@@ -1,9 +1,10 @@
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import BookingIntake from './BookingIntake.js';
 import { bookingPriceText } from '../lib/booking-price.js';
-import { useState } from 'react';
-import { api, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
+import { useEffect, useState } from 'react';
+import { api, type BookingEntitlement, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
 import { addMinutesHm, formatJpLong, slotStartsAtIso } from '../lib/datetime.js';
+import { isNotReadyYet } from '../lib/not-ready.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
 import Icon from './ui/Icon.js';
@@ -49,6 +50,22 @@ export default function Confirm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(() => crypto.randomUUID());
+  /* 使う回数券・月謝（組3）。口が無い間は 'soon'＝準備中の 1 行だけ出す。使えるものが無ければ段ごと出さない。 */
+  const [entitlements, setEntitlements] = useState<BookingEntitlement[] | 'soon' | null>(null);
+  const [entitlementId, setEntitlementId] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    Promise.resolve().then(() => api.entitlements({ menuId: menu.id, startsAt: slotStartsAtIso(slot) })).then((items) => {
+      if (alive) setEntitlements(items.filter((e) => e.usable));
+    }).catch((e) => {
+      if (!alive) return;
+      if (isNotReadyYet(e)) { setEntitlements('soon'); return; }
+      logFailure('confirm-entitlements', e);
+      setEntitlements([]);
+    });
+    return () => { alive = false; };
+  }, [menu.id, slot]);
+  const chosenEntitlement = Array.isArray(entitlements) ? entitlements.find((e) => e.id === entitlementId) ?? null : null;
 
   const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start]));
   function back() {
@@ -70,6 +87,7 @@ export default function Confirm({
           // 空き枠が返した開始の瞬間を送る（店が日本時間以外でもずれない）。
           starts_at: slotStartsAtIso(slot),
           customer_note: note || undefined,
+          ...(chosenEntitlement ? { entitlement_id: chosenEntitlement.id } : {}),
         },
         idemKey,
       );
@@ -110,9 +128,35 @@ export default function Confirm({
         <Row label="担当" value={staff.display_name} />
         <Row
           label="料金"
-          value={`${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
+          value={chosenEntitlement ? `${chosenEntitlement.name}を使う` : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
         />
       </dl>
+      {entitlements === 'soon' ? (
+        <p className="flex items-center gap-2 text-xs text-liff-sub">
+          <Icon name="ticket" className="h-4 w-4 shrink-0" />
+          回数券を使う予約は現在準備中です
+        </p>
+      ) : Array.isArray(entitlements) && entitlements.length > 0 ? (
+        <fieldset className="space-y-2">
+          <legend className="mb-2 text-sm font-bold text-ink">回数券を使う</legend>
+          {[null, ...entitlements].map((e) => {
+            const selected = (e?.id ?? null) === entitlementId;
+            return (
+              <Button key={e?.id ?? 'none'} variant="optionRow" selected={selected} aria-pressed={selected}
+                disabled={submitting} onClick={() => setEntitlementId(e?.id ?? null)}>
+                <span className={`min-w-0 truncate text-sm font-semibold ${selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}>
+                  {e ? e.name : '使わない'}
+                </span>
+                {e && (
+                  <span className={`shrink-0 text-xs whitespace-nowrap ${selected ? 'text-(--liff-on-primary)' : 'text-ink-secondary'}`}>
+                    {e.kind === 'monthly' ? `今月 あと ${e.monthRemaining ?? 0} 回` : `残り ${e.remaining ?? 0} 回`}
+                  </span>
+                )}
+              </Button>
+            );
+          })}
+        </fieldset>
+      ) : null}
       <BookingIntake question={menu.intake_question} value={note} onChange={setNote} />
       {error && (
         <p role="alert" className="text-[13px] leading-6 text-danger">
