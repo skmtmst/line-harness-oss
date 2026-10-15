@@ -1,10 +1,11 @@
 'use client'
 
 import styles from './reference-picker-dialog.module.css'
-import { Check, Star, Upload } from 'lucide-react'
+import { Check, FileUp, Star, Upload } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react'
 import Button from '@/components/shared/button'
 import Dialog, { type DialogProps } from '@/components/shared/dialog'
+import FileDropzone from '@/components/shared/file-drop'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -39,6 +40,7 @@ export default function ReferencePickerDialog({
   selected,
   onClose,
   onPick,
+  onLivePick,
   onUpload,
   frame: Frame = Dialog,
   hqLayout = false,
@@ -52,6 +54,11 @@ export default function ReferencePickerDialog({
   onClose: () => void
   /** 選び終わったとき。使い方つきの参照と、その画像の実体（親が手元に置く）を渡す。 */
   onPick: (references: BannerReference[], images: BannerImage[]) => void
+  /**
+   * 渡すと、押したその場で親の参照に入る（UcBQ5：［この画像を使う］の帯を持たない窓）。
+   * 使い方は生成パネルの行で決める。下に手元の画像を落とす欄を置く。
+   */
+  onLivePick?: (references: BannerReference[], images: BannerImage[]) => void
   onUpload: (file: File) => void
   /** V8 の板が別の窓枠を描くときの差し替え。選択・検索・送信の動きは共有する。 */
   frame?: ComponentType<DialogProps>
@@ -161,14 +168,16 @@ export default function ReferencePickerDialog({
 
   /** タイルを押したとき。選んでいれば外し、選んでいなければ 3 枚までで足す。 */
   const toggle = (image: BannerImage) => {
-    setPicks((cur) => {
-      if (cur.some((reference) => reference.imageId === image.id)) {
-        return cur.filter((reference) => reference.imageId !== image.id)
-      }
-      if (cur.length >= BANNER_MAX_REFERENCE_IMAGES) return cur
-      // 既定は「雰囲気を参考にする」。1 枚ずつ下の行で変えられる。
-      return [...cur, { imageId: image.id, mode: 'inspire' as BannerReferenceMode }]
-    })
+    const cur = picks
+    const next = cur.some((reference) => reference.imageId === image.id)
+      ? cur.filter((reference) => reference.imageId !== image.id)
+      // 既定は「雰囲気を参考にする」。1 枚ずつ下の行（または生成パネル）で変えられる。
+      : cur.length >= BANNER_MAX_REFERENCE_IMAGES ? cur : [...cur, { imageId: image.id, mode: 'inspire' as BannerReferenceMode }]
+    setPicks(next)
+    if (onLivePick && next !== cur) {
+      const byId = new Map((images ?? []).map((candidate) => [candidate.id, candidate]))
+      onLivePick(next, next.map((reference) => byId.get(reference.imageId)).filter((candidate): candidate is BannerImage => Boolean(candidate)))
+    }
   }
 
   const setUsage = (imageId: string, mode: BannerReferenceMode) => {
@@ -180,7 +189,9 @@ export default function ReferencePickerDialog({
       open={open}
       title="参照画像を選ぶ"
       description={
-        `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選べます。選んだ画像は、下で 1 枚ずつ使い方を決められます。`
+        onLivePick
+          ? `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選べます。押すとすぐ参照に入り、使い方は生成パネルで 1 枚ずつ決められます。`
+          : `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選べます。選んだ画像は、下で 1 枚ずつ使い方を決められます。`
       }
       onCancel={onClose}
       error={error || undefined}
@@ -190,7 +201,7 @@ export default function ReferencePickerDialog({
        * 共通の窓が自前の footer には付けないので、ここで持つ
        * （2026-10-06 オーナー指示「枠の隅までボタンがあり余白がない」）。
        */
-      footer={
+      footer={onLivePick ? undefined :
         <div className={Frame === Dialog ? 'flex w-full flex-wrap items-center gap-2 border-t border-hairline px-6 py-3.5' : 'flex w-full flex-wrap items-center gap-2'}>
           <Button onClick={() => fileRef.current?.click()}>
             <Upload aria-hidden="true" className="h-4 w-4" />
@@ -258,7 +269,7 @@ export default function ReferencePickerDialog({
             role="listbox"
             aria-label="参照にする画像"
             aria-multiselectable="true"
-            className={hqLayout ? "grid max-h-160 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4" : "grid max-h-160 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4"}
+            className={hqLayout ? "grid max-h-160 grid-cols-4 gap-3 overflow-y-auto" : "grid max-h-160 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4"}
           >
             {visible.map((image) => {
               const index = picks.findIndex((reference) => reference.imageId === image.id)
@@ -301,7 +312,20 @@ export default function ReferencePickerDialog({
         )}
 
         {/* 選んだ画像の使い方（`JOi8G`）。1 枚ずつ決める。選んでいないときは出さない。 */}
-        {pickedImages.length > 0 ? (
+        {/* UcBQ5：その場で選ぶ窓は、下に手元の画像を落とす欄。使い方は生成パネルの行で決める。 */}
+        {onLivePick ? (
+          <FileDropzone
+            variant="upload"
+            icon={<FileUp aria-hidden="true" size={24} style={{ width: 24, height: 24 }} />}
+            title="手元の画像を追加"
+            hint={<>ドラッグ＆ドロップ<br />またはクリック<br />10MB 以内・PNG・JPEG・WebP</>}
+            accept="image/png,image/jpeg,image/webp"
+            aria-label="参照画像のファイルを選ぶ"
+            onFiles={(files) => { if (files[0]) onUpload(files[0]) }}
+          />
+        ) : null}
+
+        {!onLivePick && pickedImages.length > 0 ? (
           <div data-design-node="JOi8G" className="flex flex-col gap-2 rounded-control bg-canvas-sunken p-3">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-label font-medium text-ink">選んだ画像の使い方</span>

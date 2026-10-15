@@ -667,6 +667,51 @@ function ProjectInner() {
                 ) })())}
               </div>
             )}
+            {/* 下の帯は左の本文の幅だけに置き、右の生成パネルに重ねない（司令塔 2026-10-15・iMnph）。 */}
+            <div className={styles.galleryFooter}>
+            {/* 入力が足りないだけの理由は、開いたばかりでは出さない（触ってから）。接続・アーカイブ・上限はすぐ出す。 */}
+            {blockedReason && input.presetKey && !running && (inputTouched || !validation) ? <p className={styles.warnText}>{blockedReason}</p> : null}
+
+            {/* G-6（sr0Po）：左は選んだ画像の配布、右は生成の操作。0枚なら左の帯は出さない。 */}
+            {canManage ? (
+              <StickyBar
+                outlined
+                className={styles.footer}
+                split={{ trailingWidth: 'auto', lead: selectedImages.length > 0 ? <>
+                  <span className={styles.selectionCount} aria-live="polite">{`${selectedImages.length} 枚を選んでいます`}</span>
+                  <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
+                  <span className={styles.spacer} />
+                  <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
+                </> : (
+                  /* 絵 iMnph：選んでいないときの左は残りの枚数（左の列の幅に収まる短い形。使う枚数は［生成する（N枚）］と title）。 */
+                  usage && input.count > usage.month.remaining
+                    ? <span className={`${styles.generationInfo} ${styles.warnText}`} title={`今月の上限 ${usage.month.limit}枚に達しています（必要 ${input.count}枚）`}>今月の上限に達しています</span>
+                    : <span className={styles.generationInfo} title={usageStatusText(usage, input.count)}>{usage ? `今月の残り ${usage.month.remaining}枚・今日 ${usage.today.remaining}枚` : usageStatusText(usage, input.count)}</span>
+                ) }}
+                info={exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span className={styles.generationInfo}>寸法 —</span>}
+                actions={
+                  running ? (
+                    <>
+                      <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる</Button>
+                      <Button variant="primary" disabled>
+                        <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
+                        生成中… 画面を離れても続きます
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy}>条件をクリア</Button>
+                      <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || starting || Boolean(blockedReason)} busy={starting}>
+                        <Sparkles aria-hidden="true" className={styles.icon} />
+                        {/* 板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。パネルの見出し `S0ay0i`「画像を生成」とは別。 */}
+                        生成する（{input.count} 枚）
+                      </Button>
+                    </>
+                  )
+                }
+              />
+            ) : null}
+            </div>
           </section>
 
           {canManage ? (
@@ -692,48 +737,6 @@ function ProjectInner() {
           ) : null}
         </div>
 
-        {/* 入力が足りないだけの理由は、開いたばかりでは出さない（触ってから）。接続・アーカイブ・上限はすぐ出す。 */}
-        {blockedReason && input.presetKey && !running && (inputTouched || !validation) ? <p className={styles.warnText}>{blockedReason}</p> : null}
-
-        {/* G-6（sr0Po）：左は選んだ画像の配布、右は生成の操作。0枚なら左の帯は出さない。 */}
-        {canManage ? (
-          <StickyBar
-            outlined
-            className={styles.footer}
-            split={{ trailingWidth: 'calc(var(--tpl-hb-panel-w) + var(--tpl-hb-footer-inset))', lead: selectedImages.length > 0 ? <>
-              <span className={styles.selectionCount} aria-live="polite">{`${selectedImages.length} 枚を選んでいます`}</span>
-              <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
-              <span className={styles.spacer} />
-              <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
-            </> : (
-              /* 絵 iMnph：選んでいないときの左は残りの枚数と、この生成で使う枚数。 */
-              usage && input.count > usage.month.remaining
-                ? <span className={`${styles.generationInfo} ${styles.warnText}`}>{`今月の上限 ${usage.month.limit}枚に達しています（必要 ${input.count}枚）`}</span>
-                : <span className={styles.generationInfo}>{usageStatusText(usage, input.count)}</span>
-            ) }}
-            info={exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span className={styles.generationInfo}>寸法 —</span>}
-            actions={
-              running ? (
-                <>
-                  <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる</Button>
-                  <Button variant="primary" disabled>
-                    <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
-                    生成中… 画面を離れても続きます
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy}>条件をクリア</Button>
-                  <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || starting || Boolean(blockedReason)} busy={starting}>
-                    <Sparkles aria-hidden="true" className={styles.icon} />
-                    {/* 板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。パネルの見出し `S0ay0i`「画像を生成」とは別。 */}
-                    生成する（{input.count} 枚）
-                  </Button>
-                </>
-              )
-            }
-          />
-        ) : null}
       </div>
 
       {distributionOpen ? <SavedDistributionDialog
@@ -825,6 +828,11 @@ function ProjectInner() {
         selected={input.references}
         onClose={() => setPickerOpen(false)}
         onPick={applyReferences}
+        /* UcBQ5：押したその場で参照に入る。窓は×で閉じる。 */
+        onLivePick={(references, picked) => {
+          setReferencePool((prev) => [...picked, ...prev.filter((candidate) => !picked.some((image) => image.id === candidate.id))])
+          setInput((cur) => ({ ...cur, references }))
+        }}
         onUpload={(file) => { setPickerOpen(false); void uploadReference(file) }}
       />
     </ListPage></SaveErrorScope>

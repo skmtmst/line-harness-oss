@@ -148,7 +148,7 @@
 }
 /* 左の一覧と右の作る欄が独立した操作を持つ板用。既定の帯は変えない。 */
 :root .bar.splitBar.outlined { border: 0; background: transparent; }
-.bar.splitBar { grid-template-columns: minmax(0, 1fr) var(--sticky-trailing-width); gap: 0; padding: 0; }
+.bar.splitBar { grid-template-columns: minmax(0, 1fr) var(--sticky-trailing-width); gap: 0; padding: 0; align-items: stretch; }
 .splitLead:empty { padding: 0; }
 .splitLead:not(:empty) { background: var(--color-canvas); border: 1px solid var(--color-hairline); border-right: 0; border-radius: var(--radius-card) 0 0 var(--radius-card); }
 .splitLead { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 12px 24px; }
