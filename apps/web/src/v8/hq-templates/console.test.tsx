@@ -601,7 +601,7 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     expect(within(folderDialog).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(within(folderDialog).getByRole('button', { name: 'キャンセル' }))
     const listName = await screen.findByRole('link', { name: 'VIP', exact: true })
-    expect(within(listName).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
+    expect(within(listName).getByRole('img', { name: 'フォルダ：予約' }).getAttribute('style')).toContain(expectedColor)
     fireEvent.click(listName.closest('tr')!)
     const body = await screen.findByRole('region', { name: '本文' })
     const pill = within(body).getByRole('group', { name: 'タグ「VIP」' })
