@@ -10,6 +10,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import Drawer from '@/components/shared/drawer'
+import { DialogActions } from '@/components/shared/dialog'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
 import { IdentityEvidenceList, IdentityHistoryList, IdentityImpactList, IdentitySubjectCard } from '@/components/identity/identity-parts'
@@ -269,7 +270,7 @@ export default function EcIdentityCandidatesScreen() {
 
         {detail ? (
           <>
-          <Drawer heightMode="viewport" contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</>}>
+          <Drawer heightMode="viewport" contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<DialogActions padding="none"><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</DialogActions>}>
             <div className={styles.detailPair}>
               <IdentitySubjectCard side="ECの会員" subject={detail.left} />
               <IdentitySubjectCard side="LINE の友だち" subject={detail.right} />

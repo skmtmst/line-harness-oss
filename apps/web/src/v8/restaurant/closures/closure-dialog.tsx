@@ -195,6 +195,7 @@ export default function ClosureDialog({
       designNode="nVvXy"
       designWidth={600}
       designTop={147}
+      fitViewport
       designHeaderPadding="20px 24px 0"
       footerAlign="center"
       title={editing ? '臨時休業・貸切を変える' : '臨時休業・貸切を足す'}

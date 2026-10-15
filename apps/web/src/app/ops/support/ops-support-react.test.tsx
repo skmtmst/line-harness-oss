@@ -244,6 +244,7 @@ describe('画面', () => {
   })
 
   it('AIで下書きを作ると案内と作成時刻が出て、送ると aiAssisted 付きで返信 API を呼ぶ', async () => {
+    availableReferences = [{ id: 'ref-banner', title: 'バナーの日本語', version: 1, articleKind: 'verified' }]
     await act(async () => { root.render(<OpsSupportPage />) })
     await flush()
     const aiButton = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('AIで下書きを作る'))
@@ -264,6 +265,7 @@ describe('画面', () => {
     for (const row of ['この返事を送りますか？', '宛先', '状態', '優先度', '下書きを削除', '戻って直す', '送信する']) {
       expect(confirm?.textContent ?? '', `「${row}」がない`).toContain(row)
     }
+    expect(confirm?.textContent).toContain('AI の下書きの根拠：ナレッジ「バナーの日本語」をもとに作成')
     const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.includes('送信する')) as HTMLButtonElement
     await act(async () => { sendInDialog.click() })
     await flush()
