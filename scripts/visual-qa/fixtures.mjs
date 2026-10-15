@@ -3720,7 +3720,13 @@ export const BROADCASTS = [
   messageType: String(messageType),
   messageContent: index === 1
     ? 'まだご購入いただいていない方へ。今なら初回20%オフでお試しいただけます。'
-    : `${title}の本文です。`,
+    // 送った後の詳細（F3X1Mo）の右のスマホに出すカルーセル。中身は columns の配列（送る形と同じ）。
+    : index === 2
+      ? JSON.stringify([
+        { title: '秋の新商品 3種', text: '定期便なら 10%オフ', actions: [{ type: 'uri', label: '商品を見る', uri: 'https://nen.example/new' }] },
+        { title: 'お試しセット', text: '初回限定 1,980円', actions: [{ type: 'uri', label: '詳しく見る', uri: 'https://nen.example/trial' }] },
+      ])
+      : `${title}の本文です。`,
   targetType: String(targetType),
   targetTagId: targetType === 'tag' ? 'tag-0' : null,
   status: String(status),
