@@ -1531,10 +1531,15 @@
 }
 
 /* メニューの分類札の帯。 */
+/* 実 LIFF と同じく1行（入りきらない札は横へ送る）。スマホの器が 310 の画面になっても2段に折らない。 */
 .phoneCats {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   gap: var(--tpl-bm-6);
+  overflow: hidden;
+  padding: 2px; /* 選んだ札の枠を切らない */
+  margin: -2px;
 }
 
 .phoneCat {
@@ -1545,6 +1550,8 @@
   color: var(--v8-liff-sub);
   font-size: var(--tpl-bm-12);
   font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .phoneCatNow {
