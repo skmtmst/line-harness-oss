@@ -148,6 +148,7 @@
 .sideActions {
   display: flex;
   flex-direction: column;
+  align-self: stretch;
   gap: var(--tpl-bm-10);
 }
 
@@ -164,6 +165,7 @@
 
 .sideTitle {
   display: flex;
+  align-self: flex-start;
   align-items: center;
   gap: var(--tpl-bm-6);
   margin: 0;
@@ -406,7 +408,7 @@
   padding: 0;
   line-height: var(--tpl-bm-19);
   overflow: hidden;
-  color: var(--color-action);
+  color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 600;
   text-overflow: ellipsis;
