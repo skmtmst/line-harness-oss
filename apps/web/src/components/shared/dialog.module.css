@@ -381,6 +381,8 @@
   font-size: 11px;
   line-height: 17px;
 }
+/* 注意帯の説明は 1 行で本文いっぱいに使う。字体が変わって文が少し広く出ても折り返さないよう、横の内側を 8px に締める（上下はそのまま）。 */
+:root .callout.calloutDanger { padding-inline: 8px; }
 :root .panel[data-description-band='danger'] > .headerRow { padding-bottom: 0; }
 :root .descriptionBand {
   flex: none;
