@@ -4,7 +4,7 @@ import { ArrowUpRight, Lock } from 'lucide-react'
 import { BASIC_FRIEND_FIELDS, ageFromBirthday, type FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import DateField from '@/components/shared/date-field'
+import DateField, { formatLabel as formatDateLabel } from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -56,8 +56,11 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
   }
   if (readOnly && (field.type === 'select' || field.type === 'checkbox' || field.type === 'date')) {
     // 選ぶ部品は置かず、選んでいる値を文字で見せる。
-    const shown = field.type === 'checkbox' ? (value === '1' ? 'はい' : 'いいえ') : (value || emptyValue('unconfigured'))
-    return <SaveErrorField names={["shown"]}><TextField id={id} value={shown} readOnly aria-readonly="true" aria-label={`${field.name}の値`} title={shown} /></SaveErrorField>
+    const ymd = field.type === 'date' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null
+    // 日付はほかの日付の欄と同じ「2026年9月15日（火）」の書き方で見せる。
+    const shown = field.type === 'checkbox' ? (value === '1' ? 'はい' : 'いいえ') : ymd ? formatDateLabel(new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))) : (value || emptyValue('unconfigured'))
+    // EC が正本の値は、年齢と同じ灰色の読むだけの欄にする（絵 vX3wQ）。
+    return <SaveErrorField names={["shown"]}><TextField id={id} value={shown} readOnly disabled={!!field.ecIsMaster} aria-readonly="true" aria-label={`${field.name}の値`} title={shown} /></SaveErrorField>
   }
   if (field.type === 'select') {
     return (
@@ -81,7 +84,7 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
   }
   if (computed) return <TextField id={id} value={value} disabled readOnly aria-readonly="true" placeholder="未設定" />
   const inputType = field.type === 'number' ? 'number' : field.type === 'url' ? 'url' : field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'
-  return <SaveErrorField names={["value"]}><TextField id={id} type={inputType} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} placeholder="未設定" onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
+  return <SaveErrorField names={["value"]}><TextField id={id} type={inputType} value={value} readOnly={readOnly} disabled={!!field.ecIsMaster} aria-readonly={readOnly || undefined} placeholder="未設定" onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
 }
 
 export default function InfoTab({ friendId, group, data, perms }: {
@@ -203,7 +206,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
                     computed={!!fixed?.derived}
                   />
                   {field.type === 'multi_select' && field.fixedKey !== 'allergy' ? <p className={styles.fieldNote}>複数選択の項目はこの画面では変更できません。</p> : null}
-                  {field.ecIsMaster ? <p className={styles.fieldNote}>EC側の値が正のため、ここからは変更できません。</p> : null}
+                  {field.ecIsMaster ? <p className={styles.fieldNote}>EC で登録された値です。ここでは変えられません。</p> : null}
                 </div>
               )
             })}
