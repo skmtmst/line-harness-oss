@@ -31,6 +31,7 @@ export interface TemplateRow {
   published_version: number;
   /** 347: 最後に公開した日時。既存行は移行時に updated_at を入れる。 */
   published_at: string | null;
+  deleted_at?: string | null;
   /**
    * 347: 編集中の下書き。PUT はここへだけ書く。
    * どれか1つでも入っていれば「公開待ちの下書きあり」。
@@ -72,16 +73,16 @@ export function hasTemplateDraft(row: Pick<TemplateRow,
 
 export async function getTemplates(db: D1Database, category?: string): Promise<TemplateRow[]> {
   if (category) {
-    const result = await db.prepare(`SELECT * FROM templates WHERE category = ? ORDER BY created_at DESC`)
+    const result = await db.prepare(`SELECT * FROM templates WHERE deleted_at IS NULL AND category = ? ORDER BY created_at DESC`)
       .bind(category).all<TemplateRow>();
     return result.results;
   }
-  const result = await db.prepare(`SELECT * FROM templates ORDER BY created_at DESC`).all<TemplateRow>();
+  const result = await db.prepare(`SELECT * FROM templates WHERE deleted_at IS NULL ORDER BY created_at DESC`).all<TemplateRow>();
   return result.results;
 }
 
 export async function getTemplateById(db: D1Database, id: string): Promise<TemplateRow | null> {
-  return db.prepare(`SELECT * FROM templates WHERE id = ?`).bind(id).first<TemplateRow>();
+  return db.prepare(`SELECT * FROM templates WHERE id = ? AND deleted_at IS NULL`).bind(id).first<TemplateRow>();
 }
 
 /**
@@ -321,7 +322,7 @@ export async function updateTemplate(
 
 export async function deleteTemplate(db: D1Database, id: string): Promise<void> {
   await db.batch([
-    db.prepare(`DELETE FROM templates WHERE id = ?`).bind(id),
+    db.prepare(`UPDATE templates SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`).bind(jstNow(), jstNow(), id),
     db.prepare(`DELETE FROM media_usages WHERE ref_kind = 'template' AND ref_id = ?`).bind(id),
   ]);
 }
@@ -932,7 +933,7 @@ export async function getTemplatesWithUsageCount(
   filter?: TemplateListFilter,
 ): Promise<{ items: TemplateRowWithUsage[]; total: number }> {
   // 1. templates 本体
-  const filters: string[] = [];
+  const filters: string[] = ['deleted_at IS NULL'];
   const values: unknown[] = [];
   if (category) {
     filters.push('category = ?');
@@ -1126,7 +1127,7 @@ export async function getTemplateFolderCounts(
   scope?: TemplateListScope,
   messageType?: string,
 ): Promise<Map<string, number>> {
-  const filters: string[] = [];
+  const filters: string[] = ['deleted_at IS NULL'];
   const values: unknown[] = [];
   if (messageType) {
     filters.push('message_type = ?');
