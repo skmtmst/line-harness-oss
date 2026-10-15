@@ -232,8 +232,8 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
             </span>
             <span className={styles.staffColMenu}>
               <RowMenu
-                appearance="plain"
-                className={styles.rowMenuButton}
+                appearance="box"
+                size="row"
                 label={`${person.display_name}のそのほかの操作`}
                 menuLabel={`${person.display_name}の操作`}
                 open={openMenuId === person.id}

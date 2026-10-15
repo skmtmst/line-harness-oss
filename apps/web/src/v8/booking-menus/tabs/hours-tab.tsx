@@ -438,8 +438,8 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
       <span className={styles.equipCap}>{resource.capacity}</span>
       <span className={styles.colMenu}>
         {canEdit ? <RowMenu
-          appearance="plain"
-          className={styles.rowMenuButton}
+          appearance="box"
+          size="row"
           label={`「${resource.name}」のそのほかの操作`}
           menuLabel={`「${resource.name}」の操作`}
           items={menuItems}
