@@ -3070,7 +3070,14 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --choice-ring: 1.5px;
   --choice-dot: 8px;
   --choice-card-ring: 2px;
+  /*
+   * 余白の段の変数は1か所で決める（2026-10-15）。一斉配信の作成（broadcast-form-v8）は自分の外枠にだけ
+   * --space-2〜32 を置いていたので、統括の一括配信のように外枠の外で同じ部品を使うと 0 になっていた。
+   * 吹き出し・ラジオの札・受信箱など共通部品が読む --space-4・12 も、ここで定義が無く 0 だった。
+   */
+  --space-2: 2px; --space-4: 4px; --space-6: 6px;
   --space-8: 8px;
+  --space-10: 10px; --space-12: 12px; --space-14: 14px; --space-20: 20px; --space-24: 24px; --space-32: 32px;
   /* コピー成功の7文字・印・間隔。表の操作列も同じ予約幅を読む。 */
   --copy-feedback-min-w: calc(7 * var(--text-caption) + var(--polish-icon-control) + var(--space-8) + var(--tpl-slot-gap));
   --space-16: 16px;
