@@ -817,6 +817,25 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           setMessage('ひな形を複製しました。')
         })}
         onEnterAccount={(accountId) => { setSelectedAccountId(accountId); router.push('/templates') }}
+        onRemove={canEdit ? () => setRemove(detail.template) : undefined}
+      />
+      <ConfirmDialog
+        open={!!remove}
+        title="ひな形を削除"
+        deleteName={remove?.name ?? ''}
+        description={`「${remove?.name ?? ''}」を削除します。配布済みのアカウントデータは残ります。`}
+        destructive
+        confirmLabel="削除する"
+        busy={busy}
+        onCancel={() => { if (!busy) setRemove(null) }}
+        onConfirm={() => perform(async () => {
+          if (!remove) return
+          await hqTemplatesApi.remove(remove.id, remove.revision)
+          setTemplates((current) => current.filter((t) => t.id !== remove.id))
+          setKindRows((current) => current ? current.filter((t) => t.id !== remove.id) : current)
+          setRemove(null); setMessage('ひな形を削除しました。')
+          toList()
+        })}
       /></SaveErrorScope>
     )
   }
