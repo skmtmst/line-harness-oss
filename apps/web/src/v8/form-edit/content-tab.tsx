@@ -9,13 +9,8 @@ import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type R
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import {
-  AlignLeft,
   CalendarCheck,
   ExternalLink,
-  Heading,
-  HelpCircle,
-  Image as ImageIcon,
-  MousePointerClick,
   Plus,
   X,
 } from 'lucide-react'
@@ -31,7 +26,7 @@ import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { SettingCheckbox } from '@/components/shared/checkbox'
-import { ADD_GROUPS, blockKindLine, blockTitleKind, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
+import { blockKindLine, blockTitleKind, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile, uploadToMediaLibrary } from '@/components/shared/media-library-upload'
@@ -44,6 +39,8 @@ import { SaveErrorScope, useSaveFormErrors, SaveErrorField } from '@/components/
 import { formJumpsInto } from '@/components/forms/form-definition-operations'
 import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect from '@/components/shared/entity-select'
+import AddGrid from './add-blocks'
+import { formBlockIcon as blockIcon } from './block-icons'
 
 /*
  * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
@@ -195,16 +192,6 @@ function RenameDialog({ value, onCancel, onSave }: { value: string | null; onCan
 /* ---------------- ブロックの行 ---------------- */
 
 type RowProps = Props & { block: FormBlock; index: number }
-
-function blockIcon(block: FormBlock): ReactNode {
-  switch (block.kind) {
-    case 'image': return <ImageIcon size={15} aria-hidden="true" />
-    case 'heading': return <Heading size={15} aria-hidden="true" />
-    case 'text': return <AlignLeft size={15} aria-hidden="true" />
-    case 'button': return <MousePointerClick size={15} aria-hidden="true" />
-    default: return block.type === 'booking' ? <CalendarCheck size={15} aria-hidden="true" /> : <HelpCircle size={15} aria-hidden="true" />
-  }
-}
 
 /** つまみ：矢印キーで上下へ、つかんで落とす先の行へ。 */
 function useRowDrag(props: RowProps) {
@@ -614,28 +601,3 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
 
 /** 統括も画像を追加できる。固有の参照は保存前に別途確認する。 */
 const PORTABLE_HIDDEN_CARDS: ReadonlySet<string> = new Set()
-
-function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) => void; hide?: ReadonlySet<string> }) {
-  return (
-    <div className={styles.addBox}>
-      <p className={styles.addTitle}>ブロックを足す</p>
-      {ADD_GROUPS.map((group) => (
-        <div key={group.title} className={styles.addGroup}>
-          <p className={styles.addGroupTitle}>{group.title}</p>
-          <div className={styles.addCards} data-writing={group.title === '書いてもらう' || undefined}>
-            {group.cards.filter((card) => !hide?.has(card.key)).map((card) => (
-              <button key={card.key} type="button" className={styles.addCard} data-fresh={card.fresh || undefined} onClick={() => onAdd(card.make)}>
-                <span className={styles.addCardTop}>
-                  <Plus size={15} aria-hidden="true" />
-                  <span className={styles.addCardLabel}>{card.label}</span>
-                  {card.fresh ? <span className={styles.newBadge}>新</span> : null}
-                </span>
-                <span className={styles.addCardHint} title={card.hint}>{card.hint}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}

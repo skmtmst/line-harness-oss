@@ -63,7 +63,7 @@ export default function CarouselButtons({ actions, selectedIndex, fields, hqHost
         {host ? <SettingsFormRow layout="columns">{label}{tap}</SettingsFormRow> : tap}
       </div>
       <FieldError id={`cr-button-${ai}-error`}>{fields.error(`card-${selectedIndex}-button-${ai}`)}</FieldError>
-      {host ? null : <InlineSettings open={editing === ai && action.kind === 'action'} title={`ボタン${ai + 1}の動き`} onClose={() => setEditing(null)}>{editing === ai && action.kind === 'action' ? editActions() : null}</InlineSettings>}
+      {host ? null : <InlineSettings flow="column" open={editing === ai && action.kind === 'action'} title={`ボタン${ai + 1}の動き`} onClose={() => setEditing(null)}>{editing === ai && action.kind === 'action' ? editActions() : null}</InlineSettings>}
     </Fragment>
   })}</>
 }

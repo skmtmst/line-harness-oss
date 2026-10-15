@@ -42,7 +42,6 @@ import te from '../template-edit/edit.module.css'
 import styles from './question-new.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import InlineSettings from '@/components/shared/inline-settings'
 
 /*
  * ★V8 テンプレート「質問を作る・編集」（Pencil `l87p1J`）。
@@ -349,7 +348,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         <Card variant="form" gap="normal" aria-labelledby="q-choices">
           <CardHeader title="選択肢" titleId="q-choices" size="stacked" meta="答えをどこに残すかを、選択肢ごとに決めます" />
           <div className={styles.choices}>
-            {question.choices.map((choice, index) => (
+            {question.choices.map((choice, index) => {
+              const extras = <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={host ? null : selectedAccountId} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
+              return (
               <div key={choice.key ?? index} className={styles.choice}>
                 <div className={styles.choiceHead}>
                   <span className={styles.choiceNo}>{`選択肢 ${index + 1}`}</span>
@@ -367,7 +368,8 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                 )}
                 <Field label="押したときの返信"><SaveErrorField names={[`choices.${index}.reply`,"reply","choice.reply"]}><TextField value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} /></SaveErrorField></Field>
               </div>
-            ))}
+              )
+            })}
           </div>
           <span>
             <Button type="button" variant="text" disabled={question.choices.length >= MAX_CHOICES} title={question.choices.length >= MAX_CHOICES ? `選択肢は${MAX_CHOICES}つまでです。` : undefined} onClick={addChoice}>
