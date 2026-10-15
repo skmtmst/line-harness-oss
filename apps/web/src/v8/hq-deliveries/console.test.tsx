@@ -37,7 +37,7 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
     expect(save.title).toBe('統括での名前を入力してください。')
     fireEvent.click(save)
     expect(calls.create).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByLabelText('統括での名前'), { target: { value: '予約の返事' } })
+    fireEvent.change(screen.getByLabelText(/^統括での名前/), { target: { value: '予約の返事' } })
     expect(save.disabled).toBe(false)
     expect(save.title).toBe('')
   })

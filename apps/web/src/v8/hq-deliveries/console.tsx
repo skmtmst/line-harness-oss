@@ -24,6 +24,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { OptionalBadge, RequiredBadge } from '@/components/shared/form-controls'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
 import { hqDeliveriesApi, type HqDeliveryTemplate, type HqDeliveryTemplateDetail } from '@/lib/api-hq-deliveries'
@@ -98,11 +99,14 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
     if (!selected) return
     setSelected({ ...selected, definition: { ...selected.definition, settings: { ...selected.definition.settings, [key]: value } } })
   }
+  /* 必須・任意の札（T5ljMA）。ほかの作る画面と同じく、題の右に置く。 */
+  const req = (label: string, required: boolean) => <span className={styles.fieldLabel}>{label}{canEdit ? (required ? <RequiredBadge /> : <OptionalBadge />) : null}</span>
+  const OPTIONAL_KEYS = new Set(['description'])
   const field = (key: string, label: string, multiline = false) => {
     const nested = type === 'friend_add_rule' && key === 'messageText'
     const value = String(nested ? (settings?.definition as Record<string, unknown>)?.[key] ?? '' : settings?.[key] ?? '')
     const change = (text: string) => nested ? updateSetting('definition', { ...(settings?.definition as object), [key]: text }) : updateSetting(key, text)
-    return <label className={styles.field} key={key}><span>{label}</span><SaveErrorField names={[key, `definition.settings.${nested ? 'definition.' : ''}${key}`]}>{multiline
+    return <label className={styles.field} key={key}>{req(label, !OPTIONAL_KEYS.has(key))}<SaveErrorField names={[key, `definition.settings.${nested ? 'definition.' : ''}${key}`]}>{multiline
       ? <HqMessageBody value={value} label={label} onChange={change} readOnly={!canEdit} disabled={busy}/>
       : canEdit ? <TextField value={value} onChange={(event) => change(event.target.value)} /> : <span>{String(value)}</span>}</SaveErrorField></label>
   }
@@ -172,11 +176,11 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
   if (view === 'edit' && selected) return <SaveErrorScope errors={saveErrors}><CreatePage dirty={false} busy={busy} boardId="X4JcOf" title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
     footerActions={<><Button disabled={busy} onClick={back}>キャンセル</Button>{canEdit && <Button variant="primary" disabled={busy || !selected.template.name.trim()} title={!selected.template.name.trim() ? '統括での名前を入力してください。' : undefined} onClick={()=>void save()} busy={busy} busyLabel="保存中…">下書きを保存する</Button>}</>}>
       <div className={styles.fields}>
-        <label className={styles.field}><span>統括での名前</span><SaveErrorField names={["name"]}>{canEdit ? <TextField value={selected.template.name} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, name: event.target.value } })} /> : <span>{String(selected.template.name)}</span>}</SaveErrorField></label>
-        <label className={styles.field}><span>説明</span><SaveErrorField names={["description"]}>{canEdit ? <TextField value={selected.template.description ?? ''} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, description: event.target.value } })} /> : <span>{String(selected.template.description ?? '')}</span>}</SaveErrorField></label>
+        <label className={styles.field}>{req('統括での名前', true)}<SaveErrorField names={["name"]}>{canEdit ? <TextField value={selected.template.name} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, name: event.target.value } })} /> : <span>{String(selected.template.name)}</span>}</SaveErrorField></label>
+        <label className={styles.field}>{req('説明', false)}<SaveErrorField names={["description"]}>{canEdit ? <TextField value={selected.template.description ?? ''} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, description: event.target.value } })} /> : <span>{String(selected.template.description ?? '')}</span>}</SaveErrorField></label>
         {field('name', '店に届く名前')}
         {type === 'auto_reply' && <>{field('keyword', 'キーワード')}
-          <label className={styles.field}><span>一致方法</span>{canEdit ? <Select aria-label="一致方法" value={String(settings?.matchType ?? 'contains')} options={[{ value: 'contains', label: '含む' }, { value: 'exact', label: '完全一致' }]} onChange={(value) => updateSetting('matchType', value)} /> : <span>{settings?.matchType === 'exact' ? '完全一致' : '含む'}</span>}</label>
+          <label className={styles.field}>{req('一致方法', true)}{canEdit ? <Select aria-label="一致方法" value={String(settings?.matchType ?? 'contains')} options={[{ value: 'contains', label: '含む' }, { value: 'exact', label: '完全一致' }]} onChange={(value) => updateSetting('matchType', value)} /> : <span>{settings?.matchType === 'exact' ? '完全一致' : '含む'}</span>}</label>
           {field('responseContent', '返信内容', true)}</>}
         {type === 'friend_add_rule' && <>
           <label className={styles.field}><span>対象</span>{canEdit ? <Select aria-label="対象" value={String(settings?.friendKind ?? 'first_time')} options={[{ value: 'first_time', label: '初めての友だち' }, { value: 'returning', label: '再び追加した友だち' }]} onChange={(value) => updateSetting('friendKind', value)} /> : <span>{settings?.friendKind === 'returning' ? '再び追加した友だち' : '初めての友だち'}</span>}</label>
