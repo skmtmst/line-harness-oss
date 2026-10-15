@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
 import { CreatePage } from '@/components/templates/create-page'
+import PreviewLauncher from '@/components/templates/preview-launcher'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -176,6 +177,7 @@ function MenuEditBody() {
         help={<>コースと単品の名前・値段・提供時間・アレルギーと、お支払いの方法を決めます。価格を変えると承認ワークフローへ申請されます。</>}
         preview={side}
         previewSurface="plain"
+        previewToggle={<PreviewLauncher title="お支払いの説明" label="お支払いの説明を見る">{side}</PreviewLauncher>}
         destructive={canEdit && draftItem ? <Button variant="danger" onClick={() => setDeleting(true)} disabled={busy}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
