@@ -102,7 +102,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   }
   const tableOptions = [
     { value: '', label: '未配席' },
-    ...tables.filter((table) => table.is_active || table.id === reservation.table_id).map((table) => ({ value: table.id, label: `${table.code}・${table.label}`, description: `${table.min_capacity}〜${table.max_capacity}名` })),
+    ...tables.filter((table) => table.is_active || table.id === reservation.table_id).map((table) => ({ value: table.id, label: `${table.code}・${table.label}` })),
   ]
   const courseOptions = [
     { value: '', label: '席のみ' },
