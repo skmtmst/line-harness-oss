@@ -5358,7 +5358,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ? LINE_NOTIFICATION_DELIVERIES.items.filter((item) => item.status === 'failed' || item.status === 'excluded' || item.status === 'retry_wait')
       : LINE_NOTIFICATION_DELIVERIES.items
     ).map(toPublic)
-    return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
+    // 板 g3iDs の今月の送信枠（1,041 / 5,000 通）。本物は includeQuota=1 のときだけ quota を足す。
+    const quota = query.get('includeQuota') === '1'
+      ? { quota: { state: 'available', total: 5000, used: 1041, remaining: 3959, asOf: '2026-09-27T12:00:00.000+09:00' } }
+      : {}
+    return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit), ...quota }, pagination: { total: items.length, limit, offset } }
   }
   /* 運用者へのお知らせのチーム（板 gjUz3 の「チーム」欄・sDXNy の宛先）。高橋・佐々木・中川の3人（LINE は2人）。 */
   if (pathname === '/api/notifications/teams') {
