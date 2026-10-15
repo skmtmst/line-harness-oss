@@ -25,7 +25,8 @@ export interface PaymentStartResult {
 }
 
 export type WebhookOutcome =
-  | { providerPaymentId: string; status: 'paid' | 'failed' }
+  | { providerPaymentId: string; status: 'paid' | 'failed' | 'refunded' | 'expired';
+      providerEventId?: string; amount?: number; currency?: string; receiptUrl?: string }
   | null;
 
 export interface PaymentProvider {
@@ -97,7 +98,9 @@ export interface StripeTestSecrets {
 interface StripeTestEvent {
   id?: unknown;
   type?: unknown;
-  data?: { object?: { id?: unknown } };
+  livemode?: unknown;
+  data?: { object?: { id?: unknown; payment_intent?: unknown; amount?: unknown; amount_refunded?: unknown;
+    currency?: unknown; receipt_url?: unknown } };
 }
 
 /**
@@ -136,14 +139,29 @@ export function createStripeTestProvider(secrets: StripeTestSecrets): PaymentPro
       } catch {
         return null;
       }
-      const providerPaymentId = String(event?.data?.object?.id ?? '');
-      if (!providerPaymentId) return null;
+      if (event.livemode !== undefined && event.livemode !== false) return null;
+      const object = event?.data?.object;
+      const providerPaymentId = event.type === 'charge.refunded' || event.type === 'checkout.session.expired'
+        ? object?.payment_intent : object?.id;
+      if (typeof providerPaymentId !== 'string' || !providerPaymentId || providerPaymentId.length > 255) return null;
+      if (event.id !== undefined && (typeof event.id !== 'string' || !event.id || event.id.length > 255)) return null;
+      if (object?.amount !== undefined && (!Number.isSafeInteger(object.amount) || (object.amount as number) < 0)) return null;
+      if (object?.currency !== undefined && (typeof object.currency !== 'string' || !/^[a-z]{3}$/i.test(object.currency))) return null;
+      const metadata = { providerEventId: event.id as string | undefined, amount: object?.amount as number | undefined,
+        currency: object?.currency as string | undefined };
       if (event.type === 'payment_intent.succeeded') {
-        return { providerPaymentId, status: 'paid' };
+        return { providerPaymentId, status: 'paid', ...metadata };
       }
       if (event.type === 'payment_intent.payment_failed') {
-        return { providerPaymentId, status: 'failed' };
+        return { providerPaymentId, status: 'failed', ...metadata };
       }
+      // 部分返金を全額返金として扱わない。部分返金は別の契約が決まるまで受け付けない。
+      if (event.type === 'charge.refunded' && typeof object?.amount === 'number' && object.amount === object.amount_refunded) {
+        const receiptUrl = typeof object.receipt_url === 'string' && /^https:\/\/pay\.stripe\.com\//.test(object.receipt_url)
+          ? object.receipt_url : undefined;
+        return { providerPaymentId, status: 'refunded', ...metadata, receiptUrl };
+      }
+      if (event.type === 'checkout.session.expired') return { providerPaymentId, status: 'expired', ...metadata };
       return null;
     },
   };

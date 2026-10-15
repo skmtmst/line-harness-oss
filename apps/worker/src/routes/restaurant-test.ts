@@ -27,7 +27,10 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireRole, requirePermission } from '../middleware/role-guard.js';
+import { BOOKING_SETTINGS_KEY } from '@line-crm/shared';
+import { assignmentSettingsResponse } from './booking-assignment-settings.js';
+import { assignRestaurantTable } from '../services/booking-assignment.js';
 import {
   canAccessLineAccount,
   getVisibleLineAccountScope,
@@ -37,6 +40,7 @@ import { promoteSeatWaitlist } from '../services/restaurant-seat-waitlist.js';
 import { finishExpiredWaitlists } from '../services/booking-waitlist.js';
 import { processBookingWaitlists } from '../services/waitlist-tick.js';
 import { dbFor } from '../services/db-router.js';
+import { paymentSettingResponse } from './booking-payment-settings.js';
 import {
   issueRestaurantIntakeAddress,
   listRestaurantIntakeAddresses,
@@ -57,7 +61,6 @@ import { restaurantChannelState, restaurantDayBounds } from '../services/restaur
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import {
-  chooseRestaurantTable,
   isRestaurantReservationSource,
   validateInboundReservation,
 } from '../services/restaurant-test.js';
@@ -389,6 +392,19 @@ function lineConnectionMessage(reason: LineTokenIssueFailure): string {
 }
 
 /** HQ store list. Session store scope is deliberately ignored here. */
+restaurantTest.get('/api/restaurant-test/assignment-settings', requireRole('owner', 'admin', 'staff'), async c => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c), id = c.req.query('storeId');
+  if (!organization || !id || !await storeBelongsTo(c, organization.id, id)) return c.json({ success: false, error: 'store_not_found' }, 404);
+  return assignmentSettingsResponse(c, dbFor(c.env, id), { kind: 'table', id });
+});
+restaurantTest.put('/api/restaurant-test/assignment-settings', requireRole('owner', 'admin', 'staff'), requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async c => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c), id = c.req.query('storeId');
+  if (!organization || !id || !await storeBelongsTo(c, organization.id, id)) return c.json({ success: false, error: 'store_not_found' }, 404);
+  return assignmentSettingsResponse(c, dbFor(c.env, id), { kind: 'table', id });
+});
+
 restaurantTest.get('/api/restaurant-test/stores', requireRole('owner', 'admin', 'staff'), async (c) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c, { ignoreSession: true });
@@ -1039,7 +1055,10 @@ restaurantTest.post('/api/restaurant-test/inbound-emails/:id/manual-import', req
       AND NOT EXISTS (SELECT 1 FROM rt_reservations r WHERE r.store_id = t.store_id AND r.table_id = t.id
         AND r.status NOT IN ('cancelled', 'no_show') AND r.departed_at IS NULL AND datetime(r.starts_at) < datetime(?) AND datetime(r.ends_at) > datetime(?))`)
       .bind(email.store_id, reservation.endsAt, reservation.startsAt).all<{ id: string; min_capacity: number; max_capacity: number; is_active: number }>();
-    const tableId = chooseRestaurantTable(tables.results.map((t) => ({ id: t.id, minCapacity: t.min_capacity, maxCapacity: t.max_capacity, isActive: t.is_active === 1 })), reservation.guestCount);
+    const eligible = tables.results.filter(t => t.is_active === 1 && t.min_capacity <= reservation.guestCount && t.max_capacity >= reservation.guestCount)
+      .map(t => ({ id: t.id, label: t.id, minCapacity: t.min_capacity, maxCapacity: t.max_capacity }))
+      .sort((a,b) => a.maxCapacity - b.maxCapacity || a.id.localeCompare(b.id));
+    const tableId = (await assignRestaurantTable(db, email.store_id, reservation.startsAt, reservation.guestCount, eligible))?.id ?? null;
     const id = crypto.randomUUID();
     const source = isRestaurantReservationSource(email.media_code) ? email.media_code : 'manual';
     const writes = await db.batch([
@@ -1216,7 +1235,7 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
     }
     if(checked.value.tableId&&!open.some(t=>t.id===checked.value.tableId||t.tableIds?.includes(checked.value.tableId!)))return inputError(c,{success:false,error:'卓に入る人数を確認してください'},400,['guestCount','tableId']);
     const candidates=await openSeatTables(dbFor(c.env,storeId),storeId,checked.value.startsAt,checked.value.endsAt,checked.value.guestCount);
-    const tableId=checked.value.tableId || candidates[0]?.id;
+    const tableId=checked.value.tableId || (await assignRestaurantTable(dbFor(c.env,storeId),storeId,checked.value.startsAt,checked.value.guestCount,candidates))?.id;
     if(!tableId || !candidates.some(t=>t.id===tableId||t.tableIds?.includes(tableId)))return c.json({success:false,code:'availability_conflict',error:'人数が入る空き卓がありません'},409);
     if (tableId && await overlappingReservationExists(dbFor(c.env, storeId), storeId, tableId, checked.value.startsAt, checked.value.endsAt, undefined, c.env)) {
       return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため登録できません' }, 409);
@@ -1291,7 +1310,7 @@ restaurantTest.post('/api/restaurant-test/reservations/walk-in', requireRole('ow
     }
     if(checked.value.tableId&&!open.some(t=>t.id===checked.value.tableId||t.tableIds?.includes(checked.value.tableId!)))return inputError(c,{success:false,error:'卓に入る人数を確認してください'},400,['guestCount','tableId']);
     const candidates=await openSeatTables(dbFor(c.env,storeId),storeId,checked.value.startsAt,checked.value.endsAt,checked.value.guestCount);
-    const tableId=checked.value.tableId || candidates[0]?.id;
+    const tableId=checked.value.tableId || (await assignRestaurantTable(dbFor(c.env,storeId),storeId,checked.value.startsAt,checked.value.guestCount,candidates))?.id;
     if(!tableId || !candidates.some(t=>t.id===tableId||t.tableIds?.includes(tableId)))return c.json({success:false,code:'availability_conflict',error:'人数が入る空き卓がありません'},409);
     if (tableId && await overlappingReservationExists(dbFor(c.env, storeId), storeId, tableId, checked.value.startsAt, checked.value.endsAt, undefined, c.env)) {
       return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため登録できません' }, 409);
@@ -2048,6 +2067,23 @@ const updateRestaurantMenu = async (c: Context<Env>) => {
 restaurantTest.patch('/api/restaurant-test/menu/:id', requireRole('owner', 'admin'), inputJsonBoundary({"kind":["string"],"name":["string"],"price":["number"],"allergens":["array"],"servicePeriods":["array"],"status":["string"],"effectiveAt":["null","string"]}), updateRestaurantMenu);
 restaurantTest.patch('/api/restaurant-test/menus/:id', requireRole('owner', 'admin'), inputJsonBoundary({"kind":["string"],"name":["string"],"price":["number"],"allergens":["array"],"servicePeriods":["array"],"status":["string"],"effectiveAt":["null","string"]}), updateRestaurantMenu);
 
+// 飲食の既存の統括/店/機能の境界を先に通す。
+for (const method of ['get','put'] as const) {
+  restaurantTest[method]('/api/restaurant-test/menus/:id/payment',requireRole('owner','admin','staff'),async c => {
+    c.header('Cache-Control','no-store');
+    if (method==='put' && (c.get('staff').readOnly || c.get('staff').role==='staff')) return c.json({success:false,error:'forbidden'},403);
+    if (!accountId(c)) return requiredAccount(c);
+    const organization=await organizationFor(c);
+    if (!organization) return c.json({success:false,error:'not_found'},404);
+    const menu=await dbFor(c.env).prepare(`SELECT m.id,m.store_id FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id
+      WHERE m.id=? AND m.kind='course' AND s.organization_id=? AND s.line_account_id=?
+      AND (? IS NULL OR s.id=?)`)
+      .bind(c.req.param('id'),organization.id,accountId(c),organization.scopedStoreId,organization.scopedStoreId).first<{id:string;store_id:string}>();
+    if (!menu) return c.json({success:false,error:'not_found'},404);
+    return paymentSettingResponse(c,dbFor(c.env,menu.store_id),{kind:'course',id:menu.id,account:accountId(c)!,storeId:menu.store_id},'mode');
+  });
+}
+
 /** 全枠を一括保存し、どれか一つの版が古ければ一件も変更しない。 */
 restaurantTest.put('/api/restaurant-test/inventory/allocation', requireRole('owner', 'admin'), inputJsonBoundary({"storeId":["string"],"slots":["array"],"otaCapacity":["number"],"lineCapacity":["number"],"walkInCapacity":["number"],"sameDayCapacity":["number"]}), async c => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
@@ -2343,7 +2379,7 @@ restaurantTest.post('/api/restaurant-test/reservations/holds', requireRole('owne
   try {
     const closures = await closuresForRange(db, body.storeId, body.startsAt, body.endsAt);
     const tables = await openSeatTables(db, body.storeId, body.startsAt, body.endsAt, body.guestCount);
-    const tableId = body.tableId ? tables.find(t => t.id === body.tableId)?.id : tables[0]?.id;
+    const tableId = body.tableId ? tables.find(t => t.id === body.tableId)?.id : (await assignRestaurantTable(db, body.storeId, body.startsAt, body.guestCount, tables))?.id;
     if (!tableId) {
       const blocked = closures.filter(r => body.tableId ? closureAffectsTable(r, body.tableId) : true);
       if (blocked.length) return c.json({ success: false, error: 'closure_conflict', code: 'closure_conflict', reason: '臨時休業・貸切の日時と卓に重なります', data: { closures: blocked.map(publicClosure) }, closures: blocked.map(publicClosure) }, 409);

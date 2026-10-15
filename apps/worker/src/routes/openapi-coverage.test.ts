@@ -44,6 +44,8 @@ function isCoveredRoute(method: string, path: string): boolean {
   if (method === 'ALL' || method === 'OPTIONS') return false;
   if (INFRASTRUCTURE_PATHS.has(path)) return false;
   if (path.startsWith('/api/restaurant-test') && ![
+    '/api/restaurant-test/menus/:id/payment',
+    '/api/restaurant-test/assignment-settings',
     '/api/restaurant-test/store-groups', '/api/restaurant-test/store-groups/:id/members/:storeId', '/api/restaurant-test/stores/:id/referral-location',
     '/api/restaurant-test/closures', '/api/restaurant-test/closures/preview', '/api/restaurant-test/closures/:id',
     '/api/restaurant-test/availability', '/api/restaurant-test/google/hours/from-closure',
@@ -131,7 +133,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 771;
+const ALLOWLIST_MAX = 770;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -142,6 +144,30 @@ const ALLOWLIST_MAX = 771;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/booking/admin/payment-connection',
+  'GET /api/booking/admin/menu-payments',
+  'GET /api/booking/admin/payments',
+  'GET /api/booking/admin/payments/export',
+  'GET /api/booking/admin/staff/today-counts',
+  'POST /api/booking/admin/payments/{id}/send-link',
+  'GET /api/booking/admin/payment-events',
+  'POST /api/booking/admin/payment-events/{id}/replay',
+  'GET /api/events/admin/events/{id}/payment',
+  'PUT /api/events/admin/events/{id}/payment',
+  'GET /api/events/admin/events/{id}/price',
+  'PUT /api/events/admin/events/{id}/price',
+  'GET /api/restaurant-test/menus/{id}/payment',
+  'PUT /api/restaurant-test/menus/{id}/payment',
+  'POST /api/liff/booking/requests',
+  'GET /api/booking/admin/entitlements',
+  'POST /api/booking/admin/entitlements',
+  'POST /api/booking/admin/entitlements/{id}/operations',
+  'GET /api/booking/admin/entitlements/{id}/history',
+  'GET /api/liff/booking/entitlements',
+  'GET /api/booking/admin/assignment-settings',
+  'PUT /api/booking/admin/assignment-settings',
+  'GET /api/restaurant-test/assignment-settings',
+  'PUT /api/restaurant-test/assignment-settings',
   'GET /api/auth/api-key',
   'POST /api/auth/api-key',
   'DELETE /api/auth/api-key',
@@ -1048,7 +1074,6 @@ const ALLOWLIST = new Set<string>([
   'POST /api/liff/affiliate/links',
   'POST /api/liff/affiliate/offers/{id}/enroll',
   'POST /api/liff/affiliate/register',
-  'POST /api/liff/booking/requests',
   'POST /api/liff/events/me/{bookingId}/cancel',
   'POST /api/liff/events/{id}/bookings',
   'POST /api/liff/friend-add-intent',
