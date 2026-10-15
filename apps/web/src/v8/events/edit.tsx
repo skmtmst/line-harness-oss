@@ -20,6 +20,8 @@ import TargetMissing from '@/components/shared/target-missing'
 import EventForm from '@/v8/events/edit-form'
 import { useBookingRequests } from './booking-requests'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { PaymentSideCard } from '../booking-payments/menu-payment'
+import styles from './edit.module.css'
 
 
 const NEXT_LIFECYCLE: Record<EventLifecycleStatus, Array<{ to: EventLifecycleStatus; label: string; needsReason: boolean }>> = {
@@ -136,6 +138,17 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
   </FormSection></SaveErrorScope>
 }
 
+/** 題の後ろ半分（絵 XFRyO：「イベント予約 › 朝ヨガ」）。読めないときは「イベントの編集」。 */
+function EventName({ accountId, eventId }: { accountId: string; eventId: string }) {
+  const [name, setName] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    void Promise.resolve().then(() => eventsApi.getEvent(accountId, eventId)).then((detail) => { if (alive) setName(detail?.name || null) }).catch(() => {})
+    return () => { alive = false }
+  }, [accountId, eventId])
+  return <>{name ?? 'イベントの編集'}</>
+}
+
 function EditEntry() {
   const id = useSearchParams().get('id')
   const { selectedAccountId } = useAccount()
@@ -143,7 +156,13 @@ function EditEntry() {
   if (!id) return <TargetMissing kind="unspecified" title="編集するイベントが指定されていません" description="一覧から、編集するイベントを選び直してください。" backHref="/events" backLabel="イベント一覧へ戻る" />
   if (!selectedAccountId) return <ListState kind="empty" title="アカウントを選択してください。" />
   const scope = JSON.stringify([selectedAccountId, id])
-  return <DetailPage title="イベントの編集"
+  return <DetailPage title={<span className={styles.title}><span className={styles.titleParent}>イベント予約 ›</span><EventName accountId={selectedAccountId} eventId={id} /></span>}
+    help={<>イベント・クラスの中身と予約枠、公開、お支払いの方法を決めます。</>}
+    summary={<div className={styles.side}>
+      <PaymentSideCard title="決済をつないでいない店のとき">「お支払い」の段は出さず、「先払いを受けるには お支払いをつなぐ →」の 1 行だけ出します（押せない形にしない）。</PaymentSideCard>
+      <PaymentSideCard title="キャンセルと返金">開始前のキャンセルの期限までの取り消しは自動で返金します。過ぎた取り消しは返金しません（予約設定 › 予約のルール）。</PaymentSideCard>
+    </div>}
+    summaryLabel="お支払いの説明"
     actions={<><Button href={`/events/change-review?id=${id}`}>変更の影響を確認</Button><Button href={`/events/preview?id=${id}`}>お客様表示を確認</Button><Button href={`/events/bookings?id=${id}`}>申込の一覧を見る</Button></>}
     stats={<BookingStatus key={scope} accountId={selectedAccountId} eventId={id} refreshKey={statusSeq} />}>
     <LifecycleSection key={scope} accountId={selectedAccountId} eventId={id} onChanged={() => setStatusSeq((value) => value + 1)} />
