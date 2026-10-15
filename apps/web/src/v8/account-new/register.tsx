@@ -480,8 +480,9 @@ export default function AccountRegisterV8() {
       <PageHeading
         title="LINEアカウントを登録"
         help={shownStep.lead}
-        steps={(
-          <Steps
+        /* ★V8 xj3zz〜TvXII：手順は題と同じ行（題・手順・？の順）。 */
+        titleAccessory={(
+          <div className={styles.titleSteps}><Steps
             label="登録の進捗"
             currentKey={String(createdId ? 5 : currentStep)}
             steps={V8_STEPS.map((step) => ({
@@ -492,7 +493,7 @@ export default function AccountRegisterV8() {
               /* 登録する前は、済んだ段を押すとその段へ戻る（入れた値はそのまま）。登録した後は戻らない。 */
               onSelect: !createdId && currentStep > step.number ? () => setCurrentStep(step.number) : undefined,
             }))}
-          />
+          /></div>
         )}
       />
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
