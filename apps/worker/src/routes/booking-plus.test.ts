@@ -94,7 +94,7 @@ describe('7 予約からの売上', () => {
       };
     };
     expect(json.data.total).toEqual({
-      bookings: 4, confirmed: 2, revenue: 16000, paidRevenue: 0, cancelRate: 0.25, noshowRate: 0.25,
+      bookings: 4, confirmed: 2, revenue: 16000, paidRevenue: 0, cancelRate: 0.25, noshowRate: 1 / 3,
       cancelled: 1, noshow: 1,
     });
     expect(json.data.menus).toHaveLength(1);

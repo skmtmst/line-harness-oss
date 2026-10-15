@@ -27,7 +27,7 @@ export async function restaurantRotation(db:D1Database,storeId:string,date:strin
  const denominator=[...open.values()].reduce((sum,x)=>sum+length(x),0),activeTables=[...open.values()].filter(x=>length(x)>0).length;
  const unmeasured=visits.filter(v=>!v.arrived_at&&(!v.departed_at||Date.parse(reservationInstant(v.departed_at))>=start)).length;
  const bookings=await db.prepare(`SELECT COUNT(*) AS total,SUM(CASE WHEN status='no_show' THEN 1 ELSE 0 END) AS no_shows FROM rt_reservations WHERE store_id=? AND status<>'cancelled' AND hold_expires_at IS NULL AND julianday(starts_at)>=julianday(?) AND julianday(starts_at)<julianday(?)`).bind(storeId,from,to).first<{total:number;no_shows:number|null}>();
- return {date,activeTables,departedGroups:completed.length,turnover:setting&&activeTables?completed.length/activeTables:null,
+ return {date,activeTables,openTableMinutes:setting?denominator/60000:null,occupiedTableMinutes:setting&&!unmeasured?[...occupied.values()].reduce((sum,x)=>sum+length(x),0)/60000:null,measuredDepartures:stay.length,totalStayMinutes:stay.reduce((a,b)=>a+b,0),departedGroups:completed.length,turnover:setting&&activeTables?completed.length/activeTables:null,
   utilization:setting&&denominator&&!unmeasured?[...occupied.values()].reduce((sum,x)=>sum+length(x),0)/denominator:null,
   averageStayMinutes:stay.length?stay.reduce((a,b)=>a+b,0)/stay.length:null,noShowRate:bookings?.total?(bookings.no_shows??0)/bookings.total:null,unmeasuredVisits:unmeasured};
 }

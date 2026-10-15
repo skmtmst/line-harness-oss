@@ -1,3 +1,5 @@
+import { bookingAudience } from './styles.js';
+import { StyleError } from '../services/style-setup.js';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -356,6 +358,7 @@ function explicitTimestamp(value: unknown, code: string): string {
 }
 
 function funnelErrorStatus(error: unknown): 404 | 409 | 422 | 500 {
+  if(error instanceof StyleError)return error.status===404?404:error.status===409?409:422;
   const message = error instanceof Error ? error.message : '';
   if (message.endsWith('_not_found')) return 404;
   if (message.endsWith('_conflict')) return 409;
@@ -1275,9 +1278,12 @@ analytics.post('/api/analytics/results/:id/audiences', requireRole('owner', 'adm
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
     const body = await c.req.json<{
-      sourceKind?: unknown; groupKey?: unknown; stepOrder?: unknown; selection?: unknown;
+      sourceKind?: unknown; groupKey?: unknown; stepOrder?: unknown; selection?: unknown; friendIds?: unknown;
       rowKey?: unknown; columnKey?: unknown;
     }>();
+    if (body.sourceKind === 'booking') {
+      return c.json({ success: true, data: await bookingAudience(c, c.req.param('id'), body as Record<string, unknown>, account.accountId) }, 201);
+    }
     if (body.sourceKind === 'cross') {
       const result = await createAnalyticsCrossAudience(c.env.DB, {
         lineAccountId: account.accountId,
