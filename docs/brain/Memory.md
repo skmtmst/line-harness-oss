@@ -54,7 +54,7 @@ tags: [memory, core]
 
 ## 進行中（2026-10-15）
 
-- oneF2x再開：列車38最新352c8を22f10222ceへ取り込み、F提供6ac85の共通修正を受け取り中。競合3か所は画面接続と両側の記録を保持、関連53/型/lintエラー0/所有新規0。新しい全Web/3幅/自己撮影は未完、22fでの成功を新しい版へ流用しない。docs/qa/one-f2x-owner-f-1015.md。コミットまで、Pen/台帳/DB/配備/push/PRなし。
+- oneF2x再開：列車38 352c8を22f10222ce、F提供6ac85をf182992ddfへ取り込み。関連53/型/lintエラー0/所有新規0成功だが、全Webは5ファイル11件失敗・2236ファイル13334件成功で停止。F21の曜日switch追随7件、共通CSSの前置き2件、消えたcheckListの例外1件、Button利用先一覧1件をFへ。新しい版のbuild/3幅/自己撮影/鍵は未実施、完成/候補/RECIPES追加0。基準22fの17板51条件と2写真を新しい版の証拠へ流用しない。docs/qa/one-f2x-owner-f-1015.md・外部F2x/owner-f-1015/RESULT.json。コミットまで、Pen/台帳/親EC/DB/配備/push/PRなし。
 
 - oneF2x A2の区切り：製品13e6e29653/351366bf83、本線d12・列車38最新版包含。VLEajの顔/輪の選択印/RowMenu/RowNameLinkを修正、3幅全F/崩れ0・名前9名/開閉3成功、1440全高左右を目視/版確認true、RECIPES3行（完成1板）。関連25/名前22（重複）/型/lint/build/設計値/型新規0成功。保護331/332・既存53板2731差/cFo1440欠測1/終了2、13eとの全差が一致・追加0、正式候補/合格0。残4板はVFxWUの旧Save判定・UgZPJの役目・gSsPR/hmr2Pの共通の口を司令塔/F/Gへ。docs/qa/one-f2x-a2-1015.md・外部F2x/a2-1015/name-ink/clean。コミットまで、Pen/台帳/鍵/push/PR/DB/配備0。下は前回。
 
