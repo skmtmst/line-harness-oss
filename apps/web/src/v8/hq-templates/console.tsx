@@ -7,7 +7,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useListReturnHref, useListNavigationHref, useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useAccount } from '@/contexts/account-context'
-import { ArrowLeft, Check, Plus, Search, Send } from 'lucide-react'
+import { ArrowLeft, Check, Plus, Send } from 'lucide-react'
 import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqTemplateReceivedVersion, type HqTemplateVersionDisplay, type TemplateKind } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -60,6 +60,7 @@ import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import styles from './console.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
+import SearchField from '@/components/shared/search-field'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { DistributionPage } from '@/components/templates/distribution-page'
@@ -1154,7 +1155,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       {error || message ?notices : null}
         </>}
         toolbar={<DistributionToolbar>
-          <Field label={<><Search size={14} aria-hidden="true" /></>}><SaveErrorField names={["search"]}><input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} /></SaveErrorField></Field>
+          <span className={styles.distSearch}><SaveErrorField names={["search"]}><SearchField aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={setSearch} onClear={() => setSearch('')} /></SaveErrorField></span>
           <span className={styles.bulkPick}>
             <SaveErrorField names={["bulkMode","bulk_mode"]}><Select
               aria-label="一括の配布方法"
