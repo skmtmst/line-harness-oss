@@ -410,7 +410,7 @@ export default function OpsSupportV8() {
           ) : (
             <>
               <div className={styles.detailHead}>
-                <h2 className={styles.detailTitle}>{`${ticket.ticketLabel} ${ticket.subject}`}</h2>
+                <h2 className={styles.detailTitle} title={`${ticket.ticketLabel} ${ticket.subject}`}>{`${ticket.ticketLabel} ${ticket.subject}`}</h2>
                 {readOnly ? null : (
                   <span className={styles.prioritySelect}>
                     <SaveErrorField names={["priority","ticket.priority"]}><Select size="page-size" aria-label="優先度を変える" value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS} /></SaveErrorField>

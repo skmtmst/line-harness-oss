@@ -1,6 +1,7 @@
 'use client'
 import ReservationBoard from '@/components/shared/reservation-board'
 import PeopleDayList from '@/v8/booking-bookings/day-list'
+import PeopleDayFrame from '@/v8/booking-bookings/day-frame'
 import { usePeopleVisitMarks } from '@/v8/booking-bookings/use-visit-marks'
 import {peopleBoardEntry} from '@line-crm/shared'
 import {reservationBoardApi,allBoardPages} from '@/lib/api-reservation-board'
@@ -9,7 +10,6 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { PageHeading } from '@/components/templates/page-frame'
-import { BookingPage } from '@/components/templates/booking-page'
 import SegmentedControl from '@/components/shared/segmented'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import Link from 'next/link'
@@ -937,7 +937,7 @@ export default function BookingsPage() {
   {/* 帯同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   if (view === 'day' || view === 'week') {
     return (
-      <BookingPage title="予約管理" actions={headingActions}>
+      <PeopleDayFrame view={view} date={calendarFrom} rows={calendarItems} ready={calendarStatus === 'ready'} availability={availability} actions={headingActions} canWrite={canOperate} onOpen={setDetailId}>
         {/*
           ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
           出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
@@ -953,7 +953,7 @@ export default function BookingsPage() {
             onRetry={() => { setError(''); setCalendarSeq((n) => n + 1); void load() }}
           />
         ) : (
-          <ReservationBoard printContext={selectedAccount?.name??selectedAccountId??'予約管理'} kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
+          <ReservationBoard timeDirection={view === 'day' ? 'vertical' : undefined} printContext={selectedAccount?.name??selectedAccountId??'予約管理'} kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
             toolbar={<><Button onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?-7:-1))}>‹</Button><strong>{Number(calendarFrom.slice(5,7))}月{Number(calendarFrom.slice(8))}日{view==='week'?`〜${Number(calendarTo.slice(5,7))}月${Number(calendarTo.slice(8))}日`:null}</strong><Button onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?7:1))}>›</Button><Button onClick={()=>setCalendarAnchor(jstDay(new Date().toISOString()))}>今日</Button></>}
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<p>担当者か予約メニューが未設定です</p>:null}
@@ -965,7 +965,7 @@ export default function BookingsPage() {
           />
         )}
         {dialogs}
-      </BookingPage>
+      </PeopleDayFrame>
     )
   }
 

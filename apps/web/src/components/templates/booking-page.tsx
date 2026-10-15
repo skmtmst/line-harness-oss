@@ -1,9 +1,21 @@
 import type { ReactNode } from 'react'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
+import dayStyles from './booking-day-layout.module.css'
+import PreviewLauncher from './preview-launcher'
 
 /** O2Z8u・GcyTr：題と主操作の直下に数の帯を置く予約の型。 */
-export function BookingPage({ children, ...heading }: PageHeadingProps & { children: ReactNode }) {
+export function BookingPage({ children, stats, aside, ...heading }: PageHeadingProps & { children: ReactNode; stats?: ReactNode; aside?: ReactNode }) {
+  if (aside) return <PageFrame kind="booking" boardId="acRIl">
+    <div className={dayStyles.layout}>
+      <div className={dayStyles.main}>
+        <PageHeading {...heading} titleAccessory={<span className={dayStyles.launcher}><PreviewLauncher label="次の予約・内訳" title="次の予約・内訳">{aside}</PreviewLauncher></span>} />
+        {stats ? <div data-template-region="stats">{stats}</div> : null}
+        <div className={dayStyles.content} data-template-region="content">{children}</div>
+      </div>
+      <aside className={dayStyles.aside} aria-label="次の予約・内訳">{aside}</aside>
+    </div>
+  </PageFrame>
   return <PageFrame kind="booking" boardId="acRIl">
     <div className={styles.bookingHeading}><PageHeading {...heading} /></div>
     {children}

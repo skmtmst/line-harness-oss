@@ -1,5 +1,12 @@
 # V8 型の対応表（パターン台帳）
 
+## people-day-grid 人の当日予約盤（L28）
+
+- 役目：時刻を縦、担当を横に並べる。正の部品は `shared/reservation-board.tsx` の `timeDirection="vertical"` と `reservation-people-grid.tsx`。標準の横時間軸は変更しない。
+- 空き枠はAPIから渡った `slots` のみ。予約の詳細・版付き移動・移動失敗後の復旧は共通盤の契約を保つ。閲覧者へ作成入口・ドラッグを出さない。
+- 当日の型は `templates/booking-page.tsx` の明示的な `stats` / `aside`。白い板が1100未満なら右欄を畳み「次の予約・内訳」で開く。数・次の予約・売上は実データから読み、未取得は0にしない。
+- 見張り：`reservation-people-grid.test.tsx`・`day-frame.test.tsx` と実ブラウザの3幅。使う板はGcyTr/O2Z8u。細かな最終調整はClaudeへ渡す。
+
 - 作成：2026-10-09（オーナー「見落としていて決まりから外れているところが、次回から外れないように、同じものとして認識されるようにしておいて」・B-143・B-168・B-172）
 - 何の文書か：**同じ役目の物を、画面が違っても同じ物として見つける**ための表。型ごとに「役目・持ち主（正の部品）・見つけ方・決まり・見張り」を1節で書く。
 - 誰が読むか：画面を作る・直す人（Codex・Claude・Pen の作業役）と、点検の道具。機械が読む表は `scripts/visual-qa/v8-pattern-catalog.json`（この文書と同じ中身。正規表現は JSON が正）。

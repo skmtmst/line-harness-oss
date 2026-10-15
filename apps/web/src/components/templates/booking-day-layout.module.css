@@ -1,0 +1,10 @@
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-booking-aside-width); min-width: 0; }
+.main { min-width: 0; }
+.content { min-width: 0; padding: var(--polish-space-card) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
+.aside { min-width: 0; border-left: 1px solid var(--color-hairline); }
+.launcher { display: none; }
+@container v8-page (width < 1100px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .aside { display: none; }
+  .launcher { display: inline-flex; }
+}
