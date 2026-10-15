@@ -707,27 +707,9 @@
   white-space: nowrap;
 }
 
-/* TimeField は中に自分の欄（枠・時計・消す）を持つ。外には幅だけを当てて、
-   内側の欄を見本の大きさ（高さ32・12px）へ揃える。 */
 .timeInput {
   width: var(--tpl-bm-84);
   flex-shrink: 0;
-}
-
-.timeInput > button:first-of-type {
-  height: var(--tpl-bm-32);
-  padding: 0 var(--tpl-bm-10);
-  font-size: var(--tpl-bm-12);
-}
-
-/* 見本の箱は「9:00」だけ。時計アイコンと中の消すボタンは隠す
-   （時間帯の消去は行はしの×でできる）。 */
-.timeInput > button:first-of-type :global(svg) {
-  display: none;
-}
-
-.timeInput > button:not(:first-of-type) {
-  display: none;
 }
 
 .numInput {
@@ -1108,28 +1090,13 @@
   min-width: 0;
 }
 
-.staffNameLink {
-  width: fit-content;
-  overflow: hidden;
-  color: var(--color-accent-deep);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.staffNameLink:hover {
-  text-decoration: underline;
-}
-
 .staffRole {
   color: var(--color-ink-faint);
   font-size: var(--tpl-bm-11);
 }
 
 .staffColMenus {
-  width: var(--tpl-bk2-staff-col-menus);
+  width: calc(var(--tpl-bk2-staff-col-menus) + var(--polish-space-card));
   flex-shrink: 0;
 }
 
@@ -1165,14 +1132,11 @@
   flex-shrink: 0;
 }
 
-.staffNote {
-  margin: 0;
-  padding: var(--tpl-bm-10) var(--tpl-bm-12);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bm-12);
-  line-height: var(--tpl-bm-18);
+.staffMenuWarning {
+  margin-top: var(--tpl-bm-2);
+  color: var(--color-warning);
+  font-size: var(--text-micro);
+  white-space: nowrap;
 }
 
 .staffColLink .staffCellSub {

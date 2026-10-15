@@ -24,8 +24,6 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
-/* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
-
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
   settings: BookingSettings | null
@@ -96,7 +94,6 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
     const validationError = validateBusinessHours(draft)
     if (validationError) {
       setSaveError(validationError.message)
-      /* 落ちた区間の欄を赤くして移る（B-139）。理由の文は表の下に出す。 */
       setBadHours(validationError.at ?? null)
       const at = validationError.at
       const dayLabel = at ? DAYS.find((day) => day.weekday === at.weekday)?.label : undefined
@@ -227,6 +224,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, start: value } : entry))}
                       className={styles.timeInput}
                       size="compact"
+                      pickerTrigger="field"
                     /></SaveErrorField>
                     <span className={styles.intervalTilde}>〜</span>
                     <SaveErrorField names={[`intervals.${index}.end`,"end","interval.end"]}><TimeField
@@ -236,6 +234,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, end: value } : entry))}
                       className={styles.timeInput}
                       size="compact"
+                      pickerTrigger="field"
                     /></SaveErrorField>
                     <span className={styles.sameTimeLabel}>同時</span>
                     <SaveErrorField names={[`intervals.${index}.capacity`,"capacity","interval.capacity"]}><NumberInput
@@ -244,6 +243,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       type="number"
                       min={1}
                       max={1000}
+                      note={false}
                       value={interval.capacity ?? 1}
                       onChange={(event) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, capacity: Number(event.target.value) } : entry))}
                       className={styles.numInput}
