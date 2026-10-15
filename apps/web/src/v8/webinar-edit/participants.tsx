@@ -247,9 +247,9 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
           ) : null}
           <KpiBand>
             {kpis.map((kpi) => (
-              <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} help={kpi.help} value={kpi.value} unit={kpi.value === null ? '' : kpi.unit} detail={kpi.detail} />
+              <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value === null ? '' : kpi.unit} detail={<span title={kpi.help}>{kpi.detail}</span>} />
             ))}
-          </KpiBand>
+          </KpiBand><Notice tone="info" icon={null} appearance="soft">「見ていない」は申込だけで入場の記録がない人です。「入場のみ」は入場したが再生を確かめられなかった人です。</Notice>
         </>}
         toolbar={<ListToolbarFrame>
           {csvError ? <Notice tone="danger">{csvError}</Notice> : null}

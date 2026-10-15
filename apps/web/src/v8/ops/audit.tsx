@@ -13,6 +13,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import { OpsHead } from './shell'
+import { PageFrame } from '@/components/templates/page-frame'
 import parts from './parts.module.css'
 import styles from './audit.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -20,6 +21,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import Card from '@/components/shared/card'
 
 /**
  * 運営の監査ログ V8（絵 `e7ljE`）。
@@ -119,13 +121,13 @@ export default function OpsAuditV8() {
   const pageCount = Math.max(1, Math.ceil(total / PAGE))
 
   return (
-    <div data-design-node="e7ljE">
+    <PageFrame kind="list" boardId="e7ljE" standalone heightMode="content">
       <OpsHead
         title="監査ログ"
         description="運営が行った操作の記録です。代理ログイン・個人情報の表示・契約先の停止・運営メンバーの変更が残ります。"
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         actions={(
-          <Button onClick={() => void exportCsv()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
+          <Button onClick={() => void exportCsv()} title={exporting ? '書き出しています' : total === 0 ? '記録がないため書き出せません' : undefined} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
             <Download aria-hidden="true" />CSVで書き出す
           </Button>
         )}
@@ -161,26 +163,25 @@ export default function OpsAuditV8() {
             <ListState permissionScope="hq" kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
           </div>
         ) : (
-          <DataTable density="records" columnSizing="content" label="監査ログ">
-            <thead><TableHeadRow>
-              <Th>日時</Th><Th>運営者</Th><Th><span>操作</span></Th><Th>契約先</Th><Th grow>理由</Th>
-            </TableHeadRow></thead><tbody>
-            {rows.map((row) => (
+          <Card padding="rows" overflow="hidden"><DataTable density="records" columnSizing="content" label="監査ログ">
+            <colgroup><col className={styles.colAt} /><col className={styles.colWho} /><col className={styles.colWhat} /><col className={styles.colTenant} /><col /></colgroup>
+            <thead><TableHeadRow><Th>日時</Th><Th>運営者</Th><Th><span>操作</span></Th><Th>契約先</Th><Th>理由</Th></TableHeadRow></thead>
+            <tbody>{rows.map((row) => (
               <Tr key={row.id}>
                 <Td title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</Td>
-                <Td><TruncatedText value={String(row.staff_name ?? '')} /></Td>
+                <Td><TruncatedText value={row.staff_name ?? ''} /></Td>
                 <Td><TruncatedText value={actionWord(row.action)} /></Td>
-                <Td><TruncatedText value={row.tenant_name ?? emptyValue('unknown')} /></Td>
-                <Td grow title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}><TruncatedText value={row.reason ?? emptyValue('unknown')} /></Td>
+                <Td title={row.tenant_name ?? ''}><TruncatedText value={row.tenant_name ?? emptyValue('unknown')} /></Td>
+                <Td title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}><TruncatedText value={row.reason ?? emptyValue('unknown')} /></Td>
               </Tr>
-            ))}
-            </tbody></DataTable>
+            ))}</tbody>
+          </DataTable></Card>
         )}
-        {rows.length > 0 ? (
+        {rows.length > 0 && pageCount > 1 ? (
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         ) : null}
         <p className={parts.note} title={`${total}件中 ${total === 0 ? 0 : (page - 1) * PAGE + 1}〜${Math.min(page * PAGE, total)}件を表示`}>記録は運営メンバーでも消せません。理由は4文字以上が必須です。</p>
       </div>
-    </div>
+    </PageFrame>
   )
 }

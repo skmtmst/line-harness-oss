@@ -1,7 +1,7 @@
 'use client'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
-import { Armchair, CalendarCheck, Check, Phone, Plus, Star, Users } from 'lucide-react'
+import { Check, Inbox, Phone, Plus } from 'lucide-react'
 import { DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import EntitySelect from '@/components/shared/entity-select'
@@ -154,7 +154,7 @@ function TodayStore() {
             <KpiCard
               presentation="band"
               title="今日の予約"
-              icon={<CalendarCheck size={13} aria-hidden="true" />}
+              icon={<Inbox size={13} aria-hidden="true" />}
               value={summary?.groups ?? null}
               unit="組"
               loading={!summary}
@@ -163,7 +163,7 @@ function TodayStore() {
             <KpiCard
               presentation="band"
               title="来店予定"
-              icon={<Users size={13} aria-hidden="true" />}
+              icon={<Inbox size={13} aria-hidden="true" />}
               value={summary?.guests ?? null}
               unit="人"
               loading={!summary}
@@ -172,7 +172,7 @@ function TodayStore() {
             <KpiCard
               presentation="band"
               title="空席（いま）"
-              icon={<Armchair size={13} aria-hidden="true" />}
+              icon={<Inbox size={13} aria-hidden="true" />}
               value={summary?.freeTables ?? null}
               unit="卓"
               loading={!summary}
@@ -182,7 +182,7 @@ function TodayStore() {
             <KpiCard
               presentation="band"
               title="未返信の口コミ"
-              icon={<Star size={13} aria-hidden="true" />}
+              icon={<Inbox size={13} aria-hidden="true" />}
               value={googleConnected ? google.summary.unrepliedCount : null}
               unit="件"
               detail={googleConnected

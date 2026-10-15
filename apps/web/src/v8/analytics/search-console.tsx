@@ -47,7 +47,7 @@ function Ranking({ title, rows, kind }: { title: string; rows: SearchConsoleMetr
     {rows.length === 0 ? <p>データがありません</p> : <GridTable label={title} framed={false} design={{
       columns: 'minmax(0, 1fr) var(--tpl-an-col-60) var(--tpl-an-col-70) var(--tpl-an-col-58)',
       gap: 'var(--polish-space-row)', rowPadding: '0', headPadding: '0',
-      rowHeight: 'var(--polish-table-row)', headHeight: 'var(--tpl-thead-h)',
+      rowHeight: 'var(--tpl-list-row-h)', headHeight: 'var(--tpl-thead-h)',
       fontSize: 'var(--text-caption)', headFontSize: 'var(--text-micro)',
     }}>
       <GridHeadRow>
@@ -165,7 +165,7 @@ export default function SearchConsoleV8() {
           <Card variant="form" aria-labelledby="sc-trend-title">
             <CardHeader size="stacked" titleId="sc-trend-title" title="検索クリックの推移（日別クリック数）" />
             {data.daily.length === 0 ? <ListState kind="empty" title="期間内のデータがありません" description="集計期間を変えると、ここに推移が出ます。" /> : <>
-              <ValueBarChart label="日別クリック数の推移" unit="クリック" items={data.daily.map(row=>({key:row.key,label:row.key,value:row.clicks}))} />
+              <ValueBarChart label="日別クリック数の推移" unit="クリック" presentation="summary" items={data.daily.map(row=>({key:row.key,label:row.key,value:row.clicks}))} />
             </>}
           </Card>
           <DashboardColumns layout="cards">{[

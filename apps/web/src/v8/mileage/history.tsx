@@ -316,7 +316,7 @@ export default function HistoryTab() {
   ) : table
 
 
-  const footer = !loading && !error && result !== null && (items.length > 0 || (spentOnly && pageCount > 1)) ? (
+  const footer = !loading && !error && total !== null && (items.length > 0 || (spentOnly && pageCount > 1)) ? (
     <HistoryPager {...{ spentOnly, total, page, pageSize, items, pageCount, loading, setPage }} />
   ) : undefined
 

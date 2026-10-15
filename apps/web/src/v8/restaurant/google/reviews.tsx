@@ -161,6 +161,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
           aria-label={syncing ? 'Googleから取得中…' : 'Googleから同期する'}
           onClick={() => void sync()}
           disabled={syncing || connection.status !== 'connected'}
+          title={syncing ? '口コミを取得しています' : connection.status !== 'connected' ? 'Googleとの接続を確認してください' : undefined}
         >
           <RefreshCw aria-hidden className={`${styles.icon16} ${syncing ? styles.spin : ''}`} />
         </IconButton>

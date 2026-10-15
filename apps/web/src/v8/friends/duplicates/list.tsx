@@ -13,8 +13,9 @@ import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
+import StatusBadge from '@/components/shared/status-badge'
+import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
 import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td, RowNameLink } from '@/components/shared/table';
 import { loadFailureCopy, isForbidden } from '@/components/shared/api-error-message';
@@ -26,7 +27,6 @@ import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDate
 import styles from './list.module.css'
 import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
-import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
 
 /*
@@ -129,8 +129,7 @@ export default function DuplicatesListV8() {
               value={null}
               valueText={kpi.valueText}
               unit={kpi.unit}
-              detail={kpi.detail}
-              help={kpi.help}
+              detail={<span title={kpi.help}>{kpi.detail}</span>}
             />
           ))}
         </KpiBand>
@@ -184,12 +183,12 @@ export default function DuplicatesListV8() {
             </colgroup>
             <thead>
               <TableHeadRow>
-                <Th className={styles.th}>候補</Th>
-                <Th className={styles.th}>確からしさ</Th>
-                <Th className={styles.th}>一致した根拠</Th>
-                <Th className={styles.th}>アカウント</Th>
-                <Th className={styles.th}>状態</Th>
-                <Th className={styles.th}><span className="sr-only">操作</span></Th>
+                <Th>候補</Th>
+                <Th>確からしさ</Th>
+                <Th>一致した根拠</Th>
+                <Th>アカウント</Th>
+                <Th>状態</Th>
+                <Th><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -219,12 +218,12 @@ export default function DuplicatesListV8() {
                 const evidence = candidate.evidenceSummary.length ? candidate.evidenceSummary.join('・') : '根拠を確認'
                 return (
                   <Tr key={candidate.id} className={styles.row} data-row-id={candidate.id}>
-                    <Td className={styles.td}>
+                    <Td>
                       <RowNameLink href={href} className={styles.pair} title={`${candidate.left.label} ↔ ${candidate.right.label}`}>
                         {`${candidate.left.label} ↔ ${candidate.right.label}`}
                       </RowNameLink>
                     </Td>
-                    <Td className={styles.td}>
+                    <Td>
                       <span className={confidenceTone(candidate.confidence.label) === 'ok' ? `${styles.pill} ${styles.pill_ok}` : `${styles.pill} ${styles.pill_muted}`}>
                         {CONFIDENCE_WORD[candidate.confidence.label] ?? candidate.confidence.label}
                       </span>
@@ -261,7 +260,7 @@ export default function DuplicatesListV8() {
             {d.data.perAccount.length === 0 ? (
               <p className={styles.panelSub}>アカウントが登録されていません。</p>
             ) : (
-              <DataTable className={styles.table}>
+              <DataTable>
                 <colgroup>
                   <col />
                   <col className={styles.colNum} />
@@ -270,10 +269,10 @@ export default function DuplicatesListV8() {
                 </colgroup>
                 <thead>
                   <TableHeadRow>
-                    <Th className={styles.th}>アカウント</Th>
-                    <Th className={styles.th}>友だち</Th>
-                    <Th className={styles.th}>うち重複</Th>
-                    <Th className={styles.th}>重複の割合</Th>
+                    <Th>アカウント</Th>
+                    <Th>友だち</Th>
+                    <Th>うち重複</Th>
+                    <Th>重複の割合</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody>
@@ -281,10 +280,10 @@ export default function DuplicatesListV8() {
                     const rate = Math.round(row.dupRate * 100)
                     return (
                       <Tr key={row.accountId} className={styles.rowCompact}>
-                        <Td className={styles.td}><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
-                        <Td className={styles.td}>{formatNumber(row.friends)}</Td>
-                        <Td className={styles.td}>{formatNumber(row.dups)}</Td>
-                        <Td className={styles.td}><span className={rate >= 10 ? styles.rateHigh : undefined}>{`${rate}%`}</span></Td>
+                        <Td><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
+                        <Td>{formatNumber(row.friends)}</Td>
+                        <Td>{formatNumber(row.dups)}</Td>
+                        <Td><span className={rate >= 10 ? styles.rateHigh : undefined}>{`${rate}%`}</span></Td>
                       </Tr>
                     )
                   })}
@@ -300,21 +299,21 @@ export default function DuplicatesListV8() {
               <h3 id="dup-matrix-title" className={styles.panelTitle}>アカウント間 重複マトリクス</h3>
               <p className={styles.panelSub}>同じ人が両方にいる数</p>
             </div>
-            <DataTable className={styles.table}>
+            <DataTable>
               <thead>
                 <TableHeadRow>
-                  <Th className={styles.th}>行 ＼ 列</Th>
-                  {d.data.perAccount.map((col) => <Th key={col.accountId} className={styles.th} title={col.accountName}>{col.accountName}</Th>)}
+                  <Th>行 ＼ 列</Th>
+                  {d.data.perAccount.map((col) => <Th key={col.accountId} title={col.accountName}>{col.accountName}</Th>)}
                 </TableHeadRow>
               </thead>
               <tbody>
                 {d.data.perAccount.map((row) => (
                   <Tr key={row.accountId} className={styles.rowCompact}>
-                    <Td className={styles.td}><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
+                    <Td><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
                     {d.data!.perAccount.map((col) => {
-                      if (row.accountId === col.accountId) return <Td key={col.accountId} className={styles.td}><span className={styles.faint}>{emptyValue('unknown')}</span></Td>
+                      if (row.accountId === col.accountId) return <Td key={col.accountId}><span className={styles.faint}>{emptyValue('unknown')}</span></Td>
                       const pair = d.data!.pairwiseOverlap!.find((p) => p.fromAccountId === row.accountId && p.toAccountId === col.accountId)
-                      return <Td key={col.accountId} className={styles.td}>{formatNumber(pair?.overlap ?? 0)}</Td>
+                      return <Td key={col.accountId}>{formatNumber(pair?.overlap ?? 0)}</Td>
                     })}
                   </Tr>
                 ))}

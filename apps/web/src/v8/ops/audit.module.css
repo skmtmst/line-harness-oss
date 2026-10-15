@@ -16,6 +16,13 @@
   font-size: var(--text-micro);
 }
 
+.dateGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+  flex-shrink: 0;
+}
+
 .date {
   width: var(--tpl-op-audit-date-w);
 }

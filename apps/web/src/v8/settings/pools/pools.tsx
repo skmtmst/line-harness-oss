@@ -20,7 +20,7 @@ import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import { useStaffRole } from '@/lib/staff-role'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
@@ -56,6 +56,7 @@ export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {
 
 export default function PoolsV8() {
   usePageTitle(TITLE)
+  usePageCrumbs([{ label: '設定', href: '/settings' }])
   const role = useStaffRole()
   // APIと同じくオーナーだけ。役割の確認中も変更操作を隠す。
   const canManage = role === 'owner'
@@ -98,7 +99,7 @@ export default function PoolsV8() {
   if (featureOff) {
     return (
       <div className={frame.screen}>
-        <SettingsPage layout="accounts" boardId="u3iab3" title={TITLE} help={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
+        <SettingsPage layout="accounts" heightMode="content" boardId="u3iab3" title={TITLE} help={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
           <FeatureDisabledScreen featureId="multi_store_hierarchy" />
         </SettingsPage>
       </div>
@@ -116,7 +117,7 @@ export default function PoolsV8() {
 
   return (
     <div className={frame.screen}>
-      <SettingsPage layout="accounts"
+      <SettingsPage layout="accounts" heightMode="content"
         boardId="u3iab3"
         title={TITLE}
         help={DESCRIPTION}

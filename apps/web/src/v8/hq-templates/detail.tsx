@@ -9,7 +9,7 @@
  * 読み書き（読み込み・複製・配る・版を比べる・戻す）は呼ぶ側（console.tsx）。ここは見せ方と押した知らせだけ。
  */
 import { useState } from 'react'
-import { ArrowLeft, CircleAlert, Copy, GitCompare, LogIn, Pencil, RotateCcw, Send } from 'lucide-react'
+import { ArrowLeft, ChevronDown, CircleAlert, Copy, GitCompare, LogIn, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
 import type { HqTemplateReceivedVersion, HqTemplateVersionComparison, HqTemplateVersionDisplay, MessageTemplateDefinition } from '@line-crm/shared'
 import { templateKind } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -247,7 +247,7 @@ export default function HqTemplateDetail({
               </Button>
             ) : null}
             <Button variant="primary" onClick={onDistribute} disabled={busy} aria-label={`${detail.template.name}を配る`}>
-              <Send size={14} aria-hidden="true" />
+              <Upload size={14} aria-hidden="true" />
               配る
             </Button>
           </div>
@@ -306,7 +306,7 @@ export default function HqTemplateDetail({
           ) : <ListEmptyMessage>まだ配っていません</ListEmptyMessage>}
           {canEdit ? (
             <div className={styles.moreRow}>
-              <button type="button" className={styles.ghostButton} onClick={onDistribute} disabled={busy}>配る先を変える</button>
+              <Button variant="text" onClick={onDistribute} disabled={busy}><ChevronDown size={14} aria-hidden="true" />配る先を変える</Button>
             </div>
           ) : null}
         </section>
@@ -338,12 +338,12 @@ export default function HqTemplateDetail({
                     {version.is_current ? (
                       inUse && inUse.version !== version.version ? (
                         <div className={styles.versionActions}>
-                          <Button variant="secondary" onClick={() => openCompare(inUse.version, version.version)}>いまの版と比べる</Button>
+                          <Button variant="secondary" onClick={() => openCompare(inUse.version, version.version)}><GitCompare size={14} aria-hidden="true" />いまの版と比べる</Button>
                         </div>
                       ) : null
                     ) : !isInUse ? (
                       <div className={styles.versionActions}>
-                        {current ? <Button variant="secondary" onClick={() => openCompare(version.version, current.version)}>比べる</Button> : null}
+                        {current ? <Button variant="secondary" onClick={() => openCompare(version.version, current.version)}><GitCompare size={14} aria-hidden="true" />比べる</Button> : null}
                         {canEdit ? (
                           <Button variant="secondary" disabled={busy} onClick={() => { setRestoreError(''); setRestoreTarget(version.version) }}><RotateCcw size={14} aria-hidden="true" />この版に戻す</Button>
                         ) : null}

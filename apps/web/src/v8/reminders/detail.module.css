@@ -46,7 +46,6 @@
   flex-direction: column;
   gap: var(--tpl-create-content-gap);
   min-width: 0;
-  padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side);
 }
 .side {
   display: flex;
@@ -138,7 +137,7 @@
 .colWide { flex: none; width: var(--tpl-rm-col-step); }
 .colResult { display: flex; flex: none; width: var(--tpl-rm-col-result); }
 .colReason { flex: none; width: var(--tpl-rm-col-when); overflow: hidden; color: var(--color-ink-secondary); text-overflow: ellipsis; white-space: nowrap; }
-.colDate { flex: none; width: var(--tpl-rm-col-date); }
+.colDate { flex: none; width: calc(var(--tpl-rm-col-date) + var(--tpl-rm-col-time) + var(--tpl-rm-row-gap-lg)); }
 .colState { display: flex; flex: none; width: var(--tpl-rm-col-step); }
 .colOps { display: flex; flex: none; justify-content: flex-end; gap: var(--tpl-rm-insert-gap); width: var(--tpl-rm-col-ops); }
 .cellSub { display: block; color: var(--color-ink-faint); font-size: var(--tpl-rm-small-size); line-height: var(--tpl-rm-small-lh); }
@@ -147,7 +146,6 @@
 .friendLink { color: var(--color-action); font-weight: 600; text-decoration: none; }
 .colDate > * { width: 100%; }
 /* 絵の基準日の欄は高さ32（表の行 55.5）。部品の中身は変えず、この表の中でだけ高さを合わせる。 */
-.dateField > button { min-height: 0; height: var(--tpl-rm-date-h); }
 .pill {
   display: inline-flex;
   align-items: center;

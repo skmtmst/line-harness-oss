@@ -22,13 +22,16 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import { CreateSummaryCard } from '@/components/templates/create-parts';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
-import { TableHeadRow } from '@/components/shared/table';
+import { DataTable, TableHeadRow, Th, Tr, Td, RowNameLink } from '@/components/shared/table';
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
 import FilterChip from '@/components/shared/filter-chip'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
 import ListState from '@/components/shared/list-state'
+import { DetailColumns } from '@/components/templates/detail-columns'
+import { ListPageSection } from '@/components/templates/list-page'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -42,14 +45,6 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { DetailLoading } from '@/components/templates/detail-page';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
-
-/*
- * ★V8 リマインダの詳細（src/v8 に一から書いた版）。
- * 板：rbAig（概要）/ loVfW（登録者）/ RwVo5（一時停止の窓）。
- * 枠は型（PageFrame）。頭の中にタブを持つ形（絵の「板の頭」）は型の頭に無いので、ここで組む。
- * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
- */
-
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
 const EXPORT_LIMIT = 5000
@@ -207,6 +202,7 @@ function ReminderDetailV8() {
   const [deleteError, setDeleteError] = useState('')
   const [duplicating, setDuplicating] = useState(false)
   const [confirmPause, setConfirmPause] = useState(false)
+  const [asideExpanded, setAsideExpanded] = useState(false)
   const [pausing, setPausing] = useState(false)
 
   usePageTitle(data?.reminder.name ? `${data.reminder.name}・リマインダ` : null)
@@ -489,39 +485,8 @@ function ReminderDetailV8() {
           ]}
         /></>} />
 
-      <div className={styles.split}>
-        <div className={styles.main}>
-          {actionMessage ? <Notice tone="info">{actionMessage}</Notice> : null}
-          {tab === 'overview' ? (
-            <OverviewTab
-              data={data}
-              reminder={reminder}
-              nextByStep={plannedPartial ? null : nextByStep}
-              onShowErrors={() => {
-                const params = new URLSearchParams(searchParams.toString())
-                params.set('id', reminderId)
-                params.set('tab', 'runs')
-                params.set('runStatus', 'permanent_failed')
-                samePageUrl.replace(`/reminders/detail?${params.toString()}`)
-              }}
-              onShowAllRuns={() => selectTab('runs')}
-            />
-          ) : tab === 'schedule' ? (
-            <ScheduleTab reminderId={reminderId} steps={data.steps} />
-          ) : tab === 'runs' ? (
-            <RunsTab
-              // 概要の警告帯から飛んだとき、絞り込みを確実に掛け直す。
-              key={runsStatusParam ?? ''}
-              reminderId={reminderId}
-              canManage={canManage}
-              initialStatus={runsStatusParam === 'permanent_failed' ? 'permanent_failed' : ''}
-            />
-          ) : (
-            <RegistrantsTab reminderId={reminderId} canManage={canManage} />
-          )}
-        </div>
+      <ListPageSection><DetailColumns presentation="notification" asideLabel="いまの状態と操作" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<>
 
-        <aside className={styles.side} aria-label="いまの状態と操作">
           <div className={styles.sideActions}>
             {canManage && !isUnpublishedDraft ? (
               data.reminder.isActive ? (
@@ -542,7 +507,6 @@ function ReminderDetailV8() {
             ) : null}
             <span className={styles.menuAnchor}>
               <RowMenu
-                className={styles.menuButton}
                 label={`リマインダ「${data.reminder.name}」のその他の操作`}
                 title="その他の操作"
                 items={menuItems}
@@ -577,8 +541,39 @@ function ReminderDetailV8() {
             </LinePreview>
             </div>
           )}
-        </aside>
-      </div>
+
+</>}>
+<div className={styles.main}>
+          {actionMessage ? <Notice tone="info">{actionMessage}</Notice> : null}
+          {tab === 'overview' ? (
+            <OverviewTab
+              data={data}
+              reminder={reminder}
+              nextByStep={plannedPartial ? null : nextByStep}
+              onShowErrors={() => {
+                const params = new URLSearchParams(searchParams.toString())
+                params.set('id', reminderId)
+                params.set('tab', 'runs')
+                params.set('runStatus', 'permanent_failed')
+                samePageUrl.replace(`/reminders/detail?${params.toString()}`)
+              }}
+              onShowAllRuns={() => selectTab('runs')}
+            />
+          ) : tab === 'schedule' ? (
+            <ScheduleTab reminderId={reminderId} steps={data.steps} />
+          ) : tab === 'runs' ? (
+            <RunsTab
+              // 概要の警告帯から飛んだとき、絞り込みを確実に掛け直す。
+              key={runsStatusParam ?? ''}
+              reminderId={reminderId}
+              canManage={canManage}
+              initialStatus={runsStatusParam === 'permanent_failed' ? 'permanent_failed' : ''}
+            />
+          ) : (
+            <RegistrantsTab reminderId={reminderId} canManage={canManage} />
+          )}
+        </div>
+</DetailColumns></ListPageSection>
 
       <SheetDialog
         open={confirmPause}
@@ -1053,7 +1048,7 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
         基準日を変えると、まだ送っていない通知だけ新しい日程で組み直します。送った履歴は消えません。
       </p>
 
-      <section className={styles.card} aria-labelledby="rm-detail-registrants">
+      <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--tpl-rm-row-gap-lg)" aria-labelledby="rm-detail-registrants">
         <div className={styles.cardHead}>
           <h2 id="rm-detail-registrants" className={styles.cardTitle}>登録者</h2>
           <p className={styles.cardNote}>{formatNumber(items.length)} 人</p>
@@ -1088,36 +1083,38 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
           <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setSearch(''); setFilter('all'); setPage(1) }}>条件を外す</Button>} />
         ) : (
           <>
-            <div className={styles.table} role="table" aria-label="登録者">
-              <TableHeadRow as="div" presentation="embedded" className={styles.headRow}>
-                <span role="columnheader" className={styles.colFlex}>友だち</span>
-                <span role="columnheader" className={styles.colDate}>基準日（予約日時）</span>
-                <span role="columnheader" className={styles.colState}>状態</span>
-                <span role="columnheader" className={styles.colOps}><span className="sr-only">操作</span></span>
-              </TableHeadRow>
+            <DataTable aria-label="登録者">
+              <colgroup><col /><col className={styles.colDate} /><col className={styles.colState} /><col className={styles.colOps} /></colgroup>
+              <thead>
+              <TableHeadRow>
+                <Th>友だち</Th>
+                <Th>基準日（予約日時）</Th>
+                <Th>状態</Th>
+                <Th><span className="sr-only">操作</span></Th>
+              </TableHeadRow></thead><tbody>
               {pageItems.map((item) => {
                 const dirty = (draftDates[item.id] ?? '') !== dateTimeLocalJst(item.targetDate)
                 const busy = actioningId === item.id
                 return (
-                  <div key={item.id} role="row" className={styles.row}>
-                    <span role="cell" className={styles.colFlex}>
-                      <Link href={`/friends/${encodeURIComponent(item.friendId)}`} className={styles.friendLink}>{item.friendName || '名前未設定'}</Link>
-                    </span>
-                    <span role="cell" className={styles.colDate}>
+                  <Tr key={item.id}>
+                    <Td>
+                      <RowNameLink href={`/friends/${encodeURIComponent(item.friendId)}`} title={item.friendName || '名前未設定'}>{item.friendName || '名前未設定'}</RowNameLink>
+                    </Td>
+                    <Td>
                       <SaveErrorField names={["draftDates","draft_dates"]}><DateTimeField
-                        className={styles.dateField}
+                        size="compact"
                         aria-label={`${item.friendName || '登録者'}の基準日`}
                         value={draftDates[item.id] ?? ''}
                         disabled={item.status !== 'active' || busy || !canManage}
                         onChange={(v) => setDraftDates((current) => ({ ...current, [item.id]: v }))}
                       /></SaveErrorField>
-                    </span>
-                    <span role="cell" className={styles.colState}>
+                    </Td>
+                    <Td>
                       <StatusPill tone={item.status === 'active' ? 'ok' : 'muted'}>
                         {item.status === 'active' ? '有効' : item.status === 'cancelled' ? '取消済み' : item.status}
                       </StatusPill>
-                    </span>
-                    <span role="cell" className={styles.colOps}>
+                    </Td>
+                    <Td>
                       {/* 閲覧のみの人には、押せない操作を置かない。 */}
                       {!canManage ? null : item.status === 'active' ? (
                         dirty ? (
@@ -1134,18 +1131,17 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
                           <RotateCcw size={15} aria-hidden="true" />再開する
                         </Button>
                       ) : null}
-                    </span>
-                  </div>
+                    </Td>
+                  </Tr>
                 )
               })}
-            </div>
+              </tbody></DataTable>
             <div className={styles.pager}>
-              <span className={styles.pagerCount}>{formatNumber(visible.length)} 人中 {visible.length === 0 ? 0 : (page - 1) * pageSize + 1}〜{Math.min(page * pageSize, visible.length)} 人</span>
-              <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="登録者のページ送り" />
+              <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="登録者のページ送り" range={{ total: visible.length, first: visible.length === 0 ? 0 : (page - 1) * pageSize + 1, last: Math.min(page * pageSize, visible.length), unit: '人' }} />
             </div>
           </>
         )}
-      </section>
+      </Card>
     </></SaveErrorScope>
   )
 }
