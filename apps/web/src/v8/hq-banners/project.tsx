@@ -703,10 +703,9 @@ function ProjectInner() {
           <StickyBar
             outlined
             className={styles.footer}
-            split={{ trailingWidth: running ? 'auto' : 'calc(var(--tpl-hb-panel-w) + var(--tpl-hb-footer-inset))', lead: running ? (
-              /* 絵 p03ImY：生成中は左に進み具合と今月の残り、右に書き出す大きさ・やめる・生成中を1行。 */
-              <span className={styles.selectionCount} aria-live="polite">{`${running.requestedCount}枚中${doneSoFar}枚できました・今月の残り${usage?.month.remaining ?? emptyValue('unknown')}枚`}</span>
-            ) : selectedImages.length > 0 ? <>
+            /* 絵 p03ImY：生成中は1本の帯（左に進み具合と今月の残り、右に書き出す大きさ・やめる・生成中）。左右の箱に分けると段違いになった。 */
+            status={running ? `${running.requestedCount}枚中${doneSoFar}枚できました・今月の残り${usage?.month.remaining ?? emptyValue('unknown')}枚` : undefined}
+            split={running ? undefined : { trailingWidth: 'calc(var(--tpl-hb-panel-w) + var(--tpl-hb-footer-inset))', lead: selectedImages.length > 0 ? <>
               <span className={styles.selectionCount} aria-live="polite">{`${selectedImages.length} 枚を選んでいます`}</span>
               <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
               <span className={styles.spacer} />
