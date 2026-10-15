@@ -3,10 +3,11 @@
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { useEffect, useId, useState, type ReactNode } from 'react'
-import { Send, ShieldCheck } from 'lucide-react'
+import { MessageCircle, Send, ShieldCheck } from 'lucide-react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import { HqAccountPickerField } from '@/components/shared/hq-account-picker'
+import { EntityPickerField } from '@/components/shared/entity-picker'
+import { HqAccountPickerField, toHqAccountItems, toPickerFolders, useHqAccountFolders } from '@/components/shared/hq-account-picker'
 import Dialog from '@/components/shared/dialog'
 import { Field as FormField, FieldError } from '@/components/shared/form-controls'
 import { focusFieldById } from '@/lib/use-form-errors'
@@ -18,7 +19,7 @@ import head from './dialog-head.module.css'
 import styles from './member-dialog.module.css'
 import { inviteRequirements } from './member-requirements'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 
 /*
@@ -28,7 +29,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  *   招待＝名前・メール・役割・担当範囲・最初に表示するアカウント
  *   変更＝役割・担当範囲・最初に表示するアカウント・状態（名前とメールは本人が持つ）
  * 見た目だけを絵どおりに組んだ：幅 620・上から 110 の窓、欄は全幅で縦に並べ、担当範囲と状態は
- * 行内のラジオ、担当するアカウントは枠の中に縦1列のチェック、下の帯は線の下で真ん中寄せ。
+ * 行内のラジオ、担当するアカウントは専用の窓で選び、下の帯は線の下で真ん中寄せ。
  * 窓の枠・×・題は共通の Dialog、頭の寸法は dialog-head.module.css。
  */
 
@@ -116,6 +117,7 @@ export default function MemberDialogV8({
   const uid = useId()
   const [value, setValue] = useState<MemberDialogValue>(initial(member, accounts))
   const [localError, setLocalError] = useState('')
+  const accountFolders = useHqAccountFolders(open)
   /* 板 `ukPgd`：名前・メールの間違いは欄の下に赤で出し、直すまで送るボタンを押せなくする。 */
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; scope?: string; assigned?: string }>({})
 
@@ -161,6 +163,11 @@ export default function MemberDialogV8({
     { value: 'viewer', label: '閲覧のみ（見るだけ）' },
   ]
   const scopeAccounts = choosableAccounts(accounts, value.scopedLineAccountIds)
+  const accountItems = toHqAccountItems(accounts, accountFolders).map((item) => {
+    const folder = accountFolders.membership?.get(item.id)?.folder
+    return { ...item, color: folder ? folderDisplayColor(folder) : undefined }
+  })
+  const folders = toPickerFolders(accountFolders.folders)
 
   return (
     <Dialog
@@ -244,15 +251,13 @@ export default function MemberDialogV8({
         </div>
 
         <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
-          <SaveErrorField names={["assignedLineAccountId","value.assignedLineAccountId","assigned_line_account_id","value.assigned_line_account_id"]}><EntitySelect
-            aria-label="最初に表示するアカウント"
-            size="full"
+          <SaveErrorField names={["assignedLineAccountId","value.assignedLineAccountId","assigned_line_account_id","value.assigned_line_account_id"]}><EntityPickerField
+            label="最初に表示するアカウント" noun="アカウント" icon={MessageCircle} items={accountItems} folders={folders} foldersFailed={accountFolders.failed}
             id={`${uid}-assigned`}
             value={value.assignedLineAccountId}
             disabled={busy}
-            error={fieldErrors.assigned}
+            invalid={Boolean(fieldErrors.assigned)}
             onChange={(next) => set('assignedLineAccountId', next)}
-            options={accounts.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))}
           /></SaveErrorField>
           <FieldError id={`${uid}-assigned-error`}>{fieldErrors.assigned}</FieldError>
         </Field>

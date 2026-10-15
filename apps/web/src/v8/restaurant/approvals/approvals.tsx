@@ -159,7 +159,7 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
       footer={(
         <DialogActions>
           <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" disabled={busy || !reason.trim()} title={busy ? '処理しています' : !reason.trim() ? '差し戻す理由を入力してください' : undefined} busy={busy} busyLabel="処理中…" onClick={() => onSubmit(reason.trim())}>差し戻す</Button>
+          <Button variant="primary" disabled={busy || !reason.trim()} title={busy ? '処理しています' : !reason.trim() ? '差し戻す理由を入力してください' : undefined} busy={busy} busyLabel="処理中…" onClick={() => onSubmit(reason.trim())}><Undo2 size={15} aria-hidden="true" />差し戻す</Button>
         </DialogActions>
       )}
     >
@@ -171,14 +171,14 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
             </p>
             <p className={styles.dialogSummaryMain}>{approvalSummary(item)}</p>
           </div>
-          <DialogFormRow><Field note={<>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</>} label="差し戻す理由（・申請者に届きます）" required><SaveErrorField names={["reason"]}><TextArea
+          <Field label="差し戻す理由（・申請者に届きます）" required><SaveErrorField names={["reason"]}><TextArea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：原価の根拠（仕入れ値の表）を添えてください"
               rows={3}
               disabled={busy}
-            /></SaveErrorField></Field></DialogFormRow>
-
+            /></SaveErrorField></Field>
+          <p className={styles.dialogNote}>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</p>
         </div>
       ) : null}
     </Dialog>
