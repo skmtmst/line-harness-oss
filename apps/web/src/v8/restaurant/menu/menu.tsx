@@ -27,6 +27,8 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { DialogFormRow } from '@/components/shared/dialog-form-row'
+import { notifyToast } from '@/components/shared/toast'
+import { MenuPaymentFields, useMenuPayment } from '../../booking-payments/menu-payment'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
@@ -84,6 +86,8 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const editing = editor && editor !== 'new' ? rows.find((row) => row.id === editor) ?? null : null
   const stopping = rows.find((row) => row.id === stopId)
   const deleting = rows.find((row) => row.id === deleteId)
+  /* コースのお支払い（B-305 追記 3・絵 mauOC）。単品には出さない。 */
+  const coursePayment = useMenuPayment('course', selectedAccountId, editing && editing.kind === 'course' ? editing.id : null)
   const priceChanged = Boolean(editing && draft.price !== '' && Number(draft.price) !== editing.price)
 
   const openNew = () => { setDraft(emptyDraft); setEditor('new') }
@@ -107,6 +111,9 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
       : store
         ? await mutate(() => restaurantTestApi.createMenu(selectedAccountId, { storeId: store.id, ...body }), 'メニューを追加しました。')
         : false
+    if (ok && editing && editing.kind === 'course' && coursePayment.dirty) {
+      try { await coursePayment.save(editing.id) } catch { notifyToast('メニューは保存しましたが、お支払いの方法を保存できませんでした。もう一度お試しください。'); return }
+    }
     if (ok) setEditor(null)
   }
 
@@ -264,6 +271,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
             ? `価格を変えると承認ワークフローへ申請されます。承認されるまで、いまの価格（${formatYen(editing.price)}）のまま出ます。空欄の開始日時は承認後すぐに反映します。`
             : '追加したメニューは、予約台帳・Google投稿・LINEカードで同じマスターとして使われます。あとから価格を変えるときは承認ワークフローへ申請されます。'}
         </DialogNote>
+        {editing && editing.kind === 'course' ? <DialogField label="お支払い" kind="select" optional={false}><MenuPaymentFields state={coursePayment} name="course" price={draft.price === '' ? editing.price : Number(draft.price)} people={2} /></DialogField> : null}
         </fieldset></DialogFormRow> : <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? '変更予定の価格は承認後に反映します。開始日時が未設定のときは、承認後すぐに反映します。' : undefined} rows={[
           { label: '種類', value: draft.kind === 'course' ? 'コース' : '単品' },
           { label: 'メニュー名', value: draft.name || emptyValue('unconfigured') },
