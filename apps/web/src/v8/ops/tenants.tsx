@@ -164,7 +164,7 @@ export default function OpsTenantsV8() {
         {loading && rows.length === 0 ? <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />
           : listLoadError && rows.length === 0 ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={loadDescription(listLoadError)} error={listLoadError ?? undefined} onRetry={() => void load()} />
           : visible.length === 0 ? <ListState permissionScope="hq" kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
-          : <DataTable aria-label="契約先" columnSizing="content" columnLayout={{ headHeight: 'var(--tpl-list-head-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--tpl-slot-gap)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
+          : <DataTable aria-label="契約先" columnSizing="content" columnLayout={{ headHeight: 'var(--tpl-list-head-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <thead><TableHeadRow data-table-layout="columns">
               <Th grow>統括名</Th><Th>プラン</Th><Th>状態</Th><Th align="right" collapseAt="narrow">店舗</Th><Th align="right" collapseAt="narrow">権限者</Th><Th>利用 / 請求</Th><Th collapseAt="narrow">契約日</Th><Th>最終ログイン</Th><Th collapseAt="narrow">飲食店機能</Th>
             </TableHeadRow></thead>
