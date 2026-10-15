@@ -3,6 +3,7 @@
  * V8 統括のアカウント（src/v8/hq/home.tsx）の動きの試験。
  * LINE ID の @ を二重にしない、要確認のカードに引っかかった確認の言葉を出す（全文は title）、
  * 閲覧のみには「更新する」を置かない。
+ * 「入る」は見た目のまま、押すと友だちの引き継ぎを続きから進める（2026-10-15 の決まり）。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -13,6 +14,7 @@ vi.hoisted(() => {
 })
 
 const accounts = vi.hoisted(() => vi.fn())
+const stepImport = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -21,7 +23,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      lineAccounts: { ...actual.api.lineAccounts, list: accounts },
+      lineAccounts: { ...actual.api.lineAccounts, list: accounts, stepFollowerImport: stepImport },
       lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })) },
       tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '然 -NEN-' } })) },
     },
@@ -67,6 +69,8 @@ beforeEach(() => {
   document.body.appendChild(container)
   root = createRoot(container)
   accounts.mockResolvedValue({ success: true, data: [warnedAccount] })
+  stepImport.mockReset()
+  stepImport.mockResolvedValue({ success: true, data: { state: { phase: 'completed' }, busy: false, profilesFetched: 0 } })
   role.value = 'owner'
 })
 
@@ -111,6 +115,34 @@ describe('統括のアカウント', () => {
     accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, connection: { status: 'ok', issues: [] } }] })
     await render()
     expect(container.querySelector('article [data-design-part="notice"]')).toBeNull()
+  })
+
+  it('「入る」を押すと、友だちの引き継ぎを続きから進める口を叩く', async () => {
+    await render()
+    const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
+    await act(async () => { enter.click() })
+    expect(stepImport).toHaveBeenCalledWith('acc-1')
+  })
+
+  it('口が返らなくても、口が転んでも「入る」は止まらない', async () => {
+    // 返らない場合（答えを待たない）と、転んだ場合（遷移を止めない）の両方。
+    stepImport.mockReturnValueOnce(new Promise(() => {}))
+    await render()
+    const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
+    await act(async () => { enter.click() })
+    expect(stepImport).toHaveBeenCalledTimes(1)
+    stepImport.mockRejectedValueOnce(new Error('worker unavailable'))
+    await act(async () => { enter.click() })
+    await act(async () => { await Promise.resolve() })
+    expect(stepImport).toHaveBeenCalledTimes(2)
+  })
+
+  it('閲覧のみは引き継ぎを動かさない', async () => {
+    role.value = 'viewer'
+    await render()
+    const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
+    await act(async () => { enter.click() })
+    expect(stepImport).not.toHaveBeenCalled()
   })
 
   it('閲覧のみには「更新する」を置かない', async () => {
