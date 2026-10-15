@@ -112,7 +112,7 @@ async function postEvent(
 beforeEach(async () => {
   vi.clearAllMocks();
   connectorCipher = await encryptCredential(CONNECTOR_SECRET, ENCRYPTION_KEY);
-  mocks.connectorRow.mockResolvedValue({ inbound_secret_encrypted: connectorCipher });
+  mocks.connectorRow.mockResolvedValue({ inbound_secret_encrypted: connectorCipher, status:'connected',event_types_json:'["ec.order.confirmed"]' });
   mocks.getAccount.mockResolvedValue({ id: 'account-1', is_active: 1, channel_access_token: 'token' });
   mocks.getFriend.mockResolvedValue(null);
 });
