@@ -96,6 +96,8 @@
 :root .single[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); }
 :root .multi[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); border-color: var(--color-danger); }
 :root .single { gap: 0; }
+/* 1行の欄は、入りきらない見本の文・中身を字の途中で切らず「…」で省く（全文は欄を押すと読める）。 */
+:root .single { text-overflow: ellipsis; }
 
 /*
  * 打ち直している間（Field の data-field-quiet）は v8 の複数行も普段の枠に戻す。
