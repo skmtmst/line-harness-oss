@@ -130,7 +130,6 @@ export default function SearchConsoleV8() {
   const settingsHref = settingsSiteUrl ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(settingsSiteUrl)}` : null
   const periodControl = <SaveErrorField names={["days"]}><PeriodPicker days={days} onChange={(value) => setDays(value as RangeDays)} supportedDays={RANGES} /></SaveErrorField>
   const settingsButton = settingsHref ? <Button external variant="secondary" href={settingsHref}  ><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
-  const middle = data ? data.daily[Math.floor(data.daily.length / 2)] : null
 
   return <ListPage
     boardId="h1G4d"
@@ -157,7 +156,7 @@ export default function SearchConsoleV8() {
         </KpiBand>
         <div className={styles.body} data-gap="tab">
           <div className={styles.controls} data-gap="narrow">
-            <Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><TextField id="search-property" readOnly value={data.siteUrl} title={data.siteUrl} /></SaveErrorField></Field>
+            <div className={styles.property}><Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><TextField id="search-property" readOnly value={data.siteUrl} title={data.siteUrl} /></SaveErrorField></Field></div>
             <StatePill tone="ok">連携中</StatePill>
             {periodControl}
             <span className={styles.spacer} />
@@ -166,8 +165,8 @@ export default function SearchConsoleV8() {
           <Card variant="form" aria-labelledby="sc-trend-title">
             <CardHeader size="stacked" titleId="sc-trend-title" title="検索クリックの推移（日別クリック数）" />
             {data.daily.length === 0 ? <ListState kind="empty" title="期間内のデータがありません" description="集計期間を変えると、ここに推移が出ます。" /> : <>
-              <ValueBarChart label="日別クリック数の推移" unit="クリック" items={data.daily.map(row=>({key:row.key,label:row.key,value:row.clicks}))} />
-              <div className={styles.scAxis}><span>{shortDay(data.daily[0].key)}</span><span>{middle ? shortDay(middle.key) : ''}</span><span>{`${shortDay(data.daily[data.daily.length - 1].key)}（反映待ち）`}</span></div>
+              {/* 絵どおり目盛りの無い小さい棒（summary）。日付の文字は部品の下の段に出し、最後の日に「反映待ち」を添える。 */}
+              <ValueBarChart label="日別クリック数の推移" unit="クリック" presentation="summary" items={data.daily.map((row, index) => ({ key: row.key, label: index === data.daily.length - 1 ? `${shortDay(row.key)}（反映待ち）` : shortDay(row.key), value: row.clicks }))} />
             </>}
           </Card>
           <div className={styles.rankings}>

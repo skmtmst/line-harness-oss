@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { RowMenu } from '@/components/shared/row-actions'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
@@ -82,11 +83,18 @@ function latestPill(item: SavedAnalyticsSummary) {
   return <StatePill tone={latest.state === 'partial' ? 'warn' : 'neutral'}>{SAVED_STATE_LABELS[latest.state]}</StatePill>
 }
 
-/** 定期レポートの行の「…」：内容を変える（作る画面を開く）。 */
-function ScheduleMenu({ schedule }: { schedule: AnalyticsReportSchedule }) {
+/**
+ * 定期レポートの行の「…」（行の右端は「…」1つ・B-253）：内容を変える・止める／また送る・しまう。
+ * 止める・また送る・しまうの動きは一覧の側が持ち、ここは項目に並べるだけ。
+ */
+function ScheduleMenu({ schedule, busy, onPause, onResume, onArchive }: { schedule: AnalyticsReportSchedule; busy: boolean; onPause: () => void; onResume: () => void; onArchive: () => void }) {
   const router = useRouter()
+  const items: ActionMenuItem[] = [{ id: 'edit', label: '内容を変える', onSelect: () => router.push(`/analytics/reports/new?id=${schedule.id}`) }]
+  if (schedule.status === 'active') items.push({ id: 'pause', label: '止める', disabled: busy, onSelect: onPause })
+  if (schedule.status === 'paused') items.push({ id: 'resume', label: 'また送る', disabled: busy, onSelect: onResume })
+  items.push({ id: 'archive', label: 'しまう', tone: 'danger', disabled: busy, onSelect: onArchive })
   return <span className={styles.rowMenu}>
-    <RowMenu appearance="box" label={`定期レポート「${schedule.name}」の操作`} items={[{ id: 'edit', label: '内容を変える', onSelect: () => router.push(`/analytics/reports/new?id=${schedule.id}`) }]} />
+    <RowMenu appearance="box" label={`定期レポート「${schedule.name}」の操作`} items={items} />
   </span>
 }
 
@@ -253,7 +261,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       {loading ? <ListState kind="loading" title="保存した分析を読み込んでいます" />
         : error && items.length === 0 ? <ListState kind="error" title="保存した分析を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setSavedReload((n) => n + 1)} />
         : items.length === 0 ? <ListState kind="empty" title="保存した分析はまだありません" description="クロス分析かファネルを集計し、その結果を保存してください。" />
-        : <DetailColumns presentation="analysis" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={
+        : <DetailColumns presentation="analysis" variant="analysis-history" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={
           <Card variant="records" aria-labelledby="saved-history-title">
             <CardHeader size="content" titleId="saved-history-title" meta={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${schedules.filter(schedule => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined} title={<TruncatedText value={selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'} />} />
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
@@ -262,7 +270,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
               : !selected ? <p data-card-footer className={styles.caption}>一覧から分析を選んでください</p>
               : snapshots.length === 0 ? <p data-card-footer className={styles.caption}>保存された結果はありません</p>
               : <DataTable aria-label="結果の履歴" columnSizing="content" columnLayout={{ ...TABLE_LAYOUT, rowHeight: 'var(--polish-table-row)' }}>
-                <thead><TableHeadRow>
+                <thead><TableHeadRow data-table-layout="columns">
                   <Th grow truncate>対象期間</Th>
                   <Th collapseAt="narrow" truncate>データ締切</Th>
                   <Th truncate>状態</Th>
@@ -282,7 +290,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <p data-card-footer className={styles.caption}>保存時点の固定結果です。いま集計し直しても変わりません。</p>
           </Card>
         }>
-          <DataTable aria-label="保存した分析" columnSizing="content" grid={{ columns: 'minmax(0, 1fr) var(--tpl-an-col-90) var(--tpl-an-col-80) var(--tpl-an-col-100) var(--tpl-an-col-100)', padding: '0 var(--tpl-list-inset)', headPadding: '0 var(--tpl-list-inset)', gap: 'var(--polish-space-row)', rowHeight: 'var(--tpl-list-row-h)', bodyTextSize: 'var(--polish-text-body)' }}>
+          <Card variant="records" contentPadding="0" aria-label="保存した分析の一覧"><DataTable aria-label="保存した分析" columnSizing="content" grid={{ columns: 'minmax(0, 1fr) var(--tpl-an-col-90) var(--tpl-an-col-80) var(--tpl-an-col-100) var(--tpl-an-col-100)', padding: '0 var(--tpl-list-inset)', headPadding: '0 var(--tpl-list-inset)', gap: 'var(--polish-space-row)', rowHeight: 'var(--tpl-list-row-h)', bodyTextSize: 'var(--polish-text-body)' }}>
             <thead><TableHeadRow><Th grow truncate>分析名</Th><Th truncate>種類</Th><Th truncate>作った人</Th><Th truncate>更新日時</Th><Th truncate>集計状態</Th></TableHeadRow></thead>
             <tbody>
               {visibleItems.length === 0 ? <Tr><Td colSpan={5}>条件に合う保存済み分析はありません。<Button onClick={() => setQuery('')}>キャンセル</Button></Td></Tr> : visibleItems.map(item => <Tr key={item.id} data-table-layout="columns" selected={selectedId === item.id} onOpen={() => setSelectedId(item.id)}>
@@ -291,7 +299,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
                 <Td title={item.latestSnapshot ? `${formatAnalyticsDate(item.latestSnapshot.periodFrom)}〜${formatAnalyticsDate(item.latestSnapshot.periodTo)}・${SAVED_STATE_LABELS[item.latestSnapshot.state]}` : undefined}>{latestPill(item)}</Td>
               </Tr>)}
             </tbody>
-          </DataTable>
+          </DataTable></Card>
         </DetailColumns>}
 
       <div className={styles.sectionHead}>
@@ -303,27 +311,22 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       </div>
       {schedulesError ? <Notice tone="danger" ><span>{schedulesError}</span>{/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}<Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></Notice> : null}
       {schedulesLoading ? null : schedules.length === 0 ? (schedulesError ? null : <ListState kind="empty" title="定期レポートはまだありません" description="決まった曜日や日に、集計結果をメールやLINEへ届けられます。" />)
-        : <DataTable aria-label="定期レポート" columnSizing="content" columnLayout={TABLE_LAYOUT}>
-          <thead><TableHeadRow>
+        : <Card variant="records" contentPadding="0" aria-label="定期レポートの一覧">{/* 表を本文の直下に置くと、一覧の型が本文の左右の余白を 0 にする。枠で包んで余白を保つ。 */}<DataTable aria-label="定期レポート" columnSizing="content" columnLayout={TABLE_LAYOUT}>
+          <thead><TableHeadRow data-table-layout="columns">
             <Th grow truncate>レポート名</Th>
             <Th truncate>間隔</Th>
             <Th truncate>次に届く予定</Th>
             <Th truncate>状態</Th>
-            <Th truncate>操作</Th>
+            <Th truncate><span className="sr-only">操作</span></Th>
           </TableHeadRow></thead><tbody>
           {schedules.map((schedule) => <Tr key={schedule.id} data-table-layout="columns">
             <Td grow><TruncatedText value={String(schedule.name ?? '')} /></Td>
             <Td><TruncatedText value={schedule.isOneTime ? '1回だけ' : cadenceLabel(schedule)} /></Td>
             <Td><TruncatedText value={schedule.status === 'paused' ? emptyValue('unknown') : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')} /></Td>
             <Td><span><StatePill tone={schedule.status === 'active' ? 'ok' : 'neutral'}>{REPORT_STATUS_LABELS[schedule.status]}</StatePill></span></Td>
-            <ActionCell>{canManage ? <span className={styles.rowActions}>
-              {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')} busy={Boolean(scheduleBusyId === schedule.id)} busyLabel="処理中…">止める</Button> : null}
-              {schedule.status === 'paused' ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'active')} busy={Boolean(scheduleBusyId === schedule.id)} busyLabel="処理中…">また送る</Button> : null}
-              {!schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => setArchiveTarget(schedule)}>しまう</Button> : null}
-              {!schedule.isOneTime ? <ScheduleMenu schedule={schedule} /> : null}
-            </span> : null}</ActionCell>
+            <ActionCell>{canManage && !schedule.isOneTime ? <ScheduleMenu schedule={schedule} busy={scheduleBusyId === schedule.id} onPause={() => void changeScheduleStatus(schedule, 'paused')} onResume={() => void changeScheduleStatus(schedule, 'active')} onArchive={() => setArchiveTarget(schedule)} /> : null}</ActionCell>
           </Tr>)}</tbody>
-        </DataTable>}
+        </DataTable></Card>}
 
       {/* 1回だけ送った直近の結果。一覧からは消えるため、ここから失敗理由・宛先別結果へ進める。 */}
       {recentOneTime.length > 0 ? <section className={styles.table} aria-label="1回だけ送った結果">

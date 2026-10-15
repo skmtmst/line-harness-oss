@@ -109,6 +109,8 @@
   overflow-y: auto;
 }
 
+/* 概要の段どうしの間（絵 tnTn9：数の帯・リンク・待っている成果・付け方の間は 16）。 */
+.stack { display: flex; flex-direction: column; gap: var(--tpl-af-dr-gap); min-width: 0; }
 .section {
   display: flex;
   flex-direction: column;
@@ -253,3 +255,5 @@
 }
 .stop:disabled { color: var(--color-ink-faint); cursor: default; }
 .spacer { flex: 1 1 0; }
+/* 絵 tnTn9：下の帯は「紹介を止める」を左端、［編集する］［支払いを確定する］を右端に。 */
+.footerRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); width: 100%; }

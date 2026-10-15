@@ -1159,7 +1159,7 @@ export default function RemindersListV8() {
       {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
       {!friendId ? <KpiBand data-design="KPIs">
         {kpis.map((kpi) => (
-          <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? kpi.link : undefined} retryLabel="失敗を見る →" />
+          <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} action={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? { label: '失敗を見る', onClick: kpi.link } : undefined} />
         ))}
       </KpiBand> : null}
 
@@ -1178,7 +1178,7 @@ export default function RemindersListV8() {
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
         open={pauseTarget !== null}
-        designNode="RwVo5" footerAlign="center" actionWidthReserve="idle"
+        designNode="RwVo5" designWidth={480} footerAlign="center" actionWidthReserve="idle"
         title={pauseTarget ? `「${pauseTarget.name}」を一時停止する` : ''}
         description="再開するまで、このリマインダの通知は送られません。"
         confirmLabel="一時停止する"
@@ -1200,10 +1200,10 @@ export default function RemindersListV8() {
       {/* 削除の窓（★V8 `VsSyu`）。 */}
       <SheetDialog
         open={deleteTarget !== null}
-        designNode="VsSyu" designWidth={480} designTop={260}
+        designNode="VsSyu" designWidth={480}
         title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
         description="通知の予定と登録者がすべて消えます。すでに送ったメッセージは友だちのトークに残ります。"
-        band="削除は元に戻せません。しばらく使わないだけなら「一時停止する」を使ってください。"
+        band={deleteTarget && statusKeyOf(deleteTarget) === 'active' ? '削除は元に戻せません。しばらく使わないだけなら「一時停止する」を使ってください。' : '削除は元に戻せません。'}
         bandTone="danger"
         busy={deleting}
         error={deleteError || (deleteTarget && !deleteStillListed ? 'このリマインダが一覧から外れました。この窓を閉じて、いまの一覧から選び直してください。' : undefined)}

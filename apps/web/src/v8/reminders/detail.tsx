@@ -6,7 +6,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowRight, Check, Copy, Download, Info, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react';
+import { ArrowRight, Check, Copy, Download, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -19,6 +19,7 @@ import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/
 import { csvCell } from '@/lib/presentation';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
+import { PageExplanationBody, PageExplanationProvider, PageExplanationToggle } from '@/components/shared/page-explanation';
 import { CreateSummaryCard } from '@/components/templates/create-parts';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
@@ -476,8 +477,10 @@ function ReminderDetailV8() {
   ].filter(Boolean).join('・')
 
   return (
-    <SaveErrorScope errors={saveErrors}><PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
+    <SaveErrorScope errors={saveErrors}><PageExplanationProvider pageKey="reminders:registrants"><PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
       <PageHeading title={data.reminder.name}
+        help="登録した友だちごとに、基準日から決めた日時に通知を送ります。"
+        explanationToggle={tab === 'registrants' ? <PageExplanationToggle /> : undefined}
         crumbs={<><p className={styles.meta}>{meta}</p></>}
         tabs={<><Tabs
           label="リマインダの詳細"
@@ -611,7 +614,7 @@ function ReminderDetailV8() {
         onConfirm={() => runDelete()}
         onCancel={() => setConfirmDelete(false)}
       />
-    </PageFrame></SaveErrorScope>
+    </PageFrame></PageExplanationProvider></SaveErrorScope>
   )
 }
 
@@ -1048,10 +1051,7 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      <p className={styles.infoBand}>
-        <Info size={16} aria-hidden="true" className={styles.infoIcon} />
-        基準日を変えると、まだ送っていない通知だけ新しい日程で組み直します。送った履歴は消えません。
-      </p>
+      <PageExplanationBody keepMounted>基準日を変えると、まだ送っていない通知だけ新しい日程で組み直します。送った履歴は消えません。</PageExplanationBody>
 
       <section className={styles.card} aria-labelledby="rm-detail-registrants">
         <div className={styles.cardHead}>
@@ -1101,11 +1101,13 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
                 return (
                   <div key={item.id} role="row" className={styles.row}>
                     <span role="cell" className={styles.colFlex}>
-                      <Link href={`/friends/${encodeURIComponent(item.friendId)}`} className={styles.friendLink}>{item.friendName || '名前未設定'}</Link>
+                      <Link href={`/friends/${encodeURIComponent(item.friendId)}`} className={styles.friendName}>{item.friendName || '名前未設定'}</Link>
                     </span>
                     <span role="cell" className={styles.colDate}>
                       <SaveErrorField names={["draftDates","draft_dates"]}><DateTimeField
                         className={styles.dateField}
+                        labelFormat="short"
+                        clearable={false}
                         aria-label={`${item.friendName || '登録者'}の基準日`}
                         value={draftDates[item.id] ?? ''}
                         disabled={item.status !== 'active' || busy || !canManage}
@@ -1119,20 +1121,20 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
                     </span>
                     <span role="cell" className={styles.colOps}>
                       {/* 閲覧のみの人には、押せない操作を置かない。 */}
-                      {!canManage ? null : item.status === 'active' ? (
-                        dirty ? (
-                          <Button variant="primary" disabled={busy} busy={busy} busyLabel="保存しています" onClick={() => void saveDate(item)}>
-                            <Check size={15} aria-hidden="true" />基準日を保存
-                          </Button>
-                        ) : (
-                          <Button variant="text" disabled={busy} onClick={() => void changeStatus(item, 'cancel')}>
-                            <X size={15} aria-hidden="true" />取り消す
-                          </Button>
-                        )
-                      ) : item.status === 'cancelled' ? (
-                        <Button variant="text" disabled={busy} onClick={() => void changeStatus(item, 'resume')}>
-                          <RotateCcw size={15} aria-hidden="true" />再開する
+                      {/* 行の操作は「…」1つの中（B-253）。基準日を変えたときだけ、その場で保存するボタンを横に出す。閲覧のみの人には置かない。 */}
+                      {canManage && item.status === 'active' && dirty ? (
+                        <Button variant="primary" disabled={busy} busy={busy} busyLabel="保存しています" onClick={() => void saveDate(item)}>
+                          <Check size={15} aria-hidden="true" />基準日を保存
                         </Button>
+                      ) : null}
+                      {canManage && (item.status === 'active' || item.status === 'cancelled') ? (
+                        <RowMenu
+                          label={`${item.friendName || '登録者'}の操作`}
+                          title="その他の操作"
+                          items={item.status === 'active'
+                            ? [{ id: 'cancel', label: '取り消す', icon: <X size={16} aria-hidden="true" />, disabled: busy, onSelect: () => void changeStatus(item, 'cancel') }]
+                            : [{ id: 'resume', label: '再開する', icon: <RotateCcw size={16} aria-hidden="true" />, disabled: busy, onSelect: () => void changeStatus(item, 'resume') }]}
+                        />
                       ) : null}
                     </span>
                   </div>

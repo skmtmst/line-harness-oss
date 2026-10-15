@@ -26,6 +26,12 @@
   display: grid;
 }
 
+:root .items[data-choice-columns] {
+  width: 100%;
+  grid-template-columns: repeat(var(--choice-columns), minmax(0, 1fr));
+  gap: var(--polish-space-row);
+}
+
 .card {
   grid-template-columns: 20px minmax(0, 1fr);
   cursor: pointer;
@@ -351,8 +357,18 @@ html:root .card:not(.row) { position: relative; display: flex; flex-direction: c
 html:root .card:not(.row) > .radio { position: absolute; top: var(--space-16); right: var(--space-16); margin: 0; opacity: 1; pointer-events: auto; }
 /* 行型の選択は丸だけで示す。カードの選択枠を引き継がない。 */
 html:root .card.row { outline-color: transparent; box-shadow: none; background: transparent; }
+/* 行型の部品は .card を持たないので、選んだ行にも同じく枠を出さない（絵 pUT4L・E1CeT：選んだ文の周りに細い緑の四角が出ていた）。 */
+html:root .row.checked, html:root .row.checked:hover { outline-color: transparent; box-shadow: none; background: transparent; }
+html:root .row, html:root .row.checked, html:root .row.checked:hover { outline-color: transparent; box-shadow: none; background: transparent; }
 
 html:root .card[data-choice-indicator='check'] > .radio { width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 html:root .card[data-choice-indicator='check'] .body { padding-right: 0; }
 html:root .card[data-choice-indicator='check'] .title { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
 .check { width: var(--space-16); height: var(--space-16); flex-shrink: 0; color: var(--color-accent-deep); }
+
+/* バナー生成の出力サイズ（★BG-B 出力サイズ・絵 iMnph）：1列に並べる小さい箱。B-152 の内側16・欄の間12 ではなく、余白 8/10・箱の間 8 で描く。 */
+:root .compact[data-compact-typography='banner'] { padding: 8px 10px; gap: 3px; }
+:root .items:has(> .compact[data-compact-typography='banner']) { gap: 8px; }
+/* バナー生成の出力サイズ（V8・1列）：絵（p03ImY・tSgl6）の小さい箱は上下8・左右12。共通の板の余白16を当てると1枚が高くなり、脇のパネルが画面の下の帯にかぶった。 */
+html:root .card.compact[data-compact-typography='banner'] { padding: var(--space-8) var(--space-12); }
+html:root .card.compact[data-compact-typography='banner'] > .radio { top: var(--space-12); right: var(--space-12); }

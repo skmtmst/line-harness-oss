@@ -2,7 +2,7 @@
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Star, FileCode, History, Inbox, LayoutList, RefreshCw, RotateCw, TriangleAlert } from 'lucide-react'
+import { FileCode, History, Inbox, LayoutList, RefreshCw, RotateCw, TriangleAlert } from 'lucide-react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -22,7 +22,8 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { RowMenu } from '@/components/shared/row-actions'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { notifyToast } from '@/components/shared/toast'
 import { withViewTransition } from '@/components/shared/view-transition'
@@ -289,7 +290,8 @@ export default function WebhooksInteractionsV8() {
   const known = loaded ? summary : null
   const bandCells: BandCell[] = [
     {
-      key: 'sent', title: '今月送った', icon: <History size={13} aria-hidden="true" />,
+      // 数の帯の題はタブをまたいで「直近30日 送った」にそろえる（絵 Uv9AA）。期間を変えたらその日数で出す。
+      key: 'sent', title: `直近${periodDays}日 送った`, icon: <History size={13} aria-hidden="true" />,
       value: known ? known.outgoing : null, unit: '回',
       detail: known ? `成功 ${formatNumber(Math.max(0, known.outgoing - known.outgoingFailed))}` : '集計を読み込めませんでした',
     },
@@ -310,17 +312,18 @@ export default function WebhooksInteractionsV8() {
     },
   ]
 
-  const chip = (label: string, count: number, on: boolean, select: () => void, icon: React.ReactNode) => (
-    <FilterChip selected={on} onChange={() => { select(); setPage(1) }} icon={icon}>
+  /* 絞り込みの札は文字と数だけ（意味のない印は付けない・絵 Uv9AA）。 */
+  const chip = (label: string, count: number, on: boolean, select: () => void) => (
+    <FilterChip selected={on} onChange={() => { select(); setPage(1) }}>
       {loaded ? `${label} ${formatNumber(count)}` : label}
     </FilterChip>
   )
   const chips = (
     <div role="group" aria-label="向きと結果で絞り込む" className={styles.chips}>
-      {chip('すべて', summary.total, direction === 'all' && status === 'all', () => { setDirection('all'); setStatus('all') }, <Star size={13} aria-hidden="true" />)}
-      {chip('送った', summary.outgoing, direction === 'outgoing' && status === 'all', () => { setDirection('outgoing'); setStatus('all') }, <Star size={13} aria-hidden="true" />)}
-      {chip('受け取った', summary.incoming, direction === 'incoming' && status === 'all', () => { setDirection('incoming'); setStatus('all') }, <Star size={13} aria-hidden="true" />)}
-      {chip('失敗', summary.failed, status === 'failed', () => { setDirection('all'); setStatus('failed') }, <Star size={13} aria-hidden="true" />)}
+      {chip('すべて', summary.total, direction === 'all' && status === 'all', () => { setDirection('all'); setStatus('all') })}
+      {chip('送った', summary.outgoing, direction === 'outgoing' && status === 'all', () => { setDirection('outgoing'); setStatus('all') })}
+      {chip('受け取った', summary.incoming, direction === 'incoming' && status === 'all', () => { setDirection('incoming'); setStatus('all') })}
+      {chip('失敗', summary.failed, status === 'failed', () => { setDirection('all'); setStatus('failed') })}
     </div>
   )
   /* 期間は絵に無い。消さずに、道具の段の右の空いた所へ小さく置く（件数はページ送りの段へ）。 */
@@ -420,9 +423,13 @@ export default function WebhooksInteractionsV8() {
                     <StatusBadge tone={reply.failed ? 'danger' : 'success'}>{reply.text}</StatusBadge>
                   </Td>
                   <Td align="right" className={styles.colTime}><span className={styles.main}>{seconds(item.durationMs)}</span></Td>
-                  <Td className={styles.colOps}>
-                    <Button onClick={() => openDetail(item)} aria-label={`「${item.webhookName}」の中身を見る`} busyLabel="読み込み中…">中身を見る</Button>
-                  </Td>
+                  <ActionCell className={styles.colOps}>
+                    <RowMenu
+                      label={`「${item.webhookName}」の操作`}
+                      title="操作"
+                      items={[{ id: 'view', label: '中身を見る', onSelect: () => openDetail(item) }]}
+                    />
+                  </ActionCell>
                 </Tr>
               )
             })}
@@ -440,7 +447,7 @@ export default function WebhooksInteractionsV8() {
 
   return (
     <ListPage
-      help={<>{WEBHOOKS_DESCRIPTION}{"行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}
       explanation="失敗したものは「もう一度送る」でやり直せます。相手が止まっていたときは、自動で3回までやり直します。"
       boardId="Uv9AA"
       headingSize="regular"

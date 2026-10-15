@@ -31,6 +31,16 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   surface?: 'standard' | 'inset' | 'muted' | 'bordered' | 'danger'
 }
 
+/*
+ * 上下・左右を分けた余白（例 '8px 12px'）は max() に入らず、余白が 0 になっていた。
+ * かっこの外に空白がある値だけ、最低16を掛けずにそのまま使う（a7lUk の階層の行）。
+ */
+function hasSides(value: string): boolean {
+  let flat = value
+  while (/\([^()]*\)/.test(flat)) flat = flat.replace(/\([^()]*\)/g, '')
+  return /\s/.test(flat.trim())
+}
+
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
 export default function Card({
   children,
@@ -82,6 +92,7 @@ export default function Card({
       data-card-padding={padding} data-card-variant={variant}
       data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
+      data-card-spacing-sides={contentPadding && hasSides(contentPadding) ? '' : undefined}
       style={contentPadding || gapValue ? { ...style, '--card-content-padding': contentPadding ?? '0px', '--card-content-gap': gapValue ?? '0px' } as CSSProperties : style} {...props}>
       {children}
     </section>
@@ -102,8 +113,11 @@ export function CardHeader({
   actionTone = 'accent',
   headingLevel = 2,
   titleId,
+  help,
 }: {
   title: ReactNode
+  /** 題の右の「？」（HelpTip）。題とは間 6 で、題の行の高さの真ん中にそろえる。 */
+  help?: ReactNode
   optional?: boolean
   meta?: ReactNode
   action?: ReactNode
@@ -119,7 +133,12 @@ export function CardHeader({
       data-design-node="t0jk8p"
     >
       <div className={styles.titleGroup}>
-        <Heading id={titleId} className={styles.title}>{title}{optional ? <OptionalBadge /> : null}</Heading>
+        {help ? (
+          <span className={styles.titleRow}>
+            <Heading id={titleId} className={styles.title}>{title}{optional ? <OptionalBadge /> : null}</Heading>
+            {help}
+          </span>
+        ) : <Heading id={titleId} className={styles.title}>{title}{optional ? <OptionalBadge /> : null}</Heading>}
         {meta ? <span className={styles.meta}>{meta}</span> : null}
       </div>
       {action ? (

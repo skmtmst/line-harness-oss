@@ -73,8 +73,9 @@ function readTab(params: URLSearchParams): AnalyticsTabV8 {
 function Navigation({ active, savedCount }: { active: AnalyticsTabV8; savedCount: number | null }) {
   const owner = tabOwner(active)
   const group = GROUPS.find((item) => item.tabs.some((tab) => tab.key === owner)) ?? GROUPS[0]
+  /* 上の段（組）も下の段（その組の見かた）も共通の下線のタブ（司令塔の判断・絵 iK4cQ・AzrZq・PFe9c・N8ZrUl）。 */
   return <div className={styles.navigation}>
-    <Tabs label="分析の組" items={GROUPS.map(item => ({label:item.label,href:hrefOf(item.tabs[0].key),current:item===group}))} />
+    <Tabs label="分析の組" items={GROUPS.map((item) => ({ label: item.label, href: hrefOf(item.tabs[0].key), current: item.label === group.label }))} />
     <Tabs label="分析の見かた" items={group.tabs.map(item => ({label:item.label,href:hrefOf(item.key),current:item.key===owner,count:item.key==='saved' ? savedCount ?? undefined : undefined}))} />
   </div>
 }
@@ -102,9 +103,9 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   const board = tab === 'friends' ? (readOnly ? 'L4Uov' : narrow ? 'eEhYU' : 'ws9wt') : BOARD[tab]
   const exportReady = exportAction !== null && exportAction.scope === scope && !exportAction.disabled
   const actions = <>
-    <Button variant="secondary" className={styles.csvButton} disabled={!exportReady} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
-    {/* 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。場所だけ空けて CSV の位置を保つ。 */}
-    {readOnly ? <span className={styles.createSpace} aria-hidden="true" /> : <Button variant="primary" href="/analytics/reports/new"><Plus size={15} aria-hidden="true" />レポートを作る</Button>}
+    <Button variant="secondary" className={readOnly ? undefined : styles.csvButton} disabled={!exportReady} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+    {/* 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。CSV が右端へ寄る（絵 L4Uov）。 */}
+    {readOnly ? null : <Button variant="primary" href="/analytics/reports/new"><Plus size={15} aria-hidden="true" />レポートを作る</Button>}
   </>
   const tabs = <>
     <Navigation active={tab} savedCount={savedCount} />

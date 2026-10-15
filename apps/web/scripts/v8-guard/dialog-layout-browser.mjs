@@ -1,9 +1,14 @@
-export function scanDialogAudit({ expectedWidth, expectedTop, fullForm = false, requiredAction, fixedActions = [], pickerControls = false, compactBody = false, choices = false, plainUsage = false, columnSettings = false, scoreHistory = false } = {}) {
+export function scanDialogAudit({ expectedWidth, expectedTop, viewportFit = false, fullForm = false, requiredAction, fixedActions = [], pickerControls = false, compactBody = false, choices = false, plainUsage = false, columnSettings = false, scoreHistory = false, recipientRows = false } = {}) {
   const panel = document.querySelector('[data-m1-scope]')
   if (!panel) return { inventory: [], findings: [] }
   const rect = panel.getBoundingClientRect()
   const inventory = [{ kind: 'panel', width: rect.width, height: rect.height }]
   const findings = []
+  if (viewportFit) {
+    const excess = Math.max(-rect.top, rect.bottom - innerHeight, -rect.left, rect.right - innerWidth, 0)
+    inventory.push({ kind: 'dialog-viewport-bounds', excess, rect: rect.toJSON() })
+    if (excess > 1) findings.push({ pattern: 'F10', kind: 'dialog-viewport-bounds', excess })
+  }
   if (Number.isFinite(expectedTop)) {
     inventory.push({ kind: 'dialog-top', actual: rect.top, expected: expectedTop })
     if (Math.abs(rect.top - expectedTop) > 1) findings.push({ pattern: 'F6', kind: 'dialog-top', actual: rect.top, expected: expectedTop })
@@ -56,7 +61,36 @@ export function scanDialogAudit({ expectedWidth, expectedTop, fullForm = false, 
       }
     }
   }
+  if (recipientRows) {
+    const table = panel.querySelector('[data-dialog-recipients]')
+    if (!table) findings.push({ pattern: 'F4', kind: 'dialog-recipients-missing' })
+    for (const row of table?.querySelectorAll('tbody tr') ?? []) {
+      const height = row.getBoundingClientRect().height
+      inventory.push({ kind: 'dialog-recipient-row', height })
+      if (height > 40) findings.push({ pattern: 'F6', kind: 'dialog-recipient-row-height', height, maximum: 40 })
+      const channel = row.lastElementChild?.firstElementChild
+      if (channel) {
+        const gap = row.getBoundingClientRect().right - channel.getBoundingClientRect().right
+        inventory.push({ kind: 'dialog-recipient-edge', gap })
+        if (gap < 11.5) findings.push({ pattern: 'F6', kind: 'dialog-recipient-edge', gap, minimum: 12 })
+      }
+    }
+  }
   if (columnSettings) {
+    const body = panel.querySelector('[data-presentation="columns"]')
+    const content = body?.parentElement
+    if (body && content) {
+      const css = getComputedStyle(content)
+      const available = content.getBoundingClientRect().width - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight)
+      const width = body.getBoundingClientRect().width
+      inventory.push({ kind: 'display-body-width', width, available })
+      if (Math.abs(available - width) > 1) findings.push({ pattern: 'F6', kind: 'display-body-width', width, available })
+    }
+    for (const row of panel.querySelectorAll('[data-presentation="columns"] [data-reorder-id]')) {
+      const height = row.getBoundingClientRect().height
+      inventory.push({ kind: 'display-selected-row-height', height })
+      if (Math.abs(height - 40) > 1) findings.push({ pattern: 'F6', kind: 'display-selected-row-height', height, expected: 40 })
+    }
     const fixed = panel.querySelector('[data-fixed-display-name]')
     const selected = panel.querySelector('[data-presentation="columns"] [aria-label="選択した列"]')
     if (!fixed || !selected || !selected.contains(fixed)) findings.push({ pattern: 'F4', kind: 'display-fixed-name-missing' })
@@ -69,7 +103,7 @@ export function scanDialogAudit({ expectedWidth, expectedTop, fullForm = false, 
     }
     for (const group of panel.querySelectorAll('[role="group"][aria-label$="の追加できる列"]')) {
       const columns = getComputedStyle(group).gridTemplateColumns.split(' ').filter(Boolean)
-      if (columns.length !== 2) findings.push({ pattern: 'F10', kind: 'display-available-columns', actual: columns.length, expected: 2 })
+      if (columns.length !== 3) findings.push({ pattern: 'F10', kind: 'display-available-columns', actual: columns.length, expected: 3 })
     }
   }
   if (scoreHistory) {
@@ -103,6 +137,25 @@ export function scanDialogAudit({ expectedWidth, expectedTop, fullForm = false, 
         findings.push({ pattern: 'F6', kind: 'dialog-description-band', band: descriptionBand, ...actual, expectedColor })
       }
     }
+    const header = [...panel.children].find(el => el.querySelector('h2'))
+    const band = panel.querySelector('[data-qa-dialog-callout]')
+    if (header && band) {
+      const h = header.getBoundingClientRect(), b = band.getBoundingClientRect(), css = getComputedStyle(header)
+      const left = h.left + parseFloat(css.paddingLeft), right = h.right - parseFloat(css.paddingRight)
+      const gap = b.top - h.bottom
+      inventory.push({ kind: 'description-band-layout', width: b.width, available: right - left, gap })
+      if (Math.abs(b.left - left) > 1 || Math.abs(b.right - right) > 1) findings.push({ pattern: 'F6', kind: 'dialog-description-band-width', width: b.width, available: right - left })
+      if (gap < 11) findings.push({ pattern: 'F6', kind: 'dialog-description-band-gap', gap, minimum: 12 })
+    }
+  }
+  for (const group of panel.querySelectorAll('[data-choice-columns]')) {
+    const g = group.getBoundingClientRect(), columns = Number(group.dataset.choiceColumns)
+    const cards = [...group.querySelectorAll('[data-choice-card]')].map(el => el.getBoundingClientRect())
+    const firstRow = cards.filter(card => Math.abs(card.top - cards[0]?.top) < 1)
+    const excess = Math.max(0, ...cards.map(card => Math.max(g.left - card.left, card.right - g.right)))
+    inventory.push({ kind: 'choice-card-grid', columns: firstRow.length, expected: Math.min(columns, cards.length), excess })
+    if (excess > 1) findings.push({ pattern: 'F10', kind: 'dialog-choice-card-overflow', excess })
+    if (firstRow.length !== Math.min(columns, cards.length)) findings.push({ pattern: 'F10', kind: 'dialog-choice-card-columns', actual: firstRow.length, expected: Math.min(columns, cards.length) })
   }
   if (requiredAction && ![...panel.querySelectorAll('button,[role="menuitem"]')].some(el => el.innerText?.trim() === requiredAction)) {
     findings.push({ pattern: 'F8', kind: 'dialog-action-label', expected: requiredAction })

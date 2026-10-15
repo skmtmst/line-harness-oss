@@ -22,6 +22,9 @@
   padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom); flex-shrink: 0;
 }
 :global(:root) .headingText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
+/* 「この画面の説明」（B-245）を開いても、右の操作（店舗の欄・主ボタン）を題の行に残す。説明の長い1行が幅を取り、操作が次の行へ落ちていた（qf3ky）。 */
+:global(:root) .headingText:has(> [data-screen-explanation]:not([hidden])) { flex-basis: 0; }
+:global(:root) .heading:has(> .headingText > [data-screen-explanation]:not([hidden])) > .actions { align-self: flex-start; }
 :global(:root) .titleRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
 :global(:root) .title { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global(:root) .pageTitle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
@@ -148,7 +151,7 @@
 :global(:root) .settingsNav:has(> [data-settings-nav='inline']) { width: auto; padding: 0; }
 :global(:root) .settingsContent { flex: 1; max-width: 720px; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-settings-content-gap); padding: var(--tpl-settings-content-pad-block) var(--tpl-settings-content-pad-side); }
 /* 採用 B237-5a（VsZ25）：設定目次208、右380、各欄の内側24。 */
-:global(:root) .frame[data-template-layout='customer-look'] { --tpl-settings-nav-width:208px; --tpl-settings-gap:0px; --customer-look-preview-width:380px; --customer-look-pane-padding:24px; }
+:global(:root) .frame[data-template-layout='customer-look'] { --tpl-settings-nav-width:calc(var(--tpl-setnav-w) + var(--tpl-settings-nav-pad-side) * 2); --tpl-settings-gap:0px; --customer-look-preview-width:380px; --customer-look-pane-padding:24px; }
 :global(:root) .frame[data-template-layout='customer-look'] .settingsContent { max-width:none; padding:0; }
 .customerLookSplit { display:flex; flex:1; min-width:0; }
 .customerLookMain { flex:1; min-width:0; padding:var(--customer-look-pane-padding); }
@@ -427,7 +430,9 @@
 
 :global(:root) .frame[data-template-layout='distribution'] { --tpl-toolbar-pad-block: var(--tpl-distribution-toolbar-pad); }
 :global(:root) .frame[data-template-layout='distribution'] .listBody { flex: none; }
-:global(:root) .frame[data-template-layout='distribution'] > .footer { margin: var(--tpl-toolbar-gap) 0 0; }
+:global(:root) .frame[data-template-layout='distribution'] .listBody { margin-bottom: var(--tpl-toolbar-gap); }
+/* 下の帯は表の直後で浮かせず、白い板の下端に置く（Ft2Ey・J7HNK）。表が長いときは sticky で画面の下に追従する。 */
+:global(:root) .frame[data-template-layout='distribution'] > .footer { margin: auto 0 0; }
 .subtitle{margin:0;color:var(--color-ink-secondary);font-size:var(--text-caption);line-height:var(--tpl-rs-lh-13);}
 
 :global(:root) [data-page-template='restaurant'] .heading { min-height: 60px; }
@@ -451,7 +456,14 @@
 /* B-217：表は領域いっぱい。道具・知らせ・件数の中身だけ24。 */
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
+/* 画面が道具の段を本文の直下に置いたとき（中身と一緒に読み込む一覧）も、型の道具の段と同じ余白にする。本文は表のために左右 0。 */
+:global(:root) .listBody .content > :global([data-shared-part='list-toolbar']) { box-sizing: border-box; padding: var(--tpl-toolbar-pad-block) var(--tpl-list-inset); }
 :global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
+/* 表と同じ子の中に置いたページ送り（タグの4タブ）も、型のページ送りと同じ余白にする（絵 q5gbcM：左右24・上下12）。 */
+:global(:root) .listBody .content [data-list-pager] { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
+/* 表を道具の段と同じ内側に置く板（YMVFD）。表は左右24の内側、ページ送りの中身はその表の内側24。 */
+:global(:root) .listBody[data-table-inset] .content { padding-inline: var(--tpl-list-inset); }
+:global(:root) .listBody[data-table-inset] .pagination { padding-inline: calc(var(--tpl-list-inset) * 2); }
 :global(:root) .listBody .paginationRow,
 :global(:root) .listBody .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-16); }
 :global(:root) [data-list-skeleton] .pagination > :only-child { flex: 1; min-width: 0; }
@@ -465,6 +477,8 @@
 /* B-237：PC では目次と型を横に置き、狭い白い板では見本だけを畳む。 */
 :global(:root) .frame[data-template-layout='customer-look'] .settings { flex-direction: row; gap: var(--tpl-settings-gap); }
 :global(:root) .frame[data-template-layout='customer-look'] .settingsNav { width: var(--tpl-settings-nav-width); flex-direction: column; }
+/* 絵 VsZ25：設定の列の項目はほかの設定画面と同じ幅（--tpl-setnav-w）。列の中の右の余白・線は重ねない（「予約サイト・グルメ媒体」を全文で出す）。 */
+:global(:root) .frame[data-template-layout='customer-look'] .settingsNav > nav { padding-right: 0; border-right: 0; }
 @media (max-width:1023px) {
   :global(:root) .frame[data-template-layout='customer-look'] .settingsNav { display: none; }
 }
@@ -504,8 +518,11 @@
 .listSection { display: flex; flex-direction: column; min-width: 0; padding: var(--polish-space-card) var(--polish-space-section); gap: var(--polish-space-card); }
 .detailColumns[data-presentation='analysis'] { grid-template-columns: minmax(0, 1fr) var(--tpl-an-side-w); margin-right: 0; gap: var(--polish-space-card); }
 .detailColumns[data-presentation='analysis'] .detailColumnAside { display: flex; flex-direction: column; min-height: 0; padding-left: 0; border-left: 0; gap: var(--polish-space-card); }
+/* 保存した分析（bglah）：右の履歴は表と操作が入るので広い欄。 */
+.detailColumns[data-presentation='analysis'][data-detail-columns='analysis-history'] { grid-template-columns: minmax(0, 1fr) var(--tpl-an-history-w); }
 @container v8-page (max-width: 1099px) {
  .detailColumns[data-presentation='analysis'] { grid-template-columns: minmax(0, 1fr); }
+ .detailColumns[data-presentation='analysis'][data-detail-columns='analysis-history'] { grid-template-columns: minmax(0, 1fr); }
  .detailColumns[data-presentation='analysis'] .detailColumnAside { display: none; }
  .detailColumns[data-presentation='analysis'] .detailColumnAside[data-expanded] { display: flex; }
 }

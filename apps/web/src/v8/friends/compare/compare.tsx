@@ -1,12 +1,13 @@
 'use client'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CircleHelp, Link2, UserX } from 'lucide-react'
+import { Clock, Link2, UserX } from 'lucide-react'
 import type { IdentityCandidateDecision } from '@line-crm/shared'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
@@ -198,7 +199,7 @@ function CompareInner() {
 
               {panelOpen ? (
                 <div className={styles.pair}>
-                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide"><Field label={<>判定の理由</>} htmlFor="compare-reason" required><p id="compare-decide" className={styles.panelTitle}>「この2件を判定する」の画面</p>
+                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide"><p id="compare-decide" className={styles.panelTitle}>判定</p>
 <div className={styles.radios} role="radiogroup" aria-label="判定">
                       {DECISIONS.map((item) => (
                         <SaveErrorField names={["compare-decision","value","item.value","decision"]} key={item.value}><Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>
@@ -208,8 +209,22 @@ function CompareInner() {
                     </div>
 {decision === 'linked' ? (
                       <>
-                        <p className={styles.fieldBox}>過去の扱い：これまでの履歴を1人分にまとめる</p>
-                        <p className={styles.fieldBox}>{selectionSummary}</p>
+                        {/* 選ぶ欄として▽を出す（絵 fcg2D）。友だちの結び付けで選べる過去の扱いは1つだけ。 */}
+                        <Select aria-label="過去の扱い" size="full" value="merge" onChange={() => undefined}
+                          options={[{ value: 'merge', label: '過去の扱い：これまでの履歴を1人分にまとめる' }]} />
+                        {/* 採用する値は表の「使う値」の要約。A・B どちらかにまとめて切り替えることもできる。 */}
+                        <Select aria-label="採用する値" size="full" disabled={!detail.canDecide}
+                          value="table"
+                          onChange={(value) => {
+                            if (value !== 'A' && value !== 'B') return
+                            const id = value === 'A' ? detail.left.id : detail.right.id
+                            setSelections((current) => ({ ...current, ...Object.fromEntries(profileCandidates.flatMap((field) => field.options.some((option) => option.sourceFriendId === id) ? [[field.fieldKey, id]] : [])) }))
+                          }}
+                          options={[
+                            { value: 'table', label: selectionSummary },
+                            { value: 'A', label: `採用する値：すべて A（${detail.left.label}）` },
+                            { value: 'B', label: `採用する値：すべて B（${detail.right.label}）` },
+                          ]} />
                         <div className={styles.checks}>
                           {CONSENTS.map((label, index) => (
                             <SaveErrorField names={["consents"]} key={label}><Checkbox
@@ -223,12 +238,12 @@ function CompareInner() {
                         </div>
                       </>
                     ) : null}
-<SaveErrorField names={["reason"]}><TextField
+<Field label="判定の理由" htmlFor="compare-reason" required><SaveErrorField names={["reason"]}><TextField
                       id="compare-reason"
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
                       placeholder={decisive ? `${decisive.label}` : '何を見てそう判断したか'}
-                    /></SaveErrorField>
+                    /></SaveErrorField></Field>
 {review.decideError ? <Notice tone="danger" >{review.decideError}</Notice> : null}
 {!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
                       <p className={styles.note} role="status">3つの確認をそろえると判定できます。</p>
@@ -236,7 +251,7 @@ function CompareInner() {
 <div className={styles.panelActions}>
                       <Button type="button" variant="secondary" onClick={() => setPanelOpen(false)} disabled={review.deciding}>キャンセル</Button>
                       <Button type="button" variant="primary" onClick={submit} disabled={!ready} disabledReason={!detail.canDecide ? 'この候補は今は判定できません' : !reason.trim() ? '判定の理由を入れてください' : !linkedReady ? '使う値と3つの確認を選んでください' : undefined} busy={review.deciding} busyLabel="処理中…">判定する</Button>
-                    </div></Field></div>
+                    </div></div>
                   <div className={styles.historyCard}>
                     <p className={styles.panelTitle}>判定の履歴</p>
                     <ul className={styles.lines}>
@@ -308,24 +323,26 @@ function CompareInner() {
               </DataTable>
             </section>
 
-            <div className={styles.footer}>
-              <div className={styles.footerBar}>
+            <StickyBar
+              destructive={(
                 <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('different')}>
                   <UserX size={14} aria-hidden="true" />
                   別の人だった
                 </Button>
-                <div className={styles.footerCenter}>
+              )}
+              actions={(
+                <>
                   <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('deferred')}>
-                    <CircleHelp size={14} aria-hidden="true" />
+                    <Clock size={14} aria-hidden="true" />
                     あとで決める（保留）
                   </Button>
                   <Button type="button" variant="primary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('linked')}>
                     <Link2 size={14} aria-hidden="true" />
                     同じ人として結び付ける
                   </Button>
-                </div>
-              </div>
-            </div>
+                </>
+              )}
+            />
           </>
         ) : null}
       </div>

@@ -123,7 +123,7 @@ export default function Reserved({
   return (
     <DetailPage layout="record-detail" heightMode="content" boardId="cdZBf CRtK8" readOnly={!canEdit}
       title={broadcast.title}
-      help={`${scheduledLabel} に、${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}へ送ります。開始の前までは確かめる・取り消すができます。`}
+      subtitle={`${scheduledLabel} に、${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}へ送ります。開始の前までは確かめる・取り消すができます。`}
       titleAccessory={<StatusBadge tone="info">予約中</StatusBadge>}
       summary={summary} summaryLabel="次にできることとメッセージ"
       summaryPreview={{ label: '次の操作とメッセージを見る', title: '次にできることとメッセージ' }}>

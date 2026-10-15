@@ -11,11 +11,11 @@ import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import TapExtrasField from '@/components/shared/tap-extras-field'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ChevronDown, Plus, Send, Trash2 } from 'lucide-react'
+import { ChevronDown, GitBranch, MousePointerClick, Plus, Send, Tag as TagIcon, Trash2, type LucideIcon } from 'lucide-react'
 import { tapExtrasError, type Folder, type Scenario, type Tag } from '@line-crm/shared'
 import { tapExtraSaveError } from '@/lib/tap-actions'
 import { api } from '@/lib/api'
@@ -24,6 +24,7 @@ import QuestionEditor, { emptyQuestion, newChoiceKey, type QuestionChoice, type 
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { EntityPickerSummary } from '@/components/shared/entity-picker'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -40,8 +41,7 @@ import type { TemplateEditHost } from '../template-edit/host'
 import te from '../template-edit/edit.module.css'
 import styles from './question-new.module.css'
 import { Field } from '@/components/shared/form-controls'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import InlineSettings from '@/components/shared/inline-settings'
+import { SaveErrorField, SaveErrorScope, useSaveErrorReveal, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 テンプレート「質問を作る・編集」（Pencil `l87p1J`）。
@@ -94,6 +94,13 @@ export function choiceActionText(choice: QuestionChoice, tags: Array<Pick<Tag, '
   return parts.length ? parts.join('・') : '何もしない'
 }
 
+/** 「押されたら」の欄の印：タグ＝札、シナリオ＝分かれ道、そのほか＝押す。 */
+function choiceActionIcon(choice: QuestionChoice): LucideIcon {
+  if (choice.addTagIds?.length || choice.removeTagIds?.length) return TagIcon
+  if (choice.scenario?.op) return GitBranch
+  return MousePointerClick
+}
+
 function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
@@ -113,7 +120,10 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<Tag[]>([])
-  const [, setScenarios] = useState<Scenario[]>([])
+  const [scenarios, setScenarios] = useState<Scenario[]>([])
+  /* 「押されたら」の窓：開いている選択肢と、窓の中の下書き（［決める］で戻す・［キャンセル］で捨てる）。 */
+  const [actionIndex, setActionIndex] = useState<number | null>(null)
+  const [actionDraft, setActionDraft] = useState<ScenarioQuestion | null>(null)
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
   const [initialQuestion] = useState<ScenarioQuestion>(() => hostInitial?.question ?? emptyQuestion())
   const [question, setQuestion] = useState<ScenarioQuestion>(initialQuestion)
@@ -236,6 +246,14 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
 
   const setChoice = (index: number, patch: Partial<QuestionChoice>) =>
     setQuestion((current) => ({ ...current, choices: current.choices.map((choice, i) => i === index ? { ...choice, ...patch } : choice) }))
+  const openAction = (index: number) => { setActionDraft(question); setActionIndex(index) }
+  const closeAction = () => { setActionIndex(null); setActionDraft(null) }
+  const applyAction = () => {
+    if (actionIndex === null || !actionDraft) return
+    const next = actionDraft.choices[actionIndex]
+    setQuestion((current) => ({ ...current, choices: current.choices.map((choice, i) => (i === actionIndex && next ? { ...next, label: choice.label, reply: choice.reply } : choice)) }))
+    closeAction()
+  }
   const removeChoice = (index: number) =>
     setQuestion((current) => ({ ...current, choices: current.choices.filter((_, i) => i !== index) }))
   const addChoice = () =>
@@ -330,19 +348,28 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         <Card variant="form" gap="normal" aria-labelledby="q-choices">
           <CardHeader title="選択肢" titleId="q-choices" size="stacked" meta="答えをどこに残すかを、選択肢ごとに決めます" />
           <div className={styles.choices}>
-            {question.choices.map((choice, index) => (
+            {question.choices.map((choice, index) => {
+              return (
               <div key={choice.key ?? index} className={styles.choice}>
                 <div className={styles.choiceHead}>
                   <span className={styles.choiceNo}>{`選択肢 ${index + 1}`}</span>
-                  <Button type="button" variant="text" disabled={question.choices.length <= 1} title={question.choices.length <= 1 ? '選択肢は1つ以上必要です。' : undefined} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を消す`}><Trash2 size={14} aria-hidden="true" />消す</Button>
+                  <Button type="button" variant="text" disabled={question.choices.length <= 1} title={question.choices.length <= 1 ? '選択肢は1つ以上必要です。' : undefined} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を削除する`}><Trash2 size={14} aria-hidden="true" />削除する</Button>
                 </div>
                 <Field label="ボタンの文字（20文字まで）" requirement={fields.requirement(`choice-${index}`)}><SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><TextField {...fields.bind(`choice-${index}`)} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} /></SaveErrorField></Field>
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
-                {host ? null : <QuestionEditor value={question} onChange={setQuestion} choiceOnly={index} choiceColumns/>}
-                <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={host ? null : selectedAccountId} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
+                {host ? (
+                  <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={null} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
+                ) : (
+                  <Field label="押されたら" optional={false}>
+                    <ChoiceActionErrorReveal index={index} onReveal={openAction} />
+                    <div {...fields.bind(`extras-${index}`)}><EntityPickerSummary label={`選択肢 ${index + 1} の押されたら`} noun="押したときの動き" icon={choiceActionIcon(choice)} name={choiceActionText(choice, tags, scenarios)} invalid={fields.invalid(`extras-${index}`)} compact onOpen={() => openAction(index)} /></div>
+                    <FieldError id={`q-extras-${index}-error`}>{fields.error(`extras-${index}`)}</FieldError>
+                  </Field>
+                )}
                 <Field label="押したときの返信"><SaveErrorField names={[`choices.${index}.reply`,"reply","choice.reply"]}><TextField value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} /></SaveErrorField></Field>
               </div>
-            ))}
+              )
+            })}
           </div>
           <span>
             <Button type="button" variant="text" disabled={question.choices.length >= MAX_CHOICES} title={question.choices.length >= MAX_CHOICES ? `選択肢は${MAX_CHOICES}つまでです。` : undefined} onClick={addChoice}>
@@ -352,7 +379,17 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         </Card>
       </TemplateEditFrame>
 
-      {/* 押したときの動きは今の部品で決める（全部の選択肢をまとめて直せる）。 */}
+      {/* 押したときの動きは今の部品（QuestionEditor）を窓で開いて決める（タグ・友だち情報・シナリオ・URL など全部の設定）。 */}
+      {!host && actionIndex !== null && actionDraft ? (() => {
+        const draftChoice = actionDraft.choices[actionIndex]
+        if (!draftChoice) return null
+        return (
+          <Dialog open title={`選択肢 ${actionIndex + 1}「${draftChoice.label || `選択肢${actionIndex + 1}`}」を押されたら`} size="medium" confirmLabel="決める" onConfirm={applyAction} onCancel={closeAction}>
+            <QuestionEditor value={actionDraft} onChange={setActionDraft} choiceOnly={actionIndex} choiceColumns />
+            <TapExtrasField name={`選択肢${actionIndex + 1}`} unavailable={draftChoice.behavior === 'tel' || draftChoice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: draftChoice.addTagIds, scoreChange: draftChoice.scoreChange }} tags={tags} accountId={selectedAccountId} onChange={extra => setActionDraft((current) => current ? { ...current, choices: current.choices.map((c, i) => (i === actionIndex ? { ...c, addTagIds: extra.tagIds, scoreChange: extra.scoreChange } : c)) } : current)} />
+          </Dialog>
+        )
+      })() : null}
       <ConfirmDialog
         open={publishConfirm}
         title="この質問を公開しますか？"
@@ -383,4 +420,11 @@ export default function QuestionNewV8({ host }: { host?: TemplateEditHost } = {}
       <QuestionNew host={host} />
     </Suspense>
   )
+}
+
+/* 閉じた「押されたら」の欄に保存エラーが返ったら、その選択肢の窓を開いて理由を見せる（B-139）。 */
+const CHOICE_ACTION_FIELDS = ['behavior', 'url', 'tel', 'mail', 'userMessage', 'user_message', 'hideUserMessage', 'hide_user_message', 'repeatReply', 'repeat_reply']
+function ChoiceActionErrorReveal({ index, onReveal }: { index: number; onReveal: (index: number) => void }) {
+  useSaveErrorReveal(CHOICE_ACTION_FIELDS.map((name) => `choices.${index}.${name}`), useCallback(() => onReveal(index), [index, onReveal]))
+  return null
 }

@@ -26,8 +26,51 @@ import {
 import styles from './sidebar.module.css'
 import {
   Bell, CalendarCheck, CalendarCog, Clipboard, ClipboardList, Clock, FileText, Folder, House, Inbox,
-  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Type, UserPlus, Users, Video, type LucideIcon,
+  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Trophy, Type, UserPlus, Users, Video, type LucideIcon,
 } from 'lucide-react'
+
+
+/*
+ * 高さが足りずメニューが縦に送られるとき、端の項目が「設定」の線などで半分に
+ * 切れて見えないよう、見えている端で途中まで出ている項目は丸ごと隠す
+ * （--nav-cut-top / --nav-cut-bottom の分だけ消す）。送れば次の項目が丸ごと出る。
+ */
+function watchNavOverflow(nav: HTMLElement | null) {
+  if (!nav || typeof ResizeObserver === 'undefined') return
+  const update = () => {
+    const more = nav.scrollHeight - nav.clientHeight - nav.scrollTop > 1
+    const above = nav.scrollTop > 1
+    let cutTop = 0
+    let cutBottom = 0
+    if (more || above) {
+      const box = nav.getBoundingClientRect()
+      for (const row of Array.from(nav.querySelectorAll<HTMLElement>('a, button'))) {
+        const rect = row.getBoundingClientRect()
+        if (rect.height === 0) continue
+        if (more && rect.top < box.bottom && rect.bottom > box.bottom) cutBottom = Math.max(cutBottom, box.bottom - rect.top)
+        if (above && rect.top < box.top && rect.bottom > box.top) cutTop = Math.max(cutTop, rect.bottom - box.top)
+      }
+    }
+    nav.style.setProperty('--nav-cut-top', `${Math.ceil(cutTop)}px`)
+    nav.style.setProperty('--nav-cut-bottom', `${Math.ceil(cutBottom)}px`)
+    if (more || above) nav.setAttribute('data-clipped', '')
+    else nav.removeAttribute('data-clipped')
+  }
+  update()
+  nav.addEventListener('scroll', update, { passive: true })
+  const observer = new ResizeObserver(update)
+  observer.observe(nav)
+  for (const child of Array.from(nav.children)) observer.observe(child)
+  // 区分が後から足される・開閉されるときも測り直す。
+  const mutations = new MutationObserver(update)
+  mutations.observe(nav, { childList: true, subtree: true })
+  return () => {
+    nav.removeEventListener('scroll', update)
+    observer.disconnect()
+    mutations.disconnect()
+  }
+}
+
 
 /*
  * ★V8 の左メニューの印（絵 d8X09・WQmep の「項目 〇〇 / 印」は lucide）。
@@ -53,6 +96,7 @@ const V8_NAV_ICONS: Record<string, LucideIcon> = {
   'booking-menus': CalendarCog,
   events: Ticket,
   'booking-own-shifts': Clock,
+  affiliates: Trophy,
 }
 
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
@@ -127,6 +171,28 @@ export function clearSidebarCountCache(): void {
 
 /** 統括の左メニューを出す住所。決め方は上の帯と同じものを使う（`@/lib/menu`）。 */
 export { isHqShellPath }
+
+/**
+ * 巻く領域（左メニューの項目の並び）の中で、項目が上下とも見える所まで巻く。
+ * scrollIntoView は外のページまで巻くので使わない。上下に 8px の余裕を残す。
+ */
+export function revealInScroller(scroller: HTMLElement, item: HTMLElement, margin = 8, anchor?: HTMLElement | null) {
+  const box = scroller.getBoundingClientRect()
+  const rect = item.getBoundingClientRect()
+  if (box.height === 0 || rect.height === 0) return
+  if (rect.top < box.top + margin) {
+    scroller.scrollTop -= box.top + margin - rect.top
+  } else if (rect.bottom > box.bottom - margin) {
+    /*
+     * 下へ巻くとき、項目の下端だけで合わせると上の端で見出しや行が半分に切れる（ziSgL の「メイン」）。
+     * 項目の組（anchor）の頭を上端に置いても項目が見えるなら、組の頭で止める。
+     */
+    const anchorTop = anchor?.getBoundingClientRect().top
+    const toAnchor = anchorTop === undefined ? null : anchorTop - (box.top + margin)
+    const toItem = rect.bottom - (box.bottom - margin)
+    scroller.scrollTop += toAnchor !== null && toAnchor >= toItem && rect.bottom - toAnchor <= box.bottom - margin ? toAnchor : toItem
+  }
+}
 
 export default function Sidebar({
   friendAttributesV2Mode = false,
@@ -550,6 +616,7 @@ export default function Sidebar({
    */
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLElement>(null)
+  const desktopRef = useRef<HTMLElement>(null)
   const wasOpen = useRef(false)
   useEffect(() => {
     if (isOpen) {
@@ -660,6 +727,31 @@ export default function Sidebar({
     sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)),
   )
 
+  /*
+   * いまの画面の項目を、左メニューを開いたときに必ず全部見える位置へ巻く（2026-10-15 判定役）。
+   * 項目が多いと、下の方の項目（NEN配信など）が巻く領域の下端で半分切れ、
+   * 下に固定した「設定」の帯の陰に隠れて見えなかった。組を開く動き（--motion-base）が
+   * 終わってからもう一度測り、領域の中だけを巻く（ページ全体は巻かない）。
+   */
+  const activeItemKey = visibleSections
+    .flatMap((section) => section.items)
+    .find((item) => isActive(item))?.id ?? ''
+  // 機能の表示可否を読み終えて項目が増減したときも測り直す。
+  const visibleItemCount = visibleSections.reduce((sum, section) => sum + section.items.length, 0)
+  useEffect(() => {
+    if (!activeItemKey) return
+    const reveal = () => {
+      for (const root of [desktopRef.current, drawerRef.current]) {
+        const nav = root?.querySelector<HTMLElement>('[data-sidebar-scroll]')
+        const item = nav?.querySelector<HTMLElement>('[data-nav-active]')
+        if (nav && item) revealInScroller(nav, item, 8, item.closest<HTMLElement>(`.${styles.section}`))
+      }
+    }
+    const frame = requestAnimationFrame(reveal)
+    const timer = window.setTimeout(reveal, 320)
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(timer) }
+  }, [activeItemKey, isOpen, visibleItemCount])
+
   /**
    * 中身は1つ。ドロワーでも常時表示でも同じものを出す。
    *
@@ -715,7 +807,7 @@ export default function Sidebar({
       <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
-      <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
+      <nav ref={watchNavOverflow} className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
         {/*
           ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
           小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
@@ -792,6 +884,8 @@ export default function Sidebar({
                   prefetch={false}
                   onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={visibleLabel}
+                  aria-current={active ? 'page' : undefined}
+                  data-nav-active={active ? '' : undefined}
                   /*
                     いま開いている項目は、薄い緑の地に濃い緑の文字。設計も
                     この形。緑で塗りつぶして白抜きにすると、色の面積が大きく
@@ -847,10 +941,11 @@ export default function Sidebar({
 
       {/*
         ★V8（夕41・部品 njl8e）：左メニューのいちばん下、版の上に「設定」。
-        オーナー・管理者にだけ出す。設定の画面ではここが選ばれた形にする。
+        オーナー・管理者にだけ出す（閲覧専用のオーナー・管理者にも出す。設定は見るだけで開ける）。
+        設定の画面ではここが選ばれた形にする。
         nav は中身が多いときだけ縦に送り、この入口と版は下端に固定される。
       */}
-      {!isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
+      {!isHq && !preview && (staffReadRole === 'owner' || staffReadRole === 'admin') && (
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"
@@ -989,7 +1084,7 @@ export default function Sidebar({
 
         中身は常に展開表示。幅で文字を出し分ける必要がなくなった。
       */}
-      <aside className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
+      <aside ref={desktopRef} className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
         {sidebarContent(false)}
       </aside>
     </>

@@ -217,6 +217,8 @@ describe('共通部品の影響範囲', () => {
       'v8/restaurant/google/profile-history.tsx',
       // ★V8 予約台帳の一覧（Z3FoM）。src/v8/restaurant に一から書いた。表の下にページ送りを置く。
       'v8/restaurant/reservations/list.tsx',
+      // ★V8 枠を閉じる知らせ（YMVFD）。表の下に件数とページ送り（2026-10-15 判定役）。
+      'v8/restaurant/close-tasks/close-tasks.tsx',
       // ★V8 ログインユーザー（nku0f）。新しい置き場（src/v8/settings）に書いた。表の下にページ送りを置く。
       'v8/settings/staff/staff.tsx',
       // ★V8 設定のEC連携（GmVR5）・ファイルの検査（PfA4o）。src/v8/settings に一から書いた。表の下にページ送りを置く。

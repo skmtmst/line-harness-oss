@@ -2,7 +2,7 @@
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus, Star } from 'lucide-react'
+import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
 import { formatDate, formatDateTime, PLAN_STATUS_LABEL, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
@@ -157,14 +157,15 @@ export default function OpsTenantsV8() {
             <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
               {loading || listLoadError ? 'すべて' : `すべて ${rows.length}`}
             </FilterChip>
-            {STATUS_FILTERS.map((f) => <FilterChip key={f.key} icon={<Star size={13} aria-hidden="true" />} selected={filter === f.key} onChange={(selected) => setFilter(selected ? f.key : '')}>{f.label}</FilterChip>)}
+            {/* 状態の札は文字だけ（星はお気に入りの印に見える・絵 XWtYC）。 */}
+            {STATUS_FILTERS.map((f) => <FilterChip key={f.key} selected={filter === f.key} onChange={(selected) => setFilter(selected ? f.key : '')}>{f.label}</FilterChip>)}
           </>}
         />}
       >
         {loading && rows.length === 0 ? <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />
           : listLoadError && rows.length === 0 ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={loadDescription(listLoadError)} error={listLoadError ?? undefined} onRetry={() => void load()} />
           : visible.length === 0 ? <ListState permissionScope="hq" kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
-          : <DataTable aria-label="契約先" columnSizing="content" columnLayout={{ headHeight: 'var(--tpl-list-head-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--tpl-slot-gap)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
+          : <DataTable aria-label="契約先" columnSizing="content" columnLayout={{ headHeight: 'var(--tpl-list-head-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <thead><TableHeadRow data-table-layout="columns">
               <Th grow>統括名</Th><Th>プラン</Th><Th>状態</Th><Th align="right" collapseAt="narrow">店舗</Th><Th align="right" collapseAt="narrow">権限者</Th><Th>利用 / 請求</Th><Th collapseAt="narrow">契約日</Th><Th>最終ログイン</Th><Th collapseAt="narrow">飲食店機能</Th>
             </TableHeadRow></thead>
@@ -202,7 +203,7 @@ export default function OpsTenantsV8() {
         onCancel={closeCreate}
       >
         <div className={parts.dialogBody}>
-          <Field label="統括名（会社名）"><SaveErrorField names={["newName","new_name"]}><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" /></SaveErrorField></Field>
+          <Field label="統括名（会社名）" required><SaveErrorField names={["newName","new_name"]}><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="株式会社 然" maxLength={100} aria-label="統括名（会社名）" /></SaveErrorField></Field>
           <div className={styles.field}>
             <span className={styles.smallLabel}>飲食店機能</span>
             <div className={styles.fullSelect}>

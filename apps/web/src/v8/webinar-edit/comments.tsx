@@ -47,7 +47,7 @@ function SecondsInput({ value, label, disabled, onChange }: { value: number; lab
   useEffect(() => { setDraft(fmtSec(value)) }, [value])
   return (
     <SaveErrorField names={["draft"]}><NumberInput numericText
-      className={`${styles.cell} ${styles.cellSec}`}
+      className={styles.cellSec}
       value={draft}
       aria-label={label}
       disabled={disabled}

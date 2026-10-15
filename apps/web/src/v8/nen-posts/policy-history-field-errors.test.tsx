@@ -71,3 +71,15 @@ it('予約版のメニューから今の版と比較し、確定せずに書き�
   expect(screen.queryByRole('button', { name: 'この版に戻す' })).toBeNull()
   expect(screen.getByRole('button', { name: '新しい版を作る' })).toBeTruthy()
 })
+
+it('日時を入れた版は予約の操作となり、説明は引き出しの頭で読める', async () => {
+  await act(async () => { root.render(<PhotoPolicyHistoryV8 open canEdit onClose={() => {}} onChanged={() => {}} />) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '新しい版を作る' })) })
+  const drawer = screen.getByRole('dialog', { name: '新しい版を作る' })
+  expect(drawer.querySelector('header')?.textContent).toContain('保存しても、使い始めの日時までは今の版のままです。')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '使い始め（日本時間・空ならすぐ）' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '日付', exact: true })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '今日', exact: true })) })
+  await waitFor(() => expect(screen.getByRole('button', { name: '版を予約する' })).toBeTruthy())
+  expect(create).not.toHaveBeenCalled()
+})

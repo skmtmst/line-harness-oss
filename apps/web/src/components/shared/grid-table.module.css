@@ -65,3 +65,23 @@ html:root .table .row[data-list-content-lines]:is([data-list-content-lines='2'],
 html:root .table[data-list-density-scope='general'] .row:not([data-head]) {
   height: var(--polish-table-row); min-height: var(--polish-table-row);
 }
+
+/*
+ * 設定の板（SettingsPage）の中の表は、絵（PfA4o・cIdA2・I2V65v・DrwMm）どおり影のカードで囲む
+ * （§6.2・§6.18。2026-10-15 判定役）。一覧の型の平らな表（B-217）は外側の白い板の端まで
+ * 伸びるが、設定の板では中のメニューの右に置く本文の1段なので、外枠が無いと区切りが見えない。
+ * 枠を外したい表は framed={false} を渡す（はじめの設定・健全性チェック）。
+ */
+html:root :global([data-page-template='settings']) .table[data-framed] {
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+
+/* 時刻×担当の表もカレンダー型の枠を部品が持つ。通常の一覧は変えない。 */
+html:root .table[data-table-presentation='calendar'] {
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}

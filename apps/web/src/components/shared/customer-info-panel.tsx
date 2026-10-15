@@ -20,7 +20,7 @@ import { notifyToast } from './toast'
 export type CustomerInfoSection = { key: string; label: string; action?: ReactNode; content: ReactNode }
 /** 友だち概要と受信箱の共通の欄。取得・保存は呼び出し側、表示項目の好みは共通。 */
 export default function CustomerInfoPanel({
-  friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false,
+  friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false, labelWidth = 'standard',
 }: {
   friendId: string
   profile?: { name: string | null; pictureUrl?: string | null; addedAt: string }
@@ -33,6 +33,8 @@ export default function CustomerInfoPanel({
   extraSections?: CustomerInfoSection[]
   actionWording?: boolean
   hiddenPersonalCount?: number
+  /** 見出しの幅。'wide'（84）は受信箱の右の列（絵 eovoG）。「次の自動配信」まで1行で値と離して置く。 */
+  labelWidth?: 'standard' | 'wide'
 }) {
   const [expanded, setExpanded] = useState(false)
   const [settings, setSettings] = useState(false)
@@ -71,7 +73,7 @@ export default function CustomerInfoPanel({
     return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
   })
   const choices = [{ key: 'names', label: '基本' }, ...[...sorted, ...extraSections].map(({ key, label }) => ({ key, label }))]
-  return <div className={styles.panel} data-customer-info-panel>
+  return <div className={styles.panel} data-customer-info-panel data-label-width={labelWidth === 'wide' ? 'wide' : undefined}>
     {profile ? <div className={styles.profile}>
       <Avatar name={profile.name} src={profile.pictureUrl} size={32} />
       <span className={styles.profileName} title={profile.name ?? '名前なし'}>{profile.name ?? '名前なし'}</span>
@@ -88,9 +90,12 @@ export default function CustomerInfoPanel({
           {[...FIXED_FRIEND_FIELDS].sort((a,b) => (order.indexOf(`fixed:${a.key}`) < 0 ? 999 : order.indexOf(`fixed:${a.key}`)) - (order.indexOf(`fixed:${b.key}`) < 0 ? 999 : order.indexOf(`fixed:${b.key}`))).filter(spec => (spec.key !== 'age' || !birthdayVisible) && !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
             const { value, source, derived } = fixedFieldValue(shownFields, spec.key)
             const age = spec.key === 'birthday' && !hidden.includes('fixed:age') ? fixedFieldValue(shownFields, 'age').value : null
-            const display = value && age ? `${value}（${age}歳）` : value
+            // 生年月日は日付の欄と同じ「1988年4月12日」の書き方で出す（狭い欄なので曜日は省き、年齢を添える・vX3wQ）。
+            const ymd = spec.key === 'birthday' && value ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null
+            const shownValue = ymd ? `${Number(ymd[1])}年${Number(ymd[2])}月${Number(ymd[3])}日` : value
+            const display = shownValue && age ? `${shownValue}（${age}歳）` : shownValue
             const field = shownFields.find(field => field.fixedKey === spec.key)!
-            return <div className={styles.row} key={spec.key}>
+            return <div className={styles.row} key={spec.key} data-layout={spec.key === 'allergy' && editing ? 'stack' : undefined}>
               <dt>{spec.label}</dt>
               <dd>{spec.key === 'allergy' ? <AllergyField value={editing ? draft[field.id] : field.value ?? null} options={field.options ?? undefined} readOnly={!editing || saving} onChange={next => setDraft(current => ({ ...current, [field.id]: next }))} />
                 : editing && !derived ? <TextField aria-label={spec.label} readOnly={saving} value={draft[field.id] ?? ''} onChange={event => setDraft(current => ({ ...current, [field.id]: event.target.value }))} />

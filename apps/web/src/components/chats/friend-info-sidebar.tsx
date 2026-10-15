@@ -19,6 +19,7 @@ import { tagTextColor } from '@/lib/presentation'
 import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import TagPill from '@/components/shared/tag-pill'
+import { EntityPickerField, type EntityPickerFolder } from '@/components/shared/entity-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
@@ -765,6 +766,37 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     })
   }, [friendId, effectiveTags])
 
+  const [tagFolders, setTagFolders] = useState<EntityPickerFolder[]>([])
+  const loadTagFolders = useCallback(() => {
+    api.tagGroups.list(accountId ?? undefined).then((res) => {
+      if (res.success && Array.isArray(res.data)) setTagFolders(res.data.map((group) => ({ id: group.id, name: group.name, color: group.color ?? null })))
+    }).catch(() => {})
+  }, [accountId])
+  /** 選ぶ窓の「＋タグを作る」。作るだけで、付けるのは窓の［選ぶ］のとき。 */
+  const createTagForPicker = async (name: string) => {
+    const res = await api.tags.create({ name })
+    if (!res.success) return null
+    const created = res.data
+    setTagOptions((prev) => [...prev.filter((tag) => tag.id !== created.id), created])
+    return { id: created.id, name: created.name, color: created.color, folderId: created.groupId ?? null, frequent: false }
+  }
+  /** 選ぶ窓で決めたタグの組へ、足りない物を付け、外した物を外す。窓で作ったタグは候補を読み直してから付ける。 */
+  const applyTagSelection = async (ids: string[]) => {
+    const current = new Set((effectiveTags ?? []).map((tag) => tag.id))
+    const added = ids.filter((id) => !current.has(id))
+    const removed = [...current].filter((id) => !ids.includes(id))
+    let known = tagOptions
+    if (added.some((id) => !known.some((tag) => tag.id === id))) {
+      const res = await api.tags.list().catch(() => null)
+      if (res?.success && Array.isArray(res.data)) { known = res.data as Tag[]; setTagOptions(known) }
+    }
+    for (const id of added) {
+      const target = known.find((tag) => tag.id === id)
+      if (target) addTagById(id, { name: target.name, color: target.color })
+    }
+    for (const id of removed) removeTagById(id)
+  }
+
   // 購入（EC の直近3件と合計）。今ある口だけを使い、結びつきが無い人は「—」で出す。
   const createAndAddTag = async (query: string) => {
     const name = query.trim()
@@ -1049,6 +1081,22 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               </div>
             </div>
   )
+  /* 対応の節の「次回予約」「次の自動配信」の値。未取得と「予定なし」は分ける（IDEA-02）。 */
+  const upcomingRowValue = (which: 'booking' | 'delivery'): React.ReactNode => {
+    if (upcoming.kind === 'loading') return '読み込み中…'
+    const failed = upcoming.kind === 'error' || (which === 'booking' ? upcoming.data.nextBookingError : upcoming.data.nextAutoDeliveryError)
+    if (failed) return <span className="text-danger">読み込めませんでした</span>
+    if (upcoming.kind !== 'data') return '予定なし'
+    if (which === 'booking' && upcoming.data.nextBooking) {
+      const next = upcoming.data.nextBooking
+      return <a href={upcomingBookingHref(next, friendId ?? '')} title={`${next.title} ${formatDate(next.startsAt)}`} className="text-action block min-w-0 truncate hover:underline">{formatDate(next.startsAt)} {next.title}</a>
+    }
+    if (which === 'delivery' && upcoming.data.nextAutoDelivery) {
+      const next = upcoming.data.nextAutoDelivery
+      return <a href={upcomingDeliveryHref(next)} title={`${next.name} ${formatDate(next.scheduledAt)}`} className="text-action block min-w-0 truncate hover:underline">{formatDate(next.scheduledAt)} {next.name}</a>
+    }
+    return '予定なし'
+  }
   const renderTags = (friend: FriendDetail) => (
 <div data-customer-section="tags" style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4 ${v8.tagsSection}`}>
               <div className="mb-1.5 flex items-center justify-between">
@@ -1069,18 +1117,22 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {canEditFriend ? (
                 /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
                 <div id="inbox-panel-tag-picker" hidden={!tagPickerOpen} className={v8.editField}>
-                  <EntitySelect clearable size="full" kind="tag"
+                  {/* GBTyR：タグは選ぶ窓（S2Vgi の形）でまとめて選ぶ。付け外しは1つずつ送る（ほかの人の変更を消さない）。 */}
+                  <EntityPickerField multiple
                     id="inbox-panel-tag"
-                    aria-label="タグを探して付ける"
-                    placeholder="タグを探して付ける"
-                    value=""
-                    options={tagOptions
-                      .filter((t) => !(effectiveTags ?? []).some((own) => own.id === t.id))
-                      .map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
-                    onChange={(tagId) => { if (tagId) addTagById(tagId) }}
-                    createLabel={(query) => `＋「${query}」を作って付ける`}
-                    onCreate={(query) => { void createAndAddTag(query) }}
-                    loading={tagSaving}
+                    label="タグ"
+                    ariaLabel="タグを探して付ける"
+                    noun="タグ"
+                    title="タグを選ぶ"
+                    unit="件"
+                    searchPlaceholder="タグの名前で探す"
+                    items={tagOptions.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ id: t.id, name: t.name, color: t.color, folderId: t.groupId ?? null, frequent: Boolean(t.isStarred), meta: t.friendCount == null ? undefined : `${formatNumber(t.friendCount)} 人` }))}
+                    folders={tagFolders}
+                    onOpen={loadTagFolders}
+                    headerCreate={{ label: 'タグを作る', placeholder: '新しいタグの名前', onCreate: createTagForPicker }}
+                    disabled={tagSaving}
+                    value={(effectiveTags ?? []).map((tag) => tag.id)}
+                    onChange={(ids) => { void applyTagSelection(ids) }}
                   />
                 </div>
               ) : canEditFriend ? (
@@ -1610,6 +1662,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 */}
                 {accountId && friendId ? <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} /> : null}
                 <CustomerInfoPanel
+                  labelWidth="wide"
                   friendId={friend.id}
                   profile={{ name: friend.realName || friend.displayName, pictureUrl: friend.pictureUrl, addedAt: formatAddedDate(friend.createdAt) }}
                   fields={friendFields.kind === 'data' ? friendFields.items : []}
@@ -1620,8 +1673,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   sections={[
                     { key: 'support', label: '対応', action: canEditChat ? <Button variant="text" size="inline" aria-label="対応を編集" aria-expanded={editingSupport} onClick={() => setEditingSupport(value => !value)}>{editingSupport ? '閉じる' : '編集'}</Button> : null, content: <>
                       {editingSupport ? sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) : <>
-                        <CustomerInfoRows rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }, { label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }]} />
-                        {sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-upcoming'?: boolean }>(child) && child.props['data-customer-upcoming'])}
+                        {/* 絵 eovoG：次回予約・次の自動配信も 状況・担当 と同じ行の形（見出し＋値）で続ける。 */}
+                        <CustomerInfoRows rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }, { label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }, { label: '次回予約', value: upcomingRowValue('booking') }, { label: '次の自動配信', value: upcomingRowValue('delivery') }]} />
+                        {(upcoming.kind === 'error' || (upcoming.kind === 'data' && (upcoming.data.nextBookingError || upcoming.data.nextAutoDeliveryError))) ? (
+                          <Button variant="text" size="inline" onClick={() => setUpcomingRetry((key) => key + 1)}>再試行する</Button>
+                        ) : null}
                       </>}
                       {editingSupport ? <CustomerInfoRows rows={[{ label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }]} /> : null}
                     </> },

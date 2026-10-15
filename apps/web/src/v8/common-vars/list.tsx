@@ -57,7 +57,7 @@ import { reasonRequirement, typedKeyRequirement, blockedReason, canDelete as can
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field, RequiredBadge } from '@/components/shared/form-controls';
+import { Field } from '@/components/shared/form-controls';
 import { displayValue, emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
@@ -1339,7 +1339,7 @@ function CommonVarsListInner() {
       <Dialog
         open={deleteTarget !== null}
         designNode="xxKtW"
-        designWidth={600}
+        designWidth={480}
         designTop={240}
         designHeaderPadding="24px 24px 0"
         /* 絵 xxKtW：まだ消せないときは赤い題にしない（差し替え・止めるへ導く窓）。消せるときだけ赤。 */
@@ -1357,11 +1357,12 @@ function CommonVarsListInner() {
           <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
             {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
-              <span>{reasonRequirement.required ? <RequiredBadge /> : null}<SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+              /* 必須は欄の中の文（理由（必須…））と aria-required で伝え、下の帯を1行に保つ（絵 xxKtW の帯の高さ）。 */
+              <span><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
                 aria-required={reasonRequirement.required}
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
-                placeholder="理由（必須・記録に残ります）"
+                placeholder="理由（必須）"
                 aria-label="消した理由・止める理由（記録に残ります）"
                 title="消した理由・止める理由（記録に残ります）"
                 className={styles.footerReason}
@@ -1756,6 +1757,7 @@ function CommonVarsListInner() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              detailLayout={kpi.fix ? 'inline-action' : undefined}
               action={kpi.fix ? { label: canWrite ? '直す' : '空のままを見る', onClick: applyEmptyFilter } : undefined}
             />
           ))}

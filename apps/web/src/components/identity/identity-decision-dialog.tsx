@@ -121,8 +121,10 @@ export default function IdentityDecisionDialog({
     <Dialog
       open={open}
       designWidth={ec ? 480 : undefined}
+      designTop={ec ? 220 : undefined}
       title={ec ? '決める' : 'この2件を判定する'}
-      description="判定すると履歴に残ります。元の友だち・注文は消えません。"
+      /* EC の「決める」は、何と何を結ぶかを題の下に出す（絵 E1CeT）。履歴の決まりは下の注記が持つ。 */
+      description={ec && candidate.right.label ? `${candidate.left.label} と ${candidate.right.label}` : '判定すると履歴に残ります。元の友だち・注文は消えません。'}
       busy={busy}
       error={error}
       onCancel={onCancel}

@@ -9,6 +9,7 @@
  * はじめの設定の口（`'v8'` の6段）と、段2を確かめる機能設定の実物。
  */
 import { useCallback, useEffect, useState } from 'react'
+import { Check } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { loadFeatureSettings } from '@/lib/feature-settings-cache'
@@ -110,7 +111,7 @@ export default function GettingStartedV8() {
             </div>
 
             <Card padding="rows" overflow="hidden">
-              <GridTable label="はじめの設定の順路" framed={false} design={{ columns: "max-content minmax(0, 1fr) max-content", gap: "var(--polish-space-field)", rowPadding: "0 var(--polish-space-card)", fontSize: "var(--text-body)" }}>
+              <GridTable label="はじめの設定の順路" framed={false} design={{ columns: "max-content minmax(0, 1fr) max-content", gap: "var(--polish-space-card)", rowPadding: "var(--polish-space-card)", fontSize: "var(--text-body)" }}>
                 {steps.map((step) => <StepRow key={step.key} step={step} />)}
               </GridTable>
             </Card>
@@ -143,9 +144,9 @@ function StepRow({ step }: { step: StepResult }) {
   const done = step.state === 'done'
   return (
     <GridRow data-step-state={step.state}>
-      <GridCell><StatusBadge tone={done ? 'success' : 'neutral'} dot={false}>{done ? '✓' : step.ordinal}</StatusBadge></GridCell>
+      <GridCell><span className={`${styles.mark} ${done ? styles.markDone : ''}`} aria-label={done ? '済み' : `手順${step.ordinal}`}>{done ? <Check size={16} aria-hidden="true" /> : step.ordinal}</span></GridCell>
       <GridCell><div className={styles.stepBody}>
-        <strong><TruncatedText value={step.title} /></strong>
+        <strong className={done ? styles.stepDoneTitle : undefined}><TruncatedText value={step.title} /></strong>
         <span className={styles.stepSub}><TruncatedText value={step.sub} /></span>
       </div></GridCell>
       <GridCell align="right">

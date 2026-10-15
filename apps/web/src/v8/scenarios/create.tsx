@@ -13,13 +13,13 @@ import { Steps } from '@/components/templates/steps';
 import { notifyToast } from '@/components/shared/toast';
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';
 import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
-import HelpTip from '@/components/shared/help-tip'
 import { TextField } from '@/components/shared/text-field';
 import { Field } from '@/components/shared/form-controls';
 import { SettingsFormRow } from '@/components/shared/settings-form-card';
@@ -446,7 +446,7 @@ export default function ScenarioCreateV8() {
       </div>
 
       <Card variant="form" gap="normal" aria-label="シナリオ情報" id="scenario-step-info">
-        <CardHeader title="シナリオ情報" />
+        <CardHeader size="stacked" title="シナリオ情報" />
         <SettingsFormRow layout="name-folder">
           <div ref={nameWrapRef}>
             <Field label="シナリオ名" required error={nameError} errorId="scenario-name-error">
@@ -494,7 +494,7 @@ export default function ScenarioCreateV8() {
       </Card>
 
       <Card variant="form" gap="normal" aria-label="配信方式">
-        <CardHeader title={<>配信方式 <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip></>} />
+        <CardHeader size="stacked" title={<>配信方式 <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip></>} />
         <SaveErrorField names={["delivery-mode","selectedMode"]}><RadioCardGroup legend="配信方式" className={styles.modeRow}>
           <RadioCard
             name="delivery-mode"
@@ -506,6 +506,7 @@ export default function ScenarioCreateV8() {
             title="時刻で指定"
             note="購読開始から〇日後の〇時に届きます。決まった時刻の定期配信（メルマガ・朝の配信）に"
           >
+            {/* G-5：2人がいつ受け取るかの図を各カードの中に（絵 cu3vm・dnzqC。下の見本の表は図に入ったので消した・R83uvQ）。 */}
             <DeliveryModeDiagram mode="absolute_time" selected={selectedMode === 'absolute_time'} />
           </RadioCard>
           <RadioCard

@@ -4,7 +4,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useStaffRole } from '@/lib/staff-role';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw, ShieldCheck } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { CircleAlert } from 'lucide-react';
@@ -379,6 +379,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
               </div>
               {!runsError && draftDiffers === true ? <Notice tone="warn" message="編集中の下書きは公開中の版と違います。公開すると、この下書きで上書きされます。" /> : null}
               <div className={styles.checkBox}>
+                {!checkError && diffs !== null && diffs.length === 0 ? <ShieldCheck size={16} aria-hidden="true" className={styles.checkIcon} /> : null}
                 <div className={styles.checkText}>
                   {checkError ? <span className={styles.errorText}>{checkError}</span>
                     : diffs === null ? <span>LINEと照らし合わせています…</span>
@@ -396,7 +397,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                   <Button variant="secondary" onClick={() => { setDialogError(''); setFixOpen(true) }}>ずれを直す</Button>
                 ) : null}
                 <button type="button" className={styles.ghostButton} onClick={() => void check()} disabled={checking}>
-                  {checking ? '照らし合わせています…' : 'もう一度照らし合わせる'}
+                  <RefreshCw size={14} aria-hidden="true" />{checking ? '照らし合わせています…' : 'もう一度照らし合わせる'}
                 </button>
               </div>
               {runsError ? <p className={styles.cardNote}>{runsError}</p> : runs === null ? null : runs.length === 0 ? <p className={styles.cardNote}>まだ公開の履歴はありません。</p> : (

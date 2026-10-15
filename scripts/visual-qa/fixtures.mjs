@@ -2720,7 +2720,7 @@ export const TEMPLATES = (() => {
   const FOLDER_LABEL = { 'tf-inquiry': 'お問い合わせ', 'tf-booking': '予約', 'tf-ec': 'EC' }
   const TOP = [
     { name: '初回お問い合わせへの返信', folderId: 'tf-inquiry', messageType: 'text', messageContent: 'ご連絡ありがとうございます。以下の内容をご確認ください。', usage: 38, sends: [1240, 18300], updatedAt: '2026-08-22T09:20:00.000Z' },
-    { name: '予約前日のご案内', folderId: 'tf-booking', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。', usage: 11, sends: [1860, 31400], updatedAt: '2026-08-21T09:02:00.000Z', hasDraft: true },
+    { name: '予約前日のご案内', folderId: 'tf-booking', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。', usage: 11, sends: [1860, 31400], updatedAt: '2026-08-21T09:02:00.000Z', hasDraft: true },
     { name: '発送完了のお知らせ', folderId: 'tf-ec', messageType: 'text', messageContent: 'ご注文の商品を発送しました。お届けまで今しばらくお待ちください。', usage: 10, sends: [480, 9720] },
     { name: '定期便 初回のご案内', folderId: null, messageType: 'flex', messageContent: JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '{名前}さん、いつもありがとうございます。初回のお届けについてご案内します。' }] } }), usage: 6, sends: [210, 3040] },
     { name: '秋の新商品（画像）', folderId: null, messageType: 'image', messageContent: JSON.stringify({ originalContentUrl: 'https://example.com/autumn.jpg', previewImageUrl: 'https://example.com/autumn.jpg' }), usage: 0, sends: [0, 0], updatedAt: '2026-09-30T10:00:00.000Z', draftOnly: true },
@@ -3720,7 +3720,13 @@ export const BROADCASTS = [
   messageType: String(messageType),
   messageContent: index === 1
     ? 'まだご購入いただいていない方へ。今なら初回20%オフでお試しいただけます。'
-    : `${title}の本文です。`,
+    // 送った後の詳細（F3X1Mo）の右のスマホに出すカルーセル。中身は columns の配列（送る形と同じ）。
+    : index === 2
+      ? JSON.stringify([
+        { title: '秋の新商品 3種', text: '定期便なら 10%オフ', actions: [{ type: 'uri', label: '商品を見る', uri: 'https://nen.example/new' }] },
+        { title: 'お試しセット', text: '初回限定 1,980円', actions: [{ type: 'uri', label: '詳しく見る', uri: 'https://nen.example/trial' }] },
+      ])
+      : `${title}の本文です。`,
   targetType: String(targetType),
   targetTagId: targetType === 'tag' ? 'tag-0' : null,
   status: String(status),
@@ -5120,11 +5126,28 @@ export const AFFILIATES = [
 ]
 
 /** 案件。V8 の板（`h7dmB`）の「案件 4」（公開中 3・下書き 1）。名前・報酬・動きは板どおり。 */
+/* 案件のフォルダ（板 h7dmB）：定期便 2・新商品 1・キャンペーン 1・未分類 0。 */
+export const AFFILIATE_OFFER_FOLDERS = [
+  ['aof-teiki', '定期便', '#3B82F6', 2],
+  ['aof-new', '新商品', '#10B981', 1],
+  ['aof-campaign', 'キャンペーン', '#F59E0B', 1],
+].map(([id, name, color, itemCount], index) => ({
+  id: String(id),
+  kind: 'affiliate_offer',
+  name: String(name),
+  parentId: null,
+  displayOrder: index,
+  itemCount: Number(itemCount),
+  color: String(color),
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-01T00:00:00.000Z',
+}))
+
 export const AFFILIATE_OFFERS = [
-  { id: 'ao-1', name: '定期便の初回', description: '初回の定期便が確定したとき', rewardAmount: 2000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-1', scenarioId: null, isActive: true, createdAt: '2026-09-01T00:00:00.000Z' },
-  { id: 'ao-2', name: '夏の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 0, rewardMiles: 100, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-07-01T00:00:00.000Z' },
-  { id: 'ao-3', name: '資料請求', description: '資料をダウンロードしたとき', rewardAmount: 0, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-06-01T00:00:00.000Z' },
-  { /* 下書き。 */ id: 'ao-4', name: '秋の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-05-01T00:00:00.000Z' },
+  { id: 'ao-1', folderId: 'aof-teiki', name: '定期便の初回', description: '初回の定期便が確定したとき', rewardAmount: 2000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-1', scenarioId: null, isActive: true, createdAt: '2026-09-01T00:00:00.000Z' },
+  { id: 'ao-2', folderId: 'aof-campaign', name: '夏の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 0, rewardMiles: 100, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-07-01T00:00:00.000Z' },
+  { id: 'ao-3', folderId: 'aof-new', name: '資料請求', description: '資料をダウンロードしたとき', rewardAmount: 0, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-06-01T00:00:00.000Z' },
+  { /* 下書き。 */ id: 'ao-4', folderId: 'aof-teiki', name: '秋の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-05-01T00:00:00.000Z' },
 ]
 
 /*
@@ -6507,10 +6530,12 @@ export const MANUAL_LINKS = {
   **LINEの友だちと結びついていない行**も1つ入れる（設計の
   「LINEの友だちと結びついていません。当日の連絡ができません」を出すため）。
 */
+/* 担当はスタッフ一覧（bs-1 佐々木・bs-3 高田・bs-2 中川）の id でも持つ。名前だけだと予約の当日盤が「担当未設定」に落とす（GcyTr）。 */
+const BOOKING_STAFF_IDS = { 佐々木: 'bs-1', 高田: 'bs-3', 中川: 'bs-2' }
 const booking = (id, friendId, name, start, end, menu, staff, price, status = 'confirmed') => ({
   id, friend_id: friendId, starts_at: start, ends_at: end, status,
   customer_note: null, internal_note: null, price_at_booking: price,
-  menu_name: menu, staff_name: staff, friend_name: name,
+  menu_name: menu, staff_id: BOOKING_STAFF_IDS[staff] ?? null, staff_name: staff, friend_name: name,
   requested_at: '2026-09-02T02:00:00.000Z', decided_at: '2026-09-02T02:05:00.000Z',
   external_event_id: null,
 })
@@ -7386,14 +7411,24 @@ function mileageRewardVersion(requiredMiles, stockLimit, extra = {}) {
   }
 }
 
+/* 使い道のフォルダ（板 S35pO）：クーポン 3・商品 2・体験 0・未分類 0。 */
+export const MILEAGE_REWARD_FOLDERS = [
+  ['mrf-coupon', 'クーポン', '#3B82F6', 3],
+  ['mrf-goods', '商品', '#10B981', 2],
+  ['mrf-experience', '体験', '#F59E0B', 0],
+].map(([id, name, color, itemCount], index) => ({
+  id: String(id), kind: 'mileage_reward', name: String(name), parentId: null, displayOrder: index,
+  itemCount: Number(itemCount), color: String(color), createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+}))
+
 export const MILEAGE_REWARDS = {
   rewards: [
-    { id: 'mr-1', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', benefitName: '送料無料', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
-    { id: 'mr-2', name: '500円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '500円引き', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1000, null), exchangedThisMonth: 18, availableCodeCount: 168 },
-    { id: 'mr-3', name: '1,000円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '1,000円引き', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(1800, null), exchangedThisMonth: 6, availableCodeCount: 94 },
-    { id: 'mr-4', name: '新商品の先行案内', description: 'ふつうより3日早くお知らせします', rewardKind: 'early_access', benefitName: '先行案内', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(3000, null), exchangedThisMonth: 2, availableCodeCount: null },
+    { id: 'mr-1', folderId: 'mrf-coupon', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', benefitName: '送料無料', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
+    { id: 'mr-2', folderId: 'mrf-coupon', name: '500円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '500円引き', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1000, null), exchangedThisMonth: 18, availableCodeCount: 168 },
+    { id: 'mr-3', folderId: 'mrf-coupon', name: '1,000円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '1,000円引き', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(1800, null), exchangedThisMonth: 6, availableCodeCount: 94 },
+    { id: 'mr-4', folderId: 'mrf-goods', name: '新商品の先行案内', description: 'ふつうより3日早くお知らせします', rewardKind: 'early_access', benefitName: '先行案内', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(3000, null), exchangedThisMonth: 2, availableCodeCount: null },
     // 引換コードを数える経路がまだ無い使い道。**残りを 0 と書かない。**
-    { id: 'mr-5', name: 'オリジナルトートバッグ', description: '数量に限りがあります', rewardKind: 'template', benefitName: '発送先の確認メッセージ', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(5000, 12), exchangedThisMonth: 0, availableCodeCount: 12 },
+    { id: 'mr-5', folderId: 'mrf-goods', name: 'オリジナルトートバッグ', description: '数量に限りがあります', rewardKind: 'template', benefitName: '発送先の確認メッセージ', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(5000, 12), exchangedThisMonth: 0, availableCodeCount: 12 },
   ].map((reward) => ({
     lineAccountId: 'visual-qa-account', programId: 'mp-1', imageUrl: null,
     currentDraftVersionId: null, currentPublishedVersionId: reward.currentVersion.id,

@@ -8,7 +8,6 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import SeatTile from '@/components/shared/seat-tile'
-import CheckCard from '@/components/shared/check-card'
 import Button from '@/components/shared/button'
 import { RowActions } from '@/components/shared/row-actions'
 import IconButton from '@/components/shared/icon-button'
@@ -19,7 +18,8 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StockListHeading from './stock-list-heading'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import TimeField from '@/components/shared/time-field-v8'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
+import { DialogContentRow } from '@/components/shared/dialog-form-row'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -437,7 +437,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                       onClick={() => { setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}
                     >
                       <Td>
-                        <Button variant="text" size="inline" textTone="ink" aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}>{slot.time}</Button>
+                        <Button variant="text" size="inline" textTone="ink" data-part="row-name" aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}>{slot.time}</Button>
                       </Td>
                       <Td>
                         <svg className={styles.useBar} role="img" aria-label={`利用率 ${Math.round(slot.ratio * 100)}％`} viewBox="0 0 120 8" preserveAspectRatio="none">
@@ -577,6 +577,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
             <Button
               variant="primary"
               disabled={closedChannels.length === 0}
+              title={closedChannels.length === 0 ? '閉じた媒体にチェックを入れてください' : undefined}
               onClick={() => { if (selected) setClosedSlots((current) => [...current, selected.row.id]); setCloseNoteOpen(false) }}
             >
               <Check size={15} aria-hidden="true" />閉じたものを記録する
@@ -590,13 +591,9 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
         ) : (
           <div className={styles.checkList}>
             {closingChannels.map((channel) => (
-              <CheckCard
-                size="row"
-                key={channel.id}
-                checked={closedChannels.includes(channel.id)}
-                onChange={(checked) => setClosedChannels((current) => (checked ? [...current, channel.id] : current.filter((item) => item !== channel.id)))}
-                title={`${channel.name} の ${dayLabel(date).split('・')[0]} ${selected?.time ?? ''} を閉じた`}
-              />
+              <DialogContentRow key={channel.id}><Checkbox checked={closedChannels.includes(channel.id)}
+                onCheckedChange={(checked) => setClosedChannels((current) => (checked ? [...current, channel.id] : current.filter((item) => item !== channel.id)))}>
+                {`${channel.name} の ${dayLabel(date).split('・')[0]} ${selected?.time ?? ''} を閉じた`}</Checkbox></DialogContentRow>
             ))}
           </div>
         )}

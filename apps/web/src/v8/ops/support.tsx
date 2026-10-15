@@ -2,7 +2,9 @@
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
-import { Building2, Check, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles } from 'lucide-react'
+import { Building2, Check, Clock, Hourglass, Inbox, LogIn, Paperclip, Plus, RefreshCw, RotateCcw, Send, Sparkles } from 'lucide-react'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeReference, type OpsSupportDetail, type OpsSupportPriority, type OpsSupportStage, type OpsSupportSummary, type OpsSupportTicket, type OpsTenantRow } from '@/lib/api'
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
@@ -10,7 +12,7 @@ import { planLabel, tenantDetailHref, opsCall, formatDateTime, PLAN_STATUS_LABEL
 import { compareLabel, durationLabel, elapsedLabel } from '@/app/ops/support/format'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { ListToolbarRow } from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
@@ -60,17 +62,21 @@ function stageLabel(stage: OpsSupportStage, fallback: string): string {
 }
 
 const PRIORITY_FILTER = [
-  { value: '', label: '優先度：すべて' },
+  { value: '', label: '優先度' },
   { value: 'high', label: '高' },
   { value: 'medium', label: '中' },
   { value: 'low', label: '低' },
 ]
 const SORT_OPTIONS = [
-  { value: 'priority', label: '並び替え：優先度' },
-  { value: 'newest', label: '並び替え：新しい順' },
-  { value: 'oldest', label: '並び替え：古い順' },
+  { value: 'priority', label: '並び：優先度' },
+  { value: 'newest', label: '並び：新しい順' },
+  { value: 'oldest', label: '並び：古い順' },
 ]
-const PRIORITY_OPTIONS = PRIORITY_FILTER.slice(1)
+const PRIORITY_OPTIONS = [
+  { value: 'high', label: '高' },
+  { value: 'medium', label: '中' },
+  { value: 'low', label: '低' },
+]
 const KIND_OPTIONS = [
   { value: 'usage', label: '使い方について' },
   { value: 'bug', label: '不具合' },
@@ -360,6 +366,16 @@ export default function OpsSupportV8() {
         title="お問い合わせ"
         description={<span title={summary?.kpis ? `未対応のチケット ${summary.kpis.untouched}件・LINEから受付 ${summary.kpis.untouchedFromLine}件・初回返信 ${durationLabel(summary.kpis.avgFirstReplyMinutes)}（${compareLabel(summary.kpis.avgFirstReplyMinutes, summary.kpis.prevAvgFirstReplyMinutes, 'time')}）・解決率 ${summary.kpis.resolutionRate ?? '—'}%（${compareLabel(summary.kpis.resolutionRate, summary.kpis.prevResolutionRate, 'rate')}）・解決まで ${durationLabel(summary.kpis.avgResolutionMinutes)}（${compareLabel(summary.kpis.avgResolutionMinutes, summary.kpis.prevAvgResolutionMinutes, 'time')}）` : undefined}>統括の管理画面「お問い合わせ」から送られたものが新規として並びます。電話や LINE で受けた相談は、運営が代わりに起票できます</span>}
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
+        band={(
+          <div className={styles.band}>
+          <KpiBand>
+            <KpiCard presentation="cell" icon={<Inbox size={13} aria-hidden="true" />} title="新規" value={summary?.byStage ? summary.byStage.new : null} unit="件" detail={summary?.kpis ? `未対応 ${summary.kpis.untouched}件` : emptyValue('unknown')} loading={!summary} />
+            <KpiCard presentation="cell" icon={<Clock size={13} aria-hidden="true" />} title="対応中" value={summary?.byStage ? summary.byStage.in_progress : null} unit="件" detail={summary?.kpis ? `初回返信 ${durationLabel(summary.kpis.avgFirstReplyMinutes)}` : emptyValue('unknown')} loading={!summary} />
+            <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="確認待ち" value={summary?.byStage ? summary.byStage.waiting : null} unit="件" detail="契約先の返事待ち" loading={!summary} />
+            <KpiCard presentation="cell" icon={<RotateCcw size={13} aria-hidden="true" />} title="解決" value={summary?.byStage ? summary.byStage.resolved : null} unit="件" detail={summary?.kpis ? `解決率 ${summary.kpis.resolutionRate ?? '—'}%` : emptyValue('unknown')} loading={!summary} />
+          </KpiBand>
+          </div>
+        )}
         actions={readOnly ? null : (
           <Button onClick={() => { setCreateError(''); createFields.reset(); setCreating(true) }}><Plus aria-hidden="true" />代わりに起票する</Button>
         )}
@@ -410,7 +426,7 @@ export default function OpsSupportV8() {
           ) : (
             <>
               <div className={styles.detailHead}>
-                <h2 className={styles.detailTitle}>{`${ticket.ticketLabel} ${ticket.subject}`}</h2>
+                <h2 className={styles.detailTitle} title={`${ticket.ticketLabel} ${ticket.subject}`}>{`${ticket.ticketLabel} ${ticket.subject}`}</h2>
                 {readOnly ? null : (
                   <span className={styles.prioritySelect}>
                     <SaveErrorField names={["priority","ticket.priority"]}><Select size="page-size" aria-label="優先度を変える" value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS} /></SaveErrorField>
@@ -491,7 +507,7 @@ export default function OpsSupportV8() {
                     {closed ? null : <Button disabled={busy} onClick={() => void changeStage('closed')} busy={Boolean(busy)} busyLabel="処理中…">クローズする</Button>}
                     <span className={styles.spacer} />
                     <Button onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
-                    <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} /></SaveErrorField>
+                    <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" label="送ったあと" size="content" value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} /></SaveErrorField>
                     <Button variant="primary" onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || closed || aiBusy || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
                   </div>
                 </>
@@ -557,12 +573,10 @@ export default function OpsSupportV8() {
           designTop={202}
           onCancel={() => { if (!busy) setConfirmReply(false) }}
           footer={(
-            <div className={styles.confirmActions}>
-              <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを削除</Button>
-              <span className={styles.spacer} />
+            <DialogActions leadingAction={<Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを削除</Button>}>
               <Button onClick={() => { if (!busy) setConfirmReply(false) }} disabled={busy}>戻って直す</Button>
-              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…">送信する</Button>
-            </div>
+              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…"><Send aria-hidden="true" />送信する</Button>
+            </DialogActions>
           )}
         >
           <div className={parts.dialogBody}>

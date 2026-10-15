@@ -21,6 +21,17 @@ function hasDetail(node: ReactNode): boolean {
   })
 }
 
+/**
+ * 題の終わりの「（…）」（添え書き）は、マスに入らないときだけ行ごと隠す。本体の言葉は切らない。
+ * 「始まる見込み（試算）」が狭いマスで「始まる見込み（…」と切れていた（ARuZ4・PMLkX・Al4Ek・nMSiE・kz2B6）。
+ * 全文は title と読み上げで残る。添え書きの無い題は今までどおり。
+ */
+function titleParts(title: string) {
+  const m = /^(.+?)(（[^（）]+）)$/u.exec(title)
+  if (!m) return title
+  return <><span className={styles.labelMain}>{m[1]}</span><span className={styles.labelQualifier}>{m[2]}</span></>
+}
+
 /** B-145・B-158：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */
 function staticMenuDescription(menu: ReactNode): string | undefined {
   if (!React.isValidElement<React.ButtonHTMLAttributes<HTMLButtonElement>>(menu) || menu.type !== 'button') return
@@ -72,8 +83,12 @@ export type KpiCardProps = {
    * 長い定義・詳しい理由は description（説明アイコン）へ渡す。
    */
   detail: ReactNode
-  /** 説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。 */
-  detailLayout?: 'qualifier'
+  /**
+   * 'qualifier'：説明と括弧の補足を2行で読む形。文章は同じまま、補足から改行する。
+   * 'single'：帯の補足を1行＋省略にする（全文は title）。狭いマスで最後の1字だけ次の行に落ちる文に使う。
+   * 'inline-action'：補足の右に行き先（action）を同じ行で並べる（xxKtW）。
+   */
+  detailLayout?: 'qualifier' | 'single' | 'inline-action'
   /**
    * 指標の定義や取得できない詳しい理由などの長い説明。
    * 見出しの「？」を押したときだけ開く吹き出しへ入れるので、
@@ -195,6 +210,7 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
+      data-kpi-range={valueRange !== undefined || undefined}
       data-kpi-detail-layout={detailLayout}
       aria-busy={loading || undefined}
       data-design-version="v8"
@@ -216,11 +232,11 @@ export default function KpiCard({
             </span>
           )}
           {hasTip && helpDisplay === 'label' ? (
-            <HelpTip label={explanationLabel} className={styles.labelHelp} trigger={<span className={styles.labelText}>{title}</span>}>
+            <HelpTip label={explanationLabel} className={styles.labelHelp} trigger={<span className={styles.labelText}>{titleParts(title)}</span>}>
               {explanation}
             </HelpTip>
           ) : <span className={styles.labelText}>
-            {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
+            {title ? titleParts(title) : (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
           </span>}
           {hasTip && helpDisplay === 'question' ? (
             <HelpTip label={explanationLabel} className={styles.tip}>

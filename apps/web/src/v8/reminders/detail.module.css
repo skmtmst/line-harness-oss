@@ -36,7 +36,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.meta { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-rm-note-size); line-height: var(--tpl-rm-note-lh); }
 
 /* ---- 左の本文と右の列 ---- */
 .split { display: flex; flex: 1; min-width: 0; }
@@ -82,21 +81,6 @@
 .failTitle { margin: 0; color: var(--color-danger); font-size: var(--tpl-rm-label-size); font-weight: 700; line-height: var(--tpl-rm-label-lh); }
 .failNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-rm-note-size); line-height: var(--tpl-rm-note-lh); }
 
-/* ---- 案内の帯（登録者） ---- */
-.infoBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rm-row-gap);
-  margin: 0;
-  padding: var(--tpl-rm-info-pad);
-  border-radius: var(--tpl-rm-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-rm-label-size);
-  line-height: var(--tpl-rm-band-lh);
-}
-.infoIcon { flex: none; color: var(--color-action); }
-
 /* ---- 段（カード） ---- */
 .card {
   display: flex;
@@ -114,7 +98,8 @@
 .spacer { flex: 1; min-width: 0; }
 
 /* ---- 表（行は線で区切る。行の高さを増やさないよう線は内側の影） ---- */
-.table { display: flex; flex-direction: column; gap: var(--tpl-rm-row-gap-lg); }
+/* 行は 56 の高さで間を空けずに並べる（行の間隔 56・絵 rbAig・loVfW。線は行の下の影）。 */
+.table { display: flex; flex-direction: column; gap: 0; }
 .headRow, .row {
   display: flex;
   align-items: center;
@@ -125,7 +110,8 @@
   line-height: var(--tpl-rm-note-lh);
 }
 .headRow { color: var(--color-ink-secondary); font-weight: 600; }
-.row { color: var(--color-ink); }
+/* 見出しの行（共通の TableHeadRow）は左右に表の端の余白を持つ。行も同じ端にそろえ、見出しと中身の列を合わせる。 */
+.row { color: var(--color-ink); padding-inline: var(--tpl-list-inset); }
 .row[data-warn] { background: var(--color-status-warn-soft); }
 .colFlex { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .colNum { flex: none; width: var(--tpl-rm-col-num); }
@@ -143,8 +129,7 @@
 .colOps { display: flex; flex: none; justify-content: flex-end; gap: var(--tpl-rm-insert-gap); width: var(--tpl-rm-col-ops); }
 .cellSub { display: block; color: var(--color-ink-faint); font-size: var(--tpl-rm-small-size); line-height: var(--tpl-rm-small-lh); }
 .friendName { color: var(--color-ink); font-weight: 600; text-decoration: none; }
-.friendName:hover, .friendLink:hover { text-decoration: underline; }
-.friendLink { color: var(--color-action); font-weight: 600; text-decoration: none; }
+.friendName:hover { text-decoration: underline; }
 .colDate > * { width: 100%; }
 /* 絵の基準日の欄は高さ32（表の行 55.5）。部品の中身は変えず、この表の中でだけ高さを合わせる。 */
 .dateField > button { min-height: 0; height: var(--tpl-rm-date-h); }

@@ -8,7 +8,7 @@ import { jstDateOffset } from '@/lib/jst-datetime'
  * 選んでいるページを出す。押せない見本（role="img" ではなく読める文で出す）。
  * 予約を入れる欄の日にち・時刻は形を見せるための見本で、実際の空きではない。
  */
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 import { resolveCustomerFormTheme, DEFAULT_CUSTOMER_LOOK, type CustomerLook, PREFECTURES, normalizeRatingValue, FORM_OPTIONS_DEFAULT, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
 import { DateYmdField, AddressControls, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../../../../liff/src/components/forms/controls'
@@ -24,49 +24,77 @@ type Props = {
   pageIndex: number
   accountName: string
   bookingMenus: { id: string; name: string; durationMinutes: number }[]
+  /** 上の小さい見出し。置き場に題があるとき（リサーチの「届き方」）は null。 */
+  caption?: string | null
+  /** 上の帯の題。 */
+  title?: string
+  /** 次へ・送るを画面の下に固定する（中身が長いリサーチ。絵 EsYo4「下の帯（固定）」）。 */
+  fixedNext?: boolean
+  /** 進み具合の線と「1 / 1 ページ」を題の上（いちばん頭）に出す（絵 EsYo4「進み具合」）。 */
+  progressHead?: boolean
+  /** 編集中のブロック。スマホの中をそこまで送って見せる（下の方の問いを押しても見える。絵 SwGrd）。 */
+  focusBlockId?: string | null
 }
 
-export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus }: Props) {
+export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus, caption = 'お客さまに見える形', title = '回答フォーム', fixedNext = false, progressHead = false, focusBlockId = null }: Props) {
+  const formRef = useRef<HTMLDivElement>(null)
   const sections = layout.sections
   const section = sections[pageIndex] ?? sections[0]
   const options = { ...FORM_OPTIONS_DEFAULT, ...layout.options }
   const blocks = [...(pageIndex === 0 ? layout.header : []), ...(section?.blocks ?? [])]
   const last = pageIndex >= sections.length - 1
-  const progress = (
+  const bar = (
     <span className={styles.phoneProgress} aria-hidden="true">
       {sections.map((s, i) => <span key={s.id} data-done={i <= pageIndex || undefined} />)}
     </span>
   )
+  const progress = progressHead ? (
+    <span className={styles.phoneProgressHead}>
+      {bar}
+      <span className={styles.phonePageNo}>{`${pageIndex + 1} / ${sections.length} ページ`}</span>
+    </span>
+  ) : bar
   // 1ページ目は表紙（画像・題・説明）のあとに進み具合、ほかのページは頭に出す。
   const firstInput = blocks.findIndex((b) => b.kind === 'input')
-  const progressAt = pageIndex === 0 && firstInput > 0 ? firstInput : 0
+  const progressAt = !progressHead && pageIndex === 0 && firstInput > 0 ? firstInput : 0
   // 色を決めたフォームは、その主の色で見せる（決めていなければ LINE の緑）。
   const theme = resolveCustomerFormTheme(layout.options,accountLook ?? DEFAULT_CUSTOMER_LOOK)
   const main = theme.main
+  // 押したブロックがスマホの見えている所の外なら、そのブロックが上に来るまで中だけを送る（ページ全体は動かさない）。
+  useEffect(() => {
+    const box = formRef.current
+    if (!box) return
+    const target = focusBlockId ? box.querySelector<HTMLElement>(`[data-phone-block="${CSS.escape(focusBlockId)}"]`) : null
+    if (!target) return
+    const top = target.offsetTop - box.offsetTop
+    const bottom = top + target.offsetHeight
+    if (top < box.scrollTop || bottom > box.scrollTop + box.clientHeight) box.scrollTop = Math.max(0, top - 8)
+  }, [focusBlockId, pageIndex, blocks.length])
   const nextLabel = last
     ? (options.submitLabel || '送信する')
     : `${options.nextLabel || '次へ'}（${pageIndex + 1} / ${sections.length}）`
 
   return (
-    <LiffPhoneFrame title="回答フォーム" accountName={accountName} caption="お客さまに見える形" label="お客さまに見える形" accent={main}>
-          <div className={styles.phoneForm} style={{backgroundColor:theme.sub,color:theme.text,fontFamily:theme.fontFamily==='serif'?'serif':'sans-serif'}}>
+    <LiffPhoneFrame title={title} accountName={accountName} caption={caption ?? undefined} label="お客さまに見える形" accent={main} footer={fixedNext ? <div className={styles.phoneFoot} style={{ backgroundColor: theme.sub }}><span className={styles.phoneNext}>{nextLabel}</span></div> : undefined}>
+          <div ref={formRef} className={styles.phoneForm} style={{backgroundColor:theme.sub,color:theme.text,fontFamily:theme.fontFamily==='serif'?'serif':'sans-serif'}}>
             {blocks.length === 0 ? <p className={styles.phoneEmpty}>このページにはまだブロックがありません</p> : null}
             {blocks.map((block, index) => (
               <PhoneBlockWithProgress key={block.id} block={block} showProgress={index === progressAt} progress={progress} bookingMenus={bookingMenus} />
             ))}
             {blocks.length === 0 ? progress : null}
-            <span className={styles.phoneSpacer} />
-            <span className={styles.phoneNext}>{nextLabel}</span>
+            {fixedNext ? null : <><span className={styles.phoneSpacer} />
+            <span className={styles.phoneNext}>{nextLabel}</span></>}
           </div>
     </LiffPhoneFrame>
   )
 }
 
 function PhoneBlockWithProgress({ block, showProgress, progress, bookingMenus }: { block: FormBlock; showProgress: boolean; progress: ReactNode; bookingMenus: Props['bookingMenus'] }) {
+  if (block.kind === 'input' && block.hidden) return showProgress ? <>{progress}</> : null
   return (
     <>
       {showProgress ? progress : null}
-      <PhoneBlock block={block} bookingMenus={bookingMenus} />
+      <div data-phone-block={block.id} className={styles.phoneBlockSlot}><PhoneBlock block={block} bookingMenus={bookingMenus} /></div>
     </>
   )
 }

@@ -199,6 +199,8 @@
 /* 絵 A0pDt「切り替え」：灰の地に、選んだ所だけ白。 */
 .seg {
   display: inline-flex;
+  /* 縦に並べる欄の中でも、選ぶ部品は中身の幅（絵 A0pDt：言葉の合い方・言葉が2つ以上のとき）。 */
+  align-self: flex-start;
   gap: var(--tpl-compact-gap);
   padding: var(--tpl-compact-gap);
   border-radius: var(--radius-control);
@@ -684,7 +686,7 @@
 .weekdayRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-rule-row-gap); }
 .inlineSelect { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); color: var(--color-ink-faint); font-size: var(--text-caption); }
 .labelRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-rule-row-gap); }
-.sourceInline { display: inline-flex; align-items: center; gap: var(--tpl-rule-row-gap); color: var(--color-ink-faint); font-size: var(--text-caption); }
+.sourceInline { margin-left: auto; display: inline-flex; align-items: center; gap: var(--tpl-rule-row-gap); color: var(--color-ink-faint); font-size: var(--text-caption); }
 .moreKinds { height: var(--tpl-chip-h); padding: var(--tpl-chip-pad); border: 0; background: transparent; color: var(--color-action); font-size: var(--text-caption); cursor: pointer; }
 .countRow { display: flex; align-items: baseline; gap: var(--tpl-chip-row-gap); margin: 0; padding: var(--tpl-chip-row-gap) 0; }
 .countNum { display: block; color: var(--color-ink-faint); font-size: var(--tpl-count-num-size); font-weight: 700; line-height: var(--tpl-count-num-lh); }

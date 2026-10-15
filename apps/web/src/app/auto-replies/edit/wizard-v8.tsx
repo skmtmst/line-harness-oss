@@ -73,6 +73,7 @@ import FolderSelect, { folderById, folderCreator } from '@/components/shared/fol
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import { renderPreviewBody } from '@/components/scenarios/step-preview'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
@@ -1192,7 +1193,7 @@ function AutoReplyWizardV8Inner() {
             ? flexContentIsJson
               ? 'カード型メッセージを返します。'
               : 'カードの内容（JSON）を読めていません。'
-            : form.responseContent || '返す内容を入れると、ここに出ます。'
+            : form.responseContent ? renderPreviewBody(form.responseContent) : '返す内容を入れると、ここに出ます。'
 
   /** 手順②の右の列の試し：いまの言葉と合い方で、例の文に当たるか。 */
   const triggerSamples = (() => {
@@ -1844,6 +1845,8 @@ function AutoReplyWizardV8Inner() {
                           key={label}
                           type="button"
                           className={styles.weekday}
+                          /* つなげた7つ（絵 Z2LIUx）。選んだ日は地の色だけで示し、共通の選択の枠は付けない。 */
+                          data-part="joined-segment"
                           aria-pressed={on}
                           onClick={() => {
                             const next = on

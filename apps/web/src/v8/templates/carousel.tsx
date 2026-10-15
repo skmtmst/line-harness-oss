@@ -7,7 +7,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { tapExtrasError, type TapExtras } from '@line-crm/shared'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Fragment, Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
+import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -15,9 +15,8 @@ import { ChevronDown, Copy, Plus, Send, Trash2, TriangleAlert, Zap } from 'lucid
 import type { Folder, MediaItem, MessageTemplateMediaDefinition } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
-import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
-import { readInlineActions, type InlineAction } from '@/components/auto-replies/draft-fields'
-import { ACTION_KINDS } from '@/components/scenarios/action-editor'
+import { useActionOptions } from '@/components/auto-replies/inline-action-list'
+import { readInlineActions } from '@/components/auto-replies/draft-fields'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -27,9 +26,8 @@ import Notice from '@/components/shared/notice'
 import { FieldError } from '@/components/shared/form-controls'
 import { ErrorCountBadge } from '@/components/shared/error-count-badge'
 import { useFormErrors } from '@/lib/use-form-errors'
-import TapActionField from '@/components/shared/tap-action-field'
 import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
-import { TAP_ACTION_KINDS, isTapActionKind, tapActionDef, type TapActionKind } from '@/lib/tap-actions'
+import { TAP_ACTION_KINDS, tapActionDef, type TapActionKind } from '@/lib/tap-actions'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -51,11 +49,11 @@ import own from './carousel.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { TextField } from '@/components/shared/text-field'
-import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import InlineSettings from '@/components/shared/inline-settings'
+import CarouselButtons from './carousel-buttons'
+export { inlineActionsText } from './carousel-button-options'
 
 /*
  * ★V8 テンプレート「カルーセルを作る・編集」（Pencil `J60utH`）。
@@ -65,7 +63,7 @@ import InlineSettings from '@/components/shared/inline-settings'
  * 右の列に「気をつけること」と「届き方」。下の帯はキャンセル・下書きを保存・保存して公開。
  * 読み込み・保存（作成だけ済んだあとのやり直しは作り直さない）・公開（使用先があれば確認の窓 cuR8I）・離れる確認は
  * 現役の組み立てと保存の正本は carousel-core。
- * ボタンの「動きを実行する」の中身は今の部品（InlineActionList）を窓で開いて決める。
+ * ボタンの「動きを実行する」は要約からその場の設定を開く。保存する処理は InlineActionList で編集する。
  * ボタンの「押したら」（絵 JkLOF・2026-10-08）：URLを開く／テキストを送る／回答フォームを開く／予約ページを開く／予約履歴を開く／
  * 動きを実行する（店だけ）。回答フォーム・予約・予約履歴はそのアカウントの LIFF の URL を保存の時点で作る（LIFF の無いアカウントでは出さない）。
  * 統括（host）は URLを開く・テキストを送るだけ（配った先で LIFF ID・回答フォームの ID を付け替える口がまだ無いため）。
@@ -75,21 +73,6 @@ import InlineSettings from '@/components/shared/inline-settings'
 /** 札の名前：タイトルの（）書きを外した短い名前（絵：「夏の定番セット（送料込み）」→「夏の定番セット」）。 */
 export function chipName(title: string): string {
   return title.replace(/[（(][^）)]*[）)]\s*$/, '').trim() || title.trim()
-}
-
-/** 「動きを実行する」の中身の1行（絵：「タグ「夏セット興味」を付ける」）。 */
-export function inlineActionsText(actions: InlineAction[], tags: Array<{ id: string; name: string }>): string {
-  if (actions.length === 0) return '何もしない（決める）'
-  const first = actions[0]
-  const config = (first.config ?? {}) as Record<string, unknown>
-  let text = first.actionType === 'notify_staff' ? '担当者へ通知' : ACTION_KINDS.find((kind) => kind.type === first.actionType)?.label ?? '動き'
-  if (first.actionType === 'tag') {
-    const ids = Array.isArray(config.tagIds) ? (config.tagIds as unknown[]).map(String) : []
-    const tag = tags.find((item) => item.id === ids[0])
-    const verb = config.op === 'remove' ? '外す' : '付ける'
-    if (tag) text = `タグ「${tag.name}」を${verb}${ids.length > 1 ? ` ほか${ids.length - 1}つ` : ''}`
-  }
-  return actions.length > 1 ? `${text} ほか${actions.length - 1}` : text
 }
 
 /** 保存してある本文（LINE のカルーセルの列）をカードの形に戻す。壊れていれば投げる。 */
@@ -140,13 +123,13 @@ function hostCarouselInitial(host: TemplateEditHost | undefined) {
  * 口ができたら HOST_CHOICE_KINDS を6つにする）。
  */
 const HOST_CHOICE_KINDS: readonly TapActionKind[] = ['uri', 'message']
-const ACTION_EXTRA_KIND = [{ value: 'action', label: '動きを実行する', description: 'タグを付ける・シナリオを始めるなど', icon: Zap }] as const
 
 /** 出す「押したら」（並びは絵の順・いま選んでいる種類は消さない）。 */
 export function choiceKindOptions(opts: { host: boolean; current?: ChoiceKind }): ChoiceKind[] {
   const kinds: ChoiceKind[] = opts.host ? [...HOST_CHOICE_KINDS] : [...TAP_ACTION_KINDS, 'action']
   return opts.current && !kinds.includes(opts.current) ? [...kinds, opts.current] : kinds
 }
+const ACTION_EXTRA_KIND = [{ value: 'action', label: '動きを実行する', description: 'タグを付ける・シナリオを始めるなど', icon: Zap }] as const
 
 /** 統括で保存できない「押したら」。 */
 const HOST_ALLOWED: readonly ChoiceKind[] = HOST_CHOICE_KINDS
@@ -407,7 +390,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     setDragIndex(null)
   }
   /* 届き方：アイコンと横に並ぶカード（いま開いているカードを先頭に、次のカードの端を見せる）。 */
-  const sender = host ? '公式アカウント' : selectedAccount?.name ?? '公式アカウント'
+  const sender = host ? host.accountName || '公式アカウント' : selectedAccount?.name ?? '公式アカウント'
   const shown = panels.slice(selectedIndex, selectedIndex + 2)
   const phone = (
     <LinePreview title={null} note="カルーセルの見え方（横にスワイプして見えます）" accountName={sender} caption="配信日 10:00">
@@ -558,46 +541,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                 ) : null}
 
                 <span className={styles.pickLabel}>{`ボタン（最大 ${MAX_ACTIONS} つ）`}</span>
-                {panel.actions.map((action, ai) => {
-                  const setAction = (patch: Partial<typeof action>) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === ai ? { ...a, ...patch } : a)) })
-                  return (
-                    <Fragment key={ai}>
-                    <CardHeader size="stacked" headingLevel={3} title={`ボタン ${ai + 1}`} action={panel.actions.length > 1 ? <IconButton size="row" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} title="このボタンを外す" onClick={() => update(selectedIndex, { actions: panel.actions.filter((_, j) => j !== ai) })}><Trash2 size={14} aria-hidden="true" /></IconButton> : undefined} />
-                    <div {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
-                      <SettingsFormRow layout="columns">
-                      <Field label="ボタンの文字"><SaveErrorField names={[`actions.${ai}.label`,"label","action.label"]}><TextField value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} /></SaveErrorField></Field>
-                      <Field label="押したら・中身">
-                      <SaveErrorField names={["action"]}><TapActionField
-                        name={`カード${selectedIndex + 1}のボタン${ai + 1}`}
-                        kindLabel={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`}
-                        allowExtras accountId={hqHost ? null : folderAccountId} extrasError={fields.error(`card-${selectedIndex}-button-${ai}`)}
-                        value={{ kind: action.kind, uri: action.uri, text: action.text, refId: action.formId, tapExtras: action.tapExtras }}
-                        onChange={(patch) => setAction({
-                          ...(patch.kind !== undefined ? { kind: patch.kind as ChoiceKind } : {}),
-                          ...(patch.uri !== undefined ? { uri: patch.uri } : {}),
-                          ...(patch.text !== undefined ? { text: patch.text } : {}),
-                          ...(patch.refId !== undefined ? { formId: patch.refId } : {}),
-                          ...(patch.tapExtras !== undefined ? { tapExtras: patch.tapExtras } : {}),
-                        })}
-                        kinds={choiceKindOptions({ host: hqHost, current: action.kind }).filter(isTapActionKind)}
-                        extraKinds={hqHost ? [] : ACTION_EXTRA_KIND}
-                        renderBody={(kind) => kind !== 'action' ? undefined : (
-                          <InlineActionList actions={action.actions} {...actionOptions}
-                            onChange={next=> update(selectedIndex, { actions: panel.actions.map((a, j) => j === ai ? { ...a, actions: next } : a) })}/>
-                        )}
-                        scope={hqHost ? 'hq' : 'shop'}
-                        hasLiff={Boolean(liffId)}
-                        liffSettingsHref={folderAccountId ? `/accounts/detail?id=${encodeURIComponent(folderAccountId)}` : '/accounts'}
-                        sources={tapSources}
-                        textMax={MESSAGE_TEXT_MAX}
-                      /></SaveErrorField>
-                      </Field>
-                      </SettingsFormRow>
-                    </div>
-                    <FieldError id={`cr-button-${ai}-error`}>{fields.error(`card-${selectedIndex}-button-${ai}`)}</FieldError>
-                    </Fragment>
-                  )
-                })}
+                <CarouselButtons key={selectedIndex} actions={panel.actions} selectedIndex={selectedIndex} fields={fields}
+                  hqHost={hqHost} host={Boolean(host)} folderAccountId={folderAccountId} liffId={liffId}
+                  sources={tapSources} actionOptions={actionOptions} kindOptions={current => choiceKindOptions({ host: hqHost, current })} extraKinds={hqHost ? [] : ACTION_EXTRA_KIND}
+                  onChange={actions => update(selectedIndex, { actions })} />
                 <div className={own.toolRow}>
                   <Button type="button" variant="text" disabled={panel.actions.length >= MAX_ACTIONS} title={panel.actions.length >= MAX_ACTIONS ? `ボタンは${MAX_ACTIONS}つまでです。` : undefined} onClick={() => update(selectedIndex, { actions: [...panel.actions, emptyChoice()] })}><Plus size={15} aria-hidden="true" />ボタンを足す</Button>
                   <span className={own.spacer} />

@@ -70,7 +70,8 @@
 /* 休業日：休みにした日に予約がある人への注意（絵 KRgTQ は帯ではなく字だけ）。 */
 .closedNote {
   margin: 0;
-  color: var(--color-status-warn-deep);
+  /* 注意の色（橙の字・絵 KRgTQ #94600a）。赤（取り消せない操作）ではない。 */
+  color: var(--color-warning);
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-17);
 }
@@ -148,6 +149,7 @@
 .sideActions {
   display: flex;
   flex-direction: column;
+  align-self: stretch;
   gap: var(--tpl-bm-10);
 }
 
@@ -164,6 +166,7 @@
 
 .sideTitle {
   display: flex;
+  align-self: stretch;
   align-items: center;
   gap: var(--tpl-bm-6);
   margin: 0;
@@ -332,8 +335,13 @@
   white-space: nowrap;
 }
 
+/*
+ * 一覧の行の高さは中身の行数で決まる（§6.5 の 3・B-254：2行・3行は 60）。
+ * 名前・分類の札・説明の3段は 60 に入りきらないので、60 を下限に中身の高さ＋上下 8 で伸ばす。
+ */
 .menuRow {
-  height: calc(var(--tpl-bm-84) + var(--tpl-bm-6));
+  min-height: var(--tpl-list-row-multi-h);
+  padding-block: var(--tpl-bm-8);
   box-shadow: var(--shadow-row-line);
 }
 
@@ -406,9 +414,10 @@
   padding: 0;
   line-height: var(--tpl-bm-19);
   overflow: hidden;
-  color: var(--color-action);
+  /* 一覧の名前は黒の太字（§6.5 の 2・絵 owaS3）。押せることは下線で示す。 */
+  color: var(--color-ink);
   font-size: var(--tpl-bm-13);
-  font-weight: 600;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-decoration: none;
@@ -516,30 +525,6 @@
   flex-shrink: 0;
   border-radius: var(--radius-pill);
   background: currentcolor;
-}
-
-/* 行末の「…」。28角・細い枠。 */
-.rowMenuButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-bm-28);
-  height: var(--tpl-bm-28);
-  padding: 0;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-}
-
-.rowMenuButton:hover:not(:disabled) {
-  background: var(--color-canvas-sunken);
-}
-
-.rowMenuButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
 }
 
 /* ===== 状態（空・0件・読込中・失敗） ===== */
@@ -691,7 +676,7 @@
 
 .intervalLine {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--tpl-bm-6);
   min-height: var(--tpl-bm-36);
 }
@@ -707,27 +692,9 @@
   white-space: nowrap;
 }
 
-/* TimeField は中に自分の欄（枠・時計・消す）を持つ。外には幅だけを当てて、
-   内側の欄を見本の大きさ（高さ32・12px）へ揃える。 */
 .timeInput {
   width: var(--tpl-bm-84);
   flex-shrink: 0;
-}
-
-.timeInput > button:first-of-type {
-  height: var(--tpl-bm-32);
-  padding: 0 var(--tpl-bm-10);
-  font-size: var(--tpl-bm-12);
-}
-
-/* 見本の箱は「9:00」だけ。時計アイコンと中の消すボタンは隠す
-   （時間帯の消去は行はしの×でできる）。 */
-.timeInput > button:first-of-type :global(svg) {
-  display: none;
-}
-
-.timeInput > button:not(:first-of-type) {
-  display: none;
 }
 
 .numInput {
@@ -884,7 +851,7 @@
   align-items: flex-start;
   gap: var(--tpl-bm-2);
   height: var(--tpl-bm-46);
-  padding: var(--tpl-bm-6);
+  padding: var(--tpl-bm-8);
   border: 0;
   outline: 1px solid var(--color-hairline);
   outline-offset: calc(var(--tpl-bm-1) * -1);
@@ -920,7 +887,7 @@
 }
 
 .calMark {
-  font-size: var(--tpl-bm-9);
+  font-size: var(--tpl-bm-11);
   font-weight: 400;
   line-height: var(--tpl-bm-13);
 }
@@ -1102,34 +1069,22 @@
 
 .staffName {
   display: flex;
-  flex: 1 1 0;
+  flex: 0 0 var(--tpl-bk2-staff-col-name);
   flex-direction: column;
   gap: var(--tpl-bm-2);
   min-width: 0;
 }
 
-.staffNameLink {
-  width: fit-content;
+.staffRole {
   overflow: hidden;
-  color: var(--color-accent-deep);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
-  text-decoration: none;
+  color: var(--color-ink-faint);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.staffNameLink:hover {
-  text-decoration: underline;
-}
-
-.staffRole {
-  color: var(--color-ink-faint);
   font-size: var(--tpl-bm-11);
 }
 
 .staffColMenus {
-  width: var(--tpl-bk2-staff-col-menus);
+  width: calc(var(--tpl-bk2-staff-col-menus) + var(--polish-space-card));
   flex-shrink: 0;
 }
 
@@ -1148,9 +1103,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--tpl-bm-4);
-  width: var(--tpl-bk2-staff-col-link);
-  flex-shrink: 0;
-  min-width: 0;
+  flex: 1 1 var(--tpl-bk2-staff-col-link);
+  min-width: var(--tpl-bk2-staff-col-link);
 }
 
 .staffColStatus {
@@ -1165,14 +1119,11 @@
   flex-shrink: 0;
 }
 
-.staffNote {
-  margin: 0;
-  padding: var(--tpl-bm-10) var(--tpl-bm-12);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bm-12);
-  line-height: var(--tpl-bm-18);
+.staffMenuWarning {
+  margin-top: var(--tpl-bm-2);
+  color: var(--color-warning);
+  font-size: var(--text-micro);
+  white-space: nowrap;
 }
 
 .staffColLink .staffCellSub {
@@ -1184,10 +1135,21 @@
   line-height: var(--tpl-bm-16);
 }
 
+/* 絵 VLEaj：数の「0」は黒、下の注意文だけオレンジ。 */
 .staffRow .cellWarn {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  color: var(--color-ink);
   line-height: var(--tpl-bm-17);
+}
+
+/* 絵 VLEaj：「予約画面に出ません」は1行。狭いときは省略し、全文は title で見せる。 */
+.staffRow .cellWarn .staffCellSub {
+  overflow: hidden;
+  color: var(--color-warning);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .staffCellMain {
@@ -1522,10 +1484,15 @@
 }
 
 /* メニューの分類札の帯。 */
+/* 実 LIFF と同じく1行（入りきらない札は横へ送る）。スマホの器が 310 の画面になっても2段に折らない。 */
 .phoneCats {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   gap: var(--tpl-bm-6);
+  overflow: hidden;
+  padding: 2px; /* 選んだ札の枠を切らない */
+  margin: -2px;
 }
 
 .phoneCat {
@@ -1536,6 +1503,8 @@
   color: var(--v8-liff-sub);
   font-size: var(--tpl-bm-12);
   font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .phoneCatNow {
@@ -1670,12 +1639,11 @@
 }
 
 .phoneDayNav {
+  display: inline-flex;
   flex-shrink: 0;
   width: var(--tpl-bm-16);
-  color: var(--v8-liff-sub);
-  font-size: var(--tpl-bm-14);
-  font-weight: 600;
-  text-align: center;
+  height: var(--tpl-bm-16);
+  color: var(--color-ink);
 }
 
 .phoneDay {
@@ -1703,28 +1671,39 @@
 }
 
 .phoneDayDow {
-  color: var(--color-ink-faint);
+  color: var(--v8-liff-sub);
   font-size: var(--tpl-bm-10);
   line-height: var(--tpl-bm-14);
 }
 
 .phoneDayNum {
   color: var(--color-ink);
-  font-size: var(--tpl-bm-14);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: var(--tpl-bm-16);
   font-weight: 700;
   line-height: var(--tpl-bm-19);
   font-variant-numeric: tabular-nums;
 }
 
+.phoneDayNow .phoneDayNum {
+  color: var(--v8-liff-primary);
+}
+
+.phoneDayOff .phoneDayNum {
+  color: var(--v8-liff-idle);
+}
+
 .phoneDayState {
   color: var(--v8-liff-primary);
-  font-size: var(--text-nano);
-  font-weight: 600;
+  font-size: var(--tpl-bm-9);
+  font-weight: 400;
   line-height: var(--tpl-bm-13);
 }
 
-.phoneDayOff .phoneDayState {
-  color: var(--color-ink-faint);
+/* 休み＝地も数字も薄く。満＝地は白のまま、札だけ薄く（絵 KRgTQ）。 */
+.phoneDayOff .phoneDayState,
+.phoneDayFull .phoneDayState {
+  color: var(--v8-liff-idle);
 }
 
 /* 時刻の札。 */
@@ -1743,8 +1722,9 @@
   outline-offset: calc(var(--tpl-bm-1) * -1);
   border-radius: var(--radius-control);
   color: var(--color-ink);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: var(--tpl-bm-15);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1752,6 +1732,7 @@
   outline-color: var(--v8-liff-primary);
   background: var(--v8-liff-primary);
   color: var(--color-canvas);
+  font-weight: 700;
 }
 
 .phoneSlotOff {
@@ -1763,8 +1744,8 @@
 .phoneSectionLabel {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
   line-height: var(--tpl-bm-20);
 }
 
@@ -1779,8 +1760,8 @@
 
 .phoneFootPick {
   color: var(--v8-liff-primary);
-  font-size: var(--tpl-bm-12);
-  font-weight: 600;
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -1841,3 +1822,19 @@
 }
 
 .warnBand, .warnBandNoticePlacement { margin: 0; flex-shrink: 0; }
+
+/* 畳んだ右欄の2つのボタン（VFxWU）。 */
+.narrowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-bm-6);
+}
+
+/* 開ける時間の行：欄の上をそろえ、範囲の添え書き（1〜1000）は数の欄の下に垂らす。文字と×は欄の高さの中で真ん中。 */
+.intervalLine > .intervalTilde,
+.intervalLine > .sameTimeLabel,
+.intervalLine > .iconRemove {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tpl-bm-36);
+}

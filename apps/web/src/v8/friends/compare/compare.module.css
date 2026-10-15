@@ -101,20 +101,6 @@
 .panelTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-fr-cmp-panel-lh); }
 .radios { display: flex; align-items: center; gap: var(--tpl-fr-cmp-radio-gap); }
 
-.fieldBox {
-  display: flex;
-  align-items: center;
-  min-height: var(--tpl-fr-control-h);
-  margin: 0;
-  padding: 0 var(--tpl-fr-stack-gap);
-  border-radius: var(--radius-control);
-  box-shadow: var(--tpl-fr-shadow-control);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-fr-cmp-panel-lh);
-}
-
 .checks { display: flex; flex-direction: column; gap: var(--tpl-fr-cmp-check-gap); }
 .fieldLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-fr-cmp-panel-lh); margin-bottom: calc(var(--tpl-fr-cmp-check-gap) - var(--tpl-fr-stack-gap)); }
 .panelActions { display: flex; justify-content: flex-end; gap: var(--tpl-toolbar-gap); }
@@ -166,20 +152,6 @@
 .faint { color: var(--color-ink-faint); }
 
 /* 下の帯：左に「別の人だった」、中央に保留・結び付ける（画面の下に追従）。 */
-.footer { position: sticky; bottom: var(--tpl-fr-stack-gap); z-index: 20; }
-.footerBar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--tpl-toolbar-gap);
-  padding: var(--tpl-fr-stack-gap) var(--tpl-fr-area-gap);
-  border-radius: var(--radius-panel);
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
-}
-.footerBar > :first-child { justify-self: start; }
-.footerCenter { display: flex; gap: var(--tpl-toolbar-gap); }
-
 /* 1152 の板（p15At）：確認済みの札は値のすぐ後ろ。 */
 @container v8-page (max-width: 1000px) {
   .attr { gap: var(--tpl-fr-area-gap); }

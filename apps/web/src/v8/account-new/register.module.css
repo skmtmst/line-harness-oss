@@ -50,6 +50,11 @@
 
 /* ③ 基本情報 */
 .tagRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-chip-gap); }
+/* タグの選ぶ欄は残りの幅いっぱい、［タグを追加］は同じ行の右。 */
+.tagPick { flex: 1 1 0; min-width: 0; }
+/* 表示名・LINE ID の2列と［LINEから取得］を1行に。ボタンは欄の下端にそろえる。 */
+.idRow { display: flex; align-items: flex-end; gap: var(--tpl-htn-chip-gap); min-width: 0; }
+.idRow > :first-child { flex: 1 1 0; min-width: 0; }
 .tagAdd { display: inline-flex; align-items: center; gap: var(--tpl-htn-chip-gap); width: var(--tpl-htn-tag-input-w); }
 .infoBox {
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary);
@@ -60,30 +65,6 @@
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary);
 }
-
-/* ④ 接続確認 */
-.checkList {
-  margin: 0; padding: 0; list-style: none; border-radius: var(--tpl-htn-radius-l);
-  background: var(--color-canvas); box-shadow: var(--tpl-htn-ring);
-}
-.checkRow {
-  display: flex; align-items: center; gap: var(--tpl-htn-panel-gap); height: var(--tpl-htn-check-row-h);
-  padding: var(--tpl-htn-check-pad); box-shadow: var(--tpl-htn-line-bottom);
-}
-.checkRow:last-child { box-shadow: none; }
-.checkIcon { flex-shrink: 0; color: var(--color-ink-faint); }
-.checkRow[data-state='passed'] .checkIcon { color: var(--color-accent-deep); }
-.checkRow[data-state='failed'] .checkIcon { color: var(--color-danger); }
-.checkTitle { flex-shrink: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink); }
-.checkDetail {
-  flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary);
-}
-.checkRow[data-state='failed'] { height: auto; min-height: var(--tpl-htn-check-row-h); padding-block: var(--polish-space-row); }
-.checkRow[data-state='failed'] .checkDetail { color: var(--color-danger); white-space: normal; overflow: visible; overflow-wrap: anywhere; }
-.importText { display: flex; flex: 1; flex-direction: column; gap: var(--tpl-htn-import-gap); min-width: 0; }
-.importText strong { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink); }
-.importText span { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 
 /* ⑤ 完了 */
 .doneLine {
@@ -115,6 +96,3 @@
 .resultLead { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
 
 .manualAck { padding: var(--tpl-htn-ack-pad); }
-
-/* 手順は題と同じ行。中身の幅だけ取り、狭いときは手順の名を省略する（共通の Steps の決まり）。 */
-.titleSteps { flex: 0 1 auto; min-width: 0; }

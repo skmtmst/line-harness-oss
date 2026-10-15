@@ -281,7 +281,8 @@
   line-height: var(--tpl-nm-small-lh);
 }
 .listHint {
-  margin: 0;
+  /* 表の下の件数の文は表から 12 離す（絵 SyQA1。表とこの文は型の段の外の包みに入っているので、型の間が効かない）。 */
+  margin: var(--polish-space-field) 0 0;
   color: var(--color-ink-faint);
   font-size: var(--tpl-nm-small-size);
   line-height: var(--tpl-nm-small-lh);
@@ -603,13 +604,6 @@
   color: var(--color-ink);
   font-size: var(--text-label);
   line-height: var(--tpl-nm-name-lh);
-}
-.historyLead {
-  margin: 0;
-  word-break: normal;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-nm-row-size);
-  line-height: var(--tpl-nm-bubble-lh);
 }
 .historyFields {
   display: grid;

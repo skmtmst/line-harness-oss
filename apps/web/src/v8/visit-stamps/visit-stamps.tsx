@@ -1,6 +1,6 @@
 'use client'
 
-import Toggle from '@/components/shared/toggle'
+import Checkbox from '@/components/shared/checkbox'
 import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
 import { notifySaved, notifyToast } from '@/components/shared/toast';
@@ -33,7 +33,6 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { Tabs } from '@/components/shared/tabs';
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
 import { TextArea, TextField } from '@/components/shared/text-field';
-import { SettingCheckbox } from '@/components/shared/checkbox';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { useAccount } from '@/contexts/account-context';
 import { api, describeSaveFailure } from '@/lib/api';
@@ -474,7 +473,7 @@ function VisitStampsScreen() {
           {tab === 'settings' ? (
             <div className={styles.pair}>
               {/* ① カードの設定 */}
-              <section className={`${styles.card} ${styles.cardTall}`} aria-label="① カードの設定">
+              <section className={styles.card} aria-label="① カードの設定">
                 <SectionTitle extra={canManage ? <RowActions subjectName="カードの設定" menuItems={[
                   { id: 'stores', label: '押せる店を選ぶ', onSelect: () => setStoresOpen(true) },
                   { id: 'pin', label: '店員の暗証番号', onSelect: () => { setDialogError(''); setPinOpen(true) } },
@@ -522,10 +521,10 @@ function VisitStampsScreen() {
                     {expiryBasis === 'none' ? <span className={styles.sub}>期限を設定すると選べます</span> : <SaveErrorField names={["expiryReminder","settings.expiryReminder","expiry_reminder","settings.expiry_reminder"]}><Select aria-label="期限の前に知らせる" size="full" disabled={ro} value={settings.expiryReminder ?? 'none'} onChange={v => set({ expiryReminder: v as VisitStampSettings['expiryReminder'] })} options={REMINDER_OPTIONS} /></SaveErrorField>}
                   </div>
                   <div className={styles.field}>
-                    <span className={styles.label}>ゴールしたら <HelpTip label="ゴールしたらの説明">ゴールの特典を使うと、次のカードを受け取れます。</HelpTip></span>
+                    <span className={styles.label}>ゴールしたら <HelpTip label="ゴールしたらの説明">ゴールの特典を使うと、次のカードを受け取れます。選んだカードの名前が欄に出ます（絵 fpPlW）。</HelpTip></span>
                     <SaveErrorField names={["nextCardId","settings.nextCardId","next_card_id","settings.next_card_id"]}><EntitySelect id="stamp-nextCardId" error={issue?.field === 'nextCardId' ? issue.message : undefined} aria-label="ゴールしたら" size="full" disabled={ro} value={settings.completion === 'next_card' ? settings.nextCardId ?? 'repeat' : 'repeat'}
                       onChange={v => set({ completion: v === 'repeat' ? 'repeat' : 'next_card', nextCardId: v === 'repeat' ? null : v })}
-                      options={[{ value: 'repeat', label: '同じカードをもう一度' }, ...nextCards.map(c => ({ ...entityOptionMetadata(c), value: c.id, label: `次のカードへ：${c.name}` })), ...(settings.completion === 'next_card' && settings.nextCardId && !nextCards.some(c => c.id === settings.nextCardId) ? [{ value: settings.nextCardId, label: '次のカードを選び直してください', disabled: true }] : [])]} /></SaveErrorField>
+                      options={[{ value: 'repeat', label: '同じカードをもう一度' }, ...nextCards.map(c => ({ ...entityOptionMetadata(c), value: c.id, label: c.name })), ...(settings.completion === 'next_card' && settings.nextCardId && !nextCards.some(c => c.id === settings.nextCardId) ? [{ value: settings.nextCardId, label: '次のカードを選び直してください', disabled: true }] : [])]} /></SaveErrorField>
                   </div>
                 </div>
                 <span className={styles.label}>特典</span>
@@ -572,7 +571,7 @@ function VisitStampsScreen() {
               </section>
 
               {/* ② たまる決まり */}
-              <section className={`${styles.card} ${styles.cardTall} ${styles.cardRules}`} aria-label="② たまる決まり">
+              <section className={`${styles.card} ${styles.cardRules}`} aria-label="② たまる決まり">
                 <SectionTitle help="来店1回ごとか、会計の金額ごとかを選びます。倍率は 曜日・時間・期間 で決め、いくつも当たるときはかけ合わせます。会員ランクは当たる中でいちばん高い倍率だけを使います。1回の上限は倍率の前、重ねたときの上限は倍率と初回ボーナスを重ねたあとにかかります。止めた倍率は使いません。">② たまる決まり</SectionTitle>
                 <div className={styles.radio} role="radiogroup" aria-label="たまり方">
                   <SaveErrorField names={["stamp-mode","mode","settings.mode"]}><Radio name="stamp-mode" checked={settings.mode === 'visit'} disabled={ro} onChange={() => set({ mode: 'visit' })}>来店 1回で 1個</Radio></SaveErrorField>
@@ -594,7 +593,7 @@ function VisitStampsScreen() {
                     <SaveErrorField names={["stamp-interval","mode","interval.mode"]}><Radio name="stamp-interval" checked={interval.mode === 'same_day'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'same_day' } })}>同じ日は1回まで（0時で戻る）</Radio></SaveErrorField>
                     <div className={styles.hoursRow}>
                       <SaveErrorField names={["stamp-interval","mode","interval.mode"]}><Radio name="stamp-interval" checked={interval.mode === 'hours'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'hours', hours: interval.hours ?? 3 } })}>前の押印から</Radio></SaveErrorField>
-                      <SaveErrorField names={["hours","interval.hours"]}><NumberInput {...fieldProps('intervalHours')} aria-label="押印をあける時間" type="number" min={1} max={23} value={interval.hours ?? 3} readOnly={ro} onChange={e => set({ stampInterval: { mode: 'hours', hours: Number(e.target.value) } })} /></SaveErrorField>
+                      <SaveErrorField names={["hours","interval.hours"]}><NumberInput {...fieldProps('intervalHours')} note={false} aria-label="押印をあける時間" type="number" min={1} max={23} value={interval.hours ?? 3} readOnly={ro} onChange={e => set({ stampInterval: { mode: 'hours', hours: Number(e.target.value) } })} /></SaveErrorField>
                       <span className={styles.plain}>時間あける（1〜23）</span>
                     </div>
                     {fieldError('intervalHours')}
@@ -605,7 +604,7 @@ function VisitStampsScreen() {
                 {settings.multipliers.map((m, i) => (
                   <div key={i} className={styles.switchRow}>
                     {/* 切る＝止める（消さない）。消すのは「…」から。 */}
-                    <SaveErrorField names={[`multipliers.${i}.active`,"active","m.active"]}><SettingCheckbox checked={m.active !== false} label={`${multiplierName(m)}を使う`} locked={ro} onChange={ro ? undefined : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} /></SaveErrorField>
+                    <SaveErrorField names={[`multipliers.${i}.active`,"active","m.active"]}><Checkbox checked={m.active !== false} aria-label={`${multiplierName(m)}を使う`} disabled={ro} onCheckedChange={ro ? () => {} : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} /></SaveErrorField>
                     <span className={styles.texts}>
                       <span className={styles.name}>{multiplierName(m)}</span>
                       <span className={styles.sub} title={multiplierDetail(m)}>{m.active === false ? `止めています ・ ${multiplierDetail(m)}` : multiplierDetail(m)}</span>
@@ -615,7 +614,7 @@ function VisitStampsScreen() {
                   </div>
                 ))}
                 <div className={styles.switchRow}>
-                  <SaveErrorField names={["firstVisitBonus","settings.firstVisitBonus","first_visit_bonus","settings.first_visit_bonus"]}><SettingCheckbox checked={settings.firstVisitBonus > 0} label="初回来店ボーナスを使う" locked={ro && settings.firstVisitBonus > 0} onChange={ro ? undefined : (on) => set({ firstVisitBonus: on ? 1 : 0 })} /></SaveErrorField>
+                  <SaveErrorField names={["firstVisitBonus","settings.firstVisitBonus","first_visit_bonus","settings.first_visit_bonus"]}><Checkbox checked={settings.firstVisitBonus > 0} aria-label="初回来店ボーナスを使う" disabled={ro} onCheckedChange={ro ? () => {} : (on) => set({ firstVisitBonus: on ? 1 : 0 })} /></SaveErrorField>
                   <span className={styles.texts}>
                     <span className={styles.name}>初回来店ボーナス</span>
                     <span className={styles.sub}>{settings.firstVisitBonus > 0 ? `はじめての来店で +${settings.firstVisitBonus} 個` : 'はじめての来店で多めに押します'}</span>
@@ -623,17 +622,23 @@ function VisitStampsScreen() {
                   {ro ? null : <RowActions subjectName="初回来店ボーナス" menuItems={[{ id: 'edit', label: '個数を変える', onSelect: () => setBonusOpen(true) }]} />}
                 </div>
                 <div className={styles.switchRow}>
-                  <SaveErrorField names={["length","settings.rankMultipliers.length","rankMultipliers.length","rankOpen","settings.rank_multipliers.length","rank_multipliers.length","rank_open"]}><SettingCheckbox checked={settings.rankMultipliers.length > 0} label="会員ランクの倍率を使う" locked={ro && settings.rankMultipliers.length > 0} onChange={ro ? undefined : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} /></SaveErrorField>
+                  <SaveErrorField names={["length","settings.rankMultipliers.length","rankMultipliers.length","rankOpen","settings.rank_multipliers.length","rank_multipliers.length","rank_open"]}><Checkbox checked={settings.rankMultipliers.length > 0} aria-label="会員ランクの倍率を使う" disabled={ro} onCheckedChange={ro ? () => {} : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} /></SaveErrorField>
                   <span className={styles.texts}>
                     <span className={styles.name}>会員ランクの倍率</span>
                     <span className={styles.sub} title={rankDetail(settings)}>{rankDetail(settings)}</span>
                   </span>
                   {ro ? null : <RowActions subjectName="会員ランクの倍率" menuItems={[{ id: 'edit', label: 'ランクと倍率を変える', onSelect: () => setRankOpen(true) }]} />}
                 </div>
-                <Field label="カードを受け取った時のボーナス友だちがカードを受け取った時に押す数（0〜50）＋"><SaveErrorField names={["receiptBonus","settings.receiptBonus","receipt_bonus","settings.receipt_bonus"]}><NumberInput unit="個" {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} /></SaveErrorField>
-</Field>
+                <div className={styles.receiptRow}>
+                  <span className={styles.texts}>
+                    <span className={styles.name}>カードを受け取った時のボーナス</span>
+                    <span className={styles.sub}>友だちがカードを受け取った時に押す数（0〜50）</span>
+                  </span>
+                  <Plus size={14} aria-hidden="true" />
+                  <SaveErrorField names={["receiptBonus","settings.receiptBonus","receipt_bonus","settings.receipt_bonus"]}><NumberInput unit="個" note={false} {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} /></SaveErrorField>
+                </div>
                 {fieldError('receiptBonus')}
-                <div className={styles.row2}>
+                <div className={`${styles.row2} ${styles.stacking}`}>
                   <div className={styles.field}>
                     <span className={styles.label}>重ねたときの順番</span>
                     {/* 初回ボーナスを倍率の前に足すか後に足すか（口の stackingOrder）。倍率どうしはかけ合わせ、ランクはいちばん高い倍率だけ。 */}

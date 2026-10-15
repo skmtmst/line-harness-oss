@@ -82,8 +82,19 @@
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] { flex-direction: column; align-items: flex-start; }
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child {
   display: block; flex: none; width: 100%; white-space: normal;
-  overflow: visible; text-overflow: clip; overflow-wrap: break-word; word-break: normal;
+  overflow: visible; text-overflow: clip; overflow-wrap: break-word; word-break: auto-phrase; /* 語の途中（「離／れています」）で折らない。文節に入らない幅だけ字で折る */
 }
+/* detailLayout='single'：1行＋省略（全文は title）。最後の1字だけ次の行に落ちる補足に使う（aINnz・t2SMXX）。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail-layout='single'] [data-kpi-detail] > span:first-child {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* detailLayout='inline-action'：補足の右に行き先を同じ行で（xxKtW「空欄のまま送られます　編集する →」）。補足は1行＋省略、行き先は縮めない。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail-layout='inline-action'] [data-kpi-detail] { flex-direction: row; align-items: center; gap: var(--tpl-toolbar-gap); }
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail-layout='inline-action'] [data-kpi-detail] > span:first-child {
+  flex: 0 1 auto; width: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail-layout='inline-action'] [data-kpi-detail] > :not(:first-child) { flex-shrink: 0; margin-left: auto; }
 
 /* B-178：一覧は116の帯。マスのcompact指定を残しても段の寸法は共通。 */
 :root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > [data-design-version] {

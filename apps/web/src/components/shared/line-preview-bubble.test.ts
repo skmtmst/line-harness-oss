@@ -24,10 +24,10 @@ function effective(selector: string): Record<string, string> {
 }
 
 describe('LINE の吹き出し（v8）', () => {
-  it('吹き出しは文字に合わせる：幅は決めず、いちばん広くて 186', () => {
+  it('吹き出しは文字に合わせる：幅は決めず、いちばん広くて 210（文の幅 186＋左右の余白・絵 UTbi1）', () => {
     const bubble = effective('bubble')
     expect(bubble.width).toBe('auto')
-    expect(bubble['max-width']).toBe('186px')
+    expect(bubble['max-width']).toBe('210px')
     expect(bubble['min-height']).toBe('0')
     const body = effective('bubbleBody')
     expect(body.width).toBe('auto')

@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { FocusEventHandler, ReactNode, Ref } from 'react'
 import styles from './disclosure.module.css'
 
 /**
@@ -16,9 +16,12 @@ export default function Disclosure({
   hint,
   defaultOpen = false,
   size = 'standard',
+  appearance = 'card',
   className,
   id,
   onToggle,
+  detailsRef,
+  onBlur,
   children,
 }: {
   title: ReactNode
@@ -26,15 +29,22 @@ export default function Disclosure({
   hint?: ReactNode
   defaultOpen?: boolean
   size?: 'standard' | 'compact'
+  appearance?: 'card' | 'inset'
   className?: string
   id?: string
   /** 開いたときにだけ必要な詳細を読み込むための口。 */
   onToggle?: (open: boolean) => void
+  /** 保存の誤りで欄を開いて移るとき（呼ぶ側が open を立てる）。 */
+  detailsRef?: Ref<HTMLDetailsElement>
+  onBlur?: FocusEventHandler<HTMLDetailsElement>
   children: ReactNode
 }) {
   return (
     <details
+      ref={detailsRef}
+      onBlur={onBlur}
       id={id}
+      data-appearance={appearance}
       onToggle={onToggle ? (event) => onToggle(event.currentTarget.open) : undefined}
       open={defaultOpen || undefined}
       className={[styles.root, size === 'compact' ? styles.compact : '', className].filter(Boolean).join(' ')}

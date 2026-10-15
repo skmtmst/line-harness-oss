@@ -62,6 +62,14 @@
   gap: 8px;
 }
 
+/* 題と「？」の行（CardHeader の help）。「？」は題の行の真ん中、間 6。 */
+.titleRow {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
 .title {
   min-width: 0;
   overflow: hidden;
@@ -145,7 +153,7 @@ html:root .headerContent .meta { display: flex; flex-direction: column; align-it
 .headerStacked, .headerPanel { flex: 0 1 auto; min-width: 0; min-height: 0; align-items: flex-start; gap: var(--tpl-rs-panel-head-gap); padding: 0; }
 .headerStacked .titleGroup, .headerPanel .titleGroup { flex: 1 1 0; flex-direction: column; align-items: stretch; gap: var(--tpl-rs-panel-head-text-gap); }
 .headerStacked .title, .headerPanel .title { margin: 0; line-height: var(--tpl-rs-lh-14); }
-.headerStacked .meta, .headerPanel .meta { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; line-height: var(--tpl-rs-lh-11); }
+.headerStacked .meta, .headerPanel .meta { color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: 400; line-height: var(--tpl-rs-lh-11); }
 .headerPanel { padding: var(--tpl-rs-panel-head-pad); box-shadow: var(--tpl-rs-line-bottom); }
 
 :root .card[data-spacing='settings'] {
@@ -216,6 +224,7 @@ html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface=
 }
 html:root .paddingCompact { padding: var(--space-16); }
 html:root .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
+html:root .card[data-card-spacing][data-card-spacing-sides] { padding: var(--card-content-padding); }
 /* B-208 の16は箱の端。中の見出しと本文・欄の間は指定した8〜12も使える。 */
 html:root .vertical { gap: max(var(--space-8), var(--card-content-gap, var(--space-16))); }
 

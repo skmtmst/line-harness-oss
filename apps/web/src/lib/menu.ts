@@ -56,7 +56,8 @@ export interface MenuSection {
 /** 統括の外側（左メニュー・上の帯）を出す住所（/hq の下と、統括から開く LINEアカウントの登録）。 */
 export function isHqShellPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false
-  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new'
+  // 統括の「アカウント」から開く登録の画面（LINEアカウントを登録・飲食店の店舗を追加とその利用規約）も統括の外側（絵 xj3zz・faGn4・VdKOK）。
+  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new' || pathname === '/restaurant-test/stores/new' || pathname === '/restaurant-test/terms'
 }
 
 export const HQ_MENU_SECTIONS: MenuSection[] = [
@@ -242,6 +243,15 @@ export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [sectio
 export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
   // LINEアカウントの登録は統括の「アカウント」から開く（左メニューは統括のまま・絵 xj3zz）。
   '/accounts/new': 'hq-stores',
+  // 飲食店の店舗を追加（ao15G・faGn4）も統括の「アカウント」から開く。左メニューは「アカウント」を選んだ形。
+  '/restaurant-test/stores/new': 'hq-stores',
+  // 店舗を追加の「利用規約を別画面で読む」（VdKOK）も統括の「アカウント」の中。
+  '/restaurant-test/terms': 'hq-stores',
+  // 共通アクション（一覧・作る・編集・版と使われている場所 ziSgL）はオートメーションの中。左メニューは自動化の組を開いて「オートメーション」を選んだ形。
+  '/common-actions': 'automations',
+  '/common-actions/new': 'automations',
+  '/common-actions/edit': 'automations',
+  '/common-actions/versions': 'automations',
   '/accounts?tab=migration': 'friends',
   /*
    * /conversions の1画面に「成果とアフィリエイト」と「コンバージョン」の
@@ -263,6 +273,21 @@ export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
    * 管理者は予約設定を選ぶ。
    */
   '/booking/staff/shifts': ['booking-own-shifts', 'booking-menus'],
+  /*
+   * 左メニューの項目と別の URL に置いた画面（2026-10-15 判定役 Eo56k・YMVFD）。
+   * 宣言が無いと、どの項目も選ばれず、属する組も閉じたままになっていた。
+   * 成果とアフィリエイトの各タブ（/affiliates?tab=…）は「成果とアフィリエイト」、
+   * 担当スタッフの一覧・追加は「予約設定」の担当スタッフタブ、
+   * 重複の確認は友だちの主タブの1枚、枠を閉じる知らせは店舗ダッシュボードから開く。
+   */
+  '/affiliates': 'affiliates',
+  '/affiliates/new': 'affiliates',
+  '/affiliate-offers': 'affiliates',
+  '/affiliate-offers/new': 'affiliates',
+  '/booking/staff': 'booking-menus',
+  '/booking/staff/new': 'booking-menus',
+  '/duplicates': 'friends',
+  '/restaurant-test/close-tasks': 'restaurant-dashboard',
 }
 
 /**

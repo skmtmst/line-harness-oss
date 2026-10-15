@@ -35,7 +35,7 @@ vi.mock('@/lib/api', async importOriginal => {
       lineAccounts: { ...actual.api.lineAccounts, list: async () => ({ success: true, data: [] }) },
       access: {
         ...actual.api.access,
-        users: async () => ({ success: true, data: { items: net.populated ? ['administrator', 'operations', 'reception', 'view_only'].map((roleBundle) => ({ id: roleBundle, name: roleBundle, roleBundle, status: 'active', accountScope: { type: 'all' }, mfaEnabled: true, lastLoginAt: null })) : [], summary, pagination: { total: net.populated ? 4 : 0 } } }),
+        users: async () => ({ success: true, data: { items: net.populated ? ['administrator', 'operations', 'reception', 'view_only'].map((roleBundle) => ({ id: roleBundle, name: roleBundle, roleBundle, email: `${roleBundle}@***.jp`, status: 'active', accountScope: { type: 'all' }, mfaEnabled: true, lastLoginAt: null })) : [], summary, pagination: { total: net.populated ? 4 : 0 } } }),
         roles: async () => ({ success: true, data: { items: [] } }),
       },
     },
@@ -94,6 +94,17 @@ describe('ログインユーザーV8（nku0f・A35Gh）', () => {
     }
     const heads = [...table.querySelectorAll('[role="columnheader"]')].map(cell => cell.textContent)
     expect(heads.indexOf('役割')).toBeLessThan(heads.indexOf('最後に入った'))
+  })
+
+  it('一覧は絵 nku0f の列（人・役割・最後に入った）。行に顔とメール、表の頭に絞り込みを置かない', async () => {
+    net.populated = true
+    await render()
+    const table = host.querySelector('[role="table"][aria-label="いまいる人の一覧"]')!
+    const heads = [...table.querySelectorAll('[role="columnheader"]')].map(cell => cell.textContent)
+    expect(heads).not.toContain('担当のLINEアカウント')
+    expect(table.textContent).toContain('operations@***.jp')
+    expect(host.querySelector('[aria-label="役割で絞り込む"]')).toBeNull()
+    expect(host.textContent).not.toContain('最後に入った日が新しい順')
   })
 
   it('テーマ指定がなくてもV8で開く', async () => {

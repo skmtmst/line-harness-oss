@@ -34,6 +34,12 @@
   background: var(--color-canvas-sunken);
 }
 
+/* 計算で決まる読むだけの欄（年齢など）。絵 vX3wQ：灰色の地・薄い文字。 */
+.field[data-look='derived'] {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
 .field:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
@@ -96,6 +102,8 @@
 :root .single[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); }
 :root .multi[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); border-color: var(--color-danger); }
 :root .single { gap: 0; }
+/* 1行の欄は、入りきらない見本の文・中身を字の途中で切らず「…」で省く（全文は欄を押すと読める）。 */
+:root .single { text-overflow: ellipsis; }
 
 /*
  * 打ち直している間（Field の data-field-quiet）は v8 の複数行も普段の枠に戻す。

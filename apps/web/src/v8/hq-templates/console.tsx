@@ -7,7 +7,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useListReturnHref, useListNavigationHref, useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useAccount } from '@/contexts/account-context'
-import { ArrowLeft, Check, Plus, Search, Send } from 'lucide-react'
+import { ArrowLeft, Check, Plus, Send } from 'lucide-react'
 import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqTemplateReceivedVersion, type HqTemplateVersionDisplay, type TemplateKind } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -60,6 +60,7 @@ import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import styles from './console.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
+import SearchField from '@/components/shared/search-field'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { DistributionPage } from '@/components/templates/distribution-page'
@@ -203,6 +204,10 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const alive = useRef(true)
   /** リッチメニューの作る④で選んだ配るアカウント。 */
   const [menuTargets, setMenuTargets] = useState<string[]>([])
+  /* ③④の右の列「出る人（合計）」。選んだアカウントの友だちの合計（読めないときは null）。 */
+  const [menuFriendTotal, setMenuFriendTotal] = useState<number | null>(0)
+  /* ④「配ったときの扱い」で選んだ初めの選択。配る前の確認（重複の一覧）を開いたときに、その扱いを選べる行へ入れる。 */
+  const preferredBulkMode = useRef<'' | DistributionMode>('')
 
   const reconcileSessionUploads = (keep: readonly string[]) => {
     const kept = new Set(keep)
@@ -224,7 +229,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
    */
   const toListRef = useRef<() => void>(() => {})
   usePageTitle((stage === 'list' || stage === 'saved') ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : stage === 'detail' ? (detail?.template.name ?? PAGE_TITLES[type]) : pageTitle)
-  usePageCrumbs(stage === 'list' || stage === 'saved'
+  /* 回答フォームの編集は、編集画面が上の帯の題を「回答フォーム」にする（絵 u5MM7・P90Vp0）。一覧の段を重ねると「回答フォーム › 回答フォーム」になるので足さない。 */
+  usePageCrumbs(stage === 'list' || stage === 'saved' || (stage === 'edit' && type === 'form')
     ? [{ label: 'ホーム', href: '/' }]
     : [{ label: PAGE_TITLES[type], href: LIST_HREFS[type], onSelect: () => toListRef.current() }])
 
@@ -330,7 +336,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     setFolderBatch(null); setFolderDistribution(null)
     if (createUncertain) return
     reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : [])
-    createAttempt.current = null; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
+    createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
     flushListUrlState()
     entryHandled.current = ''
     window.history.replaceState(window.history.state, '', returnHref)
@@ -543,7 +549,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     if (checked.stores.length !== ids.length || new Set(checked.stores.map((s) => s.accountId)).size !== ids.length || checked.stores.some((s) => !ids.includes(s.accountId))) throw new Error('配布先を確認できませんでした。もう一度アカウントを選択してください。')
     if (!alive.current) return
     if (stage === 'saved') { setSearch(''); setAccountFolder(ALL_ACCOUNTS) }
-    setPendingRun(null); setPreflight(checked); setChoices({}); setBulkMode(''); setSelected(ids); setNow(Date.now()); setStage('duplicates')
+    const preferred = preferredBulkMode.current
+    preferredBulkMode.current = ''
+    const preset: Record<string, DistributionMode> = {}
+    if (preferred) for (const store of checked.stores) for (const item of store.items) if (item.duplicate && item.allowedModes.includes(preferred)) preset[choiceKey(store.accountId, item.sourceId)] = preferred
+    setPendingRun(null); setPreflight(checked); setChoices(preset); setBulkMode(preferred); setSelected(ids); setNow(Date.now()); setStage('duplicates')
   })
   const applyBulk = (mode: '' | DistributionMode) => {
     setBulkMode(mode)
@@ -751,7 +761,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         notices={notices}
         overlays={(
           <>
-          {folderDistribution ? <FolderDistributionDialog name={folderDistribution.name} templates={folderDistribution.templates} templateFolders={folders} accounts={accounts} busy={busy} error={error}
+          {folderDistribution ? <FolderDistributionDialog name={folderDistribution.name} templates={folderDistribution.templates} templateFolders={folders} accounts={accounts} accountFolders={accountFolders} busy={busy} error={error}
             onCancel={() => { if (!busy) { setFolderDistribution(null); setError('') } }}
             onConfirm={(rows, ids) => startFolderDistribution(folderDistribution.name, rows, ids)} /> : null}
           {stage === 'saved' ? <SavedDistributionDialog accounts={accounts} folders={accountFolders} selected={selected} onChange={setSelected}
@@ -809,7 +819,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         }}
         onBack={toList}
         onEdit={() => { if (detail) open(detail.template.id, 'edit') }}
-        onDistribute={() => { setSelected([]); setTextOverrides({}); setSearch(''); setAccountFolder(ALL_ACCOUNTS); setPreflight(null); setChoices({}); setBulkMode(''); setStage('accounts') }}
+        onDistribute={() => { preferredBulkMode.current = ''; setSelected([]); setTextOverrides({}); setSearch(''); setAccountFolder(ALL_ACCOUNTS); setPreflight(null); setChoices({}); setBulkMode(''); setStage('accounts') }}
         onDuplicate={() => void perform(async () => {
           const requestId = crypto.randomUUID()
           await hqTemplatesApi.duplicate(detail.template.id, `${detail.template.name}のコピー`, detail.template.revision, requestId)
@@ -817,6 +827,25 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           setMessage('ひな形を複製しました。')
         })}
         onEnterAccount={(accountId) => { setSelectedAccountId(accountId); router.push('/templates') }}
+        onRemove={canEdit ? () => setRemove(detail.template) : undefined}
+      />
+      <ConfirmDialog
+        open={!!remove}
+        title="ひな形を削除"
+        deleteName={remove?.name ?? ''}
+        description={`「${remove?.name ?? ''}」を削除します。配布済みのアカウントデータは残ります。`}
+        destructive
+        confirmLabel="削除する"
+        busy={busy}
+        onCancel={() => { if (!busy) setRemove(null) }}
+        onConfirm={() => perform(async () => {
+          if (!remove) return
+          await hqTemplatesApi.remove(remove.id, remove.revision)
+          setTemplates((current) => current.filter((t) => t.id !== remove.id))
+          setKindRows((current) => current ? current.filter((t) => t.id !== remove.id) : current)
+          setRemove(null); setMessage('ひな形を削除しました。')
+          toList()
+        })}
       /></SaveErrorScope>
     )
   }
@@ -940,25 +969,23 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       },
       imageUrl: (r2Key) => `${process.env.NEXT_PUBLIC_API_URL ?? ''}/images/${r2Key.split('/').map(encodeURIComponent).join('/')}`,
       distribute: (
-        <Card padding="spacious" layout="vertical">
+        <Card variant="form" gap="normal">
           <HqAccountPicker
             title="配るアカウント"
+            help="選んだアカウントへ、このリッチメニューを下書きとして届けます。LINE に出すのは各アカウントで公開したときです。"
             allowed={accounts}
             selected={menuTargets}
             onChange={setMenuTargets}
-            note="配った先で、既定のメニューにするかを決めます。"
+            onFriendTotal={setMenuFriendTotal}
             disabled={busy || !canEdit}
           />
         </Card>
       ),
-      distributeSummary: [
-        { key: 'accounts', label: '配るアカウント', value: menuTargets.length ? `${menuTargets.length} アカウント` : 'まだ選んでいません' },
-        { key: 'state', label: '届き方', value: '下書きとして届く' },
-      ],
       selectedCount: menuTargets.length,
+      friendTotal: menuFriendTotal,
       busy,
       notice: notices,
-      onSave: (seed, distribute) => {
+      onSave: (seed, distribute, duplicateMode) => {
         let next: RichMenuDefinition
         try {
           next = hqRichMenuDefinitionFromSeed(seed)
@@ -971,6 +998,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           return
         }
         setDefinition(next); setName(seed.name); setFolderId(seed.folderId)
+        preferredBulkMode.current = distribute ? duplicateMode ?? '' : ''
         void save(distribute, next, seed.name, description, false, { folderId: seed.folderId, preselect: distribute ? menuTargets : undefined })
       },
     }
@@ -1154,7 +1182,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       {error || message ?notices : null}
         </>}
         toolbar={<DistributionToolbar>
-          <Field label={<><Search size={14} aria-hidden="true" /></>}><SaveErrorField names={["search"]}><input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} /></SaveErrorField></Field>
+          <strong className={styles.distSelected}>{`選んだ ${selected.length} アカウント`}</strong>
+          <span className={styles.distSearch}><SaveErrorField names={["search"]}><SearchField aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={setSearch} onClear={() => setSearch('')} /></SaveErrorField></span>
           <span className={styles.bulkPick}>
             <SaveErrorField names={["bulkMode","bulk_mode"]}><Select
               aria-label="一括の配布方法"
@@ -1165,10 +1194,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
               options={[{ value: '', label: '一括の配布方法：選ぶ' }, { value: 'overwrite', label: '一括の配布方法：上書き' }, { value: 'alias', label: '一括の配布方法：別名で作る' }]}
             /></SaveErrorField>
           </span>
-        <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))}/>
-          {accountFolderRows.find((row) => row.id === accountFolder)?.leading}
-          {accountFolders.failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。" /> : null}
+          {accountFolderRows.length > 1 ? null : accountFolders.failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。" /> : null}
         </DistributionToolbar>}
+      /* 絵 J7HNK：アカウントのフォルダは左の列（数とまとめて選ぶ印）。狭い板では選ぶ欄に畳む。 */
+      folders={accountFolderRows.length > 1 ? <DistributionFolderPanel rows={accountFolderRows} activeId={accountFolder} onSelect={setAccountFolder} failed={Boolean(accountFolders.failed)} /> : undefined}
+      collapsedFolders={accountFolderRows.length > 1 ? <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: `フォルダ：${row.label}` }))}/> : undefined}
       actions={<>
 {stage === 'accounts' ? <>
             <Button disabled={busy} onClick={toList}>キャンセル</Button>

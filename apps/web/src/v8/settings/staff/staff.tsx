@@ -7,6 +7,7 @@ import TotpQr from '@/components/shared/totp-qr'
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
 import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state';
+import { avatarInitials } from '@/components/shared/avatar';
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UserPlus } from 'lucide-react';
@@ -19,7 +20,6 @@ import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/compo
 import Checkbox from '@/components/shared/checkbox'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
-import Select from '@/components/shared/select'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -35,7 +35,6 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import styles from './staff.module.css'
 import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context';
@@ -93,10 +92,6 @@ const NOTIFICATIONS = [
 const EDIT_PERMISSION_PATHS = ['/', '/chats', '/friends', '/tags', '/scenarios', '/broadcasts', '/reminders', '/auto-replies', '/templates', '/rich-menus', '/form-submissions', '/contents/vars', '/contents', '/analytics', '/automations', '/webhooks', '/booking/bookings', '/ec-commerce', '/line-notifications', '/nen-campaigns', '/nen-members'] as const
 const PERMISSIONS: Array<readonly [string, string]> = EDIT_PERMISSION_PATHS.map((path) => [path, PERMISSION_LABELS[path]] as const)
 
-const LIST_SORT_OPTIONS = [
-  { value: 'recent', label: '最後に入った日が新しい順' },
-  { value: 'name', label: '名前順' },
-]
 
 function messageOf(error: unknown): string { return error instanceof ApiError || error instanceof Error ? error.message : '通信に失敗しました。通信を確かめて、もう一度お試しください。' }
 
@@ -795,9 +790,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const [me, setMe] = useState<StaffMember | null>(null)
   const [audits, setAudits] = useState<AuditEventItem[]>([])
   const [query, setQuery] = useListUrlValue('q', '')
-  const [roleFilter, setRoleFilter] = useListUrlValue<AccessRoleBundle | 'all'>('roleFilter', 'all')
   const [statusFilter, setStatusFilter] = useListUrlValue<'active' | 'suspended' | 'all'>('statusFilter', 'active')
-  const [sort, setSort] = useListUrlValue('sort', 'recent')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
@@ -815,7 +808,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   /* 送信中の掛け金。state は次の描画まで古いままなので、素早い二度押しの2回目を止められない。 */
   const resendingRef = useRef(false)
   const removingRef = useRef(false)
-  const administrator = me?.role === 'admin' || me?.role === 'owner'
+  // 閲覧専用（代理ログインの見るだけ等）のオーナー・管理者は、変える操作を出さず閲覧のみの形にする。
+  const administrator = (me?.role === 'admin' || me?.role === 'owner') && !me?.readOnly
   usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ログインユーザー')
   const load = useCallback(async () => {
     setLoading(true)
@@ -929,14 +923,11 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     const matchesQuery = !normalizedQuery
       || [user.name, user.email, user.jobTitle].some((value) =>
         value?.toLocaleLowerCase('ja-JP').includes(normalizedQuery))
-    const matchesRole = roleFilter === 'all' || user.roleBundle === roleFilter
-    return matchesQuery && matchesRole
-  }).sort((a, b) => sort === 'name'
-    ? a.name.localeCompare(b.name, 'ja')
-    : (b.lastLoginAt ?? '').localeCompare(a.lastLoginAt ?? ''))
+    return matchesQuery
+  }).sort((a, b) => (b.lastLoginAt ?? '').localeCompare(a.lastLoginAt ?? ''))
   const pageCount = Math.max(1, Math.ceil(filteredUsers.length / USER_PAGE_SIZE))
   const shown = filteredUsers.slice((userPage - 1) * USER_PAGE_SIZE, userPage * USER_PAGE_SIZE)
-  useEffect(() => { setUserPage(1) }, [query, roleFilter, statusFilter, tab])
+  useEffect(() => { setUserPage(1) }, [query, statusFilter, tab])
   const activeAdministratorCount = members.filter(isActiveAdministrator).length
   const missing = Math.max(accessSummary.active - accessSummary.mfaEnabled, 0)
   const canEdit = (member: StaffMember) => Boolean(administrator || (me?.role === 'staff' && me.id === member.id))
@@ -1085,18 +1076,13 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
           <h2 className={styles.cardTitle}>{sectionTitle}</h2>
           <div className={styles.cardSubRow}>
             <span className={styles.cardSub}>{summaryReady ? `${filteredUsers.length}人` : emptyValue('unknown')}</span>
-            {tab === 'members' && missing > 0 ? <span className={styles.cardWarn} title={`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</span> : null}
+            {tab === 'members' && missing > 0 ? <span className={styles.cardWarn}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</span> : null}
           </div>
-        </div>
-        <div className={styles.cardTools}>
-          <div className={styles.toolSelect}><SaveErrorField names={["roleFilter","role_filter"]}><Select aria-label="役割で絞り込む" size="full" value={roleFilter} onChange={(value) => setRoleFilter(value as AccessRoleBundle | 'all')} options={[{ value: 'all', label: 'すべての役割' }, ...(['administrator', 'operations', 'reception', 'view_only', 'custom'] as const).map((role) => ({ value: role, label: summaryReady ? `${V8_ROLE_LABEL[role]} ${tabUsers.filter((user) => user.roleBundle === role).length}` : V8_ROLE_LABEL[role] }))]} /></SaveErrorField></div>
-          <SaveErrorField names={["sort"]}><ListToolbarSort value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></SaveErrorField>
         </div>
       </div>
       <GridTable className={`${styles.table} ${viewer ? styles.readOnlyTable : ''}`} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: 'var(--tpl-sa-staff-card-gap)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
         <GridHeadRow>
           <GridCell className={styles.colPerson} role="columnheader">人</GridCell>
-          <GridCell className={styles.colScope} role="columnheader" title="担当のLINEアカウント">担当のLINEアカウント</GridCell>
           <GridCell className={styles.colRole} role="columnheader">役割</GridCell>
           <GridCell className={styles.colLast} role="columnheader">最後に入った</GridCell>
           <GridCell className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
@@ -1109,8 +1095,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             const items = rowMenuItems(user)
             return (
               <GridRow key={user.id}>
-                <GridNameCell className={styles.colPerson} name={<button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? user.name : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>} />
-                <GridCell className={styles.colScope} role="cell" title={accessScopeLabel(user, accountNames)}>{scopeShort(user, accountNames)}</GridCell>
+                {/* 絵 nku0f：顔・名前・メール。担当のLINEアカウントは列にせず、名前に重ねた説明と「見える画面」で見る。 */}
+                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
                 <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}</GridCell>
                 <GridCell className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">

@@ -19,7 +19,7 @@ import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, 
 
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ArrowUpDown, Eye } from 'lucide-react';
+import { ArrowUpDown, Eye, Folder as FolderIcon } from 'lucide-react';
 import type { Folder, Tag } from '@line-crm/shared';
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api';
 import { loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message';
@@ -33,6 +33,8 @@ import { FolderDotName } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox';
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
@@ -226,6 +228,11 @@ export default function BroadcastListV8() {
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
+  /* 行を選んでまとめてフォルダへ移す（絵 l5V9a の左の選ぶ欄）。選ぶのはこのページの行だけ。 */
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set())
+  const [bulkMenuOpen, setBulkMenuOpen] = useState(false)
+  const [bulkMoving, setBulkMoving] = useState(false)
+  const bulkAnchorRef = useRef<HTMLButtonElement | null>(null)
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
@@ -953,9 +960,44 @@ export default function BroadcastListV8() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
 
+  /* 統括から来た配信は店では変えられないので選べない。 */
+  const selectableRows = visibleBroadcasts.filter((broadcast) => !isFromHeadquarters(broadcast))
+  const selectedRows = selectableRows.filter((broadcast) => selectedIds.has(broadcast.id))
+  const selectedCount = selectedRows.length
+  const allOnPageSelected = selectableRows.length > 0 && selectedCount === selectableRows.length
+  const clearSelection = () => { setSelectedIds(new Set()); setBulkMenuOpen(false) }
+  useEscapeToClearSelection(selectedCount > 0, clearSelection)
+  const toggleOne = (id: string) => setSelectedIds((current) => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+  const toggleAllOnPage = () => setSelectedIds(allOnPageSelected ? new Set() : new Set(selectableRows.map((broadcast) => broadcast.id)))
+  const moveSelected = async (folderId: string | null) => {
+    if (bulkMoving || selectedRows.length === 0) return
+    setBulkMenuOpen(false)
+    setBulkMoving(true)
+    const results = await Promise.allSettled(selectedRows.map((broadcast) => api.broadcasts.update(broadcast.id, { folderId, expectedVersion: broadcast.version ?? 0 })))
+    const failed = results.filter((result) => result.status === 'rejected' || !result.value.success).length
+    setBulkMoving(false)
+    setSelectedIds(new Set())
+    setFolderError(failed > 0 ? `${failed}件をフォルダへ移せませんでした。` : '')
+    void loadList((page - 1) * pageSize)
+    void loadFolders()
+  }
+
   const tableHead = (
     <thead>
       <TableHeadRow>
+        <Th className={styles.selectCell} aria-label="選択">
+          {canEdit && selectableRows.length > 0 ? <Checkbox
+            checked={allOnPageSelected}
+            indeterminate={!allOnPageSelected && selectedCount > 0}
+            onCheckedChange={toggleAllOnPage}
+            aria-label="このページの配信をすべて選択"
+          /> : <UnavailableSelection label="このページの配信をすべて選択" />}
+        </Th>
         <Th className={styles.colTitle}>タイトル・内容</Th>
         <Th className={styles.colStatus}>状態</Th>
         {narrow ? null : <Th className={styles.colAudience}>配信条件</Th>}
@@ -972,6 +1014,7 @@ export default function BroadcastListV8() {
       <tbody>
         {[0, 1, 2, 3, 4].map((n) => (
           <Tr key={n} className={styles.row}>
+            <Td className={styles.selectCell} />
             <Td><Skeleton width={200} height={16} /><Skeleton width={140} height={12} /></Td>
             <Td><Skeleton width={72} height={22} className="rounded-pill" /></Td>
             {narrow ? null : <Td><Skeleton width={120} height={12} /></Td>}
@@ -1040,6 +1083,13 @@ export default function BroadcastListV8() {
               detailKey="broadcast" onOpen={() => setPanelId(panelId === broadcast.id ? null : broadcast.id)}
                data-row-id={broadcast.id}
             >
+              <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
+                {canEdit && !isFromHeadquarters(broadcast) ? <Checkbox
+                  checked={selectedIds.has(broadcast.id)}
+                  onCheckedChange={() => toggleOne(broadcast.id)}
+                  aria-label={`${broadcast.title}を選択`}
+                /> : <UnavailableSelection label={`${broadcast.title}を選択`} />}
+              </Td>
               <Td>
                 <FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName>
               </Td>
@@ -1106,6 +1156,25 @@ export default function BroadcastListV8() {
       </RovingTbody>
     </DataTable>
   )
+  const bulkBar = canEdit && selectedCount > 0 ? (
+    <BulkBar count={selectedCount} total={selectableRows.length} onSelectAll={() => setSelectedIds(new Set(selectableRows.map((broadcast) => broadcast.id)))} onClear={clearSelection}>
+      <Button type="button" variant="secondary" ref={bulkAnchorRef} aria-haspopup="menu" aria-expanded={bulkMenuOpen} busy={bulkMoving} busyLabel="移しています…" onClick={() => setBulkMenuOpen((open) => !open)}>
+        <FolderIcon size={13} aria-hidden="true" />
+        フォルダへ移す
+      </Button>
+      <ActionMenu
+        open={bulkMenuOpen}
+        onClose={() => setBulkMenuOpen(false)}
+        anchorRef={bulkAnchorRef}
+        ariaLabel="移す先のフォルダ"
+        items={[
+          { id: 'bulk-move-unfiled', label: '未分類', onSelect: () => void moveSelected(null) },
+          ...folders.map((folder) => ({ id: `bulk-move-${folder.id}`, label: folder.name, onSelect: () => void moveSelected(folder.id) })),
+        ]}
+      />
+      <Button type="button" variant="secondary" onClick={clearSelection}>選択を外す</Button>
+    </BulkBar>
+  ) : null
 
   const pager = !loading && !error && !forbidden && (resultTotal !== null || visibleBroadcasts.length > 0) ? (
     <ListPagePagination>
@@ -1303,6 +1372,7 @@ export default function BroadcastListV8() {
         </div>
       ) : null}
       {listBody}
+      {bulkBar}
     </ListPage></SaveErrorScope>
   )
 }

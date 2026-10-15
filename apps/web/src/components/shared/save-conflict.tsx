@@ -174,6 +174,7 @@ export function SaveConflictBand({
           違いを比べる
         </Button>
       ) : null}
+      {/* 絵 kz2B6・J1pdB・k32cn：次に押す物が分かるよう［最新を読み込んで続ける］は緑の主ボタン。 */}
       {reloadHref ? <Button variant="primary" href={reloadHref}><RefreshCw aria-hidden="true" className={styles.buttonIcon} />最新を読み込んで続ける</Button> : <Button variant="primary" onClick={onReload}>
         <RefreshCw aria-hidden="true" className={styles.buttonIcon} />
         最新を読み込んで続ける

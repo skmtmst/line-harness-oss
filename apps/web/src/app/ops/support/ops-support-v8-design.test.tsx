@@ -108,8 +108,8 @@ describe('P0jhqO お問い合わせの絵合わせ', () => {
     await act(async () => { waiting.click() })
     await settle()
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('stage=waiting'))).toBe(true)
-    expect(body).toContain('優先度：すべて')
-    expect(body).toContain('並び替え：優先度')
+    expect(body).toContain('優先度')
+    expect(body).toContain('並び：優先度')
     // 行
     expect(body).toContain('#1042')
     expect(body).toContain('然-NEN-本部・優先度 高')

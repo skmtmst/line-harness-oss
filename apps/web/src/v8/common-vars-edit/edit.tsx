@@ -1,5 +1,6 @@
 'use client'
 
+import { TextField } from '@/components/shared/text-field'
 import { requiredText } from '@/lib/form-requirement'
 const b244Requirements = {
   changeReason: requiredText("変える理由を入力してください"),
@@ -840,7 +841,8 @@ function EditCommonVarV8Inner() {
               aria-label="フォルダ"
               label="フォルダ"
               id="cv-folder"
-              {...(narrow ? { size: 'full' as const } : { width: 240 })}
+              // 右の列の幅いっぱい（絵 AYc6O）。固定 240 は列（約206）より広く、縮んで字が真ん中に寄っていた。
+              size="full"
               value={folderId}
               onChange={(next) => { setSaved(false); setFolderId(next) }}
               // 絵は「フォルダ：お店の情報」を1つの文で見せる（閉じたボタンの頭は label）。
@@ -926,14 +928,13 @@ function EditCommonVarV8Inner() {
 
       <section className={styles.sideCard} aria-labelledby="cv-edit-memo-heading">
         <h2 id="cv-edit-memo-heading" className={styles.sideTitle}>社内メモ</h2>
-        <div className={styles.field}><Field label="メモ（お客さまには出ません）" htmlFor="cv-memo"><SaveErrorField names={["memo","saved"]}><input
+        <div className={styles.field}><Field label="メモ（お客さまには出ません）" htmlFor="cv-memo"><SaveErrorField names={["memo","saved"]}><TextField
             id="cv-memo"
-            type="text"
             value={memo}
             onChange={(e) => { setSaved(false); setMemo(e.target.value) }}
             maxLength={1000}
             placeholder="店舗ごとに違うときは店舗の共通情報へ"
-            className={styles.fieldInput}
+            title="店舗ごとに違うときは店舗の共通情報へ"
             readOnly={!canWrite}
           /></SaveErrorField></Field></div>
       </section>
@@ -977,6 +978,7 @@ function EditCommonVarV8Inner() {
             <div className={styles.schedActions}>
               <Button
                 variant="text"
+                size="slot"
                 type="button"
                 onClick={() => {
                   const now = jstNowLocalInput()
@@ -990,6 +992,7 @@ function EditCommonVarV8Inner() {
               {schedules.length > 0 ? (
                 <Button
                   variant="text"
+                  size="slot"
                   type="button"
                   onClick={() => {
                     setClearSchedulesError('')
@@ -1028,15 +1031,6 @@ function EditCommonVarV8Inner() {
       ) : (
         <p className={styles.fieldHint}>まだ変更履歴はありません。</p>
       )}
-      {canWrite ? (
-        <div className={styles.statusBox}>
-          <p className={styles.statusLabel}>下の帯の操作（状態で変わる）：</p>
-          {/* 絵どおり3つ並べ、いまの状態で押せるものだけ押せる（押せない理由は title）。 */}
-          <Button type="button" onClick={() => openStatusDialog('stop')} disabled={(item.status ?? 'active') !== 'active'} title={(item.status ?? 'active') === 'active' ? undefined : '使用中のときだけ止められます'}><Pause size={14} aria-hidden="true" />止める</Button>
-          <Button type="button" onClick={() => openStatusDialog('resume')} disabled={item.status !== 'stopped'} title={item.status === 'stopped' ? undefined : '止めているときだけ再開できます'}><Play size={14} aria-hidden="true" />再開する</Button>
-          <Button type="button" onClick={() => openStatusDialog('publish')} disabled={item.status !== 'draft'} title={item.status === 'draft' ? undefined : '下書きのときだけ公開できます'}>公開する</Button>
-        </div>
-      ) : null}
     </section>
   ) : null
 
@@ -1099,6 +1093,9 @@ function EditCommonVarV8Inner() {
       noticeSpacing="band"
       identity={<></>}
       preview={preview}
+      /* 1152（C67dE）は右の列を畳まず、スマホだけをボタンにして「決めた日に変える」を右に残す（畳むと予定の欄が見えなくなっていた）。 */
+      hidePreviewWhenNarrow={!narrow}
+      previewCompactWhenNarrow
       destructive={canWrite && item ? (
         <StickyBarAction destructive icon={Trash2} label="削除する" onClick={() => openDelete()} />
       ) : undefined}
@@ -1113,6 +1110,18 @@ function EditCommonVarV8Inner() {
               止める
             </Button>
           ) : null}
+          {/* 状態で変わる操作は下の帯だけに置く（右の列に同じ操作を並べない）。止めている→再開する、下書き→公開する。 */}
+          {canWrite && item && stopped ? (
+            <Button type="button" onClick={() => openStatusDialog('resume')} disabled={saving}>
+              <Play size={14} aria-hidden="true" />
+              再開する
+            </Button>
+          ) : null}
+          {canWrite && item && isDraft ? (
+            <Button type="button" onClick={() => openStatusDialog('publish')} disabled={saving}>
+              公開する
+            </Button>
+          ) : null}
           {canWrite && item ? (
             conflict ? (
               <Button type="button" variant="primary" icon={<GitCompare size={16} aria-hidden="true" />} onClick={() => setCompareOpen(true)} disabled={saving}>
@@ -1121,7 +1130,7 @@ function EditCommonVarV8Inner() {
             ) : (
               <Button
                 type="button"
-                variant="primary" icon={<Check size={16} aria-hidden="true" />}
+                variant="primary" widthReserve="dynamic" icon={<Check size={16} aria-hidden="true" />}
                 disabled={saving || blocked.length > 0}
                 onClick={() => void save()}
                 busy={saving}

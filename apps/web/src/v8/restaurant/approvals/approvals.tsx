@@ -115,13 +115,13 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
   return (
     <Card variant="form">
       <div className={styles.cardHead}>
-        <StatusBadge dot={false} tone="neutral">{kindLabel[item.kind]}</StatusBadge>
+        <StatusBadge dot={false} tone="success">{kindLabel[item.kind]}</StatusBadge>
         <Status value={item.status} />
         <span className={styles.store}>{store?.name || '全店舗'}</span>
         <span className={styles.spacer} aria-hidden="true" />
         {pending && !readOnly ? (
           <>
-            <Button disabled={busy} onClick={() => onReturn(item)}><Undo2 aria-hidden className={styles.buttonIcon} />差戻し</Button>
+            <Button disabled={busy} textTone="danger" onClick={() => onReturn(item)}><Undo2 aria-hidden className={styles.buttonIcon} />差戻し</Button>
             <Button disabled={busy} onClick={() => onApprove(item)}><Check aria-hidden className={styles.buttonIcon} />承認する</Button>
           </>
         ) : pending ? (
@@ -213,10 +213,10 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
         <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
-        <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} presentation="band" value={null} unit="" />
-        <KpiCard title="Google投稿" valueText={`${rows.filter((a) => a.kind === 'gbp_post').length}`} detail="投稿下書き" presentation="band" value={null} unit="" />
-        <KpiCard title="LINE配信" valueText={`${rows.filter((a) => a.kind === 'line_message').length}`} detail="配信下書き" presentation="band" value={null} unit="" />
-        <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" presentation="band" value={null} unit="" />
+        <KpiCard title="承認待ち" value={pending.length} unit="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} detail={null} presentation="band" />
+        <KpiCard title="Google投稿" value={rows.filter((a) => a.kind === 'gbp_post').length} unit="投稿下書き" detail={null} presentation="band" />
+        <KpiCard title="LINE配信" value={rows.filter((a) => a.kind === 'line_message').length} unit="配信下書き" detail={null} presentation="band" />
+        <KpiCard title="メニュー改定" value={rows.filter((a) => a.kind === 'menu_change').length} unit="価格・内容変更" detail={null} presentation="band" />
       </StatRow>
       {rows.length === 0 ? (
         <ListState kind="empty" title="承認待ちはありません" />

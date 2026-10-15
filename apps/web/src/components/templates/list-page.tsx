@@ -48,6 +48,8 @@ export interface ListPageBodyProps {
   folderWidth?: number
   /** 表以外の配布内容も一覧の道具列と同じ左右余白へ収める。 */
   contentInset?: boolean
+  /** 表とページ送りを道具の段と同じ左右24の内側に置く板（絵が表を白い板の端まで伸ばさない：YMVFD）。既定は B-217 の領域いっぱい。 */
+  tableInset?: boolean
   /** 窓の本文（左寄せの flex）でも、一覧の幅を窓いっぱいに広げる。 */
   fillWidth?: boolean
   /** 小窓の一覧は、ページの幅と独立してフォルダを横に並べる。 */
@@ -84,7 +86,7 @@ function hasListFolders({ folderNav, folders, collapsedFolders }: ListPageBodyPr
   return navs.length ? navs.some(nav => nav.rows.length > 1) : !!(folders || collapsedFolders)
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, tableInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
   const navs = listFolderNavs(folderNav)
   const hasFolders = hasListFolders({ folderNav, folders, collapsedFolders, children })
   const noFolderChoices = navs.length > 0 && navs.every(nav => nav.rows.length <= 1)
@@ -92,7 +94,7 @@ export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFold
   const collapsed = collapsedFolders ?? (visibleNavs.length > 0 ? visibleNavs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
   const help = listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null
   const helpAtEnd = listHelpPlacement === 'end' && Boolean(toolbar)
-  return <ListFolderContext.Provider value={hasFolders}><div className={styles.listBody} data-list-folders={hasFolders} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} style={fillWidth ? { width: '100%' } : undefined}>
+  return <ListFolderContext.Provider value={hasFolders}><div className={styles.listBody} data-list-folders={hasFolders} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} data-table-inset={tableInset || undefined} style={fillWidth ? { width: '100%' } : undefined}>
     {readOnly ? <ReadOnlyNotice /> : null}
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     <div className={styles.split} data-template-region="body">

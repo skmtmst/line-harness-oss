@@ -103,6 +103,16 @@ afterEach(() => {
   delete document.documentElement.dataset.theme
 })
 
+/** 行の右端の「…」を開き、中の「編集する」を返す（B-253：行の右端は「…」1つ）。 */
+async function openRowEdit(subject: string): Promise<HTMLElement> {
+  const more = host.querySelector<HTMLButtonElement>(`button[aria-label="「${subject}」の操作"]`)
+  expect(more).not.toBeNull()
+  await act(async () => { more!.click() })
+  const item = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((el) => el.textContent?.includes('編集する'))
+  expect(item).toBeTruthy()
+  return item!
+}
+
 async function flush() {
   for (let i = 0; i < 6; i += 1) await act(async () => { await Promise.resolve() })
 }
@@ -139,8 +149,11 @@ describe('画面', () => {
     expect(text).toContain('5/24')
     expect(text).toContain('下書き')
     expect(host.querySelector('button[aria-label="宛先の見込み"]')).not.toBeNull()
-    expect(host.querySelector('button[aria-label="「料金改定のご案内（下書き）」を直す"]')).not.toBeNull()
-    expect(host.querySelector('button[aria-label="「9月20日 深夜のメンテナンスのお知らせ」を元に新しく作る"]')).not.toBeNull()
+    // 行の右端は「…」1つ。開くと「編集する」が出る（下書きも送信済みも同じ言葉。送信済みは写して新しく作る）。
+    expect(Array.from(host.querySelectorAll('button')).some((b) => b.textContent === '編集する' || b.textContent === '直す')).toBe(false)
+    expect((await openRowEdit('料金改定のご案内（下書き）')).textContent).toContain('編集する')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    expect((await openRowEdit('9月20日 深夜のメンテナンスのお知らせ')).textContent).toContain('中身を写して新しく作ります')
     expect(calls.some((c) => c.url.endsWith('/api/ops/announcements/preview') && c.method === 'POST')).toBe(true)
     expect(document.querySelector('[data-design-node="tQ2MJ"]')).not.toBeNull()
   })
@@ -285,7 +298,8 @@ describe('二重押しと同時保存（M512/M513）', () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     // 下書きの「編集」を押して編集に入る。
-    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="「料金改定のご案内（下書き）」を直す"]')!.click() })
+    const editItem = await openRowEdit('料金改定のご案内（下書き）')
+    await act(async () => { editItem.click() })
     await flush()
     expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toContain('料金改定のご案内')
     await act(async () => {
@@ -316,7 +330,8 @@ describe('二重押しと同時保存（M512/M513）', () => {
 it('編集の保存後も件名と本文を残し、次の保存には更新後の版を添える', async () => {
   await act(async () => root.render(<OpsAnnouncementsV8 />))
   await flush()
-  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="「料金改定のご案内（下書き）」を直す"]')!.click())
+  const editItem = await openRowEdit('料金改定のご案内（下書き）')
+  await act(async () => editItem.click())
   const title = document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!
   await act(async () => setValue(title, '編集した件名'))
   putOverride = { status: 200, payload: { success: true, data: { ...draft, subject: '編集した件名', updatedAt: '2026-10-09T11:00:00+09:00' } } }

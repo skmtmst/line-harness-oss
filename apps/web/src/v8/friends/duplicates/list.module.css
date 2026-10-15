@@ -130,7 +130,7 @@
 /* 1152 の板（G9C4Uw）：白い板が 1000 未満のときの列と探す欄。 */
 @container v8-page (max-width: 1000px) {
   .search { width: var(--tpl-fr-search-xs); }
-  .colEvidence { width: var(--tpl-fr-dup-col-account); }
+  .colEvidence { width: var(--tpl-fr-dup-n-col-evidence); }
   .colAccount { width: var(--tpl-fr-dup-n-col-account); }
 }
 

@@ -291,7 +291,7 @@ export default function QuickSendV8({
         </div>
       )}
     >
-      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text"><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
+      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
@@ -347,7 +347,7 @@ export default function QuickSendV8({
                 size="full"
                 value={approverId}
                 onChange={setApproverId}
-                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `承認する人：${item.name}${ROLE_LABELS[item.role] ? `（${ROLE_LABELS[item.role]}）` : ''}` }))]}
+                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name, hint: ROLE_LABELS[item.role] }))]}
               /></SaveErrorField>
               <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>
             </div>
