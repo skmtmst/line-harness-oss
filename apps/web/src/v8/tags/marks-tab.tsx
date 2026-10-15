@@ -307,7 +307,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => {
     if (host) return canEdit ? [
       { id: 'edit', label: '編集', onSelect: () => host.onEdit(mark.id) },
-      { id: 'distribute', label: '配る', onSelect: () => host.onDistribute(mark.id) },
+      { id: 'distribute', label: '配る', icon: <Send size={16} aria-hidden="true" />, onSelect: () => host.onDistribute(mark.id) },
       { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => host.onRemove(mark.id) },
     ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
