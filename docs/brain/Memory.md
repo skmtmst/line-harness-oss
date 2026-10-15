@@ -54,7 +54,7 @@ tags: [memory, core]
 
 ## 進行中（2026-10-15）
 
-- oneF2x HEAVY 8割役：70%以下名簿との交差35板（直す33・作り直す1・絵修正1）。F4gELjの確認/不足2区画、OxEMMのnone選択と次へ/公開の役目印を6c95166735へ保存。関連126/型/lintエラー0/新規所有指摘0、3幅/1440自己左右はheavy待ち。到達・正式候補0。詳細docs/qa/one-f2x-heavy-80-1015.md、外部F2x/heavy-80-1015。MID/Claude20板/共通部品/Pen/台帳/親EC/DB/配備/push/PRは未変更。
+- oneF2x HEAVY 8割役：70%以下名簿との交差35板（直す33・作り直す1・絵修正1）。F4gELjの確認/不足2区画、OxEMMのnone選択と次へ/公開の役目印を6c95166735へ保存。pvimJのToggle/候補フォルダ接続も追加。関連126＋利用先5＋ウェビナー80/型/lintエラー0/新規所有指摘0、3幅/1440自己左右はheavy待ち。到達・正式候補0。詳細docs/qa/one-f2x-heavy-80-1015.md、外部F2x/heavy-80-1015。MID/Claude20板/共通部品/Pen/台帳/親EC/DB/配備/push/PRは未変更。
 
 - oneF2x J6/J7・PUNCH再開：本線d12包含、列車38最新68f580f6f9を9b707dcfacへ両側の記録保持でmerge。前回の入力/説明を1cbf86cad1、Kから継承した比較画面をd4f455a99dへ保存。関連22ファイル284件・型・lintエラー0・所有新規/一時許可0。現行browser-hostを通さなかった実寸の初回は測定前失敗として原本保持し、手順だけ修正。優先4板12条件/本番build/単板1440自己撮影はheavy待ち。完成/候補/RECIPES追加0。Pen/台帳/親EC/push/PR/DB/配備は変更なし。詳細docs/qa/one-f2x-j7-1015.md。
 

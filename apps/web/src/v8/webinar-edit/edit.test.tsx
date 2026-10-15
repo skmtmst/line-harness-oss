@@ -350,6 +350,39 @@ describe('V8 ウェビナーの編集', () => {
     expect(buttonText('比べてから保存')).toBeTruthy()
     expect([...host.querySelectorAll('a')].some((link) => link.textContent?.trim() === 'キャンセル')).toBe(true)
   })
+
+  it('CTAの自動表示をスイッチで切り替え、ほかのカードの内容と一緒に保存する', async () => {
+    nav.search = 'id=webinar-1&pane=cta'
+    await render(<WebinarEditV8 />)
+    const toggle = screen.getByRole('switch', { name: 'ボタンを押したら、フォームを自動で開く' })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    await act(async () => { fireEvent.click(toggle) })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    await act(async () => { buttonText('下書きを保存')!.click() })
+    for (let i = 0; i < 4; i += 1) await act(async () => {})
+    const saved = puts.find(entry => entry.path.endsWith('/ctas'))?.body as { ctas: Array<{ autoOpen: boolean; title: string; url: string }> }
+    expect(saved.ctas).toEqual([expect.objectContaining({ autoOpen: true, title: '資料', url: 'https://example.com' })])
+  })
+
+  it('フォームの候補が持つフォルダで絞り込める', async () => {
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname
+      if (path === '/api/forms') return json({ success: true, data: [{ id: 'form-lead', name: '相談の申込', isActive: true, folderId: 'lead' }] })
+      if (path.includes('/folders')) return json({ success: true, data: [{ id: 'lead', name: '相談受付', color: '#2563eb', kind: 'form', parentId: null, displayOrder: 0 }] })
+      return originalFetch(input, init)
+    })
+    nav.search = 'id=webinar-1&pane=cta'
+    await render(<WebinarEditV8 />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^申込に使う回答フォーム：/ })) })
+    const picker = await screen.findByRole('dialog', { name: '回答フォームを選ぶ' })
+    const folder = await within(picker).findByRole('button', { name: /相談受付/ })
+    await act(async () => { fireEvent.click(folder) })
+    await act(async () => { fireEvent.click(within(picker).getByRole('radio', { name: '相談の申込' })) })
+    await act(async () => { fireEvent.click(within(picker).getByRole('button', { name: '選ぶ', exact: true })) })
+    expect(screen.getByRole('button', { name: '申込に使う回答フォーム：変える' })).toBeTruthy()
+    expect(puts).toHaveLength(0)
+  })
 });
 
 it('WEB-166：公開中は編集の…から版を確認して停止する', async () => {
