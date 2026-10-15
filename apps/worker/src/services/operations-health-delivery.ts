@@ -78,9 +78,9 @@ export async function deliveryIntegrationFailures(
         Number(events?.max_failures ?? 0),
       ),
     };
-  } catch (error) {
-    // 符号だけ残す。相手の本文・注文の中身は記録に出さない。
-    console.error('[operations-health] delivery failure count skipped', String(error));
+  } catch {
+    // 符号だけ残す。例外の本文・相手の注文の中身は記録に出さない。
+    console.error(JSON.stringify({"code":"services_operations_health_delivery_failed"}));
     return { activeCount: 0, failingCount: 0, maxFailures: 0 };
   }
 }

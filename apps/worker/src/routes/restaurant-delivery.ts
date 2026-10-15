@@ -1710,11 +1710,8 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
       realIp: c.req.header('x-real-ip'),
     });
     if (!isDeliveryWebhookIpAllowed(sourceIp, allowlist)) {
-      // 符号だけを記録する。相手のIPは記録に残すと問い合わせの材料になるので残す。
-      console.error(
-        '[rt-delivery] webhook source ip is not allowed',
-        JSON.stringify({ service, sourceIp }),
-      );
+      // 符号と道筋だけを記録する。相手のIPやサービス名は記録に残さない。
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_webhook_ip_not_allowed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
   }
