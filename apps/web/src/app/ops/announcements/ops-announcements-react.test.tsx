@@ -139,7 +139,7 @@ describe('画面', () => {
     expect(text).toContain('5/24')
     expect(text).toContain('下書き')
     expect(host.querySelector('button[aria-label="宛先の見込み"]')).not.toBeNull()
-    expect(host.querySelector('button[aria-label="「料金改定のご案内（下書き）」を直す"]')).not.toBeNull()
+    expect(host.querySelector('button[aria-label="「料金改定のご案内（下書き）」を編集する"]')).not.toBeNull()
     expect(host.querySelector('button[aria-label="「9月20日 深夜のメンテナンスのお知らせ」を元に新しく作る"]')).not.toBeNull()
     expect(calls.some((c) => c.url.endsWith('/api/ops/announcements/preview') && c.method === 'POST')).toBe(true)
     expect(document.querySelector('[data-design-node="tQ2MJ"]')).not.toBeNull()
@@ -285,7 +285,7 @@ describe('二重押しと同時保存（M512/M513）', () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     // 下書きの「編集」を押して編集に入る。
-    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="「料金改定のご案内（下書き）」を直す"]')!.click() })
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="「料金改定のご案内（下書き）」を編集する"]')!.click() })
     await flush()
     expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toContain('料金改定のご案内')
     await act(async () => {
@@ -316,7 +316,7 @@ describe('二重押しと同時保存（M512/M513）', () => {
 it('編集の保存後も件名と本文を残し、次の保存には更新後の版を添える', async () => {
   await act(async () => root.render(<OpsAnnouncementsV8 />))
   await flush()
-  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="「料金改定のご案内（下書き）」を直す"]')!.click())
+  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="「料金改定のご案内（下書き）」を編集する"]')!.click())
   const title = document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!
   await act(async () => setValue(title, '編集した件名'))
   putOverride = { status: 200, payload: { success: true, data: { ...draft, subject: '編集した件名', updatedAt: '2026-10-09T11:00:00+09:00' } } }

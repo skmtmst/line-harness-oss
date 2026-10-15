@@ -451,8 +451,8 @@ export default function OpsAnnouncementsV8() {
                     {readOnly || a.status === 'sending'
                       ? <span className={styles.faint}>{emptyValue('unknown')}</span>
                       : a.status === 'draft' || a.status === 'scheduled'
-                        ? <Button onClick={() => edit(a)} disabled={busy} aria-label={`「${a.subject}」を直す`}>直す</Button>
-                        : <Button onClick={() => copyAsNew(a)} disabled={busy} aria-label={`「${a.subject}」を元に新しく作る`} title="送ったものは直せないので、中身を写して新しいお知らせを作ります">直す</Button>}
+                        ? <Button onClick={() => edit(a)} disabled={busy} aria-label={`「${a.subject}」を編集する`}>編集する</Button>
+                        : <Button onClick={() => copyAsNew(a)} disabled={busy} aria-label={`「${a.subject}」を元に新しく作る`} title="送ったものは変えられないので、中身を写して新しいお知らせを作ります">編集する</Button>}
                   </span>
                 </div>
               ))}
