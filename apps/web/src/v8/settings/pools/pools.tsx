@@ -1,5 +1,8 @@
 'use client'
 
+import { orderPools } from './pool-order'
+export { orderPools } from './pool-order'
+
 import { useSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle } from '@/components/shared/save-conflict'
 
 /*
@@ -45,14 +48,6 @@ type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
 const TITLE = 'プール管理'
 const DESCRIPTION = '来たお客さまを振り分ける LINE アカウントをまとめる入れ物です。公開 URL から来た人を、有効の所属アカウントからランダムに振り分けます。'
 
-/** 既定のプール（main）を先頭に、あとは作った順。 */
-export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {
-  return [...pools].sort((a, b) => {
-    if (a.slug === 'main') return -1
-    if (b.slug === 'main') return 1
-    return a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name, 'ja')
-  })
-}
 
 export default function PoolsV8() {
   usePageTitle(TITLE)

@@ -1,5 +1,7 @@
 'use client'
 
+import { statusBadge } from './post-status'
+
 import { requiredText } from '@/lib/form-requirement'
 const b244Requirements = {
   form_title: requiredText("タイトルを入力してください。"),
@@ -76,19 +78,6 @@ const FILTER_OPTIONS: Array<{ value: GooglePostFilter; label: string }> = [
 ]
 const CTA_LABELS: Record<GooglePostCtaType, string> = { book: '予約', order: '注文', shop: '購入', learn_more: '詳細', sign_up: '申し込み', call: '電話' }
 
-function statusBadge(post: GooglePost): { label: string; tone: StatusBadgeTone } {
-  switch (post.status) {
-    case 'draft': return { label: '下書き', tone: 'neutral' }
-    case 'scheduled': return { label: '予約中', tone: 'info' }
-    case 'pending_confirm': return { label: '送信確認中', tone: 'warning' }
-    case 'accepted': return { label: '審査中', tone: 'info' }
-    case 'published': return { label: '公開済み', tone: 'success' }
-    case 'rejected': return { label: 'Googleで不承認', tone: 'danger' }
-    case 'failed': return { label: '送信失敗', tone: 'danger' }
-    case 'cancelled': return { label: '取消済み', tone: 'neutral' }
-    case 'deleted': return { label: '削除済み', tone: 'neutral' }
-  }
-}
 
 function KindChip({ kind }: { kind: GooglePostKind }) {
   return <Chip tone={kind === 'event' ? 'warn' : 'neutral'}>{KIND_LABELS[kind]}</Chip>

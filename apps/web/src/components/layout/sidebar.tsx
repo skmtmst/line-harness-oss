@@ -1,5 +1,9 @@
 'use client'
 
+import { V8_NAV_ICONS } from './sidebar-icons'
+import { revealInScroller } from './sidebar-current-item'
+export { revealInScroller } from './sidebar-current-item'
+
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 
 import { useStaffRole } from '@/lib/staff-role'
@@ -24,36 +28,6 @@ import {
   SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
-import {
-  Bell, CalendarCheck, CalendarCog, Clipboard, ClipboardList, Clock, FileText, Folder, House, Inbox,
-  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Type, UserPlus, Users, Video, type LucideIcon,
-} from 'lucide-react'
-
-/*
- * ★V8 の左メニューの印（絵 d8X09・WQmep の「項目 〇〇 / 印」は lucide）。
- * V8 のときだけ使い、v7 は MENU_SECTIONS の線画のまま。載っていない項目も v7 の線画。鍵は MENU_SECTIONS の id。
- */
-const V8_NAV_ICONS: Record<string, LucideIcon> = {
-  dashboard: House,
-  inbox: Inbox,
-  friends: Users,
-  'friend-attributes': Tag,
-  scenarios: ClipboardList,
-  broadcasts: Send,
-  reminders: Bell,
-  'auto-replies': MessageCircleMore,
-  'friend-add-settings': UserPlus,
-  webinars: Video,
-  templates: FileText,
-  'rich-menus': LayoutGrid,
-  forms: Clipboard,
-  'common-vars': Type,
-  contents: Folder,
-  'booking-bookings': CalendarCheck,
-  'booking-menus': CalendarCog,
-  events: Ticket,
-  'booking-own-shifts': Clock,
-}
 
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
    反映するため同型のエイリアスを使う（描画後の1回分のズレを防ぐ）。 */
@@ -127,21 +101,6 @@ export function clearSidebarCountCache(): void {
 
 /** 統括の左メニューを出す住所。決め方は上の帯と同じものを使う（`@/lib/menu`）。 */
 export { isHqShellPath }
-
-/**
- * 巻く領域（左メニューの項目の並び）の中で、項目が上下とも見える所まで巻く。
- * scrollIntoView は外のページまで巻くので使わない。上下に 8px の余裕を残す。
- */
-export function revealInScroller(scroller: HTMLElement, item: HTMLElement, margin = 8) {
-  const box = scroller.getBoundingClientRect()
-  const rect = item.getBoundingClientRect()
-  if (box.height === 0 || rect.height === 0) return
-  if (rect.top < box.top + margin) {
-    scroller.scrollTop -= box.top + margin - rect.top
-  } else if (rect.bottom > box.bottom - margin) {
-    scroller.scrollTop += rect.bottom - (box.bottom - margin)
-  }
-}
 
 export default function Sidebar({
   friendAttributesV2Mode = false,
@@ -421,8 +380,6 @@ export default function Sidebar({
         if (isHq) return true
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
-
-
 
         if (item.href === '/staff' && staffReadRole !== 'owner' && staffReadRole !== 'admin') return false
         if (item.href === '/accounts' && staffReadRole === 'staff') return false
