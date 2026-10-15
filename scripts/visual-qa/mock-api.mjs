@@ -77,7 +77,7 @@ import {
   BROADCAST_RECIPIENTS, BROADCAST_ACTIVITY,
   BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
   FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW, FRIEND_FIELD_MIGRATION_PREVIEW_DOG,
-  INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, BOOKING_TODAY_REQUESTS,
   TEMPLATES, TEMPLATE_FOLDERS, TEMPLATE_TEST_RECIPIENTS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
@@ -4052,6 +4052,22 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       row('fs-5', 'メッセージに返信した', 5, 5, '2026-09-02T19:20:00+09:00'),
     ] } }
   }
+  if (pathname === '/api/booking/admin/today') {
+    // 予約管理「今日」（絵 O2Z8u・時計 2026-10-01）。人（スタッフ）ごとの 6 件。
+    const row = (id, staffId, staffName, customer, menu, start, end, status = 'confirmed') => ({
+      kind: 'staff', id, starts_at: `2026-10-01T${start}:00+09:00`, ends_at: `2026-10-01T${end}:00+09:00`, status, price_at_booking: 5500,
+      friend_id: null, booking_customer_id: null, menu_id: 'bm-1', menu_name: menu, staff_id: staffId, staff_name: staffName, customer_name: customer, visit_mark: null,
+    })
+    const bookings = [
+      row('tb-1', 'bs-1', '佐々木 亮太', 'ぽん太 さん', 'トリミング（小型犬）', '09:00', '10:00'),
+      row('tb-2', 'bs-3', '高田 誠', 'ハナ さん', '爪切り', '11:00', '11:15'),
+      row('tb-3', 'bs-2', '中川 由美', 'レオ さん', '足裏ケア', '11:00', '11:30'),
+      row('tb-4', 'bs-1', '佐々木 亮太', 'マロン さん', 'トリミング（中型犬）', '13:00', '14:30'),
+      row('tb-5', 'bs-3', '高田 誠', 'ココ さん', 'シャンプーのみ', '10:00', '10:30', 'pending'),
+      row('tb-6', 'bs-2', '中川 由美', 'きなこ さん', '初回相談', '15:00', '15:30'),
+    ]
+    return { date: '2026-10-01', mode: 'staff', has_seat_stores: false, bookings, seats: [], timeline: bookings }
+  }
   if (pathname === '/api/friends/friend-1/timeline') {
     const item = (id, type, summary, occurredAt, source, account = { id: 'visual-qa-account', name: '然-NEN-TEST' }) => ({
       id, type, summary, status: null, source, occurredAt, lineAccount: account,
@@ -6630,7 +6646,8 @@ const server = createServer((req, res) => {
     const menuName = url.searchParams.get('menu_name')
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
-    const filtered = BOOKING_REQUESTS.filter((item) =>
+    const pool = from && from.startsWith('2026-09-30T15') ? [...BOOKING_REQUESTS, ...BOOKING_TODAY_REQUESTS] : BOOKING_REQUESTS
+    const filtered = pool.filter((item) =>
       (status === 'all' || item.status === status)
       && (!query || (item.friend_name || '').includes(query))
       && (!menuName || item.menu_name === menuName)
