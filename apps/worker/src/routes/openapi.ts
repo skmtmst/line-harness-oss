@@ -1,4 +1,5 @@
 import { restaurantRest4Paths } from './restaurant-rest4-openapi.js';
+import { api1AuthoringPaths } from './api1-authoring-openapi.js';
 import { restaurantFollowupPaths } from './restaurant-followup-openapi.js';
 import { reservationBoardPaths } from './reservation-board-openapi.js';
 import { archiveRestorePaths } from './archive-restore-openapi.js';
@@ -409,6 +410,7 @@ const spec = {
     },
   },
   paths: {
+    ...api1AuthoringPaths,
     '/api/account-settings/customer-look': {
       get: { tags:['Account Settings'], summary:'店のお客さまのデザインを読む', parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'保存した版とデザイン'},'403':{description:'担当外'}} },
       put: { tags:['Account Settings'], summary:'店のお客さまのデザインを保存（オーナー・管理者）', requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['accountId','expectedVersion','look'],properties:{accountId:{type:'string'},expectedVersion:{type:'integer',minimum:0},look:{type:'object'}}}}}}, responses:{'200':{description:'保存した版とデザイン'},'403':{description:'変更権限なし・担当外'},'409':{description:'保存の版が競合'},'422':{description:'色・型・書体が不正'}} },
@@ -2155,6 +2157,7 @@ const spec = {
       },
     },
     '/api/hq/templates/media': {
+      get: {tags:['HQ Templates'],summary:'自組織の登録メディアを選ぶ',parameters:[{name:'kind',in:'query',schema:{type:'string',enum:['video','audio','image']}},{name:'limit',in:'query',schema:{type:'integer',minimum:1,maximum:100}},{name:'cursor',in:'query',schema:{type:'string'}}],responses:{'200':{description:'items/nextCursor。itemsはselectable/sizeKb付き。未確認の動画・音声は選択不可'},'403':{description:'統括閲覧権限なし'}}},
       post: {
         tags: ['HQ Templates'], summary: '統括ひな形のPNG/JPEG画像を登録',
         parameters: [

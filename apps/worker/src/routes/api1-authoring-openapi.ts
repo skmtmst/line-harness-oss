@@ -1,0 +1,33 @@
+type Schema=Record<string,unknown>;
+const text:Schema={type:'string'},revision:Schema={type:'integer',minimum:1};
+const json=(required:string[],properties:Record<string,Schema>)=>({required:true,content:{'application/json':{schema:{type:'object',required,properties}}}});
+const pathParams=(...names:string[])=>names.map(name=>({name,in:'path',required:true,schema:text}));
+const replies=(description:string,created=false)=>({[created?'201':'200']:{description},'400':{description:'入力の形式・範囲が不正'},'403':{description:'所属・権限の不足'},'404':{description:'自組織の有効な対象が無い'},'409':{description:'版・同名・上限の競合'}});
+const viewConditions:Schema={type:'object',additionalProperties:false,properties:{from:{type:'string',format:'date'},to:{type:'string',format:'date'},q:{type:'string',maxLength:200},status:{type:'string',enum:['draft','pending_approval','scheduled','sending','sent','failed','stopped','cancelled']},folderId:text,sort:{type:'string',enum:['newest','oldest']},limit:{type:'integer',minimum:1,maximum:100}}};
+const view={name:{type:'string',minLength:1,maxLength:100},scope:{type:'string',enum:['private','hq'],default:'hq'},conditions:viewConditions};
+const rows:Schema={type:'array',minItems:1,maxItems:500,items:{type:'object',required:['name'],properties:{line:{type:'integer',minimum:1},name:{type:'string'},folderName:text}}};
+const publicToken=[{name:'X-Form-Test-Token',in:'header',schema:text,description:'発行した合言葉。test_tokenクエリでも渡せる'},{name:'test_token',in:'query',schema:text}];
+export const api1AuthoringPaths={
+  '/api/hq/templates/rich-menu-preview':{post:{tags:['HQ Templates'],summary:'保存前に同名・不足参照・タグ・画像KBを確認（保存も配布もしない）',requestBody:json(['name','accountIds'],{name:text,accountIds:{type:'array',minItems:1,maxItems:30,items:text},definition:{type:'object'}}),responses:replies('summary/stores/references/images/requiresPreflightをdataに返す。実配布には別途preflight必須')}},
+  '/api/hq/templates/{id}/test-send':{post:{tags:['HQ Templates'],summary:'保存済み統括フォームの回答を送信・保存なしで検査',parameters:pathParams('id'),requestBody:json([],{expectedRevision:revision,answers:{type:'object'}}),responses:replies('dryRun/sent:0/persistsAnswers:false/form/answerValidation。URL発行はtest-tokenを使用')}},
+  '/api/hq/templates/{id}/test-token':{post:{tags:['HQ Templates'],summary:'固定した統括フォーム版を24時間・最大5件まで試す合言葉の発行',parameters:pathParams('id'),requestBody:json(['expectedRevision'],{expectedRevision:revision}),responses:replies('id/token/expiresAt/templateVersionId/revision/testUrl。testUrlは公開APIのJSON取得URLで、画面URLではない',true)}},
+  '/api/hq/templates/{id}/test-tokens/{tokenId}':{delete:{tags:['HQ Templates'],summary:'試し合言葉を失効（台帳は保持）',parameters:pathParams('id','tokenId'),responses:replies('id/revoked:true')}},
+  '/api/liff/hq-form-tests/{id}':{get:{tags:['LIFF'],summary:'合言葉で固定版の統括フォームを読む',security:[],parameters:[...pathParams('id'),...publicToken],responses:replies('dryRun/sent:0/persistsAnswers:false/form。期限切れ・失効・停止組織は404。no-store')}},
+  '/api/liff/hq-form-tests/{id}/submit':{post:{tags:['LIFF'],summary:'試し回答を検査。回答保存・送信・後処理・集計はしない',security:[],parameters:[...pathParams('id'),...publicToken],requestBody:json(['answers'],{answers:{type:'object'}}),responses:replies('answerValidation.valid/error。入力不備の回答も検査結果として200。合言葉不正は404')}},
+  '/api/hq/broadcasts/saved-views':{
+    get:{tags:['HQ Broadcasts'],summary:'自分の個人用と自組織の統括共有検索を読む',responses:replies('id/name/scope/staffId/conditions/revision/canEdit。共有でも編集は作成者のみ')},
+    post:{tags:['HQ Broadcasts'],summary:'統括配信の検索を保存。既定は統括共有、個人用も指定可',requestBody:json(['name','conditions'],view),responses:replies('保存した検索、revision:1',true)},
+  },
+  '/api/hq/broadcasts/saved-views/{viewId}':{
+    patch:{tags:['HQ Broadcasts'],summary:'作成者が版を確認して検索を更新',parameters:pathParams('viewId'),requestBody:json(['name','conditions','expectedRevision'],{...view,expectedRevision:revision}),responses:replies('更新後の検索とrevision')},
+    delete:{tags:['HQ Broadcasts'],summary:'作成者が検索を保管し一覧から外す',parameters:pathParams('viewId'),requestBody:json(['expectedRevision'],{expectedRevision:revision}),responses:replies('id/archived:true。物理削除しない')},
+  },
+  '/api/hq/broadcasts/quota':{get:{tags:['HQ Broadcasts'],summary:'15分以内・今月の既存記録から店別送信枠を読む',responses:replies('remaining/used/limit/perAccount。未取得や古い記録はnull。外部照会なし')}},
+  '/api/hq/broadcasts/{id}/reactions':{get:{tags:['HQ Broadcasts'],summary:'送信成功者のリンク反応と14日内のブロック観測数',parameters:pathParams('id'),responses:replies('links/blockCount/blocksByAccount。20人未満やcoverage不足はnull')}},
+  ...Object.fromEntries(['duplicate','followup'].map(kind=>[`/api/hq/broadcasts/{id}/${kind}`,{post:{tags:['HQ Broadcasts'],summary:kind==='followup'?'届いて未クリックの人への追送下書き（送信0）':'統括配信を下書きへ複製（送信0）',parameters:pathParams('id'),requestBody:json(['requestId','expectedVersion'],{requestId:text,expectedVersion:revision,title:text}),responses:replies('preparedの配信とsent:0。追送は店別元配信を保持し人数を返す',true)}}])),
+  '/api/hq/billing/metrics':{get:{tags:['HQ Billing'],summary:'保存済み請求の今月額・契約・未払い集計',responses:replies('thisMonthBilledYen/contractCount/trialCount/unpaidInvoiceCount。未取得はnull。外部照会なし')}},
+  '/api/hq/templates/tags/import/preview':{post:{tags:['HQ Templates'],summary:'店と同じCSV解析行から統括タグを確認（保存なし）',requestBody:json(['rows'],{rows}),responses:replies('summary/rows。重複を見送り、未知のフォルダは未分類として警告')}},
+  '/api/hq/templates/tags/import':{post:{tags:['HQ Templates'],summary:'CSV解析行を再検査し統括タグのひな形だけを作成',requestBody:json(['rows'],{rows}),responses:replies('summary/rows/outcome。tagIdは統括ひな形ID。店舗への配布・既存上書きなし')}},
+  '/api/webhooks/interactions/export.csv':{get:{tags:['Webhooks'],summary:'見える店舗のやり取り記録を同じ条件でCSV出力（最大5000件）',parameters:[{name:'lineAccountId',in:'query',required:true,schema:text},...['direction','status','search'].map(name=>({name,in:'query',schema:text})),{name:'periodDays',in:'query',schema:{type:'integer',minimum:1,maximum:365,default:30}}],responses:{'200':{description:'UTF-8 BOM CSV。本文・秘密値・照合値は含まない',content:{'text/csv':{schema:{type:'string'}}}},'403':{description:'担当外'},'422':{description:'5000件超。期間・条件を絞る'}}}},
+  '/api/reminders/{id}/message-preview':{post:{tags:['Reminders'],summary:'同じ店舗の友だちで下書き通知の差し込みを確認（送信・予定保存なし）',parameters:pathParams('id'),requestBody:json(['friendId','stableStepId','expectedDraftVersionId','expectedDraftUpdatedAt'],{friendId:text,stableStepId:text,expectedDraftVersionId:text,expectedDraftUpdatedAt:text,deliveredAt:{type:'string',format:'date-time'}}),responses:replies('dryRun/sent:0/persistsSchedule:false/friendName/messageType/messageContent/message。プレビュー時の値であり送信確定値ではない')}},
+};
