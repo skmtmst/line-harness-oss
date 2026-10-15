@@ -890,11 +890,16 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   const wideToolbar = (
     <div className={styles.wideTools} data-viewer={role !== null && !canEdit || undefined}>
 
-      <ListToolbar
-        search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', width: 160, value: query, onChange: setQuery }}
-        filters={filterChips}
-        secondary={<ListToolbarEnd>{savedBox}{canEdit ? sortBox : null}{perPageBox}</ListToolbarEnd>}
-      />
+      {/* 絵 r6dJFy：1段目「探す・状態の札」、2段目の右端に「よく使う絞り込み・並び・件数」。1段に詰めると札が選ぶ欄へ畳まれる。 */}
+      <ListToolbarFrame layout="stacked">
+        <ListToolbarRow>
+          <ListToolbarSearchSlot width={160} search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', value: query, onChange: setQuery }} />
+          {filterChips}
+        </ListToolbarRow>
+        <ListToolbarRow>
+          <ListToolbarEnd>{savedBox}{canEdit ? sortBox : null}{perPageBox}</ListToolbarEnd>
+        </ListToolbarRow>
+      </ListToolbarFrame>
     </div>
   )
 
@@ -957,7 +962,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           ? '利用先と影響を読み込んでいます。'
           : stopImpact
             ? `${formatNumber(stopImpact.stopImpact.affectedUsageCount)}か所で使われています。どうしますか。`
-            : '利用先と影響を読み込めませんでした。'} title={`${stopTarget.name}を止めますか？`} designWidth={480} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
+            : '利用先と影響を読み込めませんでした。'} title={`「${stopTarget.name}」を止めますか？`} designWidth={480} designTop={220} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
         <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
         <Button
           variant="primary"
@@ -971,7 +976,6 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
         </Button>
       </DialogActions>}>
 
-      <p>止めると、使っている配信・流入リンク・アフィリエイトでも、この成果地点では数えなくなります。</p>
       <SaveErrorField names={["conversion-v8-stop-action","stopAction"]}><RadioCardGroup legend="どうしますか？">
         <RadioCard
           variant="row"
