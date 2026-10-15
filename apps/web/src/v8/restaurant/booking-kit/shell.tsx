@@ -112,7 +112,7 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, children }: {
+export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, children }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
@@ -144,6 +144,8 @@ export default function RestaurantShell({ boardId, title, description, explanati
   /** 既存の頭の内側余白。頭を持つ器の中では none を渡す。 */
   headingInset?: 'none'
   headSize?: 'compact'
+  /** 題の下の説明の行を出さず「？」へ入れる（絵に説明の行が無い板。休業日・貸切 UVnvR）。 */
+  hideSubtitle?: boolean
   children: (ctx: RestaurantV8Context) => ReactNode
 }) {
   usePageTitle(title)
@@ -240,8 +242,8 @@ export default function RestaurantShell({ boardId, title, description, explanati
       {templateHeading ? <PageHeading
         inset="none"
         title={title}
-        subtitle={typeof description === 'function' ? description(ctx) : ctx?.store?.name}
-        help={<>{typeof description === 'function' ? '日付や店舗を選んで、予約と卓の状態を確認できます。' : description}{explanation ? <p>{explanation}</p> : null}</>}
+        subtitle={hideSubtitle ? undefined : typeof description === 'function' ? description(ctx) : ctx?.store?.name}
+        help={<>{typeof description === 'function' ? hideSubtitle ? description(ctx) : '日付や店舗を選んで、予約と卓の状態を確認できます。' : description}{explanation ? <p>{explanation}</p> : null}</>}
         actions={headAfter ? headAfter(ctx, storePicker) : storePicker}
       /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>

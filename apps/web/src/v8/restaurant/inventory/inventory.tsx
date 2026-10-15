@@ -112,6 +112,7 @@ export default function InventoryPage() {
       description={closures ? closuresDescription : '時間帯ごとの総枠と、媒体・LINE・当日枠の配分を確認します。'}
       boundary={!closures}
       headSize={closures ? 'compact' : undefined}
+      hideSubtitle={closures}
       headAfter={closures ? (ctx, storePicker) => (
         <>
           {ctx && ctx.data.stores.length > 1 ? storePicker : null}
