@@ -33,6 +33,14 @@ export const RulesTabV8 = memo(dynamic(() => import('./tabs/rules-tab').then((mo
   loading: () => <SkeletonRows rows={7} />,
   ssr: false,
 }))
+export const PaymentsTabV8 = memo(dynamic(() => import('../booking-payments/payments-tab').then((module) => module.PaymentsTabV8), {
+  loading: () => <SkeletonRows rows={7} />,
+  ssr: false,
+}))
+export const PaymentsSideV8 = memo(dynamic(() => import('../booking-payments/payments-side'), {
+  loading: () => <SkeletonRows rows={5} />,
+  ssr: false,
+}))
 export const StaffTabV8 = memo(dynamic(() => import('./tabs/staff-tab').then((module) => module.StaffTabV8), {
   loading: () => <SkeletonRows rows={7} />,
   ssr: false,
@@ -44,6 +52,7 @@ export const V8_TABS = [
   { key: 'rules', label: '予約のルール', node: 'x1OZS6' },
   { key: 'staff', label: '担当スタッフ', node: 'VLEaj' },
   { key: 'channels', label: '予約経路', node: 'ZyDd6' },
+  { key: 'payments', label: 'お支払い', node: 'T91bV' },
 ] as const
 export type V8TabKey = (typeof V8_TABS)[number]['key']
 export const V8_TAB_KEYS = new Set<string>(V8_TABS.map((tab) => tab.key))
@@ -54,6 +63,7 @@ export const V8_TAB_NODE: Record<V8TabKey, string> = {
   rules: 'x1OZS6',
   staff: 'VLEaj',
   channels: 'ZyDd6',
+  payments: 'T91bV',
 }
 export function previewRange(): { from: string; to: string } {
   const now = new Date()
