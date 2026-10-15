@@ -225,6 +225,10 @@ function sideFor(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedule, hre
   }
   const pay: StyleSideCard = { id: 'pay', title: 'お支払い（今日）', help: '今日の入金はオンライン（Stripe）で受け取った額です。売上（料金×確定数）とは別の数です。', rows: [{ label: '今日の入金・未払い・返金', value: '—' }], action: { label: 'お支払いを見る', icon: 'send' } }
   const cards = [fresh, pay]
+  // 口（summary・schedule）から返らないカードは消さずに置き、値は「—」。押すと準備中の窓（口が要る）。
+  const waiting = (id: string, title: string, rows: string[], action: string): StyleSideCard => ({ id, title, rows: rows.map((label) => ({ label, value: '—' })), action: { label: action, icon: 'send' } })
+  if (style === 'restaurant') cards.push(waiting('care', '今日気をつけること', ['アレルギー', '記念日', '無断歴あり'], 'くわしく見る'), waiting('waitlist', '席のキャンセル待ち', ['待っている人'], '空きを知らせる'))
+  if (style === 'salon') cards.push(waiting('rebook', '次回予約がまだ', ['今日来た人のうち次の予約がまだ'], 'LINE で次回を案内する'))
   if (style === 'consult') {
     const byCol = sch.columns.map((c) => { const slots = sch.availability.slots.filter((x) => x.columnId === c.id).sort((a, b) => a.startsAt.localeCompare(b.startsAt)); return slots.length ? { label: c.name, value: `${hm(slots[0].startsAt, tz)}〜${hm(slots.at(-1)!.endsAt, tz)}` } : null }).filter((x): x is { label: string; value: string } => Boolean(x))
     cards.push({ id: 'free', title: '今日の空き', rows: byCol.length ? byCol : [{ label: sch.availability.status === 'available' ? '空きはありません' : '空きを出せません', value: '' }] })
