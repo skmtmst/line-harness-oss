@@ -42,4 +42,3 @@ export function stepSummary(step: CommonActionStep, resources: CommonActionResou
       return ''
   }
 }
-

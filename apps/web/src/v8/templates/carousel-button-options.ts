@@ -15,4 +15,3 @@ export function inlineActionsText(actions: InlineAction[], tags: Array<{ id: str
   }
   return actions.length > 1 ? `${text} ほか${actions.length - 1}` : text
 }
-
