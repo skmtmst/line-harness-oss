@@ -15,10 +15,11 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
 import { styleApi, type StarterSetItem } from '@/lib/api-styles'
 import Select from '@/components/shared/select'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { SetupIcon } from './icons'
 import { SampleMenuPhone, SampleMenuTiles } from './sample-menu'
 import {
-  LOOK_CHOICES, STYLE_CHOICES, answerOf, answersForApi, choiceLabel, needsActivation, pairStarterItems, questionsFor, recommendedValue, selectedValue, stepNames, styleLabel,
+  LOOK_CHOICES, SETTINGS_KEYS, STYLE_CHOICES, answerOf, answersForApi, changedAnswers, isBookingConfirmSample, settingsChanges, choiceLabel, needsActivation, pairStarterItems, questionsFor, recommendedValue, selectedValue, stepNames, styleLabel,
   type Question, type StarterItemState, type StyleState,
 } from './model'
 import styles from './wizard.module.css'
@@ -47,6 +48,14 @@ const KIND_WORD: Record<string, { label: string; icon: string; href: (style: Acc
   rich_menu: { label: 'リッチメニュー', icon: 'grid', href: (style) => `/rich-menus/sample?style=${style}` },
   template: { label: 'テンプレート', icon: 'file', href: () => '/templates' },
   booking_menu: { label: '予約メニュー', icon: 'utensils', href: () => '/booking/menus' },
+}
+
+/*
+ * B-335 (1)：スタイルを変えると、ダッシュボードが数える予約が変わる（前の予約は消えないが、出なくなる）。
+ * 「データはそのまま使えます」は、前の予約も見えることを口が保証してから出す。今は前のスタイルの予約の行き先を出す。
+ */
+const BOOKING_PLACE: Record<AccountStyle, string> = {
+  restaurant: '予約台帳', salon: '予約管理', consult: '予約管理', lesson: 'イベント予約', ec: '予約管理', standard: '予約管理',
 }
 
 /** スタイルの選択を「あとで」にした印（口に質問のキーが無いので、この端末に覚える）。 */
@@ -80,7 +89,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   const current = (() => {
     if (step === 0) return style
     /* 「あとで」「手動」にした質問を開き直したときは、答えに来たのでおすすめを選んでおく。 */
-    const picked = (key: string) => (answers[key]?.mode === 'configured' ? selectedValue(answers[key]) : null)
+    const picked = (key: string) => (answers[key]?.mode === 'configured' ? selectedValue(answers[key], questions.find((q) => q.key === key)) : null)
     if (step === 1) return picked('image') ?? 'keep'
     if (question) return picked(question.key) ?? recommendedValue(question, style)
     return ''
@@ -99,22 +108,40 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
     setDirty(true)
   }
 
-  const save = async (next: Record<string, SetupAnswer>, nextChoices = choices) => {
-    const res = await styleApi.save(accountId, { expectedVersion: version, style, answers: answersForApi(next), choices: Object.keys(nextChoices).length ? nextChoices : undefined })
+  /* B-335 (2)：開き直して保存するときは、変えた答えだけを送る（前の答えで予約設定を書き戻さない）。 */
+  const [saved, setSaved] = useState<Record<string, SetupAnswer>>(answersForApi(state.answers ?? {}))
+  const [confirm, setConfirm] = useState<{ lines: string[]; run: () => void; cancel: () => void } | null>(null)
+
+  const save = async (next: Record<string, SetupAnswer>, nextChoices = choices, options: { skipSettings?: boolean } = {}) => {
+    let changed = changedAnswers(saved, answersForApi(next))
+    if (options.skipSettings) changed = Object.fromEntries(Object.entries(changed).filter(([key]) => !SETTINGS_KEYS.includes(key)))
+    const res = await styleApi.save(accountId, { expectedVersion: version, style, answers: changed, choices: Object.keys(nextChoices).length ? nextChoices : undefined })
     if (!res.success) throw new Error('save failed')
     setVersion(res.data.version)
+    setSaved((prev) => ({ ...prev, ...changed }))
     setDirty(false)
   }
+
+  /* 予約設定が変わる答え（承認の仕方）を送るときは、何が変わるかを確かめの窓で出してから保存する。 */
+  const confirmThenSave = (next: Record<string, SetupAnswer>, nextChoices = choices) => new Promise<boolean>((resolve, reject) => {
+    const lines = settingsChanges(saved, answersForApi(next))
+    if (lines.length === 0) { save(next, nextChoices).then(() => resolve(true), reject); return }
+    setConfirm({
+      lines,
+      run: () => { setConfirm(null); save(next, nextChoices).then(() => resolve(true), reject) },
+      cancel: () => { setConfirm(null); resolve(false) },
+    })
+  })
 
   const loadSummary = async () => {
     const [set, items] = await Promise.all([styleApi.starterSet(accountId, style), styleApi.starterItems(accountId)])
     if (!set.success || !items.success) throw new Error('summary failed')
     const pairs = pairStarterItems(set.data.definition.items, items.data.items)
-    const activation = pairs.filter((pair) => needsActivation(pair.state))
+    /* B-335 (3)：予約確定の見本の自動送信は、いつもの確定の知らせと重なるので一覧に出さない（動かさせない）。 */
+    const activation = pairs.filter((pair) => needsActivation(pair.state) && !isBookingConfirmSample(pair.item))
     setSummary({ inserted: pairs.filter((pair) => pair.item.kind in KIND_WORD), activation })
-    /* 質問で「送る」「受け付ける」にした物だけ最初からオン。ほかはオフで並べる（勝手に送らない）。 */
-    const on = (key: string) => answers[key]?.mode === 'configured' && answers[key]?.value === true
-    setEnabled(Object.fromEntries(activation.map((pair) => [pair.state.target_id, pair.state.kind === 'automation' ? on('reminders') : on('booking')])))
+    /* B-335 (3)：自動で送る物・予約メニューは最初から全部止めた状態。オンにするのは利用者が自分で。 */
+    setEnabled(Object.fromEntries(activation.map((pair) => [pair.state.target_id, false])))
   }
 
   /* 最後の一覧から開いたときは、入った物を読んでから出す。 */
@@ -131,7 +158,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
     if (next === 'summary') {
       setBusy(true)
       try {
-        await save(nextAnswers, nextChoices)
+        if (!(await confirmThenSave(nextAnswers, nextChoices))) return
         setSummary(null)
         setStep('summary')
       } catch (caught) {
@@ -178,13 +205,14 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
       commitAndNext('image', { mode: 'configured', value: choice })
       return
     }
-    if (question) commitAndNext(question.key, answerOf(choice))
+    if (question) commitAndNext(question.key, answerOf(choice, question))
   }
 
   const close = async () => {
     if (busy) return
     if (dirty && step !== 'summary' && step !== 0) {
-      try { await save(answers) } catch { /* 閉じるのは止めない。答えは次に開いたとき聞き直す */ }
+      /* 閉じるときは確かめの窓を出さず、予約設定が変わる答えだけは送らない（勝手に予約設定を変えない）。 */
+      try { await save(answers, choices, { skipSettings: true }) } catch { /* 閉じるのは止めない。答えは次に開いたとき聞き直す */ }
     }
     onClose(true)
   }
@@ -279,7 +307,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
             <RadioCard key={item.value} name="setup-style" value={item.value} checked={choice === item.value} onChange={setChoice} title={item.label} note={item.note} icon={<SetupIcon name={item.icon} />} />
           ))}
         </RadioCardGroup>
-        {where('あとから変えられます（設定 › 使い方のスタイル）。変えても、友だち・予約・配信のデータはそのまま使えます。')}
+        {where(`あとから変えられます（設定 › アカウント）。友だち・配信は残ります。前の予約は${BOOKING_PLACE[state.style]}から見られます。`)}
       </>
     )
   } else if (step === 1) {
@@ -413,6 +441,14 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         </Dialog>
       ) : null}
       {preparing.dialog}
+      <ConfirmDialog
+        open={confirm !== null}
+        title="予約設定が変わります"
+        description={`保存すると、予約設定のこれが変わります。${confirm?.lines.join('。') ?? ''}。`}
+        confirmLabel="変えて保存する"
+        onCancel={() => confirm?.cancel()}
+        onConfirm={() => confirm?.run()}
+      />
     </>
   )
 }

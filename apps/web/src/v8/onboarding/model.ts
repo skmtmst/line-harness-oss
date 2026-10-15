@@ -34,7 +34,11 @@ export function styleLabel(style: AccountStyle): string {
 }
 
 /** 1問の選択肢。value は画面の値（'true'/'false' は口へ真偽で送る）。 */
-export type Choice = { value: string; icon: IconKey; label: string; note: string }
+export type Choice = {
+  value: string; icon: IconKey; label: string; note: string
+  /** 口へ送る値が画面の値と違うとき（承認の「manual」は「手動で設定する」と同じ値になるので画面では分ける）。 */
+  apiValue?: string
+}
 
 export type Question = {
   /** 口の質問キー。 */
@@ -94,9 +98,9 @@ const Q: Record<string, Question> = {
     key: 'approval', short: '予約の確定の仕方', title: '予約はその場で確定しますか？', description: 'お客さまが LINE で予約したときの扱いです。',
     choices: [
       { value: 'automatic', icon: 'circleCheck', label: 'その場で確定する', note: '空いていれば、すぐに予約が決まります。' },
-      { value: 'manual', icon: 'userCheck', label: 'お店が承認してから確定する', note: '届いた予約を見て、お店が［承認する］を押すと決まります' },
+      { value: 'require_approval', apiValue: 'manual', icon: 'userCheck', label: 'お店が承認してから確定する', note: '届いた予約を見て、お店が［承認する］を押すと決まります' },
     ],
-    recommended: { consult: 'manual' },
+    recommended: { consult: 'require_approval' },
     where: '予約設定 › 予約のルール', manualHref: RULES, manualNote: '予約のルールの画面を開きます',
     todo: { title: '予約の確定の仕方を決める', note: 'その場で確定するか、お店が承認するかを選びます', action: '決める' },
   },
@@ -284,16 +288,51 @@ export function choiceLabel(question: Question, choice: Choice, style: AccountSt
 }
 
 /** 画面の値を口の答えへ（'true'/'false' は真偽）。 */
-export function answerOf(value: string): SetupAnswer {
+export function answerOf(value: string, question?: Question): SetupAnswer {
   if (value === 'later') return { mode: 'later' }
   if (value === 'manual') return { mode: 'manual' }
+  const choice = question?.choices.find((item) => item.value === value)
+  if (choice?.apiValue !== undefined) return { mode: 'configured', value: choice.apiValue }
   return { mode: 'configured', value: value === 'true' ? true : value === 'false' ? false : value }
 }
 
 /** 画面で選んでいる値（configured は value を文字にしたもの、ほかは mode）。 */
-export function selectedValue(answer: SetupAnswer | undefined): string | null {
+export function selectedValue(answer: SetupAnswer | undefined, question?: Question): string | null {
   if (!answer) return null
+  const choice = answer.mode === 'configured' ? question?.choices.find((item) => item.apiValue !== undefined && item.apiValue === answer.value) : undefined
+  if (choice) return choice.value
   return answer.mode === 'configured' ? String(answer.value ?? (answer.resourceId ? 'existing' : '')) : answer.mode
+}
+
+/* ── 開き直したときの保存（B-335 (2)） ─────────────────────────── */
+
+/** 予約設定に書く答え（口は approval を予約設定の承認の仕方へ書く）。 */
+export const SETTINGS_KEYS = ['approval']
+
+const same = (a: SetupAnswer | undefined, b: SetupAnswer | undefined) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
+/** 前に保存した答えから変わった物だけ。 */
+export function changedAnswers(saved: Record<string, SetupAnswer>, next: Record<string, SetupAnswer>): Record<string, SetupAnswer> {
+  return Object.fromEntries(Object.entries(next).filter(([key, value]) => !same(saved[key], value)))
+}
+
+const APPROVAL_WORD: Record<string, string> = { automatic: 'その場で確定する', manual: 'お店が承認してから確定する' }
+
+/** 予約設定のどこがどう変わるか（確かめの窓の文）。変わらなければ空。 */
+export function settingsChanges(saved: Record<string, SetupAnswer>, next: Record<string, SetupAnswer>): string[] {
+  const changed = changedAnswers(saved, next)
+  const lines: string[] = []
+  const approval = changed.approval
+  if (approval?.mode === 'configured') {
+    const before = saved.approval?.mode === 'configured' ? APPROVAL_WORD[String(saved.approval.value)] : null
+    lines.push(`予約の確定の仕方：${before ? `${before} → ` : ''}${APPROVAL_WORD[String(approval.value)] ?? String(approval.value)}`)
+  }
+  return lines
+}
+
+/** 予約確定のご案内の見本（いつもの確定の知らせと重なる。B-335 (3)・点検 1-3）。 */
+export function isBookingConfirmSample(item: StarterSetItem): boolean {
+  return item.kind === 'automation' && (item.key === 'reminder' || item.name.includes('予約確定'))
 }
 
 /* ── 機能と、リッチメニューのボタンの決まり（警告・お客さまの見え方） ─────────── */
@@ -387,6 +426,7 @@ export function pairStarterItems(definition: StarterSetItem[], items: StarterIte
 
 /** 動かす前に確かめる物（オートメーションの下書き・止めた予約メニュー）。 */
 export function needsActivation(state: StarterItemState): boolean {
+  /* 予約確定の見本は名前で判定するので、一覧側（isBookingConfirmSample）で外す。 */
   return (state.kind === 'automation' || state.kind === 'booking_menu') && state.status !== 'active'
 }
 

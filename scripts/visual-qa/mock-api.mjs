@@ -2242,7 +2242,8 @@ const STYLE_SETUP_ITEMS = [
   { key: 'sample-reservation-confirm', kind: 'template', name: '【見本】予約の確認' }, { key: 'sample-thanks', kind: 'template', name: '【見本】来店のお礼' }, { key: 'sample-day', kind: 'template', name: '【見本】当日のご案内' },
   { key: 'sample-review', kind: 'template', name: '【見本】口コミのお願い' }, { key: 'sample-closed', kind: 'template', name: '【見本】臨時休業のお知らせ' },
   { key: 'booking-lunch', kind: 'booking_menu', feature: 'booking', name: 'ランチコース' }, { key: 'booking-dinner', kind: 'booking_menu', feature: 'booking', name: 'ディナーコース' }, { key: 'booking-seat', kind: 'booking_menu', feature: 'booking', name: '席のみ' },
-  { key: 'reminder', kind: 'automation', feature: 'reminders', name: '前日のお知らせ', text: '予約の前日 18:00 に LINE で送る' },
+  { key: 'reminder', kind: 'automation', feature: 'reminders', name: '予約確定のご案内', text: 'ご予約ありがとうございます。日時をご確認ください。' },
+  { key: 'reminder-day-before', kind: 'automation', feature: 'reminders', name: '前日のお知らせ', text: '予約の前日 18:00 に LINE で送る' },
   { key: 'reminder-day', kind: 'automation', feature: 'reminders', name: '当日のお知らせ', text: '来店の 2 時間前に送る' },
   { key: 'dashboard', kind: 'dashboard', name: '今日のお店' },
 ]
@@ -2250,7 +2251,7 @@ const STYLE_SETUP_ITEMS = [
 const STYLE_SETUP_STATES = STYLE_SETUP_ITEMS.map((item, i) => ({ target_id: `starter-${i}`, kind: item.kind, is_sample: 1, status: item.kind === 'automation' ? 'draft' : item.kind === 'booking_menu' ? 'inactive' : 'active', draftRevision: item.kind === 'automation' ? `draft-${i}` : null }))
 const STYLE_SETUP_WARNINGS = { count: 1, items: [{ feature: 'stamps', areaId: 'area-e', groupId: 'rm-sample-restaurant', href: '/visit-stamps', customerState: 'preparing' }], pending: [{ key: 'payment', href: '/booking/settings?tab=payment', mode: 'later' }, { key: 'stamps', href: '/visit-stamps', mode: 'later' }], manual: [] }
 const HQ_STARTER_SETS = [
-  { id: 'starter-set-restaurant', style: 'restaurant', name: '飲食店向けの初期セット', version: 2, definition: { items: STYLE_SETUP_ITEMS.map((item) => item.key === 'reminder' ? { ...item, name: '前日のリマインダー' } : item) } },
+  { id: 'starter-set-restaurant', style: 'restaurant', name: '飲食店向けの初期セット', version: 2, definition: { items: STYLE_SETUP_ITEMS } },
 ]
 const STYLE_TEMPLATE_SAMPLES = [
   ['sample-reservation-confirm', '予約の確認', 'common'], ['sample-reminder', '前日のリマインド', 'common'], ['sample-day', '当日の案内', 'common'], ['sample-thanks', '来店のお礼', 'common'],

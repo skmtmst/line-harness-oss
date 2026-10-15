@@ -32,7 +32,9 @@ describe('はじめの質問の決まり（B-313・組4の質問キー）', () =
 
   it('おすすめは業種ごとに先に選び、題に「（おすすめ）」を付ける', () => {
     const approval = questionsFor('consult').find((q) => q.key === 'approval')!
-    expect(recommendedValue(approval, 'consult')).toBe('manual')
+    expect(recommendedValue(approval, 'consult')).toBe('require_approval')
+    expect(answerOf('require_approval', approval)).toEqual({ mode: 'configured', value: 'manual' })
+    expect(answerOf('manual', approval)).toEqual({ mode: 'manual' })
     expect(choiceLabel(approval, approval.choices[1], 'consult')).toBe('お店が承認してから確定する（おすすめ）')
   })
 })
@@ -66,5 +68,18 @@ describe('はじめにやること（Bdfxm）', () => {
     const summary = summarizeSetup({ ...state, answers: {} }, [], [])
     expect(summary.done).toBe(1)
     expect(summary.rows).toEqual([])
+  })
+})
+
+describe('開き直したときの保存（B-335）', () => {
+  it('変えた答えだけを送り、予約設定が変わる答えは確かめの文を作る', async () => {
+    const { changedAnswers, settingsChanges, isBookingConfirmSample } = await import('./model')
+    const saved = { approval: { mode: 'configured' as const, value: 'automatic' }, reminders: { mode: 'configured' as const, value: true } }
+    const next = { approval: { mode: 'configured' as const, value: 'automatic' }, reminders: { mode: 'configured' as const, value: false } }
+    expect(changedAnswers(saved, next)).toEqual({ reminders: { mode: 'configured', value: false } })
+    expect(settingsChanges(saved, next)).toEqual([])
+    expect(settingsChanges(saved, { ...next, approval: { mode: 'configured', value: 'manual' } })).toEqual(['予約の確定の仕方：その場で確定する → お店が承認してから確定する'])
+    expect(isBookingConfirmSample({ key: 'reminder', kind: 'automation', name: '予約確定のご案内' })).toBe(true)
+    expect(isBookingConfirmSample({ key: 'reminder-day-before', kind: 'automation', name: '前日のお知らせ' })).toBe(false)
   })
 })

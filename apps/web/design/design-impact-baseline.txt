@@ -259,6 +259,7 @@ shared-button-importer v8/hq/support.tsx
 shared-button-importer v8/hq-attention/attention.tsx
 shared-button-importer v8/hq-starter-sets/starter-sets.tsx
 shared-button-importer v8/onboarding/setup-card.tsx
+shared-button-importer v8/onboarding/style-entry.tsx
 shared-button-importer v8/onboarding/wizard.tsx
 shared-button-importer v8/inbox-chat/attach-menu.tsx
 shared-button-importer v8/inbox-chat/rules-popover.tsx
