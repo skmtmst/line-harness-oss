@@ -1,5 +1,77 @@
 # API 組5 — 機能待ちの板の口（B-323 / 2026-10-16）
 
+## 10-16 続き：B-324 の承認後（この節が初回記録より新しい）
+
+doctor は最終行「合格」。開始時は指定枝の初回3コミットだけで、変更・未追跡0。fetch/merge照合の本線は `cd63dd961f5dc2613a8b16c39a21d01e2cf7c8ba`。新しいworktreeを二重作成していない。
+
+### 今回作った口
+
+| 板 | メソッド・パス | 入力・返値・画面側のつなぎ |
+|---|---|---|
+| Upx1c | `GET/POST /api/hq/templates/saved-views`、`PATCH/DELETE /api/hq/templates/saved-views/:viewId` | 作成/変更は `name,filters,scope`、変更/保管は `expectedRevision`。filtersは `kind,messageCount,hasInterpolations,undistributed,search,folderId`。scopeはpersonal（既定）/tenant。一覧は自分の個人分＋同組織の共有分。返値はid・保存条件・owner_staff_id・scope・revision・日時。DELETEは保管。Webの `hqTemplateSavedViewsApi.list/create/update/archive` へ接続 |
+| Upx1c | 既存 `GET /api/hq/templates` の絞り込みを追加 | `search`（名前・本文・差し込み、最大200字）、`folder_id`（空は未分類）、`undistributed=true/false`。従来の `message_count/has_interpolations/kind` と組合せ可。保存したfiltersを `listHqMessageTemplates(view.filters)` へ渡す。本文をレスポンスへ追加しない |
+| Qgjmc | 既存の統括ひな形保存/一覧/配布 | `definition.mark.displayLocations` に `inbox/friends/friend_detail` の配列。空配列は全て非表示、省略した旧版は従来の3か所。重複・未知値・配列以外は422。統括一覧の `display_locations`、配布した店の `display_locations_json` へ同じ設定を保存。配布確認の後に店の表示設定が変わればversion_conflict |
+| Qgjmc | 既存 `PATCH /api/support-marks/:id?lineAccountId=...` | `displayLocations,expectedVersion`。表示場所を変える場合は版が必須。既存の店内編集・所属・役割・共有マーク複製の安全確認を使用。Webの `updateSupportMarkDisplayLocations(id,accountId,version,locations)`。GETの `displayLocations` と既存 `displayTargets` に保存値を返す。displayTargetsだけは既存画面の語 `friend_list` を使う |
+
+保存した絞り込みは自組織の有効なowner/admin・全体スコープ。個人分は所有者だけ、共有分は同組織のowner/adminが編集できる。GETは閲覧のみ可、更新は不可。版照合・更新・監査は1つのDB処理にし、同時保存は1件だけ成功、監査失敗は変更も戻す。分類は同じ組織の有効なものだけ。
+
+マークは表示設定の材料をAPIへ追加した。**受信箱・友だち一覧・友だち詳細が実際に隠す接続は画面側の作業**。表示を隠しても友だちへの付与や自動変更を解除しない。自由なマークと固定の受信箱の状態は分ける。画面・Pencilは変更していない。
+
+### 番号と適用
+
+B-324により **666〜680は承認済み**。初回の663〜665という案は取り消し、663〜665は組3の物。
+
+- **667_hq_template_saved_views.sql**：保存した絞り込み。作成済み。
+- **668_support_mark_display_locations.sql**：マークの表示場所。既存表への列追加で従来の3か所を既定にする。別の設定表は不要だった。作成済み。
+- **666**：複数通テンプレートの作成・配布・送信を一体で扱う案のために未使用で残している。初回の「通数・差し込みを返す」拡張と、複数通を新規作成する機能は別。**複数通の新規作成そのものはまだ実装していない**。承認待ちとは記載しない。
+- 本線の最大636、公開中PRが加えるmigrationの最大565を確認。667/668の重複なし。push前の再照合は司令塔。
+- bootstrapの再生成と試験のメモリ内SQLiteだけを使用。検証・本番D1への適用は0。
+
+適用前、司令塔が統合・クリーン・対象SHAを確認してから行うdry-run（今回は未実行）：
+
+```sh
+gh workflow run migrate-d1.yml -R skmtmst/line-harness-oss --ref codex/development -f operation=migrate -f environment=staging -f mode=dry-run -f migration=667_hq_template_saved_views.sql
+gh workflow run migrate-d1.yml -R skmtmst/line-harness-oss --ref codex/development -f operation=migrate -f environment=staging -f mode=dry-run -f migration=668_support_mark_display_locations.sql
+```
+
+### 再指定12板：重複禁止との照合
+
+「組1〜4の指示書にある物は作らない」を維持した。再指定12板をそのまま組5の新規12件とは数えない。範囲を変えて組5で同じファイルを補完するかは確認を出した。以下は他組の枝・契約書の読取りであり、組5へ取り込み・試験済みという意味ではない。
+
+| 板 | 担当・接続先と残る作業 |
+|---|---|
+| J7HNK | **組1の物**。`GET /api/hq/templates/:id/distribution-targets` → 既存preflight → distribute。`fetchHqDistributionTargets`。配布履歴と上書き可否を分ける |
+| N4T9mO | **組1・組2の物**。組1のフォーム試用URL・店ごとの参照、組2のijxur（メニュー選択・未承認）の保存。統合後に両方を接続 |
+| UgZPJ | **組1の物**。既存保存に `richMenu.displayAudience/displayAudienceTagName/defaultOpen`、`POST /api/hq/templates/rich-menu-preview` に店別の同名参照確認。`previewHqRichMenu` と既存の保存/配布 |
+| W5Wxr | **組2の物**（追加11）。既存の分類APIの `kind=image` と画像一覧のfolderId。組2は実SQLiteで確認済みと記録。プロジェクトの分類とは分ける |
+| ME78d | **組1の物**（項目1）。リッチメニューの保存・保存前確認・各店の同名参照。14種全ての動き/計測が揃ったとする根拠は無いので、未対応分は組1/司令塔への残りとして保持。重複禁止のまま組5が同じadapterを並行変更していない |
+| cmRZc | **組1の物**（ME78dと同じ）。予約ページ・同名参照の充足・押した人へのタグと計測。URL動作と計測タグを無条件に対応済みとはしない |
+| n9vvGx | **組2の物**（追加14）。共通フォローの複数吹き出しを `scenario_steps.message_bubbles_json` へ保存、固定版と予約起点送信へ接続済みという契約。新しいmigration不要。記念日の前の指定は組2の契約と要件に従う |
+| v0SbYR | **組1の物**（項目2）。`GET /api/forms/:id/submissions?period=this_month/last_month/all`。一覧・人数・集計を同じ期間へ絞る |
+| Fkv3w | **組1の物**（追加10）。`GET /api/hq/templates/resources?kind=tag/coupon/scenario&q=...&accountIds=...`、`searchHqTemplateResources`。返された店のIDを既存の処理へ保存 |
+| Ft2Ey | **組1の物**（追加8）。J7HNKと同じ配布先の版取得。未配布を同名データなしとして扱わない |
+| T5ljMA | **組1の物**（追加9・既存統括配信定義）。`hqDeliveriesApi.create/update` の `settings.priority`、返すもの・templateId・actions/referencesを既存の保存/配布へ。priorityは-9999〜9999、数が小さいものが先 |
+| rSRFK | **既存API、画面側の作業**。下の初回の表のsnapshot・店舗・名簿・ログイン権限・取り込みアドレス。名簿と実ログイン権限を分ける。組織階層の別システムは作らない |
+
+B-299の18板とiN6npは下の表のまま組2。追加の実装はしていない。全34板のHTML/文字表を再読し、初回から変更0。外部の `api5-1016/continuation-evidence.json` に本文と指紋を保存した。画面の完成や撮影合格の証拠ではない。
+
+### 今回の検証とコミット
+
+- コード：`ceb4f6507e`（保存した絞り込み、マークの表示場所、667/668、API関数・OpenAPI・権限経路の収録）。
+- 関連Worker9ファイル170件、DB4ファイル16件、Web1ファイル4件、重複を除いて **190件成功**。全CI・全Worker・全Webの成功とは数えない。
+- 保存検索の個人/共有/別組織・閲覧のみ・条件不正・同時更新・監査失敗、表示場所の保存→配布→一覧・古い版の拒否・確認後の変更検出・共有マークの店別複製を実SQLiteで確認。
+- Worker/DB/Webの型検査成功。sharedビルド成功。最終Workerビルドはheavy.sh経由で終了0、SSR/クライアントとも生成。既存のimport混在・大きいchunk警告は保持。DBや外部サービスへ接続していない。
+- 新規ファイルとWeb関数/試験のESLintエラー0。変更先の既存friend-attribute-distribution.tsにあるanyの6エラーは、開始HEADと規則・メッセージの件数が一致し、新規0。それ以外の変更した製品ソースはエラー0。既存の未使用変数とpages探索の警告は保持。
+- 667/668のmigration静的検査、生成bootstrap一致、差分検査成功。表示場所列を含まない旧モック、保管前確認の参照、OpenAPIのpath引数、権限一覧の順序、実際のversion_conflictの期待値、共有マーク試験の作成日時の不足を検出・修正して再成功。未解決の試験失敗はない。
+- 指定の外部 `~/lh-work/design/v8/review/API-CONTRACT-5.md` にも同じ文書を保存する。反映履歴は実PR番号がまだ無いため文案を渡す。push・PR・DB適用・配備は行わない。
+
+### 次のタスクはこれ
+
+司令塔が今回のコミットを取り込み、667/668のDB工程と画面接続を進める。再指定12板の同じファイルを組5で補完する場合は、重複禁止との担当調整が必要。複数通の新規作成・ME78d/cmRZcの未対応動作は未完として残す。PR採番後は実番号・日本時間・@kentaを付け、反映履歴を作る。文案：「テンプレートのよく使う絞り込みを保存できるようにした」「対応マークを出す場所を保存し、配った先でも引き継げるようにした」。
+
+
+## 以下は初回3コミットの記録（承認・実装状況は上の続きが優先）
+
 ## 今の進捗を全体像から整理するとこれ
 
 34板を全部確認した。担当の重複は板名だけでなく不足する機能で照合した。
