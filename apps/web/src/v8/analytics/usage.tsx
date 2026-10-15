@@ -108,8 +108,8 @@ export default function UsageV8({ accountId }: { accountId: string }) {
         ? <Notice tone="warn">{overview.stateReason}</Notice>
         : <p className={styles.noteBox}>項目が多いほど良い、ではありません。使っていないものは使用先を確かめてから、「片づける」で整理できます。未使用の項目は自動で削除しません。</p>}
       {menuFeaturesError ? <Notice tone="danger" action={<Button variant="secondary" onClick={() => setMenuReload((n) => n + 1)}>もう一度確認</Button>}>{menuFeaturesError}</Notice> : null}
-      <DetailColumns presentation="card" asideLabel="気づいたこと" expanded={observationsExpanded} onExpandedChange={setObservationsExpanded} aside={
-        <section className={styles.flowCard} aria-labelledby="usage-observations-title">
+      <DetailColumns presentation="analysis" asideLabel="気づいたこと" expanded={observationsExpanded} onExpandedChange={setObservationsExpanded} aside={
+        <section className={styles.flowCard} data-w="full" aria-labelledby="usage-observations-title">
           <h2 id="usage-observations-title" className={styles.hoursTitle}>気づいたこと</h2>
           {observations.length === 0 ? <p className={styles.observation}>気になる項目はありません</p> : observations.map((item) => <p key={item.key} className={styles.observation}>{`・${item.label}：${usageObservation(item).text}`}</p>)}
           <span><Button variant="secondary" onClick={() => { state.retry(); setMenuReload((value) => value + 1) }}><RefreshCw size={15} aria-hidden="true" />もう一度確認</Button></span>
