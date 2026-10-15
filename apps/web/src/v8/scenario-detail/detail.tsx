@@ -952,7 +952,8 @@ export default function ScenarioDetailV8({
 
       setDuplicateRemainder(null)
       setDuplicateOpen(false)
-      router.push(`/scenarios/detail?id=${copy}`)
+      /* B-177 ③（Al4Ek）：複製はその場にとどまり、下書きで作ったことをトーストで知らせる。コピーは一覧に下書きで並ぶ。 */
+      notifyToast(copyName === `${scenario.name} のコピー` ? `「${scenario.name}」のコピーを下書きで作りました` : `「${copyName}」を下書きで作りました`)
     } catch (e) {
       const fieldFailure = saveErrors.capture(e);
 
@@ -2937,6 +2938,7 @@ export default function ScenarioDetailV8({
         title="配信をはじめますか"
         description="始める前の最終確認です。はじめると、条件に合う人から順に届きます。"
         designNode="F1LK4e"
+        designWidth={560}
         confirmLabel="この内容ではじめる"
         busy={startBusy}
         error={startError}
@@ -2949,7 +2951,7 @@ export default function ScenarioDetailV8({
           setStartError('')
         }}
       >
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <p className="text-ink-faint text-xs">シナリオ</p>
             <p className="text-ink text-sm font-semibold">{scenario.name}</p>
@@ -3015,7 +3017,7 @@ export default function ScenarioDetailV8({
           ))}
         </ul>
 
-        <Notice tone="warn" className="mt-4">
+        <Notice tone="warn" className="mt-3">
           始めると取り消せません。止めた人には、再開すると続きから届きます。
         </Notice>
         <div className="mt-3">

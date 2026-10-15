@@ -17,6 +17,7 @@ const listFolders = vi.hoisted(() => vi.fn())
 const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view' } })))
 const listViews = vi.hoisted(() => vi.fn())
 const deleteBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
+const updateBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
 const narrow = vi.hoisted(() => ({ value: false }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => narrow.value }))
 const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
@@ -31,6 +32,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         ...actual.api.broadcasts,
         list: listBroadcasts,
         delete: deleteBroadcast,
+        update: updateBroadcast,
         getInsight: async () => ({ success: false }),
         savedViews: { ...actual.api.broadcasts.savedViews, list: listViews, create: createView },
       },
@@ -162,6 +164,26 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
       await flush()
       expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({ displayStatus: 'draft' }))
     } finally { narrow.value = false }
+  })
+
+  it('行を選ぶと下にまとめての帯が出て、選んだ配信をまとめてフォルダへ移す（l5V9a）', async () => {
+    listFolders.mockImplementation(async () => ({ success: true, data: [{ id: 'f-1', kind: 'broadcast', name: 'キャンペーン', parentId: null, displayOrder: 0, itemCount: 0, color: '#10B981', createdAt: '', updatedAt: '' }], unfiledCount: 2 }))
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    const pick = (label: string) => host.querySelector(`[aria-label="${label}"]`) as HTMLElement
+    expect(pick('8月キャンペーンのお知らせを選択'), '行の選ぶ欄がありません').toBeTruthy()
+    act(() => { fireEvent.click(pick('8月キャンペーンのお知らせを選択')) })
+    act(() => { fireEvent.click(pick('未購入者フォローを選択')) })
+    await flush()
+    const move = buttonByText('フォルダへ移す')
+    expect(move, 'まとめての帯がありません').toBeTruthy()
+    act(() => { move!.click() })
+    const target = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('キャンペーン')) as HTMLElement
+    act(() => { target.click() })
+    await flush()
+    expect(updateBroadcast).toHaveBeenCalledWith('bc-1', expect.objectContaining({ folderId: 'f-1' }))
+    expect(updateBroadcast).toHaveBeenCalledWith('bc-2', expect.objectContaining({ folderId: 'f-1' }))
+    expect(buttonByText('フォルダへ移す'), '移した後も帯が残っています').toBeUndefined()
   })
 
   it('行と数の帯・札の件数が出る', async () => {

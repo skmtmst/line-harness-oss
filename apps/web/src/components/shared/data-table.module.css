@@ -576,6 +576,8 @@ html:root .actionCell > :is(button, a):not([data-row-menu]) { min-width: var(--r
 html:root .frame:not([data-table-presentation='calendar']) { width: 100%; min-width: 0; container-type: inline-size; container-name: v8-list-table; }
 @container v8-list-table (max-width: 1100px) { html:root .frame[data-shared-part='list-table']:not([data-collapse-scope='page']) .table > :is(thead, tbody) > tr > :is(th, td)[data-cell-collapse='narrow'] { display: none; } }
 html:root .actionCell { flex: none; min-width: max-content; }
+/* 行末の操作は文字のボタンと「…」（字なし）を同じ高さの真ん中にそろえる。既定の baseline だと「…」が約5px 上に浮く（oRbJi）。 */
+html:root .actionCell > * { vertical-align: middle; }
 html:root .actionCell :is(button, a):not([data-row-menu]) { min-width: var(--row-action-width, max-content); }
 
 /* 既存の細いGridTableの判定も同じ器を使う。名前を置き換えない。 */

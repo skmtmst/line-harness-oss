@@ -222,12 +222,12 @@ describe('完了した移行履歴の表示と操作', () => {
     expect(writes()).toHaveLength(0)
   })
 
-  it('判断中の履歴には選択面を保つ', async () => {
+  it('判断中の履歴は今の移行をボタンで示し、行に塗りは付けない（Z0jHp）', async () => {
     await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
     await flush()
     const current = host.querySelector('[aria-labelledby="uid-history"] button[aria-current="true"]')!
     expect(current).not.toBeNull()
-    expect(current.closest('tr')?.getAttribute('aria-selected')).toBe('true')
+    expect(current.closest('tr')?.getAttribute('aria-selected')).toBeNull()
     expect(writes()).toHaveLength(0)
   })
 })

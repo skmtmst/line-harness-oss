@@ -4,7 +4,7 @@ import { normalizeActionLabel } from './action-words'
 import Link, { useListNavigationHref } from './list-navigation'
 import { ArrowUpRight, Eye, Pencil, Pause, Trash2 } from 'lucide-react'
 import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
-import MenuPortal from './menu-portal'
+import MenuPortal, { type MenuPortalAlign } from './menu-portal'
 import { useV8Leave } from './overlay-utils'
 import styles from './action-menu.module.css'
 
@@ -87,10 +87,12 @@ export type ActionMenuProps = {
    * 基準にする（`MoreAction`＋`ActionMenu` の並びが前提）。
    */
   anchorRef?: RefObject<HTMLElement | null>
+  /** 器（portal）の横の寄せ。既定は押した物の右端。「〜を足す」のように左から読む押し口は start。 */
+  align?: MenuPortalAlign
 }
 
 /** Pencil ★V8 `hnuY9`「その他操作メニュー」を正本にした小型操作メニュー。 */
-export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef }: ActionMenuProps) {
+export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef, align = 'end' }: ActionMenuProps) {
   const navigationHref = useListNavigationHref()
   const leaving = useV8Leave(open, 80)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -265,7 +267,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
   return (
     <>
       {anchorRef ? null : <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />}
-      <MenuPortal open={open} exitDuration={80} getAnchor={getAnchor} onClose={onClose}>
+      <MenuPortal open={open} exitDuration={80} getAnchor={getAnchor} onClose={onClose} align={align}>
         {menu}
       </MenuPortal>
     </>

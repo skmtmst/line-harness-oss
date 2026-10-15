@@ -500,7 +500,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /^配る先：(選ぶ|変える)$/ }))
     const picker = await findPickerDialog('配るアカウントを選ぶ')
     for (const name of names) fireEvent.click(within(picker).getByRole('checkbox', { name }))
-    fireEvent.click(within(picker).getByRole('button', { name: `この ${names.length} アカウントにする` }))
+    fireEvent.click(within(picker).getByRole('button', { name: `選ぶ（${names.length}件）` }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '配るアカウントを選ぶ' })).toBeNull())
   }
   async function selectFolder() {
@@ -595,7 +595,7 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     expect(within(folderDialog).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(within(folderDialog).getByRole('button', { name: 'キャンセル' }))
     const listName = await screen.findByRole('link', { name: 'VIP', exact: true })
-    expect(listName.closest('[data-list-name]')?.querySelector('[data-folder-dot]')?.getAttribute('style')).toContain(expectedColor)
+    expect(within(listName).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(listName.closest('tr')!)
     const body = await screen.findByRole('region', { name: '本文' })
     const pill = within(body).getByRole('group', { name: 'タグ「VIP」' })

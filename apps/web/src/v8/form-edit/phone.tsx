@@ -24,9 +24,15 @@ type Props = {
   pageIndex: number
   accountName: string
   bookingMenus: { id: string; name: string; durationMinutes: number }[]
+  /** 上の小さい見出し。置き場に題があるとき（リサーチの「届き方」）は null。 */
+  caption?: string | null
+  /** 上の帯の題。 */
+  title?: string
+  /** 次へ・送るを画面の下に固定する（中身が長いリサーチ。絵 EsYo4「下の帯（固定）」）。 */
+  fixedNext?: boolean
 }
 
-export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus }: Props) {
+export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus, caption = 'お客さまに見える形', title = '回答フォーム', fixedNext = false }: Props) {
   const sections = layout.sections
   const section = sections[pageIndex] ?? sections[0]
   const options = { ...FORM_OPTIONS_DEFAULT, ...layout.options }
@@ -48,15 +54,15 @@ export function FormPhone({ accountLook, layout, pageIndex, accountName, booking
     : `${options.nextLabel || '次へ'}（${pageIndex + 1} / ${sections.length}）`
 
   return (
-    <LiffPhoneFrame title="回答フォーム" accountName={accountName} caption="お客さまに見える形" label="お客さまに見える形" accent={main}>
+    <LiffPhoneFrame title={title} accountName={accountName} caption={caption ?? undefined} label="お客さまに見える形" accent={main} footer={fixedNext ? <div className={styles.phoneFoot} style={{ backgroundColor: theme.sub }}><span className={styles.phoneNext}>{nextLabel}</span></div> : undefined}>
           <div className={styles.phoneForm} style={{backgroundColor:theme.sub,color:theme.text,fontFamily:theme.fontFamily==='serif'?'serif':'sans-serif'}}>
             {blocks.length === 0 ? <p className={styles.phoneEmpty}>このページにはまだブロックがありません</p> : null}
             {blocks.map((block, index) => (
               <PhoneBlockWithProgress key={block.id} block={block} showProgress={index === progressAt} progress={progress} bookingMenus={bookingMenus} />
             ))}
             {blocks.length === 0 ? progress : null}
-            <span className={styles.phoneSpacer} />
-            <span className={styles.phoneNext}>{nextLabel}</span>
+            {fixedNext ? null : <><span className={styles.phoneSpacer} />
+            <span className={styles.phoneNext}>{nextLabel}</span></>}
           </div>
     </LiffPhoneFrame>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronRight, ArrowUpRight, Check, type LucideIcon } from 'lucide-react'
+import { ChevronRight, ArrowUpRight, Plus, type LucideIcon } from 'lucide-react'
 import { folderDisplayColor, FolderDot } from './folder-dot'
 import { useFieldContext, joinDescribedBy } from './field-context'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
@@ -16,6 +16,7 @@ import shell from './source-picker-dialog.module.css'
 import styles from './entity-picker.module.css'
 import Dialog from './dialog'
 import TagPill from './tag-pill'
+import { TextField } from './text-field'
 import useNarrow from './use-picker-narrow'
 
 /*
@@ -60,7 +61,9 @@ const UNFILED = PICKER_UNFILED
 function folderOf(item: EntityPickerItem, folders: EntityPickerFolder[]) {
   return item.folderId ? folders.find((folder) => folder.id === item.folderId) ?? null : null
 }
+const FREQUENT = '__frequent__'
 function inFolder(item: EntityPickerItem, folder: string) {
+  if (folder === FREQUENT) return Boolean(item.frequent)
   return !folder || (folder === UNFILED ? !item.folderId : item.folderId === folder)
 }
 function matches(item: EntityPickerItem, query: string) {
@@ -120,13 +123,15 @@ export type EntityPickerWindowProps = {
   scrollBody?: boolean
   footer: ReactNode
   band?: ReactNode
+  /** 頭の×の左の操作（S2Vgi の「＋タグを作る」）。 */
+  headerAction?: ReactNode
 }
 
 export function EntityPickerWindow(props: EntityPickerWindowProps) {
   return <Dialog open dirty={false} title={props.title} description={props.description}
     designNode={props.designNode} designWidth={640} widthPreset="picker" designHeaderPadding="var(--tpl-inbox-tp-head-pad)"
     contentLayout={props.scrollBody ? 'form' : undefined} designContentPadding={props.scrollBody ? '0' : undefined}
-    busy={props.busy} initialFocusId={props.initialFocusId} onCancel={props.onCancel}
+    busy={props.busy} initialFocusId={props.initialFocusId} onCancel={props.onCancel} headerAction={props.headerAction}
     footer={<>
       {props.scrollBody ? null : props.children}
       {props.error ? <p className={styles.tpError} role="alert">{props.error}</p> : null}
@@ -163,7 +168,7 @@ function SingleEntityPickerDialog({
   const visibleLimit = controlledQuery !== undefined ? rows.length : limit
   const picked = items.find((item) => item.id === selected) ?? null
   const folderRows = pickerFolderRows(items, folders, listState)
-  if (items.some((item) => item.frequent !== undefined)) folderRows.unshift ({id: '__frequent__', label: 'よく使う', kind: 'folder', count: listState ? null : items.filter((item) => item.frequent).length })
+  if (items.some((item) => item.frequent !== undefined)) folderRows.unshift ({id: '__frequent__', label: 'よく使う', kind: 'frequent', count: listState ? null : items.filter((item) => item.frequent).length })
   const previewNode = typeof preview === 'function' ? preview(picked) : preview
 
   return <EntityPickerDialog scrollBody={scrollBody} title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
@@ -175,13 +180,13 @@ function SingleEntityPickerDialog({
       </div>
       <div className={styles.tpFootActions}>
       <Button disabled={busy} onClick={onCancel}>{readOnly ? '閉じる' : 'キャンセル'}</Button>
-      {readOnly ? null : <Button variant="primary" busy={busy} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} title={listState ? '候補を読み込める状態になってから選んでください。' : !picked ? '候補を選んでください。' : picked.disabled ? picked.meta : confirmDisabled ? error : undefined} onClick={() => onConfirm(selected)}><Check size={16} aria-hidden />{confirmLabel}</Button>}
+      {readOnly ? null : <Button variant="primary" widthReserve="idle" busy={busy} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} title={listState ? '候補を読み込める状態になってから選んでください。' : !picked ? '候補を選んでください。' : picked.disabled ? picked.meta : confirmDisabled ? error : undefined} onClick={() => onConfirm(selected)}>{confirmLabel}</Button>}
     </div>
     </>}
   >
-    <div ref={panelRef} className={`${shell.body} ${scrollBody ? styles.tpBody : ''}`}>
+    <div ref={panelRef} className={`${shell.body} ${scrollBody ? styles.tpBody : styles.singleBody}`}>
       {hasFolders && !narrow ? <div className={shell.folders}>
-        <FolderPanel readOnly reserveCreateSpace={false} disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
+        <FolderPanel readOnly reserveCreateSpace={false} headingAfterAll disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
       </div> : null}
       <section className={styles.tpList} aria-label="候補の一覧"> <SearchField id={`${id}-search`} aria-label={`${title}：${searchPlaceholder}`} placeholder={searchPlaceholder} value={query} onChange={setQuery} onClear={() => setQuery('')} />
         {foldersFailed ? <p className={styles.note}>フォルダを読み込めませんでした。すべての候補から選べます。</p> : null}
@@ -245,13 +250,15 @@ type MultiBodyProps = {
   initialFolder?: string
   /** ほかの窓の中に埋め込むとき。高さを決めて一覧だけを送る。 */
   embedded?: boolean
+  /** 行を2段にする（名前の下に補足と状態）。名前を補足に押されて切らない（WjFWW 送るアカウント）。 */
+  stacked?: boolean
 }
 
 /**
  * まとめて選ぶ中身（フォルダの列＋一覧）。窓の中にも、ほかの窓の中にも埋め込める。
  * フォルダの横のチェックは、そのフォルダの選べる候補をまとめて付け外しする。
  */
-export function EntityMultiSelect({ items, folders = [], foldersFailed = false, selected, onChange, query, onlySelected = false, readOnly = false, busy = false, state, listFooter, rowExtra, searchSlot, listLabel = '候補の一覧', folder: controlledFolder, onFolder, folderHeading, initialFolder, embedded = false }: MultiBodyProps) {
+export function EntityMultiSelect({ items, folders = [], foldersFailed = false, selected, onChange, query, onlySelected = false, readOnly = false, busy = false, state, listFooter, rowExtra, searchSlot, listLabel = '候補の一覧', folder: controlledFolder, onFolder, folderHeading, initialFolder, embedded = false, stacked = false }: MultiBodyProps) {
   const id = useId()
   const [ownFolder, setOwnFolder] = useState(initialFolder ?? ALL)
   const folder = controlledFolder ?? ownFolder
@@ -266,10 +273,12 @@ export function EntityMultiSelect({ items, folders = [], foldersFailed = false, 
       disabled={readOnly || busy || ids.length === 0} onCheckedChange={(on) => toggleMany(ids, on)} />
   }
   const folderRows = pickerFolderRows(items, folders, Boolean(state), groupCheck)
+  // S2Vgi：利用の記録がある種類は先頭に「よく使う」。
+  if (items.some((item) => item.frequent !== undefined)) folderRows.unshift({ id: FREQUENT, label: 'よく使う', kind: 'frequent', count: state ? null : items.filter((item) => item.frequent).length, leading: groupCheck(items.filter((item) => item.frequent && !item.disabled && !item.locked).map((item) => item.id), 'よく使う') })
   const rows = items.filter((item) => inFolder(item, folder) && matches(item, query) && (!onlySelected || set.has(item.id)))
-  return <div ref={panelRef} className={embedded ? `${shell.body} ${styles.embedded}` : shell.body}>
+  return <div ref={panelRef} className={embedded ? `${shell.body} ${styles.embedded}` : `${shell.body} ${styles.multiBody}`}>
     {hasFolders && !narrow ? <div className={shell.folders}>
-      <FolderPanel readOnly reserveCreateSpace={false} heading={folderHeading} disabled={busy || Boolean(state)} rows={folderRows} activeId={folder} onSelect={setFolder} />
+      <FolderPanel readOnly reserveCreateSpace={false} heading={folderHeading} headingAfterAll={!embedded} disabled={busy || Boolean(state)} rows={folderRows} activeId={folder} onSelect={setFolder} />
     </div> : null}
     <section className={`${styles.tpList} ${styles.multiList}`} aria-label={listLabel}>
       {searchSlot}
@@ -279,6 +288,16 @@ export function EntityMultiSelect({ items, folders = [], foldersFailed = false, 
         {state || (rows.length ? rows.map((item) => {
           const checked = set.has(item.id)
           const inputId = `${id}-${item.id}`
+          if (stacked) return <div key={item.id} className={styles.multiRow} data-stacked="" data-selected={checked || undefined} data-disabled={item.disabled || undefined}>
+            <Checkbox id={inputId} aria-label={item.name} checked={checked} disabled={readOnly || busy || item.locked || (item.disabled && !checked)} onCheckedChange={(on) => toggleMany([item.id], on)} />
+            <label className={styles.multiStack} htmlFor={inputId}>
+              <span className={styles.multiName} title={item.name}>
+                {hasFolders ? <FolderDot folder={folderOf(item, folders)} /> : null}
+                <span className={styles.multiNameText}>{item.name}</span>
+              </span>
+              {item.meta || rowExtra ? <small className={styles.multiSub}>{item.meta ? <span className={styles.multiSubText} title={item.meta}>{item.meta}</span> : null}{rowExtra ? rowExtra(item) : null}</small> : null}
+            </label>
+          </div>
           return <div key={item.id} className={styles.multiRow} data-selected={checked || undefined} data-disabled={item.disabled || undefined}>
             <Checkbox id={inputId} aria-label={item.name} checked={checked} disabled={readOnly || busy || item.locked || (item.disabled && !checked)} onCheckedChange={(on) => toggleMany([item.id], on)} />
             <label className={styles.multiName} htmlFor={inputId} title={item.name}>
@@ -314,44 +333,83 @@ type MultiProps = {
   readOnly?: boolean
   createHref?: string
   createLabel?: string
+  /** 頭の「＋〇〇を作る」。名前を受けて作り、作った候補を返す（返した候補は選んだ状態で足す）。 */
+  createAction?: { label: string; placeholder?: string; onCreate: (name: string) => Promise<EntityPickerItem | null> }
+  /** 下の段の左の案内。省くと「いくつでも選べます」（上限があれば「N件まで選べます」）。 */
+  note?: string
   searchPlaceholder?: string
   /** 1件も選ばずに確定してよいか（タグを全部外す など）。 */
   allowEmpty?: boolean
   rowExtra?: (item: EntityPickerItem) => ReactNode
   initialFolder?: string
+  /** 行を2段にする（名前の下に補足と状態）。 */
+  stacked?: boolean
   onConfirm: (ids: string[]) => void
   onCancel: () => void
 }
 
 /** まとめて選ぶ窓。確定するまでは呼ぶ側の値を変えない。 */
-export function EntityMultiPickerDialog({ title, description, items, folders, foldersFailed, initialIds, unit = '件', state, listFooter, error, busy = false, readOnly = false, createHref, createLabel, searchPlaceholder = '名前で探す', allowEmpty = true, rowExtra, initialFolder, query: controlledQuery, onQueryChange, maxSelected, onConfirm, onCancel }: MultiProps) {
+export function EntityMultiPickerDialog({ title, description, items, folders, foldersFailed, initialIds, unit = '件', state, listFooter, error, busy = false, readOnly = false, createHref, createLabel, createAction, note, searchPlaceholder = '名前で探す', allowEmpty = true, rowExtra, initialFolder, stacked, query: controlledQuery, onQueryChange, maxSelected, onConfirm, onCancel }: MultiProps) {
   const [selected, setSelected] = useState(initialIds)
   const [ownQuery, setOwnQuery] = useState('')
   const query = controlledQuery ?? ownQuery
   const setQuery = (value: string) => { setOwnQuery(value); onQueryChange?.(value) }
   const [onlySelected, setOnlySelected] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
-  const sep = unit === '件' ? '' : ' '
-  const countText = `${selected.length}${sep}${unit}`
+  const [created, setCreated] = useState<EntityPickerItem[]>([])
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [createBusy, setCreateBusy] = useState(false)
+  const [createError, setCreateError] = useState('')
+  const allItems = created.length ? [...items, ...created.filter((item) => !items.some((own) => own.id === item.id))] : items
+  const runCreate = async () => {
+    const name = newName.trim()
+    if (!name || !createAction || createBusy) return
+    setCreateBusy(true); setCreateError('')
+    try {
+      const item = await createAction.onCreate(name)
+      if (!item) { setCreateError('作れませんでした。名前を確かめて、もう一度お試しください。'); return }
+      setCreated((now) => [...now, item]); setSelected((now) => [...new Set([...now, item.id])]); setCreating(false); setNewName('')
+    } catch { setCreateError('作れませんでした。もう一度お試しください。') }
+    finally { setCreateBusy(false) }
+  }
+  const countText = `${selected.length}件`
+  const pickedNames = selected.map((value) => allItems.find((item) => item.id === value)?.name ?? '見つからないもの').join('・')
+  const footNote = note ?? (maxSelected !== undefined ? `${maxSelected}${unit === '件' ? '件' : ` ${unit}`}まで選べます` : 'いくつでも選べます')
+  // S2Vgi（正の形）：頭に「＋〇〇を作る」、一覧の下に「選んだもの」の帯、下の段は案内と［キャンセル］［選ぶ（N件）］。
   return <EntityPickerDialog title={title} description={description} designNode="dJZ7Q" busy={busy} error={error} onCancel={onCancel}
+    headerAction={!readOnly && createAction ? <Button size="compact" disabled={busy || creating} onClick={() => { setCreating(true); setCreateError('') }}><Plus size={14} aria-hidden="true" />{createAction.label}</Button> : undefined}
+    band={selected.length ? <div className={styles.pickedBand} aria-live="polite">
+      <strong className={styles.pickedLabel}>選んだもの：</strong>
+      <span className={styles.pickedNames} title={pickedNames}>{pickedNames}</span>
+      <strong className={styles.pickedCount}>{`${selected.length} 件`}</strong>
+    </div> : undefined}
     footer={<>
       <div className={styles.tpFootLead}>
         {!readOnly ?
       <CreateLink href={createHref} label={createLabel} /> : null}
-      <span className={styles.tpFootText} aria-live="polite">
-          <span className=
-        {styles.tpFootTitle}>{`${countText}を選んでいます`}</span>
+      <span className={styles.tpFootText}>
+        <span className={styles.tpFootNote}>{footNote}</span>
         <button type="button" className={styles.textButton} aria-pressed={onlySelected} onClick={() => setOnlySelected((value) => !value)}>{onlySelected ? 'すべて見る' : '選んだものだけ見る'}</button>
       </span>
       </div>
       <div className={styles.tpFootActions}>
         <Button disabled={busy} onClick={onCancel}>{readOnly ? '閉じる' : 'キャンセル'}</Button>
-      {readOnly ? null : <Button variant="primary" busy={busy} disabled={busy || Boolean(state) || (maxSelected !== undefined && selected.length > maxSelected) || (!allowEmpty && selected.length === 0)} onClick={() => onConfirm(selected)}>{`この${sep || ' '}${countText}にする`}</Button>}
+      {readOnly ? null : <Button variant="primary" widthReserve="idle" busy={busy} disabled={busy || Boolean(state) || (maxSelected !== undefined && selected.length > maxSelected) || (!allowEmpty && selected.length === 0)} onClick={() => onConfirm(selected)}>{`選ぶ（${countText}）`}</Button>}
     </div>
     </>}
   >
-    <EntityMultiSelect items={maxSelected && selected.length >= maxSelected ? items.map((item) => ({ ...item, disabled: item.disabled || !selected.includes(item.id) })) :items} folders={folders} foldersFailed={foldersFailed} selected={selected} onChange={setSelected} query={query} onlySelected={onlySelected} readOnly={readOnly} busy={busy} state={state} listFooter={listFooter} rowExtra={rowExtra} initialFolder={initialFolder}
-      searchSlot={<SearchField ref={searchRef} aria-label={`${title}：${searchPlaceholder}`} placeholder={searchPlaceholder} value={query} onChange={setQuery} onClear={() => setQuery('')} />} />
+    <EntityMultiSelect items={maxSelected && selected.length >= maxSelected ? allItems.map((item) => ({ ...item, disabled: item.disabled || !selected.includes(item.id) })) :allItems} folders={folders} foldersFailed={foldersFailed} selected={selected} onChange={setSelected} query={query} onlySelected={onlySelected} readOnly={readOnly} busy={busy || createBusy} state={state} listFooter={listFooter} rowExtra={rowExtra} initialFolder={initialFolder} stacked={stacked}
+      searchSlot={<>
+        <SearchField ref={searchRef} aria-label={`${title}：${searchPlaceholder}`} placeholder={searchPlaceholder} value={query} onChange={setQuery} onClear={() => setQuery('')} />
+        {creating && createAction ? <div className={styles.createRow}>
+          <TextField aria-label={createAction.placeholder ?? '新しい名前'} placeholder={createAction.placeholder ?? '名前'} value={newName} invalid={Boolean(createError)} autoFocus
+            onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void runCreate() } }} />
+          <Button busy={createBusy} disabled={createBusy || !newName.trim()} onClick={() => void runCreate()}>作る</Button>
+          <Button disabled={createBusy} onClick={() => { setCreating(false); setNewName(''); setCreateError('') }}>やめる</Button>
+        </div> : null}
+        {createError ? <p className={styles.tpError} role="alert">{createError}</p> : null}
+      </>} />
   </EntityPickerDialog>
 }
 
@@ -416,6 +474,10 @@ type MultiField = FieldBase & {
   rowExtra?: (item: EntityPickerItem) => ReactNode
   /** 欄の補足（既定は名前を「・」でつなぐ）。 */
   summarize?: (items: EntityPickerItem[]) => string
+  /** 窓の頭の「＋〇〇を作る」。 */
+  headerCreate?: MultiProps['createAction']
+  /** 窓の下の段の案内。 */
+  note?: string
 }
 
 /** 欄の1行だけ（窓は呼ぶ側が開く）。一括配信の送るアカウントのように窓を自前で持つ画面が使う。 */
@@ -493,7 +555,7 @@ export function EntityPickerField(props: SingleField | MultiField) {
     {open ? props.multiple
       ? <EntityMultiPickerDialog title={title} description={description} items={items} folders={folders} foldersFailed={foldersFailed} initialIds={props.value} unit={props.unit} state={state} listFooter={props.listFooter} readOnly={readOnly}
         query={props.query} onQueryChange={props.onQueryChange} maxSelected={props.maxSelected}
-        createHref={createHref} createLabel={createLabel} allowEmpty={props.allowEmpty} rowExtra={props.rowExtra} searchPlaceholder={props.searchPlaceholder}
+        createHref={createHref} createLabel={createLabel} createAction={props.headerCreate} note={props.note} allowEmpty={props.allowEmpty} rowExtra={props.rowExtra} searchPlaceholder={props.searchPlaceholder}
         onCancel={close} onConfirm={(ids) => { props.onChange(ids); close() }} />
       : <EntityPickerDialog title={title} description={description} items={items} folders={folders} foldersFailed={foldersFailed} categories={props.categories} initialId={props.value ?? ''} state={state} listFooter={props.listFooter}
         query={props.query} onQueryChange={props.onQueryChange}

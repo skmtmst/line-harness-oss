@@ -259,3 +259,13 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
 }
+
+/*
+ * 店と共有の段の CSS（broadcast-form-v8）が読む --space-4・12・14 は globals に無く 0 になっていた。
+ * ② の除外の箱の文字が枠にくっつき、行どうしが重なり、右上の「スマホ／PC」が切れていた（WjFWW）。統括の ② と見え方の頭だけで値を渡す。
+ */
+.spaceScale {
+  --space-4: var(--tpl-e49-gap-xs);
+  --space-12: var(--tpl-e49-gap-l);
+  --space-14: var(--tpl-e49-gap-section);
+}

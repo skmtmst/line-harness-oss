@@ -101,7 +101,7 @@ describe('QKx8Q 保存した検索の一覧', () => {
   })
 
   it('設計の3つの絞り込みと表の列を画面に置き、絞った結果を一覧に渡す', () => {
-    const toolbar = between(SAVED_LIST, 'toolbar={<>', '<span className={styles.toolbarSpacer}')
+    const toolbar = between(SAVED_LIST, 'toolbar={<>', '<ListToolbarEnd>')
     expect(toolbar).toContain('placeholder="条件名で探す"')
     expect(toolbar).toContain('使っている所：すべて')
     expect(toolbar).toContain('該当人数：すべて')

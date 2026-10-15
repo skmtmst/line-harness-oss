@@ -1042,8 +1042,8 @@ export function TargetStageV8({
           >
             <RefreshCw size={15} aria-hidden="true" />数え直す
           </Button>
+          <span className={styles.countNote} title="数え直しにかかる時間：数秒〜1分（1,000人ごとに約10秒）">数秒〜1分</span>
         </div>
-        <p className={styles.countNote}>数秒〜1分（1,000人ごとに約10秒）</p>
         {recountError ? <p className={styles.fieldNote}>対象者を数え直せませんでした。保存済みの人数を表示しています。</p> : null}
         {validationFailed ? <p className={styles.fieldNote}>公開前チェックを実行できませんでした。人数は未取得のままです。</p> : null}
         <p className={styles.cardNote}>基準日が登録・変更されたときに、対象かどうかを自動で見直します。</p>

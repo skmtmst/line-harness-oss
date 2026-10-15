@@ -138,32 +138,19 @@
   align-items: center;
   gap: var(--tpl-body-gap);
 }
-.conditionSummary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tpl-fa-ed-field-gap);
-  width: var(--tpl-fa-ed-cond-w);
-  max-width: 100%;
-  height: var(--tpl-chip-h);
-  padding: var(--tpl-fa-ed-select-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
+.conditionReadOnly {
+  min-width: 0;
+  overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 500;
-  line-height: var(--tpl-chip-label-lh);
-  cursor: pointer;
-}
-.conditionText {
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.conditionChevron { color: var(--color-ink-secondary); }
+.conditionField {
+  width: var(--tpl-fa-ed-cond-w);
+  min-width: 0;
+  max-width: 100%;
+}
 
 /* 最初に送るもの：選ぶ札（選んだ札は墨の地に白い字）。 */
 .chipRow,

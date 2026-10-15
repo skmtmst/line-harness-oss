@@ -199,6 +199,8 @@
 /* 絵 A0pDt「切り替え」：灰の地に、選んだ所だけ白。 */
 .seg {
   display: inline-flex;
+  /* 縦に並べる欄の中でも、選ぶ部品は中身の幅（絵 A0pDt：言葉の合い方・言葉が2つ以上のとき）。 */
+  align-self: flex-start;
   gap: var(--tpl-compact-gap);
   padding: var(--tpl-compact-gap);
   border-radius: var(--radius-control);

@@ -53,7 +53,7 @@
   margin: 0;
   width: 100%;
   color: var(--color-ink-secondary);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   line-height: var(--tpl-release-404-desc-lh);
 }
 

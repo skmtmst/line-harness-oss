@@ -5120,11 +5120,28 @@ export const AFFILIATES = [
 ]
 
 /** 案件。V8 の板（`h7dmB`）の「案件 4」（公開中 3・下書き 1）。名前・報酬・動きは板どおり。 */
+/* 案件のフォルダ（板 h7dmB）：定期便 2・新商品 1・キャンペーン 1・未分類 0。 */
+export const AFFILIATE_OFFER_FOLDERS = [
+  ['aof-teiki', '定期便', '#3B82F6', 2],
+  ['aof-new', '新商品', '#10B981', 1],
+  ['aof-campaign', 'キャンペーン', '#F59E0B', 1],
+].map(([id, name, color, itemCount], index) => ({
+  id: String(id),
+  kind: 'affiliate_offer',
+  name: String(name),
+  parentId: null,
+  displayOrder: index,
+  itemCount: Number(itemCount),
+  color: String(color),
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-01T00:00:00.000Z',
+}))
+
 export const AFFILIATE_OFFERS = [
-  { id: 'ao-1', name: '定期便の初回', description: '初回の定期便が確定したとき', rewardAmount: 2000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-1', scenarioId: null, isActive: true, createdAt: '2026-09-01T00:00:00.000Z' },
-  { id: 'ao-2', name: '夏の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 0, rewardMiles: 100, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-07-01T00:00:00.000Z' },
-  { id: 'ao-3', name: '資料請求', description: '資料をダウンロードしたとき', rewardAmount: 0, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-06-01T00:00:00.000Z' },
-  { /* 下書き。 */ id: 'ao-4', name: '秋の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-05-01T00:00:00.000Z' },
+  { id: 'ao-1', folderId: 'aof-teiki', name: '定期便の初回', description: '初回の定期便が確定したとき', rewardAmount: 2000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-1', scenarioId: null, isActive: true, createdAt: '2026-09-01T00:00:00.000Z' },
+  { id: 'ao-2', folderId: 'aof-campaign', name: '夏の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 0, rewardMiles: 100, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-07-01T00:00:00.000Z' },
+  { id: 'ao-3', folderId: 'aof-new', name: '資料請求', description: '資料をダウンロードしたとき', rewardAmount: 0, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-06-01T00:00:00.000Z' },
+  { /* 下書き。 */ id: 'ao-4', folderId: 'aof-teiki', name: '秋の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-05-01T00:00:00.000Z' },
 ]
 
 /*
@@ -7386,14 +7403,24 @@ function mileageRewardVersion(requiredMiles, stockLimit, extra = {}) {
   }
 }
 
+/* 使い道のフォルダ（板 S35pO）：クーポン 3・商品 2・体験 0・未分類 0。 */
+export const MILEAGE_REWARD_FOLDERS = [
+  ['mrf-coupon', 'クーポン', '#3B82F6', 3],
+  ['mrf-goods', '商品', '#10B981', 2],
+  ['mrf-experience', '体験', '#F59E0B', 0],
+].map(([id, name, color, itemCount], index) => ({
+  id: String(id), kind: 'mileage_reward', name: String(name), parentId: null, displayOrder: index,
+  itemCount: Number(itemCount), color: String(color), createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+}))
+
 export const MILEAGE_REWARDS = {
   rewards: [
-    { id: 'mr-1', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', benefitName: '送料無料', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
-    { id: 'mr-2', name: '500円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '500円引き', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1000, null), exchangedThisMonth: 18, availableCodeCount: 168 },
-    { id: 'mr-3', name: '1,000円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '1,000円引き', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(1800, null), exchangedThisMonth: 6, availableCodeCount: 94 },
-    { id: 'mr-4', name: '新商品の先行案内', description: 'ふつうより3日早くお知らせします', rewardKind: 'early_access', benefitName: '先行案内', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(3000, null), exchangedThisMonth: 2, availableCodeCount: null },
+    { id: 'mr-1', folderId: 'mrf-coupon', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', benefitName: '送料無料', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
+    { id: 'mr-2', folderId: 'mrf-coupon', name: '500円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '500円引き', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1000, null), exchangedThisMonth: 18, availableCodeCount: 168 },
+    { id: 'mr-3', folderId: 'mrf-coupon', name: '1,000円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '1,000円引き', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(1800, null), exchangedThisMonth: 6, availableCodeCount: 94 },
+    { id: 'mr-4', folderId: 'mrf-goods', name: '新商品の先行案内', description: 'ふつうより3日早くお知らせします', rewardKind: 'early_access', benefitName: '先行案内', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(3000, null), exchangedThisMonth: 2, availableCodeCount: null },
     // 引換コードを数える経路がまだ無い使い道。**残りを 0 と書かない。**
-    { id: 'mr-5', name: 'オリジナルトートバッグ', description: '数量に限りがあります', rewardKind: 'template', benefitName: '発送先の確認メッセージ', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(5000, 12), exchangedThisMonth: 0, availableCodeCount: 12 },
+    { id: 'mr-5', folderId: 'mrf-goods', name: 'オリジナルトートバッグ', description: '数量に限りがあります', rewardKind: 'template', benefitName: '発送先の確認メッセージ', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(5000, 12), exchangedThisMonth: 0, availableCodeCount: 12 },
   ].map((reward) => ({
     lineAccountId: 'visual-qa-account', programId: 'mp-1', imageUrl: null,
     currentDraftVersionId: null, currentPublishedVersionId: reward.currentVersion.id,

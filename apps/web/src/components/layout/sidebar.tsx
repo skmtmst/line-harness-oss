@@ -26,7 +26,7 @@ import {
 import styles from './sidebar.module.css'
 import {
   Bell, CalendarCheck, CalendarCog, Clipboard, ClipboardList, Clock, FileText, Folder, House, Inbox,
-  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Type, UserPlus, Users, Video, type LucideIcon,
+  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Trophy, Type, UserPlus, Users, Video, type LucideIcon,
 } from 'lucide-react'
 
 /*
@@ -53,6 +53,7 @@ const V8_NAV_ICONS: Record<string, LucideIcon> = {
   'booking-menus': CalendarCog,
   events: Ticket,
   'booking-own-shifts': Clock,
+  affiliates: Trophy,
 }
 
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
@@ -132,14 +133,21 @@ export { isHqShellPath }
  * 巻く領域（左メニューの項目の並び）の中で、項目が上下とも見える所まで巻く。
  * scrollIntoView は外のページまで巻くので使わない。上下に 8px の余裕を残す。
  */
-export function revealInScroller(scroller: HTMLElement, item: HTMLElement, margin = 8) {
+export function revealInScroller(scroller: HTMLElement, item: HTMLElement, margin = 8, anchor?: HTMLElement | null) {
   const box = scroller.getBoundingClientRect()
   const rect = item.getBoundingClientRect()
   if (box.height === 0 || rect.height === 0) return
   if (rect.top < box.top + margin) {
     scroller.scrollTop -= box.top + margin - rect.top
   } else if (rect.bottom > box.bottom - margin) {
-    scroller.scrollTop += rect.bottom - (box.bottom - margin)
+    /*
+     * 下へ巻くとき、項目の下端だけで合わせると上の端で見出しや行が半分に切れる（ziSgL の「メイン」）。
+     * 項目の組（anchor）の頭を上端に置いても項目が見えるなら、組の頭で止める。
+     */
+    const anchorTop = anchor?.getBoundingClientRect().top
+    const toAnchor = anchorTop === undefined ? null : anchorTop - (box.top + margin)
+    const toItem = rect.bottom - (box.bottom - margin)
+    scroller.scrollTop += toAnchor !== null && toAnchor >= toItem && rect.bottom - toAnchor <= box.bottom - margin ? toAnchor : toItem
   }
 }
 
@@ -693,7 +701,7 @@ export default function Sidebar({
       for (const root of [desktopRef.current, drawerRef.current]) {
         const nav = root?.querySelector<HTMLElement>('[data-sidebar-scroll]')
         const item = nav?.querySelector<HTMLElement>('[data-nav-active]')
-        if (nav && item) revealInScroller(nav, item)
+        if (nav && item) revealInScroller(nav, item, 8, item.closest<HTMLElement>(`.${styles.section}`))
       }
     }
     const frame = requestAnimationFrame(reveal)

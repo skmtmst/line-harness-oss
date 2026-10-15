@@ -205,7 +205,7 @@ describe('R280 成果地点の操作メニューは1つだけ', () => {
     })
     await act(async () => { await Promise.resolve() })
     expect(document.body.querySelector('[data-design-part="detail-panel"]')).not.toBeNull()
-    expect(document.body.textContent).toContain('今月の成果：')
+    expect(document.body.textContent).toContain('今月の成果')
   })
 })
 
