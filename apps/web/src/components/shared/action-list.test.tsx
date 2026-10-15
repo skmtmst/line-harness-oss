@@ -46,7 +46,7 @@ describe('B-169 行うことの共通部品', () => {
     const dialog = screen.getByRole('dialog')
     const checks = within(dialog).getAllByRole('checkbox')
     fireEvent.click(checks.find(input => input.getAttribute('aria-label')?.includes('予約')) ?? checks[0])
-    fireEvent.click(within(dialog).getByRole('button', { name: 'この 1件にする' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' }))
     expect(data()).toHaveLength(1)
     expect(data()[0].text).toContain('t1')
   })

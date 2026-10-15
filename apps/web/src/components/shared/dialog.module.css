@@ -70,6 +70,12 @@
 }
 
 /* 見出しと右上の×を1行に並べる。中身は今までどおり縦に積む。 */
+.headerAction {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
 .headerRow {
   display: flex;
   /* R283: 中身が長くても見出し行は縮めない（上に固定）。 */

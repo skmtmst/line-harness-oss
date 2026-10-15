@@ -452,6 +452,9 @@
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
 :global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
+/* 表を道具の段と同じ内側に置く板（YMVFD）。表は左右24の内側、ページ送りの中身はその表の内側24。 */
+:global(:root) .listBody[data-table-inset] .content { padding-inline: var(--tpl-list-inset); }
+:global(:root) .listBody[data-table-inset] .pagination { padding-inline: calc(var(--tpl-list-inset) * 2); }
 :global(:root) .listBody .paginationRow,
 :global(:root) .listBody .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-16); }
 :global(:root) [data-list-skeleton] .pagination > :only-child { flex: 1; min-width: 0; }

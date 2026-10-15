@@ -131,7 +131,7 @@ describe('対象の友だちの複数選択（R22）', () => {
     expect(document.body.textContent).toContain('山田 花子')
     await click(document.querySelector('input[type="checkbox"][aria-label="山田 花子"]')!)
     expect(onChange).not.toHaveBeenCalled()
-    const add = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'この 1件にする')
+    const add = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === '選ぶ（1件）')
     if (!add) throw new Error('追加ボタンが見つかりません')
     await click(add)
     expect(onChange).toHaveBeenCalledWith(['friend-1'], { 'friend-1': '山田 花子' })

@@ -1265,7 +1265,7 @@ export default function TemplatesListV8() {
           <DialogChoiceCards choices={KIND_CARDS.map(card => ({
             key: card.key, title: card.title, icon: <card.icon size={16} />,
             description: card.desc, notes: [card.useFor, card.cannot], href: card.href,
-          }))} onChoose={href => { setPickerOpen(false); router.push(href) }} />
+          }))} columns={4} onChoose={href => { setPickerOpen(false); router.push(href) }} />
           {examplesError?<ListState kind="error" title="見本を読み込めませんでした" onRetry={()=>setExamplesRetry(value=>value+1)}/>:null}
           {examples && examples.length > 0 ? (
             <section className={styles.examples} aria-label="見本から作る">
