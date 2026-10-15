@@ -18,7 +18,8 @@
 /* ===== 競合の帯（頭の下・左右の列をまたぐ） ===== */
 
 .conflictRow {
-  padding: 0 var(--tpl-bm-24) var(--tpl-bm-8);
+  /* 余白は型の notice の口が持つ。 */
+  padding: 0;
 }
 
 .conflictBand {

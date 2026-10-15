@@ -939,13 +939,14 @@ export default function MenuFormV8() {
         preview={previewContent}
         previewToggle={<PreviewLauncher title="お客さまの予約画面" label="お客さまの予約画面を見る">{previewContent}</PreviewLauncher>}
        title={editTarget ? '予約メニューを直す' : '予約メニューを作る'}
-        help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>} >
+        help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>}
+        /* 競合の帯は本文と右の欄をまたいで上に出す（絵 v5L19Z）。 */
+        notice={conflict ? (
+          <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
+            <SaveConflictBand title={`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`} onCompare={() => setComparing(true)} onReload={() => void reloadLatest()} />
+          </div>
+        ) : undefined} >
 
-      {conflict && (
-        <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
-          <SaveConflictBand title={`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`} onCompare={() => setComparing(true)} onReload={() => void reloadLatest()} />
-        </div>
-      )}
 
           {/* ① メニューの中身 */}
           <Card variant="form" gap="normal">
