@@ -83,7 +83,7 @@ export async function notifyAffiliate(db: D1Database, env: AffiliateNotifierEnv,
   try {
     await pushAffiliate(db, env, affiliateId, text);
   } catch (err) {
-    console.error('notifyAffiliate failed (non-blocking):', err);
+    console.error(JSON.stringify({"code":"services_affiliate_notifier_failed"}));
   }
 }
 

@@ -7,6 +7,13 @@ import { api } from './api.js';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('本人の予約履歴と変更のAPI', () => {
+  test.each(['normal','waitlist'])('REV-H2: %sの支払い必須応答に記録がないと完了させない', async kind => {
+    vi.stubGlobal('window', {location:{origin:'https://example.test'}});
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({booking_id:'b',status:'requested',payment_required:true})));
+    const body = {menu_id:'m',staff_id:'s',starts_at:'2099-01-01T01:00:00Z'};
+    await expect(kind==='normal' ? api.createRequest(body,'key') : api.acceptWaitlist({...body,waitlist_id:'w'},'key'))
+      .rejects.toThrow('booking_payment_unavailable');
+  });
   test('履歴の版を変更・取消へ送り、本人確認とLIFF IDを付ける', async () => {
     vi.stubGlobal('window', { location: { origin: 'https://example.test' } });
     const history = {

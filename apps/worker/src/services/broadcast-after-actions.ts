@@ -73,7 +73,7 @@ export async function sweepBroadcastAfterActions(
       total.done += result.done;
       total.failed += result.failed;
     } catch (error) {
-      console.error(`[broadcast-after-actions] sweep failed broadcast=${row.broadcast_id}`, error);
+      console.error(JSON.stringify({"code":"services_broadcast_after_actions_failed"}));
     }
   }
   return total;

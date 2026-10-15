@@ -1,4 +1,9 @@
 'use client'
+import { isConflict } from './cta-errors'
+export { isConflict } from './cta-errors'
+
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import Card from '@/components/shared/card'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Play, Plus } from 'lucide-react'
@@ -17,11 +22,13 @@ import TapActionField from '@/components/shared/tap-action-field'
 import type { TapActionKind } from '@/lib/tap-actions'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
+import { buildCompareRows } from './cta-compare'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { ErrorCountBadge } from '@/components/shared/error-count-badge'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import { ReadValue } from './parts'
+import { cardFieldProblems, fmtMinSec, parseMinSec } from './cta-validation'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './cta.module.css'
@@ -36,41 +43,15 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * ★V8 ウェビナーの ③CTA・フォーム（Pencil Q0Jrk・同時編集の帯 pvimJ）。
  * CTA カードの並び（時刻・見出し・種類・「…」）→ 選んでいるカードの中身 → 申込に使う回答フォーム。
  * 右はカードの見え方。
- * 口・保存前の確かめ・同時編集（409）の扱いは app/webinars/edit/cta-v8.tsx と同じ（BEHAVIOR.md）。
+ * 口・保存前の確かめ・同時編集（409）の扱いは BEHAVIOR.md。
  */
 
 type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'; items: Array<{ id: string; name: string; isActive: boolean }> }
 
-function fmtMinSec(total: number): string {
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
-}
-function parseMinSec(text: string): number | null {
-  const match = /^(\d{1,4}):([0-5]?\d)$/.exec(text.trim())
-  return match ? Number(match[1]) * 60 + Number(match[2]) : null
-}
 /** CTA の押したら：URL を開く・回答フォーム。 */
 const WEBINAR_CTA_KINDS: readonly TapActionKind[] = ['uri', 'form']
 const EMPTY_CARD = (atSeconds: number): WebinarCtaCard => ({ atSeconds, kind: 'form', title: '', body: null, buttonLabel: '', autoOpen: false, formId: null, url: null })
 
-/** 1枚のカードの欄ごとの誤り（B-139）。欄の真下に出すので「n枚目」は付けない。 */
-function cardFieldProblems(card: WebinarCtaCard, time: string, durationSeconds: number): { time: string | null; title: string | null; button: string | null; link: string | null } {
-  const at = parseMinSec(time)
-  const url = card.url?.trim() ?? ''
-  return {
-    time: at === null
-      ? '出す時刻は 分:秒 で入れてください（例：45:00）'
-      : durationSeconds > 0 && at > durationSeconds ? `出す時刻が動画の長さ（${Math.floor(durationSeconds / 60)}分）を超えています。動画の中の時刻に直してください` : null,
-    title: card.title?.trim() ? null : 'カードの見出しを入れてください',
-    button: card.buttonLabel?.trim() ? null : 'ボタンに出す文字を入れてください',
-    link: card.kind === 'form'
-      ? (card.formId ? null : '公開中のフォームを選ぶか、種類を URL へ変えてください')
-      : !url ? 'https:// から始まる URL を入れてください' : !/^https:\/\//.test(url) ? 'URL は https:// で始めてください（http は使えません）' : null,
-  }
-}
-
-function isConflict(cause: unknown): boolean {
-  return cause instanceof ApiError && cause.status === 409 && (!cause.code || /version_conflict/i.test(cause.code))
-}
 
 export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
   const saveErrors = useSaveFormErrors()
@@ -90,6 +71,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const [forms, setForms] = useState<FormCandidates>({ state: 'idle', items: [] })
   const [registrationError, setRegistrationError] = useState('')
   const [conflict, setConflict] = useState(false)
+  const [conflictScope, setConflictScope] = useState<'cards' | 'form'>('cards')
   const [latest, setLatest] = useState<{ editor: WebinarEditor; ctas: WebinarCtaCard[] | null } | null>(null)
   const [compareOpen, setCompareOpen] = useState(false)
   const [reading, setReading] = useState(false)
@@ -162,7 +144,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const fields = useFormErrors()
   ;(ctas ?? []).forEach((card, i) => {
     const check = () => cardFieldProblems(card, times[i] ?? '', webinar.durationSeconds)
-    const opts = { reveal: () => setSelected(i), group: `card-${i}` }
+    const opts = { required: true, reveal: () => setSelected(i), group: `card-${i}` }
     fields.define(`cta-${i}-title`, `カード${i + 1}の見出し`, () => check().title, opts)
     fields.define(`cta-${i}-time`, `カード${i + 1}の出す時刻`, () => check().time, opts)
     fields.define(`cta-${i}-button`, `カード${i + 1}のボタンの言葉`, () => check().button, opts)
@@ -185,7 +167,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause);
 
-      if (isConflict(cause)) { setConflict(true); setLatest(null); return false }
+      if (isConflict(cause)) { setConflictScope('cards'); setConflict(true); setLatest(null); return false }
       { if (!fieldFailure)
       setMessage('CTA カードを保存できませんでした。入力は残っています。もう一度保存してください。') }
       return false
@@ -207,7 +189,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause);
 
-      if (isConflict(cause)) { setConflict(true); setLatest(null); return false }
+      if (isConflict(cause)) { setConflictScope('form'); setConflict(true); setLatest(null); return false }
       if (cause instanceof ApiError && ['form_inactive_or_missing', 'form_account_mismatch'].includes(cause.code ?? '')) loadForms()
       { if (!fieldFailure)
       setRegistrationError(webinarErrorText(cause, '申込フォームを保存できませんでした。入力は残っています。')) }
@@ -217,15 +199,17 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
 
   const cardsDirty = savedCards !== null && JSON.stringify([ctas, times]) !== savedCards
   const formDirty = registrationFormId !== savedForm
+  const formsReadyForSave = forms.state === 'ready' || (forms.state === 'error' && !formDirty && ctas !== null && ctas.every(card => card.kind !== 'form'))
+  const canSave = !readOnly && ctas !== null && formsReadyForSave && !conflict
   const saveCurrent = useRef<() => Promise<boolean>>(async () => false)
   saveCurrent.current = async () => {
-    if (readOnly || ctas === null || lock.current || conflict) return false
+    if (!canSave || lock.current) return false
+    if (fields.submit().length > 0) { setMessage(null); return false }
     lock.current = true
     setSaving(true)
     try {
-      if (!(await saveCards())) return false
       if (formDirty && !(await saveForm())) return false
-      return true
+      return await saveCards()
     } finally {
       lock.current = false
       setSaving(false)
@@ -234,12 +218,12 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   useEffect(() => { onDirtyChange(cardsDirty || formDirty) }, [cardsDirty, formDirty, onDirtyChange])
   useEffect(() => () => onDirtyChange(false), [onDirtyChange])
   useEffect(() => {
-    if (readOnly) { registerSave(null); return }
+    if (!canSave) { registerSave(null); return }
     registerSave(() => saveCurrent.current())
     return () => registerSave(null)
-  }, [registerSave, readOnly])
+  }, [registerSave, canSave])
 
-  /* 同時編集：最新を読んで見比べる → 最新を読み込んで続ける（自分のカードの入力は残さない／申込フォームは最新へ）。 */
+  /* 同時編集：申込フォームだけの競合ではカードの入力を残す。カード自体の競合は確認して最新版へ置き換える。 */
   const readLatest = async () => {
     if (reading) return
     setReading(true)
@@ -266,7 +250,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     setConflict(false)
     setLatest(null)
     setCompareOpen(false)
-    await loadCtas()
+    if (conflictScope === 'cards') await loadCtas()
   }
 
   const currentIndex = ctas === null ? 0 : Math.min(selected, Math.max(ctas.length - 1, 0))
@@ -276,7 +260,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const busy = saving || reading
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       boardId={conflict ? 'pvimJ' : 'Q0Jrk'}
       title={chrome.title}
       actions={chrome.actions}
@@ -301,13 +285,13 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
           <div className={styles.ctaCard}>
             <p className={styles.ctaTitle}>{current?.title || '（見出しなし）'}</p>
             {current?.body ? <p className={styles.ctaBody}>{current.body}</p> : null}
-            <p className={styles.ctaButton}>{current?.buttonLabel || 'ボタン'}</p>
+            {current?.buttonLabel.trim() ? <p className={styles.ctaButton} title="動画の下にボタンが出ます。">{current.buttonLabel}</p> : null}
           </div>
         </div>
       </>}
     >
 
-      <section className={form.card} data-gap="tight" aria-labelledby="webinar-cta-title" data-wc-pane="cta">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-cta-title" data-wc-pane="cta">
         <div className={form.cardHeadRow}><h2 id="webinar-cta-title" className={form.cardTitle}>{ctas === null ? 'CTA カード' : `CTA カード ${ctas.length} 枚`}</h2></div>
         <p className={styles.desc}>動画の途中で出す申し込みボタンです。出す時刻は 分:秒 で入れます。</p>
         {message ? <Notice tone="danger">{message}</Notice> : null}
@@ -341,16 +325,16 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
             <fieldset className={styles.editor} disabled={busy}>
               {/* 閲覧のみ：文字の欄は読み取りだけ、選ぶ部品は選んでいる値を文字で見せる（2026-10-06 オーナー決定）。 */}
               <p className={styles.editorTitle}>{`選んでいるカード：${times[currentIndex] ?? fmtMinSec(current.atSeconds)}`}</p>
-              <div className={form.pair}>
-                <div className={form.field}><Field label="見出し" htmlFor="cta-title"><SaveErrorField names={["title","current.title"]}><TextField {...fields.bind(`cta-${currentIndex}-title`)} id="cta-title" value={current.title} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-title`)} aria-describedby={errId('title')} onChange={(event) => update(currentIndex, { title: event.target.value })} /></SaveErrorField>
+              <SettingsFormRow layout="columns">
+                <div className={form.field}><Field label="見出し" htmlFor="cta-title" requirement={fields.requirement(`cta-${currentIndex}-title`)}><SaveErrorField names={["title","current.title"]}><TextField {...fields.bind(`cta-${currentIndex}-title`)} id="cta-title" value={current.title} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-title`)} aria-describedby={errId('title')} onChange={(event) => update(currentIndex, { title: event.target.value })} /></SaveErrorField>
 <FieldError id="cta-title-error">{fields.error(`cta-${currentIndex}-title`)}</FieldError></Field></div>
-                <div className={form.field}><Field label="出す時刻（分:秒）" htmlFor="cta-time"><SaveErrorField names={["times"]}><TextField {...fields.bind(`cta-${currentIndex}-time`)} id="cta-time" value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" invalid={fields.invalid(`cta-${currentIndex}-time`)} aria-describedby={errId('time')} onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /></SaveErrorField>
+                <div className={form.field}><Field label="出す時刻（分:秒）" htmlFor="cta-time" requirement={fields.requirement(`cta-${currentIndex}-time`)}><SaveErrorField names={["times"]}><TextField {...fields.bind(`cta-${currentIndex}-time`)} id="cta-time" value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" invalid={fields.invalid(`cta-${currentIndex}-time`)} aria-describedby={errId('time')} onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /></SaveErrorField>
 <FieldError id="cta-time-error">{fields.error(`cta-${currentIndex}-time`)}</FieldError></Field></div>
-              </div>
-              <div className={form.field}><Field label="ボタンの言葉" htmlFor="cta-button"><SaveErrorField names={["buttonLabel","current.buttonLabel","button_label","current.button_label"]}><TextField {...fields.bind(`cta-${currentIndex}-button`)} id="cta-button" value={current.buttonLabel} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-button`)} aria-describedby={errId('button')} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /></SaveErrorField>
+              </SettingsFormRow>
+              <div className={form.field}><Field label="ボタンの言葉" htmlFor="cta-button" requirement={fields.requirement(`cta-${currentIndex}-button`)}><SaveErrorField names={["buttonLabel","current.buttonLabel","button_label","current.button_label"]}><TextField {...fields.bind(`cta-${currentIndex}-button`)} id="cta-button" value={current.buttonLabel} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-button`)} aria-describedby={errId('button')} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /></SaveErrorField>
 <FieldError id="cta-button-error">{fields.error(`cta-${currentIndex}-button`)}</FieldError></Field></div>
               <div className={form.field}>
-                <span className={form.labelSmall}>押したら</span>
+                <Field label="押したら" errorId="cta-link-error" requirement={fields.requirement(`cta-${currentIndex}-link`)} error={fields.error(`cta-${currentIndex}-link`)} errorFrame>
                 {/*
                   押したらの共通の欄（TapActionField・YPzmo）。ウェビナーの視聴ページの CTA なので URL と回答フォームの2つだけ
                   （回答フォームは視聴ページの中で開くので LIFF は要らない）。保存の形（kind・formId・url）は今のまま。
@@ -373,7 +357,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
                     sources={forms.state === 'ready' ? { form: forms.items.map((item) => ({ id: item.id, name: item.name, note: item.isActive ? '公開中' : '公開していません', disabled: !item.isActive })) } : undefined}
                   /></SaveErrorField>
                 </div>
-                <FieldError id="cta-link-error">{fields.error(`cta-${currentIndex}-link`)}</FieldError>
+                </Field>
               </div>
               <div className={styles.toggleRow}>
                 {readOnly ? null : <SaveErrorField names={["autoOpen","current.autoOpen","auto_open","current.auto_open"]}><SettingCheckbox checked={current.autoOpen} label="ボタンを押したら、フォームを自動で開く" onChange={(next) => update(currentIndex, { autoOpen: next })} /></SaveErrorField>}
@@ -382,16 +366,16 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
             </fieldset>
           ) : null}
         </>}
-      </section>
+      </Card>
 
-      <section className={form.card} data-gap="tight" aria-labelledby="webinar-regform-title">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-regform-title">
         <div className={form.cardHeadRow}><h2 id="webinar-regform-title" className={form.cardTitle}>申込に使う回答フォーム</h2></div>
         <p className={styles.desc}>申し込みのときに答えてもらうフォームです。公開中のフォームから1つ選びます。</p>
         <div className={form.field}>
           <span className={form.labelSmall}>申込フォーム</span>
           {forms.state === 'ready' ? (
             <div className={styles.formSelect}>
-              {readOnly ? <ReadValue label="申込に使う回答フォーム">{editor.publicPage.form?.name ?? formName(registrationFormId)}</ReadValue> : <SaveErrorField names={["registrationFormId"]}><EntityKindField kind="form" label="申込に使う回答フォーム" options={formRows(registrationFormId)} meta={formMeta} accountId={accountId} value={registrationFormId} disabled={busy || conflict} invalid={Boolean(registrationFormId) && !published.some((item) => item.id === registrationFormId)} onChange={setRegistrationFormId} /></SaveErrorField>}
+              {readOnly ? <ReadValue label="申込に使う回答フォーム">{editor.publicPage.form?.name ?? formName(registrationFormId)}</ReadValue> : <SaveErrorField names={["registrationFormId"]}><EntityKindField kind="form" label="申込に使う回答フォーム" options={formRows(registrationFormId)} meta={formMeta} accountId={accountId} value={registrationFormId} disabled={busy || conflict} disabledReason={conflict ? 'ほかの人が更新しました。最新の内容を読み込んでください。' : busy ? '処理中です。完了してから操作してください。' : undefined} invalid={Boolean(registrationFormId) && !published.some((item) => item.id === registrationFormId)} onChange={setRegistrationFormId} /></SaveErrorField>}
             </div>
           ) : forms.state === 'loading' ? <p className={form.cardNote}>回答フォームを読み込んでいます。</p>
             : forms.state === 'forbidden' ? <p className={form.cardNote}>{permissionDeniedMessage('store')}</p>
@@ -401,21 +385,15 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         {forms.state === 'ready' && published.length === 0 ? <p className={form.cardNote}>公開中の回答フォームがありません。</p> : null}
         {forms.state === 'ready' && registrationFormId && !published.some((item) => item.id === registrationFormId) ? <p className={form.fieldError} role="alert">前に選んだフォームは使えなくなりました。公開中のフォームを選び直してください。</p> : null}
         {registrationError ? <p className={form.fieldError} role="alert">{registrationError}</p> : null}
-      </section>
+      </Card>
 
-      <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description="保存されている最新の CTA カードと申込フォームに置き換えます。この画面で直したところは消えます。" confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={() => acceptLatest()} />
+      <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description={conflictScope === 'form' ? '申込フォームを保存されている最新版に置き換えます。CTA カードの入力は残します。' : '保存されている最新の CTA カードと申込フォームに置き換えます。この画面で直したところは消えます。'} confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={() => acceptLatest()} />
       {compareOpen && latest ? (
-        <Dialog open title="違いを比べる" description="左がこの画面の入力、右が保存されている最新です。" confirmLabel="最新を読み込んで続ける" onConfirm={() => acceptLatest()} onCancel={() => setCompareOpen(false)}>
+        <Dialog open title="違いを比べる" description="左がこの画面の入力、右が保存されている最新です。" confirmLabel="最新を読み込んで続ける" onConfirm={() => { setCompareOpen(false); setReplaceConfirm(true) }} onCancel={() => setCompareOpen(false)}>
           <DataTable className={styles.compare}>
             <thead><TableHeadRow><Th>項目</Th><Th>この画面</Th><Th>最新</Th></TableHeadRow></thead>
             <tbody>
-              <Tr><Td>申込フォーム</Td><Td>{formName(registrationFormId)}</Td><Td>{latest.editor.publicPage.form?.name ?? formName(latest.editor.registrationFormId)}</Td></Tr>
-              {Array.from({ length: Math.max(ctas?.length ?? 0, latest.ctas?.length ?? 0) }, (_, i) => {
-                const mine = ctas?.[i]
-                const theirs = latest.ctas?.[i]
-                const describe = (card: WebinarCtaCard | undefined, time?: string) => (card ? `「${card.title || '（見出しなし）'}」／${time ?? fmtMinSec(card.atSeconds)}から` : '（なし）')
-                return <Tr key={i}><Td>{`カード${i + 1}`}</Td><Td>{describe(mine, times[i])}</Td><Td>{latest.ctas ? describe(theirs) : emptyValue('unknown')}</Td></Tr>
-              })}
+              {buildCompareRows({ formName: formName(registrationFormId), cards: ctas ?? [], times }, latest.editor.publicPage.form?.name ?? formName(latest.editor.registrationFormId), latest.ctas).map(row => <Tr key={row.key}><Td>{row.label}</Td><Td>{row.mine}</Td><Td>{row.theirs}</Td></Tr>)}
             </tbody>
           </DataTable>
         </Dialog>

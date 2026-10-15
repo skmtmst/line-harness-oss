@@ -5,12 +5,13 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
-const PAGE = read('page.tsx')
+const PAGE = read('../../v8/templates/list.tsx')
 /** 注釈を落とす。「テンプレートと書かない」の説明が自分の見張りに当たらないように。 */
 const withoutComments = (src: string) =>
   src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 const PANEL = read('../../components/shared/folder-panel.tsx')
 const PANEL_CODE = withoutComments(PANEL)
+const ROW_ACTIONS = read('../../components/shared/folder-row-actions.tsx')
 const DIALOG = read('../../components/shared/folder-add-dialog.tsx')
 
 /**
@@ -76,7 +77,8 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     expect(PANEL).toContain('if (row.onMoveUp)')
     expect(PANEL).toContain('if (row.onDelete)')
     // V8（nH0fZ）は吹き出しを出さず確認の窓で読ませる。v7 は今までどおり但し書きを出す。
-    expect(PANEL).toContain('note={v8 ? undefined : row.deleteNote}')
+    expect(PANEL_CODE).not.toContain('note={row.deleteNote}')
+    expect(ROW_ACTIONS).toContain('description={deleteFolderDescription(itemLabel, deletingCount)}')
   })
 
   it('名前と色を直す窓は、追加と同じ窓を使う', () => {
@@ -96,8 +98,8 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
   it('詳細から置き場を移せる', () => {
     expect(PAGE).not.toContain('テンプレートをフォルダへ移す操作は、まだ繋がっていません。')
     expect(PAGE).not.toContain('<Th>置き場</Th>')
-    expect(PAGE).toContain('aria-label="置き場"')
-    expect(PAGE).toContain('api.templates.update(template.id, { folderId })')
+    expect(PAGE).toContain('aria-label="移動先のフォルダ"')
+    expect(PAGE).toContain('api.templates.update(id, { folderId })')
   })
 
   /*
@@ -105,12 +107,15 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     断られたとき（消えたフォルダを指したなど）に、移っていないものが
     移ったように見えたままになる。
   */
-  it('移せたと分かってから一覧を書き換える', () => {
-    const move = PAGE.slice(PAGE.indexOf('const moveTemplate'), PAGE.indexOf('const removeFolder'))
-    expect(move.indexOf('if (!res.success)')).toBeLessThan(move.indexOf('setTemplates('))
+  it('移動の失敗では一覧を戻し、サーバーの状態を読み直す', () => {
+    const move = PAGE.slice(PAGE.indexOf('const runMove'), PAGE.indexOf('const runDuplicate'))
+    expect(move).toContain('if (!result.success) failed += 1')
+    expect(move).toContain('revert: () => {')
+    expect(move).toContain('setTemplates(previous)')
+    expect(move).toContain('Promise.all([load(), loadFolders()])')
   })
 
   it('移しているテンプレートは二重に押させない', () => {
-    expect(PAGE).toContain('disabled={movingId === drawerData.id}')
+    expect(PAGE).toContain('disabled={moving}')
   })
 })

@@ -9,7 +9,7 @@
   min-width: 0;
   margin-bottom: var(--tpl-nph-tab-pull);
 }
-:global([data-theme='v8']) .tabs [role='tab'] {
+:global(:root) .tabs [role='tab'] {
   box-sizing: border-box;
   height: var(--tpl-nph-tab-h);
   min-height: 0;
@@ -56,7 +56,7 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+:global(:root) .table .headRow[data-table-layout='columns'] {
   display: flex;
   align-items: center;
   gap: var(--tpl-nph-col-gap);
@@ -66,7 +66,7 @@
   background: var(--color-table-head);
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+:global(:root) .table .row[data-table-layout='columns'] {
   gap: var(--tpl-nph-col-gap);
   box-sizing: border-box;
   height: var(--tpl-nph-row-h);
@@ -74,8 +74,8 @@
   border-bottom: 0;
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+:global(:root) .table .headRow[data-table-layout='columns'] > th,
+:global(:root) .table .row[data-table-layout='columns'] > td {
   flex-shrink: 0;
   min-width: 0;
   height: auto;
@@ -84,18 +84,18 @@
   box-shadow: none;
   line-height: normal;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+:global(:root) .table .headRow[data-table-layout='columns'] > th {
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);
   font-weight: 600;
   white-space: nowrap;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colProduct,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colProduct {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colProduct,
+:global(:root) .table .row[data-table-layout='columns'] > td.colProduct {
   flex: 1 1 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colWeight,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colWeight {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colWeight,
+:global(:root) .table .row[data-table-layout='columns'] > td.colWeight {
   padding-right: var(--tpl-nph-num-pad-end);
   text-align: right;
 }
@@ -173,13 +173,13 @@
 
 /* 1152（白い板が 1100 未満）：年齢・避妊去勢・運動量を隠し、年齢は種類の後ろへ。道具は探す欄だけで1段。 */
 @container v8-page (max-width: 1099px) {
-  :global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > :is(th.colAge, th.colNeutered, th.colActivity),
-  :global([data-theme='v8']) .table .row[data-table-layout='columns'] > :is(td.colAge, td.colNeutered, td.colActivity) {
+  :global(:root) .table .headRow[data-table-layout='columns'] > :is(th.colAge, th.colNeutered, th.colActivity),
+  :global(:root) .table .row[data-table-layout='columns'] > :is(td.colAge, td.colNeutered, td.colActivity) {
     display: none;
   }
   .colFeed { width: var(--tpl-nph-col-feed-narrow); }
   /* 狭い列の補足（種類・年齢、目安の注記）は絵どおり2行に折る。行は中身なりに伸びる（最低 56）。 */
-  :global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  :global(:root) .table .row[data-table-layout='columns'] {
     height: auto;
     min-height: var(--tpl-nph-row-h);
   }
@@ -211,26 +211,6 @@
   width: var(--tpl-nph-menu-size);
   height: var(--tpl-nph-menu-size);
 }
-/* 「…」は共通の RowMenu。今の見た目（枠・大きさ・地）を共通の印ボタンより強く当てる。 */
-.menuBox > button.menuButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-nph-menu-size);
-  height: var(--tpl-nph-menu-size);
-  flex: 0 0 var(--tpl-nph-menu-size);
-  padding: 0;
-  border: 1px solid var(--color-hairline);
-  outline: 0;
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-}
-.menuBox > button.menuButton:hover {
-  background: var(--color-table-head);
-}
-
 /* 表の下（件数・ヒント）。 */
 .pagerRow {
   padding: var(--tpl-nph-pager-pad);

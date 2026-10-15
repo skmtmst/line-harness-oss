@@ -2,10 +2,20 @@
 import React, { act, useState } from 'react'
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { EntityMultiPickerDialog, EntityPickerField, type EntityPickerItem } from './entity-picker'
+import { EntityPickerDialog, EntityMultiPickerDialog, EntityPickerField, type EntityPickerItem } from './entity-picker'
 // @vitest-environment happy-dom
 
 afterEach(cleanup)
+
+it('単一候補の確定を止める理由を示し、選ぶだけでは反映しない', () => {
+  const confirm = vi.fn()
+  render(<EntityPickerDialog title="テンプレートを選ぶ" items={[{ id: 'a', name: '返信' }]} onCancel={() => {}} onConfirm={confirm} />)
+  expect(screen.getByRole('button', { name: '選ぶ' }).title).toContain('候補を選んで')
+  fireEvent.click(screen.getByRole('radio', { name: '返信' }))
+  expect(confirm).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+  expect(confirm).toHaveBeenCalledWith('a')
+})
 
 const folders = [{ id: 'f1', name: 'アンケート', color: '#3b82f6' }, { id: 'f2', name: '予約の前', color: '#22c55e' }]
 const items: EntityPickerItem[] = [
@@ -23,6 +33,18 @@ function Single({ initial = '', readOnly = false, onChange = vi.fn() }: { initia
 }
 
 describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
+  it('項目名を欄に残しても窓の候補名と確定するIDは変えない', async () => {
+    const onChange = vi.fn()
+    render(<EntityPickerField label="担当者" noun="担当者" items={items} value="a" valuePrefix="担当者：" onChange={onChange} />)
+    expect(screen.getByText('担当者：来店アンケート')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '担当者：変える' }))
+    const dialog = await screen.findByRole('dialog', { name: '担当者を選ぶ' })
+    expect(within(dialog).queryByText('担当者：来店アンケート')).toBeNull()
+    fireEvent.click(within(dialog).getByRole('radio', { name: '初回カウンセリング' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+    expect(onChange).toHaveBeenCalledWith('b')
+  })
+
   it('欄は空なら［選ぶ］、選ぶと名前とフォルダ＋［変える］。窓の中で押しただけでは変わらない', async () => {
     const onChange = vi.fn()
     render(<Single onChange={onChange} />)

@@ -7,8 +7,6 @@
 .name { margin: 0; font-size: var(--tpl-title-size); line-height: var(--tpl-title-lh); font-weight: var(--tpl-title-weight); color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sub { margin: 0; font-size: var(--tpl-fdt-sub-size); line-height: var(--tpl-fdt-sub-lh); color: var(--color-ink-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menuAnchor { position: relative; display: inline-flex; flex-shrink: 0; }
-/* 「…」は共通の RowMenu。前の共通ボタン（副）の色（墨）と影を、共通の印ボタンより強く当てる。 */
-.menuAnchor > button.square { width: var(--tpl-fdt-square); height: var(--tpl-fdt-square); flex: 0 0 var(--tpl-fdt-square); padding: 0; justify-content: center; color: var(--color-ink); box-shadow: var(--shadow-board); }
 .headActions { display: contents; }
 
 .band { margin: 0 var(--tpl-fdt-pad-side) var(--tpl-fdt-group-gap); }
@@ -49,7 +47,7 @@
 .content { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-fdt-content-gap); padding: var(--tpl-fdt-content-pad); }
 .kpis { width: 100%; }
 /* 絵の数の帯は角丸の枠で囲む（一覧の帯は上下の線だけ）。この画面の帯にだけ効かせる。 */
-:global([data-theme='v8']) .kpis.kpis[data-kpi-presentation='band'] { border: 1px solid var(--card-edge); border-radius: var(--tpl-fdt-row-radius); overflow: hidden; box-shadow: var(--card-shadow); }
+:global(:root) .kpis.kpis[data-kpi-presentation='band'] { border: 1px solid var(--card-edge); border-radius: var(--tpl-fdt-row-radius); overflow: hidden; box-shadow: var(--card-shadow); }
 /* 補足が空のマスは3段目を出さない（絵は数まで）。失敗・再試行の文は出す。 */
 .kpis p:has(> span:empty:only-child) { display: none; }
 .section { display: flex; flex-direction: column; gap: var(--tpl-fdt-sec-gap); min-width: 0; }

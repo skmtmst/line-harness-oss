@@ -1,144 +1,84 @@
 // @vitest-environment happy-dom
-/*
- * アフィリエイター新規作成の保存経路（AFFILIATE-08）。
- *
- * 実物の React をマウントして操作する。ソース文字列の検査では次が固定できない。
- *   - 選択中のLINEアカウントが作成リクエストへ乗ること
- *     （載せないと feature-enforcement が LINE_ACCOUNT_REQUIRED で止め、作成が必ず失敗する）
- *   - 友だちを選ぶまで作成ボタンが押せないこと
- */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import React from 'react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { chooseAffiliateFriend, openAffiliateFriendPicker } from '@/test-utils/affiliate-create'
 
-const fixture = vi.hoisted(() => ({
-  createCalls: [] as Array<Record<string, unknown>>,
-  listImpl: null as null | (() => Promise<unknown>),
-  createImpl: null as null | (() => Promise<unknown>),
-}))
-
-vi.mock('@/lib/api', () => ({
+const fixture = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn() }))
+vi.mock('@/lib/api', async original => ({
+  ...await original<typeof import('@/lib/api')>(),
   api: {
-    friends: {
-      list: () => fixture.listImpl!(),
-    },
-    affiliates: {
-      create: (data: Record<string, unknown>) => {
-        fixture.createCalls.push(data)
-        return fixture.createImpl!()
-      },
-    },
+    friends: { list: async () => ({ success: true, data: { items: [{ id: 'friend-kenta', displayName: 'Kenta Kawano(Obama)' }], total: 1 } }) },
+    affiliates: { create: fixture.create, update: fixture.update },
   },
 }))
-
-vi.mock('next/link', () => ({
-  default: ({ children, href, ...props }: { children: React.ReactNode; href: string }) =>
-    <a href={href} {...props}>{children}</a>,
-}))
-
-const { CreateAffiliateModal } = await import('./tabs')
-
-;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
-const ACCOUNT_ID = 'line-acc-stg-nen'
+vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'line-acc-stg-nen', selectedAccount: { id: 'line-acc-stg-nen', name: '本店' } }) }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+const { default: CreateAffiliateV8 } = await import('@/v8/affiliates/create')
+const { ApiError } = await import('@/lib/api')
+const { affiliateNavigation } = await import('@/test-utils/affiliate-navigation-mock')
+const submit = () => screen.getByRole('button', { name: '登録して紹介リンクを発行する' })
+const fillName = () => fireEvent.change(screen.getByLabelText('名前（表示名）'), { target: { value: 'Kenta' } })
 
 beforeEach(() => {
-  fixture.createCalls.length = 0
-  fixture.listImpl = async () => ({
-    success: true,
-    data: { items: [{ id: 'friend-kenta', displayName: 'Kenta Kawano(Obama)' }] },
-  })
-  fixture.createImpl = async () => ({
-    success: true,
-    data: { id: 'aff-new', name: 'Kenta Kawano(Obama)' },
-    link: null,
-  })
-  vi.useFakeTimers({ shouldAdvanceTime: true })
+  fixture.create.mockResolvedValue({ success: true, data: { id: 'aff-new', name: 'Kenta' }, link: null })
+  fixture.update.mockResolvedValue({ success: true, data: { id: 'aff-new' } })
 })
+afterEach(cleanup)
 
-afterEach(() => {
-  vi.useRealTimers()
-  cleanup()
-})
-
-async function selectFriend() {
-  const input = screen.getByPlaceholderText('名前で検索...')
-  fireEvent.change(input, { target: { value: 'Kenta' } })
-  // 検索は250msデバウンス。
-  await act(async () => { vi.advanceTimersByTime(300) })
-  const option = await screen.findByText('Kenta Kawano(Obama)')
-  fireEvent.click(option)
-}
-
-describe('CreateAffiliateModal', () => {
-  test('友だちを選ぶまでは作成ボタンが押せない', () => {
-    render(
-      <CreateAffiliateModal accountId={ACCOUNT_ID} onClose={() => {}} onCreated={() => {}} />,
-    )
-    const submit = screen.getByRole('button', { name: '作る' })
-    expect((submit as HTMLButtonElement).disabled).toBe(true)
-    expect(fixture.createCalls).toHaveLength(0)
+describe('現役V8の紹介者登録', () => {
+  test('必須の名前がないと作成を送らない。友だち未連携でも名前があれば登録できる', async () => {
+    render(<CreateAffiliateV8 />)
+    await act(async () => { fireEvent.click(submit()) })
+    expect(await screen.findByText('名前・屋号を入力してください')).toBeTruthy()
+    expect(fixture.create).not.toHaveBeenCalled()
+    fillName()
+    await act(async () => { fireEvent.click(submit()) })
+    expect(fixture.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Kenta', friendId: undefined }))
   })
 
-  test('作成リクエストへ選択中のLINEアカウントを乗せる', async () => {
-    const onClose = vi.fn()
-    render(
-      <CreateAffiliateModal accountId={ACCOUNT_ID} onClose={onClose} onCreated={() => {}} />,
-    )
-    await selectFriend()
-    fireEvent.click(screen.getByRole('button', { name: '作る' }))
-    await waitFor(() => expect(fixture.createCalls).toHaveLength(1))
-    expect(fixture.createCalls[0]).toMatchObject({
-      friendId: 'friend-kenta',
-      lineAccountId: ACCOUNT_ID,
-    })
-    // リンク無し応答では成功後に閉じる。
-    await waitFor(() => expect(onClose).toHaveBeenCalled())
+  test('選んだ友だちとLINEアカウントを作成に送り、一覧へ戻る', async () => {
+    render(<CreateAffiliateV8 />)
+    await chooseAffiliateFriend('Kenta Kawano(Obama)')
+    fillName()
+    await act(async () => { fireEvent.click(submit()) })
+    expect(fixture.create).toHaveBeenCalledWith(expect.objectContaining({ friendId: 'friend-kenta', lineAccountId: 'line-acc-stg-nen' }))
+    await waitFor(() => expect(affiliateNavigation.push).toHaveBeenCalledWith('/affiliates?affiliate=aff-new&highlight=aff-new'))
   })
 
-  test('サーバーの失敗文言をそのまま出して作成を送り直せる', async () => {
-    fixture.createImpl = async () => ({
-      success: false,
-      error: 'LINEアカウントを指定してください',
-    })
-    render(
-      <CreateAffiliateModal accountId={ACCOUNT_ID} onClose={() => {}} onCreated={() => {}} />,
-    )
-    await selectFriend()
-    fireEvent.click(screen.getByRole('button', { name: '作る' }))
-    await screen.findByText('LINEアカウントを指定してください')
-    expect((screen.getByRole('button', { name: '作る' }) as HTMLButtonElement).disabled).toBe(false)
+  test('サーバーの安全な失敗理由を見せ、作成を送り直せる', async () => {
+    fixture.create.mockRejectedValueOnce(new ApiError(400, 'LINEアカウントを指定してください'))
+    render(<CreateAffiliateV8 />)
+    fillName()
+    await act(async () => { fireEvent.click(submit()) })
+    expect(await screen.findByText('LINEアカウントを指定してください')).toBeTruthy()
+    expect(submit()).toHaveProperty('disabled', false)
+    await act(async () => { fireEvent.click(submit()) })
+    expect(fixture.create).toHaveBeenCalledTimes(2)
+    expect(affiliateNavigation.push).toHaveBeenCalled()
   })
-})
 
-describe('閉じる操作（監査7 #809）', () => {
-  test('ダイアログは右上の×だけで閉じる。フッターに「閉じる」は置かない', () => {
-    render(
-      <CreateAffiliateModal accountId={ACCOUNT_ID} onClose={() => {}} onCreated={() => {}} />,
-    )
-    const dialog = screen.getByRole('dialog')
+  test('友だちを選ぶ窓は共通Dialogの閉じる操作を1つ持つ', async () => {
+    render(<CreateAffiliateV8 />)
+    const { dialog } = await openAffiliateFriendPicker()
     expect(dialog.getAttribute('aria-modal')).toBe('true')
-    // 「閉じる」という名前の操作は×の1個だけ。フォームの「キャンセル」は別物。
-    expect(screen.getAllByRole('button', { name: '閉じる' })).toHaveLength(1)
+    expect(within(dialog).getAllByRole('button', { name: '閉じる' })).toHaveLength(1)
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' })) })
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  test('リンク発行後もフッターの「閉じる」は出ず、×で閉じる', async () => {
-    fixture.createImpl = async () => ({
-      success: true,
-      data: { id: 'aff-new', name: 'Kenta Kawano(Obama)' },
-      link: { url: 'https://lin.ee/issued-1' },
-    })
-    const onClose = vi.fn()
-    render(
-      <CreateAffiliateModal accountId={ACCOUNT_ID} onClose={onClose} onCreated={() => {}} />,
-    )
-    await selectFriend()
-    fireEvent.click(screen.getByRole('button', { name: '作る' }))
-    // 発行済みリンクが見える状態（成功画面）
-    await screen.findByDisplayValue('https://lin.ee/issued-1')
-    expect(screen.getAllByRole('button', { name: '閉じる' })).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
-    expect(onClose).toHaveBeenCalled()
+  test('発行後に追加情報だけ失敗してもリンクを見せ、同じ人の保存を再開する', async () => {
+    fixture.create.mockResolvedValue({ success: true, data: { id: 'aff-new', name: 'Kenta' }, link: { url: 'https://lin.ee/issued-1' } })
+    fixture.update.mockResolvedValueOnce({ success: false }).mockResolvedValue({ success: true })
+    render(<CreateAffiliateV8 />)
+    fillName()
+    await act(async () => { fireEvent.click(submit()) })
+    expect(await screen.findByTitle('https://lin.ee/issued-1')).toBeTruthy()
+    expect(affiliateNavigation.push).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '追加情報の保存を再開する' })) })
+    expect(fixture.create).toHaveBeenCalledTimes(1)
+    expect(fixture.update).toHaveBeenCalledTimes(2)
+    expect(affiliateNavigation.push).toHaveBeenCalled()
   })
 })

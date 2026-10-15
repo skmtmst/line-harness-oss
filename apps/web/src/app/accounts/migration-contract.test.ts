@@ -1,4 +1,5 @@
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
+import { readFileSync as readOwnFile } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
@@ -18,6 +19,8 @@ const PAGE = [
 ].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
 /* #984 LAY-14: 友だち配下の主タブの正本。 */
 const TABS = readFileSync(join(HERE, '..', 'friends', 'friends-tabs.ts'), 'utf8')
+const NAV = readOwnFile(join(HERE, '../friends/friends-nav-v8.tsx'), 'utf8')
+const CSS = readFileSync(join(HERE, '../friends/friends-v8.module.css'), 'utf8')
 
 /**
  * UID移行の対応表（設計 ★V6 機能3 `vtBCu`）。点検 #496 の項目2・6・9。
@@ -125,10 +128,10 @@ describe('UID移行の状態と実行・復旧の導線', () => {
 })
 
 describe('UID移行のタブと段組み（#984 LAY-13/14）', () => {
-  it('主タブは友だち一覧と同じ定義・同じ部品を使う', () => {
-    expect(PAGE).toContain("import { FRIENDS_MERGED_TABS } from '@/app/friends/friends-tabs'")
-    expect(PAGE).toContain('<MergedTabs')
-    expect(PAGE).toContain('active="uid-migration"')
+  it('データ管理は友だち一覧と同じ定義・同じ部品を使う', () => {
+    expect(PAGE).toContain('<FriendsManageNavV8 current="UID移行"')
+    expect(NAV).toContain('FRIENDS_MERGED_TABS')
+    expect(NAV).toContain('データ管理')
     // 手書きの別タブ実装（青い選択色の nav）へは戻さない。
     expect(PAGE).not.toContain('aria-label="友だち画面"')
     expect(PAGE).not.toContain('border-b-2 pb-3 font-semibold')
@@ -150,20 +153,20 @@ describe('UID移行のタブと段組み（#984 LAY-13/14）', () => {
    */
   it('下の履歴節へ飛ぶだけの「移行履歴」ボタンは置かない', () => {
     expect(PAGE).not.toContain('href="#migration-history"')
-    expect(PAGE).toContain('href="/friends/migrations"')
+    expect(NAV).toContain("const csvHref = '/friends/migrations'")
   })
 
   it('移行元・移行先の選び欄は欄いっぱいに広げる', () => {
     // 選び欄は Select 1 本化済み。幅は部品の size="full" で持たせる。
-    expect(PAGE).toContain('<Select aria-label="移行元アカウント"')
-    expect(PAGE).toContain('<Select aria-label="移行先アカウント"')
+    expect(PAGE).toContain('<EntitySelect aria-label="移行元アカウント"')
+    expect(PAGE).toContain('<EntitySelect aria-label="移行先アカウント"')
     expect(PAGE.match(/size="full"/g)?.length).toBeGreaterThanOrEqual(2)
     expect(PAGE).not.toContain('[data-selects-wide] select')
   })
 
   it('移行元と移行先は同幅の2欄、利用目的は全幅', () => {
-    expect(PAGE).toContain('sm:flex-row')
-    expect(PAGE.match(/min-w-0 flex-1/g) ?? []).toHaveLength(2)
+    expect(PAGE).toContain('className={styles.duoCards}')
+    expect(CSS).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
     expect(PAGE).toContain('利用目的')
     // 利用目的は共通の入力欄（高さ40px・タッチ44pxを部品側が持つ）。
     expect(PAGE).toContain("import { TextField } from '@/components/shared/text-field'")
@@ -184,18 +187,15 @@ describe('UID移行の5段階表示（#1015 CHK-06）', () => {
     expect(PAGE).toContain("active.status === 'ready' || active.status === 'executing' || active.status === 'failed' || unresolved === 0")
   })
 
-  it('狭い幅は「現在n/5」と全手順の展開にする', () => {
-    // sm 未満は5列に押し込まず、現在位置＋展開できる手順一覧へ。
-    expect(PAGE).toContain('sm:hidden')
-    expect(PAGE).toContain('`現在 ${currentStep + 1}/${STEPS.length}`')
-    expect(PAGE).toContain('全手順を見る')
-    expect(PAGE).toContain('hidden sm:grid sm:grid-cols-5')
+  it('手順の表示は採用済みV8の共通の帯を使う', () => {
+    expect(PAGE).toContain('<Steps')
+    expect(PAGE).toContain('label="移行の手順"')
+    expect(PAGE).toContain('steps={MIGRATION_STEPS.map')
   })
 
   it('完了・現在・未着手を分け、失敗を完了にしない', () => {
-    expect(PAGE).toContain('すべて完了')
-    // 済んだ段階だけ✓、現在は▶、先の段階は番号のまま。
-    expect(PAGE).toContain("index < currentStep ? '✓' : index === currentStep ? '▶'")
+    expect(PAGE).toContain("state: index < currentStep ? 'done' as const : 'todo' as const")
+    expect(PAGE).toContain('currentKey={currentStep < MIGRATION_STEPS.length ? String(currentStep) : undefined}')
   })
 })
 
@@ -206,7 +206,8 @@ describe('UID移行の5段階表示（#1015 CHK-06）', () => {
  */
 describe('UID移行のカード間隔（★V7 gap-4）', () => {
   it('画面の親は縦並び＋gap-4 で、カード間の mb/mt を持たない', () => {
-    expect(PAGE).toContain('data-design-node="vtBCu" className="flex flex-col gap-4"')
+    expect(PAGE).toContain('className={styles.board} data-design-node="Z0jHp"')
+    expect(CSS).toMatch(/\.board\s*\{[^}]*gap: 16px/s)
     // カードの断片（section・帯・履歴節）に個別の縦余白を付けない。
     expect(PAGE).not.toMatch(/<(section|div)[^>]*className="[^"]*\bmb-[46]\b/)
   })
@@ -219,7 +220,8 @@ describe('UID移行のカード間隔（★V7 gap-4）', () => {
   })
 
   it('対応表ありの中身も gap-4 でそろえ、mb-6（24px）を作らない', () => {
-    expect(PAGE).toContain('return (<div className="flex flex-col gap-4">')
+    expect(PAGE).toContain('className={styles.kpis}')
+    expect(CSS).toMatch(/\.section\s*\{[^}]*gap: 12px/s)
     expect(PAGE).not.toMatch(/className="[^"]*\bmb-6\b/)
   })
 })

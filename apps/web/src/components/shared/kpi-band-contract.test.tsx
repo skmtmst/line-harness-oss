@@ -27,28 +27,28 @@ describe('数の帯（Pp3nS）', () => {
   it('v8 の帯は隙間0・縦線・外側だけ角0・数22', () => {
     const css = read('kpi-card.module.css')
     const strip = css.match(
-      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] \{[^}]*\}/s,
+      /:root \.strip\[data-kpi-presentation='band'\] \{[^}]*\}/s,
     )
     expect(strip, 'v8 の帯の指定がありません').toBeTruthy()
     expect(strip![0]).toMatch(/gap:\s*var\(--tpl-band-gap\)/)
     expect(strip![0]).toMatch(/border-block:\s*1px solid var\(--tpl-band-line\)/)
     expect(strip![0]).toMatch(/border-radius:\s*var\(--radius-none\)/)
     expect(css).toMatch(
-      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] > \*:not\(:last-child\) \{[^}]*border-right:\s*1px solid var\(--tpl-band-line\)/s,
+      /:root \.strip\[data-kpi-presentation='band'\] > \*:not\(:last-child\) \{[^}]*border-right:\s*1px solid var\(--tpl-band-line\)/s,
     )
     expect(css).toMatch(
-      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] \.number \{[^}]*font-size:\s*var\(--tpl-band-number-size\)/s,
+      /:root \.strip\[data-kpi-presentation='band'\] \.number \{[^}]*font-size:\s*var\(--tpl-band-number-size\)/s,
     )
   })
 
   it('数のマスは角0・影なし', () => {
     const css = read('kpi-card.module.css')
-    expect(css).toMatch(/\.card \{[^}]*border-radius:\s*0/s)
+    expect(css).toMatch(/:root \.strip\[data-kpi-presentation='band'\] \.card \{[^}]*border-radius:\s*var\(--radius-none\)/s)
   })
 
   it('v8 の単位（件・通）は 12px', () => {
     const css = read('kpi-card.module.css')
-    expect(css).toMatch(/\[data-theme='v8'\] \.unit \{[^}]*font-size:\s*12px/s)
+    expect(css).toMatch(/:root \.unit \{[^}]*font-size:\s*12px/s)
   })
 
   it('包み（KpiBand）は帯の印を持ち、並べ方は呼び出し側のまま', () => {
@@ -63,29 +63,32 @@ describe('数の帯（Pp3nS）', () => {
     const marker = 'どの層より強い'
     expect(css).toContain(marker)
     const unlayered = css.split(marker)[1] ?? ''
-    expect(unlayered).toContain("[data-theme='v8'] .strip[data-kpi-presentation='band']")
+    expect(unlayered).toContain(":root .strip[data-kpi-presentation='band']")
     expect(unlayered).not.toContain('@layer')
   })
 
   it('折りたたみ（KpiCollapse）とナレッジ一覧も帯として出す', () => {
     const collapse = readFileSync(join(HERE, '..', 'ui', 'kpi-collapse.tsx'), 'utf8')
     expect(collapse).toContain('data-kpi-presentation="band"')
-    const knowledge = readFileSync(join(HERE, '..', 'ops', 'knowledge-list.tsx'), 'utf8')
+    const knowledge = readFileSync(join(HERE, '..', '..', 'v8', 'ops', 'knowledge.tsx'), 'utf8')
     expect(knowledge).toContain('<KpiBand')
+    expect(knowledge).toContain('presentation="cell"')
   })
 
-  it('帯の題は絵どおり13px/500/1.5（Pp3nS）', () => {
+  it('帯の題は10-11固定の絵どおり12px/500/18px', () => {
     const css = read('kpi-card.module.css')
-    const label = css.match(/\[data-theme='v8'\] \.label \{[^}]*\}/s)
+    const label = css.match(/:root \.label \{[^}]*\}/s)
     expect(label, '帯の題がありません').toBeTruthy()
-    expect(label![0]).toMatch(/font-size:\s*13px/)
+    expect(label![0]).toMatch(/font-size:\s*var\(--text-caption\)/)
+    const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8')
+    expect(globals).toMatch(/--text-caption:\s*12px/)
     expect(label![0]).toMatch(/font-weight:\s*500/)
-    expect(label![0]).toMatch(/line-height:\s*1\.5/)
+    expect(label![0]).toMatch(/line-height:\s*18px/)
   })
 
   it('印なしの帯（data-kpi-strip）もv8では横一列・隙間0', () => {
     const css = read('kpi-band-v8.css')
-    const bare = css.match(/\[data-theme='v8'\] \[data-kpi-strip\] \{[^}]*\}/s)
+    const bare = css.match(/:root \[data-kpi-strip\] \{[^}]*\}/s)
     expect(bare, 'data-kpi-strip の横並びがありません').toBeTruthy()
     expect(bare![0]).toMatch(/display:\s*grid/)
     expect(bare![0]).toMatch(/grid-auto-flow:\s*column/)

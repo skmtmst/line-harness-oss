@@ -10,7 +10,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EventItem, EventSlot } from '@/lib/api'
 
@@ -71,7 +71,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import EventForm from './event-form'
+import EventForm from '@/v8/events/edit-form'
 
 const event: EventItem = {
   id: 'ev-1',
@@ -149,7 +149,7 @@ function setInput(input: HTMLInputElement, value: string) {
 }
 
 function dialog(): HTMLElement | null {
-  return document.querySelector('.fixed.inset-0')
+  return screen.queryByRole('dialog', { name: '予約枠を編集' })
 }
 
 function dialogInput(kind: string, index = 0): HTMLInputElement {
@@ -165,27 +165,17 @@ function dialogDateTrigger(): HTMLButtonElement {
   return found as HTMLButtonElement
 }
 
-function dialogTimeTriggers(): HTMLButtonElement[] {
-  const found = [...(dialog()?.querySelectorAll('button[aria-label="開始"],button[aria-label="終了"]') ?? [])]
+function dialogTimeTriggers(): HTMLInputElement[] {
+  const found = [...(dialog()?.querySelectorAll('input[aria-label="開始"],input[aria-label="終了"]') ?? [])]
   expect(found, '開始と終了の選択がある').toHaveLength(2)
-  return found as HTMLButtonElement[]
+  return found as HTMLInputElement[]
 }
 
 /** 時刻の選択で「HH:mm」を選ぶ。値は今までどおり HH:mm（日本時間）。 */
 async function pickTime(trigger: Element, value: string) {
-  const [hour, minute] = value.split(':')
-  await act(async () => {
-    trigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    for (let step = 0; step < 10; step += 1) await Promise.resolve()
-  })
-  // 時刻の選択箱は最上層（MenuPortal→document.body）に出る。窓の中にはいない。
-  const picker = document.querySelector('[role="dialog"][aria-label="時刻を選ぶ"]')
-  expect(picker, '時刻の選択箱がある').toBeTruthy()
-  await act(async () => {
-    fireEvent.change(picker!.querySelector('select[aria-label="時"]')!, { target: { value: hour } })
-    fireEvent.change(picker!.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
-  })
+  await setTimeControl(trigger, value)
 }
+import { setTimeControl } from '@/test-utils/time-control'
 
 /** 窓の中の「保存」。ページ側の「保存して次へ」と取り違えないよう窓の中だけ探す。 */
 function dialogSaveButton(): HTMLButtonElement {
@@ -200,17 +190,17 @@ describe('予約枠の編集（入口29）', () => {
     await click(tabButton('2. 予約枠')!)
     await click(host.querySelector<HTMLButtonElement>('button[aria-label="そのほかの操作"]')!)
     await click(document.querySelector<HTMLButtonElement>('[role="menuitem"]')!)
-    expect(host.textContent).toContain('予約枠を編集')
+    expect(dialog()).toBeTruthy()
   }
 
   it('「編集」で保存済みの日時・定員が入った窓が開く', async () => {
     await openEdit()
     expect(dialogDateTrigger().textContent).toContain('2026年10月1日（木）')
-    expect(dialogTimeTriggers()[0].textContent).toContain('14:00')
-    expect(dialogTimeTriggers()[1].textContent).toContain('15:30')
+    expect(dialogTimeTriggers()[0].value.replaceAll(' ', '')).toBe('14:00')
+    expect(dialogTimeTriggers()[1].value.replaceAll(' ', '')).toBe('15:30')
     expect(dialogInput('number').value).toBe('8')
     // 予約が入っているので、動かすとリマインドも動くことを先に伝える。
-    expect(host.textContent).toContain('3件の予約')
+    expect(document.body.textContent).toContain('3件の予約')
   })
 
   it('定員を直して保存すると、既存の更新口へ送る', async () => {
@@ -225,6 +215,24 @@ describe('予約枠の編集（入口29）', () => {
     }, 1)
     // 窓が閉じて、一覧を取り直している。
     expect(listSlots).toHaveBeenCalledTimes(2)
+  })
+
+  it('保存先の入力検査は窓の定員欄へ返し、書きかけを保って再試行できる', async () => {
+    const { ApiError } = await import('@/lib/api')
+    await openEdit()
+    updateSlot.mockRejectedValueOnce(new ApiError(422, '入力を確認してください', undefined, undefined, undefined, undefined, { capacity: '定員を確認してください' }))
+    await act(async () => { setInput(dialogInput('number'), '10') })
+    await click(dialogSaveButton())
+    const capacity = dialogInput('number')
+    expect(capacity.value).toBe('10')
+    expect(capacity.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(capacity)
+    expect(dialog()?.textContent).toContain('定員を確認してください')
+    await act(async () => { setInput(capacity, '11') })
+    expect(capacity.getAttribute('aria-invalid')).not.toBe('true')
+    await click(dialogSaveButton())
+    expect(updateSlot).toHaveBeenLastCalledWith('acc-1', 'ev-1', 'slot-1', expect.objectContaining({ capacity: 11 }), 1)
+    expect(dialog()).toBeNull()
   })
 
   it('開始時刻を動かすと JST→UTC に戻して送る', async () => {
@@ -243,7 +251,7 @@ describe('予約枠の編集（入口29）', () => {
     await act(async () => { setInput(dialogInput('number'), '2') })
     await click(dialogSaveButton())
     expect(updateSlot).not.toHaveBeenCalled()
-    expect(host.textContent).toContain('定員は3以上にしてください')
+    expect(document.body.textContent).toContain('定員は3以上にしてください')
   })
 
   it('開始が終了以降のままでは保存できない', async () => {
@@ -251,7 +259,7 @@ describe('予約枠の編集（入口29）', () => {
     await pickTime(dialogTimeTriggers()[0], '16:00')
     await click(dialogSaveButton())
     expect(updateSlot).not.toHaveBeenCalled()
-    expect(host.textContent).toContain('開始時刻 < 終了時刻')
+    expect(document.body.textContent).toContain('開始時刻 < 終了時刻')
   })
 
   it('競合（409）では窓に最新の差分を出し、一覧を読み直す（m26g R577）', async () => {
@@ -264,8 +272,8 @@ describe('予約枠の編集（入口29）', () => {
     )
     await click(dialogSaveButton())
     // 敗者に差分（最新の枠）を見せる。窓は開いたまま、一覧は裏で読み直す。
-    expect(host.textContent).toContain('ほかの画面でこの枠が更新されました')
-    expect(host.textContent).toContain('定員12')
+    expect(document.body.textContent).toContain('ほかの画面でこの枠が更新されました')
+    expect(document.body.textContent).toContain('定員12')
     expect(listSlots).toHaveBeenCalledTimes(2)
   })
 })

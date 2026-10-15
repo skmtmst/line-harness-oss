@@ -73,4 +73,4 @@ git merge upstream/main   # コンフリクトがあれば解消
 ## リリース情報
 
 - 最新リリースと変更内容: [GitHub Releases](https://github.com/Shudesu/line-harness-oss/releases)
-- リリースノート: [Release-Notes](Release-Notes.md)
+- リリースノート: [反映履歴の書き方](../release-log/README.md)

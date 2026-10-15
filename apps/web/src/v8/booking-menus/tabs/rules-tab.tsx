@@ -16,9 +16,13 @@ import { BEFORE_MINUTE_CHOICES, MAX_ACTIVE_CHOICES, WINDOW_DAY_CHOICES, beforeLa
 import { bookingRulesErrorMessage } from '../lib/menu-validation'
 import { AccountIcon, Band, StateCard, SkeletonRows, useV8TabEdit, type LoadStatus } from './shared'
 import styles from '../settings.module.css'
+import { ruleNumberRequirements } from '../lib/rule-number-requirements'
+import { focusFieldById } from '@/lib/use-form-errors'
 import { Field } from '@/components/shared/form-controls'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import SaveFeedback, { useSaveFeedback } from '@/components/shared/save-feedback'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
@@ -52,7 +56,9 @@ function ReadOnlyText({ label, value, spaced = false }: { label: string; value: 
   return <SaveErrorField names={["value"]}><TextField aria-label={label} value={value} readOnly aria-readonly="true" title={value} className={spaced ? 'mt-1' : undefined} /></SaveErrorField>
 }
 
-function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty, humanize, readOnly = false }: {
+function RuleNumberFieldV8({ name, error, label, unit, min, max, value, onChange, trackEmpty, humanize, readOnly = false }: {
+  name: keyof typeof ruleNumberRequirements
+  error?: string
   label: string
   unit: string
   min: number
@@ -83,8 +89,8 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
       : Number(shown)
   const hint = hintNumber === null || Number.isNaN(hintNumber) ? null : humanize?.(hintNumber)
   return (
-    <Field label={<>{label}</>}><span className="mt-1 flex items-center gap-2">
-        <SaveErrorField names={["shown","text"]}><NumberInput unit={unit}
+    <Field label={<>{label}</>} htmlFor={`booking-rule-${name}`} requirement={ruleNumberRequirements[name]} error={error}><span className="mt-1 flex items-center gap-2">
+        <SaveErrorField names={[name, name.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`), "shown","text"]}><NumberInput id={`booking-rule-${name}`} unit={unit}
           aria-label={label}
           type="number"
           min={min}
@@ -122,6 +128,8 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
   onReload: () => void
 }) {
   const saveErrors = useSaveFormErrors()
+  const feedback = useSaveFeedback()
+  const completedRules = useRef<{ accountId: string; payload: string; settings: BookingSettings } | null>(null)
   const [draft, setDraft] = useState<BookingSettings | null>(null)
   /* 「指名なし」を出すか。店舗の保存先は無く、スタッフの is_designation_optional に書く。 */
   const [noAssign, setNoAssign] = useState<boolean | null>(null)
@@ -129,7 +137,14 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
   const [saveError, setSaveError] = useState<string | null>(null)
   const [cutoffEmpty, setCutoffEmpty] = useState(false)
   const [cancelEmpty, setCancelEmpty] = useState(false)
+  const [numberErrors, setNumberErrors] = useState<Record<string, string>>({})
   const inFlightRef = useRef(false)
+  const saveGenerationRef = useRef(0)
+  useEffect(() => {
+    setSaving(false)
+    inFlightRef.current = false
+    return () => { saveGenerationRef.current += 1 }
+  }, [accountId])
   const savedStaff = useRef(new Map<string, boolean>())
   useEffect(() => { savedStaff.current.clear() }, [accountId])
 
@@ -170,10 +185,19 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
 
   function set<K extends keyof BookingSettings>(key: K, value: BookingSettings[K]) {
     setDraft((current) => current ? { ...current, [key]: value } : current)
+    if (key in ruleNumberRequirements) setNumberErrors(current => { const next = { ...current }; delete next[key]; return next })
   }
 
   async function submit() {
-    if (!draft || inFlightRef.current) return
+    if (!draft || inFlightRef.current || !canEdit) return
+    const generation = saveGenerationRef.current
+    const alive = () => saveGenerationRef.current === generation
+    const numericProblems = Object.fromEntries((Object.keys(ruleNumberRequirements) as Array<keyof typeof ruleNumberRequirements>).flatMap(name => {
+      const reason = ruleNumberRequirements[name].check(draft[name])
+      return reason ? [[name, reason]] : []
+    }))
+    setNumberErrors(numericProblems)
+    if (Object.keys(numericProblems).length) { focusFieldById(`booking-rule-${Object.keys(numericProblems)[0]}`); return }
     const emptyLabels = [
       cutoffEmpty ? '受付の締め切り' : null,
       cancelEmpty ? 'キャンセルの期限' : null,
@@ -182,13 +206,15 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
       setSaveError(`「${emptyLabels.join('」「')}」が空欄です。空欄のまま保存できません。直前まで可能にするときは0と入力してください。`)
       return
     }
+    if (!feedback.begin('予約のルール')) return
     inFlightRef.current = true
     setSaving(true)
     setSaveError(null)
     let settingsSaved = false
+    const completedSteps: string[] = []
+    const remainingSteps = ['予約のルール']
     try {
-      const response = await bookingApi.saveSettings(accountId, {
-        expectedVersion: draft.version,
+      const payload = {
         timeZone: draft.timeZone.trim(),
         bookingWindowDays: draft.bookingWindowDays,
         cutoffMinutesBefore: draft.cutoffMinutesBefore,
@@ -200,32 +226,51 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         liffDateView: draft.liffDateView ?? 'list',
         reminderDayBeforeTime: draft.reminderDayBeforeTime || null,
         reminderHoursBefore: draft.reminderHoursBefore,
-      })
+      }
+      const payloadKey = JSON.stringify(payload)
+      const previous = completedRules.current
+      const response = previous?.accountId === accountId && previous.payload === payloadKey
+        ? { success: true as const, data: previous.settings }
+        : await bookingApi.saveSettings(accountId, { ...payload, expectedVersion: draft.version })
+      if (!alive()) return
       if (!response.success) throw new Error('booking_settings_save_failed')
+      completedRules.current = { accountId, payload: payloadKey, settings: response.data }
       setDraft(response.data)
       settingsSaved = true
+      completedSteps.push('予約のルール')
+      remainingSteps[0] = '残った担当の設定'
       /* 「指名なし」の切替は全スタッフの is_designation_optional を揃える。 */
       if (noAssign !== null && noAssign !== initialNoAssign) {
         const targets = staff.filter((person) => person.is_active && (savedStaff.current.get(person.id) ?? Boolean(person.is_designation_optional)) !== noAssign)
         for (const person of targets) {
-          await bookingApi.updateStaff(accountId, person.id, { is_designation_optional: noAssign ? 1 : 0 })
+          if (!alive()) return
+          const updated = await bookingApi.updateStaff(accountId, person.id, { is_designation_optional: noAssign ? 1 : 0 })
+          if (!updated.ok) throw new Error('担当の設定を保存できませんでした')
+          if (!alive()) return
           savedStaff.current.set(person.id, noAssign)
+          completedSteps.push(person.display_name)
         }
       }
+      if (!alive()) return
       setDraft(response.data)
       setCutoffEmpty(false)
       setCancelEmpty(false)
+      feedback.success('予約のルールと担当の設定')
       notifySaved('予約のルールを保存しました。')
       onSaved(response.data)
       if (noAssign !== null && noAssign !== initialNoAssign) onReload()
     } catch (cause) {
+      if (!alive()) return
+      feedback.failure(bookingRulesErrorMessage(cause, '保存'), completedSteps, remainingSteps)
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
       setSaveError(settingsSaved ? `ルールは保存しました。担当の更新を完了できませんでした。もう一度保存すると、残った担当だけ更新します。${bookingRulesErrorMessage(cause, '保存')}` : bookingRulesErrorMessage(cause, '保存')) }
     } finally {
-      inFlightRef.current = false
-      setSaving(false)
+      if (alive()) {
+        inFlightRef.current = false
+        setSaving(false)
+      }
     }
   }
 
@@ -257,48 +302,45 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Rules">
+      <SaveFeedback state={feedback.state} onRetry={saveError?.includes('先に保存') ? () => { feedback.reset(); onReload() } : submit} retryLabel={saveError?.includes('先に保存') ? '最新の内容を読み直す' : undefined} />
       {/* 閲覧のみ：選ぶ部品・つまみは置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */}
       <div className="contents">
         <section className={styles.section}>
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>いつまで予約を受けるか</h2>
           </div>
-          {/* 絵 x1OZS6：見出しの段と欄の段を分けて3列に並べる。 */}
-          <div className={styles.ruleGrid}>
-            <span className={styles.ruleHead}>
-              先の予約が取れる範囲
-              <HelpTip label="先の予約が取れる範囲の説明">今は {bookingWindowEnd(draft.bookingWindowDays)} まで受け付けます。</HelpTip>
-            </span>
-            <span className={styles.ruleHead}>
-              受付の締め切り
-              <HelpTip label="受付の締め切りの説明">「直前まで」は開始の直前まで受け付けます。</HelpTip>
-            </span>
-            <span className={styles.ruleHead}>キャンセルの期限</span>
-            {canEdit ? <>
-              <SaveErrorField names={["bookingWindowDays","draft.bookingWindowDays","booking_window_days","draft.booking_window_days"]}><Select size="full"
+          <SettingsFormRow layout="columns" columns={3}>
+            <Field label="先の予約が取れる範囲" optional={false} help={<>今は {bookingWindowEnd(draft.bookingWindowDays)} まで受け付けます。</>}>
+              {canEdit ? <SaveErrorField names={["bookingWindowDays","draft.bookingWindowDays","booking_window_days","draft.booking_window_days"]}><Select size="full"
                 aria-label="先の予約が取れる範囲"
                 value={String(draft.bookingWindowDays)}
                 onChange={(value) => set('bookingWindowDays', Number(value))}
                 options={windowOptions}
-              /></SaveErrorField>
-              <SaveErrorField names={["cutoffMinutesBefore","draft.cutoffMinutesBefore","cutoff_minutes_before","draft.cutoff_minutes_before"]}><Select size="full"
+              /></SaveErrorField> : <ReadOnlyText label="先の予約が取れる範囲" value={`${draft.bookingWindowDays} 日先まで`} />}
+            </Field>
+            <Field label="受付の締め切り" optional={false} help="「直前まで」は開始の直前まで受け付けます。">
+              {canEdit ? <SaveErrorField names={["cutoffMinutesBefore","draft.cutoffMinutesBefore","cutoff_minutes_before","draft.cutoff_minutes_before"]}><Select size="full"
                 aria-label="受付の締め切り"
-                value={String(draft.cutoffMinutesBefore)}
-                onChange={(value) => set('cutoffMinutesBefore', Number(value))}
+                value={cutoffEmpty ? '' : String(draft.cutoffMinutesBefore)}
+                onChange={(value) => {
+                  setCutoffEmpty(value === '')
+                  if (value !== '') set('cutoffMinutesBefore', Number(value))
+                }}
                 options={cutoffOptions}
-              /></SaveErrorField>
-              <SaveErrorField names={["cancelDeadlineMinutesBefore","draft.cancelDeadlineMinutesBefore","cancel_deadline_minutes_before","draft.cancel_deadline_minutes_before"]}><Select size="full"
+              /></SaveErrorField> : <ReadOnlyText label="受付の締め切り" value={beforeLabel(draft.cutoffMinutesBefore)} />}
+            </Field>
+            <Field label="キャンセルの期限" optional={false}>
+              {canEdit ? <SaveErrorField names={["cancelDeadlineMinutesBefore","draft.cancelDeadlineMinutesBefore","cancel_deadline_minutes_before","draft.cancel_deadline_minutes_before"]}><Select size="full"
                 aria-label="キャンセルの期限"
-                value={String(draft.cancelDeadlineMinutesBefore)}
-                onChange={(value) => set('cancelDeadlineMinutesBefore', Number(value))}
+                value={cancelEmpty ? '' : String(draft.cancelDeadlineMinutesBefore)}
+                onChange={(value) => {
+                  setCancelEmpty(value === '')
+                  if (value !== '') set('cancelDeadlineMinutesBefore', Number(value))
+                }}
                 options={cancelOptions}
-              /></SaveErrorField>
-            </> : <>
-              <ReadOnlyText label="先の予約が取れる範囲" value={`${draft.bookingWindowDays} 日先まで`} />
-              <ReadOnlyText label="受付の締め切り" value={beforeLabel(draft.cutoffMinutesBefore)} />
-              <ReadOnlyText label="キャンセルの期限" value={beforeLabel(draft.cancelDeadlineMinutesBefore)} />
-            </>}
-          </div>
+              /></SaveErrorField> : <ReadOnlyText label="キャンセルの期限" value={beforeLabel(draft.cancelDeadlineMinutesBefore)} />}
+            </Field>
+          </SettingsFormRow>
         </section>
 
         <section className={styles.section}>
@@ -366,7 +408,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
 
         {/* 絵に無いが機能がある欄（送る時刻・当日・枠の間隔・仮押さえ・タイムゾーン・日時の最初の形）は「ほかの設定」で開く。 */}
         <Disclosure title="ほかの設定（お知らせの時刻・予約枠の間隔・仮押さえ・タイムゾーン・日時の最初の形）">
-          <div className={styles.ruleFields}>
+          <SettingsFormRow layout="columns" columns={3}>
             <Field label="前日のお知らせを送る時刻"><span className="mt-1 flex items-center gap-2">
                 {canEdit ? (
                   <SaveErrorField names={["reminderDayBeforeTime","draft.reminderDayBeforeTime","reminder_day_before_time","draft.reminder_day_before_time"]}><TimeField
@@ -377,9 +419,9 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                 ) : <ReadOnlyText label="前日のお知らせを送る時刻" value={draft.reminderDayBeforeTime || emptyValue('unconfigured')} />}
                 <span className="text-ink-faint whitespace-nowrap text-xs">空欄は24時間前</span>
               </span></Field>
-            <RuleNumberFieldV8 readOnly={!canEdit} label="当日のお知らせ" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={(value) => formatHoursBeforeHint(value) || null} />
-            <RuleNumberFieldV8 readOnly={!canEdit} label="予約枠の間隔" unit="分" min={5} max={60} value={draft.slotGranularityMinutes} onChange={(value) => set('slotGranularityMinutes', value as BookingSettings['slotGranularityMinutes'])} />
-            <RuleNumberFieldV8 readOnly={!canEdit} label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} humanize={formatMinutesLengthHint} />
+            <RuleNumberFieldV8 name="reminderHoursBefore" error={numberErrors.reminderHoursBefore} readOnly={!canEdit} label="当日のお知らせ" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={(value) => formatHoursBeforeHint(value) || null} />
+            <RuleNumberFieldV8 name="slotGranularityMinutes" error={numberErrors.slotGranularityMinutes} readOnly={!canEdit} label="予約枠の間隔" unit="分" min={5} max={60} value={draft.slotGranularityMinutes} onChange={(value) => set('slotGranularityMinutes', value as BookingSettings['slotGranularityMinutes'])} />
+            <RuleNumberFieldV8 name="holdMinutes" error={numberErrors.holdMinutes} readOnly={!canEdit} label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} humanize={formatMinutesLengthHint} />
             <Field label="タイムゾーン">{canEdit ? (
                 <SaveErrorField names={["timeZone","draft.timeZone","time_zone","draft.time_zone"]}><Select size="full"
                   aria-label="タイムゾーン"
@@ -408,10 +450,10 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                 /></SaveErrorField>
               ) : <ReadOnlyText label="日時を選ぶ画面の最初の形" value={draft.liffDateView === 'calendar' ? 'カレンダー' : '週で見る（日付の横ならび）'} spaced />}</Field>
             <Notice tone="info">お客さまの画面の色と書体は、すべての画面で共通です。<Link href="/settings/customer-look">お客さまのデザインを開く ↗</Link></Notice>
-          </div>
+          </SettingsFormRow>
         </Disclosure>
 
-        {saveError ? (
+        {saveError && feedback.state.kind === 'idle' ? (
           <Notice tone="danger" >{saveError}
             {saveError.includes('先に保存') ? (
               <button type="button" className="text-action ml-2 font-semibold underline" onClick={onReload}>最新の内容を読み直す</button>

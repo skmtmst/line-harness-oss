@@ -10,11 +10,33 @@ import styles from './create-parts.module.css'
 
 export type SummaryRow = { label: ReactNode; value: ReactNode; key?: string }
 
+/** 完了の印と題は中央、結果の説明は段落として読む。 */
+export function CreateCompletionHeading({ icon, title, children }: { icon: ReactNode; title: ReactNode; children: ReactNode }) {
+  return <div className={styles.completionHeading} data-part="create-completion-heading">
+    <span className={styles.completionMark} aria-hidden="true">{icon}</span>
+    <h2 className={styles.completionTitle}>{title}</h2>
+    <p className={styles.completionDescription}>{children}</p>
+  </div>
+}
+
 /** 右の列の「設定内容」の箱（絵 K7HWG「右の箱 設定内容」）：余白16・題13/700/19・行は上下9＋下線・字12/17。 */
-export function CreateSummaryCard({ title = '設定内容', rows, children, description, variant }: { title?: ReactNode; rows: SummaryRow[]; children?: ReactNode; description?: ReactNode; variant?: 'link' }) {
+export function CreateSummaryCard({ title = '設定内容', rows, children, leading, beforeRows, description, descriptionItems, variant, completionIcon }: {
+  title?: ReactNode; rows: SummaryRow[]; children?: ReactNode; leading?: ReactNode; beforeRows?: ReactNode
+  description?: ReactNode; descriptionItems?: readonly ReactNode[]; completionIcon?: ReactNode
+  variant?: 'link' | 'record' | 'completion'
+}) {
+  const heading = <><h2 className={styles.summaryTitle}>{title}</h2>
+    {description ? <p className={styles.summaryDescription}>{description}</p> : null}
+    {descriptionItems?.length ? <ul className={`${styles.summaryDescription} ${styles.summaryDescriptionList}`} role="list">
+      {descriptionItems.map((item, index) => <li key={index}>{item}</li>)}
+    </ul> : null}</>
   return (
     <section className={styles.summary} data-part="create-summary" data-variant={variant}>
-      {description ? <div className={styles.summaryHead}><h2 className={styles.summaryTitle}>{title}</h2><p className={styles.summaryDescription}>{description}</p></div> : <h2 className={styles.summaryTitle}>{title}</h2>}
+      {completionIcon ? <div className={styles.summaryCompletion}>
+        <span className={styles.completionIcon} aria-hidden="true">{completionIcon}</span>
+        <div className={styles.summaryHead}>{heading}</div>
+      </div> : description || descriptionItems?.length ? <div className={styles.summaryHead}>{heading}</div> : heading}
+      {leading ?? beforeRows}
       {rows.length > 0 ? <dl className={styles.rows}>
         {rows.map((row, i) => (
           <div key={row.key ?? i} className={styles.row}>

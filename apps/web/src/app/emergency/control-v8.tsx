@@ -1,15 +1,16 @@
 'use client'
 
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
+import { GitBranch, OctagonPause, ShieldCheck, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, type OperationCapability, type OperationControl, type OperationHistoryEntry, type OperationImpactPreview, type OperationRestoreDrift } from '@/lib/api'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
 import { formatOperationDate } from '@/lib/operation-status'
 import { formatMinutesRough } from '@/lib/format-duration'
-import { formatNumber } from '@/lib/format'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import Button from '@/components/shared/button'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -17,35 +18,28 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
 import OtpInput from '@/components/shared/otp-input'
 import StepUpDialog from '@/components/shared/step-up-dialog'
-import SaveConflictBar from '@/components/shared/save-conflict-bar'
-import { CAPABILITY_LABEL, describeRestoreBlockers, describeRestoreDrift, describeRestoreResult } from './restore-drift'
+import { EmergencyControlFeedback } from './control-feedback-v8'
+import { emergencySafetyTransition, isEmergencyMutationLocked, runCurrentRequest } from './control-state'
+import { CAPABILITY_LABEL, describeRestoreBlockers, describeRestoreDrift, describeRestoreResult } from '@/lib/operation-restore'
 import { SendPathCoveragePanel } from './send-path-coverage-panel'
 import releaseLog from '@/generated/release-log-summary.json'
-import type { UpdateRelease } from './update-history'
+import type { UpdateRelease } from '@/lib/operation-updates'
 import styles from './control-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 
-/*
- * ★V8-B 運用状態の緊急コントロール（板 `OHwbU`）。
- *
- * v7 の制御タブ（`page.tsx` 内の EmergencyControlPanel）とは別の部品として持つ。
- * データの口・確認の言葉（停止／復旧）・本人確認（6桁かパスワード）・
- * 二重押し防止（実行中ロック＋冪等キー）・競合の戻し方・権限の扱いは同じ。
- * 違いは置き場と見せ方だけ——上に4枚の数の帯、何を止めますか・
- * 止めるアカウントのカード、止めているときの赤い帯、止めるとどうなるか・
- * 止めたあとにすること、止めた・戻した記録の表。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8-B 完成までの二重管理）。
- */
+/* ★V8-B 緊急コントロール（板 OHwbU）。停止・復旧・本人確認・冪等キーと
+ * 競合後の読み直しは、この現役の部品だけで守る。 */
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
 
 /*
  * 画面の並びと、口が返す名前の対応。画面は `broadcasts`、口は
- * `broadcast_dispatch` と呼ぶ。**どちらかに寄せない**（page.tsx と同じ約束）。
+ * `broadcast_dispatch` と呼ぶ。**どちらかに寄せない**（API の契約）。
  */
 const IMPACT_KEY: Record<StopTarget, EmergencyStopTarget> = {
   broadcasts: 'broadcast_dispatch',
@@ -153,7 +147,9 @@ const EmergencyControlV8 = (
   const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
 
   const previewGeneration = useRef(0)
-  const mutationLocked = needsReload || running
+  const reloadLock = useRef(false)
+  const mutationLock = useRef(false)
+  const mutationLocked = isEmergencyMutationLocked(needsReload || reloading, running)
 
   const requestPreview = useCallback(async (accountId: string | null) => {
     const response = await api.operations.preview(accountId)
@@ -165,23 +161,28 @@ const EmergencyControlV8 = (
   }, [])
 
   const loadPreview = useCallback(async (accountId: string | null, generation: number) => {
-    try {
-      const preview = await requestPreview(accountId)
-      if (previewGeneration.current !== generation) return
-      setImpact(preview.impact)
-      setImpactFailed(false)
-      setControl(preview.control)
-      setCanControl(preview.permissions.canControl)
-      setBlockedCode((preview.permissions as { canControl: boolean; reasonCode?: string | null }).reasonCode ?? null)
-      setCalculatedAt(preview.calculatedAt)
-    } catch (error) {
-      if (previewGeneration.current !== generation) return
-      setImpact(null)
-      setImpactFailed(true)
-      setControl(null)
-      setCanControl(false)
-      setBlockedCode(error instanceof ApiError ? (error.code ?? null) : null)
-    }
+    let loaded = false
+    await runCurrentRequest({
+      request: () => requestPreview(accountId),
+      isCurrent: () => previewGeneration.current === generation,
+      onSuccess: (preview) => {
+        loaded = true
+        setImpact(preview.impact)
+        setImpactFailed(false)
+        setControl(preview.control)
+        setCanControl(preview.permissions.canControl)
+        setBlockedCode((preview.permissions as { canControl: boolean; reasonCode?: string | null }).reasonCode ?? null)
+        setCalculatedAt(preview.calculatedAt)
+      },
+      onError: (error) => {
+        setImpact(null)
+        setImpactFailed(true)
+        setControl(null)
+        setCanControl(false)
+        setBlockedCode(error instanceof ApiError ? (error.code ?? null) : null)
+      },
+    })
+    return loaded
   }, [requestPreview])
 
   const clearPreview = useCallback(() => {
@@ -193,6 +194,24 @@ const EmergencyControlV8 = (
     setBlockedCode(null)
     setCalculatedAt(null)
   }, [])
+
+  const applySafety = useCallback((event: Parameters<typeof emergencySafetyTransition>[0]) => {
+    const state = emergencySafetyTransition(event)
+    // 読み直し失敗は loadPreview が既に値を破棄している。失敗と権限の理由は残す。
+    if (state.clearPreview && event !== 'reload-failure') clearPreview()
+    if (state.closeDialogs) {
+      setConfirmMode(null)
+      setStepUpMode(null)
+      setConfirmWord('')
+      setStopCode('')
+      setStopPassword('')
+      setStepUpError('')
+      setRequestKey('')
+    }
+    setNeedsReload(state.needsReload)
+    setReloading(state.reloading)
+    setFeedback(state.message)
+  }, [clearPreview])
 
   useEffect(() => {
     const generation = ++previewGeneration.current
@@ -210,14 +229,18 @@ const EmergencyControlV8 = (
   }, [loadPreview, targetAccountId])
 
   const reloadControl = useCallback(async () => {
-    const generation = ++previewGeneration.current
-    setNeedsReload(false)
-    setReloading(true)
-    await loadPreview(targetAccountId === 'all' ? null : targetAccountId, generation)
-    if (previewGeneration.current === generation) {
-      setReloading(false)
+    if (reloadLock.current) return
+    reloadLock.current = true
+    applySafety('reload-start')
+    const generation = previewGeneration.current
+    try {
+      const loaded = await loadPreview(targetAccountId === 'all' ? null : targetAccountId, generation)
+      if (previewGeneration.current !== generation) return
+      applySafety(loaded ? 'reload-success' : 'reload-failure')
+    } finally {
+      reloadLock.current = false
     }
-  }, [loadPreview, targetAccountId])
+  }, [applySafety, loadPreview, targetAccountId])
 
   /* 止めた・戻した記録と、いまの版。タブをまたいで同じ口・同じ数え方を使う。 */
   useEffect(() => {
@@ -296,7 +319,7 @@ const EmergencyControlV8 = (
   }
 
   const openStopConfirm = useCallback(() => {
-    if (needsReload) {
+    if (mutationLocked) {
       setFeedback({ tone: 'warning', text: '最新の状態を読み直してから、もう一度確認してください。' })
       return
     }
@@ -316,12 +339,12 @@ const EmergencyControlV8 = (
     setStepUpError('')
     setRequestKey(crypto.randomUUID())
     setConfirmMode('stop')
-  }, [canControl, control, impact, impactFailed, needsReload, selectedTargets.length])
+  }, [canControl, control, impact, impactFailed, mutationLocked, selectedTargets.length])
 
   useImperativeHandle(ref, () => ({ openStop: () => openStopConfirm() }), [openStopConfirm])
 
   const openRestoreConfirm = () => {
-    if (needsReload) {
+    if (mutationLocked) {
       setFeedback({ tone: 'warning', text: '最新の状態を読み直してから、もう一度確認してください。' })
       return
     }
@@ -374,7 +397,8 @@ const EmergencyControlV8 = (
   )
 
   const runStop = async (code: string) => {
-    if (needsReload || !control || !requestKey || stepUpMethod === 'none') return
+    if (mutationLock.current || mutationLocked || !control || !requestKey || stepUpMethod === 'none') return
+    mutationLock.current = true
     setRunning(true)
     setStepUpError('')
     setFeedback(null)
@@ -394,33 +418,34 @@ const EmergencyControlV8 = (
       setControl(response.data.control)
       setNeedsReload(false)
       setFeedback({ tone: 'success', text: 'サーバー共通の停止状態を更新しました。別の端末にも同じ状態が表示されます。' })
+      setConfirmMode(null)
       setStepUpMode(null)
       setConfirmWord('')
       setStopCode('')
       setStopPassword('')
       setRequestKey('')
-      void reloadControl()
+      void loadPreview(targetAccountId === 'all' ? null : targetAccountId, ++previewGeneration.current)
     } catch (error) {
       if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
-        setStepUpMode(null)
-        setNeedsReload(true)
-        setFeedback({ tone: 'warning', text: 'ほかの人が先に操作しました。最新の状態を読み直してから、もう一度確認してください。' })
+        applySafety('conflict')
       } else if (error instanceof ApiError && error.status === 403) {
-        setStepUpMode(null)
+        applySafety('forbidden')
         setCanControl(false)
         setBlockedCode(error.code ?? null)
         setFeedback({ tone: 'warning', text: blockedText(error.code) ?? 'この操作を行う権限がありません。オーナーに確認してください。' })
       } else {
-        setStepUpMode(null)
+        applySafety('operation-failed')
         setFeedback({ tone: 'danger', text: failureText(error, '緊急停止を保存できませんでした。最新の停止状態を読み直して、もう一度確認してください。') })
       }
     } finally {
+      mutationLock.current = false
       setRunning(false)
     }
   }
 
   const runRestore = async (code: string) => {
-    if (needsReload || !control?.activeIncidentId || !requestKey || stepUpMethod === 'none') return
+    if (mutationLock.current || mutationLocked || !control?.activeIncidentId || !requestKey || stepUpMethod === 'none') return
+    mutationLock.current = true
     setRunning(true)
     setStepUpError('')
     setFeedback(null)
@@ -440,12 +465,10 @@ const EmergencyControlV8 = (
       setFeedback({ tone: report.tone === 'warning' ? 'warning' : 'success', text: report.text })
       setStepUpMode(null)
       setRequestKey('')
-      void reloadControl()
+      void loadPreview(targetAccountId === 'all' ? null : targetAccountId, ++previewGeneration.current)
     } catch (error) {
       if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
-        setStepUpMode(null)
-        setNeedsReload(true)
-        setFeedback({ tone: 'warning', text: 'ほかの人が先に操作しました。最新の状態を読み直してから、もう一度確認してください。' })
+        applySafety('conflict')
       } else if (error instanceof ApiError && error.status === 409 && error.code === 'OPERATION_RESTORE_BLOCKED') {
         const report = (error.data as { report?: { drift?: OperationRestoreDrift } } | undefined)?.report
         const reasons = report?.drift ? describeRestoreBlockers(report.drift) : []
@@ -455,15 +478,16 @@ const EmergencyControlV8 = (
           text: [failureText(error, '停止中の変更があるため復旧を止めました。'), ...reasons].join(' '),
         })
       } else if (error instanceof ApiError && error.status === 403) {
-        setStepUpMode(null)
+        applySafety('forbidden')
         setCanControl(false)
         setBlockedCode(error.code ?? null)
         setFeedback({ tone: 'warning', text: blockedText(error.code) ?? 'この操作を行う権限がありません。オーナーに確認してください。' })
       } else {
-        setStepUpMode(null)
+        applySafety('operation-failed')
         setFeedback({ tone: 'danger', text: failureText(error, '復旧できませんでした。最新の停止状態を読み直して、もう一度確認してください。') })
       }
     } finally {
+      mutationLock.current = false
       setRunning(false)
     }
   }
@@ -483,13 +507,7 @@ const EmergencyControlV8 = (
     if (!impactFailed && selectedTargets.length === 0) stopBlockers.push('empty')
     if (isStopped) stopBlockers.push('stopped')
   }
-  const blockerText: Record<StopBlocker, string> = {
-    unavailable: '停止状態を確認できないため、停止・復旧を実行できません。',
-    forbidden: '緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。',
-    scope: 'この範囲を操作する権限がありません。対象アカウントを選び直すか、オーナーに確認してください。',
-    empty: '停止する配信を1つ以上選んでください。',
-    stopped: 'いまは止めています。戻すときは「復旧する」を使います。',
-  }
+
 
   const stopIncident = operations.find((item) => item.id === control?.activeIncidentId) ?? null
   const recordRows = operations
@@ -499,93 +517,26 @@ const EmergencyControlV8 = (
 
   return (
     <div data-design-node="OHwbU" className={styles.board}>
+      <FormLeaveGuard dirty={!isStopped && Boolean(reason.trim() || reasonDetail.trim() || targetAccountId !== 'all' || JSON.stringify(targets) !== JSON.stringify({ broadcasts: true, scenarios: true, reminders: true, automations: false }))} busy={mutationLocked} />
       {/* 権限が無い人には閲覧のみの帯。操作は出さず、記録は読める。 */}
       {previewSettled && !canControl ? (
         <div className={styles.roBand}><ReadOnlyNotice role="status">閲覧のみで見ています。止める・戻す操作はオーナーか許可された人に頼んでください。</ReadOnlyNotice></div>
       ) : null}
 
-      {needsReload ? (
-        <SaveConflictBar
-          message="ほかの人が先に操作しました。最新の状態を読み直してから、もう一度確認してください。"
-          actionLabel={reloading ? '読み直しています…' : '最新の状態を読み直す'}
-          onAction={() => void reloadControl()}
-          actionQa="emergency-reload"
-        />
-      ) : null}
-
-      {stopBlockers.length > 0 ? (
-        <div className={`${styles.feedbackBand} ${styles.feedbackWarn}`} role="status">
-          <span>{stopBlockers.map((blocker) => blockerText[blocker]).join('')}</span>
-          {stopBlockers.includes('unavailable') ? (
-            <Button type="button" onClick={() => void reloadControl()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
-              最新の状態を読み直す
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {feedback ? (
-        <div
-          className={`${styles.feedbackBand} ${feedback.tone === 'danger' ? styles.feedbackDanger : feedback.tone === 'warning' ? styles.feedbackWarn : styles.feedbackSuccess}`}
-          role={feedback.tone === 'success' ? 'status' : 'alert'}
-        >
-          <span>{feedback.text}</span>
-          {feedback.tone !== 'success' && needsReload ? (
-            <Button type="button" onClick={() => void reloadControl()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
-              最新の状態を読み直す
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
+      <EmergencyControlFeedback message={feedback} needsReload={needsReload} reloading={reloading} stopBlockers={stopBlockers} onReload={() => void reloadControl()} />
 
       {/* 数の帯。取れていない数字は「—」（0 とは言わない）。 */}
-      <div className={styles.kpis} aria-label="緊急停止の集計">
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}>
-            <span className={styles.kpiTile} aria-hidden="true"><ShieldCheck size={14} /></span>
-            <span className={styles.kpiLabel}>緊急停止状態</span>
-          </div>
-          <p className={`${styles.kpiValue} ${isStopped ? styles.kpiValueDanger : ''}`}>
-            {/* WEB312：状態が読めていないときは「動いている」と言わない。 */}
-            {previewSettled && control ? (isStopped ? '停止中' : '有効') : emptyValue('unknown')}
-          </p>
-          <p className={styles.kpiDetail}>
-            {impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'}
-          </p>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}>
-            <span className={styles.kpiTile} aria-hidden="true"><PauseCircle size={14} /></span>
-            <span className={styles.kpiLabel}>止めた回数</span>
-          </div>
-          <p className={styles.kpiValue}>
-            {historyState === 'ready' ? formatNumber(recent90.length) : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span>
-          </p>
-          <p className={styles.kpiDetail}>この90日</p>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}>
-            <span className={styles.kpiTile} aria-hidden="true"><Timer size={14} /></span>
-            <span className={styles.kpiLabel}>いちばん長かった停止</span>
-          </div>
-          <p className={styles.kpiValue}>
-            {historyState === 'ready' ? (longest.entry ? formatMinutesRough(longest.minutes) : emptyValue('unknown')) : emptyValue('unknown')}
-          </p>
-          <p className={styles.kpiDetail}>
-            {longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'}
-          </p>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}>
-            <span className={styles.kpiTile} aria-hidden="true"><Tag size={14} /></span>
-            <span className={styles.kpiLabel}>いまの版</span>
-          </div>
-          <p className={styles.kpiValue}>{historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}</p>
-          <p className={styles.kpiDetail}>
-            {latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'}
-          </p>
-        </div>
-      </div>
+      <KpiBand aria-label="緊急停止の集計">
+        <KpiCard title="緊急停止状態" icon={<ShieldCheck size={14} />} value={null} unit=""
+          valueText={previewSettled && control ? (isStopped ? '停止中' : '有効') : emptyValue('unknown')}
+          valueTone={isStopped ? 'danger' : 'default'}
+          detail={impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'} />
+        <KpiCard title="止めた回数" icon={<OctagonPause size={14} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
+        <KpiCard title="いちばん長かった停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
+          detail={longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'} />
+        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} unit="" valueText={historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}
+          detail={latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'} />
+      </KpiBand>
 
       <section className={styles.card} aria-labelledby="emergency-targets-heading">
         <h2 id="emergency-targets-heading" className={styles.cardTitle}>何を止めますか</h2>
@@ -793,6 +744,7 @@ const EmergencyControlV8 = (
       {/* 確認の窓：止めるときは板 `EA8rM` の1枚（対象・理由必須・言葉・番号）。戻すときは今までどおり。 */}
       <Dialog
         open={confirmMode !== null}
+        busy={mutationLocked}
         designNode={confirmMode === 'stop' ? 'EA8rM' : 'OHwbU-confirm'}
         tone={confirmMode === 'stop' ? 'destructive' : 'default'}
         title={confirmMode === 'stop' ? '緊急停止を確認' : '止める前の状態に戻しますか？'}

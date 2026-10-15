@@ -35,7 +35,7 @@ vi.mock('next/link', () => ({
     <a href={href} {...rest}>{children}</a>
   ),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: navigation.push }),
 }))
 
@@ -57,9 +57,11 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => ({ ...(await importOriginal()), useStaffRole: () => 'owner' }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+
 const { AccountProvider } = await import('@/contexts/account-context')
-// 編集の入口（page.tsx）は campaign-editor-v8 を出す（古い campaign-editor.tsx はどこからも描かれないので 2026-10-07 に消した）。
-const { default: CampaignEditor } = await import('./campaign-editor-v8')
+const { default: CampaignEditor } = await import('@/v8/nen-campaigns/edit')
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -108,12 +110,10 @@ async function mount() {
   await settle()
 }
 
-function bodyTextarea(): HTMLTextAreaElement {
-  const found = Array.from(container.querySelectorAll('textarea')).find(
-    (element) => element.getAttribute('aria-label') === '配信本文',
-  )
+function bodyTextarea(): HTMLElement & { value: string } {
+  const found = container.querySelector('[aria-label="配信本文"][contenteditable]')
   if (!found) throw new Error('配信本文の入力欄が見つかりません')
-  return found as HTMLTextAreaElement
+  return found as HTMLElement & { value: string }
 }
 
 function saveButton(): HTMLButtonElement {
@@ -125,9 +125,8 @@ function saveButton(): HTMLButtonElement {
 }
 
 async function setBody(value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
   await act(async () => {
-    setter.call(bodyTextarea(), value)
+    bodyTextarea().value = value
     bodyTextarea().dispatchEvent(new Event('input', { bubbles: true }))
   })
 }
@@ -154,6 +153,7 @@ function fakeStorage(): Storage {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   vi.clearAllMocks()
   vi.stubGlobal('localStorage', fakeStorage())
   lineAccountsListApi.mockResolvedValue({
@@ -178,6 +178,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   if (root) await act(async () => { root.unmount() })
+  container.remove()
+  delete document.documentElement.dataset.theme
   localStorage.clear()
   vi.unstubAllGlobals()
 })
@@ -247,7 +249,9 @@ describe('文言と実態の一致・書きかけの保護（実mount・#935）'
     })
     await mount()
 
-    expect(container.textContent).toContain('配信待ちの7通は予約したときの中身のまま届きます')
+    expect(container.textContent).toContain('配信待ち 7 通は前の中身のまま')
+    await click(container.querySelector<HTMLButtonElement>('button[aria-label="注文お礼（配信を直す）の説明"]')!)
+    expect(container.textContent).toContain('予約したときの中身のまま届きます')
     expect(container.textContent).not.toContain('42通')
   })
 
@@ -313,9 +317,11 @@ describe('同時保存の競合（実mount・M507）', () => {
     await click(saveButton())
     await settle()
 
-    // 最新を読み直す（settings がもう一度呼ばれる）。
+    // 現役の比較を開いて最新を取り、自分の本文は書き換えない。
+    await click(Array.from(container.querySelectorAll('button')).find((button) => button.textContent === '違いを比べる')!)
+    await settle()
     expect(settingsApi.mock.calls.length).toBeGreaterThan(1)
-    expect(container.textContent).toContain('ほかの人が先に保存しました')
+    expect(container.textContent).toContain('ほかの担当者が先に保存しました')
     // 入力は消えない。
     expect(bodyTextarea().value).toBe('自分の本文')
     // 保存は1回だけ（黙った上書きをしていない）。

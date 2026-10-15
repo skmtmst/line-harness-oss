@@ -173,8 +173,8 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
     const labels = [...menu!.querySelectorAll('[role="menuitem"]')]
       .map((item) => item.textContent?.trim())
     expect(labels).toEqual([
-      '詳細を見る', '登録者を管理', '配信予定を見る', '実行結果を見る',
-      '編集する', '複製する', '一時停止する', 'フォルダへ移す', '削除',
+      'リマインダの詳細を見る', '配信予定を見る', '実行結果を見る', '登録者を管理',
+      '編集する', '複製する', 'フォルダへ移す', '一時停止する', '削除する',
     ])
     // 板 SkY9V：行の「…」を開いた印
     expect(host.querySelector('[data-design-node="SkY9V"]')).toBeTruthy()
@@ -210,7 +210,7 @@ test('v8 の行の「登録者を管理」「配信予定を見る」「実行�
 })
 
 // 2026-10-06 オーナー決定：閲覧のみには押せないボタン・項目を置かずに隠す（帯は出す）。板 a5C1p。
-test('v8 の閲覧のみ（a5C1p）は作る・選ぶ箱・押せない行の操作を出さず、閲覧のみの帯を出す', async () => {
+test('v8 の閲覧のみ（a5C1p）は選ぶ枠と作る・一括・変更の操作を出さず、閲覧のみの帯を出す', async () => {
   document.documentElement.dataset.theme = 'v8'
   handler = (url) => {
     if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'viewer' } })
@@ -225,13 +225,14 @@ test('v8 の閲覧のみ（a5C1p）は作る・選ぶ箱・押せない行の操
   const actionTexts = [...host.querySelectorAll('button, a')].map((el) => el.textContent ?? '')
   expect(actionTexts.some((text) => text.includes('リマインダを作る'))).toBe(false)
   expect(actionTexts.some((text) => text.includes('フォルダを追加'))).toBe(false)
-  expect(host.querySelectorAll('input[type="checkbox"], [role="checkbox"]')).toHaveLength(0)
+  const selections = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+  expect(selections).toHaveLength(0)
   const trigger = [...host.querySelectorAll('button')]
     .find((item) => item.getAttribute('aria-label') === 'リマインダ「契約終了の前に知らせる」の操作')
   await act(async () => { trigger!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   await eventually(() => {
     const labels = [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map((item) => item.textContent?.trim())
-    expect(labels).toEqual(['詳細を見る', '登録者を管理', '配信予定を見る', '実行結果を見る'])
+    expect(labels).toEqual(['リマインダの詳細を見る', '配信予定を見る', '実行結果を見る', '登録者を管理'])
   })
 })
 
@@ -248,7 +249,7 @@ test('v8 の削除の窓（VsSyu）は危ない操作を左端に離し、動い
   const remove = await (async () => {
     let found: HTMLElement | undefined
     await eventually(() => {
-      found = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.trim() === '削除') as HTMLElement | undefined
+      found = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.trim() === '削除する') as HTMLElement | undefined
       expect(found).toBeTruthy()
     })
     return found!
@@ -259,8 +260,12 @@ test('v8 の削除の窓（VsSyu）は危ない操作を左端に離し、動い
     expect(dialog?.textContent).toContain('「契約終了の前に知らせる」を削除しますか？')
     expect(dialog?.textContent).toContain('削除は元に戻せません。')
     const buttons = [...dialog!.querySelectorAll('button')].map((button) => button.textContent?.trim())
-    // 右上の×（文字なし）のあと、左端に削除、真ん中に取消と代わりの操作。
+    // 閉じる印のあと、削除・取消・代わりの操作を同じ段へ置く。
     expect(buttons.filter(Boolean)).toEqual(['削除する', 'キャンセル', '代わりに一時停止'])
+    const panel = dialog!.querySelector('[role="alertdialog"]') as HTMLElement
+    expect(panel.style.getPropertyValue('--dialog-design-width')).toBe('480px')
+    expect((dialog as HTMLElement).style.getPropertyValue('--dialog-design-top')).toBe('260px')
+    expect(panel.querySelector('[data-dialog-actions]')?.querySelectorAll('button')).toHaveLength(3)
   })
 })
 
@@ -273,9 +278,10 @@ test('下書きの削除も確認前には送信せず、元に戻すで延期�
   await eventually(() => expect(host.querySelector('tbody tr')).toBeTruthy())
   await act(async () => (host.querySelector('tbody button[aria-label*="操作"]') as HTMLElement).click())
   await eventually(() => expect(document.querySelector('[role="menuitem"]')).toBeTruthy())
-  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '削除') as HTMLElement).click())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '削除する') as HTMLElement).click())
   await eventually(() => expect(document.querySelector('[data-design-node="VsSyu"]')?.textContent).toContain('削除しますか？'))
   expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+  expect(document.querySelector('[data-design-node="VsSyu"]')?.textContent).not.toContain('代わりに一時停止')
   const confirm = [...document.querySelectorAll('[data-design-node="VsSyu"] button')].find(button => button.textContent === '削除する') as HTMLElement
   await act(async () => confirm.click())
   expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(true)

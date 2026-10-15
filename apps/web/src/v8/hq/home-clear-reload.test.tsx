@@ -108,5 +108,5 @@ test('フォルダの「色を変える」から既存色を変えて保存し�
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
   expect(api.lineAccountFolders.update).toHaveBeenCalledWith('f1', { name: '関西', color: '#ef4444' })
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  expect(document.querySelector('[data-folder-dot="filed"]')?.getAttribute('style')).toContain('#ef4444')
+  expect(document.querySelector('nav svg.lucide-folder')?.getAttribute('style')).toContain('#ef4444')
 })

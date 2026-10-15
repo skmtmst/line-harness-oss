@@ -146,10 +146,10 @@ export default function MileageAdjustDialog({
   const sourceError = sourceReferenceId.trim().length > 128 ? '調整元IDは128文字以内で入力してください' : null
   const reasonError = !reason.trim() ? '詳しい理由を入力してください' : reason.trim().length > 500 ? '詳しい理由は500文字以内で入力してください' : null
   const fields = useFormErrors()
-  fields.define('amount', 'マイル数', () => amountError)
-  fields.define('expires', 'この分の有効期限', () => expiresError)
-  fields.define('source', '調整元ID', () => sourceError)
-  fields.define('reason', '詳しい理由', () => reasonError)
+  fields.define('amount', 'マイル数', () => amountError, { required: true })
+  fields.define('expires', 'この分の有効期限', () => expiresError, { required: false })
+  fields.define('source', '調整元ID', () => sourceError, { required: false })
+  fields.define('reason', '詳しい理由', () => reasonError, { required: true })
   const describedBy = (key: string) => (fields.invalid(key) ? `adj-${key}-error` : undefined)
 
   const inputError = useMemo(() => {
@@ -503,12 +503,12 @@ export default function MileageAdjustDialog({
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更量</p>
               <p className={styles.deltaValue}>
-                {valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : emptyValue('unknown')}
+                <span className={valid ? 'text-accent-deep' : undefined}>{valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : emptyValue('unknown')}</span>
               </p>
             </div>
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更後の残高</p>
-              <p className={styles.deltaValue}>{valid ? formatNumber(balanceAfter) : emptyValue('unknown')}</p>
+              <p className={styles.deltaValue}><span className={valid ? 'text-accent-deep' : undefined}>{valid ? formatNumber(balanceAfter) : emptyValue('unknown')}</span></p>
             </div>
           </div>
 

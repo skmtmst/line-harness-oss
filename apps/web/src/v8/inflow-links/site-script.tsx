@@ -1,10 +1,16 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  siteDialog_label: requiredText("サイトの名前を入力してください"),
+}
+
+
 import CodeBlock from '@/components/shared/code-block'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleHelp, Pause, Play, Plus, RefreshCw } from 'lucide-react'
+import { CircleHelp, Copy, Mail, Pause, Play, Plus, RefreshCw } from 'lucide-react'
 import { ApiError, api, type MeasurementSite } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
@@ -13,9 +19,12 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import HelpTip from '@/components/shared/help-tip'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -37,9 +46,9 @@ import Notice from '@/components/shared/notice'
  *
  * 呼ぶ口・権限・失敗の扱いは今のサイトスクリプト（components/inflow-links/site-script-v8.tsx）と同じ
  * （BEHAVIOR.md の「サイトスクリプト」）。違うのは見せ方だけ：
- * - 行の「…」を押すと、表の下の操作の行がそのサイトの「編集・止める・再開する」になる（押せないものは押せない形）
+ * - 行の「…」を押すと、そのサイトの「編集・止める・再開する」を共通メニューで開く（B-202）
  * - 「貼りかたが分からないときは」は窓で開く（今は右の列のいちばん下の段）
- * - 閲覧のみ（owner・admin 以外）には、サイトを追加する・「…」・操作の行を出さない
+ * - 閲覧のみ（owner・admin 以外）には、サイトを追加する・「…」を出さない
  */
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
@@ -180,7 +189,7 @@ export default function SiteScriptV8() {
   const saveSite = async () => {
     if (!siteDialog) return
     const errors: Record<string, string> = {}
-    if (!siteDialog.label.trim()) errors['site-name'] = 'サイトの名前を入力してください'
+    if ((b244Requirements.siteDialog_label.check(siteDialog.label) !== null)) errors['site-name'] = 'サイトの名前を入力してください'
     if (!parseDomains(siteDialog.domainsText).length) errors['site-domains'] = '計測を許可するドメインを入力してください'
     setSiteFieldErrors(errors)
     setSiteDialog({ ...siteDialog, error: null })
@@ -277,8 +286,6 @@ export default function SiteScriptV8() {
   const receiving = summary?.lastEventAt != null
   const lastSeen = formatShort(summary?.lastEventAt)
   const allowedDomains = [...new Set(sites.filter((site) => site.stoppedAt == null).flatMap((site) => site.domains))]
-  const selectedSite = sites.find((site) => site.id === selectedSiteId) ?? null
-  const selectedStopped = selectedSite?.stoppedAt != null
 
   const sitesBody = sitesFailed ? (
     <p className={styles.note} role="status">
@@ -290,61 +297,48 @@ export default function SiteScriptV8() {
   ) : (
     <>
       {siteActionError ? <Notice tone="danger" className={styles.noteNoticePlacement} >{siteActionError}</Notice> : null}
-      <div className={styles.siteTable} role="table" aria-label="成果を数えるサイト">
-      <div className={styles.siteHead} role="row">
-        <span className={styles.colSite} role="columnheader">サイト</span>
-        <span className={styles.colDomain} role="columnheader">ドメイン</span>
-        <span className={styles.colState} role="columnheader">状態</span>
-        <span className={styles.colLast} role="columnheader">最後に届いた</span>
-        <span className={styles.colMenu} role="columnheader"><span className="sr-only">操作</span></span>
-      </div>
+      <DataTable aria-label="成果を数えるサイト" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
+      <TableHeadRow data-table-layout="columns">
+        <Th grow>サイト</Th>
+        <Th className={styles.colDomain}>ドメイン</Th>
+        <Th className={styles.colState}>状態</Th>
+        <Th className={styles.colLast}>最後に届いた</Th>
+        <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
+      </TableHeadRow></thead><tbody>
       {sites.map((site) => {
         const stopped = site.stoppedAt != null
         const last = formatShort(site.lastReceivedAt)
         return (
-          <div key={site.id} className={styles.siteRow} role="row" data-selected={selectedSiteId === site.id || undefined}>
-            <span className={styles.colSite} role="cell"><span className={styles.siteName} title={site.label}>{site.label}</span></span>
-            <span className={styles.colDomain} role="cell"><span className={styles.cellText} title={site.domains.join('\n')}>{site.domains.join('、') || emptyValue('unknown')}</span></span>
-            <span className={styles.colState} role="cell">
+          <Tr key={site.id} data-selected={selectedSiteId === site.id || undefined} data-table-layout="columns">
+            <Td grow><span className={styles.siteName} title={site.label}>{site.label}</span></Td>
+            <Td className={styles.colDomain}><span className={styles.cellText} title={site.domains.join('\n')}>{site.domains.join('、') || emptyValue('unknown')}</span></Td>
+            <Td className={styles.colState}>
               {stopped ? (
-                <StatusBadge tone="neutral" size="compact">停止中</StatusBadge>
+                <StatusBadge tone="neutral" size="compact" title={site.stoppedReason ? `理由: ${site.stoppedReason}` : undefined}>停止中</StatusBadge>
               ) : (
                 <StatusBadge tone="success" size="compact">{site.lastReceivedAt ? '届いている' : '受信待ち'}</StatusBadge>
               )}
-            </span>
-            <span className={styles.colLast} role="cell"><span className={styles.cellText}>{last ?? emptyValue('unknown')}</span></span>
-            <span className={styles.colMenu} role="cell">
+            </Td>
+            <Td className={styles.colLast}><span className={styles.cellText} title={`最後に受け取った時刻: ${site.lastReceivedAt ? polishFormatDate(site.lastReceivedAt, { style: 'detail', fallback: 'まだ受け取っていません' }) : 'まだ受け取っていません'}`}>{last ?? emptyValue('unknown')}</span></Td>
+            <Td className={styles.colMenu}>
               {manage ? (
-                <MoreAction
-                  title={`「${site.label}」の操作`}
-                  aria-label={`「${site.label}」の操作`}
-                  aria-expanded={selectedSiteId === site.id}
-                  aria-controls="site-script-row-actions"
-                  onClick={() => setSelectedSiteId((current) => (current === site.id ? null : site.id))}
-                 />
+                <RowMenu
+                  label={`「${site.label}」の操作`}
+                  open={selectedSiteId === site.id}
+                  onOpenChange={(open) => setSelectedSiteId(open ? site.id : null)}
+                  items={[
+                    { id: 'edit', label: '編集', onSelect: () => { setSiteFieldErrors({}); setSiteDialog({ mode: 'edit', site, label: site.label, domainsText: site.domains.join('\n'), error: null }) } },
+                    ...(stopped
+                      ? [{ id: 'resume', label: '再開する', icon: <Play size={15} aria-hidden />, onSelect: () => setResumeTarget(site) }]
+                      : [{ id: 'stop', label: '止める', icon: <Pause size={15} aria-hidden />, onSelect: () => { setStopReasonError(''); setStopDialog({ site, reason: '', error: null }) } }]),
+                  ]}
+                />
               ) : null}
-            </span>
-          </div>
+            </Td>
+          </Tr>
         )
       })}
-      </div>
-      {manage ? (
-        <div className={styles.rowActions} id="site-script-row-actions" role="group" aria-label="選んだサイトの操作">
-          <span className={styles.rowActionsLabel}>{selectedSite ? `「${selectedSite.label}」の操作：` : '「…」を開いたとき：'}</span>
-          <Button
-            disabled={!selectedSite}
-            onClick={() => { if (selectedSite) { setSiteFieldErrors({}); setSiteDialog({ mode: 'edit', site: selectedSite, label: selectedSite.label, domainsText: selectedSite.domains.join('\n'), error: null }) } }}
-          >
-            編集
-          </Button>
-          <Button disabled={!selectedSite || selectedStopped} onClick={() => { if (selectedSite) { setStopReasonError(''); setStopDialog({ site: selectedSite, reason: '', error: null }) } }}>
-            <Pause size={15} aria-hidden="true" />止める
-          </Button>
-          <Button disabled={!selectedSite || !selectedStopped} onClick={() => selectedSite && setResumeTarget(selectedSite)}>
-            <Play size={15} aria-hidden="true" />再開する
-          </Button>
-        </div>
-      ) : null}
+      </tbody></DataTable>
     </>
   )
 
@@ -367,7 +361,7 @@ export default function SiteScriptV8() {
             onRetry={() => void load()}
           />
         ) : <>
-          <section className={styles.card} aria-labelledby="ss-sites">
+          <Card variant="panel" contentPadding="var(--polish-space-card)" gap="var(--polish-space-field)" aria-labelledby="ss-sites">
             <h2 className={styles.cardTitle} id="ss-sites">{`成果を数えるサイト ${sites.length > 0 ? formatNumber(sites.length) : ''}`.trim()}</h2>
             <div className={styles.sitesLead}>
               <p className={styles.lead}>サイトごとにコードを分けます。止めたサイトの成果は数えません。</p>
@@ -378,22 +372,22 @@ export default function SiteScriptV8() {
               ) : null}
             </div>
             {sitesBody}
-          </section>
+          </Card>
 
           <div className={styles.split}>
             <div className={styles.column}>
-              <section className={styles.panel} aria-labelledby="ss-code">
+              <Card variant="aside" contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)" aria-labelledby="ss-code">
                 <h2 className={styles.cardTitle} id="ss-code">サイトに貼るコード</h2>
                 <p className={styles.small}>ホームページの &lt;/head&gt; の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。</p>
                 {keyLoading ? (
                   <p className={styles.small}>あなたのアカウントのコードを取得しています…</p>
                 ) : snippet ? (
                   <>
-                    <CodeBlock>{snippet}</CodeBlock>
+                    <CodeBlock wrap>{snippet}</CodeBlock>
                     {copyFailed ? <Notice tone="danger" className={styles.smallNoticePlacement} >コピーできませんでした。上のコードを選んでコピーしてください。</Notice> : null}
                     <div className={styles.buttons}>
-                      <CopyTextButton value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー"  />
-                      <CopyTextButton value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} label="制作会社へ送る文をコピー" aria-label="制作会社へ送る文をコピー"  />
+                      <CopyTextButton variant="primary" icon={<Copy size={15} aria-hidden />} value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー" />
+                      <CopyTextButton variant="secondary" icon={<Mail size={15} aria-hidden />} value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} label="制作会社へ送る文をコピー" aria-label="制作会社へ送る文をコピー" />
                     </div>
                   </>
                 ) : (
@@ -404,9 +398,9 @@ export default function SiteScriptV8() {
                     </div>
                   </>
                 )}
-              </section>
+              </Card>
 
-              <section className={styles.panel} aria-labelledby="ss-domains">
+              <Card variant="aside" contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)" aria-labelledby="ss-domains">
                 <h2 className={styles.cardTitle} id="ss-domains">計測を許可するドメイン</h2>
                 <div className={styles.domainBox}>
                   {allowedDomains.length > 0
@@ -414,9 +408,9 @@ export default function SiteScriptV8() {
                     : <span className={styles.domainEmpty}>まだ許可したドメインがありません。</span>}
                 </div>
                 <p className={styles.faint}>このサイトから届いた成果だけを数えます。1行に1つ。www の有無は同じサイトとして扱います。</p>
-              </section>
+              </Card>
 
-              <section className={styles.panel} aria-labelledby="ss-consent">
+              <Card variant="aside" contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)" aria-labelledby="ss-consent">
                 <h2 className={styles.cardTitle} id="ss-consent">閲覧の記録への同意（サイトの下に出る案内の見本）</h2>
                 <div className={styles.consent} aria-label="お客さまのサイトに出る案内の見本">
                   <span className={styles.consentText}>広告の効果を知るため、この端末での閲覧を記録してよいですか？</span>
@@ -424,12 +418,12 @@ export default function SiteScriptV8() {
                   <span className={`${styles.mockButton} ${styles.mockPrimary}`}>記録してよい</span>
                 </div>
                 <p className={styles.faint}>同意がなかった人は記録しません（「数えなかった」に入ります）。個人が特定できる情報は送りません。</p>
-              </section>
+              </Card>
             </div>
 
             <div className={styles.rail}>
-              <section className={styles.panel} aria-labelledby="ss-status">
-                <h2 className={styles.cardTitle} id="ss-status">いま届いているか</h2>
+              <Card variant="aside" contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)" aria-labelledby="ss-status">
+                <h2 className={styles.cardTitle} id="ss-status" title={receiving ? `今日は ${formatNumber(summary?.todayEvents)}件、${formatNumber(summary?.pathCount)}種類のページから届いています。` : 'まだ受け取っていないため数字は出しません'}>いま届いているか</h2>
                 <div className={styles.statusBlock}>
                   {receiving ? (
                     <>
@@ -444,37 +438,37 @@ export default function SiteScriptV8() {
                   )}
                   <span><Button onClick={() => load()} busyLabel="処理中…"><RefreshCw size={15} aria-hidden="true" />いま届いているか確かめる</Button></span>
                 </div>
-                <div className={styles.pageTable} role="table" aria-label="ページごとの表示">
-                  <div className={styles.pageHead} role="row">
-                    <span className={styles.pageCol} role="columnheader">ページ</span>
-                    <span className={styles.numCol} role="columnheader">この30日のページ表示</span>
-                    <span className={styles.numColNarrow} role="columnheader">訪問者数<HelpTip label="訪問者数の説明">この30日にページを訪れた人数です。同じ訪問者は1人として数えます。LINEの友だち追加数は含みません。</HelpTip></span>
-                  </div>
+                <DataTable aria-label="ページごとの表示" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
+                  <TableHeadRow data-table-layout="columns">
+                    <Th grow>ページ</Th>
+                    <Th className={styles.numCol} align="right">この30日のページ表示</Th>
+                    <Th className={styles.numColNarrow} align="right">訪問者数<HelpTip label="訪問者数の説明">この30日にページを訪れた人数です。同じ訪問者は1人として数えます。LINEの友だち追加数は含みません。</HelpTip></Th>
+                  </TableHeadRow></thead><tbody>
                   {pages.slice(0, 4).map((page) => (
-                    <div key={`${page.host ?? ''}:${page.path}`} className={styles.pageRow} role="row">
-                      <span className={styles.pageCol} role="cell"><span className={styles.cellSmall} title={page.host ? `${page.host}${page.path}` : page.path}>{page.path}</span></span>
-                      <span className={styles.numCol} role="cell">{formatNumber(page.views)}</span>
-                      <span className={styles.numColNarrow} role="cell">{formatNumber(page.visitors)}</span>
-                    </div>
+                    <Tr key={`${page.host ?? ''}:${page.path}`} data-table-layout="columns">
+                      <Td grow><span className={styles.cellSmall} title={page.host ? `${page.host}${page.path}` : page.path}>{page.path}</span></Td>
+                      <Td className={styles.numCol} align="right">{formatNumber(page.views)}</Td>
+                      <Td className={styles.numColNarrow} align="right">{formatNumber(page.visitors)}</Td>
+                    </Tr>
                   ))}
                   {pages.length === 0 ? (
-                    <div className={styles.pageRow} role="row">
-                      <span className={styles.pageCol} role="cell">同意なし</span>
-                      <span className={styles.numCol} role="cell">{emptyValue('unknown')}</span>
-                      <span className={styles.numColNarrow} role="cell">{emptyValue('unknown')}</span>
-                    </div>
+                    <Tr data-table-layout="columns">
+                      <Td grow>同意なし</Td>
+                      <Td className={styles.numCol} align="right">{emptyValue('unknown')}</Td>
+                      <Td className={styles.numColNarrow} align="right">{emptyValue('unknown')}</Td>
+                    </Tr>
                   ) : null}
-                </div>
-              </section>
+                </tbody></DataTable>
+              </Card>
 
-              <section className={styles.panel} aria-labelledby="ss-how">
+              <Card variant="aside" contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)" aria-labelledby="ss-how">
                 <h2 className={styles.cardTitle} id="ss-how">どうやって友だちと結びつくか</h2>
                 <p className={styles.small}>1. LINE から開いた場合：その場で経路を記録します。</p>
                 <p className={styles.small}>2. あとから LINE を追加した場合：同じブラウザの記録と結びつけます。</p>
                 <p className={styles.small}>3. 結びつかない場合：個人を推測せず経路不明として数えます。</p>
-              </section>
+              </Card>
 
-              <section className={styles.panel} aria-labelledby="ss-links">
+              <Card variant="aside" contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)" aria-labelledby="ss-links">
                 <h2 className={styles.cardTitle} id="ss-links">つながる先</h2>
                 <nav className={styles.links} aria-label="つながる先">
                   <Link href="/conversions" className={styles.goLink}>→ コンバージョン</Link>
@@ -482,7 +476,7 @@ export default function SiteScriptV8() {
                   <Link href="/friends" className={styles.goLink}>→ 友だち</Link>
                   <Link href="/inflow-links" className={styles.goLink}>→ 流入と計測</Link>
                 </nav>
-              </section>
+              </Card>
             </div>
           </div>
         </>}
@@ -509,7 +503,7 @@ export default function SiteScriptV8() {
       >
         {siteDialog ? (
           <div className={styles.dialogFields}>
-            <Field label="サイトの名前"><SaveErrorField names={["label","siteDialog.label","site_dialog.label","site_dialog"]}><TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例：公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} /></SaveErrorField>
+            <Field label="サイトの名前" requirement={b244Requirements.siteDialog_label}><SaveErrorField names={["label","siteDialog.label","site_dialog.label","site_dialog"]}><TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例：公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} /></SaveErrorField>
 {siteFieldErrors['site-name'] ? <span id="site-name-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-name']}</span> : null}</Field>
             <Field label="計測を許可するドメイン"><SaveErrorField names={["domainsText","siteDialog.domainsText","domains_text","site_dialog.domains_text","site_dialog"]}><TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} /></SaveErrorField>
 {siteFieldErrors['site-domains'] ? <span id="site-domains-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-domains']}</span> : null}</Field>

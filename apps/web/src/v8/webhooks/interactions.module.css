@@ -67,24 +67,6 @@
   font-size: var(--text-micro);
   line-height: var(--tpl-row-sub-lh);
 }
-.pagerRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tpl-wh-ops-gap);
-  margin: var(--tpl-wh-pager-margin);
-}
-.pagerLead {
-  display: flex;
-  padding-left: var(--tpl-wh-pager-lead-pad);
-  align-items: center;
-  gap: var(--tpl-rule-row-gap);
-}
-.pagerCount {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-variant-numeric: tabular-nums;
-}
 
 /* 読み込み中の骨（絵 wWrpY）。 */
 .skeletonRow {
@@ -108,14 +90,14 @@
  * やり取りの中身の窓（DA0Ag）。枠・頭（題・説明・×）は共通の窓。ここは本文と下の段だけ。
  * 絵：頭と項目の間14・項目は上の線＋上下7（1行31）・ラベル幅110・本文 12・中身の箱・下の段は線＋上14。
  */
-:global([data-theme='v8'] [data-design-part='dialog']):has(.dialogBody) {
+:global(:root [data-design-part='dialog']):has(.dialogBody) {
   position: relative;
 }
-:global([data-theme='v8'] [data-design-part='dialog']):has(.dialogBody) h2 {
+:global(:root [data-design-part='dialog']):has(.dialogBody) h2 {
   font-weight: var(--tpl-wb-ix-title-weight);
   line-height: var(--tpl-wb-ix-title-lh);
 }
-:global([data-theme='v8'] [data-design-part='dialog']):has(.dialogBody) h2 + p {
+:global(:root [data-design-part='dialog']):has(.dialogBody) h2 + p {
   margin-top: var(--tpl-wb-ix-sub-after-title);
   font-size: var(--text-caption);
   line-height: var(--tpl-wb-ix-sub-lh);

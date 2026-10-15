@@ -23,7 +23,7 @@ describe('リッチメニュー作る①の形と画像（JeINq）', () => {
     expect(TSX).toContain("from '@/components/shared/layout-picker'")
     expect(TSX).toContain('<LayoutPicker')
     expect(CSS).not.toContain('.layoutThumb {')
-    // V7の見本は引き続き旧フォームで使う。
+    // 面の見本は統括の例外時にもV8の共通フォームで使う。
     expect(FORM).toContain("fill: 'none'")
   })
 

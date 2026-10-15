@@ -8,7 +8,7 @@ import {
   eventRowState,
   isLowApplication,
   summarizeEventAttention,
-} from './event-attention'
+} from '@/v8/events/attention'
 
 const NOW = Date.parse('2026-08-25T00:00:00.000Z')
 

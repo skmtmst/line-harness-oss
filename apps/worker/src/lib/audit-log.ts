@@ -8,8 +8,7 @@ import type { Env } from '../index.js';
  * マイルとアフィリエイトは残高や報酬に直結するため、
  * 「誰がいつ何を変更したか」を残す。
  *
- * 構造化ログと共通監査台帳の両方へ残す。ログ集約側と管理画面のどちらでも
- * actor と action で絞れるよう、キーは固定にしている。
+ * 誰が・何を・いつは共通監査台帳へ残す。consoleは固定コードとroute型だけ。
  *
  * 値そのものは残さない。金額やマイル数は変更後の状態を見れば分かるし、
  * 個人情報をログへ流さないため。残すのは「誰が・いつ・何に対して・何をしたか」だけ。
@@ -178,6 +177,9 @@ export type AuditAction =
   | 'restaurant.delivery.intake.resume'
   // 履歴CSVの書き出し（注文番号・金額が店舗の外へ出るため、他の出力と同じく残す）。
   | 'restaurant.delivery.history.export'
+  // Uber Eats のログイン連携。店舗の代理で使えるトークンを得る操作なので必ず残す。
+  | 'restaurant.delivery.ubereats.connect.start'
+  | 'restaurant.delivery.ubereats.connect'
   // #818: 広告費の手入力と、管理画面からの取り直し
   | 'ad_cost.manual_entry'
   | 'ad_cost.import'
@@ -240,20 +242,9 @@ export function auditLog(
 ): void {
   const staff = c.get('staff');
   // 認証前に呼ばれることはない想定だが、ログのために例外を投げたくない。
-  const actorId = staff?.id ?? 'unknown';
   const actorRole = staff?.role ?? 'unknown';
   c.set('auditRecorded', true);
-  console.log(
-    JSON.stringify({
-      tag: 'audit',
-      action,
-      actorId,
-      actorRole,
-      targetKind: target?.kind ?? null,
-      targetId: target?.id ?? null,
-      at: new Date().toISOString(),
-    }),
-  );
+  console.log(JSON.stringify({ code: 'audit.recorded', route: c.req.routePath || '(unmatched)' }));
 
   const db = c.env?.DB;
   const writer = commonAuditWriter();
@@ -274,7 +265,7 @@ export function auditLog(
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    console.error('audit_events insert failed:', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"lib_audit_log_failed"}));
   });
   try {
     c.executionCtx.waitUntil(task);

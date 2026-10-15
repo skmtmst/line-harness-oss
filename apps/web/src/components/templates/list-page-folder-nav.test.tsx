@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
+import ListToolbar from '@/components/shared/list-toolbar'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ts from 'typescript'
 import { ListPage, ListPageBody } from './index'
+import { FolderDotName } from '@/components/shared/folder-dot'
 
 afterEach(cleanup)
 
@@ -28,7 +30,7 @@ describe('一覧の型：板が狭いときに畳む左の列（folderNav）', (
     expect(collapsed.contains(trigger)).toBe(true)
     expect(trigger.textContent).toContain('フォルダ：すべて')
     fireEvent.click(trigger)
-    fireEvent.click(screen.getByRole('button', { name: 'フォルダ：春の案内' }))
+    fireEvent.click(screen.getByRole('button', { name: '春の案内' }))
     expect(onSelect).toHaveBeenCalledWith('f1')
   })
 
@@ -63,10 +65,10 @@ describe('一覧の型：板が狭いときに畳む左の列（folderNav）', (
     expect(screen.queryByRole('button', { name: 'フォルダ' })).toBeNull()
   })
 
-  it('左の列が無い（画面が狭い幅で列を外した）ときは出さない。1152 用の道具の段と二重にしない', () => {
+  it('B-244：画面が狭い幅で左の列を外しても、渡されたフォルダの操作を失わない', () => {
     const { container } = render(<ListPageBody folderNav={{ rows, activeId: '', onSelect: () => {} }}>本文</ListPageBody>)
-    expect(collapsedRegion(container)).toBeNull()
-    expect(toolbarRegion(container)).toBeNull()
+    expect(collapsedRegion(container)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'フォルダ' })).toBeTruthy()
   })
 
   it('道具を渡さない画面では、畳んだ段だけの道具の段に印を付ける（広い板では CSS が隠す）', () => {
@@ -89,8 +91,8 @@ describe('一覧の型の CSS：畳んだ段は板が 1100 未満のときだけ
     expect(narrowBlock).toMatch(/\.collapsedFolders \{ display: flex;/)
     expect(narrowBlock).toMatch(/\.toolbar\[data-collapsed-only\] \{ display: flex; \}/)
   })
-  it('選ぶ欄の幅は 1152 の板の値（変数）を使う', () => {
-    expect(css).toMatch(/\.collapsedSelect \{[^}]*width: var\(--tpl-narrow-folder-w\)/)
+  it('選ぶ欄は選択中の名前の実寸を確保する', () => {
+    expect(css).toMatch(/\.collapsedSelect \{[^}]*width: max-content/)
   })
 })
 
@@ -140,4 +142,42 @@ describe('左の列を持つ一覧は、畳んだときの行き先も持つ', (
     const source = readFileSync(file, 'utf8')
     expect(folderLists(source).every((list) => list.fallback)).toBe(true)
   })
+})
+
+
+it('X1: a one-choice rail places creation before other heading actions', () => {
+  const { container } = render(<ListPage title="決めごと" folders={<nav>すべて</nav>}
+    folderNav={{rows:[{id:'all',label:'すべて'}],activeId:'all',onSelect:()=>{},createAction:<a href="/new">作る</a>}}
+    actions={<button>CSVで書き出す</button>}
+    toolbar={<ListToolbar search={{placeholder:'名前で探す',value:'',onChange:()=>{}}} />}>本文</ListPage>)
+  expect(container.querySelector('[data-template-region="folders"]')).toBeNull()
+  expect(screen.queryByRole('button',{name:'フォルダ'})).toBeNull()
+  const heading=container.querySelector('[data-template-region="heading"]')!
+  const create=screen.getByRole('link',{name:'作る'})
+  expect(heading.contains(create)).toBe(true)
+  expect(create.getAttribute('href')).toBe('/new')
+  expect(create.compareDocumentPosition(screen.getByRole('button',{name:'CSVで書き出す'})) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(container.querySelector('[data-template-region="toolbar"]')?.contains(create)).toBe(false)
+})
+
+it('X2: folderless names retain selection and links; changing capability restores unfiled dots', () => {
+  const select=vi.fn()
+  const body=<FolderDotName><a href="/detail">決めごと</a></FolderDotName>
+  const {container,rerender}=render(<ListPage title="一覧" folderNav={{rows:[rows[0]],activeId:'',onSelect:select}}>{body}</ListPage>)
+  expect(container.querySelector('[data-folder-dot]')).toBeNull()
+  expect(screen.getByRole('link',{name:'決めごと'}).getAttribute('href')).toBe('/detail')
+  rerender(<ListPage title="一覧" folderNav={{rows,activeId:'',onSelect:select}}>{body}</ListPage>)
+  expect(container.querySelector('[data-folder-dot="unfiled"]')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button',{name:'フォルダ'}))
+  fireEvent.click(screen.getByRole('button',{name:'春の案内'}))
+  expect(select).toHaveBeenCalledWith('f1')
+})
+
+
+it('W2: a readonly no-choice list leaves no empty leading slot', () => {
+  const { container } = render(<ListPage title="決めごと" readOnly folders={<nav>すべて</nav>}
+    folderNav={{rows:[{id:'all',label:'すべて'}],activeId:'all',onSelect:()=>{}}}
+    toolbar={<ListToolbar search={{placeholder:'名前で探す',value:'',onChange:()=>{}}} />}>本文</ListPage>)
+  expect(container.querySelector('[data-template-region="folders"]')).toBeNull()
+  expect(container.querySelector('[data-toolbar-leading]')).toBeNull()
 })

@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 
 /*
  * ★V8 リマインダの一覧（Pencil `apLqS`、状態は `RrYYJ`）。
@@ -540,7 +539,7 @@
   .folderSelectWrap { width: 150px; }
 }
 /* ★V8 行の名前の横の「失敗 n」は札の高さ22（apLqS 行の「名と注意」）。押せるボタンでも行を押し広げない */
-:global([data-theme='v8']) .miniBadgeDanger { min-height: 0; height: 22px; }
+:global(:root) .miniBadgeDanger { min-height: 0; height: 22px; }
 
 /* 1152 の板（Iffil）の道具の段：1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び」。 */
 .narrowTools { display: flex; flex-basis: 100%; flex-direction: column; gap: var(--tpl-toolbar-gap); }

@@ -10,7 +10,6 @@ import ListState from '@/components/shared/list-state'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import SearchField from '@/components/shared/search-field'
 import { api } from '@/lib/api'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import {
   BANNER_MAX_REFERENCE_IMAGES,
   BANNER_REFERENCE_MODES,
@@ -59,8 +58,7 @@ export default function ReferencePickerDialog({
   /** UcBQ5：検索を次の行に置く4列の板。ほかの選択窓は変えない。 */
   hqLayout?: boolean
 }) {
-  const theme = useAdminTheme()
-  const v8 = theme === 'v8'
+
   /** 画像ごとのラジオ群を別の群として扱わせるための接頭辞。 */
   const uid = useId()
   const [images, setImages] = useState<BannerImage[] | null>(null)
@@ -182,9 +180,7 @@ export default function ReferencePickerDialog({
       open={open}
       title="参照画像を選ぶ"
       description={
-        v8
-          ? `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選べます。選んだ画像は、下で 1 枚ずつ使い方を決められます。`
-          : `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選びます。生成した画像や取り込んだ画像がここに並びます。手元のファイルを選ぶこともできます。`
+        `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選べます。選んだ画像は、下で 1 枚ずつ使い方を決められます。`
       }
       onCancel={onClose}
       error={error || undefined}
@@ -217,6 +213,7 @@ export default function ReferencePickerDialog({
           <Button
             variant="primary"
             disabled={picks.length === 0}
+            disabledReason={picks.length === 0 ? '使う画像を選んでください。' : undefined}
             onClick={() => onPick(picks, pickedImages.map(({ image }) => image))}
           >
             <Check aria-hidden="true" className="h-4 w-4" />

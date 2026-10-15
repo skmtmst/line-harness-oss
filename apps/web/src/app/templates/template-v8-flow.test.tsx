@@ -48,7 +48,7 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: mocks.push, replace: mocks.replace, refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(mocks.query),
 }))
@@ -88,7 +88,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
-import TemplatesListV8 from './list-v8'
+import TemplatesListV8 from '@/v8/templates/list'
 import TemplateEditPage from './edit/page'
 import TemplateDetailPage from './detail/page'
 
@@ -129,7 +129,7 @@ describe('V8 テンプレートの通し', () => {
 
     const openPicker = async () => {
       await act(async () => {
-        fireEvent.click(screen.getAllByRole('button', { name: '＋ テンプレートを作る' })[0])
+        fireEvent.click(screen.getAllByRole('button', { name: 'テンプレートを作る' })[0])
       })
       await screen.findByText('どの種類を作りますか')
     }
@@ -145,7 +145,7 @@ describe('V8 テンプレートの通し', () => {
     await openPicker()
     await screen.findByText('どの種類を作りますか')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /^メッセージ / }))
+      fireEvent.click(screen.getByRole('link', { name: 'メッセージ', exact: true }))
     })
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/templates/edit'))
   })

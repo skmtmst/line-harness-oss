@@ -28,21 +28,22 @@ export const RULE_VALUES = {
   '--tpl-section-title-size': '15px', '--tpl-section-title-weight': '700',
   '--tpl-field-label-size': '12px', '--tpl-field-label-weight': '500',
   '--tpl-card-pad': '16px', '--tpl-notice-pad': '12px 16px', '--tpl-thead-pad-side': '24px',
+  '--tpl-list-row-h': '52px', '--tpl-list-row-multi-h': '60px', '--tpl-tl-row-h': '52px', '--tpl-mb-life-row-h': '60px',
+  '--polish-table-row': '56px',
 }
 
 export function verifyRuleValues(css, expected = RULE_VALUES) {
   const defaults = new Map()
-  const overrides = new Map()
+  const rootValues = new Map()
   const root = postcss.parse(css)
   root.walkDecls(/^--/, decl => {
     // 要素専用の変数や別テーマは、全画面の値として数えない。
     const p = decl.parent
-    if ((p.type === 'atrule' && p.name === 'theme') ||
-        (p.type === 'rule' && /^\s*:root\s*$/.test(p.selector))) defaults.set(decl.prop, decl.value)
-    if (p.type === 'rule' && /^\s*\[data-theme=['"]v8['"]\]\s*$/.test(p.selector)) overrides.set(decl.prop, decl.value)
+    if (p.type === 'atrule' && p.name === 'theme' && p.parent.type === 'root') defaults.set(decl.prop, decl.value)
+    if (p.type === 'rule' && /^\s*:root\s*$/.test(p.selector) && p.parent.type === 'root') rootValues.set(decl.prop, decl.value)
   })
-  // テーマの詳細度は :root より高い。後ろにある :root にも勝つ。
-  const vars = new Map([...defaults, ...overrides])
+  // 共通のrootはthemeレイヤーに勝つ。同じroot同士は後の宣言が勝つ。
+  const vars = new Map([...defaults, ...rootValues])
   const resolve = (value, seen = new Set()) => value.replace(/var\((--[\w-]+)\)/g, (_, name) => {
     if (seen.has(name) || !vars.has(name)) throw new Error(`未定義または循環: ${name}`)
     return resolve(vars.get(name), new Set([...seen, name]))
@@ -89,7 +90,7 @@ export const RULE_BINDINGS = [
 export function verifyRuleBindings(readCss) {
   const normalize = selector => selector.trim().replaceAll('"', "'").replace(/\s+/g, ' ')
   return RULE_BINDINGS.flatMap(([file, selector, prop, token]) => {
-    const target = normalize(`[data-theme='v8'] ${selector}`)
+    const target = normalize(`:root ${selector}`)
     let actual
     const root = postcss.parse(readCss(file))
     root.walkRules(rule => {

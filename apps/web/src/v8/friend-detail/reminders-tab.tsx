@@ -1,16 +1,17 @@
 'use client'
 
-/* リマインダタブ。この友だちに届くリマインダだけを集めた画面はまだ無い。 */
+/* 登録済みのリマインダへ、IDだけで絞り込みを引き継ぐ。 */
 import { Bell } from 'lucide-react'
 import EmptyTab from './empty-tab'
+import { friendFilterHref } from '@/components/shared/friend-filter-band'
 
-export default function RemindersTab() {
+export default function RemindersTab({ friendId }: { friendId: string }) {
   return (
     <EmptyTab
       icon={<Bell size={17} />}
-      title="この友だちに届くリマインダだけを集めた画面はまだありません"
-      text="設定済みのリマインダは一覧で確認できます。"
-      actions={[{ label: 'リマインダ一覧を見る ↗', href: '/reminders' }]}
+      title="この友だちのリマインダ"
+      text="登録されているリマインダを一覧で確認できます。"
+      actions={[{ label: 'この友だちのリマインダを見る ↗', href: friendFilterHref('/reminders', friendId) }]}
     />
   )
 }

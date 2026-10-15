@@ -1,4 +1,6 @@
 'use client'
+import { requiredText } from '@/lib/form-requirement'
+const notificationTitleRequirement = requiredText('通知の見出しを入力してください。')
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { RowActions } from '@/components/shared/row-actions'
 import { notifySaved } from '@/components/shared/toast'
@@ -6,11 +8,11 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile } from '@/components/shared/media-library-upload'
 import Link from '@/components/shared/list-navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import Toggle from '@/components/shared/toggle'
-import { CircleDot, Download, Plus, Star } from 'lucide-react'
+import { CircleDot, Download, Inbox, Plus, Star } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
@@ -19,7 +21,7 @@ import RunsTab from './runs-tab'
 import styles from './screen.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { TextField, TextArea } from '@/components/shared/text-field'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell, RowNameButton } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
@@ -32,6 +34,8 @@ import { ApiError, api, fetchApi, type EcCommerceOverview, type EcNotificationSe
 import { useAccount } from '@/contexts/account-context'
 import { canOpenCustomerNotificationKpi, customerNotificationKpis, type CustomerNotificationKpi, type LineNotificationQuota } from './customer-kpis'
 import KpiCard from '@/components/shared/kpi-card'
+import Card from '@/components/shared/card'
+import TruncatedText from '@/components/shared/truncated-text'
 import FilterChip from '@/components/shared/filter-chip'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -569,7 +573,7 @@ function CustomerNotificationEditor({
   const titleRef = useRef<HTMLInputElement>(null)
   const [titleError, setTitleError] = useState('')
   const validateEditor = (action: () => void) => {
-    if (!setting.title?.trim()) {
+    if (notificationTitleRequirement.check(setting.title ?? '')) {
       setTitleError('通知の見出しを入力してください。')
       titleRef.current?.focus()
       titleRef.current?.scrollIntoView?.({ block: 'center' })
@@ -605,7 +609,7 @@ function CustomerNotificationEditor({
         <section className="rounded-card border content-card bg-canvas p-4">
           <h2 className="font-bold text-ink">送るもの</h2>
           <div className="mt-3 space-y-4">
-            <Field htmlFor="customer-notification-title" label="通知の見出し" error={titleError}><SaveErrorField names={["title","setting.title","titleError","name","title_error"]}><TextField id="customer-notification-title" value={setting.title ?? ''} maxLength={80} ref={titleRef} onChange={(event) => { setTitleError(''); onChange({ title: event.target.value }) }} /></SaveErrorField></Field>
+            <Field htmlFor="customer-notification-title" label="通知の見出し" requirement={notificationTitleRequirement} error={titleError}><SaveErrorField names={["title","setting.title","titleError","name","title_error"]}><TextField id="customer-notification-title" value={setting.title ?? ''} maxLength={80} ref={titleRef} onChange={(event) => { setTitleError(''); onChange({ title: event.target.value }) }} /></SaveErrorField></Field>
             <Field htmlFor="customer-notification-intro" label="ご案内文"><SaveErrorField names={["introText","setting.introText","intro_text","setting.intro_text"]}><TextArea id="customer-notification-intro" value={setting.introText} maxLength={800} rows={5} onChange={(event) => onChange({ introText: event.target.value })} /></SaveErrorField></Field>
             <div className="rounded-control border border-nen-border bg-nen-ivory p-4">
               <p className="text-sm font-bold text-nen-green">このお知らせで差し込める項目（EC連携から来ます）</p>
@@ -683,7 +687,7 @@ function CustomerNotificationEditor({
   </div>
 }
 
-function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: (lineAccountId: string | null) => ReactNode } = {}) {
+function LineNotificationsPage() {
   const saveErrors = useSaveFormErrors()
 
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -999,12 +1003,13 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     <KpiCard
       key={kpi.label}
       presentation="band"
-      icon={null}
+      icon={<Inbox size={16} aria-hidden="true" />}
       title={kpi.label}
       value={typeof kpi.value === 'number' || kpi.value === null ? kpi.value : null}
       valueText={kpi.valueText ?? (typeof kpi.value === 'string' ? kpi.value : undefined)}
-      unit=""
-      detail={kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
+      unit={kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
+      valueTextWithUnit
+      detail={kpi.note === '取得失敗' ? '取得失敗' : null}
       help={kpi.note || undefined}
       valueTone={kpi.label === '送れなかった' && typeof kpi.value === 'number' && kpi.value > 0 ? 'warning' : 'default'}
       loading={loadState === 'loading'}
@@ -1108,7 +1113,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   }
 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
-    if (!setting.title?.trim()) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
+    if (notificationTitleRequirement.check(setting.title ?? '')) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     if (definitionsFailed && !definitionByEvent.get(setting.eventType)) {
       setNotice({ tone: 'error', text: 'お知らせの設定を読み込めなかったため、保存できません。読み直してから、もう一度お試しください。' })
@@ -1207,8 +1212,9 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       <Button onClick={() => setOperatorExportOpen(true)} disabled={!selectedAccountId}><Download aria-hidden="true" size={15} />CSVで書き出す</Button>
       <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
     </> : undefined}
-    title="LINE通知"
-    help="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。"
+    title="LINE通知" help={tab === 'failures' ? '送れなかった理由や再試行の予定を確かめます。ブロックなどの対象外と、再試行が必要な失敗を分けて確認してください。' : undefined}
+    explanationKey={`line-notifications:${tab}`}
+    explanation={tab === 'operator' ? 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。' : '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。'}
   >
     {expandedSetting === null ? <Tabs label="LINE通知の中の切り替え" size="notification" items={tabsWithCounts.map(item => ({ label: item.label, href: tabHref[item.key], current: tab === item.key }))} /> : null}
     {/*
@@ -1223,9 +1229,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     {!canManage && expandedSetting === null ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</ReadOnlyNotice></div> : null}
     {tab === 'failures' ? <RunsTab lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <RunsTab lineAccountId={selectedAccountId} mode="history" /> : null}
-    {tab === 'operator' ? (renderOperatorRules
-      ? renderOperatorRules(selectedAccountId)
-      : <OperatorTab lineAccountId={selectedAccountId} canManage={canManage} exportOpen={operatorExportOpen} onExportClose={() => setOperatorExportOpen(false)} />) : null}
+    {tab === 'operator' ? <OperatorTab lineAccountId={selectedAccountId} canManage={canManage} exportOpen={operatorExportOpen} onExportClose={() => setOperatorExportOpen(false)} /> : null}
     {tab === 'customer' && expandedSetting ? <>
       <CustomerNotificationEditor
         setting={expandedSetting}
@@ -1318,7 +1322,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
 
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
-    <section className={styles.table} data-design-node="festr" data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}>
+    <Card padding="rows" overflow="hidden" data-design-node="festr" data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}>
       {loadState === 'loading' ? (
         <div aria-busy="true" aria-label="顧客へのお知らせを読み込んでいます">
           <DelayedSkeleton
@@ -1359,18 +1363,18 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
               const sent = sendCountsFailed ? null : sent30dOf(setting.eventType)
               const name = setting.title?.trim() || setting.label
               return <Tr key={setting.eventType}>
-                <Td><FolderDotName>{canManage ? <button type="button" className={styles.name} title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</button> : <span className={styles.name} title={name}>{deliveryWords(setting).trigger || name}</span>}</FolderDotName></Td>
+                <Td><FolderDotName>{canManage ? <RowNameButton title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</RowNameButton> : <TruncatedText value={deliveryWords(setting).trigger || name} />}</FolderDotName></Td>
                 <Td className={styles.cell} title={timingLabel(setting)}>{timingLabel(setting)}</Td>
                 <Td className={styles.cell} title={audienceLabel(setting)}>{audienceLabel(setting)}</Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'warn' ? 'warning' : 'neutral'}>{status.label}</StatusBadge></Td>
                 <Td>{canManage ? <NotificationToggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /> : <span className={styles.minor}>{setting.isEnabled ? 'オン' : 'オフ'}</span>}</Td>
-                <Td className={styles.actions}>{canManage ? <RowActions edit={{ onClick: () => setExpanded(setting.eventType) }} /> : null}</Td>
+                <ActionCell>{canManage ? <RowActions edit={{ onClick: () => setExpanded(setting.eventType) }} /> : null}</ActionCell>
               </Tr>
             })}
           </tbody>
         </DataTable>}
-    </section>
+    </Card>
     </> : null}
   </SbSettingsScreen></SaveErrorScope>
 }

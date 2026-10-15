@@ -1,9 +1,5 @@
 /* 運営のメンバー管理 V8（FvbHW）。値は --tpl-op-*。 */
 
-.kpis3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .invite {
   display: flex;
   align-items: center;
@@ -58,6 +54,7 @@
 .faint {
   color: var(--color-ink-faint);
 }
+.shortText { white-space: nowrap; }
 
 @media (max-width: 1023.98px) {
   .colMail,

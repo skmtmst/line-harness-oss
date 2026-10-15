@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 一覧が0件のときの1枚（★V8 修正案 D-2・絵 `gIaJZ`）。

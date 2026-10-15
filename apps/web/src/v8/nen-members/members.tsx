@@ -71,7 +71,6 @@ export default function MembersV8({
 
   const tabs = <>
     <Tabs
-      className={styles.tabs}
       label="会員の切り替え"
       items={[
         { label: '会員一覧', count: kpis?.members, current: tab === 'members', onClick: () => onChangeTab('members') },
@@ -90,9 +89,9 @@ export default function MembersV8({
   if (!accountId) {
     body = <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、会員を見るLINEアカウントを選びます。" />
   } else if (tab === 'ranks') {
-    body = <RankSettingsV8 key={accountId} accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} onTopBand={setTopBand} />
+    body = <RankSettingsV8 accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} onTopBand={setTopBand} />
   } else if (tab === 'lifetime') {
-    body = <LifetimeV8 key={accountId} accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} />
+    body = <LifetimeV8 accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} />
   } else {
     body = <MembersListV8 key={accountId} accountId={accountId} settings={settings} />
   }
@@ -102,6 +101,7 @@ export default function MembersV8({
       skeleton
       boardId={BOARD_NODE[tab]}
       title="会員"
+      explanation="会員はネットショップで登録した人です。LINE と結びつくと、ランクやペットに合わせた配信ができます。ランクは通年の購入額で決まり、翌年の12月末まで維持されます。"
       help="ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。"
       actions={accountId ? <CsvExportButton accountId={accountId} /> : null}
       tabs={tabs}
@@ -116,7 +116,7 @@ export default function MembersV8({
  * 数の帯。白い板の左右いっぱいに4つ（★V8 の共通部品 KpiBand）。
  * 「○○以上」は上から2ランク（描いた板は ゴールド以上＝プラチナとゴールド）。
  */
-function MembersKpiBand({
+export function MembersKpiBand({
   kpis,
   ranks,
   loading,
@@ -132,7 +132,7 @@ function MembersKpiBand({
   const petPercent = kpis && kpis.members > 0 ? Math.round(((kpis.petMembers ?? 0) / kpis.members) * 100) : null
   const pending = loading || !kpis
   return (
-    <KpiBand className={styles.band} aria-label="会員の数の帯">
+    <KpiBand className={styles.band} aria-label="会員の数の帯" title={pending ? undefined : `通年の購入 合計 ${yen(kpis.annualTotalYen)}・ライフタイム 合計 ${yen(kpis.lifetimeTotalYen)}・マイル残高 ${formatNumber(kpis.balanceTotal)}・今月使ったマイル ${formatNumber(kpis.usedThisMonth)}`}>
       <KpiCard presentation="band" title="会員" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.members} unit="人" loading={loading} detail={pending ? emptyValue('unknown') : `LINE 連携済み ${formatNumber(kpis.linkedMembers ?? 0)}`} />
       <KpiCard presentation="band" title={topTwoLabel} icon={<CircleHelp size={13} aria-hidden="true" />} value={pending || topTwo.length === 0 ? null : topTwoCount} unit="人" loading={loading} detail={topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : emptyValue('unknown')} />
       <KpiCard presentation="band" title="ペット登録あり" icon={<CircleHelp size={13} aria-hidden="true" />} value={pending ? null : kpis.petMembers ?? 0} unit="人" loading={loading} detail={pending || petPercent === null ? emptyValue('unknown') : `会員の ${petPercent}%`} />

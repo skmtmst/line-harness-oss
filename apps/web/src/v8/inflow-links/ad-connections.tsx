@@ -6,6 +6,8 @@ import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -14,11 +16,12 @@ import StatusBadge from '@/components/shared/status-badge'
 import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from './ad-shared'
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
-import { PageHeading } from '@/components/templates/page-frame'
+import { DetailPage } from '@/components/templates'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import AdMappingDialog from './ad-mapping-dialog'
 
 /*
  * ★V8 広告とのつなぎ（Pencil `FDBsG`・`/inflow-links?tab=connections`）。
@@ -53,6 +56,7 @@ export default function AdConnectionsV8() {
   const [mapping, setMapping] = useState<MappingState>({ kind: 'loading' })
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [saveError, setSaveError] = useState('')
+  const [editing, setEditing] = useState<AdEventMapping | null>(null)
   const generationRef = useRef(0)
 
   const loadMappings = useCallback(async () => {
@@ -89,7 +93,27 @@ export default function AdConnectionsV8() {
   useEffect(() => {
     setSavingKey(null)
     setSaveError('')
+    setEditing(null)
   }, [accountId])
+
+  const saveMapping = async (item: AdEventMapping, values: Pick<AdEventMapping, 'mode' | 'eventName' | 'googleActionId'>) => {
+    if (!accountId || !manage || savingKey) return false
+    const accountAtStart = accountId
+    setSavingKey(`${item.pointId}:${item.provider}`)
+    try {
+      const result = await api.adPlatforms.saveMapping(item.pointId, {
+        account_id: accountId, provider: item.provider, ...values, expectedVersion: item.version,
+      })
+      if (accountRef.current !== accountAtStart) return false
+      if (!result.success) throw new Error(result.error ?? '対応を保存できませんでした。読み直してからもう一度お試しください。')
+      await loadMappings()
+      if (accountRef.current !== accountAtStart) return false
+      setEditing(null)
+      return true
+    } finally {
+      if (accountRef.current === accountAtStart) setSavingKey(null)
+    }
+  }
 
   /* 結びつけない ⇔ 自動で返す（口が出す自動の名前）。版が合わないと 409（ほかの人が先に変えた）。 */
   const saveMode = async (item: AdEventMapping, mode: 'auto' | 'off') => {
@@ -120,7 +144,9 @@ export default function AdConnectionsV8() {
   }
 
   const nameCell = (item: AdEventMapping | null, label: string) => {
-    if (adMappingReturns(item)) return <span className={styles.cellText} title={item!.eventName ?? ''}>{item!.eventName}</span>
+    if (adMappingReturns(item)) return manage
+      ? <button type="button" className={styles.cellText} title={item!.eventName ?? ''} aria-label={`${item!.pointName} ${item!.provider}の対応を編集`} onClick={() => setEditing(item)}>{item!.eventName}</button>
+      : <span className={styles.cellText} title={item!.eventName ?? ''}>{item!.eventName}</span>
     if (item && manage && item.automaticEventName) {
       return (
         <Select
@@ -128,15 +154,18 @@ export default function AdConnectionsV8() {
           value={item.mode === 'off' ? 'off' : 'auto'}
           width={180}
           disabled={savingKey !== null}
-          onChange={(value) => void saveMode(item, value === 'auto' ? 'auto' : 'off')}
+          onChange={(value) => value === 'manual' ? setEditing(item) : void saveMode(item, value === 'auto' ? 'auto' : 'off')}
           options={[
             { value: 'off', label: '結びつけない' },
             { value: 'auto', label: `自動で返す（${item.automaticEventName}）` },
+            { value: 'manual', label: '名前を指定する' },
           ]}
         />
       )
     }
-    return <span className={styles.cellFaint}>{emptyValue('unknown')}</span>
+    return item && manage
+      ? <button type="button" className={styles.cellFaint} aria-label={`${item.pointName} ${item.provider}の対応を編集`} onClick={() => setEditing(item)}>{emptyValue('unknown')}</button>
+      : <span className={styles.cellFaint}>{emptyValue('unknown')}</span>
   }
 
   if (!accountId) {
@@ -159,36 +188,37 @@ export default function AdConnectionsV8() {
     table = <ListState kind="empty" title="成果地点がまだありません" description="成果地点を作ると、ここで広告に返す名前を決められます。" />
   } else {
     table = (
-      <div className={styles.table} role="table" aria-label="成果地点と、広告に返す名前の対応">
-        <div className={styles.tableHead} role="row">
-          <span className={styles.colPoint} role="columnheader">成果地点</span>
-          <span className={styles.colName} role="columnheader">Google広告に返す名前</span>
-          <span className={styles.colName} role="columnheader">Meta広告に返す名前</span>
-          <span className={styles.colState} role="columnheader">状態</span>
-        </div>
+      <DataTable aria-label="成果地点と、広告に返す名前の対応" columnLayout={INFLOW_TABLE_LAYOUT} columnSizing="controls"><thead>
+        <TableHeadRow data-table-layout="columns">
+          <Th grow>成果地点</Th>
+          <Th className={styles.colName}>Google広告に返す名前</Th>
+          <Th className={styles.colName}>Meta広告に返す名前</Th>
+          <Th className={styles.colState}>状態</Th>
+        </TableHeadRow></thead><tbody>
         {mapping.rows.map((row) => {
           const returns = adMappingReturns(row.google) || adMappingReturns(row.meta)
           return (
-            <div key={row.pointId} className={styles.tableRow} role="row">
-              <span className={styles.colPoint} role="cell"><span className={styles.cellText} title={row.pointName}>{row.pointName}</span></span>
-              <span className={styles.colName} role="cell">{nameCell(row.google, 'Google広告')}</span>
-              <span className={styles.colName} role="cell">{nameCell(row.meta, 'Meta広告')}</span>
-              <span className={styles.colState} role="cell">
+            <Tr key={row.pointId} data-table-layout="columns">
+              <Td grow><span className={styles.cellText} title={row.pointName}>{row.pointName}</span></Td>
+              <Td className={styles.colName}>{nameCell(row.google, 'Google広告')}</Td>
+              <Td className={styles.colName}>{nameCell(row.meta, 'Meta広告')}</Td>
+              <Td className={styles.colState}>
                 <StatusBadge tone={returns ? 'success' : 'neutral'} size="compact">{returns ? '返している' : '返していない'}</StatusBadge>
-              </span>
-            </div>
+              </Td>
+            </Tr>
           )
         })}
-      </div>
+      </tbody></DataTable>
     )
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><div className={adsStyles.board} data-design-node="FDBsG">
-      <PageHeading title={<>広告とのつなぎ</>}
+    <SaveErrorScope errors={saveErrors}><DetailPage boardId="FDBsG" contentPadding="0 var(--tpl-head-pad-side)" title={<>広告とのつなぎ</>}
         help={<>LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。</>}
-        actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>} />
+        actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>}>
+
       <div className={adsStyles.body}>
+        {editing && manage ? <AdMappingDialog key={`${accountId}:${editing.pointId}:${editing.provider}`} item={editing} onClose={() => setEditing(null)} onSave={(values) => saveMapping(editing, values)} /> : null}
         {readonly ? (
           <div className={adsStyles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
@@ -227,6 +257,6 @@ export default function AdConnectionsV8() {
           気をつけること：広告側で成果の名前を先に作ってから対応を決めてください。失敗した送信のやり直しは、送信履歴から行えます。
         </p>
       </div>
-    </div></SaveErrorScope>
+    </DetailPage></SaveErrorScope>
   )
 }

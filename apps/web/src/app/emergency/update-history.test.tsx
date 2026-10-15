@@ -6,11 +6,17 @@
  * 5件目以降への案内もなかった。0/4/10/12件それぞれで案内と実際の行数、
  * 新しい順、続きの案内を試す。
  */
-import { act, cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { OperationHistoryEntry } from '@/lib/api'
-import EmergencyPage from './page'
+import HistoryPanel from './page'
+
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/emergency', useSearchParams: () => new URLSearchParams('tab=history') }))
+vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'viewer', canManageRole: () => false }))
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -21,6 +27,7 @@ type Release = { version: string; released: string | null; entryCount?: number; 
 
 const fixture = vi.hoisted(() => ({
   history: [] as OperationHistoryEntry[],
+  failed: false,
   releases: [] as Release[],
 }))
 
@@ -30,9 +37,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      health: { ...actual.api.health, accounts: async () => ({ success: true, data: [] }) },
       operations: {
         ...actual.api.operations,
-        history: () => Promise.resolve({ success: true as const, data: fixture.history }),
+        history: () => fixture.failed ? Promise.reject(new Error('network down')) : Promise.resolve({ success: true as const, data: fixture.history }),
       },
     },
   }
@@ -45,7 +53,6 @@ vi.mock('@/generated/release-log-summary.json', () => ({
   },
 }))
 
-const { HistoryPanel } = EmergencyPage.__test
 
 function releaseEntries(count: number, prefix = '更新'): ReleaseEntry[] {
   // 新しい順に 更新-01 が先頭になるよう、番号が大きいほど古い日付にする。
@@ -63,10 +70,7 @@ function releasedLog(entries: ReleaseEntry[]): Release[] {
 }
 
 function updateSection(): HTMLElement {
-  const heading = screen.getByRole('heading', { name: '管理画面の更新' })
-  const section = heading.closest('section')
-  if (!section) throw new Error('管理画面の更新 section が見つかりません')
-  return section
+  return screen.getByRole('dialog', { name: '管理画面の更新内容' })
 }
 
 function updateRows(section: HTMLElement): HTMLElement[] {
@@ -83,6 +87,7 @@ async function flush() {
 afterEach(() => {
   cleanup()
   fixture.history = []
+  fixture.failed = false
   fixture.releases = []
 })
 
@@ -91,16 +96,24 @@ describe('管理画面の更新欄(OPERATIONS-01)', () => {
     fixture.releases = releasedLog([])
     render(<HistoryPanel />)
     await flush()
+    fireEvent.click(screen.getByRole('button', { name: '履歴のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '更新内容を見る' }))
+    await screen.findByRole('dialog', { name: '管理画面の更新内容' })
+    await flush()
 
     const section = updateSection()
     expect(within(section).getByText(/新しい10件を表示します/)).toBeTruthy()
-    expect(within(section).getByText('更新の記録はありません。')).toBeTruthy()
+    expect(within(section).getByText('更新の記録はありません')).toBeTruthy()
     expect(within(section).queryByText(/続きが/)).toBeNull()
   })
 
   it('4件なら4行だけ出し、続きの案内は出さない', async () => {
     fixture.releases = releasedLog(releaseEntries(4))
     render(<HistoryPanel />)
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '履歴のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '更新内容を見る' }))
+    await screen.findByRole('dialog', { name: '管理画面の更新内容' })
     await flush()
 
     const section = updateSection()
@@ -112,6 +125,10 @@ describe('管理画面の更新欄(OPERATIONS-01)', () => {
     fixture.releases = releasedLog(releaseEntries(10))
     render(<HistoryPanel />)
     await flush()
+    fireEvent.click(screen.getByRole('button', { name: '履歴のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '更新内容を見る' }))
+    await screen.findByRole('dialog', { name: '管理画面の更新内容' })
+    await flush()
 
     const section = updateSection()
     const rows = updateRows(section)
@@ -122,6 +139,10 @@ describe('管理画面の更新欄(OPERATIONS-01)', () => {
   it('12件なら新しい順に10行出し、続きが2件あると案内する', async () => {
     fixture.releases = releasedLog(releaseEntries(12))
     render(<HistoryPanel />)
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '履歴のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '更新内容を見る' }))
+    await screen.findByRole('dialog', { name: '管理画面の更新内容' })
     await flush()
 
     const section = updateSection()
@@ -141,6 +162,10 @@ describe('管理画面の更新欄(OPERATIONS-01)', () => {
     ]
     render(<HistoryPanel />)
     await flush()
+    fireEvent.click(screen.getByRole('button', { name: '履歴のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '更新内容を見る' }))
+    await screen.findByRole('dialog', { name: '管理画面の更新内容' })
+    await flush()
 
     const section = updateSection()
     // 配備済みの2行だけが出る。未配備の3件は行にしない。
@@ -157,6 +182,10 @@ describe('管理画面の更新欄(OPERATIONS-01)', () => {
     ]
     render(<HistoryPanel />)
     await flush()
+    fireEvent.click(screen.getByRole('button', { name: '履歴のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '更新内容を見る' }))
+    await screen.findByRole('dialog', { name: '管理画面の更新内容' })
+    await flush()
 
     const section = updateSection()
     expect(updateRows(section)).toHaveLength(10)
@@ -164,4 +193,20 @@ describe('管理画面の更新欄(OPERATIONS-01)', () => {
     expect(within(section).getByText(/続きが26件あります/)).toBeTruthy()
     expect(within(section).getByText(/まだ画面に入っていない変更が2736件あります/)).toBeTruthy()
   })
+
+  it('変更内容の取得失敗を記録なしと表示せず、読み直した内容を出す', async () => {
+    fixture.failed = true
+    render(<HistoryPanel />); await flush()
+    fireEvent.click(screen.getByRole('button', { name: '履歴のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '更新内容を見る' }))
+    const dialog = await screen.findByRole('dialog', { name: '管理画面の更新内容' }); await flush()
+    expect(within(dialog).getByText('運用履歴を読み込めませんでした')).toBeTruthy()
+    expect(within(dialog).queryByText('更新の記録はありません')).toBeNull()
+    fixture.failed = false
+    fixture.releases = releasedLog(releaseEntries(1))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度読み込む' }))
+    await waitFor(() => expect(within(dialog).getByTitle('更新-01')).toBeTruthy())
+    expect(within(dialog).queryByText('運用履歴を読み込めませんでした')).toBeNull()
+  })
+
 })

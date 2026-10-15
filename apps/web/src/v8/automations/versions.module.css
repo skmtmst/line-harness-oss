@@ -6,40 +6,7 @@
 
 
 
-/* 中身の段（絵：上 16・左右 24・間 14）。型の詳細の中身（上 20・左右 28・間 20）との差だけ外へ出す。 */
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-am-ver-content-gap);
-  margin: var(--tpl-am-ver-body-shift);
-}
-
-/* 4つの数のマス（枠つき・同じ幅・間 12）。 */
-.cards {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tpl-am-ver-card-gap);
-}
-
-/* 版の履歴（白い角丸の板・中 20・間 12）。 */
-.historyCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-am-ver-history-gap);
-  padding: var(--tpl-am-ver-history-pad);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-am-ver-title-size);
-  font-weight: 700;
-  line-height: normal;
-}
+/* 枠・数の帯・頭・札・表の描画は型と共通部品が持つ。 */
 .cardLead {
   margin: 0;
   color: var(--color-ink-secondary);
@@ -49,7 +16,7 @@
 .versionList {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-am-ver-history-gap);
+  gap: var(--polish-space-field);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -62,9 +29,6 @@
   min-height: var(--tpl-am-ver-row-h);
   flex-shrink: 0;
   box-shadow: var(--shadow-row-line);
-}
-.versionRow > .pill {
-  align-self: center;
 }
 .versionName {
   width: var(--tpl-am-ver-name-w);
@@ -85,108 +49,17 @@
   white-space: nowrap;
 }
 
-/* 札（点つき）。 */
-.pill {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  flex-shrink: 0;
-  gap: var(--tpl-am-pill-gap);
-  padding: var(--tpl-am-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-am-pill-lh);
-  white-space: nowrap;
-}
-.pillDot {
-  width: var(--tpl-badge-dot);
-  height: var(--tpl-badge-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-.pill[data-tone='active'] { background: var(--color-success-bg); color: var(--color-success); }
-.pill[data-tone='neutral'] { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
-.pill[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-action); }
 
-/* どこから呼ばれているか（見出し 14/700・枠つきの表）。 */
+/* 利用先の内容と列の幅。共通表の色・余白・行は上書きしない。 */
 .usage {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-am-ver-usage-gap);
-}
-.usageTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 700;
-  line-height: var(--tpl-am-ver-usage-title-lh);
-}
-.tableBox {
-  overflow: hidden;
-  border: 1px solid var(--color-control-border);
-  border-radius: var(--radius-card);
-}
-.table {
-  border: 0;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
-  gap: var(--tpl-am-col-gap);
-  height: var(--tpl-am-ver-head-h);
-  min-height: 0;
-  padding: var(--tpl-am-ver-head-pad);
-}
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
-  gap: var(--tpl-am-col-gap);
-  height: var(--tpl-am-ver-use-row-h);
-  padding: var(--tpl-am-ver-use-row-pad);
-  border-bottom: 0;
-  box-shadow: var(--tpl-am-ver-use-row-line);
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--tpl-compact-gap);
-  height: auto;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-  line-height: normal;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
-  font-size: var(--text-micro);
-  font-weight: 600;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colNum,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colNum {
-  align-items: flex-end;
-  padding-right: var(--tpl-am-ver-num-pad-end);
-  text-align: right;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colWhere,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colWhere {
-  flex: 1 1 0;
-  min-width: 0;
-}
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colOps,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colState {
-  align-items: flex-start;
+  gap: var(--polish-space-field);
 }
 .colPinned { width: var(--tpl-am-ver-col-pinned); flex-shrink: 0; }
 .colNum { width: var(--tpl-am-ver-col-num); flex-shrink: 0; }
 .colState { width: var(--tpl-am-ver-col-state); flex-shrink: 0; }
 .colOps { width: var(--tpl-am-ver-col-ops); flex-shrink: 0; }
-.where {
-  display: block;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .whereSub {
   display: block;
   color: var(--color-ink-faint);
@@ -200,17 +73,6 @@
 .cellMuted {
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
-}
-
-/* 表の下の灰色の注。 */
-.footBox {
-  margin: 0;
-  padding: var(--tpl-am-ver-foot-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-am-ver-lead-lh);
 }
 
 /* 利用先を更新する窓の中身。 */

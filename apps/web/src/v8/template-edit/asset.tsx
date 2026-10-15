@@ -1,4 +1,7 @@
 'use client'
+
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
 import Toggle from '@/components/shared/toggle'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -19,7 +22,6 @@ import TapExtrasField from '@/components/shared/tap-extras-field'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Card from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
 import ActionMenu from '@/components/shared/action-menu'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import Combobox from '@/components/shared/combobox'
@@ -144,7 +146,6 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const [imageUrl, setImageUrl] = useState(init ? init.imageUrl : '')
   const [tapExtras, setTapExtras] = useState<TapExtras | undefined>(init?.tapExtras)
   const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited'>(init ? init.couponOnce : 'once')
   const [couponVisibility, setCouponVisibility] = useState<'friends' | 'link'>(init ? init.couponVisibility : 'friends')
@@ -217,19 +218,19 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
    * 組み立て（buildPayload）の決まりと同じ中身を欄ごとに持つ。
    */
   const fields = useFormErrors()
-  fields.define('name', 'テンプレート名', () => (name.trim() ? null : `${meta.title}名を入力してください`))
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : `${meta.title}名を入力してください`), { required: true })
   if (kind === 'coupon') {
     fields.define('tapExtras', 'ボタンの追加処理', () => tapExtrasError(tapExtras))
-    fields.define('start', '使える期間の開始', () => (couponStartsAt ? null : '開始を入力してください'))
-    fields.define('end', '使える期間の終了', () => (!couponEndsAt ? '終了を入力してください' : couponStartsAt && couponEndsAt <= couponStartsAt ? '終了は開始よりあとにしてください' : null))
+    fields.define('start', '使える期間の開始', () => (couponStartsAt ? null : '開始を入力してください'), { required: true })
+    fields.define('end', '使える期間の終了', () => (!couponEndsAt ? '終了を入力してください' : couponStartsAt && couponEndsAt <= couponStartsAt ? '終了は開始よりあとにしてください' : null), { required: true })
     if (lottery) {
-      fields.define('rate', '当たる確率', () => { const rate = Number(lotteryRate); return Number.isInteger(rate) && rate >= 1 && rate <= 100 ? null : '1〜100の整数で入力してください' })
-      fields.define('limit', '当選人数の上限', () => { const limit = Number(winnerLimit); return Number.isInteger(limit) && limit >= 1 ? null : '1以上の整数で入力してください' })
+      fields.define('rate', '当たる確率', () => { const rate = Number(lotteryRate); return Number.isInteger(rate) && rate >= 1 && rate <= 100 ? null : '1〜100の整数で入力してください' }, { required: true })
+      fields.define('limit', '当選人数の上限', () => { const limit = Number(winnerLimit); return Number.isInteger(limit) && limit >= 1 ? null : '1以上の整数で入力してください' }, { required: true })
     }
   } else {
     questions.forEach((question, index) => {
-      fields.define(`q-${question.key}`, `質問 ${index + 1} の本文`, () => (question.text.trim() ? null : '質問文を入力してください'))
-      if (question.format !== 'free') fields.define(`qc-${question.key}`, `質問 ${index + 1} の選択肢`, () => (question.choices.some((choice) => choice.trim()) ? null : '選択肢を1つ以上入力してください'))
+      fields.define(`q-${question.key}`, `質問 ${index + 1} の本文`, () => (question.text.trim() ? null : '質問文を入力してください'), { required: true })
+      if (question.format !== 'free') fields.define(`qc-${question.key}`, `質問 ${index + 1} の選択肢`, () => (question.choices.some((choice) => choice.trim()) ? null : '選択肢を1つ以上入力してください'), { required: true })
       if (question.format !== 'free') question.choices.forEach((_, ci) => fields.define(`extra-${question.key}-${ci}`, `質問 ${index + 1} の選択肢 ${ci + 1} の追加処理`, () => tapExtrasError(question.choiceTapExtras?.[ci])))
     })
   }
@@ -418,7 +419,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={sideCard}
       >
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
         </Card>
       </TemplateEditFrame></SaveErrorScope>
@@ -426,14 +427,14 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   }
 
   const nameCard = (
-    <Card padding="none" layout="vertical" className={styles.card}>
+    <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
       <div className={styles.cardHead}>
         <h2 className={styles.cardTitle}>名前とフォルダ</h2>
       </div>
-      <div className={styles.pair}>
-        <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor={`te-${kind}-name`}><SaveErrorField names={["name"]}><TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" /></SaveErrorField>
+      <SettingsFormRow layout="name-folder">
+        <div className={styles.field}><Field label="テンプレート名" htmlFor={`te-${kind}-name`} requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" /></SaveErrorField>
 <FieldError id={`te-${kind}-name-error`}>{fields.error('name')}</FieldError></Field></div>
-        <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor={`te-${kind}-folder`}><SaveErrorField names={["folder","host.folder"]}><FolderSelect
+        <div className={styles.field}><Field label="フォルダ" htmlFor={`te-${kind}-folder`}><SaveErrorField names={["folder","host.folder"]}><FolderSelect size="full"
             id={`te-${kind}-folder`}
             aria-label="フォルダ"
             value={host ? host.folder : folder}
@@ -446,7 +447,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                 : undefined}
           /></SaveErrorField></Field></div>
-      </div>
+      </SettingsFormRow>
     </Card>
   )
 
@@ -456,14 +457,11 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         boardId={meta.board}
         title={meta.heading}
         description={meta.lead}
-        side={(
+        side={(inDialog) => (
           <>
-            <div className={styles.previewToggle}>
-              <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
-            </div>
             {sideCard}
-            <h2 className={styles.previewHead}>届き方</h2>
-            <div className={styles.phone}>{phone}</div>
+            <h2 className={styles.previewHead} title="この形式は、いまの画面から自分へのテスト送信ができません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。">届き方</h2>
+            <div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div>
           </>
         )}
         footerActions={(
@@ -486,7 +484,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
 
         {kind === 'coupon' ? (
           <>
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>中身</h2>
               </div>
@@ -516,18 +514,18 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               </div>
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>使える期間と回数</h2>
                 <p className={styles.cardNote}>この管理画面の時刻（日本時間）で入ります</p>
               </div>
-              <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}><Field label="開始" htmlFor="te-coupon-start"><span {...fields.bind('start')}><SaveErrorField names={["couponStartsAt","startsAt","coupon_starts_at"]}><DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required invalid={fields.invalid('start')} aria-describedby={fields.invalid('start') ? 'te-coupon-start-error' : undefined} /></SaveErrorField></span>
+              <SettingsFormRow layout="columns">
+                <div className={styles.field}><Field label="開始" htmlFor="te-coupon-start" requirement={fields.requirement('start')}><span {...fields.bind('start')}><SaveErrorField names={["couponStartsAt","startsAt","coupon_starts_at"]}><DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required invalid={fields.invalid('start')} aria-describedby={fields.invalid('start') ? 'te-coupon-start-error' : undefined} /></SaveErrorField></span>
 <FieldError id="te-coupon-start-error">{fields.error('start')}</FieldError></Field></div>
-                <span className={styles.tilde} aria-hidden="true">〜</span>
-                <div className={`${styles.field} ${styles.grow}`}><Field label="終了" htmlFor="te-coupon-end"><span {...fields.bind('end')}><SaveErrorField names={["couponEndsAt","endsAt","coupon_ends_at"]}><DateTimeField className={styles.dateBox} id="te-coupon-end" value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" required invalid={fields.invalid('end')} aria-describedby={fields.invalid('end') ? 'te-coupon-end-error' : undefined} /></SaveErrorField></span>
+
+                <div className={styles.field}><Field label="終了" htmlFor="te-coupon-end" requirement={fields.requirement('end')}><span {...fields.bind('end')}><SaveErrorField names={["couponEndsAt","endsAt","coupon_ends_at"]}><DateTimeField className={styles.dateBox} id="te-coupon-end" value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" required invalid={fields.invalid('end')} aria-describedby={fields.invalid('end') ? 'te-coupon-end-error' : undefined} /></SaveErrorField></span>
 <FieldError id="te-coupon-end-error">{fields.error('end')}</FieldError></Field></div>
-              </div>
+              </SettingsFormRow>
               <div className={styles.typeRow}>
                 <span className={styles.labelSmall}>1人が使える回数</span>
                 <SaveErrorField names={["couponOnce"]}><SegmentedControl
@@ -548,7 +546,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               </div>
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>抽選</h2>
               </div>
@@ -558,12 +556,12 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 <SaveErrorField names={["lottery"]}><SettingCheckbox checked={lottery} label="抽選する" onChange={setLottery} /></SaveErrorField>
               </div>
               {lottery ? (
-                <div className={styles.pair}>
-                  <div className={`${styles.field} ${styles.grow}`}><Field label="当たる確率（%）" htmlFor="te-lottery-rate"><SaveErrorField names={["lotteryRate","lottery_rate"]}><NumberInput unit="%" {...fieldProps('rate', 'te-lottery-rate')} id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} /></SaveErrorField>
+                <SettingsFormRow layout="columns">
+                  <div className={styles.field}><Field label="当たる確率（%）" htmlFor="te-lottery-rate" requirement={fields.requirement('rate')}><SaveErrorField names={["lotteryRate","lottery_rate"]}><NumberInput unit="%" {...fieldProps('rate', 'te-lottery-rate')} id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} /></SaveErrorField>
 <FieldError id="te-lottery-rate-error">{fields.error('rate')}</FieldError></Field></div>
-                  <div className={`${styles.field} ${styles.grow}`}><Field label="当選人数の上限（人）" htmlFor="te-winner-limit"><SaveErrorField names={["winnerLimit","winner_limit"]}><NumberInput unit="人" {...fieldProps('limit', 'te-winner-limit')} id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} /></SaveErrorField>
+                  <div className={styles.field}><Field label="当選人数の上限（人）" htmlFor="te-winner-limit" requirement={fields.requirement('limit')}><SaveErrorField names={["winnerLimit","winner_limit"]}><NumberInput unit="人" {...fieldProps('limit', 'te-winner-limit')} id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} /></SaveErrorField>
 <FieldError id="te-winner-limit-error">{fields.error('limit')}</FieldError></Field></div>
-                </div>
+                </SettingsFormRow>
               ) : (
                 <p className={styles.cardNote}>抽選しないときは、受け取った人全員に配ります。</p>
               )}
@@ -571,7 +569,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
 
             <div {...fields.bind("tapExtras")}><TapExtrasField error={fields.error("tapExtras")} name="クーポンのボタン" value={tapExtras} onChange={extra => { fields.clear("tapExtras"); setTapExtras(extra) }} accountId={host ? null : selectedAccountId} /></div>
             {host ? null : (
-              <Card padding="none" layout="vertical" className={styles.card}>
+              <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
                 <div className={styles.cardHead}>
                   <h2 className={styles.cardTitle}>使われたときに行うこと</h2>
                 </div>
@@ -581,19 +579,19 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
           </>
         ) : (
           <>
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>受付</h2>
               </div>
-              <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}><Field label="受付の開始" htmlFor="te-research-start"><SaveErrorField names={["researchStartsAt","startsAt","research_starts_at"]}><DateTimeField className={styles.dateBox} id="te-research-start" value={researchStartsAt} onChange={setResearchStartsAt} aria-label="受付の開始" /></SaveErrorField></Field></div>
-                <span className={styles.tilde} aria-hidden="true">〜</span>
-                <div className={`${styles.field} ${styles.grow}`}><Field label="受付の終了" htmlFor="te-research-end"><SaveErrorField names={["researchEndsAt","endsAt","research_ends_at"]}><DateTimeField className={styles.dateBox} id="te-research-end" value={researchEndsAt} onChange={setResearchEndsAt} aria-label="受付の終了" /></SaveErrorField></Field></div>
-              </div>
+              <SettingsFormRow layout="columns">
+                <div className={styles.field}><Field label="受付の開始" htmlFor="te-research-start"><SaveErrorField names={["researchStartsAt","startsAt","research_starts_at"]}><DateTimeField className={styles.dateBox} id="te-research-start" value={researchStartsAt} onChange={setResearchStartsAt} aria-label="受付の開始" /></SaveErrorField></Field></div>
+
+                <div className={styles.field}><Field label="受付の終了" htmlFor="te-research-end"><SaveErrorField names={["researchEndsAt","endsAt","research_ends_at"]}><DateTimeField className={styles.dateBox} id="te-research-end" value={researchEndsAt} onChange={setResearchEndsAt} aria-label="受付の終了" /></SaveErrorField></Field></div>
+              </SettingsFormRow>
               <div className={styles.field}><Field label="はじめのあいさつ" htmlFor="te-research-greeting"><SaveErrorField names={["description"]}><TextField id="te-research-greeting" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：いつもありがとうございます。3問だけ聞かせてください。" /></SaveErrorField></Field></div>
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>質問（上から順に出ます）</h2>
               </div>
@@ -628,11 +626,11 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                       消す
                     </button>
                   </div>
-                  <div className={styles.pair}>
-                    <div className={`${styles.field} ${styles.grow}`}><Field label="質問文" htmlFor={`te-q-${question.key}`}><SaveErrorField names={[`shown.${index}.text`,"text","question.text"]}><TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" /></SaveErrorField>
+                  <SettingsFormRow layout="columns">
+                    <div className={styles.field}><Field label="質問文" htmlFor={`te-q-${question.key}`} requirement={fields.requirement(`q-${question.key}`)}><SaveErrorField names={[`shown.${index}.text`,"text","question.text"]}><TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" /></SaveErrorField>
 <FieldError id={`te-q-${question.key}-error`}>{fields.error(`q-${question.key}`)}</FieldError></Field></div>
-                    <div className={`${styles.field} ${styles.formatField}`}><Field label="答え方" htmlFor={`te-qf-${question.key}`}><SaveErrorField names={[`shown.${index}.format`,"format","question.format"]}><Select id={`te-qf-${question.key}`} aria-label={`問 ${index + 1} の答え方`} value={question.format} onChange={(value) => updateQuestion(index, { format: value as ResearchFormat })} options={FORMAT_OPTIONS} /></SaveErrorField></Field></div>
-                  </div>
+                    <div className={styles.field}><Field label="答え方" htmlFor={`te-qf-${question.key}`}><SaveErrorField names={[`shown.${index}.format`,"format","question.format"]}><Select id={`te-qf-${question.key}`} aria-label={`問 ${index + 1} の答え方`} value={question.format} onChange={(value) => updateQuestion(index, { format: value as ResearchFormat })} options={FORMAT_OPTIONS} /></SaveErrorField></Field></div>
+                  </SettingsFormRow>
                   {question.format !== 'free' ? (
                     <>
                     <div className={styles.choiceRow} role="group" aria-label={`問 ${index + 1} の選択肢`} {...fields.bind(`qc-${question.key}`)} aria-describedby={fields.invalid(`qc-${question.key}`) ? `te-qc-${question.key}-error` : undefined}>
@@ -689,7 +687,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
 
             {host ? null : (
             <>
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>答え終わったときに行うこと</h2>
               </div>
@@ -697,7 +695,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <InlineActionRowsV8 actions={answerActions} onChange={setAnswerActions} {...actionOptions} />
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>答えてもらう人</h2>
                 <p className={styles.cardNote}>タグで絞れます。選ばなければ全員が対象です。</p>
@@ -724,9 +722,6 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         items={orderMenu ? questionOrder.menuItems(orderMenu, () => setOrderMenu(null)).map((item) => ({ ...item, id: item.id === 'move-up' ? 'up' : 'down', disabledReason: undefined })) : []}
       />
 
-      <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
-        <div className={styles.previewDialog}>{phone}</div>
-      </Dialog>
 
       <MediaPickerDialog
         open={pickerOpen}

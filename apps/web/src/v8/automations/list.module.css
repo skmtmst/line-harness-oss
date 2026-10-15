@@ -32,57 +32,12 @@
 .tableWrap {
   min-width: 0;
 }
-.table {
-  border: 0;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
-  gap: var(--tpl-am-col-gap);
-  height: var(--tpl-am-head-h);
-  padding: var(--tpl-am-head-pad);
-}
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
-  gap: var(--tpl-am-col-gap);
-  height: var(--tpl-am-row-h);
-  padding: var(--tpl-am-row-pad);
-  border-bottom: 0;
-  box-shadow: var(--shadow-row-line);
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--tpl-am-cell-gap);
-  height: auto;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-  line-height: normal;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colRuns,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colRuns {
-  align-items: flex-end;
-  padding-right: var(--tpl-am-num-pad-end);
-  text-align: right;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
-  flex: 1 1 0;
-  min-width: 0;
-}
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colOps {
-  overflow: visible;
-}
-/* 1152 の板（En14p）：名前が2行になるので行は 55.5。 */
-:global([data-theme='v8']) .narrowTable .table .row[data-table-layout='columns'] {
-  height: var(--tpl-am-narrow-row-h);
-}
 .colTrigger { width: var(--tpl-am-col-trigger); flex-shrink: 0; }
 .colWho { width: var(--tpl-am-col-who); flex-shrink: 0; }
 .colDo { width: var(--tpl-am-col-do); flex-shrink: 0; }
 .colRuns { width: var(--tpl-am-col-runs); flex-shrink: 0; }
 .colState { width: var(--tpl-am-col-state); flex-shrink: 0; }
-.colOps { width: var(--tpl-am-col-ops); flex-shrink: 0; }
+.colOps { width: var(--tpl-icon-btn-row-hit); flex-shrink: 0; }
 
 /* 短い名前は途中で折らず、全文は title で確かめる。 */
 .name {
@@ -96,16 +51,6 @@
   text-overflow: ellipsis;
 }
 
-/* きっかけ・だれに：12 の文字で2行まで。 */
-.cell {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: normal;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
 .cellOne {
   display: block;
   max-width: 100%;
@@ -143,34 +88,6 @@
   line-height: normal;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-}
-
-/* 状態の札（点つき）。 */
-.pill {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: var(--tpl-am-pill-gap);
-  padding: var(--tpl-am-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-am-pill-lh);
-  white-space: nowrap;
-}
-.pillDot {
-  width: var(--tpl-badge-dot);
-  height: var(--tpl-badge-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-.pill[data-tone='active'] {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-.pill[data-tone='neutral'] {
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
 }
 
 /* 行の右端：編集と「…」。メニューの位置の目印が行を1段増やさないよう横に並べる。 */

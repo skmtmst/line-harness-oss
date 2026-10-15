@@ -11,28 +11,36 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const EVENTS = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const BOOKINGS = readFileSync(join(HERE, 'bookings', 'page.tsx'), 'utf8')
-const EDIT = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const EVENTS = readFileSync(join(HERE, '../../v8/events/list.tsx'), 'utf8')
+const BOOKINGS = readFileSync(join(HERE, '../../v8/events/bookings.tsx'), 'utf8')
+const RECORDS = readFileSync(join(HERE, '../../v8/events/booking-records.tsx'), 'utf8')
+const REQUESTS = readFileSync(join(HERE, '../../v8/events/booking-requests.ts'), 'utf8')
+const EDIT = readFileSync(join(HERE, '../../v8/events/edit.tsx'), 'utf8')
 
 /** 説明の文だけで通ってしまわないよう、判定の前にコメントを落とす。 */
 function code(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
 
-describe('V6 イベント・申込者一覧の状態', () => {
+describe('V8 イベント・申込者一覧の状態', () => {
   for (const [name, source] of [['イベント', EVENTS], ['申込者', BOOKINGS]] as const) {
     const body = code(source)
 
     it(`${name}は読込・成功・失敗を別の状態として持つ`, () => {
-      expect(body).toContain("setLoadStatus('ready')")
-      expect(body).toContain("loadStatus === 'error'")
+      expect(body).toContain(name === 'イベント' ? "setLoadStatus('ready')" : "setApplicantsStatus('ready')")
+      expect(body).toContain(name === 'イベント' ? "loadStatus === 'error'" : "applicantsStatus === 'error'")
     })
 
     it(`${name}は切替前の遅い応答を採用しない`, () => {
       // 前のアカウント・前の絞り込みの応答が、次の一覧に混ざらないこと。
-      expect(body).toContain('loadRequestRef')
-      expect(body).toContain('if (requestId !== loadRequestRef.current) return')
+      if (name === 'イベント') {
+        expect(body).toContain('loadRequestRef')
+        expect(body).toContain('if (requestId !== loadRequestRef.current) return')
+      } else {
+        expect(body).toContain('useBookingRequests(operationScope)')
+        expect(body).toContain('if (!request.isCurrent()) return')
+        expect(REQUESTS).toContain('current.current === frame')
+      }
     })
 
     it(`${name}は失敗したときに一覧を0件と同じ文で出さない`, () => {
@@ -42,7 +50,7 @@ describe('V6 イベント・申込者一覧の状態', () => {
   }
 
   it('申込者は失敗を error 状態として持つ', () => {
-    expect(code(BOOKINGS)).toContain("setLoadStatus('error')")
+    expect(code(BOOKINGS)).toContain("setApplicantsStatus('error')")
   })
 
   /*
@@ -57,64 +65,66 @@ describe('V6 イベント・申込者一覧の状態', () => {
     expect(body).toContain("'forbidden'")
     expect(body).toContain(": 'error'")
     expect(body).toContain("loadStatus === 'forbidden'")
-    expect(body).toContain('kind="forbidden"')
+    expect(body).toContain('イベントを見る権限がありません')
+    expect(body).toContain('管理者に権限を確かめてください')
   })
 
   it('イベント一覧は未取得の帯を0件にしない', () => {
     const body = code(EVENTS)
     // 帯は「数」ではなく「次にすること」を出す（R79/R80 で全体集計へ）。
-    expect(body).toContain("value={dataReady ? kpi.upcoming_slots : null}")
-    expect(body).toContain("value={dataReady ? kpi.upcoming_active : null}")
+    expect(body).toContain('value: dataReady ? kpi.upcoming_slots : null')
+    expect(body).toContain('value: dataReady ? kpi.upcoming_active : null')
     expect(body).toContain('登録したイベントは消えていません。')
   })
 
   it('申込者一覧は未取得の帯を0件にしない', () => {
     const body = code(BOOKINGS)
-    expect(body).toContain("value={dataReady ? applied : null}")
-    expect(body).toContain("value={dataReady ? pending : null}")
-    expect(body).toContain("value={dataReady ? cancelled : null}")
-    expect(body).toContain('受け付けた予約は消えていません。')
+    expect(body).toContain('value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null}')
+    expect(body).toContain('value={ready ? requestedSeats : null}')
+    expect(body).toContain('value={ready ? cancelledCount : null}')
+    expect(body).toContain('申込者は消えていません。')
   })
 
   it('申込者一覧は定員と全状態の件数を小さい集計APIから読む', () => {
     const body = code(BOOKINGS)
-    expect(body).toContain('eventsApi.getBookingSummary(selectedAccountId, eventId)')
+    expect(code(RECORDS)).toContain('eventsApi.getBookingSummary(accountId, eventId)')
     expect(body).not.toContain('.listSlots(selectedAccountId, eventId)')
     expect(body).not.toContain('.listWaitlist(selectedAccountId, eventId)')
     // IDEA-29: 残席は行数ではなく、席を消費中の人数(activeSeats)から引く。
-    expect(body).toContain('describeBookingCapacity(activeSeats, capacity)')
+    expect(code(RECORDS)).toContain('describeBookingCapacity(activeSeats, summary.totalCapacity ?? null)')
+    expect(body).toContain('capacity - (occurrence?.activeSeats ?? 0)')
   })
 
   it('申込者一覧は切替後に前のイベント名と定員を残さない', () => {
     const body = code(BOOKINGS)
     expect(body).toContain('setEvent(null)')
-    expect(body).toContain('setSummary(null)')
+    expect(body).toContain('setApplicants(null)')
     // 控えがあれば取りに行かない、をやめる（前のイベント名が残る）。
     expect(body).not.toContain('Promise.resolve(event)')
   })
 
   it('編集画面から申込者一覧へのリンクは申込者画面の読む引数名と揃える', () => {
     // 申込者画面は `id` だけを読む。一覧と作成フォームは `?id=` で正しい。
-    expect(code(BOOKINGS)).toContain("params.get('id')")
-    expect(code(EDIT)).toContain('/events/bookings?id=${eventId}')
+    expect(code(BOOKINGS)).toContain("useSearchParams().get('id')")
     expect(code(EDIT)).toContain('/events/bookings?id=${id}')
     // `?eventId=` では「イベントを選び直してください」になり、承認待ちへ行けない。
     expect(code(EDIT)).not.toContain('bookings?eventId=')
   })
 
   it('イベントと申込者は共通のoffsetページ送りを使う(点検#520の中8)', () => {
-    const body = code(BOOKINGS)
+    const body = code(RECORDS)
     expect(body).not.toContain('eventsApi.listEvents(')
-    expect(body).toContain('setBookingsTotal')
+    expect(body).toContain('setTotal')
     expect(body).toContain('page,')
     expect(body).toContain('limit: PAGE_SIZE')
     expect(body).toContain('<Pagination')
     const list = code(EVENTS)
     expect(list).toContain('setListTotal')
     // #625: 検索語は上限へ切り詰めてから送る
-    expect(list).toContain('q: clampSearchQuery(query.trim()) || undefined')
-    expect(list).toContain('filter,')
-    expect(list).toContain('sort,')
+    expect(list).toContain('clampSearchQuery(query.trim())')
+    expect(list).toContain("params.set('q', trimmed)")
+    expect(list).toContain("params.set('filter', filter)")
+    expect(list).toContain("params.set('sort', sort)")
     expect(EVENTS).not.toContain('200件まで表示しています')
   })
 
@@ -122,7 +132,7 @@ describe('V6 イベント・申込者一覧の状態', () => {
     const body = code(EDIT)
     expect(body).toContain('setLoadError')
     expect(body).toContain('setReloadSeq')
-    expect(EDIT).toContain('一部を取得できませんでした。取得できなかった数は「—」で表示しています。')
+    expect(EDIT).toContain('一部を読み込めませんでした。読み込めなかった数は「—」で表示しています。')
     expect(EDIT).toContain('読み直す')
     expect(body).toContain('eventsApi.getBookingSummary(accountId, eventId)')
     expect(body).not.toContain('eventsApi.listBookings(accountId, eventId)')

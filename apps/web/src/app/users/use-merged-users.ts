@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
-import type { UserRowData } from '@/components/users/user-row'
+import type { UserRowData } from '@/components/users/users-types'
 
 export const USERS_PAGE_SIZE = 50
 

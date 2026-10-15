@@ -1,6 +1,10 @@
 'use client'
+import { requiredText } from '@/lib/form-requirement'
+export const formNameRequirement = requiredText('フォーム名を入力してください')
 
-import { useState } from 'react'
+
+import Card from '@/components/shared/card'
+import { useRef, useState } from 'react'
 import { Sparkles, Link2 } from 'lucide-react'
 import {
   FORM_THEME_DEFAULT, CUSTOMER_DESIGNS, DEFAULT_CUSTOMER_LOOK, resolveCustomerFormTheme, type CustomerLook,
@@ -32,6 +36,7 @@ import { Field, FieldError } from '@/components/shared/form-controls'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * 「受付と見た目」のタブ（tpRRT）。受付のきまり・色と文字・背景とリンクの見え方・
@@ -67,6 +72,7 @@ type Props = {
   ogImageUrl: string
   onChangeOptions: (next: Partial<FormOptions>) => void
   onChangeName: (next: string) => void
+  onBlurName?: () => void
   onChangeDescription: (next: string) => void
   onChangeOgTitle: (next: string) => void
   onChangeOgDescription: (next: string) => void
@@ -86,6 +92,7 @@ export function AppearanceTab(props: Props) {
   const patchBackground = (backgroundImageUrl: string | null) => onChangeOptions({customerDesign:{mode,preset},theme:{...theme,backgroundImageUrl}})
   const deadlineOn = options.deadline?.enabled ?? false
   const ogImageError = ogImageUrlError(props.ogImageUrl)
+  const initialAppearance = useRef({ theme: { ...theme }, ogTitle: props.ogTitle, ogDescription: props.ogDescription, ogImageUrl: props.ogImageUrl })
   const linkSummary = [props.ogTitle.trim() ? '見出し' : null, props.ogDescription.trim() ? '説明' : null, props.ogImageUrl.trim() ? '画像' : null].filter(Boolean).join('・') || '自動で作る'
 
   if (props.readOnly) {
@@ -111,15 +118,15 @@ export function AppearanceTab(props: Props) {
       ['フォーム名', props.name],
       ['覚え書き', props.description || 'なし'],
     ]
-    return <section className={styles.card}>
+    return <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)">
       <h2 className={styles.cardTitle}>受付と見た目</h2>
       <dl>{rows.map(([label, value]) => <div className={styles.field} key={label}><dt className={styles.fieldLabel}>{label}</dt><dd>{value}</dd></div>)}</dl>
-    </section>
+    </Card>
   }
 
   return (
     <>
-      <section className={styles.card} aria-labelledby="fe-reception-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-reception-title">
         <h2 id="fe-reception-title" className={styles.cardTitle}>受付のきまり</h2>
         <div className={styles.periodRow}>
           <div className={styles.field}>
@@ -159,9 +166,9 @@ export function AppearanceTab(props: Props) {
               onChange={(e) => onChangeOptions({ totalLimit: { ...options.totalLimit, enabled: true, max: Math.max(1, Number(e.target.value) || 1) } })}
             /></SaveErrorField></Field></div>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-label="受付のつづきと見た目">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-label="受付のつづきと見た目">
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>受付のきまり（つづき）</h3>
           <SaveErrorField names={["restorePrevious","options.restorePrevious","restore_previous","options.restore_previous"]}><Checkbox checked={options.restorePrevious ?? false} onCheckedChange={(restorePrevious) => onChangeOptions({ restorePrevious })}>前回の答えを最初から入れておく</Checkbox></SaveErrorField>
@@ -180,11 +187,11 @@ export function AppearanceTab(props: Props) {
           {props.accountLookError && !props.portable ? <FieldError id="account-look-error">{props.accountLookError}</FieldError> : null}
           {mode === 'fixed' ? <><p className={styles.fieldLabelPlain}>デザインの型</p><CustomerDesignPicker value={preset} onChange={next => onChangeOptions({customerDesign:{mode:'fixed',preset:next}})} /></> : null}
           {mode === 'fixed' && preset === 'custom' ? <>
-          <p className={styles.fieldLabelPlain}>色（5つの役割）</p>
+          <p className={styles.fieldLabelPlain} title="文字と背景の色の差は4.5:1以上にしてください。">色（5つの役割）</p>
           <div id="fe-colors" className={styles.wells}>
             {COLOR_ROLES.map((role) => (
               <span key={role.key} className={styles.well}>
-                <ColorWell value={theme[role.key]} allowAlpha={false} allowClear={false} label={`${role.label}の色`} onChange={(color) => color && patchTheme({ [role.key]: color.slice(0, 7).toLowerCase() })} />
+                <ColorWell value={theme[role.key]} allowAlpha={false} allowClear={false} retainInvalidInput label={`${role.label}の色`} onChange={(color) => color && patchTheme({ [role.key]: color.slice(0, 7).toLowerCase() })} />
                 <span className={styles.wellLabel}>{role.label}</span>
               </span>
             ))}
@@ -244,22 +251,22 @@ export function AppearanceTab(props: Props) {
           <span>次へ</span>
           <span>送る</span>
         </div>
-        <div className={styles.wordsRow}>
+        <SettingsFormRow layout="columns" columns={3}>
           <SaveErrorField names={["prevLabel","options.prevLabel","prev_label","options.prev_label"]}><TextField aria-label="前へボタンの文字" value={options.prevLabel ?? ''} placeholder="前へ" onChange={(e) => onChangeOptions({ prevLabel: e.target.value })} /></SaveErrorField>
           <SaveErrorField names={["nextLabel","options.nextLabel","next_label","options.next_label"]}><TextField aria-label="次へボタンの文字" value={options.nextLabel ?? ''} placeholder="次へ" onChange={(e) => onChangeOptions({ nextLabel: e.target.value })} /></SaveErrorField>
           <SaveErrorField names={["submitLabel","options.submitLabel","submit_label","options.submit_label"]}><TextField aria-label="送るボタンの文字" value={options.submitLabel ?? ''} placeholder="送信する" onChange={(e) => onChangeOptions({ submitLabel: e.target.value })} /></SaveErrorField>
-        </div>
-      </section>
+        </SettingsFormRow>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="fe-about-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-about-title">
         <div className={styles.cardHeadText}>
           <h2 id="fe-about-title" className={styles.cardTitle}>フォームのこと</h2>
           <p className={styles.cardNote}>名前は一覧と題に出ます。覚え書きはお客さまには出ません。</p>
         </div>
-        <div className={styles.field}><Field label="フォーム名" htmlFor="fe-name"><SaveErrorField names={["name","props.name"]}><TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onChange={(e) => props.onChangeName(e.target.value)} /></SaveErrorField>
+        <div className={styles.field}><Field label="フォーム名" htmlFor="fe-name" requirement={formNameRequirement}><SaveErrorField names={["name","props.name"]}><TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onBlur={props.onBlurName} onChange={(e) => props.onChangeName(e.target.value)} /></SaveErrorField>
 {props.nameError ? <p role="alert" className={styles.fieldError}>{props.nameError}</p> : null}</Field></div>
         <div className={styles.field}><Field label="覚え書き" htmlFor="fe-desc"><SaveErrorField names={["description","props.description"]}><TextArea id="fe-desc" rows={2} value={props.description} onChange={(e) => props.onChangeDescription(e.target.value)} /></SaveErrorField></Field></div>
-      </section>
+      </Card>
 
       {/* 3欄は親のフォームへ即時反映済み。窓を閉じても入力を捨てない。 */}
       <Dialog open={linkOpen} dirty={false} title="リンクの見え方" description="LINEやSNSにこのフォームのURLを貼ったときに出るカードです。空のままなら自動で作ります。" confirmLabel="閉じる" onConfirm={() => setLinkOpen(false)} onCancel={() => setLinkOpen(false)}>
@@ -280,6 +287,16 @@ export function AppearanceTab(props: Props) {
               urlEntry={{ id: 'fe-og-image', value: props.ogImageUrl, onChange: props.onChangeOgImageUrl, label: 'カードの画像URL', placeholder: 'https://', open: Boolean(ogImageError) }}
             /></SaveErrorField>
           </div>
+        </div>
+        <div className={styles.tight}>
+          <Button onClick={() => {
+            const initial = initialAppearance.current
+            onChangeOptions({ theme: { ...initial.theme } })
+            props.onChangeOgTitle(initial.ogTitle)
+            props.onChangeOgDescription(initial.ogDescription)
+            props.onChangeOgImageUrl(initial.ogImageUrl)
+          }}>元に戻す</Button>
+          <Button onClick={() => onChangeOptions({ theme: { ...FORM_THEME_DEFAULT } })} title="色・書体・角の丸み・背景を初期設定に戻します">初期設定に戻す</Button>
         </div>
       </Dialog>
 

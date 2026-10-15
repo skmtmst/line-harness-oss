@@ -20,7 +20,7 @@ const fixture = vi.hoisted(() => ({
   push: null as null | ((...args: unknown[]) => void),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: (...args: unknown[]) => fixture.push!(...args), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -29,7 +29,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 
@@ -63,6 +63,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ApiError,
     api: { staff: { list: () => fixture.memberList!() } },
     bookingApi: {
+      listStaff: async () => ({ staff: [] }),
       listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
       createStaff: (...args: unknown[]) => fixture.createStaff!(...args),
       putStaffMenus: (...args: unknown[]) => fixture.putStaffMenus!(...args),
@@ -113,7 +114,7 @@ afterEach(() => {
 
 async function renderNew() {
   render(<NewBookingStaffPage />)
-  await screen.findByText('ログインユーザーとの紐づけ')
+  await screen.findByText('ログインユーザーとのひも付け')
 }
 
 describe('追加発見 ログインユーザー一覧の取得失敗と未設定を言い分ける', () => {
@@ -129,7 +130,7 @@ describe('追加発見 ログインユーザー一覧の取得失敗と未設定
     fixture.memberList = async () => ({ success: true, data: [] })
     await renderNew()
 
-    await screen.findByRole('combobox', { name: 'ログインユーザーとの紐づけ' })
+    await screen.findByRole('button', { name: 'ログインユーザーとの紐づけ' })
     expect(screen.queryByText('ログインユーザーを読み込めませんでした')).toBeNull()
     expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
   })
@@ -143,14 +144,15 @@ describe('追加発見 ログインユーザー一覧の取得失敗と未設定
     await renderNew()
     await screen.findByText('ログインユーザーを読み込めませんでした')
 
-    const name = screen.getByPlaceholderText('例: 田中 美咲') as HTMLInputElement
+    const name = screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }) as HTMLInputElement
     fireEvent.change(name, { target: { value: '田中' } })
 
     fail = false
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
+    fireEvent.click(await screen.findByRole('button', { name: 'ログインユーザーとの紐づけ' }))
     await screen.findByText('管理者（owner@example.com）')
     expect(screen.queryByText('ログインユーザーを読み込めませんでした')).toBeNull()
-    expect((screen.getByPlaceholderText('例: 田中 美咲') as HTMLInputElement).value).toBe('田中')
+    expect((screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }) as HTMLInputElement).value).toBe('田中')
   })
 })

@@ -5,7 +5,7 @@
  *   - 描画前に data-theme を差し替えるスクリプトは無い（v7 が一瞬出ない）
  *   - 設定画面に「画面の見た目」の切り替えは無い
  *   - 配備の設定に NEXT_PUBLIC_ADMIN_THEME は要らない
- *   - globals.css の V8 値は [data-theme="v8"] の下にある
+ *   - globals.css の V8 値は :root の下にある
  */
 import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { existsSync, readdirSync, readFileSync as readRawSource } from 'node:fs'
@@ -49,11 +49,11 @@ describe('見た目は V8 に固定', () => {
         if (!/\.tsx?$/.test(file) || /\.test\.tsx?$/.test(file)) continue
         const source = ts.createSourceFile(file, readRawSource(file, 'utf8'), ts.ScriptTarget.Latest, true)
         function visit(node: ts.Node) {
-          // コメントは調べない。試験専用の環境変数の読み取りは共通関数だけに置く。
+          // コメントは調べない。環境変数による選択をどこにも戻さない。
           if (ts.isStringLiteral(node) && node.text === 'lh-admin-theme') failures.push(file)
           const envChoice = (ts.isPropertyAccessExpression(node) && node.name.text === 'NEXT_PUBLIC_ADMIN_THEME')
             || (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) && node.argumentExpression.text === 'NEXT_PUBLIC_ADMIN_THEME')
-          if (envChoice && file !== join(src, 'lib/admin-theme-default.ts')) failures.push(file)
+          if (envChoice) failures.push(file)
           if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
             && /^document\.documentElement\.dataset(?:\.theme|\[['"]theme['"]\])$/.test(node.left.getText(source))) failures.push(file)
           if (ts.isCallExpression(node) && node.expression.getText(source) === 'document.documentElement.setAttribute'
@@ -77,9 +77,9 @@ describe('見た目は V8 に固定', () => {
     }
   })
 
-  it('V8 の値は [data-theme="v8"] の下にある（角丸 control 10 / panel 16）', () => {
-    const v8 = globals.match(/\[data-theme="v8"\]\s*\{([\s\S]*?)\}/)
-    expect(v8, '[data-theme="v8"] ブロックが無い').not.toBeNull()
+  it('V8 の値は :root の下にある（角丸 control 10 / panel 16）', () => {
+    const v8 = globals.match(/:root\s*\{([^}]*--radius-control: 10px[^}]*)\}/)
+    expect(v8, ':root ブロックが無い').not.toBeNull()
     expect(v8![1]).toContain('--radius-control: 10px')
     expect(v8![1]).toContain('--radius-panel: 16px')
   })
@@ -87,7 +87,7 @@ describe('見た目は V8 に固定', () => {
   it('V8 で増える語彙がある（divider・table-head・chat-outgoing・board・印のタイル）', () => {
     for (const token of [
       '--color-divider: #1d1d1f12',
-      '--color-table-head: #fafafb',
+      '--color-table-head: #f7f8fa',
       '--color-chat-outgoing: #dff5e7',
       '--color-board-line',
       '--shadow-board',

@@ -1,7 +1,8 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
@@ -64,18 +65,18 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
     expect(PAGE).toContain('CROSS_POLL_ERROR_BACKOFF_MS')
     expect(PAGE).toContain('Math.min(pollErrors')
     // 失敗の待ち時間を積む前に打ち切りを見る(見ないと上限15分を越えて叩き続ける)。
-    expect(PAGE).toMatch(/stopIfDeadlinePassed\(\)\) return\n\s*\/\/ 失敗が続くほど間隔を空ける/)
+    expect(PAGE).toMatch(/stopIfDeadlinePassed\(\)\) return\n\s*timer = window.setTimeout\(\(\) => void check\(\), CROSS_POLL_ERROR_BACKOFF_MS/)
   })
 
   it('再読込時は同じアカウントのrunだけ復元し、恒久4xxの再試行を止める', () => {
     expect(PAGE).toContain("CROSS_RUN_STORAGE_PREFIX = 'lh:analytics:cross-run:v1:'")
-    expect(PAGE).toContain('sessionStorageはSSRの初期HTMLでは読まない')
+    expect(PAGE).toContain('hydration の後に一度だけ復元する')
     expect(PAGE).toContain('setCrossStorageRestored(true)')
     expect(PAGE).toContain('!crossStorageRestored || !crossRunId')
     expect(PAGE).toContain('saveStoredCrossRun(accountId')
     expect(PAGE).toContain('clearStoredCrossRun(accountId)')
     expect(PAGE).toContain('crossStartInFlight')
-    expect(PAGE).toContain('Boolean(crossRunId)')
+    expect(PAGE).toContain('crossRunId || loading')
     // 認証切れは再ログイン後に復元できるよう控えを残すが、無限再試行はしない。
     expect(PAGE).toContain('caught.status === 401')
     expect(PAGE).toContain('ログインし直した後、同じ集計を確認できます')
@@ -85,7 +86,7 @@ describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
 
   it('アカウント切替で作り直し、前のアカウントの遅延応答を表示へ入れない', () => {
     // 画面ごと作り直す(key)。加えて世代fenceで、切替前に投げた通信の応答を落とす。
-    expect(PAGE).toContain('<CrossTab key={selectedAccountId} accountId={selectedAccountId}')
+    expect(PAGE).toContain('<CrossV8 key={selectedAccountId} accountId={selectedAccountId}')
     expect(PAGE).toContain('viewGeneration')
     expect(PAGE).toContain('viewGeneration.current !== generation')
   })

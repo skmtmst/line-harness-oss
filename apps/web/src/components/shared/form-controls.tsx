@@ -6,6 +6,7 @@ import type {
   CSSProperties,
   ReactNode,
 } from 'react'
+import type { FormRequirement } from '@/lib/form-requirement'
 import { FieldContext } from './field-context'
 import HelpTip from './help-tip'
 import { TextArea as BaseTextArea, TextField } from './text-field'
@@ -27,7 +28,7 @@ import styles from './form-controls.module.css'
  * （legend や行内のラベル）ではこの部品を直接置く。
  */
 export function RequiredBadge({ appearance = 'badge' }: { appearance?: 'badge' | 'text' }) {
-  return <span aria-hidden="true" className={styles.required}>必須</span>
+  return <span aria-hidden="true" data-required-badge className={styles.required}>必須</span>
 }
 
 /**
@@ -58,12 +59,14 @@ export function Field({
   size,
   htmlFor,
   required,
+  requirement,
   requiredAppearance,
   optional,
   labelHidden = false,
   labelSize = 'standard',
   note,
   error,
+  errorId: providedErrorId,
   errorFrame = false,
   spacing,
   help,
@@ -85,6 +88,7 @@ export function Field({
   /** 横に並ぶ欄を等分する。 */
   fill?: boolean
   htmlFor?: string
+  requirement?: Pick<FormRequirement<unknown>, 'required'>
   required?: boolean
   /** 設定カードの絵で、必須を任意と同じ薄い文字で示す。 */
   requiredAppearance?: 'badge' | 'text'
@@ -95,6 +99,8 @@ export function Field({
   labelSize?: 'standard' | 'compact'
   note?: ReactNode
   error?: ReactNode
+  /** 既存の欄が使っている理由のIDを保つ。省略すると部品が作る。 */
+  errorId?: string
   /** 複合入力を1つの欄として確かめる画面だけ、誤りの枠を付ける。 */
   errorFrame?: boolean
   /** カード内の入力と操作を、型の段の間隔で並べる。 */
@@ -129,7 +135,7 @@ export function Field({
   const [autoRequired, setAutoRequired] = useState(false)
   const syncControl = () => {
     if (!fieldRef.current || typeof fieldRef.current.querySelector !== 'function') return
-    const control = fieldRef.current.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type=number]):not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]),textarea')
+    const control = fieldRef.current.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]),textarea')
     if (control) { if (!control.id) control.id = controlId; setDetectedId(control.id); if (!control.hasAttribute('aria-label') && typeof shownLabel === 'string') control.setAttribute('aria-label', shownLabel) }
     const next = control && !fieldRef.current.querySelector('[data-message-character-count]') && control.maxLength >= 0 ? { value: control.value.length, max: control.maxLength } : undefined
     setAutoCount(previous => previous?.value === next?.value && previous?.max === next?.max ? previous : next)
@@ -137,7 +143,7 @@ export function Field({
   }
   useEffect(syncControl)
   const actualCount = count ?? autoCount
-  const actualRequired = required || autoRequired || Boolean(typeof label === 'string' && label.match(/[（(]必須[）)]/u))
+  const actualRequired = requirement?.required ?? required ?? (autoRequired || Boolean(typeof label === 'string' && label.match(/[（(]必須[）)]/u)))
   const shownLabel = typeof label === 'string' ? label.replace(/\s*[（(](任意|必須)[）)]/gu, '').replace(/\s*[*＊]$/, '') : label
   const longNote = fieldNoteIsLong(note)
   const actualHelp = longNote ? <>{help}{help ? <br /> : null}{note}</> : help
@@ -159,16 +165,37 @@ export function Field({
    * aria-required として渡す。画面ごとに書かない。
    */
   const noteId = `${baseId}-note`
-  const errorId = `${baseId}-error`
+  const errorId = providedErrorId ?? `${baseId}-error`
   const countId = `${baseId}-count`
   const showNote = !shownError && Boolean(note) && !longNote
   const over = actualCount ? actualCount.value > actualCount.max : false
   const describedBy = [shownError ? errorId : null, showNote ? noteId : null, actualCount ? countId : null].filter(Boolean).join(' ') || undefined
+  useEffect(() => {
+    const root = fieldRef.current
+    if (!root || typeof root.querySelectorAll !== 'function') return
+    for (const control of root.querySelectorAll<HTMLElement>('input:not([type=hidden]),textarea,select')) {
+      if (control.closest('[data-form-requirement]') !== root) continue
+      // 入力自身の required を読む欄では上書きしない。内側の Field と検出が循環しない。
+      if (requirement || required !== undefined) control.setAttribute('aria-required', String(Boolean(actualRequired)))
+      const externalError = (control.getAttribute('aria-describedby') ?? '').split(/\s+/).some(id => id !== errorId && document.getElementById(id)?.getAttribute('role') === 'alert' && Boolean(document.getElementById(id)?.textContent))
+      const explicitInvalid = control.getAttribute('aria-invalid') === 'true' && !control.hasAttribute('data-field-managed-invalid')
+      if (shownError || externalError || explicitInvalid) control.setAttribute('aria-invalid', 'true')
+      else if (control.getAttribute('aria-invalid') !== 'false') control.removeAttribute('aria-invalid')
+      if (shownError) control.setAttribute('data-field-managed-invalid', '')
+      else control.removeAttribute('data-field-managed-invalid')
+      const previous = (control.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(id => id && ![noteId, errorId, countId].includes(id))
+      const ids = [...new Set([...previous, ...(describedBy?.split(/\s+/) ?? [])])].join(' ')
+      if (ids) control.setAttribute('aria-describedby', ids)
+      else control.removeAttribute('aria-describedby')
+    }
+  }, [actualRequired, requirement?.required, required, shownError, describedBy, noteId, errorId, countId])
   return (
     <FieldContext.Provider value={{ label: typeof shownLabel === 'string' ? shownLabel : undefined, controlId, describedBy, invalid: Boolean(shownError), required: Boolean(actualRequired) }}>
     <div
       ref={fieldRef}
       className={styles.field}
+      data-form-requirement={actualRequired ? 'required' : 'optional'}
+      data-field-error={Boolean(shownError) || undefined}
       data-label-size={labelSize}
       data-grow={grow || undefined}
       data-density={density}
@@ -184,7 +211,7 @@ export function Field({
       {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
           入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
       {label && !labelHidden ? <div className={styles.labelRow}>
-        <label htmlFor={controlId} className={styles.label}>
+        <label htmlFor={controlId} className={styles.label} title={fieldNoteText(shownLabel) || undefined}>
           {shownLabel}
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
               何も伝わらない。 */}
@@ -198,6 +225,7 @@ export function Field({
           </HelpTip>
         ) : null}
       </div> : null}
+      {labelHidden && actualRequired ? <RequiredBadge /> : null}
       {errorFrame ? <div className={styles.errorFrame} data-invalid={Boolean(shownError) || undefined} role="group" aria-invalid={Boolean(shownError) || undefined} aria-describedby={describedBy}>{children}</div> : children}
       {shownError ? <p id={errorId} className={styles.error} role="alert">{shownError}</p> : null}
       {showNote ? <p id={noteId} className={styles.note}>{note}</p> : null}

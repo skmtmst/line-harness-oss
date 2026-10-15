@@ -157,7 +157,7 @@ friendMigrations.get('/api/friends/migrations', requireRole('owner', 'admin', 's
     const runs = await listUidMigrationRuns(c.env.DB, scope.allowedAccountIds);
     return c.json({ success: true, data: runs.map(runJson) });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migrations_list_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"friend_migrations_list_failed","route":"GET /api/friends/migrations"}));
     return c.json({ success: false, error: '移行履歴を読み込めませんでした' }, 500);
   }
 });
@@ -213,7 +213,7 @@ friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), 
     });
     return c.json({ success: true, data: runJson(run) }, 201);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_dry_run_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"friend_migration_dry_run_failed","route":"POST /api/friends/migrations"}));
     return c.json({ success: false, error: 'テスト移行を実行できませんでした' }, 500);
   }
 });
@@ -268,7 +268,7 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_detail_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"friend_migration_detail_failed","route":"GET /api/friends/migrations/:id"}));
     return c.json({ success: false, error: '移行結果を読み込めませんでした' }, 500);
   }
 });
@@ -317,7 +317,7 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
       .run();
     return c.json({ success: true, data: { ...(runJson((await getUidMigrationRun(c.env.DB, run.id))!)), unresolved: pending?.count ?? null } });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_decision_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"friend_migration_decision_failed","route":"PATCH /api/friends/migrations/:id/items/:itemId"}));
     return c.json({ success: false, error: '判断を保存できませんでした' }, 500);
   }
 });
@@ -628,7 +628,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
           }
         }
       } catch (compensationError) {
-        console.error(JSON.stringify({ event: 'friend_migration_create_compensation_failed', error: String(compensationError) }));
+        console.error(JSON.stringify({"code":"friend_migration_create_compensation_failed","route":"POST /api/friends/migrations/:id/execute"}));
       }
       /*
         途中例外でも executing のまま放置しない。ここまでに反映・失敗した
@@ -651,7 +651,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
     ).run();
     return c.json({ success: true, data: runJson((await getUidMigrationRun(c.env.DB, run.id))!) });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_execute_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"friend_migration_execute_failed","route":"POST /api/friends/migrations/:id/execute"}));
     return c.json({ success: false, error: '本移行を実行できませんでした' }, 500);
   }
 });
@@ -805,7 +805,7 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
       data: { ...runJson((await getUidMigrationRun(c.env.DB, run.id))!), rolledBack: rolledBack + alreadyRestored },
     });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_rollback_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"friend_migration_rollback_failed","route":"POST /api/friends/migrations/:id/rollback"}));
     return c.json({ success: false, error: '切り戻しを実行できませんでした' }, 500);
   }
 });
@@ -841,9 +841,10 @@ friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), inp
       id, accountId, JSON.stringify({ accountId }), JSON.stringify(columns), body.encoding ?? 'utf-8',
       count?.count ?? 0, staff.id, staff.name, now.toISOString(), new Date(now.getTime() + 7 * 86_400_000).toISOString(),
     ).run();
+    c.set('outputAudit', { count: count?.count ?? null, accountId, targetId: id, phase: 'requested' });
     return c.json({ success: true, data: { id, rowCount: count?.count ?? null, status: 'completed', downloadUrl: `/api/friends/exports/${id}/download` } }, 201);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_export_create_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"friend_export_create_failed","route":"POST /api/friends/exports"}));
     return c.json({ success: false, error: '書き出しを作れませんでした' }, 500);
   }
 });
@@ -859,6 +860,8 @@ friendMigrations.get('/api/friends/exports/:id/download', requireRole('owner', '
   const fields = (JSON.parse(job.columns_json) as ExportColumn[]).includes('friend_fields')
     ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: job.line_account_id }, { status: 'active' })
     : [];
+  const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM friends WHERE line_account_id=?').bind(job.line_account_id).first<{ n: number }>();
+  c.set('outputAudit', { count: count?.n ?? 0, accountId: job.line_account_id, targetId: c.req.param('id') });
   const encoder = new TextEncoder();
   let offset = 0;
   let started = false;
@@ -998,7 +1001,7 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), inp
     ).run();
     return c.json({ success: true, data: { id, status: 'previewed', result: { summary, rows: results }, duplicate: false } }, 201);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_import_preview_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"friend_import_preview_failed","route":"POST /api/friends/imports"}));
     return c.json({ success: false, error: '取り込みの確認を実行できませんでした' }, 500);
   }
 });
@@ -1073,7 +1076,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
       .bind(now, job.id).run();
     return c.json({ success: true, data: { id: job.id, status: 'completed', applied, duplicate: false } });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_import_execute_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"friend_import_execute_failed","route":"POST /api/friends/imports/:id/execute"}));
     return c.json({ success: false, error: '取り込みを反映できませんでした' }, 500);
   }
 });
@@ -1100,7 +1103,7 @@ friendMigrations.get('/api/friends/migration-jobs', requireRole('owner', 'admin'
       .slice(0, 20)
       .map(({ sortCreatedAt: _sortCreatedAt, ...job }) => job) });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_jobs_list_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"friend_migration_jobs_list_failed","route":"GET /api/friends/migration-jobs"}));
     return c.json({ success: false, error: '書き出し・取り込み履歴を読み込めませんでした' }, 500);
   }
 });

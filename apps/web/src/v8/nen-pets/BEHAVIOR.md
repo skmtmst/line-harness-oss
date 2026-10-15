@@ -3,7 +3,7 @@
 対象：今までの V8 のマイペット（`app/nen/pets/pets-v8.tsx`）と v7（`pets-tab.tsx`・`feeding-tab.tsx`・`pet-editor.tsx`）。動きを写して、`pets.tsx`（外枠）・`list.tsx`（登録ペット）・`editor.tsx`（ペットの情報を直す）・`feeding.tsx`（ごはんの目安）を一から書いた。見た目は型（ListPage）と部品で組み直した。板は 一覧 `wTIej`・一覧 1152 `t2SMXX`・ペットの情報を直す `eLjeQ`・ごはんの目安 `h7A2F`。
 
 ## 入口
-- `app/nen/pets/page.tsx`：V8 のときだけ `@/v8/nen-pets/pets` を出す。v7 の画面と `pets-v8.tsx` は切り替えの日まで残す。
+- `app/nen/pets/page.tsx`：`@/v8/nen-pets/pets` に固定。旧一覧/編集/ごはん設定と読まれない旧V8の写しは除去済み。CSVと絞り込みは現役の外枠で扱う。ごはん設定は対象切替で未保存の入力を捨てて知らせ、切替前の取得/保存成功/失敗を採用しない。
 
 ## 受け付ける URL と指定（今までと同じ名前・同じ意味）
 - `?tab=feeding`：ごはんの目安。無い・ほかの値は登録ペット。

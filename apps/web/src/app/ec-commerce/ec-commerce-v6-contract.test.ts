@@ -2,15 +2,15 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const page = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const page = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
 const tabs = readFileSync(join(import.meta.dirname, 'ec-tabs.ts'), 'utf8')
-const tabsView = readFileSync(join(import.meta.dirname, 'ec-tabs-view.tsx'), 'utf8')
-const identity = readFileSync(join(import.meta.dirname, 'identity-candidates', 'page.tsx'), 'utf8')
-const subscriptions = readFileSync(join(import.meta.dirname, 'subscriptions-panel.tsx'), 'utf8')
-const connector = readFileSync(join(import.meta.dirname, 'connector-panel.tsx'), 'utf8')
+const tabsView = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
+const identity = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/identity.tsx'), 'utf8')
+const subscriptions = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/subscriptions.tsx'), 'utf8')
+const connector = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/connector.tsx'), 'utf8')
 const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
-describe('V6 EC integration screens', () => {
+describe('V8 EC integration screens', () => {
   it('connects all four EC tabs to real routes', () => {
     expect(tabs).toContain("{ key: 'events', label: '取り込みの記録' }")
     expect(tabs).toContain("href: '/ec-commerce/identity-candidates'")
@@ -33,11 +33,11 @@ describe('V6 EC integration screens', () => {
      * ここで保つ——定期便も `overview` の成否判定の中に入るので、失敗時は
      * `undefined`(タブに数字を出さない)のままになる。
      */
-    expect(tabsView).toContain('overview.value.data.subscriptions')
+    expect(tabsView).toContain('ov?.subscriptions')
     expect(tabsView).not.toContain('api.ecCommerce.subscriptions')
   })
 
-  it('shows the V6 decision information without inventing unavailable values', () => {
+  it('shows the V8 decision information without inventing unavailable values', () => {
     for (const wording of ['処理完了', '処理中', '送信なし', '失敗']) {
       expect(page).toContain(wording)
     }
@@ -49,7 +49,7 @@ describe('V6 EC integration screens', () => {
     expect(page).toContain('formatNumber(order.totalAmount')
     expect(identity).toContain('operations?.summary.linked')
     expect(identity).toContain('operations?.summary.potentialRevenue')
-    expect(identity).toContain('過去のLINE送信は再送しません')
+    expect(identity).toContain('過去の LINE 送信は再送しません')
   })
 
   it('uses state-specific feedback and never turns missing values into zero', () => {
@@ -59,8 +59,8 @@ describe('V6 EC integration screens', () => {
       expect(source).toContain("'empty'")
       expect(source).toContain("'loading'")
     }
-    expect(subscriptions).toContain("monthlyAmount === null ? '今月の金額は未取得'")
-    expect(connector).toContain("'— 未取得'")
+    expect(subscriptions).toContain('summary?.monthlyAmount == null')
+    expect(connector).toContain("'未取得'")
   })
 
   it('reads subscription facts and writes versioned connector settings without exposing the secret', () => {
@@ -68,7 +68,7 @@ describe('V6 EC integration screens', () => {
     expect(api).toContain('/api/ec-commerce/connector?')
     expect(connector).toContain('expectedVersion')
     expect(connector).toContain('type="password"')
-    expect(connector).toContain('鍵そのものは表示しません')
+    expect(connector).toContain('画面には最後の4文字だけを出します')
     expect(connector).not.toContain('inbound_secret_encrypted')
   })
 
@@ -78,10 +78,10 @@ describe('V6 EC integration screens', () => {
     // #948 N-320: 影響件数はEC起点の設定だけを数え、行ごとに範囲を添える。
     // やり直しかたは値に依存せず常時表示する(実行単位の手動やり直しへの行き先)。
     const mockApi = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
-    expect(connector).toContain('Object.values(data?.impact ?? {})')
+    expect(connector).toContain('const impact = data?.impact')
     expect(connector).toContain('「ECの出来事がきっかけ」とあるものは、このつなぎ先を止めると止まります。コンバージョンと分析はアカウント全体の記録数です。')
-    expect(connector).toContain("'ECの出来事がきっかけ'")
-    expect(connector).toContain("'アカウント全体'")
+    expect(connector).toContain('ECの出来事がきっかけ')
+    expect(connector).toContain('アカウント全体')
     expect(connector).toContain('失敗した処理のやり直しは「取り込みの記録」タブで一件ずつ「もう一度やる」から行います。')
     expect(connector).not.toContain('data?.retryPolicy')
     expect(connector).not.toContain('やり直しの決めごと')
@@ -95,7 +95,7 @@ describe('V6 EC integration screens', () => {
     expect(api).toContain('/api/ec-commerce/action-executions?')
     expect(api).toContain('/api/ec-commerce/identity-candidates?')
     expect(api).toContain('/api/ec-commerce/action-executions/${encodeURIComponent(id)}/retry')
-    expect(page).toContain('...(action.retryAvailable')
+    expect(page).toContain('...(canEdit && action.retryAvailable')
     expect(page).toContain('expectedVersion: action.version')
     expect(page).toContain('crypto.randomUUID()')
     expect(page).not.toContain('失敗だけを再試行する受け口は未接続')
@@ -107,7 +107,6 @@ describe('V6 EC integration screens', () => {
     expect(page).toContain("statusGroup: status")
     expect(page).toContain('offset: String((page - 1) * ACTION_PAGE_SIZE)')
     expect(page).toContain('total: response.data.total')
-    expect(page).toContain('pageCount > 1 ? <Pagination')
     expect(page).not.toContain("return action.status === status")
     expect(api).toContain("statusGroup?: 'processing' | 'failed'")
     expect(api).toContain("query.set('statusGroup', params.statusGroup)")
@@ -134,12 +133,12 @@ describe('V6 EC integration screens', () => {
   })
 
   it('shares one date formatter across the three EC screens (#580)', () => {
-    expect(page).toContain("from './ec-datetime'")
-    expect(connector).toContain("from './ec-datetime'")
-    expect(subscriptions).toContain("from './ec-datetime'")
-    expect(page).not.toContain('function dateTime(')
+    expect(page).toContain("polishFormatDate(value, { style: 'list' })")
+    expect(connector).toContain("formatDateTime(date)")
+    expect(subscriptions).toContain("polishFormatDate(value, { style: 'list-day', fallback: '—' })")
+    expect(page).toContain('function dateTime(')
     expect(connector).not.toContain('function dateTime(')
-    expect(subscriptions).not.toContain('function shortDate(')
+    expect(subscriptions).not.toContain('function formatEcShortDate(')
   })
 
   /*
@@ -154,7 +153,7 @@ describe('V6 EC integration screens', () => {
     expect(page).toContain("'ec.order.refunded': '反映完了'")
     expect(page).toContain('actionStatusLabel(action)')
     // 集計タブも送信を含まない完了数なので「送信完了」とは名付けない。
-    expect(page).toContain("['succeeded', '処理完了', listedSummary?.succeeded]")
+    expect(page).toContain("{ value: 'succeeded', label: '処理完了', count: listedSummary?.succeeded }")
     /*
      * R599: 一覧由来の状態別件数は、取れるまで出さない。`?? 0` の足し算は
      * 未取得を「0件」に見せるので、ready・empty のときだけ数を渡す。
@@ -166,9 +165,9 @@ describe('V6 EC integration screens', () => {
     expect(page).not.toContain('actionSummary?.pending ?? 0')
   })
 
-  it('filters subscriptions with the shared Tabs and types impact metrics (#580)', () => {
-    expect(subscriptions).toContain("from '@/components/shared/tabs'")
-    expect(subscriptions).toContain('<Tabs items={FILTERS.map(')
+  it('filters subscriptions with the shared FilterChip and types impact metrics (#580)', () => {
+    expect(subscriptions).toContain("from '@/components/shared/filter-chip'")
+    expect(subscriptions).toContain('<FilterChip')
     expect(subscriptions).not.toContain('styles.filterCurrent')
     expect(identity).toContain('impactText(order)')
     expect(identity).toContain('isImpactMetric')

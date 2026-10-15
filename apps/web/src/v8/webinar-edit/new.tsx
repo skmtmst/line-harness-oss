@@ -22,9 +22,9 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 ウェビナーを作る ①基本設定（Pencil j7PP04。入口 app/webinars/new/page.tsx。V8 のときだけここ）。
+ * ★V8 ウェビナーを作る ①基本設定（Pencil j7PP04。入口 app/webinars/new/page.tsx。この画面に固定）。
  * 下書きとして作り、「動画の設定へ」で編集の ②動画へ進む。
- * 口・確かめ・離れる前の確かめは app/webinars/new/new-v8.tsx と同じ（BEHAVIOR.md）。
+ * 口・確かめ・離れる前の確かめは BEHAVIOR.md に記録。
  */
 
 const FOLDERS_BLOCKED = 'フォルダを読み込めていないため、下書きを保存できません。フォルダをもう一度読み込んでください。'
@@ -144,6 +144,8 @@ function NewInner() {
     <SaveErrorScope errors={saveErrors}><>
       <CreatePage
         boardId="j7PP04"
+        readOnly={readOnly}
+        notice={readOnly ? <ReadOnlyNotice>閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</ReadOnlyNotice> : undefined}
         title="ウェビナーを作る"
         identity={<BackLink />}
         steps={<WizardSteps current="basic" stateOf={(key) => (key === 'basic' ? 'current' : 'todo')} />}
@@ -158,7 +160,6 @@ function NewInner() {
         </>}
         preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />} dirty={false}
       >
-        {readOnly ? <ReadOnlyNotice >閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</ReadOnlyNotice> : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {/* 閲覧のみと分かったら、押せない入力の欄は置かず閲覧のみの帯だけを出す（作る画面なので見せる中身は無い。2026-10-06 オーナー決定）。 */}
         {readOnly ? null : <BasicForm

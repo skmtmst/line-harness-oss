@@ -1,6 +1,12 @@
 'use client'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  editing_title: requiredText("称号を入れてください。"),
+}
+
 import { notifySaved } from '@/components/shared/toast'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
@@ -61,13 +67,28 @@ export default function LifetimeV8({
   const [notice, setNotice] = useState('')
   /** 編集の窓。index は直す行（新しい行は drafts.length）。 */
   const [editing, setEditing] = useState<{ index: number; threshold: string; title: string; notify: boolean } | null>(null)
+  const [draftAccountId, setDraftAccountId] = useState(accountId)
+  const activeAccount = useRef({ id: accountId })
+  if (activeAccount.current.id !== accountId) activeAccount.current = { id: accountId }
   const fields = useFieldValidation(editing ? [
     ...(!Number.isFinite(parseYen(editing.threshold)) || parseYen(editing.threshold) <= 0
       ? [{ id: 'milestone-threshold', message: '節目の金額は1円以上で入れてください。' }] : []),
-    ...(!editing.title.trim() ? [{ id: 'milestone-title', message: '称号を入れてください。' }] : []),
+    ...((b244Requirements.editing_title.check(editing.title) !== null) ? [{ id: 'milestone-title', message: '称号を入れてください。' }] : []),
   ] : [])
 
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
+
+  if (draftAccountId !== accountId) {
+    const hadUnsaved = dirty || editing !== null
+    setDraftAccountId(accountId)
+    setDrafts([])
+    setDirty(false)
+    setBusy(false)
+    setError('')
+    setEditing(null)
+    cancelLeave()
+    setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
+  }
 
   useEffect(() => {
     if (!settings || dirty) return
@@ -107,6 +128,8 @@ export default function LifetimeV8({
   }
 
   const save = async () => {
+    const target = activeAccount.current
+    if (busy || draftAccountId !== accountId) return
     setBusy(true)
     setError('')
     setNotice('')
@@ -114,12 +137,14 @@ export default function LifetimeV8({
       const res = await nenRanksApi.saveMilestones(accountId, drafts.map((row) => ({
         id: row.id, thresholdYen: row.threshold, title: row.title.trim(), notifyOnReach: row.notify,
       })))
+      if (activeAccount.current !== target) return
       if (!res.success) throw new Error(res.error)
       setDirty(false)
       onSaved(accountId, res.data)
       notifySaved(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。')
       if (res.data.sync?.status !== 'synced') setError('ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
     } catch (caught) {
+      if (activeAccount.current !== target) return
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
@@ -128,7 +153,7 @@ export default function LifetimeV8({
         scope: 'store',
       })) }
     } finally {
-      setBusy(false)
+      if (activeAccount.current === target) setBusy(false)
     }
   }
 
@@ -198,7 +223,7 @@ export default function LifetimeV8({
 
         {readonly ? null : (
           <div className={styles.lifeAdd}>
-            <button type="button" className={styles.textAction} disabled={drafts.length >= MAX_MILESTONES} onClick={() => openEdit(drafts.length)}>
+            <button type="button" className={styles.textAction} disabled={drafts.length >= MAX_MILESTONES} title={drafts.length >= MAX_MILESTONES ? '節目は12個までです' : undefined} onClick={() => openEdit(drafts.length)}>
               ＋ 節目を足す
             </button>
           </div>
@@ -207,8 +232,8 @@ export default function LifetimeV8({
 
       {readonly ? null : (
         <div className={styles.saveRow}>
-          <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty}>キャンセル</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} busy={Boolean(busy)} busyLabel="処理中…">
+          <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '変更がありません' : undefined}>キャンセル</Button>
+          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '節目を変更すると保存できます' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
             <Check size={15} aria-hidden="true" />保存して EC へ同期する
           </Button>
         </div>
@@ -228,7 +253,7 @@ export default function LifetimeV8({
           <div className={styles.editBody}>
             <Field label="節目（累計の金額）"><SaveErrorField names={["threshold","editing.threshold"]}><NumberInput numericText {...fields.bind('milestone-threshold')} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} /></SaveErrorField>
 <FieldError id="milestone-threshold-error">{fields.error('milestone-threshold')}</FieldError></Field>
-            <Field label="称号"><SaveErrorField names={["title","editing.title"]}><TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></SaveErrorField>
+            <Field label="称号" requirement={b244Requirements.editing_title}><SaveErrorField names={["title","editing.title"]}><TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></SaveErrorField>
 <FieldError id="milestone-title-error">{fields.error('milestone-title')}</FieldError></Field>
             <div className={styles.editToggle}>
               <SaveErrorField names={["notify","editing.notify"]}><SettingCheckbox checked={editing.notify} onChange={(checked) => setEditing({ ...editing, notify: checked })} label={editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'} /></SaveErrorField>

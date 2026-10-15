@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 
 /*
  * ★V8 運用者へのお知らせを作る・なおす（板 gjUz3・hiBO8）。
@@ -33,44 +32,6 @@
 }
 
 /* 受け取るスタッフの箱（絵：角 12・余白 16・行は 37.5 で下に線）。 */
-.staffBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hb2-op-col-gap);
-  padding: var(--tpl-hb2-op-box-pad);
-  border-radius: var(--tpl-hb2-op-card-radius);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  box-shadow: var(--card-shadow);
-}
-
-.staffHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tpl-hb2-op-col-gap);
-}
-
-.staffTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 700;
-  line-height: normal;
-}
-
-.textButton {
-  min-height: 0;
-  padding: 0;
-  line-height: normal;
-  border: 0;
-  background: none;
-  color: var(--color-action);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .staffList {
   display: flex;
   flex-direction: column;
@@ -142,31 +103,6 @@
   background: var(--tpl-hb2-op-preview-bg);
 }
 
-.previewBubble {
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: var(--tpl-hb2-op-bubble-gap);
-  padding: var(--tpl-hb2-op-bubble-pad);
-  border-radius: var(--tpl-hb2-op-bubble-radius);
-  background: var(--color-canvas);
-}
-
-.previewName {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-micro);
-  font-weight: 700;
-  line-height: normal;
-}
-
-.previewBody {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-hb2-op-note-lh);
-}
-
 .wideButton {
   width: 100%;
 }
@@ -188,25 +124,8 @@
   line-height: var(--tpl-hb2-op-lh);
 }
 
-.linkItem {
-  color: var(--color-accent-deep);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.linkItem:hover {
-  text-decoration: underline;
-}
-
 .formError {
   color: var(--color-danger);
-  font-size: var(--text-label);
-}
-
-.formNotice {
-  margin: 0;
-  color: var(--color-success);
   font-size: var(--text-label);
 }
 
@@ -304,8 +223,8 @@
 }
 
 /* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
-.roBand { }
 
 .cardNote, .cardNoteNoticePlacement { margin: 0; }
 
 .formError, .formErrorNoticePlacement { margin: 0; }
+.roBand { }

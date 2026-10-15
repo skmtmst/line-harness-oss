@@ -61,6 +61,7 @@ vi.mock('@/lib/api', () => ({
     templates: {
       list: () => Promise.resolve({ success: true, data: TEMPLATES }),
       get: templateGet,
+      usages: () => Promise.resolve({ success: true, data: USED_BY }),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -87,7 +88,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: () => {}, replace: () => {}, refresh: () => {},
     back: () => {}, forward: () => {}, prefetch: () => {},
@@ -132,6 +133,7 @@ function stubTemplateGet(usedBy = USED_BY, question: unknown = null, publishedVe
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/templates')
   searchParams.value = new URLSearchParams()
   templateGet.mockReset()
   stubRole('owner')
@@ -148,14 +150,16 @@ async function renderDetailAndWait(usedBy = USED_BY) {
   render(<TemplateDetailPage />)
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
-  await screen.findByText('使われている場所')
+  await screen.findByRole('heading', { name: '使っている所' })
+  const more = screen.queryByRole('button', { name: /^ほか \d+ か所を見る$/ })
+  if (more) fireEvent.click(more)
 }
 
 describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
   test('使用先の各行が個別の編集・詳細画面へ行く', async () => {
     await renderDetailAndWait()
 
-    const hrefs = screen.getAllByText('開く').map((el) => (el as HTMLAnchorElement).getAttribute('href'))
+    const hrefs = screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))
     expect(hrefs).toEqual([
       '/auto-replies/edit?id=ar-1',
       '/scenarios/detail?id=sc-1',
@@ -164,7 +168,7 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
       '/inflow-links/detail?id=tl-1',
     ])
     // 旧形式オートメーションは開ける画面が無い。リンクを出さず理由を示す
-    expect(screen.getByText('開ける画面がありません')).toBeTruthy()
+    expect(screen.getByText('予約後フォロー').closest('[title]')?.getAttribute('title')).toContain('開ける画面がありません')
     expect(screen.getByText('オートメーション')).toBeTruthy()
     expect(screen.getByText('予約後フォロー')).toBeTruthy()
   })
@@ -172,7 +176,7 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
   test('使用先が0件なら「どこからも呼ばれていません」と出る', async () => {
     await renderDetailAndWait(EMPTY_USED_BY)
 
-    expect(screen.getByText('どこからも呼ばれていません')).toBeTruthy()
+    expect(screen.getByText('どこからも呼ばれていません。使われると、ここに並びます。')).toBeTruthy()
     expect(screen.queryByText('開く')).toBeNull()
   })
 
@@ -188,9 +192,9 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
     })
 
     expect(screen.getByText('前日案内')).toBeTruthy()
-    expect(screen.getByText('第1版')).toBeTruthy()
+    expect(screen.getByText('版1で固定（変わらない）')).toBeTruthy()
     expect(screen.getByText('送信待ち')).toBeTruthy()
-    const hrefs = screen.getAllByText('開く').map((el) => (el as HTMLAnchorElement).getAttribute('href'))
+    const hrefs = screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))
     expect(hrefs).toEqual(['/reminders/detail?id=re-1'])
   })
 })
@@ -211,11 +215,11 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
     // U043: 副操作は行の「…」メニューへ。押してから項目を選ぶ。
     // メニューは最上層の器（MenuPortal）に出る。表とカードの両方の分が出るので
     // 先頭を選ぶ（どちらも同じ操作へつながる）。
-    fireEvent.click(table().getByLabelText('来店お礼のその他操作'))
-    fireEvent.click(screen.getAllByRole('menuitem', { name: '使用先を見る' })[0])
+    fireEvent.click(table().getByLabelText('テンプレート「来店お礼」の操作'))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    await screen.findByText('使用中のテンプレートは削除できません')
+    await screen.findByText('「来店お礼」はまだ消せません')
   }
 
   test('使用先の全行が個別のリンクで、1件目だけを開く導線はない', async () => {
@@ -223,18 +227,20 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
 
     const dialog = screen.getByRole('dialog')
     const links = Array.from(dialog.querySelectorAll('a')).map((a) => a.getAttribute('href'))
-    expect(links).toEqual([
-      '/scenarios/detail?id=sc-1',
-      '/auto-replies/edit?id=ar-1',
-      '/reminders/edit?id=re-1',
-      '/rich-menus/edit?id=rg-1',
-      '/inflow-links/detail?id=tl-1',
-    ])
-    // 旧形式オートメーションはリンクにせず「開けない」と伝える
-    expect(dialog.textContent).toContain('オートメーション「予約後フォロー」')
-    expect(dialog.textContent).toContain('旧形式')
+    // 採用済みのV8の窓は2行と残り件数。全件は「すべて見る」から詳細へ渡す。
+    expect(links).toEqual(['/auto-replies/edit?id=ar-1', '/scenarios/detail?id=sc-1'])
+    expect(within(dialog).getByRole('button', { name: '使っている所をすべて見る' })).toBeTruthy()
     // 「Nか所の差し替え画面を開きます」と言いながら1件目しか開かなかった退行
     expect(dialog.textContent).not.toContain('か所の差し替え画面を開きます')
+    fireEvent.click(within(dialog).getByRole('button', { name: '使っている所をすべて見る' }))
+    cleanup()
+    await renderDetailAndWait()
+    expect(screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))).toEqual([
+      '/auto-replies/edit?id=ar-1', '/scenarios/detail?id=sc-1', '/reminders/edit?id=re-1',
+      '/rich-menus/edit?id=rg-1', '/inflow-links/detail?id=tl-1',
+    ])
+    expect(screen.getByText('予約後フォロー').closest('a')).toBeNull()
+    expect(screen.getByText('予約後フォロー').closest('[title]')?.getAttribute('title')).toContain('開ける画面がありません')
   })
 
   test('一覧ドロワーの使用先も個別の画面へ行く', async () => {
@@ -244,15 +250,16 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
     await act(async () => { await Promise.resolve() })
     await within(await screen.findByRole('table')).findByText('来店お礼')
 
-    fireEvent.keyDown(table().getByRole('link', { name: '来店お礼の詳細を開く' }), { key: 'Enter' })
+    fireEvent.keyDown(table().getByText('来店お礼').closest('tr')!, { key: 'Enter' })
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    await screen.findByText(/使用箇所/)
+    const panel = await screen.findByRole('dialog')
+    await within(panel).findByText('予約')
 
-    expect(screen.getByText('自動返信: 予約', { exact: false }).closest('a')?.getAttribute('href'))
+    expect(within(panel).getByText('予約').closest('li')?.querySelector('a')?.getAttribute('href'))
       .toBe('/auto-replies/edit?id=ar-1')
     // 旧形式オートメーションはリンクにしない（別ID空間の画面へ飛ばさない）
-    const automationText = screen.getByText('オートメーション: 予約後フォロー', { exact: false })
+    const automationText = within(panel).getByText('予約後フォロー（旧形式・画面からは開けません）')
     expect(automationText.closest('a')).toBeNull()
     expect(automationText.textContent).toContain('旧形式')
   })
@@ -276,10 +283,10 @@ describe('テンプレート編集の利用先表示 (IDEA-11)', () => {
      * R237: 保存は下書きの保存で、利用先へは公開した内容だけが届く。
      * 「そのまま使われる」とは書かない。公開の場所も名指しする。
      */
-    expect(screen.getByText(/保存は下書きの保存です/)).toBeTruthy()
-    expect(screen.getByText(/一覧の詳細パネルから公開してください/)).toBeTruthy()
+    expect(screen.getByText(/下書きを保存しただけでは届きません/)).toBeTruthy()
+    expect(screen.getByText(/「保存して公開」で使っている場所へ届きます/)).toBeTruthy()
     expect(screen.queryByText(/新しい内容がそのまま使われます/)).toBeNull()
-    expect(screen.getByText('シナリオ「来店後」2通目').closest('a')?.getAttribute('href'))
+    expect(screen.getByText(/シナリオ「来店後」2\s*通目/).closest('a')?.getAttribute('href'))
       .toBe('/scenarios/detail?id=sc-1')
     expect(screen.getByText('自動応答「予約」の返信').closest('a')?.getAttribute('href'))
       .toBe('/auto-replies/edit?id=ar-1')
@@ -299,7 +306,8 @@ describe('テンプレート編集の利用先表示 (IDEA-11)', () => {
     await renderEditAndWait(USED_BY, 0)
 
     expect(screen.getByText(/まだ公開していません/)).toBeTruthy()
-    expect(screen.getByText(/保存しただけでは利用先へ反映されません/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '下書きを保存' })).toBeTruthy()
+    expect(screen.getByText(/「保存して公開」で使っている場所へ新しい内容が使われます/)).toBeTruthy()
     expect(screen.queryByText(/新しい内容がそのまま使われます/)).toBeNull()
   })
 
@@ -310,9 +318,9 @@ describe('テンプレート編集の利用先表示 (IDEA-11)', () => {
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    await screen.findByText('この変更が使われる場所（0か所）')
-
-    expect(screen.getByText('このテンプレートはまだどこからも呼ばれていません。')).toBeTruthy()
+    const empty = await screen.findByTitle('この変更が使われる場所（0か所）。このテンプレートはまだどこからも呼ばれていません。')
+    expect(empty.getAttribute('title')).toContain('0か所')
+    expect(empty.getAttribute('title')).toContain('このテンプレートはまだどこからも呼ばれていません。')
   })
 })
 

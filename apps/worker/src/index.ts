@@ -68,6 +68,8 @@ import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
 import { rateLimitMiddleware, authenticatedRateLimitMiddleware } from './middleware/rate-limit.js';
+import { pruneSensitiveRateLimits } from './middleware/sensitive-rate-limit.js';
+import { htmlSecurityMiddleware } from './middleware/html-security.js';
 import { businessAuditMiddleware } from './middleware/business-audit.js';
 import { featureEnforcementMiddleware } from './middleware/feature-enforcement.js';
 import { webhook } from './routes/webhook.js';
@@ -156,6 +158,7 @@ import { webinarRoutes } from './routes/webinars.js';
 import { instagramEngagement } from './routes/instagram-engagement.js';
 import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
+import { privateImageResponseMiddleware } from './services/image-access.js';
 import { ecIntegrations } from './routes/ec-integrations.js';
 import { ecCommerce } from './routes/ec-commerce.js';
 import { ecOperations } from './routes/ec-operations.js';
@@ -190,6 +193,7 @@ import { restaurantDelivery } from './routes/restaurant-delivery.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
 import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
+import { outputAuditMiddleware } from './middleware/output-audit.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
 import { hqBilling } from './routes/hq-billing.js';
@@ -255,6 +259,8 @@ export type Env = {
     BUILD_GIT_COMMIT?: string;
     BUILD_VERSION?: string;
     BUILD_RELEASED_AT?: string;
+    /** 外部ファイル検査の許可組（host=FILE_SCAN_SECRET_X、カンマ区切り）。未設定なら内蔵検査のみ。 */
+    FILE_SCAN_ALLOWED_PAIRS?: string;
     IMAGES: R2Bucket;
     /** 飲食店向けの受信メール原本。本番 wrangler.toml には束縛が無いので任意 */
     RAW_MAIL?: R2Bucket;
@@ -288,6 +294,16 @@ export type Env = {
     RT_DELIVERY_ROCKETNOW_API_BASE_URL?: string;
     RT_DELIVERY_ROCKETNOW_API_TOKEN?: string;
     RT_DELIVERY_ROCKETNOW_WEBHOOK_SECRET?: string;
+    /**
+     * Uber Eats のログイン連携（設定 › デリバリー連携からお店の人が自分でつなぐ経路）。
+     * Uber の開発者画面で発行された値を、環境ごとの秘密設定として入れる。
+     * 入れるのは2つだけで、戻り先URLは WORKER_PUBLIC_URL から組み立てる。
+     * 2つそろわない環境では連携の口を開けない。
+     */
+    RT_DELIVERY_UBEREATS_CLIENT_ID?: string;
+    RT_DELIVERY_UBEREATS_CLIENT_SECRET?: string;
+    /** 既定では使わない。Uber 側の登録が別の文字列のときだけ上書きとして入れる。 */
+    RT_DELIVERY_UBEREATS_REDIRECT_URI?: string;
     RAW_MAIL_RETENTION_DAYS?: string;
     RESTAURANT_REQUEST_HOLD_END_HOUR?: string;
     XSERVER_MAIL_HOST?: string;
@@ -454,6 +470,9 @@ export type Env = {
     staff: AuthenticatedStaff;
     /** route固有の監査を残した場合、共通middlewareとの二重記録を防ぐ。 */
     auditRecorded?: boolean;
+    mfaAuditRecorded?: boolean;
+    outputAuditRecorded?: boolean;
+    outputAudit?: { count: number | null; accountId?: string; accountIds?: string[]; accountCounts?: Record<string, number>; targetId?: string; phase?: 'requested' | 'download' };
     /** 代理ログイン中（★V6 37-5）。middleware/impersonation.ts が入れる。 */
     impersonation?: ImpersonationContext;
     /** 段ごとの経過時間（V6R-CX-a）。lib/server-timing.ts が入れる。 */
@@ -508,6 +527,7 @@ app.use('*', cors({
 
 app.use('*', timingMark('cors'));
 // Rate limiting — runs before auth to block abuse early
+app.use('*', htmlSecurityMiddleware);
 app.use('*', rateLimitMiddleware);
 app.use('*', timingMark('rate'));
 
@@ -518,6 +538,7 @@ app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
 app.use('*', authenticatedRateLimitMiddleware);
+app.use('/api/*', outputAuditMiddleware);
 app.use('*', timingMark('auth'));
 
 // Tenant boundary — authenticated admin APIs may only select LINE accounts
@@ -526,6 +547,7 @@ app.use('*', tenantScopeMiddleware);
 app.use('*', timingMark('tenant'));
 // 代理ログイン中の個人情報の伏せ字。認証の後ろ、各ルートの前。
 app.use('/api/*', piiMaskMiddleware);
+app.use('/api/*', privateImageResponseMiddleware);
 app.use('/api/*', timingMark('pii'));
 
 // 認証済み管理APIの変更を共通監査へ残す。route固有の監査がある場合は重複させない。
@@ -699,7 +721,7 @@ app.route('/', operations);
 // ADMIN_API_KEY middleware on subpaths.
 app.route('/admin', adminVersion);
 // Phase 5 Task 18 — self-update endpoints guarded by x-admin-api-key.
-// authMiddleware skips non-/api/ paths so this router owns its own auth gate.
+// HTTP self-update is retired; the router returns 404 for every request.
 app.route('/admin/update', adminUpdate);
 
 // QR は Worker の中だけで作る。流入 ref や LIFF URL は計測の識別子で、
@@ -1432,25 +1454,15 @@ export async function notFoundHandler(
 }
 app.onError((error, c) => {
   const incidentId = crypto.randomUUID();
-  const url = new URL(c.req.url);
-  console.error(JSON.stringify({
-    event: 'unhandled_worker_error',
-    incidentId,
-    method: c.req.method,
-    path: url.pathname,
-    error: String(error),
-  }));
+  const method = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(c.req.method) ? c.req.method : 'OTHER';
+  const route = `${method} ${c.req.routePath || '(unmatched)'}`;
+  console.error(JSON.stringify({ code: 'unhandled_worker_error', route }));
   const reportPromise = reportHarnessErrorToSlack(c.env, {
     source: 'worker',
-    message: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined,
-    path: `${c.req.method} ${url.pathname}`,
-  }).catch((reportError) => {
-    console.error(JSON.stringify({
-      event: 'unhandled_worker_error_slack_report_failed',
-      incidentId,
-      error: String(reportError),
-    }));
+    message: 'unhandled_worker_error',
+    path: route,
+  }).catch(() => {
+    console.error(JSON.stringify({"code":"unhandled_worker_error_slack_report_failed"}));
   });
   try {
     c.executionCtx.waitUntil(reportPromise);
@@ -1466,6 +1478,8 @@ async function runFrequentHeavyJobs(
   event: ScheduledEvent,
   env: Env['Bindings'],
 ): Promise<void> {
+  try { await pruneSensitiveRateLimits(env.DB, new Date(event.scheduledTime)); }
+  catch { console.error('sensitive_rate_limit_cleanup_failed'); }
   const dbAccounts = await getLineAccounts(env.DB);
   const lineClients = new Map<string, LineClient>();
   for (const account of dbAccounts) {
@@ -1474,7 +1488,7 @@ async function runFrequentHeavyJobs(
   try {
     const { processAutoReplyDeliveries } = await import('./services/auto-reply-delivery.js');
     await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
-  } catch (error) { console.error('delayed auto reply error:',error); }
+  } catch (error) { console.error(JSON.stringify({"code":"src_index_failed"})); }
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
@@ -1506,7 +1520,7 @@ async function runFrequentHeavyJobs(
           credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
         });
         if (result.processed + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'ec_event_retry', ...result }));
+          console.log(JSON.stringify({"code":"ec_event_retry"}));
         }
       },
     },
@@ -1533,7 +1547,7 @@ async function runFrequentHeavyJobs(
           }, bookingId),
         });
         if (result.processed > 0) {
-          console.log(JSON.stringify({ event: 'booking_calendar_delete_retry', ...result }));
+          console.log(JSON.stringify({"code":"booking_calendar_delete_retry"}));
         }
       },
     },
@@ -1545,7 +1559,7 @@ async function runFrequentHeavyJobs(
         const { processDueFileScans } = await import('./routes/file-scan.js');
         const result = await processDueFileScans(env, 20);
         if (result.processed > 0) {
-          console.log(JSON.stringify({ event: 'file_scan_retry', ...result }));
+          console.log(JSON.stringify({"code":"file_scan_retry"}));
         }
       },
     },
@@ -1556,7 +1570,7 @@ async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
           executorDependencies: { credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY },
         });
-        if (result.items > 0) console.log(JSON.stringify({ event: 'friend_bulk_runs_cron', ...result }));
+        if (result.items > 0) console.log(JSON.stringify({"code":"friend_bulk_runs_cron"}));
       },
     },
     {
@@ -1571,7 +1585,7 @@ async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.claimed > 0) {
-          console.log(JSON.stringify({ event: 'scheduled_chat_sends', ...result }));
+          console.log(JSON.stringify({"code":"scheduled_chat_sends"}));
         }
       },
     },
@@ -1581,7 +1595,7 @@ async function runFrequentHeavyJobs(
       run: async () => {
         const { processDueAnnouncements } = await import('./services/platform-announcements.js');
         const result = await processDueAnnouncements(env, { now: new Date(event.scheduledTime + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00') });
-        if (result.sent > 0) console.log(JSON.stringify({ event: 'platform_announcements_cron', ...result }));
+        if (result.sent > 0) console.log(JSON.stringify({"code":"platform_announcements_cron"}));
       },
     },
     {
@@ -1600,7 +1614,7 @@ async function runFrequentHeavyJobs(
           limit: 50,
         });
         if (result.processed > 0) {
-          console.log(JSON.stringify({ event: 'mileage_reward_delivery_retry', ...result }));
+          console.log(JSON.stringify({"code":"mileage_reward_delivery_retry"}));
         }
       },
     },
@@ -1617,7 +1631,7 @@ async function runFrequentHeavyJobs(
         );
         const result = await processPendingAnalyticsCrossRuns(env.DB, 1);
         if (recovered + result.processed + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'analytics_cross_tick', recovered, ...result }));
+          console.log(JSON.stringify({"code":"analytics_cross_tick"}));
         }
       },
     },
@@ -1626,9 +1640,7 @@ async function runFrequentHeavyJobs(
       run: async () => {
         const result = await processPendingMileageEvents(env.DB, { limit: 100 });
         if (result.claimed > 0) {
-          console.log(
-            `[mileage-queue] processed=${result.processed} failed=${result.failed} granted=${result.granted}`,
-          );
+          console.log(JSON.stringify({"code":"src_index_log"}));
         }
         // m22o: 付与ルールの「通知する」で予約された分だけ、付与の後に届ける。
         // OFF のルールは予約自体が無い。公開URLが無い環境では送らず残す。
@@ -1646,9 +1658,7 @@ async function runFrequentHeavyJobs(
             { limit: 20 },
           );
           if (notified.delivered + notified.failed > 0) {
-            console.log(
-              `[mileage-grant-notify] delivered=${notified.delivered} failed=${notified.failed}`,
-            );
+            console.log(JSON.stringify({"code":"src_index_log"}));
           }
         }
       },
@@ -1667,12 +1677,7 @@ async function runFrequentHeavyJobs(
         if (result.newlyBroken.length > 0) {
           await notifyBrokenManualLinks(env.DB, env, result.newlyBroken);
         }
-        console.log(JSON.stringify({
-          event: 'manual_link_weekly_check',
-          checked: result.checked,
-          broken: result.broken,
-          newlyBroken: result.newlyBroken.length,
-        }));
+        console.log(JSON.stringify({"code":"manual_link_weekly_check"}));
       },
     },
     {
@@ -1683,7 +1688,7 @@ async function runFrequentHeavyJobs(
           limit: 50, credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
         });
         if (result.claimed > 0) {
-          console.log(JSON.stringify({ event: 'ad_conversion_outbox_tick', ...result }));
+          console.log(JSON.stringify({"code":"ad_conversion_outbox_tick"}));
         }
       },
     },
@@ -1696,7 +1701,7 @@ async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.claimed > 0) {
-          console.log(JSON.stringify({ event: 'analytics_url_exposure_queue', ...result }));
+          console.log(JSON.stringify({"code":"analytics_url_exposure_queue"}));
         }
       },
     },
@@ -1710,7 +1715,7 @@ async function runFrequentHeavyJobs(
           new Date(event.scheduledTime),
         );
         if (result.processed > 0) {
-          console.log(JSON.stringify({ event: 'analytics_projection_tick', ...result }));
+          console.log(JSON.stringify({"code":"analytics_projection_tick"}));
         }
       },
     },
@@ -1720,7 +1725,7 @@ async function runFrequentHeavyJobs(
         const { processDueAnalyticsReports } = await import('./services/analytics-reports.js');
         const result = await processDueAnalyticsReports(env, new Date(event.scheduledTime));
         if (result.processed + result.failed + result.purged + result.reclaimed + result.repaired > 0) {
-          console.log(JSON.stringify({ event: 'analytics_report_tick', ...result }));
+          console.log(JSON.stringify({"code":"analytics_report_tick"}));
         }
       },
     },
@@ -1734,7 +1739,7 @@ async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.generated + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'scheduled_exports_tick', ...result }));
+          console.log(JSON.stringify({"code":"scheduled_exports_tick"}));
         }
       },
     },
@@ -1748,7 +1753,7 @@ async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.synced + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'google_sheets_sync_tick', ...result }));
+          console.log(JSON.stringify({"code":"google_sheets_sync_tick"}));
         }
       },
     },
@@ -1764,7 +1769,7 @@ async function runFrequentHeavyJobs(
       run: async () => {
         const { processPendingNenRichMenuJobs } = await import('./services/nen-rich-menu.js');
         const result = await processPendingNenRichMenuJobs(env);
-        if (result.processed > 0) console.log(JSON.stringify({ event: 'nen_rich_menu_job', ...result }));
+        if (result.processed > 0) console.log(JSON.stringify({"code":"nen_rich_menu_job"}));
       },
     },
     {
@@ -1777,7 +1782,7 @@ async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime),
         });
         if (result.checked + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'rich_menu_daily_reconcile', ...result }));
+          console.log(JSON.stringify({"code":"rich_menu_daily_reconcile"}));
         }
       },
     },
@@ -1789,7 +1794,7 @@ async function runFrequentHeavyJobs(
       run: async () => {
         const { syncXServerSupportMailbox } = await import('./services/xserver-mail.js');
         const result = await syncXServerSupportMailbox(env);
-        if (result.checked > 0) console.log(JSON.stringify({ event: 'support_email_sync', ...result }));
+        if (result.checked > 0) console.log(JSON.stringify({"code":"support_email_sync"}));
       },
     });
   }
@@ -1817,7 +1822,7 @@ async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.reviewsSynced + result.postsSynced + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'google_business_resync_tick', ...result }));
+          console.log(JSON.stringify({"code":"google_business_resync_tick"}));
         }
       },
     });
@@ -1832,9 +1837,7 @@ async function runFrequentHeavyJobs(
       run: async () => {
         const result = await processFriendFieldReminders(env.DB);
         if (result.enrolled > 0 || result.hasMore) {
-          console.log(
-            `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped} scanned=${result.scanned} has_more=${result.hasMore}`,
-          );
+          console.log(JSON.stringify({"code":"src_index_log"}));
         }
       },
     });
@@ -1857,11 +1860,7 @@ async function runFrequentHeavyJobs(
           });
         }
         if (result.candidates > 0) {
-          console.log(JSON.stringify({
-            event: 'action_score_inactivity_tick',
-            candidates: result.candidates,
-            applied: result.applied,
-          }));
+          console.log(JSON.stringify({"code":"action_score_inactivity_tick"}));
         }
       },
     });
@@ -1880,7 +1879,7 @@ async function runSixHourlyHeavyJobs(
       run: async () => {
         const { refreshAllNenTags } = await import('./services/nen-tag-sync.js');
         const result = await refreshAllNenTags(env.DB, { allTenants: true }, 500, new Date());
-        if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
+        if (result.added + result.removed > 0) console.log(JSON.stringify({"code":"nen_tag_refresh"}));
       },
     },
     {
@@ -1892,7 +1891,7 @@ async function runSixHourlyHeavyJobs(
           purged.events + purged.dailyMetrics + purged.reconciliationRuns
           + purged.funnelRuns + purged.crossRuns + purged.savedSnapshots + purged.audiences > 0
         ) {
-          console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
+          console.log(JSON.stringify({"code":"analytics_retention_purged"}));
         }
       },
     },
@@ -1903,7 +1902,7 @@ async function runSixHourlyHeavyJobs(
         const { purgeExpiredAutomationRuns } = await import('@line-crm/db');
         const purged = await purgeExpiredAutomationRuns(env.DB, new Date(event.scheduledTime));
         if (purged.runs + purged.dailyExpired > 0) {
-          console.log(JSON.stringify({ event: 'automation_retention_purged', ...purged }));
+          console.log(JSON.stringify({"code":"automation_retention_purged"}));
         }
       },
     },
@@ -1922,7 +1921,7 @@ async function runSixHourlyHeavyJobs(
         const scanStartedAt = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
         const result = await scanMediaUsage(env.DB, scanStartedAt);
         if (result.matched > 0 || result.pruned > 0) {
-          console.log(JSON.stringify({ event: 'media_usage_scan', ...result }));
+          console.log(JSON.stringify({"code":"media_usage_scan"}));
         }
       },
     },
@@ -1931,26 +1930,23 @@ async function runSixHourlyHeavyJobs(
       run: async () => {
         const result = await enqueueFollowingMileageMilestones(env.DB, { limitPerMilestone: 1000 });
         if (result.eventsCreated + result.queued > 0) {
-          console.log(`[following-mileage] events=${result.eventsCreated} queued=${result.queued}`);
+          console.log(JSON.stringify({"code":"src_index_log"}));
         }
       },
     },
     {
       name: 'booking expirer',
       run: async () => {
-        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification });
-        console.log(
-          `[booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
-        );
+        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification,
+          credentials: { email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY } });
+        console.log(JSON.stringify({"code":"src_index_log"}));
       },
     },
     {
       name: 'event booking expirer',
       run: async () => {
         const result = await runEventBookingExpirer(env.DB, { now: new Date() });
-        console.log(
-          `[event-booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
-        );
+        console.log(JSON.stringify({"code":"src_index_log"}));
       },
     },
     {
@@ -1960,7 +1956,7 @@ async function runSixHourlyHeavyJobs(
         const { sweepCommonVarExpiryNotices } = await import('./services/common-var-expiry-sweep.js');
         const result = await sweepCommonVarExpiryNotices(env.DB, env, new Date());
         if (result.notified > 0 || result.errors > 0) {
-          console.log(JSON.stringify({ event: 'common_var_expiry_sweep', ...result }));
+          console.log(JSON.stringify({"code":"common_var_expiry_sweep"}));
         }
       },
     },
@@ -1970,13 +1966,7 @@ async function runSixHourlyHeavyJobs(
         const { syncBillingInvoicesDaily } = await import('./services/billing-invoices-sync.js');
         const result = await syncBillingInvoicesDaily(env, new Date(event.scheduledTime));
         if (result && (result.imported > 0 || result.failed > 0)) {
-          console.log(JSON.stringify({
-            event: 'billing_invoice_sync',
-            tenants: result.tenants,
-            imported: result.imported,
-            failed: result.failed,
-            completed: result.completed,
-          }));
+          console.log(JSON.stringify({"code":"billing_invoice_sync"}));
         }
       },
     },
@@ -1994,7 +1984,7 @@ async function runSixHourlyHeavyJobs(
           credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
         });
         if (result.imported + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'ad_cost_import', ...result }));
+          console.log(JSON.stringify({"code":"ad_cost_import"}));
         }
       },
     },
@@ -2008,7 +1998,7 @@ async function runSixHourlyHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.createdSheets + result.importedOrders + result.wroteRows + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'tiktok_pnl_tick', ...result }));
+          console.log(JSON.stringify({"code":"tiktok_pnl_tick"}));
         }
       },
     },
@@ -2022,7 +2012,7 @@ async function runSixHourlyHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.anchoredTrials + result.tenants + result.deletedRows > 0) {
-          console.log(JSON.stringify({ event: 'tenant_data_retention_purge', ...result }));
+          console.log(JSON.stringify({"code":"tenant_data_retention_purge"}));
         }
       },
     },
@@ -2039,7 +2029,7 @@ async function runSixHourlyHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (totalRetentionActions(result) > 0) {
-          console.log(JSON.stringify({ event: 'google_business_content_retention', ...result }));
+          console.log(JSON.stringify({"code":"google_business_content_retention"}));
         }
       },
     },
@@ -2051,7 +2041,7 @@ async function runSixHourlyHeavyJobs(
       run: async () => {
         const result = await deleteExpiredRestaurantRawEmails(env);
         if (result.deleted + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'restaurant_raw_mail_retention', ...result }));
+          console.log(JSON.stringify({"code":"restaurant_raw_mail_retention"}));
         }
       },
     });
@@ -2065,7 +2055,7 @@ async function runSixHourlyHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.synced + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'google_business_metrics_tick', ...result }));
+          console.log(JSON.stringify({"code":"google_business_metrics_tick"}));
         }
       },
     });
@@ -2079,7 +2069,7 @@ async function runSixHourlyHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.refreshed + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'google_business_token_keepalive_tick', ...result }));
+          console.log(JSON.stringify({"code":"google_business_token_keepalive_tick"}));
         }
       },
     });
@@ -2119,19 +2109,19 @@ async function scheduled(
       queue: env.CODEX_MENTION_QUEUE,
     });
   } catch (error) {
-    console.error('operation health checks error:', error);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   try {
     await processOperationNotificationOutbox(env);
   } catch (error) {
-    console.error('operation notification outbox error:', error);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   try {
     await processOperationAlertNotificationOutbox(env);
   } catch (error) {
-    console.error('operation alert notification outbox error:', error);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // N-327 (#663): 公開済み運用者通知ルールの送り残しを回収する。
@@ -2150,17 +2140,10 @@ async function scheduled(
       now: new Date(event.scheduledTime),
     });
     if (result.swept > 0) {
-      console.log(JSON.stringify({
-        event: 'operator_notification_sweep',
-        swept: result.swept,
-        accepted: result.accepted,
-        excluded: result.excluded,
-        failed: result.failed,
-        pending: result.pending,
-      }));
+      console.log(JSON.stringify({"code":"operator_notification_sweep"}));
     }
   } catch (error) {
-    console.error('operator notification sweep error:', error);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // N-369/N-370 (#938): 送信Webhookの送り残しを回収する。
@@ -2178,23 +2161,16 @@ async function scheduled(
       now: new Date(event.scheduledTime),
     });
     if (result.swept > 0) {
-      console.log(JSON.stringify({
-        event: 'outgoing_webhook_delivery_sweep',
-        swept: result.swept,
-        delivered: result.delivered,
-        failed: result.failed,
-        retryWait: result.retryWait,
-        skipped: result.skipped,
-      }));
+      console.log(JSON.stringify({"code":"outgoing_webhook_delivery_sweep"}));
     }
   } catch (error) {
-    console.error('outgoing webhook delivery sweep error:', error);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   try {
     const { processAutoReplyDeliveries } = await import('./services/auto-reply-delivery.js');
     await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
-  } catch (error) { console.error('delayed auto reply error:',error); }
+  } catch (error) { console.error(JSON.stringify({"code":"src_index_failed"})); }
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const dispatchObservedAt = new Date(event.scheduledTime).toISOString();
@@ -2224,7 +2200,7 @@ async function scheduled(
   try {
     await refreshLineAccessTokens(env.DB);
   } catch (e) {
-    console.error('token refresh error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // V6オートメーションの日時指定を起動し、待機・一時失敗中の実行を再開する。
@@ -2244,27 +2220,18 @@ async function scheduled(
       });
       for (const result of [...scheduledResult.results, ...overdueResults]) {
         if (result.kind === 'configuration_error') {
-          console.error(JSON.stringify({
-            event: 'automation_v6_scheduled_trigger_failed',
-            automationId: result.automationId,
-            reason: result.error,
-          }));
+          console.error(JSON.stringify({"code":"automation_v6_scheduled_trigger_failed"}));
         }
       }
       const dueResult = await processDueAutomationRuns(env.DB, {
         now, executors, limit: 100,
       });
       if (scheduledResult.results.length + overdueResults.length + dueResult.processed > 0) {
-        console.log(JSON.stringify({
-          event: 'automation_v6_cron',
-          scheduled: scheduledResult.results.length,
-          support_mark_overdue: overdueResults.length,
-          resumed: dueResult.processed,
-        }));
+        console.log(JSON.stringify({"code":"automation_v6_cron"}));
       }
     });
   } catch (e) {
-    console.error('automation-v6 cron error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   try {
@@ -2274,11 +2241,11 @@ async function scheduled(
         sender: sendBookingNotification,
       });
       if (result.sent + result.failed > 0) {
-        console.log(`[booking-reminders] sent=${result.sent} failed=${result.failed}`);
+        console.log(JSON.stringify({"code":"src_index_log"}));
       }
     });
   } catch (e) {
-    console.error('booking-reminders error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   try {
@@ -2288,11 +2255,11 @@ async function scheduled(
         sender: sendEventBookingNotification,
       });
       if (result.sent + result.failed > 0) {
-        console.log(`[event-booking-reminders] sent=${result.sent} failed=${result.failed}`);
+        console.log(JSON.stringify({"code":"src_index_log"}));
       }
     });
   } catch (e) {
-    console.error('event-booking-reminders error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // 取消・拒否・期限切れで空いた席を、同意が必要な24時間の保留として先頭へ案内する。
@@ -2303,12 +2270,10 @@ async function scheduled(
       sender: createEventWaitlistOfferSender(env.DB, { liffUrl: env.LIFF_URL }),
     });
     if (result.processed > 0) {
-      console.log(
-        `[event-waitlist] processed=${result.processed} promoted=${result.promoted} retried=${result.retried}`,
-      );
+      console.log(JSON.stringify({"code":"src_index_log"}));
     }
   } catch (e) {
-    console.error('event-waitlist error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // 来店スタンプの期限通知。配信の見張り（observeDispatch）の対応表には未登録なので、
@@ -2319,7 +2284,7 @@ async function scheduled(
       proxyDispatch: request => Promise.resolve(lineProxy.fetch(request, env, ctx)),
     });
   } catch {
-    console.error(JSON.stringify({ event: 'visit_stamp_reminders_pending' }));
+    console.error(JSON.stringify({"code":"visit_stamp_reminders_pending"}));
   }
 
   // 外部Google Calendarで確定したMeet個別相談。前日・1時間前のLINE通知を
@@ -2333,11 +2298,11 @@ async function scheduled(
         proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
       });
       if (result.sent + result.failed > 0) {
-        console.log(`[meet-consultation-reminders] sent=${result.sent} failed=${result.failed}`);
+        console.log(JSON.stringify({"code":"src_index_log"}));
       }
     });
   } catch (e) {
-    console.error('meet-consultation-reminders error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // ウェビナー予約リマインド (セッション選択メニュー)。時刻厳守・軽量なので
@@ -2357,11 +2322,11 @@ async function scheduled(
         },
       );
       if (result.sent + result.failed > 0) {
-        console.log(`[webinar-reminders] sent=${result.sent} failed=${result.failed}`);
+        console.log(JSON.stringify({"code":"src_index_log"}));
       }
     });
   } catch (e) {
-    console.error('webinar-reminders error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // V6で設定した複数時点の通知。既存の5分前通知とはDB上で排他的にし、
@@ -2378,11 +2343,11 @@ async function scheduled(
         proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
       });
       if (result.sent + result.failed + result.skipped > 0) {
-        console.log(`[webinar-notifications] sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);
+        console.log(JSON.stringify({"code":"src_index_log"}));
       }
     });
   } catch (e) {
-    console.error('webinar-notifications error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // NEN専用の購入後フォローと誕生日クーポン。自動配信なのでmanualヘッダーは付けない。
@@ -2431,11 +2396,11 @@ async function scheduled(
       if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped
         + result.deferred + photoRewards.synced + photoRewards.failed + photoRewards.skipped
         + publicationRewards.synced + publicationRewards.failed > 0) {
-        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, photoPublicationRewardSynced: publicationRewards.synced, photoPublicationRewardFailed: publicationRewards.failed, photoRewardSynced: photoRewards.synced, photoRewardFailed: photoRewards.failed, ...result }));
+        console.log(JSON.stringify({"code":"nen_campaign_tick"}));
       }
     });
   } catch (e) {
-    console.error('nen-campaign delivery error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // 共通情報の日付での切り替え。
@@ -2449,10 +2414,10 @@ async function scheduled(
       const { applyDueCommonVarSchedules } = await import('@line-crm/db');
       const jstNowIso = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
       const applied = await applyDueCommonVarSchedules(env.DB, jstNowIso);
-      if (applied > 0) console.log(JSON.stringify({ event: 'common_var_schedule_applied', applied }));
+      if (applied > 0) console.log(JSON.stringify({"code":"common_var_schedule_applied"}));
     });
   } catch (e) {
-    console.error('common-var schedule error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // E-08 (#621): 保存済みリッチメニュー公開予約を時刻到来時に実行する。
@@ -2788,10 +2753,10 @@ async function scheduled(
       },
     }, { now: new Date(event.scheduledTime) });
     if (result.processed > 0) {
-      console.log(JSON.stringify({ event: 'rich_menu_schedule_tick', ...result }));
+      console.log(JSON.stringify({"code":"rich_menu_schedule_tick"}));
     }
   } catch (e) {
-    console.error('rich-menu schedule error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // 予約画面の未予約、予約後の未視聴、フォーム途中離脱、回答後の相談未予約を
@@ -2808,11 +2773,11 @@ async function scheduled(
         proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
       });
       if (result.sent + result.failed > 0) {
-        console.log(`[webinar-followups] sent=${result.sent} failed=${result.failed}`);
+        console.log(JSON.stringify({"code":"src_index_log"}));
       }
     });
   } catch (e) {
-    console.error('webinar-followups error:', e);
+    console.error(JSON.stringify({"code":"src_index_failed"}));
   }
 
   // Phase 2: 配信系と定期ジョブを並列実行する。processScheduledBroadcasts は tag/all の
@@ -2835,10 +2800,10 @@ async function scheduled(
         const { sweepBroadcastAfterActions } = await import('./services/broadcast-after-actions.js');
         const swept = await sweepBroadcastAfterActions(env.DB);
         if (swept.done + swept.failed > 0) {
-          console.log(JSON.stringify({ event: 'broadcast_after_actions_sweep', ...swept }));
+          console.log(JSON.stringify({"code":"broadcast_after_actions_sweep"}));
         }
       } catch (sweepError) {
-        console.error('[broadcast] after-actions sweep failed', sweepError);
+        console.error(JSON.stringify({"code":"src_index_failed"}));
       }
     }),
     observeDispatch('reminder deliveries',
@@ -2874,26 +2839,14 @@ export default {
           message.attempts,
           env.CODEX_QUEUE_MAX_ATTEMPTS,
         );
-        console.error(JSON.stringify(createCodexQueueFailureLog({
-          kind: message.body.kind,
-          slackEventId: message.body.slackEventId,
-          reason,
-          attempts: message.attempts,
-          stopped,
-          error,
-        })));
+        console.error(JSON.stringify({"code":"src_index_failed"}));
         if (stopped) {
           try {
             if (message.body.kind !== 'auto_merge') {
               await markCodexMentionFailed(env.DB, message.body.slackEventId);
             }
           } catch {
-            console.error(JSON.stringify({
-              event: 'codex_cloud_monitor_queue_ledger_failed',
-              kind: message.body.kind,
-              slackEventId: message.body.slackEventId,
-              reason: 'db_error',
-            }));
+            console.error(JSON.stringify({"code":"codex_cloud_monitor_queue_ledger_failed"}));
           }
           message.ack();
         } else {

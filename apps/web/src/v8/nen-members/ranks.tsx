@@ -1,7 +1,7 @@
 'use client'
 
 import { SaveConflictBand } from '@/components/shared/save-conflict';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Plus, RefreshCw } from 'lucide-react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { GitCompareArrows, TriangleAlert } from 'lucide-react';
@@ -13,7 +13,7 @@ import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field';
-import { FieldError } from '@/components/shared/form-controls';
+import { Field, FieldError } from '@/components/shared/form-controls';
 import { useFieldValidation } from '@/lib/use-field-validation';
 import { describeApiFailure } from '@/components/shared/api-error-message';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
@@ -86,6 +86,9 @@ export default function RankSettingsV8({
   const [comparing, setComparing] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<number | null>(null)
   const [replacement, setReplacement] = useState('')
+  const [draftAccountId, setDraftAccountId] = useState(accountId)
+  const activeAccount = useRef({ id: accountId })
+  if (activeAccount.current.id !== accountId) activeAccount.current = { id: accountId }
 
   const fields = useFieldValidation(drafts.flatMap((row, index) => [
     ...(!row.name.trim() ? [{ id: `rank-name-${index}`, message: 'ランク名を入れるか、行を消してください。' }] : []),
@@ -96,6 +99,21 @@ export default function RankSettingsV8({
   ]))
 
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
+
+  if (draftAccountId !== accountId) {
+    const hadUnsaved = dirty
+    setDraftAccountId(accountId)
+    setDrafts([])
+    setDirty(false)
+    setBusy(false)
+    setError('')
+    setConflict(null)
+    setComparing(false)
+    setRemoveTarget(null)
+    setReplacement('')
+    cancelLeave()
+    setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
+  }
 
   useEffect(() => {
     if (!settings || dirty) return
@@ -126,14 +144,18 @@ export default function RankSettingsV8({
 
   /** 競合を見つけたとき、最新を取り直して帯を出す。 */
   const showConflict = async () => {
+    const target = activeAccount.current
     const res = await nenRanksApi.settings(accountId).catch(() => null)
+    if (activeAccount.current !== target) return
     setConflict({ latest: res?.success ? res.data : (settings as NenRankSettingsData) })
   }
 
   /** 保存の前に最新を取り直し、読み込んだ版から進んでいたら競合の帯へ。 */
   const checkConflict = async (): Promise<boolean> => {
+    const target = activeAccount.current
     if (!settings?.rules) return false
     const res = await nenRanksApi.settings(accountId)
+    if (activeAccount.current !== target) return true
     if (!res.success) return false
     const latest = res.data
     if (latest.rules && latest.rules.version !== settings.rules.version) {
@@ -144,6 +166,8 @@ export default function RankSettingsV8({
   }
 
   const save = async (force = false) => {
+    const target = activeAccount.current
+    if (busy || draftAccountId !== accountId) return
     const rows = drafts.map((row) => ({
       id: row.id,
       name: row.name.trim(),
@@ -157,7 +181,9 @@ export default function RankSettingsV8({
     setNotice('')
     try {
       if (!force && await checkConflict()) return
+      if (activeAccount.current !== target) return
       const res = await nenRanksApi.saveRanks(accountId, rows)
+      if (activeAccount.current !== target) return
       if (!res.success) throw new Error(res.error)
       setDirty(false)
       setConflict(null)
@@ -167,6 +193,7 @@ export default function RankSettingsV8({
         ? 'ランク設定を保存し、ECへ同期しました。タグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
+      if (activeAccount.current !== target) return
       const fieldFailure = saveErrors.capture(caught)
       /* 保存の口が版の違いを 409 で返したときも、競合の帯へ（e5yBLx）。 */
       if (caught instanceof ApiError && caught.status === 409) {
@@ -178,7 +205,7 @@ export default function RankSettingsV8({
         })) }
       }
     } finally {
-      setBusy(false)
+      if (activeAccount.current === target) setBusy(false)
     }
   }
 
@@ -200,6 +227,7 @@ export default function RankSettingsV8({
 
   /** ランクの削除は版つきの DELETE（移す先を選んで会員を反映する）。 */
   const removeRank = async () => {
+    const target = activeAccount.current
     if (removeTarget === null || !settings?.rules) return
     const row = drafts[removeTarget]
     if (!row?.id) return
@@ -210,12 +238,14 @@ export default function RankSettingsV8({
         replacementRankId: row.memberCount > 0 ? replacement || null : null,
         expectedVersion: settings.rules.version,
       })
+      if (activeAccount.current !== target) return
       if (!res.success) throw new Error(res.error)
       setRemoveTarget(null)
       setReplacement('')
       setNotice(res.data.ecSync === 'synced' ? 'ランクを削除し、会員を移し先へ反映しました。' : `ランクを削除しました。${res.data.message ?? ''}`)
       onRetry()
     } catch (caught) {
+      if (activeAccount.current !== target) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.status === 409) {
@@ -229,7 +259,7 @@ export default function RankSettingsV8({
         })) }
       }
     } finally {
-      setBusy(false)
+      if (activeAccount.current === target) setBusy(false)
     }
   }
 
@@ -245,14 +275,17 @@ export default function RankSettingsV8({
   }
 
   const resync = async () => {
+    const target = activeAccount.current
     setBusy(true)
     setError('')
     try {
       const res = await nenRanksApi.resync(accountId)
+      if (activeAccount.current !== target) return
       if (!res.success) throw new Error(res.error)
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
+      if (activeAccount.current !== target) return
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
@@ -261,7 +294,7 @@ export default function RankSettingsV8({
         scope: 'store',
       })) }
     } finally {
-      setBusy(false)
+      if (activeAccount.current === target) setBusy(false)
     }
   }
 
@@ -269,7 +302,7 @@ export default function RankSettingsV8({
   const conflictAt = conflict?.latest.rules ? shortTime(conflict.latest.rules.updatedAt) : null
   useEffect(() => {
     onTopBand(conflict ? (
-      <div className={styles.conflictSlot}>
+      <div className={styles.conflictSlot} title={conflict?.latest.rules ? shortDateTime(conflict.latest.rules.updatedAt) : undefined}>
         <SaveConflictBand title={conflictAt ? `ほかの人が ${conflictAt} にランク設定を保存しました` : 'ほかの人がランク設定を保存しました'} description="このまま保存すると、ほかの人の変更が消えます" onCompare={() => setComparing(true)} onReload={reloadLatest} />
       </div>
     ) : null)
@@ -330,7 +363,7 @@ export default function RankSettingsV8({
               const isBase = index === drafts.length - 1 && parseYen(row.threshold) === 0
               const label = row.name.trim() || `ランク ${index + 1}`
               return (
-                <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
+                <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={`タグ：${row.tagName ?? emptyValue('unconfigured')}・会員 ${formatNumber(row.memberCount)} 人`}>
                   <div className={styles.rankColName}>
                     <SaveErrorField names={[`drafts.${index}.name`,"row.name"]}><TextField {...fields.bind(`rank-name-${index}`)} aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} /></SaveErrorField>
                     <FieldError id={`rank-name-${index}-error`}>{fields.error(`rank-name-${index}`)}</FieldError>
@@ -414,14 +447,14 @@ export default function RankSettingsV8({
       <Dialog
         open={removeTarget !== null && removeRow !== null && removeRow.id !== null}
         designNode="dEv6G"
-        designWidth={520}
+        size="medium"
         designTop={300}
         designHeaderPadding="var(--tpl-fm2-rank-dialog-head-pad)"
         confirmation
         tone="destructive"
         title={`ランク「${removeName}」を消しますか？`}
         busy={busy}
-        confirmLabel={moving > 0 ? `${formatNumber(moving)} 人を移して消す` : '消す'}
+        actionWidthReserve="idle" confirmLabel={moving > 0 ? `${formatNumber(moving)} 人を移して消す` : '消す'}
         cancelLabel="キャンセル"
         onConfirm={moving > 0 && !replacement ? undefined : () => removeRank()}
         onCancel={() => setRemoveTarget(null)}
@@ -434,8 +467,7 @@ export default function RankSettingsV8({
               : 'このランクに会員はいません。消すと、ランクの一覧から外れます。'}
           </p>
           {moving > 0 ? (<>
-            <div className={styles.removeField}>
-              <span className={styles.removeLabel} id="nen-rank-move-label">移す先のランク（必須）</span>
+            <Field label="移す先のランク" requirement={{ required: true }}>
               <SaveErrorField names={["replacement"]}><EntitySelect
                 aria-label="移す先のランク（必須）"
                 size="full"
@@ -446,7 +478,7 @@ export default function RankSettingsV8({
                   ...removeCandidates.map((row) => ({ ...entityOptionMetadata(row), value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),
                 ]}
               /></SaveErrorField>
-            </div>
+            </Field>
             <p className={styles.removeNote}>
               移し先のランクは、各会員のいまの有効期限まで使います。期限のあとは通常のランク判定に戻ります。ECへ反映したあと、次の購入から還元率が変わります。タグも付け替えます。
             </p>

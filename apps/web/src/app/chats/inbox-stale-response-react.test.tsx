@@ -339,15 +339,9 @@ async function typeDatetime(text: string) {
       (b.getAttribute('aria-label') ?? '').startsWith(`${year}年${month}月${day}日（${week}）`),
     ) ?? null,
   )
-  for (const [label, v] of [['時', match[4]], ['分', match[5]]] as const) {
-    const select = dialog()?.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)
-    if (!select) throw new Error('時刻の選択が見つからない')
-    await act(async () => {
-      select.value = v
-      select.dispatchEvent(new Event('change', { bubbles: true }))
-    })
-  }
+  await setTimeControl(dialog()?.querySelector('input[role="combobox"]') ?? null, `${match[4]}:${match[5]}`)
 }
+import { setTimeControl } from '@/test-utils/time-control'
 
 async function click(el: Element | null) {
   if (!el) throw new Error('クリック対象が見つからない')
@@ -494,7 +488,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     // Aへ送信を開始し、応答は保留のまま。(ダイレクト送信パネルにも
     // 「送信」ボタンがあるので、トーク画面の中に限定する)
     const pane = document.querySelector('[data-inbox-v4="talk-pane"]')
-    const sendButton = [...(pane?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '送信')
+    const sendButton = [...(pane?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '送信する')
     await click(sendButton ?? null)
     await flush()
     expect(net.posts.some((p) => p.path === '/api/chats/friend-a/send')).toBe(true)

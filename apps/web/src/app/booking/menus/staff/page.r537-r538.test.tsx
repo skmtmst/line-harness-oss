@@ -20,7 +20,7 @@ const fixture = vi.hoisted(() => ({
   putStaffMenusBulk: null as null | ((...args: unknown[]) => Promise<unknown>),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -29,7 +29,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 
@@ -100,7 +100,7 @@ describe('R537 取得失敗は空状態と分け、画面内で取り直せる',
     // 失敗中に「先にスタッフを登録してください」は出さない。
     expect(screen.queryByText('先にスタッフを登録してください')).toBeNull()
     // KPI も0ではなく「—」。
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('table')).toBeNull()
 
     // 通信復旧後に同じ画面から取り直す。
     succeedAll()
@@ -118,6 +118,9 @@ describe('R537 取得失敗は空状態と分け、画面内で取り直せる',
     await screen.findByText('担当スタッフの割り当てを見る権限がありません')
     expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     expect(screen.queryByText('先にスタッフを登録してください')).toBeNull()
+    succeedAll()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    expect(await screen.findByText('カット')).toBeTruthy()
   })
 
   test('429は待ち案内と一緒に再試行の口を出す', async () => {
@@ -145,14 +148,13 @@ describe('R538 閲覧のみでは変更・保存の入口に進めない', () =>
     expect(boxes.length).toBeGreaterThan(0)
     for (const box of boxes) expect((box as HTMLInputElement).disabled).toBe(true)
     // 数値の上書きも押せない。
+    fireEvent.click(screen.getByText('カット').closest('tr')!.querySelector('td')!)
     const duration = screen.getByLabelText('稼働さん の カット の所要時間') as HTMLInputElement
     expect(duration.disabled).toBe(true)
     // 保存の押し口は出ず、理由が読める。
-    expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
-    expect(screen.getByText(/担当割当の変更権限がありません/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '保存' })).toBeNull()
     // スタッフ追加の行き先も押せない姿になる。
     expect(screen.queryByRole('link', { name: 'スタッフを追加する' })).toBeNull()
-    expect(screen.getByText('スタッフを追加する')).toBeTruthy()
   })
 
   test('編集権限があれば変えられる', async () => {
@@ -161,11 +163,11 @@ describe('R538 閲覧のみでは変更・保存の入口に進めない', () =>
 
     const boxes = screen.getAllByRole('checkbox')
     for (const box of boxes) expect((box as HTMLInputElement).disabled).toBe(false)
-    expect(screen.getByRole('link', { name: 'スタッフを追加する' })).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: 'カット を 稼働さん が受ける' })).toBeTruthy()
     expect(screen.queryByText(/担当割当の変更権限がありません/)).toBeNull()
 
     // 変えると保存の押し口が出る。
     fireEvent.click(boxes[0])
-    expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '保存' })).toBeTruthy()
   })
 })

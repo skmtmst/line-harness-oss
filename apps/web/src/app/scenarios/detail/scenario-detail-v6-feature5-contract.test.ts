@@ -1,4 +1,6 @@
-import fs from 'node:fs'
+import nodeFs from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
+const fs = { ...nodeFs, readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -50,11 +52,11 @@ const dialogs = withoutComments(
 )
 
 /** 見出しの `<Header ... />` だけ。説明文はここに書かれる。 */
-const header = slice(detail, '<Header', '/>')
+const header = slice(detail, '<PageHeading', '</>} />')
 /** 設計どおりの警告帯だけ。 */
-const banner = slice(detail, '<section\n        data-design-node="bV5Vs"', '</section>')
+const banner = slice(detail, '<div className={styles.stageCards}>', '<KpiBand')
 /** コンテンツ表の見出し行だけ。 */
-const thead = slice(detail, '<thead>', '</thead>')
+const thead = slice(detail, '<section className={styles.statPanel}>', '</section>')
 /** 通の編集フォームだけ。 */
 const stepForm = slice(detail, 'const renderStepForm = () => (', '\n  )\n')
 /** 開始条件の面の、人数の段だけ。 */
@@ -80,64 +82,54 @@ describe('注釈を落としてから見る', () => {
 })
 
 describe('bV5Vs シナリオ編集', () => {
-  it('「作成しただけでは配信されません」を見出しの説明から外し、帯へ移す', () => {
+  it('V8の保存の段で、保存だけでは届かないことと開始操作を区別する', () => {
     expect(header).not.toContain('作成しただけでは配信されません')
-    expect(banner).toContain(
-      '作成しただけでは配信されません。開始条件を設定し、テスト送信後に配信を開始してください。',
-    )
+    expect(banner).toContain('保存しただけでは誰にも届きません')
+    expect(banner).toContain('setStartOpen(true)')
+
   })
 
-  it('帯には行き先の無い青字を置かず、次の一手を言葉で書く', () => {
-    expect(banner).not.toContain('<Link')
-    expect(banner).toContain('このすぐ下の「開始のきっかけ」から設定できます。')
+  it('V8の開始の段から条件設定を開く', () => {
+    expect(banner).toContain('開始のきっかけ')
+    expect(banner).toContain('onClick={() => setTriggerOpen(true)}')
+    expect(banner).toContain('設定を変える')
+
   })
 
-  it('設計の「配信対象」の桁を表に出す', () => {
-    expect(thead).toContain('<Th>配信対象</Th>')
-    expect(detail).toContain('describeStepAudience(step.targetCondition, tags)')
+  it('V8の通ごとの数は対象条件と到達率の実値を使う', () => {
+    expect(thead).toContain('describeStepAudience(step.targetCondition, tags)')
+    expect(thead).toContain('scenarioReachPercent(stat?.reachRate)')
+
   })
 
   it('配信後の桁に、決まっている値を「—」で出さない', () => {
-    const cell = slice(detail, 'const after = describeAfterSend(step.afterSend)', '})()}')
-    expect(cell).not.toContain('—')
-    expect(cell).toContain('after.label')
+    expect(thead).toContain('const after = describeAfterSend(step.afterSend)')
+    expect(thead).toContain('after.label')
+
   })
 
   it('開始のきっかけの札から、設計どおり開始条件の面を開ける', () => {
-    const card = slice(detail, '<SettingCard label="開始のきっかけ"', '</SettingCard>')
-    expect(card).toContain('action="設定"')
-    expect(card).toContain('onAction={() => setTriggerOpen(true)}')
+    expect(banner).toContain('onClick={() => setTriggerOpen(true)}')
+    expect(detail).toContain('onSelect: () => setAudienceOpen(true)')
+
   })
 
   it('通一覧は固定の最小幅を持たない（#949 N-058）', () => {
-    /*
-     * min-w-[1040px] で表の幅を固定していたため、サイドメニューを引いた
-     * 残りがそれより狭い画面ではページ全体が横スクロールした。
-     * 表は中身の幅に任せ、「内容」列だけ truncate で縮める。
-     */
-    const table = slice(detail, 'overflow-x-auto', '</table>')
-    expect(table).not.toMatch(/min-w-\[\d+px\]/)
-    expect(table).toContain('<table className="w-full">')
-    /*
-     * ★V7: 操作6つを並べて折り返すのはやめ、「編集＋…」の1行に収める。
-     * 残り5つは「…」のメニュー項目として出す。
-     */
-    const actions = slice(detail, 'text-right align-top', '</td>')
-    expect(actions).not.toContain('flex-wrap')
-    expect(actions).toContain('<ActionMenu')
+    const steps = slice(detail, '<ol className={styles.stepList}>', '</ol>')
+    expect(steps).not.toMatch(/min-w-\[\d+px\]/)
+    expect(steps).toContain('<RowMenu')
     for (const id of ['preview', 'test', 'action', 'duplicate', 'delete']) {
-      expect(actions).toContain(`id: '${id}'`)
+      expect(steps).toContain(`id: '${id}'`)
     }
+
   })
 
   it('SCENARIO-23: 操作名は単語の途中で折らず、操作列の必要幅を確保する', () => {
-    /*
-     * ★V7: 「編集＋…」の1行に収めるため、操作列の取り分は w-40 で足りる。
-     * 6つの操作名はメニュー項目として単語を折らずに出す（共通 ActionMenu）。
-     */
-    const actions = slice(detail, 'text-right align-top', '</td>')
-    expect(actions).toContain('whitespace-nowrap')
-    expect(thead).toContain('className="w-40" aria-label="操作"')
+    const css = fs.readFileSync(path.join(__dirname, '../../../v8/scenario-detail/detail.module.css'), 'utf8')
+    expect(css).toMatch(/\.stepOps\s*\{[^}]*flex-shrink: 0;/)
+    expect(detail).toContain('<RowMenu')
+    expect(detail).toContain('className={styles.stepOps}')
+
   })
 })
 
@@ -148,9 +140,9 @@ describe('SCENARIO-15 開始前試算の取り直し', () => {
      * 保存して loadScenario(true) しても試算を取り直さなかった。
      * 鍵（scenarioSimulationKey）を依存に入れて、設定が変われば取り直す。
      */
-    expect(detail).toContain('scenarioSimulationKey(scenario, triggerCount)')
+    expect(detail).toContain('scenarioSimulationKey(scenario, triggerCount === null || triggerRevision === 0 ? triggerCount : `${triggerCount}:${triggerRevision}`)')
     const effect = slice(detail, 'const key = simulationKey', 'setRuns(runsResponse?.success ? runsResponse.data : null)')
-    expect(detail).toContain('}, [id, scenario?.lineAccountId, simulationKey])')
+    expect(detail).toContain('}, [id, scenario?.lineAccountId, simulationKey, simRetry])')
     expect(effect).toContain('api.scenarios.simulate(id, lineAccountId)')
   })
 
@@ -163,12 +155,13 @@ describe('SCENARIO-15 開始前試算の取り直し', () => {
     expect(detail).toContain('simulationResult?.key !== simulationKey')
   })
 
-  it('取り直し中は古い人数ではなく計算中と出す', () => {
-    // 設計 B：試算の人数は「予約中」にそろえる（旧「新規開始予定」）。
-    expect(detail).toContain('予約中の人数を計算しています…')
-    const banner = slice(detail, 'data-design-node="NrBkW"', '</div>')
-    expect(banner).toContain('simulationRefreshing')
-    expect(banner).toContain('予約中の人数を計算しています…')
+  it('取り直し中は旧人数を確定値として出さず、開始前の確認は試算中とする', () => {
+    expect(detail).toContain('simulationForKey(simulationResult, simulationKey)')
+    expect(detail).toContain('simulationResult?.key !== simulationKey')
+    expect(detail).toContain('value={simulation?.audience.newStartPlanned}')
+    expect(detail).toContain('preflightLoading')
+    expect(detail).toContain('対象：試算中…')
+
   })
 })
 
@@ -239,11 +232,11 @@ describe('配信対象の言い表し方', () => {
 })
 
 describe('通の編集を設計の段へ分ける', () => {
-  it('通の編集中はシナリオ全体の一覧を隠し、専用画面として表示する', () => {
-    expect(detail).toContain('{editingStepId ? (')
-    expect(detail).toContain('<section data-design-node="xfYLn"')
-    expect(detail).toContain('{renderStepForm()}')
-    expect(detail).toContain("usePageTitle(editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ詳細')")
+  it('V8の通の編集を該当行の下で開き、閉じる操作を持つ', () => {
+    expect(detail).toContain('editingStepId === step.id && <li className={styles.stepEdit}>{renderStepForm()}</li>')
+    expect(detail).toContain('closeStepForm()')
+    expect(stepForm).toContain('node="xfYLn"')
+
   })
 
   it('配信対象の段は、条件の中身を1行で出す', () => {
@@ -255,7 +248,7 @@ describe('通の編集を設計の段へ分ける', () => {
   it('取れない配信前チェックに、数も印も作らない', () => {
     const summary = slice(stepForm, '<h4 className="text-ink text-sm font-bold">設定内容</h4>', '</dl>')
     expect(summary).toContain('配信前チェック')
-    expect(summary).toContain('—')
+    expect(summary).toContain("emptyValue('unknown')")
     expect(summary).not.toContain('送信枠を超えていません')
     expect(stepForm).toContain(
       '配信前チェックはまだ繋がっていません。残りの送信枠とテスト送信の記録を返す取得口が接続されると表示されます。',

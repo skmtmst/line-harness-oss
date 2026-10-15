@@ -1,5 +1,17 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import HistoryTable from '@/v8/mileage/history-table'
+import { mileageSourceNoteText } from '@/v8/mileage/display'
+import type { MileageAdminHistoryItem } from '@/lib/api'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
+function historyMarkup(hasSource: boolean) {
+  const item: MileageAdminHistoryItem = { id: 'history-1', primaryFriendId: 'friend-1', displayName: '友だち', pictureUrl: null, entryType: 'grant', status: 'available', amount: 10, reason: '予約', source: 'booking', hasSourceEvent: hasSource, sourceReferenceId: hasSource ? 'internal-event-7' : null, ruleName: null, mode: 'automatic', executedByStaffName: null, lineAccountName: '店', balanceAfter: 10, occurredAt: '2026-10-13T00:00:00Z' }
+  return renderToStaticMarkup(React.createElement(HistoryTable, { items: [item], readonly: true, menuId: null, setMenuId: () => {}, openPending: () => {}, viewName: row => row.displayName }))
+}
 
 /**
  * 運用者の画面に、内部IDとデータベースの語を出さない（V6の5画面）。
@@ -24,7 +36,8 @@ import { describe, expect, it } from 'vitest'
  */
 
 const SCREENS = [
-  { node: 'n5VVTb / jwrbf', path: 'affiliates/tabs.tsx' },
+  { node: 'OylSV', path: '../v8/affiliates/approvals.tsx' },
+  { node: 'tnTn9', path: '../v8/affiliates/drawer.tsx' },
   { node: 'n5VVTb / jwrbf', path: 'conversions/page.tsx' },
   { node: 'voJtX', path: 'contents/page.tsx' },
   { node: 'voJtX', path: 'contents/media-detail-dialog.tsx' },
@@ -34,6 +47,9 @@ const SCREENS = [
 ] as const
 
 function read(path: string): string {
+  if (path === 'mileage/mileage-history-tab.tsx') return readFileSync(new URL('../v8/mileage/history.tsx', import.meta.url), 'utf8')
+  if (path === 'mileage/friends/detail/page.tsx') return readFileSync(new URL('../v8/mileage/friend-detail.tsx', import.meta.url), 'utf8')
+  if (['contents/media-detail-dialog.tsx', 'contents/media-replacement-dialog.tsx'].includes(path)) return readFileSync(new URL('../v8/' + path, import.meta.url), 'utf8')
   return readFileSync(new URL(`./${path}`, import.meta.url), 'utf8')
 }
 
@@ -114,66 +130,67 @@ describe('V6の画面に内部IDとDBの語を出さない', () => {
   })
 
   it('マイルの2画面が調整元IDを組み立てない', () => {
-    for (const path of ['mileage/mileage-history-tab.tsx', 'mileage/friends/detail/page.tsx']) {
-      const source = withoutComments(read(path))
-      expect(source, path).not.toContain('調整元ID')
-      expect(source, path).toContain('mileageSourceNoteText(')
-    }
-  })
-})
+    const markup = historyMarkup(true)
+    expect(markup).not.toContain('調整元ID')
+    expect(markup).not.toContain('internal-event-7')
+    expect(markup).toContain('元の記録あり')
+    const detail = withoutComments(read('mileage/friends/detail/page.tsx'))
+    expect(detail).not.toContain('調整元ID')
+    expect(mileageSourceNoteText({ hasSourceEvent: true, sourceReferenceId: 'internal-event-7' })).toBe('元の記録あり')
+  })})
 
 describe('成果承認 n5VVTb の友だち列', () => {
   const CELL = between(
-    read('affiliates/tabs.tsx'),
-    '{pagedItems.map((item) => {',
-    '{item.affiliateName',
+    read('../v8/affiliates/approvals.tsx'),
+    '<Td grow><FolderDotName>',
+    '<Td className={styles.colApAffiliate}>',
   )
 
   it('名前だけを出し、内部IDを添えない', () => {
-    expect(CELL).toContain('{personNameText(item.friendName)}')
+    expect(CELL).toContain('{personName(item.friendName)}')
     expect(CELL).not.toContain('item.friendId')
     expect(CELL).not.toContain('不明')
   })
 })
 
 describe('紹介者 jwrbf の内訳', () => {
-  const TABS = read('affiliates/tabs.tsx')
+  const TABS = read('../v8/affiliates/drawer.tsx')
 
   it('集計カードの見出しに表名を出さない', () => {
-    const CARDS = between(TABS, '{/* v2 summary cards */}', '{/* Per-offer breakdown */}')
-    expect(CARDS).toContain('{CLICK_SUMMARY_LABEL}')
+    const CARDS = between(TABS, 'title="今月の成果"', '</KpiBand>')
+    expect(CARDS).toContain('value={report?.conversions}')
     expect(CARDS).not.toContain('ref_tracking')
   })
 
   it('重複の見出しと札に列名もIDも出さない', () => {
-    const DUP = between(TABS, '{/* Duplicate flags */}', '{/* CV by point */}')
-    expect(DUP).toContain('{duplicateFlagHeading(report.duplicateFlags.length)}')
-    expect(DUP).toContain('{duplicateFriendNameText(f.friendId, journeys)}')
+    const DUP = between(TABS, '{report.duplicateFlags.length > 0', 'const friends =')
+    expect(DUP).toContain('同じ友だちの重複')
+    expect(DUP).toContain('成果承認で中身を確かめてください')
     expect(DUP).not.toMatch(/identity_key/i)
     expect(DUP).not.toContain('f.friendId.slice')
   })
 
   it('リンク別クリックの列見出しを運用者の言葉にする', () => {
-    const HEAD = between(TABS, '{/* Links table */}', '</thead>')
-    expect(HEAD).toContain('<th className="pb-1 pr-4">{LINK_CODE_HEADING}</th>')
+    const HEAD = between(TABS, 'links.map((link)', '<section className={styles.section} aria-label="認めるのを待っている成果">')
+    expect(HEAD).toContain('クリック ${formatNumber(link.click_count)}')
     expect(HEAD).not.toContain('>ref_code<')
   })
 
   it('帰属ジャーニーの列見出しと友だち名を運用者の言葉にする', () => {
-    const HEAD = between(TABS, '<th className="pb-1 pr-4">友だち</th>', '</thead>')
-    expect(HEAD).toContain('<th className="pb-1 pr-4">{LINK_CODE_HEADING}</th>')
+    const HEAD = between(TABS, 'const friends =', 'const payment =')
+    expect(HEAD).toContain('・リンク ')
     expect(HEAD).not.toContain('>ref_code<')
 
-    const ROW = between(TABS, '{journeys.map((j) => {', '{formatDate(j.addedAt)}')
-    expect(ROW).toContain('{personNameText(j.displayName)}')
+    const ROW = between(TABS, '{journeys.map((journey)', '</section>')
+    expect(ROW).toContain('{personName(journey.displayName)}')
     expect(ROW).not.toContain('不明')
   })
 
   it('重複のしるしの吹き出しに列名を出さない', () => {
-    const FLAG = between(TABS, '{needsReview ? (', '</td>')
+    const FLAG = between(read('../v8/affiliates/approvals.tsx'), '<Td className={styles.colApCheck}>', '</Td>')
     // IDEA-16: 理由は approvalReviewReasons が運用者の言葉で組み立てる。
     // metadata のキー名（orderNumber/ecEventId）や列名は出さない。
-    expect(FLAG).toContain('title={reviewReasons.join')
+    expect(FLAG).toContain('title={reasons.join')
     expect(FLAG).not.toMatch(/identity_key|order_number|ec_event_id/i)
   })
 })
@@ -194,24 +211,19 @@ describe('登録メディア voJtX の使用箇所', () => {
 })
 
 describe('マイルの発生元 MvZm5 / HIU5O', () => {
-  it('履歴の発生元は「元の記録あり／なし」だけを出す', () => {
-    const CELL = between(
-      read('mileage/mileage-history-tab.tsx'),
-      '{mileageSourceLabel(item.source)}',
-      '</Td>',
-    )
-    expect(CELL).toContain('mileageSourceNoteText({')
-    expect(CELL).not.toContain('調整元ID')
-    expect(CELL).not.toContain('title={item.sourceReferenceId')
+  it('履歴の発生元は記録の有無だけを出す', () => {
+    expect(historyMarkup(true)).toContain('元の記録あり')
+    expect(historyMarkup(false)).toContain('元の記録なし')
+    expect(historyMarkup(true)).not.toContain('internal-event-7')
   })
-
   it('マイル明細の発生元も同じ言い方にする', () => {
     const CELL = between(
       read('mileage/friends/detail/page.tsx'),
-      '{mileageSourceLabel(item.source)}',
-      '</Td>',
+      'const note = mileageSourceNoteText(',
+      '<Td className={styles.colKind}>',
     )
-    expect(CELL).toContain('mileageSourceNoteText({')
+    expect(CELL).toContain('mileageDetailHasSourceEvent(item)')
+    expect(CELL).toContain('title={`${note}・${mileageStatusLabel(item.status)}`}')
     expect(CELL).not.toContain('調整元ID')
     expect(CELL).not.toContain('title={item.sourceReferenceId')
   })

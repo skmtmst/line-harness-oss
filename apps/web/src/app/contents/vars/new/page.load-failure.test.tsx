@@ -34,13 +34,15 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
 }))
 
 const routerPush = vi.fn()
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 
@@ -75,6 +77,13 @@ async function render() {
 
 async function settle() {
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)) })
+}
+
+function typeRadio(type: string): HTMLInputElement {
+  const labels: Record<string, string> = { text: '標準', long_text: '長文', number: '数値', url: 'URL', image: '画像', date: '年月日', datetime: '日時', boolean: 'はい／いいえ' }
+  const radio = [...document.querySelectorAll<HTMLInputElement>('input[type=radio]')].find(el => el.value === type && el.closest('label')?.textContent?.startsWith(labels[type]))
+  if (!radio) throw new Error('Missing type option: ' + type)
+  return radio
 }
 
 function byId(id: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
@@ -140,7 +149,7 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '受付中')
-    await click(byExactText('button', '登録する'))
+    await click(byExactText('button', '保存して公開'))
     await settle()
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ folderId: null }))
@@ -174,7 +183,7 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '受付中')
-    await click(byExactText('button', '登録する'))
+    await click(byExactText('button', '保存して公開'))
     await settle()
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'f-1' }))
@@ -185,10 +194,10 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     await settle()
     await setValue(byId('cv-name'), '受付可否')
     await setValue(byId('cv-key'), 'is_open')
-    await click(document.querySelector('input[name="cv-type"][value="boolean"]') as HTMLInputElement)
+    await click(typeRadio('boolean') as HTMLInputElement)
 
     // 空欄のまま登録すると入力エラーが欄直下と画面下部の両方に出る。
-    await click(byExactText('button', '登録する'))
+    await click(byExactText('button', '保存して公開'))
     await settle()
     expect(api.create).not.toHaveBeenCalled()
     const fieldError = document.querySelector('#cv-value')?.parentElement?.textContent ?? ''
@@ -204,7 +213,7 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     expect(document.querySelectorAll('[role="alert"]').length).toBe(0)
 
     // そのまま登録できる。
-    await click(byExactText('button', '登録する'))
+    await click(byExactText('button', '保存して公開'))
     await settle()
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'boolean', value: 'true' }))
   })

@@ -15,10 +15,10 @@
  * 追加時に一度だけ付く計測値で、友だち詳細にもあるので辿れる。
  */
 @media (max-width: 1365px) {
-  [data-theme='v8'] [data-friend-cols] {
+  :root [data-friend-cols] {
     grid-template-columns: var(--friend-cols-narrow);
   }
-  [data-theme='v8'] [data-friend-cols] > [data-column='source'] {
+  :root [data-friend-cols] > [data-column='source'] {
     display: none;
   }
 }
@@ -29,12 +29,12 @@
  * 選びは崩れない）。行は78pxでそろっているので寸法の推測も78px。
  * 札は高さがばらばらのため、描いた実績が無ければ220pxと推測する。
  */
-[data-theme='v8'] [data-friend-row] {
+:root [data-friend-row] {
   content-visibility: auto;
   contain-intrinsic-size: auto 78px;
 }
 
-[data-theme='v8'] [data-friend-card] {
+:root [data-friend-card] {
   content-visibility: auto;
   contain-intrinsic-size: auto 220px;
 }

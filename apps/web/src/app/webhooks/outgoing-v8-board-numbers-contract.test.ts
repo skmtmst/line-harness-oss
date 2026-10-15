@@ -1,31 +1,26 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-
-/*
- * 外部連携の一覧（こちらから送る）と板 `AsfFB` の数値突き合わせ（2026-10-03）。
- * 見本の数字が変わったらここも直す。共通部品の中身は M10 の持ち物なので見ない。
- */
-const HERE = dirname(fileURLToPath(import.meta.url))
-const css = readFileSync(join(HERE, 'outgoing-v8.module.css'), 'utf8')
-
-describe('外部連携の一覧は板 AsfFB の数字どおり', () => {
-  it('数の帯のマスは余白 16/20・間 8', () => {
-    expect(css).toMatch(/\.kpiCell \{[^}]*padding: 16px 20px/s)
-    expect(css).toMatch(/\.kpiCell \{[^}]*gap: 8px/s)
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const kpi = read('../../components/shared/kpi-card.module.css')
+const view = read('../../v8/webhooks/outgoing.tsx')
+const table = read('../../components/shared/data-table.module.css')
+describe('外部連携の一覧は現在のV8の型と数の帯を使う', () => {
+  it('数の帯は共通の余白と間隔で描く', () => {
+    expect(kpi).toContain('gap: var(--tpl-band-cell-gap)')
+    expect(kpi).toContain('padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side)')
+    expect(view).toContain('<WebhookBand')
   })
-
-  it('数の帯の題は 12・500・ink', () => {
-    expect(css).toMatch(/\.kpiLabel \{[^}]*font-size: 12px/s)
-    expect(css).toMatch(/\.kpiLabel \{[^}]*color: var\(--color-ink\)/s)
+  it('数の帯の題は共通の文字と色を使う', () => {
+    expect(kpi).toMatch(/:root \.label \{[^}]*font-size: var\(--text-caption\)/s)
+    expect(kpi).toContain('var(--color-ink)')
+    expect(read('../../v8/webhooks/shell.tsx')).toContain('presentation="band"')
   })
-
-  it('表の見出しの地は table-head', () => {
-    expect(css).toMatch(/\.table thead th \{[^}]*background: var\(--color-table-head\)/s)
+  it('表の見出しは共通のV8の地と寸法を使う', () => {
+    expect(view).toContain('<TableHeadRow data-table-layout="columns">')
+    expect(table).toContain('var(--color-table-head)')
+    expect(table).toContain('var(--table-head-height)')
   })
-
-  it('探す欄の幅は 240', () => {
-    expect(css).toMatch(/\.searchWrap \{[^}]*width: 240px/s)
+  it('狭い板の探す欄の幅は240を保つ', () => {
+    expect(view).toContain("label: 'つなぎ先で探す', width: 240")
   })
 })

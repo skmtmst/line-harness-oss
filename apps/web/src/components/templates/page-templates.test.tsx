@@ -3,9 +3,30 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CreatePage, DetailColumns, ListPage, SettingsPage } from './index'
 import { useState } from 'react'
+import { PageFrame } from './page-frame'
 
 afterEach(cleanup)
 describe('V8 の型へ渡す操作', () => {
+  it('一覧型は画面の任意指定によらず標準の一覧寸法と検査を持つ', () => {
+    const { container, rerender } = render(<ListPage title="一覧">表</ListPage>)
+    expect(container.querySelector('[data-page-template="list"]')?.getAttribute('data-list-skeleton')).toBe('templates')
+    rerender(<PageFrame kind="create">入力</PageFrame>)
+    expect(container.querySelector('[data-page-template="create"]')?.hasAttribute('data-list-skeleton')).toBe(false)
+  })
+  it('一覧の高さは本文で決まり、単独の板と明示した画面高さを保つ', () => {
+    const { container, rerender } = render(<ListPage title="一覧">少ない行</ListPage>)
+    const frame = () => container.querySelector('[data-page-template]')!
+    expect(frame().getAttribute('data-frame-height')).toBe('content')
+    rerender(<ListPage title="一覧">{Array.from({ length: 20 }, (_, i) => <p key={i}>行{i}</p>)}</ListPage>)
+    expect(frame().getAttribute('data-frame-height')).toBe('content')
+    expect(container.querySelectorAll('p')).toHaveLength(20)
+    rerender(<ListPage title="一覧" heightMode="viewport">本文</ListPage>)
+    expect(frame().getAttribute('data-frame-height')).toBe('viewport')
+    rerender(<ListPage title="一覧" standalone>小窓</ListPage>)
+    expect(frame().hasAttribute('data-frame-height')).toBe(false)
+    rerender(<PageFrame kind="create">入力</PageFrame>)
+    expect(frame().hasAttribute('data-frame-height')).toBe(false)
+  })
   it('畳んだ詳細欄を開閉でき、検索欄の入力を保持する', () => {
     function Example() {
       const [expanded, setExpanded] = useState(false)
@@ -33,6 +54,19 @@ describe('V8 の型へ渡す操作', () => {
     expect(screen.getAllByRole('button', { name: '保存' })).toHaveLength(1)
   })
 
+  it('畳んだ設定の見本を開閉しても入力と保存を保持する', () => {
+    const save = vi.fn()
+    render(<SettingsPage title="プールを作る" navigation="目次" previewLayout="cards" preview={<p>受け入れ先の見本</p>} saveActions={<button onClick={save}>保存</button>}><input aria-label="プール名" defaultValue="渋谷" /></SettingsPage>)
+    fireEvent.change(screen.getByRole('textbox', { name: 'プール名' }), { target: { value: '中目黒' } })
+    fireEvent.click(screen.getByRole('button', { name: 'プレビューを開く' }))
+    expect(screen.getByRole('dialog', { name: 'プレビュー' }).textContent).toContain('受け入れ先の見本')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect((screen.getByRole('textbox', { name: 'プール名' }) as HTMLInputElement).value).toBe('中目黒')
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    expect(save).toHaveBeenCalledOnce()
+  })
+
   it('設定の変更があるときだけ保存口を出し、渡された処理を実行する', () => {
     const save = vi.fn()
     const { rerender } = render(<SettingsPage title="設定" navigation={<a href="#delivery">配信</a>}><section id="delivery">配信設定</section></SettingsPage>)
@@ -42,12 +76,11 @@ describe('V8 の型へ渡す操作', () => {
     expect(save).toHaveBeenCalledOnce()
     expect(screen.getByRole('navigation', { name: 'この設定の目次' })).toBeTruthy()
   })
-  it('型の説明をキーボード操作で開き、閉じたら元の？へ戻る', () => {
-    render(<ListPage title="タグ" help="友だちに付ける目印です。">一覧</ListPage>)
-    const help = screen.getByRole('button', { name: 'タグの説明' })
+  it('型の説明は初めに開き、閉じてもボタンにフォーカスを保つ', () => {
+    render(<ListPage title="タグ" explanation="友だちに付ける目印です。">一覧</ListPage>)
+    const help = screen.getByRole('button', { name: 'この画面の説明' })
     help.focus(); fireEvent.click(help)
     expect(screen.getByText('友だちに付ける目印です。')).toBeTruthy()
-    fireEvent.keyDown(document, { key: 'Escape' })
     expect(document.activeElement).toBe(help)
     expect(help.getAttribute('aria-expanded')).toBe('false')
   })

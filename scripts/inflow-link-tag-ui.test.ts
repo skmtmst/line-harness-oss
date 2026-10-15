@@ -4,43 +4,49 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const page = readFileSync(
-  resolve(root, 'apps/web/src/app/inflow-links/page.tsx'),
+  resolve(root, 'apps/web/src/v8/inflow-links/list.tsx'),
   'utf8',
 );
 const v8List = readFileSync(resolve(root, 'apps/web/src/v8/inflow-links/list.tsx'), 'utf8');
+const rows = readFileSync(resolve(root, 'apps/web/src/v8/inflow-links/rows.ts'), 'utf8');
 const listStyles = readFileSync(
-  resolve(root, 'apps/web/src/app/inflow-links/inflow-list-v8.module.css'),
+  resolve(root, 'apps/web/src/v8/inflow-links/list.module.css'),
   'utf8',
 );
 const modal = readFileSync(
-  resolve(root, 'apps/web/src/app/inflow-links/_components/edit-route-modal.tsx'),
+  resolve(root, 'apps/web/src/v8/inflow-links/edit-route-dialog.tsx'),
   'utf8',
 );
 
 describe('inflow link tag auto-assignment UI wiring', () => {
   test('inflow-links page loads tags and shows the assigned auto-tag in the route list', () => {
-    expect(page).toContain("import type { ApiResponse, EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag }");
+    expect(page).toContain("import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TrafficPool }");
     expect(page).toContain('const [tags, setTags] = useState<Tag[]>([])');
     // R23横展開: 候補は今のアカウントだけ（別アカウントの同名タグ混入防止）。
     expect(page).toContain('api.tags.list(candidateParams)');
-    expect(page).toContain('if (tagRes.success) setTags(tagRes.data)');
-    expect(page).toContain('tagId: r.tagId');
+    expect(page).toContain('if (tagRes.success && Array.isArray(tagRes.data)) setTags(tagRes.data)');
+    expect(rows).toContain('tagId: r.tagId');
     expect(page).toContain('const tag = tags.find((t) => t.id === r.tagId)');
     // V8はシナリオとタグを「友だちになったら」の2行にまとめる。
-    expect(page).toContain('becameLines(r, sc, tag)');
-    expect(page).toContain('タグ「${tag.name}」');
+    expect(page).toContain('becameLines(r, sc, tag, introTemplate?.name ?? null)');
+    expect(rows).toContain('タグ「${tag.name}」');
     expect(page).toContain('title={becameSecond}>{becameSecond}');
     expect(page).toContain('tags={tags}');
   });
 
   test('desktop referral table stays compact without breaking identifiers mid-word', () => {
-    expect(page).toContain('className={styles.tableShell}');
-    for (const cell of ['nameLink', 'refCode', 'twoLine', 'twoLineSub']) {
-      const rule = listStyles.match(new RegExp(`\\.${cell} \\{([^}]+)\\}`))?.[1];
+    expect(page).toContain('className={styles.tableWrap}');
+    for (const cell of ['cellMain', 'cellSub']) {
+      const rule = listStyles.match(new RegExp(`\\.${cell}[^{}]*\\{([^}]+)\\}`))?.[1];
       expect(rule, cell).toContain('text-overflow: ellipsis');
       expect(rule, cell).toContain('white-space: nowrap');
     }
+    const truncateStyles = readFileSync(new URL('../apps/web/src/components/shared/truncated-text.module.css', import.meta.url), 'utf8')
+    expect(truncateStyles).toContain('text-overflow: ellipsis')
+    expect(truncateStyles).toContain('white-space: nowrap')
     expect(page).not.toContain('title={r.refCode}')
+    expect(page).toContain("label: 'URLをコピー'");
+    expect(page).toContain('<CopyTextButton role="menuitem" value={referralUrl(row.refCode)}');
     expect(v8List).toContain('<FolderDotName');
     expect(page).not.toContain('min-w-[1180px]');
     expect(page).not.toContain('font-mono text-blue-600 break-all');
@@ -62,6 +68,6 @@ describe('inflow link tag auto-assignment UI wiring', () => {
     expect(modal).toContain('api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })');
     expect(modal).toContain('api.entryRoutes.update(route!.id, form)');
     expect(modal).toContain('友だち追加時にこのタグを自動付与します');
-    expect(modal).toContain('tags.map((tag) => (');
+    expect(modal).toContain('clearable size="full" kind="tag"');
   });
 });

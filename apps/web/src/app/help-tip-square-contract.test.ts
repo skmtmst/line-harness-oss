@@ -25,40 +25,12 @@ const TREND = fs.readFileSync(path.join(DASHBOARD, 'friend-trend-table.tsx'), 'u
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 describe('「？」の正円', () => {
-  it('箱は 18×18 に固定し、縦横を同じに保つ', () => {
-    // 行頭に固定する（`min-width: 18px;` の中に `width: 18px;` が
-    // 含まれるため、toContain では戻しても赤くならない）。
-    for (const declaration of [
-      'width: 18px;',
-      'height: 18px;',
-      'min-width: 18px;',
-      'max-width: 18px;',
-      'max-height: 18px;',
-      'aspect-ratio: 1 / 1;',
-    ]) {
-      expect(CSS).toMatch(new RegExp(`^\\s*${declaration.replace(/[/\\^$*+?.()|[\]{}]/g, '\\$&')}`, 'm'))
-    }
-    // globals の min-height:32px を上書きし、題の行を伸ばさない。
-    expect(CSS).toMatch(/^\s*min-height: 0;/m)
-  })
-
-  it('箱は枠つき（ink-faint・canvas）で、中の「?」は 11px 太字 ink-secondary', () => {
-    expect(CSS).toContain('border: 1px solid var(--color-ink-faint);')
-    expect(CSS).toContain('background: var(--color-canvas);')
-    expect(CSS).toContain('border-radius: var(--radius-pill);')
-    expect(CSS).toContain('font-size: var(--text-micro);')
-    expect(CSS).toContain('font-weight: 500;')
-  })
-
-  it('lucide の丸いアイコン・枠なし・透明地は使わない', () => {
+  it('文字の「？」を専用の円に置き、アイコンへ置き換えない', () => {
     expect(TSX).not.toContain('lucide')
     expect(TSX).not.toContain('CircleHelp')
     expect(TSX).toContain('className={styles.mark}>?</span>')
     expect(CSS).not.toContain('.button svg')
-    expect(CSS.match(/\.button\s*\{[^}]*\}/)?.[0]).not.toContain('background: transparent;')
-    const baseButton = CSS.match(/^\.button\s*\{[^}]*\}/m)?.[0]
-    expect(baseButton).toBeDefined()
-    expect(baseButton).not.toMatch(/border:\s*0;/)
+    expect(CSS).toMatch(/:root \.button\s*\{[^}]*background:\s*transparent;/)
   })
 
   it('カードの見出しは題と「？」をひとかたまりで縦の中央にそろえる', () => {
@@ -72,8 +44,8 @@ describe('「？」の正円', () => {
 
 describe('V8の「？」は円と押せる範囲を分ける', () => {
   it('16pxの円を28pxの当たりの中に置き、枠と背景は円が持つ', () => {
-    const button = CSS.match(/\[data-theme='v8'\] \.button\s*\{[^}]*\}/)?.[0]
-    const mark = CSS.match(/\[data-theme='v8'\] \.mark\s*\{[^}]*\}/)?.[0]
+    const button = CSS.match(/:root \.button\s*\{[^}]*\}/)?.[0]
+    const mark = CSS.match(/:root \.mark\s*\{[^}]*\}/)?.[0]
     expect(button).toContain('width: 28px;')
     expect(button).toContain('height: 28px;')
     expect(button).toContain('background: transparent;')

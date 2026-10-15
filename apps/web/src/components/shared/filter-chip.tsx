@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import './filter-chip.css'
 
 /**
@@ -22,12 +22,14 @@ export default function FilterChip({
   selectedIcon = true,
   size,
   showCheck = true,
+  'aria-expanded': expanded,
+  'aria-haspopup': popup,
   children,
-}: {
+}: Pick<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-expanded' | 'aria-haspopup'> & {
   icon?: ReactNode
   /** 印のない絞り込み札（設定・ログインユーザーの板）。省略時は従来の ✓。 */
   selectedIcon?: boolean
-  size?: 'compact'
+  size?: 'compact' | 'inbox'
   /** 選んだときの ✓ を出すか（メッセージ作成の札）。selectedIcon と同じ意味で、どちらかが false なら出さない。 */
   showCheck?: boolean
   selected: boolean
@@ -43,6 +45,8 @@ export default function FilterChip({
     <button
       type="button"
       aria-pressed={selected}
+      aria-expanded={expanded}
+      aria-haspopup={popup}
       disabled={disabled}
       title={title}
       onClick={() => onChange(!selected)}

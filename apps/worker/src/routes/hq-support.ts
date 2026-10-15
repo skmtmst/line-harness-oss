@@ -154,7 +154,7 @@ hqSupport.get('/api/hq/support/requests', async (c) => {
     }));
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/hq/support/requests error:', err);
+    console.error(JSON.stringify({"code":"routes_hq_support_failed","route":"GET /api/hq/support/requests"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -194,7 +194,7 @@ hqSupport.get('/api/hq/support/context', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/hq/support/context error:', err);
+    console.error(JSON.stringify({"code":"routes_hq_support_failed","route":"GET /api/hq/support/context"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -322,7 +322,7 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
         });
       }
     } catch (error) {
-      console.warn('hq support mail failed:', error instanceof Error ? error.message : error);
+      console.warn(JSON.stringify({"code":"routes_hq_support_warn","route":"POST /api/hq/support/requests"}));
     }
     if (notified) await markHqSupportRequestNotified(c.env.DB, request.id);
 
@@ -331,7 +331,7 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
       data: { ...serialize({ ...request, notified_at: notified ? request.created_at : null }, base), notified },
     }, 201);
   } catch (err) {
-    console.error('POST /api/hq/support/requests error:', err);
+    console.error(JSON.stringify({"code":"routes_hq_support_failed","route":"POST /api/hq/support/requests"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -361,7 +361,7 @@ hqSupport.get('/api/hq/support/requests/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/hq/support/requests/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_hq_support_failed","route":"GET /api/hq/support/requests/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -433,7 +433,7 @@ hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'ad
         });
       }
     } catch (error) {
-      console.warn('hq support follow-up mail failed:', error instanceof Error ? error.message : error);
+      console.warn(JSON.stringify({"code":"routes_hq_support_warn","route":"POST /api/hq/support/requests/:id/messages"}));
     }
     return c.json({
       success: true,
@@ -449,7 +449,7 @@ hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'ad
       },
     }, 201);
   } catch (err) {
-    console.error('POST /api/hq/support/requests/:id/messages error:', err);
+    console.error(JSON.stringify({"code":"routes_hq_support_failed","route":"POST /api/hq/support/requests/:id/messages"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

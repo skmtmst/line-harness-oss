@@ -1844,3 +1844,210 @@ describe('m26f: 緊急対応の失敗後回復', () => {
     ).toBe(2);
   });
 });
+
+it.each([undefined, 'short', 'fixture-encryption-key-with-more-than-thirty-two-characters'])('operation status exposes only encryption readiness (%s)', async key => {
+  const res = await app().request('/api/operations/health?account_id=account-1', {}, bindings({ TOTP_ENCRYPTION_KEY: key }));
+  expect(res.status).toBe(200);
+  const body = await res.json() as { data: { loginSecurity: { configured: boolean; notice: string | null } } };
+  expect(body.data.loginSecurity.configured).toBe(Boolean(key && key.length >= 32));
+  expect(body.data.loginSecurity.notice).toBe(key && key.length >= 32 ? null : '二段階認証の鍵が未設定のため、必須にできません');
+  if (key) expect(JSON.stringify(body)).not.toContain(key);
+});
+
+/* ============ デリバリー連携のエラー監視（出前館QA#3） ============ */
+describe('デリバリー連携のエラー監視（出前館QA#3）', () => {
+  /**
+   * 外部連携の確認だけを取り出す。板の9行は増やさず、ここへ畳んで数える。
+   * 確認は5分枠で1回しか作られないため、同じ試験で2回目を見るときは
+   * NEXT_SLOT（6分後）を渡して別の枠にする。
+   */
+  async function externalIntegrations(db: D1Database = testDb.db, now = '2026-09-15T05:00:00.000Z') {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/quota/consumption')) return Response.json({ totalUsage: 0 });
+      return Response.json({ type: 'unlimited' });
+    }));
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    const checked = await runOperationHealthChecks(db, {
+      lineAccountId: 'account-1', source: 'manual', now,
+    });
+    return checked.run.results.find((result) => result.checkKey === 'external_integrations');
+  }
+
+  /** 2026-09-15T05:00:00Z の通算秒。基準からの差で「何分前」を作る。 */
+  const NOW_SEC = Math.floor(Date.parse('2026-09-15T05:00:00.000Z') / 1000);
+  const minutesAgo = (minutes: number) => NOW_SEC - minutes * 60;
+  /** 同じ試験で2回目の確認を作るための次の5分枠。 */
+  const NEXT_SLOT = '2026-09-15T05:06:00.000Z';
+
+  function seedState(service: string, connectionStatus: string, storeId = 'store-1'): void {
+    testDb.raw.prepare(
+      `INSERT INTO rt_delivery_service_states
+         (account_id, store_id, service, connection_status, intake_status, version, created_at, updated_at)
+       VALUES ('account-1', ?, ?, ?, 'open', 1, ?, ?)`,
+    ).run(storeId, service, connectionStatus, NOW_SEC, NOW_SEC);
+  }
+
+  function seedDispatch(
+    id: string,
+    service: string,
+    status: string,
+    requestedAt: number,
+    attempts = 1,
+    accountId = 'account-1',
+  ): void {
+    testDb.raw.prepare(
+      `INSERT INTO rt_delivery_dispatches
+         (id, account_id, store_id, service, action, target_kind, target_id, status,
+          attempts, requested_at, version, created_at, updated_at)
+       VALUES (?, ?, 'store-1', ?, 'accept', 'order', 'order-1', ?, ?, ?, 1, ?, ?)`,
+    ).run(id, accountId, service, status, attempts, requestedAt, requestedAt, requestedAt);
+  }
+
+  function seedEvent(
+    id: string,
+    service: string,
+    status: string,
+    receivedAt: number,
+    attempts = 1,
+  ): void {
+    testDb.raw.prepare(
+      `INSERT INTO rt_delivery_events
+         (id, account_id, service, external_event_id, event_type, status,
+          payload_json, attempts, received_at, version)
+       VALUES (?, 'account-1', ?, ?, 'order.created', ?, '{}', ?, ?, 1)`,
+    ).run(id, service, `ext-${id}`, status, attempts, receivedAt);
+  }
+
+  it('デリバリーの台帳が空なら今までどおり正常のまま', async () => {
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'normal',
+      value: { activeCount: 0, failingCount: 0, maxConsecutiveFailures: 0 },
+    });
+  });
+
+  it('つながっているサービスの数は外部連携の件数に足す', async () => {
+    seedState('demaecan', 'connected');
+    seedState('ubereats', 'connected', 'store-2');
+    seedState('rocketnow', 'disconnected');
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'normal',
+      value: { activeCount: 2, failingCount: 0 },
+    });
+  });
+
+  it('連携が切れたままのサービスは注意にする', async () => {
+    seedState('demaecan', 'error');
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'warning',
+      value: { activeCount: 1, failingCount: 1 },
+    });
+  });
+
+  it('送信の失敗は注意、再試行を使い切った打ち切りは異常にする', async () => {
+    seedDispatch('dsp-1', 'demaecan', 'failed', minutesAgo(5), 1);
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'warning',
+      value: { failingCount: 1, maxConsecutiveFailures: 1 },
+    });
+
+    seedDispatch('dsp-2', 'demaecan', 'exhausted', minutesAgo(3), 1);
+    expect(await externalIntegrations(testDb.db, NEXT_SLOT)).toMatchObject({
+      status: 'danger',
+      value: { maxConsecutiveFailures: 3 },
+    });
+  });
+
+  it('再試行待ちの送信も見える。繰り返しが3回に達したら異常にする', async () => {
+    seedDispatch('dsp-1', 'demaecan', 'retryable_failed', minutesAgo(5), 1);
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'warning',
+      value: { failingCount: 1, maxConsecutiveFailures: 1 },
+    });
+
+    testDb.raw.prepare('UPDATE rt_delivery_dispatches SET attempts = 3 WHERE id = ?').run('dsp-1');
+    expect(await externalIntegrations(testDb.db, NEXT_SLOT)).toMatchObject({
+      status: 'danger',
+      value: { maxConsecutiveFailures: 3 },
+    });
+  });
+
+  it('同じサービスの連打は1件にまとめ、別サービスは別の件数で数える', async () => {
+    seedDispatch('dsp-1', 'demaecan', 'failed', minutesAgo(5));
+    seedDispatch('dsp-2', 'demaecan', 'failed', minutesAgo(4));
+    seedDispatch('dsp-3', 'demaecan', 'failed', minutesAgo(3));
+    expect(await externalIntegrations()).toMatchObject({ value: { failingCount: 1 } });
+
+    seedDispatch('dsp-4', 'rocketnow', 'failed', minutesAgo(2));
+    expect(await externalIntegrations(testDb.db, NEXT_SLOT)).toMatchObject({ value: { failingCount: 2 } });
+  });
+
+  it('受信を処理できなかった通知も同じ確認で見える', async () => {
+    seedEvent('evt-1', 'demaecan', 'failed', minutesAgo(10));
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'warning',
+      value: { failingCount: 1 },
+    });
+  });
+
+  it('受信の繰り返し失敗が3回に達したら異常にする', async () => {
+    seedEvent('evt-1', 'demaecan', 'retryable_failed', minutesAgo(10), 3);
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'danger',
+      value: { maxConsecutiveFailures: 3 },
+    });
+  });
+
+  it('処理できた通知と成功した送信は失敗に数えない', async () => {
+    seedEvent('evt-1', 'demaecan', 'processed', minutesAgo(10), 2);
+    seedEvent('evt-2', 'demaecan', 'ignored', minutesAgo(9), 2);
+    seedDispatch('dsp-1', 'demaecan', 'succeeded', minutesAgo(5), 2);
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'normal',
+      value: { failingCount: 0, maxConsecutiveFailures: 0 },
+    });
+  });
+
+  it('1時間より前の失敗は数えない。直った後も注意が残り続けないようにする', async () => {
+    seedDispatch('dsp-old', 'demaecan', 'exhausted', minutesAgo(61));
+    seedEvent('evt-old', 'demaecan', 'failed', minutesAgo(90), 5);
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'normal',
+      value: { failingCount: 0, maxConsecutiveFailures: 0 },
+    });
+  });
+
+  it('別のアカウントの失敗は混ぜない', async () => {
+    seedDispatch('dsp-other', 'demaecan', 'exhausted', minutesAgo(5), 1, 'account-9');
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'normal',
+      value: { failingCount: 0 },
+    });
+  });
+
+  it('デリバリーの台帳が読めない配備でも外部連携の確認ごと落とさない', async () => {
+    // 移行前の配備では rt_delivery_* が無い。その問い合わせだけ失敗させる。
+    const withoutDeliveryLedger = new Proxy(testDb.db, {
+      get(target, property) {
+        if (property === 'prepare') {
+          return (sql: string) => {
+            if (/rt_delivery_/.test(sql)) throw new Error('no such table: rt_delivery_dispatches');
+            return (target.prepare as (sql: string) => unknown)(sql);
+          };
+        }
+        return Reflect.get(target, property);
+      },
+    }) as D1Database;
+    // Webhook 側の連続失敗は、デリバリーの台帳が無くても今までどおり見えること。
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks
+         (id, line_account_id, name, url, event_types, is_active, consecutive_failures, created_at, updated_at)
+       VALUES ('owh-1', 'account-1', '連携先', 'https://example.test/hook', '["friend_add"]', 1, 4,
+               '2026-09-15T00:00:00.000Z', '2026-09-15T00:00:00.000Z')`,
+    ).run();
+    expect(await externalIntegrations(withoutDeliveryLedger)).toMatchObject({
+      status: 'danger',
+      value: { failingCount: 1, maxConsecutiveFailures: 4 },
+    });
+  });
+});

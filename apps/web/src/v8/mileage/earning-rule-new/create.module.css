@@ -37,29 +37,6 @@
 }
 
 /* 段のカード。 */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-cn-card-gap);
-  padding: var(--tpl-cn-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-.cardHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-compact-gap);
-}
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-cn-card-title-size);
-  font-weight: 700;
-  line-height: var(--tpl-cn-card-title-lh);
-}
 .cardNote {
   margin: 0;
   color: var(--color-ink-secondary);
@@ -150,16 +127,6 @@
   gap: var(--tpl-cn-card-gap);
   width: 100%;
 }
-.sideCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-cn-field-gap);
-  padding: var(--tpl-cn-panel-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  box-shadow: var(--card-shadow);
-}
 .sideHead {
   display: flex;
   align-items: center;
@@ -178,22 +145,6 @@
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-cn-sub-lh);
-}
-.trialButton {
-  flex-shrink: 0;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-action);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-cn-sub-lh);
-  cursor: pointer;
-}
-.trialButton:disabled {
-  color: var(--color-ink-faint);
-  cursor: default;
 }
 .trialRows {
   display: flex;

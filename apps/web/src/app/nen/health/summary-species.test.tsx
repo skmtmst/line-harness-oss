@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/api', () => ({ fetchApi: vi.fn() }))
 
 import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
-import { SummarySheet } from './summary-drawer'
+import { SummarySheet } from '@/v8/nen-health/summary'
 
 afterEach(cleanup)
 

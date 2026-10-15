@@ -17,12 +17,12 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+:global(:root) .table .headRow[data-table-layout='columns'] {
   gap: var(--tpl-wb-col-gap);
   height: var(--tpl-wb-head-h);
   padding: var(--tpl-wb-head-pad);
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+:global(:root) .table .row[data-table-layout='columns'] {
   gap: var(--tpl-wb-col-gap);
   height: var(--tpl-wb-row-h);
   padding: var(--tpl-wb-row-pad);
@@ -30,23 +30,23 @@
   box-shadow: var(--shadow-row-line);
   cursor: pointer;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+:global(:root) .table .headRow[data-table-layout='columns'] > th,
+:global(:root) .table .row[data-table-layout='columns'] > td {
   height: auto;
   padding: 0;
   border: 0;
   box-shadow: none;
   line-height: normal;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colCount,
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colView,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colCount,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colView {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colCount,
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colView,
+:global(:root) .table .row[data-table-layout='columns'] > td.colCount,
+:global(:root) .table .row[data-table-layout='columns'] > td.colView {
   padding-right: var(--tpl-wb-num-pad-end);
   text-align: right;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colName,
+:global(:root) .table .row[data-table-layout='columns'] > td.colName {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -176,8 +176,6 @@
 
 
 /* 道具の段の右：並び・よく使う絞り込み（左に印）。 */
-.sortBox { width: var(--tpl-wb-sort-w); }
-.sortBox :global(*) { max-width: 100%; }
 .savedBox { position: relative; width: var(--tpl-wb-saved-w); }
 .savedBox :global(*) { max-width: 100%; }
 .savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 9); }

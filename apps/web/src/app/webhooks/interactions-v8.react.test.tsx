@@ -110,6 +110,10 @@ test('v8 では Uv9AA の記録（帯・札・表）が出る', async () => {
   // 数の帯：同じ集計から出す（送った 1,734回・すべて 2,146回）。
   expect(board?.textContent).toContain('1,734')
   expect(board?.textContent).toContain('2,146')
+  const details = [...(board?.querySelectorAll('[title]') ?? [])].map(node => node.getAttribute('title'))
+  expect(details.some(title => title?.includes('この30日で 99.9%成功。平均 0.4 秒'))).toBe(true)
+  expect(details.some(title => title?.includes('この30日でいちばん遅くて 1.2秒'))).toBe(true)
+  expect(details.some(title => title?.includes('うち2件はここから送り直せます'))).toBe(true)
   // 表の行：返事の札・かかった時間・操作。
   expect(board?.textContent).toContain('500 エラー')
   expect(board?.textContent).toContain('中身を見る')
@@ -122,10 +126,10 @@ test('v8 で失敗したものをまとめてやり直すボタンが出る', as
   expect(board?.textContent).toContain('失敗したものをまとめてやり直す')
 })
 
-test('v7 では従来の記録タブが出て Uv9AA は出ない', async () => {
+test('旧テーマ属性でも現役の記録タブが出て Uv9AA が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="Uv9AA"]')).toBeNull()
-  expect(host.querySelector('[data-design-node="KNG00"]')).not.toBeNull()
+  expect(host.querySelector('[data-design-node="Uv9AA"]')).not.toBeNull()
+  expect(host.querySelector('[data-design-node="KNG00"]')).toBeNull()
 })
 
 /*

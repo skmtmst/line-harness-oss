@@ -1,17 +1,15 @@
 # マイル（V8）の動き
 
 入口：
-- `app/mileage/page.tsx`：V8 のときだけ `src/v8/mileage/mileage.tsx`（それ以外は今の v7 の画面）。
+- `app/mileage/page.tsx`：`src/v8/mileage/mileage.tsx` へ固定（旧画面の分岐は削除）。
 - `app/mileage/rewards/edit/page.tsx`：`src/v8/mileage/reward-edit.tsx`（この入口はもとから V8 の画面だけを出している）。
-- `app/mileage/friends/detail/page.tsx`：V8 のときだけ `src/v8/mileage/friend-detail.tsx`。
+- `app/mileage/friends/detail/page.tsx`：`src/v8/mileage/friend-detail.tsx` へ固定。
 
 絵：たまる決めごと `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`・使い道 `S35pO`・友だちの残高 `CJlf4`・履歴 `oRbJi`・
 行動スコア `IRPw8`・点数を手で直す `Nv7An`・点数の変化の明細 `R8NNi`・使い道を作る `L2Bzp`・友だちのマイル詳細 `R6kIG`・
 状態の見本帳 `zaqP9`（見本帳なので画面としては測らない）。
 
-写し元（古い V8 の器。消していない）：`app/mileage/mileage-v8.tsx`・`v8-*-tab.tsx`・`rewards/edit/v8-reward-edit.tsx`・
-`friends/detail/v8-friend-detail.tsx`・`v8-mileage-adjust-dialog.tsx`。表示の言い換えは `display.ts`、使い道の入力の確かめは
-`reward-form.ts` に写した（src/v8 は `@/app` を import できない）。
+写し元の旧一覧・各タブ・使い道編集・友だち詳細・調整窓は削除済み。表示の言い換えは `display.ts`、使い道の入力の確かめは `reward-form.ts` を使う。旧V7の使い道も削除済み。履歴・スコアは残りの区切りで消す。
 
 ## 受け付ける URL と指定（今と同じ）
 - `/mileage`：たまる決めごと。`?tab=rewards|balances|history|score` で各タブ。知らない値はたまる決めごと。
@@ -56,6 +54,7 @@
 - この頁の行動スコアの CSV はページ送りの段。
 
 ## 使い道を作る（reward-edit.tsx）
+- 作成・編集・交換テストはWorkerの変更権限と同じくowner/adminだけ。確認前・担当者・閲覧のみは共通の閲覧のみ帯と一覧へ戻るを出し、変更APIを呼ばない。
 - 呼ぶ口・確かめ・保存・公開・交換テスト・離れる前の確かめは今と同じ。
 - 入力の誤りは欄の赤い枠と直下の理由で知らせ、最初の誤りへ移る。畳まれた欄も先に開く。上の帯は通信・保存等の失敗だけに使う。
 - 絵に無い欄（説明・交換したときの案内・交換後に使える日数・種類ごとの説明）は最後の「そのほか（任意）」の段。欄の説明は「？」へ。

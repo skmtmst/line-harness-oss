@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 増減の札（Pencil ★V8 `C6DGX`・`OEQxt`・`r9qfM2`）。
@@ -13,29 +13,11 @@
   align-items: center;
   gap: 3px;
   padding: 2px 8px;
-  border-radius: var(--radius-mini);
-  font-size: var(--text-caption);
   font-weight: 600;
-  line-height: var(--text-lh, 1.4);
   white-space: nowrap;
 }
 
-.up {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.down {
-  background: var(--color-status-danger-soft);
-  color: var(--color-danger);
-}
-
-.attention {
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-}
-
-[data-theme='v8'] .root {
+:root .root {
   flex-shrink: 0;
   justify-content: flex-start;
   border-radius: var(--polish-radius-small);
@@ -44,10 +26,10 @@
   font-size: 12px;
   line-height: 18px;
 }
-[data-theme='v8'] .attentionIcon { display: none; }
-[data-theme='v8'] .up { background: var(--color-success-bg); color: var(--color-success); }
-[data-theme='v8'] .down { background: var(--color-status-danger-soft); color: var(--color-danger); }
-[data-theme='v8'] .attention { background: var(--color-status-warn-soft); color: var(--color-warning); }
-[data-theme='v8'] .root svg { flex-shrink: 0; }
+:root .attentionIcon { display: none; }
+:root .up { background: var(--color-success-bg); color: var(--color-success); }
+:root .down { background: var(--color-status-danger-soft); color: var(--color-danger); }
+:root .attention { background: var(--color-status-warn-soft); color: var(--color-warning); }
+:root .root svg { flex-shrink: 0; }
 
 }

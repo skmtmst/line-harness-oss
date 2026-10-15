@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
 import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
@@ -51,6 +50,7 @@ export default function MembersListV8({
   /** よく使う札：○○以上（上位2ランク）・ペットあり・EC未連携。 */
   const [chipTopRanks, setChipTopRanks] = useListUrlValue('chipTopRanks', false)
   const [chipPet, setChipPet] = useListUrlValue('chipPet', false)
+  const [petSelection, setPetSelection] = useListUrlValue<'with' | 'without'>('petSelection', 'with')
   const [chipUnlinked, setChipUnlinked] = useListUrlValue('chipUnlinked', false)
   const [rank, setRank] = useListUrlValue('rank', '')
   const [sort, setSort] = useListUrlValue<NenMemberSort>('sort', 'annual_desc')
@@ -67,7 +67,6 @@ export default function MembersListV8({
   const topTwoKeys = useMemo(() => sorted.slice(0, 2).map((item) => item.key), [sorted])
   /* load の依存には配列ではなく、内容で比べられる結合文字を使う（取得ループを防ぐ）。 */
   const topTwoKeyQuery = topTwoKeys.join(',')
-  const rankOrder = useMemo(() => [...rankSource].sort((a, b) => a.annualThresholdYen - b.annualThresholdYen).map((item) => item.key), [rankSource])
 
   const load = useCallback(async () => {
     const request = ++requestRef.current
@@ -78,7 +77,7 @@ export default function MembersListV8({
         rank,
         ranks: chipTopRanks && topTwoKeyQuery ? topTwoKeyQuery.split(',') : undefined,
         link: chipUnlinked ? 'unlinked' : undefined,
-        pet: chipPet ? 'with' : 'any',
+        pet: chipPet ? petSelection : 'any',
         sort,
         page,
         pageSize,
@@ -91,7 +90,7 @@ export default function MembersListV8({
       if (request !== requestRef.current) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId, query, rank, chipTopRanks, chipPet, chipUnlinked, page, pageSize, sort, topTwoKeyQuery])
+  }, [accountId, query, rank, chipTopRanks, chipPet, petSelection, chipUnlinked, page, pageSize, sort, topTwoKeyQuery])
 
   useEffect(() => {
     void load()
@@ -107,6 +106,7 @@ export default function MembersListV8({
     setQuery('')
     setChipTopRanks(false)
     setChipPet(false)
+    setPetSelection('with')
     setChipUnlinked(false)
     setRank('')
     setPage(1)
@@ -114,9 +114,7 @@ export default function MembersListV8({
 
   return (
     <div className={styles.listBody}>
-      <NoteBar tone="info" help="ランクは通年の購入額で決まり、翌年の12月末まで維持されます" helpLabel="ランクの決まり">
-        会員はネットショップで登録した人です。LINE と結びつくと、ランクやペットに合わせた配信ができます。
-      </NoteBar>
+
 
       <ListToolbarRow>
         <ListToolbarSearchSlot>
@@ -136,9 +134,10 @@ export default function MembersListV8({
         >
           {topTwoLabel}
         </FilterChip>
-        <FilterChip selected={chipPet} count={kpis?.petMembers} onChange={(next) => { setChipPet(next); setPage(1) }}>
-          ペットあり
+        <FilterChip selected={chipPet} count={petSelection === 'with' ? kpis?.petMembers : undefined} onChange={(next) => { setChipPet(next); setPage(1) }}>
+          {petSelection === 'without' && chipPet ? 'ペット未登録' : 'ペットあり'}
         </FilterChip>
+        {chipPet ? <Select aria-label="ペットの有無で絞り込む" value={petSelection} onChange={(value) => { setPetSelection(value === 'without' ? 'without' : 'with'); setPage(1) }} options={[{ value: 'with', label: 'ペット：登録あり' }, { value: 'without', label: 'ペット：未登録' }]} /> : null}
         <FilterChip selected={chipUnlinked} count={unlinkedCount} onChange={(next) => { setChipUnlinked(next); setPage(1) }}>
           EC未連携
         </FilterChip>
@@ -204,7 +203,7 @@ export default function MembersListV8({
               </div>
               <div role="rowgroup">
                 {data.items.map((member) => (
-                  <MemberRow key={member.friendId} member={member} rankOrder={rankOrder} onOpen={(href) => router.push(href)} />
+                  <MemberRow key={member.friendId} member={member} onOpen={(href) => router.push(href)} />
                 ))}
               </div>
             </GridTable>
@@ -214,9 +213,7 @@ export default function MembersListV8({
                 first={data.total === 0 ? 0 : (data.page - 1) * data.pageSize + 1}
                 last={Math.min(data.total, data.page * data.pageSize)}
               />
-              {data.total > data.pageSize ? (
-                <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} />
-              ) : null}
+              <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} />
             </ListPager>
             <p className={styles.listHint}>行の「…」から 会員の詳細・友だちを開く・ECで開く。</p>
           </>
@@ -228,19 +225,17 @@ export default function MembersListV8({
 
 function MemberRow({
   member,
-  rankOrder,
   onOpen,
 }: {
   member: NenMemberRow
-  rankOrder: string[]
   onOpen: (href: string) => void
 }) {
   const friendDetail = `/friends/detail?id=${encodeURIComponent(member.friendId)}`
   return (
     <GridRow className={styles.mRow} data-row-id={member.friendId}>
-      <GridNameCell name={
+      <GridNameCell folder={false} name={
         <span className={styles.memberName} title={`${member.name || '（名前なし）'} ／ ${member.customerId ? `EC会員 ${member.customerId}` : 'EC未連携'}`}>{member.name || '（名前なし）'}</span>}/>
-      <span role="cell"><RankChip rankKey={member.rankKey} name={member.rankName} rankOrder={rankOrder} /></span>
+      <span role="cell"><RankChip name={member.rankName} /></span>
       <span role="cell"><span className={styles.numStrong}>{yen(member.annualMilesYen)}</span></span>
       <span role="cell"><span className={styles.numSoft}>{yen(member.lifetimeMilesYen)}</span></span>
       <span role="cell"><span className={styles.numPlain}>{formatNumber(member.mileBalance)}</span></span>

@@ -16,6 +16,18 @@ const CSS = readFileSync(join(HERE, 'filter-chip.css'), 'utf8')
 const CODE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('絞り込み札 FilterChip（m13i）', () => {
+  it('条件の選択と窓の開閉を別の属性で伝える', () => {
+    const onChange = vi.fn()
+    const {container, rerender} = render(<FilterChip selected={false} onChange={onChange} aria-haspopup="dialog" aria-expanded={false}>配信日</FilterChip>)
+    const button = container.querySelector('button')!
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+    expect(button.getAttribute('aria-haspopup')).toBe('dialog')
+    fireEvent.click(button)
+    expect(onChange).toHaveBeenCalledWith(true)
+    rerender(<FilterChip selected={false} onChange={onChange} aria-haspopup="dialog" aria-expanded>配信日</FilterChip>)
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+  })
   it('押せるボタンとして描き、選んでいない時は印を出さない', () => {
     const onChange = vi.fn()
     const { container } = render(
@@ -78,22 +90,21 @@ describe('絞り込み札 FilterChip（m13i）', () => {
     expect((container.querySelector('button') as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('v8 の札は板どおり（高36・内側0/10・間5・角丸999・枠control-border＋薄い影。I3L41O）', () => {
-    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
-    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*padding:\s*0 10px/s)
-    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*gap:\s*5px/s)
-    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{\s*[^}]*border-radius:\s*999px/s)
-    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*outline:\s*1px solid var\(--color-control-border\)/s)
+  it('v8 の札は固定絵の共通寸法を使う（高36・内側0/12・間4・角丸999・枠control-border＋薄い影）', () => {
+    expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
+    expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{[^}]*padding:\s*0 var\(--polish-space-field\)/s)
+    expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{[^}]*gap:\s*calc\(var\(--tpl-toolbar-gap\) \/ 2\)/s)
+    expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{\s*[^}]*border-radius:\s*999px/s)
+    expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{[^}]*outline:\s*1px solid var\(--color-control-border\)/s)
   })
 
-  it('見た目の決まりは CSS が持つ（高さ32・濃い緑の選択・タッチ44px）', () => {
-    // 高さ32（#639 の契約と同じ錨）。
-    expect(CODE).toMatch(/\.v6-filter-chip\s*\{[^}]*height:\s*32px/s)
-    // 選んだ札は濃い緑の地に白文字（#669 の有効状態。薄緑＋濃字に戻すと赤くなる）。
+  it('現在のV8の高さ36・緑の選択を使い、タッチ44pxを保つ', () => {
+    expect(CODE).toMatch(/:root \.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
+    // 現役の選択はB-211の薄い緑の地と濃い緑の文字。aria-pressed の動きも別の試験で守る。
     expect(CODE).toMatch(
-      /\.v6-filter-chip\[aria-pressed='true'\]\s*\{[^}]*background:\s*var\(--color-accent-deep\)/s,
+      /:root \.v6-filter-chip\[aria-pressed='true'\]\s*\{[^}]*background:\s*var\(--color-selection-bg\)/s,
     )
-    expect(CODE).toMatch(/\.v6-filter-chip\[aria-pressed='true'\]\s*\{[^}]*color:\s*var\(--color-on-accent\)/s)
+    expect(CODE).toMatch(/\.v6-filter-chip\[aria-pressed='true'\]\s*\{[^}]*color:\s*var\(--color-selection-border\)/s)
     // タッチ端末は44px（#639 の契約と同じ錨）。
     expect(CODE).toMatch(
       /@media \(pointer: coarse\)\s*\{\s*\.v6-filter-chip\s*\{\s*min-height:\s*44px;/,

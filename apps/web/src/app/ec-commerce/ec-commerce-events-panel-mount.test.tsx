@@ -3,23 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-/*
- * 司令塔独立審査(Opus, 2026-09-09)の差し戻し: `ec-commerce-load-contract.test.ts`は
- * `readFileSync(page.tsx)` への文字列一致だけで、実行4ms・mountもレンダリングもない。
- * 逆変異(M3〜M7)を当てても表明された文字列はすべて残ったまま挙動だけが壊れるため、
- * gate内では検知できなかった。ここは本物のReact(react-dom/client)で
- * `EcCommercePage`(default export)をmountし、通信(fetchApi・api.ecCommerce)と
- * タブ・アカウント選択だけを差し替えて、実際の画面の文字と通信回数で挙動を見張る。
- * Next.jsのpage規約上 `page.tsx` は default export 以外を許さないため、
- * `EventsPanel` を個別にexportできない ―― default export をそのままmountする。
- *
- * - M3: boundTo() の先頭に `if (slot) return slot` を挿す → アカウント境界fenceが無効
- * - M4: loadRecords の guard直前に `currentAccountIdRef.current = accountId` を挿す
- *       → 古いクロージャ弾きが無効。再試行応答待ち中の切替でBの一覧が固まる
- * - M5: loadRecords の catch で overview まで pendingFor に戻す → 部分失敗保護が消える
- * - M6: `params.set('query', searchQuery)` を消す → 検索語がサーバへ行かない
- * - M7: `view: 'actions'` を消す → 新APIを使わなくなる(この PR の修正が丸ごと消える)
- */
+/* アカウント切替・部分失敗・検索・取得口を、本物の描画と通信で守る。 */
 
 const fixture = vi.hoisted(() => ({ accountId: 'account-a' as string | null }))
 
@@ -48,6 +32,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 
 import { ApiError, api, fetchApi } from '@/lib/api'
 import EcCommercePage from './page'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 
 const mockFetchApi = fetchApi as unknown as ReturnType<typeof vi.fn>
 const mockOverview = api.ecCommerce.overview as unknown as ReturnType<typeof vi.fn>
@@ -153,6 +138,7 @@ let overviewCalls: string[] = []
 let overviewDeferreds: Map<string, Deferred<unknown>[]> = new Map()
 
 beforeEach(() => {
+  flushListUrlState(); window.history.replaceState({}, '', '/ec-commerce'); window.dispatchEvent(new Event('popstate')); document.documentElement.dataset.theme='v8'
   vi.useFakeTimers()
   fixture.accountId = 'account-a'
   eventsCalls = []
@@ -182,7 +168,7 @@ afterEach(async () => {
   if (container) container.remove()
   root = null
   container = null
-  vi.useRealTimers()
+  flushListUrlState(); vi.useRealTimers(); delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })
 
@@ -198,7 +184,7 @@ async function drainMicrotasks(): Promise<void> {
   for (let index = 0; index < 8; index += 1) await Promise.resolve()
 }
 
-function overviewFor(accountId: string, index = 0): Deferred<unknown> {
+function overviewFor(accountId: string, index = 1): Deferred<unknown> {
   const bucket = overviewDeferreds.get(accountId)
   const item = bucket?.[index]
   if (!item) throw new Error(`${accountId} 向けの overview 呼び出しが見つかりません`)
@@ -410,7 +396,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
 
 /*
  * #635: 存在しない言葉で検索して0件になったとき、件数が減るだけでなく
- * 「条件に合う取り込みの記録はありません」と次にやること（解除）を出す。
+ * 「条件に合うものはありません」と次にやること（解除）を出す。
  * 監査5b_23: 不存在語を入れても明示の空メッセージが特定できなかった。
  */
 describe('EC取込一覧の絞り込み0件 (#635)', () => {
@@ -442,9 +428,9 @@ describe('EC取込一覧の絞り込み0件 (#635)', () => {
     })
 
     // 「0件」と分かる表示＋次の行動提案（別の言葉・絞り込み解除）。
-    expect(el.textContent).toContain('条件に合う取り込みの記録はありません')
-    expect(el.textContent).toContain('検索語や表示条件を変えてください。')
-    const clear = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '検索と絞り込みを解除')
+    expect(el.textContent).toContain('条件に合うものはありません')
+    expect(el.textContent).toContain('札や検索を外すと、すべて出ます')
+    const clear = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '条件を外す')
     expect(clear).toBeTruthy()
 
     // 解除すると検索語を外して取り直す。
@@ -465,9 +451,9 @@ describe('EC取込一覧の絞り込み0件 (#635)', () => {
  */
 describe('R599 一覧未取得の状態別件数', () => {
   function statusTabText(el: HTMLDivElement, label: string): string | null {
-    const tab = Array.from(el.querySelectorAll('[role="tab"]'))
+    const tab = Array.from(el.querySelectorAll('button[aria-pressed]'))
       .find((node) => (node.textContent ?? '').startsWith(label))
-    return tab ? tab.textContent : null
+    return tab ? tab.textContent?.replaceAll(' ', '') ?? null : null
   }
 
   function retryListButton(el: HTMLDivElement): HTMLButtonElement {
@@ -546,7 +532,7 @@ describe('R599 一覧未取得の状態別件数', () => {
     expect(statusTabText(el, '送信なし')).toBe('送信なし1')
   })
 
-  it('正常時は実数を出す', async () => {
+  it('正常時は実数と1ページの送りを出す', async () => {
     const { container: el, root: r } = mount()
     await render(el, r)
     await act(async () => { await drainMicrotasks() })
@@ -562,6 +548,9 @@ describe('R599 一覧未取得の状態別件数', () => {
 
     expect(statusTabText(el, '処理中')).toBe('処理中3')
     expect(statusTabText(el, '失敗')).toBe('失敗4')
+    expect(el.querySelector('[data-pagination]')).not.toBeNull()
+    expect(nextPageButton(el).disabled).toBe(true)
+    expect(el.querySelector('[data-pagination] button')).toHaveProperty('disabled', true)
   })
 
   it('空の一覧は「記録はありません」と実数の0を出す', async () => {
@@ -618,7 +607,11 @@ describe('取り込みの記録の器（監査A2）', () => {
       }))
       await drainMicrotasks()
     })
-    expect(el.textContent).toContain('NEN-12492')
+    expect(el.querySelector('[title="注文 NEN-12492"]')).toBeTruthy()
     expect(el.textContent).not.toContain('取り込みの記録を読み込めませんでした')
   })
 })
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/staff-role', async (importOriginal) => ({...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner'}))

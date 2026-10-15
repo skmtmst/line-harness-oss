@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const SCORE_TAB = readFileSync(join(HERE, 'action-score-tab.tsx'), 'utf8')
+const SCORE_TAB = readFileSync(join(HERE, '../../v8/mileage/score.tsx'), 'utf8')
 const FRIENDS_PAGE = readFileSync(join(HERE, '..', 'friends', 'page.tsx'), 'utf8')
 const BROADCAST_NEW = readFileSync(join(HERE, '..', 'broadcasts', 'new', 'page.tsx'), 'utf8')
 const HANDOFF = readFileSync(join(HERE, '..', '..', 'lib', 'friends-broadcast-condition.ts'), 'utf8')

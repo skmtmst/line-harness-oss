@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 段の題（Pencil ★V8 `CugIm`）。
@@ -12,7 +12,6 @@
 .root {
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 
 .title {
@@ -20,17 +19,10 @@
   /* 題は1行で「…」。全文は要素の title で読める（RESPONSIVE.md）。 */
   flex: 0 1 auto;
   min-width: 0;
-  overflow: hidden;
-  font-size: var(--tpl-section-title-size);
-  font-weight: var(--tpl-section-title-weight);
   color: var(--color-ink);
-  line-height: var(--text-lh, 1.4);
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .note {
-  font-size: var(--text-caption);
   color: var(--color-ink-faint);
 }
 
@@ -45,23 +37,22 @@
   flex-shrink: 0;
   align-items: center;
 }
-[data-theme='v8'] .title { line-height: 23px; }
-/* 当たり28pxは保持し、見える円だけ CugIm の16pxに合わせる。 */
-[data-theme='v8'] .help button > span[aria-hidden] { border: 0; border-radius: var(--polish-radius-pill); outline: 1px solid var(--color-ink-faint); outline-offset: -.5px; background: transparent; color: var(--color-ink-faint); }
+:root .title { line-height: 23px; }
+/* 補足の円と当たりは HelpTip が持つ。包みの span に二重の円を描かない。 */
 
 }
 
-[data-theme='v8'] .root[data-size="small"] .title { font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rt-label-lh); }
+:root .root[data-size="small"] .title { font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rt-label-lh); }
 
-[data-theme='v8'] .root { gap: var(--polish-space-row); }
+:root .root { gap: var(--polish-space-row); }
 
 /* B-152②：役割ごとの文字の段。 */
-[data-theme='v8'] .title, [data-theme='v8'] .root[data-size='small'] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); white-space: normal; overflow: visible; text-overflow: clip; }
-[data-theme='v8'] .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); }
+:root .title, :root .root[data-size='small'] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); white-space: normal; overflow: visible; text-overflow: clip; }
+:root .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); }
 
-[data-theme='v8'] .root[data-size="small"] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); line-height: var(--tpl-rt-label-lh); }
+:root .root[data-size="small"] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); line-height: var(--tpl-rt-label-lh); }
 @layer components { .labels{min-width:0;display:flex;flex-direction:column;gap:2px;}.description{margin:0;font-size:11px;line-height:16px;color:var(--color-ink-secondary);}}
 
-@layer components { [data-theme='v8'] .root[data-size='customer'] .title{font-size:13px;line-height:20px;} }
+@layer components { :root .root[data-size='customer'] .title{font-size:13px;line-height:20px;} }
 
-@layer components { [data-theme='v8'] .root[data-size='customer']{gap:6px;} }
+@layer components { :root .root[data-size='customer']{gap:6px;} }

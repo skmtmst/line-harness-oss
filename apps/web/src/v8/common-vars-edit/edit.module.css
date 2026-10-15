@@ -240,6 +240,6 @@
 .compareMine { background: var(--color-success-bg); }
 
 /* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
-.roBand { }
 
 .fieldError, .fieldErrorNoticePlacement { margin: 0; }
+.roBand { }

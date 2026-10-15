@@ -4,10 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const LIST = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
-const TAB = readFileSync(join(HERE, 'tags-tab-v8.tsx'), 'utf8')
-const EDITOR = readFileSync(join(HERE, 'tag-editor-v8.tsx'), 'utf8')
-const EDIT = readFileSync(join(HERE, 'edit-tag-page-v8.tsx'), 'utf8')
+const LIST = readFileSync(join(HERE, '../../v8/tags/list.tsx'), 'utf8')
+const TAB = readFileSync(join(HERE, '../../v8/tags/tags-tab.tsx'), 'utf8')
+const EDIT = readFileSync(join(HERE, '../../v8/tag-edit/edit.tsx'), 'utf8')
 
 /*
  * 状態・1152・閲覧のみ・競合の板は `data-design-node` が無いと
@@ -16,7 +15,7 @@ const EDIT = readFileSync(join(HERE, 'edit-tag-page-v8.tsx'), 'utf8')
  */
 describe('タグの残りの板ID', () => {
   it('状態の4場面に U0aKD が付く', () => {
-    // 読み込み場面は共通の骨組み（TagRowsSkeleton）に designNode で渡す。
+    // 現役の読み込み・失敗・空の状態に同じ板の印が付く。
     // 注釈の `U0aKD` を除き、札の値を4つ数える。
     const count = (TAB.match(/(?<!`)U0aKD(?!`)/g) ?? []).length
     expect(count).toBe(3)
@@ -31,7 +30,8 @@ describe('タグの残りの板ID', () => {
   it('タグの編集を見るだけの人に fkGUR の帯が出て操作が止まる', () => {
     expect(EDIT).toMatch(/(?:data-design-node|boardId)="fkGUR"/)
     expect(EDIT).toContain('閲覧のみで見ています')
-    expect(EDIT).toContain('<fieldset disabled={saving || readOnly}')
+    expect(EDIT).toContain('readOnly={readOnly}')
+    expect(EDIT).toContain('if (readOnly) return')
   })
 
   it('タグの編集の競合に xn95q の帯と比較み・読み込みが出る', () => {

@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
   /*
    * ★V7 `Xn1Mz`「一覧の上の道具の並び」。どの一覧も同じ2行。
@@ -13,13 +13,9 @@
    */
   .toolbar {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 12px;
   }
 
   .row1 {
-    display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
@@ -30,22 +26,14 @@
    * search-field 側の `.search`（min-width: 0）より詳細度を上げて
    * 320 / 240 を必ず効かせる。
    */
-  .row1 > .search {
-    width: 320px;
-    max-width: 100%;
-    min-width: 240px;
-    flex: 0 1 320px;
-  }
 
   .row2 {
-    display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
   }
 
   .filters {
-    display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
@@ -67,14 +55,6 @@
     width: 132px;
     flex: none;
     max-width: 100%;
-  }
-
-  .trailing {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
   }
 
   /*
@@ -111,7 +91,7 @@
    * Pencil の順：検索 → 絞り込み → 道具 → 右端に並び順・件数。
    * 入りきらない低優先度の道具は「…」へ畳み、帯は折り返さない。
    */
-  [data-theme='v8'] .toolbar {
+  :root .toolbar {
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
@@ -119,29 +99,29 @@
     padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
   }
 
-  [data-theme='v8'] .row1,
-  [data-theme='v8'] .row2,
-  [data-theme='v8'] .filters {
+  :root .row1,
+  :root .row2,
+  :root .filters {
     display: contents;
   }
 
-  [data-theme='v8'] .filters > * {
+  :root .filters > * {
     order: 2;
   }
 
-  [data-theme='v8'] .row1 > *:not(.search) {
+  :root .row1 > *:not(.search) {
     order: 3;
   }
 
-  [data-theme='v8'] .trailing {
+  :root .trailing {
     order: 4;
   }
 
-[data-theme='v8'] .toolbar { margin-bottom: 0; }
-[data-theme='v8'] .row1 > .search { width: 280px; max-width: 100%; flex: none; }
+:root .toolbar { margin-bottom: 0; }
+:root .row1 > .search { width: 280px; max-width: 100%; flex: none; }
 
-[data-theme='v8'] .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
-[data-theme='v8'] .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+:root .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
+:root .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
   /*
    * ★V8「道具の1段」（c4n9Kr）：探す欄は幅 280px・縮まない
    * （flex-shrink: 0）。中の文だけが flex:1 で伸び縮みする。
@@ -151,62 +131,50 @@
 
 }
 /* ★V8 型の道具の枠（[data-template-region=toolbar]）の中では、枠が余白を持つので部品は二重に持たない。並び・件数（trailing）は右端（c4n9Kr：右寄せ）。司令塔 2026-10-05 */
-[data-theme='v8'] :global([data-template-region='toolbar']) .toolbar { padding: 0; flex: 1; min-width: 0; }
-[data-theme='v8'] .trailing { margin-left: auto; display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
-[data-theme='v8'] .toolbar [role='group'] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+:root :global([data-template-region='toolbar']) .toolbar { padding: 0; flex: 1; min-width: 0; }
+:root .trailing { margin-left: auto; display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+:root .toolbar [role='group'] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 /* 道具の幅は文字と印から決める。親より広い選ぶ欄を残さない。 */
-[data-theme='v8'] .trailing { flex: none; flex-wrap: nowrap; }
-[data-theme='v8'] .trailing > * { width: max-content; flex: none; }
-[data-theme='v8'] .toolbar :global([data-design-node='rpot9']),
-[data-theme='v8'] .toolbar :global([data-design-node='Gfsb4']),
-[data-theme='v8'] .toolbar :global([data-design-node='niGPF']) { width: max-content; min-width: 0; max-width: 100%; }
-[data-theme='v8'] .toolbar :global(button[aria-haspopup='listbox']) { width: max-content; max-width: 100%; }
-[data-theme='v8'] .row1 > .search { flex: 0 1 var(--list-search-width, 280px); }
-[data-theme='v8'] .toolbar:has(.optional) .row1 > .search { flex: none; }
-.optional { position: relative; flex: none; width: max-content; }
-.optional > summary { display: none; }
-.optional > div { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
-.optional[data-collapsed] > summary {
-  display: flex; align-items: center; justify-content: center; list-style: none;
-  height: var(--tpl-chip-h); padding: 0 var(--tpl-toolbar-gap); cursor: pointer;
-  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
-}
-.optional > summary::-webkit-details-marker { display: none; }
-.optional > summary:focus-visible { outline: 2px solid var(--color-focus-ring); }
-.optional[data-collapsed] > div {
-  position: absolute; right: 0; top: 100%; z-index: 50;
-  padding: var(--tpl-toolbar-gap); background: var(--color-canvas);
-  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
-}
-.optional[data-collapsed]:not([open]) > div { display: none; }
-[data-theme='v8'] .row1 > .search { width: var(--list-search-width, 280px); min-width: 0; }
+:root .trailing { flex: none; flex-wrap: nowrap; }
+:root .trailing > * { width: max-content; flex: none; }
+:root .toolbar :global([data-design-node='rpot9']),
+:root .toolbar :global([data-design-node='Gfsb4']),
+:root .toolbar :global([data-design-node='niGPF']) { width: max-content; min-width: 0; max-width: 100%; }
+:root .toolbar :global(button[aria-haspopup='listbox']:not([data-icon-only])) { width: max-content; max-width: 100%; }
+:root .row1 > .search { flex: 0 1 var(--list-search-width, 280px); }
+:root .toolbar:has(.optional) .row1 > .search { flex: none; }
+.optional { display: inline-flex; flex: none; align-items: center; gap: var(--tpl-toolbar-gap); }
+.leading { display: none; }
+:root .optional { width: max-content; min-width: var(--toolbar-optional-width, max-content); }
+.optional > [data-toolbar-optional-content] { display: inline-flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+:root .row1 > .search { width: var(--list-search-width, 280px); min-width: 0; }
 /*
  * ★V8「道具の2段」（acRIl 予約管理）：1段目＝探す・担当・経路・CSV、
  * 2段目＝札。段の間 10・段の中の間 6。v7 の2段組みは変えない。
  * layout="stacked" のときだけ段を残し、それ以外は1本の帯。
  */
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row1,
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .filters { display: contents; }
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .filters > *,
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row1 > *,
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .trailing { order: 0; }
+:root .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
+:root .toolbar[data-toolbar-layout='stacked'] .row1,
+:root .toolbar[data-toolbar-layout='stacked'] .row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+:root .toolbar[data-toolbar-layout='stacked'] .filters { display: contents; }
+:root .toolbar[data-toolbar-layout='stacked'] .filters > *,
+:root .toolbar[data-toolbar-layout='stacked'] .row1 > *,
+:root .toolbar[data-toolbar-layout='stacked'] .trailing { order: 0; }
 /* 畳む道具がない一覧では、実際の空き幅に合わせて折り返す。
  * フォルダ列がある1440幅でも、検索・並び順・件数を切らない。 */
-[data-theme='v8'] .toolbar:not(:has(.optional)) { flex-wrap: wrap; }
+:root .toolbar:not(:has(.optional)) { flex-wrap: wrap; }
 
 
 /* B-178：通常は1段。狭い板は検索を縮め、その次に右の道具を折り返す。 */
-[data-theme='v8'] :global([data-list-skeleton]) .toolbar {
+:root :global([data-list-skeleton]) .toolbar {
   flex-wrap: wrap; min-width: 0;
 }
-[data-theme='v8'] :global([data-list-skeleton]) .row1 > .search {
-  width: var(--tpl-list-search-w);
-  flex: 0 1 var(--tpl-list-search-w);
+:root :global([data-list-skeleton]) .row1 > .search {
+  width: var(--list-search-width, var(--tpl-list-search-w));
+  flex: 0 1 var(--list-search-width, var(--tpl-list-search-w));
   min-width: min(var(--tpl-list-search-min), 100%);
 }
-[data-theme='v8'] :global([data-list-skeleton]) .search > * { width: 100%; min-width: 0; }
+:root :global([data-list-skeleton]) .search > * { width: 100%; min-width: 0; }
 .secondary {
   display: flex; flex: 1 0 100%; order: 5; min-width: 0;
   flex-wrap: wrap; align-items: center; gap: var(--tpl-list-gap);
@@ -215,17 +183,114 @@
 /* B-178：独自の段組みを持っていた一覧の移行用。中身とイベントだけ渡す。 */
 .slots { display: flex; flex: 1 0 100%; width: 100%; flex-direction: column; min-width: 0; gap: var(--tpl-list-gap); }
 .slotsRow { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; gap: var(--tpl-list-gap); }
-.searchSlot { flex: 0 1 var(--tpl-list-search-w); min-width: min(var(--tpl-list-search-min), 100%); max-width: 100%; }
+.searchSlot { flex: 0 1 var(--list-search-width, var(--tpl-list-search-w)); min-width: min(var(--list-search-width, var(--tpl-list-search-min)), 100%); max-width: 100%; }
 .searchSlot > * { width: 100%; min-width: 0; }
 .slotsEnd { display: flex; flex-wrap: wrap; align-items: center; margin-left: auto; min-width: 0; gap: var(--tpl-list-gap); }
+html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-width: max-content; max-width: none; flex: none; }
 
-.filterChoices, .filterWide { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+.filterChoices, .filterWide { display: flex; flex: none; align-items: center; gap: var(--space-8); min-width: 0; }
 .filterNarrow { display: none; }
-@container v8-page (max-width: 1100px) { .filterWide { display: none; } .filterNarrow { display: flex; } }
 
-/* B-191/205：白い板ではなく、道具に実際に残った幅で札を畳む。 */
+
+/* B-191/205：札とほかの道具が入りきらない時だけ、共通の実寸判定で畳む。 */
 .toolbar, .slots { container-type: inline-size; container-name: v8-list-toolbar; }
-@container v8-list-toolbar (max-width: 1100px) { .filterWide { display: none; } .filterNarrow { display: flex; } }
+.filterChoices[data-filter-collapsed] .filterWide { display: none; }
+.filterChoices[data-filter-collapsed] .filterNarrow { display: flex; }
 .slots { flex-direction: row; flex-wrap: wrap; align-items: center; }
 .slots > .slotsRow { display: contents; }
+.slots[data-toolbar-layout='slots-stacked'] { flex-direction: column; align-items: stretch; }
+.slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: flex; }
+.slots[data-toolbar-layout='slots-stacked'] > .slotsRow:has(.slotsEnd) { flex-wrap: nowrap; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
+
+.slotTool { display: contents; }
+.rowBreak { display: none; }
+.slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
+
+/* B-244：白い板が狭い時、役目で必ず2段。件数は2段目の右端。 */
+@container v8-page (max-width: 1099px) {
+  :root .toolbar:is([data-toolbar-layout='band'], [data-toolbar-layout='stacked']) {
+    display: flex; flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: var(--tpl-toolbar-gap);
+  }
+  :root .toolbar .row1,
+  :root .toolbar .row2 { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tpl-toolbar-gap); min-width: 0; }
+  :root .toolbar .row1 > *,
+  :root .toolbar .filters > *,
+  :root .toolbar .trailing { order: 0; }
+  :root .toolbar .filters { display: flex; flex: 1 1 0; min-width: 0; }
+  :root .toolbar .row2 .trailing { margin-left: auto; }
+  :root .toolbar .leading { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); }
+  :root .toolbar .row1 > .search { flex: 1 1 var(--tpl-list-search-min); min-width: 0; }
+  :root .slots > .slotsRow { display: contents; }
+  :root .slots .leading,
+  :root .slotsRow > .leading { display: inline-flex; gap: var(--tpl-toolbar-gap); order: 0; }
+  :root .rowBreak { display: block; flex-basis: 100%; height: 0; order: 1; }
+  :root .slotTool { display: flex; align-items: center; align-self: flex-start; min-width: 0; order: 2; }
+  :root .slotTool[data-toolbar-role='search'] { order: 0; flex: 1 1 var(--tpl-list-search-min); }
+  :root .slotTool[data-toolbar-role='sort'] { order: 3; margin-left: auto; align-self: flex-start; }
+  :root .slotTool[data-toolbar-role='count'] { order: 4; margin-left: auto; align-self: flex-start; }
+  :root .slotsEnd { margin-left: auto; }
+}
+
+/* B-244：保存した条件などの道具は、狭い板の2段目へ。広い板の順は保つ。 */
+.actions { display: contents; }
+:root .actions > * { order: 3; }
+@container v8-page (max-width: 1099px) {
+  :root .actions > * { order: 0; }
+}
+/* A notice and the search controls form two sections. Preserve the section gap
+   even when the old screen supplied an extra wrapper around the notice. */
+html:root :global([data-template-region='toolbar']):has(> div > :is([data-design-part='notice'], [role='status'], [role='alert'])):has(> .slots > .toolbar) {
+  row-gap: var(--polish-space-card);
+}
+
+/* B-191: reserve the measured placeholder, then wrap the other list tools. */
+html:root :is(.toolbar, .slots) [data-toolbar-tools] :is(.search, .searchSlot)[data-toolbar-search] {
+  min-width: min(var(--list-search-content-min, var(--tpl-list-search-min)), 100%);
+  flex-basis: max(var(--list-search-width, var(--tpl-list-search-w)), var(--list-search-content-min, 0px));
+  flex-shrink: 1;
+}
+
+html:root :is(.slots, .toolbar)[data-toolbar-fit='single']:is([data-toolbar-layout='slots'], [data-toolbar-layout='band']):not(:has([data-design-part='notice'], [data-toolbar-secondary])) { flex-wrap: nowrap; }
+html:root :is(.slots, .toolbar)[data-toolbar-fit='wrap']:is([data-toolbar-layout='slots'], [data-toolbar-layout='band']) { flex-wrap: wrap; }
+html:root :is(.slots, .toolbar) [data-toolbar-row][data-toolbar-fit='wrap'] { flex-wrap: wrap; }
+html:root :is(.slots, .toolbar) [data-toolbar-row][data-toolbar-fit='single'] { flex-wrap: nowrap; }
+:root .slots > :is([data-design-part='notice'], div:has(> [data-design-part='notice'])) { flex: 1 0 100%; }
+
+/* A readable Select also owns its old sort/page-size wrapper's width. */
+html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) {
+  width: max-content; min-width: max-content; max-width: none; flex: none;
+}
+/* Narrow list frames own the two rows, including a formerly stacked caller. */
+@container v8-page (max-width: 1099px) {
+  html:root .slots[data-toolbar-layout='slots-stacked'] { flex-direction: row; flex-wrap: wrap; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: contents; }
+  html:root .slots:has([data-toolbar-role='search']) > .rowBreak { display: none; }
+  html:root .slots .slotTool[data-toolbar-role='search'] { flex-basis: calc(100% - var(--toolbar-leading-width, 0px) - var(--tpl-toolbar-gap)); }
+  html:root .leading { flex: none; flex-wrap: nowrap; }
+  html:root .leading > :is(button, a),
+  html:root .leading :global(.v8-folder-create) { width: max-content; flex: none; }
+}
+/* A named overflow group preserves the original controls and handlers. */
+.optional > summary { display: none; }
+.optional[data-toolbar-overflow-group]:not([data-collapsed]) { flex: 1; }
+.optional[data-toolbar-overflow-group]:not([data-collapsed]) > [data-toolbar-optional-content] { width: 100%; }
+.optional[data-collapsed] { position: relative; min-width: 0; }
+.optional[data-collapsed] > summary {
+  display: inline-flex; align-items: center; height: var(--tpl-chip-h); padding: 0 var(--tpl-toolbar-gap);
+  border: 1px solid var(--color-hairline); border-radius: var(--radius-control); cursor: pointer;
+  gap: var(--tpl-toolbar-gap); font: inherit; font-size: var(--polish-text-body); line-height: var(--tpl-chip-label-lh); font-weight: 500; white-space: nowrap; box-shadow: var(--control-shadow);
+}
+.optional > summary::-webkit-details-marker { display: none; }
+.optional > summary:focus-visible { outline: 2px solid var(--color-focus-ring); }
+.optional[data-collapsed] > [data-toolbar-optional-content] {
+  position: absolute; top: 100%; left: 0; z-index: 50; width: max-content;
+  padding: var(--tpl-toolbar-gap); background: var(--color-canvas);
+  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
+}
+.optional[data-collapsed]:not([open]) > [data-toolbar-optional-content] { display: none; }
+
+/* A list without folder choices keeps its create action in the shared tools at
+   every width; it never reserves an empty rail or a one-option select. */
+html:root .leading[data-toolbar-persistent] { display: inline-flex; align-items: center; gap: var(--tpl-toolbar-gap); flex: none; flex-wrap: nowrap; }
+html:root .leading > :is(button, a) { width: max-content; flex: none; }

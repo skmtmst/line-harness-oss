@@ -115,7 +115,7 @@ import {
   FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_DETAIL_PUBLISHED, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_TAGS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_DETAIL_STOPPED, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   ACCOUNT_HEALTH_LOGS,
-  CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
+  CONVERSION_POINTS, CONVERSION_FOLDERS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
   CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY, OPERATION_ALERTS,
@@ -328,7 +328,7 @@ const HQ_TEMPLATE_ACCOUNTS_HTN = [
   { id: 'visual-qa-account-prod', name: '然 -NEN- 本店' },
   { id: 'visual-qa-account-store', name: '然 -NEN- 渋谷店' },
   { id: 'visual-qa-account-event-2025', name: '2025年イベント' },
-  { id: 'visual-qa-account', name: '然 -NEN- TEST' },
+  { id: 'visual-qa-account', name: '然-NEN-TEST' },
 ]
 function hqTemplateDefinitionHtn(row) {
   /* 統括のリッチメニュー（作る①〜④ gobhu・egdGx・K0gu1・gQabc）：大きい・6面（予約する・お知らせ・クーポン・会員証・よくある質問・お問い合わせ）。 */
@@ -512,19 +512,19 @@ const OPS_TENANTS = [
 const OPS_TENANT_SUMMARY = { active: 3, trialing: 1, suspended: 1, pastDue: 1 }
 const OPS_AUDIT = [
   {
-    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '河野',
     tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
     action: 'impersonation.start', reason: '問い合わせの確認', detail: null,
     ip: null, visible_to_tenant: 1, created_at: '2026-10-01T15:20:00+09:00',
   },
   {
-    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '河野',
     tenant_id: 'visual-tenant-3', tenant_name: 'サンプル商店',
     action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"active","to":"suspended"}',
     ip: null, visible_to_tenant: 1, created_at: '2026-09-30T09:12:00+09:00',
   },
   {
-    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '見本 次郎',
+    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '河野',
     tenant_id: 'visual-tenant-2', tenant_name: '見本物産',
     action: 'impersonation.write', reason: '初期設定の代行（本人の依頼）', detail: null,
     ip: null, visible_to_tenant: 1, created_at: '2026-09-28T18:40:00+09:00',
@@ -556,7 +556,7 @@ const OPS_MEMBERS = [
     lastLoginAt: '2026-10-01T22:40:00+09:00', createdAt: '2026-05-01T10:00:00+09:00',
   },
   {
-    staffId: 'visual-ops-invited', name: '見本 花子', email: null, isActive: true,
+    staffId: 'visual-ops-invited', name: '山田 花子', email: null, isActive: true,
     totpEnabled: false, lineLinked: false, inviteStatus: 'sent', activationState: 'invited',
     invitedAt: '2026-09-06T10:00:00+09:00', approvedBy: '検証 太郎',
     lastLoginAt: null, createdAt: '2026-09-06T10:00:00+09:00',
@@ -929,9 +929,9 @@ const FRIEND_ADD_RULE_OPTIONS = {
   ],
   tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }, { id: 'tag-member', name: 'NEN会員' }],
   folders: [
-    { id: 'friend-add-folder-store', name: '店頭' },
-    { id: 'friend-add-folder-ads', name: '広告' },
-    { id: 'friend-add-folder-referral', name: '紹介' },
+    { id: 'friend-add-folder-store', name: '店頭', color: '#2563EB' },
+    { id: 'friend-add-folder-ads', name: '広告', color: '#16A34A' },
+    { id: 'friend-add-folder-referral', name: '紹介', color: '#D97706' },
   ],
 }
 
@@ -1185,7 +1185,7 @@ const SUPPORT_INBOX_ITEMS = [
     id: 'inbox-1',
     channel: 'line',
     customerName: 'Kyohei Yamamoto',
-    preview: '🚕💐',
+    preview: '🚚💐',
     // 「6日前」と出したい。撮るときの時計は `VISUAL_QA_NOW` で止めてある。
     lastIncomingAt: '2026-08-13T12:00:00.000Z',
   },
@@ -1286,7 +1286,7 @@ const FEATURES = {
   friend_add_routing: true, multi_store_hierarchy: false,
   friend_fields: true, support_marks: true, saved_searches: true,
   media: true, common_vars: true, analytics: true, site_tracking: true,
-  webinars: false, events: true, booking: true, visit_stamps: true, affiliates: false, mileage: true,
+  webinars: true, events: true, booking: true, visit_stamps: true, affiliates: false, mileage: true,
   ec_commerce: true, line_notifications: true, nen_campaigns: true,
   restaurant_test: true,
 }
@@ -2134,7 +2134,7 @@ const SHAPES = {
   // 設定の画面（★V8 設定の中のメニュー・プール管理 u3iab3）は「プール管理」が見える統括で描かれている。
   // 機能設定の既定（multi_store_hierarchy は既定オフ）はそのまま、表示の出し分けだけオンで返す。
   '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true } },
-  '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
+  '/api/inbox/unanswered/count': { total: 5, byAccount: [{ accountId: 'visual-qa-account', accountName: '然-NEN-TEST', count: 5 }], oldestWaitMinutes: 9110 },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
   /*
@@ -2768,6 +2768,33 @@ const HQ_RUN_SENT = {
   ],
 }
 
+/* 作成③の撮影状態。既存APIから5つの吹き出しを戻す。未選択の素材は下書きのまま。 */
+const VISUAL_COMPOSE_BUBBLES = [
+  { id: 'visual-text', type: 'text', content: { text: '{{name}}さん、いつもありがとうございます。\n定期便のお客さま限定で、秋の新商品を先行でご案内します🍂' } },
+  { id: 'visual-sticker', type: 'sticker', content: { state: {
+    location: { title: '', address: '', latitude: '', longitude: '' },
+    video: { originalContentUrl: '', previewImageUrl: '' },
+    audio: { originalContentUrl: '', duration: '' },
+    sticker: { packageId: '11537', stickerId: '52002734' },
+  } } },
+  { id: 'visual-carousel', type: 'carousel', content: { templateName: '秋の新商品 3種', inline: true,
+    columnsJson: JSON.stringify(['秋の新商品', '定期便', 'お試しセット'].map((title, index) => ({
+      title, text: '秋のおすすめ商品をご案内します',
+      actions: [{ type: 'uri', label: index === 1 ? '申し込む' : '商品を見る', uri: `https://example.com/products/autumn-${index + 1}` }],
+    }))),
+  } },
+  { id: 'visual-audio', type: 'audio', content: { fileName: '秋のごあいさつ.m4a', state: {
+    location: { title: '', address: '', latitude: '', longitude: '' },
+    video: { originalContentUrl: '', previewImageUrl: '' },
+    audio: { originalContentUrl: 'https://example.com/autumn-greeting.m4a', duration: '42' },
+    sticker: { packageId: '', stickerId: '' },
+  } } },
+  { id: 'visual-rich', type: 'rich_message', content: {} },
+]
+const HQ_VISUAL_COMPOSE_DRAFT = { ...HQ_RUN_DRAFT, id: 'hq-visual-compose', input: { ...HQ_RUN_INPUT, messageBubblesJson: JSON.stringify(VISUAL_COMPOSE_BUBBLES) } }
+const HQ_VISUAL_SENT = { ...HQ_RUN_SENT, id: 'hq-visual-sent', title: '新商品発売のお知らせ', status: 'sent' }
+const VISUAL_COMPOSE_DRAFT = { ...BROADCASTS[1], id: 'visual-compose', targetType: 'all', messageBubbles: VISUAL_COMPOSE_BUBBLES }
+
 const HQ_BROADCAST_FOLDERS = [
   { id: 'hqbf-reserve', name: '予約配信', revision: 1, item_count: 0 },
   { id: 'hqbf-campaign', name: 'キャンペーン', revision: 1, item_count: 1 },
@@ -2850,7 +2877,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/approval$/.test(pathname)) return { success: true, data: HQ_APPROVAL_NONE }
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/activity$/.test(pathname)) return { success: true, data: { rows: [{ id: 'act-2', accountId: '', actorId: 'stf-1', action: 'scheduled', createdAt: '2026-01-14T09:00:00.000Z' }, { id: 'act-1', accountId: '', actorId: 'stf-1', action: 'target_fixed', createdAt: '2026-01-14T08:40:00.000Z' }], nextCursor: null } }
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/targets\/[^/]+\/recipients$/.test(pathname)) return { success: true, data: { rows: [{ friendId: 'f-1', displayName: '山田 花子', state: 'sent', attemptNo: 1, sentAt: '2026-01-15T02:00:10.000Z', claimedAt: '2026-01-15T02:00:00.000Z', errorCode: null }, { friendId: 'f-2', displayName: '佐藤 健二', state: 'sent', attemptNo: 1, sentAt: '2026-01-15T02:00:11.000Z', claimedAt: '2026-01-15T02:00:00.000Z', errorCode: null }], total: 2, nextCursor: null } }
-  if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+$/.test(pathname)) return { success: true, data: pathname.endsWith('/hq-run-sent') ? HQ_RUN_SENT : HQ_RUN_DRAFT }
+  if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+$/.test(pathname)) return { success: true, data: pathname.endsWith('/hq-visual-compose') ? HQ_VISUAL_COMPOSE_DRAFT : pathname.endsWith('/hq-visual-sent') ? HQ_VISUAL_SENT : pathname.endsWith('/hq-run-sent') ? HQ_RUN_SENT : HQ_RUN_DRAFT }
   /*
     友だちのマイル詳細（V8 R6kIG・手で増やす・減らす M8zhjL）は1人に絞って読む。
     絞ったときだけ絵の数（残高 1,240・確定待ち 120・期限が近い 200）と5行の明細を返す。
@@ -2943,6 +2970,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/snapshot') {
     return { success: true, data: RESTAURANT_SNAPSHOT }
   }
+  if (method === 'GET' && pathname === '/api/restaurant-test/store-groups') return { success: true, data: [] }
   if (method === 'GET' && pathname === '/api/restaurant-test/stores') {
     return { success: true, data: { organization: RESTAURANT_SNAPSHOT.organization, stores: RESTAURANT_SNAPSHOT.stores } }
   }
@@ -3082,6 +3110,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, store: DELIVERY_STORE, items: DELIVERY_MENU_ITEMS }
   }
 
+  if (method === 'GET' && pathname === '/api/auth/two-factor/policy') return { success: true, data: { required: true, canEdit: true, configured: true, notice: null, registered: 4, total: 6 } }
+  if (method === 'GET' && pathname === '/api/auth/two-factor/self') return { success: true, data: { staffId: 'visual-qa-owner', enabledAt: '2026-10-12T03:00:00Z', remaining: 8, total: 8, canEdit: true, configured: true, notice: null } }
   if (pathname === '/api/auth/session') {
     /*
      * 運営コンソールの外枠（`OpsShell`）は `platformAdmin` を見る。
@@ -3709,7 +3739,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 統括の名前（絵 `JKjsE` の説明・`K7HYu` の欄）。 */
   if (method === 'GET' && pathname === '/api/tenants/me') return { success: true, data: { name: '然 -NEN- 本部' } }
   if (method === 'GET' && pathname === '/api/tenants/me/company-contact') return { success: true, data: {
-    legalCompanyName: 'Shed Products株式会社', postalCode: '1500001', address: '東京都渋谷区神宮前1-2-3',
+    legalCompanyName: 'Shed Products株式会社', postalCode: '150-0001', address: '東京都渋谷区神宮前1-2-3',
     building: null, phone: '03-1234-5678', contactName: '山田 太郎', contactEmail: 'yamada@shed.example', invoiceAddressee: null, revision: 0,
   } }
   if (method === 'GET' && pathname === '/api/postal-code/search') return { success: true, data: {
@@ -3929,6 +3959,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ['email', 'メール', 'email', 'sample@example.test'],
       ['tel', '電話', 'tel', '09012345678'],
       ['address', '住所', 'textarea', '東京都新宿区1-2'],
+      // B-235：基本の8つ目。値の中身は絵へ合わせず、複数の状態を見せる。
+      ['allergy', 'アレルギー', 'checkbox', JSON.stringify(['小麦', 'えび', 'くるみ'])],
     ]
     const basics = specs.map(([fixedKey, name, type, value], index) => ({
       id: `fixed-${fixedKey}`, fixedKey, name, fieldKey: `fixed_${fixedKey}`, type, value,
@@ -4291,6 +4323,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
     // 板 `NtCE3`：未分類は `folderId: null` の5件。
     return { success: true, data: BROADCAST_FOLDERS, unfiledCount: BROADCASTS.filter((broadcast) => !broadcast.folderId).length }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'conversion') {
+    return { success: true, data: CONVERSION_FOLDERS, unfiledCount: 0 }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'scenario') {
     // 板 `axFrW`：未分類は `folderId: null` の1件（会員更新リマインド）。
@@ -4695,7 +4730,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
-    const found = BROADCASTS.find((item) => item.id === broadcastOne[1])
+    const found = broadcastOne[1] === 'visual-compose' ? VISUAL_COMPOSE_DRAFT : BROADCASTS.find((item) => item.id === broadcastOne[1])
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/broadcasts') {
@@ -5837,8 +5872,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       metadata: null, isRead, createdAt,
     })
     const items = [
-      item('nc-3', 'ec.import_failed', 'error', 'EC連携の取り込みが 3 件失敗しています', 'EC連携を開く', false, '2026-08-21T00:15:00.000Z'),
-      item('nc-2', 'account_health_webhook_delay', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, '2026-08-21T09:32:00.000Z'),
+      item('nc-3', 'ec.import_failed', 'error', 'EC連携の取り込みが 3 件失敗しています', 'EC連携を開く', false, new Date(Date.now() - 2 * 3600_000).toISOString()),
+      item('nc-2', 'account_health_webhook_delay', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, new Date(Date.now() - 3 * 3600_000).toISOString()),
       item('nc-1', 'broadcast.send_failed', 'error', '一斉配信「8月号のご案内」で 12 件が送信失敗', '配信結果を開く', false, '2026-08-20T11:05:00.000Z'),
       item('nc-4', 'visual_qa.update', 'update', 'v0.25 の更新が利用できます', '更新履歴を見る', true, '2026-08-20T00:00:00.000Z'),
       item('nc-5', 'visual_qa.update', 'update', 'v0.24.1 を適用しました', '更新履歴を見る', true, '2026-08-14T00:00:00.000Z'),
@@ -6550,6 +6585,30 @@ const server = createServer((req, res) => {
     res.setHeader('Content-Type', 'image/jpeg')
     res.setHeader('Cache-Control', 'no-store')
     res.writeHead(200).end(jpeg)
+    return
+  }
+
+  // 一覧は配信URLではなく認証付きの内容取得口を読む。同じ見本画像を返す。
+  const mediaContent = /^\/api\/media\/([^/]+)\/content$/.exec(url.pathname)
+  if (method === 'GET' && mediaContent) {
+    const item = MEDIA_ITEMS.find((row) => row.id === mediaContent[1])
+    if (item?.kind === 'image' && item.url.startsWith('data:image/svg+xml,')) {
+      const svg = decodeURIComponent(item.url.slice('data:image/svg+xml,'.length))
+      res.setHeader('Content-Type', 'image/svg+xml')
+      res.setHeader('Cache-Control', 'no-store')
+      res.writeHead(200).end(svg)
+      return
+    }
+  }
+
+  const richThumb = /^\/api\/rich-menu-images\/qa-thumb-(normal|gold|autumn|guide)$/.exec(url.pathname)
+  if (method === 'GET' && richThumb) {
+    const color = { normal: '#9bd4b1', gold: '#e8bf6b', autumn: '#f4d2be', guide: '#cbd9f1' }[richThumb[1]]
+    const compact = richThumb[1] === 'autumn'
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="44"><rect width="64" height="44" fill="${color}"/><path d="M21 0v44M43 0v44${compact ? '' : 'M0 22h64'}" stroke="white" stroke-width="2"/></svg>`
+    res.setHeader('Content-Type', 'image/svg+xml')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(svg)
     return
   }
 

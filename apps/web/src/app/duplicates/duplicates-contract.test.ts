@@ -1,11 +1,9 @@
-import { readFileSync as readOriginal } from 'node:fs'
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE_V7 = readOriginal(join(HERE, 'page.tsx'), 'utf8')
 const PAGE = [
   'page.tsx',
   'use-duplicates-data.ts',
@@ -15,30 +13,31 @@ const PAGE = [
 /**
  * #984 LAY-12/16: 重複検出の表見出しと0件の件数表示。
  *
- * 見出しは共通の TableHeadRow/Th を通す（画面ごとの直書き th は残さない）。
+ * 見出しは採用済みV8の候補と根拠の列を保つ（画面ごとの直書き th は残さない）。
  * 件数0のとき「0組中 1〜0組」と出していた回帰を防ぎ、
  * 検索で0件のときは解除の導線を必ず出す。
  */
 describe('重複検出の表見出しと0件表示（#984 LAY-12/16）', () => {
-  it('見出しは共通の TableHeadRow/Th を通す', () => {
-    expect(PAGE_V7).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
-    // ★V7: 表の中の状態行は TableStateRow に寄せる。見出しの共通化は変えない。
-    expect(PAGE_V7).toContain("import { TableStateRow } from '@/components/shared/table'")
-    expect(PAGE_V7).toContain('<TableHeadRow>')
-    // v7 の表は共通部品。v8（duplicates-v8.tsx）は板どおりの CSS 表なので対象外。
-    expect(PAGE_V7).not.toMatch(/<th\b/)
+  it('見出しは採用済みV8の候補と根拠の列を保つ', () => {
+    expect(PAGE).toContain('<thead>')
+    expect(PAGE).toContain('<th>候補</th>')
+    expect(PAGE).toContain('<th>一致した根拠</th>')
+    expect(PAGE).not.toContain('<TableHeadRow>')
   })
 
   it('候補が0件のとき「1〜0組」を出さない', () => {
     expect(PAGE).toContain('candidateTotal === 0')
-    expect(PAGE).toContain("'0組'")
+    expect(PAGE).toContain('d.candidateTotal > CANDIDATE_PAGE_SIZE')
+    expect(PAGE).toContain('`${formatNumber(d.candidateTotal)}組`')
     expect(PAGE).not.toContain('1〜0')
   })
 
   it('検索で0件のとき解除の導線を出す', () => {
-    expect(PAGE).toContain('検索条件に合う候補はありません')
-    expect(PAGE).toContain('検索条件を解除する')
-    expect(PAGE).toContain("setQuery(''); setStatus('')")
+    expect(PAGE).toContain('条件に合う候補はありません')
+    expect(PAGE).toContain('× 条件を外す')
+    expect(PAGE).toContain('onClick={d.clearFilters}')
+    expect(PAGE).toContain("setQuery('')")
+    expect(PAGE).toContain("setStatus('')")
   })
 })
 
@@ -74,7 +73,7 @@ describe('重複候補の全件到達と応答の新旧管理（#1011 FRIEND-11/
     expect(PAGE).toContain('candidatesReqRef.current')
     expect(PAGE).toContain('candidatesKeyRef.current !== key')
     // 失敗時は件数表示へ進まず、読み込み待ちを0件と誤認させない。
-    expect(PAGE.indexOf('candidateError ?')).toBeLessThan(PAGE.indexOf('candidateTotal === 0 && !candidatesLoading'))
+    expect(PAGE.indexOf('d.candidateError ?')).toBeLessThan(PAGE.indexOf("filtering ? '条件に合う候補はありません'"))
   })
 })
 
@@ -87,20 +86,21 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
     expect(PAGE).toContain('DuplicatesStatsNotice')
     expect(PAGE).toContain('statsFailure')
     // 集計が無くても（!data）候補の表へ進む。1枚の失敗は両方失敗の条件だけ。
-    expect(PAGE).toContain('!data && !candidatesLoading && candidates.length === 0 && candidateError')
-    expect(PAGE).toContain('<DuplicatesStatsNotice failure={statsFailure} onRetry={() => load()} />')
+    expect(PAGE).toContain('d.candidateError ?')
+    expect(PAGE).toContain('d.candidates.length ? d.candidates.map')
+    expect(PAGE).toContain('<DuplicatesStatsNotice failure={d.statsFailure} onRetry={() => void d.load()} />')
   })
 
   it('捕まえた失敗を残し、403を権限の案内に言い分ける', () => {
     // 集計・候補とも catch の失敗をそのまま残す（loadFailureCopy が言い分ける）。
     expect(PAGE).toContain('setStatsFailure(err)')
     expect(PAGE).toContain('setCandidateFailure(err)')
-    expect(PAGE).toContain('error={candidateFailure ?? undefined}')
+    expect(PAGE).toContain("loadFailureCopy(d.candidateFailure, '重複の候補').title")
   })
 
   it('集計が無いとき数値カードは「—」にし、内訳は出さない', () => {
-    expect(PAGE).toContain('detail="読み込めませんでした"')
+    expect(PAGE).toContain("d.statusCounts !== null ? '統合ユーザーに紐付け済みの組数です' : '読み込めませんでした'")
     // 内訳とマトリックスは集計があるときだけ。
-    expect(PAGE.indexOf('{data ? (')).toBeGreaterThan(-1)
+    expect(PAGE.indexOf('{d.data ? (')).toBeGreaterThan(-1)
   })
 })

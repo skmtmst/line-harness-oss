@@ -4,9 +4,7 @@ import { Calendar, Clock, X } from 'lucide-react'
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import DateField, { formatLabel as formatDateLabel, parseDate } from './date-field'
 import MenuPortal from './menu-portal'
-import Select from './select'
 import TimeFieldV8, { type TimeFieldSize } from './time-field-v8'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { joinDescribedBy, useFieldContext } from './field-context'
 import dateStyles from './date-field.module.css'
 import styles from './date-time-field.module.css'
@@ -67,7 +65,7 @@ export default function DateTimeField({
   /** お任せ式の検証用。見た目は変えず、読み上げにだけ必須と伝える。 */
   required?: boolean
   placeholder?: string
-  /** ★V8 の時刻の列の分のきざみ（分）。既定は 1。v7 は使わない。 */
+  /** ★V8 の時刻の列の分のきざみ（分）。既定は 1。 */
   minuteStep?: number
   id?: string
   name?: string
@@ -79,7 +77,7 @@ export default function DateTimeField({
   const field = useFieldContext()
   invalid = invalid || Boolean(field?.invalid)
   ariaDescribedBy = joinDescribedBy(ariaDescribedBy, field?.describedBy)
-  const theme = useAdminTheme()
+
   const autoId = useId()
   const fieldId = id ?? autoId
   const dialogId = `${fieldId}-datetime-dialog`
@@ -236,7 +234,7 @@ export default function DateTimeField({
               aria-label="日付"
             />
           </div>
-          {theme === 'v8' ? (
+          {(
             // ★V8：時刻の部分は時刻の欄（打つ＋2列から選ぶ・提案 YCOoR）と同じ部品。
             <div className={styles.timeV8}>
               <span className={styles.timeV8Label} id={`${fieldId}-time-label`}>時刻</span>
@@ -256,30 +254,6 @@ export default function DateTimeField({
                 }}
               />
             </div>
-          ) : (
-          <div className={styles.timeRow}>
-            <label className={styles.timeLabel}>
-              時
-              {/* size="full" で箱の内幅へ追従させる。固定176pxだと狭い画面で分欄がはみ出す（監査 R156）。 */}
-              <Select
-                size="full"
-                aria-label="時"
-                value={pad(shownTime?.hours ?? 10)}
-                onChange={(value) => chooseTime(Number(value), (shownTime?.minutes ?? 0))}
-                options={HOURS.map((hour) => ({ value: pad(hour), label: `${hour}時` }))}
-              />
-            </label>
-            <label className={styles.timeLabel}>
-              分
-              <Select
-                size="full"
-                aria-label="分"
-                value={pad(shownTime?.minutes ?? 0)}
-                onChange={(value) => chooseTime((shownTime?.hours ?? 10), Number(value))}
-                options={MINUTES.map((minute) => ({ value: pad(minute), label: `${minute}分` }))}
-              />
-            </label>
-          </div>
           )}
           <div className={styles.footer}>
             <button type="button" className={styles.closeBtn} onClick={close}>閉じる</button>
@@ -298,12 +272,12 @@ type TimeFieldProps = {
   onChange?: (value: string) => void
   /** `type="time"` と同じ秒の刻み（300 で 5分）。V8 では分の列のきざみになる。 */
   step?: number
-  /** 分のきざみ（分）。`step` より優先。V8 だけが使う（v7 は 1分のまま）。 */
+  /** 分のきざみ（分）。`step` より優先。分の刻みを決める。 */
   minuteStep?: number
-  /** ★V8 の欄の高さ。`field`＝40（日付の欄と並ぶ）、`compact`＝32（表の中の細い欄）。v7 は使わない。 */
+  /** ★V8 の欄の高さ。`field`＝40（日付の欄と並ぶ）、`compact`＝32（表の中の細い欄）。 */
   size?: TimeFieldSize
   disabled?: boolean
-  /** 閲覧のみ。V8 は値を見せて打てない・時計を出さない。v7 は押せない欄。 */
+  /** 閲覧のみ。値を見せて打てない・時計を出さない。 */
   readOnly?: boolean
   invalid?: boolean
   /** お任せ式の検証用。見た目は変えず、読み上げにだけ必須と伝える。 */
@@ -322,19 +296,11 @@ type TimeFieldProps = {
  *
  * - ★V8（`data-theme="v8"`）：数字を打てる欄＋時と分の2列から選ぶ（time-field-v8.tsx・
  *   Pencil 提案 YCOoR）。分のきざみは `minuteStep`（分）か `step`（秒）
- * - v7：今までの形（時・分の2つのプルダウン）。切り替えの1週間後に消す
  */
 export function TimeField(props: TimeFieldProps) {
-  const theme = useAdminTheme()
-  if (theme === 'v8') {
-    const { step, minuteStep, placeholder, size, ...rest } = props
-    // v7 の置き場所文（「時刻を選ぶ」）は V8 では使わない。絵の空は「-- : --」。
-    void placeholder
-    return <TimeFieldV8 {...rest} size={size} minuteStep={minuteStep ?? stepSecondsToMinutes(step)} />
-  }
-  const { readOnly, disabled, size, ...v7 } = props
-  void size
-  return <TimeFieldV7 {...v7} disabled={disabled || readOnly} />
+  const { step, minuteStep, placeholder, size, ...rest } = props
+  void placeholder
+  return <TimeFieldV8 {...rest} size={size} minuteStep={minuteStep ?? stepSecondsToMinutes(step)} />
 }
 
 /** `type="time"` の秒の刻みを分へ。分にならない刻みは 1分。 */
@@ -342,167 +308,6 @@ function stepSecondsToMinutes(step?: number): number {
   if (!step || step < 60 || step % 60 !== 0) return 1
   return step / 60
 }
-
-/**
- * v7 の時刻の選択。欄の見た目は DateField と同じ（高さ40・14px）、表示は `10:00`。
- *
- * `step` は `type="time"` との置き換えやすさのために受け付けるだけ（分の刻みを
- * 狭めない）。保存する値の形は変えない。
- */
-function TimeFieldV7({
-  value,
-  defaultValue = '',
-  onChange,
-  step,
-  disabled = false,
-  invalid = false,
-  required = false,
-  placeholder = '時刻を選ぶ',
-  id,
-  name,
-  className,
-  'aria-label': ariaLabel,
-  'aria-labelledby': ariaLabelledBy,
-  'aria-describedby': ariaDescribedBy,
-}: TimeFieldProps) {
-  void step
-  const autoId = useId()
-  const fieldId = id ?? autoId
-  const dialogId = `${fieldId}-time-dialog`
-  const [inner, setInner] = useState(defaultValue)
-  const current = value ?? inner
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-
-  const parsed = parseTime(current)
-
-  const emit = (next: string) => {
-    if (value === undefined) setInner(next)
-    onChange?.(next)
-  }
-
-  // 外側を押したときの扱いは MenuPortal に任せる（箱の中の時刻押しで閉じない）。
-
-  const openDialog = () => {
-    if (disabled) return
-    setOpen(true)
-  }
-
-  const close = () => {
-    setOpen(false)
-    triggerRef.current?.focus()
-  }
-
-  const chooseTime = (hours: number, minutes: number) => {
-    emit(`${pad(hours)}:${pad(minutes)}`)
-  }
-
-  const onRootKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape' && open) {
-      event.preventDefault()
-      close()
-    }
-  }
-
-  const shownHours = parsed ? parsed.hours : 10
-  const shownMinutes = parsed ? parsed.minutes : 0
-
-  return (
-    <div ref={rootRef} className={[dateStyles.root, className].filter(Boolean).join(' ')} onKeyDown={onRootKeyDown}>
-      {name ? <input type="hidden" name={name} value={current} /> : null}
-      <button
-        ref={triggerRef}
-        id={fieldId}
-        type="button"
-        className={dateStyles.field}
-        disabled={disabled}
-        data-invalid={invalid || undefined}
-        aria-invalid={invalid || undefined}
-        aria-required={required || undefined}
-        // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
-        title={parsed ? formatTimeLabel(parsed) : undefined}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? dialogId : undefined}
-        aria-label={ariaLabel}
-        aria-labelledby={ariaLabelledBy}
-        aria-describedby={ariaDescribedBy}
-        data-open={open || undefined}
-        onClick={() => (open ? close() : openDialog())}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowDown' && !open) {
-            event.preventDefault()
-            openDialog()
-          }
-        }}
-      >
-        <Clock aria-hidden="true" className={dateStyles.icon} />
-        <span className={parsed ? dateStyles.value : dateStyles.placeholder}>
-          {parsed ? formatTimeLabel(parsed) : placeholder}
-        </span>
-      </button>
-      {parsed && !disabled ? (
-        <button type="button" className={dateStyles.clear} aria-label="時刻を消す" onClick={() => emit('')}>
-          <X aria-hidden="true" />
-        </button>
-      ) : null}
-
-      {open ? (
-        <MenuPortal
-          open={open}
-          align="start"
-          getAnchor={() => triggerRef.current}
-          onClose={() => setOpen(false)}
-        >
-        <div
-          id={dialogId}
-          role="dialog"
-          aria-label="時刻を選ぶ"
-          className={styles.popover}
-          // 最上層では absolute 指定を無効にする（位置は器が決める）。
-          style={{ position: 'static' }}
-          // 日時の選択と同じく、箱の中の押下はここで止める（包んだ `<label>` への再送達を防ぐ）。
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className={styles.timeRow}>
-            <label className={styles.timeLabel}>
-              時
-              {/* size="full" で箱の内幅へ追従させる。固定176pxだと狭い画面で分欄がはみ出す（監査 R156）。 */}
-              <Select
-                size="full"
-                aria-label="時"
-                value={pad(shownHours)}
-                disabled={disabled}
-                onChange={(value) => chooseTime(Number(value), shownMinutes)}
-                options={HOURS.map((hour) => ({ value: pad(hour), label: `${hour}時` }))}
-              />
-            </label>
-            <label className={styles.timeLabel}>
-              分
-              <Select
-                size="full"
-                aria-label="分"
-                value={pad(shownMinutes)}
-                disabled={disabled}
-                onChange={(value) => chooseTime(shownHours, Number(value))}
-                options={MINUTES.map((minute) => ({ value: pad(minute), label: `${minute}分` }))}
-              />
-            </label>
-          </div>
-          <div className={styles.footer}>
-            <button type="button" className={styles.closeBtn} onClick={close}>閉じる</button>
-            <button type="button" className={styles.clearBtn} onClick={() => { emit(''); close() }}>消す</button>
-          </div>
-        </div>
-        </MenuPortal>
-      ) : null}
-    </div>
-  )
-}
-
-const HOURS = Array.from({ length: 24 }, (_, index) => index)
-const MINUTES = Array.from({ length: 60 }, (_, index) => index)
 
 export type ParsedDateTime = { date: Date; hours: number; minutes: number }
 

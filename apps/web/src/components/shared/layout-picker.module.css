@@ -1,8 +1,8 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* 案A（JeINq・EFV8l）：寸法は部品が持ち、呼ぶ画面から上書きしない。 */
 .list { display: flex; flex-wrap: wrap; gap: 8px; }
-.tile { width: 120px; min-height: 110px; align-items: center; padding: 40px 16px 16px; }
+.tile { width: 120px; min-height: 110px; align-items: center; }
 .tile > span:last-child { order: -1; }
 .sample { position: relative; display: block; overflow: hidden; width: 72px; height: 48px; border-radius: var(--radius-mini, 6px); background: var(--color-layout-picker-sample); }
 .list[data-preview='compact-menu'] .sample { height: 24px; }
@@ -11,3 +11,12 @@
 .area { position: absolute; display: flex; align-items: center; justify-content: center; outline: 2px solid var(--color-canvas); outline-offset: -1px; color: var(--color-ink-secondary); font-size: 11px; font-weight: 600; line-height: 16px; }
 .tile:has(input:checked) .area { color: var(--color-accent-deep); }
 }
+
+/* リッチメッセージの6面を1段に置く。右上のラジオの下へ見本を置き、重ねない（B-203/229）。 */
+html:root .list[data-preview='message'] .tile {
+  width: 104px;
+}
+
+html:root .list:is([data-preview='menu'], [data-preview='compact-menu']) { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+html:root .list:is([data-preview='menu'], [data-preview='compact-menu']) .tile { width: auto; min-width: 0; min-height: 0; padding: var(--space-8); }
+html:root .list:is([data-preview='menu'], [data-preview='compact-menu']) .sample { max-width: 100%; }

@@ -29,6 +29,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => role.value,
+  useStaffIdentity: () => null,
   canManageRole: (value: string | null | undefined) => value === 'owner' || value === 'admin',
 }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => narrow.value }))
@@ -78,7 +79,7 @@ describe('V8 タグ タグの一覧', () => {
     await render(<TagsList fixture={fixture} />)
     const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())
     // 左にフォルダの列があるので表にフォルダ列は置かない（2026-10-07 オーナー）。
-    expect(heads).toEqual(['タグ', '状態', '人数', '付け方', '連動', '使っている所', '操作'])
+    expect(heads).toEqual(['タグ', '人数', '付け方', '連動', '使っている所', '操作'])
     expect(container.querySelectorAll('tbody [data-list-name]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     for (const label of ['タグ', '友だち情報欄', '対応マーク', '保存した検索']) {
       expect(screen.getAllByRole('tab', { name: label }).length).toBeGreaterThan(0)
@@ -86,6 +87,12 @@ describe('V8 タグ タグの一覧', () => {
     expect(container.querySelector('[data-design-node="I1E7Bt"]')).not.toBeNull()
     expect(screen.getByText('EC顧客連携済み')).toBeTruthy()
     expect(container.querySelector('[data-list-name]')?.textContent).not.toContain('登録')
+  })
+
+  it('空の状態列を外しても、名前が重なったタグの注意は出す', async () => {
+    await render(<TagsList fixture={{ ...fixture, items: fixture.items.map((tag, index) => index === 0 ? { ...tag, cleanupReasons: ['duplicate_name' as const] } : tag) }} />)
+    expect(screen.getByRole('columnheader', { name: '状態' })).toBeTruthy()
+    expect(screen.getByText('名前が重なっている')).toBeTruthy()
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
@@ -144,6 +151,22 @@ describe('V8 タグ タグの一覧', () => {
     await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '保存した検索' })) })
     expect(screen.queryByRole('link', { name: '友だち一覧で条件を作る' })).toBeNull()
     expect(screen.getByPlaceholderText('条件名で探す')).toBeTruthy()
+  })
+
+  it('保存した検索の説明は題から開閉し、条件作成のリンクには検索の印を出す', async () => {
+    await render(<TagsList fixture={fixture} />)
+    await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '保存した検索' })) })
+    const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+    const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    expect(body.textContent).toContain('配信や自動処理の宛先にも使えます')
+    expect(body.hidden).toBe(false)
+    await act(async () => { fireEvent.click(toggle) })
+    expect(body.hidden).toBe(true)
+    await act(async () => { fireEvent.click(toggle) })
+    expect(body.hidden).toBe(false)
+    const create = screen.getByRole('link', { name: '友だち一覧で条件を作る' })
+    expect(create.getAttribute('href')).toBe('/friends')
+    expect(create.querySelector('svg.lucide-search')).not.toBeNull()
   })
 
   it('連動は絵の書き方（本人+10・1.2倍 他1）', () => {

@@ -8,6 +8,8 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import Link from '@/components/shared/list-navigation'
+import Card from '@/components/shared/card'
+import TextLink from '@/components/shared/text-link'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -45,9 +47,9 @@ export default function NotificationsV8() {
   const filter: DashboardNotificationFilter =
     categoryParam === 'error' || categoryParam === 'update' ? categoryParam : 'all'
   const [items, setItems] = useState<NotificationCenterItem[]>([])
-  // 未読が先・新しい順。口が作成日の新しい順で返すので、未読と既読に分けるだけ（それぞれの中は口の順のまま）。
+  // 読み込んだ範囲を未読が先・新しい順にする。追加取得後も同じ順を保つ。
   const orderedItems = useMemo(
-    () => [...items.filter((row) => !row.isRead), ...items.filter((row) => row.isRead)],
+    () => [...items].sort((a, b) => a.isRead !== b.isRead ? (a.isRead ? 1 : -1) : b.createdAt.localeCompare(a.createdAt)),
     [items],
   )
   const [counts, setCounts] = useState<NotificationCenterData['counts'] | null>(null)
@@ -216,12 +218,12 @@ export default function NotificationsV8() {
             tone="danger"
             message={error}
             action={loadError !== null && listFailure?.retryable ? (
-              <button type="button" onClick={() => void load(0, false)} className={styles.retry}>もう一度読み込む</button>
+              <Button type="button" variant="text" onClick={() => void load(0, false)}>もう一度読み込む</Button>
             ) : undefined}
           />
         ) : null}
 
-        <div className={styles.box}>
+        <Card padding="rows" surface="inset" overflow="hidden" aria-label="通知一覧">
           {listFailed ? (
             <ListState
               kind="error"
@@ -262,7 +264,7 @@ export default function NotificationsV8() {
             </ul>
           )}
           {loading ? <p className={styles.loading}>{STATE_TEXT.loading}…</p> : null}
-        </div>
+        </Card>
 
         <div className={styles.foot}>
           <p className={styles.note}>
@@ -270,7 +272,7 @@ export default function NotificationsV8() {
               ? '未読のお知らせはありません。'
               : '未読は青い点と太字。押すと既読になり、行の右から関係する画面へ移れます'}
           </p>
-          <Link href="/line-notifications?tab=operator" className={styles.settingsLink}>通知設定</Link>
+          <TextLink href="/line-notifications?tab=operator">通知設定</TextLink>
         </div>
 
         {hasMore ? (

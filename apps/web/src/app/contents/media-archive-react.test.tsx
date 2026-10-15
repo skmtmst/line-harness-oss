@@ -133,7 +133,7 @@ function buttonByLabel(label: string): HTMLButtonElement {
 }
 
 /*
- * ★V7: 編集・取得・アーカイブは札の「…」の中。開く操作と選ぶ操作は
+ * V8: 編集・取得・アーカイブは札の「…」の中。開く操作と選ぶ操作は
  * 別の act に分ける（同じ act ではメニューの装着が間に合わない）。
  */
 async function openCardMenu() {
@@ -141,13 +141,15 @@ async function openCardMenu() {
 }
 
 async function clickChip(label: string) {
+  await act(async () => { buttonByLabel('よく使う絞り込み').click(); await settle() })
   const chip = [...document.querySelectorAll<HTMLButtonElement>('button')]
-    .find((candidate) => candidate.textContent?.trim() === label)
+    .find((candidate) => candidate.textContent?.trim() === `${label}だけ`)
   if (!chip) throw new Error(`絞り込みがありません: ${label}`)
   await act(async () => { chip.click(); await settle() })
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   fixture.accountId = 'account-a'
   fixture.role = 'owner'
   fixture.listCalls.length = 0
@@ -197,7 +199,9 @@ describe('登録メディアの退避と復帰（N-201）', () => {
 
     await openCardMenu()
     await act(async () => { buttonByLabel('アーカイブ').click(); await settle() })
-    expect(document.body.textContent).toContain('理由必須（あとから履歴で確認できます）')
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(dialog.textContent).toContain('理由（あとから履歴で確認できます）')
+    expect(dialog.textContent).toContain('必須')
 
     const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('button')]
       .find((candidate) => candidate.textContent === 'アーカイブする')!

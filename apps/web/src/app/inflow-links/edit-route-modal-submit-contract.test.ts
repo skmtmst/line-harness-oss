@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const MODAL = readFileSync(join(HERE, '_components', 'edit-route-modal.tsx'), 'utf8')
+const MODAL = readFileSync(join(HERE, '../../v8/inflow-links/edit-route-dialog.tsx'), 'utf8')
 
 /** 名前で見つけた関数の本体だけを切り出す。ファイル全体を見ると素通しになる。 */
 function fnBody(src: string, decl: string): string {
@@ -27,7 +27,7 @@ describe('リファラルリンク編集窓の保存 (#1058)', () => {
     const body = fnBody(MODAL, 'const doSave = async ()')
     expect(body, '保存をtryで囲んでいない').toMatch(/try\s*\{[\s\S]*await api\.entryRoutes\./)
     expect(body, 'APIの例外を受けていない').toContain('} catch (err) {')
-    expect(body, '失敗の理由を窓に出していない').toContain('setError(describeSaveFailure(err))')
+    expect(body, '失敗の理由を窓に出していない').toContain("setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))")
     expect(body, '処理中の印を必ず戻していない').toMatch(/finally\s*\{[\s\S]*setSubmitting\(false\)/)
   })
 
@@ -47,8 +47,8 @@ describe('リファラルリンク編集窓の保存 (#1058)', () => {
     expect(body).toContain("else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 
-  it('失敗は窓の中に出る（★V7: 共通 Dialog のエラー表示へ）', () => {
-    expect(MODAL).toContain("import Dialog from '@/components/shared/dialog'")
-    expect(MODAL).toContain('error={error || undefined}')
+  it('失敗は現役の編集面の中に出る（共通のエラー表示へ）', () => {
+    expect(MODAL).toContain("import EditorSurface from '@/components/shared/editor-surface'")
+    expect(MODAL).toContain("error={error || fieldErrors['route-coupon'] || undefined}")
   })
 })

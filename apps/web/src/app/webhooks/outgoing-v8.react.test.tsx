@@ -127,7 +127,7 @@ test('v8 では ZSbFY の一覧（帯・表・動いているの札）が出る'
   expect(board?.textContent).toContain('動いている')
   // 板 `ZSbFY` 全行の操作欄に「中身を見る」「設定」。
   expect(board?.textContent).toContain('中身を見る')
-  expect(board?.textContent).toContain('設定')
+  expect(board?.querySelector('[aria-label="「顧客台帳（CRM）」の設定"]')).not.toBeNull()
 })
 
 test('v8 で失敗がある行は失敗ありの札と失敗の内訳が出る', async () => {
@@ -201,9 +201,9 @@ test('v8 の閲覧のみ（l5SRfT）は帯が出て、押せない作るボタ�
   expect(clickable.some((element) => element.textContent?.includes('中身を見る'))).toBe(true)
 })
 
-test('v7 では従来の一覧が出て ZSbFY は出ない', async () => {
+test('旧テーマ属性でも現役の一覧が出て ZSbFY が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="ZSbFY"]')).toBeNull()
+  expect(host.querySelector('[data-design-node="ZSbFY"]')).not.toBeNull()
 })
 
 test('v8 の動かす・止めるは押した瞬間に札が変わり、失敗したら戻る', async () => {
@@ -233,8 +233,11 @@ test('v8 の動かす・止めるは押した瞬間に札が変わり、失敗�
   const board = host.querySelector('[data-design-node="ZSbFY"]')!
   expect(board.textContent).toContain('動いている')
   // 「設定」を開いて「止める」を押す。口の返事を待たず札が変わる。
-  const settingButton = [...board.querySelectorAll('button')].find((button) => button.textContent?.includes('設定'))!
+  const settingButton = [...board.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === '「顧客台帳（CRM）」の設定')!
+  expect(settingButton.getAttribute('aria-haspopup')).toBe('menu')
+  expect(settingButton.getAttribute('aria-expanded')).toBe('false')
   await act(async () => { settingButton.click() })
+  expect(settingButton.getAttribute('aria-expanded')).toBe('true')
   const stopItem = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.includes('止める'))!
   await act(async () => { (stopItem as HTMLElement).click() })
   expect(board.textContent).toContain('止めている')

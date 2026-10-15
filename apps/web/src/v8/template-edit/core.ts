@@ -1,11 +1,8 @@
 /*
  * ★V8 テンプレートの作る・編集の決まり（読み込み・断り方・保存・利用先）。
  *
- * 今の画面（app/templates/edit/edit-core.tsx・template-detail-data.ts・
- * edit/template-conflict-diff.ts）と同じ決まりを写した。src/v8 からは
- * @/app を読めないので写している。呼ぶ API・送る形・断る文は今と同じ。
- * 違いは1つだけ：保存の 409（ほかの人が先に保存した）を「競合」として返す
- * （絵 NCbYn の帯を出すため。今の画面は文だけを出していた）。
+ * 現役の画面と動作試験が同じ決まりを使う。保存の409は「競合」として
+ * 返し、絵NCbYnの帯で入力を残したまま比較と読み直しを選べる。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
 

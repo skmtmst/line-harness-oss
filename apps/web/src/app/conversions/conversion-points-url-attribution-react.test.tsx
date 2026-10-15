@@ -3,6 +3,8 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ConversionsPage from './page'
+import EditPage from './edit/page'
+const editNavigation = vi.hoisted(() => ({ query: '' }))
 
 /*
  * R281: 対象URLと計測期間を、作ったあと画面から確かめ・直せる。
@@ -18,9 +20,9 @@ const net = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ replace: () => {}, push: () => {} }),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useSearchParams: () => new URLSearchParams(editNavigation.query),
+  useRouter: () => ({ replace: () => {}, push: (href: string) => { editNavigation.query = href.split('?')[1] ?? '' } }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
@@ -161,13 +163,18 @@ async function type(node: HTMLInputElement | undefined, value: string) {
 }
 
 async function openDetail(name: string) {
-  await click(byLabel(`${name}のその他操作`) as HTMLButtonElement)
-  await click(byText('中身を見る'))
+  await act(async () => { root.render(React.createElement(ConversionsPage)) })
+  await act(async () => { await Promise.resolve() })
+  await click(byLabel(`成果地点「${name}」の操作`) as HTMLButtonElement)
+  await click(byText('成果地点の詳細を見る'))
 }
 
 async function openEdit(name: string) {
   await openDetail(name)
   await click(byText('編集'))
+  expect(editNavigation.query).toContain('id=')
+  await act(async () => { root.render(React.createElement(EditPage)) })
+  await act(async () => { await Promise.resolve() })
 }
 
 function pagePoint() {
@@ -181,6 +188,7 @@ function pagePoint() {
 }
 
 beforeEach(() => {
+  editNavigation.query = ''
   net.calls = []
   fixture.accountId = 'account-a'
   state.items = [pagePoint()]

@@ -1,4 +1,11 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("リンク名を入力してください"),
+}
+
 
 import Toggle from '@/components/shared/toggle';
 import { formatDate as polishFormatDate } from '@/lib/format'
@@ -19,6 +26,7 @@ import { CreatePage } from '@/components/templates'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
+import Card, { CardHeader } from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
@@ -26,17 +34,18 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
 import { Th } from '@/components/shared/table'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Checkbox from '@/components/shared/checkbox'
 import { TextField } from '@/components/shared/text-field'
 import { focusField } from '../focus-field'
 import { groupTagsByFolder } from './tag-options'
 import CouponSettings, { type CouponSettingsValue } from '../coupon-settings'
 import styles from './create.module.css'
-import { Field } from '@/components/shared/form-controls'
+import { Field, FieldError } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ActionList from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 流入リンクを作る（Pencil：作る `KMaMk`・競合 `vWJEm`・競合の比べ `E14GFm`）。
@@ -184,7 +193,7 @@ function InflowCreate() {
     if(candidatesError || candidatesLoading)return
     setSaveError(null)
     const errors: Record<string, string> = {}
-    if (!name.trim()) errors['ir-name'] = 'リンク名を入力してください'
+    if ((b244Requirements.name.check(name) !== null)) errors['ir-name'] = 'リンク名を入力してください'
     if (!validRef) errors['ir-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
     if (redirectUrl.trim()) {
       try {
@@ -352,13 +361,15 @@ function InflowCreate() {
       : 'あいさつのメッセージが届く（右のスマホ）'
   const preview = (
     <div className={styles.side}>
-      <h2 className={styles.sideTitle}>お客さまはこの順に進みます</h2>
+      <CardHeader size="stacked" title="お客さまはこの順に進みます" />
+      <Card variant="aside" gap="tight">
       <ol className={styles.steps}>
         <li className={styles.step}><span className={styles.stepNum} aria-hidden="true">1</span><span>QR コード・URL を開く</span></li>
         <li className={styles.step}><span className={styles.stepNum} aria-hidden="true">2</span><span>LINE で友だちになる（この経路で数える）</span></li>
         <li className={styles.step}><span className={styles.stepNum} aria-hidden="true">3</span><span>{tagName ? `タグ「${tagName}」が付く` : 'タグは付かない'}</span></li>
         <li className={styles.step}><span className={`${styles.stepNum} ${styles.stepNumNow}`} aria-hidden="true">4</span><span>{step4}</span></li>
       </ol>
+      </Card>
       <div>
         <LinePreview title={null} accountName={selectedAccount?.name ?? '公式アカウント'} caption="登録した日 10:00">
           <LinePreviewMessage accountName={selectedAccount?.name ?? '公式アカウント'} avatar={(selectedAccount?.name ?? '公').slice(0, 1)} time="10:00">
@@ -374,6 +385,7 @@ function InflowCreate() {
       hidePreviewWhenNarrow
       boardId="KMaMk"
       title="流入リンクを作る"
+      help="友だち追加の入口を作り、どこから来たかと、追加後に行うことを決めます。"
       /* 競合の帯（vWJEm）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       notice={conflictBand}
       preview={preview}
@@ -394,13 +406,10 @@ function InflowCreate() {
       {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
       {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError(null)} /> : null}
 
-      <section className={styles.card} aria-labelledby="ir-new-where">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="ir-new-where">どこに置くリンクですか</h2>
-          <p className={styles.cardNote}>名前は一覧で見分けるため。お客さまには見えません</p>
-        </div>
-        <div className={styles.fieldRow}>
-          <Field label="名前"><SaveErrorField names={["name","mine"]}><TextField
+      <Card variant="form" gap="normal" aria-labelledby="ir-new-where">
+        <CardHeader size="stacked" titleId="ir-new-where" title={<>どこに置くリンクですか</>} meta={<>名前は一覧で見分けるため。お客さまには見えません</>} />
+        <SettingsFormRow layout="name-folder">
+          <div className={styles.field}><Field label="名前" requirement={b244Requirements.name}><SaveErrorField names={["name","mine"]}><TextField
               id="ir-name"
               type="text"
               value={name}
@@ -414,32 +423,26 @@ function InflowCreate() {
               aria-invalid={Boolean(fieldErrors['ir-name'])}
               aria-describedby={fieldErrors['ir-name'] ? 'ir-name-error' : undefined}
             /></SaveErrorField>
-{fieldErrors['ir-name'] ? <span id="ir-name-error" className={styles.fieldError} role="alert">{fieldErrors['ir-name']}</span> : null}</Field>
+<FieldError id="ir-name-error">{fieldErrors['ir-name']}</FieldError></Field></div>
           <div className={styles.field}>
-            <span className={styles.pickLabel}>フォルダ</span>
-            <SaveErrorField names={["genre"]}><Select
+            <Field label="フォルダ">
+            <SaveErrorField names={["genre"]}><FolderSelect
               id="ir-genre"
               value={genre}
-              onChange={(next) => setGenre(next)}
+              onChange={setGenre}
               aria-label="フォルダ"
               size="full"
-              options={[
-                { value: '', label: '（選ばない）' },
-                ...genres.map((item) => ({ value: item.name, label: item.name })),
-                { value: '__new', label: '新しいフォルダ…' },
-              ]}
-            /></SaveErrorField>
+              colors={false}
+              unfiled={{ value: '', label: '（選ばない）' }}
+              folders={[...genres.map((item) => ({ value: item.name, label: item.name })), ...(genre === '__new' && newGenre ? [{ value: '__new', label: newGenre }] : [])]}
+              onCreate={async (name) => {
+                // フォルダの保存は、これまでと同じリンクの発行時だけ。
+                setNewGenre(name)
+                return { value: name, label: name }
+              }}
+            /></SaveErrorField></Field>
           </div>
-        </div>
-        {genre === '__new' ? (
-          <SaveErrorField names={["newGenre","new_genre"]}><TextField
-            type="text"
-            value={newGenre}
-            onChange={(event) => setNewGenre(event.target.value)}
-            placeholder="新しいフォルダの名前"
-            aria-label="新しいフォルダの名前"
-          /></SaveErrorField>
-        ) : null}
+        </SettingsFormRow>
         <Field label={<><span className={styles.labelRow}>
             <span className={styles.label}>転送先（入れると友だち追加へ進みません）</span>
 
@@ -452,8 +455,8 @@ function InflowCreate() {
             aria-invalid={Boolean(fieldErrors['ir-redirect'])}
             aria-describedby={fieldErrors['ir-redirect'] ? 'ir-redirect-error' : undefined}
           /></SaveErrorField>
-{fieldErrors['ir-redirect'] ? <span id="ir-redirect-error" className={styles.fieldError} role="alert">{fieldErrors['ir-redirect']}</span> : null}</Field>
-        <Field label="見分けるための文字（URL の最後に付く）"><SaveErrorField names={["refCode","refTouched","ref_code","ref_touched"]}><TextField
+<FieldError id="ir-redirect-error">{fieldErrors['ir-redirect']}</FieldError></Field>
+        <Field label="見分けるための文字（URL の最後に付く）" required><SaveErrorField names={["refCode","refTouched","ref_code","ref_touched"]}><TextField
             id="ir-ref"
             type="text"
             value={refCode}
@@ -462,14 +465,11 @@ function InflowCreate() {
             aria-invalid={Boolean(fieldErrors['ir-ref']) || (refCode !== '' && !validRef)}
             aria-describedby={fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? 'ir-ref-error' : undefined}
           /></SaveErrorField>
-{fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? <span id="ir-ref-error" className={styles.fieldError} role="alert">半角英数字・_・ハイフンで1〜64文字にしてください</span> : null}</Field>
-      </section>
+{fieldErrors['ir-ref'] || (refCode !== '' && !validRef) ? <FieldError id="ir-ref-error">半角英数字・_・ハイフンで1〜64文字にしてください</FieldError> : null}</Field>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ir-new-account">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="ir-new-account">どの LINE アカウントに入れますか</h2>
-          <p className={styles.cardNote}>友だちになる先のアカウント</p>
-        </div>
+      <Card variant="form" gap="normal" aria-labelledby="ir-new-account">
+        <CardHeader size="stacked" titleId="ir-new-account" title={<>どの LINE アカウントに入れますか</>} meta={<>友だちになる先のアカウント</>} />
         <div className={styles.field}>
           <span className={styles.labelRow}>
             <span className={styles.pickLabel}>友だちの追加先</span>
@@ -491,17 +491,14 @@ function InflowCreate() {
             ]}
           /></SaveErrorField>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-label="クーポン QR">
+      <Card variant="form" gap="normal" aria-label="クーポン QR">
         <CouponSettings accountId={selectedAccountId} value={coupon} onChange={setCoupon} onOptionsLoaded={setCouponOptions} disabled={saving} />
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ir-new-after">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="ir-new-after">友だちになったときにすること</h2>
-          <p className={styles.cardNote}>何も決めないと「動きが未設定」になり、数えるだけになります</p>
-        </div>
+      <Card variant="form" gap="normal" aria-labelledby="ir-new-after">
+        <CardHeader size="stacked" titleId="ir-new-after" title={<>友だちになったときにすること</>} meta={<>何も決めないと「動きが未設定」になり、数えるだけになります</>} />
             <SaveErrorField names={["tagId","tag_id"]}><ActionList<{ kind: string;
               id: string }>
               value={[
@@ -518,13 +515,10 @@ function InflowCreate() {
           renderEditor={(action, update) => <EntityPickerField label="操作の対象" noun="対象" value={action.id} items={action.kind === 'tag' ? tags : action.kind === 'template' ? templates : scenarios} onChange={id => update({ ...action, id })}
             />}
             /></SaveErrorField>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ir-new-url">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="ir-new-url">発行される URL</h2>
-          <p className={styles.cardNote}>発行したあと、一覧の「…」から QR コードと URL をコピーできます</p>
-        </div>
+      <Card variant="form" gap="normal" aria-labelledby="ir-new-url">
+        <CardHeader size="stacked" titleId="ir-new-url" title={<>発行される URL</>} meta={<>発行したあと、一覧の「…」から QR コードと URL をコピーできます</>} />
         <div className={styles.urlBox}>
           <Link2 size={14} aria-hidden="true" className={styles.urlIcon} />
           <span className={styles.urlText} title={previewUrl || undefined}>{previewUrl || `例：${workerBase}/r/summer-ig`}</span>
@@ -534,16 +528,8 @@ function InflowCreate() {
           <p className={styles.cardNote}>上の「見分けるための文字」を決めると、発行されるURLがここに出ます。例のURLは実際には開けないので配らないでください。</p>
         ) : null}
         {/* 絵には無いが、公開オフで仕込む口は残す（URL の発行の話なのでこの段の最後に置く）。 */}
-        <div className={styles.actionRow}>
-          <SaveErrorField names={["isActive","is_active"]}><SettingCheckbox checked={isActive} label="発行したらすぐ使えるようにする" onChange={(next) => setIsActive(next)} /></SaveErrorField>
-          <div className={styles.actionText}>
-            <span className={styles.actionTitle}>発行したらすぐ使えるようにする</span>
-            <span className={styles.actionValue}>
-              {isActive ? '発行すると、すぐにこのURLが使えます。' : '公開オフのまま発行すると、URLを開いても友だち追加できません。'}
-            </span>
-          </div>
-        </div>
-      </section>
+        <SaveErrorField names={["isActive","is_active"]}><Checkbox checked={isActive} onCheckedChange={setIsActive} description={isActive ? '発行すると、すぐにこのURLが使えます。' : '公開オフのまま発行すると、URLを開いても友だち追加できません。'}>発行したらすぐ使えるようにする</Checkbox></SaveErrorField>
+      </Card>
 
       <Dialog
         open={conflict !== null && showCompare}

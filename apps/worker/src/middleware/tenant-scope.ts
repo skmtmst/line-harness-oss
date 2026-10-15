@@ -30,13 +30,7 @@ export const tenantScopeMiddleware: MiddlewareHandler<Env> = async (c, next) => 
   const scope = await getVisibleLineAccountScope(dbFor(c.env), staff);
   for (const id of candidates) {
     if (!scope.ids.includes(id)) {
-      console.warn({
-        event: 'tenant_boundary_denied',
-        staff_id: staff.id,
-        staff_tenant_id: staff.tenantId ?? null,
-        requested_account_id: id,
-        path: c.req.path,
-      });
+      console.warn(JSON.stringify({"code":"tenant_boundary_denied"}));
       recordBoundaryDenial(c, id);
       return c.json({
         success: false,
@@ -83,7 +77,7 @@ function recordBoundaryDenial(
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    console.error('boundary audit insert failed:', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"middleware_tenant_scope_failed"}));
   });
   try {
     c.executionCtx.waitUntil(task);

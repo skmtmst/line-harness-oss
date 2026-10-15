@@ -22,7 +22,7 @@ const fixture = vi.hoisted(() => ({
   downloadLedgerCsv: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }))
@@ -34,12 +34,13 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async () => ({
   ApiError: class extends Error { constructor(public status: number) { super('API error') } },
   api: {
     staff: { me: fixture.staffMe },
   },
   bookingApi: {
+    ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
     listRequests: fixture.listRequests,
     requestsSummary: fixture.requestsSummary,
     listMenus: fixture.listMenus,
@@ -115,6 +116,32 @@ function monthBounds(): { from: string; to: string } {
 }
 
 describe('監査 R90: 今月は今月の予約に絞る', () => {
+  it('今月の数の帯には項目の印があり、今日の表示は保つ', async () => {
+    render(<BookingsPage />)
+    fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
+    for (const [title, icon] of [['今月の予約', 'calendar'], ['確定', 'calendar-plus'], ['変更依頼', 'circle-alert'], ['キャンセル', 'calendar-x']]) {
+      const label = await screen.findByText(title, { selector: '[data-kpi-label] > span' })
+      expect(label.closest('[data-kpi-label]')?.querySelectorAll(`[data-kpi-icon] svg.lucide-${icon}`)).toHaveLength(1)
+    }
+    fireEvent.click(within(screen.getByRole('group', { name: '予約の表示' })).getByRole('button', { name: /^今日/ }))
+    expect(document.querySelectorAll('[data-kpi-icon]')).toHaveLength(0)
+  })
+  it('今月の題から一覧とCSVの説明を開ける', async () => {
+    render(<BookingsPage />)
+    fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
+    fireEvent.click(await screen.findByRole('button', { name: '予約管理の説明' }))
+    expect(await screen.findByText('予約を探して、行から詳細を見られます。CSVは今の絞り込みで書き出します。')).toBeTruthy()
+  })
+  it('今月の確定だけに数の説明の印を出し、今日の表示には足さない', async () => {
+    render(<BookingsPage />)
+    fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
+    const help = await screen.findByRole('button', { name: '確定の説明' })
+    expect(help.querySelector('span[aria-hidden="true"]')).toBeTruthy()
+    fireEvent.click(help)
+    expect(await screen.findByText('今月の予約のうち、確定して来店を予定している件数です。')).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('group', { name: '予約の表示' })).getByRole('button', { name: /^今日/ }))
+    expect(screen.queryByRole('button', { name: '確定の説明' })).toBeNull()
+  })
   it('今月タブで一覧の取得に今月の初め〜来月の初めが入る', async () => {
     render(<BookingsPage />)
     fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
@@ -182,7 +209,7 @@ describe('監査 R89: 状態変更の後は集計・カレンダーも更新す�
      })
      render(<BookingsPage />)
      await screen.findAllByRole('button', { name: /今日/ })
-     expect(screen.getAllByText('読み込んでいます').length).toBeGreaterThan(0)
+     expect(screen.getAllByLabelText('読み込んでいます').length).toBeGreaterThan(0)
    })
    it('WEB296：期間の取得失敗から再試行したら、その期間を読み直す', async () => {
      let rangeCalls = 0

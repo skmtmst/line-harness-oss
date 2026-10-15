@@ -53,12 +53,15 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
+import Card, { CardHeader } from '@/components/shared/card'
+import { CreateCompletionHeading } from '@/components/templates/create-parts'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
 import DetailPanel from '@/components/shared/detail-panel'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
@@ -66,7 +69,7 @@ import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import ConditionBuilder, { findConditionDraftIssue, pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
-import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { firstReminderStepMessage, reminderPlaceholders, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
 import { TestRecipientGuidance, testRecipientDestinationLabel, testRecipientNote, testSendConfirmDescription } from '@/components/reminders/test-recipient-guidance'
@@ -102,12 +105,24 @@ const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
  *     p5YuP・r1l0bT（通知の中身 1440・1152）/ T0nis（配信予定）/
  *     ltAaq（確認）/ hjNpJ（有効にした）。
  * 画面の枠は型（CreatePage）が持つ。動き（API・保存・競合・テスト送信・有効化）は
- * 今の画面（app/reminders/edit/edit-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
+ * 既存のAPIと版管理を保持する。BEHAVIOR.md に一覧がある。
  */
 
 type V8Stage = 'basics' | 'target' | 'messages' | 'schedule' | 'confirm' | 'done'
 
-/** URL の ?stage= → 手順（今の画面と同じ名前）。 */
+/** 保存済みの対象人数。未取得を0にしない。現役の対象の段が使う。 */
+export function reminderAudienceCounts(validation: ReminderValidationResult | null) {
+  const matched = validation?.audience.matched ?? null
+  const excluded = validation?.audience.excluded ?? null
+  return {
+    matched,
+    excluded,
+    total: matched == null || excluded == null ? null : matched + excluded,
+  }
+}
+
+
+/** URLの?stage=を現役の手順へ対応させる。 */
 export function stageFor(raw: string | null): V8Stage {
   switch (raw) {
     case 'basics':
@@ -231,6 +246,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
   const [loadMissing, setLoadMissing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [conflict, setConflict] = useState(false)
   const [compareTarget, setCompareTarget] = useState<ReminderDraftSettings | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
@@ -251,6 +267,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     const seq = ++requestSeq.current
     setLoading(true)
     setError('')
+    setLoadError(null)
     setLoadMissing(false)
     try {
       const response = await api.reminders.getDraft(reminderId)
@@ -263,6 +280,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       setConflict(false)
     } catch (caught) {
       if (seq !== requestSeq.current) return
+      setLoadError(caught)
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.status === 404) setLoadMissing(true)
@@ -507,7 +525,8 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     )
   }
   if (!subjectDraft || !subjectSettings) {
-    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} onRetry={() => void loadDraft()} /></SaveErrorScope>
+    const failure = isForbiddenOrRateLimited(loadError) ? loadFailureCopy(loadError, 'リマインダ') : null
+    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title={failure?.title ?? '下書きを表示できませんでした'} description={failure?.description ?? (error || '下書きを読み込めませんでした。')} error={loadError ?? undefined} onRetry={() => void loadDraft()} /></SaveErrorScope>
   }
 
   const testIssue = testSend.phase.kind === 'failed' || testSend.phase.kind === 'unknown' ? testSend.phase.message : ''
@@ -838,7 +857,7 @@ function BasicsStageV8({
 
 /* ---------------- 手順2：対象者と止める条件（YChR6） ---------------- */
 
-function TargetStageV8({
+export function TargetStageV8({
   frame,
   notice,
   reminderId,
@@ -908,12 +927,10 @@ function TargetStageV8({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reminderId, JSON.stringify(condition), recountRetryToken])
 
-  const matched = recount ? recount.matched : validation?.audience.matched ?? null
-  const total = recount
-    ? recount.matched + recount.excluded
-    : validation?.audience.matched != null && validation.audience.excluded != null
-      ? validation.audience.matched + validation.audience.excluded
-      : null
+  const savedAudience = reminderAudienceCounts(validation)
+  const matched = recount ? recount.matched : savedAudience.matched
+  const total = recount ? recount.matched + recount.excluded : savedAudience.total
+  const excluded = recount ? recount.excluded : savedAudience.excluded
 
   function openFaces() {
     if (recount) {
@@ -1004,7 +1021,7 @@ function TargetStageV8({
         {mode === 'condition' ? (
           <ConditionBuilder value={condition} showCount={false} onChange={(next) => onChange({ ...settings, targetCondition: next })} />
         ) : null}
-        <div className={styles.countBand}>
+        <div className={styles.countBand} aria-label={`対象人数：当てはまる ${countLabel(total, '人')}・送る予定 ${countLabel(matched, '人')}・除く ${countLabel(excluded, '人')}`}>
           <div className={styles.countItem}>
             <span className={styles.countLabel}>当てはまる人</span>
             <strong className={styles.countValue}>{`${counting ? '…' : total == null ? emptyValue('unknown') : formatNumber(total)} 人`}</strong>
@@ -1025,8 +1042,8 @@ function TargetStageV8({
           >
             <RefreshCw size={15} aria-hidden="true" />数え直す
           </Button>
-          <span className={styles.countNote}>数秒〜1分（1,000人ごとに約10秒）</span>
         </div>
+        <p className={styles.countNote}>数秒〜1分（1,000人ごとに約10秒）</p>
         {recountError ? <p className={styles.fieldNote}>対象者を数え直せませんでした。保存済みの人数を表示しています。</p> : null}
         {validationFailed ? <p className={styles.fieldNote}>公開前チェックを実行できませんでした。人数は未取得のままです。</p> : null}
         <p className={styles.cardNote}>基準日が登録・変更されたときに、対象かどうかを自動で見直します。</p>
@@ -1273,10 +1290,10 @@ function MessagesStageV8({
                     {stepShortTiming(step, settings.deliveryMode)}
                   </button>
                   <span className={styles.spacer} aria-hidden="true" />
-                  <Button type="button" variant="text" disabled={!stepOrder.canMoveBy(step.stableStepId, -1)} onClick={() => stepOrder.moveBy(step.stableStepId, -1, 'menu')}>
+                  <Button type="button" variant="text" title={stepOrder.moveReason(step.stableStepId, -1) ?? undefined} disabled={!stepOrder.canMoveBy(step.stableStepId, -1)} onClick={() => stepOrder.moveBy(step.stableStepId, -1, 'menu')}>
                     <ArrowUp size={15} aria-hidden="true" />前へ
                   </Button>
-                  <Button type="button" variant="text" disabled={!stepOrder.canMoveBy(step.stableStepId, 1)} onClick={() => stepOrder.moveBy(step.stableStepId, 1, 'menu')}>
+                  <Button type="button" variant="text" title={stepOrder.moveReason(step.stableStepId, 1) ?? undefined} disabled={!stepOrder.canMoveBy(step.stableStepId, 1)} onClick={() => stepOrder.moveBy(step.stableStepId, 1, 'menu')}>
                     <ArrowDown size={15} aria-hidden="true" />後ろへ
                   </Button>
                   <Button type="button" variant="text" disabled={settings.steps.length <= 1} onClick={() => removeStep(step.stableStepId)}>
@@ -1431,7 +1448,7 @@ function TimingEditor({
 
 /* ---------------- 手順4：配信予定（T0nis） ---------------- */
 
-function ScheduleStageV8({
+export function ScheduleStageV8({
   frame,
   notice,
   reminderId,
@@ -1484,7 +1501,9 @@ function ScheduleStageV8({
           />
           <PhoneV8
             accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
-            chip={nextItem ? formatMd(nextItem.scheduledAt) : '送信予定はまだありません'}
+            chip={nextItem ? formatMd(nextItem.scheduledAt)
+              : previewFailed ? '配信予定を読み込めませんでした'
+                : preview ? '送信予定はまだありません' : '配信予定を確認しています'}
             empty={!nextItem}
             message={nextItem ? renderReminderBodySample(firstReminderStepMessage(settings, nextItem.stableStepId) || '本文はまだありません') : undefined}
           />
@@ -1572,7 +1591,7 @@ function editHref(reminderId: string, stage: 'basics' | 'target' | 'preview' | n
   return `/reminders/edit?id=${encodeURIComponent(reminderId)}${stage ? `&stage=${stage}` : ''}`
 }
 
-function ConfirmStageV8({
+export function ConfirmStageV8({
   frame,
   notice,
   reminderId,
@@ -1635,6 +1654,9 @@ function ConfirmStageV8({
   }, [settings.folderId])
 
   const destination = testRecipientDestinationLabel(recipientView, sentName, sentKind)
+  const placeholderSummary = reminderPlaceholders(settings, sentName ?? (recipientView.kind === 'ready' ? recipientView.recipient.displayName : null))
+    .map((placeholder) => `${placeholder.token}：テストで使う値＝${placeholder.testValue}／本番での取得元＝${placeholder.source}`)
+    .join('\n')
   const firstStep = settings.steps[0] ?? null
   const testedLabel = draft.lastTestStatus === 'succeeded' && draft.lastTestedAt
     ? `前回：${formatMd(draft.lastTestedAt)} に送れました（1通目）`
@@ -1710,7 +1732,9 @@ function ConfirmStageV8({
           {confirmRows.map((row) => (
             <div key={row.key} className={styles.confirmRow}>
               <span className={styles.confirmKey}>{row.key}</span>
-              <span className={styles.confirmVal} title={row.value}>{row.value}</span>
+              <span className={styles.confirmVal} title={row.key === '通知' && validation?.audience.matched != null
+                ? `${row.value}（対象者×通知数：${countLabel(validation.audience.matched * settings.steps.length, '通')}）`
+                : row.value}>{row.value}</span>
               <Button variant="text" href={editHref(reminderId, row.stage)}>変える</Button>
             </div>
           ))}
@@ -1723,7 +1747,7 @@ function ConfirmStageV8({
           <p className={styles.cardNote}>{testRecipientNote(recipientView, sentKind)}</p>
         </div>
         <div className={styles.testRow}>
-          <span className={styles.testDestination} aria-label="送り先">送り先：{destination}</span>
+          <span className={styles.testDestination} aria-label="送り先" title={placeholderSummary || undefined}>送り先：{destination}</span>
           <Button variant="secondary" onClick={onSend} disabled={sendBusy || recipientView.kind !== 'ready'} busy={sendBusy} busyLabel="送信中…">
             <Send size={15} aria-hidden="true" />テストを送る
           </Button>
@@ -1790,7 +1814,7 @@ function CheckRow({ ok, title, note, action }: { ok: boolean; title: string; not
 
 /* ---------------- 完了（hjNpJ） ---------------- */
 
-function DoneStageV8({
+export function DoneStageV8({
   frame,
   reminderId,
   settings,
@@ -1814,14 +1838,10 @@ function DoneStageV8({
     <PageFrame kind="create" boardId={boardId}>
       <PageHeading {...heading} />
       <div className={styles.doneBody}>
-        <div className={styles.doneCard}>
-          <span className={styles.doneIcon}>
-            <Check size={24} aria-hidden="true" />
-          </span>
-          <h2 className={styles.doneTitle}>「{settings.name}」を有効にしました</h2>
-          <p className={styles.doneNote}>
+        <Card variant="form" className={styles.doneCard}>
+          <CreateCompletionHeading icon={<Check />} title={`「${settings.name}」を有効にしました`}>
             これから{settings.triggerType === 'friend_field' ? '基準日が入った人' : '予約が入った人'}にも、自動で予定が作られます。止めたいときは、詳細の「一時停止する」から止められます。
-          </p>
+          </CreateCompletionHeading>
           <dl className={styles.doneFacts}>
             <div className={styles.doneFact}>
               <dt>最初に送る</dt>
@@ -1841,7 +1861,7 @@ function DoneStageV8({
               <ArrowRight size={15} aria-hidden="true" />詳細を見る
             </Button>
           </div>
-        </div>
+        </Card>
       </div>
     </PageFrame>
   )

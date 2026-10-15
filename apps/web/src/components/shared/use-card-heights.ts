@@ -7,7 +7,7 @@ export function useCardHeights() {
   const ref = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     const card = ref.current
-    if (!card || document.documentElement.dataset.theme !== 'v8') return
+    if (!card) return
     const css = getComputedStyle(card)
     const border = ['Top', 'Right', 'Bottom', 'Left'].some(side => parseFloat(css.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0)
     const outline = css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0
@@ -28,11 +28,11 @@ export function useCardHeights() {
         view.cancelAnimationFrame(frame)
         frame = view.requestAnimationFrame(() => {
           const cards = [...parent.children].filter((el): el is HTMLElement => el instanceof HTMLElement && el.matches('[data-design-part="card"]'))
-          if (cards.length < 2 || document.documentElement.dataset.theme !== 'v8') return
+          if (cards.length < 2) return
           const layout = getComputedStyle(parent)
           const horizontal = layout.display.includes('grid') || layout.display.includes('flex') && layout.flexDirection === 'row'
-          if (!horizontal) {
-            // 縦の箱は本来の幅・高さを保つ。flex-start は縦並びの幅を内容幅へ縮める。
+          if (!horizontal || parent.dataset.cardHeight === 'natural') {
+            // 高さを揃えない段では、呼び出し側の幅・高さを保つ。
             for (const card of cards) {
               const original = originals.get(card)
               if (original !== undefined) { card.style.cssText = original; originals.delete(card) }
@@ -62,7 +62,7 @@ export function useCardHeights() {
       observer?.observe(parent)
       const Observer = parent.ownerDocument.defaultView?.MutationObserver
       const mutations = Observer ? new Observer(measure) : null
-      mutations?.observe(parent, { childList: true, subtree: true, characterData: true })
+      mutations?.observe(parent, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-card-height'] })
       parent.addEventListener('load', measure, true)
       void document.fonts?.ready.then(measure)
       measure()

@@ -57,8 +57,8 @@ import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size
  *
  * 型（ListPage）に、数の帯（これからの回・申込・あと少しで満席・申し込みが少ない）、
  * 左のフォルダの列（上に「イベントを作る」）、案内の帯と道具の段、表、ページ送りをはめる。
- * データの口（取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ）は今の V8
- * （src/app/events/events-list-v8.tsx）と同じ。行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
+ * データの口は取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ。
+ * 行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
  */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -295,7 +295,7 @@ export default function EventsListV8() {
   })
 
   const rowMenuItems = (e: EventListItem): ActionMenuItem[] => [
-    { id: 'detail', label: '中身を見る', onSelect: () => router.push(`/events/edit?id=${e.id}`) },
+    { id: 'detail', label: "イベントの設定を見る", onSelect: () => router.push(`/events/edit?id=${e.id}`) },
     { id: 'applicants', label: '申込者を見る', onSelect: () => router.push(`/events/bookings?id=${e.id}`) },
     { id: 'change', label: '日時・定員を変える', onSelect: () => router.push(`/events/change-review?id=${e.id}`) },
     { id: 'preview', label: 'プレビュー', onSelect: () => router.push(`/events/preview?id=${e.id}`) },
@@ -341,12 +341,12 @@ export default function EventsListV8() {
     },
   ]
 
-  /* 作るボタン。見るだけの人には置かず、場所だけ空ける（2026-10-06 オーナー決定）。 */
+  /* 作る場所と余白は共通フォルダ列へ。閲覧のみでは出さない。 */
   const createButton = canEdit ? (
     <Button variant="primary" href="/events/new" className="v8-folder-create w-full">
       <Plus size={15} aria-hidden="true" />イベントを作る
     </Button>
-  ) : <span className={styles.createSpace} aria-hidden="true" />
+  ) : null
 
   const folderRows = managedFolderNavRows('event', folders, { allId: '', unfiledId: UNFILED })
 
@@ -366,6 +366,8 @@ export default function EventsListV8() {
       unfiledCount={unfiledCount}
       onAddStart={closeDetail}
       placeholder="例：教室"
+      createAction={createButton}
+      reserveCreateSpace={false}
     >
       {foldersError ? (
         <Notice tone="danger" className={styles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。
@@ -377,9 +379,7 @@ export default function EventsListV8() {
   const savedValue = filter === 'full' ? 'full' : sort === 'name' ? 'sort-name' : ''
   const toolbar = (
     <>
-      <div className={styles.noticeRow}>
-        <Notice tone="info">定員に達すると、お客さまの画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。</Notice>
-      </div>
+
       <ListToolbar
         search={{
           placeholder: 'イベント名で探す',
@@ -533,18 +533,15 @@ export default function EventsListV8() {
               const when = whenText(e.next_slot_starts_at)
               return (
                 <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id} detailKey="event" onOpen={() => openDetail(e.id)}>
-                  <NameCell name={(
+                  <NameCell selection={folderMove.checkbox(e)} name={(
                       <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
-                        <>{folderMove.checkbox(e)}
                           <RowNameLink
                             href={`/events/edit?id=${encodeURIComponent(e.id)}`}
                             title={`${e.name}の詳細を見る`}
                             aria-label={`「${e.name}」の詳細を見る`}
-                            className={styles.nameButton}
                           >
                             {e.name}
                           </RowNameLink>
-                        </>
                       </ContextMenu>
                     )} folder={folderDotOf(e.folderId)}
                   />
@@ -593,7 +590,6 @@ export default function EventsListV8() {
   const pager = !dataReady || items.length === 0 ? null : (
     <div className={styles.pagerBlock}>
 
-      {pageCount > 1 ? (
         <Pagination
           page={current}
           pageCount={pageCount}
@@ -601,7 +597,6 @@ export default function EventsListV8() {
           ariaLabel="イベントのページ送り"
           summary={<ListRange bare className={styles.pagerCount} total={listTotal} first={(current - 1) * perPage + 1} last={Math.min(current * perPage, listTotal)} />}
         />
-      ) : null}
     </div>
   )
 
@@ -668,7 +663,11 @@ export default function EventsListV8() {
       headingSize="regular"
       title="イベント予約"
       layout="event-list"
-      help="教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。"
+      help={<>
+        教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。
+        {dataReady && kpi.nearest_low_starts_at ? <p>申し込みが少ないのは{jstDay(kpi.nearest_low_starts_at)}の回。あと{daysUntilIso(kpi.nearest_low_starts_at) ?? emptyValue('unknown')}日です。</p> : null}
+      </>}
+      explanation="定員に達すると、お客さまの画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。"
       folderWidth={200}
 
       tabs={!canEdit ? (
@@ -689,7 +688,7 @@ export default function EventsListV8() {
           ))}
         </KpiBand>
       )}
-      folders={<>{createButton}{folderPanel}</>}
+      folders={folderPanel}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
       toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{toolbar}</>}
       pagination={pager}

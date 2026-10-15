@@ -13,7 +13,6 @@ import {
 import { GripVertical } from 'lucide-react'
 import type { ActionMenuItem } from './action-menu'
 import { useLiveReorder } from '@/lib/use-live-reorder'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import styles from './row-actions.module.css'
 
 /*
@@ -27,7 +26,7 @@ import styles from './row-actions.module.css'
  * - 保存は画面ごとの今の API のまま。失敗したら画面側で元の位置へ戻して理由を出す。
  *
  * 以前の `DragHandle`（shared/row-actions）と `ReorderGrip`（friend-fields）は
- * この部品の別名として残す。v7 の画面の見た目を変えないため。
+ * この部品の別名として残す。動きは同じ入口を使う。
  */
 
 export type ReorderDirection = -1 | 1
@@ -56,7 +55,7 @@ export type ReorderHandleProps = HandleButtonProps & {
   look?: 'icon' | 'inline' | 'bare'
   /**
    * 動かせない時の出し方。V8 の画面は `hide`（つまみを出さない）。
-   * `dim` は v7 の画面の見た目を変えないためだけに残す（薄いつまみ）。
+   * `dim` は呼び出し互換の値。動かせない時は指定にかかわらず隠す。
    */
   disabledLook?: 'hide' | 'dim'
   children?: ReactNode
@@ -100,20 +99,9 @@ export default function ReorderHandle({
     setParentDraggable(previous => previous === connected ? previous : connected)
   })
   const mouseConnected = parentDraggable || rest.onPointerDown || rest.onMouseDown || (rest.draggable && rest.onDragStart)
-  const v8 = useAdminTheme() === 'v8'
-  const noMouse = v8 && !mouseConnected
+
+  const noMouse = !mouseConnected
   if (disabledReason || locked || rest.disabled || noMouse) {
-    if (disabledLook === 'dim' && !v8) {
-      return (
-        <span
-          className="inline-flex cursor-not-allowed items-center justify-center text-ink-faint"
-          title={disabledReason ?? undefined}
-          aria-label={disabledReason ?? undefined}
-        >
-          {glyph}
-        </span>
-      )
-    }
     /* つまみは出さない。幅だけ同じに空け、理由は title と読み上げで言う。 */
     return (
       <span
@@ -150,7 +138,7 @@ export default function ReorderHandle({
       data-reorder-handle=""
       aria-label={ariaLabel ?? `${label}を並び替え。上下キーで移動`}
       title={title ?? 'ドラッグまたは上下キーで並び替え'}
-      className={[look === 'icon' && styles.action, look === 'icon' && styles.grip, look === 'inline' && INLINE_CLASS, className].filter(Boolean).join(' ')}
+      className={[look === 'icon' && styles.action, look === 'icon' && styles.grip, look === 'inline' && `${INLINE_CLASS} ${styles.inlineGrip}`, className].filter(Boolean).join(' ')}
     >
       {glyph}
     </button>
@@ -232,6 +220,8 @@ export function useReorder<T>({
     return !blocked && from >= 0 && to >= 0 && to < ids.length
   }
 
+  const moveReason = (id: string, direction: ReorderDirection) => reorderMoveReason(ids.indexOf(id), ids.length, direction, disabledReason)
+
   const dropOn = (targetId: string) => {
     const from = dragId
     setDragId(null)
@@ -274,14 +264,14 @@ export function useReorder<T>({
         id: 'move-up',
         label: '上へ',
         disabled: from <= 0,
-        disabledReason: from <= 0 ? 'いちばん上です' : undefined,
+        disabledReason: moveReason(id, -1) ?? undefined,
         onSelect: () => { moveBy(id, -1, 'menu'); onDone?.() },
       },
       {
         id: 'move-down',
         label: '下へ',
         disabled: from < 0 || from >= ids.length - 1,
-        disabledReason: from >= ids.length - 1 ? 'いちばん下です' : undefined,
+        disabledReason: moveReason(id, 1) ?? undefined,
         onSelect: () => { moveBy(id, 1, 'menu'); onDone?.() },
       },
     ]
@@ -299,10 +289,20 @@ export function useReorder<T>({
     blocked,
     moveBy,
     canMoveBy,
+    moveReason,
     handleProps,
     rowProps,
     menuItems,
     /** ReorderHandle に渡す onMove・disabledReason。 */
     handle,
   }
+}
+
+/** 矢印・メニュー・つまみが同じ並びと禁止理由を読む。保存の口は画面が保つ。 */
+export function reorderMoveReason(index: number, count: number, direction: ReorderDirection, blockedReason?: string | null): string | null {
+  if (blockedReason) return blockedReason
+  if (index < 0 || index >= count) return 'この項目が見つかりません'
+  if (index + direction < 0) return 'いちばん上です'
+  if (index + direction >= count) return 'いちばん下です'
+  return null
 }

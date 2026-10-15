@@ -147,7 +147,20 @@ const buttons = () => [...document.querySelectorAll('button')] as HTMLButtonElem
 const buttonText = (text: string) => buttons().find((button) => button.textContent?.trim() === text)
 
 describe('V8 ウェビナーの編集', () => {
-  it('入口は V8 のときだけ新しい画面を出す（v7 の見た目では今の画面のまま）', async () => {
+  it('現在の通知の補足は有効フラグで組み立て、切ってある通知の時刻を出さない', async () => {
+    nav.search = 'id=webinar-1&pane=notifications'
+    await render(<WebinarEditV8 />)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '送った数と通知の対象' })))
+    const summary = screen.getByRole('button', { name: '送った数と通知の対象' }).parentElement!.querySelector('[role="note"]')!
+    expect(summary.textContent).toContain('前日 19:00／開始時')
+    expect(summary.textContent).toContain('送りません')
+    expect(summary.textContent).toContain('見終わった人へお礼を送信')
+    expect(summary.textContent).not.toContain('15分前')
+    expect(summary.textContent).not.toContain('翌日10:00に送信')
+    expect(screen.getByText('設定済み').closest('[data-design-node="xRvDB"]')?.getAttribute('data-tone')).toBe('success')
+  })
+
+  it('入口は保存された古いテーマがあっても現役のV8を出す', async () => {
     nav.search = 'id=webinar-1&pane=participants'
     await render(<EditPage />)
     expect(host.querySelector('[data-wc-editor="v8"]')).toBeTruthy()
@@ -155,7 +168,7 @@ describe('V8 ウェビナーの編集', () => {
     act(() => { root.unmount() })
     root = createRoot(host)
     await render(<EditPage />)
-    expect(host.querySelector('[data-wc-editor="v8"]')).toBeNull()
+    expect(host.querySelector('[data-wc-editor="v8"]')).toBeTruthy()
   })
 
   it('参加者（uNsEy）：頭・タブ（参加者の人数つき）・数の帯・表・チャットへの道', async () => {
@@ -164,7 +177,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.textContent).toContain('NEN活用スタートセミナー')
     await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(host.textContent).toContain('オンデマンド・いつでも視聴・公開中（版 3）')
-    const tabs = host.querySelector('[data-wc-tabs="true"]')
+    const tabs = host.querySelector('[role="tablist"]')
     expect(tabs?.textContent).toContain('参加者 124')
     expect(tabs?.querySelector('[aria-current="page"]')?.textContent).toBe('参加者 124')
     expect(host.textContent).toContain('視聴完了 71')
@@ -183,8 +196,10 @@ describe('V8 ウェビナーの編集', () => {
     const row = [...(funnel?.querySelectorAll('button') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
     expect(row?.textContent).toContain('9人')
     const stats = host.querySelector('[data-template-region="stats"]')
-    expect(stats?.textContent).toContain('フォーム送信?9人')
-    expect(stats?.textContent).not.toContain('フォーム送信?9件')
+    const metric = [...(stats?.querySelectorAll('[data-kpi-presentation]') ?? [])].find(item => item.querySelector('[data-kpi-label]')?.textContent === 'フォーム送信')
+    expect(metric?.querySelector('[data-kpi-number]')?.textContent).toBe('9')
+    expect(metric?.textContent).toContain('9人')
+    expect(metric?.textContent).not.toContain('9件')
   })
 
   it('コメントの見え方は開始前2件で埋めず、開始後の最初のコメントも出す', async () => {

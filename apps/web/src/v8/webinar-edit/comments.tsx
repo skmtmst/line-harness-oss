@@ -2,7 +2,7 @@
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageContent } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
@@ -17,12 +17,13 @@ import type { DetailChrome, EditContext, PaneSaveProps } from './types'
 import styles from './comments.module.css'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import CommentViewerStats from './comment-stats'
 
 
 /*
  * ★V8 ウェビナーのコメント演出（Pencil Omqd4）。
  * 左に流すコメントの表（秒数・名前・本文はその場で直せる。行の右端は消す）、右に視聴画面での見え方。
- * 口・件数の上限・JSON の読み込み・保存の決まりは app/webinars/edit/comments-v8.tsx と同じ（BEHAVIOR.md）。
+ * 口・件数の上限・JSON の読み込み・保存の決まりは BEHAVIOR.md。
  */
 
 /** 1行の中身を確かめる。直せないときは理由の文を返す。 */
@@ -173,7 +174,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
   const firstBefore = chronological.find((comment) => comment.atSeconds < 0)
   const preview = firstDuring && firstBefore ? [firstDuring, firstBefore] : chronological.slice(0, 2)
   const previewContent = <>
-    <div className={styles.screen}>
+    <div className={styles.screen} data-video-player>
       {preview.map((comment, index) => (
         <p key={index} className={styles.screenLine} data-dim={index > 0 || undefined}>{`${comment.authorName}：${comment.body}`}</p>
       ))}
@@ -185,7 +186,8 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="list" boardId="Omqd4">
       <DetailHead {...chrome} current="comments" />
-      <div className={styles.body} data-design-node="Omqd4">
+      <CommentViewerStats analytics={ctx.analytics} state={ctx.analyticsState} onRetry={ctx.retryAnalytics} />
+      <PageContent layout="columns" data-design-node="Omqd4">
         <div className={styles.previewToggle}>
           <Disclosure title="視聴画面での見え方" size="compact">{previewContent}</Disclosure>
         </div>
@@ -248,7 +250,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
           <h3 id="webinar-comments-preview" className={styles.sideTitle}>視聴画面での見え方</h3>
           {previewContent}
         </aside>
-      </div>
+      </PageContent>
     </PageFrame></SaveErrorScope>
   )
 }

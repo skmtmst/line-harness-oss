@@ -8,6 +8,8 @@ import { useCallback, useDeferredValue, useEffect, useState } from 'react'
 import { ApiError, api, type FileScanConfig, type FileScanItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { readSaveFieldErrors } from '@/lib/api-field-errors'
 
 /** 一覧の1ページの件数。先頭50件固定だった監査 R132 の名残を残さない。 */
 export const FILE_SCAN_PAGE_SIZE = 50
@@ -48,6 +50,18 @@ export function useFileScan() {
   const [configBusy, setConfigBusy] = useState(false)
   const [stopExternal, setStopExternal] = useState(false)
   const [stopError, setStopError] = useState('')
+  const configFields = useFormErrors()
+  const hasExternalInput = Boolean(provider.trim() || endpoint.trim() || secretRef.trim())
+  configFields.define('externalProvider', '提供元', () => hasExternalInput && !provider.trim() ? '提供元を入力してください' : null, { required: hasExternalInput })
+  configFields.define('externalEndpointUrl', '送り先（https）', () => {
+    if (!hasExternalInput) return null
+    if (!endpoint.trim()) return '送り先を入力してください'
+    try {
+      return new URL(endpoint.trim()).protocol === 'https:' ? null : 'https:// で始まる送り先を入力してください'
+    } catch { return '送り先の URL を確かめてください（https:// から）' }
+  }, { required: hasExternalInput })
+  configFields.define('externalSecretRef', '鍵の名前', () => !hasExternalInput || (/^FILE_SCAN_SECRET_[A-Z0-9_]+$/.test(secretRef.trim()) && secretRef.trim().length <= 120)
+    ? null : '鍵の名前は FILE_SCAN_SECRET_ で始まる大文字・数字・下線の120文字以内で指定してください', { required: hasExternalInput })
 
   // 外の検査の設定が保存前なら離脱の番兵を出す。
   const configDirty = configOpen && (
@@ -167,8 +181,9 @@ export function useFileScan() {
 
   async function saveConfig() {
     if (!selectedAccountId) return
-    setConfigBusy(true)
     setActionError('')
+    if (configFields.submit().length > 0) return
+    setConfigBusy(true)
     try {
       const res = await api.fileScan.saveConfig(selectedAccountId, {
         externalProvider: provider.trim() || null,
@@ -183,8 +198,11 @@ export function useFileScan() {
       notifySaved('外の検査の設定を保存しました。')
       await load()
     } catch (caught) {
+      const errors = readSaveFieldErrors(caught)
+      const count = Object.keys(errors).length
+      if (count && configFields.setServerErrors(errors) === count) return
       setActionError(caught instanceof ApiError && caught.status === 400
-        ? '宛先は https にし、提供元と宛先の両方を入れてください。'
+        ? caught.message
         : '設定を保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       setConfigBusy(false)
@@ -223,6 +241,8 @@ export function useFileScan() {
 
   /* 開き直す時は保存済みの値へ戻す。編集中の置き去りを残さない。 */
   function toggleConfigOpen() {
+    configFields.reset()
+    setActionError('')
     if (!configOpen) {
       setProvider(config?.externalProvider ?? '')
       setEndpoint(config?.externalEndpointUrl ?? '')
@@ -275,6 +295,7 @@ export function useFileScan() {
     secretRef,
     setSecretRef,
     configBusy,
+    configFields,
     stopExternal,
     setStopExternal,
     stopError,

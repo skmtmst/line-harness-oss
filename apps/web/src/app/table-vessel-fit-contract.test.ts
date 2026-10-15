@@ -1,19 +1,30 @@
+// @vitest-environment happy-dom
+import React from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import type { BookingMenu } from '@/lib/api'
+import type { RowMenuProps } from '@/components/shared/row-actions'
 
-/*
- * 表の幅の見張り（m15c）。
- *
- * 共通の表は table-fixed のため、列幅の指定どおりに器へ収まる。
- * 逆に言うと、列幅の指定を誤るとそのままはみ出し・右空きになる。
- * 司令塔の見た目点検（1440px・表の左右の余白）で出た4件を守る。
- *
- * 決まり：最後の列（操作・状態）は中身に合わせた固定幅にし、
- * 割合の列だけでは 100% を超えない。残りは幅を指定しない列が吸う。
- * 直しを割合へ戻すと、この試験が赤くなる。
- */
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
+vi.mock('next/navigation', async () => ({
+  ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useRouter: () => navigation,
+}))
+vi.mock('@/components/shared/row-actions', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/shared/row-actions')>()
+  return { ...actual, RowMenu: (props: RowMenuProps) => React.createElement(actual.RowMenu, {
+    ...props, className: process.env.L2X_MENU_OWNER_FAULT && props.label !== '共通の基準' ? 'page-owned-row-menu' : props.className,
+  }) }
+})
+import { RowMenu } from '@/components/shared/row-actions'
+import { MenusTabV8 } from '@/v8/booking-menus/tabs/menus-tab'
+
+afterEach(() => { cleanup(); vi.clearAllMocks() })
+
+/** Tables and row controls keep their shared layout and navigation. */
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -30,44 +41,49 @@ function percentTotal(source: string): number {
 }
 
 describe('表は器の幅にぴったり収める', () => {
-  it('/booking/menus: 操作は「中身を見る」＋「…」で、中身が器からはみ出さない', () => {
-    const page = read('booking/menus/page.tsx')
-    expect(page).toContain('<DataTable')
-    // ★V7 行の操作の決まり：主な1つ＋「…」。共通の RowActions を使う。
-    // 4つ並べると1440pxで器から72pxはみ出す。上へ・下へ・止める／再開は「…」の中。
-    expect(page).toContain('<RowActions')
-    expect(page).toContain("label: '中身を見る'")
-    expect(page).toContain("label: '上へ'")
-    expect(page).toContain("label: '下へ'")
-    expect(page).toContain("label: m.is_active ? '止める' : '再開'")
-    // 行への直置きボタン（↑↓・止める・出す）に戻さない。
-    expect(page).not.toContain('を上へ')
-    expect(page).not.toContain('を下へ')
-    expect(page).not.toContain('止める・出す')
-    // 操作列は「中身を見る」＋「…」（約138px）に合わせた固定幅。4つ並びの w-48 に戻さない。
-    expect(page).toMatch(/<Th[^>]*w-44[^>]*>操作<\/Th>/)
-    expect(page).not.toMatch(/<Th[^>]*w-48[^>]*>操作<\/Th>/)
-    // 割合の合計は 100% 未満。残りは「だれが受けられるか」（自動）が吸う。
-    expect(percentTotal(page)).toBeLessThan(100)
+  it('/booking/menus: 共通の行末操作から長い名前のメニューの中身を開ける', () => {
+    const menu: BookingMenu = {
+      id: 'menu-long', name: '小型犬のトリミングとシャンプーを一緒に受けるメニュー',
+      category_label: null, description: null, duration_minutes: 60, buffer_after_minutes: 10,
+      base_price: 5000, sort_order: 0, is_active: 1, auto_tag_id: null,
+    }
+    render(React.createElement(React.Fragment, null,
+      React.createElement(MenusTabV8, { accountId: 'account-test', menus: [menu], status: 'ready', error: null,
+        menuCount: 1, canEdit: true, onReload: () => {} }),
+      React.createElement(RowMenu, { label: '共通の基準', appearance: 'box', size: 'row', items: [] }),
+    ))
+    expect(screen.getByRole('button', { name: menu.name, exact: true })).toBeTruthy()
+    const trigger = screen.getByRole('button', { name: `「${menu.name}」のそのほかの操作` })
+    const reference = screen.getByRole('button', { name: '共通の基準' })
+    expect(trigger.className).toBe(reference.className)
+    expect(trigger.getAttribute('data-size')).toBe(reference.getAttribute('data-size'))
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: '中身を編集' }))
+    expect(navigation.push).toHaveBeenCalledWith('/booking/menus/new?menu=menu-long')
   })
 
   it('/events: 操作列は固定幅で、中身が器からはみ出さない', () => {
-    const page = read('events/page.tsx')
+    const page = read('../v8/events/list.tsx')
+    const css = read('../v8/events/list.module.css')
     expect(page).toContain('<DataTable')
-    // 操作列は 2ボタン（約242px）に合わせた固定幅。割合（14%）に戻さない。
-    expect(page).toMatch(/<Th[^>]*w-64[^>]*>操作<\/Th>/)
+    // V8の行末メニューは共通の固定幅。旧2ボタン分の幅へ戻さない。
+    expect(page).toContain('<col className={styles.colMenu} />')
+    expect(page).toContain('<Th aria-label="操作" />')
+    expect(css).toContain('.colMenu { width: var(--tpl-fm-col-menu); }')
     expect(page).not.toMatch(/width:\s*['"]14%['"]/)
     expect(percentTotal(page)).toBeLessThan(100)
   })
 
   it('/events: 申込条件は1行で省略し、全文は title で確認する', () => {
-    const page = read('events/page.tsx')
+    const page = read('../v8/events/list.tsx')
     // 申込条件は状態の札の下へ畳む。独立した列に戻すと、狭い器で見出しが
     // 重なり「全員」が縦に折れる（m19d の撮影指摘）。
     expect(page).not.toContain('>申込条件</Th>')
     // タグ名は長さが読めない。省略を外して素の文字に戻さない。
-    expect(page).toContain('max-w-32 truncate')
-    expect(page).toContain('title={e.visible_tag_name}')
+    expect(page).toContain("<TagPill name={e.visible_tag_name ?? '消えたタグ'} size=\"sm\" />")
+    const tag = read('../components/shared/tag-pill.tsx')
+    expect(tag).toContain('<TruncatedText className={styles.name} value={name} />')
+    expect(read('../components/shared/truncated-text.module.css')).toContain('white-space: nowrap; text-overflow: ellipsis;')
   })
 
   it('/（対応が必要な受信）: 状態列は札に合わせた固定幅で、右に空けない', () => {

@@ -53,7 +53,11 @@ function safeLog(
   level: 'log' | 'warn' | 'error',
   value: SafeWebhookLog,
 ): void {
-  console[level](value);
+  const code = value.event === 'line_webhook_event_failed' ? 'line_webhook_event_failed'
+    : value.event === 'line_webhook_ledger_reserve_failed' ? 'line_webhook_ledger_reserve_failed'
+    : value.event === 'line_webhook_duplicate_skipped' ? 'line_webhook_duplicate_skipped'
+    : 'line_webhook_event';
+  console[level](JSON.stringify({ code }));
 }
 
 /**

@@ -2,8 +2,10 @@
 /*
  * ウェビナー作成（V8）の「その場で確かめる入力」。
  * 保存を押す前に、欄を離れたとき（blur）に直し方を欄の下へ出す。
- * 文は保存時と同じ「何をすれば直るか」の1文。v7 は触らない。
+ * 文は保存時と同じ「何をすれば直るか」の1文。
  */
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
@@ -18,7 +20,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.push }),
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -39,8 +41,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-/* 入口（page.tsx）は V8 のとき src/v8/webinar-edit/new を出す。この試験は今の作る画面（new-v8）の動きを見る。 */
-import NewWebinarPage from './new-v8'
+/* 現役の作成入口から、同じ操作を確かめる。 */
+import NewWebinarPage from './page'
 
 /* happy-dom に localStorage は無い。booking 配下と同じ memory stub を置く。 */
 const localStorageValues = new Map<string, string>()
@@ -57,6 +59,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   fixture.push.mockClear()
   fixture.create.mockReset()
   fixture.folders.mockReset()
@@ -87,13 +90,13 @@ async function flush() {
 }
 
 function titleInput(): HTMLInputElement {
-  const input = host.querySelector('#webinar-v8-title')
+  const input = host.querySelector('#webinar-new-title')
   if (!input) throw new Error('title input not found (v8)')
   return input as HTMLInputElement
 }
 
 function slugInput(): HTMLInputElement {
-  const input = host.querySelector('#webinar-v8-slug')
+  const input = host.querySelector('#webinar-new-slug')
   if (!input) throw new Error('slug input not found (v8)')
   return input as HTMLInputElement
 }

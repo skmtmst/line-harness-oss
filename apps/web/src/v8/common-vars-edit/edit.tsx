@@ -1,11 +1,18 @@
 'use client'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  changeReason: requiredText("変える理由を入力してください"),
+  draft_date: requiredText("開始日を入れてください"),
+}
+
 import { jstDate } from '@/lib/jst-datetime';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { notifySaved } from '@/components/shared/toast';
 import { SaveConflictBand } from '@/components/shared/save-conflict';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, CircleCheck, Download, GitCompare, Pause, Play, Plus, Smartphone, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, CircleCheck, Download, GitCompare, Pause, Play, Plus, Smartphone, Trash2, X } from 'lucide-react';
 import type { CommonVar, CommonVarChangeImpact, CommonVarDeleteImpact, CommonVarSchedule, Folder } from '@line-crm/shared';
 import Link from '@/components/shared/list-navigation'
 
@@ -23,6 +30,7 @@ import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import Button from '@/components/shared/button'
+import { StickyBarAction } from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
@@ -35,6 +43,7 @@ import { VAR_TYPE_LABELS, commonVarValueError, isSecretLikeVarValue, COMMON_VAR_
 import { blockingErrors, checkedAtText, historicalText, isChangeItem, placeholderText, reflectionScopeText, reflectionTimingText, reviewWarnings, hiddenText, immediateItems, impactCsv, impactStateFromError, impactStateText, saveErrorText, scheduleErrorText, type ChangeImpactState } from './impact';
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format';
 import styles from './edit.module.css'
+import { characterCountText, impactBreakdown, urgentImpactCount, overLimitCount } from './impact'
 import { focusFieldById } from '@/lib/use-form-errors';
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls';
@@ -417,7 +426,7 @@ function EditCommonVarV8Inner() {
       document.getElementById('cv-fallback-value')?.focus()
       return
     }
-    if (!changeReason.trim()) {
+    if ((b244Requirements.changeReason.check(changeReason) !== null)) {
       const message = '変える理由を入力してください'
       if (!saveErrors.fail("changeReason", message))
       setError(message)
@@ -596,7 +605,7 @@ function EditCommonVarV8Inner() {
 
   const addSchedule = async () => {
     if (addingSchedule || !item || !draft || !selectedAccountId) return
-    if (!draft.date) {
+    if ((b244Requirements.draft_date.check(draft.date) !== null)) {
       setScheduleDateError('開始日を入れてください')
       focusFieldById('sc-date')
       return
@@ -1011,7 +1020,7 @@ function EditCommonVarV8Inner() {
             return (
               <li key={entry.id} className={styles.historyItem}>
                 <span className={styles.historyDate}>{historyStamp(entry.createdAt)}</span>
-                <span className={previous ? styles.historyText : styles.historyTextQuiet}>{what}</span>
+                <span className={previous ? styles.historyText : styles.historyTextQuiet} title={entry.changeReason || undefined}>{what}</span>
               </li>
             )
           })}
@@ -1062,16 +1071,9 @@ function EditCommonVarV8Inner() {
     )
   ) : undefined
 
-  return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
-      boardId={narrow ? 'C67dE' : 'AYc6O'}
-      title={item?.name ?? '共通情報を編集'}
-      help={item ? (
-        <>
-          {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? emptyValue('unknown') : `${formatNumber(usageTotal)}か所で使っています`}`}
+  const conflictNotice = item && conflict ? <>
           {/* 競合の帯（板 `piWhz`）。頭の下に横いっぱい。入力は残したまま、誰の保存かを見せる。 */}
-          {conflict ? (
-            /* 帯は共通部品（save-conflict）に寄せた。誰が・いつ保存したかの文はこの画面のまま。 */
+            {/* 誰が・いつ保存したかの文と、入力を残す動きは同じ。 */}
             <div className={styles.conflictSlot}>
               <SaveConflictBand
                 title={`${conflict.actorName ?? '別の担当者'}さんが ${conflict.savedAt && formatHourMinute(conflict.savedAt) ? `${formatHourMinute(conflict.savedAt)} に` : ''}共通情報「${item.name}」を保存しました`}
@@ -1081,15 +1083,24 @@ function EditCommonVarV8Inner() {
                 onReload={adoptLatest}
               />
             </div>
-          ) : null}
+  </> : undefined
+
+  return (
+    <SaveErrorScope errors={saveErrors}><CreatePage
+      boardId={narrow ? 'C67dE' : 'AYc6O'}
+      title={item?.name ?? '共通情報を編集'}
+      help={item ? (
+        <>
+          {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? emptyValue('unknown') : `${formatNumber(usageTotal)}か所で使っています`}`}
+
         </>
       ) : undefined}
+      notice={conflictNotice}
+      noticeSpacing="band"
       identity={<></>}
       preview={preview}
       destructive={canWrite && item ? (
-        <Button variant="danger" type="button" onClick={() => openDelete()} busyLabel="処理中…">
-          削除
-        </Button>
+        <StickyBarAction destructive icon={Trash2} label="削除する" onClick={() => openDelete()} />
       ) : undefined}
       status={blocked.length > 0 ? `${blocked[0]}。直すまで保存できません。` : undefined}
       footerActions={(
@@ -1104,20 +1115,18 @@ function EditCommonVarV8Inner() {
           ) : null}
           {canWrite && item ? (
             conflict ? (
-              <Button type="button" variant="primary" onClick={() => setCompareOpen(true)} disabled={saving}>
-                <GitCompare size={14} aria-hidden="true" />
+              <Button type="button" variant="primary" icon={<GitCompare size={16} aria-hidden="true" />} onClick={() => setCompareOpen(true)} disabled={saving}>
                 比べてから保存
               </Button>
             ) : (
               <Button
                 type="button"
-                variant="primary"
+                variant="primary" icon={<Check size={16} aria-hidden="true" />}
                 disabled={saving || blocked.length > 0}
                 onClick={() => void save()}
                 busy={saving}
                 busyLabel="保存中…"
               >
-                <Check size={14} aria-hidden="true" />
                 {impactState === 'ready' && impact && usageTotal !== null
                   ? `${formatNumber(usageTotal)}か所に反映して保存`
                   : '保存する'}
@@ -1168,6 +1177,7 @@ function EditCommonVarV8Inner() {
                   <SaveErrorField names={["value","saved"]}><input
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
+                    maxLength={item.type === 'number' ? undefined : 200}
                     value={value}
                     onChange={(e) => { setSaved(false); setValue(e.target.value) }}
                     className={styles.fieldInput}
@@ -1178,7 +1188,7 @@ function EditCommonVarV8Inner() {
                 )}</Field></div>
             </div>
             {valueFieldError ? <p className={styles.fieldError} role="alert">{valueFieldError}</p> : null}
-            <div className={styles.field}><Field label="変える理由（記録に残ります）" htmlFor="cv-change-reason"><SaveErrorField names={["changeReason","saved","change_reason"]}><input
+            <div className={styles.field}><Field label="変える理由（記録に残ります）" htmlFor="cv-change-reason" requirement={b244Requirements.changeReason}><SaveErrorField names={["changeReason","saved","change_reason"]}><input
                 id="cv-change-reason"
                 type="text"
                 value={changeReason}
@@ -1195,7 +1205,7 @@ function EditCommonVarV8Inner() {
           <section className={styles.card} aria-labelledby="cv-edit-impact-heading">
             <div className={styles.cardHead}>
               <h2 id="cv-edit-impact-heading" className={styles.cardTitle}>変える前に影響を見る</h2>
-              <p className={styles.cardNote}>
+              <p className={styles.cardNote} title={impact ? [reflectionScopeText(impact), reflectionTimingText(impact), historicalText(impact), ...('canSave' in impact ? [impactBreakdown(impact), `予約中・配信中：${urgentImpactCount(impact) ?? NOT_AVAILABLE}か所`, `文字数超過：${overLimitCount(impact)}か所`] : [])].filter(Boolean).join('\n') : undefined}>
                 {impactState === 'ready' && impact
                   ? `${formatNumber(impact.total)}か所。次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません`
                   : '次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません'}
@@ -1299,10 +1309,13 @@ function EditCommonVarV8Inner() {
           ) : deleteImpact ? (
             <>
               <p className={deleteImpact.blockingTotal > 0 ? styles.fieldError : styles.fieldHint}>
-                {deleteImpact.blockingTotal > 0
+                {deleteImpact.unavailableReferences?.length
+                  ? 'まだ数えられていない使用先があります。読み直してから確認してください。'
+                  : deleteImpact.blockingTotal > 0
                   ? `いま${deleteImpact.blockingTotal}か所で使われています。一覧の削除の窓から差し替えてください。`
                   : '使っている設定はありません。'}
               </p>
+              {deleteImpact.unavailableReferences?.map((reference) => <p key={reference.kind} className={styles.fieldHint}>{reference.kindLabel}：{reference.reason}</p>)}
               <Field label="消した理由" required><SaveErrorField names={["deleteReason","delete_reason"]}><input
                   value={deleteReason}
                   onChange={(event) => setDeleteReason(event.target.value)}
@@ -1336,7 +1349,7 @@ function EditCommonVarV8Inner() {
         {draft ? (
           <div className={styles.dialogBody}>
             <div className={styles.dialogPair}>
-              <div className={styles.field}><Field label="開始日" htmlFor="sc-date"><SaveErrorField names={["date","draft.date"]}><DateField
+              <div className={styles.field}><Field label="開始日" htmlFor="sc-date" requirement={b244Requirements.draft_date}><SaveErrorField names={["date","draft.date"]}><DateField
                   id="sc-date"
                   value={draft.date}
                   min={jstNowLocalInput().date}
@@ -1471,7 +1484,7 @@ function ImpactRows({
   return (
     <>
       {rows.length === 0 ? (
-        <p className={styles.cardNote}>使われている場所がないため、確かめる文はありません。</p>
+        <p className={styles.cardNote}>{impact.total === 0 ? '使われている場所がないため、確かめる文はありません。' : 'すぐ変わる使用先の文はありません。'}</p>
       ) : (
         <div className={styles.impactList}>
           {visible.map((row, index) => (
@@ -1484,7 +1497,7 @@ function ImpactRows({
               </div>
               <div className={styles.impactPair}>
                 <p className={styles.impactBefore} title={row.currentPreview}>{`…${row.currentPreview}`}</p>
-                <p className={styles.impactAfter}>
+                <p className={styles.impactAfter} title={isChangeItem(row) ? characterCountText(row) : undefined} data-over-limit={isChangeItem(row) && row.exceedsCharacterLimit || undefined}>
                   {isChangeItem(row)
                     ? `…${row.nextPreview ?? `${NOT_AVAILABLE}（使用先を開いて確認してください）`}`
                     : '値を変えると、ここに保存後の文が出ます。'}

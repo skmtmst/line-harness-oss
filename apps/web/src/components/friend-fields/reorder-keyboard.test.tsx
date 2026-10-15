@@ -11,6 +11,7 @@
  * account-context だけ。見た目（ドラッグの挙動）は変えていない。
  */
 import React, { act } from 'react'
+import { screen } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -36,6 +37,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      folders: { ...actual.api.folders, list: async () => ({ success: true, data: [] }) },
       tags: {
         ...actual.api.tags,
         list: async () => ({ success: true, data: [] }),
@@ -101,7 +103,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href, ...rest }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -110,10 +112,12 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'a1', selectedAccount: { id: 'a1', name: '店舗A' } }),
 }))
 
-import TagsPageV4 from './tags-page-v4'
-import FriendFieldList from './field-list'
-import SupportMarkList from './mark-list'
-import SavedSearchList from './saved-search-list'
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+
+import TagsList from '@/v8/tags/list'
+import FriendFieldList from '@/v8/tags/fields-tab'
+import SupportMarkList from '@/v8/tags/marks-tab'
+import SavedSearchList from '@/v8/tags/searches-tab'
 
 let host: HTMLDivElement
 let root: Root
@@ -173,6 +177,18 @@ function grip(name: string): HTMLButtonElement {
   return el as HTMLButtonElement
 }
 
+async function keyboardActivate(element: HTMLElement) {
+  await act(async () => {
+    element.focus()
+    const key = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    element.dispatchEvent(key)
+    // happy-dom does not perform the browser's native Enter activation.
+    if (!key.defaultPrevented) element.click()
+    element.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+  })
+}
+
 async function press(element: Element, key: 'ArrowUp' | 'ArrowDown') {
   await act(async () => {
     element.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
@@ -217,13 +233,13 @@ afterEach(async () => {
 
 describe('N-049 キーボードだけで並び替えられる', () => {
   it('タグ一覧: ↓で1つ下へ動き、新しい並びを reorder API へ送る', async () => {
-    await render(React.createElement(TagsPageV4, { fixture: { items: tags, groups: [] } }))
+    await render(React.createElement(TagsList, { fixture: { items: tags, groups: [] } }))
     await press(grip('タグA'), 'ArrowDown')
     expect(calls.tagsReorder).toHaveBeenCalledWith(['t2', 't1', 't3'])
   })
 
   it('タグ一覧: 先頭で↑を押しても何も送らない', async () => {
-    await render(React.createElement(TagsPageV4, { fixture: { items: tags, groups: [] } }))
+    await render(React.createElement(TagsList, { fixture: { items: tags, groups: [] } }))
     await press(grip('タグA'), 'ArrowUp')
     expect(calls.tagsReorder).not.toHaveBeenCalled()
   })
@@ -234,7 +250,7 @@ describe('N-049 キーボードだけで並び替えられる', () => {
     途中失敗の半端な順位と、共有マークへの複製を防ぐ。
   */
   it('友だち情報欄: ↑で1つ上へ動き、新しい並びを reorder API へ1回で送る', async () => {
-    await render(React.createElement(FriendFieldList, { accountId: 'a1' }))
+    await render(React.createElement(FriendFieldList, { canEdit: true, accountId: 'a1' }))
     await press(grip('項目B'), 'ArrowUp')
     expect(calls.friendFieldsReorder).toHaveBeenCalledTimes(1)
     expect(calls.friendFieldsReorder).toHaveBeenCalledWith('a1', ['ff-2', 'ff-1', 'ff-3'])
@@ -242,16 +258,17 @@ describe('N-049 キーボードだけで並び替えられる', () => {
   })
 
   it('対応マーク: ↓で1つ下へ動き、新しい並びを reorder API へ1回で送る', async () => {
-    await render(React.createElement(SupportMarkList, { accountId: 'a1' }))
+    await render(React.createElement(SupportMarkList, { canEdit: true, accountId: 'a1' }))
     await press(grip('マークA'), 'ArrowDown')
     expect(calls.supportMarksReorder).toHaveBeenCalledTimes(1)
     expect(calls.supportMarksReorder).toHaveBeenCalledWith('a1', ['m2', 'm1', 'm3'])
     expect(calls.supportMarksUpdate).not.toHaveBeenCalled()
   })
 
-  it('保存した検索: ↑で1つ上へ動き、新しい並びを reorder API へ1回で送る', async () => {
-    await render(React.createElement(SavedSearchList, { accountId: 'a1' }))
-    await press(grip('検索B'), 'ArrowUp')
+  it('保存した検索: キーボードで上へ動かし、新しい並びを reorder API へ1回で送る', async () => {
+    await render(React.createElement(SavedSearchList, { accountId: 'a1', canEdit: true }))
+    await keyboardActivate(screen.getByRole('button', { name: '保存した検索「検索B」の操作' }))
+    await keyboardActivate(screen.getByRole('menuitem', { name: '上へ動かす' }))
     expect(calls.savedSearchesReorder).toHaveBeenCalledTimes(1)
     expect(calls.savedSearchesReorder).toHaveBeenCalledWith('a1', ['s2', 's1', 's3'])
     expect(calls.savedSearchesUpdate).not.toHaveBeenCalled()
@@ -263,7 +280,7 @@ describe('N-049 キーボードだけで並び替えられる', () => {
       mark('m2', 'マークB', 1),
       { ...mark('m3', '共有マーク', 2), isInherited: true },
     ]
-    await render(React.createElement(SupportMarkList, { accountId: 'a1' }))
+    await render(React.createElement(SupportMarkList, { canEdit: true, accountId: 'a1' }))
     await press(grip('マークA'), 'ArrowDown')
     // 末尾の共有マークは位置が固定なので送らない。動かせる2件だけの新しい順。
     expect(calls.supportMarksReorder).toHaveBeenCalledWith('a1', ['m2', 'm1'])
@@ -276,7 +293,7 @@ describe('N-049 キーボードだけで並び替えられる', () => {
       { ...mark('m2', '共有マーク', 1), isInherited: true },
       mark('m3', 'マークC', 2),
     ]
-    await render(React.createElement(SupportMarkList, { accountId: 'a1' }))
+    await render(React.createElement(SupportMarkList, { canEdit: true, accountId: 'a1' }))
     await press(grip('マークA'), 'ArrowDown')
     // 共有マークに向かう移動は止める。送られないので複製も起きない。
     expect(calls.supportMarksReorder).not.toHaveBeenCalled()
@@ -285,7 +302,7 @@ describe('N-049 キーボードだけで並び替えられる', () => {
 
   it('保存に失敗したら元の並びへ戻し、失敗を残したまま再読込しない（#1014 ATTR-02）', async () => {
     calls.friendFieldsReorder.mockResolvedValueOnce({ success: false, error: 'conflict' })
-    await render(React.createElement(FriendFieldList, { accountId: 'a1' }))
+    await render(React.createElement(FriendFieldList, { canEdit: true, accountId: 'a1' }))
     await press(grip('項目B'), 'ArrowUp')
     // 失敗のあとも項目Bは元の位置（2番目）のまま表示されている。
     // 狭幅カードと表で同じ項目が2度出るため、表の側だけを見る。
@@ -296,9 +313,13 @@ describe('N-049 キーボードだけで並び替えられる', () => {
   })
 
   it('つまみは説明付きのボタンとして出る（マウス専用の印ではない）', async () => {
-    await render(React.createElement(TagsPageV4, { fixture: { items: tags, groups: [] } }))
+    await render(React.createElement(TagsList, { fixture: { items: tags, groups: [] } }))
     const el = grip('タグA')
     expect(el.tagName).toBe('BUTTON')
-    expect(el.tabIndex).not.toBe(-1)
+    const name = host.querySelector<HTMLAnchorElement>('a[href="/tags/edit?id=t1"]')!
+    expect(name.tabIndex).toBe(0)
+    name.focus()
+    await act(async () => { name.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })) })
+    expect(document.activeElement).toBe(el)
   })
 })

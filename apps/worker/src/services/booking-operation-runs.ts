@@ -155,6 +155,8 @@ export async function listBookingOperations(
     `SELECT id, kind, status, scheduled_at, completed_at, opened_at, result_json, error_code
        FROM booking_operation_runs
       WHERE booking_id = ? AND line_account_id = ?
+        AND idempotency_key != booking_id || ':confirmation-effects'
+        AND idempotency_key != booking_id || ':confirmation-reminders'
       ORDER BY created_at ASC, id ASC`,
   ).bind(input.bookingId, input.lineAccountId).all<RunRow>();
   return (rows.results ?? []).map((row) => ({

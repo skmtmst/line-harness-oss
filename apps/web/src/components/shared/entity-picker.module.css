@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* dJZ7Q：画面の欄。選んだもの＋［選ぶ］／［変える］の1行。 */
 .field { display: flex; align-items: center; gap: var(--tpl-picker-gap); min-width: 0; width: 100%; height: var(--tpl-picker-field-h); padding: var(--tpl-picker-field-pad); border: 1px solid var(--color-control-border, var(--color-hairline)); border-radius: var(--radius-control); background: var(--color-canvas); }
@@ -34,7 +34,7 @@
 }
 
 @layer components {
-[data-theme='v8'] .field { box-shadow: var(--control-shadow); }
+:root .field { box-shadow: var(--control-shadow); }
 }
 
 @layer components {
@@ -46,6 +46,8 @@
   max-height: var(--tpl-inbox-tp-body-max);
   box-shadow: var(--tpl-inbox-line-top);
 }
+:root .tpBody { flex: none; }
+:root .tpBody .tpList > * { flex-shrink: 0; }
 .tpSide {
   display: grid;
   grid-template-rows: 1fr auto;
@@ -154,6 +156,8 @@
 .fieldValue, .fieldIcon, .fieldAction { pointer-events: none; }
 .fieldValue { align-items: center; }
 .fieldName { max-width: 100%; flex-shrink: 1; }
+/* eovoGの絞り込み：項目名と値を1行の本文として見せる。 */
+.field[data-value-prefix] .fieldName { font-size: var(--polish-text-body); font-weight: 400; line-height: var(--tpl-inbox-row-preview-lh); }
 .fieldAction { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); flex-shrink: 0; font-size: var(--text-caption); color: var(--color-accent-deep); }
 .fieldClear { position: relative; border: 0; background: none; color: var(--color-ink-secondary); font-size: var(--text-caption); cursor: pointer; }
 .fieldClear:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); }
@@ -168,8 +172,8 @@
 }
 
 /* B-203：候補のカードも同じ選択の枠・輪・点。 */
-html[data-theme='v8'] .tpCard { position: relative; padding-right: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
-html[data-theme='v8'] .tpCard[data-selected] { background: var(--color-choice-selected); outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; }
-html[data-theme='v8'] .cardRadio { appearance: none; opacity: 1; width: var(--choice-size); height: var(--choice-size); right: var(--space-16); top: var(--space-16); margin: 0; border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
-html[data-theme='v8'] .cardRadio:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
-html[data-theme='v8'] .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+html:root .tpCard { position: relative; padding-right: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
+html:root .tpCard[data-selected] { background: var(--color-choice-selected); outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; }
+html:root .cardRadio { appearance: none; opacity: 1; width: var(--choice-size); height: var(--choice-size); right: var(--space-16); top: var(--space-16); margin: 0; border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
+html:root .cardRadio:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
+html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }

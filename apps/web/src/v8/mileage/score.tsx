@@ -1,5 +1,13 @@
 'use client'
 
+import StatusBadge from '@/components/shared/status-badge'
+import { mileageStatusTone } from './parts'
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  reason: requiredText("理由を入力してください。"),
+}
+
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -24,6 +32,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { DialogFormRow } from '@/components/shared/dialog-form-row'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -31,7 +40,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { DataTable, DateCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import {
   actionScoreReasonLabel,
   formatMileageChange,
@@ -39,7 +48,7 @@ import {
   formatMileageMonthDay,
   formatMileageNumber,
 } from './display'
-import { MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import { mileagePaginationTotal } from './display'
 import styles from './mileage.module.css'
@@ -79,11 +88,6 @@ const FRIEND_BAND_LABELS: Record<ActionScoreBand, string> = {
   low: '低い',
 }
 
-const BAND_TONE: Record<ActionScoreBand, 'active' | 'neutral' | 'warn'> = {
-  high: 'active',
-  normal: 'neutral',
-  low: 'warn',
-}
 
 function bandName(band: ActionScoreBand, highMin: number, normalMin: number) {
   if (band === 'high') return `点が高い（${formatMileageNumber(highMin)} 点〜）`
@@ -129,7 +133,7 @@ function ruleChanged(rule: ActionScoreRule, published: ActionScoreRule | undefin
 
 type FriendsItem = ActionScoreOverview['items'][number]
 
-/** 手で直すときの失敗の言葉（app/mileage/action-score-adjustment-dialog.tsx から写した）。 */
+/** 手で直すときの失敗の言葉（現役の調整窓で使う）。 */
 function actionScoreAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 400) return error.message
@@ -438,7 +442,7 @@ export default function ScoreTab() {
       presentation="band"
       title={bandName(band, highMin, normalMin)}
       icon={icon}
-      value={ready ? value ?? 0 : null}
+      value={ready ? value ?? null : null}
       unit="人"
       detail={detail}
       onRetry={ready ? () => { setPage(1); setFilter(filter === band ? 'all' : band) } : undefined}
@@ -507,7 +511,7 @@ export default function ScoreTab() {
           <Bookmark size={15} aria-hidden="true" /> この分けかただと何人入るか
         </Button>
         <PerPageSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
-        <Button href={broadcastHref}>
+        <Button href={broadcastHref} title={rangeQuery ? '点数がついている人のみ' : undefined}>
           <Send size={15} aria-hidden="true" /> この帯の人に送る
         </Button>
         {!readonly ? (
@@ -521,14 +525,14 @@ export default function ScoreTab() {
 
   const friendsTable = (
     <div className={styles.tableWrap}>
-      <DataTable className={`${styles.table} ${styles.tableScore}`}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>友だち</Th>
-            <Th className={styles.colScore}>いまの点数</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>友だち</Th>
+            <Th align="right" className={styles.colScore}>いまの点数</Th>
             <Th className={styles.colBand}>帯</Th>
-            <Th className={styles.colTrend}>30日間の変化</Th>
-            <Th className={styles.colReact}>最後の反応</Th>
+            <Th align="right" className={styles.colTrend}>30日間の変化</Th>
+            <Th collapseAt="narrow" className={styles.colReact}>最後の反応</Th>
             <Th className={styles.colOpsBalance}>操作</Th>
           </TableHeadRow>
         </thead>
@@ -538,21 +542,18 @@ export default function ScoreTab() {
             const day = formatMileageMonthDay(item.lastChangedAt)
             const reason = actionScoreReasonLabel(item.lastReason)
             return (
-              <Tr data-row-id={item.friendId} key={item.friendId} className={styles.row} data-table-layout="columns">
-                <Td className={styles.colName}><FolderDotName><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></FolderDotName></Td>
-                <Td className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
+              <Tr data-row-id={item.friendId} key={item.friendId} data-table-layout="columns">
+                <Td grow><FolderDotName><span  title={item.displayName}>{item.displayName}</span></FolderDotName></Td>
+                <Td align="right" className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
                 <Td className={styles.colBand}>
-                  <span className={styles.pill} data-tone={BAND_TONE[item.band]}>
-                    <span className={styles.pillDot} aria-hidden="true" />
-                    {FRIEND_BAND_LABELS[item.band]}
-                  </span>
+                  <StatusBadge tone="neutral" dot={false}>{FRIEND_BAND_LABELS[item.band]}</StatusBadge>
                 </Td>
-                <Td className={styles.colTrend}>
+                <Td align="right" className={styles.colTrend}>
                   <span className={styles.scoreNum} data-score-delta={change === null || change === 0 ? 'zero' : change > 0 ? 'positive' : 'negative'}>
                     {change === null ? emptyValue('unknown') : formatMileageChange(change)}
                   </span>
                 </Td>
-                <Td className={styles.colReact}>
+                <Td collapseAt="narrow" className={styles.colReact}>
                   <span className={styles.cellMain} title={reason}>{day === '—' ? reason : `${day} ${reason}`}</span>
                 </Td>
                 <Td className={styles.colOpsBalance}>
@@ -663,10 +664,10 @@ export default function ScoreTab() {
         ) : rules.length === 0 ? (
           <StateCard title="条件に合うできごとはありません" description="検索や絞り込みを外すと、すべて出ます" action={<Button type="button" onClick={resetRuleFilters}>条件を外す</Button>} />
         ) : (
-          <DataTable className={styles.table}>
+          <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
             <thead>
-              <TableHeadRow className={styles.headRow} data-table-layout="columns">
-                <Th className={styles.colName}>できごと（数え方）</Th>
+              <TableHeadRow data-table-layout="columns">
+                <Th grow>できごと（数え方）</Th>
                 <Th className={styles.colGives}>点・今月当てはまった人</Th>
                 <Th className={styles.colStateWide}>状態</Th>
                 <Th className={styles.colOpsMenu}>操作</Th>
@@ -677,17 +678,14 @@ export default function ScoreTab() {
                 const changed = ruleChanged(rule, publishedRules.get(rule.id))
                 const stopped = !rule.enabled
                 return (
-                  <Tr data-row-id={rule.id} key={rule.id} className={styles.row} data-table-layout="columns">
-                    <Td className={styles.colName}><FolderDotName>
-                      <span className={styles.rowNameInk} title={rule.name}>{rule.name}</span>
+                  <Tr data-row-id={rule.id} key={rule.id} data-table-layout="columns">
+                    <Td grow><FolderDotName>
+                      <span  title={rule.name}>{rule.name}</span>
 
                     </FolderDotName></Td>
                     <Td className={styles.colGives}><span className={styles.cellMain}>{ruleValueText(rule)}</span></Td>
                     <Td className={styles.colStateWide}>
-                      <span className={styles.pill} data-tone={stopped ? 'neutral' : changed ? 'warn' : 'active'}>
-                        <span className={styles.pillDot} aria-hidden="true" />
-                        {stopped ? '停止中' : changed ? '下書きで変更' : '公開中'}
-                      </span>
+                      <StatusBadge tone={mileageStatusTone(stopped ? 'neutral' : changed ? 'warn' : 'active')}>{stopped ? '停止中' : changed ? '下書きで変更' : '公開中'}</StatusBadge>
                     </Td>
                     <Td className={styles.colOpsMenu}>
                       {!readonly ? (
@@ -745,7 +743,11 @@ export default function ScoreTab() {
 
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
-      help="行の「…」から、点数の手直し・この人を見る。表の下の「できごとの決めごと」を開くと、できごとの編集・外す・＋ できごとを足す（30日間反応がない、も選べる）。公開中のルールを止めるときは、その題の横の「…」から。"
+      help={<>
+        行の「…」から、点数の手直し・この人を見る。表の下の「できごとの決めごと」を開くと、できごとの編集・外す・＋ できごとを足す（30日間反応がない、も選べる）。公開中のルールを止めるときは、その題の横の「…」から。
+        スコアはマイルではありません。お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。
+        {rangeQuery ? <Button variant="text" href={`/friends?${rangeQuery}`}>この帯の友だちを見る（点数がついている人のみ）</Button> : null}
+      </>}
       actions={readonly ? undefined : <div className={styles.headActions}>
         <Button href="/mileage/score-rules" title="決めごとの編集画面で1人分を試します">
           <UserRound size={15} aria-hidden="true" /> 1人で試す
@@ -896,8 +898,8 @@ export function ScoreAdjustDialog({
   const bandChanges = validAmount && bandAfter !== band
   /* 確定で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
   const fields = useFormErrors()
-  fields.define('amount', '点数', () => (validAmount ? null : '1以上1000000以下の整数で点数を入力してください'))
-  fields.define('reason', '理由', () => (!reason.trim() ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null))
+  fields.define('amount', '点数', () => (validAmount ? null : '1以上1000000以下の整数で点数を入力してください'), { required: true })
+  fields.define('reason', '理由', () => ((b244Requirements.reason.check(reason) !== null) ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null), { required: true })
 
   const submit = async () => {
     if (fields.submit().length > 0) {
@@ -975,7 +977,7 @@ export function ScoreAdjustDialog({
           </div>
         </div>
 
-        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount"><SaveErrorField names={["amountText","amount_text"]}><NumberInput numericText
+        <DialogFormRow><Field label="点数" htmlFor="ml-score-amount" requirement={fields.requirement('amount')}><SaveErrorField names={["amountText","amount_text"]}><NumberInput numericText
             id="ml-score-amount"
             className={styles.dlgInput}
             inputMode="numeric"
@@ -985,9 +987,9 @@ export function ScoreAdjustDialog({
             aria-invalid={fields.invalid('amount') || undefined}
             aria-describedby={fields.invalid('amount') ? 'ml-score-amount-error' : undefined}
           /></SaveErrorField>
-<FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></div>
+<FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></DialogFormRow>
 
-        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason"><SaveErrorField names={["reason"]}><textarea
+        <DialogFormRow><Field label="理由" htmlFor="ml-score-reason" requirement={b244Requirements.reason}><SaveErrorField names={["reason"]}><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}
@@ -997,9 +999,9 @@ export function ScoreAdjustDialog({
             aria-invalid={fields.invalid('reason') || undefined}
             aria-describedby={fields.invalid('reason') ? 'ml-score-reason-error' : undefined}
           /></SaveErrorField>
-<FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError></Field></div>
+<FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError></Field></DialogFormRow>
 
-        <p className={styles.dlgCaption}>この変更で起きること</p>
+        <p className={styles.dlgCaption} title="既存の履歴は書き換えず、理由と実行者を持つ新しい調整行を追加します。同じ操作を再送しても二重反映しません。">この変更で起きること</p>
         <div className={styles.delta3}>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更前</p>
@@ -1007,11 +1009,11 @@ export function ScoreAdjustDialog({
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更量</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageChange(delta)} 点` : emptyValue('unknown')}</p>
+            <p className={styles.deltaValue}><span className={validAmount ? 'text-accent-deep' : undefined}>{validAmount ? `${formatMileageChange(delta)} 点` : emptyValue('unknown')}</span></p>
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更後</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : emptyValue('unknown')}</p>
+            <p className={styles.deltaValue}><span className={validAmount ? 'text-accent-deep' : undefined}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : emptyValue('unknown')}</span></p>
           </div>
         </div>
 
@@ -1113,36 +1115,30 @@ function ScoreHistoryDialog({
       ) : items.length === 0 ? (
         <ListState kind="empty" title="点数が変わった記録はありません" description="メッセージへの返信やリンクのクリックなど、決めたきっかけがあると記録されます。" />
       ) : (
-        <table className={styles.miniTable}>
-          <colgroup>
-            <col className={styles.miniColWhen} />
-            <col />
-            <col className={styles.miniColNum} />
-            <col className={styles.miniColNum} />
-          </colgroup>
+        <DataTable columnSizing="content" aria-label="点数の変化の明細">
           <thead>
-            <tr>
-              <Th className={styles.miniTh}>いつ</Th>
-              <Th className={styles.miniTh}>できごと</Th>
-              <Th className={`${styles.miniTh} ${styles.miniNum}`} align="right">点</Th>
-              <Th className={`${styles.miniTh} ${styles.miniNum}`} align="right">合計</Th>
-            </tr>
+            <TableHeadRow>
+              <Th>いつ</Th>
+              <Th>できごと</Th>
+              <Th align="right">点</Th>
+              <Th align="right">合計</Th>
+            </TableHeadRow>
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.id}>
-                <td className={styles.miniOneLine}><time dateTime={item.occurredAt}>{formatScoreHistoryTime(item.occurredAt)}</time></td>
-                <td className={styles.miniOneLine} title={actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}>{actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}</td>
-                <td className={styles.miniNum}>
-                  <span data-score-delta={item.scoreChange > 0 ? 'positive' : item.scoreChange < 0 ? 'negative' : 'zero'}>
+              <Tr key={item.id}>
+                <DateCell><time data-list-date-time dateTime={item.occurredAt}>{formatScoreHistoryTime(item.occurredAt)}</time></DateCell>
+                <Td grow title={`${actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}・${item.scoreBefore == null || item.scoreAfter == null ? '前後の点数は未取得' : `${formatMileageNumber(item.scoreBefore)} 点 → ${formatMileageNumber(item.scoreAfter)} 点`}・${item.mode === 'manual' ? `手で変更（${item.executedByStaffName ?? '担当者は未取得'}）` : '自動で加算'}`}><TruncatedText value={actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)} /></Td>
+                <Td align="right">
+                  <span className={styles.historyDelta} data-score-delta={item.scoreChange > 0 ? 'positive' : item.scoreChange < 0 ? 'negative' : 'zero'}>
                     {formatMileageChange(item.scoreChange)}
                   </span>
-                </td>
-                <td className={styles.miniNum}>{item.scoreAfter === null ? emptyValue('unknown') : formatMileageNumber(item.scoreAfter)}</td>
-              </tr>
+                </Td>
+                <Td align="right">{item.scoreAfter === null ? emptyValue('unknown') : formatMileageNumber(item.scoreAfter)}</Td>
+              </Tr>
             ))}
           </tbody>
-        </table>
+        </DataTable>
       )}
       </div>
     </Dialog>

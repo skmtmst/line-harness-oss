@@ -16,7 +16,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 const account = vi.hoisted(() => ({ id: 'account-1' }))
 const routerPush = vi.hoisted(() => vi.fn())
-vi.mock('next/navigation', () => ({
+const notice = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shared/toast', () => ({ notifyToast: notice, notifySaved: notice }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: routerPush, replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -44,6 +47,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      tagGroups: { ...actual.api.tagGroups, list: vi.fn().mockResolvedValue({ success: true, data: [] }) },
+      friends: { ...actual.api.friends, list: vi.fn().mockResolvedValue({ success: true, data: { items: [{ id: 'friend-1', displayName: '相談者' }], total: 1 } }) },
       tags: { ...actual.api.tags, list: vi.fn() },
       scenarios: { ...actual.api.scenarios, list: vi.fn() },
       friendFields: { ...actual.api.friendFields, list: vi.fn() },
@@ -67,7 +72,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { api, ApiError } from '@/lib/api'
-import NewAutomationPage from './page'
+import { NewAutomationV8 as NewAutomationPage } from '@/v8/automations/create/create'
+import { pickAutomationTag, pickAutomationTestFriend } from '@/test-utils/automation-v8-interactions'
 
 const mockList = api.automations.list as unknown as ReturnType<typeof vi.fn>
 const mockResources = api.automations.draftResources as unknown as ReturnType<typeof vi.fn>
@@ -97,6 +103,8 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  notice.mockReset()
   account.id = 'account-1'
   routerPush.mockReset()
   window.sessionStorage.clear()
@@ -137,6 +145,8 @@ afterEach(async () => {
   root = null
   container = null
   document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
+  vi.unstubAllGlobals()
   vi.clearAllMocks()
 })
 
@@ -162,18 +172,10 @@ async function typeText(input: HTMLInputElement, value: string): Promise<void> {
   })
 }
 
-async function chooseOption(select: HTMLSelectElement, value: string): Promise<void> {
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')?.set
-    setter?.call(select, value)
-    select.dispatchEvent(new Event('change', { bubbles: true }))
-  })
-}
-
 async function clickButton(el: HTMLElement, text: string): Promise<void> {
   // 確認窓は最上層（document.body）に出ることがある。器になければ全体から探す。
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === text)
-    ?? Array.from(document.querySelectorAll('button')).find((node) => node.textContent === text)
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]'))
+    ?? Array.from(document.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]'))
   if (!button) throw new Error(`ボタンが見つかりません: ${text}`)
   await act(async () => { (button as HTMLButtonElement).click() })
   await act(async () => { await drainMicrotasks() })
@@ -181,18 +183,18 @@ async function clickButton(el: HTMLElement, text: string): Promise<void> {
 
 /** 下書きを保存して1人テストの確認まで開く。確認文が出た器を返す。 */
 async function openTestConfirmation(el: HTMLDivElement): Promise<void> {
-  await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, '試すルール')
-  await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-  await clickButton(el, '下書きを保存する')
-  await typeText(el.querySelector('input[aria-label="1人テストの友だちID"]') as HTMLInputElement, 'friend-1')
+  await typeText(el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement, '試すルール')
+  await pickAutomationTag('予約')
+  await clickButton(el, '下書きを保存')
+  await pickAutomationTestFriend('friend-1')
   await clickButton(el, '1人で試す')
   if (!el.textContent?.includes('送る前に確認してください')) throw new Error('1人テストの確認が出ませんでした')
 }
 
 /** 「つくって動かす」→確認窓→「保存して動かし始める」。 */
 async function activateRule(el: HTMLDivElement): Promise<void> {
-  await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, '動かすルール')
-  await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
+  await typeText(el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement, '動かすルール')
+  await pickAutomationTag('予約')
   await clickButton(el, 'つくって動かす')
   await clickButton(el, '保存して動かし始める')
 }
@@ -257,7 +259,7 @@ describe('R490・R491: 公開の再試行と店切替', () => {
     mockUpdate.mockRejectedValueOnce(new ApiError(404, '編集中の下書きが見つかりません'))
     mockList.mockResolvedValue(ok([{ id: 'draft-9', status: 'active' }]))
     await activateRule(el)
-    expect(el.textContent).toContain('すでに公開されています')
+    expect(notice).toHaveBeenCalledWith(expect.stringContaining('すでに公開されています'))
     // 新しい下書きは作らない（稼働ルールを2件にしない）。
     expect(mockCreate).toHaveBeenCalledTimes(1)
     expect(routerPush).toHaveBeenCalledWith('/automations?highlight=draft-9')
@@ -335,10 +337,10 @@ describe('R486・R487・R489: 共通アクションの版と公開の照合', ()
       }],
     }))
     const el = await mountPage()
-    await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, '試すルール')
-    await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-    await clickButton(el, '下書きを保存する')
-    await typeText(el.querySelector('input[aria-label="1人テストの友だちID"]') as HTMLInputElement, 'friend-1')
+    await typeText(el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement, '試すルール')
+    await pickAutomationTag('予約')
+    await clickButton(el, '下書きを保存')
+    await pickAutomationTestFriend('friend-1')
     await clickButton(el, '1人で試す')
     expect(el.textContent).not.toContain('送る前に確認してください')
     expect(el.textContent).toContain('共通アクションの内容を確認できませんでした')
@@ -350,9 +352,11 @@ describe('R486・R487・R489: 共通アクションの版と公開の照合', ()
     const el = await mountPage()
     await activateRule(el)
     expect(mockPublish).not.toHaveBeenCalled()
-    expect(el.textContent).toContain('ほかの人が同じ下書きを保存しました')
+    expect(el.textContent).toContain('ほかの人が先にこのルールを保存しました')
+    expect(el.querySelector('[data-template-region="notice"] [data-save-conflict]')).not.toBeNull()
+    expect(el.querySelector('[data-template-region="heading"] [data-save-conflict]')).toBeNull()
     // 自分の入力は消えず、相手の保存も消えない（双方保持）。
-    expect((el.querySelector('input[id="au-name"]') as HTMLInputElement).value).toBe('動かすルール')
+    expect((el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement).value).toBe('動かすルール')
   })
 })
 
@@ -361,8 +365,8 @@ describe('R491: 公開待ちの店切替', () => {
     let releasePublish!: (value: unknown) => void
     mockPublish.mockReturnValueOnce(new Promise((resolve) => { releasePublish = resolve as (value: unknown) => void }))
     const el = await mountPage()
-    await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, '動かすルール')
-    await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
+    await typeText(el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement, '動かすルール')
+    await pickAutomationTag('予約')
     await clickButton(el, 'つくって動かす')
     await clickButton(el, '保存して動かし始める')
     // 公開待ちの間にB店へ。

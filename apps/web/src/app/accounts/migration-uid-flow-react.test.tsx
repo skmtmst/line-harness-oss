@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccountMigration from './migration'
+import UidMigrationV8 from '@/v8/friends/migrations/uid'
 
 /**
  * Issue #1012 FRIEND-14/15/16/33/36 の回帰試験。
@@ -143,6 +144,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme='v8'
   fixture.push.mockClear()
   fixture.replace.mockClear()
   net.calls.length = 0
@@ -164,6 +166,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  document.documentElement.removeAttribute('data-theme')
   document.body.innerHTML = ''
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
@@ -180,6 +183,8 @@ async function flush() {
 }
 
 function buttonByText(text: string, scope: ParentNode = document.body): HTMLButtonElement {
+  if(text==='開く') text='詳細'
+  if(text==='本移行を実行' && scope===document.body) text='本移行へ進む'
   const found = Array.from(scope.querySelectorAll('button')).find((button) => button.textContent?.trim() === text)
   if (!found) throw new Error(`button "${text}" not found`)
   return found
@@ -188,6 +193,7 @@ function buttonByText(text: string, scope: ParentNode = document.body): HTMLButt
 /** 履歴行のように、目的の文字列を中に含むボタンを拾う。 */
 function buttonContaining(text: string, scope: ParentNode = document.body): HTMLButtonElement {
   const found = Array.from(scope.querySelectorAll('button')).find((button) => button.textContent?.includes(text))
+    ?? Array.from(scope.querySelectorAll('tr')).find(row=>row.textContent?.includes(text))?.querySelector('button')
   if (!found) throw new Error(`button containing "${text}" not found`)
   return found
 }
@@ -199,6 +205,32 @@ function openDialog(): HTMLElement {
 }
 
 const writes = () => net.calls.filter((call) => call.method !== 'GET')
+
+describe('完了した移行履歴の表示と操作', () => {
+  it('完了履歴に選択面を付けず、現在の履歴と切り戻しの確認を残す', async () => {
+    net.runs = [runFixture({ status: 'completed', rollbackable: true })]
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    const history = host.querySelector('[aria-labelledby="uid-history"]')!
+    const current = history.querySelector('button[aria-current="true"]')!
+    expect(current).not.toBeNull()
+    expect(current.closest('tr')?.getAttribute('aria-selected')).toBeNull()
+    expect(host.textContent).toContain('照合の結果')
+    fireEvent.click(buttonByText('切り戻す', history))
+    await flush()
+    expect(openDialog().textContent).toContain('切り戻す')
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('判断中の履歴には選択面を保つ', async () => {
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    const current = host.querySelector('[aria-labelledby="uid-history"] button[aria-current="true"]')!
+    expect(current).not.toBeNull()
+    expect(current.closest('tr')?.getAttribute('aria-selected')).toBe('true')
+    expect(writes()).toHaveLength(0)
+  })
+})
 
 describe('UID移行の詳細確認（FRIEND-14）', () => {
   it('「開く」は読み取り専用で、更新APIを呼ばない', async () => {
@@ -292,7 +324,7 @@ describe('UID移行の切り戻し（FRIEND-36/15）', () => {
     await render()
     await flush()
     expect(document.body.textContent).not.toContain('実データはまだ変更していません')
-    expect(document.body.textContent).toContain('本移行と照合が完了しています')
+    expect(document.body.textContent).toContain('本移行と照合が終わりました')
     fireEvent.click(buttonByText('この移行を切り戻す'))
     await flush()
     const dialog = openDialog()
@@ -445,9 +477,9 @@ describe('UID移行の空と履歴のカード表示', () => {
     const emptyTitle = Array.from(document.body.querySelectorAll('p')).find((node) => node.textContent === 'テスト移行はまだありません')
     expect(emptyTitle).toBeTruthy()
     // 灰色の1枚ではなく、白地・枠・角丸のカード（section）の中にある。
-    const card = emptyTitle!.closest('section.bg-canvas')
+    const card = emptyTitle!.closest('section')
     expect(card).toBeTruthy()
-    expect(card!.querySelector('h2')?.textContent).toBe('テスト移行の結果')
+    expect(card!.querySelector('h3')?.textContent).toBe('テスト移行の結果')
     // 履歴側の空カードも同じ形で出す。
     expect(document.body.textContent).toContain('移行履歴はまだありません')
   })
@@ -458,7 +490,9 @@ describe('UID移行の空と履歴のカード表示', () => {
     await flush()
     expect(document.body.querySelector('a[href="#migration-history"]')).toBeNull()
     // 別画面への導線は残す。
-    expect(document.body.querySelector('a[href="/friends/migrations"]')).toBeTruthy()
+    fireEvent.click(buttonByText('データ管理'))
+    fireEvent.click(buttonByText('CSVで書き出す'))
+    expect(fixture.push).toHaveBeenCalledWith('/friends/migrations')
   })
 
   it('読み込み中は1枚だけ出す', async () => {
@@ -475,7 +509,7 @@ describe('UID移行の空と履歴のカード表示', () => {
     net.failList = 'network'
     await render()
     await flush()
-    expect(document.body.textContent).toContain('UID移行を表示できませんでした')
+    expect(document.body.textContent).toContain('UID移行を読み込めませんでした')
     // 登録した履歴が消えたように見せない文言を出す。
     expect(document.body.textContent).toContain('登録した移行履歴は消えていません')
     // 再読み込みで直る。
@@ -488,8 +522,8 @@ describe('UID移行の空と履歴のカード表示', () => {
   it('対応表あり（正常）は結果カードと履歴節を両方出す', async () => {
     await render()
     await flush()
-    expect(document.body.textContent).toContain('テスト移行の状態')
-    expect(document.body.textContent).toContain('移行履歴')
+    expect(document.body.textContent).toContain('要確認の判断')
+    expect(document.body.textContent).toContain('移行の履歴')
     expect(document.body.querySelector('a[href="#migration-history"]')).toBeNull()
   })
 })

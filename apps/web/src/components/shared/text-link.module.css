@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * リンク（→つき。Pencil ★V8 `g5Db8`）。
@@ -18,11 +18,10 @@
 
 .label {
   font-size: var(--text-caption);
-  font-weight: 500;
 }
 
 /* Pencil の文字は行の高さ 1.5（--text-lh）。v7 は書かない（既定のまま）。 */
-[data-theme='v8'] .label {
+:root .label {
   line-height: var(--text-lh);
 }
 
@@ -45,11 +44,11 @@
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .root { font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
-[data-theme='v8'] .label { line-height: 18px; }
+:root .root { font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .label { line-height: 18px; }
 }
 
 /* B-152②：役割ごとの文字の段。 */
-[data-theme='v8'] .label { font-weight: var(--polish-weight-body); }
+:root .label { font-weight: var(--polish-weight-label); }
 
 @layer components { .root[data-tone='action']{color:var(--color-accent-deep);} }

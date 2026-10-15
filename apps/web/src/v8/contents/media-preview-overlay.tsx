@@ -1,6 +1,5 @@
 'use client'
 
-/* ★V8 写し：src/app/contents/media-preview-overlay.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
 import Dialog from '@/components/shared/dialog'
 import TextLink from '@/components/shared/text-link'

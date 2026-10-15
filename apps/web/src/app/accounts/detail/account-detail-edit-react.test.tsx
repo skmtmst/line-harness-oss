@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { within } from '@testing-library/react'
 import AccountDetailPage from './page'
 
 /**
@@ -13,9 +14,6 @@ import AccountDetailPage from './page'
  * 統括・管理者だけに開く。
  */
 
-// v7 の画面（AccountDetail と AccountEditModal）の試験。V8 の画面（src/v8/accounts-detail）は入口が分けるので、
-// ここは v7 に固定する。V8 の同じ動きは src/v8/accounts-detail/detail.test.tsx が見る。
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v7' }))
 
 const fixture = vi.hoisted(() => ({
   tab: 'overview' as string | null,
@@ -23,12 +21,12 @@ const fixture = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
+  default: ({ children, href, ...rest }: React.ComponentProps<'a'>) => (
+    <a href={href} {...rest}>{children}</a>
   ),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => ({
     get: (key: string) => (key === 'id' ? 'a1' : key === 'tab' ? fixture.tab : null),
   }),
@@ -36,7 +34,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => undefined, replace: () => undefined, back: () => undefined }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
   usePageChrome: () => ({ title: null, fullWidth: false }),
 }))
@@ -73,6 +71,7 @@ function installFetch() {
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
     let body: unknown
     if (path === '/api/staff/me') body = { success: true, data: { role: fixture.role } }
+    else if (path.includes('/test-recipients')) body = {success:true,data:[]}
     else if (path === '/api/line-accounts/a1') body = { success: true, data: ACCOUNT }
     else if (path === '/api/line-accounts' || path.startsWith('/api/line-accounts?')) {
       body = { success: true, data: [ACCOUNT] }
@@ -87,6 +86,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme='v8'
   fixture.tab = 'overview'
   fixture.role = 'owner'
   installFetch()
@@ -98,7 +98,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(async () => { root.unmount() })
-  host.remove()
+  host.remove(); delete document.documentElement.dataset.theme
   vi.unstubAllGlobals()
 })
 
@@ -110,7 +110,7 @@ async function renderPage() {
 }
 
 function clickButton(label: string) {
-  const button = [...host.querySelectorAll('button')].find((el) => el.textContent === label)
+  const button = [...document.body.querySelectorAll('button')].find((el) => el.textContent?.trim() === label)
   expect(button, `ボタン「${label}」がある`).toBeTruthy()
   act(() => { button!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
 }
@@ -118,17 +118,17 @@ function clickButton(label: string) {
 describe('R73 編集・差替えの入口', () => {
   it('「編集」で登録内容の入力窓が開く', async () => {
     await renderPage()
-    clickButton('編集')
-    expect(host.textContent).toContain('登録の内容を編集する')
-    expect(host.querySelector('input[aria-label="タイムゾーン"]')).toBeTruthy()
-    const nameInput = host.querySelector('input[value="然-NEN- TEST"]')
+    clickButton('編集する')
+    expect(document.body.textContent).toContain('登録の内容を編集する')
+    expect(within(document.body).getByLabelText('タイムゾーン')).toBeTruthy()
+    const nameInput = document.body.querySelector('input[value="然-NEN- TEST"]')
     expect(nameInput).toBeTruthy()
   })
 
   it('「差し替える」で資格情報の入力窓が開く', async () => {
     await renderPage()
     clickButton('差し替える')
-    expect(host.textContent).toContain('資格情報を差し替える')
+    expect(document.body.textContent).toContain('資格情報を差し替える')
   })
 
   it('運用担当には入力の入口を見せない', async () => {
@@ -142,15 +142,15 @@ describe('R73 編集・差替えの入口', () => {
   it('資格情報タブにも保存の入口がある', async () => {
     fixture.tab = 'credentials'
     await renderPage()
-    expect(host.textContent).toContain('値そのものは、ここにも出しません')
-    clickButton('資格情報を差し替える')
-    expect(host.textContent).toContain('資格情報を差し替える')
+    expect(document.body.textContent).toContain('秘密値そのものは表示しません')
+    clickButton('差し替える')
+    expect(document.body.textContent).toContain('資格情報を差し替える')
   })
 })
 
  it('V8 saves timezone through PUT and reloads the account', async () => {
-    await renderPage(); clickButton('編集');
-    const input = host.querySelector('input[aria-label="タイムゾーン"]') as HTMLInputElement;
+    await renderPage(); clickButton('編集する');
+    const input = within(document.body).getByLabelText('タイムゾーン') as HTMLInputElement;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'Europe/Paris');
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -161,6 +161,8 @@ describe('R73 編集・差替えの入口', () => {
       requests.push({ url: String(url), init });
       return original(url, init);
     });
-    await act(async () => { host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    await act(async () => { [...document.body.querySelectorAll('button')].find(b => b.textContent?.trim() === '保存する')!.click(); });
     expect(requests.some((r) => r.init?.method === 'PUT' && JSON.parse(String(r.init.body)).timezone === 'Europe/Paris')).toBe(true);
  });
+
+vi.mock('@/contexts/account-context', () => ({useAccount: () => ({selectedAccountId:'a1',selectedAccount:{id:'a1',name:'Fixture'},accounts:[],loading:false})}))

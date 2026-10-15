@@ -18,6 +18,7 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
  */
 import { Hono } from 'hono';
 import type { Context, MiddlewareHandler } from 'hono';
+import { CredentialEncryptionKeyError, encryptCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -27,13 +28,36 @@ import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
+import { randomToken } from '../services/google-business.js';
+import {
+  UberEatsError,
+  buildAuthorizeUrl as buildUberAuthorizeUrl,
+  exchangeAuthorizationCode as exchangeUberAuthorizationCode,
+} from '../services/uber-eats.js';
+import { UBER_PROVISIONING_SCOPES } from '../services/uber-eats-hosts.js';
+import { verifySupportRelay } from '../services/support-relay.js';
+import { platformCooldownStore, probeUberSandboxToken, uberProbeSecret } from '../services/ubereats-token-probe.js';
 import { accountId, fail, staffTenantId, storeFor } from './restaurant-google.js';
 import type { StoreContext } from './restaurant-google.js';
 import {
+  deliveryWebhookIpAllowlist,
+  deliveryWebhookSecret,
+  isDeliveryWebhookIpAllowed,
+  webhookSourceIp,
+} from '../services/delivery-webhook-ip.js';
+import {
+  MAX_WEBHOOK_BODY_BYTES,
+  WEBHOOK_SKEW_SECONDS,
+  parseWebhookPayload,
+  utf8Length,
+  type WebhookOrder,
+} from '../services/delivery-webhook-payload.js';
+import {
+  UBER_OAUTH_CALLBACK_PATH,
+  uberOAuthClient,
   DELIVERY_SERVICES,
   DELIVERY_SERVICE_LABELS,
   canTransitionOrder,
-  deliveryWebhookSecret,
   dispatchToDeliveryService,
   isDeliveryService,
   isIntakeStopPreset,
@@ -157,6 +181,15 @@ const ORDER_STATUS_LABELS: Record<DeliveryOrderStatus, string> = {
 function isoOrNull(seconds: number | null | undefined): string | null {
   if (seconds === null || seconds === undefined) return null;
   return new Date(seconds * 1000).toISOString();
+}
+
+/**
+ * Uber 接続（636 の表）だけは時刻をミリ秒で持つ。書き込み側が `Date.now()` のため、
+ * 秒を前提にした上の `isoOrNull` と混ぜると1970年になる。読み取り口はこちらを使う。
+ */
+function isoFromMs(ms: number | null | undefined): string | null {
+  if (ms === null || ms === undefined) return null;
+  return new Date(ms).toISOString();
 }
 
 // ---------- 入口の検査（restaurant-google.ts と同じ3点検査） ----------
@@ -1144,6 +1177,7 @@ restaurantDelivery.get(
       { id: store.id, kind: 'rt_store' },
       { lineAccountId: store.lineAccountId },
     );
+    c.set('outputAudit', { count: orders.length, accountId: store.lineAccountId, targetId: store.id });
     const fileName = `delivery-orders_${filter.fromText}_${filter.toText}.csv`;
     const headers: Record<string, string> = {
       'Content-Type': 'text/csv; charset=utf-8',
@@ -1538,135 +1572,6 @@ restaurantDelivery.post(
 
 // ---------- 受信（各サービスの公式窓口からの通知） ----------
 
-const MAX_WEBHOOK_BODY_BYTES = 128 * 1024;
-/** 署名の時刻ずれの許容。他の受信口（EC連携・成果受信）と同じ5分。 */
-const WEBHOOK_SKEW_SECONDS = 5 * 60;
-
-function utf8Length(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
-}
-
-/** 文字列の必須項目。長さ上限を超えた値は受け取らない（画面の崩れとDB肥大を防ぐ）。 */
-function textField(value: unknown, max: number): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > max) return null;
-  return trimmed;
-}
-
-function optionalText(value: unknown, max: number): string | null {
-  if (value === undefined || value === null) return null;
-  return textField(value, max);
-}
-
-function countField(value: unknown, max: number): number | null {
-  if (!Number.isSafeInteger(value)) return null;
-  const num = Number(value);
-  if (num < 0 || num > max) return null;
-  return num;
-}
-
-/** エポック秒。範囲外・形式違いは null にして、呼び出し側で既定値へ落とす。 */
-function epochField(value: unknown, now: number): number | null {
-  if (!Number.isSafeInteger(value)) return null;
-  const num = Number(value);
-  // 過去30日〜未来7日の外は受け取らない（誤った単位・ミリ秒混入を弾く）。
-  if (num < now - 30 * 86400 || num > now + 7 * 86400) return null;
-  return num;
-}
-
-interface WebhookItem {
-  name: string;
-  note: string | null;
-  quantity: number;
-  amount: number;
-}
-
-interface WebhookOrder {
-  externalOrderId: string;
-  orderNumber: string;
-  totalAmount: number;
-  pickupMethod: string | null;
-  wantedAt: number | null;
-  customerNote: string | null;
-  receivedAt: number;
-  items: WebhookItem[];
-}
-
-interface WebhookPayload {
-  eventId: string;
-  eventType: string;
-  storeId: string;
-  order: WebhookOrder | null;
-  cancel: { externalOrderId: string; canceledBy: 'customer' | 'service' } | null;
-}
-
-/**
- * 3サービス共通の受信形式。
- * サービスごとの項目名の違いは各サービスの窓口設定側で共通名へ寄せる。
- * ここで受け取るのは検証済みの項目だけで、サービスから届いた自由文の
- * エラー文や説明文は取り込まない。
- */
-function parseWebhookPayload(
-  raw: unknown,
-  now: number,
-): { ok: true; payload: WebhookPayload } | { ok: false; error: string } {
-  if (!raw || typeof raw !== 'object') return { ok: false, error: 'Invalid payload' };
-  const body = raw as Record<string, unknown>;
-  const eventId = textField(body.event_id, 128);
-  const eventType = textField(body.event_type, 64);
-  const storeId = textField(body.store_id, 128);
-  if (!eventId || !eventType || !storeId) return { ok: false, error: 'Invalid payload' };
-
-  let order: WebhookOrder | null = null;
-  if (body.order && typeof body.order === 'object') {
-    const source = body.order as Record<string, unknown>;
-    const externalOrderId = textField(source.external_order_id, 128);
-    const orderNumber = textField(source.order_number, 64);
-    const totalAmount = countField(source.total_amount, 10_000_000);
-    if (!externalOrderId || !orderNumber || totalAmount === null) {
-      return { ok: false, error: 'Invalid order' };
-    }
-    const items: WebhookItem[] = [];
-    if (Array.isArray(source.items)) {
-      if (source.items.length > 100) return { ok: false, error: 'Invalid order' };
-      for (const entry of source.items) {
-        if (!entry || typeof entry !== 'object') return { ok: false, error: 'Invalid order' };
-        const item = entry as Record<string, unknown>;
-        const name = textField(item.name, 200);
-        const quantity = countField(item.quantity, 999);
-        const amount = countField(item.amount, 10_000_000);
-        if (!name || quantity === null || quantity === 0 || amount === null) {
-          return { ok: false, error: 'Invalid order' };
-        }
-        items.push({ name, note: optionalText(item.note, 200), quantity, amount });
-      }
-    }
-    order = {
-      externalOrderId,
-      orderNumber,
-      totalAmount,
-      pickupMethod: optionalText(source.pickup_method, 100),
-      wantedAt: epochField(source.wanted_at, now),
-      customerNote: optionalText(source.customer_note, 500),
-      receivedAt: epochField(source.received_at, now) ?? now,
-      items,
-    };
-  }
-
-  let cancel: WebhookPayload['cancel'] = null;
-  if (body.cancel && typeof body.cancel === 'object') {
-    const source = body.cancel as Record<string, unknown>;
-    const externalOrderId = textField(source.external_order_id, 128);
-    if (!externalOrderId) return { ok: false, error: 'Invalid cancel' };
-    // 発生元は店舗以外の2つだけ。店舗のキャンセルは画面（D-3）から記録する。
-    const canceledBy = source.canceled_by === 'customer' ? 'customer' : 'service';
-    cancel = { externalOrderId, canceledBy };
-  }
-
-  return { ok: true, payload: { eventId, eventType, storeId, order, cancel } };
-}
-
 /** 署名検証を通った通知の宛先店舗。担当者の認証は通らないため、ここで店舗を確定する。 */
 async function webhookStore(c: Context<Env>, storeId: string): Promise<StoreContext | null> {
   const row = await dbFor(c.env, storeId)
@@ -1786,10 +1691,11 @@ async function ingestCancel(
 /**
  * 各サービスからの通知の受け口。
  *
- * 担当者の認証は通らない。守りは3つで、
- * 1) サービスごとの合言葉によるHMAC-SHA256の署名検証、
- * 2) 5分の時刻ずれ制限、
- * 3) 受信台帳 `rt_delivery_events` の UNIQUE (service, external_event_id) による重複排除。
+ * 担当者の認証は通らない。守りは4つで、
+ * 1) 送信元IPの許可リスト（設定されているときだけ。出前館QA#7）、
+ * 2) サービスごとの合言葉によるHMAC-SHA256の署名検証、
+ * 3) 5分の時刻ずれ制限、
+ * 4) 受信台帳 `rt_delivery_events` の UNIQUE (service, external_event_id) による重複排除。
  * 署名が合わない通知は本文を保存しない。
  */
 restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async (c) => {
@@ -1797,10 +1703,24 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
   if (!isDeliveryService(service)) {
     return c.json({ success: false, error: 'Unknown service' }, 404);
   }
+  // 送信元IPの確認は本文を読む前に行う。許可外からの通知は本文も台帳も残さない。
+  const allowlist = deliveryWebhookIpAllowlist(c.env, service);
+  if (allowlist !== null) {
+    const sourceIp = webhookSourceIp({
+      cfConnectingIp: c.req.header('cf-connecting-ip'),
+      forwardedFor: c.req.header('x-forwarded-for'),
+      realIp: c.req.header('x-real-ip'),
+    });
+    if (!isDeliveryWebhookIpAllowed(sourceIp, allowlist)) {
+      // 符号と道筋だけを記録する。相手のIPやサービス名は記録に残さない。
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_webhook_ip_not_allowed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+  }
   const secret = deliveryWebhookSecret(c.env, service);
   if (!secret) {
     // 合言葉が未設定・短すぎる場合は検証できない。受け取らずに設定不足として返す。
-    console.error('[rt-delivery] webhook secret is not configured', JSON.stringify({ service }));
+    console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
     return c.json({ success: false, error: 'Integration is not configured' }, 503);
   }
 
@@ -1905,11 +1825,380 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
     return c.json({ success: true, result: 'ignored' });
   } catch (error) {
     // 例外の本文は残さない。種類だけを符号にして台帳へ入れ、相手には再試行を促す。
-    console.error(
-      '[rt-delivery] webhook processing failed',
-      JSON.stringify({ service, name: error instanceof Error ? error.name : 'unknown' }),
-    );
+    console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
     await closeEvent('retryable_failed', 'processing_failed');
     return c.json({ success: false, error: 'Processing failed' }, 503);
+  }
+});
+
+// ---------- Uber Eats のログイン連携（店舗が自分でつなぐ経路） ----------
+//
+// 公式仕様の根拠は docs/integrations/uber-eats-connection.md の2節・5節。
+// 店舗が鍵を写して貼る操作はない。店舗がすることは「ログインして許可する」だけで、
+// 認可コードからトークンへの交換はここ（サーバ間）で行う。
+// 戻り先URLは配備の設定から組み立てる（呼び出し元のホストからは作らない）。
+// 入口と戻り先が1文字でも違うと Uber 側ではじかれるため。
+
+/** 認可の一時状態を入れるCookie。戻り先の道だけに限る。 */
+const UBER_STATE_COOKIE = 'lh_uber_state';
+
+/** 一時状態の寿命。1回使い切りで、これを過ぎたら使えない。 */
+const UBER_STATE_MAX_AGE_SEC = 600;
+
+/** 認可のあと店舗を戻す管理画面の道（設定 › デリバリー連携）。 */
+const UBER_ADMIN_RETURN_PATH = '/settings/delivery';
+
+interface UberOAuthStateRow {
+  state: string;
+  account_id: string;
+  store_id: string;
+  staff_id: string;
+  mode: 'connect' | 'reconnect';
+  expires_at: number;
+  used_at: number | null;
+}
+
+interface UberConnectionRow {
+  store_id: string;
+  account_id: string;
+  uber_store_id: string | null;
+  uber_store_name: string | null;
+  access_token_expires_at: number | null;
+  granted_scope: string | null;
+  status: 'pending_store' | 'connected' | 'expired' | 'no_permission' | 'disconnected';
+  connected_at: number | null;
+  provisioned_at: number | null;
+  updated_at: number | null;
+  last_error: string | null;
+  version: number;
+}
+
+function uberStateCookie(value: string, maxAge = UBER_STATE_MAX_AGE_SEC): string {
+  return `${UBER_STATE_COOKIE}=${encodeURIComponent(value)}; Path=${UBER_OAUTH_CALLBACK_PATH}; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
+function readUberStateCookie(header: string | undefined): string | null {
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const [key, ...value] = part.trim().split('=');
+    if (key === UBER_STATE_COOKIE) {
+      try {
+        return decodeURIComponent(value.join('='));
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/** 店舗を設定画面へ戻す。結果は符号だけで、自由文や秘密値は載せない。 */
+function uberReturnUrl(c: Context<Env>, lineAccountId: string | null, result: string): string {
+  const base = (c.env.ADMIN_PUBLIC_URL ?? '').replace(/\/+$/, '');
+  const url = new URL(`${base || new URL(c.req.url).origin}${UBER_ADMIN_RETURN_PATH}`);
+  if (lineAccountId) url.searchParams.set('account_id', lineAccountId);
+  url.searchParams.set('ubereats', result);
+  return url.toString();
+}
+
+async function uberConnectionFor(c: Context<Env>, storeId: string): Promise<UberConnectionRow | null> {
+  return dbFor(c.env, storeId)
+    .prepare(
+      `SELECT store_id, account_id, uber_store_id, uber_store_name, access_token_expires_at,
+              granted_scope, status, connected_at, provisioned_at, updated_at, last_error, version
+         FROM rt_delivery_uber_connections WHERE store_id = ? LIMIT 1`,
+    )
+    .bind(storeId)
+    .first<UberConnectionRow>();
+}
+
+/**
+ * いまの接続の状態。画面を開き直したときに本当の状態を出すための読み取り口。
+ *
+ * 見るのはD1だけで、Uber へは問い合わせない。トークンの口は1時間100回までの制限があり、
+ * 画面を表示するたびに使うものではない（docs/integrations/uber-eats-connection.md 5節）。
+ * 返すのは状態・日時・分類済みの符号だけ。トークン・鍵・Uber が返した自由文は返さない。
+ */
+restaurantDelivery.get(
+  '/api/restaurant-test/delivery/ubereats/connection',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const store = await deliveryStore(c);
+    if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+    const row = await uberConnectionFor(c, store.id);
+    return c.json({
+      success: true,
+      store: { id: store.id, name: store.name },
+      // 接続の設定がこの環境にあるか。無ければ画面はつなぐボタンを押させない。
+      oauthConfigured: uberOAuthClient(c.env) !== null,
+      connection: {
+        status: row?.status ?? 'disconnected',
+        storeName: row?.uber_store_name ?? null,
+        connectedAt: isoFromMs(row?.connected_at),
+        // POST /pos_data が通った時刻。ここが入って初めて Uber 側で連携が有効。
+        provisionedAt: isoFromMs(row?.provisioned_at),
+        checkedAt: isoFromMs(row?.updated_at),
+        lastError: row?.last_error ?? null,
+      },
+    });
+  },
+);
+
+/**
+ * 認可画面へ渡す入口。店舗管理者以上だけが押せる。
+ * ここでは一時状態を作るだけで、接続情報には触らない。
+ */
+restaurantDelivery.post(
+  '/api/restaurant-test/delivery/ubereats/connect/start',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const client = uberOAuthClient(c.env);
+    if (!client) {
+      return fail(c, 503, 'Uber Eats 接続の設定がこの環境にありません', { code: 'oauth_not_configured' });
+    }
+    const store = await deliveryStore(c);
+    if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+    if (!store.lineAccountId) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+
+    const existing = await uberConnectionFor(c, store.id);
+    const mode =
+      existing && existing.status !== 'disconnected' ? 'reconnect' : 'connect';
+    const state = randomToken(32);
+    const now = Date.now();
+    await dbFor(c.env, store.id)
+      .prepare(
+        `INSERT INTO rt_delivery_uber_oauth_states
+           (state, account_id, store_id, staff_id, mode, expires_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        state,
+        store.lineAccountId,
+        store.id,
+        c.get('staff')!.id,
+        mode,
+        now + UBER_STATE_MAX_AGE_SEC * 1000,
+        now,
+      )
+      .run();
+    c.header('Set-Cookie', uberStateCookie(state));
+    auditLog(
+      c,
+      'restaurant.delivery.ubereats.connect.start',
+      { id: store.id, kind: 'rt_store' },
+      { lineAccountId: store.lineAccountId },
+    );
+    return c.json({
+      success: true,
+      mode,
+      authorizeUrl: buildUberAuthorizeUrl({
+        clientId: client.clientId,
+        redirectUri: client.redirectUri,
+        state,
+        hosts: client.hosts,
+        // 店舗の認可で求めるのは店舗一覧と連携の有効化だけ。運用の権限は混ぜられない。
+        scopes: UBER_PROVISIONING_SCOPES,
+      }),
+    });
+  },
+);
+
+/**
+ * Uber からの戻り。
+ *
+ * 管理画面（別ホスト）から Worker への認可開始はクロスサイト通信になるため、
+ * ブラウザのCookie制限で state Cookie が保存されない場合がある。
+ * 届いた場合は追加検査として一致を必須にし、届かない場合もDB上の高エントロピーな
+ * state・担当者・期限・未使用の全条件が一致すれば続ける（Google 接続と同じ考え方）。
+ *
+ * stateの不一致・期限切れ・使い回し・担当者違いでは、接続情報を一切書き換えない。
+ */
+restaurantDelivery.get(
+  UBER_OAUTH_CALLBACK_PATH,
+  requireRole('owner', 'admin'),
+  async (c) => {
+    c.header('Set-Cookie', uberStateCookie('', 0));
+    const state = c.req.query('state') ?? '';
+    const code = c.req.query('code') ?? '';
+    const cookieState = readUberStateCookie(c.req.header('cookie'));
+    const stateRow = state
+      ? await dbFor(c.env)
+          .prepare(
+            `SELECT state, account_id, store_id, staff_id, mode, expires_at, used_at
+               FROM rt_delivery_uber_oauth_states WHERE state = ? LIMIT 1`,
+          )
+          .bind(state)
+          .first<UberOAuthStateRow>()
+      : null;
+    const lineAccountId = stateRow?.account_id ?? null;
+
+    if (
+      !stateRow ||
+      (cookieState !== null && cookieState !== state) ||
+      stateRow.used_at ||
+      stateRow.expires_at < Date.now()
+    ) {
+      return c.redirect(uberReturnUrl(c, lineAccountId, 'error:invalid_state'));
+    }
+    if (stateRow.staff_id !== c.get('staff')!.id) {
+      return c.redirect(uberReturnUrl(c, lineAccountId, 'error:invalid_state'));
+    }
+    /*
+     * ここから先は1回使い切り。交換に失敗しても同じ符号は二度使えない。
+     * 同じstateのcallbackが同時に二度来ても片方だけが通るよう、
+     * 使用済みへの更新は「まだ使われていない」条件付きで行い、
+     * 1件書き換えられたときだけ先へ進む（Google Sheets 連携の R448 と同じ）。
+     */
+    const consumed = await dbFor(c.env, stateRow.store_id)
+      .prepare('UPDATE rt_delivery_uber_oauth_states SET used_at = ? WHERE state = ? AND used_at IS NULL')
+      .bind(Date.now(), state)
+      .run();
+    if (Number(consumed.meta?.changes ?? 0) !== 1) {
+      return c.redirect(uberReturnUrl(c, lineAccountId, 'error:invalid_state'));
+    }
+    if (c.req.query('error') || !code) {
+      return c.redirect(uberReturnUrl(c, lineAccountId, 'error:denied'));
+    }
+    // 店舗が今もこの担当者の統括に属しているか（stateの発行後に変わっていないか）。
+    const store = await dbFor(c.env, stateRow.store_id)
+      .prepare(
+        `SELECT s.id, s.line_account_id FROM rt_stores s
+           JOIN rt_organizations o ON o.id = s.organization_id
+          WHERE s.id = ? AND o.tenant_id = ? LIMIT 1`,
+      )
+      .bind(stateRow.store_id, staffTenantId(c))
+      .first<{ id: string; line_account_id: string | null }>();
+    if (!store) return c.redirect(uberReturnUrl(c, lineAccountId, 'error:store_missing'));
+
+    const client = uberOAuthClient(c.env);
+    if (!client) return c.redirect(uberReturnUrl(c, lineAccountId, 'error:oauth_not_configured'));
+
+    const db = dbFor(c.env, store.id);
+    const fetchFn = fetch;
+    try {
+      const token = await exchangeUberAuthorizationCode({
+        client,
+        code,
+        fetch: fetchFn,
+        requiredScopes: UBER_PROVISIONING_SCOPES,
+      });
+      const accessEnc = await encryptCredential(token.accessToken, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+      const now = Date.now();
+      // つなぐ店舗を選ぶ手順（設計 DL-4）が残っているので、まだ `connected` にしない。
+      await db
+        .prepare(
+          `INSERT INTO rt_delivery_uber_connections
+             (store_id, account_id, access_token_enc, access_token_expires_at, granted_scope,
+              status, connected_by_staff_id, connected_at, disconnected_at, last_error,
+              version, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'pending_store', ?, ?, NULL, NULL, 1, ?, ?)
+           ON CONFLICT(store_id) DO UPDATE SET
+             account_id = excluded.account_id,
+             access_token_enc = excluded.access_token_enc,
+             access_token_expires_at = excluded.access_token_expires_at,
+             granted_scope = excluded.granted_scope,
+             status = 'pending_store',
+             connected_by_staff_id = excluded.connected_by_staff_id,
+             connected_at = excluded.connected_at,
+             disconnected_at = NULL,
+             last_error = NULL,
+             version = rt_delivery_uber_connections.version + 1,
+             updated_at = excluded.updated_at`,
+        )
+        .bind(
+          store.id,
+          store.line_account_id ?? stateRow.account_id,
+          accessEnc,
+          token.expiresAtMs,
+          token.scope.join(' '),
+          stateRow.staff_id,
+          now,
+          now,
+          now,
+        )
+        .run();
+      auditLog(
+        c,
+        'restaurant.delivery.ubereats.connect',
+        { id: store.id, kind: 'rt_store' },
+        { lineAccountId },
+      );
+      return c.redirect(uberReturnUrl(c, lineAccountId, 'pending_store'));
+    } catch (error) {
+      // 残すのは分類済みの符号だけ。Uber から返った自由文・本文・例外は保存も表示もしない。
+      if (error instanceof CredentialEncryptionKeyError) {
+        return c.redirect(uberReturnUrl(c, lineAccountId, 'error:encryption_key_missing'));
+      }
+      const code_ = error instanceof UberEatsError ? error.kind : 'token_exchange_failed';
+      // すでにある接続だけに理由を残す。新規の失敗では行を作らない。
+      await db
+        .prepare(
+          'UPDATE rt_delivery_uber_connections SET last_error = ?, updated_at = ? WHERE store_id = ?',
+        )
+        .bind(code_, Date.now(), store.id)
+        .run();
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+      return c.redirect(uberReturnUrl(c, lineAccountId, `error:${code_}`));
+    }
+  },
+);
+
+/**
+ * Uber Eats Sandbox への最小の実接続（トークン1回）を配備先の中から行う口。画面は持たない。
+ *
+ * Application ID と Client Secret は配備先の暗号化された秘密設定で読み戻せないため、
+ * 外から curl で叩くには秘密値を取り出すことになる。取り出さずに済むよう、
+ * 「配備先の中から1回だけ送って、結果の形だけを返す」入口をここに置く。
+ *
+ * - 管理画面の認証は通さない（`/api/` で始まらないため共通認証の対象外）。
+ *   代わりに `/webhooks/xserver/support-email` と同じ合言葉の署名で守る。
+ *   `x-nen-timestamp`（通算秒10桁）と `x-nen-signature`（`<時刻>.<本文>` の HMAC-SHA256・16進）。
+ * - 返すのは「取れたか」と `scope` と残り秒だけ。
+ *   **トークンの値と Client Secret は返さない・記録しない。**
+ * - 接続先が Sandbox でないときは送らない。冷却時間の中でも送らない。
+ */
+restaurantDelivery.post('/internal/ubereats/sandbox-token-probe', async (c) => {
+  if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
+  const secret = uberProbeSecret(c.env);
+  // 合言葉が無いあいだは口を閉じたまま。誰でも叩ける状態にはしない。
+  if (!secret) return c.json({ success: false, code: 'probe_not_configured' }, 503);
+  const rawBody = await c.req.text();
+  const verified = await verifySupportRelay(
+    secret,
+    c.req.header('x-nen-timestamp'),
+    c.req.header('x-nen-signature'),
+    rawBody,
+  );
+  if (!verified) return c.json({ success: false, code: 'probe_unauthorized' }, 401);
+  const outcome = await probeUberSandboxToken({
+    env: c.env,
+    store: platformCooldownStore(dbFor(c.env)),
+    fetch: (url, init) => fetch(url, init),
+    nowMs: Date.now(),
+  });
+  switch (outcome.kind) {
+    case 'ok':
+      return c.json({
+        success: true,
+        environment: 'sandbox',
+        scope: outcome.scope,
+        expiresInSec: outcome.expiresInSec,
+      });
+    case 'sandbox_only':
+      return c.json({ success: false, code: 'probe_sandbox_only' }, 403);
+    case 'cooldown':
+      return c.json({ success: false, code: 'probe_cooldown', retryAfterSec: outcome.retryAfterSec }, 429);
+    case 'uber_error':
+      // 残すのは分類済みの符号だけ。Uber から返った自由文・本文は保存も表示もしない。
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+      return c.json(
+        { success: false, code: outcome.code, uberCode: outcome.uberCode, status: outcome.status },
+        502,
+      );
+    case 'network_failed':
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+      return c.json({ success: false, code: 'probe_network_failed' }, 502);
+    default:
+      return c.json({ success: false, code: 'oauth_not_configured' }, 503);
   }
 });

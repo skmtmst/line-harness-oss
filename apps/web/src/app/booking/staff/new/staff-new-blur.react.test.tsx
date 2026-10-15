@@ -18,7 +18,7 @@ const fixture = vi.hoisted(() => ({
   putStaffMenus: null as null | ((...args: unknown[]) => Promise<unknown>),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -103,7 +103,7 @@ afterEach(() => {
 describe('スタッフ登録（V8）の名前欄を離れたときの確かめ', () => {
   test('空のまま離れると保存前に欄の下へ直し方が出る', async () => {
     render(<NewBookingStaffPage />)
-    const name = await screen.findByPlaceholderText('田中 美咲')
+    const name = await screen.findByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' })
 
     fireEvent.blur(name)
     expect(await screen.findByText('スタッフ名を入力してください')).toBeTruthy()
@@ -112,7 +112,7 @@ describe('スタッフ登録（V8）の名前欄を離れたときの確かめ',
 
   test('名前を入れると直し方が消える', async () => {
     render(<NewBookingStaffPage />)
-    const name = await screen.findByPlaceholderText('田中 美咲')
+    const name = await screen.findByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' })
 
     fireEvent.blur(name)
     await screen.findByText('スタッフ名を入力してください')

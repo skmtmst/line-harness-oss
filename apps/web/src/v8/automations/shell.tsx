@@ -26,6 +26,16 @@ import styles from './shell.module.css'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
+/** 一覧の列組み。線・セル・行の余白は共通Tableが持つ。 */
+export const AUTOMATION_TABLE_LAYOUT = {
+  headHeight: 'var(--tpl-am-head-h)',
+  rowHeight: 'var(--tpl-am-row-h)',
+  gap: 'var(--tpl-am-col-gap)',
+  padding: '0 var(--tpl-list-inset)',
+  numberInset: 'var(--tpl-am-num-pad-end)',
+  collapseScope: 'page' as const,
+}
+
 export type AutomationTabKey = 'rules' | 'common-actions' | 'runs' | 'templates'
 
 /** オートメーションの説明（全タブ共通の題の下）。 */
@@ -140,13 +150,14 @@ export interface AutomationTabCounts {
  * タブの件数を読む口（ルールの一覧・共通アクションの一覧・見本の一覧）。
  * ルールの数は一覧を読む画面が持っているときは渡してもらう（同じ口を2回読まない）。
  */
-export function useAutomationTabCounts(rulesFromPage?: number | null): AutomationTabCounts {
+export function useAutomationTabCounts(rulesFromPage?: number | null, commonActionsFromPage?: number | null): AutomationTabCounts {
   const { selectedAccountId } = useAccount()
   const generationRef = useRef(0)
   const [rules, setRules] = useState<number | null>(null)
   const [commonActions, setCommonActions] = useState<number | null>(null)
   const [templates, setTemplates] = useState<number | null>(null)
   const needRules = rulesFromPage === undefined
+  const needCommonActions = commonActionsFromPage === undefined
 
   const load = useCallback(async () => {
     const generation = ++generationRef.current
@@ -156,16 +167,16 @@ export function useAutomationTabCounts(rulesFromPage?: number | null): Automatio
     if (!selectedAccountId) return
     const [rulesResult, commonResult, templatesResult] = await Promise.allSettled([
       needRules ? api.automations.list({ accountId: selectedAccountId }) : Promise.resolve(null),
-      api.commonActions.list({ accountId: selectedAccountId }),
+      needCommonActions ? api.commonActions.list({ accountId: selectedAccountId }) : Promise.resolve(null),
       api.automations.templates(selectedAccountId),
     ])
     if (generationRef.current !== generation) return
     if (rulesResult.status === 'fulfilled' && rulesResult.value && rulesResult.value.success) setRules(rulesResult.value.data.length)
-    if (commonResult.status === 'fulfilled' && commonResult.value.success) setCommonActions(commonResult.value.data.length)
+    if (commonResult.status === 'fulfilled' && commonResult.value && commonResult.value.success) setCommonActions(commonResult.value.data.length)
     if (templatesResult.status === 'fulfilled' && templatesResult.value.success) setTemplates(templatesResult.value.data.length)
-  }, [selectedAccountId, needRules])
+  }, [selectedAccountId, needRules, needCommonActions])
 
   useEffect(() => { void load() }, [load])
 
-  return { rules: needRules ? rules : rulesFromPage ?? null, commonActions, templates }
+  return { rules: needRules ? rules : rulesFromPage ?? null, commonActions: needCommonActions ? commonActions : commonActionsFromPage ?? null, templates }
 }

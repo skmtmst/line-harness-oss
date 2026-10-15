@@ -18,8 +18,8 @@ const fixture = vi.hoisted(() => ({
   routerPush: vi.fn(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.routerPush }),
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -28,26 +28,22 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('@/lib/use-feature-visibility', () => ({
   useFeatureVisibility: () => ({ status: 'ready' as const, features: null, enabled: () => false }),
 }))
-vi.mock('@/lib/api', () => {
-  class MockApiError extends Error {
-    constructor(public status: number, message: string) {
-      super(message)
-      this.name = 'ApiError'
-    }
-  }
-  return {
-    ApiError: MockApiError,
-    api: {
-      reminders: {
-        getDraft: fixture.getDraft,
-        saveDraft: fixture.saveDraft,
-        validateDraft: fixture.validateDraft,
-      },
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return { ...actual, api: { ...actual.api,
+    reminders: { ...actual.api.reminders,
+      previewDraft: vi.fn(async () => ({ success: true, data: null })),
+      validateDraft: vi.fn(async () => ({ success: true, data: { valid: true, checks: [], audience: { matched: 5, excluded: 1 } } })),
+      ...fixture,
     },
-  }
+    folders: { ...actual.api.folders, list: vi.fn(async () => ({ success: true, data: [], unfiledCount: 0 })) },
+    friendFields: { ...actual.api.friendFields, list: vi.fn(async () => ({ success: true, data: [] })) },
+  } }
 })
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 
-import { Issue469ReminderStepEditor } from './issue469-reminder-screens'
+
+import ReminderEditV8 from '@/v8/reminders/edit'
 
 const DRAFT_SETTINGS = {
   name: '予約前のお知らせ',
@@ -91,6 +87,7 @@ function draftResponse() {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   fixture.getDraft.mockResolvedValue(draftResponse())
   fixture.validateDraft.mockResolvedValue({
     success: true,
@@ -105,8 +102,8 @@ afterEach(() => {
 
 describe('通知ステップの差し込みボタンと見本', () => {
   it('差し込みは押せるボタンで表示だけの札を出さない', async () => {
-    const { container } = render(<Issue469ReminderStepEditor reminderId="r-1" />)
-    await waitFor(() => expect(container.querySelector('textarea')).toBeTruthy())
+    const { container } = render(<ReminderEditV8 stage="messages" reminderId="r-1" />)
+    await waitFor(() => expect(container.querySelector('[role="textbox"][contenteditable]')).toBeTruthy())
     const nameButton = screen.getByRole('button', { name: '名前' })
     expect(nameButton.tagName).toBe('BUTTON')
     // 表示だけの札 (Pill) は差し込み欄に出さない。
@@ -114,18 +111,22 @@ describe('通知ステップの差し込みボタンと見本', () => {
   })
 
   it('名前を押すとカーソル位置に入り、見本に同じ値が出る', async () => {
-    const { container } = render(<Issue469ReminderStepEditor reminderId="r-1" />)
-    await waitFor(() => expect(container.querySelector('textarea')).toBeTruthy())
-    const area = container.querySelector('textarea') as HTMLTextAreaElement
+    const { container } = render(<ReminderEditV8 stage="messages" reminderId="r-1" />)
+    await waitFor(() => expect(container.querySelector('[role="textbox"][contenteditable]')).toBeTruthy())
+    const area = container.querySelector('[role="textbox"][contenteditable]') as HTMLTextAreaElement
     // カーソルを文末へ置く。
     area.focus()
-    area.setSelectionRange(area.value.length, area.value.length)
+    const range = document.createRange()
+    range.selectNodeContents(area)
+    range.collapse(false)
+    window.getSelection()!.removeAllRanges()
+    window.getSelection()!.addRange(range)
     fireEvent.click(screen.getByRole('button', { name: '名前' }))
     await waitFor(() => expect(area.value).toContain('{{name}}さん、こんにちは{{name}}'))
-    // 本文の下の見本行は「見本：」付きで出す。
-    expect(screen.getByText('見本：山田花子さん、こんにちは山田花子')).toBeTruthy()
-    // LINE プレビューは同じ値を「見本：」なしで出す。
-    expect(screen.getByText('山田花子さん、こんにちは山田花子')).toBeTruthy()
+    // 保存する本文は差し込みのまま、現在のLINEプレビューで見本値を確認する。
+    expect(area.value).toBe('{{name}}さん、こんにちは{{name}}')
+    fireEvent.click(screen.getByRole('button', { name: /LINEでの見え方を見る/ }))
+    expect(await screen.findByText('山田花子さん、こんにちは山田花子')).toBeTruthy()
   })
 
   it('差し込みの無い本文では見本を出さない', async () => {
@@ -136,8 +137,8 @@ describe('通知ステップの差し込みボタンと見本', () => {
         settings: { ...structuredClone(DRAFT_SETTINGS), steps: [{ ...DRAFT_SETTINGS.steps[0], messageContent: 'こんにちは' }] },
       },
     })
-    const { container } = render(<Issue469ReminderStepEditor reminderId="r-1" />)
-    await waitFor(() => expect(container.querySelector('textarea')).toBeTruthy())
+    const { container } = render(<ReminderEditV8 stage="messages" reminderId="r-1" />)
+    await waitFor(() => expect(container.querySelector('[role="textbox"][contenteditable]')).toBeTruthy())
     expect(screen.queryByText(/見本：/)).toBeNull()
   })
 })

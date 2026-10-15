@@ -1,12 +1,13 @@
 'use client'
 
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
 import { formatDate as polishFormatDate, formatDay, formatNumber } from '@/lib/format';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
-import { ArrowDownUp, CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react';
+import { CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -85,11 +86,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'name', label: '名前順' },
 ]
 
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-]
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /* 道具の段の札（絵 `rZEGN`：公開中・予約・下書き・出し分け）。もう一度押すと外れる（排他）。 */
 const FILTER_CHIPS = [
@@ -601,6 +598,13 @@ export default function RichMenusListV8() {
     void loadImpact(beginImpactRequest(selectedAccount.id, group.id))
   }
 
+  function handleDeleteExternal(menu: LineMenu) {
+    if (!selectedAccount?.id || !canEdit) return
+    setDeleteError(null)
+    beginImpactRequest(selectedAccount.id, `external:${menu.richMenuId}`)
+    setDeleteTarget({ kind: 'external', menu })
+  }
+
   function closeDelete() {
     if (deleteBusy) return
     impactRequestGenerationRef.current += 1
@@ -832,7 +836,7 @@ export default function RichMenusListV8() {
       onChanged={loadFolders}
       canManage={canEdit}
       itemLabel="メニュー"
-      createAction={createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
+      createAction={createButton}
       activeId={folderFilter}
       onSelect={(id) => {
         setFolderFilter(id)
@@ -875,17 +879,14 @@ export default function RichMenusListV8() {
       ))}
     </div>
   )
-  /* 並び（絵に無いが機能がある）。右端の件数の左に、印だけの小さな箱で置く。 */
+  /* 並びの文字・幅は共通の選ぶ欄が持つ。 */
   const sortBox = (
-    <div className={styles.sortBox} title={`並び：${SORT_OPTIONS.find((o) => o.value === sortKey)?.label ?? ''}`}>
-      <ArrowDownUp size={14} aria-hidden="true" className={styles.sortIcon} />
       <SaveErrorField names={["sortKey","sort","sort_key"]}><ListToolbarSort
         aria-label="並び順"
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}
         options={SORT_OPTIONS}
       /></SaveErrorField>
-    </div>
   )
   const perPageBox = (
     <div className={styles.perPageBox} data-per-page-select>
@@ -902,37 +903,11 @@ export default function RichMenusListV8() {
     </div>
   )
   const priorityNotice = (
-    <Notice tone="info" icon={<ListOrdered size={16} />} className={styles.priorityNotice}>
-      {PRIORITY_NOTE}
-    </Notice>
+    null
   )
 
   /* 1152 の板（Y9ASp）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札」。 */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      {priorityNotice}
-      <ListToolbarRow>
-        {createButton}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            placeholder="メニュー名・ボタン名"
-            aria-label="メニュー名・ボタン名で探す"
-            value={query}
-            onChange={(value) => {
-              setQuery(clampSearchQuery(value))
-              setPage(1)
-            }}
-            onClear={() => setQuery('')}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.spacer} aria-hidden="true" />
-        {sortBox}
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>{filterChips}</ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <>
@@ -941,7 +916,7 @@ export default function RichMenusListV8() {
         search={{
           placeholder: 'メニュー名・ボタン名',
           label: 'メニュー名・ボタン名で探す',
-          width: 200,
+          width: 240,
           value: query,
           onChange: (value) => {
             setQuery(clampSearchQuery(value))
@@ -1136,7 +1111,8 @@ export default function RichMenusListV8() {
                   <Td className={styles.menuCell}>
                     <div className={styles.menuBox}>
                       <RowMenu
-                        className={styles.menuBtn}
+                        appearance="box"
+                        size="row"
                         label={menuLabel}
                         items={rowMenuItems(g)}
                         open={openMenuId === g.id}
@@ -1153,18 +1129,11 @@ export default function RichMenusListV8() {
     </>
   )
 
-  /* 表の下：件数（1ページでも出す・絵どおり）とページ送り。 */
+  /* B-231：1ページでも件数とページ送りを共通部品で出す。 */
   const listPager = selectedAccount && !listLoading && !error && groups.length > 0 ? (
-    <div className={styles.pagerRow}>
-      <span className={styles.pagerCount}>
-        {pageCount > 1
-          ? `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)} / ${formatNumber(groupTotal)} 件`
-          : `${formatNumber(groupTotal)} 件`}
-      </span>
-      {pageCount > 1 ? (
-        <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
-      ) : null}
-    </div>
+    <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage}
+      ariaLabel="リッチメニューのページ送り"
+      range={{ total: groupTotal, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, groupTotal) }} />
   ) : null
 
   /* ===== 削除の窓（yOyCg：消せない理由を外す順に。読めないときは消させない） ===== */
@@ -1298,12 +1267,13 @@ export default function RichMenusListV8() {
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content"
       skeleton
       boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}
       headingSize="regular"
       title="リッチメニュー"
       help="トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。"
+      explanation="上のメニューが優先されます。同じ友だちが複数の条件に当てはまるときは、いちばん上の1つだけが出ます。順番は行の左のつまみで入れ替えます。"
       actions={
         <Button
           type="button"
@@ -1372,7 +1342,7 @@ export default function RichMenusListV8() {
       </>}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: (id) => { setFolderFilter(id); setPage(1) }, createAction: createButton ?? undefined }}
       folders={narrow ? undefined : folderPanel}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      toolbar={wideToolbar}
       pagination={listPager}
       overlays={<>
 
@@ -1386,6 +1356,7 @@ export default function RichMenusListV8() {
               onBack={() => setShowExternal(false)}
               onReload={() => void reload()}
               onImport={handleImport}
+              onDelete={canEdit ? handleDeleteExternal : undefined}
             />
           </div>
         ) : null}

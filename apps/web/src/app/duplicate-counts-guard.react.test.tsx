@@ -221,8 +221,10 @@ async function renderPage(element: React.ReactElement) {
 }
 
 /** lint k=8 と同じ数え方。同じ「N件」が3回以上出たら落とす（0件は除く）。 */
-function expectNoDuplicateCounts() {
-  const text = host.textContent ?? ''
+function expectNoDuplicateCounts(excludePagination = true) {
+  const content = host.cloneNode(true) as HTMLElement
+  if (excludePagination) content.querySelector('[data-pagination]')?.remove()
+  const text = content.textContent ?? ''
   const counts: Record<string, number> = {}
   for (const m of text.matchAll(/(\d[\d,]*)\s*件(?!\s*(?:ごと|あたり))/g)) counts[m[1]] = (counts[m[1]] || 0) + 1
   const flagged = Object.entries(counts).filter(([n, c]) => c >= 3 && n !== '0')
@@ -254,7 +256,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     expect(host.textContent).toContain('LINEへの返信を受け付けてもらえませんでした')
   })
 
-  it('/friend-add-settings は「初回案内」カードの1か所（一覧の下に出さない）', async () => {
+  it('/friend-add-settings は数の帯を重ねず、B-231のページ送りに表示範囲を出す', async () => {
     fns.friendAddRulesList.mockResolvedValue({
       success: true,
       data: {
@@ -271,7 +273,10 @@ describe('m22d 同じ件数は1画面に1か所', () => {
       },
     })
     await renderPage(React.createElement(FriendAddSettingsPage))
-    expectNoDuplicateCounts()
+    const pagination = host.querySelector('[data-pagination]')!
+    expect(pagination.textContent).toContain('4件中 1〜4件')
+    // B-231の範囲表示を除き、すべての件数の重複を引き続き見張る。
+    expectNoDuplicateCounts(true)
     expect(host.textContent).toContain('初回案内')
   })
 
@@ -318,7 +323,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     })
     await renderPage(React.createElement(OpsAuditPage))
     expectNoDuplicateCounts()
-    expect(host.textContent).toContain('2件中 1〜2件を表示')
+    expect(host.querySelector('[title="2件中 1〜2件を表示"]')).not.toBeNull()
   })
 
   it('/ops/dashboard はプラン別の行を割合だけにする', async () => {
@@ -383,7 +388,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     })
     await renderPage(React.createElement(OpsSupportPage))
     expectNoDuplicateCounts()
-    expect(host.textContent).toContain('これまで2のうち未解決1件')
+    expect(host.querySelector('[title*="これまで2のうち未解決1件"]')).not.toBeNull()
   })
 
   it('/affiliates/new は「1件あたり」を注記と欄名で重ねない', async () => {

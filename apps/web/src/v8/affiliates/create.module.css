@@ -3,40 +3,11 @@
  * 枠・見出し・左右の分け・下の帯は作る型（CreatePage）が持つ。ここは段（カード）の中身だけ。
  * 寸法は globals.css の --tpl-af-cr-*。
  */
-/* 段（白・薄い枠・角丸12・中20・間14）。枠は外へ場所を取らない線。 */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-af-cr-card-gap);
-  padding: var(--tpl-af-cr-card-pad);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-.cardHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-af-dr-kpi-gap);
-}
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-af-cr-title-size);
-  font-weight: 700;
-  line-height: normal;
-}
 .cardNote {
   margin: 0;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   line-height: normal;
-}
-.grid2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--tpl-af-cr-grid-gap);
 }
 .field {
   display: flex;
@@ -78,37 +49,6 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--tpl-toolbar-gap);
 }
-.switchRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-af-cr-grid-gap);
-  padding: var(--tpl-af-cr-switch-pad);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  border-radius: var(--radius-control);
-}
-.switchBody {
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: var(--tpl-af-dr-kpi-gap);
-  min-width: 0;
-}
-.switchName {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: normal;
-}
-.switchNote,
-.switchNoteFaint {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: normal;
-}
-.switchNoteFaint { color: var(--color-ink-faint); }
 .errorText {
   margin: 0;
   color: var(--color-danger);

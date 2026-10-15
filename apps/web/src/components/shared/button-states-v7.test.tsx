@@ -18,13 +18,13 @@ afterEach(() => {
 })
 
 describe('ボタンの6状態（★V7 z97zZN §2）', () => {
-  it('busy の間は回る印＋「保存中…」に見た目を切り替え、押せなくする', () => {
+  it('busy の間は回る印＋「保存しています…」に見た目を切り替え、押せなくする', () => {
     render(<Button variant="primary" busy>保存する</Button>)
     const button = screen.getByRole('button')
     expect(button).toHaveProperty('disabled', true)
     expect(button.getAttribute('aria-busy')).toBe('true')
     /* DOM の文字は今のラベルだけ。隠した文字は残さない。 */
-    expect(button.textContent).toBe('保存中…')
+    expect(button.textContent).toBe('保存しています…')
     expect(button.querySelector('svg')).not.toBeNull()
   })
 
@@ -69,7 +69,7 @@ describe('ボタンの6状態（★V7 z97zZN §2）', () => {
     const { rerender } = render(<Button busy done={false}>保存する</Button>)
     const button = screen.getByRole('button')
     rerender(<Button busy done>保存する</Button>)
-    expect(button.textContent).toBe('保存中…')
+    expect(button.textContent).toBe('保存しています…')
     rerender(<Button busy={false} done>保存する</Button>)
     expect(button.textContent).toBe('保存しました')
   })

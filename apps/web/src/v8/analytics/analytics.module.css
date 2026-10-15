@@ -164,12 +164,12 @@
 }
 
 /* 期間の切り替え（器 3・項目 5/14・文 12）。 */
-:global([data-theme='v8']) .range {
+:global(:root) .range {
   padding: var(--tpl-an-range-pad);
   border-radius: var(--tpl-an-seg-radius);
   background: var(--color-surface-pearl);
 }
-:global([data-theme='v8']) .range button {
+:global(:root) .range button {
   min-height: 0;
   padding: var(--tpl-an-range-item-pad);
   font-size: var(--text-caption);
@@ -793,14 +793,6 @@
 .rowMenu {
   display: inline-flex;
 }
-:global([data-theme='v8']) .rowMenuButton {
-  width: var(--tpl-an-icon-btn);
-  height: var(--tpl-an-icon-btn);
-  flex: 0 0 var(--tpl-an-icon-btn);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  box-shadow: var(--tpl-an-ring);
-}
 .reportNote {
   margin: 0;
   color: var(--color-ink-secondary);
@@ -854,21 +846,6 @@
 .trow[data-h='pill'] { min-height: var(--tpl-an-pill-row-h); }
 .trow[data-h='button'] { min-height: var(--tpl-an-button-row-h); }
 .rowActions[data-gap='wide'] { gap: var(--tpl-an-wide-gap); }
-:global([data-theme='v8']) .rowButton {
-  min-height: 0;
-}
-.rowButton {
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
 .linkButton {
   margin-left: var(--tpl-an-wide-gap);
   padding: 0;
@@ -878,18 +855,6 @@
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-}
-.historyCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-an-flow-gap);
-  width: var(--tpl-an-history-w);
-  flex-shrink: 0;
-  padding: var(--tpl-an-flow-pad);
-  border-radius: var(--radius-card);
-  border: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-  background: var(--color-canvas);
 }
 .sectionHead {
   display: flex;
@@ -977,7 +942,7 @@
   text-align: left;
   cursor: pointer;
 }
-:global([data-theme='v8']) .funnelStep {
+:global(:root) .funnelStep {
   min-height: 0;
 }
 .funnelStep[data-selected] {
@@ -1170,7 +1135,7 @@
   font-weight: 700;
   cursor: pointer;
 }
-:global([data-theme='v8']) .gridCell {
+:global(:root) .gridCell {
   min-height: 0;
 }
 .gridCell[data-strong] { color: var(--color-canvas); }

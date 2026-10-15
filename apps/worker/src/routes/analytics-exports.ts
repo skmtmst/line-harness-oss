@@ -1,3 +1,4 @@
+import { csvRecordCount } from '../middleware/output-audit.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -112,7 +113,7 @@ export async function runAnalyticsExportJob(db: D1Database, jobId: string): Prom
       finishedAt: finishedAt(),
     });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'analytics_export_failed', jobId, error: String(error) }));
+    console.error(JSON.stringify({"code":"analytics_export_failed"}));
     const message = error instanceof Error && error.message === 'analytics_export_not_ready'
       ? '集計がまだ終わっていません。集計が終わってから書き出してください'
       : error instanceof Error && error.message === 'analytics_export_not_found'
@@ -230,9 +231,10 @@ analyticsExports.post(
       }
       auditLog(c, 'analytics.export', { kind: 'analytics_export', id: job.id });
       const fresh = await getAnalyticsExportJob(c.env.DB, job.id, account.accountId);
-      return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 202);
+      c.set('outputAudit', { count: (fresh ?? job).row_count, accountId: account.accountId, targetId: job.id, phase: 'requested' });
+    return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 202);
     } catch (error) {
-      console.error(JSON.stringify({ event: 'analytics_export_create_failed', error: String(error) }));
+      console.error(JSON.stringify({"code":"analytics_export_create_failed","route":"POST /api/analytics/exports"}));
       return c.json({ success: false, error: '書き出しを始められませんでした' }, 500);
     }
   },
@@ -254,7 +256,7 @@ analyticsExports.get(
       }
       return c.json({ success: true, data: exportJobJson(job) });
     } catch (error) {
-      console.error(JSON.stringify({ event: 'analytics_export_status_failed', error: String(error) }));
+      console.error(JSON.stringify({"code":"analytics_export_status_failed","route":"GET /api/analytics/exports/:id"}));
       return c.json({ success: false, error: '書き出しの状態を確認できませんでした' }, 500);
     }
   },
@@ -285,6 +287,7 @@ analyticsExports.get(
         return c.json({ success: false, error: 'この書き出しはまだダウンロードできません' }, 409);
       }
       auditLog(c, 'analytics.export', { kind: 'analytics_export', id: job.id });
+      c.set('outputAudit', { count: csvRecordCount(fresh.csv_text), accountId: account.accountId, targetId: job.id });
       return new Response(`﻿${fresh.csv_text}`, {
         headers: {
           'content-type': 'text/csv; charset=utf-8',
@@ -293,7 +296,7 @@ analyticsExports.get(
         },
       });
     } catch (error) {
-      console.error(JSON.stringify({ event: 'analytics_export_download_failed', error: String(error) }));
+      console.error(JSON.stringify({"code":"analytics_export_download_failed","route":"GET /api/analytics/exports/:id/download"}));
       return c.json({ success: false, error: 'ダウンロードできませんでした' }, 500);
     }
   },

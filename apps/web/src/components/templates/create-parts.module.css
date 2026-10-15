@@ -20,8 +20,6 @@
 .summaryTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 700;
   line-height: var(--tpl-side-title-lh);
 }
 .rows {
@@ -36,10 +34,10 @@
   justify-content: space-between;
   gap: var(--tpl-label-tag-gap);
   padding: var(--tpl-side-row-pad) 0;
-  border-bottom: 1px solid var(--color-hairline);
+  box-shadow: var(--shadow-row-line);
 }
 .row:last-child {
-  border-bottom: 0;
+  box-shadow: none;
 }
 .rowLabel {
   min-width: 0;
@@ -61,15 +59,31 @@
   white-space: nowrap;
 }
 
+/* 完了の本文では項目ごとに値の開始位置をそろえ、長い結果も読めるようにする。 */
+.summary[data-variant='completion'] .row { justify-content: flex-start; }
+.summary[data-variant='completion'] .rowLabel { flex: 0 0 var(--tpl-bd-row-label); }
+.summary[data-variant='completion'] .rowValue {
+  flex: 1;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* RaMf3 の発行されるリンク。既定の設定内容の箱の寸法は変えない。 */
 .summary[data-variant='link'] { gap: var(--tpl-side-card-gap); }
 .summaryHead { display: flex; flex-direction: column; gap: var(--tpl-wa-af-side-gap); }
-.summary[data-variant='link'] .summaryTitle { font-size: var(--text-body); line-height: var(--tpl-wa-af-side-title-lh); }
+.summary[data-variant='link'] .summaryTitle { line-height: var(--tpl-wa-af-side-title-lh); }
 .summaryDescription { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-wa-af-side-note-lh); }
 .summary[data-variant='link'] .rows { gap: normal; }
 .summary[data-variant='link'] .row { padding: var(--tpl-af-cr-kv-pad); border: 0; }
 .summary[data-variant='link'] .rowLabel { flex-shrink: 0; line-height: var(--tpl-wa-af-note-lh); }
 .summary[data-variant='link'] .rowValue { font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-wa-af-preview-lh); }
+/* 実行の記録の小箱：行の線は寸法を増やさず、段の間は4。 */
+.summary[data-variant='record'] { gap: var(--tpl-fm2-rd-box-gap); }
+.summary[data-variant='record'] .rows { gap: var(--tpl-fm2-rd-box-gap); }
+.summary[data-variant='record'] .row { border: 0; box-shadow: var(--shadow-row-line); }
+.summary[data-variant='record'] .row:last-child { box-shadow: none; }
+.summary[data-variant='record'] .rowValue { font-weight: 700; }
 
 /* 箱の外の淡い案内。 */
 .note {
@@ -98,8 +112,6 @@
 .starterTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--tpl-card-title-size);
-  font-weight: 700;
 }
 .starterDescription {
   margin: 0;
@@ -115,7 +127,7 @@
 .starterCard {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-label-tag-gap);
+  gap: var(--polish-space-row);
   min-width: 0;
   min-height: var(--tpl-starter-card-h);
   padding: var(--tpl-side-card-pad);
@@ -139,6 +151,12 @@
   line-height: var(--tpl-side-title-lh);
 }
 .starterLine {
+  /* B-152⑩：条件と返信の説明は省略せず、必要な行数で読む。 */
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   line-height: var(--tpl-text-sm-lh);
@@ -159,13 +177,23 @@
 }
 
 /* B-152・仕上げ2 */
-.summaryTitle, .starterTitle { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
 .rowValue { font-weight: var(--polish-weight-body); }
 
 /* B-180：設定内容・右欄の段の題。欄のラベルはFormFieldが12/500を持つ。 */
-[data-theme='v8'] .summaryTitle,
-[data-theme='v8'] .summary[data-variant='link'] .summaryTitle,
-[data-theme='v8'] .starterTitle {
+:root .summaryTitle,
+:root .summary[data-variant='link'] .summaryTitle,
+:root .starterTitle {
   font-size: var(--tpl-section-title-size);
   font-weight: var(--tpl-section-title-weight);
 }
+
+.summaryDescriptionList { padding-inline-start: var(--text-caption); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); list-style-type: '・'; }
+/* 予約などの完了を示す印。指定しない設定内容の箱は変えない。 */
+.summaryCompletion { display: flex; align-items: center; gap: var(--polish-space-field); }
+.completionIcon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; padding: var(--polish-space-row); border-radius: var(--radius-pill); background: var(--color-notice-success-bg); color: var(--color-success); }
+.completionIcon > svg { width: var(--polish-space-section); height: var(--polish-space-section); }
+.completionHeading { display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-card); min-width: 0; }
+.completionMark { display: inline-flex; align-items: center; justify-content: center; padding: var(--polish-space-row); border-radius: var(--radius-pill); background: var(--color-notice-success-bg); color: var(--color-success); }
+.completionMark > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+.completionTitle { margin: 0; text-align: center; font-size: var(--tpl-rm-done-title-size); line-height: var(--tpl-rm-done-title-lh); font-weight: var(--polish-weight-title); color: var(--color-ink); }
+.completionDescription { align-self: stretch; margin: 0; font-size: var(--polish-text-body); line-height: var(--tpl-rm-done-note-lh); color: var(--color-ink-secondary); }

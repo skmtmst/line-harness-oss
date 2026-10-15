@@ -15,7 +15,7 @@ vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string } & Record<string, unknown>) =>
     React.createElement('a', { href, ...rest }, children),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }))
 vi.mock('@/contexts/account-context', () => ({

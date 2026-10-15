@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
@@ -15,11 +15,11 @@ describe('Webhookイベントの選択（#975 U067）', () => {
   })
 
   it('「すべて送る」か「選ぶ」の2択＋チェックの選択肢', () => {
-    expect(PAGE).toContain('すべてのイベントを送る')
-    expect(PAGE).toContain('送るイベントを選ぶ')
+    expect(PAGE).toContain('すべて送る')
+    expect(PAGE).toContain('選んだものだけ送る')
     // m21u: 素の input を共通の Checkbox へ置き換えた。直書きは残さない。
     expect(PAGE).not.toContain('type="checkbox"')
-    expect(PAGE).toContain('WEBHOOK_EVENT_GROUPS')
+    expect(PAGE).toContain('EVENT_GROUPS')
   })
 
   it('選択肢は正本の種別コードを使う', () => {
@@ -33,7 +33,7 @@ describe('Webhookイベントの選択（#975 U067）', () => {
       expect(PAGE).toContain(`value: '${code}'`)
     }
     // ECの出来事は共有の正本から描く。
-    expect(PAGE).toContain('EC_EVENT_TYPES.map')
+    expect(PAGE).toContain('EC_EVENT_TYPES.filter')
     expect(PAGE).toContain('ecEventLabel(value)')
   })
 
@@ -45,8 +45,8 @@ describe('Webhookイベントの選択（#975 U067）', () => {
   it('?event= の見本条件を初期選択にし、知らない値は全選択へ丸めない', () => {
     expect(PAGE).toContain('useSearchParams')
     expect(PAGE).toContain("searchParams.get('event')")
-    expect(PAGE).toContain('useState(!presetValid)')
-    expect(PAGE).toContain('useState<string[]>(presetValid ? [presetEvent!] : [])')
+    expect(PAGE).toContain('useState(false)')
+    expect(PAGE).toContain('useState<string[]>(presetValid && presetEvent ? [presetEvent] : [])')
     // useSearchParams は静的書き出しのため Suspense の内側に置く。
     expect(PAGE).toContain('<Suspense')
   })
@@ -54,6 +54,6 @@ describe('Webhookイベントの選択（#975 U067）', () => {
   it('「すべて送る」は * として送り、受信Webhookの種類IDは詳細設定に置く', () => {
     expect(PAGE).toContain("? ['*']")
     expect(PAGE).toContain('incoming_webhook.${value}')
-    expect(PAGE).toContain('送るイベントを選ぶか、「すべてのイベントを送る」を選んでください')
+    expect(PAGE).toContain('送るものを選ぶか、「すべて送る」を選んでください')
   })
 })

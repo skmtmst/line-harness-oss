@@ -1,5 +1,8 @@
 'use client'
 
+import StatusBadge from '@/components/shared/status-badge'
+import { mileageStatusTone } from './parts'
+
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -21,7 +24,7 @@ import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarOptional } from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -30,7 +33,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { ListPagePagination } from '@/components/templates'
 import { describeMileageCsvExportFailure, formatMileageDate, formatMileageMonthDay, formatMileageNumber, isMileageFriendsV6Overview, ruleEventLabel } from './display'
-import { CreateButton, MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, CreateButton, MileageFrame, useMileageShell } from './frame'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -179,6 +182,9 @@ export default function EarningRulesTab() {
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
+  const [viewTarget, setViewTarget] = useState<MileageEarningRuleV6 | null>(null)
+  const [averageDenominator, setAverageDenominator] = useState<number | null>(null)
+  useEffect(() => { setViewTarget(null); setAverageDenominator(null) }, [selectedAccountId])
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [menuNotice, setMenuNotice] = useState('')
@@ -244,6 +250,7 @@ export default function EarningRulesTab() {
       setSpentMiles(spend?.amount ?? 0)
       setSpentCount(spend?.count ?? 0)
       setBalanceTotal(friendsRes.data.summary.available)
+      setAverageDenominator(friendsRes.data.summary.withBalanceCount)
       setFriendTotal(friendsRes.data.summary.totalMembers)
       setRuleOrder(items.map((rule) => rule.id))
       setOrderDirty(false)
@@ -556,7 +563,7 @@ export default function EarningRulesTab() {
         presentation="band"
         title="直近30日 使われたマイル"
         icon={<Gift size={14} aria-hidden="true" />}
-        value={ready ? spentMiles ?? 0 : null}
+        value={ready ? Math.abs(spentMiles ?? 0) : null}
         unit=""
         detail={dash(`交換 ${formatMileageNumber(spentCount ?? 0)} 件`)}
       />
@@ -566,7 +573,7 @@ export default function EarningRulesTab() {
         icon={<Wallet size={14} aria-hidden="true" />}
         value={ready ? balanceTotal ?? 0 : null}
         unit=""
-        detail={dash(`友だち ${formatMileageNumber(friendTotal ?? 0)} 人`)}
+        detail={<span title={ready && averageDenominator !== null && balanceTotal !== null ? averageDenominator > 0 ? `残高0の人は除き、マイルを持っている${formatMileageNumber(averageDenominator)}人で割った平均：${formatMileageNumber(balanceTotal / averageDenominator)}マイル` : '残高がある人がいないため計算していません' : undefined}>{dash(`友だち ${formatMileageNumber(friendTotal ?? 0)} 人`)}</span>}
       />
     </KpiBand>
   )
@@ -587,6 +594,8 @@ export default function EarningRulesTab() {
       folders={[]}
       onChanged={() => undefined}
       canManage={!readonly}
+      createAction={createButton(true)}
+      reserveCreateSpace={false}
       itemLabel="決めごと"
       activeId="all"
       onSelect={() => undefined}
@@ -650,9 +659,10 @@ export default function EarningRulesTab() {
   )
 
   const savedBox = (
-    <div className={styles.savedBox}>
-      <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
+    <ListToolbarOptional compact label="保存した絞り込み"><div className={styles.savedBox}>
+
       <SaveErrorField names={["presetValue","page","preset_value"]}><Select
+        icon={<Bookmark size={15} aria-hidden="true" />}
         aria-label="よく使う絞り込み"
         value={presetValue}
         options={[
@@ -669,7 +679,7 @@ export default function EarningRulesTab() {
           setSort(preset.sort)
         }}
       /></SaveErrorField>
-    </div>
+    </div></ListToolbarOptional>
   )
 
   const perPageBox = (
@@ -686,9 +696,7 @@ export default function EarningRulesTab() {
 
   const notices = (
     <>
-      <div className={styles.fullRow}>
-        <Notice tone="info">決めごとを変えると、変えたあとの行動から新しい数で付きます。前に付いたマイルは変わりません。</Notice>
-      </div>
+
       {actionError ? <div className={styles.fullRow}><Notice tone="danger" message={actionError} /></div> : null}
       {menuNotice ? <div className={styles.fullRow}><Notice tone="success" message={menuNotice} /></div> : null}
       {orderDirty && !readonly ? (
@@ -699,30 +707,13 @@ export default function EarningRulesTab() {
     </>
   )
 
-  /*
-   * 1152 の板（ZJIyl）：案内の帯 → 1段目「作る・フォルダ・探す」→
-   * 2段目「札 … よく使う絞り込み・件数」。部品は広い板と同じ。
-   */
-  const toolbar = narrow ? (
-    <div className={styles.narrowTools}>
-      {notices}
-      <div className={styles.narrowRow}>
-        {createButton(false)}
-        {folderSelect}
-        <div className={styles.narrowSearch}>{searchBox}</div>
-      </div>
-      <div className={styles.narrowRow}>
-        {filterChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {savedBox}
-        {perPageBox}
-      </div>
-    </div>
-  ) : (
-    <>
+  /* 作成・フォルダは型の畳む口、検索・条件は共通の道具へ渡す。 */
+  const toolbar = (
+    <ListToolbarFrame>
       {notices}
       <ListToolbar
-        search={{
+        searchSlot={narrow ? searchBox : undefined}
+        search={narrow ? undefined : {
           placeholder: '決めごとの名前で探す',
           value: searchInput,
           width: 240,
@@ -731,10 +722,10 @@ export default function EarningRulesTab() {
             if (!value) { setSearch(''); setPage(1) }
           },
         }}
-        filters={<>{folderSelect}{filterChips}</>}
+        filters={<><ListToolbarOptional compact label="きっかけ">{folderSelect}</ListToolbarOptional>{filterChips}</>}
         trailing={<>{savedBox}{perPageBox}</>}
       />
-    </>
+    </ListToolbarFrame>
   )
 
   const rowMenu = (rule: MileageEarningRuleV6) => {
@@ -746,6 +737,11 @@ export default function EarningRulesTab() {
           open={menuId === rule.id}
           onOpenChange={(next) => setMenuId(next ? rule.id : null)}
           items={[
+            {
+              id: 'view',
+              label: rule.publishedVersion == null ? '下書きの内容を見る' : '公開版の中身を見る',
+              onSelect: () => setViewTarget(rule),
+            },
             /* 閲覧のみの人には、変える操作を出さない（押せない形で残さない）。 */
             ...(readonly ? [] : [
               {
@@ -806,14 +802,14 @@ export default function EarningRulesTab() {
   /* 表：絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 56）。1152 も同じ列（先頭の列が縮む）。 */
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={styles.table}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT} columnSizing="content">
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>何をしてくれたら</Th>
-            <Th className={styles.colEvent}>対象の行動</Th>
-            <Th className={`${styles.colMiles} ${styles.num}`}>たまるマイル</Th>
-            <Th className={styles.colValidity}>有効期間・失効</Th>
-            <Th className={`${styles.colRecent} ${styles.num}`}>この30日</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>何をしてくれたら</Th>
+            <Th collapseAt="narrow" className={styles.colEvent}>対象の行動</Th>
+            <Th align="right" className={styles.colMiles}>たまるマイル</Th>
+            <Th collapseAt="narrow" className={styles.colValidity}>有効期間・失効</Th>
+            <Th align="right" className={styles.colRecent}>この30日</Th>
             <Th className={styles.colState}>状態</Th>
             <Th className={styles.colOps}>操作</Th>
           </TableHeadRow>
@@ -823,30 +819,27 @@ export default function EarningRulesTab() {
             const active = rule.published.status === 'published'
             const orderIndex = ruleOrder.indexOf(rule.id)
             return (
-              <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
-                <Td className={styles.colName}>
+              <Tr key={rule.id} data-table-layout="columns" data-row-id={rule.id}>
+                <Td grow>
                   <div className={styles.rowNameLine}>
                     <FolderDotName folder={null}>
-                      <span className={styles.rowName} ><TruncatedText value={String(rule.draft.name ?? '')} /></span>
+                      <span  ><TruncatedText value={String(rule.draft.name ?? '')} /></span>
                     </FolderDotName>
                   </div>
 
                 </Td>
-                <Td className={styles.colEvent}>
+                <Td collapseAt="narrow" className={styles.colEvent}>
                   <span className={styles.cellMain}>{ruleEventLabel(rule.draft.eventType, EVENT_LABELS)}</span>
                   <span className={styles.cellSub}>{rule.draft.initialStatus === 'pending' ? '確定待ち' : 'すぐ使える'}</span>
                 </Td>
-                <Td className={`${styles.colMiles} ${styles.num}`}><span className={styles.cellMain}>{formatMileageNumber(rule.draft.amount)}</span></Td>
-                <Td className={styles.colValidity}><span className={styles.cellMain}>{validityText(rule)}</span></Td>
-                <Td className={`${styles.colRecent} ${styles.num}`}>
+                <Td align="right" className={styles.colMiles}><span className={styles.cellMain}>{formatMileageNumber(rule.draft.amount)}</span></Td>
+                <Td collapseAt="narrow" className={styles.colValidity}><span className={styles.cellMain}>{validityText(rule)}</span></Td>
+                <Td align="right" className={styles.colRecent} data-list-number="">
                   <span className={styles.cellMain}>{formatMileageNumber(grantedMiles30d(rule))}</span>
                   <span className={styles.cellSub}>{`対象外 ${formatMileageNumber(rule.metrics30d.excluded)} 回`}</span>
                 </Td>
                 <Td className={styles.colState}>
-                  <span className={styles.pill} data-tone={active ? 'active' : 'neutral'}>
-                    <span className={styles.pillDot} aria-hidden="true" />
-                    {active ? '動いています' : '止めています'}
-                  </span>
+                  <StatusBadge tone={mileageStatusTone(active ? 'active' : 'neutral')}>{active ? '動いています' : '止めています'}</StatusBadge>
                 </Td>
                 <Td className={styles.colOps}>
                   <span className={styles.rowActions}>
@@ -905,29 +898,44 @@ export default function EarningRulesTab() {
     </>
   )
 
-  const pager = ready && visible.length > 0 && pageCount > 1 ? (
+  const pager = ready && visible.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {`${shown.length} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)} 件`}
-      </span>
-      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} range={{ total: shown.length, first: (page - 1) * pageSize + 1, last: Math.min(page * pageSize, shown.length) }} />
     </ListPagePagination>
   ) : undefined
 
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
       help="行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"
+      explanation="決めごとを変えると、変えたあとの行動から新しい数で付きます。前に付いたマイルは変わりません。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
           <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
       }
       stats={stats}
-      folders={<>{createButton(true)}{folderPanel}</>}
-      folderNav={narrow ? undefined : { rows: [{ id: 'all', label: 'すべて' }], activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
+      folders={folderPanel}
+      folderNav={{ rows: [{ id: 'all', label: 'すべて' }], activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
+        <Dialog
+          open={viewTarget !== null}
+          title={viewTarget?.publishedVersion == null ? '下書きの内容' : '公開版の中身'}
+          onCancel={() => setViewTarget(null)}
+        >
+          {viewTarget ? <>
+            <p>{viewTarget.publishedVersion == null
+              ? `${viewTarget.draft.name}・${ruleEventLabel(viewTarget.draft.eventType, EVENT_LABELS)}・${formatMileageNumber(viewTarget.draft.amount)}マイル`
+              : `${viewTarget.published.name}・${ruleEventLabel(viewTarget.published.eventType, EVENT_LABELS)}・${formatMileageNumber(viewTarget.published.amount)}マイル`}</p>
+            <p>{viewTarget.publishedVersion == null
+              ? `下書き v${viewTarget.draftVersion}・${formatMileageDate(viewTarget.draftUpdatedAt)} に保存・まだ公開版はありません`
+              : `公開版 v${viewTarget.publishedVersion}・${formatMileageDate(viewTarget.published.updatedAt)} に反映`}</p>
+            <p>{viewTarget.draft.targetConditions
+              ? `利用対象：条件 ${viewTarget.draft.targetConditions.rules.length + (viewTarget.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件・下書き v${viewTarget.draftVersion}`
+              : `利用対象：すべての友だち・下書き v${viewTarget.draftVersion}`}</p>
+          </> : null}
+        </Dialog>
         <ConfirmDialog
           open={publishTarget !== null}
           title={publishTarget ? `「${publishTarget.draft.name}」の下書きを公開して反映しますか？` : '下書きを公開して反映しますか？'}

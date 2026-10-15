@@ -138,6 +138,7 @@
 .head {
   display: flex;
   flex-direction: column;
+  gap: var(--tpl-op-head-after);
 }
 
 .headRow {

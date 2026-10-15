@@ -28,6 +28,7 @@ export default function LayoutPicker({ options, value, onChange, disabled = fals
   label?: string
 }) {
   const name = useId()
+  const tiled = preview !== 'message'
   const inputs = useRef<Array<HTMLInputElement | null>>([])
   const selected = Math.max(0, options.findIndex((option) => option.value === value))
   const move = (event: KeyboardEvent<HTMLInputElement>, index: number) => {
@@ -47,7 +48,7 @@ export default function LayoutPicker({ options, value, onChange, disabled = fals
   return <div className={styles.list} role="radiogroup" aria-label={label} data-preview={preview}>
     {options.map((option, index) => <RadioCard key={option.value} className={styles.tile}
       name={name} value={option.value} checked={option.value === value} disabled={disabled}
-      title={option.label} variant="compact" onChange={onChange}
+      title={option.label} variant="compact" contentPlacement={tiled ? 'standard' : 'below-indicator'} indicator={tiled ? 'check' : 'radio'} onChange={onChange}
       inputRef={(input) => { inputs.current[index] = input }}
       tabIndex={index === selected ? 0 : -1}
       ariaLabel={`${option.label}（面 ${option.areas.map((area) => area.label).join('・')}）`}

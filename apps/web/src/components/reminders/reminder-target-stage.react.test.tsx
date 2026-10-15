@@ -8,14 +8,14 @@ const fixture = vi.hoisted(() => ({
   audience: vi.fn(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
-vi.mock('@/lib/api', () => ({ api: { reminders: { audience: fixture.audience } } }))
+vi.mock('@/lib/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/api')>()), api: { staff: { me: vi.fn(async () => ({ success: true, data: { role: 'owner' } })) }, reminders: { audience: fixture.audience } } }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: { id: 'account-1', name: 'LINE' }, loading: false }),
 }))
 vi.mock('@/lib/use-feature-visibility', () => ({
   useFeatureVisibility: () => ({ status: 'ready' as const, features: null, enabled: () => false }),
@@ -43,7 +43,7 @@ vi.mock('@/components/shared/condition-builder', async (importOriginal) => {
   return { ...mod, default: Stub }
 })
 
-import { TargetStage } from './reminder-publish-flow'
+import { TargetStage } from '../../test-utils/reminder-stages'
 
 const SETTINGS: ReminderDraftSettings = {
   name: '予約前のお知らせ',
@@ -125,16 +125,18 @@ beforeEach(() => {
 describe('対象ステージの条件編集と数え直し', () => {
   it('条件が空なら保存済みの人数を出し、数え直し口を叩かない', () => {
     renderStage()
-    expect(screen.getByText('当てはまる')).toBeTruthy()
-    expect(screen.getAllByText('4人').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('3人').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('除く')).toBeTruthy()
+    expect(screen.getByText('当てはまる人')).toBeTruthy()
+    expect(screen.getByText('4 人')).toBeTruthy()
+    expect(screen.getByText('3 人')).toBeTruthy()
+    expect(screen.getByLabelText(/除く 1 人/)).toBeTruthy()
     expect(fixture.audience).not.toHaveBeenCalled()
-    expect(screen.getByTestId('condition-value').textContent).toBe('null')
+    expect(screen.queryByTestId('condition-value')).toBeNull()
   })
 
   it('条件を足すと親へ返し、返ってきた条件で数え直す', async () => {
     const { onChange, rerenderWith } = renderStage()
+    fireEvent.click(screen.getByRole('radio', { name: /条件に合う人だけ/ }))
+    rerenderWith({ ...SETTINGS, targetCondition: { operator: 'AND', rules: [], groups: [] } })
     fireEvent.click(screen.getByRole('button', { name: 'タグ条件を足す' }))
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -155,10 +157,10 @@ describe('対象ステージの条件編集と数え直し', () => {
       VALIDATION,
     )
     // 数えている間は「数えています」と出す。
-    expect(screen.getByText('数えています…')).toBeTruthy()
-    await waitFor(() => expect(screen.getAllByText('7人').length).toBeGreaterThanOrEqual(1))
-    expect(screen.getAllByText('5人').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('2人').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('… 人').length).toBe(2)
+    await waitFor(() => expect(screen.getByText('7 人')).toBeTruthy())
+    expect(screen.getByText('5 人')).toBeTruthy()
+    expect(screen.getByLabelText(/除く 2 人/)).toBeTruthy()
   })
 
   it('数え直しに失敗したら文で知らせ、数え直せる', async () => {
@@ -169,10 +171,10 @@ describe('対象ステージの条件編集と数え直し', () => {
     )
     await waitFor(() => expect(screen.getByText(/対象者を数え直せませんでした/)).toBeTruthy())
     // 保存済みの人数は残す。失敗した試算を 0人と見せない。
-    expect(screen.getAllByText('3人').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('3 人')).toBeTruthy()
     fixture.audience.mockResolvedValue({ success: true, data: RECOUNT })
     fireEvent.click(screen.getByRole('button', { name: '数え直す' }))
-    await waitFor(() => expect(screen.getAllByText('5人').length).toBeGreaterThanOrEqual(1))
+    await waitFor(() => expect(screen.getByText('5 人')).toBeTruthy())
   })
 
   it('顔ぶれを見ると数え直した先頭が出る', async () => {
@@ -180,7 +182,7 @@ describe('対象ステージの条件編集と数え直し', () => {
       { ...SETTINGS, targetCondition: { ...TAG_CONDITION } },
       VALIDATION,
     )
-    await waitFor(() => expect(screen.getAllByText('5人').length).toBeGreaterThanOrEqual(1))
+    await waitFor(() => expect(screen.getByText('5 人')).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '顔ぶれを見る' }))
     expect(screen.getByText('対象者を確認')).toBeTruthy()
     expect(screen.getByText('山田花子')).toBeTruthy()
@@ -194,11 +196,11 @@ describe('対象ステージの条件編集と数え直し', () => {
       { ...SETTINGS, targetCondition: { ...TAG_CONDITION } },
       VALIDATION,
     )
-    await waitFor(() => expect(screen.getAllByText('5人').length).toBeGreaterThanOrEqual(1))
+    await waitFor(() => expect(screen.getByText('5 人')).toBeTruthy())
     expect(fixture.audience).toHaveBeenCalledTimes(1)
     // 親が空の条件を返したら、数え直しは消えて保存済みの人数に戻る。
     rerenderWith({ ...SETTINGS, targetCondition: null })
-    await waitFor(() => expect(screen.getAllByText('3人').length).toBeGreaterThanOrEqual(1))
+    await waitFor(() => expect(screen.getByText('3 人')).toBeTruthy())
     expect(fixture.audience).toHaveBeenCalledTimes(1)
   })
 })

@@ -7,6 +7,7 @@
  *   - 対象のLINEアカウントが確認できる
  *   - 管理者以外の対象は従来どおり保存口まで進める
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -17,7 +18,8 @@ const fixture = vi.hoisted(() => ({
   updateStaff: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams('tab=members'),
@@ -27,7 +29,7 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   default: ({ tabs }: { tabs: Array<{ key: string; label: string }> }) => <nav aria-label="ログインユーザーのタブ">{tabs.map((tab) => <span key={tab.key}>{tab.label}</span>)}</nav>,
   useMergedTab: () => 'members',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -105,15 +107,15 @@ const { default: StaffPage } = await import('./page')
 
 async function mount() {
   await act(async () => { render(<StaffPage />) })
-  await waitFor(() => expect(screen.getByText('対象者')).toBeTruthy())
+  await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
 }
 
 function rowFor(name: string): HTMLTableRowElement {
-  return screen.getByText(name).closest('tr') as HTMLTableRowElement
+  return screen.getByRole('button', { name: `${name}の中身を見る` }).closest('[role="row"]') as HTMLElement
 }
 
 async function openScope(name: string) {
-  fireEvent.click(within(rowFor(name)).getByRole('button', { name: '中身を見る' }))
+  fireEvent.click(within(rowFor(name)).getByRole('button', { name: /の中身を見る$/ }))
   await waitFor(() => expect(screen.getByText('この決め方で、この人にはこう見えます')).toBeTruthy())
 }
 
@@ -146,7 +148,7 @@ describe('ログインユーザーの権限確認 (IDEA-30)', () => {
 
     // 戻ると一覧へ戻る
     fireEvent.click(screen.getByRole('button', { name: '一覧へ戻る' }))
-    await waitFor(() => expect(screen.getByText('対象者')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
     expect(fixture.updateStaff).not.toHaveBeenCalled()
   })
 
@@ -170,3 +172,6 @@ describe('ログインユーザーの権限確認 (IDEA-30)', () => {
     expect(screen.getByText('対象のLINEアカウント：テスト本店')).toBeTruthy()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

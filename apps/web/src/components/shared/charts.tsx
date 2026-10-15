@@ -1,16 +1,36 @@
 'use client'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { barChartTicks } from './bar-chart'
 import styles from './charts.module.css'
 export const CHART_COLORS = { primary: 'var(--color-accent-deep)', secondary: 'var(--color-ink-faint)' } as const
 export function chartNumber(value: number | null, unit = '') { return value === null || !Number.isFinite(value) ? '—' : `${value.toLocaleString('ja-JP')}${unit}` }
 export function chartDate(value: string) { return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${Number(value.slice(5,7))}/${Number(value.slice(8,10))}` : value }
-export type ChartPoint = { key: string; label: string; value: number | null; note?: string }
-export function ValueBarChart({ items, label, unit = '' }: { items: ChartPoint[]; label: string; unit?: string }) {
+export type ChartPoint = { key: string; label: string; value: number | null; note?: string; emphasis?: boolean }
+export function ValueBarChart({ items, label, unit = '', presentation = 'standard' }: { items: ChartPoint[]; label: string; unit?: string; presentation?: 'standard' | 'summary' }) {
+ const columnsRef = useRef<HTMLDivElement>(null)
+ const [labelStep, setLabelStep] = useState(1)
+ useEffect(() => {
+  const columns = columnsRef.current
+  if (!columns) return
+  const measure = () => {
+   const width = columns.getBoundingClientRect().width
+   if (!width || !items.length) return
+   const axis = columns.querySelector<HTMLElement>('[data-chart-axis]')
+   const fontSize = axis ? Number.parseFloat(getComputedStyle(axis).fontSize) || 11 : 11
+   const gap = Number.parseFloat(getComputedStyle(columns).columnGap) || 0
+   const longest = Math.max(...items.map(item => chartDate(item.label).length)) * fontSize
+   setLabelStep(Math.max(1, Math.ceil((longest + gap) / ((width + gap) / items.length))))
+  }
+  measure()
+  const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+  observer?.observe(columns)
+  void document.fonts?.ready.then(measure)
+  return () => observer?.disconnect()
+ }, [items])
  const max = Math.max(1,...items.map(p=>p.value ?? 0)); const ticks = barChartTicks(max); const top=ticks.at(-1) || 1
  return <div className={styles.root} role="group" aria-label={label}>
-  <div className={styles.plot}>{ticks.map(tick=><span className={styles.grid} key={tick} style={{bottom:`${tick/top*100}%`}} aria-hidden="true"><span>{chartNumber(tick,unit)}</span></span>)}
-   <div className={styles.columns}>{items.map(item=><div className={styles.column} key={item.key}><button type="button" className={styles.hit} aria-label={`${item.label} ${chartNumber(item.value,unit)}${item.note ? `・${item.note}`:''}`}><span className={styles.bar} style={{height:`${Math.max(0,item.value??0)/top*100}%`,background:CHART_COLORS.primary}}/><span className={styles.tooltip}>{item.label} {chartNumber(item.value,unit)}{item.note}</span></button><span className={styles.axis}>{chartDate(item.label)}</span></div>)}</div>
+  <div className={styles.plot} data-presentation={presentation}>{presentation === 'standard' && ticks.map(tick=><span className={styles.grid} key={tick} style={{bottom:`${tick/top*100}%`}} aria-hidden="true"><span>{chartNumber(tick,unit)}</span></span>)}
+   <div ref={columnsRef} className={styles.columns}>{items.map((item,index)=><div className={styles.column} key={item.key}><button type="button" className={styles.hit} aria-label={`${item.label} ${chartNumber(item.value,unit)}${item.note ? `・${item.note}`:''}`}><span className={styles.bar} style={{height:`${Math.max(0,item.value??0)/top*100}%`,background:presentation === 'summary' && !item.emphasis ? 'var(--color-accent)' : CHART_COLORS.primary}}/><span className={styles.tooltip}>{item.label} {chartNumber(item.value,unit)}{item.note}</span></button><span className={styles.axis} data-chart-axis data-axis-edge={items.length > 1 ? index === 0 ? 'first' : index === items.length - 1 ? 'last' : undefined : undefined} hidden={index !== 0 && index !== items.length - 1 && (index % labelStep !== 0 || items.length - 1 - index < labelStep)}>{chartDate(item.label)}</span></div>)}</div>
   </div>
  </div>
 }

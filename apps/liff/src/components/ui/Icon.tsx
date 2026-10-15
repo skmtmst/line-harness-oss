@@ -1,3 +1,4 @@
+import styles from './Icon.module.css';
 // Lucide (ISC License, https://lucide.dev) の線アイコンを写した小さな部品。
 // 使う分だけ path を持つ。依存は増やさない (package.json・lockfile 不変)。
 // 見た目は 24x24・線・角丸 (lucide の決まり) でそろえる。絵文字は使わない。
@@ -22,6 +23,7 @@ const PATHS = {
   'chevron-left': [<path key="c" d="m15 18-6-6 6-6" />],
   /** 次へ */
   'chevron-right': [<path key="c" d="m9 18 6-6-6-6" />],
+  'arrow-right': [<path key="a" d="M5 12h14m-6-6 6 6-6 6" />],
   /** 日付・空き */
   calendar: [
     <rect key="r" width="18" height="18" x="3" y="4" rx="2" />,
@@ -237,7 +239,7 @@ const PATHS = {
 
 export type IconName = keyof typeof PATHS;
 
-export default function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
+export default function Icon({ name, className = 'h-5 w-5', tone }: { name: IconName; className?: string; tone?: 'info' | 'booking-info' }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -246,7 +248,9 @@ export default function Icon({ name, className = 'h-5 w-5' }: { name: IconName; 
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
+      className={`${className} ${tone === 'info' ? styles.info : tone === 'booking-info' ? styles.bookingInfo : ''}`}
+      data-liff-icon={name}
+      data-liff-icon-tone={tone}
       aria-hidden="true"
     >
       {PATHS[name]}

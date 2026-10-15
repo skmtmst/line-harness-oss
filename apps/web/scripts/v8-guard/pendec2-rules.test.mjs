@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+import { connectGuardBrowser } from './browser-session.mjs'
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -31,9 +31,10 @@ const cases = {
   'internal-window-copy':['<p>詳細の小窓</p>','<p>詳細</p>'],
   kpiblank:['<div data-kpi-strip><p data-kpi-detail style="min-height:18px"></p></div>','<div data-kpi-strip><p data-kpi-detail style="display:none"></p></div>'],
   kpialign:['<div data-kpi-strip><p data-kpi-detail data-kpi-detail-present>補足</p><p data-kpi-detail style="display:none"></p></div>','<div data-kpi-strip><p data-kpi-detail data-kpi-detail-present>補足</p><p data-kpi-detail style="min-height:18px"></p></div>'],
+  kpimenu:['<div data-kpi-strip><button data-row-menu aria-haspopup="menu">…</button></div>', '<div data-kpi-strip><button>未設定を見る</button><a href="/ads">広告連携を開く</a></div>'],
 }
 test('閉じたdetailsの中は箱のはみ出し・下の余白に数えず、開いたら検出する', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(shell(card('<p>見出し</p><details><summary>詳細設定</summary><p style="width:240px;height:120px">中の内容</p></details>')))
@@ -45,7 +46,7 @@ test('閉じたdetailsの中は箱のはみ出し・下の余白に数えず、�
   } finally { await browser.close() }
 })
 test('baseの共通Cardの印でも新しい種類を測り、属性を増やしても同じ結果になる', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     await page.setContent(shell(card('<p style="width:240px">はみ出す内容</p>').replace('data-rule-card','data-design-part="card"')))
@@ -57,8 +58,8 @@ test('baseの共通Cardの印でも新しい種類を測り、属性を増やし
     assert.deepEqual(await page.evaluate(scan), [])
   } finally { await browser.close() }
 })
-test('B-219〜233の19種類は故障注入で落ち、修正後は0（1152・1440・1920）', async () => {
-  const browser=await chromium.launch()
+test('B-219〜233と帯の行メニューは故障注入で落ち、修正後は0（1152・1440・1920）', async () => {
+  const browser=await connectGuardBrowser()
   try {
     const page=await browser.newPage()
     for(const width of [1152,1440,1920]) {
@@ -88,7 +89,7 @@ test('故障した見張りをCLIが終了1で止める（無断の許可追加�
 })
 
 test('実物CSS：全部空なら90、1マスに補足があれば116で全マスを揃える。統括の帯にも効く', async () => {
-  const browser = await chromium.launch()
+  const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     const read = path => readFileSync(new URL('../../src/' + path, import.meta.url), 'utf8')
@@ -112,7 +113,7 @@ test('LIFFの実物CSSは白いカードだけに影を付け、ラジオは18�
   for(const entry of ['index.css','embedded.css']) assert.match(readFileSync(new URL('../../../liff/src/'+entry,import.meta.url),'utf8'),/card-surface\.css/)
   for(const entry of ['affiliate','event-booking','webinar','nen-member']) assert.match(readFileSync(new URL('../../../worker/src/client/'+entry+'/styles.css',import.meta.url),'utf8'),/card-surface\.css/)
   assert.match(readFileSync(new URL('../../../liff/src/salon-entry.tsx',import.meta.url),'utf8'),/embedded\.css/)
-  const browser=await chromium.launch()
+  const browser=await connectGuardBrowser()
   try {
     const page=await browser.newPage()
     await page.setContent(`<style>${surface}</style><main data-liff-root><section data-liff-card style="padding:16px">内容</section><section data-liff-card data-selected style="padding:16px">選択</section><button>操作</button><input type="radio" checked></main>`)
@@ -127,7 +128,7 @@ test('LIFFの実物CSSは白いカードだけに影を付け、ラジオは18�
 })
 
 test('実物CSS：停止確認のラジオ行はカードの選択枠を引き継がない', async () => {
-  const browser=await chromium.launch()
+  const browser=await connectGuardBrowser()
   try {
     const page=await browser.newPage()
     const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
@@ -139,7 +140,7 @@ test('実物CSS：停止確認のラジオ行はカードの選択枠を引き�
 })
 
 test('実物CSS：差し込み行の項目は8px、印と字は4px。未定義の値でくっつかない', async () => {
-  const browser=await chromium.launch()
+  const browser=await connectGuardBrowser()
   try {
     const page=await browser.newPage()
     const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
@@ -153,10 +154,23 @@ test('実物CSS：差し込み行の項目は8px、印と字は4px。未定義�
   } finally { await browser.close() }
 })
 
+// 閉じた details は Chrome の高さアニメーションで本文の寸法だけが残る。
+// 見えていない本文は除外し、開いたあとの実際のはみ出しは検出する。
+test('閉じた詳細設定の本文をカードのはみ出しに数えず、開いた時は検査する', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(shell(card('<details><summary>詳細設定</summary><div style="height:200px">本文</div></details>', 'height:80px') + '<style>details::details-content { height:0; overflow:clip; content-visibility:visible } details[open]::details-content { height:auto }</style>'))
+    assert.equal((await page.evaluate(scan)).some(f => ['cardspill','cardbottom'].includes(f.kind)), false)
+    await page.locator('summary').click()
+    assert.equal((await page.evaluate(scan)).some(f => f.kind === 'cardspill'), true)
+  } finally { await browser.close() }
+})
+
 // 現役のworkerのHTMLは登録案内用の中央寄せを持つ。共通化後も予約を狭めない。
 test('共通LIFF CSSはWorker入口の中央寄せ・余白を外し、操作の素の枠を消す', async () => {
   const embedded = readFileSync(new URL('../../../liff/src/embedded.css', import.meta.url), 'utf8').replace(/^@import[^;]+;/gm, '').replace(/^@source[^;]+;/gm, '');
-  const browser = await chromium.launch();
+  const browser = await connectGuardBrowser();
   try {
     const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
     await page.setContent(`<style>body{display:flex;align-items:center;min-height:100vh}#app{max-width:480px;width:100%;padding:24px 16px}*{box-sizing:border-box;margin:0;padding:0}${embedded}</style><body class="sb-active"><div id="app"><button>人工操作</button></div></body>`);
@@ -164,3 +178,42 @@ test('共通LIFF CSSはWorker入口の中央寄せ・余白を外し、操作の
     assert.deepEqual(values, { display: 'block', padding: '0px', border: '0px' });
   } finally { await browser.close(); }
 });
+
+// B-245：説明文の移動で、同じ板の同じ下余白を新しい場所と誤認しない。
+test('板の下余白は題で照合し、説明文が変わっても実寸の悪化を止める', async () => {
+  const { assessAgainstBase } = await import('./layout-defects.mjs')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const board = (description, padding) => shell(`<section data-page-template="create" style="padding-bottom:${padding}px"><header><h2>レポートを作る</h2>${description}</header><div>内容</div></section>`)
+    await page.setContent(board('',12))
+    const base = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
+    await page.setContent(board('<button data-screen-explanation-toggle>この画面の説明</button><p data-screen-explanation>説明の本文</p>',12))
+    const same = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
+    assert.equal(assessAgainstBase(same,base,'/fixture',1152,[]).failures.length,0)
+    await page.setContent(board('<p data-screen-explanation>説明の本文</p>',0))
+    const worse = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
+    assert.equal(assessAgainstBase(worse,base,'/fixture',1152,[]).failures.length,1)
+  } finally { await browser.close() }
+})
+
+test('2択の器の空の尾を検出し、文字幅の器と等幅の器を保つ', async () => {
+ const globals = readFileSync(new URL('../../src/app/globals.css', import.meta.url), 'utf8').replace('@theme {', ':root {')
+ const css = readFileSync(new URL('../../src/components/shared/segmented.module.css', import.meta.url), 'utf8')
+ const browser = await connectGuardBrowser()
+ try {
+  const page = await browser.newPage()
+  for (const width of [1440,1152,1920]) {
+   await page.setViewportSize({width,height:900})
+   await page.setContent(`<style>${globals}${css}</style><div data-theme="v8"><main style="display:flex;flex-direction:column;width:600px"><div class="root" data-segmented-control data-appearance="track" data-size="medium"><button class="item selected" aria-pressed="true">1つだけ選ぶ</button><button class="item" aria-pressed="false">いくつでも選ぶ</button></div></main></div>`)
+   const empty = () => page.evaluate(scan).then(rows => rows.filter(row => row.kind === 'segempty'))
+   assert.equal((await empty()).length,1,'縦flexへ器を渡すだけでは空の尾が残る')
+   await page.locator('[data-segmented-control]').evaluate(el=>el.setAttribute('data-segmented-fit','content'))
+   assert.equal((await empty()).length,0)
+   await page.addStyleTag({content:'html:root .root[data-segmented-fit="content"]{align-self:stretch;width:auto}'})
+   assert.equal((await empty()).length,1,'文字幅の指定を落とす故障を止める')
+   await page.locator('[data-segmented-control]').evaluate(el=>{el.removeAttribute('data-segmented-fit');el.setAttribute('data-equal-width','true')})
+   assert.equal((await empty()).length,0,'均等に使う器は空の尾ではない')
+  }
+ } finally { await browser.close() }
+})

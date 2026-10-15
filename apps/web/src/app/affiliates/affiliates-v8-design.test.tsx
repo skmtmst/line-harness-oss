@@ -98,7 +98,7 @@ describe('KdFRI アフィリエイタータブの実入口の集計・権限・�
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: '成果を見る' }).length).toBe(3)
     })
-    // 閲覧だけの人には作る・選ぶ操作を出さない
+    // 閲覧のみの人には作る操作と選ぶ枠を出さず、見る操作は残す。
     expect(screen.queryByRole('link', { name: /アフィリエイターを作る/ })).toBeNull()
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
     // 探す・絞る・見るは使える
@@ -106,10 +106,12 @@ describe('KdFRI アフィリエイタータブの実入口の集計・権限・�
     expect(screen.getByLabelText('よく使う絞り込み')).toBeTruthy()
   })
 
-  test('道具が絵どおり', async () => {
+  test('共通の広い列と畳んだ列で作成先と絞り込みを保つ', async () => {
     render(<AffiliatesPage />)
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: /アフィリエイターを作る/ })).toBeTruthy()
+      const creates = screen.getAllByRole('link', { name: /アフィリエイターを作る/ })
+      expect(creates).toHaveLength(2)
+      for (const create of creates) expect(create.getAttribute('href')).toBe('/affiliates/new')
     })
     expect(screen.getByLabelText('名前・紹介コードで探す')).toBeTruthy()
     expect(screen.getByRole('button', { name: /計測中/ })).toBeTruthy()

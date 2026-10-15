@@ -21,6 +21,7 @@ import { TagEditForm } from './edit-form'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 タグ：タグの編集（一から書いた画面・2026-10-07）。
@@ -29,7 +30,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  * 型は「作る」（CreatePage）：頭（戻る・タグ名・フォルダと人数）→ 左に「基本」「タグ連動」「マイル」、
  * 右に「使っている所」、下の帯（削除は左端・キャンセル／複製して作る／保存は中央）。
  * 「タグ連動」「マイル」は畳んで1行の要約を出し、「開く」で中身を出す（絵どおり）。
- * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（app/tags/edit-tag-page-v8）と同じ。
+ * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（src/v8/tag-edit/edit）と同じ。
  */
 
 export default function TagEditV8() {
@@ -126,7 +127,7 @@ export default function TagEditV8() {
   const saveKeysRef = useRef(new IdempotencyKeyStore())
 
   const save = async (values: TagEditorValues, applyRetroactive: boolean, previewToken?: string) => {
-    if (!tag || !definition || !selectedAccountId || saving) return
+    if (!canEdit || !tag || !definition || !selectedAccountId || saving) return
     const savingTarget = targetKey
     const savingGeneration = requestRef.current
     const stillHere = () => targetRef.current === savingTarget && requestRef.current === savingGeneration
@@ -221,7 +222,7 @@ export default function TagEditV8() {
     }
   }
 
-  if (loading) return <SaveErrorScope errors={saveErrors}><p className={styles.loading} role="status">読み込み中…</p></SaveErrorScope>
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="読み込み中…" /></SaveErrorScope>
   if (!tagId) {
     return <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="編集するタグが指定されていません" description="一覧から編集するタグを選び直してください。" backHref="/tags" backLabel="タグ一覧へ戻る" /></SaveErrorScope>
   }

@@ -7,7 +7,6 @@ import MessageForm from './message-form'
 import { useFormErrors } from '@/lib/use-form-errors'
 
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { messageReferences: async () => [{ kind: 'form', id: 'f-1', name: 'アンケート', accountName: '本店' }] } }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false }) }))
 afterEach(cleanup)
 

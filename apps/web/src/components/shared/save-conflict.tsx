@@ -168,12 +168,12 @@ export function SaveConflictBand({
           <GitCompare aria-hidden="true" className={styles.buttonIcon} />
           違いを比べる
         </Button>
-      ) : (
+      ) : onCompare ? (
         <Button onClick={onCompare} disabled={compareBusy || compareDisabled} busy={compareBusy} busyLabel="比べています…">
           <GitCompare aria-hidden="true" className={styles.buttonIcon} />
           違いを比べる
         </Button>
-      )}
+      ) : null}
       {reloadHref ? <Button variant="primary" href={reloadHref}><RefreshCw aria-hidden="true" className={styles.buttonIcon} />最新を読み込んで続ける</Button> : <Button variant="primary" onClick={onReload}>
         <RefreshCw aria-hidden="true" className={styles.buttonIcon} />
         最新を読み込んで続ける

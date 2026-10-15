@@ -26,6 +26,7 @@ import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import styles from './broadcast-form-v8.module.css'
 import StickyBar from '@/components/shared/sticky-bar'
+import { CreateColumns } from '@/components/templates/create-page'
 import { useFormErrors } from '@/lib/use-form-errors'
 import LinePreview from '@/components/shared/line-preview'
 import BroadcastTextBubble from './broadcast-text-bubble'
@@ -84,9 +85,7 @@ import Select from '@/components/shared/select'
 import { useStaffRole } from '@/lib/staff-role'
 import { canEditFeature } from '@/lib/staff-capability'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
-import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { Steps } from '@/components/templates'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
 import MessageComposer, { ComposerCarouselPreview, MessageComposerPage } from '@/components/shared/message-composer'
@@ -365,10 +364,7 @@ export function MediaUpload({ bubble, onChange, lineAccountId, mediaAccountId = 
 export function BubblePreview({ bubble, buttons = [], accountName, composer = false }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[]; accountName?: string; composer?: boolean }) {
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
-  if (bubble.type === 'text') return <BroadcastTextBubble text={text} buttons={buttons} accountName={accountName} legacy={<div className="max-w-[82%]">
-    <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-label shadow-card">{text || 'テキストを入力すると表示されます'}</div>
-    {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-medium" title={button.value}>{button.label || 'ボタン'}</div>)}
-  </div>} />
+  if (bubble.type === 'text') return <BroadcastTextBubble text={text} buttons={buttons} accountName={accountName} />
   if (bubble.type === 'sticker') {
     const st = (bubble.content.state as MessageKindState | undefined)?.sticker
     return st?.packageId && st?.stickerId
@@ -776,8 +772,7 @@ export default function BroadcastForm({
   /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（v7 はこれまでの帯）。
      ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。v7 は今までどおり。 */
   /* ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。v7 は今までどおり。手順は V8 だけ題と説明の下（Steps）。 */
-  const showHeadBack = useAdminTheme() !== 'v8'
-  const v8 = !showHeadBack
+
   usePageTitle(
     preflightDialogOpen
       ? '一斉配信の配信前チェック'
@@ -2118,17 +2113,14 @@ export default function BroadcastForm({
     }
   }
 
-  return <SaveErrorScope errors={saveErrors}><MessageComposerPage active={v8 && currentStep === 'message'}><div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
-    <header className={styles.header} data-steps-below={v8 || undefined}>
+  return <SaveErrorScope errors={saveErrors}><MessageComposerPage active={currentStep === 'message'}><div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
+    <header className={styles.header} data-steps-below={true}>
       <div className={styles.heading}>
-        {showHeadBack ? <Button variant="secondary" className={styles.textButton} size="compact" onClick={() => guarded(onCancel)}>← 一斉配信一覧</Button> : null}
         <h2>一斉配信を作る</h2>
         <p aria-live="polite">{draftStatusLabel || '下書き・未保存'}</p>
       </div>
       {/* ★V8：手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。v7 はこれまでの帯のまま。 */}
-      {v8
-        ? <div className={styles.stepsBelow}><Steps connectorSize={currentStep === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps} currentKey={currentStep ?? undefined} /></div>
-        : <div className={styles.stepRail}><BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} /></div>}
+      {<div className={styles.stepsBelow}><Steps connectorSize={currentStep === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps} currentKey={currentStep ?? undefined} /></div>}
       <Button ref={previewToggleRef} aria-expanded={previewOpen} aria-controls="broadcast-line-preview" className={styles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
     </header>
     {/*
@@ -2160,7 +2152,7 @@ export default function BroadcastForm({
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
       </p>
     ) : null}
-    <div className={styles.body}>
+    <CreateColumns>
       <div className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
@@ -2387,7 +2379,7 @@ export default function BroadcastForm({
           <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ"
             folders={templateFolders} busy={composerBusy} error={templateApplyError}
             state={templateCandidatesStatus === 'loading' ?
-                <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><p role="alert">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</p></SaveErrorField> : undefined}
+                <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><Notice tone="danger">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</Notice></SaveErrorField> : undefined}
             items={[
                     ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:typeLabel(asset.kind)})),
               ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, content:template.messageType === 'text' ?template.messageContent : undefined, keywords: template.messageContent, meta : typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}
@@ -2578,11 +2570,11 @@ export default function BroadcastForm({
           ['送る日時', sendWhenLabel ?? '未設定'],
           ['配信後のアクション', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'],
         ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
-        <div className={styles.previewActions}><Button type="button" disabled={Boolean(validate()) || saving} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
+        <div className={styles.previewActions}><Button type="button" disabled={Boolean(validate()) || saving} title={validate() || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
         {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
         <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
       </aside>
-    </div>
+    </CreateColumns>
 
     <StickyBar className={styles.footer} actions={(
       <>

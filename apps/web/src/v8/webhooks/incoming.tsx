@@ -1,4 +1,10 @@
 'use client'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  createName: requiredText("名前を入力してください"),
+}
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSearchParams } from 'next/navigation'
@@ -430,7 +436,7 @@ export default function WebhooksIncomingV8() {
       return
     }
     const sourceValue = createSource === SOURCE_OTHER ? createSourceFree.trim() : createSource
-    if (!createName.trim()) {
+    if ((b244Requirements.createName.check(createName) !== null)) {
       setCreateFieldError({ name: '名前を入力してください' })
       requestAnimationFrame(() => { const field = document.getElementById('wh-incoming-name'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
@@ -753,30 +759,36 @@ export default function WebhooksIncomingV8() {
               <p className={styles.cardNote}>いま確認が必要な届物はありません。</p>
             ) : (
               <>
-                <DataTable aria-label="人が見つからなかった届物" columnLayout={{ headHeight: 'auto', rowHeight: 'var(--tpl-wh-mini-row-h)', gap: 'var(--tpl-rule-row-gap)', padding: 'var(--tpl-wh-mini-row-pad)', headPadding: 'var(--tpl-wh-mini-head-pad)', headRadius: 'var(--radius-segment)', rowGap: 'var(--tpl-rule-row-gap)', headTextSize: 'var(--text-micro)', bodyTextSize: 'var(--text-caption)' }}>
+                <DataTable aria-label="人が見つからなかった届物" columnSizing="content">
                   <thead>
-                    <TableHeadRow data-table-layout="columns">
+                    <TableHeadRow>
                   <Th className={styles.miniWhen}>届いた日時</Th>
-                  <Th className={styles.miniValue}>届いた値</Th>
+                  <Th grow className={styles.miniValue}>届いた値</Th>
                   <Th className={styles.miniCandidate}>候補</Th>
                   <Th className={styles.miniOps}><span className={styles.srOnly}>操作</span></Th>
                 </TableHeadRow>
                 </thead>
                 <tbody>
                 {unmatched.map((item) => (
-                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
+                  <Tr key={item.id} data-row-id={item.id}>
                     <Td className={styles.miniWhen}>{shortDateTime(item.receivedAt)}</Td>
-                    <Td className={styles.miniValue} title={item.identityAttempts.map((attempt: { kind: string; value: string }) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')}>
+                    <Td grow className={styles.miniValue} title={item.identityAttempts.map((attempt: { kind: string; value: string }) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')}>
                       {item.identityAttempts.length > 0
                         ? item.identityAttempts.map((attempt: { kind: string; value: string }) => attempt.value).join('、')
                         : '照合に使える値が届いていません'}
                     </Td>
                     <Td className={styles.miniCandidate}>
-                      {item.kind === 'candidate'
+                      <TruncatedText value={item.kind === 'candidate'
                         ? '1人の友だちに一致'
                         : item.kind === 'ambiguous'
                           ? item.candidates.length > 0 ? `${item.candidates.length} 人の友だちに一致` : '2人以上に一致'
-                          : '一致する友だちがいません'}
+                          : '一致する友だちがいません'} />
+                      {item.kind === 'ambiguous' && canResolveUnmatched ? item.candidates.map((candidate) => (
+                        <div key={candidate.friendId}>
+                          <span>{candidate.displayName ?? candidate.friendId}</span>
+                          <Button disabled={dismissingId !== null} busy={dismissingId === item.id} onClick={() => void resolveUnmatched(item, { action: 'link', friendId: candidate.friendId })}>この人に結び付ける</Button>
+                        </div>
+                      )) : null}
                     </Td>
                     <Td className={styles.miniOps}>
                       {canResolveUnmatched ? (
@@ -787,7 +799,7 @@ export default function WebhooksIncomingV8() {
                             {item.kind === 'ambiguous' ? 'どれでもない' : '確認した'}
                           </Button>
                         )
-                      ) : null}
+                      ) : <span className={styles.cardNote}>結び付け・確認は統括または管理者に頼んでください。</span>}
                     {unmatchedActionError && unmatchedActionError.id === item.id ? (
                       <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{unmatchedActionError.message}</Notice>
                     ) : null}
@@ -812,7 +824,7 @@ export default function WebhooksIncomingV8() {
             <h3 className={styles.cardTitle} id="wh-in-try">届いたつもりで試す</h3>
             <p className={styles.cardNote}>見本の JSON で、どの人に届くかと何が動くかを確かめます。実際の処理は動きません</p>
           </div>
-          <pre className={styles.sampleBox}>{sampleText}</pre>
+          <pre className={styles.sampleBox} title={detail?.latestSample ? `${shortDateTime(detail.latestSample.receivedAt)}に届いた見本。差し込み：${detail.templateFields.map((field) => field.token).join('、')}${detail.latestSample.truncated ? '。項目が多いため先頭50件まで表示しています' : ''}` : undefined}>{sampleText}</pre>
           <div>
             <Button
               onClick={() => {
@@ -871,7 +883,7 @@ export default function WebhooksIncomingV8() {
           confirmIcon={<Plus size={15} aria-hidden="true" />}
         >
           <div className={`${styles.form} ${styles.formTight}`}>
-            <Field label="名前" htmlFor="wh-incoming-name" error={createFieldError.name}>
+            <Field label="名前" htmlFor="wh-incoming-name" error={createFieldError.name} requirement={b244Requirements.createName}>
               <SaveErrorField names={["createName","name","create_name"]}><TextField
                 value={createName}
                 onChange={(event) => setCreateName(event.target.value)}

@@ -19,6 +19,11 @@ describe('候補を選ぶ共通の窓', () => {
     const onSelect = vi.fn(), onConfirm = vi.fn()
     render(<SourcePickerDialog {...props} onSelect={onSelect} onConfirm={onConfirm} onCancel={() => {}} />)
     const dialog = await screen.findByRole('dialog')
+    const footer = dialog.lastElementChild as HTMLElement
+    expect(within(footer).queryByRole('searchbox')).toBeNull()
+    expect(within(footer).queryByRole('radio')).toBeNull()
+    expect(within(footer).getByRole('button', { name: 'キャンセル' })).toBeTruthy()
+    expect(within(footer).getByRole('button', { name: 'このテンプレートを使う' })).toBeTruthy()
     fireEvent.click(within(screen.getByRole('navigation', { name: 'フォルダ' })).getByRole('button', { name: /季節/ }))
     expect(within(dialog).queryByRole('radio', { name: '商品3種' })).toBeNull()
     fireEvent.click(within(screen.getByLabelText('候補の絞り込み')).getByRole('button', { name: /テキスト/ }))

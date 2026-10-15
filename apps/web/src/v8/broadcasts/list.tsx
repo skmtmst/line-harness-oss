@@ -1,7 +1,9 @@
 'use client'
+
+import ListDateTime from '@/components/shared/list-date-time'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd, ListToolbarOptional } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -13,7 +15,7 @@ import { useListUrlValue, useListScrollMemory, useListUrlParam } from '@/compone
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FilePen, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react';
+import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react';
 
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -47,7 +49,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary';
 import { runOptimistic } from '@/lib/undoable';
-import { formatDateTime, formatNumber, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
 import { emptyValue } from '@/components/shared/empty-value';
@@ -601,7 +603,7 @@ export default function BroadcastListV8() {
     setShowCreate(true)
   }
 
-  /* ===== 数の帯（1440：予約中・今月の送信枠・今月の配信・平均の開封率。1152：送信枠の代わりに下書き） ===== */
+  /* 送信枠は表示幅にかかわらず、同じ月の使用量から残りを出す。 */
   const quotaRemaining = quota?.limit != null && quota?.used != null ? quota.limit - quota.used : null
   const kpiPending = listKpis === undefined
   const kpis = [
@@ -611,27 +613,18 @@ export default function BroadcastListV8() {
       icon: CalendarClock,
       value: kpiPending ? null : (listKpis?.scheduled ?? null),
       unit: '件',
-      detail: '今日 —（未取得）',
+      detail: <span title="今日の予約件数は取得していません">今日 {emptyValue('unknown')}</span>,
     },
-    narrow
-      ? {
-          key: 'draft',
-          title: '下書き',
-          icon: FilePen,
-          value: kpiPending ? null : (listKpis?.drafts ?? chipCount(statusCounts, 'draft')),
-          unit: '件',
-          detail: '編集の途中',
-        }
-      : {
-          key: 'quota',
-          title: '今月の送信枠',
-          icon: Gauge,
-          value: quotaRemaining,
-          unit: '通 残り',
-          detail: quota?.limit != null && quota?.used != null
-            ? `${formatNumber(quota.limit)} 通のうち ${formatNumber(quota.used)} 通を使用`
-            : '送信枠を確認できません',
-        },
+    {
+      key: 'quota',
+      title: '今月の送信枠',
+      icon: Gauge,
+      value: quotaRemaining,
+      unit: '通 残り',
+      detail: quota?.limit != null && quota?.used != null
+        ? `${formatNumber(quota.limit)} 通のうち ${formatNumber(quota.used)} 通を使用`
+        : '送信枠を確認できません',
+    },
     {
       key: 'thisMonth',
       title: '今月の配信',
@@ -692,7 +685,7 @@ export default function BroadcastListV8() {
      */
     if (isFromHeadquarters(broadcast)) {
       return [
-        { id: 'view', label: '見る', external: false, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
+        { id: 'view', label: "配信の詳細を見る", external: false, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
         ...(canEdit ? [{ id: 'duplicate', label: '複製', external: false, icon: <Copy size={14} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
       ]
     }
@@ -789,16 +782,15 @@ export default function BroadcastListV8() {
 
   const dateBox = (
     <div className={styles.datePopoverWrap} ref={datePopoverRef}>
-      <button
-        type="button"
-        className={styles.dateButton}
-        data-active={Boolean(dateFrom || dateTo)}
+      <FilterChip
+        selected={Boolean(dateFrom || dateTo)}
+        aria-haspopup="dialog"
         aria-expanded={datePopoverOpen}
-        onClick={() => setDatePopoverOpen((open) => !open)}
+        onChange={() => setDatePopoverOpen((open) => !open)}
+        icon={<CalendarDays size={14} aria-hidden="true" />}
       >
         {dateRangeLabel(dateFrom, dateTo)}
-        <CalendarDays size={14} aria-hidden="true" />
-      </button>
+      </FilterChip>
       {datePopoverOpen ? (
         <div className={styles.datePopover} role="dialog" aria-label="配信日で絞る">
           <p className={styles.datePopoverLabel}>配信日で絞る（開始〜終了）</p>
@@ -817,14 +809,15 @@ export default function BroadcastListV8() {
 
   /* 閲覧のみは保存できないので置かない。場所だけ空けて「保存した検索」までの並びを保つ。 */
   const saveCurrentButton = canEdit ? (
-    <button
+    <Button
       type="button"
-      className={styles.ghostButton}
+      variant="text"
+      textTone="quiet"
       onClick={() => setSavedViewOpen((open) => !open)}
     >
       <Bookmark size={14} aria-hidden="true" />
       この条件を保存する
-    </button>
+    </Button>
   ) : (
     <span className={`${styles.ghostButton} ${styles.viewerSpace}`} aria-hidden="true">
       <Bookmark size={14} aria-hidden="true" />
@@ -925,21 +918,14 @@ export default function BroadcastListV8() {
 
   /* 道具の段：1440 は「探す・配信日・保存 … 保存した検索」／「札 … 件数・並び」。1152 は作る・フォルダが前に入り、札は選ぶ欄。 */
   const toolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
-        {narrow ? createButton(false) : null}
-        {narrow ? folderSelect : null}
         {searchBox}
-        {dateBox}
-        {narrow ? null : saveCurrentButton}
-        <span className={styles.spacer} aria-hidden="true" />
-        {savedSearchBox}
+        <ListToolbarOptional collapse="overflow" label="配信日・検索条件">{dateBox}{saveCurrentButton}<ListToolbarEnd>{savedSearchBox}</ListToolbarEnd></ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
-        {narrow ? statusSelect : statusChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {pageSizeBox}
-        {sortButton}
+        {statusChips}
+        <ListToolbarEnd>{sortButton}{pageSizeBox}</ListToolbarEnd>
       </ListToolbarRow>
       {savedViewOpen ? (
         <div className={styles.saveRow}>
@@ -1064,8 +1050,8 @@ export default function BroadcastListV8() {
               <Td>
                 <span className={styles.cellMain}>
                   {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? polishFormatListDateTime(broadcast.sentAt) : emptyValue('unknown'))
-                    : (broadcast.scheduledAt ? polishFormatListDateTime(broadcast.scheduledAt) : emptyValue('unconfigured'))}
+                    ? (broadcast.sentAt ? <ListDateTime value={broadcast.sentAt} /> : emptyValue('unknown'))
+                    : (broadcast.scheduledAt ? <ListDateTime value={broadcast.scheduledAt} /> : emptyValue('unconfigured'))}
                 </span>
                 {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
               </Td>
@@ -1091,7 +1077,8 @@ export default function BroadcastListV8() {
                 {canEdit ? <div className={styles.menuBox}>
                   <ContextMenu label={menuLabel} items={rowContextItems(broadcast)}>
                     <RowMenu
-                      className={styles.menuButton}
+                      appearance="box"
+                      size="row"
                       label={menuLabel}
                       items={rowMenuItems(broadcast)}
                       open={openMenuId === broadcast.id}
@@ -1122,14 +1109,8 @@ export default function BroadcastListV8() {
 
   const pager = !loading && !error && !forbidden && (resultTotal !== null || visibleBroadcasts.length > 0) ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {pageCount > 1
-          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件中 ${rangeFirst}〜${rangeLast} 件`
-          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件`}
-      </span>
-      {pageCount > 1 ? (
-        <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り" />
-      ) : null}
+      <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り"
+        range={{ total: resultTotal ?? visibleBroadcasts.length, first: rangeFirst, last: rangeLast }} />
     </ListPagePagination>
   ) : null
 
@@ -1137,6 +1118,7 @@ export default function BroadcastListV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      heightMode="content"
       skeleton
       boardId={boardId}
       headingSize="compact"
@@ -1161,8 +1143,8 @@ export default function BroadcastListV8() {
           ))}
         </KpiBand>
       </>}
-      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
-      folders={narrow ? undefined : (
+      folderNav={error ? undefined : { rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
+      folders={error ? undefined : (
         <FolderPanel
           createAction={createButton(true)}
           activeId={folderFilter}

@@ -17,6 +17,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './quick-send.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import MessageInsertRow, { MessageBody, MessageInsertButton } from '@/components/shared/message-insert-row'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -164,6 +165,15 @@ export default function QuickSendV8({
     && estimate !== null
     && (!needsCountConfirmation || countMatched)
     && !busy
+  const sendDisabledReason = !text.trim() ? '送る本文を入力してください。'
+    : text.length > TEXT_LIMIT ? `本文は${TEXT_LIMIT}文字以内で入力してください。`
+      : target !== 'all' && !tagId ? '送る相手のタグを選んでください。'
+        : when !== 'now' && !scheduledValue ? '送る日時を選んでください。'
+          : needsApproval && !approverId ? '承認を頼む相手を選んでください。'
+            : approvalConfig === null ? error ? '配信の承認設定を確認できません。もう一度開き直してください。' : '配信の承認設定を確認しています。'
+              : estimate === null ? error ? '送る相手の人数を確認できません。本文や宛先を確認してください。' : '送る相手の人数を確認しています。'
+                : needsCountConfirmation && !countMatched ? '確認した対象人数を入力してください。'
+                  : busy ? '送っています。完了までお待ちください。' : undefined
 
   /** 差し込む：今のカーソルの位置に {{name}} を入れる（送るときに名前へ置き換わる形。{名前} は置き換わらずに届いていた）。 */
   const insertName = () => {
@@ -272,7 +282,7 @@ export default function QuickSendV8({
           </Link>
           <span className={styles.spacer} aria-hidden="true" />
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => void handleSend()} disabled={!canSend} busy={busy} busyLabel="送っています…">
+          <Button type="button" variant="primary" onClick={() => void handleSend()} disabled={!canSend} title={!canSend ? sendDisabledReason : undefined} busy={busy} busyLabel="送っています…">
             <Send size={15} aria-hidden="true" />{sendLabel}
           </Button>
           <span className={styles.spacer} aria-hidden="true" />
@@ -281,7 +291,7 @@ export default function QuickSendV8({
         </div>
       )}
     >
-      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text"><SaveErrorField names={["text","messageContent"]}><InsertTextField
+      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text"><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
@@ -289,13 +299,12 @@ export default function QuickSendV8({
           maxLength={TEXT_LIMIT}
           disabled={busy || pending}
           onValueChange={(next) => setText(next)}
-        /></SaveErrorField>
-<div className={styles.metaRow}>
-          <span className={styles.meta}>差し込む：</span>
-          <button type="button" className={styles.insert} disabled={busy || pending} onClick={insertName}>名前</button>
-          <span className={styles.spacer} aria-hidden="true" />
-          <span className={styles.meta}>{`${formatNumber(text.length)} / ${formatNumber(TEXT_LIMIT)}`}</span>
-        </div>
+        />
+          <MessageInsertRow count={`${formatNumber(text.length)} / ${formatNumber(TEXT_LIMIT)}`}>
+            <MessageInsertButton kind="name" label="名前" disabled={busy || pending} onClick={insertName} />
+          </MessageInsertRow>
+        </MessageBody></SaveErrorField></Field>
+
 <p className={styles.label} id="quick-send-v8-target">送る相手</p>
 <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
           {([['all', '友だち全員'], ['tag', 'タグで絞る']] as const).map(([value, label]) => (
@@ -343,7 +352,7 @@ export default function QuickSendV8({
               <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>
             </div>
           ) : null}
-        </div></Field></div>
+        </div></div>
     </Dialog>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </></SaveErrorScope>

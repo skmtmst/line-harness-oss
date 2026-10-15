@@ -19,7 +19,7 @@ import MileagePage from './page'
  * v7 では従来の器が出ることも固定する。
  */
 let query = ''
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/mileage',
   useSearchParams: () => new URLSearchParams(query),
@@ -78,7 +78,7 @@ const friendItem = {
   available: 640,
   pending: 0,
   expiringMiles30d: 0,
-  nextExpiringAt: null,
+  nextExpiringAt: '2026-11-01T00:00:00Z',
   lifetimeEarned: 1000,
   spent: 360,
   lastChangedAt: '2026-09-30T10:00:00+09:00',
@@ -291,30 +291,33 @@ test('v8 のたまる決めごとは板 OC0gy に切り替わる', async () => {
   expect(host.querySelector('[data-mileage-design="v6"]')).toBeNull()
   // 準備中は置かない
   expect(host.textContent).not.toContain('準備中')
+  expect(host.querySelector('[title*="8人で割った平均"]')?.getAttribute('title')).toContain('625')
+  await act(async () => { (host.querySelector('[aria-label="友だち追加の操作"]') as HTMLButtonElement).click() })
+  const view = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === '公開版の中身を見る') as HTMLButtonElement
+  expect(view).toBeTruthy()
+  await act(async () => { view.click() })
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('公開版 v3')
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('100マイル')
 })
 
-test('v8 のたまる決めごと：きっかけ（購入・配信の反応・紹介）は上の絞り込み。左のフォルダの列は「すべて」だけで押せない口を置かない（B-136）', async () => {
+test('v8 のたまる決めごと：きっかけ（購入・配信の反応・紹介）は上の絞り込み。所属先の受け口がないフォルダ列を出さず、作成と絞り込みを保つ（W2）', async () => {
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<MileagePage />))
   await settle()
   await eventually(() => expect(host.textContent).toContain('友だち追加'))
-  const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
-  const rows = [...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))
-  expect(rows).toEqual(['すべて'])
-  expect(nav.textContent).not.toContain('購入')
+  expect(host.querySelector('[data-template-region="folders"]')).toBeNull()
+  expect(host.querySelector('a[href="/mileage/earning-rules/new"]')).toBeTruthy()
   expect(host.textContent).not.toContain('フォルダを追加')
   expect(host.querySelector('button[aria-label="きっかけ"], [aria-label="きっかけ"]')).toBeTruthy()
 })
 
-test('v8 の使い道：種類（クーポン・シナリオなど）は上の絞り込み。左のフォルダの列は「すべて」だけ（B-136）', async () => {
+test('v8 の使い道：種類（クーポン・シナリオなど）は上の絞り込み。選ぶ物がない列を出さず、種類の絞り込みを保つ（W2）', async () => {
   document.documentElement.dataset.theme = 'v8'
   query = 'tab=rewards'
   await act(async () => root.render(<MileagePage />))
   await settle()
   await eventually(() => expect(host.textContent).toContain('送料無料クーポン'))
-  const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
-  expect([...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))).toEqual(['すべて'])
-  expect(nav.textContent).not.toContain('クーポン')
+  expect(host.querySelector('[data-template-region="folders"]')).toBeNull()
   expect(host.querySelector('[aria-label="種類"]')).toBeTruthy()
   query = ''
 })
@@ -333,6 +336,7 @@ test('v8 のタブごとに板 ID が替わる（S35pO・CJlf4・oRbJi・IRPw8�
     await eventually(() => {
       expect(host.querySelector(`[data-design-node="${node}"]`)).toBeTruthy()
       expect(host.textContent).toContain(word)
+      if (tab === 'balances') expect(host.querySelector('[title^="次は "]')?.getAttribute('title')).toContain('11')
     })
     act(() => root.unmount())
     host.remove()
@@ -357,11 +361,21 @@ test('v8 の閲覧のみは帯が出て、作る操作は出さない（E2Any）
   expect(host.querySelector('[aria-label="友だち追加を上へ"]')).toBeNull()
 })
 
-test('v7 の下では従来の器が出る（新しい器には切り替わらない）', async () => {
+test('旧テーマの属性が残っていてもV8を出す', async () => {
   await act(async () => root.render(<MileagePage />))
   await settle()
   await eventually(() => {
-    expect(host.querySelector('[data-mileage-design="v6"]')).toBeTruthy()
+    expect(host.querySelector('[data-design-node="OC0gy"]')).toBeTruthy()
   })
-  expect(host.querySelector('[data-design-node="OC0gy"]')).toBeNull()
+  expect(host.querySelector('[data-mileage-design="v6"]')).toBeNull()
+})
+
+test('U5：使われたマイルは支出の絶対量で、交換回数を保つ', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await act(async () => root.render(<MileagePage />))
+  await eventually(() => {
+    const card = [...host.querySelectorAll('[data-design-version="v8"]')].find(el => el.querySelector('[data-kpi-label]')?.textContent === '直近30日 使われたマイル')
+    expect(card?.querySelector('[data-kpi-number]')?.textContent).toBe('200')
+    expect(card?.textContent).toContain('交換 2 件')
+  })
 })

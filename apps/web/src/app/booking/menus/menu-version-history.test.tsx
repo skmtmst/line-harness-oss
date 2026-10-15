@@ -31,7 +31,7 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-import MenuVersionHistory from './menu-version-history'
+import MenuVersionHistory from '@/v8/booking-menus/menu-version-history'
 import { ApiError } from '@/lib/api'
 
 afterEach(() => {
@@ -75,7 +75,7 @@ describe('版の履歴の引き出し', () => {
   test('読み込み中はその旨を出す', () => {
     fixture.listMenuVersions = () => new Promise(() => {})
     renderHistory()
-    expect(screen.getByText('版の履歴を読み込んでいます')).toBeTruthy()
+    expect(screen.getByLabelText('版の履歴を読み込んでいます').getAttribute('aria-busy')).toBe('true')
   })
 
   test('正常時は版・札・ひとことが並ぶ', async () => {
@@ -147,5 +147,5 @@ test('版を戻す409の理由は一覧の取得成功で消えない', async ()
   fireEvent.click(screen.getByText('この版に戻す'))
   fireEvent.click(screen.getByText('新しい版を作る'))
   await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
-  await waitFor(() => expect(screen.getByText('ほかの人が先に保存しました。最新の版を読み直してから、もう一度お試しください。')).toBeTruthy())
+  await waitFor(() => expect(screen.getByText('ほかの人が先に保存しました。最新の版を読み直しました。内容を確かめてから、もう一度お試しください。')).toBeTruthy())
 })

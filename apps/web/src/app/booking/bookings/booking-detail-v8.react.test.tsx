@@ -26,7 +26,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/booking/bookings',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
@@ -56,10 +56,13 @@ const BOOKING = {
   source: 'phone',
 } as unknown as import('@/lib/api').BookingRequest
 
+const mounted: Array<{ root: Root; host: HTMLElement }> = []
+
 function render(onCancel = vi.fn()): { host: HTMLElement; onCancel: ReturnType<typeof vi.fn> } {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
+  mounted.push({ root, host })
   act(() => {
     root.render(
       <BookingDetailV8
@@ -80,8 +83,12 @@ describe('予約の詳細のV8（AjZhH）', () => {
     apiMocks.getBooking.mockResolvedValue({ booking: { historyTotal: 3 } })
   })
 
-  afterEach(() => {
-    document.body.innerHTML = ''
+  afterEach(async () => {
+    await act(async () => {
+      for (const { root } of mounted) root.unmount()
+    })
+    for (const { host } of mounted) host.remove()
+    mounted.length = 0
     vi.clearAllMocks()
   })
 

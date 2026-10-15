@@ -1,23 +1,27 @@
 'use client'
-import { Unlink } from 'lucide-react'
+import { useState } from 'react'
+import { Pencil, Unlink } from 'lucide-react'
 import { formatDateTime, formatDate as polishFormatDate } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
+import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Toggle from '@/components/shared/toggle'
 import { TextArea } from '@/components/shared/text-field'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td, RowNameLink, TableStateRow } from '@/components/shared/table'
 import MergedDeliveryDialog from '@/components/merged-person/merged-delivery-dialog'
 import MergedProfileDialog from '@/components/merged-person/merged-profile-dialog'
 import { useMergedPerson } from '@/components/merged-person/use-merged-person'
+import { deliveryPriorityDetails, linkedFriendDetails, personDetails, profileValueDetails } from '@/components/merged-person/merged-person-metadata'
 import styles from './person.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /*
  * ★V8 統合ユーザーの詳細（Pencil `Hn9eE`）。/friends?tab=merged&person=<id>（一覧の名前からも開く）。
@@ -40,6 +44,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
   const m = useMergedPerson(personId)
   const staffRole = useStaffRole()
   const canManage = canManageRole(staffRole)
+  const [valuesExpanded, setValuesExpanded] = useState(false)
 
   const head = (title: string, description: string) => (
     <PageHeading title={title}
@@ -72,7 +77,29 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
     <PageFrame kind="detail" boardId="Hn9eE">
       {head(person.primaryDisplayName, `統合ユーザー・結び付いた友だち ${person.linkedFriends.length}${earliestLink ? `・${shortDate(earliestLink)} に結び付けた` : ''}`)}
 
-      <div className={styles.split}>
+      <PageContent><DetailColumns asideLabel="使っている値" expanded={valuesExpanded} onExpandedChange={setValuesExpanded} aside={
+        <div className={styles.rail}>
+          {canManage ? (
+            <Button type="button" variant="secondary" className={styles.railButton} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile"><Pencil aria-hidden="true" />使う値を編集する</Button>
+          ) : null}
+          <section className={styles.valuesCard} aria-labelledby="mp-values">
+            <h3 id="mp-values" className={styles.valuesTitle} title={personDetails(person)}>使っている値</h3>
+            <ul className={styles.values}>
+              {person.profileValues.length === 0 ? <li className={styles.cardSub}>まだ値はありません。</li> : null}
+              <li className={styles.value}>
+                <span className={styles.valueLabel}>LINE表示名</span>
+                <span className={styles.valueText}>{person.primaryDisplayName}</span>
+              </li>
+              {person.profileValues.map((value) => (
+                  <li key={value.fieldKey} className={styles.value} title={profileValueDetails(value)}>
+                    <span className={styles.valueLabel}>{FIELD_WORD[value.fieldLabel] ?? value.fieldLabel}</span>
+                    <span className={styles.valueText}>{value.valuePreview ?? emptyValue('unknown')}</span>
+                  </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      }>
         <div className={styles.main}>
           {m.saveError ? (
             <Notice tone="danger" >{m.saveError}<button type="button" className={styles.link} onClick={m.reload}>もう一度読み込む</button></Notice>
@@ -86,30 +113,24 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
                   <button type="button" className={styles.linkRight} onClick={() => { m.setSaveError(''); m.setEditing(true) }}>目的ごとの順位を編集 →</button>
                 ) : null}
               </div>
-              <p className={styles.cardSub}>どのアカウントから送るかを決めます。全部「使わない」にすると、どこからも送れなくなります</p>
+              <p className={styles.cardSub} title={deliveryPriorityDetails(person.deliveryPriorities)}>どのアカウントから送るかを決めます。全部「使わない」にすると、どこからも送れなくなります</p>
             </div>
-            <DataTable className={styles.table}>
-              <colgroup>
-                <col className={styles.colAccountWide} />
-                <col className={styles.colName} />
-                <col className={styles.colState} />
-                <col />
-              </colgroup>
+            <DataTable grid={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-fr-dup-col-status) var(--tpl-fr-mp-col-date)', compactColumns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-fr-dup-col-status) var(--tpl-fr-mp-col-date)', padding: 'var(--tpl-fr-dup-thead-pad)', headPadding: 'var(--tpl-fr-dup-thead-pad)', gap: 'var(--tpl-fr-stack-gap)', bodyTextSize: 'var(--text-caption)', headTextSize: 'var(--text-caption)' }}>
               <thead>
                 <TableHeadRow>
-                  <Th className={styles.th}>アカウント</Th>
-                  <Th className={styles.th}>表示名</Th>
-                  <Th className={styles.th}>状態</Th>
-                  <Th className={styles.th}>配信に使う</Th>
+                  <Th>アカウント</Th>
+                  <Th>表示名</Th>
+                  <Th>状態</Th>
+                  <Th>配信に使う</Th>
                 </TableHeadRow>
               </thead>
               <tbody>
                 {deliveryRows.map(({ friend, active }) => (
-                  <Tr key={friend.friendId} className={styles.row} data-row-id={friend.friendId}>
-                    <Td className={styles.td}>{friend.lineAccountName}</Td>
-                    <Td className={styles.td}>{friend.displayName}</Td>
-                    <Td className={styles.td}><span className={friend.isFollowing ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>{friend.isFollowing ? '友だち' : 'ブロック・削除'}</span></Td>
-                    <Td className={styles.td}>
+                  <Tr key={friend.friendId} data-row-id={friend.friendId}>
+                    <Td><TruncatedText value={friend.lineAccountName} /></Td>
+                    <Td><RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`}>{friend.displayName}</RowNameLink></Td>
+                    <Td><span className={friend.isFollowing ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>{friend.isFollowing ? '友だち' : 'ブロック・削除'}</span></Td>
+                    <Td>
                       {canManage ? (
                         <SaveErrorField names={["active","deliveryActive","delivery_active"]}><Toggle checked={active} label={`${friend.lineAccountName} の配信に使う`} onChange={m.saving ? undefined : (next) => m.setDeliveryActive(friend.friendId, next)} /></SaveErrorField>
                       ) : <span className={styles.small}>{active ? '使う' : '使わない'}</span>}
@@ -125,28 +146,23 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
               <h3 id="mp-linked" className={styles.cardTitle}>結び付いている友だち</h3>
               <p className={styles.cardSub}>解除すると、元の2人に戻ります。履歴は残ります</p>
             </div>
-            <DataTable className={styles.table}>
-              <colgroup>
-                <col className={styles.colAccount} />
-                <col className={styles.colName} />
-                <col className={styles.colDate} />
-                <col />
-              </colgroup>
+            <DataTable grid={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-fr-mp-col-date) var(--tpl-fr-mp-col-date)', compactColumns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-fr-mp-col-date) var(--tpl-fr-mp-col-date)', padding: 'var(--tpl-fr-dup-thead-pad)', headPadding: 'var(--tpl-fr-dup-thead-pad)', gap: 'var(--tpl-fr-stack-gap)', bodyTextSize: 'var(--text-caption)', headTextSize: 'var(--text-caption)' }}>
               <thead>
                 <TableHeadRow>
-                  <Th className={styles.th}>アカウント</Th>
-                  <Th className={styles.th}>表示名</Th>
-                  <Th className={styles.th}>結び付けた日</Th>
-                  <Th className={styles.th}><span className="sr-only">解除</span></Th>
+                  <Th>アカウント</Th>
+                  <Th>表示名</Th>
+                  <Th>結び付けた日</Th>
+                  <Th><span className="sr-only">解除</span></Th>
                 </TableHeadRow>
               </thead>
               <tbody>
+                {person.linkedFriends.length === 0 ? <TableStateRow colSpan={4} kind="empty" title="結び付いている友だちはまだありません。" /> : null}
                 {person.linkedFriends.map((friend) => (
-                  <Tr key={friend.friendId} className={`${styles.row} ${styles.rowTall}`} data-row-id={friend.friendId}>
-                    <Td className={styles.td}>{friend.lineAccountName}</Td>
-                    <Td className={styles.td}>{friend.displayName}</Td>
-                    <Td className={styles.td}>{shortDate(friend.linkedAt)}</Td>
-                    <Td className={styles.td}>
+                  <Tr key={friend.friendId} data-row-id={friend.friendId}>
+                    <Td><TruncatedText value={friend.lineAccountName} /></Td>
+                    <Td><RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`}>{friend.displayName}</RowNameLink></Td>
+                    <Td title={linkedFriendDetails(friend)}>{shortDate(friend.linkedAt)}</Td>
+                    <Td>
                       {canManage ? (
                         <button type="button" className={styles.textButton} disabled={m.saving} onClick={() => m.setUnlinkTarget(friend)}>
                           <Unlink size={14} aria-hidden="true" />
@@ -165,39 +181,19 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
             {person.history.length === 0 ? (
               <p className={styles.cardSub}>まだ履歴はありません。</p>
             ) : (
-              <ul className={styles.lines}>
+              <DataTable density="records" columns="minmax(0, 1fr) minmax(0, 1fr)"><tbody>
                 {person.history.map((item) => (
-                  <li key={item.id} className={styles.line}>
-                    <span className={styles.when}>{`${formatDateTime(item.occurredAt)} ${item.actorName}`}</span>
-                    <span className={styles.what}>{item.summary}</span>
-                  </li>
+                  <Tr key={item.id}>
+                    <Td><TruncatedText value={`${formatDateTime(item.occurredAt)} ${item.actorName}`} /></Td>
+                    <Td><TruncatedText value={item.summary} /></Td>
+                  </Tr>
                 ))}
-              </ul>
+              </tbody></DataTable>
             )}
           </section>
         </div>
 
-        <aside className={styles.rail} aria-label="使っている値">
-          {canManage ? (
-            <Button type="button" variant="secondary" className={styles.railButton} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile">使う値を直す</Button>
-          ) : null}
-          <section className={styles.valuesCard} aria-labelledby="mp-values">
-            <h3 id="mp-values" className={styles.valuesTitle}>使っている値</h3>
-            <ul className={styles.values}>
-              <li className={styles.value}>
-                <span className={styles.valueLabel}>LINE表示名</span>
-                <span className={styles.valueText}>{person.primaryDisplayName}</span>
-              </li>
-              {person.profileValues.map((value) => (
-                  <li key={value.fieldKey} className={styles.value} title={value.sourceLabel ? `元：${value.sourceLabel}` : undefined}>
-                    <span className={styles.valueLabel}>{FIELD_WORD[value.fieldLabel] ?? value.fieldLabel}</span>
-                    <span className={styles.valueText}>{value.valuePreview ?? emptyValue('unknown')}</span>
-                  </li>
-              ))}
-            </ul>
-          </section>
-        </aside>
-      </div>
+      </DetailColumns></PageContent>
 
       <MergedDeliveryDialog
         open={m.editing}

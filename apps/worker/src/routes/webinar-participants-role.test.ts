@@ -118,7 +118,7 @@ function get(path: string, apiKey: string | null) {
 }
 
 beforeEach(async () => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ webinarRoutes } = await import('./webinars.js'));
 });

@@ -1,8 +1,8 @@
 # 登録メディア一覧（V8）の動き
 
-入口：`app/contents/page.tsx`（V8 のときだけ `src/v8/contents/list.tsx`）。v7 の画面・試験は触らない。絵：`O7hUt7`。
+入口：`app/contents/page.tsx`（`src/v8/contents/list.tsx` に固定）。絵：`O7hUt7`。
 
-`list.tsx` 以外（窓・口の計算）は、src/app/contents から**写した**もの（src/v8 は src/app を import しない決まり）。中身は同じなので、直すときは両方を直す：
+窓の実装はこのフォルダを正本とする。使われないapp内の一覧・窓は削除し、動作試験も現役を直接読む。口の計算の実装：
 `media-detail-dialog.tsx`・`media-upload-dialog.tsx`・`media-replacement-dialog.tsx`・`media-preview-overlay.tsx`・`file-scan-stopped-banner.tsx`・`media-quota-guidance.tsx`・`media-direct-upload.ts`・`media-delete-impact.ts`・`media-usage-display.ts`・`media-usage-references.ts`
 
 ## 受け付ける URL と指定（今と同じ）

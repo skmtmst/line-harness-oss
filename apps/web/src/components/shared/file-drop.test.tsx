@@ -147,3 +147,28 @@ describe('ファイルを落とす場所（★V7 NQMnx）', () => {
     expect(screen.queryByRole('button', { name: 'ファイルを選ぶ' })).toBeNull()
   })
 })
+
+
+describe('欄全体から追加するファイル選択', () => {
+  it('内側ボタンなしでクリック・Enter・Spaceから同じ選択口を開く', () => {
+    const { container } = render(<FileDropzone variant="upload" title="CSVを追加" onFiles={vi.fn()} />)
+    const zone = screen.getByRole('button', { name: 'CSVを追加' })
+    expect(zone.querySelector('button')).toBeNull()
+    expect(zone.tabIndex).toBe(0)
+    const input = container.querySelector('input')!
+    const opened = vi.fn(); input.addEventListener('click', opened)
+    fireEvent.click(zone); fireEvent.keyDown(zone, { key: 'Enter' }); fireEvent.keyDown(zone, { key: ' ' })
+    expect(opened).toHaveBeenCalledTimes(3)
+  })
+  it('取り込み中・無効時はキーとドロップから追加しない', () => {
+    const onFiles = vi.fn()
+    const { container, rerender } = render(<FileDropzone variant="upload" title="CSVを追加" disabled onFiles={onFiles} />)
+    const input = container.querySelector('input')!; const opened = vi.fn(); input.addEventListener('click', opened)
+    const zone = screen.getByRole('group', { name: 'CSVを追加' })
+    fireEvent.keyDown(zone, { key: 'Enter' }); dropFiles(zone, [new File(['a'], 'a.csv')])
+    expect(zone.getAttribute('aria-disabled')).toBe('true')
+    rerender(<FileDropzone variant="upload" title="CSVを追加" busy onFiles={onFiles} />)
+    fireEvent.click(zone); fireEvent.keyDown(zone, { key: ' ' }); dropFiles(zone, [new File(['a'], 'a.csv')])
+    expect(opened).not.toHaveBeenCalled(); expect(onFiles).not.toHaveBeenCalled()
+  })
+})

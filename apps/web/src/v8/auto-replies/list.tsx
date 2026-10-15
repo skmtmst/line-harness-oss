@@ -1,8 +1,9 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
 import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -43,13 +44,13 @@ import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import TagOverflow from '@/components/shared/tag-overflow'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
@@ -886,7 +887,7 @@ export default function AutoRepliesListV8() {
     })
     items.push({
       id: 'delete',
-      label: '削除',
+      label: '削除する',
       icon: <Trash2 size={14} aria-hidden="true" />,
       tone: 'danger',
       dividerBefore: true,
@@ -944,6 +945,12 @@ export default function AutoRepliesListV8() {
 
   const folderPanel = (
     <ManagedFolderPanel
+      createAction={canEdit ? <CreateRuleButton
+        full
+        disabled={false}
+        menuOpen={createMenuOpen}
+        onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
+      /> : undefined}
       kind="auto_reply"
       folders={folders}
       onChanged={loadFolders}
@@ -1110,12 +1117,12 @@ export default function AutoRepliesListV8() {
           <thead>
             <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canEdit && <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
+                  {canEdit ? <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのルールをすべて選択"
-                  /></SaveErrorField>}
+                  /></SaveErrorField> : <UnavailableSelection label="このページのルールをすべて選択" />}
                 </Th>
               {tableHeadCells}
             </TableHeadRow>
@@ -1143,11 +1150,11 @@ export default function AutoRepliesListV8() {
                    data-row-id={r.id}
                 >
                     <Td className={styles.selectCell}>
-                      {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
+                      {canEdit ? <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
                         checked={selectedIds.has(r.id)}
                         onCheckedChange={() => toggleOne(r.id)}
                         aria-label={`${name}を選択`}
-                      /></SaveErrorField>}
+                      /></SaveErrorField> : <UnavailableSelection label={`${name}を選択`} />}
                     </Td>
                   <Td
                     className={styles.gripCell}
@@ -1201,7 +1208,7 @@ export default function AutoRepliesListV8() {
                     >
                       {/* 数えられていないものを 0 と書かない。0 は「当たらなかった」の意味。 */}
                       <div className={styles.countMain}>{r.hits?.period ?? emptyValue('unknown')}<span className={styles.kpiUnit}>回</span></div>
-                      <div className={styles.countSub}>累計 {r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回</div>
+                      <div className={styles.countSub}>{`累計 ${r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回`}</div>
                     </Td>
                   )}
                   <Td>
@@ -1217,7 +1224,7 @@ export default function AutoRepliesListV8() {
                             setPage(1)
                           }}
                         >
-                          <span>重なり {conflicts}</span>
+                          <span>{`重なり ${conflicts}`}</span>
                         </button>
                       )}
                     {!r.isActive && r.stopReason && (
@@ -1364,12 +1371,10 @@ export default function AutoRepliesListV8() {
   )
 
   /* ページ送りは型の pagination 枠へ（余白は型）。 */
-  const listPager = pageCount > 1 ? (
+  const listPager = ready ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, sortedItems.length)} / {formatNumber(sortedItems.length)} 件
-      </span>
-      <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} />
+      <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage}
+        range={{ total: sortedItems.length, first: (safePage - 1) * pageSize + 1, last: Math.min(safePage * pageSize, sortedItems.length) }} />
     </ListPagePagination>
   ) : null
 
@@ -1485,49 +1490,15 @@ export default function AutoRepliesListV8() {
    * 1152 の板（WPrd5）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び・よく使う絞り込み（印だけ）」。
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      <Notice tone="info">上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。</Notice>
-      <ListToolbarRow>
-        {canEdit && <CreateRuleButton
-          compact
-          disabled={false}
-          menuOpen={createMenuOpen}
-          onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
-        />}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            placeholder="ルール名・言葉で探す"
-            aria-label="ルール名・言葉で探す"
-            value={query}
-            onChange={(value) => {
-              setQuery(clampSearchQuery(value))
-              setPage(1)
-            }}
-            onClear={() => {
-              setQuery('')
-              setPage(1)
-            }}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.narrowSpacer} aria-hidden="true" />
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        {sortBox}
-        <ListToolbarOptional compact label="よく使う絞り込み">{savedBox}</ListToolbarOptional>
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
         自動応答
       </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
-      </>}{"□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。"}</>}
+      </>}{"□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。"}{kpis.map((kpi) => kpi.help).filter(Boolean).join(" ")}</>}
+      explanation="上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。"
       stats={<>
         {/* 見るだけの人への帯（`Q5lOCc`）。数の帯の上。 */}
         {!canEdit && (
@@ -1536,7 +1507,7 @@ export default function AutoRepliesListV8() {
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} help={kpi.help} helpLabel={kpi.helpLabel} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? () => { setConflictOnly(true); setPage(1) } : undefined} retryLabel="重なりを見る →" />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? () => { setConflictOnly(true); setPage(1) } : undefined} retryLabel="重なりを見る →" />
           ))}
         </KpiBand>
       </>}
@@ -1569,10 +1540,10 @@ export default function AutoRepliesListV8() {
         }
         confirmLabel={pendingToggle?.kind === 'resume' ? '再開する' : '止める'}
         confirmIcon={pendingToggle?.kind === 'stop' ? <Pause size={16} aria-hidden="true" /> : undefined}
-        designNode="i8F12"
+        designNode="i8F12" actionWidthReserve="idle"
         confirmation
         designLayout="stacked"
-        designWidth={600}
+        designWidth={480}
         designTop={280}
         footerAlign="center"
         titleIcon={false}
@@ -1609,14 +1580,15 @@ export default function AutoRepliesListV8() {
       */}
       <Dialog
         open={pendingDelete !== null}
-        title={`「${pendingDelete ? displayName(pendingDelete.item) : ''}」を削除する`}
+        title={`「${pendingDelete ? displayName(pendingDelete.item) : ''}」を削除しますか？`}
         description="新しく届くメッセージへの自動返信と、タグ付けなどの後の処理が止まります。これまでの実行結果は消えません。"
         busy={deleting}
         error={deleteError}
         designNode="u8sKN"
         confirmation
         designLayout="stacked"
-        designWidth={600}
+        footerAlign="start"
+        designWidth={480}
         designTop={280}
         onCancel={() => {
           if (deleting) return
@@ -1624,7 +1596,7 @@ export default function AutoRepliesListV8() {
           setPendingDelete(null)
         }}
         footer={
-          <div className={styles.deleteFooter}>
+          <DialogActions>
             <Button
               type="button"
               variant="danger"
@@ -1635,7 +1607,6 @@ export default function AutoRepliesListV8() {
             >
               削除する
             </Button>
-            <div className={styles.deleteAlternatives}>
               <Button
                 type="button"
                 variant="secondary"
@@ -1659,8 +1630,7 @@ export default function AutoRepliesListV8() {
                   代わりに止める
                 </Button>
               ) : null}
-            </div>
-          </div>
+          </DialogActions>
         }
       >
         <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
@@ -1686,15 +1656,12 @@ export default function AutoRepliesListV8() {
       >
         <div className={styles.moveBody}>
           <span className={styles.moveLabel}>移動先のフォルダ</span>
-          <SaveErrorField names={["moveDraft","move_draft"]}><Select
+          <SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
             aria-label="移動先のフォルダ"
             size="full"
             value={moveDraft}
             onChange={(value) => setMoveDraft(value)}
-            options={[
-              { value: '', label: '未分類' },
-              ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-            ]}
+            folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
           /></SaveErrorField>
         </div>
       </ConfirmDialog>
@@ -1711,14 +1678,6 @@ export default function AutoRepliesListV8() {
       </>}
 
       folders={<>
-          {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
-          {!canEdit && <span className={styles.viewerCreateSpace} aria-hidden="true" />}
-          {canEdit && <CreateRuleButton
-            full
-            disabled={false}
-            menuOpen={createMenuOpen}
-            onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
-          />}
           <ActionMenu
             open={createMenuOpen}
             onClose={() => setCreateMenuOpen(false)}
@@ -1731,15 +1690,15 @@ export default function AutoRepliesListV8() {
           />
           {folderPanel}
         </>}
-        collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
-        toolbar={narrow ? narrowToolbar : <>
+        collapsedFolders={<>{createButton}{folderSelect}</>}
+        toolbar={<>
           {/* 案内の帯は表の上の主列に置く（板 uE9gf）。左のフォルダの列を押し下げないよう toolbar 枠の先頭に置き、一行を取る。 */}
-          <div style={{ flexBasis: '100%' }}><Notice tone="info">上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。</Notice></div>
+
           {/* 道具の段は型の toolbar 枠に渡す（中身だけ渡す）。 */}
           <ListToolbar
             search={{
               placeholder: 'ルール名・言葉で探す',
-              width: 200,
+              width: 160,
               value: query,
               onChange: (value) => {
                 setQuery(clampSearchQuery(value))

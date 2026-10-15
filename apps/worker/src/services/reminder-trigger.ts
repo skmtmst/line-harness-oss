@@ -79,7 +79,7 @@ export async function matchesReminderTargetCondition(
   try {
     return await matchesCondition(db, friendId, condition);
   } catch (err) {
-    console.error(`[reminder-trigger] target condition failed for reminder ${reminderId}`, err);
+    console.error(JSON.stringify({"code":"services_reminder_trigger_failed"}));
     return false;
   }
 }

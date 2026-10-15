@@ -70,12 +70,29 @@ export function inputJsonBoundary(shape: InputShape = {}, options: { maxBytes?: 
   };
 }
 
+/**
+ * inputJsonBoundary が読んで検査し終えた本文。
+ * この口を通ったルートが本文を使うときは、自分で読み直さずこれを使う。
+ * 読み直すと clone() で分けた同じ本文を二度読むことになり、
+ * 中身は正しいのに読み取りの失敗で 400 になる余地が残る。
+ * この口を通らない（本文が無い・JSON以外・除外パス）場合は undefined。
+ */
+export function validatedInputBody(c: Context): Record<string, unknown> | undefined {
+  return c.get('validatedInputBody') as Record<string, unknown> | undefined;
+}
+
 /** 宣言値でも実バイト数でも止める。超過時は残りを読まず、本文を保持しない。 */
 export async function readBoundedText(request: Request, maxBytes: number): Promise<string | null> {
+  const bytes = await readBoundedBytes(request, maxBytes);
+  return bytes === null ? null : new TextDecoder().decode(bytes);
+}
+
+/** Read only the allowed body bytes; never allocate the full incoming upload. */
+export async function readBoundedBytes(request: Request, maxBytes: number): Promise<Uint8Array | null> {
   const declared = Number(request.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) return null;
   const reader = request.body?.getReader();
-  if (!reader) return '';
+  if (!reader) return new Uint8Array();
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
@@ -96,10 +113,22 @@ export async function readBoundedText(request: Request, maxBytes: number): Promi
   const bytes = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return new TextDecoder().decode(bytes);
+  return bytes;
 }
 
 export type InputKind = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
+
+/** Bound binary and JSON/base64 uploads before parsing or decoding. */
+export function boundedUploadBody(maxBinaryBytes: number): MiddlewareHandler {
+  return async (c, next) => {
+    const json = /^application\/json(?:\s*;|$)/i.test(c.req.header('content-type') ?? '');
+    const max = json ? Math.ceil(maxBinaryBytes / 3) * 4 + 4096 : maxBinaryBytes;
+    const bytes = await readBoundedBytes(c.req.raw, max);
+    if (bytes === null) return c.json({ success: false, code: 'upload_too_large', error: 'ファイルが大きすぎます' }, 413);
+    c.req.raw = new Request(c.req.raw, { body: bytes });
+    await next();
+  };
+}
 export type InputShape = Record<string, readonly InputKind[]>;
 
 /** 型の違う値を .trim() 等へ渡して500にしない。必須・範囲・相関の検証は各ルートで行う。 */

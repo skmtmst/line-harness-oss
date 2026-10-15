@@ -149,6 +149,7 @@ function environment(): Env['Bindings'] {
     [V1_KEY]: 'PNG-V1',
     [V2_KEY]: 'PNG-V2',
     [V3_KEY]: 'PNG-V3',
+    'form-uploads/form/friend/private.jpg': 'SYNTHETIC-PRIVATE',
   };
   return {
     DB: enforceD1BindLimit ? ({
@@ -210,7 +211,7 @@ function mediaMetadata(id = 'md-1'): { filename: string; folder_id: string | nul
 
 beforeEach(() => {
   warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   enforceD1BindLimit = false;
   insertAccount('acc-1', DEFAULT_TENANT_ID);
   insertAccount('acc-2', 'tenant-B');
@@ -226,6 +227,15 @@ beforeEach(() => {
 });
 
 describe('ライブ参照の公開配信', () => {
+  it('S11 blocks private form objects through the public live-media alias', async () => {
+    testDb.raw.prepare("UPDATE media SET r2_key='form-uploads/form/friend/private.jpg' WHERE id='md-1'").run();
+    expect((await request('/media/md-1/content')).status).toBe(404);
+  });
+  it('S11 blocks webinar originals through both public media routes', async () => {
+    testDb.raw.prepare("INSERT INTO webinars(id,title,slug,duration_seconds,video_prefix,created_at,updated_at) VALUES ('synthetic-webinar','Synthetic','synthetic',60,?,'2026-10-13T00:00:00','2026-10-13T00:00:00')").run(V1_KEY);
+    expect((await request('/media/md-1/content')).status).toBe(404);
+    expect((await request(`/images/${V1_KEY}`)).status).toBe(404);
+  });
   it('認証なしで最新版へ解決され、immutableでは返さない', async () => {
     const res = await request('/media/md-1/content');
     expect(res.status).toBe(200);

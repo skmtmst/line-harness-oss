@@ -211,10 +211,10 @@ function CalendarFrame({
     <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-card-surface">
       <div className="border-hairline flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="v7:h-8 w-8">‹</Button>
-          <Button variant="secondary" onClick={onNext} aria-label="次の期間" className="v7:h-8 w-8">›</Button>
+          <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="w-8">‹</Button>
+          <Button variant="secondary" onClick={onNext} aria-label="次の期間" className="w-8">›</Button>
           <p className="text-ink text-sm font-semibold">{title}</p>
-          <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep hover:brightness-95 v8:inline-flex v8:h-9 v8:items-center">今日</button>
+          <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep hover:brightness-95 inline-flex h-9 items-center">今日</button>
         </div>
         <p className="text-ink-secondary text-xs tabular-nums">{meta}</p>
       </div>
@@ -651,7 +651,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           unit="枠" unitSpacing="tight" icon={<CalendarPlus size={14} />} presentation="band"
           title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'}
           valueText={mode === 'week' ? (listMissing ? '—' : weekRateValue) : undefined}
-          help={mode === 'day' ? availabilityNote : weekRateDetail}
+          help={mode === 'day' ? availabilityNote : weekRateDetail} helpDisplay={mode === 'day' ? 'question' : 'label'}
           detail={listMissing ? listMissingDetail : availability.status === 'ready' ? (mode === 'day' ? (isToday ? '今日の残り' : '選んだ日の残り') : weekRateDetail) : availabilityNote}
         />
         <KpiCard

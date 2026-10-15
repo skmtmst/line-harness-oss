@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 
-import { formatJpDateTime, formatJpSlotRange } from './event-form'
+import { formatJpDateTime, formatJpSlotRange } from '@/v8/events/edit-form'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'

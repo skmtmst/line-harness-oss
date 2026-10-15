@@ -26,11 +26,31 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
+it('空白の差し戻し理由を送らず、入力すると操作できる', async () => {
+  render(<ApprovalsV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: '差戻し' }))
+  const submit = screen.getByRole('button', { name: '差し戻す' }) as HTMLButtonElement
+  expect(submit.disabled).toBe(true)
+  expect(submit.title).toBe('差し戻す理由を入力してください')
+  const reason = screen.getByRole('textbox')
+  fireEvent.change(reason, { target: { value: '   ' } })
+  expect(submit.disabled).toBe(true)
+  expect(fixture.decideApproval).not.toHaveBeenCalled()
+  fireEvent.change(reason, { target: { value: '  原価を確認してください  ' } })
+  expect(submit.disabled).toBe(false)
+  expect(submit.title).toBe('')
+  fireEvent.click(submit)
+  await waitFor(() => expect(fixture.decideApproval).toHaveBeenCalledWith('account-1', 'apr-1', 'return', '原価を確認してください'))
+})
+
 it('管理者は承認待ちのカードで承認でき、改定の前後と差戻しのコメントが見える', async () => {
   render(<ApprovalsV8 />)
   expect(await screen.findByText('価格改定')).toBeTruthy()
+  expect(document.querySelectorAll('[data-kpi-icon] svg.lucide-inbox')).toHaveLength(4)
   expect(screen.getByText('¥3,800')).toBeTruthy()
-  expect(screen.getByText('期限を書いてください')).toBeTruthy()
+  const reason = screen.getByText('期限を書いてください').closest('[role=note]')!
+  expect(reason.getAttribute('data-appearance')).toBe('soft')
+  expect(reason.querySelector('svg')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '承認する' }))
   await waitFor(() => expect(fixture.decideApproval).toHaveBeenCalledWith('account-1', 'apr-1', 'approve', undefined))
 })
@@ -40,6 +60,7 @@ it('閲覧のみには帯を出し、差戻し・承認するのボタンを置�
   render(<ApprovalsV8 />)
   expect(await screen.findByText('価格改定')).toBeTruthy()
   expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
+  expect(document.querySelectorAll('[data-kpi-icon] svg.lucide-inbox')).toHaveLength(4)
   expect(screen.queryByRole('button', { name: '承認する' })).toBeNull()
   expect(screen.queryByRole('button', { name: '差戻し' })).toBeNull()
   expect(fixture.decideApproval).not.toHaveBeenCalled()

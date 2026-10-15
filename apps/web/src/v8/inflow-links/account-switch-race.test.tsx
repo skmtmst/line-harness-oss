@@ -68,9 +68,9 @@ describe('サイトスクリプト（WEB040）', () => {
     };
     await act(async () => { root.render(<SiteScriptV8 />) });
     await settle();
-    const header = [...host.querySelectorAll('[role="columnheader"]')].find((el) => el.textContent?.includes('訪問者数'));
+    const header = [...host.querySelectorAll('th, [role="columnheader"]')].find((el) => el.textContent?.includes('訪問者数'));
     expect(header).toBeTruthy();
-    expect(header?.closest('[role="table"]')?.textContent).toContain('4');
+    expect(header?.closest('table, [role="table"]')?.textContent).toContain('4');
     const help = host.querySelector('button[aria-label="訪問者数の説明"]') as HTMLButtonElement;
     expect(help).toBeTruthy();
     await act(async () => { help.click() });

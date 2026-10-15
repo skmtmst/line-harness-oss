@@ -14,21 +14,26 @@ import type { OpsImpersonation } from '@/lib/api'
 export interface SessionSnapshot {
   impersonation: OpsImpersonation | null
   /** V-2: いつもと違う端末・場所からのログイン時刻。帯はこれが立っている間だけ出す。 */
+  recoveryCodesRemaining?: number | null
   unfamiliarAt: string | null
   /** V-1: 再確認の聞き方。'totp' は認証アプリの6桁、'password' はパスワード。 */
   stepUpMethod: 'totp' | 'password' | 'none'
 }
+
+export const SESSION_SNAPSHOT_CHANGED = 'lh-session-snapshot-changed'
 
 let snapshot: SessionSnapshot | null = null
 
 /** AuthGuard が確認に成功したときに呼ぶ。 */
 export function rememberSessionSnapshot(next: SessionSnapshot): void {
   snapshot = next
+  if (typeof window !== 'undefined') window.dispatchEvent(new window.Event(SESSION_SNAPSHOT_CHANGED))
 }
 
 /** 確認に失敗した・セッションを失ったときに呼ぶ。次に読む側は自分で取りに行く。 */
 export function forgetSessionSnapshot(): void {
   snapshot = null
+  if (typeof window !== 'undefined') window.dispatchEvent(new window.Event(SESSION_SNAPSHOT_CHANGED))
 }
 
 /** 直前の確認結果。まだ無ければ null。 */

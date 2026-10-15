@@ -12,13 +12,14 @@ import { Banknote, CircleDot, CircleHelp, Download, Plus, Trophy, Users } from '
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
 import EmptyList from '@/components/shared/empty-list'
 import BulkBar from '@/components/shared/bulk-bar'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows, useManagedFolders, folderDotFor } from '@/components/shared/managed-folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -27,6 +28,7 @@ import Select from '@/components/shared/select'
 import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { ListPagePagination } from '@/components/templates'
+import { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import {
   calculateAffiliateReward,
   currentSettlementPeriod,
@@ -46,7 +48,9 @@ import {
 } from './display'
 import { AffiliateArchiveDialog } from './dialogs'
 import AffiliateDrawer from './drawer'
-import { AffiliateFrame, CreateButton, useAffiliateShell } from './frame'
+import { useFolderMove } from '@/components/shared/use-folder-move'
+import MonthlyFlow from './monthly-flow'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, CreateButton, useAffiliateShell } from './frame'
 import {
   AffiliateToolbar,
   PerPageSelect,
@@ -54,7 +58,6 @@ import {
   RowMenu,
   SavedSelect,
   StateCard,
-  StatusPill,
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
@@ -109,6 +112,10 @@ export default function AffiliatorsTab() {
   const settlementPeriod = useMemo(() => currentSettlementPeriod(), [])
 
   /* ===== 一覧 ===== */
+  const { folders, error: folderError, reload: reloadFolders } = useManagedFolders('affiliate', accountId)
+  const [folderId, setFolderId] = useListUrlValue('folderId', 'all')
+  const folderAccount = useRef(accountId)
+  useEffect(() => { if (folderAccount.current !== accountId) { folderAccount.current = accountId; setFolderId('all'); setPage(1) } }, [accountId, setFolderId])
   const [rows, setRows] = useState<AffiliateListRow[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
 
@@ -138,6 +145,7 @@ export default function AffiliatorsTab() {
   const [drawerId, setDrawerId] = useDetailPanelUrl('affiliate')
   const itemHref = useListItemHref()
   const [drawerEdit, setDrawerEdit] = useState(false)
+  const [monthlyFlowOpen, setMonthlyFlowOpen] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [bulkConfirm, setBulkConfirm] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
@@ -273,8 +281,8 @@ export default function AffiliatorsTab() {
   /* ===== 絞り込み ===== */
   const groupRows = useMemo(() => {
     const match = GROUPS.find((g) => g.key === group)?.match ?? (() => true)
-    return rows.filter(match)
-  }, [group, rows])
+    return rows.filter(match).filter(row => folderId === 'all' || (folderId === 'unfiled' ? !row.folderId : row.folderId === folderId))
+  }, [group, rows, folderId])
   const shownRows = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ja-JP')
     return groupRows
@@ -305,6 +313,7 @@ export default function AffiliatorsTab() {
     setQuery('')
     setFilters([])
     setGroup('all')
+    setFolderId('all')
     setSaved('')
     setPage(1)
   }
@@ -421,19 +430,20 @@ export default function AffiliatorsTab() {
   )
 
   const groupCount = (key: GroupKey) => rows.filter(GROUPS.find((g) => g.key === key)?.match ?? (() => true)).length
-  /* 左の列は共通の ManagedFolderPanel。アフィリエイターをフォルダへ入れる口（API）がまだ無いので「すべて」だけ。 */
+  const chooseFolder = (id: string) => resetPage(() => setFolderId(id))
   const folderPanel = (
-    <ManagedFolderPanel
-      kind={null}
-      folders={[]}
-      onChanged={() => undefined}
-      canManage={!readonly}
-      itemLabel="アフィリエイター"
-      activeId="all"
-      onSelect={() => undefined}
-      allCount={ready ? rows.length : null}
-    />
+    <ManagedFolderPanel kind="affiliate" accountId={accountId} folders={folders}
+      onChanged={async () => { await reloadFolders(); await loadList() }} canManage={!readonly} createAction={createButton(false)}
+      itemLabel="アフィリエイター" activeId={folderId} onSelect={chooseFolder}
+      allCount={ready ? rows.length : null} error={folderError}
+      unfiledCount={ready ? rows.filter(row => !row.folderId).length : null}
+      countOf={folder => ready ? rows.filter(row => row.folderId === folder.id).length : null}
+      onDeleted={id => { if (folderId === id) chooseFolder('all'); void loadList() }} />
   )
+  const folderMove = useFolderMove({ accountId, canEdit: !readonly, items: pagedRows, folders,
+    move: async (row, targetId) => { const result = await api.affiliates.update(row.id, { folderId: targetId }); if (!result.success) throw new Error(result.error) },
+    onChanged: async () => { await loadList(); await reloadFolders() },
+  })
 
   const folderSelect = (
     <div className={styles.narrowFolder}>
@@ -498,7 +508,7 @@ export default function AffiliatorsTab() {
       narrow={narrow}
       notices={notices}
       search={{ placeholder: '名前・紹介コードで探す', value: query, onChange: (value) => resetPage(() => setQuery(value)) }}
-      chips={narrow ? chips : <>{folderSelect}{chips}</>}
+      chips={<><ListToolbarOptional compact label="報酬の決め方">{folderSelect}</ListToolbarOptional>{chips}</>}
       trailing={trailing}
       narrowLead={<>{createButton(false)}{folderSelect}</>}
     />
@@ -516,11 +526,11 @@ export default function AffiliatorsTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={styles.table}>
+      <DataTable columnLayout={AFFILIATE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
+          <TableHeadRow data-table-layout="columns">
             <Th className={styles.colCheck}>
-              {readonly ? null : (
+              {readonly ? <UnavailableSelection label="このページの全員を選ぶ" /> : (
                 <SaveErrorField names={["allChecked","checked","all_checked"]}><Checkbox
                   aria-label="このページの全員を選ぶ"
                   checked={allChecked}
@@ -528,20 +538,20 @@ export default function AffiliatorsTab() {
                 /></SaveErrorField>
               )}
             </Th>
-            <Th className={styles.colName}>アフィリエイター</Th>
-            <Th>状態</Th>
-            <Th className={`${styles.colLinks} ${styles.num}`}>紹介リンク</Th>
-            <Th className={`${styles.colFriends} ${styles.num}`}>友だち追加</Th>
-            <Th className={`${styles.colConv} ${styles.num}`}>成果</Th>
-            <Th className={`${styles.colReward} ${styles.num}`}>報酬</Th>
+            <Th grow>アフィリエイター</Th>
+            <Th className={styles.colState}>状態</Th>
+            <Th align="right" className={styles.colLinks}>紹介リンク</Th>
+            <Th collapseAt="narrow" align="right" className={styles.colFriends}>友だち追加</Th>
+            <Th align="right" className={styles.colConv}>成果</Th>
+            <Th align="right" className={styles.colReward}>報酬</Th>
             <Th className={styles.colOps}>操作</Th>
           </TableHeadRow>
         </thead>
         <tbody>
           {pagedRows.map((row, saveFieldIndex) => (
-            <Tr key={row.id} className={styles.row} data-table-layout="columns" data-row-id={row.id} detailKey="affiliate" onOpen={() => { setDrawerId(current => current === row.id ? null : row.id); setDrawerEdit(false) }}>
+            <Tr key={row.id} data-table-layout="columns" data-row-id={row.id} detailKey="affiliate" onOpen={() => { setDrawerId(current => current === row.id ? null : row.id); setDrawerEdit(false) }}>
               <Td className={styles.colCheck}>
-                {readonly ? null : (
+                {readonly ? <UnavailableSelection label={`${row.name}を選ぶ`} /> : (
                   <SaveErrorField names={[`pagedRows.${saveFieldIndex}.id`,"id","row.id","checked"]}><Checkbox
                     aria-label={`${row.name}を選ぶ`}
                     checked={selected.has(row.id)}
@@ -549,19 +559,19 @@ export default function AffiliatorsTab() {
                   /></SaveErrorField>
                 )}
               </Td>
-              <Td className={styles.colName}>
+              <Td grow>
                 <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
-                  <FolderDotName folder={null}>
+                  <FolderDotName folder={folderDotFor(folders, row.folderId)}>
                     {nameButton(row)}
                   </FolderDotName>
 
                 </span>
               </Td>
-              <Td><StatusPill tone={row.isActive ? 'active' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusPill></Td>
-              <Td className={`${styles.colLinks} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.linkCount)}本`}</span></Td>
-              <Td className={`${styles.colFriends} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.friendAdds)} 人`}</span></Td>
-              <Td className={`${styles.colConv} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.totalConversions)} 件`}</span></Td>
-              <Td className={`${styles.colReward} ${styles.num}`}><span className={styles.cellNum}>{formatYen(row.rewardAmount)}</span></Td>
+              <Td className={styles.colState}><StatusBadge tone={row.isActive ? 'success' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusBadge></Td>
+              <Td align="right" className={styles.colLinks}><span className={styles.cellNum}>{`${formatNumber(row.linkCount)}本`}</span></Td>
+              <Td collapseAt="narrow" align="right" className={styles.colFriends}><span className={styles.cellNum}>{`${formatNumber(row.friendAdds)} 人`}</span></Td>
+              <Td align="right" className={styles.colConv}><span className={styles.cellNum}>{`${formatNumber(row.totalConversions)} 件`}</span></Td>
+              <Td align="right" className={styles.colReward}><span className={styles.cellNum}>{formatYen(row.rewardAmount)}</span></Td>
               <Td className={styles.colOps}>
                 <span className={styles.rowActions}>
                   <Button type="button" onClick={() => openDrawer(row.id, false)}>成果を見る</Button>
@@ -570,6 +580,7 @@ export default function AffiliatorsTab() {
                     items={[
                       { id: 'copy', label: '紹介リンクをコピー', content: <CopyTextButton role="menuitem" label="紹介リンクをコピー" value={row.id} getValue={() => copyFirstLink(row)} aria-label="紹介リンクをコピー" />, onSelect: () => {} },
                       ...(readonly ? [] : [
+                        { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(row) },
                         { id: 'edit', label: '編集', onSelect: () => openDrawer(row.id, true) },
                         ...(row.isActive ? [{ id: 'archive', label: '紹介を止める', tone: 'danger' as const, dividerBefore: true, onSelect: () => setArchiveTarget({ id: row.id, name: row.name }) }] : [{ id: 'resume', label: '紹介を再開する', onSelect: () => { setResumeError(''); setResumeTarget({ id: row.id, name: row.name }) } }]),
                       ]),
@@ -614,12 +625,9 @@ export default function AffiliatorsTab() {
     </>
   )
 
-  const pager = ready && shownRows.length > 0 && pageCount > 1 ? (
+  const pager = ready && shownRows.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {`${formatNumber(shownRows.length)} 人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownRows.length)} 人`}
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} range={{ total: shownRows.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, shownRows.length), unit: '人' }} />
     </ListPagePagination>
   ) : undefined
 
@@ -638,7 +646,7 @@ export default function AffiliatorsTab() {
 
   function nameButton(row: { id: string; name: string }) {
     return (
-      <RowNameLink onOpen={() => openDrawer(row.id, false)} href={itemHref('affiliate', row.id)} className={styles.rowName} title={row.name}>
+      <RowNameLink onOpen={() => openDrawer(row.id, false)} href={itemHref('affiliate', row.id)} title={row.name}>
         {row.name}
       </RowNameLink>
     )
@@ -648,16 +656,21 @@ export default function AffiliatorsTab() {
   return (
     <SaveErrorScope errors={saveErrors}><AffiliateFrame
       actions={
+        <>
+        <Button type="button" onClick={() => setMonthlyFlowOpen(true)}>今月の流れを確認</Button>
         <Button onClick={exportCsv} disabled={shownRows.length === 0}>
           <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
+        </>
       }
       stats={stats}
-      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
-      folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}
+      folderNav={{ rows: managedFolderNavRows('affiliate', folders), activeId: folderId, onSelect: chooseFolder, createAction: readonly ? undefined : createButton(false) }}
+      folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
+        {folderMove.overlays}
+        <MonthlyFlow open={monthlyFlowOpen} accountId={accountId} onClose={() => setMonthlyFlowOpen(false)} />
         <ConfirmDialog open={resumeTarget !== null} title={`「${resumeTarget?.name ?? ''}」の紹介を再開しますか？`} description="紹介リンクからの成果を再び数えます。" confirmLabel="紹介を再開する" busy={resuming} error={resumeError} onConfirm={() => void resumeReferral()} onCancel={() => { if (!resuming) setResumeTarget(null) }} />
         <AffiliateArchiveDialog
           target={archiveTarget}

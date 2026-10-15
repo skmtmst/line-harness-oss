@@ -21,6 +21,9 @@ const fixture = vi.hoisted(() => ({
   clearSelectedAccountId: vi.fn(),
   billingSummary: vi.fn(),
   logout: vi.fn(),
+  selectedAccountId: null as string | null,
+  clearStoreSelection: vi.fn(),
+  toast: vi.fn(),
 }))
 
 const localStorageValues = new Map<string, string>()
@@ -42,7 +45,7 @@ vi.mock('next/link', async () => {
   }
 })
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ clearSelectedAccountId: fixture.clearSelectedAccountId }),
+  useAccount: () => ({ selectedAccountId: fixture.selectedAccountId, clearSelectedAccountId: fixture.clearSelectedAccountId }),
 }))
 vi.mock('@/lib/api', () => ({
   api: {
@@ -51,6 +54,8 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 vi.mock('@/lib/logout', () => ({ logoutAndGoToLogin: fixture.logout }))
+vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { clearStoreSelection: fixture.clearStoreSelection } }))
+vi.mock('@/components/shared/toast', () => ({ notifyToast: fixture.toast }))
 
 import { SidebarAccountMenu, sidebarAccountRows } from './account-menu'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -85,6 +90,9 @@ describe('★V8 左下の自分とメニュー', () => {
     fixture.clearSelectedAccountId.mockReset()
     fixture.logout.mockReset()
     fixture.billingSummary.mockReset()
+    fixture.selectedAccountId = null
+    fixture.clearStoreSelection.mockReset()
+    fixture.toast.mockReset()
     fixture.billingSummary.mockResolvedValue({ success: true, data: { state: 'trialing', trialDaysLeft: 14, planName: null } })
     localStorageValues.clear()
     window.localStorage.setItem('lh_staff_name', 'Kenta Kawano')
@@ -137,6 +145,39 @@ describe('★V8 左下の自分とメニュー', () => {
     expect(fixture.clearSelectedAccountId).toHaveBeenCalledTimes(1)
     expect(fixture.push).toHaveBeenCalledWith('/hq')
     await waitFor(() => expect(view.queryByRole('menu')).toBeNull())
+  })
+
+  it('飲食の店舗選択はサーバーで解除してから統括へ戻り、二度押しでは重ねて送らない', async () => {
+    fixture.pathname = '/restaurant-test/dashboard'
+    fixture.selectedAccountId = 'account-restaurant'
+    let finish!: (value: unknown) => void
+    fixture.clearStoreSelection.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const view = await renderMenu()
+    await openMenu(view)
+    const back = view.getByRole('menuitem', { name: '統括に戻る' })
+    fireEvent.click(back)
+    fireEvent.click(back)
+    expect(fixture.clearStoreSelection).toHaveBeenCalledExactlyOnceWith('account-restaurant')
+    expect(fixture.push).not.toHaveBeenCalled()
+    expect(fixture.clearSelectedAccountId).not.toHaveBeenCalled()
+    await act(async () => { finish({ success: true, data: { selectedStore: null } }) })
+    expect(fixture.clearSelectedAccountId).toHaveBeenCalledTimes(1)
+    expect(fixture.push).toHaveBeenCalledWith('/hq')
+  })
+
+  it('飲食の店舗選択を解除できないと移動せず、同じメニューからやり直せる', async () => {
+    fixture.pathname = '/restaurant-test/dashboard'
+    fixture.selectedAccountId = 'account-restaurant'
+    fixture.clearStoreSelection.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ success: true })
+    const view = await renderMenu()
+    await openMenu(view)
+    await act(async () => { fireEvent.click(view.getByRole('menuitem', { name: '統括に戻る' })) })
+    expect(fixture.push).not.toHaveBeenCalled()
+    expect(fixture.clearSelectedAccountId).not.toHaveBeenCalled()
+    expect(fixture.toast).toHaveBeenCalled()
+    await act(async () => { fireEvent.click(view.getByRole('menuitem', { name: '統括に戻る' })) })
+    expect(fixture.clearStoreSelection).toHaveBeenCalledTimes(2)
+    expect(fixture.push).toHaveBeenCalledWith('/hq')
   })
 
   it('書きかけで統括へ戻ると、アカウント解除と移動を両方確認まで止める', async () => {

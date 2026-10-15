@@ -24,6 +24,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import Select from '@/components/shared/select'
+import { ListPager } from '@/components/templates/list-page'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
@@ -49,8 +50,8 @@ import Notice from '@/components/shared/notice'
  * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
  *
  * 動き（読み込み・数の帯・絞り込み・並べ替え・保管の確認・行の詳細パネル・右クリック・
- * 名前のその場の直し）は今の V8 タブ（app/tags/marks-v8.tsx）から写した。数え方・判定・
- * 保管の窓は v7 と同じ部品（components/friend-fields/mark-list）を使う。見た目だけを絵に合わせた：
+ * 名前のその場の直し）は現役の V8 タブ（src/v8/tags/marks-tab.tsx）から写した。数え方・判定・
+ * 保管の窓は共通のV8部品（components/friend-fields/mark-list）を使う。見た目だけを絵に合わせた：
  * 数の帯は共通の帯（板の端から端）、案内は青い帯、道具の段の右端に表示件数、
  * 表は板の端から端（行の右端は必ず「…」）、表の下に安全確認の段。
  */
@@ -60,7 +61,7 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 const PAGE_SIZES = STANDARD_PAGE_SIZES
 
-export default function MarksTab({ accountId, canEdit, host }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow> }) {
+export default function MarksTab({ accountId, canEdit, host, explanation = false }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow>; explanation?: boolean }) {
   const router = useRouter()
   const [items, setItems] = useState<MarkRow[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -466,14 +467,10 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
         </tbody>
       </DataTable>
 
-      {pages > 1 ? (
-        <div className={styles.pager}>
-          <span className={styles.pagerCount}>
-            {`${visible.length} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)} 件`}
-          </span>
-          <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="対応マークのページ送り" />
-        </div>
-      ) : null}
+      <ListPager>
+        <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="対応マークのページ送り"
+          range={{ total: visible.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, visible.length) }} />
+      </ListPager>
 
       {/* 表の下の段（安全確認）。 */}
       <section className={styles.safetyNote}>
@@ -499,19 +496,19 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
         ))}
       </KpiBand>}
 
-      <div className={styles.infoRow}>
+      {!explanation ? <div className={styles.infoRow}>
         <p className={styles.readonlyBand}>
           <Info className={styles.readonlyIcon} aria-hidden="true" />
           対応マークは、受信箱で「未対応・対応中・対応済み・保留」を見分ける印です。新しいメッセージが来たら自動で変える、などのきまりを付けられます。
         </p>
-      </div>
+      </div> : null}
 
       <ConfirmDialog open={restoreTarget !== null} title={`「${restoreTarget?.name ?? ''}」を保管から戻しますか？`}
         description="同じ対応マークを通常の一覧へ戻します。初期値や自動変更は再開せず、友だちの付け替えはそのまま残ります。"
         confirmLabel="保管から戻す" busy={restoring} error={restoreError}
         onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
       <ListPageBody
-        skeleton
+        skeleton explanation={explanation ? '対応マークは、受信箱で「未対応・対応中・対応済み・保留」を見分ける印です。新しいメッセージが来たら自動で変える、などのきまりを付けられます。' : undefined}
         toolbar={<>
           <ListToolbarSearchSlot>
             <SearchField

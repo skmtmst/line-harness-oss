@@ -27,6 +27,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      entryRouteGenres: { ...actual.api.entryRouteGenres, list: async () => ({ success: true, data: [] }) },
+      broadcastMessageAssets: { ...actual.api.broadcastMessageAssets, list: async () => ({ success: true, data: [] }) },
       entryRoutes: { ...actual.api.entryRoutes, create: api.create, list: async () => ({ success: true, data: [] }) },
       tags: { ...actual.api.tags, list: api.tagsList },
       scenarios: { ...actual.api.scenarios, list: api.scenariosList },
@@ -46,11 +48,11 @@ vi.mock('@/lib/qr-image', () => ({
 }))
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
-    React.createElement('a', { href }, children),
+  default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+    React.createElement('a', { href, ...rest }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 
@@ -103,7 +105,7 @@ async function click(element: HTMLElement) {
 async function fillAndPublish() {
   await setValue(byId('ir-name'), '夏の投稿')
   await setValue(byId('ir-ref'), 'm30-summer')
-  await click(byExactText('button', '発行してURLを受け取る'))
+  await click(byExactText('button', '発行して URL を受け取る'))
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 20))
   })

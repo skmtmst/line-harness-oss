@@ -9,17 +9,18 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
+import TruncatedText from '@/components/shared/truncated-text'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError } from '@/lib/api'
 import { nenPetsApi, petAnimalTypeLabel, type NenPetKpis, type NenPetListData, type NenPetRow, type NenPetSort } from '@/lib/nen-pets-api'
 import PetEditorV8 from './editor'
-import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, rangeText, type PetsQuery } from './parts'
+import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, type PetsQuery } from './parts'
 import styles from './pets.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 /*
@@ -61,6 +62,9 @@ export default function PetsListV8({
       const res = await nenPetsApi.pets(accountId, { ...query, page, pageSize })
       if (request !== requestRef.current) return
       if (!res.success) throw new Error(res.error)
+      if (!res.data?.kpis || !Number.isFinite(res.data.kpis.total) || !Array.isArray(res.data.items)) {
+        throw new Error('ペット一覧の内容を確認できませんでした。')
+      }
       setData(res.data)
       onKpis(res.data.kpis)
       setStatus('ready')
@@ -82,9 +86,7 @@ export default function PetsListV8({
 
   return (
     <>
-      <div className={styles.noteRow}>
-        <Notice tone="info" message="体重が90日更新されていないペットは、マイページで更新をお願いできます（行の「…」→マイページで更新を促す）。" />
-      </div>
+
 
       <ListToolbarRow data-design="ListControls">
         <ListToolbarSearchSlot>
@@ -99,12 +101,13 @@ export default function PetsListV8({
         /></SaveErrorField>
         <SaveErrorField names={["product","query.product"]}><EntitySelect
           aria-label="主食で絞り込む"
+          noun="主食"
           width={140}
           value={query.product}
           onChange={(value) => change({ product: value })}
           options={[
             { value: '', label: '主食：すべて' },
-            ...(data?.products ?? []).map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: `主食：${p.name}` })),
+            ...(data?.products ?? []).map((p) => ({ value: p.id, label: `主食：${p.name}` })),
             { value: 'none', label: '主食：未設定' },
           ]}
         /></SaveErrorField>
@@ -168,11 +171,7 @@ export default function PetsListV8({
             </tbody>
           </DataTable>
           <div className={styles.pagerRow}>
-            {data.total > data.pageSize ? (
-              <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} summary={rangeText(data.total, data.page, data.pageSize)} />
-            ) : (
-              <div className={styles.pager}><span className={styles.pagerCount}>{rangeText(data.total, data.page, data.pageSize)}</span></div>
-            )}
+            <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} range={{ total: data.total, first: (data.page - 1) * data.pageSize + 1, last: Math.min(data.total, data.page * data.pageSize) }} />
           </div>
           <p className={styles.hint}>{canEdit ? '行の「…」から ペットの情報を直す・飼い主を開く・マイページで更新を促す。' : '行の「…」から 飼い主を開く・マイページで更新を促す。'}</p>
         </>
@@ -213,7 +212,7 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
             <span className={styles.nameText} title={pet.callName || name}>{name}</span>
             <span className={styles.sub} title={kindLine}>
               <span className={styles.wideOnly}>{kindLine}</span>
-              <span className={styles.narrowOnly}>{pet.ageLabel === '—' ? kindLine : `${kindLine}・${pet.ageLabel}`}</span>
+              <span className={styles.narrowOnly}><TruncatedText value={pet.ageLabel === '—' ? kindLine : `${kindLine}・${pet.ageLabel}`} /></span>
             </span>
           </span>
         </span>
@@ -229,11 +228,11 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
       <Td className={styles.colFeed}>
         <span className={styles.stack}>
           <span className={feed.main === '—' ? styles.cell : styles.cellStrong}>{feed.main}</span>
-          <span className={styles.sub} title={feed.sub}>{feed.sub}</span>
+          <span className={styles.sub}><TruncatedText value={feed.sub} /></span>
         </span>
       </Td>
-      <Td className={styles.colNeutered}><span className={styles.cell}>{NEUTERED_LABEL[pet.neutered]}</span></Td>
-      <Td className={styles.colActivity}><span className={styles.cell}>{pet.activityLabel}</span></Td>
+      <Td className={styles.colNeutered}><span className={styles.cell} title={NEUTERED_LABEL[pet.neutered]}>{NEUTERED_LABEL[pet.neutered]}</span></Td>
+      <Td className={styles.colActivity}><span className={styles.cell} title={pet.activityLabel}>{pet.activityLabel}</span></Td>
       <Td className={styles.colProduct}><span className={styles.cell} title={pet.productName ?? '（未設定）'}>{pet.productName ?? '（未設定）'}</span></Td>
       <Td className={styles.colUpdated}>
         {pet.weightStale && updated !== '—' ? <Pill tone="warn" title="体重が90日更新されていません">{updated}</Pill> : <span className={styles.cell}>{updated}</span>}

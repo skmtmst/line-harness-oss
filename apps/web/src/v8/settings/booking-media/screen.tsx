@@ -6,7 +6,8 @@ import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, MessageCircle, Plus } from 'lucide-react'
-import { PageFrame, PageHeading, PageFooter } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageFooter } from '@/components/templates/page-footer'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -458,6 +459,7 @@ export default function BookingMediaPage() {
           headingSize="compact"
           title="予約サイト・グルメ媒体"
           help="店ごとに、予約サイト・グルメ媒体の店舗ページと管理画面（ログイン）の URL を持ちます。管理画面の URL は「今日のお店」と「枠を閉じる知らせ」の［管理画面を開く］に使います。"
+      explanation="他の予約サイトの空き枠は自動で変更しません。LINE や電話で予約が入ったら、他のサイトの同じ時刻の枠を閉じる知らせを出します。"
           actions={(
             <span className={styles.headActions}>
               {stores.length > 1 ? (
@@ -532,7 +534,6 @@ export default function BookingMediaPage() {
               help="知らせを出す媒体は、表の行の「…」から1つずつ選べます。下の切り替えは、予約を受ける媒体をまとめてオン・オフします。"
               helpLabel="他のサイトの枠を閉じる知らせの説明"
             />
-            <Notice tone="info" density="compact">他の予約サイトの空き枠は自動で変更しません。LINE や電話で予約が入ったら、他のサイトの同じ時刻の枠を閉じる知らせを出します。</Notice>
             <div className={styles.switchRow}>
               {/* 閲覧のみには押せる形のスイッチを置かない。オン・オフは札で見せる。 */}
               {canManage ? (

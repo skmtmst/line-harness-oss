@@ -1,5 +1,10 @@
 'use client'
 
+import ListDateTime from '@/components/shared/list-date-time'
+import StatusBadge from '@/components/shared/status-badge'
+
+import { useActionError } from '@/lib/use-action-error'
+
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
@@ -26,7 +31,8 @@ import {
   automationTriggerLabel,
   type Folder,
 } from '@line-crm/shared'
-import { api, fetchApi, type AutomationListItem } from '@/lib/api'
+import { api, ApiError, fetchApi, type AutomationListItem } from '@/lib/api'
+import { describeAutomationEditFailure } from './list-errors'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
@@ -44,7 +50,7 @@ import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import ManagedFolderPanel, { managedFolderOptions } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import { RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { ActionCell, RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -55,6 +61,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
   AUTOMATIONS_DESCRIPTION,
+  AUTOMATION_TABLE_LAYOUT,
   AutomationBand,
   AutomationTabs,
   READONLY_REASON,
@@ -65,7 +72,6 @@ import {
   type BandCell,
 } from './shell'
 import styles from './list.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
@@ -129,18 +135,13 @@ export function actionSummary(item: Pick<Automation, 'actions'>): { title: strin
   }
 }
 
-/** 月/日（日本時間）。 */
-function monthDay(iso: string): string {
-  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
-}
-
 function TableHead({ selection }: { selection?: ReactNode } = {}) {
   return (
     <thead>
-      <TableHeadRow className={styles.headRow} data-table-layout="columns">
-        <Th className={styles.colName}>{selection}ルール</Th>
+      <TableHeadRow data-table-layout="columns">
+        <Th grow>{selection}ルール</Th>
         <Th className={styles.colTrigger}>きっかけ</Th>
-        <Th className={styles.colWho}>だれに（条件）</Th>
+        <Th collapseAt="narrow" className={styles.colWho}>だれに（条件）</Th>
         <Th className={styles.colDo}>すること</Th>
         <Th className={styles.colRuns} align="right">この30日</Th>
         <Th className={styles.colState}>状態</Th>
@@ -186,8 +187,8 @@ export default function AutomationListV8() {
   const onlyArchived = view.archived === '1'
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [rowBusyId, setRowBusyId] = useState<string | null>(null)
-  const [actionError, setActionError] = useState('')
-  const [pending, setPending] = useState<{ kind: 'toggle' | 'archive' | 'restore'; item: Automation } | null>(null)
+  const { error: actionError, setError: setActionError } = useActionError(selectedAccountId ?? '')
+  const [pending, setPending] = useState<{ kind: 'toggle' | 'archive' | 'restore'; item: Automation; accountId: string | null } | null>(null)
   const [working, setWorking] = useState(false)
   const [testing, setTesting] = useState<Automation | null>(null)
   const [testFriendId, setTestFriendId] = useState('')
@@ -195,11 +196,14 @@ export default function AutomationListV8() {
   const [testError, setTestError] = useState('')
   const [testDone, setTestDone] = useState(false)
   const requestRef = useRef(0)
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
+  const rowActionLockRef = useRef<object | null>(null)
+  const pendingLockRef = useRef<object | null>(null)
 
   const load = useCallback(async () => {
     const requestId = ++requestRef.current
     setLoadStatus('loading')
-    setActionError('')
     try {
       const [listRes, runsRes] = await Promise.all([
         api.automations.list({ accountId: selectedAccountId || undefined, includeArchived: true }),
@@ -243,7 +247,10 @@ export default function AutomationListV8() {
     return () => { requestRef.current += 1 }
   }, [accountLoading, load])
   useEffect(() => { void loadFolders() }, [loadFolders])
-  useEffect(() => { setFolderFilter(''); setPending(null) }, [selectedAccountId])
+  useEffect(() => {
+    setFolderFilter(''); setPending(null); setRowBusyId(null); setWorking(false)
+    rowActionLockRef.current = null; pendingLockRef.current = null
+  }, [selectedAccountId])
 
   const tabCounts = useAutomationTabCounts(loadStatus === 'ready' ? items.length : null)
 
@@ -287,30 +294,41 @@ export default function AutomationListV8() {
   })
 
   const runRowAction = async (fn: () => Promise<void>, id: string) => {
-    if (rowBusyId) return
+    if (rowActionLockRef.current || !selectedAccountId || !canEdit) return
+    const accountAtStart = selectedAccountId
+    const lock = {}
+    rowActionLockRef.current = lock
     setRowBusyId(id)
     setActionError('')
     try {
       await fn()
+      if (selectedAccountIdRef.current !== accountAtStart) return
       await load()
-    } catch {
-      setActionError('操作できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (caught) {
+      if (selectedAccountIdRef.current !== accountAtStart) return
+      if (caught instanceof ApiError && (caught.status === 404 || caught.status === 409)) await load()
+      if (selectedAccountIdRef.current === accountAtStart) setActionError(describeAutomationEditFailure(caught))
     } finally {
-      setRowBusyId(null)
+      if (rowActionLockRef.current === lock) { rowActionLockRef.current = null; setRowBusyId(null) }
     }
   }
 
   /* 「編集する」は改訂用の下書きを作って（あれば同じ下書き）開く。「複製する」は写しの下書き。 */
   const openEditor = async (id: string, duplicate: boolean) => {
+    const accountAtStart = selectedAccountId
     await runRowAction(async () => {
       const res = duplicate ? await api.automations.duplicate(id) : await api.automations.createDraftFromAutomation(id)
       if (!res.success) throw new Error(res.error)
+      if (selectedAccountIdRef.current !== accountAtStart) return
       router.push(`/automations/drafts?id=${encodeURIComponent(res.data.id)}`)
     }, id)
   }
 
   const confirmPending = async () => {
-    if (!pending || working || !selectedAccountId) return
+    if (!pending || pendingLockRef.current || !selectedAccountId || !canEdit || pending.accountId !== selectedAccountIdRef.current) return
+    const accountAtStart = pending.accountId
+    const lock = {}
+    pendingLockRef.current = lock
     setWorking(true)
     setActionError('')
     try {
@@ -319,13 +337,15 @@ export default function AutomationListV8() {
         ? await api.automations.restore(pending.item.id, selectedAccountId)
         : await api.automations.setStatus(pending.item.id, status)
       if (!res.success) throw new Error(res.error)
+      if (selectedAccountIdRef.current !== accountAtStart) return
       notifyToast(pending.kind === 'restore' ? 'ルールを保管から戻しました' : pending.kind === 'archive' ? 'ルールを保管しました' : 'ルールの状態を変えました')
       setPending(null)
       await load()
     } catch (saveFailure) {
+      if (selectedAccountIdRef.current !== accountAtStart) return
       const fieldFailure = saveErrors.capture(saveFailure);
-
-
+      await load()
+      if (selectedAccountIdRef.current !== accountAtStart) return
       if (!fieldFailure) {
       setActionError(
         pending.kind === 'archive'
@@ -334,7 +354,7 @@ export default function AutomationListV8() {
           : '稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。',
       ) }
     } finally {
-      setWorking(false)
+      if (pendingLockRef.current === lock) { pendingLockRef.current = null; setWorking(false) }
     }
   }
 
@@ -372,7 +392,7 @@ export default function AutomationListV8() {
     const busy = rowBusyId === item.id
     const runs: ActionMenuItem = { id: 'runs', label: '動いた記録を見る', onSelect: () => router.push(runsHref(item)) }
     if (!canEdit) return [runs]
-    if (item.status === 'archived') return [runs, { id: 'restore', label: '保管から戻す', disabled: busy, onSelect: () => { setActionError(''); setPending({ kind: 'restore', item }) } }]
+    if (item.status === 'archived') return [runs, { id: 'restore', label: '保管から戻す', disabled: busy, onSelect: () => { setActionError(''); setPending({ kind: 'restore', item, accountId: selectedAccountId }) } }]
     return [
       { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(item) },
       { id: 'edit', label: '編集する', disabled: busy, onSelect: () => void openEditor(item.id, false) },
@@ -383,14 +403,15 @@ export default function AutomationListV8() {
         disabled: busy,
         onSelect: () => { setTesting(item); setTestFriendId(''); setTestError(''); setTestDone(false) },
       },
-      { id: 'toggle', label: item.isActive ? '止める' : '動かす', disabled: busy, onSelect: () => setPending({ kind: 'toggle', item }) },
+      { id: 'toggle', label: item.isActive ? '止める' : '動かす', disabled: busy, onSelect: () => setPending({ kind: 'toggle', item, accountId: selectedAccountId }) },
       runs,
-      { id: 'archive', label: '保管する', tone: 'danger', dividerBefore: true, disabled: busy, onSelect: () => setPending({ kind: 'archive', item }) },
+      { id: 'archive', label: '保管する', tone: 'danger', dividerBefore: true, disabled: busy, onSelect: () => setPending({ kind: 'archive', item, accountId: selectedAccountId }) },
     ]
   }
 
   /* ===== 数の帯（4つ） ===== */
   const ready = loadStatus === 'ready'
+  const estimatedHoursSaved = summary ? Math.round(summary.executionCount30d / 120) : null
   const cells: BandCell[] = [
     { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? items.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
     { key: 'runs', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
@@ -438,38 +459,13 @@ export default function AutomationListV8() {
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (
-    <div className={styles.noticeRow}>
-      <Notice tone="info">ルールは1人で試してから動かすと、まちがいを防げます。動いた結果は「動いた記録」で見られます。</Notice>
-    </div>
+    null
   )
   /* 1152 の板（En14p）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
-  const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      {notice}
-      <div className={styles.narrowRow}>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>
-          <SearchField
-            value={search}
-            onChange={setSearch}
-            onClear={() => setSearch('')}
-            placeholder="ルール名・きっかけで探す"
-            aria-label="ルールを検索"
-          />
-        </div>
-      </div>
-      <div className={styles.narrowRow}>
-        {filterChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {savedBox}
-        {perPageBox}
-      </div>
-    </div>
-  )
+
   const wideToolbar = (
     <>
-      {notice}
+
       <ListToolbar
         search={{ placeholder: 'ルール名・きっかけで探す', label: 'ルールを検索', width: 240, value: search, onChange: setSearch }}
         filters={filterChips}
@@ -518,8 +514,8 @@ export default function AutomationListV8() {
     listBody = (
       <>
         {actionError ? <div className={styles.errorRow}><Notice tone="danger">{actionError}</Notice></div> : null}
-        <div className={narrow ? `${styles.tableWrap} ${styles.narrowTable}` : styles.tableWrap}>
-          <DataTable className={styles.table}>
+        <div className={styles.tableWrap}>
+          <DataTable columnLayout={AUTOMATION_TABLE_LAYOUT}>
             <TableHead selection={folderMove.pageCheckbox} />
             <tbody>
               {paged.map((item) => {
@@ -529,14 +525,14 @@ export default function AutomationListV8() {
                 const trigger = triggerSummary(item)
                 const who = conditionSummary(item.conditions)
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
-                    <Td className={styles.colName}>
+                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
+                    <Td grow>
                       <FolderDotName folder={folders.find((folder) => folder.id === item.folderId) ?? null}>{folderMove.checkbox(item)}
-                        {canEdit && item.status !== 'archived' ? <RowNameLink href={`/automations/drafts?automationId=${encodeURIComponent(item.id)}`} className={styles.name}><TruncatedText value={String(item.name ?? '')} /></RowNameLink> : <span className={styles.name}><TruncatedText value={String(item.name ?? '')} /></span>}
+                        {canEdit && item.status !== 'archived' ? <RowNameLink href={`/automations/drafts?automationId=${encodeURIComponent(item.id)}`} className={styles.name}><TruncatedText value={String(item.name ?? '')} /></RowNameLink> : <TruncatedText value={String(item.name ?? '')} />}
                       </FolderDotName>
                     </Td>
-                    <Td className={styles.colTrigger}><span className={styles.cell} title={trigger}>{trigger}</span></Td>
-                    <Td className={styles.colWho}><span className={styles.cell} title={who}>{who}</span></Td>
+                    <Td className={styles.colTrigger}><TruncatedText value={trigger} /></Td>
+                    <Td collapseAt="narrow" className={styles.colWho}><TruncatedText value={who} /></Td>
                     <Td className={styles.colDo}>
                       <span className={styles.cellOne} title={action.title}>{action.title}</span>
                       {action.detail ? <span className={styles.sub} title={action.detail}>{action.detail}</span> : null}
@@ -544,16 +540,15 @@ export default function AutomationListV8() {
                     <Td className={styles.colRuns}>
                       <span className={styles.numMain}>{`${formatNumber(item.executionCount30d)} 回`}</span>
                       <span className={styles.numSub}>
-                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)} 回` : `更新 ${monthDay(item.updatedAt)}`}
+                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)} 回` : <>更新 <ListDateTime value={item.updatedAt} /></>}
                       </span>
                     </Td>
                     <Td className={styles.colState}>
-                      <span className={styles.pill} data-tone={item.isActive ? 'active' : 'neutral'}>
-                        <span className={styles.pillDot} aria-hidden="true" />
+                      <StatusBadge tone={item.isActive ? 'success' : 'neutral'}>
                         {item.status === 'archived' ? '保管' : item.isActive ? '動いています' : '止めています'}
-                      </span>
+                      </StatusBadge>
                     </Td>
-                    <Td className={styles.colOps}>
+                    <ActionCell className={styles.colOps}>
                       <div className={styles.opsBox}>
 
                         <RowMenu
@@ -564,7 +559,7 @@ export default function AutomationListV8() {
                           items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect?.() } }))}
                         />
                       </div>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
@@ -575,12 +570,9 @@ export default function AutomationListV8() {
     )
   }
 
-  const pager = ready && pageCount > 1 ? (
+  const pager = ready && paged.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(current - 1) * pageSize + 1}〜{(current - 1) * pageSize + paged.length} / {formatNumber(visible.length)} 件
-      </span>
-      <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="ルール一覧のページ送り" />
+      <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="ルール一覧のページ送り" range={{ total: visible.length, first: (current - 1) * pageSize + 1, last: (current - 1) * pageSize + paged.length }} />
     </ListPagePagination>
   ) : null
 
@@ -589,7 +581,10 @@ export default function AutomationListV8() {
       skeleton
       help={<>{AUTOMATIONS_DESCRIPTION}{canEdit
             ? '行の「…」から 編集・複製・1人で試す・止める・動いた記録を見る・削除。'
-            : '行の「…」から 動いた記録を見る。'}</>}
+            : '行の「…」から 動いた記録を見る。'}{estimatedHoursSaved === null
+              ? '削減時間はまだ数えられていません。'
+              : `およそ${formatNumber(estimatedHoursSaved)}時間の削減（この30日の実行1回30秒として計算しています）。`}</>}
+      explanation="ルールは1人で試してから動かすと、まちがいを防げます。動いた結果は「動いた記録」で見られます。"
       boardId={narrow ? 'En14p' : viewerOnly ? 'nH9L8' : 'LWQXd'}
       headingSize="regular"
       title="オートメーション"
@@ -622,13 +617,14 @@ export default function AutomationListV8() {
           placeholder="例： 予約・購入"
         />
       </>}
-      collapsedFolders={narrow ? undefined : foldersError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void loadFolders()}/>:<>{createButton(false)}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      collapsedFolders={foldersError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void loadFolders()}/>:<>{createButton(false)}{folderSelect}</>}
+      toolbar={wideToolbar}
       pagination={pager}
       overlays={<>
         {folderMove.overlays}
         <ConfirmDialog
-          open={pending !== null}
+          key={selectedAccountId}
+          open={pending !== null && pending.accountId === selectedAccountId}
           title={pending ? `「${pending.item.name}」を${pending.kind === 'restore' ? '保管から戻し' : pending.kind === 'archive' ? '保管し' : pending.item.isActive ? '止め' : '動か'}ますか？` : ''}
           description={
             pending?.kind === 'restore' ? '通常の一覧へ戻します。動いた記録と設定は残り、稼働は再開しません。' : pending?.kind === 'archive'
@@ -639,7 +635,7 @@ export default function AutomationListV8() {
           destructive={pending?.kind === 'archive'}
           busy={working}
           error={actionError}
-          onConfirm={() => confirmPending()}
+          onConfirm={pending?.accountId === selectedAccountId ? () => confirmPending() : undefined}
           onCancel={() => { if (!working) setPending(null) }}
         />
         <Dialog

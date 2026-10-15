@@ -6,25 +6,7 @@
 .viewerBand { margin: 0; }
 
 /* 段（カード）：枠1・角12・余白20・中の間14。共通カードの枠（1）は内側に入るので、余白は 20−1。 */
-.card {
-  gap: var(--tpl-section-gap);
-  min-width: 0;
-}
-:global([data-theme='v8']) .card {
-  padding: var(--tpl-cfl-card-pad);
-}
-.cardHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-cfl-head-gap);
-}
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-card-title-size);
-  font-weight: 700;
-  line-height: var(--tpl-cfl-title-lh);
-}
+.card { min-width: 0; }
 .cardDesc {
   margin: 0;
   color: var(--color-ink-faint);
@@ -71,13 +53,6 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-rule-row-gap);
-}
-.testTarget {
-  flex: 1 1 0;
-  min-width: 0;
-}
-.testTarget :global(*) {
-  max-width: 100%;
 }
 
 /* 有効にする前の確認：印・題と説明・見直す。行は余白10・下に線。 */

@@ -9,17 +9,24 @@
  */
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
 
 import FolderPanel from '@/components/shared/folder-panel'
 import { buttonsWithoutAccessibleName } from '@/test-utils/accessible-name'
 import type { WebinarListItem } from '@/lib/api'
-import { WebinarListContent } from './list-v8'
+import WebinarList from './page'
 
 /* 一覧の行操作（R94 参加者・分析・演出への移動）が使う router の撮影口。 */
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
-}))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [], loading: false }) }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), webinarApi: {
+  list: async () => ({ data: { items: [ITEM], total: 1 } }),
+  folders: async () => ({ success: true, data: [] }), overview: async () => ({ data: null }),
+} }))
+afterEach(cleanup)
 
 
 const ITEM: WebinarListItem = {
@@ -49,23 +56,10 @@ function hostWith(html: string): HTMLElement {
 }
 
 describe('Issue #637 /webinars 全ボタンにアクセシブルな名前', () => {
-  it('一覧の行操作に無名ボタンがない', () => {
-    const html = renderToStaticMarkup(
-      <WebinarListContent
-        accountLoading={false}
-        loading={false}
-        selectedAccountId="account-1"
-        accountsCount={1}
-        loadFailure={null}
-        visibleItems={[ITEM]}
-        panelGrand={1}
-        refreshing={false}
-        onRetry={vi.fn()}
-        onArchive={vi.fn()}
-      />,
-    )
-    const host = hostWith(html)
-    expect(buttonsWithoutAccessibleName(host).map((b) => b.outerHTML.slice(0, 160))).toEqual([])
+  it('一覧の行操作に無名ボタンがない', async () => {
+    const { container } = render(<WebinarList />)
+    await screen.findByRole('link', { name: '「入門ウェビナー」の詳細を見る' })
+    expect(buttonsWithoutAccessibleName(container).map((b) => b.outerHTML.slice(0, 160))).toEqual([])
   })
 
   it('フォルダ欄の行操作・追加操作に無名ボタンがない', () => {

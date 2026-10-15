@@ -27,6 +27,7 @@ export default function DateField({
   disabled = false,
   invalid = false,
   size = 'standard',
+  displayFormat = 'full',
   placeholder = '日付を選ぶ',
   id,
   name,
@@ -42,6 +43,8 @@ export default function DateField({
   disabled?: boolean
   invalid?: boolean
   size?: 'standard' | 'compact'
+  /** 狭い道具欄では月日だけを表示。年を含む全文はtitleと暦に残す。 */
+  displayFormat?: 'full' | 'short'
   placeholder?: string
   id?: string
   name?: string
@@ -170,7 +173,7 @@ export default function DateField({
         aria-controls={open ? dialogId : undefined}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
-        aria-invalid={invalid || undefined}
+        aria-required={field?.required || undefined} aria-invalid={invalid || undefined}
         aria-describedby={joinDescribedBy(ariaDescribedBy, field?.describedBy)}
         data-open={open || undefined}
         onClick={() => (open ? setOpen(false) : openCalendar())}
@@ -182,7 +185,7 @@ export default function DateField({
         }}
       >
         <Calendar aria-hidden="true" className={styles.icon} />
-        <span className={selected ? styles.value : styles.placeholder}>{selected ? formatLabel(selected) : placeholder}</span>
+        <span className={selected ? styles.value : styles.placeholder}>{selected ? displayFormat === 'short' ? `${selected.getMonth() + 1}/${selected.getDate()}（${WEEKDAYS[selected.getDay()]}）` : formatLabel(selected) : placeholder}</span>
       </button>
       {selected && !disabled ? (
         <button type="button" className={styles.clear} aria-label="日付を消す" onClick={() => onChange('')}>

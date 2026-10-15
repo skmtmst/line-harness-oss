@@ -1,7 +1,7 @@
 /*
  * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 `jjFNi`・閲覧のみ `NtCE3`）。
  * 枠・見出し・数の帯・フォルダの列・道具の段の外側は型（ListPage）が持つ。
- * 値は globals.css の `[data-theme="v8"]` の `--tpl-bc-*`。
+ * 値は globals.css の `:root` の `--tpl-bc-*`。
  */
 
 /* 閲覧のみの帯（NtCE3）。数の帯の上。薄い青の地・目の印・枠なし。 */
@@ -57,9 +57,7 @@
 .statusSelect :global(*) { max-width: 100%; }
 .statusSelect :global(button) { width: 100%; }
 
-.pageSizeBox { width: var(--tpl-bc-page-size-w); }
-.pageSizeBox :global(*) { max-width: 100%; }
-.pageSizeBox :global(button) { width: 100%; }
+.pageSizeBox { display: inline-flex; width: max-content; flex-shrink: 0; }
 
 .savedBox { position: relative; flex-shrink: 0; }
 
@@ -71,27 +69,6 @@
 
 /* 「配信日：指定なし」。字のあとに暦の印。 */
 .datePopoverWrap { position: relative; flex-shrink: 0; }
-
-.dateButton {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-bc-control-gap);
-  height: var(--tpl-chip-h);
-  padding: var(--tpl-bc-date-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -0.5px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 500;
-  line-height: var(--tpl-chip-label-lh);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.dateButton > svg { color: var(--color-ink-faint); }
-.dateButton[data-active='true'] { outline-color: var(--color-focus-ring); color: var(--color-action); }
 
 .datePopover {
   position: absolute;
@@ -222,12 +199,12 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 500;
+  font-weight: 700;
   line-height: var(--tpl-bc-cell-lh);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cellTitle:hover { color: var(--color-action); text-decoration: underline; }
+.cellTitle:hover { text-decoration: underline; }
 
 .cellMain {
   display: block;
@@ -295,25 +272,6 @@
 
 /* 行の「…」：28 の四角・薄い線。メニューの目印が行を伸ばさないよう箱で包む。 */
 .menuBox { display: flex; align-items: center; justify-content: flex-end; }
-/* 「…」は共通の RowMenu（右クリックの囲みの中）。四角と3点（四角の半分）を共通の印ボタンより強く当てる。 */
-.menuBox button.menuButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-bc-menu-size);
-  height: var(--tpl-bc-menu-size);
-  flex: 0 0 var(--tpl-bc-menu-size);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -0.5px;
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-}
-.menuBox button.menuButton:hover { background: var(--color-canvas-sunken); }
-.menuBox button.menuButton > svg { width: calc(var(--tpl-bc-menu-size) / 2); height: calc(var(--tpl-bc-menu-size) / 2); }
 
 .pagerCount {
   color: var(--color-ink-secondary);

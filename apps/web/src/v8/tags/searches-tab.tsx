@@ -4,7 +4,7 @@ import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { FolderDotName } from '@/components/shared/folder-dot';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bookmark, CircleDashed, Filter, Lightbulb, MousePointerClick, Send, Users } from 'lucide-react';
+import { ArrowRight, Bookmark, CircleDashed, Filter, MousePointerClick, Send } from 'lucide-react';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -26,6 +26,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
+import { ListPager } from '@/components/templates/list-page'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
@@ -52,7 +53,7 @@ import Notice from '@/components/shared/notice'
  *
  * ここは管理だけ。条件を作るのは友だち一覧の絞り込みで、「この条件を保存」で増える。
  * 動き（読み込み・数の帯・絞り込み・並べ替え・削除・行の詳細パネル・名前のその場の直し・右クリック）は
- * 今の V8 タブ（app/tags/searches-v8.tsx）から写した。見た目は絵に合わせた：
+ * 現役の V8 タブ（src/v8/tags/searches-tab.tsx）から写した。見た目は絵に合わせた：
  * 表は「条件名・内容／該当／共有／使っている所／更新／友だち一覧へ／…」。つまみの列は無く、
  * 並べ替えは行の「…」の「上へ動かす・下へ動かす」（つまみで ↑↓ と同じ口）。
  * 絵の下の段のとおり、行の「…」に「複製して保存」を足した（同じ条件で新しく保存する）。
@@ -97,7 +98,7 @@ function updatedText(search: SavedSearch): string {
   return `${who}・${day}`
 }
 
-export default function SearchesTab({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
+export default function SearchesTab({ accountId, canEdit, explanation = false }: { accountId: string | null; canEdit: boolean; explanation?: boolean }) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [items, setItems] = useState<SavedSearch[]>([])
@@ -402,7 +403,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 <Td className={styles.searchColOpen}>
                   {search.lineAccountId ? (
                     <Button href={`/friends?savedSearch=${search.id}`} aria-label={`「${search.name}」で友だち一覧を開く`}>
-                      <Users size={15} aria-hidden="true" />友だち一覧へ
+                      <ArrowRight size={16} aria-hidden="true" />友だち一覧へ
                     </Button>
                   ) : null}
                 </Td>
@@ -423,14 +424,10 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         </tbody>
       </DataTable>
 
-      {pages > 1 ? (
-        <div className={styles.pager}>
-          <span className={styles.pagerCount}>
-            {`${filteredList.length} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filteredList.length)} 件`}
-          </span>
-          <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="保存した検索のページ送り" />
-        </div>
-      ) : null}
+      <ListPager>
+        <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="保存した検索のページ送り"
+          range={{ total: filteredList.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, filteredList.length) }} />
+      </ListPager>
 
     </DelayedSkeleton>
   )
@@ -451,15 +448,9 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         ))}
       </KpiBand>
 
-      <div className={styles.infoRow}>
-        <p className={styles.readonlyBand}>
-          <Lightbulb className={styles.readonlyIcon} aria-hidden="true" />
-          友だち一覧で絞り込みを作り「この条件を保存」で保存します。配信や自動処理の宛先にも使えます。
-        </p>
-      </div>
-
       <ListPageBody
         skeleton
+        explanation={explanation ? '友だち一覧で絞り込みを作り「この条件を保存」で保存します。配信や自動処理の宛先にも使えます。' : undefined}
         listHelp={canEdit ? `保存は最大 ${MAX_SAVED} 件。行の「…」に：編集・複製して保存・削除。` : `保存は最大 ${MAX_SAVED} 件。`}
         toolbar={<>
           <ListToolbarSearchSlot>

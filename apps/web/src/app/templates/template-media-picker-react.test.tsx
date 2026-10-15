@@ -34,13 +34,16 @@ const MEDIA: MediaItem = {
 }
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
+  useAccount: () => ({ selectedAccountId: fixture.accountId, accounts: [{ id: 'account-a', name: 'A' }, { id: 'account-b', name: 'B' }], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 const emptyList = () => Promise.resolve({ success: true, data: [] })
 
 vi.mock('@/lib/api', () => ({
   api: {
+    folders: { list: emptyList },
     broadcastMessageAssets: {
       create: (input: { lineAccountId: string; kind: string; name: string; payload: Record<string, unknown> }) => {
         fixture.createCalls.push(input)
@@ -68,7 +71,11 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { default: TemplateAssetEditor } = await import('./template-asset-editor')
+const { default: TemplateRichEditor } = await import('@/v8/template-edit/rich')
+const { default: TemplateAssetEditorV8 } = await import('@/v8/template-edit/asset')
+function TemplateAssetEditor({ kind }: { kind: 'rich_message' | 'coupon' | 'research' }) {
+  return kind === 'rich_message' ? <TemplateRichEditor /> : <TemplateAssetEditorV8 kind={kind} />
+}
 
 let host: HTMLDivElement
 let root: Root
@@ -140,7 +147,7 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
       await settle()
     })
     expect(document.body.querySelector('[role="dialog"]')).toBeNull()
-    const urlInput = host.querySelector<HTMLInputElement>('input[placeholder="画像URL"]')!
+    const urlInput = host.querySelector<HTMLInputElement>('input[aria-label="画像のURL"]')!
     expect(urlInput.value).toBe('https://cdn.example.test/campaign.png')
 
     // 名前を入れて保存すると、選んだメディアのID・種別も保存値へ載る。
@@ -151,7 +158,7 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
       nameInput.dispatchEvent(new Event('input', { bubbles: true }))
       await settle()
     })
-    await act(async () => { buttonByText('テンプレートを保存する').click(); await settle() })
+    await act(async () => { buttonByText('下書きを保存').click(); await settle() })
     expect(fixture.createCalls).toHaveLength(1)
     expect(fixture.createCalls[0].payload).toMatchObject({
       imageUrl: 'https://cdn.example.test/campaign.png',
@@ -169,7 +176,7 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
       ;[...dialog().querySelectorAll<HTMLButtonElement>('[role="option"]')].find((b) => b.textContent?.includes('キャンペーン画像.png'))!.click()
       await settle()
     })
-    expect(host.textContent).toContain('選択中: キャンペーン画像.png')
+    expect(host.textContent).toContain('選択中：キャンペーン画像.png')
   })
 
   it('アカウントを切り替えると、前のアカウントで選んだ候補は保存対象から外れる', async () => {
@@ -180,7 +187,7 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
       ;[...dialog().querySelectorAll<HTMLButtonElement>('[role="option"]')].find((b) => b.textContent?.includes('キャンペーン画像.png'))!.click()
       await settle()
     })
-    expect(host.textContent).toContain('選択中: キャンペーン画像.png')
+    expect(host.textContent).toContain('選択中：キャンペーン画像.png')
 
     // account-b へ切り替えると、「選択中」表示とURL欄のピック値が消える。
     fixture.accountId = 'account-b'
@@ -188,8 +195,8 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
       root.render(<TemplateAssetEditor kind="rich_message" />)
       await settle()
     })
-    expect(host.textContent).not.toContain('選択中:')
-    expect(host.querySelector<HTMLInputElement>('input[placeholder="画像URL"]')!.value).toBe('')
+    expect(host.textContent).not.toContain('選択中：')
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="画像のURL"]')!.value).toBe('')
 
     // そのまま保存しても、別アカウントのメディアID・種別は保存値へ載らない。
     // （#989: 画像なしでは保存しない。URL欄へ直接入れて保存する。）
@@ -198,11 +205,11 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
     await act(async () => {
       setter.call(nameInput, '夏のキャンペーン告知')
       nameInput.dispatchEvent(new Event('input', { bubbles: true }))
-      setter.call(host.querySelector<HTMLInputElement>('input[placeholder="画像URL"]')!, 'https://cdn.example.test/other.png')
-      host.querySelector<HTMLInputElement>('input[placeholder="画像URL"]')!.dispatchEvent(new Event('input', { bubbles: true }))
+      setter.call(host.querySelector<HTMLInputElement>('input[aria-label="画像のURL"]')!, 'https://cdn.example.test/other.png')
+      host.querySelector<HTMLInputElement>('input[aria-label="画像のURL"]')!.dispatchEvent(new Event('input', { bubbles: true }))
       await settle()
     })
-    await act(async () => { buttonByText('テンプレートを保存する').click(); await settle() })
+    await act(async () => { buttonByText('下書きを保存').click(); await settle() })
     expect(fixture.createCalls).toHaveLength(1)
     expect(fixture.createCalls[0].lineAccountId).toBe('account-b')
     expect(fixture.createCalls[0].payload.imageMediaId).toBeNull()

@@ -4,11 +4,11 @@
  * 本文との間14」で描かれているので、この印（.head）を本文の外枠に付けた窓だけを絵に合わせる。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
  */
-:global([data-theme='v8'] [data-design-part='dialog']):has(.head) > :global(div:first-child) {
+:global(:root [data-design-part='dialog']):has(.head) > :global(div:first-child) {
   padding: var(--tpl-hq-dialog-head-pad);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.head) :global(h2) {
+:global(:root [data-design-part='dialog']):has(.head) :global(h2) {
   font-size: var(--tpl-hq-dialog-title-size);
   font-weight: 700;
   line-height: var(--tpl-hq-dialog-title-lh);
@@ -18,27 +18,27 @@
  * 絵の説明は×の列の下まで全幅（572）。題と×を1段目、説明を2段目に置く（題の行は×と同じ高さ36）。
  * 共通の Dialog の題と説明の囲み（頭の1つ目）を外して、頭の段を2列の格子にする。
  */
-:global([data-theme='v8'] [data-design-part='dialog']):has(.head) > :global(div:first-child) {
+:global(:root [data-design-part='dialog']):has(.head) > :global(div:first-child) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   row-gap: var(--tpl-hq-dialog-desc-gap);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.head) > :global(div:first-child > div:first-child) {
+:global(:root [data-design-part='dialog']):has(.head) > :global(div:first-child > div:first-child) {
   display: contents;
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.head) > :global(div:first-child) > :global(button) {
+:global(:root [data-design-part='dialog']):has(.head) > :global(div:first-child) > :global(button) {
   grid-column: 2;
   grid-row: 1;
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.head) :global(h2) {
+:global(:root [data-design-part='dialog']):has(.head) :global(h2) {
   grid-column: 1;
   grid-row: 1;
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.head) :global(h2 + p) {
+:global(:root [data-design-part='dialog']):has(.head) :global(h2 + p) {
   grid-column: 1 / -1;
   grid-row: 2;
   margin-top: var(--tpl-hq-dialog-desc-gap);
@@ -46,7 +46,7 @@
   line-height: var(--tpl-hq-contract-lh);
 }
 
-:global([data-theme='v8'] [data-design-part='dialog']):has(.head) > :global(div:nth-child(2)) {
+:global(:root [data-design-part='dialog']):has(.head) > :global(div:nth-child(2)) {
   padding: var(--tpl-hq-dialog-content-pad);
 }
 

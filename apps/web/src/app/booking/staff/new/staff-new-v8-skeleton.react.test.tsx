@@ -23,7 +23,7 @@ const fixture = vi.hoisted(() => ({
   push: null as null | ((...args: unknown[]) => void),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: (...args: unknown[]) => fixture.push?.(...args), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -151,13 +151,13 @@ describe('スタッフ登録（V8）の読み込みと登録ボタン', () => {
     render(<NewBookingStaffPage />)
     await screen.findByRole('button', { name: '予約を受けられるメニュー' })
 
-    fireEvent.change(screen.getByPlaceholderText('田中 美咲'), { target: { value: '田中' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }), { target: { value: '田中' } })
     await pickEntities('予約を受けられるメニュー', ['カット'])
     fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
 
     // ボタンの内側だけ登録中に変わり、入力欄は触れるまま。
     expect(await screen.findByRole('button', { name: '登録しています…' })).toBeTruthy()
-    expect(screen.getByPlaceholderText('田中 美咲')).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' })).toBeTruthy()
 
     await act(async () => { gate.resolve({ id: 'staff-new-1' }) })
     await waitFor(() => { expect(fixture.createStaff).toHaveBeenCalled() })

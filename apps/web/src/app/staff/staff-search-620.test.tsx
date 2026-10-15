@@ -8,13 +8,15 @@
  *   - 名前とメールを ' ' で繋いだ文字列への跨ぎ一致（別フィールド一致）をしない
  *   - 空白だけ・長文でも正しく動く
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { act } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams('tab=members'),
@@ -24,7 +26,7 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   default: ({ tabs }: { tabs: Array<{ key: string; label: string }> }) => <nav aria-label="ログインユーザーのタブ">{tabs.map((tab) => <span key={tab.key}>{tab.label}</span>)}</nav>,
   useMergedTab: () => 'members',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -101,8 +103,10 @@ const EMPTY_MESSAGE = '条件に合うログインユーザーはいません。
 
 async function mount() {
   await act(async () => { render(<StaffPage />) })
-  await waitFor(() => expect(screen.getByText('山田 太郎')).toBeTruthy())
+  await waitFor(() => expect(list().getByText('山田 太郎')).toBeTruthy())
 }
+
+const list = () => within(screen.getByRole('table', { name: 'いまいる人の一覧' }))
 
 function searchBox(): HTMLElement {
   return screen.getByRole('searchbox', { name: '名前・メールで探す' })
@@ -119,21 +123,21 @@ describe('ログインユーザー検索 (#620)', () => {
     await mount()
     typeQuery('存在しない語zzz')
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
-    expect(screen.getByText('ログインユーザー 0人中 0人を表示')).toBeTruthy()
-    expect(screen.queryByText('山田 太郎')).toBeNull()
-    expect(screen.queryByText('佐藤 花子')).toBeNull()
+    expect(screen.getByText('ログインユーザー 0 人中 0 人を表示')).toBeTruthy()
+    expect(list().queryByText('山田 太郎')).toBeNull()
+    expect(list().queryByText('佐藤 花子')).toBeNull()
   })
 
   it('名前・メールの部分一致は従来どおり効く', async () => {
     await mount()
     typeQuery('山田')
-    await waitFor(() => expect(screen.getByText('ログインユーザー 1人中 1人を表示')).toBeTruthy())
-    expect(screen.getByText('山田 太郎')).toBeTruthy()
-    expect(screen.queryByText('佐藤 花子')).toBeNull()
+    await waitFor(() => expect(screen.getByText('ログインユーザー 1 人中 1 人を表示')).toBeTruthy())
+    expect(list().getByText('山田 太郎')).toBeTruthy()
+    expect(list().queryByText('佐藤 花子')).toBeNull()
 
     typeQuery('x-sato@mail')
-    await waitFor(() => expect(screen.getByText('佐藤 花子')).toBeTruthy())
-    expect(screen.queryByText('山田 太郎')).toBeNull()
+    await waitFor(() => expect(list().getByText('佐藤 花子')).toBeTruthy())
+    expect(list().queryByText('山田 太郎')).toBeNull()
   })
 
   it('名前とメールをまたいだ語では一致しない（フィールドごとに照合する）', async () => {
@@ -142,13 +146,13 @@ describe('ログインユーザー検索 (#620)', () => {
     // 「花子 x-sato」のような跨ぎ語でも行を返していた。
     typeQuery('花子 x-sato')
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
-    expect(screen.getByText('ログインユーザー 0人中 0人を表示')).toBeTruthy()
+    expect(screen.getByText('ログインユーザー 0 人中 0 人を表示')).toBeTruthy()
   })
 
   it('空白だけの検索語は絞り込みなしとして全件を返す', async () => {
     await mount()
     typeQuery('  　 ')
-    await waitFor(() => expect(screen.getByText('ログインユーザー 3人中 3人を表示')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('ログインユーザー 3 人中 3 人を表示')).toBeTruthy())
     expect(screen.queryByText(EMPTY_MESSAGE)).toBeNull()
   })
 
@@ -156,7 +160,7 @@ describe('ログインユーザー検索 (#620)', () => {
     await mount()
     typeQuery('な'.repeat(2000))
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
-    expect(screen.getByText('ログインユーザー 0人中 0人を表示')).toBeTruthy()
+    expect(screen.getByText('ログインユーザー 0 人中 0 人を表示')).toBeTruthy()
   })
 
   it('検索語を消すと全件へ戻る', async () => {
@@ -164,8 +168,11 @@ describe('ログインユーザー検索 (#620)', () => {
     typeQuery('存在しない語zzz')
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
     typeQuery('')
-    await waitFor(() => expect(screen.getByText('ログインユーザー 3人中 3人を表示')).toBeTruthy())
-    expect(screen.getByText('山田 太郎')).toBeTruthy()
-    expect(screen.getByText('佐藤 花子')).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('ログインユーザー 3 人中 3 人を表示')).toBeTruthy())
+    expect(list().getByText('山田 太郎')).toBeTruthy()
+    expect(list().getByText('佐藤 花子')).toBeTruthy()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

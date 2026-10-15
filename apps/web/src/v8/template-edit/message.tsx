@@ -22,8 +22,7 @@ import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError, Field } from '@/components/shared/form-controls'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
+import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage, LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
@@ -31,7 +30,7 @@ import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/com
 import { TextField } from '@/components/shared/text-field'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
-import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from './core'
+import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateAccountBinding, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from './core'
 import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
@@ -43,6 +42,7 @@ import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
@@ -89,7 +89,6 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
   const [publishCheck, setPublishCheck] = useState<{ id: string; entries: ReturnType<typeof templateUsageEntries> } | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   /*
    * 新しく作る画面で自動保存が先に作ったテンプレート（一斉配信と同じく、
@@ -110,12 +109,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const { name, folderId, messageType, messageContent } = editor.draft
   /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る（B-139）。 */
   const fields = useFormErrors()
-  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'))
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'), { required: true })
   fields.define('content', messageType === 'text' ? '本文' : 'メッセージ内容', () => {
     if (!messageContent.trim()) return '本文を入力してください。'
     if (messageType === 'flex' && validateFlexContent('flex', messageContent)) return 'カードの形を直してから保存してください。'
     return null
-  })
+  }, { required: true })
   const updateDraft = (patch: Partial<TemplateDraft>) => setEditor((prev) => ({ ...prev, draft: { ...prev.draft, ...patch } }))
 
   const binding = { templateId: id, templateStatus: editor.status, templateAccountId: editor.templateAccountId, selectedAccountId }
@@ -125,7 +124,6 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     : binding
   /* 統括の入口では店のアカウントに結びつけない（差し込み候補・フォルダは店のものを使わない）。 */
   const editorAccountId = host ? null : resolveEditorAccountId(binding)
-  const accountMismatch = host ? false : templateAccountMismatch(binding)
   const saveGuard = host ? null : templateSaveGuard(binding)
   const loadFailed = editor.status === 'failed'
   const loading = Boolean(id) && (editor.status === 'idle' || editor.status === 'loading')
@@ -441,7 +439,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={<SenderCard />}
       >
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card variant="form" gap="normal">
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
           <></>
         </Card>
@@ -493,15 +491,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             title={`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
             compareBusy={compareBusy} onCompare={openCompare} onReload={reloadLatest} />
         ) : undefined}
-        side={(
+        side={(inDialog) => (
           <>
-            <div className={styles.previewToggle}>
-              <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
-            </div>
-            <SenderCard />
+            <SenderCard emptyUsage={id && editor.status === 'ready' && editor.usedBy && templateUsageEntries(editor.usedBy).length === 0 ? 'この変更が使われる場所（0か所）。このテンプレートはまだどこからも呼ばれていません。' : undefined} />
             {id && editor.status === 'ready' && editor.usedBy && templateUsageEntries(editor.usedBy).length > 0 ? <UsageCard usedBy={editor.usedBy} published={(editor.publishedVersion ?? 0) >= 1} /> : null}
             <h2 className={styles.previewHead}>届き方</h2>
-            <div className={styles.phone}>{phone}</div>
+            <div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div>
           </>
         )}
         status={autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined}
@@ -534,7 +529,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         )}
       >
         {loading ? (
-          <Card padding="none" layout="vertical" className={styles.card}>
+          <Card variant="form" gap="normal">
             <p className={styles.cardNote} role="status">テンプレートを読み込んでいます…</p>
           </Card>
         ) : (
@@ -544,15 +539,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             {error || loadFailed ? <Notice tone="danger" >{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</Notice> : null}
             {exampleNote && !id ? <p role="status" className={styles.error}>{exampleNote}</p> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
-            <Card padding="none" layout="vertical" className={styles.card}>
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>名前とフォルダ</h2>
-                <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
-              </div>
-              <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} /></SaveErrorField>
+            <Card variant="form" gap="normal">
+              <CardHeader size="stacked" title="名前とフォルダ" meta="一覧に出る名前です。友だちには見えません。" />
+              <SettingsFormRow layout="name-folder">
+                <div className={styles.field}><Field label="テンプレート名" htmlFor="te-name" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} /></SaveErrorField>
 <FieldError id="te-name-error">{fields.error('name')}</FieldError></Field></div>
-                <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-folder"><SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
+                <div className={styles.field}><Field label="フォルダ" htmlFor="te-folder"><SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect size="full"
                     id="te-folder"
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
@@ -565,13 +557,11 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                         ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: editorAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                         : undefined}
                   /></SaveErrorField></Field></div>
-              </div>
+              </SettingsFormRow>
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>中身</h2>
-              </div>
+            <Card variant="form" gap="normal">
+              <CardHeader size="stacked" title="中身" />
               <div {...fields.bind('content')}><MessageBody>
                 <SaveErrorField names={["messageContent","message_content"]}><InsertTextField
                   id="te-content"
@@ -580,7 +570,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   aria-describedby={fields.invalid('content') ? 'te-content-error' : undefined}
                   aria-label={messageType === 'text' ? '本文' : 'メッセージ内容'}
                   aria-required="true"
-                  className={styles.bodyText}
+                  editorSize={messageType === 'flex' ? 'code' : 'message'}
                   data-kind={messageType}
                   value={messageContent}
                   onValueChange={(next) => updateDraft({ messageContent: next })}
@@ -602,17 +592,11 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               {referenceState === 'failed' ? <Notice tone="danger" >差し込み項目を読み込めませんでした。画面を再読み込みしてください。</Notice> : null}
               {host ? <p className={styles.hint}>統括のテンプレートで差し込めるのは、名前・配信日・その他です（友だち情報・共通情報はアカウントごとに違うため）。</p>
                 : !editorAccountId && !loading ? <p className={styles.hint}>LINE公式アカウントを選ぶと、友だち情報と共通情報を選べます。</p> : null}
-              {accountMismatch ? (
-                <Notice tone="warn" role="alert">
-                  {ACCOUNT_MISMATCH_MESSAGE}（このテンプレートは「{accountName(editor.templateAccountId) ?? editor.templateAccountId}」のものです。差し込み候補もそのアカウントのまま出しています）
-                </Notice>
-              ) : null}
+              <TemplateAccountNotice binding={binding} templateAccountLabel={accountName(editor.templateAccountId)} selectedAccountLabel={accountName(selectedAccountId)} />
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>本文の中のURL</h2>
-              </div>
+            <Card variant="form" gap="normal">
+              <CardHeader size="stacked" title="本文の中のURL" />
               {urls.length === 0 ? (
                 <p className={styles.cardNote}>本文にURLはありません。URLを書くと、送るときに短く書き換えて、押された数を数えます。</p>
               ) : (
@@ -632,10 +616,6 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
           </>
         )}
       </TemplateEditFrame>
-
-      <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
-        <div className={styles.previewDialog}>{phone}</div>
-      </Dialog>
 
       <ConfirmDialog
         open={compareOpen}
@@ -691,21 +671,21 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   )
 }
 
-function SenderCard() {
+function SenderCard({ emptyUsage }: { emptyUsage?: string }) {
   return (
-    <section className={styles.sideCard}>
-      <h2 className={styles.sideTitle}>送るときの名前</h2>
-      <p className={styles.sideText}>公式のアイコンと表示名で送ります。担当者の名前では送れません。</p>
-    </section>
+    <Card variant="aside" gap="normal">
+      <CardHeader size="stacked" title="送るときの名前" />
+      <p className={styles.sideText} title={emptyUsage}>公式のアイコンと表示名で送ります。担当者の名前では送れません。</p>
+    </Card>
   )
 }
 
 /* 変更が使われる場所（IDEA-11）。保存は下書き、利用先へは公開した内容だけが届く。 */
-function UsageCard({ usedBy, published }: { usedBy: NonNullable<TemplateEditorState['usedBy']>; published: boolean }) {
+export function UsageCard({ usedBy, published }: { usedBy: NonNullable<TemplateEditorState['usedBy']>; published: boolean }) {
   const entries = templateUsageEntries(usedBy)
   return (
-    <section className={styles.sideCard} aria-label="このテンプレートの利用先">
-      <h2 className={styles.sideTitle}>この変更が使われる場所（{entries.length}か所）</h2>
+    <Card variant="aside" gap="normal" aria-label="このテンプレートの利用先">
+      <CardHeader size="stacked" title={<>この変更が使われる場所（{entries.length}か所）</>} />
       {entries.length === 0 ? (
         <p className={styles.sideText}>このテンプレートはまだどこからも呼ばれていません。</p>
       ) : (
@@ -722,6 +702,16 @@ function UsageCard({ usedBy, published }: { usedBy: NonNullable<TemplateEditorSt
           </ul>
         </>
       )}
-    </section>
+    </Card>
   )
+}
+
+/** 現役の所属ちがいの知らせ。見える文はそのまま、選択中の名前を補足で読める。 */
+export function TemplateAccountNotice({ binding, templateAccountLabel, selectedAccountLabel }: {
+  binding: TemplateAccountBinding; templateAccountLabel: string | null; selectedAccountLabel: string | null
+}) {
+  if (!templateAccountMismatch(binding)) return null
+  return <Notice tone="warn" role="alert" title={`いま選んでいるのは「${selectedAccountLabel ?? binding.selectedAccountId}」です。差し込み候補は「${templateAccountLabel ?? binding.templateAccountId}」のまま出しています。`}>
+    {ACCOUNT_MISMATCH_MESSAGE}（このテンプレートは「{templateAccountLabel ?? binding.templateAccountId}」のものです。差し込み候補もそのアカウントのまま出しています）
+  </Notice>
 }

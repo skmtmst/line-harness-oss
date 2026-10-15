@@ -6,7 +6,7 @@ import { LineChart, FunnelChart } from '@/components/shared/charts'
  * ★V8 ウェビナーの分析（Pencil z2dgw）。
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 「どこで人数が減っているか」→「どこまで見られたか」。
  * その下に、前からある詳しい数字（回別・日別・フォーム）と視聴者コメントを畳んで残す。
- * 口・権限・失敗の扱いは app/webinars/edit/analytics-v8.tsx と同じ（BEHAVIOR.md）。
+ * 口・権限・失敗の扱いは BEHAVIOR.md に記録。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
@@ -17,7 +17,7 @@ import Disclosure from '@/components/shared/disclosure'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
-import { TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { ApiError, downloadApiFile, webinarApi, type WebinarAnalytics, type WebinarUserComment } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { DetailHead } from './chrome'
@@ -177,16 +177,38 @@ function Retention({ analytics, durationSeconds }: { analytics: WebinarAnalytics
   )
 }
 
+function retentionDetail(analytics: WebinarAnalytics): string | null {
+  const { bucketSeconds, started, points } = analytics.retention ?? { bucketSeconds: 60, started: 0, points: [] }
+  if (started <= 0 || points.length === 0) return null
+  const completed = analytics.summary.completed
+  const completedRate = `${Math.round((completed / started) * 100)}%`
+  let dropAt: number | null = null
+  let dropMax = 0
+  for (let index = 0; index + 1 < points.length; index += 1) {
+    const lost = points[index].viewers - points[index + 1].viewers
+    if (lost > dropMax) {
+      dropMax = lost
+      dropAt = points[index + 1].atSeconds
+    }
+  }
+  const from = dropAt === null ? null : Math.floor((dropAt - bucketSeconds) / 60)
+  const to = dropAt === null ? null : Math.floor(dropAt / 60)
+  const dropRange = from === null ? emptyValue('unknown') : from === to ? `${from}分` : `${from}〜${to}分`
+  return `始まりに見ていた${formatNumber(started)}人・最後まで見た${formatNumber(completed)}人（${completedRate}）・いちばん離れた所${dropRange}`
+}
+
 /** 前から確かめられた詳しい数字。主なグラフの下へ畳んで残す。 */
 function Details({ analytics }: { analytics: WebinarAnalytics }) {
   const funnel = analytics.formFunnel
+  const retentionSummary = retentionDetail(analytics)
   return (
     <Disclosure size="compact" title="回別・日別とフォームの詳しい数字">
       <div className={styles.details}>
+        {retentionSummary ? <p className={styles.cardText}>{retentionSummary}</p> : null}
         <div>
           <h4 className={styles.detailTitle}>開催回ごとの結果</h4>
           {analytics.sessions.length === 0 ? <p className={styles.cardText}>まだ開催回の視聴データがありません。</p> : (
-            <table className={styles.detailTable}>
+            <DataTable label="項目ごとの到達人数" className={styles.detailTable}>
               <thead><TableHeadRow><Th>開催日時</Th><Th align="right">参加</Th><Th align="right">平均視聴</Th><Th align="right">CTA</Th></TableHeadRow></thead>
               <tbody>{analytics.sessions.map((session) => (
                 <Tr key={session.sessionStartAt}>
@@ -196,29 +218,35 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
                   <Td align="right">{`${formatNumber(session.ctaClicks)} 人（${percent(session.ctaClicks, session.viewers)}）`}</Td>
                 </Tr>
               ))}</tbody>
-            </table>
+            </DataTable>
           )}
         </div>
         <div>
           <h4 className={styles.detailTitle}>日別の結果</h4>
           {analytics.daily.length === 0 ? <p className={styles.cardText}>まだ日別のデータがありません。</p> : (
-            <table className={styles.detailTable}>
+            <DataTable label="項目ごとの到達人数" className={styles.detailTable}>
               <thead><TableHeadRow><Th>日付</Th><Th align="right">申込</Th><Th align="right">参加</Th><Th align="right">CTA</Th><Th align="right">送信</Th></TableHeadRow></thead>
               <tbody>{analytics.daily.map((day) => (
                 <Tr key={day.date}><Td>{day.date}</Td><Td align="right">{formatNumber(day.reservations)}</Td><Td align="right">{formatNumber(day.viewers)}</Td><Td align="right">{formatNumber(day.ctaClicks)}</Td><Td align="right">{formatNumber(day.formSubmissions)}</Td></Tr>
               ))}</tbody>
-            </table>
+            </DataTable>
           )}
         </div>
         <div>
           <h4 className={styles.detailTitle}>フォームの到達</h4>
           {funnel ? (
+            <>
             <dl className={styles.reach}>
               {([
                 ['CTA表示', funnel.ctaImpressions], ['CTAを押した', funnel.ctaClicks], ['フォームを開いた', funnel.formOpens],
                 ['入力を始めた', funnel.formStarts], ['送信を試みた', funnel.submitAttempts], ['送信できた', funnel.submitSuccesses], ['送信エラー', funnel.submitErrors],
               ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{formatNumber(Number(value))} 人</dd></div>)}
             </dl>
+            {(funnel.fieldCompletions ?? []).length > 0 ? <DataTable label="項目ごとの到達人数" className={styles.detailTable}>
+              <thead><TableHeadRow><Th>項目</Th><Th align="right">到達人数</Th></TableHeadRow></thead>
+              <tbody>{funnel.fieldCompletions.map((field) => <Tr key={field.fieldName}><Td><span title={field.fieldName}>{field.fieldName}</span></Td><Td align="right">{formatNumber(field.users)} 人</Td></Tr>)}</tbody>
+            </DataTable> : null}
+            </>
           ) : <p className={styles.cardText}>フォームの集計を取得できていません。</p>}
         </div>
       </div>

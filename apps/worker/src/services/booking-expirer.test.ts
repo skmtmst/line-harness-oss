@@ -15,6 +15,11 @@ interface StaleRow {
 function stubDB(stale: StaleRow[], idempotencyPurged = 0) {
   const updates: Array<{ sql: string; bound: unknown[] }> = [];
   const db = {
+    async batch(statements: D1PreparedStatement[]) {
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    },
     prepare(sql: string) {
       let bound: unknown[] = [];
       const stmt = {

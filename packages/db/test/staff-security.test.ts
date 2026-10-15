@@ -55,6 +55,8 @@ describe('ログインユーザーの無効化と監査記録', () => {
       CREATE TABLE admin_sessions (
         token_hash TEXT PRIMARY KEY, staff_id TEXT NOT NULL, expires_at TEXT NOT NULL
       );
+      CREATE TABLE platform_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_by TEXT, updated_at TEXT);
+      CREATE TABLE impersonation_sessions (id TEXT PRIMARY KEY, staff_id TEXT NOT NULL, ended_at TEXT);
       CREATE TABLE admin_two_factor_challenges (
         token_hash TEXT PRIMARY KEY, staff_id TEXT NOT NULL, expires_at TEXT NOT NULL,
         attempts INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

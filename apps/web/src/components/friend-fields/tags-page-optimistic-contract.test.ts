@@ -3,30 +3,33 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const root = resolve(process.cwd(), 'src')
-const source = readFileSync(resolve(root, 'components/friend-fields/tags-page-v4.tsx'), 'utf8')
+const source = readFileSync(resolve(root, 'v8/tags/tags-tab.tsx'), 'utf8')
+const editor = readFileSync(resolve(root, 'v8/tag-edit/edit.tsx'), 'utf8')
+const form = readFileSync(resolve(root, 'v8/tag-edit/edit-form.tsx'), 'utf8')
 
-describe('タグ一覧の操作失敗と再取得の契約', () => {
-  it('一覧の行にフォルダの選び直し欄を置かない（列の幅に収まらず隣へ重なるため）', () => {
+describe('タグ一覧・編集の操作失敗と再取得の契約', () => {
+  it('一覧に行ごとのフォルダ選び直し欄を置かず、移動は行メニューから行う', () => {
     expect(source).not.toContain('<FolderSelect')
-    expect(source).not.toContain('api.tags.setGroup')
+    expect(source).toContain('moveTagToGroup(tag,')
   })
-
-  it('フォルダの列は文字だけ出し、長い名前は省略して全文は重ねて読める', () => {
-    expect(source).toContain("title={group?.name ?? '未分類'}")
-    expect(source).toContain('{group?.name ?? \'未分類\'}')
+  it('フォルダは省略できる文字と色の印で出し、全文も読める', () => {
+    const dot = readFileSync(resolve(root, 'components/shared/folder-dot.tsx'), 'utf8')
+    expect(dot).toContain('title={label}')
+    expect(dot).toContain("const label = `フォルダ：${folder?.name ?? '未分類'}`")
+    expect(source).toContain('<FolderDotName folder={group}>')
   })
-
-  it('フォルダの変更は編集画面の「所属フォルダ」で行う', () => {
-    const editor = readFileSync(resolve(root, 'components/friend-fields/tag-editor-v4.tsx'), 'utf8')
-    expect(editor).toContain('所属フォルダ')
+  it('所属フォルダは編集フォームでも変更できる', () => {
+    expect(form).toContain('所属フォルダ')
   })
-
-  it('★切替の成功は手元だけ直して全件を取り直さない', () => {
-    expect(source).toContain('setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: next } : item))')
+  it('友だち一覧への表示設定は版付きの保存で更新し、成功後に最新を読む', () => {
+    expect(editor).toContain('isStarred: values.isStarred')
+    expect(editor).toContain('api.tags.updateDefinition(tag.id, selectedAccountId, tag.version ?? 1, payload,')
+    expect(editor).toContain('await load(true)')
   })
-
-  it('★切替の失敗は元に戻して理由を出す', () => {
-    expect(source).toContain('setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))')
-    expect(source).toContain("'表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。'")
+  it('表示設定の保存競合は下書きを保ち、比較か読み直しへ進める', () => {
+    expect(editor).toContain('reason instanceof ApiError && reason.status === 409')
+    expect(editor).toContain('setConflictValues(values)')
+    expect(form).toContain('<SaveConflictBand')
+    expect(form).toContain('onReload={onReloadLatest}')
   })
 })

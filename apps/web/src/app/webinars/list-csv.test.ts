@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { webinarListCsv } from './list-csv'
+import { webinarListCsv } from '@/v8/webinars/helpers'
 import type { WebinarListItem } from '@/lib/api'
 const item = (id: string, title: string) => ({ id, title, slug: id, status: 'draft' }) as WebinarListItem
 

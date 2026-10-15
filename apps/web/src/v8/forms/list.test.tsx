@@ -134,6 +134,17 @@ afterEach(() => {
 });
 
 describe('V8 回答フォーム一覧', () => {
+  it.each([false,true])('未完を名前と分けて状態の列に残し、詳細の入口を保つ（狭い=%s）', async (small) => {
+    narrow.value = small
+    fetchApi.mockImplementation(async (path: string) => path.startsWith('/api/forms?') ? {
+      success: true, data: { items: [{ ...baseForm, id: 'f-1', name: '来店アンケート', folderId: null, pendingPostActionCount: 2 }], total: 1, all_total: 1, page: 1, limit: 20 },
+    } : { success: true, data: {} })
+    await mount()
+    const row = host.querySelector('tr[data-row-id="f-1"]')!
+    expect(row.querySelector('[data-list-name-cell]')?.textContent).not.toContain('未完')
+    expect(row.querySelector('[data-list-status-cell]')?.textContent).toContain('後処理の未完 2')
+    expect(row.querySelector('[data-list-name-cell] a')?.getAttribute('href')).toContain('/form-submissions/edit?id=f-1')
+  })
   it('未分類の行にフォルダの口の unfiledCount を出す', async () => {
     await mount()
     const unfiled = screen.getByRole('button', { name: /未分類/ })
@@ -184,7 +195,7 @@ describe('V8 回答フォーム一覧', () => {
     fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」のその他の操作' }))
     await flush()
     expect(screen.getByRole('menuitem', { name: '集まった回答' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: '編集' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '編集する' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: '削除' })).toBeNull()
     fireEvent.click(host.querySelector('[data-row-id="f-1"]')!)
     await flush()
@@ -223,9 +234,10 @@ describe('V8 回答フォーム一覧', () => {
     expect(screen.getByText('友だち情報 3')).toBeTruthy()
   })
 
-  it('1ページに収まるときは件数だけ（N件）', async () => {
+  it('1ページでも件数の範囲と現在のページを出す', async () => {
     await mount()
-    expect(screen.getByText('1 件')).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: '回答フォームのページ送り' }).textContent).toContain('1件中 1〜1件')
+    expect(screen.getByRole('button', { name: '1ページ目へ' }).getAttribute('aria-current')).toBe('page')
   })
 
   it('一覧の口へ件数 20・最新の回答順で頼む', async () => {
@@ -236,7 +248,7 @@ describe('V8 回答フォーム一覧', () => {
     expect(listCall).toContain('with_list_summary=1')
   })
 
-  it('件数が1ページを超えるときは共通の ListRange で「N件中 X〜Y件を表示」と出す', async () => {
+  it('件数が1ページを超えるときは共通の ListRange で「N件中 X〜Y件」と出す', async () => {
     fetchApi.mockImplementation(async (path: string) => {
       if (path.startsWith('/api/forms?')) {
         return {
@@ -253,7 +265,7 @@ describe('V8 回答フォーム一覧', () => {
       return { success: true, data: {} }
     })
     await mount()
-    expect(host.textContent).toContain('45件中 1〜2件を表示')
+    expect(host.textContent).toContain('45件中 1〜2件')
   })
 });
 

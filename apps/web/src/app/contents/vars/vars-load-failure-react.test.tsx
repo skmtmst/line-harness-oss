@@ -42,7 +42,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: vi.fn(), replace: vi.fn(), refresh: vi.fn(),
     back: vi.fn(), forward: vi.fn(), prefetch: vi.fn(),
@@ -113,7 +113,7 @@ describe('R589 フォルダだけの失敗は一覧と警告を隠さない', ()
 
     // 取得済みの一覧と使用中の空欄警告は残る。
     expect(await screen.findByText('営業時間')).toBeTruthy()
-    expect(screen.getByText(/中身が空のまま使われているものが/)).toBeTruthy()
+    expect(screen.getAllByText(/空欄のまま送られます/).length).toBeGreaterThan(0)
     expect(screen.queryByText('共通情報を読み込めませんでした')).toBeNull()
     // フォルダ欄だけ失敗と再試行。
     const panel = folderPanel()
@@ -146,7 +146,7 @@ describe('R589 フォルダだけの失敗は一覧と警告を隠さない', ()
     expect(await screen.findByText('営業時間')).toBeTruthy()
     expect(screen.queryByText('共通情報を読み込めませんでした')).toBeNull()
     const panel = folderPanel()
-    expect(panel.textContent).toContain('フォルダを見る権限がありません')
+    expect(panel.textContent).toContain('権限がありません')
     const retry = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'もう一度読み込む')
     expect(retry).toBeUndefined()
   })
@@ -158,7 +158,7 @@ describe('R590 一覧の403と503を区別する', () => {
     render(<CommonVarsPage />)
 
     expect(await screen.findByText('共通情報を見る権限がありません')).toBeTruthy()
-    expect(screen.getByText(/オーナーか管理者に頼んでください/)).toBeTruthy()
+    expect(screen.getByText(/オーナーか管理者に、共通情報を見られるよう頼んでください/)).toBeTruthy()
     expect(screen.queryByText('通信が切れたか')).toBeNull()
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     // 読めていないのに作る口は出さない。
@@ -223,7 +223,7 @@ describe('m26m 一覧の取得失敗は件数を0と誤案内しない', () => {
     await act(async () => { fireEvent.click(retry) })
     expect(await screen.findByText('営業時間')).toBeTruthy()
     // 復旧後は実件数（2件）を戻す。
-    expect(await screen.findByText(/2件中/)).toBeTruthy()
+    expect(await screen.findByText(/^2件中 1〜2件$/)).toBeTruthy()
     expect(allRowText()).toContain('2')
   })
 
@@ -233,7 +233,7 @@ describe('m26m 一覧の取得失敗は件数を0と誤案内しない', () => {
 
     expect(await screen.findByText('営業時間')).toBeTruthy()
     // 一覧は読めているので実件数を出す。未知にしない。
-    expect(screen.getByText(/2件中/)).toBeTruthy()
+    expect(screen.getByText(/^2件中 1〜2件$/)).toBeTruthy()
     expect(allRowText()).toContain('2')
   })
 })

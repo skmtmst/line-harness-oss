@@ -1,6 +1,8 @@
 'use client'
 
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import ListDateTime from '@/components/shared/list-date-time'
+
+import ListToolbar, { ListToolbarFrame, ListToolbarOptional, ListToolbarSort } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -17,18 +19,16 @@ import { ApiError, api, fetchApi } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { canEditFeature } from '@/lib/staff-capability';
-import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { useFeatureVisibility } from '@/lib/use-feature-visibility';
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability';
 import type { FeatureKey } from '@/lib/feature-settings';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { ListPage, ListPagePagination } from '@/components/templates';
-import SearchField from '@/components/shared/search-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
@@ -50,7 +50,7 @@ import GenreDialog from './genre-dialog'
 import BulkDialog, { type BulkRouteAction } from './bulk-dialog';
 import StatusBadge from '@/components/shared/status-badge'
 import QrDialog, { referralUrl, type QrRoute } from './qr-dialog';
-import { becameLines, buildRows, formatLatest, isRefSummaryData, isUnconfigured, matchesFilter, routeStatus, shouldShowRow, sortRows, type RefSummaryData, type RouteFilter, type RouteRow, type RouteSort, type TrackedLinkRow } from './rows';
+import { becameLines, buildRows, isRefSummaryData, isUnconfigured, matchesFilter, routeStatus, shouldShowRow, sortRows, type RefSummaryData, type RouteFilter, type RouteRow, type RouteSort, type TrackedLinkRow } from './rows';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value';
@@ -102,7 +102,6 @@ export default function InflowListV8({
   const { selectedAccountId } = useAccount()
   // PERF-03: 編集窓の候補が属する機能のオン・オフ。切られている系統は取らない。
   const visibility = useFeatureVisibility(selectedAccountId)
-  const narrow = useNarrowViewport()
   const role = useStaffRole()
   // 役割が読めるまでは今までどおり操作を出す。staff と分かったら押せない形にする（最後の守りは口の 403）。
   /*
@@ -155,7 +154,6 @@ export default function InflowListV8({
   const toggleLocks = useRef(new Set<string>())
   const [bulkAction, setBulkAction] = useState<BulkRouteAction | null>(null)
   // 数の帯のマスの「…」。開いているマスの名前。
-  const [openTileMenu, setOpenTileMenu] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadRequestRef.current
@@ -609,33 +607,15 @@ export default function InflowListV8({
   const searchLabel = '経路の名前・URLで探す'
   const onSearch = (value: string) => { setSearch(value); setPage(1) }
   // 1152 の板（y1ztx）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。
-  const narrowToolbar = (
+  const toolbar = (
     <ListToolbarFrame>
-      {notice}
-      <ListToolbarRow>
-        {createButton}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField value={search} onChange={onSearch} onClear={() => onSearch('')} placeholder={searchLabel} aria-label={searchLabel} />
-        </ListToolbarSearchSlot>
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {presetBox}
-        {perPageBox}
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
-  const wideToolbar = (
-    <>
       {notice}
       <ListToolbar
         search={{ placeholder: searchLabel, label: searchLabel, width: 240, value: search, onChange: onSearch }}
         filters={filterChips}
-        trailing={<>{presetBox}{perPageBox}</>}
+        trailing={<><ListToolbarOptional compact label="保存した絞り込み">{presetBox}</ListToolbarOptional>{perPageBox}</>}
       />
-    </>
+    </ListToolbarFrame>
   )
 
   /* ===== 表 ===== */
@@ -670,11 +650,11 @@ export default function InflowListV8({
     listBody = (
       <>
         <div className={styles.tableWrap}>
-          <DataTable className={styles.table}>
+          <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--tpl-il-col-gap)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--polish-text-body)', numberInset: 'var(--tpl-il-num-pad-end)', collapseScope: 'page' }}>
             <thead>
-              <TableHeadRow className={styles.headRow} data-table-layout="columns">
+              <TableHeadRow data-table-layout="columns">
                 <Th className={styles.colCheck}>
-                  {readonly ? null : <SaveErrorField names={["allShownSelected","selectedRouteIds","all_shown_selected","selected_route_ids"]}><Checkbox
+                  {readonly ? <UnavailableSelection label="このページの全経路をまとめて操作の対象にする" /> : <SaveErrorField names={["allShownSelected","selectedRouteIds","all_shown_selected","selected_route_ids"]}><Checkbox
                     aria-label="表示中の登録済み経路をすべて選ぶ"
                     checked={allShownSelected}
                     indeterminate={!allShownSelected && selectableIds.some((id) => selectedRouteIds.has(id))}
@@ -683,12 +663,12 @@ export default function InflowListV8({
                     onCheckedChange={(checked) => setSelectedRouteIds(checked ? new Set(selectableIds) : new Set())}
                   /></SaveErrorField>}
                 </Th>
-                <Th className={styles.colName}>流入元名</Th>
-                <Th className={styles.colPool}>追加先</Th>
+                <Th grow>流入元名</Th>
+                <Th collapseAt="narrow" className={styles.colPool}>追加先</Th>
                 <Th className={styles.colBecame}>友だちになったら</Th>
-                <Th className={styles.colFriends}>友だち追加</Th>
-                <Th className={styles.colClicks}>クリック</Th>
-                <Th className={styles.colLatest}>最新追加</Th>
+                <Th align="right" className={styles.colFriends}>友だち追加</Th>
+                <Th align="right" className={styles.colClicks}>クリック</Th>
+                <Th collapseAt="narrow" className={styles.colLatest}>最新追加</Th>
 
                 <Th className={styles.colStatus}>状態</Th><Th className={styles.colOps}>操作</Th>
               </TableHeadRow>
@@ -705,14 +685,14 @@ export default function InflowListV8({
                 const menuItems = rowMenuItems(r)
                 const menuLabel = `「${r.name}」の操作`
                 const nameNode = r.source === 'entry_route' && r.entryRouteId ? (
-                  <RowNameLink href={`/inflow-links/detail?id=${r.entryRouteId}`} className={styles.nameLink} >
+                  <RowNameLink href={`/inflow-links/detail?id=${r.entryRouteId}`} >
                     <TruncatedText value={String(r.name ?? '')} />
                   </RowNameLink>
                 ) : (
                   <span className={styles.nameText} ><TruncatedText value={String(r.name ?? '')} /></span>
                 )
                 return (
-                  <Tr key={r.refCode} href={r.source === 'entry_route' && r.entryRouteId ? `/inflow-links/detail?id=${encodeURIComponent(r.entryRouteId)}` : undefined} className={styles.row} data-table-layout="columns" data-row-id={r.entryRouteId ?? r.refCode}>
+                  <Tr key={r.refCode} href={r.source === 'entry_route' && r.entryRouteId ? `/inflow-links/detail?id=${encodeURIComponent(r.entryRouteId)}` : undefined} data-table-layout="columns" data-row-id={r.entryRouteId ?? r.refCode}>
                     <Td className={styles.colCheck}>
                       {r.entryRouteId && !readonly ? (
                         <SaveErrorField names={[`currentRows.${saveFieldIndex}.entryRouteId`,`currentRows.${saveFieldIndex}.entry_route_id`,"entryRouteId","r.entryRouteId","selectedRouteIds","entry_route_id","r.entry_route_id","selected_route_ids"]}><Checkbox
@@ -729,13 +709,13 @@ export default function InflowListV8({
                           }}
                         /></SaveErrorField>
                       ) : (
-                        <span className="sr-only">まとめて操作は登録済みの流入経路だけに使えます</span>
+                        <UnavailableSelection label={`${r.name}をまとめて操作の対象にする`} reason={readonly ? "閲覧のみのため選べません" : "まとめて操作は登録済みの流入経路だけに使えます"} />
                       )}
                     </Td>
-                    <Td className={styles.colName} data-list-name-cell>
+                    <Td grow data-list-name-cell>
                       <FolderDotName folder={r.genre ? { name: r.genre } : null}>{nameNode}</FolderDotName>
                     </Td>
-                    <Td className={styles.colPool}>
+                    <Td collapseAt="narrow" className={styles.colPool}>
                       {pool ? (
                         <span className={styles.cellMain} ><TruncatedText value={String(pool.name ?? '')} /></span>
                       ) : r.source === 'tracked_link' ? (
@@ -748,7 +728,7 @@ export default function InflowListV8({
                       <span className={styles.cellMain} title={becameFirst}>{becameFirst}</span>
                       <span className={styles.cellSub} title={becameSecond}>{becameSecond}</span>
                     </Td>
-                    <Td className={styles.colFriends}>
+                    <Td align="right" className={styles.colFriends}>
                       {summaryAvailable && r.stats ? (
                         <>
                           <span className={styles.cellMain}>{`${formatNumber(r.stats.friendCount)} 人`}</span>
@@ -758,17 +738,16 @@ export default function InflowListV8({
                         <span className={styles.cellMain}>{emptyValue('unknown')}</span>
                       )}
                     </Td>
-                    <Td className={styles.colClicks}>
+                    <Td align="right" className={styles.colClicks}>
                       <span className={styles.cellMain}>{summaryAvailable && r.stats ? formatNumber(r.stats.clickCount) : emptyValue('unknown')}</span>
                     </Td>
-                    <Td className={styles.colLatest}>
-                      <span className={styles.cellMain}>{summaryAvailable ? formatLatest(r.stats?.latestAt) : emptyValue('unknown')}</span>
+                    <Td collapseAt="narrow" className={styles.colLatest}>
+                      <span className={styles.cellMain}>{summaryAvailable ? <ListDateTime value={r.stats?.latestAt} /> : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colStatus}>
                       {status ? (
-                        <span
-                          className={styles.pill}
-                          data-tone={status}
+                        <StatusBadge
+                          tone={status === 'measured' ? 'success' : status === 'unregistered' ? 'warning' : 'neutral'}
                           title={status === 'measured'
                             ? (r.source === 'tracked_link'
                               ? 'クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。'
@@ -778,7 +757,7 @@ export default function InflowListV8({
                               : '受付を止めています。このURLを開いても友だち追加できません。'}
                         >
                           {status === 'measured' ? '計測済' : status === 'unregistered' ? '未登録' : '停止中'}
-                        </span>
+                        </StatusBadge>
                       ) : null}
                     </Td>
                     <Td className={styles.colOps} data-list-action-cell>
@@ -791,6 +770,8 @@ export default function InflowListV8({
                           <span className={styles.cellMain} title="この経路は別の仕組み（クリック計測）で管理しています">{emptyValue('unknown')}</span>
                         ) : (
                           <Button
+                            size="compact"
+                            data-row-quick-action=""
                             onClick={() => setEditing({ register: r.refCode })}
                             title="未登録 ref を登録します。流入実績はそのまま引き継がれます。"
                           >
@@ -818,12 +799,9 @@ export default function InflowListV8({
     )
   }
 
-  const pager = !loading && !loadFailed && pageCount > 1 ? (
+  const pager = !loading && !loadFailed && currentRows.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + currentRows.length} / {formatNumber(sortedRows.length)} 件
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="流入経路のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="流入経路のページ送り" range={{ total: sortedRows.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + currentRows.length }} />
     </ListPagePagination>
   ) : null
 
@@ -903,19 +881,10 @@ export default function InflowListV8({
             unit={routeCountAvailable ? '件' : ''}
             loading={loading}
             detail="友だちになっても何も起きない"
-            menu={<TileMenu
-              id="unconfigured"
-              title="動きが未設定"
-              openId={openTileMenu}
-              onOpenChange={setOpenTileMenu}
-              items={[{
-                id: 'filter',
-                label: '動きが未設定の経路だけに絞る',
-                disabled: !routeCountAvailable || unconfiguredCount === 0,
-                disabledReason: !routeCountAvailable || unconfiguredCount === 0 ? '動きが未設定の経路はありません' : undefined,
-                onSelect: () => { setFilter('unconfigured'); setPage(1) },
-              }]}
-            />}
+            action={routeCountAvailable && unconfiguredCount > 0 ? {
+              label: '未設定を見る',
+              onClick: () => { setFilter('unconfigured'); setPage(1) },
+            } : undefined}
           />
           <KpiCard
             presentation="band"
@@ -924,22 +893,14 @@ export default function InflowListV8({
             value={adConnected ? adConnected.total : null}
             unit={adConnected ? '件' : ''}
             detail={adNamesSub}
-            menu={<TileMenu
-              id="ads"
-              title="広告とつないだ"
-              openId={openTileMenu}
-              onOpenChange={setOpenTileMenu}
-              items={[
-                { id: 'ads', label: '広告連携を開く', external: false, href: '/inflow-links?tab=ads', onSelect: () => router.push('/inflow-links?tab=ads') },
-                { id: 'connections', label: '広告とのつなぎを開く', external: false, href: '/inflow-links?tab=connections', onSelect: () => router.push('/inflow-links?tab=connections') },
-              ]}
-            />}
+            action={{ label: '広告連携を開く', href: '/inflow-links?tab=ads' }}
           />
         </KpiBand>
       </>}
       folders={<>
         <FolderPanel
           createAction={createButton}
+          reserveCreateSpace={false}
           activeId={selectedGenre}
           onSelect={selectGenre}
           onAddFolder={canManageFolders ? () => setEditingGenre('new') : undefined}
@@ -949,8 +910,8 @@ export default function InflowListV8({
           <FolderPanelNote>フォルダを消しても、中の経路は未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
-      collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
-      toolbar={<>{auxiliaryError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>setAuxiliaryRetry(value=>value+1)}/>:null}{narrow ? narrowToolbar : wideToolbar}</>}
+      collapsedFolders={<>{createButton}{folderSelect}</>}
+      toolbar={<>{auxiliaryError ? <ListState kind="error" title="候補を読み込めませんでした" onRetry={() => setAuxiliaryRetry(value => value + 1)} /> : null}{toolbar}</>}
       pagination={pager}
       overlays={<>
         <ConfirmDialog
@@ -982,7 +943,7 @@ export default function InflowListV8({
             }}
           />
         ) : null}
-        {qrRoute ? <QrDialog route={qrRoute} onClose={() => setQrRoute(null)} /> : null}
+        {qrRoute ? <QrDialog route={qrRoute} routes={routes} onClose={() => setQrRoute(null)} /> : null}
         {bulkAction ? (
           <BulkDialog
             targets={selectedRoutes}
@@ -1000,34 +961,5 @@ export default function InflowListV8({
     >
       {listBody}
     </ListPage></SaveErrorScope>
-  )
-}
-
-/** 数の帯のマスの右上の「…」（絵のマスの「…」）。押すとそのマスから行ける操作を出す。 */
-function TileMenu({
-  id,
-  title,
-  items,
-  openId,
-  onOpenChange,
-}: {
-  id: string
-  title: string
-  items: ActionMenuItem[]
-  openId: string | null
-  onOpenChange: (id: string | null) => void
-}) {
-  const open = openId === id
-  const label = `「${title}」のほかの操作`
-  return (
-    <span className={styles.tileMenu}>
-      <RowMenu
-        className={styles.tileMenuButton}
-        label={label}
-        open={open}
-        onOpenChange={(next) => onOpenChange(next ? id : null)}
-        items={items.map((item) => ({ ...item, onSelect: () => { onOpenChange(null); item.onSelect?.() } }))}
-      />
-    </span>
   )
 }

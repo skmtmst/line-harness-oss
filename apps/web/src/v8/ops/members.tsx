@@ -1,4 +1,7 @@
 'use client'
+
+import { requiredText } from '@/lib/form-requirement'
+const inviteEmailRequirement = requiredText('招待する人のメールアドレスを入れてください')
 import { useUrlTab } from '@/lib/use-url-tab'
 import { Eye, LogIn, Send, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
@@ -9,18 +12,23 @@ import NoticeLineAccountCard from '@/components/ops/notice-line-account-card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import KpiCard from '@/components/shared/kpi-card'
-import kpiStyles from '@/components/shared/kpi-card.module.css'
+import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
+import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
+import { PageFrame } from '@/components/templates/page-frame'
 import parts from './parts.module.css'
 import styles from './members.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
+import TruncatedText from '@/components/shared/truncated-text'
+import { RowActions } from '@/components/shared/row-actions'
 
 /**
  * 運営のメンバー管理 V8（絵 `FvbHW`・停止の窓 `VUyYu`）。
@@ -60,9 +68,12 @@ export default function OpsMembersV8() {
 
   useEffect(() => { void load() }, [load])
 
+  const [inviteError, setInviteError] = useState<string | null>(null)
   const invite = async (event: FormEvent) => {
     event.preventDefault()
-    if (!email.trim()) { setError('招待する人のメールアドレスを入れてください'); return }
+    const problem = inviteEmailRequirement.check(email)
+    setInviteError(problem)
+    if (problem) return
     setBusy(true)
     setError('')
     const res = await opsCall(api.ops.addMember({ email: email.trim() }))
@@ -99,7 +110,7 @@ export default function OpsMembersV8() {
   const active = summary ? summary.members - summary.invited : null
 
   return (
-    <div data-design-node="FvbHW">
+    <PageFrame kind="list" boardId="FvbHW" standalone skeleton>
       <OpsHead
         title="メンバー管理"
         description="運営メンバーはメールで招待します。招待された人はパスワードを設定し、2要素認証の登録が終わるまで運営コンソールに入れません。自分自身は変えられません。"
@@ -118,23 +129,23 @@ export default function OpsMembersV8() {
 
         {tab === 'members' ? (
           <>
-            <div className={`${parts.kpis} ${styles.kpis3} ${kpiStyles.strip}`}>
-              <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `有効 ${active}・招待中 ${summary.invited}` : emptyValue('unknown')} loading={!loaded} />
+            <KpiBand gridClassName="grid grid-cols-3">
+              <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? <span title={`2要素認証 設定済み ${summary.totpEnabled}人 / ${summary.members}人・未設定 ${Math.max(0, summary.members - summary.totpEnabled)}人`}>{`有効 ${active}・招待中 ${summary.invited}`}</span> : emptyValue('unknown')} loading={!loaded} />
               <KpiCard presentation="cell" icon={<LogIn size={13} aria-hidden="true" />} title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
               <KpiCard presentation="cell" icon={<Eye size={13} aria-hidden="true" />} title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
-            </div>
+            </KpiBand>
 
             {readOnly ? null : (
               <form onSubmit={(event) => void invite(event)} className={styles.invite}>
                 <div className={styles.inviteField}>
-                  <SaveErrorField names={["email"]}><TextField
+                  <Field label="招待する人のメールアドレス" requirement={inviteEmailRequirement} error={inviteError}><SaveErrorField names={["email"]}><TextField
                     type="email"
                     value={email}
-                    onChange={(event) => setEmail(event.target.value)}
+                    onChange={(event) => { setEmail(event.target.value); setInviteError(null) }}
                     placeholder="招待する人のメールアドレス"
                     aria-label="招待する人のメールアドレス"
                     autoComplete="off"
-                  /></SaveErrorField>
+                  /></SaveErrorField></Field>
                 </div>
                 <Button type="submit" variant="primary" disabled={busy}>
                   <Send aria-hidden="true" />招待メールを送る
@@ -156,43 +167,35 @@ export default function OpsMembersV8() {
                 <ListState permissionScope="hq" kind="empty" title="運営メンバーがいません" description="最初の 1 人は、自分のメールアドレスを入れて「招待メールを送る」を押して登録します。" />
               </div>
             ) : (
-              <div className={parts.mini} role="table" aria-label="運営メンバー">
-                <div className={parts.miniHead} role="row">
-                  <span className={parts.grow} role="columnheader">名前</span>
-                  <span className={`${parts.fixed} ${styles.colMail}`} role="columnheader">メール</span>
-                  <span className={`${parts.fixed} ${styles.colTotp}`} role="columnheader">2要素認証</span>
-                  <span className={`${parts.fixed} ${styles.colState}`} role="columnheader">状態</span>
-                  <span className={`${parts.fixed} ${styles.colLogin}`} role="columnheader">最終ログイン</span>
-                  <span className={`${parts.fixed} ${styles.colOps}`} role="columnheader">操作</span>
-                </div>
+              <GridTable label="運営メンバー" design={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-rt-col-130) var(--tpl-op-mem-state-w) var(--tpl-op-mem-login-w) var(--tpl-op-mem-ops-w)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
+                <GridHeadRow>
+                  <GridCell role="columnheader">名前</GridCell>
+                  <GridCell role="columnheader">メール</GridCell>
+                  <GridCell role="columnheader">2要素認証</GridCell>
+                  <GridCell role="columnheader">状態</GridCell>
+                  <GridCell role="columnheader">最終ログイン</GridCell>
+                  <GridCell role="columnheader">操作</GridCell>
+                </GridHeadRow>
                 {members.map((m) => {
                   const self = m.staffId === me
                   const invited = m.isActive && m.activationState !== 'active'
                   return (
-                    <div key={m.staffId} className={`${parts.miniRow} ${self ? styles.selfRow : styles.memberRow}`} role="row">
-                      <span className={parts.grow} role="cell" title={m.name}>{m.name}{self ? '（自分）' : ''}</span>
-                      <span className={`${parts.fixed} ${styles.colMail}`} role="cell" title={m.email ?? ''}>{m.email ?? emptyValue('unknown')}</span>
-                      <span className={`${parts.fixed} ${styles.colTotp}`} role="cell">{totpChip(m)}</span>
-                      <span className={`${parts.fixed} ${styles.colState}`} role="cell">{stateChip(m)}</span>
-                      <span className={`${parts.fixed} ${styles.colLogin} ${m.lastLoginAt ? '' : styles.faint}`} role="cell">{shortDateTime(m.lastLoginAt)}</span>
-                      <span className={`${styles.colOps} ${styles.ops}`} role="cell">
-                        {self || readOnly ? (
-                          <span className={styles.faint}>{emptyValue('unknown')}</span>
-                        ) : invited ? (
-                          <>
-                            <Button onClick={() => setPending({ member: m, kind: 'cancel' })} disabled={busy}>取り消す</Button>
-                            <Button onClick={() => void resend(m)} disabled={resendingId !== null} busy={resendingId === m.staffId} busyLabel="送信中…">再送</Button>
-                          </>
-                        ) : (
-                          <Button onClick={() => setPending({ member: m, kind: m.isActive ? 'stop' : 'resume' })} disabled={busy}>
-                            {m.isActive ? '停止' : '再開'}
-                          </Button>
-                        )}
-                      </span>
-                    </div>
+                    <GridRow key={m.staffId}>
+                      <GridNameCell folder={false} name={<TruncatedText value={`${m.name}${self ? '（自分）' : ''}`} />} />
+                      <GridCell><TruncatedText value={m.email ?? emptyValue('unknown')} /></GridCell>
+                      <GridCell>{totpChip(m)}</GridCell>
+                      <GridCell>{stateChip(m)}</GridCell>
+                      <GridCell><span className={styles.shortText} title={m.lastLoginAt ? formatDateTime(m.lastLoginAt) : undefined}>{shortDateTime(m.lastLoginAt)}</span></GridCell>
+                      <GridCell align="right">
+                        {readOnly ? null : self ? <RowActions subjectName={m.name} menuButtonProps={{ disabled: true, title: '自分の運営アカウントは停止・取り消しできません' }} menuNote="自分の運営アカウントは停止・取り消しできません" /> : <RowActions subjectName={m.name} menuButtonProps={{ disabled: busy || resendingId !== null }} menuItems={invited ? [
+                          { id: 'resend', label: '招待を再送する', onSelect: () => { void resend(m) } },
+                          { id: 'cancel', label: '取り消す', tone: 'danger', onSelect: () => setPending({ member: m, kind: 'cancel' }) },
+                        ] : [{ id: 'state', label: m.isActive ? '停止する' : '再開する', tone: m.isActive ? 'danger' : undefined, onSelect: () => setPending({ member: m, kind: m.isActive ? 'stop' : 'resume' }) }]} />}
+                      </GridCell>
+                    </GridRow>
                   )
                 })}
-              </div>
+              </GridTable>
             )}
           </>
         ) : (
@@ -231,7 +234,7 @@ export default function OpsMembersV8() {
         </p>
         </div>
       </Dialog>
-    </div>
+    </PageFrame>
   )
 }
 

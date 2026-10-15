@@ -1,6 +1,17 @@
 'use client'
+import { localJst, toJstIso } from './video-time'
 
-import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import StatusBadge from '@/components/shared/status-badge'
+import Card from '@/components/shared/card'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  from: requiredText("始まりの日付を入れてください。"),
+  to: requiredText("終わりの日付を入れてください。"),
+}
+
+
 import DateField from '@/components/shared/date-field'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from 'lucide-react'
@@ -24,6 +35,7 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './video.module.css'
+import VideoMetadata from './video-metadata'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
@@ -34,7 +46,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
  * 動画（差し替える・準備の段）→ 公開期間（オンデマンド）／開催回（日時指定）→ 配信枠 → 視聴の数え方。
  * 右は公開ページでの見え方。
- * 口・保存の決まりは app/webinars/edit/video-v8.tsx・video-stages.tsx・scheduled-session-row.tsx と同じ（BEHAVIOR.md）。
+ * 口・保存の決まりは BEHAVIOR.md に記録。
  */
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
@@ -42,15 +54,6 @@ const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 /** JST の「10/8（木）20:00」。 */
 function shortJst(iso: string): string {
   return polishFormatDate(iso, { style: 'list', fallback: '—' })
-}
-/** datetime-local の字面を JST で（`2026-10-01T10:00`）。 */
-function localJst(value: string | null | undefined): string {
-  if (!value) return ''
-  const time = Date.parse(value)
-  return Number.isNaN(time) ? '' : new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
-}
-function toJstIso(local: string): string {
-  return datetimeLocalJstToUtcIso(local)
 }
 
 function ruleView(rule: WebinarScheduleRule): { kind: string; tone: 'success' | 'neutral' | 'warn'; detail: string } {
@@ -241,7 +244,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
     return () => registerSave(null)
   }, [registerSave, readOnly])
 
-  const fileName = webinar.videoPrefix ? (webinar.videoPrefix.split('/').pop() ?? webinar.videoPrefix) : null
+
   const showStages = asset !== undefined && asset !== null && asset.stage !== 'ready'
   const stageIndex = asset ? STAGE_ORDER.indexOf(asset.stage) : -1
   const firstOnce = webinar.schedule.find((rule) => rule.type === 'once' && rule.at)
@@ -265,7 +268,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       boardId={scheduled ? 'LPOe7' : 'VWNaA'}
       title={chrome.title}
       actions={chrome.actions}
@@ -273,16 +276,16 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       steps={chrome.steps}
       help={scheduled
         ? '日時指定配信：開催回ごとに日時と定員を決めます。動画は準備（変換など）が済んでから公開できます。'
-        : '動画と、見られる期間を決めます。見終わったかどうかの決め方もここで決めます。'}
+        : `動画と、見られる期間を決めます。見終わったかどうかの決め方もここで決めます。${hasVideo ? '動画を再生すると、視聴状況が友だちごとに記録されます。' : ''}`}
       footerActions={chrome.footerActions}
       status={chrome.status}
       preview={<>
         <h2 className={form.previewTitle}>公開ページでの見え方</h2>
         <div className={styles.pageCard}>
           <p className={styles.pageTitle} title={webinar.title}>{webinar.title}</p>
-          <span className={styles.player} aria-hidden="true"><Play size={32} /></span>
+          {hasVideo ? <span className={styles.player} aria-hidden="true"><Play size={32} /></span> : null}
           <p className={styles.pageNote}>
-            {scheduled && firstOnce?.at
+            {!hasVideo ? '動画を設定すると、友だちの画面での見え方がここに出ます。' : scheduled && firstOnce?.at
               ? `${shortJst(firstOnce.at)} から・${fmtJaDuration(webinar.durationSeconds)}`
               : `${webinar.publicationEndsAt ? '期間内だけ見られます' : 'いつでも見られます'}・${fmtJaDuration(webinar.durationSeconds)}`}
           </p>
@@ -295,13 +298,12 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         ) : ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
       </>}
     >
-      <section className={form.card} aria-labelledby="webinar-video-title" data-wc-pane="video">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-video-title" data-wc-pane="video">
         <div className={form.cardHead}><h2 id="webinar-video-title" className={form.cardTitle}>動画</h2></div>
         <div className={styles.videoRow}>
           <span className={styles.thumb} aria-hidden="true"><Play size={18} /></span>
           <span className={styles.videoText}>
-            <span className={styles.videoName} title={fileName ?? undefined}>{fileName ?? '動画がまだ選ばれていません'}</span>
-            <span className={styles.videoMeta}>{hasVideo ? `${fmtJaDuration(webinar.durationSeconds)}・16:9・自動再生なし` : '差し替えるから登録メディアの動画を選びます'}</span>
+            <VideoMetadata webinar={webinar} />
           </span>
           {readOnly ? null : <Button onClick={() => setReplaceOpen(true)}><Upload size={15} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選ぶ'}</Button>}
         </div>
@@ -325,24 +327,24 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
           </p>
         </> : null}
         {assetError ? <Notice tone="danger" className={styles.stageNoteNoticePlacement} >{assetError}<Button size="compact" onClick={() => loadAsset()} busyLabel="処理中…">もう一度読み込む</Button></Notice> : null}
-      </section>
+      </Card>
 
       {scheduled ? null : (
-        <section className={form.card} aria-labelledby="webinar-period-title">
+        <Card variant="form" gap="normal" aria-labelledby="webinar-period-title">
           <div className={form.cardHead}><h2 id="webinar-period-title" className={form.cardTitle}>公開期間</h2></div>
-          <div className={form.pair}>
+          <SettingsFormRow layout="columns">
             <div className={form.field}><Field label="公開の開始" htmlFor="webinar-period-start"><SaveErrorField names={["startsAt","starts_at"]}><DateTimeField id="webinar-period-start" value={startsAt} readOnly={readOnly} onChange={setStartsAt} /></SaveErrorField></Field></div>
             <div className={form.field}><Field label="公開の終了" htmlFor="webinar-period-end">{noEnd
                 ? <TextField id="webinar-period-end" value="なし（いつでも）" readOnly onFocus={() => { if (!readOnly) setNoEnd(false) }} />
                 : <SaveErrorField names={["endsAt","ends_at"]}><DateTimeField id="webinar-period-end" value={endsAt} readOnly={readOnly} onChange={setEndsAt} /></SaveErrorField>}
 {!readOnly && !noEnd ? <SaveErrorField names={["noEnd","publicationEndsAt","no_end"]}><Checkbox checked={noEnd} onCheckedChange={setNoEnd}>終わりを決めない（いつでも見られる）</Checkbox></SaveErrorField> : null}</Field></div>
-          </div>
+          </SettingsFormRow>
           {periodError ? <Notice tone="danger">{periodError}</Notice> : null}
-        </section>
+        </Card>
       )}
 
       {scheduled ? (
-        <section className={form.card} data-gap="tight" aria-labelledby="webinar-sessions-title">
+        <Card variant="form" gap="normal" aria-labelledby="webinar-sessions-title">
           <div className={form.cardHeadRow}><h2 id="webinar-sessions-title" className={form.cardTitle}>開催回</h2></div>
           <p className={styles.note}>回ごとに日時と定員を決めます。定員を空にすると無制限</p>
           <div className={styles.sessionHead} role="presentation">
@@ -363,9 +365,9 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
           {otherRules.map(({ rule, index }) => <RuleRow key={index} rule={rule} menu={ruleMenu(index, `枠${index + 1}`)} />)}
           {readOnly ? null : <button type="button" className={form.textButton} disabled={busy} onClick={() => setAdding('one')}>＋ 枠を足す（毎日・毎週・単発）</button>}
           {error ? <Notice tone="danger">{error}</Notice> : null}
-        </section>
+        </Card>
       ) : (
-        <section className={form.card} data-gap="tight" aria-labelledby="webinar-rules-title">
+        <Card variant="form" gap="normal" aria-labelledby="webinar-rules-title">
           <div className={form.cardHeadRow}><h2 id="webinar-rules-title" className={form.cardTitle}>{`配信枠 ${webinar.schedule.length} 件`}</h2></div>
           <p className={styles.desc}>視聴できる時間の枠です。枠が0件だと公開できません。</p>
           {webinar.schedule.map((rule, index) => <RuleRow key={index} rule={rule} webinarId={webinar.id} menu={ruleMenu(index, `枠${index + 1}`)} />)}
@@ -377,19 +379,19 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
             </div>
           )}
           {error ? <Notice tone="danger">{error}</Notice> : null}
-        </section>
+        </Card>
       )}
 
-      <section className={form.card} aria-labelledby="webinar-count-title">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-count-title">
         <div className={form.cardHead}><h2 id="webinar-count-title" className={form.cardTitle}>視聴の数え方</h2></div>
-        <div className={form.pair}>
+        <SettingsFormRow layout="columns">
           <div className={form.field}><Field label="視聴完了とみなす" htmlFor="webinar-completion"><TextField id="webinar-completion" readOnly value="90%以上見たら視聴完了（変えられません）" title="視聴完了の決め方はサーバーが決めています（動画の9割以上）" /></Field></div>
           <div className={form.field}><Field label="結果が取れないとき" htmlFor="webinar-policy">{readOnly
               ? <ReadValue label="結果が取れないとき">{policy === 'escalate' ? '担当へ上げる' : '翌日に取り直す'}</ReadValue>
               : <SaveErrorField names={["policy"]}><Select id="webinar-policy" aria-label="結果が取れないとき" size="full" value={policy} disabled={policyBusy} onChange={(value) => void savePolicy(value as 'escalate' | 'retry_next_day')} options={[{ value: 'retry_next_day', label: '翌日に取り直す' }, { value: 'escalate', label: '担当へ上げる' }]} /></SaveErrorField>}
 {policyError ? <p className={form.fieldError} role="alert">{policyError}</p> : null}</Field></div>
-        </div>
-      </section>
+        </SettingsFormRow>
+      </Card>
 
       {adding ? <AddRuleDialog mode={adding} busy={busy} error={error} onCancel={() => { if (!busy) { setAdding(null); setError('') } }} onAdd={async (rules) => { if (await saveSchedule([...webinar.schedule, ...rules])) setAdding(null) }} /> : null}
       {replaceOpen ? <ReplaceVideoDialog ctx={ctx} asset={asset} onAsset={setAsset} onClose={() => setReplaceOpen(false)} /> : null}
@@ -470,7 +472,7 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
       </span>
       <span className={styles.colCount}><span className={styles.cell}>{session ? `${formatNumber(session.reservedCount)} 人` : emptyValue('unknown')}</span></span>
       <span className={styles.colState}>
-        <span className={form.pill} data-tone={session?.state === 'full' ? 'warn' : session?.state === 'open' ? 'info' : undefined}><span className={form.pillDot} aria-hidden="true" />{sessionText(session, failed)}</span>
+        <StatusBadge tone={session?.state === 'full' ? 'warning' : session?.state === 'open' ? 'info' : 'neutral'}>{sessionText(session, failed)}</StatusBadge>
       </span>
       {menu(() => { setInput(session?.capacity == null ? '' : String(session.capacity)); setError(''); setCapError(''); onEdit(true) })}
       {editing ? <Button size="compact" disabled={saving} onClick={() => { onEdit(false); setError(''); setCapError('') }}>やめる</Button> : null}
@@ -499,8 +501,8 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
     setLocalError('')
     setDateErrors({})
     if (mode === 'bulk') {
-      if (!from) { failDate('from', '始まりの日付を入れてください。'); return }
-      if (!to) { failDate('to', '終わりの日付を入れてください。'); return }
+      if ((b244Requirements.from.check(from) !== null)) { failDate('from', '始まりの日付を入れてください。'); return }
+      if ((b244Requirements.to.check(to) !== null)) { failDate('to', '終わりの日付を入れてください。'); return }
       if (from > to) { failDate('to', '終わりは始まりと同じか後の日付にしてください。'); return }
       const rules: WebinarScheduleRule[] = []
       const cursor = new Date(`${from}T00:00:00+09:00`)
@@ -534,10 +536,10 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
         ) : null}
         {mode === 'one' && kind === 'once' ? <div className={form.field}><Field label="日付" htmlFor="wd-rule-date"><SaveErrorField names={["date"]}><DateField id="wd-rule-date" value={date} invalid={Boolean(dateErrors.date)} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(value) => { setDate(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></Field></div> : null}
         {mode === 'bulk' ? (
-          <div className={form.pair}>
-            <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from"><SaveErrorField names={["from"]}><DateField id="wd-rule-from" value={from} invalid={Boolean(dateErrors.from)} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(value) => { setFrom(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
-            <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to"><SaveErrorField names={["to"]}><DateField id="wd-rule-to" value={to} invalid={Boolean(dateErrors.to)} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(value) => { setTo(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
-          </div>
+          <SettingsFormRow layout="columns">
+            <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from" requirement={b244Requirements.from}><SaveErrorField names={["from"]}><DateField id="wd-rule-from" value={from} invalid={Boolean(dateErrors.from)} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(value) => { setFrom(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
+            <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to" requirement={b244Requirements.to}><SaveErrorField names={["to"]}><DateField id="wd-rule-to" value={to} invalid={Boolean(dateErrors.to)} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(value) => { setTo(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
+          </SettingsFormRow>
         ) : null}
         <div className={form.field}><span className={form.labelSmall} id="webinar-schedule-time-label">時刻</span><SaveErrorField names={["time"]}><TimeField aria-labelledby="webinar-schedule-time-label" value={time} onChange={setTime} /></SaveErrorField></div>
       </div>

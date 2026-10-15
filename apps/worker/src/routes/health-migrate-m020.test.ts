@@ -5,12 +5,14 @@ import { health } from './health.js';
 import type { Env } from '../index.js';
 
 vi.mock('@line-crm/db', () => ({
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(async () => null),
   getAccountHealthLogs: vi.fn(async () => []),
   getLatestRiskLevel: vi.fn(async () => null),
   getLatestRiskLevels: vi.fn(async () => []),
   getAccountMigrations: vi.fn(async () => []),
   getAccountMigrationById: vi.fn(async () => null),
+  isLineAccountTenantActive: vi.fn(async () => true),
   createAccountMigration: vi.fn(),
   updateAccountMigration: vi.fn(),
 }));
@@ -28,7 +30,7 @@ vi.mock('../services/account-access.js', () => ({
 function env(): Env['Bindings'] {
   return {
     DB: {
-      prepare: () => ({ first: async () => ({ count: 0 }) }),
+      prepare: () => ({ bind: () => ({ first: async () => ({ count: 0 }) }) }),
     } as unknown as D1Database,
     IMAGES: {} as R2Bucket,
     RAW_MAIL: {} as R2Bucket,
@@ -75,7 +77,7 @@ describe('M020 存在しない移行元の移行は作らない', () => {
     const db = await import('@line-crm/db');
     const access = await import('../services/account-access.js');
     vi.mocked(access.getVisibleLineAccountScope).mockResolvedValue({
-      accounts: [],
+      accounts: ['a1','a2'].map((id) => ({ id, tenant_id: null, is_active: 1, archived_at: null, parent_line_account_id: null, login_channel_id: null, liff_id: null })),
       allowedAccountIds: ['a1', 'a2'],
       canSeeUnassigned: false,
       ids: ['a1', 'a2'],

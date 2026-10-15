@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -17,12 +17,14 @@ import { describe, expect, it } from 'vitest'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 const staffSource = readFileSync(join(directory, 'page.tsx'), 'utf8')
+const CSS = readFileSync(join(directory, '../../v8/settings/staff/staff.module.css'), 'utf8')
 
 describe('LAY-07: 権限詳細の設定欄が狭い幅で潰れない', () => {
   it('設定と説明の2列は全幅固定ではなく、十分な幅の時だけにする', () => {
     expect(staffSource).not.toContain("gridTemplateColumns: 'minmax(0, 1fr) 390px'")
     expect(staffSource).toContain('grid-cols-1')
-    expect(staffSource).toContain('lg:grid-cols-[minmax(0,1fr)_390px]')
+    expect(staffSource).toContain('styles.scopeGrid')
+    expect(CSS).toMatch(/@media \(min-width: 1024px\)\s*{\s*\.scopeGrid\s*{[^}]*grid-template-columns: minmax\(0, 1fr\) var\(--tpl-sa-scope-side-w\)/s)
   })
 
   it('選択列の `repeat(3, 140px)` 固定をやめ、機能ごとのカードにする', () => {

@@ -10,10 +10,10 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { isForbiddenOrRateLimited, loadFailureCopy, withPermissionFailure } from '@/components/shared/api-error-message'
+import { classifyApiFailure, isForbiddenOrRateLimited, loadFailureCopy, withPermissionFailure } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { useBookingEdit } from './lib/edit-permission'
-import StickyBar from '@/components/shared/sticky-bar'
+import { CreatePage } from '@/components/templates/create-page'
 import { Check } from 'lucide-react'
 import { describeSaveFailure, bookingApi, type BookingMenu, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -21,7 +21,7 @@ import { menuPriceLabel } from './lib/menu-price'
 import shell from './settings.module.css'
 import styles from './assign.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { PageHeading } from '@/components/templates/page-frame'
+
 import { Field } from '@/components/shared/form-controls'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -340,11 +340,36 @@ export default function AssignMatrixV8() {
     (selectedRow!.override_duration_minutes != null || selectedRow!.override_price != null)
 
   return (
-    <SaveErrorScope errors={saveErrors}><div className={shell.shell} data-design-node="ooufy">
-      <PageHeading title={<>担当メニューをまとめて決める</>}
-        crumbs={<><p className={shell.headNote} role="status" aria-live="polite">
-          {dirty ? '未保存の変更があります' : 'メニューごとに、予約を受けられるスタッフを決めます'}
-        </p></>}
+    <SaveErrorScope errors={saveErrors}><CreatePage boardId="ooufy" dirty={false}
+              footerActions={canEditMenus ? (
+              <>
+                <Button
+                  onClick={() => { setGrid(savedGrid ?? grid); if (!loadFailed) setError(null) }}
+                  disabled={saving}
+                >
+                  キャンセル
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    if (!dirty) {
+                      notifyToast('変更はありません。')
+                      return
+                    }
+                    void saveAll()
+                  }}
+                  // WEB061：保存の失敗で保存を押せなくしない（やり直せるように）。止めるのは読み込みの失敗だけ。
+                  disabled={saving || !selectedAccountId || loading || loadFailed}
+                  busy={saving}
+
+                >
+                  <Check size={15} aria-hidden="true" />保存
+                </Button>
+              </>
+            ) : null}
+       title={<>担当メニューをまとめて決める</>}
+        help="メニューごとに、予約を受けられるスタッフを決めます"
+        status={dirty ? '未保存の変更があります' : undefined}
         tabs={<><Tabs
             label="予約設定のタブ"
             items={V8_TABS.map((item) => ({
@@ -356,10 +381,9 @@ export default function AssignMatrixV8() {
                   ? '/booking/menus'
                   : `/booking/menus?tab=${item.key}`,
             }))}
-          /></>} />
+          /></>} >
 
-      <div className={shell.body} data-design="Body">
-        <div className={shell.main}>
+
           {!selectedAccountId ? (
             <div className={shell.stateCard}>
               <p className={shell.stateTitle}>LINEアカウントを選んでください</p>
@@ -374,7 +398,7 @@ export default function AssignMatrixV8() {
             <div className={shell.stateCard}>
               <p className={shell.stateTitle}>{loadFailure?.title ?? '読み込めませんでした'}</p>
               <p className={shell.stateDesc}>{loadFailure?.description ?? error}</p>
-              {loadFailure?.retryable ? (
+              {loadFailure?.retryable || classifyApiFailure(loadError) === 'forbidden' ? (
                 <div className={shell.stateActions}>
                   <Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
                 </div>
@@ -545,45 +569,7 @@ export default function AssignMatrixV8() {
               </section>
             </>
           )}
-        </div>
-
-        {/* 板では右の欄は空き（仕切り線だけ）。 */}
-        <div className={shell.side} aria-hidden="true" />
-      </div>
-
-      {/* 下の帯（追従・常に画面の下）。変えられない人には出さない。 */}
-      {canEditMenus ? (
-        <div className={shell.saveBarWrap} data-design="Savebar">
-          <StickyBar
-            actions={(
-              <>
-                <Button
-                  onClick={() => { setGrid(savedGrid ?? grid); if (!loadFailed) setError(null) }}
-                  disabled={saving}
-                >
-                  キャンセル
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    if (!dirty) {
-                      notifyToast('変更はありません。')
-                      return
-                    }
-                    void saveAll()
-                  }}
-                  // WEB061：保存の失敗で保存を押せなくしない（やり直せるように）。止めるのは読み込みの失敗だけ。
-                  disabled={saving || !selectedAccountId || loading || loadFailed}
-                  busy={saving}
-
-                >
-                  <Check size={15} aria-hidden="true" />保存
-                </Button>
-              </>
-            )}
-          />
-        </div>
-      ) : null}
+      </CreatePage>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
@@ -591,6 +577,6 @@ export default function AssignMatrixV8() {
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
-    </div></SaveErrorScope>
+    </SaveErrorScope>
   )
 }

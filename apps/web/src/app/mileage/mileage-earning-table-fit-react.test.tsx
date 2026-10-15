@@ -9,11 +9,12 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountProvider } from '@/contexts/account-context'
 import MileagePage from './page'
-import V8BalancesTab from './v8-balances-tab'
-import V8RewardsTab from './v8-rewards-tab'
+import { MileageShell } from '@/v8/mileage/frame'
+import V8BalancesTab from '@/v8/mileage/balances'
+import V8RewardsTab from '@/v8/mileage/rewards'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/mileage',
@@ -217,9 +218,9 @@ describe('たまる決めごとの表の器収め', () => {
     expect(cells.map((cell) => cell.textContent)).toEqual([
       '何をしてくれたら', '対象の行動', 'たまるマイル', '有効期間・失効', 'この30日', '状態', '操作',
     ])
-    /* 先頭は伸び縮みの列（colName）、ほかは固定の列。 */
-    expect(cells[0].className).toContain('colName')
-    expect(cells.slice(1).every((cell) => !cell.className.includes('colName'))).toBe(true)
+    /* 先頭の伸縮は共通表の口へ任せ、ほかは固定の列。 */
+    expect(cells[0].getAttribute('data-cell-grow')).toBe('true')
+    expect(cells.slice(1).every((cell) => !cell.hasAttribute('data-cell-grow'))).toBe(true)
   })
 })
 
@@ -298,11 +299,7 @@ describe('タブの名の横の件数', () => {
     await act(async () => {
       root.render(
         <AccountProvider>
-          <V8RewardsTab
-            readonly={false}
-            registerHeaderActions={() => {}}
-            registerTabCount={(key, text) => { calls.push({ key, text }) }}
-          />
+          <MileageShell.Provider value={{ tab: 'rewards', readonly: false, narrow: false, counts: {}, setCount: (key, text) => { calls.push({ key, text }) } }}><V8RewardsTab /></MileageShell.Provider>
         </AccountProvider>,
       )
     })
@@ -315,11 +312,7 @@ describe('タブの名の横の件数', () => {
     await act(async () => {
       root.render(
         <AccountProvider>
-          <V8BalancesTab
-            readonly={false}
-            registerHeaderActions={() => {}}
-            registerTabCount={(key, text) => { calls.push({ key, text }) }}
-          />
+          <MileageShell.Provider value={{ tab: 'balances', readonly: false, narrow: false, counts: {}, setCount: (key, text) => { calls.push({ key, text }) } }}><V8BalancesTab /></MileageShell.Provider>
         </AccountProvider>,
       )
     })

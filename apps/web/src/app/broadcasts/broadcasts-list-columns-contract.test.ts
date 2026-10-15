@@ -31,7 +31,8 @@ describe('V8 一斉配信の結果と日時', () => {
    * UTC+7 なので、9時予約が7時と出て、日をまたぐと日付までずれる。
    */
   it('配信日時は Asia/Tokyo で書き出す', () => {
-    expect(SOURCE).toContain('polishFormatListDateTime(broadcast.sentAt')
+    expect(SOURCE).toContain('<ListDateTime value={broadcast.sentAt} />')
+    expect(SOURCE).toContain('<ListDateTime value={broadcast.scheduledAt} />')
   })
 
   /** 取れない日時に `-` ではなく、理由の読める言葉を出す。 */

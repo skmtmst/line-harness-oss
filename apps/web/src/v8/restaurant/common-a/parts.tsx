@@ -7,6 +7,7 @@
  * - 状態の札：共通の StatusBadge（点＋文字）
  */
 import KpiBand from '@/components/shared/kpi-band'
+import Card, { CardHeader } from '@/components/shared/card'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import type { ReactNode } from 'react'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -47,16 +48,10 @@ export function Panel({ title, description, aside, flush = false, narrow = false
   children?: ReactNode
 }) {
   return (
-    <section className={`${styles.panel} ${narrow ? styles.panelNarrow : ''}`}>
-      <div className={styles.panelHead}>
-        <div className={styles.panelHeadText}>
-          <h2 className={styles.panelTitle}>{title}</h2>
-          {description ? <p className={styles.panelDescription}>{description}</p> : null}
-        </div>
-        {aside}
-      </div>
-      {children === undefined ? null : flush ? children : <div className={styles.panelBody}>{children}</div>}
-    </section>
+    <Card variant={flush ? 'records' : 'form'} overflow="hidden" className={narrow ? styles.panelNarrow : undefined}>
+      <CardHeader title={title} meta={description} action={aside} size="stacked" />
+      {children}
+    </Card>
   )
 }
 

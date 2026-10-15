@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ErrorCountBadge } from './error-count-badge'
 import styles from './tabs.module.css'
 
@@ -21,6 +21,7 @@ export interface TabItem {
   /** いま開いているタブ。 */
   current?: boolean
   disabled?: boolean
+  disabledReason?: string
   onClick?: () => void
 }
 
@@ -85,8 +86,8 @@ export function Tabs({
 
   /*
    * ★V8 仕上げ（M10）：選ばれている下線が滑って移る（120ms）。
-   * V8 のときだけ、今のタブの下に動く印を置く。測れないとき
-   * （v7・サーバ描画・タブ無し）は今までどおり枠線の下線が出る。
+   * 今のタブの下に動く印を置く。折り返すタブやサーバ描画・タブ無しでは
+   * 枠線の下線が出る。
    */
   const itemsRef = useRef<HTMLSpanElement>(null)
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
@@ -94,7 +95,7 @@ export function Tabs({
   const itemWidthsKey = JSON.stringify(items.map(({ label, count, countTone, errorCount }) => [label, count, countTone, errorCount]))
   useLayoutEffect(() => {
     const measure = () => {
-      if (wrap || typeof document === 'undefined' || document.documentElement?.dataset?.theme !== 'v8') {
+      if (wrap || typeof document === 'undefined') {
         setIndicator(null)
         return
       }
@@ -155,7 +156,8 @@ export function Tabs({
   )
 }
 
-function Tab({ id, controls, label, href, count, countTone, errorCount, current, disabled, onClick, tabIndex }: TabItem & { tabIndex: number }) {
+function Tab({ id, controls, label, href, count, countTone, errorCount, current, disabled, disabledReason, onClick, tabIndex }: TabItem & { tabIndex: number }) {
+  const reasonId = useId()
   const classes = [styles.tab, current && styles.current].filter(Boolean).join(' ')
   const body: ReactNode = (
     <>
@@ -188,10 +190,12 @@ function Tab({ id, controls, label, href, count, countTone, errorCount, current,
   }
 
   return (
-    <button
+    <><button
       type="button"
       {...shared}
       aria-disabled={disabled || undefined}
+      title={disabled ? disabledReason : undefined}
+      aria-describedby={disabled && disabledReason ? reasonId : undefined}
       onClick={onClick}
       /*
        * 選択中・onClick無しのタブは押せないが disabled にはしない。
@@ -201,6 +205,6 @@ function Tab({ id, controls, label, href, count, countTone, errorCount, current,
       disabled={disabled}
     >
       {body}
-    </button>
+    </button>{disabled && disabledReason ? <span id={reasonId} className="sr-only">{disabledReason}</span> : null}</>
   )
 }

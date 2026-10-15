@@ -7,9 +7,11 @@ import { CalendarClock, ClipboardList, Coins, Package, Save, Send } from 'lucide
 import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
 import { CreatePage } from '@/components/templates'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
+import Dialog from '@/components/shared/dialog'
+import NumberInput from '@/components/shared/number-field'
 import Checkbox from '@/components/shared/checkbox'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
@@ -28,20 +30,19 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { formatNumber } from '@/lib/format'
 import { formatCampaignTiming } from './display'
 import styles from './form.module.css'
-import { FieldError, Field } from '@/components/shared/form-controls'
+import { FieldError, Field, OptionalBadge } from '@/components/shared/form-controls'
 import { useFieldValidation } from '@/lib/use-field-validation'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { tapActionLiffUrl } from '@/lib/tap-actions'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8-B 配信を直す（`w5pwG`、例：口コミのお願い）。
  *
- * 取得・保存・版つき競合・テスト送信の決めごとは今の画面
- * （app/nen-campaigns/edit/campaign-editor-v8.tsx）と同じ。違いは置き場と見せ方だけ——
+ * 取得・保存・版つき競合・テスト送信の決めごとを保持する現役の編集。
  * ・節は 配信フロー・いつ送りますか・送るもの・押されたあとにすること。
  * ・きっかけからの日数・送る時刻・つなぐ回答フォーム・付けるマイルは、どれも「選ぶ欄」で選ぶ。
  * ・差し込みの道具・残りの字数は、欄の横の小さな押し口から開く／足りないときだけ出す。
@@ -120,10 +121,15 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [testTarget, setTestTarget] = useState('')
   const [testing, setTesting] = useState(false)
   const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const [customMileageOpen, setCustomMileageOpen] = useState(false)
+  const [customMileage, setCustomMileage] = useState('')
+  const [customMileageError, setCustomMileageError] = useState('')
   const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const { selectedAccountId, selectedAccount } = useAccount()
   const staffRole = useStaffRole()
   const canEdit = canManageRole(staffRole)
+
+  useEffect(() => { setCustomMileageOpen(false) }, [campaignKey, selectedAccountId, canEdit])
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -231,7 +237,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       return
     }
     const form = forms.find((candidate) => candidate.id === formId)
-    if (!form) return
+    if (!form || !form.isActive) return
     const next: NenCampaignAfterAction = { kind: 'open_form', formId: form.id, formName: form.name, buttonLabel: '感想を書く（30秒）' }
     setDraft((previous) => ({
       ...previous,
@@ -242,6 +248,12 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   }
 
   const chooseMileage = (value: string) => {
+    if (value === 'custom') {
+      setCustomMileage(mileageAction?.kind === 'award_mileage' ? String(mileageAction.amount) : '')
+      setCustomMileageError('')
+      setCustomMileageOpen(true)
+      return
+    }
     const others = actions.filter((action) => action.kind !== 'award_mileage')
     if (!value) { setActions(others); return }
     setActions([...others, { kind: 'award_mileage', amount: Number(value), trigger: 'form_submitted' }])
@@ -420,28 +432,23 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       help={`${timing}。保存した新しい中身は次のきっかけから使われ、すでに配信待ちの分は予約したときの中身のまま届きます。`}
       preview={previewOpen ? undefined : preview}
       hidePreviewWhenNarrow
+      readOnly={!canEdit}
       previewToggle={<Button type="button" onClick={() => setPreviewOpen(true)}>プレビューを見る</Button>}
       status={status}
       footerActions={canEdit ? (
         <>
           <Button href="/nen-campaigns">キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
+          <Button type="button" variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
         </>
       ) : <></>} dirty={false}
     >
-      {!canEdit ? (
-        <ReadOnlyNotice role="status">閲覧のみで見ています。配信を直すのは管理者に頼んでください。</ReadOnlyNotice>
-      ) : null}
       {saveConflict.conflict ? <SaveConflictBand title="ほかの担当者が先に保存しました" onCompare={() => void saveConflict.compare()} compareBusy={saveConflict.compareBusy} onReload={() => void saveConflict.reloadLatest()} /> : null}
       <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={() => void saveConflict.reloadLatest()} lines={saveConflict.latest ? Object.entries(withoutVersion(merged) ?? {}).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])).map(([key, value]) => ({ text: `${key === 'bodyText' ? '本文' : key === 'title' ? 'タイトル' : key === 'deliveryTime' ? '配信時刻' : '設定'}：入力 ${typeof value === 'string' ? value : JSON.stringify(value)} ／ 最新 ${JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])}`, kind: 'change' as const })) : null} />
       {error ? <Notice tone="danger" message={error} /> : null}
       {notice ? <Notice tone="success" message={notice} /> : null}
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-flow">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="nen-edit-flow">配信フロー</h2>
-          <p className={styles.cardNote}>{formAction && mileageAction ? '回答フォームへの送信をきっかけにマイルを付けます' : 'きっかけから届くまでの流れです'}</p>
-        </div>
+      <Card variant="form" gap="normal" aria-labelledby="nen-edit-flow">
+        <CardHeader size="stacked" titleId="nen-edit-flow" title="配信フロー" meta={formAction && mileageAction ? '回答フォームへの送信をきっかけにマイルを付けます' : 'きっかけから届くまでの流れです'} />
         <ol className={styles.flow} aria-label="配信フロー">
           <li className={styles.flowStep}><Package size={13} aria-hidden="true" />{trigger}</li>
           <li className={styles.flowStep}><CalendarClock size={13} aria-hidden="true" />{isBirthday ? '3日前 10:00' : `${merged.delayDays}日後 ${time}`}</li>
@@ -451,12 +458,9 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         </ol>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-when">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="nen-edit-when">いつ送りますか</h2>
-          <p className={styles.cardNote}>このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます</p>
-        </div>
-        <div className={styles.row}>
+      <Card variant="form" gap="normal" aria-labelledby="nen-edit-when">
+        <CardHeader size="stacked" titleId="nen-edit-when" title="いつ送りますか" meta="このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます" />
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <span className={styles.labelSmall}>きっかけ</span>
             {isBirthday ? (
@@ -488,7 +492,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             {/* 届かない日を決める口はまだ無い。毎日送る（今の作りのまま）。 */}
             <StaticBox label="届かない日" value="なし（毎日送る）" />
           </div>
-        </div>
+        </SettingsFormRow>
         {isBirthday ? (
           <p className={styles.cardNote}>誕生日のきっかけ・日時は配信の実行処理で固定されています。</p>
         ) : (
@@ -513,19 +517,17 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         )}
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-what">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="nen-edit-what">送るもの</h2>
-          <p className={styles.cardNote}>この配信は1通で届きます</p>
-        </div>
+      <Card variant="form" gap="normal" aria-labelledby="nen-edit-what">
+        <CardHeader size="stacked" titleId="nen-edit-what" title="送るもの" meta="この配信は1通で届きます" />
         {/* 届く形を選ぶ口はまだ無い。画像があればリッチメッセージ、無ければ文字だけで届く（今の作りのまま）。 */}
         <div className={styles.radios} role="radiogroup" aria-label="届く形">
           <SaveErrorField names={["nen-message-kind","kindIsRich"]}><Radio name="nen-message-kind" checked={kindIsRich} readOnly disabled={!kindIsRich} title={kindIsRich ? undefined : '画像のある配信だけがリッチメッセージになります'}>リッチメッセージ</Radio></SaveErrorField>
           <SaveErrorField names={["nen-message-kind"]}><Radio name="nen-message-kind" checked={!kindIsRich} readOnly disabled={kindIsRich}>文字だけ</Radio></SaveErrorField>
         </div>
         <div className={styles.field}>
-          <Field label="配信本文" htmlFor="nen-edit-body"><MessageBody><SaveErrorField names={["bodyText","merged.bodyText","draft","body_text","merged.body_text"]}><InsertTextField
+          <Field required label="配信本文" htmlFor="nen-edit-body"><MessageBody><SaveErrorField names={["bodyText","merged.bodyText","draft","body_text","merged.body_text"]}><InsertTextField
             id="nen-edit-body"
+            aria-required="true"
             aria-invalid={Boolean((validationSubmitted || !bodyCheck.fits) && bodyError)}
             aria-describedby={(validationSubmitted || !bodyCheck.fits) && bodyError ? 'nen-edit-body-error' : undefined}
             ref={bodyRef}
@@ -544,24 +546,21 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             <p className={styles.muted}>あと{formatNumber(bodyRemaining)}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
           ) : null}
         </div>
-        <p className={styles.caution}>差し込む名前が長いと、送るときに長すぎる場合があります。1回にたくさんの吹き出しを送るとブロックされやすい傾向があります（一般的な目安）。</p>
+        <Notice tone="warn">差し込む名前が長いと、送るときに長すぎる場合があります。1回にたくさんの吹き出しを送るとブロックされやすい傾向があります（一般的な目安）。</Notice>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-after">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle} id="nen-edit-after">押されたあとにすること</h2>
-          <p className={styles.cardNote}>{`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`}</p>
-        </div>
-        <div className={styles.row}>
+      <Card variant="form" gap="normal" aria-labelledby="nen-edit-after">
+        <CardHeader size="stacked" titleId="nen-edit-after" title="押されたあとにすること" meta={`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`} />
+        <SettingsFormRow layout="columns">
           <div className={styles.field}>
-            <span className={styles.labelSmall}>回答フォームを開かせる（任意）</span>
+            <span className={styles.labelSmall}>回答フォームを開かせる <OptionalBadge /></span>
             {!canEdit ? <StaticBox label="回答フォーム" value={formAction?.formName ?? '開かせない'} /> : <>
               <SaveErrorField names={["formId","formAction?.formId"]}><EntityKindField
                 id="nen-edit-form"
                 kind="form"
-                label="回答フォームを開かせる（任意）"
-                options={forms.filter((form) => form.isActive || form.id === formAction?.formId)}
-                meta={(row) => (row.isActive === false ? '公開されていません' : undefined)}
+                label="回答フォームを開かせる"
+                options={forms.map((form) => ({ ...form, disabled: !form.isActive }))}
+                meta={(row) => (row.isActive === false ? '公開されていないため選べません' : undefined)}
                 placeholder="（開かせない）"
                 clearable
                 invalid={Boolean(formIssueMessage)}
@@ -570,7 +569,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
               /></SaveErrorField>
               {formIssueMessage ? <Notice tone="danger" >{formIssueMessage}</Notice> : null}
             </>}
-            {formIssueBanner && !formIssueMessage ? <p className={styles.muted}>{formIssueBanner}</p> : null}
+            {formIssueBanner ? <p className={styles.muted}>{formIssueBanner}</p> : null}
           </div>
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答後にマイルを付ける</span>
@@ -584,13 +583,25 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
               options={[
                 { value: '', label: '付けない' },
                 ...withCurrent(MILEAGE_CHOICES, mileageAction?.kind === 'award_mileage' ? mileageAction.amount : MILEAGE_CHOICES[0]).map((amount) => ({ value: String(amount), label: `${formatNumber(amount)} マイル` })),
+                { value: 'custom', label: 'ほかの数を入れる' },
               ]}
             /></SaveErrorField>}
           </div>
-        </div>
+        </SettingsFormRow>
         <p className={styles.chain}>つながる先：→ 回答フォーム　→ マイル　→ EC連携　→ タグ</p>
       </Card>
       <Drawer open={previewOpen} title="配信のプレビュー" width="narrow" onClose={() => setPreviewOpen(false)}>{preview}</Drawer>
+      <Dialog open={customMileageOpen} title="回答後に付けるマイル" confirmLabel="この数にする" onCancel={() => setCustomMileageOpen(false)} error={customMileageError || undefined} onConfirm={() => {
+        const amount = Number(customMileage)
+        if (!Number.isInteger(amount) || amount < 1 || amount > 1_000_000) {
+          setCustomMileageError('付けるマイルは1〜1,000,000の整数で入力してください')
+          return
+        }
+        chooseMileage(String(amount))
+        setCustomMileageOpen(false)
+      }}>
+        <Field label="回答後に付けるマイル"><NumberInput unit="マイル" aria-label="回答後に付けるマイル" min={1} max={1_000_000} step={1} value={customMileage} onChange={(event) => { setCustomMileage(event.target.value); setCustomMileageError('') }} /></Field>
+      </Dialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage></SaveErrorScope>
   )

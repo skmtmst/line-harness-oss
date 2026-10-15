@@ -41,15 +41,18 @@ describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更�
 
   it('4つの作成・編集画面すべてに分類案内と重複名の注意がある', () => {
     const cases: Array<{ file: string; kind: string; label: string }> = [
-      { file: 'components/friend-fields/tag-editor-v4.tsx', kind: 'tag', label: 'タグ' },
+      { file: 'v8/tag-edit/edit-form.tsx', kind: 'tag', label: 'タグ' },
       { file: 'app/tags/fields/new/page.tsx', kind: 'field', label: '項目' },
       { file: 'app/tags/fields/edit/page.tsx', kind: 'field', label: '項目' },
-      { file: 'components/friend-fields/support-mark-editor.tsx', kind: 'mark', label: '対応マーク' },
+      { file: 'v8/tags/mark-editor.tsx', kind: 'mark', label: '対応マーク' },
       { file: 'app/tags/searches/edit/page.tsx', kind: 'search', label: '保存した検索' },
     ]
     for (const { file, kind, label } of cases) {
       const source = read(file)
-      expect(source, `${file} に分類案内が無い`).toContain(`<AttributeKindGuide current="${kind}" />`)
+      if (kind === 'tag') {
+        for (const text of ['タグは分類の目印', '友だち情報欄は', '対応マークは対応の状態', '保存した検索は']) expect(source).toContain(text)
+      }
+      else expect(source, `${file} に分類案内が無い`).toContain(`<AttributeKindGuide current="${kind}" />`)
       expect(source, `${file} に重複名の注意が無い`).toContain('DuplicateNameNote')
       expect(source, `${file} の重複名判定が自分自身を外していない`).toContain('findDuplicateNames')
       expect(source, `${file} の重複名の呼び名`).toContain(`kindLabel="${label}"`)
@@ -57,18 +60,18 @@ describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更�
   })
 
   it('タグ一覧は重複名の整理候補を行ごとに示す', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx')
     // サーバーの cleanupReasons だけを見る。画面で再判定しない。
     expect(source).toContain("tag.cleanupReasons?.includes('duplicate_name')")
-    expect(source).toContain('重複名')
-    // PC表とモバイルカードの両方に出す。
-    expect(source.match(/重複名/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+    expect(source).toContain('名前が重なっている')
+    expect(source).toContain('<StatusBadge size="annotation" tone="warning"')
   })
 
   it('タグ編集はHQ埋め込みではストアの一覧を読まず、同名だけを注意する', () => {
-    const source = read('components/friend-fields/tag-editor-v4.tsx')
+    const source = read('v8/tag-edit/edit-form.tsx')
     // embedded（HQ定義エディタ）ではストアのタグ一覧を読まない。
-    expect(source).toContain('if (embedded || !accountId) return')
+    expect(source).toContain('if (host) return')
+    expect(read('v8/hq-templates/tag-editor.tsx')).toContain('accountId=""')
     // 保存を止めない注意。サーバーの一意制約が最終判断。
     expect(read('components/friend-fields/attribute-kind-guide.tsx')).toContain('一覧の重複名の整理候補')
   })
@@ -129,7 +132,7 @@ describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更�
       'components/friend-fields/tag-editor-v4.tsx',
       'app/tags/fields/new/page.tsx',
       'app/tags/fields/edit/page.tsx',
-      'components/friend-fields/support-mark-editor.tsx',
+      'v8/tags/mark-editor.tsx',
       'app/tags/searches/edit/page.tsx',
       'components/friend-fields/attribute-kind-guide.tsx',
       'components/friend-fields/tags-page-v4.tsx',

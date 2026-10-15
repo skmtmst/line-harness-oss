@@ -1,31 +1,33 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+// @vitest-environment happy-dom
+import React from 'react'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, expect, it, vi } from 'vitest'
+import OpsKnowledgeV8 from '@/v8/ops/knowledge'
 
-const ROOT = dirname(fileURLToPath(import.meta.url))
-const LIST = readFileSync(join(ROOT, 'knowledge-list.tsx'), 'utf8')
-const CSS = readFileSync(join(ROOT, 'knowledge.module.css'), 'utf8')
+const title = '名前を省略しても同じ場所で全文を読める記事'
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/ops/knowledge' }))
+vi.mock('@/lib/api', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
+  api: { ops: { knowledge: { list: async () => ({ success: true, total: 1, data: [{
+    id: 'article', title, kind: 'usage', articleKind: 'verified', reviewState: 'pending', status: 'disabled',
+    usedCount: 0, helpfulCount: 0, updatedAt: '2026-10-01T00:00:00Z',
+  }] }) } } },
+}))
+afterEach(cleanup)
 
-/*
- * 監査 R134: 運営ナレッジ一覧を 390px で開くと、8列の表が1列44pxに潰れて
- * 題名も操作名も切れていた。狭い画面では1記事1枚のカードに畳み、
- * 題名を先頭に・項目をラベル付きで・操作を十分な幅で出す。
- */
-describe('運営ナレッジ一覧の狭い画面 (監査R134)', () => {
-  it('表の各項目にカード表示用のラベルが付いている', () => {
-    for (const label of ['種類', '状態', '使われた回数', '役に立った', '更新日']) {
-      expect(LIST, `data-label="${label}" が無い`).toContain(`data-label="${label}"`)
-    }
-  })
+it('記事の項目を見出しで区別し、既知の0回を不明に変えない', async () => {
+  render(React.createElement(OpsKnowledgeV8))
+  const name = await screen.findByRole('button', { name: `「${title}」を開く` })
+  const row = name.closest('tr')!
+  expect(screen.getAllByRole('columnheader')).toHaveLength(7)
+  for (const label of ['種類', '状態', '使われた回数', '役に立った', '更新日']) expect(screen.getByRole('columnheader', { name: label })).toBeTruthy()
+  expect([...row.querySelectorAll('[data-list-number]')].map(cell => cell.textContent)).toEqual(['0', '0'])
+})
 
-  it('狭い画面では表を畳んでカードにし、ラベルは data-label から出す', () => {
-    expect(CSS).toContain('@media (max-width: 640px)')
-    expect(CSS).toContain('.table thead { display: none; }')
-    expect(CSS).toContain('content: attr(data-label)')
-    // 操作ボタンがセルの外へ切れないよう、はみ出しを隠さない。
-    expect(CSS).toContain('overflow: visible')
-    // 題名は1行省略せず読める形にする。
-    expect(CSS).toContain('overflow-wrap: anywhere')
-  })
+it('記事の全文と開く操作を省略の外側へ残す', async () => {
+  render(React.createElement(OpsKnowledgeV8))
+  const name = await screen.findByRole('button', { name: `「${title}」を開く` })
+  expect(name.title).toBe(title)
+  expect(name.closest('td')?.getAttribute('data-list-name-cell')).not.toBeNull()
+  expect(screen.getByRole('button', { name: `${title}のその他操作` })).toBeTruthy()
 })

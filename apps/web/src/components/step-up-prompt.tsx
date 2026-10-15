@@ -122,6 +122,7 @@ export default function StepUpPrompt({
     <SaveErrorScope errors={saveErrors}><StepUpDialog
       open
       action={request.action}
+      presentation={request.purpose === 'auth.mfa.policy' ? 'mfa-off' : undefined}
       method={method}
       busy={busy}
       error={method === 'none' ? undefined : error}

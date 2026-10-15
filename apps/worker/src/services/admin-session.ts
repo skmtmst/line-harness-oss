@@ -8,6 +8,7 @@ import {
   deleteExpiredTwoFactorChallenges,
   getStaffById,
   recordAuditEvent,
+  setPlatformSetting,
   type StaffMember,
   type TwoFactorChallengePurpose,
 } from '@line-crm/db';
@@ -106,7 +107,7 @@ async function notifyUnfamiliarLogin(
       after: { note: 'いつもと違う端末・場所からのログイン' },
     });
   } catch (error) {
-    console.error('[admin-session] unfamiliar login audit failed', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
   }
   try {
     if (!staff?.email) return;
@@ -132,11 +133,11 @@ async function notifyUnfamiliarLogin(
       ].join('\n'),
     });
   } catch (error) {
-    console.error('[admin-session] unfamiliar login mail failed', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
   }
 }
 
-export async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict' | 'Lax' | 'None', remember = false) {
+export async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict' | 'Lax' | 'None', remember = false, mfaVerified = false) {
   const sessionToken = randomToken();
   const maxAge = remember ? SESSION_REMEMBER_MAX_AGE : SESSION_DEFAULT_MAX_AGE;
   const expiresAt = new Date(Date.now() + maxAge * 1000).toISOString();
@@ -155,7 +156,7 @@ export async function issueSession(c: Context<Env>, staffId: string, sameSite: '
       unfamiliarAt = new Date().toISOString();
     }
   } catch (error) {
-    console.error('[admin-session] unfamiliar check failed', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
   }
   await createAdminSession(c.env.DB, await sha256Hex(sessionToken), staffId, expiresAt, {
     userAgent,
@@ -163,6 +164,7 @@ export async function issueSession(c: Context<Env>, staffId: string, sameSite: '
     deviceHash,
     unfamiliarAt,
   });
+  if (mfaVerified) await setPlatformSetting(c.env.DB, `auth.mfa.session:${await sha256Hex(sessionToken)}`, staffId, staffId);
   if (unfamiliarAt) {
     await notifyUnfamiliarLogin(c, staffId, { ipPrefix, userAgent });
   }

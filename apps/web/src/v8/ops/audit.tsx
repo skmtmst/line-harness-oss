@@ -176,15 +176,15 @@ export default function OpsAuditV8() {
                 <span className={`${parts.fixed} ${styles.colWho}`} role="cell" ><TruncatedText value={String(row.staff_name ?? '')} /></span>
                 <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{actionWord(row.action)}</span>
                 <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? emptyValue('unknown')}</span>
-                <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? emptyValue('unknown')}</span>
+                <span className={parts.grow} role="cell" title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}>{row.reason ?? emptyValue('unknown')}</span>
               </div>
             ))}
           </div>
         )}
-        {pageCount > 1 ? (
+        {rows.length > 0 ? (
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         ) : null}
-        <p className={parts.note}>記録は運営メンバーでも消せません。理由は4文字以上が必須です。</p>
+        <p className={parts.note} title={`${total}件中 ${total === 0 ? 0 : (page - 1) * PAGE + 1}〜${Math.min(page * PAGE, total)}件を表示`}>記録は運営メンバーでも消せません。理由は4文字以上が必須です。</p>
       </div>
     </div>
   )

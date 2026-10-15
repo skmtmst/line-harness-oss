@@ -8,7 +8,8 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
     tags: {
       list: () => Promise.resolve({ success: true, data: [] }),
@@ -35,34 +36,34 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: () => {} }),
-}))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/lib/staff-role', async importOriginal => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
+  usePageCrumbs: () => {},
 }))
 
 vi.mock('@/lib/use-unsaved-guard', () => ({
   useUnsavedGuard: () => ({ leaveTarget: null, confirmLeave: () => {}, cancelLeave: () => {} }),
 }))
 
-const { NewOfferV8 } = await import('../new-offer-v8')
+const { default: NewOfferV8 } = await import('@/v8/affiliate-offer-new/create')
 
 afterEach(() => {
   cleanup()
 })
 
 describe('Td4TN 作る画面の絵合わせ', () => {
-  test('成果地点の札は見た目だけで選べない', async () => {
+  test('成果地点の未対応を説明し、使える一覧への道を残す', async () => {
     render(<NewOfferV8 />)
     await waitFor(() => {
       expect(screen.getByText('案件を作る')).toBeTruthy()
     })
-    expect(screen.getByText('コンバージョンで作った成果地点から選びます')).toBeTruthy()
-    const point = screen.getByLabelText('成果地点')
-    expect((point as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByText(/成果地点と案件をつなぐ操作にはまだ対応していません/)).toBeTruthy()
+    expect(screen.getByText('何を成果として数えるか')).toBeTruthy()
+    expect(screen.queryByLabelText('成果地点')).toBeNull()
+    expect(screen.getByText(/成果地点と案件をつなぐ設定は、まだ保存できません/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: '成果地点を見る' }).getAttribute('href')).toBe('/conversions')
   })
 
   test('頭・見え方・気をつけること・足元が絵どおり', async () => {

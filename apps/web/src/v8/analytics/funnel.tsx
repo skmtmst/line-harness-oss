@@ -25,6 +25,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
+import AggregationStatus from '@/components/shared/aggregation-status'
 
 /*
  * ★V8 分析「ファネル」（Pencil `DkRDE`）。
@@ -103,6 +104,8 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState('')
+  const [startedAt, setStartedAt] = useState<string | null>(null)
+  const runningScopes = useRef(new Set<string>())
   const [noRun, setNoRun] = useState(false)
   const [listError, setListError] = useState('')
   const [funnelsReload, setFunnelsReload] = useState(0)
@@ -155,7 +158,9 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   useEffect(() => { setRunning(false) }, [accountId, selected, funnelDays])
 
   const runNow = async () => {
-    if (!selected) return
+    if (!selected || runningScopes.current.has(scope) || selectedFunnel?.status !== 'active') return
+    runningScopes.current.add(scope)
+    setStartedAt(new Date().toISOString())
     const generation = viewGeneration.current
     setRunning(true); setRunError('')
     try {
@@ -171,6 +176,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       { if (!fieldFailure)
       setRunError(explainStartError(code, code || '再集計できませんでした')) }
     } finally {
+      runningScopes.current.delete(scope)
       if (generation === viewGeneration.current) setRunning(false)
     }
   }
@@ -274,7 +280,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
 
   /** 選んだ段の対象者を24時間の対象者として作り、その先（友だち一覧・配信）へ進む。 */
   const openAudience = async (to: 'friends' | 'broadcast') => {
-    if (!run?.runId || shownPick === null || !result?.[shownPick] || !activeGroup || selectedFunnel?.status !== 'active') return
+    if (!measurable || !run?.runId || shownPick === null || !result?.[shownPick] || !activeGroup || selectedFunnel?.status !== 'active') return
     const generation = viewGeneration.current
     setRunError(''); setAudienceBusy(true)
     try {
@@ -335,8 +341,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
             {canManage ? <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />ファネルを作る</Button> : null}
             <Button variant="secondary" disabled={running} onClick={() => setRunReload((n) => n + 1)}><RefreshCw size={15} aria-hidden="true" />最新の結果をもう一度読む</Button>
           </div>
-          {runError ? <Notice tone="danger" >{runError}</Notice> : null}
-          {noRun && !run ? <p className={styles.caption}>{`まだ集計がありません。下の「定義の操作と集計の詳細」から「この${funnelDays}日を再集計」を押してください`}</p> : null}
+          <AggregationStatus state={running ? { kind: 'running', startedAt } : runError || run?.state === 'failed' ? { kind: 'failed', reason: runError || run?.stateReason || '集計できませんでした' } : run ? { kind: 'complete', dataAt: run.dataCutoffAt } : { kind: 'empty' }} onRun={() => void runNow()} canRun={canManage} disabled={selectedFunnel?.status !== 'active'} />
           {usageNotice ? <p className={styles.warnText} role="status">{usageNotice}</p> : null}
           {run && !measurable ? <p className={styles.warnText} role="status">{`${STATE_LABELS[run.state]}のため、この結果は判定不能です。人数や割合は実測値ではありません。${run.stateReason ? ` ${run.stateReason}` : ''}`}</p> : null}
           {run && run.state === 'partial' ? <p className={styles.warnText}>{run.stateReason ?? '一部の期間・種類のデータが無いため、実際より少なく数えている可能性があります。'}</p> : null}
@@ -427,7 +432,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       open={statusTarget !== null}
       title={statusTarget?.to === 'stopped' ? 'ファネルを停止しますか' : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除しますか？` : 'ファネルを再開しますか'}
       description={statusTarget?.to === 'stopped' ? `「${statusTarget.funnel.name}」の再集計と対象者づくりを止めます。過去の結果は残り、あとから再開できます。`
-        : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除すると、選ぶ一覧から外れ、再集計と対象者づくりはできません。過去の結果は残ります。`
+        : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除すると、選ぶ一覧から外れ、再集計と対象者づくりはできません。あとから戻せません。過去の結果は残ります。`
         : statusTarget ? `「${statusTarget.funnel.name}」を再開します。再集計と対象者づくりがまた使えます。` : ''}
       confirmLabel={statusTarget?.to === 'stopped' ? '停止する' : statusTarget?.to === 'archived' ? '削除する' : '再開する'}
       destructive={statusTarget?.to === 'archived'}

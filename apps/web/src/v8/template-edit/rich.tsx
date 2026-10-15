@@ -1,5 +1,8 @@
 'use client'
 
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+
+
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
@@ -18,7 +21,6 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import LayoutPicker from '@/components/shared/layout-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
 import TapAreaEditor from '@/components/shared/tap-area-editor'
 import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
@@ -215,7 +217,6 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const [areas, setAreas] = useState<Record<string, AreaDraft>>(() => (hostInitial ? hostInitial.areas : visual ? visualAreas() : {}))
   /* 採用案 Wmch0：画像の上か右の一覧で選んだ面（記号）。下にその面の動きだけを出す。 */
   const [selectedLabel, setSelectedLabel] = useState('A')
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
@@ -285,8 +286,8 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
    * 別の面なら その面を選んでから移る。面の一覧には直す欄の数の赤い丸。
    */
   const fields = useFormErrors()
-  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'リッチメッセージ名を入力してください'))
-  fields.define('image', '画像', () => (hqHost ? (uploaded ? null : '画像を選んでください') : imageUrl.trim() ? null : '画像を設定してください'))
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'リッチメッセージ名を入力してください'), { required: true })
+  fields.define('image', '画像', () => (hqHost ? (uploaded ? null : '画像を選んでください') : imageUrl.trim() ? null : '画像を設定してください'), { required: true })
   shapeDef.areas.forEach((area) => {
     fields.define(`area-${area.label}`, `面 ${area.label} の押したら`, () => {
       const draft = areas[area.label]
@@ -434,7 +435,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={sideCard}
       >
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
         </Card>
       </TemplateEditFrame></SaveErrorScope>
@@ -449,14 +450,11 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         boardId={host ? 'g8d6ai' : 'EFV8l'}
         title="リッチメッセージを作る"
         description="1枚の画像を面に分けて、押した面ごとに動く"
-        side={(
+        side={(inDialog) => (
           <>
-            <div className={styles.previewToggle}>
-              <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
-            </div>
             {host?.composer ? null : sideCard}
-            <h2 className={styles.previewHead}>届き方</h2>
-            <div className={styles.phone}>{phone}</div>
+            <h2 className={styles.previewHead} title="この形式は、いまの画面から自分へのテスト送信ができません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。">届き方</h2>
+            <div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div>
           </>
         )}
         footerActions={(
@@ -476,14 +474,14 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         {error ? <Notice tone="danger" >{error}</Notice> : null}
         {null}
 
-        {host?.composer ? null : <Card padding="none" layout="vertical" className={styles.card}>
+        {host?.composer ? null : <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>名前とフォルダ</h2>
           </div>
-          <div className={styles.pair}>
-            <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-rich-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} /></SaveErrorField>
+          <SettingsFormRow layout="name-folder">
+            <div className={styles.field}><Field label="テンプレート名" htmlFor="te-rich-name" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} /></SaveErrorField>
 <FieldError id="te-rich-name-error">{fields.error('name')}</FieldError></Field></div>
-            <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-rich-folder"><SaveErrorField names={["folder","host.folder"]}><FolderSelect
+            <div className={styles.field}><Field label="フォルダ" htmlFor="te-rich-folder"><SaveErrorField names={["folder","host.folder"]}><FolderSelect size="full"
                 id="te-rich-folder"
                 aria-label="フォルダ"
                 value={host ? host.folder : folder}
@@ -496,10 +494,10 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                     ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                     : undefined}
               /></SaveErrorField></Field></div>
-          </div>
+          </SettingsFormRow>
         </Card>}
 
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>面の分け方</h2>
             <p className={styles.cardNote}>選んだ形に合わせて、下の設定が増えます</p>
@@ -510,7 +508,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           />
         </Card>
 
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>画像</h2>
             <p className={styles.cardNote}>1040 × 1040px（正方形）がおすすめ</p>
@@ -557,7 +555,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           </div>
         </Card>
 
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           {/* 採用案 Wmch0（リッチメニューと同じ部品）：画像の上で面を押して選ぶ＋右に一覧＋下に選んだ面の動き。 */}
           <TapAreaEditor
             framed={false}
@@ -621,9 +619,6 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         </Card>
       </TemplateEditFrame>
 
-      <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
-        <div className={styles.previewDialog}>{phone}</div>
-      </Dialog>
 
       <ConfirmDialog
         open={pendingShape !== null}

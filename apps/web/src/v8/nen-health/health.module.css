@@ -1,7 +1,7 @@
 /*
  * ★V8-B 健康日記（mIwA4・BVuYh・z2tvtX）。
  * 枠・見出し・タブの段・数の帯の並びは型（ListPage）が持つ。ここは板の中の寸法だけ。
- * 数字は app/globals.css の [data-theme="v8"] の --tpl-nph-* に置く（マイペットと同じ物差し）。
+ * 数字は app/globals.css の :root の --tpl-nph-* に置く（マイペットと同じ物差し）。
  */
 
 /* タブ（絵：高さ28・文字の下10）。 */
@@ -9,7 +9,7 @@
   min-width: 0;
   margin-bottom: var(--tpl-nph-tab-pull);
 }
-:global([data-theme='v8']) .tabs [role='tab'] {
+:global(:root) .tabs [role='tab'] {
   box-sizing: border-box;
   height: var(--tpl-nph-tab-h);
   min-height: 0;
@@ -58,7 +58,7 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+:global(:root) .table .headRow[data-table-layout='columns'] {
   display: flex;
   align-items: center;
   gap: var(--tpl-nph-col-gap);
@@ -68,7 +68,7 @@
   background: var(--color-table-head);
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+:global(:root) .table .row[data-table-layout='columns'] {
   gap: var(--tpl-nph-col-gap);
   box-sizing: border-box;
   height: var(--tpl-nph-row-h);
@@ -76,8 +76,8 @@
   border-bottom: 0;
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+:global(:root) .table .headRow[data-table-layout='columns'] > th,
+:global(:root) .table .row[data-table-layout='columns'] > td {
   flex-shrink: 0;
   min-width: 0;
   height: auto;
@@ -86,18 +86,18 @@
   box-shadow: none;
   line-height: normal;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+:global(:root) .table .headRow[data-table-layout='columns'] > th {
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);
   font-weight: 600;
   white-space: nowrap;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colChange,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colChange {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colChange,
+:global(:root) .table .row[data-table-layout='columns'] > td.colChange {
   flex: 1 1 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colCount,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colCount {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colCount,
+:global(:root) .table .row[data-table-layout='columns'] > td.colCount {
   padding-right: var(--tpl-nph-num-pad-end);
   text-align: right;
 }
@@ -111,8 +111,8 @@
 
 /* 狭い板では、気になる変化と詳細にも出る便・食いつきの列を畳む。 */
 @container v8-page (max-width: 1099px) {
-  :global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colStool,
-  :global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colStool {
+  :global(:root) .table .headRow[data-table-layout='columns'] > th.colStool,
+  :global(:root) .table .row[data-table-layout='columns'] > td.colStool {
     display: none;
   }
 }
@@ -212,25 +212,6 @@
   display: flex;
   align-items: center;
 }
-/* 「…」は共通の RowMenu。今の見た目（枠・大きさ・地）を共通の印ボタンより強く当てる。 */
-.menuBox > button.menuButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-nph-menu-size);
-  height: var(--tpl-nph-menu-size);
-  flex: 0 0 var(--tpl-nph-menu-size);
-  padding: 0;
-  border: 1px solid var(--color-hairline);
-  outline: 0;
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-}
-.menuBox > button.menuButton:hover {
-  background: var(--color-table-head);
-}
 
 /* 表の下（件数・ヒント）。 */
 .pagerRow {
@@ -304,16 +285,6 @@
  * 30日のまとめ（BVuYh）。共通の引き出し（幅 660・頭に線）を、絵の幅 600・
  * 頭の線なし・余白 24・間 16 に合わせる（NEN配信の oqSJP と同じやり方）。
  */
-:global([data-theme='v8'] [data-design-part='drawer']):has(.summaryBody) {
-  width: min(var(--tpl-nph-drawer-w), 100%);
-}
-:global([data-theme='v8'] [data-design-part='drawer']):has(.summaryBody) > :global(header) {
-  padding: var(--tpl-nph-drawer-head-pad);
-  border-bottom: 0;
-}
-:global([data-theme='v8'] [data-design-part='drawer']):has(.summaryBody) > :global(div) {
-  padding: var(--tpl-nph-drawer-body-pad);
-}
 .summaryBody {
   display: flex;
   flex-direction: column;
@@ -372,46 +343,6 @@
 .chartBar[data-level='2'] { height: var(--tpl-nph-chart-l2); }
 .chartBar[data-level='3'] { height: var(--tpl-nph-chart-l3); }
 .chartBar[data-level='4'] { height: var(--tpl-nph-chart-h); }
-
-/* 記録の表（見出し 30・行は中身なり上下 8・左右 12・間 12）。 */
-.logTable {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-}
-.logHead,
-.logRow {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tpl-nph-pair-gap);
-  box-shadow: var(--shadow-row-line);
-  line-height: normal;
-}
-.logHead {
-  padding: var(--tpl-nph-log-head-pad);
-  background: var(--color-table-head);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.logRow {
-  padding: var(--tpl-nph-log-row-pad);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-}
-.logRow:last-child {
-  box-shadow: none;
-}
-.logDate { flex: 0 0 var(--tpl-nph-lcol-date); }
-.logWeight { flex: 0 0 var(--tpl-nph-lcol-weight); }
-.logStool { flex: 0 0 var(--tpl-nph-lcol-stool); }
-.logSkin { flex: 0 0 var(--tpl-nph-lcol-skin); }
-.logTear { flex: 0 0 var(--tpl-nph-lcol-tear); }
-.logMemo { flex: 1 1 0; min-width: 0; }
 .summaryEmpty {
   margin: 0;
   color: var(--color-ink-faint);

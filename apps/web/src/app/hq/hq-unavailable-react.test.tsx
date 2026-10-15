@@ -14,11 +14,15 @@ vi.mock('next/link', () => ({
 vi.mock('@/lib/hq-template-availability', () => ({
   HQ_TEMPLATE_DISTRIBUTION_ENABLED: false,
 }))
-vi.mock('./templates/template-console', () => ({
+vi.mock('@/v8/hq-templates/console', () => ({
   default: ({ type }: { type: string }) => <div data-testid="v8-console">{type}</div>,
 }))
 
-import HqTemplatePage from './hq-template-page'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+import HqFormPage from './form-submissions/page'
+import HqTagsPage from './friend-attributes/page'
+import HqRichMenusPage from './rich-menus/page'
+import HqTemplatesPage from './templates/page'
 
 /**
  * m13k: 直接URLを開いたとき、4画面とも「まだ使えません」の案内と
@@ -41,17 +45,17 @@ afterEach(() => {
 })
 
 const CASES = [
-  { type: 'form' as const, label: '回答フォーム', target: 'form-submissions' as const },
-  { type: 'tag' as const, label: 'タグ', target: 'tags' as const },
-  { type: 'rich_menu' as const, label: 'リッチメニュー', target: 'rich-menus' as const },
-  { type: 'template' as const, label: 'テンプレート', target: 'templates' as const },
+  { type: 'form', label: '回答フォーム', Page: HqFormPage },
+  { type: 'tag', label: 'タグ', Page: HqTagsPage },
+  { type: 'rich_menu', label: 'リッチメニュー', Page: HqRichMenusPage },
+  { type: 'template', label: 'テンプレート', Page: HqTemplatesPage },
 ]
 
 describe('統括V8の直接URL', () => {
-  for (const { type, label, target } of CASES) {
+  for (const { type, label, Page } of CASES) {
     it(`${label}はV8のひな形画面を出す`, async () => {
       await act(async () => {
-        root.render(<HqTemplatePage type={type} label={label} target={target} />)
+        root.render(<Page />)
       })
       expect(host.querySelector('[data-testid="v8-console"]')?.textContent).toBe(type)
     })

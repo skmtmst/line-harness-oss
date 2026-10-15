@@ -5,6 +5,7 @@ export default function scanPendec2Rules() {
   const visible = el => {
     if (!el || el.closest('svg,script,style,[inert],[data-line-preview-part="talk"],[data-template-region="folders"]')) return false
     for (let p = el; p; p = p.parentElement) {
+      // 一般の崩れ検査と同じ。閉じた詳細設定の本文は描かれていない。
       if (p !== el && p.matches('details:not([open])') && !p.querySelector(':scope > summary')?.contains(el)) return false
       const c = css(p); if (c.display === 'none' || c.visibility === 'hidden' || +c.opacity === 0) return false
     }
@@ -19,7 +20,7 @@ export default function scanPendec2Rules() {
     }
     return parts.join(' > ')
   }
-  const add = (kind, el, measure, other) => findings.push({ kind, target: sel(el), text: (el.innerText || el.textContent || '').replace(/\s+/g,' ').slice(0,120), measure, ...(other ? {other:sel(other)} : {}) })
+  const add = (kind, el, measure, other) => findings.push({ kind, target: sel(el), text: ((kind === 'canvasbottom' ? el.querySelector('h1,h2')?.textContent : null) || el.innerText || el.textContent || '').replace(/\s+/g,' ').slice(0,120), measure, ...(other ? {other:sel(other)} : {}) })
   const all = selector => [...root.querySelectorAll(selector)].filter(visible)
   const framed = el => { const c=css(el); return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth)>0 || ['Top','Right','Bottom','Left'].every(x => c['border'+x+'Style']!=='none' && parseFloat(c['border'+x+'Width'])>0) || c.boxShadow!=='none' }
   const choiceSelector = '[data-choice-card],label[class*="radio-card_card"]:not([data-variant="row"]),label[class*="layout-picker_tile"]'
@@ -47,6 +48,7 @@ export default function scanPendec2Rules() {
     if(gap<23) add('canvasbottom',board,{deficit:Math.ceil(24-gap)})
   }
   for(const band of all('[data-kpi-strip],[data-kpi-band]')) {
+    for (const menu of [...band.querySelectorAll('[data-row-menu],button[aria-haspopup="menu"]:not(:has([data-kpi-number]))')].filter(visible)) add('kpimenu',menu,{count:1})
     const details=[...band.querySelectorAll('[data-kpi-detail]')]
     const hasDetail=details.some(el=>el.hasAttribute('data-kpi-detail-present') || el.textContent.trim() || el.querySelector('a[href],button'))
     if(!hasDetail && details.some(visible)) add('kpiblank',band,{count:1})
@@ -55,15 +57,30 @@ export default function scanPendec2Rules() {
   for(const seg of all('[data-segmented-control],[class*="segmented_root"]')) {
     const buttons=[...seg.querySelectorAll(':scope > button')].filter(visible)
     for(const b of buttons) if(!b.textContent.trim() && !b.getAttribute('aria-label')) add('segempty',b,{count:1})
+    if (buttons.length && seg.getAttribute('data-appearance') === 'track') {
+      const c = css(seg), end = Math.max(...buttons.map(button => button.getBoundingClientRect().right))
+      const tail = seg.getBoundingClientRect().right - parseFloat(c.paddingRight || '0') - end
+      if (tail > 2 && !['transparent', 'rgba(0, 0, 0, 0)'].includes(c.backgroundColor)) add('segempty', seg, { tail: Math.ceil(tail) })
+    }
     const selected=buttons.filter(b=>b.getAttribute('aria-pressed')==='true')
     if(buttons.length && selected.length!==1) add('segselected',seg,{count:Math.abs(selected.length-1) || 1})
     if(selected.length===1) { const c=css(selected[0]); if(c.backgroundColor!=='rgb(232, 245, 236)' || c.color!=='rgb(8, 122, 62)' || !framed(selected[0])) add('segstyle',selected[0],{count:1}) }
   }
   for(const card of all(choiceSelector)) {
     const radio=card.querySelector('input[type="radio"]'), r=card.getBoundingClientRect()
-    if(!radio || !visible(radio)) { add('choice-radio',card,{count:1}); continue }
+    if(!radio) { add('choice-radio',card,{count:1}); continue }
     const rr=radio.getBoundingClientRect()
-    if(Math.abs(r.right-rr.right-16)>2 || Math.abs(rr.top-r.top-16)>2) add('choice-radio',card,{excess:Math.ceil(Math.max(Math.abs(r.right-rr.right-16),Math.abs(rr.top-r.top-16)))})
+    if(card.dataset.choiceIndicator==='check') {
+      const checks=[...card.querySelectorAll('[data-choice-check]')].filter(check=>{
+        const box=check.getBoundingClientRect(), c=css(check)
+        return visible(check.parentElement) && box.width>0 && box.height>0 && c.visibility!=='hidden' && +c.opacity>0
+      })
+      if(visible(radio) || checks.length!==(radio.checked && !radio.disabled ? 1 : 0)) add('choice-check',card,{count:1})
+      for(const check of checks) if(css(check).color!=='rgb(8, 122, 62)') add('choice-check-color',card,{count:1})
+    } else {
+      if(!visible(radio)) { add('choice-radio',card,{count:1}); continue }
+      if(Math.abs(r.right-rr.right-16)>2 || Math.abs(rr.top-r.top-16)>2) add('choice-radio',card,{excess:Math.ceil(Math.max(Math.abs(r.right-rr.right-16),Math.abs(rr.top-r.top-16)))})
+    }
     if(radio.checked) { const c=css(card); if(!['rgb(241, 248, 243)','rgb(232, 245, 236)'].includes(c.backgroundColor) || ![c.borderTopColor,c.outlineColor].includes('rgb(8, 122, 62)')) add('choice-color',card,{count:1}) }
   }
   for(const pager of all('[data-pagination],nav[class*="pagination_pagination"]')) {

@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {referenceChecks} from './speed-check.mjs'
+import {referenceChecks,checkMeasuredResult} from './speed-check.mjs'
 import {spawnSync} from 'node:child_process'
-import {mkdtempSync,writeFileSync,rmSync} from 'node:fs'
+import {mkdtempSync,writeFileSync,readFileSync,rmSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 const names=['dashboard','inbox','friends','broadcasts','broadcast-new','templates','booking','answers','tags','settings','friends-2000']
@@ -37,5 +37,42 @@ test('同じ結果の2000件判定は、読む端末のCI環境変数で50/65ms�
   const broken=spawnSync(process.execPath,['apps/web/scripts/v8-guard/stress-targets.mjs',path],{encoding:'utf8'})
   assert.equal(broken.status,1)
   assert.match(broken.stderr,/保存した測定条件/)
+ } finally {rmSync(dir,{recursive:true,force:true})}
+})
+
+test('列車17と共通入口が超過と測定不正を区別し、CLIの超過は表を出して終了0にする',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'speed-train17-report-'))
+ try {
+  const path=join(dir,'speed.json'),summary=join(dir,'summary.md')
+  const result=fixture(),row=result.measured[0]
+  row.showMs=1086;row.samples.forEach(s=>s.showMs=1086)
+  const checks=referenceChecks(result)
+  result.targetExceedances=[{screen:'dashboard',metric:'showMs',value:1086,limit:1000,unit:'ms',check:'target'}]
+  assert.doesNotThrow(()=>checkMeasuredResult(result))
+  assert.equal(result.exceedances.length,1)
+  assert.equal(checks.train17.measurementFailed,false)
+  assert.deepEqual(checks.train17.exceedances,[{screen:'dashboard',metric:'showMs',value:1086,limit:1000,unit:'ms',check:'train17'}])
+  writeFileSync(path,JSON.stringify(result))
+  for(const mode of ['report','enforce']) {
+   const run=spawnSync(process.execPath,['apps/web/scripts/v8-guard/stgfix17-targets.mjs',path],{encoding:'utf8',env:{...process.env,V8_SPEED_ENFORCEMENT:mode,GITHUB_STEP_SUMMARY:summary}})
+   assert.equal(run.status,mode==='report'?0:1,run.stderr)
+  }
+  assert.match(readFileSync(summary,'utf8'),/dashboard \| showMs \| 1086ms \| 1000ms \| \+86ms/)
+  writeFileSync(path,JSON.stringify(checkMeasuredResult(result)))
+  for(const mode of ['report','enforce']) {
+   const run=spawnSync(process.execPath,['apps/web/scripts/v8-guard/speed-report.mjs',path],{encoding:'utf8',env:{...process.env,V8_SPEED_ENFORCEMENT:mode,GITHUB_STEP_SUMMARY:summary,SPEED_BUDGET_OUTCOME:'success',STRESS_SPEED_OUTCOME:'success',PERF3_TARGETS_OUTCOME:'success'}})
+   assert.equal(run.status,mode==='report'?0:1,run.stderr)
+   assert.match(run.stdout,/超過/)
+  }
+  row.samples[0].showMs=null
+  assert.equal(referenceChecks(result).train17.measurementFailed,true)
+  assert.throws(()=>checkMeasuredResult(result),/欠測/)
+  writeFileSync(path,JSON.stringify(result))
+  for(const script of ['stgfix17-targets','perf3-targets','stress-targets']) {
+   const broken={...result,complete:false}
+   writeFileSync(path,JSON.stringify(broken))
+   const run=spawnSync(process.execPath,[`apps/web/scripts/v8-guard/${script}.mjs`,path],{encoding:'utf8',env:{...process.env,V8_SPEED_ENFORCEMENT:'report'}})
+   assert.equal(run.status,1)
+  }
  } finally {rmSync(dir,{recursive:true,force:true})}
 })

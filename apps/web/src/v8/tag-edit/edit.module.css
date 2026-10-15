@@ -4,9 +4,6 @@
  */
 .page {
   display: contents;
-  --tpl-create-head-row-gap: var(--tpl-eds-tag-head-gap);
-  --tpl-create-desc-size: var(--tpl-eds-tag-desc-size);
-  --tpl-create-desc-lh: var(--tpl-eds-tag-desc-lh);
 }
 .loading { margin: 0; padding: var(--tpl-eds-loading-pad); color: var(--color-ink-faint); font-size: var(--text-label); }
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-eds-back-gap); color: var(--color-action); font-size: var(--text-label); font-weight: 600; text-decoration: none; }
@@ -18,25 +15,19 @@
 /* 競合の帯の置き場。帯の見た目は共通部品（save-conflict）が持つ。 */
 .conflictSlot { display: block; margin: var(--tpl-eds-band-mt) 0 var(--tpl-eds-band-mb); }
 
-/* カード：枠1本・角12・余白20・間14。題 15/700・説明 12。 */
-.card { display: flex; flex-direction: column; gap: var(--tpl-eds-tag-card-gap); padding: var(--tpl-eds-card-pad); border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: -1px; background: var(--color-canvas); box-shadow: var(--card-shadow); }
-.cardHead { display: flex; flex-direction: column; }
-.cardTitles { display: flex; flex-direction: column; gap: var(--tpl-eds-title-gap); min-width: 0; }
+/* 段の箱はCard(form)。題と中身だけを並べる。 */
 .titleRow { display: flex; align-items: center; gap: var(--tpl-eds-field-gap); min-width: 0; }
 .titleSpacer { flex: 1 1 0; }
-.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-eds-card-title-lh); }
 .noteRow { display: flex; align-items: center; gap: var(--tpl-eds-head-gap); }
 .cardNote { flex: 1 1 0; margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
 .linkedState { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; }
 .summaryRow { display: flex; align-items: center; gap: var(--tpl-eds-head-gap); padding: var(--tpl-eds-summary-pad); }
 .summaryText { min-width: 0; overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
-.openButton { display: inline-flex; flex-shrink: 0; align-items: center; gap: var(--tpl-eds-open-gap); min-height: 0; padding: 0; border: 0; background: transparent; color: var(--color-action); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-eds-note-lh); cursor: pointer; }
 
 .field { display: flex; flex-direction: column; gap: var(--tpl-eds-field-gap); min-width: 0; }
 .labelStrong { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-eds-label-lh); }
 .label { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-eds-label2-lh); }
 .hint { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-eds-hint-lh); }
-.input { width: 100%; min-width: 0; height: var(--tpl-eds-input-h); padding: var(--tpl-eds-input-pad); border: 0; border-radius: var(--radius-control); outline: 1px solid var(--color-control-border); outline-offset: -1px; background: var(--color-canvas); color: var(--color-ink); font-size: var(--text-body); line-height: var(--tpl-eds-input-lh); }
 /* 閲覧のみ：入力の部品の代わりに、いまの値を文字で出す。 */
 .roValue { min-width: 0; color: var(--color-ink); font-size: var(--text-body); line-height: var(--tpl-eds-input-lh); overflow-wrap: anywhere; }
 .input:focus-visible { outline: var(--tpl-nt-focus-ring) solid var(--color-focus-ring); }

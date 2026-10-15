@@ -1,4 +1,6 @@
 'use client'
+
+import Card from '@/components/shared/card'
 import {japaneseDetailOf} from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 
@@ -6,7 +8,6 @@ import { Field } from '@/components/shared/form-controls'
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
-import Link from '@/components/shared/list-navigation'
 import {
   AlignLeft,
   CalendarCheck,
@@ -30,7 +31,7 @@ import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { SettingCheckbox } from '@/components/shared/checkbox'
-import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
+import { ADD_GROUPS, blockKindLine, blockTitleKind, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile, uploadToMediaLibrary } from '@/components/shared/media-library-upload'
@@ -40,6 +41,7 @@ import { useFormEditAttempted } from './field-issues'
 import styles from './edit.module.css'
 import TextLink from '@/components/shared/text-link'
 import { SaveErrorScope, useSaveFormErrors, SaveErrorField } from '@/components/shared/save-form-errors'
+import { formJumpsInto } from '@/components/forms/form-definition-operations'
 import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect from '@/components/shared/entity-select'
 
@@ -64,6 +66,7 @@ type Props = {
   onRenamePage: (index: number, name: string) => boolean
   onDuplicatePage: (index: number) => void
   onRemovePage: (index: number) => void
+  canUndoPageRemoval?: boolean
   onSelectBlock: (id: string | null) => void
   onAddBlock: (block: FormBlock) => void
   onPatchBlock: (id: string, patch: Partial<FormBlock>) => void
@@ -78,9 +81,14 @@ export function ContentTab(props: Props) {
   const [removing, setRemoving] = useState(false)
   const section = layout.sections[page]
 
+  const askRemoveSection = (index: number) => {
+    if (props.readOnly || layout.sections.length <= 1 || !section) return
+    setRemoving(true)
+  }
+
   return (
     <>
-      <section className={styles.card} aria-labelledby="fe-pages-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-pages-title">
         <div className={styles.cardHead}>
           <span className={styles.cardHeadText}>
             <h2 id="fe-pages-title" className={styles.cardTitle}>ページ</h2>
@@ -95,7 +103,7 @@ export function ContentTab(props: Props) {
             destructiveItem={layout.sections.length > 1 ? {
               id: 'remove',
               label: 'このページを消す',
-              onSelect: () => setRemoving(true),
+              onSelect: () => askRemoveSection(page),
             } : undefined}
           />}
         </div>
@@ -117,9 +125,9 @@ export function ContentTab(props: Props) {
             ページを足す
           </Button>}
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="fe-blocks-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>
           <h2 id="fe-blocks-title" className={styles.cardTitle}>{`ページ${page + 1} のブロック`}</h2>
           <p className={styles.cardNote}>つまみで並べ替え。押すと設定が開きます</p>
@@ -143,7 +151,7 @@ export function ContentTab(props: Props) {
           )
         )}
         {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
-      </section>
+      </Card>
 
       <RenameDialog
         value={props.readOnly ? null : renaming}
@@ -155,14 +163,17 @@ export function ContentTab(props: Props) {
       <Dialog
         open={!props.readOnly && removing}
         title="このページを消す"
-        description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0} 個を消します。この操作は元に戻せません。`}
+        description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0} 個を消します。${props.canUndoPageRemoval ? '保存する前なら「元に戻す」で戻せます。' : 'この操作は元に戻せません。'}`}
         confirmLabel="消す"
         onConfirm={() => {
           setRemoving(false)
           props.onRemovePage(page)
         }}
         onCancel={() => setRemoving(false)}
-      />
+      >
+        <p>集まった回答は消えません。</p>
+        <p>このページへの分岐{section ? formJumpsInto(layout, section.id) : 0}件は「次へ進む」に戻します。</p>
+      </Dialog>
     </>
   )
 }
@@ -298,10 +309,6 @@ function OpenBlock(props: RowProps) {
   )
 }
 
-function blockTitleKind(block: FormBlock): string {
-  return { image: '画像', heading: '見出し', text: 'テキスト', button: 'ボタン', input: '入力' }[block.kind]
-}
-
 function Labeled({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
   return <Field label={label} htmlFor={htmlFor}>{children}</Field>
 }
@@ -410,6 +417,7 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
             className={styles.choiceRemove}
             aria-label={`選択肢「${choice.label}」を消す`}
             disabled={choices.length <= 1 || (block.fixedField === 'allergy' && choice.isOther)}
+            title={block.fixedField === 'allergy' && choice.isOther ? '自由に書く選択肢は、アレルギーの書き足しに使うため消せません' : choices.length <= 1 ? '選択肢を1つ以上残してください' : undefined}
             onClick={() => set({ choices: choices.filter((_, i) => i !== index) })}
           >
             <X size={15} aria-hidden="true" />
@@ -445,6 +453,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
       <span className={styles.saveSelect}>
         <SaveErrorField names={["current"]}><EntitySelect
           aria-label="答えを保存する先"
+          compact
           value={current}
           onChange={(value) => {
             const rest = (block.destinations?.friendFieldIds ?? []).slice(1)
@@ -621,7 +630,7 @@ function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) 
                   <span className={styles.addCardLabel}>{card.label}</span>
                   {card.fresh ? <span className={styles.newBadge}>新</span> : null}
                 </span>
-                <span className={styles.addCardHint}>{card.hint}</span>
+                <span className={styles.addCardHint} title={card.hint}>{card.hint}</span>
               </button>
             ))}
           </div>

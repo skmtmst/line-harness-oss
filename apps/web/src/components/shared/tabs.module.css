@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * ページ内タブ。Pencil V5 の `VPn1F`（選択中）と `ISA1Q`（通常）。
@@ -12,11 +12,8 @@
  */
 
 .list {
-  display: flex;
-  align-items: flex-end; /* alignItems: end */
-  justify-content: space-between; /* justifyContent: space_between */
-  gap: 26px; /* gap: 26 */
-  height: 44px; /* 種別タブ height: 44 */
+  display: flex; /* alignItems: end */
+  justify-content: space-between; /* justifyContent: space_between */ /* gap: 26 */ /* 種別タブ height: 44 */
   border-bottom: 1px solid var(--color-hairline);
 }
 
@@ -24,8 +21,6 @@
 .items {
   display: flex;
   min-width: 0;
-  align-items: flex-end;
-  gap: 26px;
 }
 
 /* タブ行の右端。ヘッダー操作を独立した行にしない。 */
@@ -38,14 +33,9 @@
 }
 
 .tab {
-  display: inline-flex;
-  align-items: center; /* alignItems: center */
-  height: 44px; /* height: 44 */
-  padding: 0 4px; /* padding: [0, 4] */
+  display: inline-flex; /* alignItems: center */ /* height: 44 */ /* padding: [0, 4] */
   border-bottom: 2px solid transparent; /* strokeWidth: {bottom: 2} / stroke: #00000000 */
-  color: var(--color-ink-secondary); /* fill: $ink-secondary */
-  font-size: var(--text-body); /* fontSize: $size-body */
-  font-weight: 500; /* fontWeight: 500 */
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */ /* fontSize: $size-body */ /* fontWeight: 500 */
   white-space: nowrap;
   cursor: pointer;
   background: none;
@@ -68,10 +58,7 @@
 /* VPn1F 共通 ページ内タブ項目（選択中）
  * #976 U084: 文字色は `$accent`(#06c755、白地で2.26:1) から
  * `$accent-deep`(#087a3e、5.44:1) へ。下線も同じ色で揃える。 */
-.current {
-  border-bottom-color: var(--color-accent-deep);
-  color: var(--color-accent-deep);
-  font-weight: 500; /* fontWeight: 500 */
+.current { /* fontWeight: 500 */
   cursor: default;
 }
 
@@ -83,10 +70,6 @@
   font-weight: 600;
 }
 
-.current .count {
-  color: var(--color-accent-deep);
-}
-
 /*
  * #1014 U029: 390pxではタブ4個と右端の操作が44pxの1行に入らず、
  * 重なって読めなかった。狭い画面ではタブ行を折り返し、タブは横に
@@ -95,7 +78,6 @@
 @media (max-width: 767px) {
   .list {
     flex-wrap: wrap;
-    height: auto;
     padding-bottom: 8px;
   }
 
@@ -114,16 +96,16 @@
  * 選んでないタブは ink-secondary の 500。下線と文字色は速い動きで
  * 移る（★V8 動き「切り替え・タブは滑る 120ms」）。
  */
-[data-theme='v8'] .list {
+:root .list {
   gap: 24px;
   height: var(--tpl-tabs-h); /* 画面の板（AzrZq ほか72枚）：高さ28。部品見本 clV5c の35は少数なので板に合わせる */
 }
 
-[data-theme='v8'] .items {
+:root .items {
   gap: 24px;
 }
 
-[data-theme='v8'] .tab {
+:root .tab {
   height: var(--tpl-tabs-h);
   align-items: flex-end; /* 文字は下付き（文字の下10） */
   padding-bottom: var(--tpl-tabs-pad-bottom);
@@ -134,7 +116,7 @@
     border-color var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] .current {
+:root .current {
   border-bottom-color: var(--color-ink);
   color: var(--color-ink);
   font-weight: 600;
@@ -145,11 +127,11 @@
  * 測れたときだけ動く印を出し、枠線の下線は消す。
  * 測れないときは枠線の下線が残る（tabs.tsx の data-sliding）。
  */
-[data-theme='v8'] .items {
+:root .items {
   position: relative;
 }
 
-[data-theme='v8'] .indicator {
+:root .indicator {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -161,35 +143,35 @@
     width var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] .items[data-sliding='true'] .current {
+:root .items[data-sliding='true'] .current {
   border-bottom-color: transparent;
 }
 
-[data-theme='v8'] .current .count {
+:root .current .count {
   color: var(--color-ink-faint);
 }
 
 /* 狭い幅ではタブが折り返すので、帯の高さ固定を外す（v8 のみ）。 */
 @media (max-width: 767px) {
-  [data-theme='v8'] .list {
+  :root .list {
     height: auto;
   }
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .list { height: auto; align-items: flex-start; }
-[data-theme='v8'] .items { align-items: flex-start; }
-[data-theme='v8'] .tab { height: auto; padding: 0 0 12px; border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
-[data-theme='v8'] .current { border-bottom: 2px solid var(--color-ink); }
-[data-theme='v8'] .items[data-sliding='true'] .current { border-bottom-color: transparent; }
-[data-theme='v8'] .indicator { border-radius: 0; }
+:root .list { height: auto; align-items: flex-start; }
+:root .items { align-items: flex-start; }
+:root .tab { height: auto; padding: 0 0 12px; border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .current { border-bottom: 2px solid var(--color-ink); }
+:root .items[data-sliding='true'] .current { border-bottom-color: transparent; }
+:root .indicator { border-radius: 0; }
 /* 詰めた段（size="compact"）：文字の行だけ詰める。下12・間24・線は同じ。 */
-[data-theme='v8'] .list[data-size='compact'] .tab { min-height: 0; line-height: var(--tpl-tabs-compact-lh); }
+:root .list[data-size='compact'] .tab { min-height: 0; line-height: var(--tpl-tabs-compact-lh); }
 /* 選んだタブの下線は段の線に重ねる（絵の下線は段の高さを足さない）。 */
-[data-theme='v8'] .list[data-size='compact'] .current { margin-bottom: var(--tpl-tabs-compact-line-overlap); }
-[data-theme='v8'] .list[data-spacing='settings'] .items { gap: var(--tpl-sb-tab-gap); }
-[data-theme='v8'] .list[data-spacing='settings'] .tab { padding-bottom: var(--tpl-sb-tab-pad-bottom); }
-[data-theme='v8'] .count[data-tone='warning'] {
+:root .list[data-size='compact'] .current { margin-bottom: var(--tpl-tabs-compact-line-overlap); }
+:root .list[data-spacing='settings'] .items { gap: var(--tpl-sb-tab-gap); }
+:root .list[data-spacing='settings'] .tab { padding-bottom: var(--tpl-sb-tab-pad-bottom); }
+:root .count[data-tone='warning'] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -200,33 +182,31 @@
   color: var(--color-status-warn-deep);
   background: var(--color-status-warn-soft);
 }
-[data-theme='v8'] .list[data-size='notification'] .items { gap: var(--tpl-nt-tab-gap); }
-[data-theme='v8'] .list[data-size='notification'] .tab { min-height: 0; padding-bottom: var(--tpl-nt-tab-pad); line-height: var(--tpl-nt-tab-lh); }
+:root .list[data-size='notification'] .items { gap: var(--tpl-nt-tab-gap); }
+:root .list[data-size='notification'] .tab { min-height: 0; padding-bottom: var(--tpl-nt-tab-pad); line-height: var(--tpl-nt-tab-lh); }
 }
 
-[data-theme="v8"] .list[data-spacing="compact"] .items { gap: var(--tpl-rt-tab-gap); }
+:root .list[data-spacing="compact"] .items { gap: var(--tpl-rt-tab-gap); }
 /* EC等の設定本文に入る詰めたタブ。 */
-[data-theme='v8'] .list[data-size='settings'] .items { gap: var(--tpl-sb-tab-gap); }
-[data-theme='v8'] .list[data-size='settings'] .tab {
+:root .list[data-size='settings'] .items { gap: var(--tpl-sb-tab-gap); }
+:root .list[data-size='settings'] .tab {
   padding-bottom: var(--tpl-sb-tab-pad-bottom);
   line-height: var(--tpl-sb-row-name-lh);
   border-bottom: var(--tpl-sb-tab-line) solid transparent;
 }
-[data-theme='v8'] .list[data-size='settings'] .current { border-bottom-color: var(--color-ink); }
-[data-theme='v8'] .list[data-size='settings'] .items[data-sliding='true'] .current { border-bottom-color: transparent; }
+:root .list[data-size='settings'] .current { border-bottom-color: var(--color-ink); }
+:root .list[data-size='settings'] .items[data-sliding='true'] .current { border-bottom-color: transparent; }
 /* 文字18＋下の余白10の段。指定したタブだけで使う。 */
-[data-theme='v8'] .list[data-size='short'] .tab {
+:root .list[data-size='short'] .tab {
   box-sizing: border-box; height: var(--tpl-wh-tab-h); min-height: 0;
   align-items: flex-start; padding-bottom: 0; line-height: var(--tpl-tabs-text-lh);
 }
 
-/* B-152②：役割ごとの文字の段。 */
-[data-theme='v8'] .tab, [data-theme='v8'] .current { font-weight: var(--polish-weight-body); }
 .list[data-wrap='true'] { min-width: 0; max-width: 100%; }
 .list[data-wrap='true'] .items { flex-wrap: wrap; min-width: 0; max-width: 100%; }
 
 /* B-180：形の指定にかかわらず36px。滑る下線の動きは保つ。 */
-[data-theme='v8'] .list .tab.tab {
+:root .list .tab.tab {
   box-sizing: border-box;
   height: var(--tpl-tabs-h);
   min-height: var(--tpl-tabs-h);
@@ -238,8 +218,10 @@
   border-bottom: 2px solid transparent;
   margin-bottom: 0;
 }
-[data-theme='v8'] .list .current.current {
+:root .list .current.current {
   font-weight: var(--tpl-tabs-current-weight);
   border-bottom-color: var(--color-ink);
 }
-[data-theme='v8'] .list .items[data-sliding='true'] .current { border-bottom-color: transparent; }
+:root .list .items[data-sliding='true'] .current { border-bottom-color: transparent; }
+/* 通知の固定絵は文字を段の上へ置く。高さ36と切り替えの動きは共通。 */
+:root .list[data-size='notification'] .tab.tab { align-items: flex-start; }

@@ -23,7 +23,7 @@ describe('押した感じ（V8 のボタン・絵ボタン）', () => {
     expect(globals).toContain('--card-shadow: 0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)')
     expect(globals).toContain('--color-primary-border: #06612f')
     expect(globals).toContain('--radius-primary-action: 8px')
-    expect(buttonCss).toMatch(/\[data-theme='v8'\] \.primary \{[^}]*border: 1px solid var\(--color-primary-border\);[^}]*border-radius: var\(--radius-primary-action\);[^}]*box-shadow: var\(--shadow-primary-action\)/s)
+    expect(buttonCss).toMatch(/:root \.primary \{[^}]*border: 0;[^}]*outline: 1px solid var\(--color-primary-border\);[^}]*outline-offset: -1px;[^}]*border-radius: var\(--radius-primary-action\);[^}]*box-shadow: var\(--shadow-primary-action\)/s)
   })
 
   it('押す暗さは乗せる暗さ（0.92）より暗い', () => {
@@ -38,9 +38,9 @@ describe('押した感じ（V8 のボタン・絵ボタン）', () => {
     ['icon-button', iconCss, '--press-dim-soft'],
   ] as const) {
     it(`${name}：押している間は暗く・0.98・120ms（数字は変数から）`, () => {
-      expect(css).toMatch(new RegExp(`\\[data-theme='v8'\\] \\.button:active:not\\(:disabled\\) \\{\\s*filter: var\\(${dim}\\);`))
+      expect(css).toMatch(new RegExp(`:root \\.button:active:not\\(:disabled\\) \\{\\s*filter: var\\(${dim}\\);`))
       expect(css).toMatch(
-        /@media \(prefers-reduced-motion: no-preference\) \{\s*\[data-theme='v8'\] \.button:active:not\(:disabled\) \{\s*scale: var\(--press-scale\);/s,
+        /@media \(prefers-reduced-motion: no-preference\) \{\s*:root \.button:active:not\(:disabled\) \{\s*scale: var\(--press-scale\);/s,
       )
       expect(css).toMatch(/scale var\(--motion-fast\) var\(--motion-ease-out\)/)
     })
@@ -49,13 +49,11 @@ describe('押した感じ（V8 のボタン・絵ボタン）', () => {
       expect(css).toMatch(/scale var\(--motion-snap\) var\(--motion-spring\)/)
     })
 
-    it(`${name}：v7 の沈みは変えない`, () => {
-      expect(css).toMatch(/\.button:active:not\(:disabled\) \{\s*scale: 0\.9[68];/s)
-    })
+
   }
 
   it('白地のボタンは弱い暗さ（白が灰色に沈みすぎない）', () => {
-    expect(buttonCss).toMatch(/\[data-theme='v8'\] \.secondary:active:not\(:disabled\) \{\s*filter: var\(--press-dim-soft\);/)
+    expect(buttonCss).toMatch(/:root \.secondary:active:not\(:disabled\) \{\s*filter: var\(--press-dim-soft\);/)
   })
 
   it('押せるものは全部「指」の形（Tailwind の土台は button を default にする）', () => {

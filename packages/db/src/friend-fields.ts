@@ -610,7 +610,7 @@ export async function getFriendFieldListSummary(
       formLinks: new Set(usages.filter((usage) => usage.kind === 'form').map((usage) => usage.id)).size,
     };
   } catch (error) {
-    console.error('friend field form usage unavailable:', error);
+    console.error(JSON.stringify({"code":"src_friend_fields_failed"}));
     return {
       ...base,
       formLinks: null,

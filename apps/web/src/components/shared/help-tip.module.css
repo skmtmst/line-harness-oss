@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 見出し・ラベル横の「？」（共通ルール 2-1b・★V7 `LYs5d`「？ 補足の印」）。
@@ -31,24 +31,15 @@
   align-items: center; /* alignItems: center */
   justify-content: center; /* justifyContent: center */
   flex: none; /* 押し潰されて楕円・縦長にならない */
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
   min-height: 0; /* globals の 32px を上書き。題の行を伸ばさない */
-  max-width: 18px;
-  max-height: 18px;
-  aspect-ratio: 1 / 1; /* 縦横は必ず同じ */
-  padding: 0;
-  border: 1px solid var(--color-ink-faint); /* border: $ink-faint */
-  border-radius: var(--radius-pill); /* ★V7 `LYs5d` 18px 正円 */
-  background: var(--color-canvas); /* fill: $canvas */
+  aspect-ratio: 1 / 1; /* 縦横は必ず同じ */ /* border: $ink-faint */
+  border-radius: var(--radius-pill); /* ★V7 `LYs5d` 18px 正円 */ /* fill: $canvas */
   color: var(--color-ink-secondary); /* color: $ink-secondary */
   cursor: pointer;
 }
 
 /* 当たりだけを広げる。absolute のため行の高さ・幅に影響しない。 */
 .button::before {
-  content: "";
   position: absolute;
   inset: -5px; /* 18 + 10 = 28px の当たり */
 }
@@ -62,14 +53,10 @@
 
 .button:focus-visible {
   outline: 2px solid var(--color-status-info); /* keyboard focus */
-  outline-offset: 1px;
 }
 
 /* 箱の中の「?」。★V7 `LYs5d`：11px 太字 `ink-secondary`。 */
-.mark {
-  font-size: var(--text-micro); /* fontSize: 11 */
-  font-weight: 500;
-  line-height: 1;
+.mark { /* fontSize: 11 */
 }
 
 .tip {
@@ -78,15 +65,7 @@
   left: 0;
   z-index: 10;
   width: max-content;
-  max-width: 300px; /* maxWidth: 300 */
-  padding: 8px 10px; /* padding: [8, 10] */
-  border: 1px solid var(--color-hairline); /* border: $hairline */
-  border-radius: var(--radius-control); /* cornerRadius: $radius-control */
-  background: var(--color-canvas); /* fill: $canvas */
-  box-shadow: var(--shadow-card);
-  color: var(--color-ink-secondary); /* color: $ink-secondary */
-  font-size: var(--text-caption); /* fontSize: $size-caption */
-  line-height: 1.6;
+  max-width: 300px; /* maxWidth: 300 */ /* padding: [8, 10] */ /* border: $hairline */ /* cornerRadius: $radius-control */ /* fill: $canvas */ /* color: $ink-secondary */ /* fontSize: $size-caption */
   white-space: normal;
 }
 
@@ -94,7 +73,6 @@
 .tip a {
   display: inline-block;
   margin-left: 8px;
-  color: var(--color-action);
   font-weight: 600;
   text-decoration: underline;
 }
@@ -107,14 +85,14 @@
 /*
  * ★V8 `f6zwfs`：ふきだしは黒（ink）の地に白い字。印の18px正円は変えない。
  */
-[data-theme='v8'] .tip {
+:root .tip {
   border-color: transparent;
   background: var(--color-ink);
   box-shadow: var(--shadow-float);
   color: var(--color-canvas);
 }
 
-[data-theme='v8'] .tip a {
+:root .tip a {
   color: var(--color-canvas);
 }
 
@@ -129,7 +107,7 @@
  * 透明な 28px の当たりにする（外側の配置は戻し余白で 16 に保つ）。
  * 見た目の円・28px の当たり・読み上げは変わらない。v7 は今までどおり。
  */
-[data-theme='v8'] .button {
+:root .button {
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -142,11 +120,11 @@
 }
 
 /* V8 の当たりは札自体。透明の ::before は出さない（指の 44px も同じ）。 */
-[data-theme='v8'] .button::before {
+:root .button::before {
   content: none;
 }
 
-[data-theme='v8'] .mark {
+:root .mark {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -162,7 +140,7 @@
 }
 
 /* 札は透明なので、キーボードの輪は中の円に寄せる。 */
-[data-theme='v8'] .button:focus-visible {
+:root .button:focus-visible {
   outline-offset: -5px;
 }
 
@@ -172,23 +150,23 @@
  * 中身は少し下からふっと出る（小さいふきだしなので 120ms）。
  * （G3：沈みの地は円（.mark）側へ。札は透明の当たりのまま。）
  */
-[data-theme='v8'] .button {
+:root .button {
   transition: scale var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] .mark {
+:root .mark {
   transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] .button:hover .mark {
+:root .button:hover .mark {
   background: var(--color-canvas-sunken);
 }
 
-[data-theme='v8'] .button:active {
+:root .button:active {
   scale: 0.88;
 }
 
-[data-theme='v8'] .tip {
+:root .tip {
   animation: help-tip-v8-in var(--motion-fast) var(--motion-ease-out);
   transform-origin: top left;
 }
@@ -207,7 +185,7 @@
 }
 
 /* 正本 f6zwfs：影なし、枠なし、上下6、行間18。 */
-[data-theme='v8'] .tip {
+:root .tip {
   display: flex; align-items: flex-start; gap: 0; padding: 6px 10px;
   border: 0; border-radius: var(--polish-radius-small); box-shadow: none;
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
@@ -215,10 +193,10 @@
 }
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
-[data-theme='v8'] .tip { -webkit-font-smoothing: auto; }
+:root .tip { -webkit-font-smoothing: auto; }
 
 @layer components {
-[data-theme='v8'] .mark {
+:root .mark {
   gap: 0;
   border: 0;
   outline: 1.2px solid var(--color-ink-faint);
@@ -239,14 +217,24 @@
  * 上下の幅の小さい Inter で描く（箱は 12・中心は円の中心のまま）。円の大きさ（16）・字の大きさ・太さは変えない。
  */
 @layer components {
-[data-theme='v8'] .mark {
+:root .mark {
   font-family: var(--tpl-ux5-help-mark-font);
 }
 }
 
 /* B-203・B-207・B-211：10-10 に採用した共通の形。 */
-html[data-theme='v8'] .tip { background: var(--color-canvas); color: var(--color-ink); border: 1px solid var(--color-code-border); box-shadow: var(--shadow-float); padding: var(--space-12); }
-html[data-theme='v8'] .tip a { color: var(--color-action); }
+html:root .tip { background: var(--color-canvas); color: var(--color-ink); border: 1px solid var(--color-code-border); box-shadow: var(--shadow-float); padding: var(--space-12); }
+html:root .tip a { color: var(--color-action); }
 
 .sourceMark { display: inline-flex; width: var(--choice-size); height: var(--choice-size); color: var(--color-ink-secondary); align-items: center; justify-content: center; }
 .sourceMark svg { width: var(--text-caption); height: var(--text-caption); }
+
+/* 題から開く説明は、印の寸法・戻し余白を持たない。 */
+html:root .button[data-help-trigger='text'] {
+  width: auto; height: auto; min-width: 0; max-width: 100%; max-height: none;
+  margin: 0; aspect-ratio: auto; border-radius: var(--radius-control);
+  color: inherit; font: inherit; text-align: inherit; justify-content: flex-start;
+}
+html:root .button[data-help-trigger='text']:hover { text-decoration: underline; }
+html:root .button[data-help-trigger='text']:focus-visible { outline-offset: 2px; }
+html:root .button[data-help-trigger='text']:active { scale: 1; }

@@ -9,6 +9,7 @@ import type { StaffMember } from '@line-crm/shared'
  *   控えたIDを使い回し、割当だけ送り直す。
  */
 import React from 'react'
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -20,7 +21,7 @@ const fixture = vi.hoisted(() => ({
   push: null as null | ((...args: unknown[]) => void),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: (...args: unknown[]) => fixture.push!(...args), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -29,7 +30,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 
@@ -63,6 +64,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ApiError,
     api: { staff: { list: async () => ({ success: true, data: [] }) } },
     bookingApi: {
+      listStaff: async () => ({ staff: [] }),
       listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
       createStaff: (...args: unknown[]) => fixture.createStaff!(...args),
       putStaffMenus: (...args: unknown[]) => fixture.putStaffMenus!(...args),
@@ -113,18 +115,19 @@ async function renderNew() {
 }
 
 async function fillAndSave() {
-  fireEvent.change(screen.getByPlaceholderText('例: 田中 美咲'), { target: { value: '田中' } })
-  fireEvent.click(screen.getByRole('checkbox', { name: /カット/ }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }), { target: { value: '田中' } })
+  await pickEntities('予約を受けられるメニュー', ['カット'])
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'スタッフを追加する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
   })
 }
 
 describe('R309 メニュー候補の料金は一覧と同じ言葉', () => {
   test('お問い合わせは¥0と出さない', async () => {
     await renderNew()
-    expect(screen.getByText('30分 / お問い合わせ')).toBeTruthy()
-    expect(screen.getByText('60分 / ¥8,000')).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: '予約を受けられるメニュー' }))
+    expect(await screen.findByText('30分・お問い合わせ')).toBeTruthy()
+    expect(screen.getByText('60分・¥8,000')).toBeTruthy()
     expect(screen.queryByText(/¥0/)).toBeNull()
   })
 })
@@ -141,7 +144,7 @@ describe('R310 割当だけ失敗してもスタッフを作り直さない', ()
 
     // 部分成功：何が済んで何が残っているかを出す。
     await screen.findByText('スタッフは登録できましたが、担当メニューの設定に失敗しました。入力は残っています。「割当をやり直す」を押してください。')
-    expect(screen.getByText('スタッフは登録済みです。担当メニューの設定が残っています')).toBeTruthy()
+    expect(screen.getByText('スタッフは登録済みです。担当メニューの設定が残っています。')).toBeTruthy()
     expect(fixture.createStaff).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('button', { name: '割当をやり直す' })).toBeTruthy()
 

@@ -32,8 +32,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 /*
  * ★V8 運用状態 健全性チェック（Pencil `Y4LkX1`）。
  *
- * app/emergency/page.tsx の HealthPanel・OperationAlertsPanel を写し（src/v8 は @/app を読めない）、
- * 見た目だけ絵に合わせた：上の「全体の状態」の帯／表の上に「開いている異常」／9行の表／下の3枚。
+ * 現役の健全性と異常の受領・通知をここに集める。絵の並びは：上の「全体の状態」の帯／表の上に「開いている異常」／9行の表／下の3枚。
  * 動き（初回だけ読み込み中・5分ごとの取り直し・手動確認の世代照合・受領・通知のやり直し・
  * 古い確認と未確認の言い分け・アカウント切替の見張り）は同じ。
  */
@@ -172,7 +171,7 @@ const ALERT_RESPONSE_FIRST: Record<OperationHealthCheckKey, { impact: string; re
 }
 
 /** 表の上の「開いている異常」。受領（メモつき）・通知のやり直し。異常なしと「読めない」を混同しない。 */
-function OpenAlerts({
+export function OpenAlerts({
   alerts,
   failed,
   busyId,
@@ -222,7 +221,7 @@ function OpenAlerts({
               <div className={styles.alertLine}>
                 <StatusPill severity={alert.severity} />
                 <p className={styles.alertText} title={detail}>{`${checkTitle}：${alert.summary}${formatDetectedSince(alert.firstDetectedAt)}`}</p>
-                {alert.status === 'acknowledged' ? <span className={styles.status} data-tone="info">受領済み</span> : null}
+                {alert.status === 'acknowledged' ? <span className={styles.status} data-tone="info">受領済み</span> : alert.status === 'resolved' ? <span className={styles.status} data-tone="info">解消済み</span> : null}
                 {response ? <Link href={response.href} className={styles.srOnly}>対象画面へ</Link> : null}
                 {canManage && alert.status === 'open' ? (
                   <Button variant="secondary" disabled={busy} busy={busy} onClick={() => {
@@ -283,6 +282,7 @@ export function HealthPanelV8({
   const [loading, setLoading] = useState(true)
   const hasLoaded = useRef(false)
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
+  const [loginSecurityNotice, setLoginSecurityNotice] = useState<string | null>(null)
   const [snapshotStatus, setSnapshotStatus] = useState<OperationHealthSnapshot['overallStatus']>('unknown')
   const [alerts, setAlerts] = useState<OperationAlert[]>([])
   const [stats, setStats] = useState<{ stops: number; longest: string; version: string } | null>(null)
@@ -343,6 +343,7 @@ export function HealthPanelV8({
   }
 
   const applySnapshot = useCallback((snapshot: OperationHealthSnapshot) => {
+    setLoginSecurityNotice(snapshot.loginSecurity?.notice ?? null)
     const results = snapshot.latestRun?.results ?? []
     const snapshotStale = snapshot.overallStatus === 'stale'
     setChecks(CHECK_DEFINITIONS.map((definition) => {
@@ -521,10 +522,11 @@ export function HealthPanelV8({
 
   useEffect(() => { if (hasLoaded.current) onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
 
-  const openAlerts = alerts.filter((alert) => alert.status !== 'resolved')
+  const openAlerts = alerts.filter((alert) => alert.status !== 'resolved' || alert.notification.failed + alert.notification.unconfigured > 0)
 
   return (
     <>
+      {loginSecurityNotice ? <Notice tone="warn" message={loginSecurityNotice} /> : null}
       <div className={styles.banner} data-tone={banner.tone} role="status">
         <BannerIcon className={styles.bannerIcon} aria-hidden="true" />
         <div className={styles.bannerText}>
@@ -595,9 +597,9 @@ export function HealthPanelV8({
         </GridTable>
       </section>
       <KpiBand presentation="band">
-        <KpiCard presentation="band" icon={null} title="止めた回数" value={stats ? stats.stops : null} unit="" detail={statsNote} />
-        <KpiCard presentation="band" icon={null} title="いちばん長かった停止" value={null} valueText={stats?.longest ?? '—'} unit="" detail={statsNote} />
-        <KpiCard presentation="band" icon={null} title="いまの版" value={null} valueText={stats?.version ?? '—'} unit="" detail={stats ? '反映済み' : statsNote} />
+        <KpiCard presentation="band" title="止めた回数" value={stats ? stats.stops : null} unit="" detail={statsNote} />
+        <KpiCard presentation="band" title="いちばん長かった停止" value={null} valueText={stats?.longest ?? '—'} unit="" detail={statsNote} />
+        <KpiCard presentation="band" title="いまの版" value={null} valueText={stats?.version ?? '—'} unit="" detail={stats ? '反映済み' : statsNote} />
       </KpiBand>
     </>
   )

@@ -93,18 +93,16 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
    *
    * `app/form-submissions/edit` の「ページの名前」は、そもそも入力欄を持つ窓に
    * するのが正しい。
-   * 手本は `app/rich-menus/edit/page.tsx`——`ConfirmDialog` の `children` に
+   * 手本は `app/rich-menus/new/create-v8.tsx`——`Dialog` の `children` に
    * 入力欄を置いている。
    *
    * **増やせない。0 になったら行ごと消す**（消し忘れるとここで落ちる）。
    */
-  // 2026-09-14 点検#520の軽15(#739)で components/events/event-form.tsx の
+  // 2026-09-14 点検#520の軽15(#739)で v8/events/edit-form.tsx の
   // window.prompt 2箇所を隣の読取専用欄へ寄せたので、一覧から外した。
   // 2026-09-23 V6R-S3-f で予約管理・流入経路の詳細のコピー失敗を画面内の欄と一言へ寄せたので、
   // 一覧から外した。
-  const PROMPT_NOT_YET = [
-    'app/form-submissions/edit/page.tsx',
-  ]
+  const PROMPT_NOT_YET: string[] = []
 
   it('prompt を使うファイルを増やさない', () => {
     expect(offenders(BROWSER_PROMPT), 'ConfirmDialog の children に入力欄を置く').toEqual(

@@ -28,7 +28,9 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/components/shared/page-header', () => ({ default: () => null }))
 vi.mock('@/lib/api', () => ({
   ApiError: class extends Error {

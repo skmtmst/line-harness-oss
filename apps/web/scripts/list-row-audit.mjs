@@ -31,6 +31,12 @@ export function auditListSource(source, filename = 'screen.tsx') {
     if (name && attrs && /styles\.(?:sub|nameSub|cellSub|refCode|slug|rowCode|rowPlan|rowSub|urlText|miniBadgeWarn|miniBadgeDanger)\b/.test(attrs.getText(ast))) report(node, 'B-194 名前の2行目')
     if (name && ['StatusBadge', 'StatusPill', 'StatePill'].includes(kind)) report(node, 'B-194 状態は状態の列')
     if (ts.isCallExpression(node) && /\.tags\.slice$/.test(node.expression.getText(ast))) report(node, 'B-190 タグを切り捨てず+Nへ')
+    // NameCell の名前と、名前の横の未完・失敗の注記は別の口。
+    // 固定V8の主状態は引き続き状態列へ置く（nameの口の札は検出する）。
+    if (ts.isJsxAttribute(node) && node.name.getText(ast) === 'annotation') {
+      const cell = node.parent?.parent
+      if (cell && ['NameCell', 'GridNameCell'].includes(tag(cell))) name = false
+    }
     ts.forEachChild(node, (child) => visit(child, row, menu, name, folderName))
   }
   visit(ast)

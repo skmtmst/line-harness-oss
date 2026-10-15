@@ -9,40 +9,41 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/events/bookings.tsx', import.meta.url), 'utf8')
 
 /** 説明の文だけで通ってしまわないよう、判定の前にコメントを落とす。 */
+const RECORDS = readFileSync(new URL('../../../v8/events/booking-records.tsx', import.meta.url), 'utf8')
 const CODE = PAGE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
-describe('V6 i5SN2j イベント申込者の次行動と安全なキャンセル', () => {
+describe('V8 Mu8qW イベント申込者の次行動と安全なキャンセル', () => {
   it('帯を数だけで終わらせず、次にすることへつなぐ', () => {
     // IDEA-29: 残席は申込行数ではなく、席を消費中の人数(activeSeats)から引く。
-    expect(CODE).toContain('describeBookingCapacity(activeSeats, capacity)')
+    expect(RECORDS).toContain('describeBookingCapacity(activeSeats, summary.totalCapacity ?? null)')
     // 0件のときと有るときで、添え字が変わること。
-    expect(CODE).toContain('対応が必要：')
-    expect(CODE).toContain('件を確認してください')
-    expect(CODE).toContain('確認待ちはありません')
-    expect(CODE).toContain('空いた枠を確認してください')
-    expect(CODE).toContain('キャンセルはありません')
+    expect(RECORDS).toContain('対応が必要：')
+    expect(RECORDS).toContain('件を確認してください')
+    expect(RECORDS).toContain('確認待ちはありません')
+    expect(RECORDS).toContain('空いた枠を確認してください')
+    expect(RECORDS).toContain('キャンセルはありません')
   })
 
   it('運営キャンセルをブラウザ標準の窓で直に実行しない', () => {
     expect(CODE).not.toContain("confirm('運営側でキャンセルしますか？")
     // 窓を開ける押し口に目印。これが無いと撮影から辿れない。
-    expect(CODE).toContain('data-qa-open="i5SN2j-cancel"')
-    expect(CODE).toContain('open={cancelTarget !== null}')
+    expect(CODE).toContain('setCancelApplicant({ applicant: row, accountId: selectedAccountId })')
+    expect(CODE).toContain('open={cancelApplicant !== null}')
     // 何が起きるか・何が残るか・戻せないこと。
-    expect(CODE).toContain('友だちにはLINEでキャンセルのお知らせが届きます')
+    expect(CODE).toContain('友だちへLINEでお知らせが届き')
     expect(CODE).toContain('送ったお知らせは取り消せません')
   })
 
   it('拒否理由をブラウザ標準の窓で聞かず、届く範囲が分かる窓で確認する', () => {
     expect(CODE).not.toContain('window.prompt')
-    expect(CODE).toContain('data-qa-open="i5SN2j-reject"')
-    expect(CODE).toContain('open={rejectTarget !== null}')
+    expect(CODE).toContain('setRejectApplicant(row)')
+    expect(CODE).toContain('open={rejectApplicant !== null}')
     // 書いた理由がどこへ行くのか。prompt には書く場所が無かった。
-    expect(CODE).toContain('この理由は運営の記録にだけ残ります')
-    expect(CODE).toContain('友だちには決まったお知らせの文が届きます')
+    expect(CODE).toContain('理由は内部にだけ残り')
+    expect(CODE).toContain('友だちには決まったお知らせの文が届き')
     expect(CODE).toContain('rejectReason.trim() || undefined')
     expect(CODE).toContain('error={rejectError}')
   })
@@ -59,14 +60,14 @@ describe('V6 i5SN2j イベント申込者の次行動と安全なキャンセル
     expect(CODE).not.toContain('friend_id.slice(0, 8)')
     expect(CODE).not.toContain("(b.line_account_id ?? '').slice(0, 8)")
     expect(CODE).toContain('友だちは未取得')
-    expect(CODE).toContain('アカウントは未取得')
+    expect(RECORDS).toContain('アカウントは未取得')
   })
 
   it('タブ切替では申込一覧だけ取り直す(点検#520軽13)', () => {
     // 詳細・待ち列はタブと無関係。切替のたびに3つ取り直すと遅く、裏も重い。
-    expect(CODE).toContain('refreshList')
-    expect(CODE).toContain('refreshMeta')
-    expect(CODE).toContain('void refreshList()')
-    expect(CODE).toContain('void refreshMeta()')
+    expect(RECORDS).toContain('eventsApi.listBookings(accountId, eventId,')
+    expect(RECORDS).toContain('function RecordSummary(')
+    expect(RECORDS).toContain('useBookingRequests(JSON.stringify([accountId, eventId, revision, retry]))')
+    expect(CODE).toContain('void refreshEvent()')
   })
 })

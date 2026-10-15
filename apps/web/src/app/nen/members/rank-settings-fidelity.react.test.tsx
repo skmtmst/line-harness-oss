@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * ランク設定（板 `fb9NJ`）と競合の帯（板 `e5yBLx`）。
- * 送った日時は短く出す（9/30 10:12）。競合の帯も短い日時で出す。
+ * 送った日時は短く出す（09/30 10:12）。競合の帯も短い日時で出す。
  * 保存した人の名は口に無いので出さない（別途、口の追加が要る）。
  */
 import React, { act } from 'react'
@@ -10,12 +10,13 @@ import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NenRankSettingsData } from '@/lib/nen-ranks-api'
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams('tab=ranks'),
 }))
 
-import MembersPageV8, { RankSettingsTabV8 } from './members-v8'
+import MembersPageV8 from '@/v8/nen-members/members'
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true, useStaffIdentity: () => ({ id: 'test-staff' }) }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -65,6 +66,8 @@ const originalFetch = globalThis.fetch
 
 describe('ランク設定の絵合わせ（板 `fb9NJ`・`e5yBLx`）', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-11T12:00:00+09:00'))
     stubFetch()
     host = document.createElement('div')
     document.body.appendChild(host)
@@ -77,15 +80,16 @@ describe('ランク設定の絵合わせ（板 `fb9NJ`・`e5yBLx`）', () => {
     document.body.innerHTML = ''
     globalThis.fetch = originalFetch
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
-  it('送った日時は短く出す（9/30 10:12）', async () => {
+  it('送った日時は短く出す（09/30 10:12）', async () => {
     await act(async () => {
       root.render(
-        <RankSettingsTabV8 accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} readonly={false} />,
+        <MembersPageV8 accountId="acc-1" tab="ranks" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} onChangeTab={() => {}} />,
       )
     })
-    expect(host.textContent ?? '').toContain('最後に送った日時 9/30 10:12')
+    expect(host.textContent ?? '').toContain('最後に送った日時 09/30 10:12')
   })
 
   it('ランク設定の板にも CSV のボタンと基準ランクの「固定」がある', async () => {
@@ -97,13 +101,13 @@ describe('ランク設定の絵合わせ（板 `fb9NJ`・`e5yBLx`）', () => {
     const labels = [...host.querySelectorAll('button')].map((element) => element.textContent)
     expect(labels).toContain("CSVで書き出す")
     /* SETTINGS の末尾はしきい値 0 のブロンズ＝基準ランク。 */
-    expect(host.textContent ?? '').toContain('円〜（固定）')
+    expect(host.textContent ?? '').toContain('¥0〜（固定）')
   })
 
   it('競合の帯は短い日時で出す', async () => {
     await act(async () => {
       root.render(
-        <RankSettingsTabV8 accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} readonly={false} />,
+        <MembersPageV8 accountId="acc-1" tab="ranks" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} onChangeTab={() => {}} />,
       )
     })
     /* 下書きを汚して保存を押せるようにする。 */
@@ -124,7 +128,8 @@ describe('ランク設定の絵合わせ（板 `fb9NJ`・`e5yBLx`）', () => {
       if ((host.textContent ?? '').includes('にランク設定が保存されました')) break
     }
     /* 版4（14:02 JST）が読み直され、帯が出る。 */
-    expect(host.textContent ?? '').toContain('10/2 14:02 にランク設定が保存されました')
+    expect(host.textContent ?? '').toContain('ほかの人が 14:02 にランク設定を保存しました')
+    expect(host.querySelector('[title="10/02 14:02"]')).not.toBeNull()
     expect(host.textContent ?? '').toContain('違いを比べる')
     expect(host.textContent ?? '').toContain('最新を読み込んで続ける')
   })

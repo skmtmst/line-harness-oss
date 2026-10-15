@@ -21,6 +21,10 @@ export const STEP_UP_WINDOW_MS = 10 * 60 * 1000;
 
 /** POST /api/auth/step-up が受け付ける目的。ここに無い文字列は発行しない。 */
 export const STEP_UP_PURPOSES = [
+  'auth.api_key',
+  'auth.mfa.policy',
+  'auth.mfa.recovery',
+  'auth.mfa.reenroll',
   'operations.control',
   'affiliate.payout.export',
   'photo.original.download',

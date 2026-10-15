@@ -8,7 +8,7 @@
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -179,6 +179,23 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
 })
 
 describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
+  it('入力した画像・分類・題名・概要を見本に出し、文字だけへ戻すと画像を外す（送信しない）', async () => {
+    await act(async () => { root.render(<ColumnNew />) })
+    await flush()
+    for (const [label, value] of [['題名', '季節のコラム'], ['分類', '秋のごはん'], ['概要', '食事の短い紹介'], ['記事の URL', 'https://example.test/article']]) {
+      await act(async () => { fireEvent.change(host.querySelector(`input[aria-label="${label}"]`)!, { target: { value } }) })
+    }
+    await act(async () => { fireEvent.click(button('URL で入れる')!) })
+    await act(async () => { fireEvent.change(host.querySelector('input[aria-label="画像の URL"]')!, { target: { value: 'https://example.test/article.jpg' } }) })
+    const preview = host.querySelector('[data-template-region="preview"]')!
+    for (const text of ['季節のコラム', '秋のごはん', '食事の短い紹介', 'コラムを読む']) expect(preview.textContent).toContain(text)
+    expect(preview.querySelector('img[src="https://example.test/article.jpg"]')).not.toBeNull()
+    await act(async () => { fireEvent.click(host.querySelector('input[type="radio"][value="text"]')!) })
+    expect(preview.querySelector('img[src="https://example.test/article.jpg"]')).toBeNull()
+    expect((host.querySelector('input[aria-label="画像の URL"]') as HTMLInputElement).value).toBe('')
+    expect(calls.createColumn).not.toHaveBeenCalled()
+  })
+
   it('配信対象はタグを1つの欄で選び、保存に乗る', async () => {
     await act(async () => { root.render(<ColumnNew />) })
     await flush()
@@ -252,4 +269,11 @@ it('保存のぶつかりでは入力を残し、比較では変えず、読み�
   await act(async () => { fireEvent.click(reload) })
   await flush()
   expect((document.getElementById('nen-edit-body') as HTMLElement).textContent).toBe('ほかの担当者の入力')
+})
+
+it('押された後の説明に設定のボタン名を出し、式を文字として見せない', async () => {
+  await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  expect(screen.getByText('メッセージの「感想を書く」を押した人に何をするかです')).toBeTruthy()
+  expect(host.textContent).not.toContain('${merged.')
 })

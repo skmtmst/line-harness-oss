@@ -6,7 +6,7 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import ChannelsTabV8 from './channels-tab-v8'
+import ChannelsTabV8 from '@/v8/booking-menus/channels-tab'
 
 vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -16,12 +16,12 @@ const LIST = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
 const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
 const SETTINGS_V8 = readFileSync(join(ROOT, 'settings-v8.tsx'), 'utf8')
 // タブの中身は settings-tabs/ に分かれている（見た目・動きは同じ）。
-const SETTINGS_MENUS_TAB = readFileSync(join(ROOT, 'settings-tabs', 'menus-tab.tsx'), 'utf8')
-const SETTINGS_CSS = readFileSync(join(ROOT, 'settings-v8.module.css'), 'utf8')
+const SETTINGS_MENUS_TAB = readFileSync(join(ROOT, '../../../v8/booking-menus/tabs/menus-tab.tsx'), 'utf8')
+const SETTINGS_CSS = readFileSync(join(ROOT, '../../../v8/booking-menus/settings.module.css'), 'utf8')
 
-describe('V6 予約設定', () => {
+describe('V8 予約設定', () => {
   it('R91: メニューがあるときも見出しに作成の入口を常設する', () => {
-    expect(LIST).toContain("tab === 'menus' && canEditMenus")
+    expect(LIST).toContain("{canEdit ? (")
     expect(LIST).toContain('href="/booking/menus/new"')
   })
 
@@ -29,13 +29,13 @@ describe('V6 予約設定', () => {
     expect(LIST).toContain('受付枠')
     expect(LIST).toContain('休業日')
     expect(LIST).toContain('予約のルール')
-    expect(LIST).toContain('店舗共通の予約ルール')
+    expect(LIST).toContain('いつまで予約を受けるか')
     expect(LIST).toContain('bookingApi.saveSettings(accountId, {')
     expect(LIST).toContain('expectedVersion: draft.version')
-    expect(LIST).toContain('メニューごとの上書き')
-    expect(LIST).toContain("key: 'booking_window_days'")
-    expect(LIST).toContain("key: 'cutoff_hours_before'")
-    expect(LIST).toContain("key: 'cancel_deadline_hours_before'")
+    expect(CREATE).toContain('空ならお店全体のきまり（予約のルール）を使います')
+    expect(CREATE).toContain('booking_window_days:')
+    expect(CREATE).toContain('cutoff_hours_before:')
+    expect(CREATE).toContain('cancel_deadline_hours_before:')
   })
 
   it('作成画面で予約後の通知・リマインダ・マイルを実データから確認できる', () => {
@@ -43,18 +43,18 @@ describe('V6 予約設定', () => {
     expect(CREATE).toContain('予約を受け付けたことを知らせる')
     expect(CREATE).toContain('前日・開始前に思い出してもらう')
     expect(CREATE).toContain("item.eventType === 'booking_created'")
-    expect(CREATE).toContain('マイルを ${formatNumber(bookingMileage)} 付ける')
+    expect(CREATE).toContain('formatNumber(bookingMileage)')
   })
 
   it('作成画面で価格種別と店舗共通ルールの継承を実契約へ送る', () => {
     expect(CREATE).toContain('bookingApi.getSettings(selectedAccountId)')
     expect(CREATE).toContain("? 'inquiry'")
     expect(CREATE).toContain("? 'free'")
-    expect(CREATE).toContain('price_mode: priceMode')
-    expect(CREATE).toContain('空欄なら店舗設定を使います')
-    expect(CREATE).toContain('booking_window_days: windowDays ? Number(windowDays) : null')
-    expect(CREATE).toContain('cutoff_hours_before: cutoffHours ? Number(cutoffHours) : null')
-    expect(CREATE).toContain('cancel_deadline_hours_before: cancelDeadlineHours')
+    expect(CREATE).toContain("price_mode: basePrice.trim() === ''")
+    expect(CREATE).toContain('お店のきまりに戻す')
+    expect(CREATE).toContain('booking_window_days: ownRules && windowDays ? Number(windowDays) : null')
+    expect(CREATE).toContain('cutoff_hours_before: ownRules && cutoffHours ? Number(cutoffHours) : null')
+    expect(CREATE).toContain('cancel_deadline_hours_before: ownRules && cancelDeadlineHours')
     expect(CREATE).toContain('? Number(cancelDeadlineHours)')
   })
 
@@ -62,10 +62,10 @@ describe('V6 予約設定', () => {
     // 分割先のコメントは画面の文言ではない。
     expect(LIST.replace(/^\s*\/\/.*$/gm, '')).not.toContain('準備中')
     expect(LIST).toContain('bookingApi.getSettings(accountId)')
-    expect(LIST).toContain('<Pagination page={page} pageCount={pageCount}')
-    expect(LIST).toContain("label: m.is_active ? '止める' : '再開'")
-    expect(LIST).toContain('bookingApi.patchMenu(selectedAccountId, menu.id, version')
-    expect(LIST).toContain('error={visibilityError ?? undefined}')
+    expect(LIST).toContain('<Pagination page={safePage} pageCount={pageCount}')
+    expect(LIST).toContain("label: (visOverride[menu.id] ?? menu.is_active) ? '止める' : '出す'")
+    expect(LIST).toContain('bookingApi.patchMenu(accountId, menu.id, version')
+    expect(LIST).toContain('visibilityError ? <Notice')
     expect(LIST).not.toContain('メニュー名で検索')
     expect(LIST).not.toContain('CSVで書き出す')
   })
@@ -73,60 +73,61 @@ describe('V6 予約設定', () => {
   it('作成後の担当保存だけが失敗した場合は、作成済みと伝えて設定導線を出す (DEEP-16)', () => {
     // メニュー作成済みの再実行は createMenu を呼ばず、残りの担当設定だけを
     // やり直す。同名メニューの二重作成を防ぐ。
-    expect(CREATE).toContain('createdMenuNeedingStaff?.menuId ?? null')
-    expect(CREATE).toContain('setCreatedMenuNeedingStaff({ menuId, remainingStaffIds')
-    expect(CREATE).toContain('メニューは作成済みですが、一部の担当スタッフを保存できませんでした。')
-    expect(CREATE).toContain('もう一度押しても新しいメニューは増えません')
-    expect(CREATE).toContain('担当の設定をやり直す')
-    expect(CREATE).toContain('/booking/menus?tab=staff&menu=')
+    expect(CREATE).toContain('createdMenuNeedingFollowUp?.menuId ?? null')
+    expect(CREATE).toContain('setCreatedMenuNeedingFollowUp({ menuId, remainingStaffIds')
+    expect(CREATE).toContain('メニューは保存されましたが、一部の担当・設備を保存できませんでした。')
+    expect(CREATE).toContain('else if (createdMenuNeedingFollowUp && !editTarget)')
+    expect(CREATE).toContain('残りの設定をやり直す')
+    expect(CREATE).toContain('writeStaffAssignments(menuId, pendingStaffIds)')
   })
 
   it('読込・失敗・空を同じ空状態として扱わない', () => {
-    expect(LIST).toContain('<ListState kind="loading"')
-    expect(LIST).toContain('<ListState kind="error"')
-    expect(LIST).toContain('kind="empty"')
+    expect(LIST).toContain("status === 'loading'")
+    expect(LIST).toContain("status === 'error'")
+    expect(LIST).toContain('<EmptyList')
   })
 
-  it('休業日タブは受付枠内の休業日へ直接飛ぶ', () => {
-    expect(LIST).toContain('/booking/staff/shifts#special')
+  it('休業日タブはV8の休業日画面につながる', () => {
+    expect(LIST).toContain('<HolidaysTabV8')
   })
 
   it('担当の取得失敗・取得中を「未登録」と誤表示せず作成も止める (DEEP-17)', () => {
-    expect(CREATE).toContain('staffLoadState')
+    expect(CREATE).toContain('staffStatus')
     expect(CREATE).toContain('担当を読み込んでいます')
     // 取得失敗は「未登録」と混ぜない。入力を残したまま、その場で取り直せる。
     expect(CREATE).toContain('担当を読み込めませんでした。入力はそのまま残っています。')
     expect(CREATE).toContain('担当をもう一度読み込む')
-    expect(CREATE).toContain('reloadStaff')
+    expect(CREATE).toContain('onClick={() => loadAll()}')
     // 権限不足の失敗に再試行は出さず、権限の案内だけ出す。
-    expect(CREATE).toContain('担当スタッフを見る権限がありません')
+    expect(CREATE).toContain("permissionDeniedMessage('store')")
     expect(CREATE).toContain("classifyApiFailure(staffError) !== 'forbidden'")
     // 空（0人）は失敗と別の言葉で出し、登録へ誘導するのは空のときだけ。
     expect(CREATE).toContain('まだスタッフが登録されていません')
     // 候補が確定するまで保存しない。候補にいないIDは選択数に数えない。
-    expect(CREATE).toContain("staffLoadState === 'loading'")
-    expect(CREATE).toContain("staffLoadState === 'error'")
-    expect(CREATE).toContain('担当スタッフを読み込めませんでした。下の「担当をもう一度読み込む」で読み込んでから作成してください')
+    expect(CREATE).toContain("staffStatus === 'loading'")
+    expect(CREATE).toContain("staffStatus === 'error'")
+    expect(CREATE).toContain('担当スタッフを読み込めませんでした。読み直してから保存してください')
     expect(CREATE).toContain('assignedIds')
   })
 
   it('編集窓の数値欄へ文字列が入る逃げ道を残さない', () => {
     expect(LIST).not.toContain('BookingMenu[K] | string | null')
-    expect(LIST).toContain('function set<K extends keyof BookingMenu>(k: K, v: BookingMenu[K])')
+    expect(CREATE).toContain('duration_minutes: Number(durationMinutes)')
+    expect(CREATE).toContain('base_price: Number(basePrice)')
   })
 
   it('作成は専用画面だけに寄せ、作成と編集で同じ担当必須の検証を使う', () => {
     expect(CREATE).toContain('bookingMenuError({')
-    expect(LIST).toContain('bookingMenuError({')
-    expect(LIST).toContain('assignedStaffCount: form.assigned_staff?.length ?? 0')
-    expect(LIST).toContain('function EditMenuModal(')
+    expect(CREATE).toContain('bookingMenuError({')
+    expect(CREATE).toContain('assignedStaffCount: assignedIds.length')
+    expect(LIST).toContain('/booking/menus/new?menu=${menu.id}')
     expect(LIST).not.toContain('bookingApi.createMenu(')
     expect(LIST).not.toContain("'新規メニュー'")
   })
 
   it('日時の表示は予約設定内の共通整形を使う', () => {
     // readUiSource は共通整形の定義まで読むので、入口だけを検査する。
-    const entry = readRawSource(join(ROOT, 'page.tsx'), 'utf8')
+    const entry = readRawSource(join(ROOT, '../../../v8/booking-menus/tabs/rules-tab.tsx'), 'utf8')
     expect(entry).toContain("from '../lib/format-time'")
     expect(entry).not.toContain('function bookingWindowEnd(')
     expect(entry).not.toContain('function businessHourSummary(')
@@ -136,24 +137,14 @@ describe('V6 予約設定', () => {
     expect(LIST).not.toContain('.at(-1)!')
   })
 
-  it('C9fv7A: 閲覧のみは帯と押せない作るボタンと目印を出す', () => {
-    // 閲覧のみの帯と押せない作るボタンはメニュータブの中にある。
-    expect(SETTINGS_MENUS_TAB).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
-    expect(SETTINGS_MENUS_TAB).toContain('<Button variant="primary" disabled')
-    expect(SETTINGS_V8).toContain("tab === 'menus' && !canEditMenus ? 'C9fv7A'")
-  })
+  // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('P6EdLW: 1152ではメニュー表の担当・30日を畳む', () => {
     expect(SETTINGS_CSS).toContain('@container (max-width: 1080px)')
     expect(SETTINGS_CSS).toMatch(/\.colStaff,\s*\.colCount\s*\{\s*display:\s*none/)
   })
 
-  it('VFxWU: 1152の右欄は見え方ボタンと確かめるボタンの2つ', () => {
-    expect(SETTINGS_V8).toContain('LINEでの見え方を見る')
-    expect(SETTINGS_V8).toContain('setPhoneOpen(true)')
-    expect(SETTINGS_V8).toContain('お客さまに見える画面を確かめる')
-    expect(SETTINGS_CSS).toMatch(/\.sidePhoneButton\s*\{[^}]*display:\s*flex/)
-  })
+  // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('ZyDd6: 予約経路タブは経路の口から表を作る', () => {
     expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路', node: 'ZyDd6' }")
@@ -203,11 +194,9 @@ describe('wJYQb 自動割り当ての保存・権限・失敗', () => {
   it('閲覧のみでは保存を送らず、現在の設定は読める', async () => {
     const requests = installChannels()
     render(React.createElement(ChannelsTabV8, { accountId: 'account-a', canEdit: false }))
-    const toggle = await screen.findByRole('switch')
-    expect(toggle.closest('fieldset')?.disabled).toBe(true)
-    await act(async () => { toggle.click() })
+    await screen.findByText('オン')
+    expect(screen.queryByRole('switch')).toBeNull()
     expect(requests).toEqual([])
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
   })
 
   it('保存に失敗したら設定を変えず、失敗を知らせて再操作を許す', async () => {

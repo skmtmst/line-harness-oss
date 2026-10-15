@@ -1,35 +1,25 @@
 /*
- * 部品の設計値（design/design-parts.json）と実際のCSSを突き合わせる。
- * 見た目の正本は ★V8 の絵。ここの部品の値は本番の v7 の見た目を守るためのもの
- * （V5/V6 を優先する決まりは 2026-10-08 に外した）。V8 部品の実寸は末尾で別に見る。
+ * 採用済みV8の部品の実寸と固定HTMLの値を、現在のCSSへ突き合わせる。
+ * design-parts.jsonは部品の登録情報として形だけを確認し、旧見た目の値は照合しない。
  *
  * これが無かったため「35項目一致」という報告が再現できなかった。
  * 手元でその場かぎりに数えたものは証拠にならないので、ここへ置く。
  *
  *   node apps/web/scripts/verify-design-values.mjs
  *
- * 正本は Pencil の .pen ファイル。`design/design-parts.json` はそこから
- * 写したスナップショットで、値を変えるときはPencilを先に直す。
- *
- * 状態で見る場所が変わる:
- *
- *   pending      コード未実装。報告するだけで落とさない
- *   implemented  CSSモジュールの**ソース**で var() を解き写しの値と比べる（まだ画面で使われていない）
- *   active       **ビルド後のCSS**を見る。var() を解いて比べ、配信漏れも調べる
- *
- * `active` をビルド後で見るのは、部品があっても画面が使っていなければ
- * CSSモジュールは出力されないため。逆に `implemented` をビルド後で見ると、
- * 「まだ誰も使っていないだけ」なのに配信漏れとして落ちてしまう。
+ * 正本は Pencil の .pen ファイル。`design/v8-part-values.json` の採用値は
+ * 書き換えず、値を変えるときはPencilを先に直す。CSSの状態・狭幅条件は
+ * 基準状態へ混ぜず、参照トークンは現在の:rootの値まで解く。
  */
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { globalTokens } from './card-shape-contract.mjs'
 import { checkTemporaryAllowances } from '../../../scripts/visual-qa/temporary-allowances.mjs'
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PARTS = join(WEB, 'design', 'design-parts.json')
 const INVENTORY = join(WEB, 'design', 'pencil-component-inventory.json')
-const BUILT_CSS_DIR = join(WEB, '.next', 'static', 'css')
 const V8_VALUES = join(WEB, 'design', 'v8-part-values.json')
 const GLOBALS = join(WEB, 'src', 'app', 'globals.css')
 
@@ -93,17 +83,6 @@ function stripConditionalBlocks(css) {
 }
 
 /** `.card{...}` の中身を取り出す。クラス名は完全一致。 */
-function ruleBody(css, selector) {
-  css = stripConditionalBlocks(css)
-  // `[data-theme="v8"] ...` の規定は別テーマの上書きで、既定（V7）の
-  // 契約値とは別物。照合対象から除く（V8 側は v8-*-contract.test.ts が守る）。
-  css = css.replace(/[^{}]*data-theme[^{}]*\{[^}]*\}/g, '')
-  const re = new RegExp(`\\.${selector}\\s*\\{([^}]*)\\}`, 'g')
-  const bodies = []
-  let m
-  while ((m = re.exec(css))) bodies.push(m[1])
-  return bodies.join(';')
-}
 
 /**
  * ビルド後は `.summary-card_card__A1b2` のようにハッシュが付く。
@@ -145,20 +124,7 @@ function declaration(body, prop) {
 
 /* ---------- ビルド後CSSの読み込みと var() の解決 ------------------------- */
 
-function loadBuiltCss() {
-  if (!existsSync(BUILT_CSS_DIR)) return null
-  const files = readdirSync(BUILT_CSS_DIR).filter((f) => f.endsWith('.css'))
-  if (files.length === 0) return null
-  return files.map((f) => readFileSync(join(BUILT_CSS_DIR, f), 'utf8')).join('\n')
-}
 
-function collectVariables(css) {
-  const vars = {}
-  for (const m of css.matchAll(/--([a-z0-9-]+)\s*:\s*([^;}]+)/gi)) {
-    if (!(m[1] in vars)) vars[m[1]] = m[2].trim()
-  }
-  return vars
-}
 
 export function resolveVars(value, vars, depth = 0) {
   if (depth > 8 || !value.includes('var(')) return value
@@ -351,7 +317,7 @@ const V8_MEASURE = [
   { id: 'x4FeKG', file: 'shared/activity-item.module.css', cls: 'marker', skipText: true },
   { id: 'EsjP2', file: 'shared/activity-item.module.css', cls: 'row', textCls: 'title' },
   { id: 'CugIm', file: 'shared/section-header.module.css', cls: 'root', textCls: 'title' },
-  { id: 'w6uYMd', file: 'shared/check-card.module.css', cls: 'card', textCls: 'title' },
+  { id: 'w6uYMd', file: 'shared/check-card.module.css', cls: ['card', 'checked'], textCls: 'title' },
   { id: 'dtJVi', file: 'shared/segmented.module.css', cls: 'root', textCls: ['item', 'selected'] },
   { id: 'RfHCo', file: 'shared/otp-input.module.css', cls: 'group', node: '桁の並び', skipText: true },
   { id: 'prbOC', file: 'shared/delete-button.module.css', cls: 'tile', skipText: true },
@@ -363,42 +329,14 @@ const V8_MEASURE = [
   { id: 'mpVfY', file: 'shared/status-badge.module.css', cls: 'badge' },
 ]
 
-/** `[data-theme="v8"] .cls { … }` の中身だけを取り出す（引用符の違いを吸収）。 */
-function v8ScopedBody(css, cls) {
-  css = stripConditionalBlocks(css)
-  const re = new RegExp(
-    `\\[data-theme=["']?v8["']?\\]\\s+\\.${cls}\\s*\\{([^}]*)\\}`,
-    'g',
-  )
-  const bodies = []
-  let m
-  while ((m = re.exec(css))) bodies.push(m[1])
-  return bodies.join(';')
-}
-
-/** `.a, .b:hover { X }` を `.a { X } .b:hover { X }` に分解し、単独表記の規則として読める形にする。 */
-function splitSelectorGroups(css) {
-  return css.replace(/([^{}\n][^{}]*?)\{([^}]*)\}/g, (m, sel, body) => {
-    if (!sel.includes(',')) return m
-    return sel
-      .split(',')
-      .map((s) => `${s.trim()} {${body}}`)
-      .join('\n')
-  })
-}
-
-/** v8 での実効値：素の規定（base）＋ v8 上書き（後勝ち）。cls は合成可（同じ要素に付く複数クラス）。 */
-function v8EffectiveBody(css, cls) {
-  const flat = splitSelectorGroups(css)
-  return (Array.isArray(cls) ? cls : [cls])
-    .flatMap((c) => [ruleBody(flat, c), v8ScopedBody(flat, c)])
-    .filter(Boolean)
-    .join(';')
+/** 現在の実効値を宣言順で読む。clsは同じ要素に付く合成クラス。 */
+export function v8EffectiveBody(css, cls) {
+  return frozenSelectorBody(css, (Array.isArray(cls) ? cls : [cls]).map(c => '.' + c).join(''))
 }
 
 /** 固定HTMLの色・選択状態の照合。同じ要素の合成クラスとv8上書きだけを読む。 */
 export function frozenSelectorBody(css, selector) {
-  const clean = s => s.trim().replace(/\[data-theme=["']?v8["']?\]\s*/g, '').replace(/["']/g, '')
+  const clean = s => s.trim().replace(/^(?:(?:html)?:root|:global\(:root\)|(?:html)?\[data-theme=["']?v8["']?\])\s+/, '').replace(/["']/g, '')
   const wanted = clean(selector)
   const classes = [...wanted.matchAll(/\.([\w-]+)/g)].map(m => m[1])
   const rest = wanted.replace(/\.[\w-]+/g, '')
@@ -442,17 +380,10 @@ function verifyFrozenChecks(values, lines, failures) {
   return { checked, matched }
 }
 
-/** globals.css の :root 変数に [data-theme="v8"] の上書きを重ねた変数表。 */
+/** @themeの入口と現在の:rootの値。条件付きの変数は基準状態へ混ぜない。 */
 function v8Vars() {
-  const css = stripComments(readFileSync(GLOBALS, 'utf8'))
-  const vars = {}
-  // 冒頭の @custom-variant にも [data-theme] がある。そこまでで切ると@themeの色を失う。
-  const base = css.replace(/\[data-theme=["']?v8["']?\]\s*\{[^}]*\}/g, '')
-  Object.assign(vars, collectVariables(base))
-  const v8re = /\[data-theme=["']?v8["']?\]\s*\{([^}]*)\}/g
-  let m
-  while ((m = v8re.exec(css))) Object.assign(vars, collectVariables(m[1]))
-  return vars
+  const css = stripConditionalBlocks(readFileSync(GLOBALS, 'utf8'))
+  return Object.fromEntries([...globalTokens(css)].map(([name, value]) => [name.slice(2), value]))
 }
 
 const toNum = (v) => {
@@ -613,116 +544,10 @@ export function verify() {
   const failures = []
   const shape = [...checkShape(data), ...checkInventoryShape(data, inventory)]
 
-  const built = loadBuiltCss()
-  const builtVars = built ? collectVariables(built) : {}
-  // 未利用の部品もトークン参照を解く。写しの値は変えず、色・丸みの直書きを要求しない。
-  const sourceVars = collectVariables(readFileSync(join(WEB, 'src/app/globals.css'), 'utf8'))
-
   let checked = 0
   let matched = 0
-  let waiting = 0
+  const waiting = 0
 
-  /* --- トークン --- */
-  lines.push('トークン')
-  for (const [name, t] of Object.entries(data.tokens)) {
-    if (name.startsWith('$')) continue
-    if (t.status === 'pending') {
-      waiting++
-      lines.push(`  ${pad(name, 24)}${pad(t.pencil, 18)}${pad(t.resolved, 24)}… 未実装`)
-      continue
-    }
-    checked++
-    const want = normalize(t.status === 'active' ? t.resolved : t.source)
-    let got = null
-    if (t.status === 'active') {
-      got = name.slice(2) in builtVars ? resolveVars(builtVars[name.slice(2)], builtVars) : null
-      if (got === null) {
-        failures.push(`配信漏れ: ${name} がビルド後CSSに見つかりません（${t.pencil}）`)
-        lines.push(`  ${pad(name, 24)}${pad(t.pencil, 18)}${pad(want, 24)}★配信漏れ`)
-        continue
-      }
-    } else {
-      const src = readFileSync(join(WEB, 'src', 'app', 'globals.css'), 'utf8')
-      const m = src.match(new RegExp(`${name}\\s*:\\s*([^;]+);`))
-      got = m ? m[1] : null
-      if (got === null) {
-        failures.push(`未定義: ${name} が globals.css にありません（${t.pencil}）`)
-        lines.push(`  ${pad(name, 24)}${pad(t.pencil, 18)}${pad(want, 24)}★未定義`)
-        continue
-      }
-    }
-    const actual = normalize(t.status === 'active' ? resolveVars(got, builtVars) : got)
-    const ok = actual === want
-    if (ok) matched++
-    else failures.push(`不一致: ${name}\n    設計 Pencil ${t.pencil} = ${want}\n    実際 ${actual}`)
-    lines.push(`  ${pad(name, 24)}${pad(t.pencil, 18)}${pad(want, 24)}${ok ? '一致' : '★不一致'}`)
-  }
-
-  /* --- 部品 --- */
-  lines.push('', '部品')
-  for (const [key, part] of Object.entries(data.parts)) {
-    if (key.startsWith('$')) continue
-    const head = `  ${part.name}（${part.pencilNodes.join(' / ')}）`
-
-    if (part.status === 'pending') {
-      waiting += part.declarations.length
-      lines.push(`${head} … 未実装（${part.declarations.length}項目）`)
-      continue
-    }
-
-    let css = null
-    if (part.status === 'implemented') {
-      const file = join(WEB, part.cssModule)
-      if (!existsSync(file)) {
-        failures.push(`未実装: ${key} の ${part.cssModule} がありません`)
-        lines.push(`${head} ★CSSモジュールがありません`)
-        continue
-      }
-      css = stripComments(readFileSync(file, 'utf8'))
-    } else if (!built) {
-      failures.push(`ビルド成果物がありません。先に pnpm --filter web build を流してください（${key}）`)
-      lines.push(`${head} ★ビルド未実行`)
-      continue
-    }
-
-    lines.push(head)
-    for (const d of part.declarations) {
-      checked++
-      const want = normalize(d.resolved)
-      const body =
-        part.status === 'implemented'
-          ? ruleBody(css, d.class)
-          : builtRuleBody(built, part.cssPrefix, d.class, d.selector)
-
-      if (!body) {
-        const why =
-          part.status === 'active'
-            ? `配信漏れ: ${key} の .${d.class} がビルド後CSSにありません。部品が実際に使われていないか、CSSが出力されていません`
-            : `未実装: ${key} の .${d.class} が ${part.cssModule} にありません`
-        failures.push(why)
-        lines.push(`    ${pad(d.pencil, 34)}${pad(d.prop, 15)}${pad(want, 26)}★${part.status === 'active' ? '配信漏れ' : '宣言なし'}`)
-        continue
-      }
-
-      const raw = declaration(body, d.prop)
-      if (raw === null) {
-        failures.push(`宣言なし: ${key} .${d.class} に ${d.prop} がありません（設計 ${d.pencil}）`)
-        lines.push(`    ${pad(d.pencil, 34)}${pad(d.prop, 15)}${pad(want, 26)}★宣言なし`)
-        continue
-      }
-
-      const got = normalize(resolveVars(raw, part.status === 'active' ? builtVars : sourceVars))
-      const ok = got === want
-      if (ok) matched++
-      else
-        failures.push(
-          `不一致: ${key} の ${d.prop}\n    設計 Pencil ${d.pencil} = ${want}\n    実際 ${got}\n    Pencilを変えたのであれば design/design-parts.json も更新してください。`,
-        )
-      lines.push(`    ${pad(d.pencil, 34)}${pad(d.prop, 15)}${pad(want, 26)}${ok ? '一致' : '★不一致'}`)
-    }
-  }
-
-  /* --- V8 部品の実寸 --- */
   lines.push('', 'V8 部品の実寸（design/v8-part-values.json）')
   const v8 = verifyV8Parts(lines, failures)
   if (v8.uncovered?.length) {
@@ -747,7 +572,7 @@ export function verify() {
 
 if (process.argv[1] && process.argv[1].endsWith('verify-design-values.mjs')) {
   const r = verify()
-  console.log('部品の設計値とCSSの照合（本番 v7 の値・V8 部品の実寸）\n')
+  console.log('V8部品の設計値と現在のCSSの照合\n')
   console.log(r.lines.join('\n'))
   console.log('\n' + '─'.repeat(60))
   console.log(`照合対象 ${r.checked} 件 / 一致 ${r.matched} / 不一致 ${r.checked - r.matched}`)

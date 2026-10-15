@@ -227,8 +227,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/auth', 'public', 'ログイン開始とcallback'),
   exempt('/health', 'system', '稼働確認'),
   exempt('/t', 'public', '計測リンク'),
-  exempt('/r', 'public', '公開流入リンク'),
-  exempt('/o', 'public', '公開流入リンク'),
+  exempt('/r', 'public', '公開流入リンク'), exempt('/o', 'public', '公開流入リンク'),
   exempt('/book', 'public', '公開予約導線'),
   exempt('/pool', 'public', '公開流入プール'),
   exempt('/images', 'public', '署名付き画像配信'),
@@ -243,6 +242,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 /** 同じ prefix 内で公開経路と管理経路が分かれる例外。 */
 export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadata[] = [
   {pattern:/^\/api\/instagram\/webhook$/,methods:['GET','POST'],accountResolver:'none',classification:{kind:'public',reason:'Metaの確認用トークン・HMAC署名で個別認証する受信口'}},
+  {pattern:/^\/internal\/ubereats\/sandbox-token-probe$/,methods:['POST'],accountResolver:'none',classification:{kind:'system',reason:'合言葉の署名で個別認証するUber Sandbox接続確認の一回実行口'}},
   {
     pattern: /^\/api\/auth\/(?:register|password)\//,
     methods: ['GET', 'POST'],
@@ -251,7 +251,7 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
   },
   {
     // 二段階認証の確認と初回設定。セッションはまだ無く、合言葉だけで守る公開経路（N-426）。
-    pattern: /^\/api\/auth\/two-factor\//,
+    pattern: /^\/api\/auth\/two-factor\/(verify|setup(?:\/confirm)?)$/,
     methods: ['POST'],
     accountResolver: 'none',
     classification: { kind: 'public', reason: 'ログイン中の合言葉で本人確認する二段階認証の入口' },
@@ -799,7 +799,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
     classification = { kind: 'feature', featureId: 'forms' };
   }
   if (!classification) {
-    console.error(JSON.stringify({ event: 'route.feature.unclassified', method: c.req.method, path: c.req.path }));
+    console.error(JSON.stringify({"code":"route.feature.unclassified"}));
     return c.json({
       success: false,
       error: 'APIの機能分類が未設定です',

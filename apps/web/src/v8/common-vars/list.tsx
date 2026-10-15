@@ -1,8 +1,9 @@
 'use client'
 
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -14,7 +15,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react';
+import { Archive, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -30,9 +31,9 @@ import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel, { managedFolderNavRows, type ManagedFolderControl } from '@/components/shared/managed-folder-panel';
 import KpiBand from '@/components/shared/kpi-band'
@@ -51,13 +52,13 @@ import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shar
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
 import { classifyApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars';
-import { formatDay, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
-import { blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from './model';
+import { formatListTimestamp, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
+import { reasonRequirement, typedKeyRequirement, blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from './model';
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls';
-import { emptyValue } from '@/components/shared/empty-value';
+import { Field, RequiredBadge } from '@/components/shared/form-controls';
+import { displayValue, emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -113,20 +114,11 @@ const ORDER_OPTIONS: Array<{ value: CommonVarOrder; label: string }> = [
 ]
 
 /** 表示件数（絵：10・20・50件）。 */
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-]
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
-/*
- * 一覧の更新日は、次回変更と同じセルに収まる短い形で出す（v7 と同じ）。
- * 更新日は UTC の ISO で来るので JST 固定で出す。
- */
+/** 記録の更新日時は別年でも時刻を残す。業務値の日付は変えない。 */
 function formatListDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return formatDay(date)
+  return formatListTimestamp(value)
 }
 
 /** 「10/7まで」の札の日付。年月は要らず、月日だけ出す。 */
@@ -157,10 +149,7 @@ function stateBadge(item: CommonVar): { label: string; tone: 'success' | 'info' 
   }
 }
 
-/** 差し込み名の右のコピーの印（絵：キーの横の小さな印）。押すと印が「✓」に変わる。 */
-function CopyKeyButton({ value, label }: { value: string; label: string }) {
-  return <CopyTextButton value={value} aria-label={label} />
-}
+
 
 function CommonVarsListInner() {
   const saveErrors = useSaveFormErrors()
@@ -414,7 +403,7 @@ function CommonVarsListInner() {
   const applyStatus = async () => {
     if (!statusTarget || !selectedAccountId || statusBusy) return
     const reason = statusReason.trim()
-    if (!reason) {
+    if (reasonRequirement.check(reason)) {
       setStatusError(statusAction === 'stop' ? '止める理由を入力してください' : '再開する理由を入力してください')
       return
     }
@@ -599,7 +588,7 @@ function CommonVarsListInner() {
 
   const confirmReplacement = async () => {
     if (!deleteTarget || !selectedAccountId || !replacementImpact?.canReplace || deleteBusy) return
-    if (!deleteReason.trim()) {
+    if (reasonRequirement.check(deleteReason)) {
       setDeleteError('消した理由を入力してください。')
       return
     }
@@ -687,7 +676,7 @@ function CommonVarsListInner() {
   /** 「消さずに止める」を選んだとき。理由を止める理由として使う。 */
   const confirmStopInstead = async () => {
     if (!deleteTarget || !selectedAccountId || deleteBusy) return
-    if (!deleteReason.trim()) {
+    if (reasonRequirement.check(deleteReason)) {
       setDeleteError('止める理由を入力してください。')
       return
     }
@@ -727,9 +716,15 @@ function CommonVarsListInner() {
   /* 行の「…」の中身。右クリックでも同じものを出す。 */
   const rowMenuItems = (item: CommonVar): ActionMenuItem[] => {
     const stopped = (item.status ?? 'active') === 'stopped'
-    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
-    if (!canWrite) return []
+    const copyKey: ActionMenuItem = {
+      id: 'copy-key',
+      label: '差し込みキーをコピー',
+      content: <CopyTextButton role="menuitem" value={placeholderText(item.varKey)} label="差し込みキーをコピー" aria-label={`${item.name}の差し込みキーをコピー`} />,
+    }
+    // 閲覧のみでもコピーは使える。変更の項目は隠す。
+    if (!canWrite) return [copyKey]
     return [
+      copyKey,
       {
         id: 'edit',
         label: '編集',
@@ -839,7 +834,7 @@ function CommonVarsListInner() {
 
   const removeSelected = async () => {
     if (deleteTargets.length === 0 || !selectedAccountId || deleting) return
-    if (!batchReason.trim()) {
+    if (reasonRequirement.check(batchReason)) {
       setDeleteBatchError('消した理由を入力してください。')
       return
     }
@@ -925,13 +920,19 @@ function CommonVarsListInner() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   /* 並びは絵どおり：すべて → 作ったフォルダ → 未分類（最後）。 */
-  const folderRows = managedFolderNavRows('common_var', folders, { allId: '', unfiledId: UNGROUPED })
+  const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
+  const folderRows = managedFolderNavRows('common_var', folders, { allId: '', unfiledId: UNGROUPED }).map(row => ({ ...row,
+    leadingActions: canWrite && selectedUserFolder?.id === row.id ? [
+      { id: 'edit-folder', label: 'フォルダ名を変える', onSelect: () => folderControlRef.current?.startEdit(selectedUserFolder) },
+      { id: 'delete-folder', label: 'フォルダを削除する', tone: 'danger' as const, onSelect: () => folderControlRef.current?.startDelete(selectedUserFolder) },
+    ] : [],
+  }))
   const folderOptions = [
     { value: '', label: 'フォルダ：すべて' },
     ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
     { value: UNGROUPED, label: '未分類' },
   ]
-  const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
+
 
   /* 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。 */
   const createButton = (full: boolean) => canWrite ? (
@@ -1011,69 +1012,7 @@ function CommonVarsListInner() {
    * 1152 の板（`XIzkJ`）：1段目「作る・フォルダ・探す … 件数」、2段目「札」。
    * フォルダの追加・名前変更・削除は、縦の列が無いぶん、フォルダの印のメニューから。
    */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      <ListToolbarRow>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>
-          <SaveErrorField names={["folderFilter","folderId","activeId","folder_filter"]}><Select
-            aria-label="フォルダ"
-            value={folderFilter}
-            onChange={(value) => setFolderFilter(value)}
-            options={folderOptions}
-          /></SaveErrorField>
-        </div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            aria-label="共通情報を検索"
-            placeholder="名前・差し込み名・中身"
-            value={query}
-            onChange={onSearch}
-            onClear={() => onSearch('')}
-          />
-        </ListToolbarSearchSlot>
-        {canWrite ? (
-          <>
-            <IconButton
-              title="フォルダの操作"
-              aria-label="フォルダの操作"
-              aria-haspopup="menu"
-              aria-expanded={folderMenuOpen}
-              onClick={(event) => {
-                folderMenuAnchorRef.current = event.currentTarget
-                setFolderMenuOpen((open) => !open)
-              }}
-            >
-              <FolderCog size={15} aria-hidden="true" />
-            </IconButton>
-            <ActionMenu
-              open={folderMenuOpen}
-              onClose={() => setFolderMenuOpen(false)}
-              anchorRef={folderMenuAnchorRef}
-              ariaLabel="フォルダの操作"
-              items={[
-                { id: 'add', label: 'フォルダを追加する', onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startAdd() } },
-                ...(selectedUserFolder ? [
-                  { id: 'rename', label: 'フォルダ名を変える', onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startEdit(selectedUserFolder) } },
-                  {
-                    id: 'delete',
-                    label: 'フォルダを削除する',
-                    tone: 'danger' as const,
-                    dividerBefore: true,
-                    onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startDelete(selectedUserFolder) },
-                  },
-                ] : []),
-              ]}
-            />
-          </>
-        ) : null}
-        <span className={styles.spacer} aria-hidden="true" />
-        {orderBox}
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>{filterChips}</ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <ListToolbarFrame>
@@ -1101,7 +1040,7 @@ function CommonVarsListInner() {
             {`「${firstEmpty.name}」が空のまま ${typeof firstEmpty.usageCount === 'number' ? `${formatNumber(firstEmpty.usageCount)}か所` : '何か所か'}で使われています。差し込んだところが空欄のまま送られます。`}
           </span>
           <span className={styles.alertSpacer} aria-hidden="true" />
-          <Button type="button" onClick={applyEmptyFilter}>直す</Button>
+          <Button type="button" actionWording onClick={applyEmptyFilter}>{canWrite ? "直す" : "空のままを見る"}</Button>
         </div>
       ) : null}
       {listLimited && !listFailed ? (
@@ -1168,8 +1107,7 @@ function CommonVarsListInner() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canWrite ? (
-                    <SaveErrorField names={["allOnPageSelected","selected","all_on_page_selected"]}><Checkbox
+                  {canWrite ? (<SaveErrorField names={["allOnPageSelected","selected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && someOnPageSelected}
                       onCheckedChange={() =>
@@ -1183,8 +1121,7 @@ function CommonVarsListInner() {
                         })
                       }
                       aria-label="このページの共通情報をすべて選ぶ"
-                    /></SaveErrorField>
-                  ) : null}
+                    /></SaveErrorField>) : <UnavailableSelection label="このページの共通情報をすべて選ぶ" />}
                 </Th>
                 <Th className={styles.headCell}>共通情報（差し込み名）</Th>
                 <Th className={styles.headCell}>中身</Th>
@@ -1212,13 +1149,11 @@ function CommonVarsListInner() {
 
                   >
                     <Td className={styles.selectCell}>
-                      {canWrite ? (
-                        <SaveErrorField names={[`current.${saveFieldIndex}.id`,"id","item.id","itemId"]}><Checkbox
+                      {canWrite ? (<SaveErrorField names={[`current.${saveFieldIndex}.id`,"id","item.id","itemId"]}><Checkbox
                           checked={selected.has(item.id)}
                           onCheckedChange={() => toggle(item.id)}
                           aria-label={`${item.name}を選ぶ`}
-                        /></SaveErrorField>
-                      ) : null}
+                        /></SaveErrorField>) : <UnavailableSelection label={`${item.name}を選ぶ`} />}
                     </Td>
                     <NameCell name={
                         <div className={styles.dotLine}>
@@ -1235,8 +1170,8 @@ function CommonVarsListInner() {
                         </div>
                       } folder={folderDotOf(item)}
                     />
-                    <Td className={styles.valueCell} title={valueText || '（空）'}>
-                      {valueText || <span className={styles.valueEmpty}>（空）</span>}
+                    <Td className={styles.valueCell} title={displayValue(valueText, 'unconfigured')}>
+                      {valueText || <span className={styles.valueEmpty}>{emptyValue('unconfigured')}</span>}
                     </Td>
                     <Td>
                       <SharedStatusPill tone={badge.tone}>{badge.label}</SharedStatusPill>
@@ -1244,7 +1179,7 @@ function CommonVarsListInner() {
                     {!narrow && (
                       <Td>
                         {item.usageCount === undefined ? (
-                          <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
+                          <span className={styles.usageNone} title="使われている場所を取得できていません">{emptyValue('unknown')}</span>
                         ) : item.usageCount === 0 ? (
                           <span className={styles.usageNone}>{emptyValue('none')}</span>
                         ) : (
@@ -1261,15 +1196,16 @@ function CommonVarsListInner() {
                     <Td className={styles.menuCell}>
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。
                           閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す）。 */}
-                      {canWrite ? <div className={styles.menuBox}>
+                      <div className={styles.menuBox}>
                         <RowMenu
-                          className={styles.rowMenuButton}
+                          appearance="box"
+                          size="row"
                           label={`共通情報「${item.name}」の操作`}
                           items={rowMenuItems(item)}
                           open={openMenuId === item.id}
                           onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                         />
-                      </div> : null}
+                      </div>
                     </Td>
                   </Tr>
                 )
@@ -1287,15 +1223,8 @@ function CommonVarsListInner() {
     </>
   )
 
-  const pagerSummary = filtered.length === 0
-    ? '0件'
-    : pageCount > 1
-      ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} / ${formatNumber(filtered.length)} 件`
-      : `${formatNumber(filtered.length)} 件`
-  const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : pageCount > 1 ? (
-    <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
-  ) : (
-    <p className={styles.pagerSolo}>{pagerSummary}</p>
+  const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : (
+    <Pagination page={page} pageCount={pageCount} onPageChange={setPage} range={{ total: filtered.length, first: (page - 1) * pageSize + 1, last: Math.min(page * pageSize, filtered.length) }} />
   )
 
   /* 数の帯。取れていない数字は「—」（0 とは言わない）。 */
@@ -1341,6 +1270,9 @@ function CommonVarsListInner() {
       <Dialog
         open={statusTarget !== null && deleteTarget === null && !panelStatus}
         designNode="Hhl9M"
+        designWidth={480}
+        designLayout="stacked"
+        footerAlign="center"
         title={statusTarget ? `「${statusTarget.name}」を${statusAction === 'stop' ? '止める' : '再開する'}` : ''}
         description={
           statusAction === 'stop'
@@ -1353,7 +1285,7 @@ function CommonVarsListInner() {
         error={statusError || undefined}
         onCancel={closeStatusDialog}
         footer={
-          <div className={styles.centerFooter}>
+          <DialogActions>
             <Button type="button" onClick={closeStatusDialog} disabled={statusBusy}>
               キャンセル
             </Button>
@@ -1372,7 +1304,7 @@ function CommonVarsListInner() {
                 </>
               ) : '再開する'}
             </Button>
-          </div>
+          </DialogActions>
         }
       >
         {statusTarget ? (
@@ -1387,20 +1319,17 @@ function CommonVarsListInner() {
             ) : null}
             <Field label={<><span className={styles.dialogLabel}>
                 {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
-              </span></>}><SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
+              </span></>} requirement={reasonRequirement} error={statusError && reasonRequirement.check(statusReason)}><SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
                 value={statusReason}
                 onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
                 placeholder={statusAction === 'stop' ? 'キャンペーンが終わったため' : '新しい期間の案内を始めるため'}
                 className={styles.dialogInput}
               /></SaveErrorField></Field>
             {statusAction === 'stop' && statusScheduled.length > 0 ? (
-              <p className={styles.dialogWarn} role="note">
-                <TriangleAlert size={14} aria-hidden="true" />
-                <span>
+              <Notice tone="warn" appearance="soft" icon={<TriangleAlert size={14} aria-hidden="true" />}>
                   予約中の{statusScheduled[0].kindLabel}「{statusScheduled[0].name}」が送られなくなります。
                   {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)} 件` : ''}
-                </span>
-              </p>
+              </Notice>
             ) : null}
           </div>
         ) : null}
@@ -1428,14 +1357,15 @@ function CommonVarsListInner() {
           <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
             {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
-              <SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+              <span>{reasonRequirement.required ? <RequiredBadge /> : null}<SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+                aria-required={reasonRequirement.required}
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
                 placeholder="理由（必須・記録に残ります）"
                 aria-label="消した理由・止める理由（記録に残ります）"
                 title="消した理由・止める理由（記録に残ります）"
                 className={styles.footerReason}
-              /></SaveErrorField>
+              /></SaveErrorField></span>
             ) : <span aria-hidden="true" />}
             <Button type="button" onClick={closeDelete} disabled={deleteBusy}>
               キャンセル
@@ -1496,6 +1426,12 @@ function CommonVarsListInner() {
               <Notice tone="danger" >使用先を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
             ) : deleteImpact ? (
               <>
+                {splitItems(deleteImpact.items).historical.length > 0 ? (
+                  <p className={styles.dialogHint}>
+                    送信済みの配信はこれから変わりません（削除を止める理由には含めません）。
+                    {splitItems(deleteImpact.items).historical.map((usage) => `${usage.kindLabel}「${usage.name}」`).join('、')}
+                  </p>
+                ) : null}
                 {deleteImpact.canDelete ? (
                   <>
                     <p className={styles.dialogLead}>{usageText(deleteImpact)}</p>
@@ -1620,7 +1556,7 @@ function CommonVarsListInner() {
                 ) : null}
 
                 {deleteImpact.canDelete ? (
-                <Field label="消した理由（記録に残ります）"><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+                <Field label="消した理由（記録に残ります）" requirement={reasonRequirement} error={deleteError && reasonRequirement.check(deleteReason)}><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
                     placeholder="店舗情報の変更のため"
@@ -1629,7 +1565,7 @@ function CommonVarsListInner() {
                 ) : null}
 
                 {deleteImpact.canDelete ? (
-                  <Field label="削除する場合は、差し込みキーを入力してください"><SaveErrorField names={["typedKey","typed_key"]}><input
+                  <Field label="削除する場合は、差し込みキーを入力してください" requirement={typedKeyRequirement(deleteImpact)}><SaveErrorField names={["typedKey","typed_key"]}><input
                       value={typedKey}
                       onChange={(e) => setTypedKey(e.target.value)}
                       placeholder={placeholderText(deleteImpact.variable.varKey)}
@@ -1672,7 +1608,7 @@ function CommonVarsListInner() {
           setDeleteTargets([])
         }}
       >
-        <Field label="消した理由" required><SaveErrorField names={["batchReason","batch_reason"]}><input
+        <Field label="消した理由" requirement={reasonRequirement}><SaveErrorField names={["batchReason","batch_reason"]}><input
             value={batchReason}
             onChange={(e) => setBatchReason(e.target.value)}
             placeholder="店舗情報の変更のため"
@@ -1810,7 +1746,7 @@ function CommonVarsListInner() {
         <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
       stats={
-        <KpiBand data-design="KPIs" aria-label="共通情報の集計" className={styles.kpiStrip}>
+        <KpiBand data-design="KPIs" aria-label="共通情報の集計">
           {kpis.map((kpi) => (
             <KpiCard
               key={kpi.key}
@@ -1819,25 +1755,18 @@ function CommonVarsListInner() {
               icon={<kpi.icon size={13} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
-              detail={kpi.fix ? (
-                /* 絵：説明の右端に「直す →」。押すと「空のまま」で絞り込む。 */
-                <span className={styles.kpiDetailRow}>
-                  <span className={styles.kpiDetailText}>{kpi.detail}</span>
-                  <button type="button" className={styles.kpiFix} onClick={applyEmptyFilter}>
-                    直す<ArrowRight size={12} aria-hidden="true" />
-                  </button>
-                </span>
-              ) : kpi.detail}
+              detail={kpi.detail}
+              action={kpi.fix ? { label: canWrite ? '直す' : '空のままを見る', onClick: applyEmptyFilter } : undefined}
             />
           ))}
         </KpiBand>
       }
       /* 1281〜1339 の幅は板が狭いのに 1152 用の道具の段にならない。そこだけ型が作る・フォルダを出す。 */
-      folderNav={narrow ? undefined : { rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
       folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={<>
         {hasAlerts ? <div className={styles.alertSlot}>{alerts}</div> : null}
-        {narrow ? narrowToolbar : wideToolbar}
+        {wideToolbar}
       </>}
       pagination={listPager}
       overlays={overlays}

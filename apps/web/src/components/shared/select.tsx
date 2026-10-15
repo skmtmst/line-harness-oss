@@ -1,89 +1,19 @@
 'use client'
 
-import { ArrowUpDown, Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { pageSizeLabel } from './page-size-options'
+import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { KeyboardEvent, ReactNode } from 'react'
+import type { KeyboardEvent } from 'react'
 import { isImeComposing } from './ime'
 import { joinDescribedBy, useFieldContext } from './field-context'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import MenuPortal from './menu-portal'
 import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
 import styles from './select.module.css'
 import pillStyles from './status-pill.module.css'
-import type { StatusBadgeTone } from './status-badge'
+import { useSelectContentWidth } from './use-select-content-width'
+import IconButton from './icon-button'
 
-export interface SelectOption {
-  value: string
-  label: string
-  disabled?: boolean
-  /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。v7 では出さない。 */
-  leading?: ReactNode
-  /** ★V8 の開いた中身で名前の下に出す1行の説明（「押したら」YPzmo）。候補が多く間引く一覧では出さない。 */
-  description?: string
-  /** 対応状況の札の地・文字・点に使う色。treatment='pill' のときだけ適用する。 */
-  tone?: StatusBadgeTone
-}
-
-/** 「＋ 〇〇」を押した後の板に渡すもの。 */
-export interface SelectCreateContext {
-  /** 一覧へ戻る（［やめる］・Esc）。 */
-  back: () => void
-  /** 作ったものを選んで閉じる。 */
-  finish: (value: string) => void
-}
-
-export interface SelectCreateAction {
-  /** 一覧の下の行の文（「新しいフォルダを作る」）。 */
-  label: string
-  /** 押した後、同じ板に出す中身（iBuZH）。 */
-  render: (context: SelectCreateContext) => ReactNode
-}
-
-export interface SelectProps {
-  'aria-label': string
-  className?: string
-  defaultOpen?: boolean
-  disabled?: boolean
-  error?: string
-  /** 理由を Field が描くとき、欄の赤枠だけを出す。 */
-  invalid?: boolean
-  id?: string
-  label?: string
-  name?: string
-  onChange: (value: string) => void
-  options: SelectOption[]
-  size?: 'standard' | 'page-size' | 'full'
-  value: string
-  /**
-   * 箱の幅（px）。渡すと size の幅を上書きする
-   * （x6QsVz の絞り込み欄 122〜136 など板ごとの絵幅）。
-   */
-  width?: number
-  /**
-   * 見せ方。既定 'box' は枠の箱。'text' は枠なし文字＋上下矢印
-   * （x6QsVz の並び替えどおり）。'pill' は対応状況の丸い札。V8 にだけ適用する。
-   */
-  treatment?: 'box' | 'text' | 'pill'
-  /**
-   * 箱の先頭の図柄（v19Ivv のよく使う絞り込みの栞どおり）。
-   * 渡さなければ出ない。
-   */
-  icon?: ReactNode
-  /**
-   * 先頭の図柄と値の並べ方。既定は箱の両端へ寄せる（会話の頭・よく使う絞り込みの絵どおり、
-   * 値が図柄と上下矢印の間で釣り合う）。`'start'` を渡すと値を図柄のすぐ右へ寄せる
-   * （★V8 デリバリー受注の注文履歴 `OzHLO`：余白12・印15・間6で文字が x1120 から始まる絵）。
-   * 渡さない箱は今までどおり。
-   */
-  valueAlign?: 'start'
-  /**
-   * ★V8 だけ：開いた中身の一番下に区切りと「＋ 〇〇」を置き、押すと同じ板で作れるようにする
-   * （dLffh・iBuZH。ふつうは FolderSelect が渡す）。渡さなければ出ない（閲覧のみ・権限なし）。
-   */
-  createAction?: SelectCreateAction
-  /** ★V8 の開いた中身の上の小さな見出し（label・選択肢の頭から出ないとき。dLffh の「フォルダ」）。 */
-  menuHeading?: string
-}
+import type { SelectCreateContext, SelectOption, SelectProps } from './select-types'
+export type { SelectOption, SelectCreateContext, SelectCreateAction, SelectProps } from './select-types'
 
 /*
  * 候補が多い（タグ 2,000 個など）ときは、開いた一覧のうち見えている所の前後だけ描く
@@ -93,7 +23,6 @@ export interface SelectProps {
  * キーボードで動かした先が描かれていなければ、そこまでスクロールしてから描く。
  */
 const WINDOW_THRESHOLD = 100
-const OPTION_HEIGHT_V7 = 38
 const WINDOW_OVERSCAN = 12
 
 /** Pencil V5 `rpot9` / `Gfsb4` を正本にした単一選択。 */
@@ -110,14 +39,23 @@ export default function Select({
   onChange,
   icon,
   valueAlign,
-  options,
+  showChevron = true,
+  iconOnly = false,
+  options: suppliedOptions,
   size = 'standard',
+  pageSizeControl = false,
   value,
   width,
   treatment = 'box',
   createAction,
   menuHeading,
 }: SelectProps) {
+  // Width is a visual preset; a duration selector may use it too. The role
+  // comes from the explicit flag or the control's accessible page-size name.
+  const isPageSizeControl = pageSizeControl || /表示件数|1ページ|件表示/.test(ariaLabel ?? label ?? '')
+  const options = useMemo(() => isPageSizeControl
+    ? suppliedOptions.map(option => /^\d+$/.test(option.value) ? { ...option, label: pageSizeLabel(Number(option.value)) } : option)
+    : suppliedOptions, [suppliedOptions, isPageSizeControl])
   // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
   const field = useFieldContext()
   const invalid = Boolean(error) || invalidProp || Boolean(field?.invalid)
@@ -147,9 +85,10 @@ export default function Select({
    * ★V8 は開いた中身を共通部品 select-menu（StFE7）で描く（2026-10-08 B-45）。
    * 選択肢の「並び：」などの頭は外して上の見出しにし、閉じたボタンは今のまま。
    */
-  const v8 = useAdminTheme() === 'v8'
-  const OPTION_HEIGHT = v8 ? SELECT_MENU_ROW_STRIDE : OPTION_HEIGHT_V7
+
+  const OPTION_HEIGHT = SELECT_MENU_ROW_STRIDE
   const heads = useMemo(() => splitOptionHeads(options, label), [options, label])
+  useSelectContentWidth(rootRef, { size, selectedLabel: selected?.label, label, treatment, showChevron, iconOnly, icon })
   // 一覧は器（MenuPortal）が後から描くので、ref ではなく描かれた時に受け取る。
   const [listEl, setListEl] = useState<HTMLUListElement | null>(null)
   const [scrollWindow, setScrollWindow] = useState({ top: 0, height: 0 })
@@ -212,7 +151,7 @@ export default function Select({
     setMode('list')
   }, [open])
 
-  const hasCreate = Boolean(createAction) && v8
+  const hasCreate = Boolean(createAction)
   // キーボードで動く行の数。「＋ 〇〇」は使える候補の後ろの1行。
   const rowCount = enabledOptions.length + (hasCreate ? 1 : 0)
   const createActive = hasCreate && activeIndex === enabledOptions.length
@@ -277,6 +216,7 @@ export default function Select({
     }
   }
 
+  const Trigger = iconOnly ? IconButton : 'button'
   return (
     <div
       ref={rootRef}
@@ -301,15 +241,21 @@ export default function Select({
         setOpen(false)
       }}
       data-design-node={open ? 'Gfsb4' : size === 'page-size' ? 'niGPF' : 'rpot9'}
+      data-list-page-size={isPageSizeControl || undefined}
+      data-select-icon-only={iconOnly || undefined}
     >
       {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
-      <button
+      <Trigger
+        size={iconOnly ? 'compact' : undefined}
         ref={triggerRef}
         id={buttonId}
         type="button"
-        className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' && v8 ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
-        data-tone={treatment === 'pill' && v8 ? selected?.tone ?? 'neutral' : undefined}
+        className={iconOnly ? undefined : `${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
+        data-tone={treatment === 'pill' ? selected?.tone ?? 'neutral' : undefined}
         data-value-align={valueAlign}
+        data-chevron={showChevron || undefined}
+        data-icon-only={iconOnly || undefined}
+        title={iconOnly ? ariaLabel : undefined}
         aria-label={ariaLabel}
         aria-controls={listboxId}
         aria-expanded={open}
@@ -329,16 +275,16 @@ export default function Select({
           </span>
         ) : null}
         {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
-        <span className={styles.value} title={selected?.label ?? undefined}>
-          {label ? `${label}：` : ''}{selected?.label ?? ''}
+        <span className={styles.value} hidden={iconOnly} data-select-value title={selected?.label ?? undefined}>
+          {label ? `${label}：${selected ? heads.labelOf(selected) : ''}` : selected?.label ?? ''}
         </span>
-        {open ? (
+        {showChevron && !iconOnly && (open ? (
           <ChevronUp className={styles.chevron} aria-hidden="true" />
         ) : (
           <ChevronDown className={styles.chevron} aria-hidden="true" />
-        )}
-      </button>
-      {open && v8 ? (
+        ))}
+      </Trigger>
+      {open ? (
         <SelectMenu
           open={open}
           getAnchor={() => triggerRef.current}
@@ -387,59 +333,6 @@ export default function Select({
           })}
           {windowEnd < options.length ? <SelectMenuSpacer rows={options.length - windowEnd} /> : null}
         </SelectMenu>
-      ) : null}
-      {open && !v8 ? (
-        <MenuPortal
-          open={open}
-          align="start"
-          matchWidth
-          getAnchor={() => triggerRef.current}
-          onClose={() => setOpen(false)}
-        >
-          <ul
-            ref={setListEl}
-            id={listboxId}
-            role="listbox"
-            aria-labelledby={buttonId}
-            className={styles.listbox}
-            // 最上層では absolute 指定を無効にする（位置は器が決める）。
-            // 欄に焦点を残したまま押せるよう、押す前に焦点を移さない。
-            style={{ position: 'static', width: '100%' }}
-            onMouseDown={(event) => event.preventDefault()}
-          >
-          {windowStart > 0 ? <li role="presentation" aria-hidden="true" style={{ height: windowStart * OPTION_HEIGHT }} /> : null}
-          {options.slice(windowStart, windowEnd).map((option, offset) => {
-            const optionIndex = enabledIndexOf.get(option.value) ?? -1
-            const isSelected = option.value === value
-            return (
-              <li
-                key={option.value}
-                role="option"
-                aria-selected={isSelected}
-                aria-setsize={windowed ? options.length : undefined}
-                aria-posinset={windowed ? windowStart + offset + 1 : undefined}
-              >
-                <button
-                  type="button"
-                  className={`${styles.option} ${isSelected ? `${styles.selected} ${styles.selectedBackground}` : ''}`}
-                  disabled={option.disabled}
-                  data-active={optionIndex === activeIndex || undefined}
-                  onMouseEnter={() => {
-                    if (optionIndex >= 0) setActiveIndex(optionIndex)
-                  }}
-                  onClick={() => choose(option)}
-                >
-                  <span className={`${styles.check} ${isSelected ? styles.checked : ''}`}>
-                    {isSelected ? <Check className={styles.checkIcon} aria-hidden="true" /> : null}
-                  </span>
-                  <span>{option.label}</span>
-                </button>
-              </li>
-            )
-          })}
-          {windowEnd < options.length ? <li role="presentation" aria-hidden="true" style={{ height: (options.length - windowEnd) * OPTION_HEIGHT }} /> : null}
-          </ul>
-        </MenuPortal>
       ) : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
     </div>

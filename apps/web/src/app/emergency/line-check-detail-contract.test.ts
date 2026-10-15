@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, '../../v8/settings/emergency/health.tsx'), 'utf8')
 
 /**
  * 9項目の判定は、同じサーバー結果を正本にする。

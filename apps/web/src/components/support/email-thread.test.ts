@@ -65,7 +65,8 @@ describe('LINE のトークとそろえたもの', () => {
   );
 
   it('内部メモは返信欄と別のポップアップで保存できる', () => {
-    expect(CLIENT).toContain('role="dialog"');
+    expect(CLIENT).toContain('<Dialog open={showMemoEditor}');
+    expect(CLIENT).toContain('title="内部メモ"');
     expect(CLIENT).toContain('担当者だけに表示され、相手には送信されません。');
   });
 

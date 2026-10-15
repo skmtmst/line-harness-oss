@@ -40,7 +40,7 @@ describe('作る型：板いっぱいの帯の置き場', () => {
 describe('行の「…」のメニュー：区切りの余白', () => {
   it('V8 では区切りの上下に余白を足さない（SkY9V：項目の並び 36 に線と間で 3 だけ）', () => {
     const menuCss = readFileSync(join(here, '../shared/action-menu.module.css'), 'utf8')
-    expect(menuCss).toMatch(/\[data-theme="v8"\] \.divider \{\s*margin: var\(--tpl-menu-divider-margin\);/)
+    expect(menuCss).toMatch(/:root \.divider \{\s*margin: var\(--tpl-menu-divider-margin\);/)
     expect(globals).toMatch(/--tpl-menu-divider-margin: 0;/)
   })
 })

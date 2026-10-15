@@ -8,9 +8,9 @@ import type { ReactNode } from 'react'
 import { Bookmark } from 'lucide-react'
 import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarOptional } from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
-import SearchField from '@/components/shared/search-field'
+import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import Select from '@/components/shared/select'
 import styles from './mileage.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -29,10 +29,9 @@ export function SavedSelect({
   onChange: (value: string) => void
 }) {
   return (
-    <div className={styles.savedBox}>
-      <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <SaveErrorField names={["value"]}><Select aria-label="よく使う絞り込み" value={value} options={options} onChange={onChange} /></SaveErrorField>
-    </div>
+    <ListToolbarOptional label="保存した絞り込み">
+      <SaveErrorField names={["value"]}><Select size="content" icon={<Bookmark size={15} aria-hidden="true" />} aria-label="よく使う絞り込み" value={value} options={options} onChange={onChange} /></SaveErrorField>
+    </ListToolbarOptional>
   )
 }
 
@@ -89,41 +88,15 @@ export interface MileageToolbarProps {
  * 道具の段。広い板は型の道具（ListToolbar）を1段、1152 の板は
  * 「作る・フォルダ・探す」→「札 … 右の道具」の2段。部品は同じ。
  */
-export function MileageToolbar({ narrow, notices, search, chips, trailing, narrowLead }: MileageToolbarProps) {
-  if (narrow) {
-    return (
-      <div className={styles.narrowTools}>
-        {notices}
-        <div className={styles.narrowRow}>
-          {narrowLead}
-          <div className={styles.narrowSearch}>
-            <SearchField
-              aria-label={search.placeholder}
-              placeholder={search.placeholder}
-              value={search.value}
-              onChange={search.onChange}
-              onClear={() => search.onChange('')}
-            />
-          </div>
-        </div>
-        <div className={styles.narrowRow}>
-          {chips}
-          <span className={styles.spacer} aria-hidden="true" />
-          {trailing}
-        </div>
-      </div>
-    )
-  }
-  return (
-    <>
-      {notices}
-      <ListToolbar
-        search={{ placeholder: search.placeholder, value: search.value, width: 240, onChange: search.onChange }}
-        filters={chips}
-        trailing={trailing}
-      />
-    </>
-  )
+export function MileageToolbar({ notices, search, chips, trailing }: MileageToolbarProps) {
+  return <ListToolbarFrame>
+    {notices}
+    <ListToolbar search={{ ...search, width: 240 }} filters={chips} trailing={trailing} />
+  </ListToolbarFrame>
+}
+
+export function mileageStatusTone(tone: 'active' | 'warn' | 'danger' | 'neutral'): StatusBadgeTone {
+  return tone === 'active' ? 'success' : tone === 'warn' ? 'warning' : tone
 }
 
 /** 空・絞り込みで0件・失敗の1枚（見本帳 zaqP9）。 */

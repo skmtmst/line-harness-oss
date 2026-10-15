@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { inboxItemHref, type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import Pagination from '@/components/shared/pagination'
+import TruncatedText from '@/components/shared/truncated-text'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import SectionHeader from './head'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
@@ -136,30 +138,31 @@ export function InboxSection({ onSummaryChange }: {
       ) : !summary || summary.total === 0 ? (
         <p className={styles.empty}>返信を待っている問い合わせはありません。</p>
       ) : (
-        <div className={styles.inboxTable} role="table" aria-label="対応が必要な受信">
-          <div className={styles.inboxHead} role="row">
-            <span role="columnheader" className={styles.colName}>お名前</span>
-            <span role="columnheader" className={styles.colBody}>内容</span>
-            <span role="columnheader" className={styles.colWait}>待ち時間</span>
-            <span role="columnheader" className={styles.colState}>状態</span>
-          </div>
-          {items.map((item) => (
-            <div key={item.id} className={styles.inboxRow} role="row">
-              <span role="cell" className={styles.colName}>
+        <><DataTable aria-label="対応が必要な受信" columnLayout={{ headHeight: 'var(--tpl-list-head-h)', rowHeight: 'var(--tpl-db-inbox-row-h)', rowGap: 'var(--polish-space-field)', gap: 'var(--tpl-db-col-gap)', padding: '0 var(--tpl-db-inbox-gap)', bodyTextSize: 'var(--text-body)' }}>
+          <thead>
+          <TableHeadRow data-table-layout="columns">
+            <Th className={styles.colName}>お名前</Th>
+            <Th grow>内容</Th>
+            <Th className={styles.colWait}>待ち時間</Th>
+            <Th className={styles.colState}>状態</Th>
+          </TableHeadRow></thead>
+          <tbody>{items.map((item) => (
+            <Tr key={item.id} data-table-layout="columns">
+              <Td className={styles.colName}>
                 <span className={styles.route}>{item.channel === 'email' ? 'メール' : 'LINE'}</span>
                 <Link href={inboxItemHref(item)} className={styles.inboxName} title={`${item.customerName}の受信箱を開く`}>
                   {item.customerName}
                 </Link>
-              </span>
-              <span role="cell" className={styles.colBody} title={item.preview}>{item.preview}</span>
-              <span role="cell" className={styles.colWait}>{elapsed(item.lastIncomingAt)}</span>
-              <span role="cell" className={styles.colState}><StatusBadge tone="warning" size="compact">未確認</StatusBadge></span>
-            </div>
-          ))}
+              </Td>
+              <Td grow><TruncatedText value={item.preview} /></Td>
+              <Td className={styles.colWait}>{elapsed(item.lastIncomingAt)}</Td>
+              <Td className={styles.colState}><StatusBadge tone="danger" size="compact">未対応</StatusBadge></Td>
+            </Tr>
+          ))}</tbody>
+          </DataTable>
           {pageCount > 1 ? (
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="受信一覧のページ送り" className={styles.inboxPager} />
-          ) : null}
-        </div>
+          ) : null}</>
       )}
     </>
   )

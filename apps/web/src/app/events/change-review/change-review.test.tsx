@@ -6,6 +6,8 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent } from '@testing-library/react'
+import { changeEventStart, waitEventPreview } from '@/test-utils/event-change'
 
 const getEvent = vi.hoisted(() => vi.fn())
 const listSlots = vi.hoisted(() => vi.fn())
@@ -27,7 +29,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(searchParams.value),
 }))
 
@@ -41,7 +43,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
@@ -76,6 +78,7 @@ const SLOTS = [
 ]
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -92,6 +95,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  delete document.documentElement.dataset.theme
 })
 
 async function renderPage() {
@@ -102,7 +106,7 @@ async function renderPage() {
 }
 
 function buttons(): HTMLButtonElement[] {
-  return [...host.querySelectorAll('button')] as HTMLButtonElement[]
+  return [...document.querySelectorAll('button')] as HTMLButtonElement[]
 }
 
 function buttonByText(text: string): HTMLButtonElement {
@@ -166,32 +170,25 @@ describe('U-1 変更の確認', () => {
     })
     await renderPage()
     expect(host.textContent).toContain('秋のしつけ教室')
-    expect(host.textContent).toContain('影響を確かめる')
-
-    // 開始日時を30分遅らせる
-    const startInput = host.querySelector('input[type="datetime-local"]') as HTMLInputElement
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      setter?.call(startInput, '2099-06-01T10:30')
-      startInput.dispatchEvent(new Event('input', { bubbles: true }))
-    })
-    await click(buttonByText('影響を確かめる'))
+    await changeEventStart('10:30')
 
     expect(previewEventChange).toHaveBeenCalledTimes(1)
-    expect(host.textContent).toContain('確定 3人・待ち 1人に影響します')
-    expect(host.textContent).toContain('日時が動きます')
+    expect(host.textContent).toContain('確定した申込 3 人へ')
+    expect(host.textContent).toContain('キャンセル待ち 1 人')
+    expect(host.textContent).toContain('日時が変わります')
 
     // 主役の緑の塗りボタンは「この内容で変える」1つだけ。
-    const applyButtons = buttons().filter((button) => button.textContent === 'この内容で変える')
+    const applyButtons = buttons().filter((button) => button.textContent === '変えてお知らせする')
     expect(applyButtons).toHaveLength(1)
 
-    const reason = host.querySelector('textarea[aria-label="変える理由"]') as HTMLTextAreaElement
+    const reason = host.querySelector<HTMLInputElement>('#ev-cr-reason')!
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
-      setter?.call(reason, '会場の都合で30分遅らせます')
-      reason.dispatchEvent(new Event('input', { bubbles: true }))
+      fireEvent.change(reason, { target: { value: '会場の都合で30分遅らせます' } })
     })
-    await click(buttonByText('この内容で変える'))
+    await click(buttonByText('変えてお知らせする'))
+    expect(applyEventChange).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-design-node="qUdNh"]')).toBeTruthy()
+    await click(buttonByText('変えて 3 人にお知らせする'))
 
     expect(applyEventChange).toHaveBeenCalledWith('acc-1', 'e1', expect.objectContaining({
       expected_version: 3,
@@ -199,10 +196,10 @@ describe('U-1 変更の確認', () => {
       idempotency_key: expect.any(String),
     }))
     expect(host.textContent).toContain('変えました')
-    expect(host.textContent).toContain('LINEのお知らせは 3人に送りました')
+    expect(host.textContent).toContain('LINE のお知らせは 3 人に送りました')
   })
 
-  it('止まる理由があるときは変えるボタンを出さない', async () => {
+  it('止まる理由があるときは変更できず、APIも呼ばない', async () => {
     previewEventChange.mockResolvedValue({
       event_id: 'e1',
       impacts: [
@@ -225,15 +222,15 @@ describe('U-1 変更の確認', () => {
       total_pending_reminders: 0,
     })
     await renderPage()
-    const capacityInput = host.querySelector('input[type="number"]') as HTMLInputElement
+    const capacityInput = host.querySelector('#ev-cr-cap') as HTMLInputElement
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      setter?.call(capacityInput, '2')
-      capacityInput.dispatchEvent(new Event('input', { bubbles: true }))
+      fireEvent.change(capacityInput, { target: { value: '2' } })
     })
-    await click(buttonByText('影響を確かめる'))
+    await waitEventPreview()
 
     expect(host.textContent).toContain('定員を、すでに申し込まれている人数より下げられません')
-    expect(buttons().some((button) => button.textContent === 'この内容で変える')).toBe(false)
+    expect(buttonByText('変えてお知らせする').disabled).toBe(true)
+    await click(buttonByText('変えてお知らせする'))
+    expect(applyEventChange).not.toHaveBeenCalled()
   })
 })

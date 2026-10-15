@@ -19,25 +19,33 @@ export function SbSettingsScreen({
   boardId,
   title,
   help,
+  explanation,
+  explanationKey,
   actions,
   children,
+  preview,
   saveActions,
   saveStatus,
   savePlacement,
   layout = 'wide-nav',
+  contentLayout,
 }: {
   /**
    * 板の作りの違い。wide-nav＝今の設定の板（中のメニュー 208・頭の間 8・説明 12）。
    * narrow-nav＝EC連携・LINE通知・運用状態の板（中のメニュー 200・頭は型のまま・本文の余白 16/24）。
    */
   layout?: 'wide-nav' | 'narrow-nav'
+  contentLayout?: 'wide'
   boardId?: string
   title: ReactNode
   help?: ReactNode
+  explanation?: ReactNode
+  explanationKey?: string
   /** @deprecated ★V8 では板の頭に戻るを描かない（オーナー 2026-10-08）。戻るのは上の帯のパンくず。 */
   identity?: ReactNode
   actions?: ReactNode
   children: ReactNode
+  preview?: ReactNode
   saveActions?: ReactNode
   saveStatus?: ReactNode
   savePlacement?: 'content'
@@ -45,11 +53,16 @@ export function SbSettingsScreen({
   return (
     <SettingsPage
       layout={layout}
+      contentLayout={contentLayout}
       boardId={boardId}
       title={title}
       help={help}
+      explanation={explanation}
+      explanationKey={explanationKey}
       actions={actions}
       navigation={<SettingsInnerNav inline />}
+      preview={preview}
+      previewLayout={preview ? 'cards' : undefined}
       saveActions={saveActions}
       saveStatus={saveStatus}
       savePlacement={savePlacement}

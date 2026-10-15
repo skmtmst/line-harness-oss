@@ -70,8 +70,8 @@ const ALL_FEATURES_ON = Object.fromEntries(
     .map((key) => [key, true]),
 )
 
-/** 飲食店向け（テスト）は環境の旗が立たないと出ない。テストでは 8 組。 */
-const VISIBLE_GROUP_LABELS = ['メイン', '配信', 'コンテンツ', '成果と分析', '自動化', '予約', '専用機能', '設定']
+/** B-261: 設定は下の歯車から開く。定義は設定内のナビゲーションに残す。 */
+const VISIBLE_GROUP_LABELS = ['メイン', '配信', 'コンテンツ', '成果と分析', '自動化', '予約', '専用機能']
 
 async function renderSidebar(props: { friendAttributesV2Mode?: boolean } = {}) {
   const view = render(<Sidebar {...props} />)
@@ -114,6 +114,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     for (const label of VISIBLE_GROUP_LABELS) {
       expect(view.getAllByRole('button', { name: label }).length, `組「${label}」の見出しが無い`).toBeGreaterThan(0)
     }
+    expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
   })
 
   it('主要4組ははじめから開き、ほかの組は見出しだけ', async () => {
@@ -154,7 +155,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(box.hasAttribute('aria-hidden')).toBe(false)
     const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'sidebar.module.css'), 'utf8')
     // 動きは「動きを減らす」設定では付けない
-    expect(css).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*\[data-theme="v8"\] \.sectionItems \{\s*transition:\s*grid-template-rows var\(--motion-base\)/)
+    expect(css).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*:root \.sectionItems \{\s*transition:\s*grid-template-rows var\(--motion-base\)/)
     expect(css).toMatch(/\.sectionItemsClosed \{\s*grid-template-rows: 0fr;/)
   })
 
@@ -179,6 +180,23 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(staffView.queryAllByRole('link', { name: '設定' })).toHaveLength(0)
   })
 
+  it.each(['owner', 'admin'] as const)('設定の段を外しても%sの歯車と設定内の現在地を保つ', async (role) => {
+    rememberStaffIdentity({ role } as StaffMember)
+    // 保存していた組の開閉も、重複した入口を復活させない。
+    window.localStorage.setItem('lh-sidebar-groups', JSON.stringify({ settings: true }))
+    for (const pathname of ['/settings', '/accounts', '/emergency']) {
+      rememberStaffIdentity({ role } as StaffMember)
+      fixture.pathname = pathname
+      const view = await renderSidebar()
+      expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
+      expect(view.queryAllByRole('link', { name: '機能設定', exact: true })).toHaveLength(0)
+      const gear = view.getAllByRole('link', { name: '設定', exact: true })[0]!
+      expect(gear.getAttribute('href')).toBe('/settings')
+      expect(gear.className).toMatch(/active/)
+      cleanup()
+    }
+  })
+
   it('★V8 店の画面の左下に自分のメニュー（店の形）を出す（オーナー 2026-10-07）', async () => {
     const view = await renderSidebar()
     expect(view.getAllByText('me-store').length).toBeGreaterThan(0)
@@ -187,31 +205,30 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
 
   it('V2 のタグモードでも、v8 では組を丸ごと隠さない', async () => {
     const view = await renderSidebar({ friendAttributesV2Mode: true })
-    // v7 では「自動化・予約・設定」の組が消えるが、v8 では見出しが残る
-    for (const label of ['自動化', '予約', '設定']) {
+    for (const label of ['自動化', '予約']) {
       expect(view.getAllByRole('button', { name: label }).length, `組「${label}」が消えている`).toBeGreaterThan(0)
     }
+    expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
+    expect(view.getAllByRole('link', { name: '設定', exact: true }).length).toBeGreaterThan(0)
   })
 
-  it('v7 では組の開閉も「設定」の入口も出さず、全項目がそのまま出る', async () => {
+  it('旧テーマ指定でも組を開閉でき、設定と自分の入口を出す', async () => {
     document.documentElement.dataset.theme = 'v7'
     const view = await renderSidebar()
-    // 組の見出しはボタンではない（開閉しない）
-    expect(view.queryAllByRole('button', { name: '自動化' })).toHaveLength(0)
-    // 全項目が常に出る
+    const automation = view.getAllByRole('button', { name: '自動化' })[0]!
+    expect(automation.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => { automation.click() })
     expect(view.getAllByRole('link', { name: 'オートメーション' }).length).toBeGreaterThan(0)
-    expect(view.getAllByRole('link', { name: '機能設定' }).length).toBeGreaterThan(0)
-    // 歯車の「設定」リンクは無い
-    expect(view.queryAllByRole('link', { name: '設定' })).toHaveLength(0)
-    // V8 の左下の自分も出さない（v7 の店は上の帯の名前とログアウトのまま）
-    expect(view.queryAllByTestId('sidebar-account')).toHaveLength(0)
+    expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
+    expect(view.getAllByRole('link', { name: '設定' }).length).toBeGreaterThan(0)
+    expect(view.getAllByTestId('sidebar-account').length).toBeGreaterThan(0)
   })
 
-  it('v7 では V2 モードの組隠しが今までどおり効く', async () => {
+  it('旧テーマとV2指定でも組を丸ごと隠さない', async () => {
     document.documentElement.dataset.theme = 'v7'
     const view = await renderSidebar({ friendAttributesV2Mode: true })
-    expect(view.queryAllByText('自動化')).toHaveLength(0)
-    expect(view.queryAllByText('予約')).toHaveLength(0)
+    expect(view.getAllByRole('button', { name: '自動化' }).length).toBeGreaterThan(0)
+    expect(view.getAllByRole('button', { name: '予約' }).length).toBeGreaterThan(0)
   })
 })
 
@@ -266,15 +283,14 @@ describe('★V8 統括の左メニュー（絵 V8-B/JKjsE・オーナー 2026-10
     expect(home.getAllByRole('link', { name: '統括の設定' })[0].className).not.toMatch(/active/)
   })
 
-  it('v7 の統括は今までどおり（見出し無し・左下はアカウントの行・統括の設定と版は無し）', async () => {
+  it('旧テーマ指定でも統括の見出し・設定・版と自分の入口を出す', async () => {
     document.documentElement.dataset.theme = 'v7'
     const view = await renderHq()
-    expect(view.queryAllByRole('button', { name: '統括' })).toHaveLength(0)
-    expect(view.queryAllByRole('link', { name: '統括の設定' })).toHaveLength(0)
-    expect(view.queryAllByText('version')).toHaveLength(0)
-    expect(view.getAllByText('hq').length).toBeGreaterThan(0)
-    // v7 の統括には V8 の左下の自分を出さない。
-    expect(view.queryAllByTestId('sidebar-account')).toHaveLength(0)
+    expect(view.getAllByRole('button', { name: '統括' }).length).toBeGreaterThan(0)
+    expect(view.getAllByRole('link', { name: '統括の設定' }).length).toBeGreaterThan(0)
+    expect(view.getAllByText('version').length).toBeGreaterThan(0)
+    expect(view.queryAllByText('hq')).toHaveLength(0)
+    expect(view.getAllByTestId('sidebar-account').length).toBeGreaterThan(0)
   })
 })
 

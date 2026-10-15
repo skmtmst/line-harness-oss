@@ -21,8 +21,6 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/hq/banners',
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},  usePageTitle: vi.fn(), usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
-vi.mock('@/components/hq/banners/projects-section', () => ({ default: () => null }))
-vi.mock('@/components/hq/banners/library-section', () => ({ default: () => null }))
 vi.mock('@/lib/api', async (original) => ({
   ...await original<typeof import('@/lib/api')>(),
   api: {
@@ -74,4 +72,4 @@ describe('hq/banners の形違い応答', () => {
   })
 })
 
-vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => ({ id: 'banner-test-staff' }), useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))

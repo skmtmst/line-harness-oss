@@ -51,17 +51,18 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 // 複製後の編集画面への遷移に使う。KPIの試験では遷移しない。
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {} }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status = 500
   },
   api: {
+    staff: { me: () => Promise.resolve({ success: true, data: { id: 'owner-1', role: 'owner' } }) },
     richMenuGroups: {
       listPage: (accountId: string) => fixture.listPage(accountId),
       external: (accountId: string) => fixture.external(accountId),
@@ -74,6 +75,9 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  window.history.replaceState({}, '', '/rich-menus')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   fixture.selectedAccount = { id: 'account-a', name: 'A社' }
   fixture.listPage = () => Promise.resolve(listResult(3, 2, 1))
   fixture.tapStats = () => Promise.resolve(tapResult(12, { label: '予約ボタン', taps: 7 }))
@@ -83,10 +87,10 @@ beforeEach(() => {
   })
 })
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
 
 async function renderPage() {
-  const { default: RichMenusListPage } = await import('./page')
+  const { default: RichMenusListPage } = await import('@/v8/rich-menus/list')
   const rendered = render(<RichMenusListPage />)
   const kpis = rendered.container.querySelector<HTMLElement>('[data-design="KPIs"]')
   if (!kpis) throw new Error('KPI block is missing')
@@ -99,11 +103,11 @@ describe('リッチメニュー一覧のKPI', () => {
 
     await within(kpis).findByText('12')
     expect(kpis.hidden).toBe(false)
-    expect(kpis.dataset.groupKpiState).toBe('ready')
+    expect(within(kpis).queryByText('読み込んでいます')).toBeNull()
     // R12: 全体（3）はKPIに重ねて出さず、「すべて」の行とページ送りだけにする。
     expect(within(kpis).queryByText('3')).toBeNull()
     expect(within(kpis).queryByText('2')).toBeTruthy()
-    expect(within(kpis).queryByText('下書き 1件')).toBeTruthy()
+    expect(within(kpis).queryByText('下書き 1 件')).toBeTruthy()
     expect(within(kpis).queryByText('予約ボタン')).toBeTruthy()
     expect(within(kpis).queryByText('1')).toBeTruthy()
   })
@@ -115,7 +119,6 @@ describe('リッチメニュー一覧のKPI', () => {
     const { kpis } = await renderPage()
 
     expect(kpis.hidden).toBe(false)
-    expect(kpis.dataset.groupKpiState).toBe('loading')
     expect(within(kpis).getAllByText('読み込んでいます').length).toBeGreaterThan(0)
     expect(within(kpis).queryByText('0')).toBeNull()
   })
@@ -125,14 +128,14 @@ describe('リッチメニュー一覧のKPI', () => {
     fixture.tapStats = () => Promise.resolve(tapResult(0))
     const ready = await renderPage()
     await within(ready.kpis).findAllByText('0', {}, { timeout: 2_000 })
-    expect(within(ready.kpis).getByText('下書き 0件')).toBeTruthy()
+    expect(within(ready.kpis).getByText('下書き 0 件')).toBeTruthy()
     expect(within(ready.kpis).getByText('まだ押されていません')).toBeTruthy()
     ready.unmount()
 
     fixture.listPage = () => Promise.reject(new Error('list failed'))
     fixture.tapStats = () => Promise.reject(new Error('stats failed'))
     const failed = await renderPage()
-    await within(failed.kpis).findAllByText('一覧を取得できませんでした')
+    await within(failed.kpis).findAllByText('一覧を読み込めませんでした')
     expect(within(failed.kpis).getAllByText('集計を取れませんでした')).toHaveLength(2)
     expect(within(failed.kpis).queryByText('0')).toBeNull()
   })

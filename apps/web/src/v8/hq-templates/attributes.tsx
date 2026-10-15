@@ -1,10 +1,11 @@
 'use client'
+import { markNameRequirement } from '@/v8/tags/mark-requirement'
 
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FriendField, Folder, HqFriendAttributeDetail, HqFriendAttributeInput, HqFriendAttributeTemplate, HqFriendAttributeType, HqFriendAttributeListStats, HqTemplateFolder, HqMarkDefinition } from '@line-crm/shared'
-import { ClipboardList, FileText, Flag, History, Loader, Users, CircleDot, PenLine, Plus } from 'lucide-react'
+import { ClipboardList, List, Flag, History, Loader, Users, CircleDot, Pencil, Plus } from 'lucide-react'
 import { hqFriendAttributesApi as api } from '@/lib/hq-friend-attributes-api'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
@@ -12,6 +13,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage, CreatePage } from '@/components/templates'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -33,6 +35,7 @@ import createStyles from '@/v8/tags/create.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PageExplanationProvider, PageExplanationToggle } from '@/components/shared/page-explanation'
 
 type Attempt = { input: HqFriendAttributeInput; requestId: string; distribute: boolean }
 type Entry = { row: HqFriendAttributeTemplate; detail: HqFriendAttributeDetail }
@@ -180,10 +183,10 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
   const fieldRows = entries.filter((entry): entry is Entry & { detail: Extract<HqFriendAttributeDetail, { template: { template_type: 'friend_field' } }> } => entry.detail.template.template_type === 'friend_field').map((entry) => fieldOf(entry.detail, entry.row.friend_count))
   const markRows = type === 'mark' ? entries.map((entry) => markOf(entry.detail, entry.row.friend_count)) : []
   const kpis = type === 'friend_field' ? [
-    { title: '項目', icon: ClipboardList, value: status === 'ready' ? stats?.totalTemplates ?? entries.length : null, unit: '件', detail: '使っている —' },
+    { title: '項目', icon: List, value: status === 'ready' ? stats?.totalTemplates ?? entries.length : null, unit: '件', detail: '使っている —' },
     { title: '入力済みの友だち', icon: Users, value: null, unit: '人', detail: '1つ以上入っている' },
-    { title: '回答フォームで集める', icon: FileText, value: null, unit: '件', detail: '回答で自動で入る' },
-    { title: '今月の変更', icon: PenLine, value: null, unit: '件', detail: '追加・名前の変更' },
+    { title: '回答フォームで集める', icon: ClipboardList, value: null, unit: '件', detail: '回答で自動で入る' },
+    { title: '今月の変更', icon: Pencil, value: null, unit: '件', detail: '追加・名前の変更' },
   ] : [
     { title: 'マーク', icon: Flag, value: status === 'ready' ? stats?.totalTemplates ?? entries.length : null, unit: '種類', detail: entries.some((entry) => entry.row.friend_count == null) ? '使っている —' : `使っている ${entries.filter((entry) => (entry.row.friend_count ?? 0) > 0).length}` },
     { title: '未対応', icon: CircleDot, value: null, unit: '人', detail: '受信箱の —' },
@@ -217,7 +220,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     const definition = current && 'mark' in current.definition ? current.definition : input?.type === 'mark' ? input.definition : { schemaVersion: 1 as const, mark: { name: '', color: '#EF4B55', displayOrder: entries.length } }
     return <SaveErrorScope errors={saveErrors}> <HqMarkEditor key={`${current?.template.id ?? 'new'}:${current?.template.revision ?? 'new'}`} definition={definition} busy={busy} locked={uncertain} notices={notices} footer={footer} onCancel={() => setEditor(null)} onSave={(definition) => void save({ type: 'mark', name: definition.mark.name, description: current?.template.description ?? '', folderId: current?.template.folder_id ?? null, definition }, saveIntent.current)} /></SaveErrorScope>
   }
-  return <SaveErrorScope errors={saveErrors}> <ListPage boardId={tab === 'fields' ? 'y0sapC' : 'Qgjmc'} headingSize="regular" title={title} help={description}
+  const page = <SaveErrorScope errors={saveErrors}> <ListPage boardId={tab === 'fields' ? 'y0sapC' : 'Qgjmc'} headingSize="regular" title={title} help={description} explanationToggle={<PageExplanationToggle />}
     actions={type === 'mark' && canEdit ? <Button variant="primary" disabled={busy || status !== 'ready'} onClick={hostBase.onCreate}><Plus size={15} aria-hidden="true" />マークを作る</Button> : undefined}
     tabs={<AttributeTabs tab={tab} onSelect={onTab} />} overlays={<>
       {distribution?.saved ? <AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} saved onClose={() => { setDistribution(null); void load() }} /> : null}
@@ -229,8 +232,9 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
       <ConfirmDialog open={!!deletingFolder} title="フォルダを削除" deleteName={deletingFolder?.name ?? ''} description="中のひな形は未分類に残ります。" destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeletingFolder(null) }} onConfirm={() => perform(async () => { if (!deletingFolder) return; await api.folders.remove(deletingFolder.id, deletingFolder.revision); setDeletingFolder(null); await loadFolders(); await load() })} />
     </>}>
     {notices}
-    {type === 'friend_field' ? <FieldsTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: fieldRows }} /> : <MarksTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: markRows }} />}
+    {type === 'friend_field' ? <FieldsTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: fieldRows }} explanation /> : <MarksTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: markRows }} explanation />}
   </ListPage></SaveErrorScope>
+  return <PageExplanationProvider pageKey={type === 'mark' ? 'hq:marks' : 'hq:fields'}>{page}</PageExplanationProvider>
 }
 
 function HqMarkEditor({ definition, busy, locked, notices, footer, onCancel, onSave }: { definition: HqMarkDefinition; busy: boolean; locked: boolean; notices: React.ReactNode; footer: (submit: () => void, cancel: () => void) => React.ReactNode; onCancel: () => void; onSave: (definition: HqMarkDefinition) => void }) {
@@ -242,11 +246,11 @@ function HqMarkEditor({ definition, busy, locked, notices, footer, onCancel, onS
   const dirty = name !== definition.mark.name || color !== (definition.mark.color ?? '#3B82F6') || isDefault !== (definition.mark.isDefault ?? false) || autoOnInbound !== (definition.mark.autoOnInbound ?? false)
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: busy || locked })
   const submit = () => {
-    if (!name.trim()) { setError('マーク名を入力してください'); requestAnimationFrame(() => { const input = document.querySelector<HTMLElement>('[aria-labelledby="mark-basic"] input'); input?.focus(); input?.scrollIntoView({ block: 'center' }) }); return }
+    if (markNameRequirement.check(name)) { setError('マーク名を入力してください'); requestAnimationFrame(() => { const input = document.querySelector<HTMLElement>('[aria-labelledby="mark-basic"] input'); input?.focus(); input?.scrollIntoView({ block: 'center' }) }); return }
     onSave({ ...definition, mark: { ...definition.mark, name: name.trim(), color, isDefault, autoOnInbound } })
   }
   return <><CreatePage title="対応マークのひな形" notice={notices} footerActions={footer(submit, () => guarded(onCancel))} dirty={false}>
     <MarkBasicFields name={name} color={color} onName={setName} onColor={setColor} disabled={busy || locked} error={error || undefined} />
-    <section className={createStyles.card}><h2 className={createStyles.cardTitle}>自動で変えるきまり</h2><SaveErrorField names={["autoOnInbound","auto_on_inbound"]}><Checkbox checked={autoOnInbound} onCheckedChange={setAutoOnInbound} disabled={busy || locked}>新しいメッセージが来たらこのマークに変える</Checkbox></SaveErrorField><SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} onCheckedChange={setIsDefault} disabled={busy || locked}>新しい友だちに最初から付ける</Checkbox></SaveErrorField></section>
+    <Card variant="form" gap="normal"><h2 className={createStyles.cardTitle}>自動で変えるきまり</h2><SaveErrorField names={["autoOnInbound","auto_on_inbound"]}><Checkbox checked={autoOnInbound} onCheckedChange={setAutoOnInbound} disabled={busy || locked}>新しいメッセージが来たらこのマークに変える</Checkbox></SaveErrorField><SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} onCheckedChange={setIsDefault} disabled={busy || locked}>新しい友だちに最初から付ける</Checkbox></SaveErrorField></Card>
   </CreatePage><UnsavedLeaveDialog open={leaveTarget !== null} subject="マークへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} /></>
 }

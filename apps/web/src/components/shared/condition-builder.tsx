@@ -2,14 +2,15 @@
 
 import TagOverflow from './tag-overflow'
 import { useEffect, useState } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { TagToggle } from './tag-pill'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import DateField from './date-field'
 import { TextField } from './text-field'
-import Combobox from './combobox'
+import { EntityPickerDialog } from './entity-picker'
+import Card, { CardHeader } from './card'
+import { Plus } from 'lucide-react'
 import Select from './select'
 import {
   findInvalidRangeIssue,
@@ -322,9 +323,8 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
 
   /*
    * 条件の足し口。15個の札を並べっぱなしにすると1440pxでも3行に
-   * 折れて、どれがどれだか探せない。共通の候補つき入力（Combobox）で
-   * 打って絞り、右端のまとまり名（友だちの情報・タグ・行動など）で
-   * 確かめてから足す。札は1つも並べないので折り返しは起きない。
+   * 折れて、どれがどれだか探せない。共通の選ぶ窓で検索し、
+   * まとまり名（友だちの情報・タグ・行動など）を確かめてから足す。
    */
   const kindButtons = (groupIndex: number | null) => (
     <div className="mt-2 max-w-md">
@@ -343,25 +343,17 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           <button type="button" className="font-semibold underline" onClick={() => setOptionsAttempt((n) => n + 1)}>読み直す</button>
         </p>
       ) : null}
-      <div className="content-card rounded-card border p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-ink text-sm font-bold">
-            「すべて満たす」必要がある条件<span className="text-ink-faint ml-1 font-normal">(and条件)</span>
-          </p>
-          {label && <span className="text-ink-faint text-xs">{label}</span>}
-        </div>
+      <Card surface="muted" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
+        <CardHeader size="stacked" headingLevel={3} title="すべて満たす条件" meta={label} />
         <div className="mt-3">{renderRules(condition.rules, null)}</div>
         <p className="text-ink-faint mt-3 text-center text-xs">絞り込む項目を更に追加できます</p>
         {kindButtons(null)}
-      </div>
+      </Card>
 
       {(condition.groups ?? []).map((group, gi) => (
-        <div key={gi} className="border-hairline rounded-card border p-4">
+        <Card key={gi} surface="muted" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-ink text-sm font-bold">
-              「いずれか1つ以上を満たす」必要がある条件
-              <span className="text-ink-faint ml-1 font-normal">(or条件)</span>
-            </p>
+            <CardHeader headingLevel={3} size="stacked" title="いずれか1つ以上を満たす条件" />
             <Button variant="secondary" className="text-ink-faint hover:text-danger h-9 px-3 text-xs whitespace-normal" type="button" onClick={() =>
                 update({ ...condition, groups: (condition.groups ?? []).filter((_, i) => i !== gi) })
               }>
@@ -370,16 +362,16 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           </div>
           <div className="mt-3">{renderRules(group.rules, gi)}</div>
           {kindButtons(gi)}
-        </div>
+        </Card>
       ))}
 
-      <Button variant="secondary" className="text-ink-secondary rounded-card v7:h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
+      <Button variant="secondary" aria-label="いずれか条件のかたまりを足す" className="text-ink-secondary rounded-card w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
           update({
             ...condition,
             groups: [...(condition.groups ?? []), { operator: 'OR', rules: [] }],
           })
         }>
-        ＋「いずれか1つ以上を満たす」必要がある条件(or条件)を追加
+        ＋いずれか1つ以上を満たす条件を足す
       </Button>
 
       {showCount && (
@@ -403,11 +395,9 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
 }
 
 /**
- * 条件の足し口（1つ選ぶ）。共通の候補つき入力（★V7 `WUVcz`）を使う。
+ * 条件の足し口（1つ選ぶ）。共通の選ぶ窓（B-163/B-165）を使う。
  *
- * 選んだ直後は欄を空に戻す（続けてもう1つ足せる）。Combobox は value と
- * 一致する選択肢の名前を欄に出すため、どの選択肢とも一致しない値を渡して
- * 空に戻す。焦点は欄に残る。
+ * 確定したときだけ追加し、窓を閉じる。取消では条件を変えない。
  */
 function KindPicker({
   kinds,
@@ -416,21 +406,16 @@ function KindPicker({
   kinds: typeof RULE_KINDS
   onPick: (kind: (typeof RULE_KINDS)[number]) => void
 }) {
-  const [added, setAdded] = useState(0)
-  return (
-    <Combobox
-      aria-label="追加する条件を選ぶ"
-      placeholder="条件を追加（文字で検索）"
-      value={added === 0 ? '' : `added-${added}`}
-      onChange={(next) => {
-        const kind = kinds.find((item) => item.type === next)
-        if (!kind) return
-        onPick(kind)
-        setAdded((current) => current + 1)
-      }}
-      options={kinds.map((kind) => ({ value: kind.type, label: kind.label, hint: kind.group }))}
-    />
-  )
+  const [open, setOpen] = useState(false)
+  return <>
+    <Button type="button" aria-label="追加する条件を選ぶ" onClick={() => setOpen(true)}>
+      <Plus size={16} aria-hidden="true" />条件を足す
+    </Button>
+    {open ? <EntityPickerDialog title="条件を選ぶ" confirmLabel="条件を足す" searchPlaceholder="条件の名前で探す"
+      items={kinds.map(kind => ({ id: kind.type, name: kind.label, meta: kind.group, keywords: kind.group }))}
+      onConfirm={id => { const kind = kinds.find(kind => kind.type === id); if (kind) onPick(kind); setOpen(false) }}
+      onCancel={() => setOpen(false)} /> : null}
+  </>
 }
 
 /**

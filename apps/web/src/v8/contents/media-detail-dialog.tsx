@@ -1,4 +1,6 @@
 'use client'
+import { requiredText } from '@/lib/form-requirement'
+const changeReasonRequirement = requiredText('変更理由を入力してください。')
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
@@ -18,7 +20,6 @@ import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
-/* ★V8 写し：src/app/contents/media-detail-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
 function versionBlockerText(blockers: MediaVersionBlocker[]): string {
@@ -393,7 +394,7 @@ export default function MediaDetailDialog({
   }
 
   async function publishVersion() {
-    if (!item || !accountId || !versionPreview?.canReplace || !changeReason.trim()) return
+    if (!item || !accountId || !versionPreview?.canReplace || Boolean(changeReasonRequirement.check(changeReason))) return
     setVersionPhase('publishing')
     setVersionError('')
     try {
@@ -492,7 +493,7 @@ export default function MediaDetailDialog({
               </div>
             ) : null}
             {versionPreview?.canReplace ? (
-              <div className="mt-3"><Field label="変更理由" htmlFor={`${fileInputId}-reason`}><SaveErrorField names={["changeReason","change_reason"]}><input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" /></SaveErrorField></Field></div>
+              <div className="mt-3"><Field label="変更理由" htmlFor={`${fileInputId}-reason`} requirement={changeReasonRequirement}><SaveErrorField names={["changeReason","change_reason"]}><input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" /></SaveErrorField></Field></div>
             ) : null}
             {versionError ? <Notice tone="danger" message={versionError} className="mt-3" /> : null}
             {impact && impact.usageCount > 0 ? (
@@ -502,7 +503,7 @@ export default function MediaDetailDialog({
             ) : null}
             <div className="mt-4 flex justify-end">
               {versionPreview?.canReplace ? (
-                <Button type="button" variant="primary" onClick={() => void publishVersion()} disabled={!changeReason.trim() || versionPhase === 'publishing'} busy={versionPhase === 'publishing'} busyLabel="追加しています…">新しい版を追加する
+                <Button type="button" variant="primary" onClick={() => void publishVersion()} disabled={Boolean(changeReasonRequirement.check(changeReason)) || versionPhase === 'publishing'} busy={versionPhase === 'publishing'} busyLabel="追加しています…">新しい版を追加する
                 </Button>
               ) : (
                 <Button type="button" variant="primary" onClick={() => void prepareVersion()} disabled={!versionFile || versionPhase === 'uploading'}>

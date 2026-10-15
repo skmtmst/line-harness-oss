@@ -1,4 +1,5 @@
 'use client'
+import Card, { CardHeader } from '@/components/shared/card'
 
 import { api, type CommonActionResources } from '@/lib/api';
 import Toggle from '@/components/shared/toggle';
@@ -35,6 +36,7 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './notifications.module.css'
+import { audienceText, NotificationStateBadge, notificationRowState, deliveryTimingSummary, missedNoticeSummary, completedNoticeSummary } from './notification-summary'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -46,8 +48,7 @@ import EntityRemoteField, { type RemoteEntityKind } from '@/components/shared/en
  * ★V8 ウェビナーの ④通知（Pencil E7iAYs）。
  * 通知とリマインド（送った数・6つの通知の入／切と時刻）→ 視聴後にすること（3つの場合・本文・取れないとき）。
  * 右は LINE での見え方（選んだ通知の本文）。
- * 口・保存の順（通知の設定 → 版のある設定）・テスト送信は app/webinars/edit/notifications-v8.tsx と
- * components/webinars/webinar-notifications.tsx と同じ（BEHAVIOR.md）。
+ * 口・保存の順（通知の設定 → 版のある設定）・テスト送信は BEHAVIOR.md。
  */
 
 const SETTINGS_KEYS = [
@@ -277,6 +278,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
 
   const available = overview !== null
   const count = (value: number | undefined) => (available && typeof value === 'number' ? formatNumber(value) : emptyValue('unknown'))
+  const countWithUnit = (value: number | undefined) => (available && typeof value === 'number' ? `${count(value)}件` : count(value))
 
   const timeBox = (value: string, label: string, onChange: (next: string) => void) => (readOnly
     ? <ReadValue compact label={label}>{value}</ReadValue>
@@ -333,7 +335,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       hidePreviewWhenNarrow
       boardId="E7iAYs"
       title={chrome.title}
@@ -350,23 +352,20 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
             : <p className={styles.previewEmpty}>{`「${previewRow?.label ?? '通知'}」の本文はまだありません。送るときに決まった文面を使います。`}</p>}
         </LinePreview>
         <div className={form.previewActions}>
-          {readOnly ? null : <Button onClick={() => setTestOpen(true)} disabled={testing || saving || testDone || !settings} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : 'テストを送る'}</Button>}
+          {readOnly ? null : <Button onClick={() => setTestOpen(true)} disabled={testing || saving || testDone || !settings} title={testDone ? 'テスト済みです' : saving ? '保存しています' : !settings ? '通知の設定を読み込んでください' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : 'テストを送る'}</Button>}
           {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
       </>}
     >
-      <section className={form.card} data-gap="tight" aria-labelledby="webinar-notify-title" data-wc-pane="notifications">
-        <div className={form.cardHeadRow}>
-          <h2 id="webinar-notify-title" className={form.cardTitle}>通知とリマインド</h2>
-          <HelpTip label="送った数と通知の対象">{`予定 ${count(overview?.pending)}件・取消 ${count(overview?.cancelled)}件・合計 ${count(overview?.total)}件。通知の対象：${overview?.audience ? `${formatNumber(overview.audience.people)}人（取消を除いた有効な申込。延べ予約は${formatNumber(overview.audience.bookings)}件）` : emptyValue('unknown')}`}</HelpTip>
-        </div>
+      <Card variant="form" gap="normal" aria-labelledby="webinar-notify-title" data-wc-pane="notifications">
+        <CardHeader size="stacked" titleId="webinar-notify-title" title="通知とリマインド" action={<HelpTip label="送った数と通知の対象">{`予定 ${countWithUnit(overview?.pending)}・取消 ${countWithUnit(overview?.cancelled)}・合計 ${countWithUnit(overview?.total)}。通知の対象：${audienceText(overview?.audience)}`}<br /><NotificationStateBadge state={notificationRowState(settings ? SETTINGS_KEYS.filter(key => key.endsWith("Enabled")).some(key => Boolean(settings[key])) : undefined, loadState !== 'loading', loadState === 'error')} /><br />{deliveryTimingSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{missedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{completedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}</HelpTip>} />
         <p className={styles.desc}>LINE で送るお知らせです。テストは全部をまとめて自分に送ります。</p>
         {notificationBody}
-      </section>
+      </Card>
 
-      <section className={form.card} data-gap="tight" aria-labelledby="webinar-after-title">
-        <h2 id="webinar-after-title" className={form.cardTitle}>視聴後にすること</h2>
+      <Card variant="form" gap="normal" aria-labelledby="webinar-after-title">
+        <CardHeader size="stacked" titleId="webinar-after-title" title="視聴後にすること" />
         <p className={styles.desc}>見たかどうかで、タグを付けたりシナリオを始めたりします。</p>
         {actionError ? (
           <Notice tone="info" action={<Button onClick={() => setActionAttempt((value) => value + 1)}>もう一度読み込む</Button>}>視聴後の設定を読み込めませんでした。</Notice>
@@ -374,7 +373,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
           <div>
             {resourcesError ? <Notice tone="danger" action={<Button onClick={() => setResourceAttempt(n => n + 1)}>もう一度読み込む</Button>}>動きの対象を読み込めませんでした。</Notice> : null}
             {TRIGGERS.map(trigger => <div key ={trigger.key}>
-              <h3 className={form.cardTitle}>{trigger.label}</h3>
+              <CardHeader size="stacked" headingLevel={3} title={trigger.label} />
               { actions === null? <ListState kind="loading" /> : <ActionList<WebinarAction> value={actions.filter(action => action.trigger === trigger.key)} readOnly={readOnly || saving}
                 onChange={next => setActions(current => [...(current ?? []).filter(action => action.trigger !== trigger.key), ...next])}
                 idOf={(action, index) => action.id ?? String(index)} titleOf={action =>{
@@ -404,7 +403,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
               ? <ReadValue label="視聴結果を取得できない場合">{policy === 'escalate' ? '要対応へ追加' : '翌日に取り直す'}</ReadValue>
               : <SaveErrorField names={["policy","missingResultPolicy"]}><Select id="webinar-missing-policy" aria-label="視聴結果を取得できない場合" size="full" value={policy} disabled={saving} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に取り直す' }]} /></SaveErrorField>}
           </div></div>
-      </section>
+      </Card>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {testResult ? <p role="status" className={form.previewNote}>{testResult}</p> : null}
 

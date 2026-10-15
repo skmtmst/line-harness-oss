@@ -1,4 +1,7 @@
 'use client'
+import Card, { CardHeader } from '@/components/shared/card'
+import IconButton from '@/components/shared/icon-button'
+import { markNameRequirement } from '@/v8/tags/mark-requirement'
 import { createPageReturnHref } from '@/components/shared/create-page';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
 import { notifySaved } from '@/components/shared/toast';
@@ -9,6 +12,7 @@ import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react';
 import { api, ApiError, describeSaveFailure, type SaveSupportMarkAutomationRule, type SupportMarkArchiveImpact, type SupportMarkAutomationEvent, type SupportMarkAutomationRule, type SupportMarkListItem } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { StickyBarAction } from '@/components/shared/sticky-bar'
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import { Field } from '@/components/shared/form-controls';
@@ -36,7 +40,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 型（CreatePage）の左に段「基本」（マーク名・色）と段「自動で変えるきまり」、右の列に「出す場所と数」と案内の帯。
  * 下の帯は「保管する」が左端、キャンセル・保存が真ん中。
  * 読み込み・保存・版の衝突（R513）・冪等キー（R512）・権限（R511）・保管の影響確認は
- * 今の部品（app/tags/mark-editor-v8.tsx）から写した。
+ * 今の部品（src/v8/tags/mark-editor.tsx）から写した。
  * 絵に無い「新しい友だちに最初から付ける」は右の列の下の空きに置く。並び順は一覧で並べ替える（ここでは今の値を保つ）。
  * きまりの中身を変える・作るは、今の自動変更ルールの部品（SupportMarkRulesPanel）を窓で開く。
  */
@@ -286,7 +290,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   }
 
   const save = async () => {
-    if (!name.trim()) { setNameError('マーク名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
+    if (markNameRequirement.check(name)) { setNameError('マーク名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     if (loadState !== 'ready' || roleBlocked || saveForbidden) return
@@ -445,10 +449,10 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           保管すると、新しく付けられなくなります。いま付いている人は、確認画面で選ぶマークへ置き換わり、履歴に残ります。
         </p>
       ) : null}
-      <div className={styles.field}>
+      <div ><Field>
         <SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} disabled={selected?.isDefault} onCheckedChange={setIsDefault}>新しい友だちに最初から付ける</Checkbox></SaveErrorField>
         <p className={styles.fieldNote}>最初から付けるマークは1つだけ選べます</p>
-      </div>
+      </Field></div>
     </div>
   )
 
@@ -460,11 +464,11 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
         help={<>{description}{<AttributeKindGuide current="mark" />}</>}
         identity={back}
+        previewLabel="表示設定を見る"
+        previewTitle="対応マークの表示"
         preview={aside}
         destructive={editing && selected && !hideForm ? (
-          <Button type="button" variant="danger" onClick={() => openArchive()} busyLabel="処理中…" disabled={archiveBlockReason !== null} title={archiveBlockReason ?? undefined}>
-            <Pause size={15} aria-hidden="true" />保管する
-          </Button>
+          <StickyBarAction label="保管する" icon={Pause} onClick={() => openArchive()} disabledReason={archiveBlockReason} />
         ) : undefined}
         footerActions={hideForm ? <></> : <>
           <Button type="button" onClick={() => guarded(() => router.push('/tags?tab=marks'))}>キャンセル</Button>
@@ -491,11 +495,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           <>
             <MarkBasicFields name={name} color={color} onName={(value) => { setName(value); setNameError('') }} onColor={setColor} nameDuplicates={nameDuplicates} disabled={saving} error={nameError} nameRef={nameRef} />
 
-            <section className={styles.card} aria-labelledby="mark-rules">
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle} id="mark-rules">自動で変えるきまり</h2>
-                <p className={styles.cardNote}>条件に合ったら、このマークに変えます</p>
-              </div>
+            <Card variant="form" gap="normal" aria-labelledby="mark-rules">
+              <CardHeader size="stacked" titleId="mark-rules" title="自動で変えるきまり" meta="条件に合ったら、このマークに変えます" />
               {editing ? (
                 <>
                   {rulesState === 'not-connected' ? <p className={styles.fieldNote}>自動で変えるきまりは、まだこの環境で使えません。</p> : null}
@@ -513,12 +514,12 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                       <Zap className={styles.ruleIcon} aria-hidden="true" />
                       <span className={styles.ruleWhen} title={rule.name}>{`${WHEN_WORDS[rule.event] ?? eventLabel(rule.event)}${rule.isActive ? '' : '（止めています）'}`}</span>
                       <span className={styles.ruleThen}>{`→ ${name.trim() || 'このマーク'}にする`}</span>
-                      <button type="button" className={styles.iconButton} aria-label={`きまり「${rule.name}」を直す`} title="直す" onClick={() => setRulesOpen(true)}>
+                      <IconButton size="small" aria-label={`きまり「${rule.name}」を直す`} title="直す" onClick={() => setRulesOpen(true)}>
                         <Pencil className={styles.wayIcon} aria-hidden="true" />
-                      </button>
-                      <button type="button" className={styles.iconButton} aria-label={`きまり「${rule.name}」を止める`} title="止める" onClick={() => { setRuleError(''); setStoppingRule(rule) }}>
+                      </IconButton>
+                      <IconButton size="small" aria-label={`きまり「${rule.name}」を止める`} title="止める" onClick={() => { setRuleError(''); setStoppingRule(rule) }}>
                         <Trash2 className={styles.wayIcon} aria-hidden="true" />
-                      </button>
+                      </IconButton>
                     </div>
                   ))}
                   {rulesState === 'ready' || rulesState === 'loading' ? (
@@ -551,7 +552,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                   <Button type="button" variant="text" onClick={() => setCreateRule(true)}><Plus size={15} aria-hidden="true" />きまりを作る</Button>
                 </span>
               )}
-            </section>
+            </Card>
           </>
         )}
       </CreatePage>

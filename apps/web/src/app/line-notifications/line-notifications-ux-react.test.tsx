@@ -8,6 +8,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
+  tab: 'customer',
   settings: vi.fn(),
   overview: vi.fn(),
   operatorList: vi.fn(),
@@ -30,10 +31,10 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => null,
-  useMergedTab: () => 'customer',
+  useMergedTab: () => fixture.tab,
 }))
-vi.mock('@/components/line-notifications/notification-run-list', () => ({ default: () => null }))
-vi.mock('./operator-notification-rules', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/runs-tab', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/operator-tab', () => ({ default: () => null }))
 
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {
@@ -69,12 +70,13 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => null, useStaffRole: () => 'owner', canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 
 import LineNotificationsPage from './page'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  fixture.tab = 'customer'
   fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 }, items: [] } })
   fixture.settings.mockResolvedValue({ success: true, data: [] })
   fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
@@ -120,4 +122,13 @@ it('顧客タブの読み込み中は骨組みが出て「読み込み中」の�
   })
   expect(screen.queryByText(/読み込んでいます/)).toBeNull()
   delete document.documentElement.dataset.theme
+})
+
+it('LINE通知は題の用語説明と画面の説明を両方開ける', async () => {
+  fixture.tab = 'failures'
+  render(<LineNotificationsPage />)
+  const help = screen.getByRole('button', { name: 'LINE通知の説明' })
+  await act(async () => { help.click() })
+  expect(screen.getByText(/送れなかった理由や再試行の予定/)).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'この画面の説明' })).toBeTruthy()
 })

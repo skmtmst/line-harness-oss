@@ -22,7 +22,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { default: AttributionSection } = await import('./attribution-view')
+const { default: AttributionSection } = await import('@/v8/affiliates/attribution-view')
 
 const VIEW = {
   conversionEventId: 'ev-1',
@@ -82,7 +82,7 @@ describe('AttributionSection', () => {
   test('読み込み中はその旨を出す', () => {
     fixture.impl = () => new Promise(() => {})
     render(<AttributionSection eventId="ev-1" />)
-    expect(screen.getByText('付け方を読み込んでいます')).toBeTruthy()
+    expect(screen.getByLabelText('付け方を読み込んでいます')).toBeTruthy()
   })
 
   test('失敗は1つの帯で出し、再試行できる', async () => {

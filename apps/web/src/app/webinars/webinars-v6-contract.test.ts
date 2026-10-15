@@ -1,23 +1,24 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'list-v8.tsx'), 'utf8')
-const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
-const PARTICIPANTS = fs.readFileSync(path.join(__dirname, 'edit/participants-v8.tsx'), 'utf8')
-const REVIEW = fs.readFileSync(path.join(__dirname, 'edit/review-v8.tsx'), 'utf8')
-const ANALYTICS = fs.readFileSync(path.join(__dirname, 'edit/analytics-v8.tsx'), 'utf8')
+const PAGE = readUiSource(path.join(__dirname, 'page.tsx'), 'utf8')
+const EDIT = readUiSource(path.join(__dirname, 'edit/page.tsx'), 'utf8')
+const PARTICIPANTS = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/participants.tsx'), 'utf8')
+const REVIEW = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/review.tsx'), 'utf8')
+const ANALYTICS = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/analytics.tsx'), 'utf8')
 const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/webinar-form.tsx'), 'utf8')
 /** 読み込めなかった理由の文言は、試験しやすいよう別ファイルへ出した。 */
-const FAILURE = fs.readFileSync(path.join(__dirname, 'webinar-load-failure.ts'), 'utf8')
+const FAILURE = fs.readFileSync(path.join(__dirname, '../../v8/webinars/helpers.ts'), 'utf8')
 
-describe('V6 ウェビナー一覧の契約', () => {
+describe('V8 ウェビナー一覧の契約', () => {
   it('既存データで判定できる並び順と表示件数だけを選べる', () => {
-    expect(PAGE).toContain('更新が新しい順')
-    expect(PAGE).toContain('作成が新しい順')
+    expect(PAGE).toContain("value: 'updated', label: '更新順'")
+    expect(PAGE).toContain("value: 'created', label: '作成順'")
     expect(PAGE).toContain('名前順')
     /* #668: 並び順・表示件数は共通部品（SortSelect / PageSizeSelect）。 */
     expect(PAGE).toContain('SortSelect')
@@ -39,11 +40,12 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('選択アカウントのフォルダ件数を表示し、追加・改名・並び替え・削除を保存する', () => {
-    expect(PAGE).toContain('className={styles.body}')
-    expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
-    expect(PAGE).toContain("onAddFolder={() => { if (!canEdit) return; setFolderError(''); closeDetail(); setFolderDialogOpen(true) }}")
-    expect(PAGE).toContain("webinarApi.createFolder(selectedAccountId, { name })")
-    expect(PAGE).toContain('webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name })')
+    expect(PAGE).toContain('<FolderPanel')
+    expect(PAGE).toContain('folders={foldersLoadError?')
+    expect(PAGE).toContain('title="フォルダを読み込めませんでした"')
+    expect(PAGE).toContain("onAddFolder={canEdit ? () => { setFolderError(''); closeDetail(); setFolderFormOpen(true) } : undefined}")
+    expect(PAGE).toContain("webinarApi.createFolder(selectedAccountId, { name, color })")
+    expect(PAGE).toContain('webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name, color })')
     expect(PAGE).toContain('webinarApi.deleteFolder(selectedAccountId, deletingFolder.id)')
     expect(PAGE).toContain('webinarApi.folders(selectedAccountId)')
     expect(PAGE).toContain('count: folder.count')
@@ -55,20 +57,21 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
     expect(PAGE).toContain('peopleText(w.registrationCount)')
     expect(PAGE).toContain('peopleText(w.viewerCount)')
-    expect(PAGE).toContain('publicationSummary(w)')
+    expect(PAGE).toContain('periodSummary(w)')
   })
 
   it('選択中のLINEアカウントだけを読み、新規作成にも所属を保存する', () => {
-    expect(PAGE).toContain('list: webinarApi.list,')
-    expect(PAGE).toContain('currentGeneration: () => requestGeneration.current')
+    expect(PAGE).toContain('webinarApi.list(accountId, params)')
+    expect(PAGE).toContain('requestGeneration.current !== generation')
     expect(PAGE).toContain('loadedAccountId === selectedAccountId ? items : []')
-    expect(PAGE).toContain('folderRequestGeneration.current === generation')
-    expect(PAGE).toContain('上のバーでLINE公式アカウントを選んでください')
+    expect(PAGE).toContain('folderGeneration.current !== generation')
+    expect(PAGE).toContain('<AccountRequiredState hasAccounts={accounts.length > 0}')
     expect(FORM).toContain("...(!initial ? { accountId: selectedAccountId } : {})")
   })
 
   it('一覧は頁ごとに取り、取った頁を絞り直さない', () => {
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
+    expect(PAGE).toContain('range={{ total: visibleTotal,')
     expect(PAGE).toContain('limit: pageSize')
     expect(PAGE).toContain('q: debouncedQuery.trim() || undefined')
     expect(PAGE).toContain('folder: selectedFolder || undefined')
@@ -87,7 +90,7 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(FAILURE).toContain('ウェビナーを表示できませんでした')
     expect(FAILURE).toContain('通信状態を確認して、もう一度読み込んでください。')
     expect(PAGE).not.toContain('e instanceof Error ? e.message')
-    expect(PAGE).toContain('onRetry={() => void refresh()}')
+    expect(PAGE).toContain('onClick={() => refresh()}')
     expect(PAGE).toContain('もう一度読み込む')
     /* 失敗の1枚と、空の1枚が別であること。 */
     expect(PAGE).toContain('if (loadFailure && visibleItems.length === 0)')
@@ -101,7 +104,7 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('同じ /webinars/new への操作名は「＋ ウェビナーを作る」で一致する(DETAIL-02)', () => {
-    expect(PAGE).toContain('href="/webinars/new">＋ ウェビナーを作る')
+    expect(PAGE).toContain('href="/webinars/new"'); expect(PAGE).toContain('ウェビナーを作る')
     expect(PAGE).not.toContain('ウェビナーを作成')
     expect(PAGE).not.toContain('ウェビナーをつくる')
   })
@@ -134,14 +137,16 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('視聴後アクション・参加者・分析・公開プレビューを別の面で開ける', () => {
-    for (const label of ['視聴後アクション', '公開プレビュー', '参加者', '分析']) {
+    for (const label of ['participants', 'analytics', 'comments']) {
       expect(EDIT).toContain(`'${label}'`)
     }
+    expect(EDIT).toContain("if (value === 'actions') return 'notifications'")
+    expect(EDIT).toContain("if (value === 'preview') return 'review'")
     expect(EDIT).toContain('webinarApi.saveActions(webinarId, actions)')
     // #1053: 直リンクは Bearer 補完経路で401になるため、認証付き取得へ。
-    expect(ANALYTICS).toContain('downloadApiFile(webinarApi.participantsCsvUrl(webinarId')
-    expect(EDIT).toContain('data-design-node="Xjk8q"')
-    expect(ANALYTICS).toContain('data-design-node="z2dgw"')
+    expect(ANALYTICS).toContain('downloadApiFile(webinarApi.participantsCsvUrl(webinar.id')
+    expect(EDIT).toContain('boardId="uNsEy"')
+    expect(ANALYTICS).toContain('boardId="z2dgw"')
   })
 
   it('アーカイブの失敗は対象を失わず同じ窓で伝える（#985 CHK-02）', () => {
@@ -155,7 +160,7 @@ describe('V6 ウェビナー一覧の契約', () => {
   it('編集・公開前検査・運用・参加者・分析を実APIへ接続する', () => {
     for (const call of [
       'webinarApi.editor(id)',
-      'webinarApi.testPublicPage(webinar.id, editor.version)',
+      'webinarApi.testPublicPage(webinar.id, version.current)',
     ]) expect(EDIT).toContain(call)
     for (const call of [
       'webinarApi.pause(id, editor.version)',
@@ -163,8 +168,9 @@ describe('V6 ウェビナー一覧の契約', () => {
       'webinarApi.duplicate(id, editor.version)',
     ]) expect(PUBLISHED).toContain(call)
     expect(REVIEW).toContain('webinarApi.publishValidation(webinar.id)')
-    expect(PARTICIPANTS).toContain('webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE, filter || undefined)')
-    expect(ANALYTICS).toContain('retention={analytics.retention')
+    expect(PARTICIPANTS).toContain('webinarApi.participants(webinar.id, nextCursor, PARTICIPANTS_PAGE_SIZE, filter || undefined)')
+    expect(ANALYTICS).toContain('const retention = analytics.retention ??')
+    expect(ANALYTICS).toContain('<Retention analytics={analytics}')
     expect(PUBLISHED).toContain('editor.monitoring.notificationFailures')
   })
 })

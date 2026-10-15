@@ -8,7 +8,7 @@ import type { Env } from '../index.js';
 
 let fixture: SqliteD1, app: Hono<Env>;
 beforeEach(() => {
-  fixture = createTestD1({ foreignKeys: true });
+  fixture = createTestD1({ loginPolicy: 'off', foreignKeys: true });
   const raw = fixture.raw;
   raw.prepare("INSERT INTO tenants(id,name) VALUES('other-tenant','別の統括')").run();
   for (const [id, tenant] of [['a', DEFAULT_TENANT_ID], ['b', DEFAULT_TENANT_ID], ['other', 'other-tenant']]) {

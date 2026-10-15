@@ -1,4 +1,6 @@
 'use client'
+import Card, { CardHeader } from '@/components/shared/card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { AlignLeft, Calendar, Check, CircleDot, Hash, ListChecks, Star, Type } from 'lucide-react';
@@ -8,8 +10,9 @@ import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
-import { TextField } from '@/components/shared/text-field';
-import { Field } from '@/components/shared/form-controls';
+import { AffixedTextField, TextField } from '@/components/shared/text-field';
+import { Field, RequiredBadge } from '@/components/shared/form-controls';
+import { requiredText } from '@/lib/form-requirement';
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
@@ -20,13 +23,17 @@ import { sameLabels, storedDefaultLabels, suggestKey } from './field-model';
 import styles from './create.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors';
 
+const nameRequirement = requiredText('項目名を入力してください')
+const keyRequirement = requiredText('差し込みの名前を入力してください')
+const ecPathRequirement = requiredText('EC側の項目名を入力してください')
+
 /*
  * ★V8 友だち情報欄を作る・編集（Pencil `w9zY5`）。
  *
  * 型（CreatePage）の左に段「基本」（項目名・差し込みの名前・フォルダ）と段「種類」（よく使う6つの選ぶカード）、
  * 右の列に「種類（つづき）」の札・「値の扱い」（選択肢・既定値）・「オプション」3つの箱と「出す場所」、
  * （編集のみ）「いまの使用状況」。下の帯はキャンセル・保存を真ん中に。
- * 入力・検査・保存の中身は今の部品（app/tags/field-editor-v8.tsx）と同じ。
+ * 入力・検査・保存の中身は今の部品（src/v8/tags/field-editor.tsx）と同じ。
  * 絵に無い説明（種別の違い・作成後に変えられないもの）は板の頭の「？」へ入れた。
  */
 
@@ -213,6 +220,7 @@ export default function FieldEditor({
   useEffect(() => { onDraftChange?.(draftValues) }, [draftValues, onDraftChange])
   const typeLocked = mode === 'edit' || locked
   const optionsActive = NEEDS_OPTIONS.has(effectiveType) && !locked
+  const optionsDisabledReason = locked ? 'この情報欄は編集できません' : !optionsActive ? '種類が選択肢の項目のときに追加できます' : undefined
   const destination = folders.find((folder) => folder.id === folderId)?.name ?? '未分類'
   const shownKey = mode === 'create' ? (fieldKey.trim() || 'pet_name') : (field?.fieldKey ?? '')
 
@@ -227,10 +235,10 @@ export default function FieldEditor({
   const submit = () => {
     if (saving) return
     if (mode === 'create' && !siblingsReady) return
-    if (!name.trim()) return failField('name', '項目名を入力してください')
-    if (mode === 'create' && !fieldKey.trim()) return failField('key', '差し込みの名前を入力してください')
+    if (nameRequirement.check(name)) return failField('name', nameRequirement.check(name)!)
+    if (mode === 'create' && keyRequirement.check(fieldKey)) return failField('key', keyRequirement.check(fieldKey)!)
     if (NEEDS_OPTIONS.has(effectiveType) && optionList.length === 0) return failField('options', '選択肢を1つ以上入力してください')
-    if (ecIsMaster && !ecFieldPath.trim()) return failField('ec', 'EC側の項目名を入力してください')
+    if (ecIsMaster && ecPathRequirement.check(ecFieldPath)) return failField('ec', ecPathRequirement.check(ecFieldPath)!)
     /* 選択肢から外れた既定値は送る前に止める（R139）。 */
     if (effectiveType === 'multi_select') {
       const missing = defaultOptions.filter((item) => !optionList.includes(item))
@@ -267,27 +275,19 @@ export default function FieldEditor({
   const aside = (
     <div className={styles.aside}>
       <div className={styles.sideStack}>
-        <section className={styles.sideCard} aria-labelledby="ff-more-types">
+        <Card variant="aside" aria-labelledby="ff-more-types">
           <h2 className={styles.sideCardTitle} id="ff-more-types">{`種類（つづき：全${TYPE_COUNT}種）`}</h2>
-          <div className={styles.chipColumn} role="radiogroup" aria-label="項目の種類（つづき）">
+          <RadioCardGroup className={styles.chipColumn} legend="項目の種類（つづき）">
             {SECONDARY_TYPES.map((item) => (
-              <button
-                key={item}
-                type="button"
-                role="radio"
-                aria-checked={effectiveType === item}
-                disabled={typeLocked}
-                className={styles.typeChip}
-                onClick={() => selectType(item)}
-              >
-                <Star className={styles.typeChipIcon} aria-hidden="true" />
-                {FIELD_TYPE_WORDS[item]}
-              </button>
+              <RadioCard key={item} variant="row" name="friend-field-secondary-type" value={item}
+                checked={effectiveType === item} disabled={typeLocked}
+                icon={<Star aria-hidden="true" />} title={FIELD_TYPE_WORDS[item]} ariaLabel={FIELD_TYPE_WORDS[item]}
+                onChange={() => selectType(item)} onClick={() => selectType(item)} />
             ))}
-          </div>
-        </section>
+          </RadioCardGroup>
+        </Card>
 
-        <section className={styles.sideCard} aria-labelledby="ff-values" data-field="options">
+        <Card variant="aside" aria-labelledby="ff-values" data-field="options">
           <h2 className={styles.sideCardTitle} id="ff-values">値の扱い</h2>
           <p className={styles.sideNote}>{`「${FIELD_TYPE_WORDS.select}」「${FIELD_TYPE_WORDS.multi_select}」のときは選択肢を並べます。`}</p>
           <div className={styles.optionStack}>
@@ -298,6 +298,7 @@ export default function FieldEditor({
                   aria-describedby={index === 0 && validationTarget === 'options' && validationError ? 'ff-error-options' : undefined}
                   value={value}
                   disabled={!optionsActive}
+                  title={optionsDisabledReason}
                   aria-label={`選択肢 ${index + 1}`}
                   placeholder={OPTION_EXAMPLES[index] ?? undefined}
                   onChange={(event) => setOption(index, event.target.value)}
@@ -305,7 +306,7 @@ export default function FieldEditor({
             ))}
             {fieldError('options')}
             <span>
-              <Button type="button" disabled={!optionsActive} onClick={() => setOptions([...optionRows, ''])}>選択肢を足す</Button>
+              <Button type="button" disabled={!optionsActive} title={optionsDisabledReason} onClick={() => setOptions([...optionRows, ''])}>選択肢を足す</Button>
             </span>
           </div>
           <div className={styles.defaultBox} ref={(element) => { validationRefs.current.default = element }}>
@@ -325,18 +326,18 @@ export default function FieldEditor({
             />
             </Field>
           </div>
-        </section>
+        </Card>
 
-        <section className={styles.sideCard} aria-labelledby="ff-options">
+        <Card variant="aside" aria-labelledby="ff-options">
           <h2 className={styles.sideCardTitle} id="ff-options">オプション</h2>
           <SaveErrorField names={["isPersonal","is_personal"]}><Checkbox checked={isPersonal} onCheckedChange={setIsPersonal} disabled={locked || saving}>個人情報として保護（画面で伏せる）</Checkbox></SaveErrorField>
           <SaveErrorField names={["isStarred","is_starred"]}><Checkbox checked={isStarred} onCheckedChange={setIsStarred} disabled={locked || saving}>友だち一覧の列に出す</Checkbox></SaveErrorField>
           <SaveErrorField names={["ecIsMaster","ec_is_master"]}><Checkbox checked={ecIsMaster} onCheckedChange={setEcIsMaster} disabled={locked || saving}>EC側の値を正とする（EC連携で上書き）</Checkbox></SaveErrorField>
           {ecIsMaster ? (
-            <Field label="EC側の項目名"><SaveErrorField names={["ecFieldPath","ec_field_path"]}><TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" /></SaveErrorField>
+            <Field label="EC側の項目名" requirement={{ ...ecPathRequirement, required: ecIsMaster }}><SaveErrorField names={["ecFieldPath","ec_field_path"]}><TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" /></SaveErrorField>
 {fieldError('ec')}</Field>
           ) : null}
-        </section>
+        </Card>
       </div>
 
       {host ? null : <>
@@ -371,6 +372,8 @@ export default function FieldEditor({
         help={<>{host ? '各アカウントへ配る情報欄のひな形を作ります。種類と差し込みの名前は作ったあと変えられません。' : mode === 'create' ? '友だち1人ひとりに持たせる情報欄を作ります。種類は作ったあと「移行」でだけ変えられます' : '名前・フォルダ・値の扱いを変えられます。種類は「移行」でだけ変えられます'}{help}</>}
         identity={host ? undefined : back}
         notice={host?.notice}
+        previewLabel="種類と設定を見る"
+        previewTitle="項目の種類と設定"
         preview={aside}
         footerActions={host ? host.footer(submit, () => guarded(onCancel)) : <>
           <Button type="button" onClick={() => guarded(onCancel)} disabled={saving}>キャンセル</Button>
@@ -391,9 +394,9 @@ export default function FieldEditor({
         {error ? <Notice tone="danger" message={error} /> : null}
         {locked && !host ? <Notice tone="warn">共通項目はこのアカウントから直接変更できません。新しい項目へ移行してから編集してください。</Notice> : null}
 
-        <section className={styles.card} aria-labelledby="ff-basic">
-          <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ff-basic">基本</h2></div>
-          <Field label="項目名"><SaveErrorField names={["name"]}><TextField
+        <Card variant="form" gap="normal" aria-labelledby="ff-basic">
+          <CardHeader size="stacked" titleId="ff-basic" title="基本" />
+          <Field requirement={nameRequirement} label="項目名"><SaveErrorField names={["name"]}><TextField
               ref={(element) => { validationRefs.current.name = element }}
               invalid={validationTarget === 'name' && Boolean(validationError)}
               aria-describedby={validationTarget === 'name' && validationError ? 'ff-error-name' : undefined}
@@ -405,32 +408,29 @@ export default function FieldEditor({
             /></SaveErrorField>
 {fieldError('name')}
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" /></Field>
-          <div className={styles.field} data-field="key">
-            <span className={styles.labelStrong} id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}</span>
+          <div  data-field="key"><Field requirement={mode === 'create' ? keyRequirement : undefined} label={<span id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}</span>}>
+
             <span className={styles.keyRow}>
-              <span className={styles.keyBrace}>{'{{field.'}</span>
               {mode === 'create' ? (
-                <SaveErrorField names={["fieldKey","keyTouched","field_key","key_touched"]}><TextField
+                <SaveErrorField names={["fieldKey","keyTouched","field_key","key_touched"]}><AffixedTextField monospace startAdornment="{{field." endAdornment="}}"
                   ref={(element) => { validationRefs.current.key = element }}
                   invalid={validationTarget === 'key' && Boolean(validationError)}
                   aria-describedby={validationTarget === 'key' && validationError ? 'ff-error-key' : undefined}
-                  className={styles.keyInput}
                   value={fieldKey}
                   aria-labelledby="ff-key"
                   aria-required="true"
                   placeholder="pet_name"
                   onChange={(event) => { setKeyTouched(true); setFieldKey(event.target.value) }}
                 /></SaveErrorField>
-              ) : <span className={`${styles.input} ${styles.keyInput} ${styles.keyFixed}`}>{field?.fieldKey}</span>}
-              <span className={styles.keyBrace}>{'}}'}</span>
+              ) : <AffixedTextField monospace startAdornment="{{field." endAdornment="}}" readOnly value={field?.fieldKey ?? ''} aria-labelledby="ff-key" />}
             </span>
             {fieldError('key')}
             {keyOwners.length > 0
               ? <p className={styles.fieldError}>{`この差し込みの名前はすでに「${keyOwners[0]}」で使われています。別の名前にしてください。`}</p>
               : <p className={styles.keyNote}>{`メッセージに {{field.${shownKey}}} と書くと、その人の値に置き換わります`}</p>}
-          </div>
-          <div className={styles.field}>
-            <span className={styles.labelStrong}>フォルダ</span>
+          </Field></div>
+          <div ><Field label={<span>フォルダ</span>}>
+
             {foldersState === 'error' ? (
               <div className={styles.inlineRetry}>
                 <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{mode === 'create' ? 'フォルダを読み込めませんでした。今は未分類にしか入れられません。' : '所属を読み込めませんでした。今の所属は変わらず保存されます。'}</Notice>
@@ -449,40 +449,34 @@ export default function FieldEditor({
                 /></SaveErrorField>
               </span>
             )}
-          </div>
-        </section>
+          </Field></div>
+        </Card>
 
-        <section className={styles.card} aria-labelledby="ff-type">
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="ff-type">種類</h2>
-            <p className={styles.cardNote}>
-              {host ? '種類は作ったあと変えられません。別の種類は新しいひな形として作ってください。' : mode === 'edit' ? '種類は変えられません。別の種類にしたいときは一覧の「移行」から新しい項目へ移してください。' : '作ったあとは「移行」でだけ変えられます'}
-            </p>
-          </div>
-          <div className={styles.typeGrid} role="radiogroup" aria-label="項目の種類（よく使う）">
+        <Card variant="form" gap="normal" aria-labelledby="ff-type">
+          <CardHeader size="stacked" titleId="ff-type" title="種類"
+            meta={host ? '種類は作ったあと変えられません。別の種類は新しいひな形として作ってください。' : mode === 'edit' ? '種類は変えられません。別の種類にしたいときは一覧の「移行」から新しい項目へ移してください。' : '作ったあとは「移行」でだけ変えられます'} />
+          <RadioCardGroup className={styles.typeGrid} legend="項目の種類（よく使う）">
             {PRIMARY_TYPES.map((item) => {
               const Icon = TYPE_ICONS[item] ?? Type
               return (
-                <button
+                <RadioCard
                   key={item}
-                  type="button"
-                  role="radio"
-                  aria-checked={effectiveType === item}
+                  name="friend-field-primary-type"
+                  value={item}
+                  checked={effectiveType === item}
                   disabled={typeLocked}
-                  className={styles.typeCard}
-                  onClick={() => selectType(item)}
-                >
-                  <span className={styles.typeCardTop}>
-                    <Icon className={styles.wayIcon} aria-hidden="true" />
-                    <span className={styles.typeRadio} aria-hidden="true" />
-                  </span>
-                  <span className={styles.typeCardLabel}>{FIELD_TYPE_WORDS[item]}</span>
-                  <span className={styles.typeCardHint}>{TYPE_HINTS[item]}</span>
-                </button>
+                  icon={<Icon aria-hidden="true" />}
+                  contentPlacement="below-indicator"
+                  title={FIELD_TYPE_WORDS[item]}
+                  ariaLabel={FIELD_TYPE_WORDS[item]}
+                  note={TYPE_HINTS[item]}
+                  onChange={(value) => selectType(value as FriendFieldType)}
+                  onClick={() => { if (effectiveType === item) selectType(item) }}
+                />
               )
             })}
-          </div>
-        </section>
+          </RadioCardGroup>
+        </Card>
       </CreatePage>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject={mode === 'edit' ? '項目への変更' : '入力した項目'} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </>

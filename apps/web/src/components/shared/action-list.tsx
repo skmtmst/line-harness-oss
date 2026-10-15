@@ -21,16 +21,19 @@ export type ActionChoice<T> = {
     title: string
     items: EntityPickerItem[]
     multiple?: boolean
+    /** 種類ごとのフォルダ・作成・見本も、既存の選ぶ窓へ渡す。 */
+    render?: (props: { onConfirm: (ids: string[]) => void; onCancel: () => void }) => ReactNode
     apply: (item: T, ids: string[]) => T
   }
 }
 
 /** B-169: 種類を選んでから対象を確定する。取消では空の行を追加しない。 */
-export function ActionAddButton<T>({ choices, onAdd, disabled = false, id }: {
+export function ActionAddButton<T>({ choices, onAdd, disabled = false, id, label = '行うことを足す' }: {
   choices: ActionChoice<T>[]
   onAdd: (item: T) => void
   disabled?: boolean
   id?: string
+  label?: string
 }) {
   const anchor = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
@@ -44,14 +47,14 @@ export function ActionAddButton<T>({ choices, onAdd, disabled = false, id }: {
   return <>
     <Button id={id} ref={anchor} type="button" variant="secondary" disabled={disabled || choices.length === 0}
       aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-      <Plus size={16} aria-hidden="true" />行うことを足す
+      <Plus size={16} aria-hidden="true" />{label}
     </Button>
     <ActionMenu open={open} anchorRef={anchor} ariaLabel="行うことの種類" onClose={() => setOpen(false)}
       items={choices.map(choice => ({ id: choice.id, label: choice.label, disabled: choice.disabled, disabledReason: choice.disabledReason,
         icon: choice.icon ? <choice.icon size={16} aria-hidden="true" /> : undefined,
         onSelect: () => { if (choice.picker) setPendingId(choice.id); else onAdd(choice.make()) },
       }))} />
-    {pending?.picker ? pending.picker.multiple
+    {pending?.picker ? pending.picker.render ? pending.picker.render({ onConfirm: confirmTarget, onCancel: () => setPendingId(null) }) : pending.picker.multiple
       ? <EntityMultiPickerDialog title={pending.picker.title} items={pending.picker.items} initialIds={[]} allowEmpty={false} onConfirm={confirmTarget} onCancel={() => setPendingId(null)} />
       : <EntityPickerDialog title={pending.picker.title} items={pending.picker.items} onConfirm={id => confirmTarget([id])} onCancel={() => setPendingId(null)} />
       : null}
@@ -87,9 +90,11 @@ export function ActionRow({ title, kind, icon: Icon = Zap, number, open, readOnl
       {readOnly ? null : handle}
       <span className={styles.icon}><Icon size={16} aria-hidden="true" /></span>
       {kind ? <span className={styles.kind} title={kind}>{kind}</span> : null}
-      {readOnly || !onToggle ? <span className={styles.title} title={title}>{title}</span>
-        : <button type="button" className={styles.titleButton} title={title} aria-expanded={Boolean(open)} onClick={onToggle}>{title}</button>}
-      {extra ? <div className={styles.extra}>{extra}</div> : null}
+      <div className={styles.details}>
+        {readOnly || !onToggle ? <span className={styles.title} data-action-name title={title}>{title}</span>
+          : <button type="button" className={styles.titleButton} data-action-name title={title} aria-expanded={Boolean(open)} onClick={onToggle}>{title}</button>}
+        {extra ? <div className={styles.extra} data-action-value title={typeof extra === 'string' ? extra : undefined}>{extra}</div> : null}
+      </div>
       {readOnly ? null : <RowActions menuAppearance="box" menuSize="row" subjectName={`${number}つ目の行うこと`} menuItems={[
         ...(onToggle ? [{ id: 'edit', label: open ? '設定を閉じる' : '設定を変える', onSelect: onToggle }] : []), ...menuItems,
       ]} destructiveItem={onRemove ? { id: 'remove', label: '削除する', onSelect: () => setRemoving(true) } : undefined} />}

@@ -100,7 +100,7 @@ function mileageRewardError(c: Parameters<typeof auditLog>[0], error: unknown) {
   if (error instanceof MileageRewardError) {
     return inputError(c, { success: false, error: error.message, code: error.code }, error.status as 400, []);
   }
-  console.error('mileage rewards error:', error);
+  console.error(JSON.stringify({"code":"routes_scoring_failed"}));
   return c.json({ success: false, error: '使い道を処理できませんでした' }, 500);
 }
 
@@ -113,7 +113,7 @@ function mileageV6Error(c: Parameters<typeof auditLog>[0], error: unknown) {
       ...(error.field ? { field: error.field } : {}),
     }, error.status as 400, []);
   }
-  console.error('mileage V6 API error:', error);
+  console.error(JSON.stringify({"code":"routes_scoring_failed"}));
   return c.json({ success: false, error: 'マイル情報を処理できませんでした' }, 500);
 }
 
@@ -825,7 +825,7 @@ scoring.get('/api/mileage/overview', requireRole('owner', 'admin', 'staff'), asy
     });
     return c.json({ success: true, data: overview });
   } catch (err) {
-    console.error('GET /api/mileage/overview error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/mileage/overview"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -903,7 +903,7 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
     ]);
     return c.json({ success: true, data: { ...history, summary } });
   } catch (err) {
-    console.error('GET /api/mileage/history error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/mileage/history"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -932,7 +932,7 @@ scoring.get('/api/mileage/adjustment-policy', requireRole('owner', 'admin'), asy
         : { configured: false as const, approvalThreshold: null },
     });
   } catch (err) {
-    console.error('GET /api/mileage/adjustment-policy error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/mileage/adjustment-policy"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -953,7 +953,7 @@ scoring.put('/api/mileage/adjustment-policy', requireRole('owner'), inputJsonBou
     auditLog(c, 'mileage.adjustment.policy.update', { kind: 'line_account', id: accountId });
     return c.json({ success: true, data: { configured: true, approvalThreshold } });
   } catch (err) {
-    console.error('PUT /api/mileage/adjustment-policy error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"PUT /api/mileage/adjustment-policy"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1177,7 +1177,7 @@ scoring.post(
           return c.json({ success: false, error: 'Friend not found', code: err.code }, 404);
         }
       }
-      console.error('POST /api/mileage/adjustments error:', err);
+      console.error(JSON.stringify({"code":"routes_scoring_failed","route":"POST /api/mileage/adjustments"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1497,7 +1497,7 @@ scoring.get('/api/mileage/rules', requireRole('owner', 'admin', 'staff'), async 
       : scope.allowedAccountIds.includes(rule.line_account_id));
     return c.json({ success: true, data: rules.map(serializeMileageRule) });
   } catch (err) {
-    console.error('GET /api/mileage/rules error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/mileage/rules"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1571,6 +1571,7 @@ scoring.get('/api/mileage/rules/export', requireRole('owner', 'admin', 'staff'),
       item.published.status === 'published' ? '動いています' : '止めています',
     ]);
     const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(mileageCsvCell).join(',')).join('\r\n')}\r\n`;
+    c.set('outputAudit', { count: items.length, accountId });
     auditLog(c, 'mileage.rule.export', { kind: 'mileage_earning_rule_export', id: accountId });
     const day = new Date().toISOString().slice(0, 10);
     return new Response(csv, {
@@ -1582,7 +1583,7 @@ scoring.get('/api/mileage/rules/export', requireRole('owner', 'admin', 'staff'),
       },
     });
   } catch (err) {
-    console.error('GET /api/mileage/rules/export error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/mileage/rules/export"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1631,7 +1632,7 @@ scoring.post('/api/mileage/events', requireRole('owner', 'admin'), inputJsonBoun
     if (err instanceof Error && err.message.startsWith('Mileage friend not found:')) {
       return c.json({ success: false, error: 'friend_not_found' }, 404);
     }
-    console.error('POST /api/mileage/events error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"POST /api/mileage/events"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1811,7 +1812,7 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), inputJsonBound
     });
     return c.json({ success: true, data: serializeMileageRule(rule) }, 201);
   } catch (err) {
-    console.error('POST /api/mileage/rules error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"POST /api/mileage/rules"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1861,7 +1862,7 @@ scoring.put('/api/mileage/rules/:id', requireRole('owner', 'admin'), inputJsonBo
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeMileageRule(updated) });
   } catch (err) {
-    console.error('PUT /api/mileage/rules/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"PUT /api/mileage/rules/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1886,7 +1887,7 @@ scoring.delete('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/mileage/rules/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"DELETE /api/mileage/rules/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1929,7 +1930,7 @@ scoring.get('/api/action-scores/friends', requireRole('owner', 'admin', 'staff')
     });
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/action-scores/friends error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/action-scores/friends"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1952,7 +1953,7 @@ scoring.get('/api/scoring-rules', async (c) => {
       })),
     });
   } catch (err) {
-    console.error('GET /api/scoring-rules error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/scoring-rules"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1966,7 +1967,7 @@ scoring.get('/api/scoring-rules/:id', async (c) => {
       data: { id: item.id, name: item.name, eventType: item.event_type, scoreValue: item.score_value, isActive: Boolean(item.is_active), createdAt: item.created_at },
     });
   } catch (err) {
-    console.error('GET /api/scoring-rules/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/scoring-rules/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1980,7 +1981,7 @@ scoring.post('/api/scoring-rules', requireRole('owner', 'admin'), inputJsonBound
     const item = await createScoringRule(c.env.DB, body);
     return c.json({ success: true, data: { id: item.id, name: item.name, eventType: item.event_type, scoreValue: item.score_value } }, 201);
   } catch (err) {
-    console.error('POST /api/scoring-rules error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"POST /api/scoring-rules"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1994,7 +1995,7 @@ scoring.put('/api/scoring-rules/:id', requireRole('owner', 'admin'), inputJsonBo
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: { id: updated.id, name: updated.name, eventType: updated.event_type, scoreValue: updated.score_value, isActive: Boolean(updated.is_active) } });
   } catch (err) {
-    console.error('PUT /api/scoring-rules/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"PUT /api/scoring-rules/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2004,7 +2005,7 @@ scoring.delete('/api/scoring-rules/:id', requireRole('owner', 'admin'), async (c
     await deleteScoringRule(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/scoring-rules/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"DELETE /api/scoring-rules/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2046,7 +2047,7 @@ scoring.get('/api/friends/:id/score', requireVisibleFriendForScore, async (c) =>
       },
     });
   } catch (err) {
-    console.error('GET /api/friends/:id/score error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/friends/:id/score"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2079,7 +2080,7 @@ scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVis
     if (err instanceof Error && err.message === 'score_idempotency_conflict') {
       return c.json({ success: false, error: '同じ操作番号で異なる加点はできません' }, 409);
     }
-    console.error('POST /api/friends/:id/score error:', err);
+    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"POST /api/friends/:id/score"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

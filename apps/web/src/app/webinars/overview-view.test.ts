@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { WebinarOverview, WebinarOverviewMetric } from '@/lib/api'
-import { NOT_AVAILABLE, audienceText, metricView, overviewCards, rateView } from './overview-view'
+import { kpiCells, metricValue } from '@/v8/webinars/overview'
+import { audienceText } from '@/v8/webinar-edit/notification-summary'
+const NOT_AVAILABLE = '—'
 
 const available = (value: number): WebinarOverviewMetric => ({
   value,
@@ -33,31 +35,28 @@ const overview = (metrics: Partial<WebinarOverview['metrics']> = {}): WebinarOve
 
 describe('ウェビナー一覧の実測値', () => {
   it('実値0は0、未取得は理由付きの横線として表示する', () => {
-    expect(metricView(available(0), '人')).toEqual({ text: '0人', note: null, available: true })
-    expect(metricView(unavailable('区間の記録が無いため'), '人')).toEqual({
-      text: NOT_AVAILABLE,
-      note: '区間の記録が無いため',
-      available: false,
-    })
+    expect(metricValue(available(0))).toBe(0)
+    expect(metricValue(unavailable('区間の記録が無いため'))).toBeNull()
+    expect(kpiCells(overview()).find(card => card.key === 'viewers')?.help).toContain('実際に見た区間の記録をまだ集計できないため')
   })
 
   it('申込人数と延べ予約を分けて表示する', () => {
-    const card = overviewCards(overview()).find(({ key }) => key === 'registrations')
-    expect(card?.view.text).toBe('428人')
+    const card = kpiCells(overview()).find(({ key }) => key === 'registrations')
+    expect(card?.value).toBe(428)
+    expect(card?.unit).toBe('人')
     expect(card?.detail).toBe('延べ予約 451件')
   })
 
   it('視聴不能を0人にせず、理由は説明アイコンの中へまとめる', () => {
-    const card = overviewCards(overview()).find(({ key }) => key === 'viewers')
-    expect(card?.view.text).toBe(NOT_AVAILABLE)
-    expect(card?.view.note).toContain('区間')
+    const card = kpiCells(overview()).find(({ key }) => key === 'viewers')
+    expect(card?.value).toBeNull()
+    expect(card?.help).toContain('区間')
     /* 3段目は短い状態だけ。理由の長文は detail へ直置きしない（#1005）。 */
-    expect(card?.status).toBe('取得できていません')
-    expect(card?.detail).toBe(`視聴率 ${NOT_AVAILABLE}`)
-    expect(card?.description).toContain('実際に見た区間の記録をまだ集計できないため')
-    expect(card?.description).toContain('視聴人数を取得できないため')
-    expect(card?.description).toContain('視聴人数:')
-    expect(card?.description).toContain('視聴率:')
+    expect(card?.detail).toBe(NOT_AVAILABLE)
+    expect(card?.help).toContain('実際に見た区間の記録をまだ集計できないため')
+    expect(card?.help).toContain('視聴人数を取得できないため')
+    expect(card?.help).toContain('視聴人数:')
+    expect(card?.help).toContain('視聴率:')
   })
 
   it('同じ理由で出せない指標は説明の中でひとつにまとめる', () => {
@@ -65,33 +64,33 @@ describe('ウェビナー一覧の実測値', () => {
       viewers: unavailable('視聴区間の記録をまだ集計できないため'),
       viewRate: unavailable('視聴区間の記録をまだ集計できないため'),
     })
-    const card = overviewCards(sameReason).find(({ key }) => key === 'viewers')
-    expect(card?.description).toBe('視聴区間の記録をまだ集計できないため。')
-    expect(card?.description).not.toContain('視聴人数:')
+    const card = kpiCells(sameReason).find(({ key }) => key === 'viewers')
+    expect(card?.help?.match(/視聴区間の記録をまだ集計できないため/g)).toHaveLength(1)
+    expect(card?.help).not.toContain('視聴人数:')
   })
 
   it('視聴率の小数を百分率で表示する', () => {
-    expect(rateView(available(0.729))).toEqual({ text: '72.9%', note: null, available: true })
+    expect(kpiCells(overview({ viewRate: available(0.729) })).find(card => card.key === 'viewers')?.detail).toBe('申込の 72.9%')
   })
 
-  it('CTAは延べクリック数ではなく押した人数を表示する', () => {
-    const card = overviewCards(overview()).find(({ key }) => key === 'cta')
-    expect(card?.title).toBe('CTA反応')
-    expect(card?.view.text).toBe('86人')
-    expect(card?.detail).toBe('クリックした人')
+  it('CTAの延べ回数と押した人数を分けて表示する', () => {
+    const card = kpiCells(overview()).find(({ key }) => key === 'cta')
+    expect(card?.title).toBe('CTAクリック')
+    expect(card?.value).toBeNull()
+    expect(card?.detail).toBe('押した人 86人')
   })
 })
 
 describe('通知対象の実測値', () => {
   it('対象人数と延べ予約を分け、内部語を表示しない', () => {
     const view = audienceText({ people: 184, bookings: 191, definition: 'active_registrations' })
-    expect(view.people).toBe('184人')
-    expect(view.note).toContain('延べ予約は191件')
-    expect(`${view.people}${view.note}`).not.toContain('active_registrations')
+    expect(view).toContain('184人')
+    expect(view).toContain('延べ予約は191件')
+    expect(view).not.toContain('active_registrations')
   })
 
   it('実値0と未取得を区別する', () => {
-    expect(audienceText({ people: 0, bookings: 0, definition: 'active_registrations' }).people).toBe('0人')
-    expect(audienceText(undefined).people).toBe(NOT_AVAILABLE)
+    expect(audienceText({ people: 0, bookings: 0, definition: 'active_registrations' })).toContain('0人')
+    expect(audienceText(undefined)).toBe(NOT_AVAILABLE)
   })
 })

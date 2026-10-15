@@ -1,5 +1,5 @@
 'use client'
-import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+import { ValueBarChart } from '@/components/shared/charts'
 import { useEffect, useState } from 'react'
 import { Download, Eye, ListOrdered, MousePointerClick, Percent, SlidersHorizontal } from 'lucide-react'
 import { ListPage } from '@/components/templates'
@@ -8,18 +8,22 @@ import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import PeriodPicker from '@/components/shared/period-picker'
-import Select from '@/components/shared/select'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError, type SearchConsoleMetric, type SearchConsoleMetricRow, type SearchConsolePerformance, type SearchConsoleSetup } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { StatePill, shortDay } from './common'
-import styles from './analytics.module.css'
+import styles from './search-console.module.css'
+import Card, { CardHeader } from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
+import TruncatedText from '@/components/shared/truncated-text'
+import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField } from '@/components/shared/text-field'
 
 /*
  * ★V8 Search Console（Pencil `h1G4d`・`/search-console`）。
@@ -38,32 +42,36 @@ function pagePath(key: string) {
 }
 
 function Ranking({ title, rows, kind }: { title: string; rows: SearchConsoleMetricRow[]; kind: 'query' | 'page' }) {
-  return <section className={styles.funnelFlow} aria-label={title}>
-    <h2 className={styles.hoursTitle}>{title}</h2>
-    {rows.length === 0 ? <p className={styles.caption}>データがありません</p> : <div className={styles.table} role="table" aria-label={title} data-kind={kind}>
-      <div className={styles.thead} role="row" data-size="compact">
-        <span role="columnheader" className={styles.colMain}>{kind === 'query' ? 'キーワード' : 'ページ'}</span>
-        <span role="columnheader" className={styles.num} data-w="sc60">クリック</span>
-        <span role="columnheader" className={styles.num} data-w="sc70">表示回数</span>
-        <span role="columnheader" className={styles.num} data-w="sc64">掲載順位</span>
-      </div>
-      {rows.map((row) => <div key={row.key} className={styles.trow} role="row" data-size="compact">
-        <span role="cell" className={styles.colMain}><span className={styles.cellText} title={row.key}>{kind === 'query' ? (row.key || '（検索語句なし）') : pagePath(row.key)}</span></span>
-        <span role="cell" className={styles.num} data-w="sc60"><span title={`CTR ${formatNumber(row.ctr * 100, { digits: 1 })}%`}>{formatNumber(row.clicks)}</span></span>
-        <span role="cell" className={styles.num} data-w="sc70"><span>{formatNumber(row.impressions)}</span></span>
-        <span role="cell" className={styles.num} data-w="sc64"><span>{formatNumber(row.position, { digits: 1 })}</span></span>
-      </div>)}
-    </div>}
-  </section>
+  return <Card variant="form" aria-label={title}>
+    <CardHeader size="stacked" title={title} />
+    {rows.length === 0 ? <p>データがありません</p> : <GridTable label={title} framed={false} design={{
+      columns: 'minmax(0, 1fr) var(--tpl-an-col-60) var(--tpl-an-col-70) var(--tpl-an-sc-col-64)',
+      gap: 'var(--polish-space-row)', rowPadding: '0', headPadding: '0',
+      rowHeight: 'var(--polish-table-row)', headHeight: 'var(--tpl-thead-h)',
+      fontSize: 'var(--text-caption)', headFontSize: 'var(--text-micro)',
+    }}>
+      <GridHeadRow>
+        <GridCell role="columnheader">{kind === 'query' ? 'キーワード' : 'ページ'}</GridCell>
+        <GridCell role="columnheader" align="right">クリック</GridCell>
+        <GridCell role="columnheader" align="right">表示回数</GridCell>
+        <GridCell role="columnheader" align="right">掲載順位</GridCell>
+      </GridHeadRow>
+      {rows.map(row => <GridRow key={row.key}>
+        <GridCell><TruncatedText value={kind === 'query' ? (row.key || '（検索語句なし）') : pagePath(row.key)} /></GridCell>
+        <GridCell align="right" title={`CTR ${formatNumber(row.ctr * 100, { digits: 1 })}%`}>{formatNumber(row.clicks)}</GridCell>
+        <GridCell align="right">{formatNumber(row.impressions)}</GridCell>
+        <GridCell align="right">{formatNumber(row.position, { digits: 1 })}</GridCell>
+      </GridRow>)}
+    </GridTable>}
+  </Card>
 }
 
 function SetupCard({ setup, denied }: { setup: SearchConsoleSetup | null; denied: boolean }) {
-  return <section className={styles.flowCard} data-w="full" aria-labelledby="sc-setup-title">
-    <h2 id="sc-setup-title" className={styles.hoursTitle}>{denied ? '閲覧権限の確認が必要です' : 'Search Consoleとつなぐ設定'}</h2>
-    <p className={styles.observation}>Search Consoleで対象プロパティを開き、サービスアカウントを「制限付きユーザー」として追加すると、検索データを読み取り専用で表示できます。</p>
-    <div className={styles.compareRow}><span className={styles.flowLabel} data-size="row">対象プロパティ</span><span className={styles.spacer} /><strong title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? emptyValue('unconfigured')}</strong></div>
-    <div className={styles.compareRow}><span className={styles.flowLabel} data-size="row">追加するアカウント</span><span className={styles.spacer} /><strong title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? emptyValue('unconfigured')}</strong></div>
-  </section>
+  return <Card variant="form" aria-labelledby="sc-setup-title">
+    <CardHeader size="stacked" titleId="sc-setup-title" title={denied ? '閲覧権限の確認が必要です' : 'Search Consoleとつなぐ設定'} meta="Search Consoleで対象プロパティを開き、サービスアカウントを「制限付きユーザー」として追加すると、検索データを読み取り専用で表示できます。" />
+    <div className={styles.compareRow}><span >対象プロパティ</span><span className={styles.spacer} /><strong title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? emptyValue('unconfigured')}</strong></div>
+    <div className={styles.compareRow}><span >追加するアカウント</span><span className={styles.spacer} /><strong title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? emptyValue('unconfigured')}</strong></div>
+  </Card>
 }
 
 export default function SearchConsoleV8() {
@@ -122,24 +130,23 @@ export default function SearchConsoleV8() {
   const settingsHref = settingsSiteUrl ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(settingsSiteUrl)}` : null
   const periodControl = <SaveErrorField names={["days"]}><PeriodPicker days={days} onChange={(value) => setDays(value as RangeDays)} supportedDays={RANGES} /></SaveErrorField>
   const settingsButton = settingsHref ? <Button external variant="secondary" href={settingsHref}  ><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
-  const maxDaily = Math.max(1, ...(data?.daily ?? []).map((row) => row.clicks))
   const middle = data ? data.daily[Math.floor(data.daily.length / 2)] : null
 
   return <ListPage
     boardId="h1G4d"
     title="Search Console"
-    help={<span className={styles.description}>Google の検索から、どのキーワード・どのページで人が来たかを見ます。サイトスクリプトとつなぐと、検索から友だち追加までを結べます。</span>}
+    help={<>Google の検索から、どのキーワード・どのページで人が来たかを見ます。サイトスクリプトとつなぐと、検索から友だち追加までを結べます。</>}
     actions={<Button variant="secondary" onClick={exportCsv} disabled={!data || loading}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>}
   >
     {loading ? <div className={styles.body} data-gap="tab"><DelayedSkeleton loading skeleton={<Skeleton className="block h-36 w-full rounded-card" />} /></div>
       : loadError ? <div className={styles.body} data-gap="tab"><ListState kind="error" error={loadError} onRetry={() => setAttempt((current) => current + 1)} /></div>
       : !data ? <div className={styles.body} data-gap="tab">
         <div className={styles.toolbar}>{periodControl}<span className={styles.spacer} />{settingsButton}</div>
-        <p className={styles.noteBox}>Search Console をつなぐと、検索からの流入が見られます。</p>
+        <Notice tone="info">Search Console をつなぐと、検索からの流入が見られます。</Notice>
         <SetupCard setup={setup} denied={denied} />
       </div>
       : <>
-        <KpiBand className={styles.band}>
+        <KpiBand>
           {metrics.map((item) => {
             const value = data.summary[item.key] * (item.key === 'ctr' ? 100 : 1)
             const previous = data.previousSummary[item.key] * (item.key === 'ctr' ? 100 : 1)
@@ -150,32 +157,32 @@ export default function SearchConsoleV8() {
         </KpiBand>
         <div className={styles.body} data-gap="tab">
           <div className={styles.controls} data-gap="narrow">
-            <Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><Select id="search-property" aria-label="対象プロパティ" size="full" value={data.siteUrl} disabled onChange={() => {}} options={[{ value: data.siteUrl, label: data.siteUrl }]} /></SaveErrorField></Field>
-            <span className={styles.pillSlot}><StatePill tone="ok">連携中</StatePill></span>
+            <Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><TextField id="search-property" readOnly value={data.siteUrl} title={data.siteUrl} /></SaveErrorField></Field>
+            <StatePill tone="ok">連携中</StatePill>
             {periodControl}
             <span className={styles.spacer} />
             {settingsButton}
           </div>
-          <section className={styles.flowCard} data-w="full" aria-labelledby="sc-trend-title">
-            <h2 id="sc-trend-title" className={styles.hoursTitle}>検索クリックの推移（日別クリック数）</h2>
+          <Card variant="form" aria-labelledby="sc-trend-title">
+            <CardHeader size="stacked" titleId="sc-trend-title" title="検索クリックの推移（日別クリック数）" />
             {data.daily.length === 0 ? <ListState kind="empty" title="期間内のデータがありません" description="集計期間を変えると、ここに推移が出ます。" /> : <>
               <ValueBarChart label="日別クリック数の推移" unit="クリック" items={data.daily.map(row=>({key:row.key,label:row.key,value:row.clicks}))} />
               <div className={styles.scAxis}><span>{shortDay(data.daily[0].key)}</span><span>{middle ? shortDay(middle.key) : ''}</span><span>{`${shortDay(data.daily[data.daily.length - 1].key)}（反映待ち）`}</span></div>
             </>}
-          </section>
-          <div className={styles.routesSplit}>
+          </Card>
+          <div className={styles.rankings}>
             <Ranking title="検索キーワード 上位10件" rows={data.queries} kind="query" />
             <Ranking title="検索流入ページ 上位10件" rows={data.pages} kind="page" />
-            <section className={styles.funnelSide} data-w="devices" aria-labelledby="sc-devices-title">
-              <h2 id="sc-devices-title" className={styles.hoursTitle}>デバイス別</h2>
+            <Card className={styles.devices} variant="form" aria-labelledby="sc-devices-title">
+              <CardHeader size="stacked" titleId="sc-devices-title" title="デバイス別" />
               {data.devices.map((device) => {
                 const ratio = data.summary.clicks ? device.clicks / data.summary.clicks * 100 : 0
                 const label = DEVICE_LABELS[device.key] ?? device.key
-                return <div key={device.key} className={styles.compareRow} title={`${label}：${ratio.toFixed(1)}%`}><span className={styles.flowLabel} data-size="row">{label}</span><span className={styles.spacer} /><strong data-weight="bold">{formatNumber(device.clicks)}</strong></div>
+                return <div key={device.key} className={styles.compareRow} title={`${label}：${ratio.toFixed(1)}%`}><span >{label}</span><span className={styles.spacer} /><strong data-weight="bold">{formatNumber(device.clicks)}</strong></div>
               })}
-            </section>
+            </Card>
           </div>
-          <p className={styles.noteBox} title={`集計期間 ${data.startDate}〜${data.endDate} ／ 読み取り専用で取得・最終更新 ${formatDateTime(data.fetchedAt)}`}>見かたの注意：Search Console のデータは反映まで2〜3日かかります。直近の数字は出ません。掲載順位は平均値です。「検索から友だち追加」はサイトスクリプトで結びついた分だけを数えるものですが、その突き合わせはまだありません。</p>
+          <Notice tone="info" title={`集計期間 ${data.startDate}〜${data.endDate} ／ 読み取り専用で取得・最終更新 ${formatDateTime(data.fetchedAt)}`}>見かたの注意：Search Console のデータは反映まで2〜3日かかります。直近の数字は出ません。掲載順位は平均値です。「検索から友だち追加」はサイトスクリプトで結びついた分だけを数えるものですが、その突き合わせはまだありません。</Notice>
         </div>
       </>}
   </ListPage>

@@ -1,11 +1,12 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import {
   getActiveImpersonation,
+  recordAuditEvent,
   getPlatformAdminByStaffId,
   type ImpersonationSession,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from './auth.js';
+import { adminSessionTokenHashFromRequest, type AuthenticatedStaff } from './auth.js';
 
 /**
  * 代理ログイン（★V6 37-5）。
@@ -30,7 +31,7 @@ export interface ImpersonationContext {
   startedAt: string;
 }
 
-const EXEMPT_PREFIXES = ['/api/ops/', '/api/auth/', '/api/admin/'];
+const EXEMPT_PREFIXES = ['/api/ops/', '/api/auth/'];
 
 export function isImpersonationExemptPath(path: string): boolean {
   return EXEMPT_PREFIXES.some((prefix) => path.startsWith(prefix));
@@ -58,7 +59,9 @@ export async function resolveImpersonation(
   if (isImpersonationExemptPath(path)) return null;
   // env API_KEY で入った擬似オーナーには行が無い。
   if (staff.id === 'env-owner') return null;
-  const session = await getActiveImpersonation(c.env.DB, staff.id);
+  const sessionTokenHash = await adminSessionTokenHashFromRequest(c);
+  if (!sessionTokenHash) return null;
+  const session = await getActiveImpersonation(c.env.DB, staff.id, sessionTokenHash);
   if (!session) return null;
   // 運営マスターでなくなっていたら（停止された等）、差し替えは無効にする。
   const admin = await getPlatformAdminByStaffId(c.env.DB, staff.id);
@@ -83,27 +86,27 @@ export async function resolveImpersonation(
 // 個人情報の伏せ字（要件 §3 37-5 / §6-6）
 // ---------------------------------------------------------------------------
 
-/** 友だち・会話を返す API。代理ログイン中はここだけ伏せる。 */
-const PII_MASK_PREFIXES = [
-  '/api/friends',
-  '/api/chats',
-  '/api/inbox',
-  '/api/conversations',
-  '/api/support',
-  '/api/nen-members',
-  '/api/nen/members',
-  '/api/nen/pets',
-  '/api/nen/health',
-  '/api/form-submissions',
-  '/api/forms/',
-];
-
-const NAME_KEYS = new Set(['display_name', 'displayName', 'friend_name', 'friendName', 'full_name', 'fullName']);
-const DROP_KEYS = new Set(['picture_url', 'pictureUrl', 'phone', 'phone_number', 'email', 'address', 'postal_code']);
-const TEXT_KEYS = new Set(['text', 'content', 'message', 'body', 'last_message', 'lastMessage', 'preview']);
+/** Classify fields independently of URL; new admin routes inherit protection. */
+const NAME_KEYS = new Set(['displayname', 'systemdisplayname', 'realname', 'friendname', 'fullname', 'customername', 'staffname', 'recipientname', 'firstname', 'lastname', 'bankaccountholder', 'furigana', 'kana']);
+const CONTACT_KEYS = new Set(['pictureurl', 'phone', 'phonenumber', 'email', 'emailaddress', 'address', 'postalcode', 'zipcode', 'birthdate', 'birthday', 'dateofbirth', 'lineuserid', 'allergies', 'allergy', 'accountnumber', 'bankaccountnumber', 'filename', 'r2key', 'downloadurl', 'contenturl', 'originalurl', 'attachmenturl', 'customeremail', 'customerphone', 'recipientemail', 'recipientphone', 'contactemail', 'contactphone', 'phonee164', 'addressline1', 'addressline2', 'city', 'prefecture', 'bankcode', 'branchcode', 'accountlast4', 'url', 'uri', 'imageurl', 'avatarurl', 'thumbnailurl', 'originalcontenturl', 'previewimageurl']);
+const TEXT_KEYS = new Set(['alttext', 'subject', 'caption', 'snippet', 'usercomment', 'friendcomment', 'notificationtext', 'reason', 'text', 'content', 'message', 'body', 'lastmessage', 'preview', 'customernote', 'internalnote', 'note', 'memo', 'description']);
+// Arbitrary answers/metadata cannot be safely classified by their nested keys.
+const OPAQUE_KEYS = new Set(['metadata', 'metadatajson', 'answers', 'answer', 'fieldvalues', 'customfields', 'formdata', 'profile', 'payload']);
+function fieldKey(key: string): string { return key.replace(/[_-]/g, '').toLowerCase(); }
 
 export function shouldMaskPii(path: string): boolean {
-  return PII_MASK_PREFIXES.some((prefix) => path.startsWith(prefix));
+  return path.startsWith('/api/') && !path.startsWith('/api/auth/');
+}
+
+function maskOpaque(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return [];
+  if (typeof value === 'object') return {}; // arbitrary keys can also contain PII
+  return typeof value === 'number' ? 0 : typeof value === 'boolean' ? false : '（代理ログイン中は伏せています）';
+}
+
+export function isSensitiveFilePath(path: string): boolean {
+  return /(?:\.csv|\/export(?:\/|$)|\/exports\/[^/]+\/download|\/download(?:\/|$)|\/form-files\/[^/]+\/content)$/.test(path);
 }
 
 export function maskedFriendLabel(id: unknown): string {
@@ -116,17 +119,22 @@ export function maskedFriendLabel(id: unknown): string {
  * 構造は変えない（画面が壊れないように）。値だけ差し替える。
  */
 export function maskPiiDeep(value: unknown, depth = 0): unknown {
-  if (depth > 12 || value === null || typeof value !== 'object') return value;
+  if (value === null || typeof value !== 'object') return value;
+  if (depth > 64) return null; // Never return an unexamined subtree.
   if (Array.isArray(value)) return value.map((item) => maskPiiDeep(item, depth + 1));
   const source = value as Record<string, unknown>;
   const out: Record<string, unknown> = {};
+  const person = Object.keys(source).some(key => ['friendid', 'lineuserid', 'realname', 'customername', 'customerid', 'email', 'phonenumber', 'phone', 'fieldid', 'submissionid', 'displayname', 'systemdisplayname', 'friendname', 'fullname', 'recipientname', 'pictureurl', 'role', 'rolebundle'].includes(fieldKey(key)));
   const id = source.id ?? source.friend_id ?? source.friendId ?? source.line_user_id ?? source.lineUserId;
   for (const [key, raw] of Object.entries(source)) {
-    if (NAME_KEYS.has(key) && typeof raw === 'string') {
+    const classified = fieldKey(key);
+    if ((NAME_KEYS.has(classified) || (classified === 'name' && person)) && typeof raw === 'string') {
       out[key] = maskedFriendLabel(id);
-    } else if (DROP_KEYS.has(key)) {
-      out[key] = raw === null || raw === undefined ? raw : '';
-    } else if (TEXT_KEYS.has(key) && typeof raw === 'string' && raw.length > 0) {
+    } else if (OPAQUE_KEYS.has(classified) || (person && ['data', 'value', 'values', 'valuejson', 'valuetext'].includes(classified))) {
+      out[key] = maskOpaque(raw);
+    } else if (CONTACT_KEYS.has(classified)) {
+      out[key] = raw === null || raw === undefined ? raw : Array.isArray(raw) ? [] : typeof raw === 'object' ? {} : typeof raw === 'number' ? 0 : typeof raw === 'boolean' ? false : '';
+    } else if (TEXT_KEYS.has(classified) && typeof raw === 'string' && raw.length > 0) {
       out[key] = '（代理ログイン中は伏せています）';
     } else {
       out[key] = maskPiiDeep(raw, depth + 1);
@@ -139,23 +147,54 @@ export function maskPiiDeep(value: unknown, depth = 0): unknown {
  * 代理ログイン中で、個人情報の表示を許可していないときだけ、応答を伏せる。
  * authMiddleware の後ろに置く（c.get('impersonation') を読むため）。
  */
-export const piiMaskMiddleware: MiddlewareHandler<Env> = async (c, next) => {
-  await next();
+async function auditPiiOutput(c: Context<Env>, result: 'success' | 'denied', kind: 'json' | 'file') {
   const impersonation = c.get('impersonation');
-  if (!impersonation || impersonation.piiRevealed) return;
-  if (!shouldMaskPii(c.req.path)) return;
+  const staff = c.get('staff');
+  if (!impersonation) return;
+  await recordAuditEvent(c.env.DB, { tenantId: impersonation.tenantId, category: 'auth',
+    action: 'impersonation.pii.output', actorPrincipalId: staff.id, actorRole: staff.role,
+    targetKind: 'impersonation', targetId: impersonation.id, result, riskLevel: 'high',
+    after: { format: kind }, retentionClass: 'security' });
+}
+
+export const piiMaskMiddleware: MiddlewareHandler<Env> = async (c, next) => {
+  let impersonation = c.get('impersonation');
+  // Ops keeps the operator's original authority, but is still an output while
+  // that session impersonates someone. Mask its broad console data regardless
+  // of a reveal granted only for the target organization's customer APIs.
+  if (!impersonation && c.req.path.startsWith('/api/ops/') && c.get('staff')) {
+    const tokenHash = await adminSessionTokenHashFromRequest(c);
+    const active = tokenHash ? await getActiveImpersonation(c.env.DB, c.get('staff').id, tokenHash) : null;
+    if (active) { impersonation = { ...toImpersonationContext(active), piiRevealed: false }; c.set('impersonation', impersonation); }
+  }
+  if (!impersonation || !shouldMaskPii(c.req.path)) return next();
+  if (!impersonation.piiRevealed && isSensitiveFilePath(c.req.path)) {
+    await auditPiiOutput(c, 'denied', 'file');
+    return c.json({ success: false, error: '代理ログイン中の書き出し・書類取得には理由付きの個人情報表示の許可が必要です' }, 403);
+  }
+  await next();
   const contentType = c.res.headers.get('content-type') ?? '';
-  if (!contentType.includes('application/json')) return;
-  let payload: unknown;
-  try {
-    payload = await c.res.clone().json();
-  } catch {
+  const json = contentType.includes('application/json');
+  c.header('Cache-Control', 'private, no-store');
+  if (impersonation.piiRevealed) {
+    await auditPiiOutput(c, c.res.status < 400 ? 'success' : 'denied', json ? 'json' : 'file');
     return;
   }
-  const masked = maskPiiDeep(payload);
+  if (!json) {
+    await auditPiiOutput(c, 'denied', 'file');
+    c.res = c.json({ success: false, error: '代理ログイン中はファイルを取得できません' }, 403);
+    return;
+  }
+  let payload: unknown;
+  try { payload = await c.res.clone().json(); }
+  catch {
+    c.res = c.json({ success: false, error: '個人情報を伏せられませんでした' }, 503);
+    return;
+  }
   const headers = new Headers(c.res.headers);
   headers.delete('content-length');
-  c.res = new Response(JSON.stringify(masked), { status: c.res.status, headers });
+  headers.delete('etag');
+  c.res = new Response(JSON.stringify(maskPiiDeep(payload)), { status: c.res.status, headers });
 };
 
 // ---------------------------------------------------------------------------

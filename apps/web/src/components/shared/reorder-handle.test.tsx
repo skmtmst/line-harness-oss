@@ -6,7 +6,7 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import ReorderHandle, { moveIdTo, useReorder, type ReorderChange } from './reorder-handle'
+import ReorderHandle, { moveIdTo, reorderMoveReason, useReorder, type ReorderChange } from './reorder-handle'
 import { DragHandle } from './row-actions'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 
@@ -15,7 +15,7 @@ afterEach(cleanup)
 describe('ReorderHandle', () => {
   it('上下キーで1つずつ動かす', () => {
     const onMove = vi.fn()
-    render(<ReorderHandle label="A" onMove={onMove} />)
+    render(<ReorderHandle label="A" onMove={onMove} onPointerDown={vi.fn()} />)
     const handle = screen.getByRole('button', { name: 'Aを並び替え。上下キーで移動' })
     fireEvent.keyDown(handle, { key: 'ArrowUp' })
     fireEvent.keyDown(handle, { key: 'ArrowDown' })
@@ -33,13 +33,13 @@ describe('ReorderHandle', () => {
     expect(slot.textContent).toBe('Aは並び替えできません。検索を外すと動かせます')
   })
 
-  it('旧 ReorderGrip（v7）は、動かせない時に薄いつまみを出す（見た目を変えない）', () => {
+  it('別名のReorderGripも、動かせない時はつまみを隠す', () => {
     const view = render(<ReorderGrip label="A" disabled onMove={() => {}} />)
     expect(screen.queryByRole('button')).toBeNull()
     const dim = view.container.querySelector('span.cursor-not-allowed')
-    expect(dim).toBeTruthy()
-    expect(dim?.querySelector('svg')).toBeTruthy()
-    expect(view.container.querySelector('[data-reorder-disabled]')).toBeNull()
+    expect(dim).toBeNull()
+    expect(view.container.textContent).toContain('Aは並び替えできません。')
+    expect(view.container.querySelector('[data-reorder-disabled]')).not.toBeNull()
   })
 
   it('DragHandle はマウスで動かせるときに名前とキー操作を保つ', () => {
@@ -76,7 +76,7 @@ function List({ disabledReason, onReorder }: { disabledReason?: string | null; o
         <li key={id} {...reorder.rowProps(id)}>
           <ReorderHandle label={id} {...reorder.handle(id)} {...reorder.handleProps(id)} />
           {reorder.menuItems(id).map((item) => (
-            <button key={item.id} type="button" disabled={item.disabled} onClick={item.onSelect}>{`${id}:${item.label}`}</button>
+            <button key={item.id} type="button" title={reorder.moveReason(id, item.id === 'move-up' ? -1 : 1) ?? undefined} disabled={item.disabled} onClick={item.onSelect}>{`${id}:${item.label}`}</button>
           ))}
         </li>
       ))}
@@ -101,6 +101,9 @@ describe('useReorder', () => {
       ['drag', ['b', 'a', 'c']],
     ])
     expect(screen.getByRole('button', { name: 'a:上へ' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'a:上へ' }).title).toBe('いちばん上です')
+    expect(screen.getByRole('button', { name: 'c:下へ' }).title).toBe('いちばん下です')
+    expect(screen.getByRole('button', { name: 'b:上へ' }).title).toBe('')
   })
 
   it('動かせない時は、つまみ・上へ／下へを出さず、ドラッグも受けない', () => {
@@ -111,4 +114,10 @@ describe('useReorder', () => {
     expect(view.container.querySelector('[draggable="true"]')).toBeNull()
     expect(onReorder).not.toHaveBeenCalled()
   })
+})
+
+it('順番の端より保存・権限などの禁止理由を優先し、未取得の項目を動かさない', () => {
+  expect(reorderMoveReason(0, 3, -1, '保存しています')).toBe('保存しています')
+  expect(reorderMoveReason(-1, 3, 1)).toBe('この項目が見つかりません')
+  expect(reorderMoveReason(1, 3, 1)).toBeNull()
 })

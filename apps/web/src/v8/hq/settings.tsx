@@ -4,6 +4,7 @@ import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { TextField } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
@@ -40,7 +41,7 @@ export default function HqSettingsV8() {
   const canEdit = role === 'owner' || role === 'admin'
 
   return (
-    <ListPage boardId="K7HYu" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderNav={settingsNav}>
+    <ListPage boardId="K7HYu" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderWidth={200} folderNav={settingsNav}>
       <div className={styles.body}>
         {role && !canEdit ? <ReadOnlyNotice >閲覧のみで見ています。統括名の変更と会社・連絡先の登録は管理者だけができます。</ReadOnlyNotice> : null}
         <TenantNameCard canEdit={canEdit} />
@@ -50,7 +51,7 @@ export default function HqSettingsV8() {
   )
 }
 
-/** 統括名のカード（角丸12・余白20・間12）。 */
+/** 統括名のカード（共通の入力段・間12）。 */
 function TenantNameCard({ canEdit }: { canEdit: boolean }) {
   const saveErrors = useSaveFormErrors()
   const uid = useId()
@@ -113,19 +114,19 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
 
   if (!canEdit) {
     return (
-      <SaveErrorScope errors={saveErrors}><section className={styles.card} aria-label="統括名">
+      <SaveErrorScope errors={saveErrors}><Card variant="form" gap="normal" aria-label="統括名">
         <dl className={styles.field}>
           <dt className={styles.label}>統括名</dt>
           <dd className={styles.value}>{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || emptyValue('unknown')}</dd>
         </dl>
         {error ? <Notice tone="danger" >{error}</Notice> : null}
         <p className={styles.hint}>統括名の変更は管理者だけができます。</p>
-      </section></SaveErrorScope>
+      </Card></SaveErrorScope>
     )
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><form onSubmit={save} className={styles.card}>
+    <SaveErrorScope errors={saveErrors}><form onSubmit={save} className={styles.form}><Card variant="form" gap="normal">
       <FormLeaveGuard dirty={name !== baseline} busy={saving} />
       <div className={styles.field}><Field label="統括名" htmlFor={`${uid}-name`}><SaveErrorField names={["name"]}><TextField
           id={`${uid}-name`}
@@ -144,6 +145,6 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       <div className={styles.actions}>
         <Button variant="primary" type="submit" disabled={loading || saving} busy={saving}>統括名を保存する</Button>
       </div>
-    </form></SaveErrorScope>
+    </Card></form></SaveErrorScope>
   )
 }

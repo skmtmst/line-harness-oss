@@ -3,10 +3,14 @@
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import { Check, Undo2 } from 'lucide-react'
+import Card, { CardHeader } from '@/components/shared/card'
+import StatusBadge from '@/components/shared/status-badge'
+import Notice from '@/components/shared/notice'
+import { Check, Inbox, Undo2 } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import { DialogFormRow } from '@/components/shared/dialog-form-row'
 import ListState from '@/components/shared/list-state'
 import { TextArea } from '@/components/shared/text-field'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -26,7 +30,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * 数4 → 承認カード（種類・状態・店舗・申請者・変更内容・差戻しコメント・差戻し／承認する）→ 公開境界。
  * 閲覧のみ（変える権限が無い人）には案内の帯を出し、差戻し・承認するのボタンは置かない
  * （2026-10-06 オーナー決定。場所だけ空けて、下の並びを動かさない）。
- * 承認待ちのカードは閲覧のみのとき枠を緑にして目立たせる（n4DT7）。動きは BEHAVIOR.md。
+ * 承認待ちは共通の状態札で知らせる。動きは BEHAVIOR.md。
  */
 
 const kindLabel: Record<RestaurantApproval['kind'], string> = {
@@ -109,15 +113,15 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
 }) {
   const pending = item.status === 'pending'
   return (
-    <article className={`${styles.card} ${readOnly && pending ? styles.cardPending : ''}`}>
+    <Card variant="form">
       <div className={styles.cardHead}>
-        <span className={styles.kindChip}>{kindLabel[item.kind]}</span>
+        <StatusBadge dot={false} tone="neutral">{kindLabel[item.kind]}</StatusBadge>
         <Status value={item.status} />
         <span className={styles.store}>{store?.name || '全店舗'}</span>
         <span className={styles.spacer} aria-hidden="true" />
         {pending && !readOnly ? (
           <>
-            <Button className={styles.returnButton} disabled={busy} onClick={() => onReturn(item)}><Undo2 aria-hidden className={styles.buttonIcon} />差戻し</Button>
+            <Button disabled={busy} onClick={() => onReturn(item)}><Undo2 aria-hidden className={styles.buttonIcon} />差戻し</Button>
             <Button disabled={busy} onClick={() => onApprove(item)}><Check aria-hidden className={styles.buttonIcon} />承認する</Button>
           </>
         ) : pending ? (
@@ -125,14 +129,14 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
           <span className={styles.actionsSpace} aria-hidden="true" />
         ) : null}
       </div>
-      <h3 className={styles.cardTitle}>{item.title}</h3>
+      <CardHeader size="stacked" headingLevel={3} title={item.title} />
       <p className={styles.requested}>{`申請：${item.requested_by || emptyValue('unknown')} ・ ${formatStamp(item.created_at)}`}</p>
-      <div className={styles.payload}>
+      <Card surface="muted" layout="vertical" padding="compact" gap="var(--polish-space-row)">
         <p className={styles.payloadLabel}>変更内容</p>
         <ApprovalContent item={item} data={data} />
-      </div>
-      {item.review_comment ? <p className={styles.returnComment}>{item.review_comment}</p> : null}
-    </article>
+      </Card>
+      {item.review_comment ? <Notice tone="warn" appearance="soft" icon={null}>{item.review_comment}</Notice> : null}
+    </Card>
   )
 }
 
@@ -150,12 +154,13 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
       open={item !== null}
       title="差し戻しますか？"
       designNode="n4j0Rm"
+      contentLayout="form"
       onCancel={onCancel}
       footer={(
-        <div className={styles.dialogActions}>
+        <DialogActions>
           <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" disabled={busy || !reason.trim()} busy={busy} busyLabel="処理中…" onClick={() => onSubmit(reason.trim())}>差し戻す</Button>
-        </div>
+          <Button variant="primary" disabled={busy || !reason.trim()} title={busy ? '処理しています' : !reason.trim() ? '差し戻す理由を入力してください' : undefined} busy={busy} busyLabel="処理中…" onClick={() => onSubmit(reason.trim())}>差し戻す</Button>
+        </DialogActions>
       )}
     >
       {item ? (
@@ -166,13 +171,13 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
             </p>
             <p className={styles.dialogSummaryMain}>{approvalSummary(item)}</p>
           </div>
-          <Field note={<>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</>} label="差し戻す理由（・申請者に届きます）" required><SaveErrorField names={["reason"]}><TextArea
+          <DialogFormRow><Field note={<>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</>} label="差し戻す理由（・申請者に届きます）" required><SaveErrorField names={["reason"]}><TextArea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：原価の根拠（仕入れ値の表）を添えてください"
               rows={3}
               disabled={busy}
-            /></SaveErrorField></Field>
+            /></SaveErrorField></Field></DialogFormRow>
 
         </div>
       ) : null}
@@ -208,13 +213,13 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
         <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
-        <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="Google投稿" valueText={`${rows.filter((a) => a.kind === 'gbp_post').length}`} detail="投稿下書き" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="LINE配信" valueText={`${rows.filter((a) => a.kind === 'line_message').length}`} detail="配信下書き" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} presentation="band" value={null} unit="" />
+        <KpiCard title="Google投稿" valueText={`${rows.filter((a) => a.kind === 'gbp_post').length}`} detail="投稿下書き" presentation="band" value={null} unit="" />
+        <KpiCard title="LINE配信" valueText={`${rows.filter((a) => a.kind === 'line_message').length}`} detail="配信下書き" presentation="band" value={null} unit="" />
+        <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" presentation="band" value={null} unit="" />
       </StatRow>
       {rows.length === 0 ? (
-        <div className={styles.emptyBox}><ListState kind="empty" title="承認待ちはありません" /></div>
+        <ListState kind="empty" title="承認待ちはありません" />
       ) : (
         rows.map((item) => (
           <ApprovalCard
@@ -229,10 +234,10 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
           />
         ))
       )}
-      <section className={styles.boundary}>
-        <h2 className={styles.boundaryTitle}>公開境界</h2>
+      <Card variant="aside">
+        <CardHeader size="stacked" title="公開境界" />
         <p className={styles.boundaryText}>承認しても検証中は外部公開しません。状態は「承認済」まで進みます。Google投稿、LINE送信、メニュー媒体反映は、接続承認後に別工程として有効化します。</p>
-      </section>
+      </Card>
       <ReturnDialog
         item={returnTarget}
         store={data.stores.find((s) => s.id === returnTarget?.store_id)}

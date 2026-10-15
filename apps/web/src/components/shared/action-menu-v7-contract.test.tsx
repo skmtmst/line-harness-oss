@@ -45,7 +45,7 @@ function openMenu(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[role="menu"]')
 }
 
-describe('ActionMenu ★V7 の項目', () => {
+describe('ActionMenu B-244 の項目', () => {
   it('補足・別画面・見出し・区切り・危ない操作を出せる', async () => {
     const onSelect = vi.fn()
     const onClose = vi.fn()
@@ -83,7 +83,8 @@ describe('ActionMenu ★V7 の項目', () => {
     // 中身は最上層（portal）に出るので、置き場所ではなく文書全体で見る。
     expect(document.body.textContent).toContain('テンプレートを送る')
     expect(document.body.textContent).toContain('受信箱で選んで送ります')
-    expect(document.body.textContent).toContain('整理')
+    // B-244：3項目では組の見出しを出さず、線だけで区切る。
+    expect(document.body.textContent).not.toContain('整理')
     // 別画面へ行く項目は ↗（読み上げに含めない飾り）。
     const external = document.querySelector('svg[aria-hidden="true"]')
     expect(external).toBeTruthy()
@@ -220,9 +221,9 @@ describe('ActionMenu ★V8 の見た目', () => {
     expect(css).toMatch(/\.menu\s*{[^}]*max-width:\s*min\(320px,\s*calc\(100vw - 16px\)\)/s)
     expect(css).toMatch(/\.menu\s*{[^}]*background:\s*var\(--color-canvas\)/s)
     expect(css).toMatch(/\.menu\s*{[^}]*border-radius:\s*var\(--radius-card\)/s)
-    expect(css).toMatch(/\.menu\s*{[^}]*border:\s*1px solid var\(--card-edge\)/s)
-    expect(css).toMatch(/\.menu\s*{[^}]*box-shadow:\s*var\(--shadow-float\)/s)
-    expect(css).toMatch(/\.item\s*{[^}]*height:\s*36px/s)
+    expect(css).toMatch(/:root \.menu\s*{[^}]*outline:\s*1px solid var\(--card-edge\)/s)
+    expect(css).toMatch(/:root \.menu\s*{[^}]*box-shadow:\s*var\(--shadow-controls-pop\)/s)
+    expect(css).toMatch(/:root \.item:not\(\.itemTall\)\s*{[^}]*height:\s*var\(--tpl-menu-item-h\)/s)
     expect(css).toMatch(/\.itemTall\s*{[^}]*height:\s*52px/s)
     expect(css).toMatch(/\.item\s*{[^}]*font-size:\s*var\(--text-body\)/s)
     expect(css).toMatch(/\.icon\s*{[^}]*width:\s*16px/s)

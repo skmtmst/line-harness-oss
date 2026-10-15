@@ -19,14 +19,14 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.push }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -69,7 +69,7 @@ async function flush() {
 
 function saveButton(): HTMLButtonElement {
   const buttons = Array.from(host.querySelectorAll('button'))
-  const button = buttons.find((b) => b.textContent?.trim() === '保存する')
+  const button = buttons.find((b) => b.textContent?.trim() === 'つくって動かす')
   if (!button) throw new Error('保存ボタンが見つかりません')
   return button as HTMLButtonElement
 }
@@ -79,7 +79,7 @@ describe('webhooks/new の保存前検証（D006）', () => {
     await render()
     await flush()
 
-    await act(async () => { saveButton().click() })
+    await act(async () => { (host.querySelector('input[value="all"]') as HTMLInputElement).click(); saveButton().click() })
     await flush()
 
     expect(fixture.outgoingCreate).not.toHaveBeenCalled()
@@ -91,9 +91,9 @@ describe('webhooks/new の保存前検証（D006）', () => {
     await flush()
 
     await act(async () => {
-      fireEvent.change(host.querySelector('#wh-name')!, { target: { value: '外部CRM連携' } })
+      fireEvent.change(host.querySelector('#wh-new-name')!, { target: { value: '外部CRM連携' } })
     })
-    await act(async () => { saveButton().click() })
+    await act(async () => { (host.querySelector('input[value="all"]') as HTMLInputElement).click(); saveButton().click() })
     await flush()
 
     expect(fixture.outgoingCreate).not.toHaveBeenCalled()
@@ -104,10 +104,10 @@ describe('webhooks/new の保存前検証（D006）', () => {
     await flush()
 
     await act(async () => {
-      fireEvent.change(host.querySelector('#wh-name')!, { target: { value: '外部CRM連携' } })
-      fireEvent.change(host.querySelector('#wh-url')!, { target: { value: 'http://insecure.example.com/hook' } })
+      fireEvent.change(host.querySelector('#wh-new-name')!, { target: { value: '外部CRM連携' } })
+      fireEvent.change(host.querySelector('#wh-new-url')!, { target: { value: 'http://insecure.example.com/hook' } })
     })
-    await act(async () => { saveButton().click() })
+    await act(async () => { (host.querySelector('input[value="all"]') as HTMLInputElement).click(); saveButton().click() })
     await flush()
 
     expect(fixture.outgoingCreate).not.toHaveBeenCalled()
@@ -120,10 +120,10 @@ describe('webhooks/new の保存前検証（D006）', () => {
     await flush()
 
     await act(async () => {
-      fireEvent.change(host.querySelector('#wh-name')!, { target: { value: '外部CRM連携' } })
-      fireEvent.change(host.querySelector('#wh-url')!, { target: { value: 'https://example.com/hook' } })
+      fireEvent.change(host.querySelector('#wh-new-name')!, { target: { value: '外部CRM連携' } })
+      fireEvent.change(host.querySelector('#wh-new-url')!, { target: { value: 'https://example.com/hook' } })
     })
-    await act(async () => { saveButton().click() })
+    await act(async () => { (host.querySelector('input[value="all"]') as HTMLInputElement).click(); saveButton().click() })
     await flush()
 
     expect(fixture.outgoingCreate).toHaveBeenCalledTimes(1)
@@ -139,13 +139,23 @@ describe('webhooks/new の保存失敗文（D005・結合）', () => {
     await flush()
 
     await act(async () => {
-      fireEvent.change(host.querySelector('#wh-name')!, { target: { value: '外部CRM連携' } })
-      fireEvent.change(host.querySelector('#wh-url')!, { target: { value: 'https://example.com/hook' } })
+      fireEvent.change(host.querySelector('#wh-new-name')!, { target: { value: '外部CRM連携' } })
+      fireEvent.change(host.querySelector('#wh-new-url')!, { target: { value: 'https://example.com/hook' } })
     })
-    await act(async () => { saveButton().click() })
+    await act(async () => { (host.querySelector('input[value="all"]') as HTMLInputElement).click(); saveButton().click() })
     await flush()
 
     expect(host.textContent).not.toContain('API error')
     expect(host.textContent).toContain('もう一度お試しください')
   })
+})
+
+for (const role of [null, 'admin', 'staff', 'viewer']) it(`作成に必要なowner権限${role}の確認なしでは操作と送信を出さない`, async () => {
+  if (role === null) fixture.staffMe.mockImplementation(() => new Promise(() => {}))
+  else fixture.staffMe.mockResolvedValue({ success: true, data: { role } })
+  await render(); await flush()
+  expect(host.querySelector('#wh-new-name')).toBeNull()
+  expect(host.querySelector('a[href="/webhooks"]')).toBeTruthy()
+  expect(host.textContent).not.toContain('つくって動かす')
+  expect(fixture.outgoingCreate).not.toHaveBeenCalled()
 })

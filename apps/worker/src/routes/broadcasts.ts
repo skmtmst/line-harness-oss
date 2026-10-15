@@ -603,7 +603,7 @@ async function recordLifecycle(
       detail: detail ?? null,
     });
   } catch (err) {
-    console.error(`[broadcast-lifecycle] ${action} record failed:`, err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed"}));
   }
 }
 
@@ -672,7 +672,7 @@ broadcasts.get('/api/broadcasts', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -696,7 +696,7 @@ broadcasts.get('/api/broadcasts/stats', async (c) => {
       data: await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope),
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/stats error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/stats"}));
     return c.json({ success: false as const, error: '配信の集計を取得できませんでした' }, 500);
   }
 });
@@ -768,7 +768,7 @@ broadcasts.get('/api/broadcasts/saved-views', requireRole('owner', 'admin', 'sta
       })),
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/saved-views error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/saved-views"}));
     return c.json({ success: false, error: '保存した検索を取得できませんでした' }, 500);
   }
 });
@@ -810,7 +810,7 @@ broadcasts.post('/api/broadcasts/saved-views', requireRole('owner', 'admin'), in
       data: { id, name, filters: body.filters, sortKey, pageSize, createdBy: c.get('staff')!.id, createdAt: now, updatedAt: now, version: 1 },
     }, 201);
   } catch (err) {
-    console.error('POST /api/broadcasts/saved-views error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/saved-views"}));
     return c.json({ success: false, error: '保存した検索を保存できませんでした' }, 500);
   }
 });
@@ -838,7 +838,7 @@ broadcasts.get('/api/broadcasts/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -963,7 +963,7 @@ broadcasts.get('/api/broadcasts/:id/recipients', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/recipients error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/recipients"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -988,7 +988,7 @@ broadcasts.get('/api/broadcasts/:id/activity', async (c) => {
       pagination: { limit, cursor, nextCursor },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/activity error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/activity"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1072,7 +1072,7 @@ broadcasts.get('/api/broadcasts/:id/preview-count', async (c) => {
       } catch (segmentError) {
         // 条件が壊れているときは 0 を返す。ここで500にすると、下書きの一覧
         // そのものが開かなくなる。送信を押した時点で理由付きで止まる。
-        console.error('preview-count: invalid segment_conditions', segmentError);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/preview-count"}));
       }
     } else if (broadcast.target_type === 'all') {
       const accountId = (raw.line_account_id as string | null) || null;
@@ -1086,7 +1086,7 @@ broadcasts.get('/api/broadcasts/:id/preview-count', async (c) => {
 
     return c.json({ success: true, data: { count, perAccount } });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/preview-count error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/preview-count"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1174,7 +1174,7 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
               uniqueClick: (overview.uniqueClick as number) ?? null,
             });
           } catch (err) {
-            console.error(`[per-account-stats] account ${aid} insight failed:`, err);
+            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/per-account-stats"}));
           }
         }),
       );
@@ -1190,7 +1190,7 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
 
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/per-account-stats error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/per-account-stats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1315,7 +1315,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
       },
     });
   } catch (err) {
-    console.error('POST /api/broadcasts/preflight error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/preflight"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1505,7 +1505,7 @@ broadcasts.post('/api/broadcasts', inputJsonBoundary({"title":["string"],"messag
     await recordLifecycle(c.env.DB, broadcast.id, c.get('staff')?.id, 'created');
     return c.json({ success: true, data: serializeBroadcast(broadcast) }, 201);
   } catch (err) {
-    console.error('POST /api/broadcasts error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1734,7 +1734,7 @@ broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"mes
             .bind(confirmed, id).run();
         }
       } catch (gateError) {
-        console.error('PUT /api/broadcasts/:id approval gate error:', gateError);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"PUT /api/broadcasts/:id"}));
         return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
       }
     }
@@ -1798,7 +1798,7 @@ broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"mes
           await approval.recordBroadcastApprovalEvent(c.env.DB, id, c.get('staff')?.id ?? '', 'cancelled', '内容の変更');
         }
       } catch (approvalError) {
-        console.error('PUT /api/broadcasts/:id approval reset error:', approvalError);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"PUT /api/broadcasts/:id"}));
       }
     }
 
@@ -1837,7 +1837,7 @@ broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"mes
     );
     return c.json({ success: true, data: updated ? serializeBroadcast(updated) : null });
   } catch (err) {
-    console.error('PUT /api/broadcasts/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"PUT /api/broadcasts/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1875,7 +1875,7 @@ broadcasts.post('/api/broadcasts/:id/cancel', requirePermission(BROADCAST_DEFINI
     await recordLifecycle(c.env.DB, id, c.get('staff')?.id, 'cancelled');
     return c.json({ success: true, data: serializeBroadcast(updated) });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/cancel error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/cancel"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1893,11 +1893,11 @@ function kickQueueProcessing(c: Context<Env>, label: string): void {
     const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
     ctx.waitUntil(
       processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-        console.error(`[${label}] background queue processing failed:`, err);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed"}));
       }),
     );
   } catch (kickErr) {
-    console.warn(`[${label}] waitUntil unavailable, falling back to cron:`, kickErr);
+    console.warn(JSON.stringify({"code":"routes_broadcasts_warn"}));
   }
 }
 
@@ -1967,7 +1967,7 @@ async function recordBroadcastControlAudit(
       deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
     });
   } catch (err) {
-    console.error(`${action} audit insert failed:`, err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed"}));
   }
 }
 
@@ -2099,7 +2099,7 @@ broadcasts.post('/api/broadcasts/:id/stop', requirePermission(BROADCAST_JOB_STOP
       stoppedUnknownCount: closed.unknown,
     });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/stop error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/stop"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2152,7 +2152,7 @@ broadcasts.post('/api/broadcasts/:id/resume', requirePermission(BROADCAST_JOB_ST
     kickQueueProcessing(c, 'resume');
     return c.json({ success: true, data: { ...serializeBroadcast(updated ?? existing), ledger } });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/resume error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/resume"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2246,7 +2246,7 @@ broadcasts.post(
         retryTargets: reopened,
       }, 202);
     } catch (err) {
-      console.error('POST /api/broadcasts/:id/retry-failed error:', err);
+      console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/retry-failed"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2286,7 +2286,7 @@ broadcasts.delete('/api/broadcasts/:id', requirePermission(BROADCAST_DEFINITION_
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/broadcasts/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"DELETE /api/broadcasts/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2341,7 +2341,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
       }
     } catch (gateError) {
       // 数えられない（DB到達不能など）ときは送らない。誤送信より停止を選ぶ。
-      console.error('POST /api/broadcasts/:id/send approval gate error:', gateError);
+      console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
       return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
     }
 
@@ -2445,12 +2445,12 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
         ctx.waitUntil(
           processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-            console.error('[segment-broadcast] background queue processing failed:', err);
+            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
           }),
         );
       } catch (kickErr) {
         // waitUntil が使えない環境では cron が拾う。送れないわけではない。
-        console.warn('[segment-broadcast] waitUntil unavailable, falling back to cron:', kickErr);
+        console.warn(JSON.stringify({"code":"routes_broadcasts_warn","route":"POST /api/broadcasts/:id/send"}));
       }
 
       return c.json({
@@ -2517,11 +2517,11 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
         ctx.waitUntil(
           processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-            console.error('[personalized-broadcast] background queue processing failed:', err);
+            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
           }),
         );
       } catch (kickErr) {
-        console.warn('[personalized-broadcast] waitUntil unavailable, falling back to cron:', kickErr);
+        console.warn(JSON.stringify({"code":"routes_broadcasts_warn","route":"POST /api/broadcasts/:id/send"}));
       }
 
       return c.json({
@@ -2588,12 +2588,12 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
         ctx.waitUntil(
           processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-            console.error('[multi-account-dedup] background queue processing failed:', err);
+            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
           }),
         );
       } catch (kickErr) {
         // ExecutionContext 未利用環境 (test 等) — cron 経由にフォールバック
-        console.warn('[multi-account-dedup] waitUntil unavailable, falling back to cron:', kickErr);
+        console.warn(JSON.stringify({"code":"routes_broadcasts_warn","route":"POST /api/broadcasts/:id/send"}));
       }
 
       return c.json({
@@ -2723,7 +2723,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         });
       } catch (notificationError) {
         // 配信本体は完了済み。通知の失敗で再配信させず、台帳の回収口に残す。
-        console.error('[broadcast-completed] operator notification failed:', notificationError);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
       }
     }
     return c.json({ success: true, data: result ? serializeBroadcast(result) : null });
@@ -2731,7 +2731,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
       if (sendAccountId) await releaseQuotaSlot(c.env.DB, sendAccountId, id);
     }
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/send error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2781,7 +2781,7 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
           }, segmentGate.status as 409, []);
       }
     } catch (gateError) {
-      console.error('POST /api/broadcasts/:id/send-segment approval gate error:', gateError);
+      console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send-segment"}));
       return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
     }
 
@@ -2851,7 +2851,7 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
     const result = await getBroadcastById(c.env.DB, id);
     return c.json({ success: true, data: result ? serializeBroadcast(result) : null, queued: true, message: 'Broadcast queued for batch processing by Cron' }, 202);
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/send-segment error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send-segment"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2926,7 +2926,7 @@ broadcasts.get('/api/broadcasts/:id/insight', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/insight error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/insight"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -3026,7 +3026,7 @@ broadcasts.post('/api/broadcasts/:id/fetch-insight', requirePermission('/broadca
           aggMedia += (overview.uniqueMediaPlayed as number) ?? 0;
           if (messages && messages.length > 0) hasAnyData = true;
         } catch (err) {
-          console.error(`[fetch-insight] dedup account ${aid} failed:`, err);
+          console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/fetch-insight"}));
           responses.push({ accountId: aid, data: { error: String(err) } });
         }
       }
@@ -3107,7 +3107,7 @@ broadcasts.post('/api/broadcasts/:id/fetch-insight', requirePermission('/broadca
       data: { delivered, uniqueImpression, uniqueClick, uniqueMediaPlayed, openRate, clickRate },
     });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/fetch-insight error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/fetch-insight"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -3255,14 +3255,14 @@ broadcasts.post('/api/broadcasts/:id/test-send', requirePermission(BROADCAST_TES
            VALUES (?, ?, 'outgoing', ?, ?, NULL, 'test', 'broadcast', ?)`
         ).bind(crypto.randomUUID(), friend.id, part.messageType, part.messageContent, now)));
       } catch (err) {
-        console.error(`Test send to ${friend.id} failed:`, err);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/test-send"}));
         failed++;
       }
     }
 
     return c.json({ success: true, sent, failed });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/test-send error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/test-send"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -3397,7 +3397,7 @@ broadcasts.post('/api/segments/count', requirePermission(BROADCAST_DEFINITION_ED
 
     return c.json({ success: true, count: result?.count ?? 0 });
   } catch (err) {
-    console.error('POST /api/segments/count error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/segments/count"}));
     return inputError(c, { success: false, error: 'Invalid segment conditions' }, 400, ["conditions"]);
   }
 });

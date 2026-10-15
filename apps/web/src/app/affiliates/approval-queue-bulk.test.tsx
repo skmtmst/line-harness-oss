@@ -22,7 +22,10 @@ const fixture = vi.hoisted(() => ({
   listCalls: [] as Array<{ status?: string; limit?: number; offset?: number }>,
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
+
+vi.mock('@/lib/api', async (original) => ({
+  ...await original<typeof import('@/lib/api')>(),
   api: {
     conversionApprovals: {
       list: (params?: unknown) => {
@@ -45,7 +48,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { ApprovalQueue } = await import('./tabs')
+const { ApprovalQueue } = await import('@/test-utils/affiliate-tabs')
 
 function item(eventId: string, friendName: string) {
   return {
@@ -119,14 +122,31 @@ async function openBulkConfirm() {
     fireEvent.click(screen.getByLabelText('利用者2の成果を選ぶ'))
   })
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: '選んだ2件をまとめて認める' }))
+    fireEvent.click(screen.getByRole('button', { name: '操作を選ぶ' }))
   })
+}
+
+async function bulkConfirmation() {
+  const dialog = await screen.findByRole('dialog')
+  const next = within(dialog).queryByRole('button', { name: '実行内容を確認' })
+  if (!next) return dialog
+  await act(async () => { fireEvent.click(next) })
+  return screen.findByRole('dialog', { name: /選んだ.*件を認めますか/ })
+}
+
+async function openRowMenu(name = '利用者1') {
+  await act(async () => { fireEvent.click(await screen.findByRole('button', { name: `${name}の成果の操作` })) })
+}
+
+async function retryAction() {
+  await openRowMenu()
+  return screen.findByRole('menuitem', { name: /^付帯動作をやり直す/ })
 }
 
 describe('一括承認の確認と結果表示', () => {
   test('確認に出る顔ぶれが実行対象と一致し、確認前はrequestが出ない', async () => {
     await openBulkConfirm()
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await bulkConfirmation()
     expect(within(dialog).getByText('利用者1／紹介者1／案件A')).toBeTruthy()
     expect(within(dialog).getByText('利用者2／紹介者1／案件A')).toBeTruthy()
     expect(fixture.bulkDecideCalls).toHaveLength(0)
@@ -134,18 +154,18 @@ describe('一括承認の確認と結果表示', () => {
 
   test('キャンセルではrequestが出ず、確定で1本だけ出る', async () => {
     await openBulkConfirm()
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await bulkConfirmation()
     await act(async () => {
       fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
     })
     expect(fixture.bulkDecideCalls).toHaveLength(0)
     // 開き直して確定する。
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '選んだ2件をまとめて認める' }))
+      fireEvent.click(screen.getByRole('button', { name: '操作を選ぶ' }))
     })
-    const reopened = await screen.findByRole('dialog')
+    const reopened = await bulkConfirmation()
     await act(async () => {
-      fireEvent.click(within(reopened).getByRole('button', { name: 'まとめて認める' }))
+      fireEvent.click(within(reopened).getByRole('button', { name: '認める' }))
     })
     expect(fixture.bulkDecideCalls).toHaveLength(1)
     expect(fixture.bulkDecideCalls[0]).toEqual([
@@ -156,29 +176,29 @@ describe('一括承認の確認と結果表示', () => {
 
   test('結果は成功と競合に分かれ、全成功とは表示しない', async () => {
     await openBulkConfirm()
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await bulkConfirmation()
     await act(async () => {
-      fireEvent.click(within(dialog).getByRole('button', { name: 'まとめて認める' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: '認める' }))
     })
     const result = await screen.findByRole('status')
-    expect(within(result).getByText(/成功 1件/)).toBeTruthy()
-    expect(within(result).getByText(/ほかの人が先に判断 1件/)).toBeTruthy()
+    expect(within(result).getByText(/成功 1\s*件/)).toBeTruthy()
+    expect(within(result).getByText(/ほかの人が先に判断 1\s*件/)).toBeTruthy()
     expect(within(result).getByText(/先に判断されました：利用者2/)).toBeTruthy()
     expect(within(result).queryByText(/全.*成功/)).toBeNull()
   })
 
   test('残りの選び直し再試行ができる', async () => {
     await openBulkConfirm()
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await bulkConfirmation()
     await act(async () => {
-      fireEvent.click(within(dialog).getByRole('button', { name: 'まとめて認める' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: '認める' }))
     })
     const result = await screen.findByRole('status')
     // 再試行では競合で状態が変わった利用者2だけが選ばれ直す。
     await act(async () => {
       fireEvent.click(within(result).getByRole('button', { name: '残りを選び直して再試行' }))
     })
-    const reopened = await screen.findByRole('dialog')
+    const reopened = await bulkConfirmation()
     expect(within(reopened).queryByText('利用者1／紹介者1／案件A')).toBeNull()
     expect(within(reopened).getByText('利用者2／紹介者1／案件A')).toBeTruthy()
   })
@@ -227,8 +247,10 @@ describe('付帯動作のやり直し', () => {
 
     await openApprovedTab()
     // flag が立った行にだけ出る（ev-2 には出ない）。
-    const retry = await screen.findByRole('button', { name: '付帯動作をやり直す' })
-    expect(screen.getAllByRole('button', { name: '付帯動作をやり直す' })).toHaveLength(1)
+    await openRowMenu('利用者2')
+    expect(screen.queryByRole('menuitem', { name: '付帯動作をやり直す' })).toBeNull()
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    const retry = await retryAction()
 
     await act(async () => {
       fireEvent.click(retry)
@@ -236,8 +258,10 @@ describe('付帯動作のやり直し', () => {
     expect(fixture.approveCalls).toEqual([{ eventId: 'ev-1', expectedStatus: 'approved' }])
     // 成功で読み直し → flag が下りると列ごと消える。
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: '付帯動作をやり直す' })).toBeNull()
+      expect(screen.queryByText('付帯動作が未完')).toBeNull()
     })
+    await openRowMenu()
+    expect(screen.queryByRole('menuitem', { name: '付帯動作をやり直す' })).toBeNull()
   })
 
   test('失敗は一覧のエラー領域に理由が出る', async () => {
@@ -247,9 +271,8 @@ describe('付帯動作のやり直し', () => {
     }
 
     await openApprovedTab()
-    await act(async () => {
-      fireEvent.click(await screen.findByRole('button', { name: '付帯動作をやり直す' }))
-    })
+    const retry = await retryAction()
+    await act(async () => { fireEvent.click(retry) })
     await waitFor(() => {
       expect(screen.getByText('タグ付与後の処理が残っています')).toBeTruthy()
     })
@@ -261,12 +284,11 @@ describe('付帯動作のやり直し', () => {
     fixture.approveImpl = () => new Promise((resolve) => { resolveApprove = resolve })
 
     await openApprovedTab()
-    const retry = await screen.findByRole('button', { name: '付帯動作をやり直す' })
-    fireEvent.click(retry)
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: '付帯動作をやり直す' })).toHaveProperty('disabled', true)
-    })
-    fireEvent.click(screen.getByRole('button', { name: '付帯動作をやり直す' }))
+    const retry = await retryAction()
+    await act(async () => { fireEvent.click(retry) })
+    const busyRetry = await retryAction()
+    expect(busyRetry).toHaveProperty('disabled', true)
+    fireEvent.click(busyRetry)
     expect(fixture.approveCalls).toHaveLength(1)
     await act(async () => {
       resolveApprove({ success: true, data: { id: 'ev-1', approvalStatus: 'approved' } })
@@ -279,13 +301,15 @@ describe('付帯動作のやり直し', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('利用者1の成果を選ぶ')).toBeTruthy()
     })
-    expect(screen.queryByRole('button', { name: '付帯動作をやり直す' })).toBeNull()
+    await openRowMenu()
+    expect(screen.queryByRole('menuitem', { name: '付帯動作をやり直す' })).toBeNull()
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /却下した/ }))
+      fireEvent.click(screen.getByRole('button', { name: /認めなかった/ }))
     })
     await waitFor(() => {
-      expect(screen.getByText('条件に合う成果がありません')).toBeTruthy()
+      expect(screen.getByText('条件に合うものはありません')).toBeTruthy()
     })
     expect(screen.queryByRole('button', { name: '付帯動作をやり直す' })).toBeNull()
   })
@@ -316,7 +340,7 @@ describe('200件を超える成果の読み込みと操作', () => {
     usePagedPendingList(201)
     render(<ApprovalQueue />)
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /認めるのを待っている 201/ })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /承認待ち 201/ })).toBeTruthy()
     })
     // 1ページ目(offset 0)と2ページ目(offset 200)の両方がpendingで出ている。
     const pendingCalls = fixture.listCalls.filter((c) => c.status === 'pending')
@@ -328,21 +352,23 @@ describe('200件を超える成果の読み込みと操作', () => {
     usePagedPendingList(201)
     render(<ApprovalQueue />)
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /認めるのを待っている 201/ })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /承認待ち 201/ })).toBeTruthy()
     })
     // 201件目は末尾のページにいるので、検索で絞って選ぶ。
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('成果承認を検索'), { target: { value: '利用者201' } })
+      fireEvent.change(screen.getByLabelText('名前・注文番号で探す'), { target: { value: '利用者201' } })
     })
     const checkbox = await screen.findByLabelText('利用者201の成果を選ぶ')
     await act(async () => {
       fireEvent.click(checkbox)
-      fireEvent.click(screen.getByRole('button', { name: '選んだ1件をまとめて認める' }))
     })
-    const dialog = await screen.findByRole('dialog')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '操作を選ぶ' }))
+    })
+    const dialog = await bulkConfirmation()
     expect(within(dialog).getByText('利用者201／紹介者1／案件A')).toBeTruthy()
     await act(async () => {
-      fireEvent.click(within(dialog).getByRole('button', { name: 'まとめて認める' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: '認める' }))
     })
     expect(fixture.bulkDecideCalls[0]).toEqual([
       { id: 'ev-201', status: 'approved', expectedStatus: 'pending' },
@@ -353,14 +379,14 @@ describe('200件を超える成果の読み込みと操作', () => {
     usePagedPendingList(5001)
     render(<ApprovalQueue />)
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /認めるのを待っている 5000/ })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /承認待ち 5,000/ })).toBeTruthy()
     })
     const more = await screen.findByRole('button', { name: /さらに読み込む/ })
     await act(async () => {
       fireEvent.click(more)
     })
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /認めるのを待っている 5001/ })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /承認待ち 5,001/ })).toBeTruthy()
     })
     const pendingCalls = fixture.listCalls.filter((c) => c.status === 'pending')
     expect(pendingCalls[pendingCalls.length - 1].offset).toBe(5000)
@@ -403,31 +429,28 @@ describe('アカウントでの絞り込み', () => {
   })
 
   test('絞ると一覧・件数・まとめて操作の対象がそのアカウントだけになる', async () => {
-    render(<ApprovalQueue />)
+    const view = render(<ApprovalQueue />)
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /認めるのを待っている 2/ })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /承認待ち 2/ })).toBeTruthy()
     })
-    // アカウントの絞りを「支店」に変える。
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '成果承認をアカウントで絞る' }))
-    })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '支店' }))
-    })
+    // 現役V8では、共通のアカウント選択がタブへ渡す値を切り替える。
+    view.rerender(<ApprovalQueue accountId="acc-b" />)
     // 支店の行だけ残り、本店の行は消える。
     await waitFor(() => {
       expect(screen.getByLabelText('利用者Bの成果を選ぶ')).toBeTruthy()
       expect(screen.queryByLabelText('利用者Aの成果を選ぶ')).toBeNull()
     })
     // 件数も絞った顔ぶれで数える。
-    expect(screen.getByRole('button', { name: /認めるのを待っている 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /承認待ち 1/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /認めた 1/ })).toBeTruthy()
     // まとめて操作も支店の行だけが対象になる。
     await act(async () => {
       fireEvent.click(screen.getByLabelText('利用者Bの成果を選ぶ'))
-      fireEvent.click(screen.getByRole('button', { name: '選んだ1件をまとめて認める' }))
     })
-    const dialog = await screen.findByRole('dialog')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '操作を選ぶ' }))
+    })
+    const dialog = await bulkConfirmation()
     expect(within(dialog).getByText('利用者B／紹介者1／案件A')).toBeTruthy()
     expect(within(dialog).queryByText('利用者A／紹介者1／案件A')).toBeNull()
   })
@@ -485,7 +508,7 @@ describe('IDEA-16: 注文根拠の表示と要確認の拡大', () => {
       expect(screen.getByLabelText('利用者1の成果を選ぶ')).toBeTruthy()
     })
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('成果承認を検索'), { target: { value: 'NEN-2002' } })
+      fireEvent.change(screen.getByLabelText('名前・注文番号で探す'), { target: { value: 'NEN-2002' } })
     })
     await waitFor(() => {
       expect(screen.queryByLabelText('利用者1の成果を選ぶ')).toBeNull()
@@ -500,13 +523,12 @@ describe('IDEA-16: 注文根拠の表示と要確認の拡大', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('利用者1の成果を選ぶ')).toBeTruthy()
     })
-    await act(async () => {
-      fireEvent.click(screen.getAllByRole('button', { name: '見る' })[0])
-    })
+    await openRowMenu()
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '詳細と成果の付け方を見る' })) })
     const dialog = await screen.findByRole('dialog', { name: '成果の詳細' })
     expect(within(dialog).getByText(/NEN-1001/)).toBeTruthy()
-    expect(within(dialog).getByText(/通常の注文/)).toBeTruthy()
-    expect(within(dialog).getByText(/同じ注文の重複/)).toBeTruthy()
+    expect(within(dialog).getByText(/NEN-1001（有効）/)).toBeTruthy()
+    expect(within(dialog).getByText(/同じ注文・同じ成果地点/)).toBeTruthy()
     // 承認前の成果は確定した報酬が無いので「未確定」と出す。
     expect(within(dialog).getByText('未確定')).toBeTruthy()
     expect(within(dialog).getByText('まだ確定していません')).toBeTruthy()

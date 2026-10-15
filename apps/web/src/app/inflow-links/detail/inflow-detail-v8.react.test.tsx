@@ -12,9 +12,9 @@ import InflowLinkDetailPage from './page'
 
 /*
  * ★V8-B 流入と計測の詳細（Pencil `Q5le3`）の契約。
- * `<html data-theme="v8">` の下でだけ新しい詳細に切り替わり、
+ * テーマを選ぶことなく現役V8を出し、
  * 見本が決めた見出し・数の帯・その後・友だちの表・つながる先・
- * QR の欄が出ることを実DOMで固定する。v7 では従来の詳細が出ることも固定する。
+ * QR の欄が出ることを実DOMで固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),

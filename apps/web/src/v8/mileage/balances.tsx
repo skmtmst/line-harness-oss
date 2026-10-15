@@ -1,5 +1,7 @@
 'use client'
 
+import { ListToolbarFrame } from '@/components/shared/list-toolbar'
+
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -33,13 +35,14 @@ import {
   isMileageFriendsV6Overview,
   mileagePaginationTotal,
 } from './display'
-import { MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { formatMileageDate } from './display'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
@@ -406,11 +409,8 @@ export default function BalancesTab() {
   )
 
   const toolbar = (
-    <>
-      <div className={styles.fullRow}>
-        <Notice tone="info">残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。</Notice>
-      </div>
-      {approval ? <div className={styles.fullRowFlush}>{approval}</div> : null}
+    <ListToolbarFrame>
+      {approval ? <div className={styles.fullRow}>{approval}</div> : null}
       <MileageToolbar
         narrow={narrow}
         notices={<ToolbarNotices error={exportError} />}
@@ -440,20 +440,20 @@ export default function BalancesTab() {
           <PerPageSelect value={pageSize} onChange={(next) => { setOffset(0); setPageSize(next) }} />
         </>}
       />
-    </>
+    </ListToolbarFrame>
   )
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={styles.table}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>友だち</Th>
-            <Th className={styles.colRank}>ランク</Th>
-            <Th className={`${styles.colBalance} ${styles.num}`}>いまの残高</Th>
-            <Th className={`${styles.colChange} ${styles.num}`}>今月の増減</Th>
-            <Th className={`${styles.colBalance} ${styles.num}`}>消える予定</Th>
-            <Th className={styles.colLast}>最終行動</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>友だち</Th>
+            <Th collapseAt="narrow" className={styles.colRank} title={summary ? summary.rankCounts.length > 0 ? summary.rankCounts.map(rank => `${rank.rankName} ${formatMileageNumber(rank.friendCount)}名`).join('・') : '公開中のランクなし' : 'ランク別の人数は未取得'}>ランク</Th>
+            <Th align="right" className={styles.colBalance} title="並び順：残高が多い順">いまの残高</Th>
+            <Th align="right" className={styles.colChange}>今月の増減</Th>
+            <Th align="right" className={styles.colBalance} title={`もうすぐ消えるマイル：${summary?.expiringMiles30d == null ? '未取得' : formatMileageNumber(summary.expiringMiles30d)}`}>消える予定</Th>
+            <Th collapseAt="narrow" className={styles.colLast}>最終行動</Th>
             <Th className={styles.colOpsBalance}>操作</Th>
           </TableHeadRow>
         </thead>
@@ -463,7 +463,7 @@ export default function BalancesTab() {
             return (
               <Tr
                 key={member.friendId}
-                className={styles.row}
+
                 data-table-layout="columns"
                 interactive
                 onClick={(event) => {
@@ -472,18 +472,18 @@ export default function BalancesTab() {
                   router.push(href)
                 }} data-row-id={member.friendId}
               >
-                <Td className={styles.colName}><FolderDotName>
-                  <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>
+                <Td grow><FolderDotName>
+                  <span  title={member.displayName}>{member.displayName}</span>
 
                 </FolderDotName></Td>
-                <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
-                <Td className={`${styles.colBalance} ${styles.num}`}>
+                <Td collapseAt="narrow" className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
+                <Td align="right" className={styles.colBalance}>
                   <span className={styles.cellMain}>{formatMileageNumber(member.available)}</span>
                   {member.pending > 0 ? <span className={styles.cellSub}>{`保留 ${formatMileageNumber(member.pending)}`}</span> : null}
                 </Td>
-                <Td className={`${styles.colChange} ${styles.num}`}><span className={styles.cellMain}>{signed(member.monthChange)}</span></Td>
-                <Td className={`${styles.colBalance} ${styles.num}`}><span className={styles.cellMain}>{expiringText(member)}</span></Td>
-                <Td className={styles.colLast}><span className={styles.cellMain}>{formatMileageMonthDay(member.lastChangedAt)}</span></Td>
+                <Td align="right" className={styles.colChange}><span className={styles.cellMain}>{signed(member.monthChange)}</span></Td>
+                <Td align="right" className={styles.colBalance}><span className={styles.cellMain} title={member.nextExpiringAt ? `次は ${formatMileageDate(member.nextExpiringAt)}` : undefined}>{expiringText(member)}</span></Td>
+                <Td collapseAt="narrow" className={styles.colLast}><span className={styles.cellMain}>{formatMileageMonthDay(member.lastChangedAt)}</span></Td>
                 <Td className={styles.colOpsBalance}>
                   <span className={styles.rowActions}>
                     <Button href={href}>明細を見る</Button>
@@ -536,6 +536,7 @@ export default function BalancesTab() {
   return (
     <MileageFrame
       help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。"
+      explanation="残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。"
       actions={<div className={styles.headActions}>
         <Button onClick={() => void reloadAll()} disabled={loading}>
           <RefreshCw size={15} aria-hidden="true" /> 残高を再読み込み

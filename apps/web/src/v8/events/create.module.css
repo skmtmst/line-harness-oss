@@ -2,35 +2,6 @@
  * ★V8 イベントを作る（d4adD4）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
  * ここはカード（枠1・角12・余白20・間12）と、右の列のカード（余白16・間8）の中身だけ。
  */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-wh-card-gap);
-  padding: var(--tpl-wh-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-.cardHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-compact-gap);
-}
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-wh-card-title-size);
-  font-weight: 700;
-  line-height: var(--tpl-wh-card-title-lh);
-}
-.cardNote {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-wh-cell-lh);
-}
 .cardRow {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -49,36 +20,6 @@
 }
 .field :global(*) {
   max-width: 100%;
-}
-.labelRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-wh-ops-gap);
-}
-.label {
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 500;
-  line-height: var(--tpl-chip-label-lh);
-}
-.pickLabel {
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-wh-cell-lh);
-}
-.optional {
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-wh-cell-lh);
-  white-space: nowrap;
-}
-.required {
-  color: var(--color-danger);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-row-sub-lh);
-  white-space: nowrap;
 }
 .timeRow {
   display: flex;
@@ -140,31 +81,12 @@
   flex-direction: column;
   gap: var(--tpl-body-pad);
 }
-.sideCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-toolbar-gap);
-  padding: var(--tpl-side-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
 .sideTitle {
   margin: 0;
   color: var(--color-ink);
   font-size: var(--text-body);
   font-weight: 700;
   line-height: var(--tpl-chip-label-lh);
-}
-.phone {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-ev-phone-gap);
-  padding: var(--tpl-rule-row-gap);
-  border-radius: var(--radius-segment);
-  background: var(--color-surface-pearl);
 }
 .phoneName {
   margin: 0;
@@ -219,21 +141,6 @@
   flex-direction: column;
   gap: var(--tpl-wh-ops-gap);
 }
-.linkButton {
-  min-height: 0;
-  height: auto;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-action);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-wh-cell-lh);
-  cursor: pointer;
-}
-.linkButton:hover {
-  text-decoration: underline;
-}
 .questionEmpty {
   display: flex;
   align-items: center;
@@ -245,36 +152,10 @@
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
 }
-.checkItem {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-compact-gap);
-}
-.checkSub {
-  margin: 0;
-  padding-left: var(--tpl-ev-check-indent);
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-row-sub-lh);
-}
 .linkRow {
   display: flex;
 }
 
 /* 共通の日付欄の高さとの差は、次の段との間で吸収する。 */
-.datePair { margin-bottom: calc(-1 * var(--tpl-toolbar-gap)); }
 
 /* 申込の見え方（application-preview）の押せない入力欄。作成の手直しで消えたのを戻す。 */
-.input {
-  width: 100%;
-  min-width: 0;
-  height: var(--tpl-chip-h);
-  padding: var(--tpl-kw-input-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-body);
-}

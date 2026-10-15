@@ -1,6 +1,6 @@
 /*
  * ★V8 通知（Pencil `y8QQV`）。枠・見出しは型（ListPage）が持つ。
- * 値は globals.css の `[data-theme="v8"]` の `--tpl-nt-*`。
+ * 値は globals.css の `:root` の `--tpl-nt-*`。
  */
 
 /* 中身 V8：上16・左右24・下24、段の間16。 */
@@ -17,24 +17,7 @@
   flex-shrink: 0;
 }
 
-.retry {
-  flex-shrink: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  font-weight: 500;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
 /* 一覧の箱：角丸12・細い枠。 */
-.box {
-  overflow: hidden;
-  border: 1px solid var(--card-edge);
-  border-radius: var(--tpl-nt-box-radius);
-  box-shadow: var(--card-shadow);
-}
 
 .list {
   margin: 0;
@@ -116,7 +99,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--polish-text-body);
   font-weight: 500;
   line-height: var(--tpl-nt-title-lh);
 }
@@ -130,7 +113,7 @@
   height: var(--tpl-nt-dot);
   flex-shrink: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-action);
+  background: var(--color-status-info);
 }
 
 .time {
@@ -169,14 +152,6 @@
   margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  line-height: var(--tpl-nt-small-lh);
-}
-
-.settingsLink {
-  flex-shrink: 0;
-  color: var(--color-action);
-  font-size: var(--text-micro);
-  font-weight: 600;
   line-height: var(--tpl-nt-small-lh);
 }
 

@@ -1,5 +1,6 @@
-import type { FormEventHandler, KeyboardEventHandler, Ref, ReactNode } from 'react'
+import { useId, type FormEventHandler, type KeyboardEventHandler, type Ref, type ReactNode } from 'react'
 import styles from './radio-card.module.css'
+import { CircleCheck } from 'lucide-react'
 import { joinDescribedBy, useFieldContext } from './field-context'
 
 /**
@@ -109,6 +110,10 @@ export interface RadioCardProps {
   height?: 'default' | 'short'
   /** 横並びの小さい箱（j8p3yj）。既定のカード・行・v7 の寸法は変えない。 */
   size?: 'default' | 'small'
+  /** 図・本文を右上の丸の下へ置く箱。本文の右側を丸用に狭めない。 */
+  contentPlacement?: 'standard' | 'below-indicator'
+  /** 面のタイルは選択枠と題の印で示し、入力自体は読み上げとキー操作に残す。 */
+  indicator?: 'radio' | 'check'
 }
 
 export default function RadioCard({
@@ -131,8 +136,11 @@ export default function RadioCard({
   compactTypography = 'default',
   height = 'default',
   size = 'default',
+  contentPlacement = 'standard',
+  indicator = 'radio',
 }: RadioCardProps) {
   const field = useFieldContext()
+  const disabledReasonId = useId()
   invalid = invalid || Boolean(field?.invalid)
   return (
     <label
@@ -149,6 +157,8 @@ export default function RadioCard({
       ].filter(Boolean).join(' ')}
       data-choice-card={variant !== 'row' || undefined}
       data-variant={variant}
+      data-content-placement={contentPlacement}
+      data-choice-indicator={indicator === 'check' ? indicator : undefined}
       data-compact-typography={variant === 'compact' ? compactTypography : undefined}
       onClick={disabled ? undefined : onClick}
     >
@@ -166,13 +176,13 @@ export default function RadioCard({
         checked={checked}
         disabled={disabled}
         aria-invalid={invalid || undefined}
-        aria-describedby={joinDescribedBy(field?.describedBy)}
+        aria-describedby={joinDescribedBy(field?.describedBy, disabled && disabledReason ? disabledReasonId : undefined)}
         onChange={() => onChange(value)}
       />
       <span className={styles.body}>
-        <strong className={styles.title} title={title}>{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
+        <strong className={styles.title} title={title}>{indicator === 'check' && checked && !disabled ? <CircleCheck className={styles.check} data-choice-check aria-hidden="true" /> : null}{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
         {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
-        {disabled && disabledReason ? <small className={styles.reason}>{disabledReason}</small> : null}
+        {disabled && disabledReason ? <small id={disabledReasonId} className={styles.reason}>{disabledReason}</small> : null}
       </span>
       {children}
     </label>

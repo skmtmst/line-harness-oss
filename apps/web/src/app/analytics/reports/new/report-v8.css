@@ -1,69 +1,10 @@
-@layer properties, theme, base, components, utilities;
+/* レポートの状態と中身。外側はCreatePage、箱は共通Cardが持つ。 */
+.report-v8-page { min-width: 0; }
 
 /*
  * 分析レポート作成・送信設定の V8（板 H5UoIu・競合 G83vi）。
  * V8専用。名前をこの画面の中で分けて共通の殻へ影響させない。
  */
-
-.report-v8-page {
-  min-width: 0;
-  margin: -20px -24px -28px;
-  padding-bottom: 80px;
-  container-type: inline-size;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.report-v8-head {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--tpl-an-rp-head-gap);
-  padding: var(--tpl-an-rp-head-pad);
-  border-bottom: 1px solid var(--color-hairline);
-}
-
-.report-v8-back {
-  display: inline-block;
-  line-height: normal;
-  font-size: var(--tpl-an-rp-back-size);
-  font-weight: 600;
-  color: var(--color-action);
-  text-decoration: none;
-}
-
-.report-v8-back:hover {
-  text-decoration: underline;
-}
-
-.report-v8-title {
-  margin: 0;
-  line-height: var(--tpl-title-lh);
-  font-size: var(--tpl-title-size);
-  font-weight: var(--tpl-title-weight);
-  color: var(--color-ink);
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-.report-v8-lead {
-  margin: 0;
-  line-height: normal;
-  font-size: var(--tpl-an-rp-lead-size);
-  color: var(--color-ink-secondary);
-}
-
-.report-v8-required {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: var(--radius-tile-sm);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-  font-size: 11px;
-  font-weight: 600;
-  vertical-align: middle;
-}
 
 .report-v8-fieldError {
   margin-top: 6px;
@@ -72,44 +13,14 @@
 }
 
 /* 競合の帯（G83vi）。板の頭の下（余白 12/24）。左に印と2行、右に操作。 */
-.report-v8-conflictWrap { padding: var(--tpl-an-rp-conflict-wrap-pad); }
-.report-v8-conflict { display: flex; align-items: center; gap: var(--tpl-an-rp-grid-gap); padding: var(--tpl-an-rp-conflict-pad); border-radius: var(--tpl-an-rp-choice-radius); background: var(--color-warning-bg); min-width: 0; }
-.report-v8-conflictIcon { flex-shrink: 0; color: var(--color-warning); }
-.report-v8-conflictText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-an-rp-stack-gap); min-width: 0; }
-.report-v8-conflictTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-choice-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
-.report-v8-conflictSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-an-rp-sub-size); line-height: normal; }
-.report-v8-conflictActions { display: flex; flex-wrap: wrap; flex-shrink: 0; gap: var(--tpl-an-rp-grid-gap); }
-
-.report-v8-page a:focus-visible,
-.report-v8-page button:focus-visible,
-.report-v8-page input:focus-visible {
-  outline: 2px solid var(--color-accent-deep);
-  outline-offset: 2px;
-}
-
-
-/* 本文：左は段の列（余白 24/28・段の間 16）、右は幅 380 の列（線で区切る）。 */
-.report-v8-columns { display: flex; align-items: flex-start; min-width: 0; }
-.report-v8-fields { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-an-rp-col-gap); min-width: 0; border: 0; padding: var(--tpl-an-rp-body-pad); margin: 0; }
-.report-v8-card { display: flex; flex-direction: column; gap: var(--tpl-an-rp-card-gap); outline: 1px solid var(--card-edge); outline-offset: -1px; border-radius: var(--tpl-an-rp-card-radius); background: var(--color-canvas); padding: var(--tpl-an-rp-card-pad); min-width: 0; box-shadow: var(--card-shadow); }
-.report-v8-cardTitle { display: flex; align-items: center; gap: var(--tpl-an-rp-field-gap); margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-card-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
-.report-v8-cardHead { position: relative; min-width: 0; }
-.report-v8-cardHeadStack { display: flex; flex-direction: column; gap: var(--tpl-an-rp-stack-gap); min-width: 0; }
-.report-v8-cardSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-an-rp-sub-size); line-height: normal; }
-.report-v8-headCheck { position: absolute; top: 0; right: 0; font-size: var(--tpl-an-rp-sub-size); color: var(--color-ink-secondary); }
+/* 本文：左は段の列（余白 24・段の間 16）、右は幅 380 の列（線で区切る）。 */
 .report-v8-field { display: flex; flex-direction: column; gap: var(--tpl-an-rp-field-gap); min-width: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-sub-size); font-weight: 600; line-height: normal; }
 .report-v8-inputField { font-size: var(--tpl-an-rp-label-size); font-weight: 500; line-height: var(--tpl-an-rp-label-lh); }
 .report-v8-label { display: flex; align-items: center; gap: var(--tpl-an-rp-field-gap); }
 .report-v8-scheduleGrid, .report-v8-alertGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-an-rp-card-gap) var(--tpl-an-rp-grid-gap); align-items: start; }
 .report-v8-sectionCards, .report-v8-alerts { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--tpl-an-rp-list-gap); padding: 0; margin: 0; list-style: none; }
 /* 何を入れますか：1つずつ枠の中に、題と説明を縦に（説明も題と同じ左端）。 */
-.report-v8-selectionCard { display: flex; align-items: center; outline: 1px solid var(--color-hairline); outline-offset: -1px; border-radius: var(--tpl-an-rp-choice-radius); padding: var(--tpl-an-rp-choice-pad); min-width: 0; }
-.report-v8-selectionCard > span { min-width: 0; }
-.report-v8-choice { display: flex; flex-direction: column; gap: var(--tpl-an-rp-stack-gap); min-width: 0; }
-.report-v8-choiceTitle { color: var(--color-ink); font-size: var(--tpl-an-rp-choice-title); font-weight: 600; line-height: normal; }
-.report-v8-choiceDetail { overflow: hidden; color: var(--color-ink-secondary); font-size: var(--tpl-an-rp-choice-detail); line-height: normal; white-space: nowrap; text-overflow: ellipsis; }
 /* 知らせの決めごと：条件ごとの枠（題の行と、2つの入力）。 */
-.report-v8-alertCard { display: flex; flex-direction: column; gap: var(--tpl-an-rp-alert-gap); outline: 1px solid var(--color-hairline); outline-offset: -1px; border-radius: var(--tpl-an-rp-choice-radius); padding: var(--tpl-an-rp-alert-pad); min-width: 0; }
 /* 選んだもの（札）。選んでいないときは同じ高さの1行で知らせる。 */
 .report-v8-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-an-rp-chips-gap); min-width: 0; min-height: var(--tpl-an-rp-chip-h); }
 .report-v8-chip { display: inline-flex; align-items: center; gap: var(--tpl-an-rp-chip-gap); max-width: 100%; padding: var(--tpl-an-rp-chip-pad); border-radius: var(--radius-pill); background: var(--color-surface-pearl); font-size: var(--tpl-an-rp-chip-size); line-height: normal; }
@@ -131,11 +42,6 @@
 .report-v8-sub { margin: 0; font-size: var(--tpl-an-rp-sub-size); color: var(--color-ink-secondary); }
 
 /* 右の列（幅 380・左に線）。カードは余白 16・間 8。 */
-.report-v8-rail { flex: 0 0 var(--tpl-an-rp-rail-w); display: flex; flex-direction: column; gap: var(--tpl-an-rp-rail-gap); align-self: stretch; padding: var(--tpl-an-rp-rail-pad); border-left: 1px solid var(--color-hairline); min-width: 0; }
-.report-v8-railCard { display: flex; flex-direction: column; gap: var(--tpl-an-rp-railcard-gap); outline: 1px solid var(--card-edge); outline-offset: -1px; border-radius: var(--tpl-an-rp-card-radius); background: var(--color-canvas); padding: var(--tpl-an-rp-railcard-pad); min-width: 0; box-shadow: var(--card-shadow); }
-.report-v8-railTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-rail-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
-.report-v8-railSub { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-an-rp-rail-sub); line-height: normal; }
-.report-v8-preview { display: flex; flex-direction: column; gap: var(--tpl-an-rp-preview-gap); border-radius: var(--tpl-an-rp-choice-radius); background: var(--color-surface-pearl); padding: var(--tpl-an-rp-preview-pad); }
 .report-v8-previewTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-preview-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
 .report-v8-previewRow, .report-v8-kvRow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--tpl-an-rp-grid-gap); margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-an-rp-sub-size); line-height: normal; }
 .report-v8-previewRow strong, .report-v8-kvRow strong { min-width: 0; overflow: hidden; color: var(--color-ink); font-weight: var(--tpl-an-rp-bold); text-align: right; white-space: nowrap; text-overflow: ellipsis; }
@@ -143,16 +49,9 @@
 .report-v8-notes { margin: 0; padding: 0; list-style: none; color: var(--color-ink-secondary); font-size: var(--tpl-an-rp-sub-size); line-height: var(--tpl-an-rp-notes-lh); }
 .report-v8-notes li::before { content: "・"; }
 
-@container (max-width: 1099px) {
-  .report-v8-columns { flex-direction: column; }
-  .report-v8-fields, .report-v8-rail { width: 100%; }
-  .report-v8-rail { flex-basis: auto; border-left: 0; }
-}
+
 @container (max-width: 600px) {
-  .report-v8-fields { padding: var(--tpl-an-rp-railcard-pad); }
-  .report-v8-card { padding: var(--tpl-an-rp-railcard-pad); }
   .report-v8-scheduleGrid, .report-v8-alertGrid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* B-187：列を縦に畳んだ時も段間と下端の余白を重ねない。 */
-.report-v8-fields { padding-bottom: 0; }

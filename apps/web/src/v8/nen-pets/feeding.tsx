@@ -1,4 +1,5 @@
 'use client'
+import { DetailColumns } from '@/components/templates/detail-columns'
 import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
@@ -11,7 +12,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFieldValidation } from '@/lib/use-field-validation'
-import { describeApiFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -60,6 +61,7 @@ const fromData = (next: NenFeedingData): FeedingDraft[] =>
   next.products.map((p) => ({ key: p.id, id: p.id, name: p.name, kcal: String(p.kcalPer100g), isDefault: p.isDefault, kind: p.kind === 'nen' ? 'nen' : 'staple', editing: false }))
 
 export default function FeedingV8({ accountId, canEdit }: { accountId: string; canEdit: boolean }) {
+  const [formulaExpanded, setFormulaExpanded] = useState(false)
   const saveErrors = useSaveFormErrors()
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [data, setData] = useState<NenFeedingData | null>(null)
@@ -69,6 +71,8 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [dataAccountId, setDataAccountId] = useState(accountId)
   const fields = useFieldValidation(drafts.flatMap((row) => [
     ...(!row.name.trim() ? [{ id: `feeding-name-${row.key}`, message: '商品名を入れるか、行を消してください。' }] : []),
     ...(!Number.isFinite(Number(row.kcal.replace(/[,，]/g, ''))) || Number(row.kcal.replace(/[,，]/g, '')) <= 0
@@ -77,9 +81,26 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
   const generationRef = useRef(0)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
+  if (dataAccountId !== accountId) {
+    const hadUnsaved = dirty
+    generationRef.current += 1
+    setDataAccountId(accountId)
+    setData(null)
+    setDrafts([])
+    setTreatLimit('10')
+    setDirty(false)
+    setBusy(false)
+    setError('')
+    setLoadError(null)
+    setStatus('loading')
+    cancelLeave()
+    setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
+  }
+
   const load = useCallback(async () => {
     const generation = ++generationRef.current
     setStatus('loading')
+    setLoadError(null)
     try {
       const res = await nenRanksApi.feeding(accountId)
       if (!res.success) throw new Error(res.error)
@@ -92,6 +113,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
     } catch (caught) {
       if (generationRef.current !== generation) return
       saveErrors.capture(caught);
+      setLoadError(caught)
 
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
@@ -163,6 +185,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
         ? `主食を保存し、登録済みのペット ${formatNumber(res.data.refreshedPets)}頭の目安を計算し直しました。`
         : '主食を保存しました。')
     } catch (caught) {
+      if (generationRef.current !== generation) return
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
@@ -171,49 +194,16 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
         scope: 'store',
       })) }
     } finally {
-      setBusy(false)
+      if (generationRef.current === generation) setBusy(false)
     }
   }
 
   if (status === 'forbidden') return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" /></SaveErrorScope>
-  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} /></SaveErrorScope>
-  if (!data) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></SaveErrorScope>
+  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="主食のカロリー表を読み込めませんでした" error={loadError ?? undefined} description={isForbiddenOrRateLimited(loadError) ? undefined : '通信の状態を確認して、もう一度お試しください。'} onRetry={() => void load()} /></SaveErrorScope>
+  if (!data) return <SaveErrorScope errors={saveErrors}>{notice ? <Notice tone="success" message={notice} /> : null}<ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></SaveErrorScope>
 
-  const tableProps = { fields, drafts, canEdit, busy, onUpdate: update, onDefault: setDefault, onRemove: remove, addDisabled: drafts.length >= MAX_PRODUCTS }
-
-  return (
-    <SaveErrorScope errors={saveErrors}><div className={styles.feeding}>
-      {notice ? <Notice tone="success" message={notice} /> : null}
-      {error ? <Notice tone="danger" message={error} /> : null}
-      <div className={styles.feedingGrid}>
-        <div className={styles.feedingMain}>
-          <Card layout="vertical" padding="spacious" surface="bordered" spacing="normal" aria-label="主食">
-            <div className={styles.cardHead}>
-              <h2 className={styles.cardTitle}>主食（お客さまが選ぶ、ふだんのごはん）</h2>
-              <p className={styles.cardDesc}>一般的な種類だけ登録します。マイページの「いつもの主食」で選ばれ、1日の目安（g）はこの kcal で割ります</p>
-            </div>
-            <ProductTable {...tableProps} kind="staple" defaultHead="既定の主食" defaultChip="既定" makeDefault="既定にする" addLabel="主食を追加する" onAdd={() => add('staple')} />
-          </Card>
-          <Card layout="vertical" padding="spacious" surface="bordered" spacing="normal" aria-label="然の商品">
-            <div className={styles.cardHead}>
-              <h2 className={styles.cardTitle}>然の商品（おやつ・トッピング）</h2>
-              <p className={styles.cardDesc}>然の商品名と 100g あたりのカロリーを登録すると、マイページに「然の鹿肉の目安」が出ます</p>
-            </div>
-            <ProductTable {...tableProps} kind="nen" defaultHead="目安に使う商品" defaultChip="目安に使う中" makeDefault="これを使う" addLabel="然の商品を追加する" onAdd={() => add('nen')} />
-            <div className={styles.treat}><Field label="おやつの上限（%）" htmlFor="nen-treat-limit"><span className={styles.treatRow}>
-                <span className={styles.treatInput}>
-                  {canEdit ? (
-                    <SaveErrorField names={["treatLimit","treat_limit"]}><NumberInput numericText unit="%" disabled={busy} id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} /></SaveErrorField>
-                  ) : (
-                    <SaveErrorField names={["treatLimit","treat_limit"]}><TextField id="nen-treat-limit" value={treatLimit} readOnly /></SaveErrorField>
-                  )}
-                </span>
-                <span className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</span>
-              </span></Field></div>
-          </Card>
-        </div>
-
-        <Card layout="vertical" padding="spacious" surface="bordered" spacing="normal" className={styles.formulaCard} aria-label="今日の目安の計算">
+  const formula = (
+        <Card layout="vertical" padding="spacious" surface="bordered" spacing="normal" aria-label="今日の目安の計算">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>今日の目安の計算</h2>
             <p className={styles.cardDesc}>体重・年齢・避妊去勢・運動量から、公的な指針の式で計算します</p>
@@ -242,7 +232,44 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
           </div>
           <p className={styles.formulaNote}>犬・猫以外は計算しません</p>
         </Card>
-      </div>
+  )
+
+  const tableProps = { fields, drafts, canEdit, busy, onUpdate: update, onDefault: setDefault, onRemove: remove, addDisabled: drafts.length >= MAX_PRODUCTS }
+
+  return (
+    <SaveErrorScope errors={saveErrors}><div className={styles.feeding}>
+      {notice ? <Notice tone="success" message={notice} /> : null}
+      {error ? <Notice tone="danger" message={error} /> : null}
+      <DetailColumns aside={formula} asideLabel="今日の目安の計算" expanded={formulaExpanded} onExpandedChange={setFormulaExpanded} presentation="card">
+        <div className={styles.feedingMain}>
+          <Card layout="vertical" padding="spacious" surface="bordered" spacing="normal" aria-label="主食">
+            <div className={styles.cardHead}>
+              <h2 className={styles.cardTitle}>主食（お客さまが選ぶ、ふだんのごはん）</h2>
+              <p className={styles.cardDesc}>一般的な種類だけ登録します。マイページの「いつもの主食」で選ばれ、1日の目安（g）はこの kcal で割ります</p>
+            </div>
+            <ProductTable {...tableProps} kind="staple" defaultHead="既定の主食" defaultChip="既定" makeDefault="既定にする" addLabel="主食を追加する" onAdd={() => add('staple')} />
+          </Card>
+          <Card layout="vertical" padding="spacious" surface="bordered" spacing="normal" aria-label="然の商品">
+            <div className={styles.cardHead}>
+              <h2 className={styles.cardTitle}>然の商品（おやつ・トッピング）</h2>
+              <p className={styles.cardDesc}>然の商品名と 100g あたりのカロリーを登録すると、マイページに「然の鹿肉の目安」が出ます</p>
+            </div>
+            <ProductTable {...tableProps} kind="nen" defaultHead="目安に使う商品" defaultChip="目安に使う中" makeDefault="これを使う" addLabel="然の商品を追加する" onAdd={() => add('nen')} />
+            <div className={styles.treat}><Field label="おやつの上限（%）" htmlFor="nen-treat-limit"><span className={styles.treatRow}>
+                <span className={styles.treatInput}>
+                  {canEdit ? (
+                    <SaveErrorField names={["treatLimit","treat_limit"]}><NumberInput numericText unit="%" disabled={busy} id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} /></SaveErrorField>
+                  ) : (
+                    <SaveErrorField names={["treatLimit","treat_limit"]}><TextField id="nen-treat-limit" value={treatLimit} readOnly /></SaveErrorField>
+                  )}
+                </span>
+                <span className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</span>
+              </span></Field></div>
+          </Card>
+        </div>
+
+
+      </DetailColumns>
 
       {canEdit ? (
         <StickyBar
@@ -250,8 +277,8 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
           status={dirty ? '保存していない変更があります' : undefined}
           actions={(
             <>
-              <Button onClick={cancel} disabled={busy || !dirty}>キャンセル</Button>
-              <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} busy={busy} busyLabel="保存しています…"><Check size={15} aria-hidden="true" />保存する</Button>
+              <Button onClick={cancel} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '変更がありません' : undefined}>キャンセル</Button>
+              <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? 'ごはんの目安を変更すると保存できます' : undefined} busy={busy} busyLabel="保存しています…"><Check size={15} aria-hidden="true" />保存する</Button>
             </>
           )}
         />

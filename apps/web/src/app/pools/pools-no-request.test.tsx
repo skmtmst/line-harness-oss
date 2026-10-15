@@ -76,3 +76,8 @@ describe('プール管理の発行前ゲート（#703）', () => {
     expect(seenPaths).toContain('/api/traffic-pools')
   })
 })
+
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())

@@ -8,7 +8,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-wb-tm-body-gap);
-  padding: var(--tpl-wb-tm-body-pad);
+  padding-block: var(--polish-space-card) var(--polish-space-section);
 }
 
 /* きっかけの札の段（1行・右端に再読み込み）。 */
@@ -17,6 +17,8 @@
   align-items: center;
   gap: var(--tpl-wb-tm-tools-gap);
   min-width: 0;
+  padding-inline: var(--polish-space-section);
+  flex-wrap: wrap;
 }
 .toolsLabel {
   flex-shrink: 0;
@@ -34,27 +36,6 @@
   flex: 1;
 }
 
-/* カード：4列・横12・縦14。高さは絵の162を最低にそろえ、ボタンは下にそろえる。 */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tpl-wb-tm-grid-gap);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-wb-tm-card-gap);
-  min-width: 0;
-  min-height: var(--tpl-wb-tm-card-h);
-  padding: var(--tpl-wb-tm-card-pad);
-  border-radius: var(--tpl-wb-tm-card-radius);
-  border: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-  background: var(--color-canvas);
-}
 .cardTitle {
   margin: 0;
   overflow: hidden;
@@ -93,14 +74,9 @@
 .cardSpacer {
   flex: 1;
 }
-.cardButton {
-  width: 100%;
-  justify-content: center;
-}
-
 /* 注記（薄い地・角丸8）。 */
 .note {
-  margin: 0;
+  margin: 0 var(--polish-space-section);
   padding: var(--tpl-wb-tm-note-pad);
   border-radius: var(--tpl-wb-tm-note-radius);
   background: var(--color-surface-pearl);

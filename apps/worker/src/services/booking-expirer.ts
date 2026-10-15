@@ -1,6 +1,8 @@
 // Cron handler: expire 24h-old request bookings + purge idempotency rows.
 
-import { recoverExpiredBookingPayments, recoverPaidBookingPayments } from './booking-payment-recovery.js';
+import { recoverExpiredBookingPayments, recoverPaidBookingPayments, recoverOrphanedOnlineBookings } from './booking-payment-recovery.js';
+import { recoverConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
+import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 import type { BookingNotificationSender } from './booking-notifier.js';
 import { formatStartsAtForStore, notificationTiming } from './booking-notifier.js';
 import { purgeExpiredIdempotency } from './booking-idempotency.js';
@@ -26,14 +28,17 @@ interface StaleRow {
 export interface RunExpirerParams {
   now: Date;
   sender: BookingNotificationSender;
+  credentials?: GoogleServiceAccountCredentials;
 }
 
 export async function runExpirer(
   db: D1Database,
   params: RunExpirerParams,
 ): Promise<{ expired: number; idempotencyPurged: number }> {
-  await recoverPaidBookingPayments(db, params.now);
+  await recoverPaidBookingPayments(db, params.now, params.credentials);
+  await recoverConfirmedBookingSideEffects(db, { now: params.now, credentials: params.credentials });
   await recoverExpiredBookingPayments(db, params.now);
+  await recoverOrphanedOnlineBookings(db, params.now);
   const cutoff = new Date(params.now.getTime() - REQUEST_TTL_HOURS * 3600_000).toISOString();
   // 機能オフはSQLで先に除き、緊急停止中の行も消費枠に数えず、IDで次のページへ進む。
   const stale: StaleRow[] = [];
@@ -113,7 +118,7 @@ export async function runExpirer(
       reason: 'request_ttl_expired',
       actorType: 'system',
       occurredAt: params.now.toISOString(),
-    }).catch((error) => console.error('booking audit (expire) failed:', error));
+    }).catch((error) => console.error(JSON.stringify({"code":"services_booking_expirer_failed"})));
     await db
       .prepare(
         `UPDATE booking_reminders SET status='cancelled' WHERE booking_id = ? AND status IN ('pending','failed')`,
@@ -133,7 +138,7 @@ export async function runExpirer(
         cancelReason: `booking_expired:${row.id}:by:system`,
       });
     } catch (error) {
-      console.error('reminder cancel (booking expired) failed:', error);
+      console.error(JSON.stringify({"code":"services_booking_expirer_failed"}));
     }
     try {
       const accessToken = await resolveLineCredential(
@@ -192,11 +197,11 @@ export async function runExpirer(
           allowLegacyFallback: false,
         });
       } catch (error) {
-        console.error('reminder repair (booking leftover) failed:', error);
+        console.error(JSON.stringify({"code":"services_booking_expirer_failed"}));
       }
     }
   } catch (error) {
-    console.error('reminder repair (booking leftover scan) failed:', error);
+    console.error(JSON.stringify({"code":"services_booking_expirer_failed"}));
   }
 
   const idempotencyPurged = await purgeExpiredIdempotency(db, params.now);

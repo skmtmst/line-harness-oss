@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * Pencil `cBSCb`（V6s 共通トップバー）の実測値。
@@ -6,13 +6,8 @@
  */
 .root {
   display: flex;
-  height: 56px;
   min-width: 0;
   align-items: center;
-  gap: 12px;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-shell-gray);
 }
 
 /* `cBSCb/wgtL5`。画面名とマニュアルは左。あきで右操作を押し出す。 */
@@ -97,7 +92,6 @@
   min-width: 0;
   flex-shrink: 0;
   align-items: center;
-  gap: 12px;
 }
 
 /* `cBSCb/VQGk7`。「LINEアカウント」の見出しと切替の札。 */
@@ -116,37 +110,24 @@
   position: relative;
   display: flex;
   min-width: 0;
-  height: 36px;
   align-items: center;
-  gap: 8px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
   background: var(--color-canvas);
-  padding: 0 10px;
 }
 
 /* `cBSCb/KZ9W9`。22px・radius-mini・accent-soft。 */
 .accountMark {
   display: flex;
-  width: 22px;
-  height: 22px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-mini);
   background: var(--color-accent-soft);
   color: var(--color-accent-deep);
-  font-size: var(--text-nano);
-  font-weight: 600;
 }
 
 /* `cBSCb/q6d8jk`。$size-label 13 / 700。 */
 .accountName {
-  max-width: 148px;
   overflow: hidden;
   color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -272,7 +253,7 @@
  * 各一覧の中の欄が受ける。長いアカウント名は 128px、自分の名前は
  * 104px で「…」に収める。
  * ------------------------------------------------------------------- */
-[data-theme="v8"] .root {
+:root .root {
   height: 60px;
   gap: 8px;
   padding: 0 16px;
@@ -421,11 +402,11 @@
   font-weight: 600;
 }
 
-[data-theme="v8"] .separator {
+:root .separator {
   display: none;
 }
 
-[data-theme="v8"] .actions {
+:root .actions {
   gap: 8px;
 }
 
@@ -433,7 +414,7 @@
  * 帯が混まないよう、V8 は名前の見せる幅を固定する（128 / 104）。
  * はみ出た分は「…」。全文は title 属性で読める。
  */
-[data-theme="v8"] .accountName {
+:root .accountName {
   max-width: 128px;
 }
 
@@ -443,18 +424,18 @@
  * 「…」で受ける）。代わりにパンくずと自分の名前が縮む（どちらも
  * 「…」持ち）。v7 は今までどおり。
  */
-[data-theme='v8'] .accountPill {
+:root .accountPill {
   flex-shrink: 0;
 }
 
-[data-theme='v8'] .crumbCurrent,
-[data-theme='v8'] .crumbFrom,
-[data-theme='v8'] .crumbFromLink,
-[data-theme='v8'] .user {
+:root .crumbCurrent,
+:root .crumbFrom,
+:root .crumbFromLink,
+:root .user {
   min-width: 0;
 }
 
-[data-theme="v8"] .user {
+:root .user {
   max-width: 104px;
 }
 
@@ -464,25 +445,25 @@
  * 128px の「…」で受ける）。代わりにパンくずと自分の名前が縮む
  * （どちらも「…」持ち）。v7 は今までどおり。
  */
-[data-theme='v8'] .accountPill {
+:root .accountPill {
   flex-shrink: 0;
 }
 
-[data-theme='v8'] .crumbCurrent,
-[data-theme='v8'] .crumbFrom,
-[data-theme='v8'] .crumbFromLink,
-[data-theme='v8'] .user {
+:root .crumbCurrent,
+:root .crumbFrom,
+:root .crumbFromLink,
+:root .user {
   min-width: 0;
 }
 
 /* 1152 未満ではログアウトを印だけにする（板 NF3uI「1152 の帯」）。
    字を消しても aria-label が残るので読み上げは変わらない。 */
 @media (max-width: 1151px) {
-  [data-theme="v8"] .logout span {
+  :root .logout span {
     display: none;
   }
 
-  [data-theme="v8"] .logout {
+  :root .logout {
     width: 36px;
     justify-content: center;
     padding: 0;
@@ -495,9 +476,6 @@
  * ------------------------------------------------------------------- */
 
 /* v7 の中箱（名前＋役割）は素通しにする。V8 でだけ積む。 */
-.identityText {
-  display: contents;
-}
 
 /* ホームの格子印＋文字。手前の段の頭。 */
 .crumbHome {
@@ -516,11 +494,8 @@
 }
 
 /* 札の中の役割（統括など）。V8 で名前の上に小さい行で添える。 */
-.pillText {
-  display: contents;
-}
 
-[data-theme='v8'] .pillText {
+:root .pillText {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -528,7 +503,7 @@
   line-height: 1.25;
 }
 
-[data-theme='v8'] .pillRole {
+:root .pillRole {
   color: var(--color-ink-faint);
   font-size: var(--text-nano);
   font-weight: 500;
@@ -537,7 +512,7 @@
 }
 
 /* 札は2行ぶんの高さにする（役割＋名前）。幅の決めは変えない。 */
-[data-theme='v8'] .accountPill {
+:root .accountPill {
   height: auto;
   min-height: 44px;
   padding-top: 4px;
@@ -548,7 +523,7 @@
  * 自分：名前を太字・役割を下の小さい行に積む（絵どおり）。
  * 役割の印（押せる統括ボタンも）は札の形をやめ小さい文字にする。
  */
-[data-theme='v8'] .identityText {
+:root .identityText {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -556,14 +531,14 @@
   line-height: 1.25;
 }
 
-[data-theme='v8'] .identityText .user {
+:root .identityText .user {
   order: -1;
   max-width: 140px;
   color: var(--color-ink);
 }
 
-[data-theme='v8'] .identityText .role,
-[data-theme='v8'] .identityText .roleButton {
+:root .identityText .role,
+:root .identityText .roleButton {
   height: auto;
   border-radius: var(--radius-none);
   background: none;
@@ -574,50 +549,50 @@
   padding: 0;
 }
 
-[data-theme='v8'] .identityText .roleButton:hover {
+:root .identityText .roleButton:hover {
   background: none;
   color: var(--color-action);
   text-decoration: underline;
 }
 
-[data-theme='v8'] .root { padding: 0 8px; gap: 10px; }
-[data-theme='v8'] .iconButton:not(:focus-visible) { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+:root .root { padding: 0 8px; gap: 10px; }
+:root .iconButton:not(:focus-visible) { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
 
 /* zUg8S / Yw24X: 統括の別の絵は既存の default variant に残す。 */
 /* 帯の右端は白い板の右端にそろえる（絵 JKjsE・ziYCN のログアウトの右端 1420）。 */
-[data-theme='v8'] .root[data-v8-chrome='shell'] { padding-right: var(--tpl-hq2-topbar-pad-end); }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .actions { gap: 10px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .crumbs { gap: 6px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .crumbHome { gap: 6px; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--color-ink-faint); }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 14px; height: 14px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .crumbCurrent { font-size: 13px; font-weight: 500; line-height: 20px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: var(--polish-radius-control); background: transparent; }
+:root .root[data-v8-chrome='shell'] { padding-right: var(--tpl-hq2-topbar-pad-end); }
+:root .root[data-v8-chrome='shell'] .actions { gap: 10px; }
+:root .root[data-v8-chrome='shell'] .crumbs { gap: 6px; }
+:root .root[data-v8-chrome='shell'] .crumbHome { gap: 6px; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--color-ink-faint); }
+:root .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 14px; height: 14px; }
+:root .root[data-v8-chrome='shell'] .crumbCurrent { font-size: 13px; font-weight: 500; line-height: 20px; }
+:root .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: var(--polish-radius-control); background: transparent; }
 /* 切替の札は箱の中に小さい字＋名前の2行（絵の指示）。外の見出しは畳む。 */
-[data-theme='v8'] .accountField > span:first-child { display: none; }
+:root .accountField > span:first-child { display: none; }
 /* 1439 以下の v7 の決まり（見出しの span を画面外へ）が V8 では札そのものに当たり、幅 0 に潰れていた。札は戻す（1152 の絵にも札がある）。 */
-[data-theme='v8'] .accountField > .accountPill { position: relative; width: auto; height: 36px; overflow: visible; clip: auto; white-space: nowrap; }
-[data-theme='v8'] .accountPill { height: 36px; min-height: 36px; padding: 0 10px 0 6px; gap: 8px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
-[data-theme='v8'] .accountMark { width: 24px; height: 24px; border-radius: 7px; font-size: 11px; font-weight: 700; line-height: 17px; }
-[data-theme='v8'] .pillText { gap: 0; }
-[data-theme='v8'] .pillRole { font-size: 10px; font-weight: 400; line-height: 12px; }
-[data-theme='v8'] .accountName { font-size: 13px; font-weight: 600; line-height: 17px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .bellBadge { background: var(--color-status-danger); width: 18px; height: 18px; min-width: 18px; left: 22px; right: auto; top: -4px; padding: 0; outline: 2px solid var(--color-shell); outline-offset: -1px; font-size: 10px; font-weight: 700; line-height: 10px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .identity { height: 36px; padding: 0 10px 0 4px; gap: 8px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .avatar { width: 28px; height: 28px; border-radius: var(--polish-radius-pill); background: var(--color-status-info-soft); color: var(--color-action); font-size: 11px; font-weight: 600; line-height: 17px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .user { font-size: 13px; font-weight: 600; line-height: 17px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .role,
-[data-theme='v8'] .root[data-v8-chrome='shell'] .roleButton { font-size: 11px; font-weight: 400; line-height: 13px; }
+:root .accountField > .accountPill { position: relative; width: auto; height: 36px; overflow: visible; clip: auto; white-space: nowrap; }
+:root .accountPill { height: 36px; min-height: 36px; padding: 0 10px 0 6px; gap: 8px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+:root .accountMark { width: 24px; height: 24px; border-radius: 7px; font-size: 11px; font-weight: 700; line-height: 17px; }
+:root .pillText { gap: 0; }
+:root .pillRole { font-size: 10px; font-weight: 400; line-height: 12px; }
+:root .accountName { font-size: 13px; font-weight: 600; line-height: 17px; }
+:root .root[data-v8-chrome='shell'] .bellBadge { background: var(--color-status-danger); width: 18px; height: 18px; min-width: 18px; left: 22px; right: auto; top: -4px; padding: 0; outline: 2px solid var(--color-shell); outline-offset: -1px; font-size: 10px; font-weight: 700; line-height: 10px; }
+:root .root[data-v8-chrome='shell'] .identity { height: 36px; padding: 0 10px 0 4px; gap: 8px; }
+:root .root[data-v8-chrome='shell'] .avatar { width: 28px; height: 28px; border-radius: var(--polish-radius-pill); background: var(--color-status-info-soft); color: var(--color-action); font-size: 11px; font-weight: 600; line-height: 17px; }
+:root .root[data-v8-chrome='shell'] .user { font-size: 13px; font-weight: 600; line-height: 17px; }
+:root .root[data-v8-chrome='shell'] .role,
+:root .root[data-v8-chrome='shell'] .roleButton { font-size: 11px; font-weight: 400; line-height: 13px; }
 /* 押せる役割（統括へ戻る）は文字の高さのまま。ボタンの最低の高さで名前が上へ押し出されていた（絵 ziYCN の名前と役割の2行）。指で触る端末は今までどおり。 */
-@media (pointer: fine) { [data-theme='v8'] .root[data-v8-chrome='shell'] .identityText .roleButton { min-height: 0; } }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .logout svg { width: 15px; height: 15px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .v8Left > .iconButton:not(:focus-visible) { outline-color: transparent; }
+@media (pointer: fine) { :root .root[data-v8-chrome='shell'] .identityText .roleButton { min-height: 0; } }
+:root .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }
+:root .root[data-v8-chrome='shell'] .logout svg { width: 15px; height: 15px; }
+:root .root[data-v8-chrome='shell'] .v8Left > .iconButton:not(:focus-visible) { outline-color: transparent; }
 /* 展開時は絵の名前欄128/104px、畳んだ外側は内容に合わせた幅。 */
-[data-theme='v8'] .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .accountName { width: 128px; height: 20px; line-height: 17px; }
-[data-theme='v8'] .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .user { width: 104px; height: 20px; line-height: 17px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .identity { border-radius: var(--polish-radius-control); }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .bellBadge { border: 0; border-radius: var(--polish-radius-pill); }
-[data-theme='v8'] .root[data-v8-chrome='shell'][data-menu-collapsed] .crumbHome { gap: 0; }
-[data-theme='v8'] .root[data-v8-chrome='shell'][data-menu-collapsed] .crumbHome > svg { display: none; }
+:root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .accountName { width: 128px; height: 20px; line-height: 17px; }
+:root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .user { width: 104px; height: 20px; line-height: 17px; }
+:root .root[data-v8-chrome='shell'] .identity { border-radius: var(--polish-radius-control); }
+:root .root[data-v8-chrome='shell'] .bellBadge { border: 0; border-radius: var(--polish-radius-pill); }
+:root .root[data-v8-chrome='shell'][data-menu-collapsed] .crumbHome { gap: 0; }
+:root .root[data-v8-chrome='shell'][data-menu-collapsed] .crumbHome > svg { display: none; }
 
 }

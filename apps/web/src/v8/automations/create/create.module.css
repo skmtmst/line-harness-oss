@@ -23,7 +23,7 @@
 }
 
 /* 競合の帯（tJqST）：頭の下・左右の列の上に板いっぱい。型の「頭と本文の間の段」に置く。 */
-:global([data-theme='v8'] [data-page-template='create']) > :global(div):has(> .conflictBand) {
+:global(:root [data-page-template='create']) > :global(div):has(> .conflictBand) {
   display: block;
 }
 .conflictBand {
@@ -59,14 +59,7 @@
   line-height: var(--tpl-text-sm-lh);
 }
 
-/* 段（カード）：枠1・角12・余白20・中の間14。共通カードの枠（1）は内側に入るので、余白は 20−1。 */
-.card {
-  gap: var(--tpl-section-gap);
-  min-width: 0;
-}
-:global([data-theme='v8']) .card {
-  padding: var(--tpl-cfl-card-pad);
-}
+/* 段の枠・余白・間は共通Card(form/normal)が持つ。 */
 .cardHead {
   display: flex;
   flex-direction: column;
@@ -289,17 +282,6 @@
   flex-direction: column;
   gap: var(--tpl-section-gap);
   width: 100%;
-}
-.sideCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-body-gap);
-  padding: var(--tpl-cfl-side-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
 }
 .sideHead {
   display: flex;

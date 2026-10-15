@@ -17,6 +17,8 @@ import EmergencyControlV8 from './control-v8'
  * 隠れること、止める確認の窓は「停止」の言葉が合うまで
  * 進めないことを実DOMで固定する。
  */
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => (
     <a href={String(href)}>{children}</a>
@@ -159,6 +161,9 @@ test('新しい制御タブ（OHwbU）が出る', async () => {
   expect(host?.querySelector('[data-design-node="OHwbU"]')).not.toBeNull()
   expect(host?.textContent).toContain('何を止めますか')
   expect(host?.textContent).toContain('止めた・戻した記録')
+  const labels = Array.from(host?.querySelectorAll('[data-kpi-label]') ?? [])
+  expect(labels.find(label => label.textContent === '止めた回数')?.querySelector('.lucide-octagon-pause')).toBeTruthy()
+  expect(labels.find(label => label.textContent === 'いまの版')?.querySelector('.lucide-git-branch')).toBeTruthy()
 })
 
 test('PKG107: 閲覧のみには停止操作を隠し、状態と記録を残す', async () => {

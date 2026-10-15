@@ -1,9 +1,19 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("名前を入力してください"),
+  slug: { required: true, check: (value: string) => SLUG_PATTERN.test(value) ? null : 'URLに使う名前は、半角英小文字・数字・ハイフンで2〜32文字にしてください' },
+}
+
+
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
+import Card, { CardHeader } from '@/components/shared/card'
+import { useStaffRole } from '@/lib/staff-role'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
@@ -41,9 +51,8 @@ function accountHandle(account: LineAccount): string | null {
   return account.basicId.startsWith('@') ? account.basicId : `@${account.basicId}`
 }
 
-export default function PoolCreateV8() {
+function PoolCreateBody() {
   const saveErrors = useSaveFormErrors()
-  usePageTitle(TITLE)
   const router = useRouter()
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
@@ -106,8 +115,9 @@ export default function PoolCreateV8() {
   }
 
   const validate = (): { target: string; message: string } | null => {
-    if (!name.trim()) return { target: 'pl-name', message: '名前を入力してください' }
-    if (!slugValid) return { target: 'pl-slug', message: 'URLに使う名前は、半角英小文字・数字・ハイフンで2〜32文字にしてください' }
+    if ((b244Requirements.name.check(name) !== null)) return { target: 'pl-name', message: '名前を入力してください' }
+    const slugError = b244Requirements.slug.check(slug)
+    if (slugError) return { target: 'pl-slug', message: slugError }
     if (accountIds.length === 0) return { target: 'pl-add-account', message: '受け入れ先のアカウントを選んでください' }
     return null
   }
@@ -145,6 +155,23 @@ export default function PoolCreateV8() {
       layout="narrow-nav"
       title={TITLE}
       help={DESCRIPTION}
+      preview={(
+        <>
+          <Card variant="aside">
+            <CardHeader size="stacked" title="プレビュー" />
+            <dl className={styles.facts}>
+              <div className={styles.fact}>
+                <dt>友だち追加URL</dt>
+                <dd>{slugValid ? publicUrl : 'まだURLは発行されていません。「URLに使う名前」を入れて保存すると、正式なURLが発行されます。'}</dd>
+              </div>
+              <div className={styles.fact}>
+                <dt>現在の受け入れ先</dt>
+                <dd>{selectedAccounts.length > 0 ? `${selectedAccounts.map((account) => account.name).join('・')}（有効の所属先からランダムに振り分け）` : '未選択'}</dd>
+              </div>
+            </dl>
+          </Card>
+        </>
+      )}
       savePlacement="content"
       saveActions={(
         <>
@@ -155,31 +182,27 @@ export default function PoolCreateV8() {
         </>
       )}
     >
-      <form id="pool-create-form" className={styles.columns} onSubmit={(event) => void save(event)} noValidate>
-        <div className={styles.main}>
+      <form id="pool-create-form" className={styles.main} onSubmit={(event) => void save(event)} noValidate>
           {error ? <Notice tone="danger" >{error}</Notice> : null}
-          <section className={styles.card} aria-labelledby="pool-create-what">
-            <h2 id="pool-create-what" className={styles.cardTitle}>1. どのプールか</h2>
-            <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined}>
+          <Card variant="form" aria-labelledby="pool-create-what">
+            <CardHeader size="stacked" titleId="pool-create-what" title="1. どのプールか" />
+            <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined} requirement={b244Requirements.name}>
               <SaveErrorField names={["name"]}><TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例：渋谷エリア" maxLength={100} /></SaveErrorField>
             </Field>
             <Field note={<>
               {slugValid
                 ? `保存すると、このURLが発行されます：${publicUrl}`
                 : '半角英小文字・数字・ハイフンで2〜32文字。配ったURLが使えなくなるため、あとから変えられません。'}
-            </>} label="URLに使う名前（あとから変えられません）" htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
+            </>} label="URLに使う名前（あとから変えられません）" requirement={b244Requirements.slug} htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
               <SaveErrorField names={["slug"]}><TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} /></SaveErrorField>
             </Field>
 
-          </section>
+          </Card>
 
-          <section className={styles.card} aria-labelledby="pool-create-where">
-            <div className={styles.cardHead}>
-              <h2 id="pool-create-where" className={styles.cardTitle}>2. いまの受け入れ先</h2>
-              <p className={styles.cardSub}>友だちが開く追加先と、現在の受け入れ先です</p>
-            </div>
+          <Card variant="form" aria-labelledby="pool-create-where">
+            <CardHeader size="stacked" titleId="pool-create-where" title="2. いまの受け入れ先" meta="友だちが開く追加先と、現在の受け入れ先です" />
             {selectedAccounts.map((account) => (
-              <div key={account.id} className={styles.account}>
+              <Card key={account.id} layout="horizontal" padding="compact" gap="normal" surface="muted">
                 <span className={styles.accountName} ><TruncatedText value={String(account.name ?? '')} /></span>
                 {accountHandle(account) ? <span className={styles.accountSub}>{accountHandle(account)}</span> : null}
                 <span className={styles.spacer} />
@@ -191,7 +214,7 @@ export default function PoolCreateV8() {
                 >
                   外す
                 </Button>
-              </div>
+              </Card>
             ))}
             {pickerOpen ? (
               <div className={styles.picker}>
@@ -207,29 +230,23 @@ export default function PoolCreateV8() {
             )}
             {inputError?.target === 'pl-add-account' ? <p className={styles.error} role="alert">{inputError.message}</p> : null}
             {accountsError ? (
-              <Notice tone="danger" >{accountsError}{' '}<button type="button" className={styles.retry} onClick={() => void loadAccounts()}>もう一度読み込む</button></Notice>
+              <Notice tone="danger" >{accountsError}{' '}<Button variant="text" onClick={() => void loadAccounts()}>もう一度読み込む</Button></Notice>
             ) : null}
-          </section>
-        </div>
-
-        <aside className={styles.side} aria-label="プレビュー">
-          <section className={styles.card}>
-            <h2 className={styles.cardTitle}>プレビュー</h2>
-            <dl className={styles.facts}>
-              <div className={styles.fact}>
-                <dt>友だち追加URL</dt>
-                <dd>{slugValid ? publicUrl : 'まだURLは発行されていません。「URLに使う名前」を入れて保存すると、正式なURLが発行されます。'}</dd>
-              </div>
-              <div className={styles.fact}>
-                <dt>現在の受け入れ先</dt>
-                <dd>{selectedAccounts.length > 0 ? `${selectedAccounts.map((account) => account.name).join('・')}（有効の所属先からランダムに振り分け）` : '未選択'}</dd>
-              </div>
-            </dl>
-          </section>
-        </aside>
+          </Card>
       </form>
     </SbSettingsScreen>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="入力したプールの内容" busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </></SaveErrorScope>
   )
+}
+
+/** APIと同じowner限定。確認前も入力と変更操作を出さない。 */
+export default function PoolCreateV8() {
+  usePageTitle(TITLE)
+  const role = useStaffRole()
+  if (role !== 'owner') return <SbSettingsScreen boardId="D0AOyx" layout="narrow-nav" title={TITLE} help={DESCRIPTION}>
+    <ReadOnlyNotice>プールを作れるのはオーナーだけです。作成はオーナーに頼んでください。</ReadOnlyNotice>
+    <Button href={LIST_HREF}>プール一覧へ戻る</Button>
+  </SbSettingsScreen>
+  return <PoolCreateBody />
 }

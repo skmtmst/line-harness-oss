@@ -26,6 +26,8 @@ export type NoPermissionBoardProps = {
   /** 戻り先。既定はダッシュボード。 */
   backHref?: string
   backLabel?: string
+  /** 一覧の窓など、その場で戻る呼び出し元の操作。 */
+  onBack?: () => void
 }
 
 export default function NoPermissionBoard({
@@ -36,6 +38,7 @@ export default function NoPermissionBoard({
   capabilitiesHref,
   backHref = '/',
   backLabel = 'ダッシュボードへ戻る',
+  onBack,
 }: NoPermissionBoardProps) {
   return (
     <div data-design-node="O5tUeE" className={styles.board}>
@@ -62,7 +65,7 @@ export default function NoPermissionBoard({
             {capabilitiesHref ? (
               <Button href={capabilitiesHref} variant="secondary"><BookOpen size={15} aria-hidden="true" />役割でできることを見る</Button>
             ) : null}
-            <Button href={backHref} variant="primary"><CircleHelp size={15} aria-hidden="true" />{backLabel}</Button>
+            <Button href={onBack ? undefined : backHref} onClick={onBack} variant="primary"><CircleHelp size={15} aria-hidden="true" />{backLabel}</Button>
           </div>
         </section>
       </div>

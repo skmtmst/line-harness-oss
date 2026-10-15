@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 .band {
   display: flex;
@@ -13,6 +13,6 @@
   font-weight: 400;
   line-height: var(--tpl-ro-band-lh);
 }
-.band > svg { flex-shrink: 0; color: var(--color-action); }
+.band > svg { flex-shrink: 0; color: var(--color-status-info); }
 .band > span { min-width: 0; }
 }

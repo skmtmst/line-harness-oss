@@ -97,25 +97,32 @@ describe('標準ボタンの第1段階移行', () => {
   })
 
   it('リンク先と主要な操作ハンドラを維持する', () => {
-    const all = Object.values(sources).join('\n')
+    // 成果地点は旧の移行対象から外れ、現役V8を使う。行き先の検査は続ける。
+    const all = [...Object.values(sources), readFileSync(join(SRC, 'app/conversions/page.tsx'), 'utf8'), readFileSync(join(SRC, 'v8/inflow-links/new/create.tsx'), 'utf8'), readFileSync(join(SRC, 'v8/tags/list.tsx'), 'utf8'), readFileSync(join(SRC, 'v8/affiliates/affiliators.tsx'), 'utf8'), readFileSync(join(SRC, 'v8/affiliates/offers.tsx'), 'utf8')].join('\n')
     for (const href of [
       '/tags/new',
       '/tags/fields/new',
       '/reminders/new',
-      '/affiliate-offers/new',
       '/conversions/new',
       '/inflow-links/new',
     ]) {
       expect(all).toContain(`href="${href}"`)
     }
+    // 案件の作成は現役V8の窓へ移った。入口と実際に窓を開く処理を守る。
+    const offers = readFileSync(join(SRC, 'v8/affiliates/offers.tsx'), 'utf8')
+    expect(offers).toContain('<CreateButton onClick={openCreate}')
+    expect(offers).toContain('const openCreate = () => { setEditTarget(null); setFormOpen(true) }')
     for (const handler of [
       'onClick={exportCsv}',
-      'onClick={handleCreate}',
-      "onAddFolder={readonly ? undefined : () => setEditingGenre('new')}",
-      'onClick={save}',
-      'onClick={onCancel}',
+      'onClick={() => void doSave()}',
+      "onAddFolder={canManageFolders ? () => setEditingGenre('new') : undefined}",
     ]) {
       expect(all).toContain(handler)
     }
+    const create = readFileSync(join(SRC, 'v8/affiliates/create.tsx'), 'utf8')
+    expect(create).toContain("onClick={() => void runSave('finish')}")
+    expect(create).toContain('const affiliateId = await save()')
+    expect(create).toContain('<Button href={LIST_PATH}>キャンセル</Button>')
+    expect(readFileSync(join(SRC, 'v8/reminders/ui.tsx'), 'utf8')).toContain('onClick={onCancel}')
   })
 })

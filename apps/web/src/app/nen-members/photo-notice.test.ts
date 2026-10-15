@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { photoNoticeFor } from './photo-notice'
+import { photoNoticeFor } from '@/v8/nen-posts/notice'
 
 const FALLBACK = '審査結果を保存できませんでした。'
 

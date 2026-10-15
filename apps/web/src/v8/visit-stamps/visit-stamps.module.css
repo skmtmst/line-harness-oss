@@ -270,46 +270,46 @@
   border: 0;
 }
 
-:global([data-theme='v8']) .table .headRow > th,
-:global([data-theme='v8']) .table .row > td {
+:global(:root) .table .headRow > th,
+:global(:root) .table .row > td {
   height: auto;
   border: 0;
   box-shadow: none;
 }
 
-:global([data-theme='v8']) .table .headRow > th {
+:global(:root) .table .headRow > th {
   padding: var(--tpl-e78-head-pad);
   padding-inline: 0;
   line-height: var(--tpl-e78-sub-lh);
 }
 
-:global([data-theme='v8']) .table .row > td {
+:global(:root) .table .row > td {
   padding-block: 0;
   padding-inline: 0;
 }
 
 /* 表の列：両端は 20、列の間は 16（絵の「表の行」padding 9/13・20、gap 16）。列の幅は中身の幅＋左の余白。 */
-:global([data-theme='v8']) .table .headRow > th,
-:global([data-theme='v8']) .table .row > td {
+:global(:root) .table .headRow > th,
+:global(:root) .table .row > td {
   padding-left: var(--tpl-e78-col-gap);
 }
 
-:global([data-theme='v8']) .table .headRow > th:first-child,
-:global([data-theme='v8']) .table .row > td:first-child {
+:global(:root) .table .headRow > th:first-child,
+:global(:root) .table .row > td:first-child {
   padding-left: var(--tpl-e78-edge);
 }
 
-:global([data-theme='v8']) .table .headRow > th:last-child,
-:global([data-theme='v8']) .table .row > td:last-child {
+:global(:root) .table .headRow > th:last-child,
+:global(:root) .table .row > td:last-child {
   padding-right: var(--tpl-e78-edge);
 }
 
-:global([data-theme='v8']) .table .row {
+:global(:root) .table .row {
   height: var(--tpl-e78-row-h);
   box-shadow: var(--shadow-row-line);
 }
 
-:global([data-theme='v8']) .table .paperLine {
+:global(:root) .table .paperLine {
   height: var(--tpl-e78-paper-row-h);
 }
 

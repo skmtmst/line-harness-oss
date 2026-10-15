@@ -5,6 +5,7 @@
  * - 道具：下書きの札、よく使う絞り込み（並び順は置かない）
  * - 行：編集ボタンと公開中／下書きの札
  */
+import { AffiliateShell } from '@/v8/affiliates/frame'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
@@ -23,7 +24,10 @@ const OFFERS = [
   },
 ]
 
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   api: {
     affiliateOffers: { list: async () => ({ success: true, data: OFFERS }) },
     lineAccounts: { list: async () => ({ success: true, data: [] }) },
@@ -32,12 +36,13 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-vi.mock('./tabs', () => ({
+vi.mock('@/v8/affiliates/display', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/v8/affiliates/display')>(),
   listAllConversionApprovals: async () => ({ items: [], truncated: false }),
   OfferFormModal: () => null,
 }))
 
-const { default: OffersTabV8 } = await import('./v8-offers-tab')
+const { default: OffersTabV8 } = await import('@/v8/affiliates/offers')
 
 afterEach(() => {
   cleanup()
@@ -45,7 +50,7 @@ afterEach(() => {
 
 describe('h7dmB 案件タブの絵合わせ', () => {
   test('数の帯と道具が絵どおり', async () => {
-    render(<OffersTabV8 canEdit registerHeaderActions={() => {}} />)
+    render(<AffiliateShell.Provider value={{ tab: 'offers', readonly: false, narrow: false, accountId: 'acc-1', counts: {}, setCount: () => {}, focusAffiliateId: null }}><OffersTabV8 /></AffiliateShell.Provider>)
     await waitFor(() => {
       expect(screen.getByText('平均報酬')).toBeTruthy()
     })
@@ -57,15 +62,15 @@ describe('h7dmB 案件タブの絵合わせ', () => {
   })
 
   test('行に編集と札が出る', async () => {
-    render(<OffersTabV8 canEdit registerHeaderActions={() => {}} />)
+    render(<AffiliateShell.Provider value={{ tab: 'offers', readonly: false, narrow: false, accountId: 'acc-1', counts: {}, setCount: () => {}, focusAffiliateId: null }}><OffersTabV8 /></AffiliateShell.Provider>)
     await waitFor(() => {
       expect(screen.getAllByText('公開中').length).toBeGreaterThan(0)
     })
     expect(screen.getAllByText('公開中').length).toBeGreaterThan(0)
     expect(screen.getAllByText('下書き').length).toBeGreaterThan(0)
-    expect(screen.queryAllByRole('button', { name: '編集' })).toHaveLength(0)
-    fireEvent.click(screen.getAllByRole('button', { name: /のその他操作$/ })[0])
-    expect(screen.getByRole('menuitem', { name: '編集' })).toBeTruthy()
+    expect(screen.queryAllByRole('button', { name: '編集する' })).toHaveLength(0)
+    fireEvent.click(screen.getAllByRole('button', { name: /の操作$/ })[0])
+    expect(screen.getByRole('menuitem', { name: '編集する' })).toBeTruthy()
     expect(screen.queryByText('停止・終了')).toBeNull()
   })
 })

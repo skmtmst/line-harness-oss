@@ -15,8 +15,9 @@ const FRIENDS = read('app/friends/page.tsx')
 const FRIENDS_BODY = withoutComments(FRIENDS)
 const ROW = read('components/friends/friend-list-row.tsx')
 const ROW_BODY = withoutComments(ROW)
-const SUMMARY = read('components/users/summary-bar.tsx')
+const SUMMARY = read('v8/friends/merged/merged.tsx')
 const SUMMARY_BODY = withoutComments(SUMMARY)
+const SUMMARY_HOOK = read('components/users/use-users-summary.ts')
 const DUPLICATES_BODY = withoutComments(read('app/duplicates/page.tsx'))
 const TOKENS = read('app/globals.css')
 
@@ -61,8 +62,8 @@ describe('統合ユーザー(r7eSi)の指標カードを共通部品へ載せ替
     expect(SUMMARY_BODY).toContain('読み込んでいます')
     expect(SUMMARY_BODY).toContain('読み込めませんでした')
     expect(SUMMARY_BODY).toContain('再読み込み')
-    expect(SUMMARY_BODY, '失敗しても前の数字を残している').toContain('setStats(null)')
-    expect(SUMMARY_BODY, '遅れて返った古い集計を照合していない').toContain(
+    expect(SUMMARY_HOOK, '失敗しても前の数字を残している').toContain('setStats(null)')
+    expect(SUMMARY_HOOK, '遅れて返った古い集計を照合していない').toContain(
       'requestGuard.isCurrent(requestGeneration)',
     )
   })
@@ -80,18 +81,18 @@ describe('重複検出で取れない数を作らない契約', () => {
   it('取れない数は「—」と未接続の説明にする', () => {
     /* #1005: 独自カードをやめて共通 KpiCard の3段へ揃えた。値の「—」と
        短い状態は常時表示、接続待ちの説明は説明アイコンの中へ。 */
-    expect(DUPLICATES_BODY).toContain("import KpiCard from '@/components/shared/kpi-card'")
-    expect(DUPLICATES_BODY).toContain('title="重複配信の削減"')
-    expect(DUPLICATES_BODY).toContain('valueText="—"')
+    expect(DUPLICATES_BODY).toContain('className={styles.kpi}')
+    expect(DUPLICATES_BODY).toContain('重複配信の削減')
+    expect(DUPLICATES_BODY).toContain("emptyValue('unknown')")
     expect(DUPLICATES_BODY).toContain('配信前プレビューの実績')
   })
 
   it('読込中と取得失敗を状態の言葉でそろえる', () => {
-    expect(DUPLICATES_BODY).toContain('読み込んでいます')
+    expect(DUPLICATES_BODY).toContain('aria-busy={d.candidatesLoading}')
     expect(DUPLICATES_BODY).toContain('読み込めませんでした')
     // ★V7 `x63W5x`：失敗の1枚は共通部品の error（副ボタン「もう一度読み込む」つき）。
     // 文言は部品が持つ。ここでは口（`onRetry`）があることだけ見る。
-    expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('onRetry={() => void loadCandidates()}')
+    expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('onClick={() => void (d.data ? d.loadCandidates() : d.load())}')
     expect(DUPLICATES_BODY).not.toContain('読み込み中…')
     expect(DUPLICATES_BODY).not.toContain('集計の取得に失敗しました')
   })

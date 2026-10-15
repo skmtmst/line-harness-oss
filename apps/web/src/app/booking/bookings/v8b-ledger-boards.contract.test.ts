@@ -29,8 +29,12 @@ describe('V8-B 予約台帳・運営の板の印', () => {
   })
 
   it('6桁の確認（tOPeY）は6マスの入力に付く', () => {
-    const twoFactor = src('app', 'login', 'two-factor', 'page.tsx')
-    expect(twoFactor).toContain('data-design-node="tOPeY"')
+    const entry = src('app', 'login', 'two-factor', 'page.tsx')
+    expect(entry).toContain('<OpsTwoFactorV8')
+    const twoFactor = src('v8', 'login', 'two-factor-ops.tsx')
+    expect(twoFactor).toContain("boardId={recovery ? undefined : 'tOPeY'}")
+    expect(src('components', 'templates', 'auth-page.tsx')).toContain('cardNode={boardId}')
+    expect(src('components', 'auth', 'auth-card.tsx')).toContain('data-design-node={cardNode}')
     expect(twoFactor).toContain('<OtpInput')
   })
 })

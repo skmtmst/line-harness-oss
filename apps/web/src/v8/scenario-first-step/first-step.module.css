@@ -14,25 +14,6 @@
 .viewerBand { margin: 0; }
 
 /* 段（カード）：枠1・角12・余白20・中の間14。共通カードの枠（1）は内側に入るので、余白は 20−1。 */
-.card {
-  gap: var(--tpl-section-gap);
-  min-width: 0;
-}
-:global([data-theme='v8']) .card {
-  padding: var(--tpl-cfl-card-pad);
-}
-.cardHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-cfl-head-gap);
-}
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-card-title-size);
-  font-weight: 700;
-  line-height: var(--tpl-cfl-title-lh);
-}
 .cardDesc {
   margin: 0;
   color: var(--color-ink-faint);
@@ -143,25 +124,6 @@
 }
 .kindBody {
   max-width: var(--tpl-cfl-image-w);
-}
-
-.bodyField {
-  display: block;
-  width: 100%;
-  height: var(--tpl-cfl-body-h);
-  padding: var(--tpl-cfl-body-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: var(--tpl-row-name-lh);
-  resize: vertical;
-}
-.bodyField:focus-visible {
-  outline-color: var(--color-accent);
 }
 
 /* 差し込み：小さな札（余白2/8・角6・12/18）。右端に字数。 */

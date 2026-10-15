@@ -1,8 +1,12 @@
 'use client'
 
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
+import Avatar from './avatar'
 import React from 'react'
+import { recordTableColumns } from './record-table-columns'
 import { useTableActionWidth } from './use-table-action-width'
+import { useListRowDensity } from './use-list-row-density'
+import { useListColumnSizing } from './use-list-column-sizing'
 import { useListUrlState } from './list-url-state'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import TruncatedText from './truncated-text'
@@ -11,12 +15,10 @@ import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
 import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { DelayedSkeleton, ListSkeleton } from './skeleton'
 import presentationStyles from './table-presentation.module.css'
 import PageLink, { RowNavigation, useListNavigationHref } from './list-navigation'
 import { isRowControl } from './destination-policy'
-
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
   className?: string
@@ -128,12 +130,13 @@ export function DataTable({
   columnLayout,
   'aria-label': ariaLabel,
   grid,
+  columnSizing,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
   /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
-  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery'
+  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery' | 'template-list'
   /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
   density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
   /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */
@@ -141,15 +144,20 @@ export function DataTable({
   label?: string
   'aria-label'?: string
   /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
-  columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string }
+  columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string; collapseScope?: 'page' }
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
-  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
+  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string; headTextSize?: string; bodyTextSize?: string }
+  /** 名前へ残りを配る。contentは補助列の内容幅、controlsは札・操作だけ最低必要幅を確保。 */
+  columnSizing?: 'content' | 'controls'
 }) {
   const actionWidthRef = useTableActionWidth<HTMLDivElement>()
+  useListRowDensity(actionWidthRef)
+  useListColumnSizing(actionWidthRef, columnSizing !== undefined)
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
+  columns ??= tableDensity && !grid && !columnLayout ? recordTableColumns(children) : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div ref={actionWidthRef} data-shared-part="list-table" className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
+    <div ref={actionWidthRef} data-shared-part="list-table" data-column-sizing={columnSizing} className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
@@ -168,11 +176,12 @@ export function DataTable({
         '--table-grid-gap':grid.gap,
         '--table-grid-row-height':grid.rowHeight,
         '--table-head-padding': grid.headPadding,
+        '--table-head-text-size': grid.headTextSize ?? 'var(--tpl-sb-tbl-head)',
+        '--table-body-text-size': grid.bodyTextSize ?? 'var(--tpl-sb-tbl-head)',
       } as CSSProperties : undefined}>{children}</table>
     </div>
   )
 }
-
 export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
   className?: string
@@ -244,6 +253,11 @@ export function RowNameLink({ onOpen, onClick, ...props }: React.ComponentProps<
   }} />
 }
 
+/** 名前から既存の詳細を開く操作。行き先の切り替え方は画面が保つ。 */
+export function RowNameButton({ className, selected, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }) {
+  return <button type="button" aria-pressed={selected} {...props} className={[styles.rowNameLink, className].filter(Boolean).join(' ')} />
+}
+
 export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'children' | 'className'> & {
   children?: ReactNode
   align?: 'left' | 'right' | 'center'
@@ -263,15 +277,43 @@ export function Td({ children, align = 'left', className, collapseAt, grow, ...c
   return <td className={classes} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
 }
 
-/** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, folder, className }: {
+/** 日時の本文セル。数字の桁と補足色は共通部品が持つ。 */
+export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>) {
+  return <Td {...cellProps} className={styles.dateCell}>{children}</Td>
+}
+
+/** 顔と名前を同じ1行に保つ。狭い列では名前だけを省略する。 */
+export function PersonCell({ name, avatarName, avatarSrc, ...cellProps }: Omit<TdProps, 'children'> & {
   name: ReactNode
+  avatarName?: string | null
+  avatarSrc?: string | null
+}) {
+  return <Td {...cellProps} data-list-person-cell><span className={styles.person}>
+    <Avatar name={avatarName} src={avatarSrc} size={24} />
+    <span className={styles.personName}>{name}</span>
+  </span></Td>
+}
+
+/** B-194: states belong to their column; stacked badges keep the 60px row. */
+export function StatusCell({ primary, children, ...cellProps }: Omit<TdProps, 'className'> & { primary?: ReactNode }) {
+  return <Td {...cellProps} className={shell.statusCell} data-list-status-cell><div className={shell.statusStack}>{primary ? <span className={shell.statusPrimary}>{primary}</span> : null}{children}</div></Td>
+}
+
+/** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
+export function NameCell({ name, folder, annotation, selection, className, grow }: {
+  name: ReactNode
+  /** 名前の横の状態札。名前やリンクの中には入れない。 */
+  annotation?: ReactNode
+  /** Selection stays outside the truncatable name, including its context menu. */
+  selection?: ReactNode
   folder?: FolderDotFolder | null
   className?: string
+  /** 列の余りを名前へ配る。見出しの Th と同じ役割を渡す。 */
+  grow?: boolean
 }) {
   return (
-    <td data-list-name-cell="" className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
-      <div className={shell.name}><FolderDotName folder={folder}>{name}</FolderDotName></div>
+    <td data-list-name-cell="" data-cell-grow={grow || undefined} className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
+      <div className={shell.name}><FolderDotName folder={folder} annotation={annotation} selection={selection}>{name}</FolderDotName></div>
     </td>
   )
 }
@@ -365,8 +407,7 @@ export function TableStateRow({
   retryLabel?: string
   error?: unknown
 }) {
-  const v8 = useAdminTheme() === 'v8'
-  if (kind === 'loading' && v8) return <tr><td colSpan={colSpan} aria-busy="true" aria-label={title ?? TABLE_STATE_TEXT.loading.title}><DelayedSkeleton loading skeleton={<ListSkeleton columns={colSpan} />} /></td></tr>
+  if (kind === 'loading') return <tr><td colSpan={colSpan} aria-busy="true" aria-label={title ?? TABLE_STATE_TEXT.loading.title}><DelayedSkeleton loading skeleton={<ListSkeleton columns={colSpan} />} /></td></tr>
   const text = TABLE_STATE_TEXT[kind]
   const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面') : null
   return (

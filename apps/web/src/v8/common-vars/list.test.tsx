@@ -2,7 +2,7 @@
 /*
  * V8 共通情報の一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
  * 行が出る・札で絞れる・行の「…」から止める窓と削除の窓が開く（板 Hhl9M・xxKtW）・
- * 閲覧のみでは帯が出て作るボタンを出さない・空のまま使われている帯の「直す」で絞れる。
+ * 閲覧のみでは帯が出て作るボタンを出さない・空のまま使われている帯の「編集する」で絞れる。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -142,6 +142,27 @@ function buttonByText(text: string): HTMLElement {
 }
 
 describe('V8 共通情報の一覧（src/v8）の動き', () => {
+  it('未入力と取得できない数を分け、実値の0を残す', async () => {
+    // 使用先の列が出る1440相当。狭い板ではこの列を詳細へ畳む。
+    const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+      matches:false, media:query, onchange:null,
+      addEventListener:vi.fn(), removeEventListener:vi.fn(),
+      addListener:vi.fn(), removeListener:vi.fn(), dispatchEvent:vi.fn(()=>true),
+    }))
+    try {
+      listVars.mockResolvedValue({success:true,data:[{...company,usageCount:undefined},contact,{...notice,value:'0'}]})
+      act(() => { root.render(<CommonVarsListV8 />) })
+      await flush()
+      const rows = [...host.querySelectorAll('tbody tr')]
+      const companyRow = rows.find(row=>row.textContent?.includes('会社名'))!
+      expect(companyRow.querySelector('[title="使われている場所を取得できていません"]')?.textContent).toBe('—')
+      expect(rows.find(row=>row.textContent?.includes('問い合わせ先'))?.textContent).toContain('未設定')
+      const zeroRow = rows.find(row=>row.textContent?.includes('臨時のお知らせ'))!
+      expect([...zeroRow.querySelectorAll('td')].some(cell=>cell.textContent==='0')).toBe(true)
+      expect(zeroRow.textContent).toContain('なし')
+      expect(host.textContent).not.toContain('—（未取得）')
+    } finally { media.mockRestore() }
+  })
   it('行が出て、数の帯と空のままの帯が出る', async () => {
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
@@ -164,11 +185,11 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     expect(host.textContent).toContain('株式会社NEN')
   })
 
-  it('空のままの帯の「直す」で、空のものだけに絞る', async () => {
+  it('空のままの帯の「編集する」で、空のものだけに絞る', async () => {
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
-    const fix = [...host.querySelectorAll('[role="status"] button')].find((b) => b.textContent === '直す') as HTMLButtonElement
-    expect(fix, '帯の「直す」がありません').toBeTruthy()
+    const fix = [...host.querySelectorAll('[role="status"] button')].find((b) => b.textContent === '編集する') as HTMLButtonElement
+    expect(fix, '帯の「編集する」がありません').toBeTruthy()
     act(() => { fix.click() })
     await flush()
     expect(host.textContent).not.toContain('株式会社NEN')
@@ -187,6 +208,12 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
   })
 
   it('行の「…」から削除の窓（xxKtW）が開き、使われているものは「まだ消せません」', async () => {
+    const original = await deleteImpact()
+    deleteImpact.mockResolvedValue({ ...original, data: {
+      ...original.data,
+      historicalTotal: 1,
+      items: [...original.data.items, { kind: 'broadcast', kindLabel: '一斉配信', name: '送信済みのお知らせ', status: '配信済み', href: '/broadcasts/edit?id=sent', blocksDeletion: false, currentPreview: '' }],
+    } })
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
     act(() => { buttonByLabel('共通情報「会社名」の操作').click() })
@@ -196,16 +223,24 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     expect(document.body.textContent).toContain('「会社名」はまだ消せません')
     expect(document.body.textContent).toContain('どうしますか')
     expect(document.body.textContent).toContain('消さずに止める')
+    expect(document.body.textContent).toContain('送信済みの配信はこれから変わりません')
+    expect(document.body.textContent).toContain('送信済みのお知らせ')
+    expect(document.querySelector('a[href="/broadcasts/edit?id=sent"]')).toBeNull()
+    expect(document.querySelector('a[href="/broadcasts/edit?id=b1"]')).not.toBeNull()
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
-  it('閲覧のみ（staff）では帯が出て、作るボタンと行の「…」は出さない', async () => {
+  it('閲覧のみ（staff）では帯が出て、作成・変更は隠しコピーだけを使える', async () => {
     staffRole.value = 'staff'
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
     const create = [...host.querySelectorAll('button, a')].filter((b) => b.textContent?.includes('共通情報を作る'))
     expect(create).toHaveLength(0)
-    expect(host.querySelector('button[aria-label^="共通情報「"][aria-label$="」の操作"]')).toBeNull()
+    act(() => { buttonByLabel('共通情報「会社名」の操作').click() })
+    await flush()
+    const menu = document.querySelector('[role="menu"]')!
+    expect(menu.textContent).toContain('差し込みキーをコピー')
+    for (const label of ['編集', '止める', '削除する', '再開する']) expect(menu.textContent).not.toContain(label)
   })
 })

@@ -11,6 +11,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccountsPage from './page'
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-a', loading: false }) }))
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -19,13 +20,13 @@ vi.hoisted(() => {
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/accounts',
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
   usePageChrome: () => ({}),
 }))
@@ -75,6 +76,8 @@ const originalFetch = globalThis.fetch
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 beforeEach(() => {
+  document.documentElement.dataset.theme='v8'
+  window.history.replaceState(null,'','/accounts')
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -85,6 +88,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   container.remove()
+  document.documentElement.removeAttribute('data-theme')
   globalThis.fetch = originalFetch
   vi.restoreAllMocks()
 })
@@ -110,7 +114,7 @@ describe('R520 アカウント一覧の取得失敗中の集計（本物のReact
     // 3 つの集計は未取得と真の 0 件を見分けられる形にする。
     const text = kpis()?.textContent ?? ''
     expect(text).toContain('—')
-    expect(text).toContain('読み込めませんでした')
+    expect(container.textContent).toContain('読み込めませんでした')
     expect(text).not.toMatch(/[0-9]/)
 
     // 一覧の合計も 0 件と出さない。
@@ -130,10 +134,11 @@ describe('R520 アカウント一覧の取得失敗中の集計（本物のReact
 
     const text = kpis()?.textContent ?? ''
     // 稼働中 1・停止中 1・アーカイブ 0（板 V7vn3 の3枚だけ）。
-    expect(text).toContain('稼働中')
-    expect(text).toContain('停止中')
-    expect(text).toContain('アーカイブ')
-    expect(text).not.toContain('接続に問題')
-    expect(container.textContent ?? '').toContain('2件中 1〜2件を表示')
+    for (const label of ['つないでいる','有効','接続に問題','友だちの合計']) expect(text).toContain(label)
+    const cards=kpis()?.children;
+    expect(cards?.[0]?.textContent).toContain('2');
+    expect(cards?.[1]?.textContent).toContain('1');
+    expect(cards?.[2]?.textContent).toContain('0');
+    expect(cards?.[3]?.textContent).toContain('10');
   })
 })

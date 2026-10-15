@@ -20,68 +20,12 @@
 }
 .otherBox :global(*) { max-width: 100%; }
 .otherBox :global(button) { width: 100%; }
-.viewToggle {
-  display: flex;
-  align-items: center;
-  height: var(--tpl-fm-control-h);
-  overflow: hidden;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-}
-.viewButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-fm-control-h);
-  height: 100%;
-  border: 0;
-  background: none;
-  color: var(--color-ink-faint);
-  cursor: pointer;
-}
-.viewButtonActive {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-}
 .moreNote {
   margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
 }
 
-/* 札の格子。 */
-.cards {
-  margin-top: var(--tpl-ev-md-grid-top);
-  padding: var(--tpl-ev-md-grid-pad);
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tpl-rule-row-gap);
-  min-width: 0;
-}
-.rows {
-  padding: var(--tpl-ev-md-grid-pad);
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-toolbar-gap);
-  min-width: 0;
-}
-.card,
-.row {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-.row {
-  flex-direction: row;
-  align-items: stretch;
-}
 .thumbButton {
   display: flex;
   align-items: center;
@@ -114,20 +58,16 @@
   flex: 1 1 0;
   flex-direction: column;
   min-width: 0;
-  padding: var(--tpl-rule-row-gap);
 }
 .nameRow {
   display: flex;
   align-items: center;
   gap: var(--tpl-toolbar-gap);
   min-width: 0;
-  padding-right: var(--tpl-fm-menu-size);
-  margin-bottom: var(--tpl-rule-row-gap);
 }
 .nameDot {
   display: inline-flex;
   flex-shrink: 0;
-  margin-left: calc(var(--tpl-compact-gap) * -1);
 }
 .fileName {
   flex: 1 1 0;
@@ -158,7 +98,7 @@
   white-space: nowrap;
 }
 .usage {
-  margin: var(--tpl-ev-md-usage-top) 0 0;
+  margin: 0;
   overflow: hidden;
   font-size: var(--text-micro);
   line-height: var(--tpl-row-sub-lh);
@@ -167,11 +107,6 @@
 }
 .usageIdle { color: var(--color-ink-faint); }
 .usageUsed { color: var(--color-ink-secondary); }
-.cardFoot {
-  position: absolute;
-  top: var(--tpl-toolbar-gap);
-  right: var(--tpl-toolbar-gap);
-}
 .menuWrap {
   position: relative;
   display: inline-flex;
@@ -240,13 +175,6 @@
   align-items: center;
   gap: var(--tpl-rule-row-gap);
   min-width: 0;
-}
-.selectAll {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-wh-ops-gap);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
 }
 
 /* 見るだけの人の帯（見出しの下・数の帯の上）。 */

@@ -317,6 +317,11 @@ describe('POST /api/booking/admin/bookings', () => {
 
   function happyDb(insertChanges = 1) {
     return scriptedDb([
+      ['SELECT line_account_id, friend_id, staff_id, menu_id, starts_at,', { first: {
+        line_account_id: 'acc1', friend_id: 'f1', staff_id: 's1', menu_id: 'm1',
+        starts_at: validBody.starts_at, notification_policy_snapshot: '{}',
+      } }],
+      ['UPDATE booking_operation_runs SET opened_at', { run: { meta: { changes: 1 } } }],
       ['FROM friends', { first: { id: 'f1', is_following: 1 } }],
       ['FROM staff WHERE', { first: { ok: 1 } }],
       [

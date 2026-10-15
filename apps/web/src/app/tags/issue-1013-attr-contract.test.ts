@@ -11,10 +11,10 @@ import { describe, expect, it } from 'vitest'
 const root = resolve(process.cwd(), 'src')
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
-const FIELD_LIST = read('components/friend-fields/field-list.tsx')
-const MARK_LIST = read('components/friend-fields/mark-list.tsx')
-const MARK_EDITOR = read('components/friend-fields/support-mark-editor.tsx')
-const SEARCH_LIST = read('components/friend-fields/saved-search-list.tsx')
+const FIELD_LIST = read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx')
+const MARK_LIST = read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx')
+const MARK_EDITOR = read('v8/tags/mark-editor.tsx')
+const SEARCH_LIST = read('v8/tags/searches-tab.tsx') + read('components/friend-fields/saved-search-list.tsx')
 const SEARCH_EDIT = read('app/tags/searches/edit/page.tsx')
 const MIGRATE = read('app/tags/fields/migrate/page.tsx')
 const CSV_DIALOG = read('components/friend-fields/tag-csv-import-dialog.tsx')
@@ -57,7 +57,7 @@ describe('ATTR-05: 既存の情報欄を編集できる入口がある', () => {
     expect(page).toContain('差し込みの名前（変えられません）')
     expect(page).toContain('種類は変えられません')
     expect(page).toContain("if (mode === 'create' && !keyTouched) setFieldKey")
-    expect(page).toContain('{field?.fieldKey}</span>')
+    expect(page).toMatch(/<AffixedTextField[^>]*readOnly[^>]*value=\{field\?\.fieldKey \?\? ''\}/)
     // 変更できる項目: 名前・選択肢・既定値・保護・使用状況
     for (const label of ['項目名', '既定値', '個人情報として保護', 'EC側の値を正とする']) {
       expect(page).toContain(label)
@@ -74,10 +74,10 @@ describe('ATTR-06: マーク作成と自動ルールの有効化を分ける', (
     expect(MARK_EDITOR).toContain('const [createRule, setCreateRule] = useState(false)')
     expect(MARK_EDITOR).not.toContain('const [createRule, setCreateRule] = useState(true)')
     // 利用者が「＋ ルールを作る」を押したときだけルールを作る。
-    expect(MARK_EDITOR).toContain('＋ ルールを作る')
-    expect(MARK_EDITOR).toContain('ルールを外す')
+    expect(MARK_EDITOR).toContain('きまりを作る')
+    expect(MARK_EDITOR).toContain('きまりを外す')
     // 有効化も利用者が選ぶ（外せる・無効のまま登録できる）。
-    expect(MARK_EDITOR).toContain('このルールを有効にして登録する')
+    expect(MARK_EDITOR).toContain('このきまりを有効にして登録する')
     expect(MARK_EDITOR).toContain('isActive: ruleActive')
   })
 })

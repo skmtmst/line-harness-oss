@@ -152,7 +152,7 @@ describe('部品のCSS境界', () => {
     expect(read('button.module.css')).toMatch(/\.button\[hidden\]\s*\{[^}]*display:\s*none;/s)
     expect(read('kpi-card.module.css')).toMatch(/\.card\[hidden\]\s*\{[^}]*display:\s*none;/s)
     expect(read('table.module.css')).toMatch(/\.cell\[hidden\][^{]*\{[^}]*display:\s*none;/s)
-    expect(read('button.module.css')).toMatch(/\.button:focus-visible\s*\{[^}]*outline:\s*revert;/s)
+    expect(read('button.module.css')).toMatch(/:root \.button:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--color-focus-ring\);/s)
     expect(read('kpi-card.module.css')).toMatch(/\.link:focus-visible\s*\{[^}]*outline:\s*revert;/s)
   })
 

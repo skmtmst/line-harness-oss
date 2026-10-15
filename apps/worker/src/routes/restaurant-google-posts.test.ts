@@ -224,7 +224,7 @@ beforeEach(async () => {
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
     { id: 'account-2', name: '渋谷店', is_active: 1, channel_access_token: 'token-2' },
   ];
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
   googleCalls = [];
   googlePostsOnGoogle = [];
@@ -671,7 +671,7 @@ describe('Instagram 同時投稿', () => {
     expect(graphPaths()).toEqual(['ig-1/media', 'ig-1/media_publish', 'ig-media-1']);
     expect(body.post.status).toBe('published');
     expect(body.post.instagram).toMatchObject({ status: 'published', permalink: 'https://www.instagram.com/p/abc123/', error: null });
-    expect(logSpy.mock.calls.flat().some((line) => String(line).includes('restaurant.google.post.instagram_retry'))).toBe(true);
+    expect(testDb.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='restaurant.google.post.instagram_retry'").get()).toEqual({ n: 1 });
   });
 
   it('再送できない状態（公開済み・Instagramへ出さない設定・未公開）は409で断る', async () => {

@@ -66,10 +66,10 @@ const settle = async () => { for (let i = 0; i < 8; i += 1) await act(async () =
 
 it('UI1-OPS-C01 担当取得失敗時は選択を残し、読み直し成功と案内しない',async()=>{
  const {ApiError}=await import('@/lib/api');net.updateMenu.mockRejectedValue(new ApiError(409,'version_conflict','version_conflict'));
- render(<MenuFormV8/>);await settle();const staff=()=>screen.getByRole('button',{name:/高田/});expect(staff().getAttribute('aria-pressed')).toBe('true');
+ render(<MenuFormV8/>);await settle();const staff=()=>screen.getByRole('checkbox',{name:/高田/}) as HTMLInputElement;expect(staff().checked).toBe(true);
  fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'),{target:{value:'編集した名前'}});
  fireEvent.click(screen.getByRole('button',{name:'変更を保存する'}));await settle();net.bulk.mockRejectedValueOnce(new Error('fixture bulk unavailable'));
- fireEvent.click(screen.getByRole('button',{name:/最新.*読み込/}));await settle();expect(staff().getAttribute('aria-pressed')).toBe('true');
+ fireEvent.click(screen.getByRole('button',{name:/最新.*読み込/}));await settle();expect(staff().checked).toBe(true);
  const {notifyToast}=await import('@/components/shared/toast');expect(notifyToast).not.toHaveBeenCalledWith('最新の内容を読み込みました');expect(screen.getByDisplayValue('編集した名前')).toBeTruthy();expect(net.putStaffMenus).not.toHaveBeenCalled();
 });
 

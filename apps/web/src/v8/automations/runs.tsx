@@ -17,12 +17,13 @@ import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell, RowNameButton } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowActions } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import StatusBadge from '@/components/shared/status-badge'
 import {
   AUTOMATIONS_DESCRIPTION,
   AutomationBand,
@@ -111,10 +112,10 @@ const STEP_STATUS_LABEL: Record<AutomationRunDetail['steps'][number]['status'], 
   cancelled: '取りやめ',
 }
 
-function statusTone(status: RunStatus): 'active' | 'danger' | 'warn' | 'neutral' {
-  if (status === 'succeeded') return 'active'
+function statusTone(status: RunStatus): 'success' | 'danger' | 'warning' | 'neutral' {
+  if (status === 'succeeded') return 'success'
   if (status === 'permanent_failed' || status === 'partial') return 'danger'
-  if (status === 'retry_wait' || status === 'queued' || status === 'claimed' || status === 'waiting') return 'warn'
+  if (status === 'retry_wait' || status === 'queued' || status === 'claimed' || status === 'waiting') return 'warning'
   return 'neutral'
 }
 
@@ -147,13 +148,13 @@ function runsSearchUrl(pathname: string, currentParams: string, value: string): 
 function TableHead() {
   return (
     <thead>
-      <TableHeadRow className={styles.headRow} data-table-layout="columns">
-        <Th className={styles.colWhen}>いつ・だれに</Th>
+      <TableHeadRow data-table-layout="columns">
+        <Th grow>いつ・だれに</Th>
         <Th className={styles.colRule}>オートメーション</Th>
         <Th className={styles.colResult}>結果</Th>
         <Th className={styles.colDone}>したこと</Th>
         <Th className={styles.colTime} align="right">かかった時間</Th>
-        <Th className={styles.colOps}>操作</Th>
+        <Th>操作</Th>
       </TableHeadRow>
     </thead>
   )
@@ -185,7 +186,6 @@ export default function AutomationRunsV8() {
   const includeTest = saved === 'include-test'
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [runId, setRunId] = useDetailPanelUrl('run')
   const [selectedRun, setSelectedRunState] = useState<AutomationRunRow | null>(null)
   const setSelectedRun = (run: AutomationRunRow | null | ((current: AutomationRunRow | null) => AutomationRunRow | null)) => {
@@ -428,7 +428,7 @@ export default function AutomationRunsV8() {
 
   /* 行の「…」：中身を見る・もう一度やる（やり直せる失敗のとき）・ルールを開く・トークを開く。 */
   const rowMenuItems = (run: AutomationRunRow): ActionMenuItem[] => [
-    { id: 'open', label: '中身を見る', onSelect: () => setSelectedRun(run) },
+    { id: 'open', label: "実行の記録を見る", onSelect: () => setSelectedRun(run) },
     ...(canOperate && run.canRetry
       ? [{ id: 'retry', label: 'もう一度やる', disabled: retryingId !== null, onSelect: () => void retryRun(run) }]
       : []),
@@ -472,9 +472,9 @@ export default function AutomationRunsV8() {
   )
   const toolbar = (
     <>
-      <div className={styles.noticeRow}>
-        <Notice tone="info">「もう一度やる」は、やり直せる失敗（一時的な送信の失敗など）だけに出ます。ブロック中など原因を直す必要があるものには出ません。条件に外れたものは、ルールの「だれに」に当てはまらなかった人です。</Notice>
-      </div>
+      {canExport && data && data.pagination.total > 5000 ? (
+        <div className={styles.noticeRow}><Notice tone="warn">CSVは5,000件までしか出ません。期間や絞り込みで分けて出してください。</Notice></div>
+      ) : null}
       {notice ? <div className={styles.noticeRow}><Notice tone="info" role="status">{notice}</Notice></div> : null}
       <ListToolbar
         search={{ placeholder: '友だち・ルールの名前で探す', label: '友だちの名前・オートメーションの名前で探す', width: 240, value: query, onChange: changeQuery }}
@@ -509,7 +509,7 @@ export default function AutomationRunsV8() {
     listBody = (
       <>
         <div className={styles.tableWrap}>
-          <DataTable className={styles.table}>
+          <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <TableHead />
             <tbody>
               {data.items.map((run) => {
@@ -517,13 +517,13 @@ export default function AutomationRunsV8() {
                 const reason = resultReason(run)
                 const whenLine = [shortDateTime(run.occurredAt), run.accountLabel].filter(Boolean).join('・')
                 const versionLine = `v${run.versionNumber}${run.isTest ? '・テスト' : ''}`
-                const menuLabel = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」の操作`
+                const subjectName = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」`
                 return (
-                  <Tr key={run.id} className={styles.row} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}>
-                    <Td className={styles.colWhen}>
-                      <button type="button" className={styles.subject} onClick={() => setSelectedRun(run)}>
+                  <Tr key={run.id} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}>
+                    <Td grow>
+                      <RowNameButton title={run.subject ?? "友だち名なし"} onClick={() => setSelectedRun(run)}>
                         {run.subject ?? '友だち名なし'}
-                      </button>
+                      </RowNameButton>
                       <span className={styles.sub}>{whenLine}</span>
                     </Td>
                     <Td className={styles.colRule}>
@@ -531,28 +531,17 @@ export default function AutomationRunsV8() {
                       <span className={styles.sub}>{versionLine}</span>
                     </Td>
                     <Td className={styles.colResult}>
-                      <span className={styles.pill} data-tone={statusTone(run.status)}>
-                        <span className={styles.pillDot} aria-hidden="true" />
-                        {STATUS_LABEL[run.status]}
-                      </span>
+                      <StatusBadge tone={statusTone(run.status)}>{STATUS_LABEL[run.status]}</StatusBadge>
                       {reason ? <span className={styles.sub} title={reason}>{reason}</span> : null}
                     </Td>
                     <Td className={styles.colDone}>
                       <span className={styles.main} title={done.join('・') || run.detail || ''}>{done.length > 0 ? done.join('・') : emptyValue('unknown')}</span>
                       {done.length > 0 ? <span className={styles.sub}>{`${done.length} つ`}</span> : null}
                     </Td>
-                    <Td className={styles.colTime}><span className={styles.main}>{durationText(run.durationMs)}</span></Td>
-                    <Td className={styles.colOps}>
-                      <div className={styles.opsBox}>
-                        <Button onClick={() => setSelectedRun(run)}>中身を見る</Button>
-                        <RowMenu
-                          label={menuLabel}
-                          open={openMenuId === run.id}
-                          onOpenChange={(next) => setOpenMenuId(next ? run.id : null)}
-                          items={rowMenuItems(run).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
-                        />
-                      </div>
-                    </Td>
+                    <Td align="right" className={styles.colTime}><span className={styles.main}>{durationText(run.durationMs)}</span></Td>
+                    <ActionCell>
+                      <RowActions subjectName={subjectName} detail={{ label: '中身を見る', onClick: () => setSelectedRun(run) }} menuItems={rowMenuItems(run)} />
+                    </ActionCell>
                   </Tr>
                 )
               })}
@@ -567,12 +556,7 @@ export default function AutomationRunsV8() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const pager = status === 'ready' && data && data.items.length > 0 ? (
     <>
-      <div className={styles.pagerRow}>
-        <span className={styles.pagerCount}>
-          {`${formatNumber(total)} 件中 ${data.pagination.offset + 1}〜${data.pagination.offset + data.items.length} 件`}
-        </span>
-        {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="動いた記録のページ送り" /> : null}
-      </div>
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="動いた記録のページ送り" range={{ total, first: data.pagination.offset + 1, last: data.pagination.offset + data.items.length }} />
     </>
   ) : null
 
@@ -587,6 +571,8 @@ export default function AutomationRunsV8() {
   return (
     <ListPage
       help={<>{AUTOMATIONS_DESCRIPTION}{"行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"}</>}
+      noticeSpacing="section"
+      explanation="「もう一度やる」は、やり直せる失敗（一時的な送信の失敗など）だけに出ます。ブロック中など原因を直す必要があるものには出ません。条件に外れたものは、ルールの「だれに」に当てはまらなかった人です。"
       boardId="g98F9"
       headingSize="regular"
       title="オートメーション"

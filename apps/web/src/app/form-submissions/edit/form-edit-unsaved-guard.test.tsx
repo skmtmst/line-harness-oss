@@ -18,14 +18,15 @@ import { emptyLayout } from '@line-crm/shared'
 
 const navigation = vi.hoisted(() => ({
   pathname: '/form-submissions/edit',
-  query: 'id=form-1&tab=basic',
+  query: 'id=form-1&tab=appearance',
   push: vi.fn(),
   replace: vi.fn(),
   back: vi.fn(),
   refresh: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => navigation,
   usePathname: () => navigation.pathname,
   useSearchParams: () => new URLSearchParams(navigation.query),
@@ -141,8 +142,8 @@ let root: Root
 
 beforeEach(() => {
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-  window.history.replaceState(null, '', '/form-submissions/edit?id=form-1&tab=basic')
-  navigation.query = 'id=form-1&tab=basic'
+  window.history.replaceState(null, '', '/form-submissions/edit?id=form-1&tab=appearance')
+  navigation.query = 'id=form-1&tab=appearance'
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -164,7 +165,7 @@ async function show(over: Partial<ApiForm> = {}) {
 }
 
 function nameInput(): HTMLInputElement {
-  const input = host.querySelector<HTMLInputElement>('#fm-name')
+  const input = host.querySelector<HTMLInputElement>('#fe-name')
   expect(input, 'フォーム名の欄がある').toBeTruthy()
   return input!
 }
@@ -211,7 +212,7 @@ describe('フォーム編集の未保存ガード（FORM-19）', () => {
   it('変更中に一覧のパンくずを押すと確認が出て、まだ移動しない（FORM-19a）', async () => {
     await show()
     await editName('書きかけの名前')
-    await click(anchor('回答フォーム'))
+    await click(anchor('キャンセル'))
     expect(bodyText()).toContain('保存していない変更があります')
     expect(navigation.push).not.toHaveBeenCalled()
     // まだ画面に残っているので、書きかけの内容もそのまま。
@@ -221,32 +222,38 @@ describe('フォーム編集の未保存ガード（FORM-19）', () => {
   it('「保存せずに移る」は入力を保存済みの状態へ戻してから移動する（FORM-19b）', async () => {
     await show()
     await editName('書きかけの名前')
-    await click(anchor('回答フォーム'))
+    await click(anchor('キャンセル'))
     await click(dialogButton('保存せずに移る'))
     expect(navigation.push).toHaveBeenCalledWith('/form-submissions')
     // 移動が画面を外さない場合でも「消えます」と言った変更は戻っている。
     expect(nameInput().value).toBe('読み込んだフォーム名')
   })
 
-  it('同じページ内のタブ移動でも、破棄してから移動する（FORM-19b）', async () => {
+  it('同じ編集ページのタブでは入力を保ち、その後の離脱では破棄して移動する（FORM-19b）', async () => {
     await show()
     await editName('書きかけの名前')
-    await click(anchor('デザイン設定'))
+    const tab = [...host.querySelectorAll('[role="tab"]')].find((el) => el.textContent === '中身')!
+    await click(tab)
+    expect(bodyText()).not.toContain('保存していない変更があります')
+    const appearance = [...host.querySelectorAll('[role="tab"]')].find((el) => el.textContent === '受付と見た目')!
+    await click(appearance)
+    expect(nameInput().value).toBe('書きかけの名前')
+    await click(anchor('キャンセル'))
     expect(bodyText()).toContain('保存していない変更があります')
     await click(dialogButton('保存せずに移る'))
-    expect(navigation.push).toHaveBeenCalledWith('/form-submissions/edit?id=form-1&tab=design')
+    expect(navigation.push).toHaveBeenCalledWith('/form-submissions')
     expect(nameInput().value).toBe('読み込んだフォーム名')
   })
 
   it('破棄したあとは未変更扱いになり、次の移動は確認なしで通る', async () => {
     await show()
     await editName('書きかけの名前')
-    await click(anchor('回答フォーム'))
+    await click(anchor('キャンセル'))
     await click(dialogButton('保存せずに移る'))
     navigation.push.mockClear()
     // 捨て終わると未変更に戻るので、次のリンク押下は番兵が止めない
     // （止めない＝defaultPrevented されない＝そのまま遷移できる）。
-    const event = await click(anchor('回答フォーム'))
+    const event = await click(anchor('キャンセル'))
     expect(bodyText()).not.toContain('保存していない変更があります')
     expect(event.defaultPrevented).toBe(false)
   })
@@ -254,7 +261,7 @@ describe('フォーム編集の未保存ガード（FORM-19）', () => {
   it('「編集を続ける」は移動も破棄もしない', async () => {
     await show()
     await editName('書きかけの名前')
-    await click(anchor('回答フォーム'))
+    await click(anchor('キャンセル'))
     await click(dialogButton('編集を続ける'))
     expect(navigation.push).not.toHaveBeenCalled()
     expect(nameInput().value).toBe('書きかけの名前')

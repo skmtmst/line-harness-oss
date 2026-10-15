@@ -1,10 +1,11 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { purgeUnsafeFormDocuments } from '../services/form-documents.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { allowedFileScanEndpoint, isFileScanSecretRef } from '../lib/file-scan-policy.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { recordAuditEvent } from '@line-crm/db';
+import { auditEventStatement, recordAuditEvent } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   FILE_SCAN_REASON_LABELS,
@@ -155,7 +156,7 @@ export async function processDueFileScans(
       });
       if (next.status === 'pending') stillPending += 1;
     } catch (err) {
-      console.error('processDueFileScans error:', scan.id, err);
+      console.error(JSON.stringify({"code":"routes_file_scan_failed"}));
       if (await markFileScanPendingRetry(env.DB, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined) === 'pending') stillPending += 1;
     }
   }
@@ -420,6 +421,8 @@ fileScan.get('/api/file-scans/config', requireRole('owner', 'admin'), async (c) 
         externalEndpointUrl: config.external_endpoint_url,
         // 鍵そのものは返さない。名前だけ。
         externalSecretRef: config.external_secret_ref,
+        // 許可境界だけを判定する。鍵の値や実在、通信の健康状態は返さない。
+        externalEnabled: resolveExternalScanner(c.env as unknown as Record<string, string | undefined>, config) !== null,
         externalTimeoutMs: config.external_timeout_ms,
         maxBytesOverride: config.max_bytes_override,
         maxPixelsOverride: config.max_pixels_override,
@@ -449,10 +452,20 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
     return typeof v === 'string' ? v.trim().slice(0, max) || null : null;
   };
   const provider = text(body?.externalProvider, 80);
-  const endpoint = text(body?.externalEndpointUrl, 500);
-  const secretRef = text(body?.externalSecretRef, 120);
-  if (endpoint && !/^https:\/\//.test(endpoint)) {
-    return inputError(c, { success: false, error: '外の検査の宛先は https にしてください' }, 400, ["externalEndpointUrl"]);
+  for (const key of ['externalEndpointUrl', 'externalSecretRef'] as const) {
+    if (body?.[key] != null && typeof body[key] !== 'string') {
+      return inputError(c, { success: false, error: '文字で入力してください' }, 400, [key]);
+    }
+  }
+  // 宛先・名前は切り詰めず、不正な入力全体を拒否する。
+  const endpoint = typeof body?.externalEndpointUrl === 'string' ? body.externalEndpointUrl.trim() || null : null;
+  const secretRef = typeof body?.externalSecretRef === 'string' ? body.externalSecretRef.trim() || null : null;
+  const url = endpoint ? allowedFileScanEndpoint(endpoint, c.env.FILE_SCAN_ALLOWED_PAIRS, secretRef) : null;
+  if (endpoint && !url) {
+    return inputError(c, { success: false, error: '送り先と鍵の名前は、運営が許可した同じ組で指定してください。送り先は公開ホストの https、資格情報なし、既定ポートだけ使えます' }, 400, ['externalEndpointUrl', 'externalSecretRef']);
+  }
+  if ((provider || endpoint || secretRef) && !isFileScanSecretRef(secretRef)) {
+    return inputError(c, { success: false, error: '鍵の名前は FILE_SCAN_SECRET_ で始まる大文字・数字・下線の120文字以内で指定してください' }, 400, ['externalSecretRef']);
   }
   if ((provider || endpoint || secretRef) && !(provider && endpoint)) {
     return inputError(c, { success: false, error: '外の検査を使う時は提供元と宛先の両方が必要です' }, 400, ["externalProvider","externalEndpointUrl","externalSecretRef"]);
@@ -464,7 +477,15 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
     return Number.isSafeInteger(n) && n > 0 ? n : null;
   };
   const now = new Date().toISOString();
-  await c.env.DB.prepare(
+  const endpointHost = url?.hostname ?? null;
+  // 共通監査は長い文字列を秘密値として伏せる。ホストだけを短い断片で
+  // 保存すれば、その保護を緩めず長い正式ホストも正確に復元できる。
+  // 3文字の断片は電話番号の伏せ字にも該当しない。1配列50項目の上限を
+  // 守って二段に分け、最大253文字をすべて保存する。flat().join('')で復元。
+  const auditHost = endpointHost && (endpointHost.length > 200 || /[A-Za-z0-9_-]{32,}|[0-9-]{6,}/.test(endpointHost))
+    ? { endpointHostParts: [endpointHost.slice(0, 150).match(/.{1,3}/g)!, ...(endpointHost.length > 150 ? [endpointHost.slice(150).match(/.{1,3}/g)!] : [])] }
+    : { endpointHost };
+  const statement = c.env.DB.prepare(
     `INSERT INTO file_scan_configs
       (line_account_id, external_provider, external_endpoint_url, external_secret_ref,
        external_timeout_ms, max_bytes_override, max_pixels_override, updated_by, updated_at)
@@ -483,7 +504,21 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
     Number.isSafeInteger(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
     numOrNull(body?.maxBytesOverride), numOrNull(body?.maxPixelsOverride),
     c.get('staff')?.id ?? null, now,
-  ).run();
+  );
+  // 設定と監査を同じbatchで確定。宛先のパス・クエリ・鍵の値は記録しない。
+  await c.env.DB.batch([statement, auditEventStatement(c.env.DB, {
+    tenantId: c.get('staff')?.tenantId,
+    lineAccountId: accountId,
+    category: 'business',
+    actorPrincipalId: c.get('staff')?.id ?? 'unknown',
+    actorRole: c.get('staff')?.role ?? 'unknown',
+    action: 'file_scan.config.update',
+    targetKind: 'file_scan_config',
+    targetId: accountId,
+    result: 'success',
+    after: auditHost,
+    createdAt: now,
+  })]);
   return c.json({ success: true, data: { lineAccountId: accountId } });
 });
 

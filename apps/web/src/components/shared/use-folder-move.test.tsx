@@ -69,9 +69,10 @@ it('アカウント切り替え後は古い処理で次の行を動かさず、�
   expect(net.toast).not.toHaveBeenCalled()
 })
 
-it('閲覧のみでは選択と窓を隠して移動を送らない', () => {
+it('閲覧のみでは選択の操作を描かず、行からの移動も送らない', () => {
   render(<Harness canEdit={false} />)
-  expect(screen.queryByRole('checkbox')).toBeNull()
+  expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+  expect(screen.queryByRole('button', { name: 'フォルダへ移す' })).toBeNull()
   fireEvent.click(screen.getByText('移す:one'))
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(net.move).not.toHaveBeenCalled()

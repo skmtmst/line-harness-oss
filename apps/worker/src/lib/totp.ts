@@ -121,7 +121,7 @@ export async function encryptTotpSecret(secret: string, masterKey: string): Prom
   return `v1.${bytesToBase64Url(iv)}.${bytesToBase64Url(encrypted)}`;
 }
 
-export async function decryptTotpSecret(payload: string, masterKey: string): Promise<string> {
+async function decryptTotpPayload(payload: string, masterKey: string): Promise<string> {
   const [version, rawIv, rawEncrypted] = payload.split('.');
   if (version !== 'v1' || !rawIv || !rawEncrypted) throw new Error('Invalid encrypted TOTP secret');
   const decrypted = await crypto.subtle.decrypt(
@@ -130,6 +130,51 @@ export async function decryptTotpSecret(payload: string, masterKey: string): Pro
     base64UrlToBytes(rawEncrypted),
   );
   return new TextDecoder().decode(decrypted);
+}
+
+/** Backward compatible with the original encrypted base32 secret. */
+export async function decryptTotpEnrollment(payload: string, masterKey: string): Promise<{ secret: string; recoveryHashes: string[] }> {
+  const plain = await decryptTotpPayload(payload, masterKey);
+  if (!plain.startsWith('{')) return { secret: plain, recoveryHashes: [] };
+  const enrollment = JSON.parse(plain) as { secret: string; recoveryHashes: string[] };
+  if (!/^[A-Z2-7]+$/.test(enrollment.secret) || !Array.isArray(enrollment.recoveryHashes)
+    || !enrollment.recoveryHashes.every(hash => /^[a-f0-9]{64}$/.test(hash))) throw new Error('Invalid TOTP enrollment');
+  return enrollment;
+}
+
+export async function decryptTotpSecret(payload: string, masterKey: string): Promise<string> {
+  return (await decryptTotpEnrollment(payload, masterKey)).secret;
+}
+
+/** Eight 40-bit codes (8 base32 characters). Online attempts are account-throttled. Only hashes persist. */
+export async function createTotpEnrollment(secret: string, masterKey: string) {
+  const uniqueCodes = new Set<string>();
+  while (uniqueCodes.size < 8) {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    const code = Array.from(bytes, b => alphabet[b & 31]).join('');
+    uniqueCodes.add(`${code.slice(0, 4)}-${code.slice(4)}`);
+  }
+  const recoveryCodes = [...uniqueCodes];
+  const recoveryHashes = await Promise.all(recoveryCodes.map(hashRecoveryCode));
+  return { encrypted: await encryptTotpSecret(JSON.stringify({ secret, recoveryHashes }), masterKey), recoveryCodes };
+}
+
+async function hashRecoveryCode(code: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code.trim().toLowerCase().replace(/-/g, '')));
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function consumeTotpRecoveryCode(db: D1Database, staffId: string, encrypted: string, masterKey: string, code: string): Promise<boolean> {
+  if (!/^[A-Za-z2-9]{4}-?[A-Za-z2-9]{4}$/.test(code.trim())) return false;
+  const enrollment = await decryptTotpEnrollment(encrypted, masterKey);
+  const hash = await hashRecoveryCode(code);
+  if (!enrollment.recoveryHashes.includes(hash)) return false;
+  enrollment.recoveryHashes = enrollment.recoveryHashes.filter(value => value !== hash);
+  const next = await encryptTotpSecret(JSON.stringify(enrollment), masterKey);
+  const result = await db.prepare('UPDATE staff_members SET totp_secret_enc=? WHERE id=? AND totp_secret_enc=? AND is_active=1')
+    .bind(next, staffId, encrypted).run();
+  return result.meta.changes === 1;
 }
 
 /*

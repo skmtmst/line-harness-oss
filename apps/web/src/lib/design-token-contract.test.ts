@@ -1,3 +1,4 @@
+import { globalTokens, resolveValue } from '../../scripts/card-shape-contract.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -7,9 +8,10 @@ const WEB = path.join(__dirname, '..', '..')
 const CSS = fs.readFileSync(path.join(WEB, 'src', 'app', 'globals.css'), 'utf8')
 const BUTTON = fs.readFileSync(path.join(WEB, 'src', 'components', 'shared', 'button.module.css'), 'utf8')
 
+const CURRENT_TOKENS = globalTokens(CSS)
 function token(name: string): string {
-  const hit = CSS.match(new RegExp(`--${name}:\\s*([^;]+);`))
-  return hit ? hit[1].trim() : '(未定義)'
+  if (!CURRENT_TOKENS.has(`--${name}`)) throw new Error(`Missing CSS token: ${name}`)
+  return resolveValue(`var(--${name})`, CURRENT_TOKENS).trim()
 }
 
 /**
@@ -25,20 +27,20 @@ const ALLOWED_SAME_VALUE = [
   '--color-danger / --color-status-danger',
   // §6 B-149: 区切り線と枠線は同じ黒7%。
   '--color-hairline / --color-divider',
+  // V8の薄い面と表見出しは現在同じ背景。役割ごとの入口を残す。
+  '--color-surface-pearl / --color-table-head',
   // 面と、その上の文字は別の役割。
   '--color-on-accent / --color-on-action / --color-canvas',
   // 既存の字重の別名。大きな数以外は600。
   '--font-weight-bold / --font-weight-extrabold',
   // §6: 入力・操作10、印の小型6。役割別の入口を維持。
-  '--radius-control / --radius-tile / --radius-field',
-  '--radius-icon / --radius-mini / --radius-tile-sm',
-  // §6: 浮く面と最前面の面は現在同じ影。
-  '--shadow-float / --shadow-overlay',
-  // B-148・B-151: カードと主操作は同じ案Aの影を使い、役割ごとの入口を残す。
-  '--shadow-card-surface / --shadow-primary-action',
+  '--radius-control / --radius-tile / --radius-segment',
+  '--radius-icon / --radius-tile-sm',
   // §6: 補足とラベル12、大きな数28。
   '--text-caption / --text-label',
   '--text-hero / --text-metric',
+  // B-152: 補足・本文・小さい文字は現在1.5。サイズに対応する入口を維持する。
+  '--text-caption--line-height / --text-body--line-height / --text-micro--line-height',
   '--text-lead--line-height / --text-heading--line-height / --text-title--line-height',
 ]
 
@@ -52,7 +54,7 @@ describe('設計の実測値に合わせる', () => {
     expect(token('text-label')).toBe('12px')
     expect(token('text-body')).toBe('13px')
     expect(token('text-lead')).toBe('15px')
-    expect(token('text-heading')).toBe('18px')
+    expect(token('text-heading')).toBe('15px')
     expect(token('text-title')).toBe('20px')
     expect(token('text-metric')).toBe('28px')
     expect(token('text-display')).toBe('22px')
@@ -73,15 +75,15 @@ describe('設計の実測値に合わせる', () => {
     expect(token('radius-control')).toBe('10px')
     expect(token('radius-card')).toBe('12px')
     expect(token('radius-panel')).toBe('16px')
-    expect(token('radius-large')).toBe('18px') // 既存の rounded-lg へ波及させない専用名
-    expect(token('radius-pill')).toBe('9999px')
+    expect(token('radius-large')).toBe('16px') // 既存の rounded-lg へ波及させない専用名
+    expect(token('radius-pill')).toBe('999px')
   })
 
   it('V6の18pxをTailwind既定の rounded-lg へ流し込まない', () => {
     // `--radius-lg` をここで定義すると、V6専用の2箇所だけでなく
     // 既存の `rounded-lg` 利用先85ファイルが8pxから18pxへ変わる。
     expect(CSS).not.toMatch(/--radius-lg:\s*18px/)
-    expect(token('radius-large')).toBe('18px')
+    expect(token('radius-large')).toBe('16px')
   })
 
   // 役割が異なる同値トークンだけ、上の理由付き一覧で許可する。
@@ -91,6 +93,8 @@ describe('設計の実測値に合わせる', () => {
     const byFamily = new Map<string, Map<string, string[]>>()
     for (const [, family, rest, raw] of tokens) {
       const value = raw.trim().toLowerCase()
+      // 既存の役割別名は参照先を共有する。ここでは独立した生の値を点検する。
+      if (value.includes('var(')) continue
       if (!byFamily.has(family)) byFamily.set(family, new Map())
       const bucket = byFamily.get(family)!
       if (!bucket.has(value)) bucket.set(value, [])
@@ -131,13 +135,19 @@ describe('設計の実測値に合わせる', () => {
   })
 
   // V8ではPC36px、タッチ端末は44pxの当たりを維持する。
-  it('共通ボタンは V8 の36px・角丸10px・13px・600 に合わせる', () => {
-    expect(BUTTON).toMatch(/\.standard\s*{[^}]*height:\s*36px/s)
-    expect(BUTTON).toMatch(/padding:\s*0 16px/)
+  it('共通ボタンは現在のV8の高さ・余白・文字を使う', () => {
+    expect(BUTTON).toMatch(/:root \.standard,\s*:root \.field\s*{[^}]*height:\s*var\(--tpl-button-h\)/s)
+    expect(token('tpl-button-h')).toBe('36px')
+    expect(BUTTON).toMatch(/padding:\s*0 var\(--tpl-button-pad-side\)/)
+    expect(token('tpl-button-pad-side')).toBe('16px')
     expect(BUTTON).toMatch(/border-radius:\s*var\(--radius-control\)/)
     expect(token('radius-control')).toBe('10px')
     expect(BUTTON).toMatch(/font-size:\s*var\(--text-body\)/)
-    expect(BUTTON).toMatch(/font-weight:\s*600/)
+    expect(BUTTON).toMatch(/:root \.button\s*{[^}]*font-weight:\s*var\(--tpl-button-weight\)/s)
+    expect(token('tpl-button-weight')).toBe('600')
+    // B-152：文字だけの操作もボタンの太さ600。本文400へ戻さない。
+    expect(BUTTON).toMatch(/:root \.button\.inline\.text\s*{[^}]*font-weight:\s*var\(--font-weight-bold\)/s)
+    expect(token('font-weight-bold')).toBe('600')
     // タッチ端末（pointer: coarse）は44pxの当たり判定を確保する
     expect(BUTTON).toMatch(/@media\s*\(pointer:\s*coarse\)[^{]*\{[^}]*min-height:\s*44px/s)
   })

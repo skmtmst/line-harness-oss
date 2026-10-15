@@ -16,50 +16,10 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
-  gap: var(--tpl-am-col-gap);
-  height: var(--tpl-am-head-h);
-  padding: var(--tpl-am-head-pad);
-}
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
-  gap: var(--tpl-am-col-gap);
-  height: auto;
-  min-height: var(--tpl-am-run-row-h);
-  padding: var(--tpl-am-row-pad);
-  border-bottom: 0;
-  box-shadow: var(--shadow-row-line);
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--tpl-am-cell-gap);
-  height: auto;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-  line-height: normal;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colTime,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colTime {
-  align-items: flex-end;
-  padding-right: var(--tpl-am-num-pad-end);
-  text-align: right;
-}
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colWhen,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colWhen {
-  flex: 1 1 0;
-  min-width: 0;
-}
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colOps {
-  overflow: visible;
-}
 .colRule { width: var(--tpl-am-run-col-rule); flex-shrink: 0; min-width: 0; }
 .colResult { width: var(--tpl-am-run-col-result); flex-shrink: 0; min-width: 0; }
 .colDone { width: var(--tpl-am-run-col-done); flex-shrink: 0; min-width: 0; }
 .colTime { width: var(--tpl-am-run-col-time); flex-shrink: 0; }
-.colOps { width: var(--tpl-am-run-col-ops); flex-shrink: 0; }
 
 /* いつ・だれに：友だちの名前（緑の 13/600）と日時・店。 */
 .subject {
@@ -106,35 +66,6 @@
 }
 
 /* 結果の札（点つき）。 */
-.pill {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: var(--tpl-am-pill-gap);
-  padding: var(--tpl-am-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-am-pill-lh);
-  white-space: nowrap;
-}
-.pillDot {
-  width: var(--tpl-badge-dot);
-  height: var(--tpl-badge-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-.pill[data-tone='active'] { background: var(--color-success-bg); color: var(--color-success); }
-.pill[data-tone='danger'] { background: var(--color-danger-bg); color: var(--color-danger); }
-.pill[data-tone='warn'] { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.pill[data-tone='neutral'] { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
-
-/* 行の右端：中身を見ると「…」。 */
-.opsBox {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-am-ops-gap);
-}
 
 /* 状態の札の並び。 */
 .chipGroup {

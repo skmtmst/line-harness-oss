@@ -1,4 +1,7 @@
 'use client'
+
+import { tableRequirements as b244Requirements } from './requirements'
+
 import {reservationBoardApi} from '@/lib/api-reservation-board'
 import {seatBoardEntry,type RestaurantFloor} from '@line-crm/shared'
 import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
@@ -15,7 +18,7 @@ import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect,useMemo, useRef, useState } from 'react'
-import { Check, Plus } from 'lucide-react'
+import { Check, Inbox, Plus } from 'lucide-react'
 import SeatTile from '@/components/shared/seat-tile'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
@@ -31,6 +34,7 @@ import RestaurantShell, { Panel, QuietError, StatRow, Status, type RestaurantV8C
 import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
 import { pickMoveTarget, reservationLine } from './move'
 import styles from './tables.module.css'
+import TableRowActions from './table-row-actions'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -128,8 +132,8 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const save = async () => {
     if (!draft || !selectedAccountId) return
     const errors: Partial<Record<keyof Draft, string>> = {}
-    if (!draft.code.trim()) errors.code = '卓番を入れてください。'
-    if (!draft.label.trim()) errors.label = '表示名を入れてください。'
+    if ((b244Requirements.draft_code.check(draft.code) !== null)) errors.code = '卓番を入れてください。'
+    if ((b244Requirements.draft_label.check(draft.label) !== null)) errors.label = '表示名を入れてください。'
     const min = Number(draft.minCapacity), max = Number(draft.maxCapacity)
     if (!Number.isInteger(min) || min < 1) errors.minCapacity = '最小人数は1以上の整数にしてください。'
     if (!Number.isInteger(max) || max < min || max < 1) errors.maxCapacity = '最大人数は最小人数以上の整数にしてください。'
@@ -235,13 +239,12 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   return (
     <SaveErrorScope errors={saveErrors}><>
       <StatRow fusion>
-        <KpiCard title="卓数" value={rows.length} unit="卓" detail="稼働・停止を含む" icon={undefined} presentation="band" />
-        <KpiCard title="総席数" value={rows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="席" detail="最大収容人数" icon={undefined} presentation="band" />
-        <KpiCard title="結合可能" value={groups.size} unit="組" detail="結合グループ" icon={undefined} presentation="band" />
-        <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={undefined} presentation="band" />
+        <KpiCard title="卓数" value={rows.length} unit="卓" detail="稼働・停止を含む" icon={<Inbox size={16} aria-hidden />} presentation="band" />
+        <KpiCard title="総席数" value={rows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="席" detail="最大収容人数" icon={<Inbox size={16} aria-hidden />} presentation="band" />
+        <KpiCard title="結合可能" value={groups.size} unit="組" detail="結合グループ" icon={<Inbox size={16} aria-hidden />} presentation="band" />
+        <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={<Inbox size={16} aria-hidden />} presentation="band" />
       </StatRow>
       <DetailColumns variant="restaurant-tables" asideLabel="卓の詳細を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={(
-        <div className={styles.detailPanel}>
         <Panel fusion title="卓の詳細" flush>
           <ul className={styles.detailList}>
             {rows.map((item) => (
@@ -251,19 +254,12 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
                   <p className={styles.detailSub}>{`${seatTypeLabel(item.seat_type)} / ${item.min_capacity}〜${item.max_capacity}名`}</p>
                 </div>
                 <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} /></span>
-                {canEdit ? (
-                  <>
-                    <Button presentation="restaurant" disabled={busy} aria-label={`${item.code}・${item.label}を変更`} onClick={() => openEdit(item)}>変更</Button>
-                    {item.is_active
-                      ? <Button presentation="restaurant" disabled={busy} aria-label={`${item.code}・${item.label}を停止`} onClick={() => { setStopError(''); setMoveMode('move'); setStopId(item.id) }}>停止</Button>
-                      : <Button presentation="restaurant" disabled={busy} aria-label={`${item.code}・${item.label}を再開`} onClick={() => resume(item)}>再開</Button>}
-                  </>
-                ) : null}
+                <TableRowActions table={item} canEdit={canEdit} busy={busy} onEdit={openEdit} onResume={resume}
+                  onStop={(table) => { setStopError(''); setMoveMode('move'); setStopId(table.id) }} />
               </li>
             ))}
           </ul>
         </Panel>
-        </div>
       )}>
         <div className={styles.floorPanel}>
           {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} resources={rows.map(t=>({id:t.id,label:t.code,capacity:t.max_capacity,active:!!t.is_active}))} canEdit={canEdit} onSelect={setSelectedId}/>:null}
@@ -299,10 +295,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         {draft ? (
           <div ref={editorRef} className={styles.editorFields}>
             <div className={styles.pair}>
-              <Field label="卓番" htmlFor="rs-table-code" error={fieldErrors.code}>
+              <Field label="卓番" htmlFor="rs-table-code" error={fieldErrors.code} requirement={b244Requirements.draft_code}>
                 <SaveErrorField names={["code","draft.code"]}><TextField id="rs-table-code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} /></SaveErrorField>
               </Field>
-              <Field label="表示名" htmlFor="rs-table-label" error={fieldErrors.label}>
+              <Field label="表示名" htmlFor="rs-table-label" error={fieldErrors.label} requirement={b244Requirements.draft_label}>
                 <SaveErrorField names={["label","draft.label"]}><TextField id="rs-table-label" value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></SaveErrorField>
               </Field>
             </div>
@@ -310,10 +306,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
               <SaveErrorField names={["seatType","draft.seatType","seat_type","draft.seat_type"]}><Select aria-label="席種" size="full" value={draft.seatType} onChange={(value) => setDraft({ ...draft, seatType: value })} options={SEAT_TYPE_OPTIONS} /></SaveErrorField>
             </DialogField>
             <div className={styles.pair}>
-              <Field label="最小人数" htmlFor="rs-table-min" error={fieldErrors.minCapacity}>
+              <Field label="最小人数" htmlFor="rs-table-min" error={fieldErrors.minCapacity} requirement={b244Requirements.draft_min_capacity}>
                 <SaveErrorField names={["minCapacity","draft.minCapacity","min_capacity","draft.min_capacity"]}><NumberInput id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => setDraft({ ...draft, minCapacity: event.target.value })} /></SaveErrorField>
               </Field>
-              <Field label="最大人数" htmlFor="rs-table-max" error={fieldErrors.maxCapacity}>
+              <Field label="最大人数" htmlFor="rs-table-max" error={fieldErrors.maxCapacity} requirement={b244Requirements.draft_max_capacity}>
                 <SaveErrorField names={["maxCapacity","draft.maxCapacity","max_capacity","draft.max_capacity"]}><NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => setDraft({ ...draft, maxCapacity: event.target.value })} /></SaveErrorField>
               </Field>
             </div>

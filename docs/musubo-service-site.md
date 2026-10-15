@@ -7,7 +7,7 @@
 - 正式公開用（公開中）：`https://musubo.jp` — 2026-10-05にXserverのapexへ本番反映済み。`/`・`/privacy/`・`/terms/`・`/legal/`・`/contact/` がHTTPS 200、法務ページは施行日 `2026-10-04`、`noindex` はHTML・HTTPヘッダーともに無し、`sitemap.xml` に `<loc>` 5件。
 - 確認・検証用：`https://stg.musubo.jp`
 - 検証サイトの配置先：Xserverサーバーパネルで設定したstg専用の公開フォルダ（サーバー利用者名・内部の絶対パスは非公開の配備記録で管理）
-- 新規登録・ログイン：既存の `https://nen-line-stg-admin.pages.dev`。アプリのドメインや認証設定は今回変更しない。
+- 新規登録・ログイン：確認用サイトは検証環境の管理画面 `https://stg-admin.musubo.jp`（2026-10-13に `nen-line-stg-admin.pages.dev` から変更。同じ検証環境の公開ドメイン）、正式公開用は `https://admin.musubo.jp`。アプリのドメインや認証設定はこのサイトからは変更しない。
 
 2026-09-13、Masatoが検証用は `stg.musubo.jp` に分ける方針へ変更し、設置を明示承認。今後の検証配備はapexへ行わない。`previewOrigin` と正式公開用の `origin` は別に管理する。検証用Apache設定はstg以外のHostを拒否し、将来 `musubo.jp/stg.musubo.jp/` から同じ確認版が表示されることも防ぐ。これは一般閲覧を制限する認証ではない（確認用バナー・noindexは維持）。
 
@@ -86,7 +86,7 @@ CSSとJSはブラウザー標準のみで、外部依存・追加の鍵・DB変�
 
 このサイト専用の配備手順を、既存EC・Cloudflareの配備スクリプトと区別する。2026-09-13の最新承認は「stg.musubo.jpへの確認版設置、stg用DNS・HTTPS設定、一般閲覧可能・検索対象外」。これは有料サービスの正式公開・法務文面の承認ではない。apexのDNS、MX、SPF、DKIM、r/rsのメール用設定、ネームサーバーは変更しない。
 
-stg初回設置専用スクリプト：`node sites/musubo/deploy-preview.mjs`（dry-run）→ `node sites/musubo/deploy-preview.mjs --apply`。実行時のみ `MUSUBO_XSERVER_USER` と `MUSUBO_XSERVER_HOST` に確認済みの配備先を渡す（`.env`やGitへ保存しない、SSH鍵は既存設定を使う）。初期ページの監査済みハッシュ、3件だけの初期ファイル一覧、クリーン状態、GitHub最新統合版との一致を確認する。既に `.htaccess` や他のファイルが追加されていたら停止する。stg専用の排他ロック、Webルート外へのバックアップ、反映ハッシュ検証を行う。`.user.ini`・初期画像・apexのファイルは変更しない。失敗時は初期HTMLを復元し、追加した `.htaccess` 等は削除せずバックアップ内へ移動する。このスクリプトはstg専用で、apexには使えない（配備先ゲートが `previewOrigin` を要求し、初期3ファイル前提の事前条件がapexでは必ず落ちる）。apexへの反映は下の「Xserverでの本番配備手順」を使う。
+stg配備スクリプト（2026-10-13から初回設置と更新の両方に対応）：`node sites/musubo/deploy-preview.mjs`（dry-run）→ `node sites/musubo/deploy-preview.mjs --apply`。実行時のみ `MUSUBO_XSERVER_USER` と `MUSUBO_XSERVER_HOST` に確認済みの配備先を渡す（`.env`やGitへ保存しない、SSH鍵は既存設定を使う）。初期ページの監査済みハッシュ、3件だけの初期ファイル一覧、クリーン状態、GitHub最新統合版との一致を確認する。既に `.htaccess` や他のファイルが追加されていたら停止する。stg専用の排他ロック、Webルート外へのバックアップ、反映ハッシュ検証を行う。`.user.ini`・初期画像・apexのファイルは変更しない。失敗時は初期HTMLを復元し、追加した `.htaccess` 等は削除せずバックアップ内へ移動する。設置済みのstgでは更新モードで動く。stg直下のファイル一覧・シンボリックリンク・配信中の全ファイルのハッシュを照合し、刷新前（11件）か刷新後（18件）の構成と完全一致しなければ上書きせず停止する。バックアップ後に入れ替え、失敗時は旧ファイルを戻し、追加分は削除せず退避してハッシュを再照合する。このスクリプトはstg専用で、apexには使えない（配備先ゲートが `previewOrigin` を要求し、初期3ファイル前提の事前条件がapexでは必ず落ちる）。apexへの反映は下の「Xserverでの本番配備手順」を使う。
 
 1. 親・子両リポジトリの状態とGitHub最新版を再確認し、承認済みのクリーンな統合コミットから新規の出力ディレクトリへ確認用成果物を生成・検査する（`--production` は使わない）。
 2. 配備担当が同時に1人であることを確認し、Xserver上のstg専用公開フォルダを `.user.ini` を含めてWebルート外へバックアップ。保存先・時刻は非公開の作業記録で管理する。
@@ -108,7 +108,7 @@ apex（`https://musubo.jp` 直下）への反映は専用スクリプト `sites/
 
 - 配備先は `/home/<user>/musubo.jp/public_html`。排他ロックは `/home/<user>/.musubo-production-site-deploy.lock`、バックアップはWebルート外の `/home/<user>/musubo-site-backups`。
 - `--apply` は `config.origin === "https://musubo.jp"` でなければ停止する。作業ツリーがクリーンで、対象SHAがGitHubの最新統合版と一致することも確認する。
-- 配るのは毎回その場で生成した `build({ production: true })` の成果物。`sites/musubo/dist/` はGit管理外で古い可能性があるため、必ず再ビルドする。対象は11ファイル：`.htaccess`、`assets/site.css`、`assets/site.js`、`assets/symbol.svg`、`terms/index.html`、`privacy/index.html`、`legal/index.html`、`contact/index.html`、`robots.txt`、`sitemap.xml`、`index.html`。この一覧以外は転送せず、`--delete` や広いディレクトリ削除は行わない。
+- 配るのは毎回その場で生成した `build({ production: true })` の成果物。`sites/musubo/dist/` はGit管理外で古い可能性があるため、必ず再ビルドする。対象は18ファイル（2026-10-13の刷新で11件から追加）：`.htaccess`、`404.html`、`assets/site.css`、`assets/site.js`、`assets/symbol.svg`、`assets/og.png`、`assets/favicon-16.png`、`assets/favicon-32.png`、`assets/apple-touch-icon.png`、`assets/icon-512.png`、`assets/site.webmanifest`、`terms/index.html`、`privacy/index.html`、`legal/index.html`、`contact/index.html`、`robots.txt`、`sitemap.xml`、`index.html`。サーバーが刷新前の11件構成なら一度だけ受け付けて新ファイルを追加する。この一覧以外は転送せず、`--delete` や広いディレクトリ削除は行わない。
 - HTMLガードは本番マーカー向き。`施行日：2026-10-04` と保存期限の記載が**あること**、`noindex`・`確認用サイト`・`stg.musubo.jp` のstgマーカーが**ないこと**を要求する。確認版の文面を本番へ流すと停止する。
 - 遠隔の事前確認は、ウェブルート直下に想定外のエントリがないこと、apexに想定外のファイルがないこと、シンボリックリンクが1つもないことの3点。いずれかに該当したら上書きせず停止し、見つかった一覧を報告する。
 - 書き込み前に `before.tar.gz` と `BEFORE_SHA256SUMS` をバックアップ先へ作り、作成後に `sha256sum -c` で検証する。`--exclude='./stg.musubo.jp'` でstgは含めない。

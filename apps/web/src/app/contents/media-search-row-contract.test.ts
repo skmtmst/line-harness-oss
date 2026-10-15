@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -6,20 +6,12 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 
-/**
- * U016 → ★V7 `Xn1Mz`（2026-09-27 オーナー指摘）。
- *
- * U016（外部UI監査 ab9d80b07）の旧処方は「検索を独立した全幅の行に」
- * だったが、正本を「検索は幅320で1行目、2行目は左に絞り込み・右端に
- * 表示切替・並び順・表示件数」に変えた。潰れ対策の意図は残す：検索は
- * 320（狭い時は240まで）で折り返し、読めないほど潰さない。幅の実数は
- * 共通 ListToolbar の契約テストで守る。
- */
-describe('登録メディアの検索行（U016 → ★V7 Xn1Mz）', () => {
+// 現役V8の共通道具欄で検索・絞り込み・並べ替えの接続を守る。
+describe('V8 登録メディアの検索と操作', () => {
   it('検索は共通 ListToolbar の1行目に置く', () => {
     expect(PAGE).toContain("import ListToolbar from '@/components/shared/list-toolbar'")
     expect(PAGE).toContain('<ListToolbar')
-    expect(PAGE).toContain("placeholder: 'ファイル名で検索'")
+    expect(PAGE).toContain("placeholder: 'ファイル名で探す'")
   })
 
   it('検索を横いっぱいに伸ばさない（裸の全幅 input を置かない）', () => {
@@ -39,11 +31,11 @@ describe('登録メディアの検索行（U016 → ★V7 Xn1Mz）', () => {
     const toolbarAt = PAGE.indexOf('<ListToolbar')
     const trailingAt = PAGE.indexOf('trailing={', toolbarAt)
     expect(trailingAt).toBeGreaterThan(toolbarAt)
-    for (const name of ['aria-label="並べ方"', 'aria-label="並び順"', 'aria-label="表示件数"'] as const) {
+    for (const name of ['aria-label="並べ方"', 'aria-label="よく使う絞り込み"', 'aria-label="表示件数"'] as const) {
       expect(PAGE.indexOf(name, trailingAt), `${name} が2行目の右に無い`).toBeGreaterThan(trailingAt)
     }
-    // 結果の一覧（`h8pBZr`）より前にある。
-    expect(trailingAt).toBeLessThan(PAGE.indexOf('data-design-node="h8pBZr"'))
+    expect(PAGE).toContain('...SORT_OPTIONS.map')
+    expect(PAGE).toContain('setSort(value.slice(5) as MediaSort)')
   })
 
   it('削除はメニューの中の危ない操作にし、ゴミ箱の直置きを残さない', () => {

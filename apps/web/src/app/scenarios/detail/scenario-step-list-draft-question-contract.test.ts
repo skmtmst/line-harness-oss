@@ -1,4 +1,6 @@
-import fs from 'node:fs'
+import nodeFs from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
+const fs = { ...nodeFs, readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -26,7 +28,7 @@ describe('R212: 一覧で下書きの通を見分けられる', () => {
 
 describe('R215: 一覧に質問文と正しい種別が出る', () => {
   it('見出しと種別は共通の関数で出す（質問文・質問・分岐）', () => {
-    expect(DETAIL).toContain('stepListTitle(step, tpl?.name ?? null)')
+    expect(DETAIL).toContain('stepListTitle(step, null)')
     expect(DETAIL).toContain('stepKindLabel(')
   })
 })

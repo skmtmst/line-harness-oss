@@ -11,10 +11,12 @@ import { api, type FollowerImportState, type LineAccountConnectData, type LineAc
 import type { StaffMember } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { CreateStepColumns } from '@/components/templates/create-step-columns'
 import { Steps } from '@/components/templates/steps'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TagToggle } from '@/components/shared/tag-pill'
 import { DataTable, Tr, Td } from '@/components/shared/table'
@@ -496,7 +498,16 @@ export default function AccountRegisterV8() {
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
         <div ref={stepPanelRef} tabIndex={-1} className={styles.stepBody}>
           {currentStep === 1 && !createdId && (
-            <div className={styles.split} data-design-node="xj3zz">
+            <CreateStepColumns data-design-node="xj3zz" previewTitle="この5段でやること" preview={(
+                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="この5段でやること">
+                <h2>この5段でやること</h2>
+                <p>① LINE準備：公式アカウントとチャネルを用意</p>
+                <p>② チャネル設定：チャネル ID とシークレット 4項目</p>
+                <p>③ 基本情報：表示名・LINE ID・担当範囲</p>
+                <p>④ 接続確認：5つの確認がすべて通るまで登録しない</p>
+                <p>⑤ 完了：既存の友だちの取り込み</p>
+              </Card>
+              )}>
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="アカウントの用意方法">
                 {draftRestored && (
                   <Notice tone="info" message="端末の下書きから続けます。チャネルシークレットだけ入れ直してください。" onClose={() => setDraftRestored(false)} />
@@ -520,63 +531,51 @@ export default function AccountRegisterV8() {
                   <Button external href={`${MANUAL}#m1`}  ><BookOpen size={15} aria-hidden="true" />全手順を見る</Button>
                 </div>
               </Card>
-              <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" role="complementary" aria-label="この5段でやること">
-                <h2>この5段でやること</h2>
-                <p>① LINE準備：公式アカウントとチャネルを用意</p>
-                <p>② チャネル設定：チャネル ID とシークレット 4項目</p>
-                <p>③ 基本情報：表示名・LINE ID・担当範囲</p>
-                <p>④ 接続確認：5つの確認がすべて通るまで登録しない</p>
-                <p>⑤ 完了：既存の友だちの取り込み</p>
-              </Card>
-            </div>
+            </CreateStepColumns>
           )}
-
           {currentStep === 2 && !createdId && (
-            <div className={styles.split} data-design-node="JYfda">
+            <CreateStepColumns data-design-node="JYfda" previewTitle="どこにある？" preview={(
+                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="どこにある？">
+                <h2>どこにある？</h2>
+                <p>チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
+                <p>登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
+              </Card>
+              )}>
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続に必要な4項目">
                 <h2 className={styles.panelTitle}>接続に必要な4項目</h2>
                 <p className={styles.groupLabel}>Messaging API</p>
-                <div className={styles.twoCol}>
+                <SettingsFormRow layout="columns">
                   <Field htmlFor="v8-channel-id" label="チャネルID" error={fieldErrors.channelId}>
                     <SaveErrorField names={["channelId","form.channelId","channel_id","form.channel_id"]}><TextField id="v8-channel-id" value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} /></SaveErrorField>
                   </Field>
                   <Field htmlFor="v8-channel-secret" label="チャネルシークレット" error={fieldErrors.channelSecret}>
                     <SaveErrorField names={["channelSecret","form.channelSecret","channel_secret","form.channel_secret"]}><TextField id="v8-channel-secret" type="password" autoComplete="new-password" value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} required aria-invalid={fieldErrors.channelSecret ? true : undefined} /></SaveErrorField>
                   </Field>
-                </div>
+                </SettingsFormRow>
                 <p className={styles.groupLabel}>LINE Login</p>
-                <div className={styles.twoCol}>
+                <SettingsFormRow layout="columns">
                   <Field htmlFor="v8-login-channel-id" label="LoginチャネルID" error={fieldErrors.loginChannelId}>
                     <SaveErrorField names={["loginChannelId","form.loginChannelId","login_channel_id","form.login_channel_id"]}><TextField id="v8-login-channel-id" value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} /></SaveErrorField>
                   </Field>
                   <Field htmlFor="v8-login-channel-secret" label="Loginチャネルシークレット" error={fieldErrors.loginChannelSecret}>
                     <SaveErrorField names={["loginChannelSecret","form.loginChannelSecret","login_channel_secret","form.login_channel_secret"]}><TextField id="v8-login-channel-secret" type="password" autoComplete="new-password" value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} /></SaveErrorField>
                   </Field>
-                </div>
+                </SettingsFormRow>
                 <div className={styles.secretRow}>
                   <span className={styles.secretNote}><Lock size={14} aria-hidden="true" />秘密値は保存後に画面へ表示されません。</span>
                   <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />取得方法を見る</Button>
                 </div>
               </Card>
-              <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" role="complementary" aria-label="どこにある？">
-                <h2>どこにある？</h2>
-                <p>チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
-                <p>登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
-              </Card>
-            </div>
+            </CreateStepColumns>
           )}
-
           {currentStep === 3 && !createdId && (
-            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acct-basic-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="基本情報" data-design-node="GwKE2" data-step="3">
+            <Card surface="standard" layout="vertical" contentPadding="var(--polish-space-section)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="基本情報" data-design-node="GwKE2" data-step="3">
               <h2 className={styles.panelTitle}>基本情報</h2>
-              <div className={styles.basicGrid}>
-
-
-                <span aria-hidden="true" />
+              <SettingsFormRow layout="columns">
                 <Field label="表示名" htmlFor="v8-display-name"><SaveErrorField names={["name","form.name"]}><TextField id="v8-display-name" value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "v8-display-name-error" : undefined} /></SaveErrorField></Field>
                 <Field label="LINE ID" htmlFor="v8-line-id"><SaveErrorField names={["lineId","form.lineId","line_id","form.line_id"]}><TextField id="v8-line-id" value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly /></SaveErrorField></Field>
-                <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…"><Download size={15} aria-hidden="true" />LINEから取得</Button>
-              </div>
+              </SettingsFormRow>
+              <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…"><Download size={15} aria-hidden="true" />LINEから取得</Button>
               {fieldErrors.name && <p id="v8-display-name-error" role="alert" className={styles.fieldError}>{fieldErrors.name}</p>}
               <div className={styles.field}>
                 <span className={styles.groupLabel}>タグ</span>
@@ -593,16 +592,16 @@ export default function AccountRegisterV8() {
                   )}
                 </div>
               </div>
-              <Card className={styles.infoBox} layout="horizontal" surface="muted" corner="control" contentPadding="var(--tpl-htn-info-pad)" gap="var(--tpl-htn-panel-gap)">
+              <Card className={styles.infoBox} layout="horizontal" surface="muted" corner="control" contentPadding="var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
                 <p>LIFF は登録のときに自動で作ります。親アカウントと担当範囲は、登録のあと「設定」と「メンバー」で決めます。</p>
                 <Button type="button" variant="text" presentation="registration-inline" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>{moreOpen ? '閉じる' : 'いま決める'}</Button>
               </Card>
               {moreOpen && (
                 <div className={styles.moreBox}>
-                  <div className={styles.twoCol}>
+                  <SettingsFormRow layout="columns">
                     <div className={styles.field}><span className={styles.label}>親アカウント</span><SaveErrorField names={["parentId","form.parentId","parent_id","parentLineAccountId","form.parent_id"]}><EntitySelect aria-label="親アカウント" value={form.parentId} onChange={(value) => update('parentId', value)} options={[{ value: '', label: '親なし' }, ...parents.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))]} /></SaveErrorField></div>
                     <div className={styles.field}><Field label="既存のLIFF ID" htmlFor="v8-existing-liff"><SaveErrorField names={["liffId","form.liffId","liff_id","form.liff_id"]}><TextField id="v8-existing-liff" value={form.liffId} onChange={(event) => update('liffId', event.target.value)} placeholder="未入力なら自動で用意します" /></SaveErrorField></Field></div>
-                  </div>
+                  </SettingsFormRow>
                   <fieldset className={styles.fieldset}>
                     <legend className={styles.label}>このアカウントを担当範囲に追加する人</legend>
                     <SaveErrorField names={["staffIds", "staff_ids"]}><EntitySelect aria-label="このアカウントを担当範囲に追加する人" noun="スタッフ" values={form.staffIds} onChange={(ids) => update('staffIds', ids)} options={staffOptions.map((member) => ({ value: member.id, label:member.name}))}/></SaveErrorField>
@@ -613,29 +612,16 @@ export default function AccountRegisterV8() {
               )}
               <div className={styles.field}>
                 <span className={styles.groupLabel}>Callback URL</span>
-                <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--tpl-htn-endpoint-pad)" gap="var(--tpl-htn-panel-gap)">
+                <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
                   <span className={styles.endpointValue} ><TruncatedText value={String(callbackUrl ?? '')} url /></span>
                   <CopyButton value={callbackUrl} />
                 </Card>
               </div>
             </Card>
           )}
-
           {currentStep === 4 && !createdId && (
-            <div className={styles.split} data-design-node="v2KMj">
-              <div className={styles.column}>
-                <ol className={styles.checkList} aria-label="接続確認項目">
-                  {checkRows.map((row) => <CheckRow key={row.key} row={row} />)}
-                </ol>
-                <Card className={styles.importBox} surface="inset" contentPadding="var(--tpl-htn-import-pad)" gap="var(--tpl-htn-panel-gap)">
-                  <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><SettingCheckbox checked={form.importFriends} label="既存の友だちの取り込み" onChange={(next) => update('importFriends', next)} /></SaveErrorField>
-                  <span className={styles.importText}>
-                    <strong>既存の友だちの取り込み</strong>
-                    <span>登録のあと、いまの友だちを musubo に取り込みます（数分かかります）</span>
-                  </span>
-                </Card>
-              </div>
-              <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" role="complementary" aria-label="登録内容を確認する">
+            <CreateStepColumns data-design-node="v2KMj" previewTitle="登録内容を確認する" preview={(
+                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="登録内容を確認する">
                 <h2>登録内容を確認する</h2>
                 <p>{`表示名：${form.name.trim() || (connection?.displayName ? `${connection.displayName}（LINEから取得）` : 'LINEから取得')}`}</p>
                 <p>{`LINE ID：${form.lineId || '接続確認で取得します'}`}</p>
@@ -643,9 +629,22 @@ export default function AccountRegisterV8() {
                 <p>{`タグ：${selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : emptyValue('none')}`}</p>
                 <p>{`担当：${staffNames.length > 0 ? staffNames.join('・') : emptyValue('none')}`}</p>
               </Card>
-            </div>
-          )}
+              )}>
+              <div className={styles.column}>
+                <ol className={styles.checkList} aria-label="接続確認項目">
+                  {checkRows.map((row) => <CheckRow key={row.key} row={row} />)}
+                </ol>
+                <Card layout="horizontal" surface="inset" contentPadding="var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
+                  <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><SettingCheckbox checked={form.importFriends} label="既存の友だちの取り込み" onChange={(next) => update('importFriends', next)} /></SaveErrorField>
+                  <span className={styles.importText}>
+                    <strong>既存の友だちの取り込み</strong>
+                    <span>登録のあと、いまの友だちを musubo に取り込みます（数分かかります）</span>
+                  </span>
+                </Card>
+              </div>
 
+            </CreateStepColumns>
+          )}
           {createdId && connection && (
             <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="登録完了" data-design-node="TvXII">
               <h2 className={styles.panelTitle}>登録が完了しました</h2>
@@ -676,7 +675,7 @@ export default function AccountRegisterV8() {
               )}
               <p className={styles.groupLabel}>次にすること</p>
               <div className={styles.buttonRow}>
-                <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>
+                {importingIds ? <Button disabled title="友だち情報の取り込みが終わると、登録したアカウントを開けます">登録したアカウントを見る</Button> : <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>}
                 <Button href="/friends"><Users size={15} aria-hidden="true" />友だち一覧</Button>
                 <Button href="/friend-add-settings"><QrCode size={15} aria-hidden="true" />友だち追加URL・QR</Button>
                 <Button href="/emergency"><Activity size={15} aria-hidden="true" />運用状態の接続監視</Button>
@@ -684,7 +683,6 @@ export default function AccountRegisterV8() {
             </Card>
           )}
         </div>
-
         {recoveredAccountId ? (
           <Notice
             tone="warn"
@@ -695,7 +693,6 @@ export default function AccountRegisterV8() {
         ) : error ? (
           <Notice tone="danger" message={error} onClose={() => setError('')} />
         ) : null}
-
         <StickyBar presentation="account-registration" actions={createdId ? (
             <Button href="/hq" variant="primary"><ArrowLeft size={15} aria-hidden="true" />統括コンソールへ戻る</Button>
           ) : currentStep === 4 ? <>
@@ -708,10 +705,8 @@ export default function AccountRegisterV8() {
             <Button type="submit" variant="primary" disabled={busy}><ArrowRight size={15} aria-hidden="true" />次へ</Button>
           </>} />
       </form>
-
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-
       <Dialog
         open={resultOpen}
         onCancel={() => setResultOpen(false)}
@@ -754,7 +749,6 @@ export default function AccountRegisterV8() {
     </PageFrame></SaveErrorScope>
   )
 }
-
 function CheckRow({ row }: { row: V8CheckRow }) {
   const Icon = row.state === 'passed' ? CircleCheck : row.state === 'failed' ? CircleX : CircleDashed
   return (
@@ -768,7 +762,6 @@ function CheckRow({ row }: { row: V8CheckRow }) {
     </li>
   )
 }
-
 function ResultRow({ label, value, state }: { label: string; value: string; state: 'passed' | 'failed' | 'todo' }) {
   return (
     <Tr>
@@ -778,10 +771,8 @@ function ResultRow({ label, value, state }: { label: string; value: string; stat
     </Tr>
   )
 }
-
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
-
   return (
     <CopyTextButton value={value} aria-label="値をコピー" disabled={value === '—'} />
   )

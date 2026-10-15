@@ -1,5 +1,12 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("ルール名を入力してください"),
+  row_message: requiredText("送る文面を入力してください"),
+}
+
+
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import Select from '@/components/shared/select'
@@ -22,7 +29,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import { Field, RequiredBadge } from '@/components/shared/form-controls'
+import { Field, FieldError, RequiredBadge } from '@/components/shared/form-controls'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import ConditionBuilder, { isEmptyCondition, isRuleComplete, pruneCondition, type SegmentCondition, type SegmentRule } from '@/components/shared/condition-builder'
@@ -36,7 +43,7 @@ import { FriendMultiSelect } from './friend-multi-select'
 import { formatNumber, formatTime } from '@/lib/format'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { japaneseDetailOf, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ActionList from '@/components/shared/action-list'
@@ -105,7 +112,7 @@ const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; not
  */
 /* 並びは共有の正本 `AUTOMATION_DRAFT_TRIGGER_OPTIONS` と同じ順を保つ。 */
 const TRIGGER_EVENT_GROUPS: ReadonlyArray<{ id: string; label: string; values: readonly string[] }> = [
-  { id: 'people', label: '友だちやお客さんの動き', values: ['friend_add', 'message_received', 'tag_change', 'form_submitted', 'link_clicked', 'calendar_booked'] },
+  { id: 'people', label: '友だちやお客さんの動き', values: ['friend_add', 'message_received', 'tag_change', 'form_submitted', 'link_clicked', 'calendar_booked', ...AUTOMATION_DRAFT_TRIGGER_OPTIONS.filter(option => option.value.startsWith('restaurant.')).map(option => option.value)] },
   { id: 'schedule', label: '決めた時刻・曜日', values: ['datetime', 'daily', 'weekly'] },
   { id: 'ec', label: 'ECの出来事', values: ['ec.order.confirmed'] },
 ]
@@ -278,6 +285,8 @@ type ActionType = string
 interface ActionDraft {
   /** 行を取り違えないための、画面の中だけの番号。 */
   key: number
+  /** 読み込んだ処理のID。名前だけの保存や並べ替えで別の処理にしない。 */
+  sourceId?: string
   type: ActionType
   tagId: string
   message: string
@@ -511,23 +520,36 @@ const formSnapshotHasContent = (snapshot: FormSnapshot): boolean =>
   )
 
 /** 「すること」1行を、保存で送る形へ直す。指紋とも同じ形を使う。 */
-export const actionDraftToPayload = (row: ActionDraft, index: number): AutomationDraftAction => (
+export const actionDraftToPayload = (row: ActionDraft, index: number, rows?: ActionDraft[]): AutomationDraftAction => {
+  let id = row.sourceId ?? `step-${index + 1}`
+  if (!row.sourceId && rows) {
+    const used = new Set(rows.map(item => item.sourceId).filter(Boolean))
+    for (let position = 0; position <= index; position += 1) {
+      if (rows[position]?.sourceId) continue
+      let number = position + 1
+      while (used.has(`step-${number}`)) number += 1
+      id = `step-${number}`
+      used.add(id)
+    }
+  }
+  return (
   row.type === 'notify_staff'
     /* 担当へ知らせる：読んだときの知らせのルール・文面をそのまま戻す（口は F-14 で受け付ける）。 */
-    ? ({ id: `step-${index + 1}`, type: 'notify_staff', params: { ...(row.kept ?? {}) }, onFailure: 'stop' } as unknown as AutomationDraftAction)
+    ? ({ id, type: 'notify_staff', params: { ...(row.kept ?? {}) }, onFailure: 'stop' } as unknown as AutomationDraftAction)
     : row.type === 'add_tag'
-    ? { id: `step-${index + 1}`, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
+    ? { id, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
     : row.type === 'start_scenario'
-      ? { id: `step-${index + 1}`, type: 'start_scenario' as const, params: { scenarioId: row.scenarioId }, onFailure: 'stop' as const }
+      ? { id, type: 'start_scenario' as const, params: { scenarioId: row.scenarioId }, onFailure: 'stop' as const }
       : row.type === 'common_action'
-        ? { id: `step-${index + 1}`, type: 'common_action' as const, params: { commonActionId: row.commonActionId }, onFailure: 'stop' as const }
+        ? { id, type: 'common_action' as const, params: { commonActionId: row.commonActionId }, onFailure: 'stop' as const }
         : {
-            id: `step-${index + 1}`,
+            id,
             type: 'send_message' as const,
             params: { messageType: 'text', content: row.message.trim() },
             onFailure: 'stop' as const,
           }
-)
+  )
+}
 
 /**
  * 「だれに」の条件を、保存で送る形へ直す（AUTOMATION-04）。
@@ -546,35 +568,41 @@ const normalizeTriggerConfigFor = (
   triggerConfig: Record<string, unknown>,
   keyword: string,
 ): Record<string, unknown> => {
-  if (eventType === 'message_received') return keyword.trim() ? { keyword: keyword.trim() } : {}
+  const plain = Object.fromEntries(Object.entries(triggerConfig).filter(([key]) => key !== 'friendNames'))
+  const managed = new Set(AUTOMATION_DRAFT_TRIGGER_OPTIONS.find(option => option.value === eventType)?.configKeys ?? [])
+  const kept = Object.fromEntries(Object.entries(plain).filter(([key]) => !managed.has(key)))
+  if (eventType === 'message_received') return { ...kept, ...(keyword.trim() ? { keyword: keyword.trim() } : {}) }
   if (eventType === 'tag_change') return {
+    ...kept,
     tagId: String(triggerConfig.tagId ?? ''),
     action: triggerConfig.action === 'remove' ? 'remove' : 'add',
   }
   if (eventType === 'datetime') {
     const local = String(triggerConfig.at ?? '')
-    return { at: local ? new Date(`${local}:00+09:00`).toISOString() : '', friendIds: normalizeFriendIds(triggerConfig.friendIds) }
+    return { ...kept, at: local ? new Date(`${local}:00+09:00`).toISOString() : '', friendIds: normalizeFriendIds(triggerConfig.friendIds) }
   }
   if (eventType === 'daily' || eventType === 'weekly') return {
+    ...kept,
     time: String(triggerConfig.time ?? ''),
     friendIds: normalizeFriendIds(triggerConfig.friendIds),
     ...(eventType === 'weekly' ? { weekdays: normalizeWeekdays(triggerConfig.weekdays) } : {}),
   }
   if (eventType === 'link_clicked') {
     const trackedLinkId = String(triggerConfig.trackedLinkId ?? '').trim()
-    return trackedLinkId ? { trackedLinkId } : {}
+    return { ...kept, ...(trackedLinkId ? { trackedLinkId } : {}) }
   }
   if (eventType === 'calendar_booked') {
     const bookingType = String(triggerConfig.bookingType ?? '')
     const menuId = String(triggerConfig.menuId ?? '').trim()
     const eventId = String(triggerConfig.eventId ?? '').trim()
     return {
+      ...kept,
       ...(bookingType === 'salon' || bookingType === 'event' ? { bookingType } : {}),
       ...(menuId ? { menuId } : {}),
       ...(eventId ? { eventId } : {}),
     }
   }
-  return triggerConfig
+  return plain
 }
 
 /**
@@ -627,38 +655,42 @@ export const draftDetailToForm = (detail: AutomationDraftDetail): {
     switch (detail.eventType) {
       case 'tag_change':
         return {
+          ...config,
           tagId: String(config.tagId ?? ''),
           action: config.action === 'remove' ? 'remove' : 'add',
         }
       case 'form_submitted':
-        return { formId: String(config.formId ?? '') }
+        return { ...config, formId: String(config.formId ?? '') }
       case 'link_clicked':
-        return { trackedLinkId: String(config.trackedLinkId ?? '') }
+        return { ...config, trackedLinkId: String(config.trackedLinkId ?? '') }
       case 'calendar_booked':
         return {
+          ...config,
           bookingType: String(config.bookingType ?? ''),
           menuId: String(config.menuId ?? ''),
           eventId: String(config.eventId ?? ''),
         }
       case 'datetime':
-        return { at: isoToDatetimeLocal(String(config.at ?? '')), friendIds: normalizeFriendIds(config.friendIds), friendNames }
+        return { ...config, at: isoToDatetimeLocal(String(config.at ?? '')), friendIds: normalizeFriendIds(config.friendIds), friendNames }
       case 'daily':
-        return { time: String(config.time ?? ''), friendIds: normalizeFriendIds(config.friendIds), friendNames }
+        return { ...config, time: String(config.time ?? ''), friendIds: normalizeFriendIds(config.friendIds), friendNames }
       case 'weekly':
         return {
+          ...config,
           time: String(config.time ?? ''),
           friendIds: normalizeFriendIds(config.friendIds),
           friendNames,
           weekdays: normalizeWeekdays(config.weekdays),
         }
       default:
-        return {}
+        return { ...config }
     }
   })()
   const actions: ActionDraft[] = detail.actions.length === 0
     ? [newActionDraft()]
     : detail.actions.map((step) => ({
         key: ++actionKeySeed,
+        sourceId: step.id,
         type: step.type,
         tagId: String(step.params.tagId ?? ''),
         message: String(step.params.content ?? ''),
@@ -1280,8 +1312,7 @@ export function NewAutomationV8({
   }).join('、')
 
   /** 保存で送る「すること」。確認画面とのずれを見るときも同じ形を使う。 */
-  const draftActions = (): AutomationDraftAction[] => actions.map((row, index) =>
-    actionDraftToPayload(row, index))
+  const draftActions = (): AutomationDraftAction[] => actions.map(actionDraftToPayload)
 
   /**
    * 共通アクションの版の中身を、確認画面向けの一文へたたむ（R486）。
@@ -1469,7 +1500,8 @@ export function NewAutomationV8({
       setInputError({ target, message })
       return message
     }
-    if (!name.trim()) return invalid('v8-rule-name', 'ルール名を入力してください')
+    if ((b244Requirements.name.check(name) !== null)) return invalid('v8-rule-name', 'ルール名を入力してください')
+    if (eventType === 'tag_change' && !String(triggerConfig.tagId ?? '').trim()) return invalid('v8-trigger-tag', 'きっかけのタグを選んでください')
     /*
      * 古い形で保存された条件を読めなかった下書きは、付け直すまで保存させない。
      * そのまま保存すると、読めなかった条件が黙って消えて全員へ届くルールに
@@ -1489,7 +1521,7 @@ export function NewAutomationV8({
       if (row.type === 'add_tag' && !row.tagId) return invalid(`v8-tag-${row.key}`, '付けるタグを選んでください', row.key)
       if (row.type === 'start_scenario' && !row.scenarioId) return invalid(`v8-scenario-${row.key}`, '始めるシナリオを選んでください', row.key)
       if (row.type === 'common_action' && !row.commonActionId) return invalid(`v8-common-action-${row.key}`, '使う共通アクションを選んでください', row.key)
-      if (row.type === 'send_message' && !row.message.trim()) return invalid(`v8-message-${row.key}`, '送る文面を入力してください', row.key)
+      if (row.type === 'send_message' && (b244Requirements.row_message.check(row.message) !== null)) return invalid(`v8-message-${row.key}`, '送る文面を入力してください', row.key)
       if (row.type === 'notify_staff'
         && (!String(row.kept?.notificationRuleId ?? '').trim() || !String(row.kept?.message ?? '').trim())) {
         return invalid(`v8-action-${row.key}`, '担当へ知らせる中身が読めません。することを選び直してください', row.key)
@@ -1992,9 +2024,7 @@ export function NewAutomationV8({
         } else {
           { if (!fieldFailure)
           setError(
-            caught instanceof ApiError || caught instanceof Error
-              ? caught.message
-              : '保存できませんでした',
+            japaneseDetailOf(caught) || '下書きを保存できませんでした。状態を読み直してから、もう一度お試しください。',
           ) }
         }
       }
@@ -2318,13 +2348,13 @@ export function NewAutomationV8({
 
   const sideColumn = (
     <div className={styles.side} aria-label="決めごとの確認">
-      <section className={styles.sideCard} aria-label="いまの決めごとを文章にすると">
+      <Card variant="aside" aria-label="いまの決めごとを文章にすると">
         <h2 className={styles.sideTitle}>いまの決めごとを文章にすると</h2>
         {/* この文章のとおりに動く。おかしいと感じたら、左の3つを見直す。 */}
         <p className={styles.sideBody}>{ruleSentence}</p>
-      </section>
+      </Card>
 
-      <section className={styles.sideCard} aria-label="当てはまりそうな人数">
+      <Card variant="aside" aria-label="当てはまりそうな人数">
         <div className={styles.sideHead}>
           <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
           <p className={styles.sideNote}>
@@ -2357,9 +2387,9 @@ export function NewAutomationV8({
             </Button>
           </div>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.sideCard} aria-label="1人で試す">
+      <Card variant="aside" aria-label="1人で試す">
         <div className={styles.sideHead}>
           <div className={styles.sideTitleRow}>
             <h2 className={styles.sideTitle}>1人で試す</h2>
@@ -2431,9 +2461,9 @@ export function NewAutomationV8({
             </div>
           </div>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.sideCard} aria-label="気をつけること">
+      <Card variant="aside" aria-label="気をつけること">
         <h2 className={styles.sideTitle}>気をつけること</h2>
         {existingError?<ListState kind="error" title="既存のルールを読み込めませんでした" onRetry={()=>setExistingRetry(value=>value+1)}/>:null}
         <ul className={styles.cautionList}>
@@ -2442,9 +2472,9 @@ export function NewAutomationV8({
           <li>・止めると、そのあとのきっかけでは動きません</li>
           <li>・友だちになったとき は、ブロック解除では動きません</li>
         </ul>
-      </section>
+      </Card>
 
-      <section className={styles.sideCard} aria-label="つながる先">
+      <Card variant="aside" aria-label="つながる先">
         <h2 className={styles.sideTitle}>つながる先</h2>
         <dl className={styles.kvList}>
           <div className={styles.kvRow}>
@@ -2460,7 +2490,7 @@ export function NewAutomationV8({
             <dd className={styles.kvLight}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : emptyValue('none')}</dd>
           </div>
         </dl>
-      </section>
+      </Card>
     </div>
   )
 
@@ -2491,12 +2521,16 @@ export function NewAutomationV8({
         ? (
           <>
             見本に実データは入っていません。このアカウントで使うタグやシナリオを選び、下書きとして保存します。
+            保存しても自動では動きません。公開するまでは下書きのままです。
             {sourceBand}
           </>
         )
         : 'きっかけ・だれに・何をするかを決めます。1人で試してから動かすと、まちがいを防げます。'}
       /* 競合の帯（tJqST）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
-      previewToggle={conflictBand}
+      notice={conflictBand}
+      noticeSpacing="band"
+      previewLabel="設定内容を見る"
+      previewTitle="設定内容"
       preview={sideColumn}
       status={saveStatusText}
       footerActions={(
@@ -2549,12 +2583,12 @@ export function NewAutomationV8({
         </div>
       ) : null}
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="名前">
+      <Card variant="form" gap="normal" aria-label="名前">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>{isDraft ? '1. どのルールか' : '名前'}</h2>
           <p className={styles.cardDesc}>一覧で見分けるための名前。お客さまには見えません</p>
         </div>
-        <Field label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined}>
+        <Field requirement={b244Requirements.name} label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined}>
           <SaveErrorField names={["name"]}><TextField
             id="v8-rule-name"
             value={name}
@@ -2565,7 +2599,7 @@ export function NewAutomationV8({
         </Field>
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="どんなときに動かしますか">
+      <Card variant="form" gap="normal" aria-label="どんなときに動かしますか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>{isDraft ? '2. 何が起きたら動かすか' : 'どんなときに動かしますか'}</h2>
         </div>
@@ -2619,7 +2653,7 @@ export function NewAutomationV8({
           <div className={styles.subBox}>
             <p className={styles.subTitle}>きっかけの詳しい設定</p>
             <div className={styles.formGrid}>
-              {eventType === 'tag_change' ? <SaveErrorField names={["tagId","triggerConfig.tagId","triggerConfig"]}><EntityKindField kind="tag" label="きっかけのタグ" placeholder="（どのタグか選ぶ）" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={tags} /></SaveErrorField> : null}
+              {eventType === 'tag_change' ? <SaveErrorField names={["tagId","triggerConfig.tagId","triggerConfig"]}><EntityKindField id="v8-trigger-tag" invalid={inputError?.target === 'v8-trigger-tag'} aria-describedby={inputError?.target === 'v8-trigger-tag' ? 'v8-trigger-error' : undefined} kind="tag" label="きっかけのタグ" placeholder="（どのタグか選ぶ）" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={tags} /></SaveErrorField> : null}
               {eventType === 'tag_change' ? <SaveErrorField names={["action","triggerConfig.action","trigger_config.action","trigger_config"]}><Select aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(value) => setTriggerConfig({ ...triggerConfig, action: value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} size="full" /></SaveErrorField> : null}
               {eventType === 'form_submitted' ? <SaveErrorField names={["formId","triggerConfig.formId","form_id","trigger_config.form_id","trigger_config"]}><EntityRemoteField kind="form" label="回答フォーム" value={String(triggerConfig.formId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, formId: value })} /></SaveErrorField> : null}
               {eventType === 'link_clicked' ? <SaveErrorField names={["trackedLinkId","triggerConfig.trackedLinkId","tracked_link_id","trigger_config.tracked_link_id","trigger_config"]}><EntityRemoteField kind="tracked_link" label="計測リンク" value={String(triggerConfig.trackedLinkId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, trackedLinkId: value })} /></SaveErrorField> : null}
@@ -2646,19 +2680,20 @@ export function NewAutomationV8({
                 />
               ) : null}
             </div>
-            {inputError?.target === 'v8-trigger-at' || inputError?.target === 'v8-trigger-time' ? <p id="v8-trigger-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
+            {inputError?.target === 'v8-trigger-tag' || inputError?.target === 'v8-trigger-at' || inputError?.target === 'v8-trigger-time' ? <FieldError id="v8-trigger-error">{inputError.message}</FieldError> : null}
             <p className={styles.cardDesc}>{triggerConfigSummary}。保存後も設定を確認できます。</p>
           </div>
         ) : null}
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="だれに動かしますか">
+      <Card variant="form" gap="normal" aria-label="だれに動かしますか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>だれに動かしますか</h2>
         </div>
         {conditionUnreadable ? (
           <Notice tone="danger" heading={<> 保存されていた条件は読めませんでした </>} action={<> <div>
-              <Button id="v8-repair-condition" onClick={() => { setConditionUnreadable(false); setInputError(null) }}>以前の条件を外して付け直す</Button>
+              <Button id="v8-repair-condition" aria-describedby={inputError?.target === 'v8-repair-condition' ? 'v8-repair-condition-error' : undefined} onClick={() => { setConditionUnreadable(false); setInputError(null) }}>以前の条件を外して付け直す</Button>
+              {inputError?.target === 'v8-repair-condition' ? <FieldError id="v8-repair-condition-error">{inputError.message}</FieldError> : null}
             </div> </>} >以前の画面が別の形で保存した条件です。このままでは人数を数えられないため、保存できません。
               以前の条件を外してもよければ、下のボタンから付け直せます。</Notice>
         ) : (
@@ -2681,13 +2716,13 @@ export function NewAutomationV8({
               </button>
             </div>
             <button type="button" className={styles.linkButton} onClick={() => setConditionOpen(true)}>
-              ＋「いずれか1つ以上を満たす」条件（or 条件）を足す
+              ＋「いずれか1つ以上を満たす」条件を足す
             </button>
           </>
         )}
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="何をするか">
+      <Card variant="form" gap="normal" aria-label="何をするか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>{isDraft ? '3. 何をするか' : '何をするか'}</h2>
           <p className={styles.cardDesc}>上から順に動きます</p>
@@ -2752,17 +2787,17 @@ export function NewAutomationV8({
                 知らせる相手と文面は、見本から作ったときのまま保ちます。変えるときは、することを選び直してください。
               </p>
             ) : (
-              <Field label="送る文面" htmlFor={`v8-message-${row.key}`}><SaveErrorField names={["message","editingRow.message","editing_row.message"]}><TextArea
+              <Field label="送る文面" htmlFor={`v8-message-${row.key}`} requirement={b244Requirements.row_message}><SaveErrorField names={["message","editingRow.message","editing_row.message"]}><TextArea
                   invalid={inputError?.target === `v8-message-${row.key}`}
                   aria-describedby={inputError?.target === `v8-message-${row.key}` ? 'v8-action-error' : undefined}
                   id={`v8-message-${row.key}`}
                   value={row.message}
                   onChange={(event) => updateAction(row.key, { message: event.target.value })}
                 /></SaveErrorField>
-{inputError?.target === `v8-message-${row.key}` ? <p id="v8-action-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}</Field>
+{inputError?.target === `v8-message-${row.key}` ? <FieldError id="v8-action-error">{inputError.message}</FieldError> : null}</Field>
             )}
           </div>} />
-        {inputError?.target === 'v8-add-action' ? <p className={styles.inputError} role="alert">{inputError.message}</p> : null}
+        {inputError?.target === 'v8-add-action' ? <FieldError id="v8-add-action-error">{inputError.message}</FieldError> : null}
       </Card>
 
       {/* だれに：条件の窓。一斉配信・シナリオと同じ条件（標準互換・15軸）。 */}
@@ -2892,7 +2927,7 @@ function ResourcePick(props: {
         onChange={(picked) => onPick(picked)}
         options={options}
       /></SaveErrorField>
-      {props.error ? <p id={`${id}-error`} className={styles.inputError} role="alert">{props.error}</p> : null}
+      {props.error ? <FieldError id={`${id}-error`}>{props.error}</FieldError> : null}
       {loading ? <p className={styles.cardDesc}>読み込んでいます</p> : null}
       {failed ? <p className={styles.cardDesc}>{failedNote}</p> : null}
     </div>

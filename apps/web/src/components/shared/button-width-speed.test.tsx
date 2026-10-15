@@ -10,6 +10,23 @@ afterEach(() => {
 })
 
 describe('保存中・完了のボタン幅', () => {
+  it('保存文が短→長→短に変わるたび、前の固定幅を外して全文を測る', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return parseFloat(this.style.width) || (this.textContent?.includes('か所') ? 240 : 100)
+    })
+    const action = (label: string, busy = false) => <Button busy={busy} done={false}>{label}</Button>
+    const { rerender } = render(action('保存する'))
+    const button = screen.getByRole('button')
+    expect(button.style.width).toBe('121px')
+    rerender(action('8か所に反映して保存'))
+    expect(button.style.width).toBe('240px')
+    rerender(action('8か所に反映して保存', true))
+    expect(button.style.width).toBe('240px')
+    expect(button.disabled).toBe(true)
+    rerender(action('保存する'))
+    expect(button.style.width).toBe('121px')
+  })
+
   it('同じ文字でもアイコン・寸法・非表示が変わったら測り直す', () => {
     document.documentElement.dataset.theme = 'v8'
     const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(100)
@@ -40,7 +57,7 @@ describe('保存中・完了のボタン幅', () => {
     expect(button.style.width).toBe('121px')
     rerender(<Button busy done={false}>機能設定を保存</Button>)
     expect(button.disabled).toBe(true)
-    expect(button.textContent).toBe('保存中…')
+    expect(button.textContent).toBe('保存しています…')
     expect(button.style.minWidth).toBe('100px')
   })
 })

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -24,7 +24,7 @@ describe('ログインユーザーの操作契約', () => {
   })
 
   it('「最後に入った」の下の1行は省略しても全文をtitleで読める', () => {
-    expect(staffSource).toContain('truncate text-xs text-ink-faint')
+    expect(staffSource).toContain('className={styles.colLast}')
     expect(staffSource).toContain('title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}`')
   })
 

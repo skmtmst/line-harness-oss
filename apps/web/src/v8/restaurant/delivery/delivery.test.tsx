@@ -485,7 +485,7 @@ describe('承認v02の見え方を守る', () => {
     // 絵の下のボタンの段に線は無い。
     expect(detail).toMatch(/footerPlain/)
     const shared = readFileSync(join(__dirname, '../../../components/shared/dialog.module.css'), 'utf8')
-    expect(shared).toMatch(/\[data-theme='v8'\] \.titleNote \{[^}]*font-size: var\(--text-caption\)/)
+    expect(shared).toMatch(/:root \.titleNote \{[^}]*font-size: var\(--text-caption\)/)
   })
 
   it('注文詳細（hjdqV）の数量と金額は離れた2つの右寄せの列にする', () => {

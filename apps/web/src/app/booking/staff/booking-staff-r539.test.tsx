@@ -30,8 +30,8 @@ memStorage.setItem('lh_staff_role', 'owner')
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn() }),
 }))
 vi.mock('@/lib/api', () => ({
@@ -76,7 +76,7 @@ describe('R539 429は画面内の再読込で取り直せる', () => {
     render(<BookingStaffPage />)
 
     // 待ち案内と一緒に再試行の口が出る。
-    await screen.findByText('予約スタッフを表示できませんでした')
+    await screen.findByText('予約スタッフを読み込めませんでした')
     const retry = screen.getByRole('button', { name: '予約スタッフを再読み込み' })
 
     fixture.listStaff = vi.fn(async () => ({ staff: [ROW] })) as unknown as typeof fixture.listStaff
@@ -90,7 +90,7 @@ describe('R539 429は画面内の再読込で取り直せる', () => {
     }) as unknown as typeof fixture.listStaff
     render(<BookingStaffPage />)
 
-    await screen.findByText('予約スタッフを表示できませんでした')
+    await screen.findByText('予約スタッフを読み込めませんでした')
     expect(screen.queryByRole('button', { name: '予約スタッフを再読み込み' })).toBeNull()
   })
 
@@ -98,7 +98,7 @@ describe('R539 429は画面内の再読込で取り直せる', () => {
     fixture.listStaff = vi.fn(async () => { throw new Error('network') }) as unknown as typeof fixture.listStaff
     render(<BookingStaffPage />)
 
-    await screen.findByText('予約スタッフを表示できませんでした')
+    await screen.findByText('予約スタッフを読み込めませんでした')
     expect(screen.getByRole('button', { name: '予約スタッフを再読み込み' })).toBeTruthy()
   })
 })

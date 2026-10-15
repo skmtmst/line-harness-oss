@@ -4,10 +4,7 @@
  */
 
 /* 段（カード）：枠1・角12・余白20・中の間14。 */
-.card {
-  gap: var(--tpl-section-gap);
-  min-width: 0;
-}
+.card { min-width: 0; }
 .cardHead {
   display: flex;
   flex-direction: column;
@@ -43,14 +40,6 @@
   color: var(--color-danger);
   font-size: var(--text-caption);
 }
-/* 設定名＋フォルダ（220）の2列。 */
-.fieldPair {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--tpl-fa-ed-folder-w);
-  align-items: end;
-  gap: var(--tpl-rule-row-gap);
-}
-
 /* だれに送るか：2枚の選ぶカード（高さ98・余白14）。 */
 .kindPair {
   display: grid;
@@ -79,24 +68,14 @@
   background: var(--color-canvas);
   color: var(--color-ink-faint);
 }
-.routeSearchInput {
-  flex: 1 1 0;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: var(--tpl-chip-label-lh);
-}
 /* 選ぶ行は共通のチェックのカード。絵の行（余白10/12・角10・名前13/600）に合わせて寸法だけ当てる。 */
-:global([data-theme='v8']) label.routeCard {
+:global(:root) label.routeCard {
   align-items: center;
   min-height: 0;
   padding: var(--tpl-fa-ed-route-pad);
   border-radius: var(--radius-control);
 }
-:global([data-theme='v8']) label.routeCard > span:last-child > span:first-child {
+:global(:root) label.routeCard > span:last-child > span:first-child {
   font-size: var(--text-label);
   font-weight: 600;
   line-height: var(--tpl-row-name-lh);
@@ -220,43 +199,6 @@
 .pickChip:disabled { cursor: not-allowed; }
 
 /* 本文の箱：余白14・文と差し込みの行の間12。 */
-.bodyBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-fa-ed-body-gap);
-  padding: var(--tpl-body-pad);
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-}
-.bodyText {
-  min-height: calc(var(--tpl-body-lh) * 2);
-  padding: 0;
-  border: 0;
-  outline: 0;
-  box-shadow: none;
-  background: transparent;
-  font-size: var(--text-label);
-  line-height: var(--tpl-body-lh);
-  resize: vertical;
-}
-.insertRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-chip-row-gap);
-}
-.insertLabel {
-  margin-right: var(--tpl-chip-row-gap);
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-row-sub-size);
-  line-height: var(--tpl-row-sub-lh);
-}
-.charCount {
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-row-sub-size);
-  font-variant-numeric: tabular-nums;
-}
-
 .segRow {
   display: flex;
   align-items: center;

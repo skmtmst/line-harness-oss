@@ -1,9 +1,10 @@
 'use client'
 
+import Card, { CardHeader } from '@/components/shared/card'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation';
-import { ArrowRight, TriangleAlert } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { FriendField, FriendFieldType } from '@line-crm/shared';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -27,12 +28,17 @@ import { permissionDeniedMessage, withPermissionFailure } from '@/components/sha
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
+import { TextField } from '@/components/shared/text-field'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
 
 /*
  * ★V8 友だち情報欄の移行（種類を変える。Pencil `GobMd`）。
  *
  * 読み込み・移行先の作成（R519）・事前確認・実行・結果の見守り（R547・R548）・アカウント切替の扱いは
- * 今の画面（app/tags/field-migrate-v8.tsx）から写した。見せ方を絵に合わせた：
+ * 今の画面（src/v8/tags/field-migrate.tsx）から写した。見せ方を絵に合わせた：
  * 頭は「「〇〇」の種類を変える」と今の種類・人数、注意の帯、段「移行の先」に移行後の種類と見本の表
  * （今の値 → 移したあと・人数。種類だけで読む事前確認＝何も書き込まない）、その下に移行先の名前など。
  * 事前確認したあとは、結果・切り替わる使用先・実行の結果の段を足す。
@@ -524,17 +530,16 @@ function FieldMigrate() {
         ) : null}
       </>}
     >
-      <p className={styles.infoNote}>
-        <TriangleAlert className={styles.wayIcon} aria-hidden="true" />
+      <Notice tone="info">
         種類を変えると、合わない値は空になることがあります。まず新しい種類の項目を作って、値がどう移るかを事前に確かめます。今の項目はそのまま残ります。
-      </p>
+      </Notice>
       {error ? <Notice tone="danger" message={error} /> : null}
 
-      <section className={styles.card} aria-labelledby="migrate-target">
-        <div className={styles.cardHead}><h2 className={styles.cardTitle} id="migrate-target">移行の先</h2></div>
+      <Card variant="form" gap="normal" aria-labelledby="migrate-target">
+        <CardHeader title="移行の先" titleId="migrate-target" />
         {targetMode === 'new' && !createdTarget ? (
-          <div className={styles.field}>
-            <span className={styles.labelStrong}>移行後の種類</span>
+          <div ><Field label={<span>移行後の種類</span>}>
+
             <span className={styles.selectBox}>
               <SaveErrorField names={["targetType","type","target_type"]}><Select
                 value={targetType}
@@ -544,35 +549,37 @@ function FieldMigrate() {
                 options={TYPES.map((type) => ({ value: type, label: FIELD_TYPE_WORDS[type] }))}
               /></SaveErrorField>
             </span>
-          </div>
+          </Field></div>
         ) : null}
 
-        <div className={styles.sampleTable} role="table" aria-label="値の移り方の見本">
-          <div className={styles.sampleHead} role="row">
-            <span role="columnheader">今の値</span>
-            <span role="columnheader">移したあと</span>
-            <span role="columnheader" className={styles.sampleCount}>人数</span>
-          </div>
-          {sampleState === 'loading' ? <p className={styles.sampleNote}>値の移り方を確かめています…</p> : null}
-          {sampleState === 'error' ? <p className={styles.sampleNote}>値の移り方を確かめられませんでした。「項目を作って事前確認」で確かめられます。</p> : null}
-          {sampleState === 'ready' && rows.length === 0 ? <p className={styles.sampleNote}>値が入っている友だちはいません。</p> : null}
+        <DataTable label="値の移り方の見本">
+          <thead><TableHeadRow>
+            <Th truncate>今の値</Th>
+            <Th truncate>移したあと</Th>
+            <Th truncate align="right">人数</Th>
+          </TableHeadRow></thead>
+          <tbody>
+          {sampleState === 'loading' ? <Tr><Td colSpan={3}><TruncatedText value="値の移り方を確かめています…" /></Td></Tr> : null}
+          {sampleState === 'error' ? <Tr><Td colSpan={3}><TruncatedText value="値の移り方を確かめられませんでした。「項目を作って事前確認」で確かめられます。" /></Td></Tr> : null}
+          {sampleState === 'ready' && rows.length === 0 ? <Tr><Td colSpan={3}><TruncatedText value="値が入っている友だちはいません。" /></Td></Tr> : null}
           {rows.map((row) => (
-            <div key={`${row.from}:${row.to}`} className={styles.sampleRow} role="row">
-              <span role="cell" title={row.from}>{row.from}</span>
-              <span role="cell" title={row.to}>{row.to}</span>
-              <span role="cell" className={styles.sampleCount}>{`${formatNumber(row.count)} 人`}</span>
-            </div>
+            <Tr key={`${row.from}:${row.to}`}>
+              <Td><TruncatedText value={row.from} /></Td>
+              <Td><TruncatedText value={row.to} /></Td>
+              <Td align="right"><TruncatedText value={`${formatNumber(row.count)} 人`} /></Td>
+            </Tr>
           ))}
-        </div>
+          </tbody>
+        </DataTable>
 
         {target ? (
-          <div className={styles.field}>
-            <span className={styles.labelStrong}>移行先の項目</span>
+          <div ><Field label={<span>移行先の項目</span>}>
+
             <p className={styles.cardNote}>{`${target.name}（{{field.${target.fieldKey}}}・${FIELD_TYPE_WORDS[target.type]}）`}</p>
             <span>
               <Button type="button" variant="text" onClick={() => { setCreatedTarget(null); setExistingTargetId(''); resetConfirmation() }}>別の項目を選び直す</Button>
             </span>
-          </div>
+          </Field></div>
         ) : (
           <>
             <SaveErrorField names={["targetMode"]}><SegmentedControl
@@ -582,13 +589,13 @@ function FieldMigrate() {
               onChange={(value) => { setTargetMode(value); resetConfirmation() }}
             /></SaveErrorField>
             {targetMode === 'new' ? (
-              <div className={styles.twoCols}>
-                <Field label="新しい項目の名前"><SaveErrorField names={["targetName","name","target_name"]}><input className={styles.input} value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
-                <Field label="差し込みの名前"><SaveErrorField names={["targetKey","fieldKey","target_key"]}><input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
-              </div>
+              <SettingsFormRow layout="name-folder">
+                <Field label="新しい項目の名前"><SaveErrorField names={["targetName","name","target_name"]}><TextField value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
+                <Field label="差し込みの名前"><SaveErrorField names={["targetKey","fieldKey","target_key"]}><TextField value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
+              </SettingsFormRow>
             ) : (
-              <div className={styles.field}>
-                <span className={styles.label}>移行先</span>
+              <div ><Field label={<span>移行先</span>}>
+
                 <span className={styles.selectBox}>
                   <SaveErrorField names={["existingTargetId","targetFieldId","existing_target_id"]}><EntitySelect
                     value={existingTargetId}
@@ -601,62 +608,53 @@ function FieldMigrate() {
                     ]}
                   /></SaveErrorField>
                 </span>
-              </div>
+              </Field></div>
             )}
           </>
         )}
         {targetMode === 'new' && !createdTarget ? <p className={styles.fieldNote}>{FIELD_TYPE_HINTS[targetType]}</p> : null}
-      </section>
+      </Card>
 
       {preview ? (
-        <section className={styles.card} aria-labelledby="migrate-preview">
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="migrate-preview">事前確認の結果</h2>
-            <p className={styles.cardNote}>登録済みの値を読み取り、移せる数だけを確かめました。まだ何も変えていません。</p>
-          </div>
-          <dl className={styles.placeList}>
-            <div className={styles.placeRow}><dt>値がある友だち</dt><dd>{`${preview.summary.total} 人`}</dd></div>
-            <div className={styles.placeRow}><dt>そのまま移せる</dt><dd>{`${preview.summary.convertible} 人`}</dd></div>
-            <div className={styles.placeRow}><dt>人が確認する</dt><dd>{`${preview.summary.review} 人`}</dd></div>
-            <div className={styles.placeRow}><dt>空欄</dt><dd>{`${preview.summary.invalid} 人`}</dd></div>
-          </dl>
-          <div className={styles.cardHead}><h3 className={styles.labelStrong}>切り替わる使用先</h3></div>
+        <Card variant="form" gap="normal" aria-labelledby="migrate-preview">
+          <CardHeader title="事前確認の結果" titleId="migrate-preview" meta="登録済みの値を読み取り、移せる数だけを確かめました。まだ何も変えていません。" />
+          <CreateSummaryCard title="値の移行" rows={[
+            { label: '値がある友だち', value: `${preview.summary.total} 人` },
+            { label: 'そのまま移せる', value: `${preview.summary.convertible} 人` },
+            { label: '人が確認する', value: `${preview.summary.review} 人` },
+            { label: '空欄', value: `${preview.summary.invalid} 人` },
+          ]} />
           {preview.usageTargets.length > 0 ? (
-            <dl className={styles.placeList}>
-              {preview.usageTargets.map((item) => (
-                <div key={`${item.kind}:${item.id}`} className={styles.placeRow}><dt title={item.name}>{item.name}</dt><dd>{item.switchable ? '移行のときに切り替わる' : '手で確かめる'}</dd></div>
-              ))}
-            </dl>
-          ) : <p className={styles.fieldNote}>切り替えが必要な使用先はありません。</p>}
+            <CreateSummaryCard title="切り替わる使用先" rows={preview.usageTargets.map(item => ({
+              key: `${item.kind}:${item.id}`,
+              label: <TruncatedText value={item.name} />,
+              value: item.switchable ? '移行のときに切り替わる' : '手で確かめる',
+            }))} />
+          ) : <Notice tone="info" message="切り替えが必要な使用先はありません。" />}
           {preview.runId && preview.previewExpiresAt ? <p className={styles.fieldNote}>{`確認番号：${preview.runId} ／ 有効期限：${formatDateTime(preview.previewExpiresAt)}`}</p> : null}
-        </section>
+        </Card>
       ) : null}
 
       {/* 実行を受け付けたのに結果がまだ無い間は「未確認」と出し、再取得・再開へつなげる（R548）。 */}
       {!run && executedRunId ? (
-        <section className={styles.card} aria-live="polite">
-          <h2 className={styles.cardTitle}>移行の結果</h2>
-          <p className={styles.cardNote}>{pollProblem || '実行を受け付けました。結果を確認しています…'}</p>
-        </section>
+        <Card variant="form" gap="normal" aria-live="polite">
+          <CardHeader title="移行の結果" meta={pollProblem || '実行を受け付けました。結果を確認しています…'} />
+        </Card>
       ) : null}
       {run ? (
-        <section className={styles.card} aria-live="polite">
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle}>移行の結果</h2>
-            <p className={styles.cardNote}>{RUN_STATUS_LABELS[run.status]}</p>
-          </div>
-          <dl className={styles.placeList}>
-            <div className={styles.placeRow}><dt>移行できた</dt><dd>{`${run.summary.succeeded} 人`}</dd></div>
-            <div className={styles.placeRow}><dt>移行できなかった</dt><dd>{`${run.summary.failed} 人`}</dd></div>
-            <div className={styles.placeRow}><dt>確認が必要なまま</dt><dd>{`${run.summary.review + run.summary.invalid} 人`}</dd></div>
-          </dl>
+        <Card variant="form" gap="normal" aria-live="polite">
+          <CreateSummaryCard title="移行の結果" description={RUN_STATUS_LABELS[run.status]} rows={[
+            { label: '移行できた', value: `${run.summary.succeeded} 人` },
+            { label: '移行できなかった', value: `${run.summary.failed} 人` },
+            { label: '確認が必要なまま', value: `${run.summary.review + run.summary.invalid} 人` },
+          ]} />
           {run.rows.filter((row) => row.status === 'failed').map((row) => (
             <p key={row.friendId} className={styles.fieldError}>{`${row.sourceValue || '（空欄）'}：${row.reason ?? '失敗しました。通信を確かめて、もう一度お試しください。'}`}</p>
           ))}
           {run.error ? <Notice tone="danger" message={run.error} /> : null}
           {/* 元に戻す操作はまだ無い。戻す必要が出たときの行き先をはっきり書く。 */}
           {run.rollbackDeadline ? <p className={styles.fieldNote}>{`元の項目の値は ${formatDateTime(run.rollbackDeadline)} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。`}</p> : null}
-        </section>
+        </Card>
       ) : null}
     </CreatePage></SaveErrorScope>
   )

@@ -8,20 +8,22 @@ import { useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
 import StatusBadge from '@/components/shared/status-badge'
 import { notifyToast } from '@/components/shared/toast'
 import { AD_LOG_PAGE_SIZE, adDateTime, adLogStatus, adPlatformLabel, useAdLogs } from './ad-shared'
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
-import { PageHeading } from '@/components/templates/page-frame'
+import { DetailPage } from '@/components/templates'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import EntitySelect from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
 
 /*
@@ -129,52 +131,51 @@ export default function AdHistoryV8() {
     body = <ListState kind="empty" title="条件に合う送信履歴はありません" description="成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。" />
   } else {
     body = (
-      <div className={styles.table} role="table" aria-label="広告への送信履歴">
-        <div className={`${styles.tableHead} ${styles.historyHead}`} role="row">
-          <span className={styles.colWhen} role="columnheader">いつ・何の成果</span>
-          <span className={styles.colMedia} role="columnheader">媒体</span>
-          <span className={styles.colSource} role="columnheader">流入元</span>
-          <span className={styles.colStatus} role="columnheader">状態</span>
-          <span className={styles.colNext} role="columnheader">次の予定</span>
-          <span className={styles.colOps} role="columnheader">操作</span>
-        </div>
+      <DataTable aria-label="広告への送信履歴" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
+        <TableHeadRow data-table-layout="columns">
+          <Th className={styles.colWhen} grow>いつ・何の成果</Th>
+          <Th className={styles.colMedia}>媒体</Th>
+          <Th className={styles.colSource} collapseAt="narrow">流入元</Th>
+          <Th className={styles.colStatus}>状態</Th>
+          <Th className={styles.colNext} collapseAt="narrow">次の予定</Th>
+          <Th className={styles.colOps}>操作</Th>
+        </TableHeadRow></thead><tbody>
         {visible.map((log) => {
           const state = adLogStatus(log.status)
           const platform = model.platforms.find((item) => item.id === log.adPlatformId)
           return (
-            <div key={log.id} className={`${styles.tableRow} ${styles.historyRow}`} role="row" data-row-id={log.id}>
-              <span className={styles.colWhen} role="cell">
+            <Tr key={log.id} data-row-id={log.id} data-table-layout="columns">
+              <Td className={styles.colWhen} grow>
                 <span className={styles.whenMain} title={log.eventName}>{log.eventName}</span>
                 <span className={styles.whenSub}>{adDateTime(log.createdAt)}</span>
-              </span>
-              <span className={styles.colMedia} role="cell"><span className={styles.cellText}>{adPlatformLabel(platform)}</span></span>
+              </Td>
+              <Td className={styles.colMedia}><span className={styles.cellText}>{adPlatformLabel(platform)}</span></Td>
               {/* 流入元は送信記録の口が返さないので「—」。 */}
-              <span className={styles.colSource} role="cell"><span className={styles.cellFaint}>{emptyValue('unknown')}</span></span>
-              <span className={styles.colStatus} role="cell">
+              <Td className={styles.colSource} collapseAt="narrow"><span className={styles.cellFaint}>{emptyValue('unknown')}</span></Td>
+              <Td className={styles.colStatus}>
                 <StatusBadge tone={state.tone} size="compact" title={log.status === 'failed' && log.errorMessage ? `断られた理由：${log.errorMessage}` : undefined}>{state.label}</StatusBadge>
-              </span>
-              <span className={styles.colNext} role="cell">
+              </Td>
+              <Td className={styles.colNext} collapseAt="narrow">
                 <span className={styles.cellFaint}>{log.status === 'pending' ? '送信待ち' : emptyValue('unknown')}</span>
-              </span>
-              <span className={styles.colOps} role="cell">
+              </Td>
+              <Td className={styles.colOps}>
                 {log.status === 'failed' && canRetry ? (
                   <Button onClick={() => void retry(log)} busy={retryingId === log.id} busyLabel="やり直しています…" disabled={retryingId !== null}>
                     <RotateCw size={15} aria-hidden="true" />やり直す
                   </Button>
                 ) : <span className={styles.cellFaint}>{emptyValue('unknown')}</span>}
-              </span>
-            </div>
+              </Td>
+            </Tr>
           )
         })}
-      </div>
+      </tbody></DataTable>
     )
   }
 
   return (
-    <div className={adsStyles.board} data-design-node="p0kA3">
-      <PageHeading title={<>広告への送信履歴</>}
+    <DetailPage boardId="p0kA3" contentPadding="0 var(--tpl-head-pad-side)" title={<>広告への送信履歴</>}
         help={<>成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。</>}
-        actions={<><Button onClick={exportLogs} disabled={visible.length === 0}><Download size={15} aria-hidden="true" />CSVで書き出す</Button></>} />
+        actions={<><Button onClick={exportLogs} disabled={visible.length === 0}><Download size={15} aria-hidden="true" />CSVで書き出す</Button></>}>
       <div className={adsStyles.body}>
         <div className={styles.tools}>
           <span className={styles.searchBox}>
@@ -190,7 +191,7 @@ export default function AdHistoryV8() {
             <SaveErrorField names={["status"]}><Select aria-label="送信状態" value={status} onChange={(value) => { setStatus(value); setPage(1) }} options={STATUS_OPTIONS} width={160} /></SaveErrorField>
           </span>
           <span className={styles.selectBox}>
-            <SaveErrorField names={["media"]}><EntitySelect aria-label="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} /></SaveErrorField>
+            <SaveErrorField names={["media"]}><EntitySelect aria-label="媒体" noun="媒体" value={media} onChange={setMedia} options={mediaOptions} width={160} /></SaveErrorField>
           </span>
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <span className={styles.toolsCount}>{`${formatNumber(model.total)} 件中 ${formatNumber(visible.length)} 件`}</span>
@@ -209,6 +210,6 @@ export default function AdHistoryV8() {
             : 'やり直しても同じ目印を使うため、2重には数えられません。'}
         </p>
       </div>
-    </div>
+    </DetailPage>
   )
 }

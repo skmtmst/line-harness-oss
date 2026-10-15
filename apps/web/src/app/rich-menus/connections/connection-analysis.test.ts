@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeConnections, type ConnectionPage } from './connection-analysis'
+import { analyzeConnections, type ConnectionPage } from '@/v8/rich-menus/connection-analysis'
 
 function page(id: string, targets: Array<string | null> = []): ConnectionPage {
   return {

@@ -129,10 +129,19 @@ export async function getStaffByApiKey(
   db: D1Database,
   apiKey: string,
 ): Promise<StaffMember | null> {
-  return db
-    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.api_key = ? AND sm.is_active = 1`)
+  const staff = await db
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.api_key = ? AND sm.is_active = 1
+      AND NOT EXISTS(SELECT 1 FROM platform_settings WHERE key='auth.staff_api_key.revoked_at:'||sm.id)`)
     .bind(...tenantStatusBindings(), apiKey)
     .first<StaffMember>();
+  if (!staff || staff.tenant_status !== 'active') return null;
+  // Guard the metadata write against a concurrent rotation or revocation.
+  const used = await db.prepare(`INSERT INTO platform_settings(key,value,updated_by,updated_at)
+    SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM staff_members sm WHERE sm.id=? AND sm.api_key=? AND sm.is_active=1
+      AND NOT EXISTS(SELECT 1 FROM platform_settings WHERE key='auth.staff_api_key.revoked_at:'||sm.id))
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at RETURNING key`)
+    .bind(`auth.staff_api_key.last_used_at:${staff.id}`, new Date().toISOString(), staff.id, jstNow(), staff.id, apiKey).first();
+  return used ? staff : null;
 }
 
 export async function getStaffByLineUserId(
@@ -646,6 +655,10 @@ export async function deleteAdminSessionForStaff(
     .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash = ?')
     .bind(staffId, tokenHash)
     .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    await db.prepare("DELETE FROM platform_settings WHERE key='auth.mfa.session:'||?").bind(tokenHash).run();
+    await db.prepare('UPDATE impersonation_sessions SET ended_at=? WHERE staff_id=? AND ended_at IS NULL').bind(jstNow(), staffId).run();
+  }
   return (result.meta.changes ?? 0) > 0;
 }
 
@@ -655,6 +668,9 @@ export async function deleteOtherAdminSessions(
   staffId: string,
   keepTokenHash: string,
 ): Promise<number> {
+  await db.prepare(`DELETE FROM platform_settings WHERE key IN
+    (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE staff_id=? AND token_hash<>?)`)
+    .bind(staffId, keepTokenHash).run();
   const result = await db
     .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash <> ?')
     .bind(staffId, keepTokenHash)
@@ -685,11 +701,17 @@ export async function getStaffByAdminSession(
 }
 
 export async function deleteAdminSession(db: D1Database, tokenHash: string): Promise<void> {
-  await db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').bind(tokenHash).run();
+  await db.batch([
+    db.prepare(`UPDATE impersonation_sessions SET ended_at=? WHERE ended_at IS NULL
+      AND staff_id IN (SELECT staff_id FROM admin_sessions WHERE token_hash=?)`).bind(jstNow(), tokenHash),
+    db.prepare("DELETE FROM platform_settings WHERE key='auth.mfa.session:'||?").bind(tokenHash),
+    db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').bind(tokenHash),
+  ]);
 }
 
 export async function deleteExpiredAdminSessions(db: D1Database, now: string): Promise<void> {
-  await db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').bind(now).run();
+  await db.batch([db.prepare("DELETE FROM platform_settings WHERE key IN (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE expires_at<=?)").bind(now),
+    db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').bind(now)]);
 }
 
 /**
@@ -701,6 +723,8 @@ export async function deleteExpiredAdminSessions(db: D1Database, now: string): P
  */
 export async function revokeStaffAuthentication(db: D1Database, staffId: string): Promise<void> {
   await db.batch([
+    db.prepare('UPDATE impersonation_sessions SET ended_at=? WHERE staff_id=? AND ended_at IS NULL').bind(jstNow(), staffId),
+    db.prepare("DELETE FROM platform_settings WHERE key IN (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE staff_id=?)").bind(staffId),
     db.prepare('DELETE FROM admin_sessions WHERE staff_id = ?').bind(staffId),
     db.prepare('DELETE FROM admin_two_factor_challenges WHERE staff_id = ?').bind(staffId),
   ]);

@@ -20,7 +20,10 @@ vi.mock('@/components/shared/select', () => ({
     </select>
   ),
 }))
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
+
+vi.mock('@/lib/api', async (original) => ({
+  ...await original<typeof import('@/lib/api')>(),
   api: {
     affiliateOffers: {
       list: () => Promise.resolve({ success: true, data: [OFFER] }),
@@ -56,7 +59,7 @@ const OFFER = {
   createdAt: '2026-09-01T00:00:00.000Z',
 }
 
-const { OffersTab } = await import('./tabs')
+const { OffersTab } = await import('@/test-utils/affiliate-tabs')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -69,10 +72,10 @@ afterEach(() => {
 async function openOfferEdit() {
   render(<OffersTab />)
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: 'そのほかの操作' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '案件Aの操作' })).toBeTruthy()
   })
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '案件Aの操作' }))
   })
   await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '編集する' })) })
   const title = await screen.findByText('案件を編集')
@@ -83,7 +86,7 @@ async function openOfferEdit() {
 
 describe('R286 案件編集の入力欄は項目名で一意に特定できる', () => {
   test.each([
-    ['案件名 *', 'INPUT', 'text'],
+    ['案件名', 'INPUT', 'text'],
     ['説明', 'TEXTAREA', null],
     ['報酬額（円）', 'INPUT', 'number'],
     ['成果承認時の付与マイル', 'INPUT', 'number'],

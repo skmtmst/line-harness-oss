@@ -1,6 +1,9 @@
 'use client'
+import SelfMfa from './self-mfa'
+import MfaPolicy from './mfa-policy'
+import { RecoveryCodePanel } from '@/v8/login/recovery-codes'
+import TotpQr from '@/components/shared/totp-qr'
 
-import { useOverlayFocus } from '@/components/shared/overlay-utils';
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
 import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state';
@@ -32,6 +35,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import styles from './staff.module.css'
 import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context';
@@ -684,6 +688,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
 
 function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onClose: () => void; onSaved: () => Promise<void> }) {
   const saveErrors = useSaveFormErrors()
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
 
   const [uri, setUri] = useState(''), [manualKey, setManualKey] = useState(''), [qr, setQr] = useState(''), [code, setCode] = useState(''), [error, setError] = useState(''), [saving, setSaving] = useState(false)
   useEffect(() => { void (async () => { try { const res = await api.staff.beginTwoFactorSetup(member.id); if (res.success) { setUri(res.data.provisioningUri); setManualKey(res.data.manualKey) } } catch (caught) {
@@ -693,17 +698,19 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
 
  setError(messageOf(caught)) } } })() }, [member.id, saveErrors])
   useEffect(() => { if (uri) void qrToDataURL(uri, { width: 240, margin: 1, color: qrColors() }).then(setQr) }, [uri])
-  const save = async (entered?: string) => { const value = entered ?? code; if (saving) return; if (!/^\d{6}$/.test(value)) return setError('6桁の認証コードを入力してください'); setSaving(true); setError(''); try { await api.staff.confirmTwoFactorSetup(member.id, value); await onSaved(); onClose() } catch (caught) {
+  const save = async (entered?: string) => { const value = entered ?? code; if (saving) return; if (!/^\d{6}$/.test(value)) return setError('6桁の認証コードを入力してください'); setSaving(true); setError(''); try { const res = await api.staff.confirmTwoFactorSetup(member.id, value); if (!res.success) throw new Error(res.error); if (res.data.recoveryCodes?.length) setRecoveryCodes(res.data.recoveryCodes); else { await onSaved(); onClose() } } catch (caught) {
     const fieldFailure = saveErrors.capture(caught)
  { if (!fieldFailure)
 
 
  setError(otpFailureMessage(messageOf(caught))) } } finally { setSaving(false) } }
-  return <SaveErrorScope errors={saveErrors}><Modal title="二段階認証を設定" onClose={onClose} wide><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">認証アプリを登録して、ログインを安全にします。</p></div></div>
-    <div className="mt-5 grid grid-cols-2 gap-2 text-sm"><div className="rounded-control bg-accent-soft px-4 py-3 font-medium text-accent-deep">1　QRコードを読み取る</div><div className="rounded-control bg-canvas-sunken px-4 py-3 text-ink-secondary">2　6桁コードを入力</div></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-    <div className={`mt-5 grid gap-5 ${styles.twoFactorGrid}`}>{qr ? <img src={qr} alt="Authenticator登録用QRコード" className={`${styles.qrImage} rounded-control border border-hairline`} /> : <DelayedSkeleton loading skeleton={<Skeleton width={220} height={220} className="block rounded-control" />} />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || emptyValue('unknown')}</p></div></div></div>
-    <p id="staff-totp-label" className="mt-5 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p><div className="mt-2">{/* 共通 OTP入力（Pencil ★V8 RfHCo）。 */}<SaveErrorField names={["code"]}><OtpInput value={code} onChange={setCode} onComplete={(entered) => void save(entered)} labelledBy="staff-totp-label" invalid={Boolean(error)} busy={saving} /></SaveErrorField></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">登録後はLINEログインのあとに認証アプリのコード入力が必要です。</p>
-    <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving || !uri} busy={Boolean(saving)} busyLabel="確認中…">✓ 設定を完了</Button></div></Modal></SaveErrorScope>
+  return <SaveErrorScope errors={saveErrors}><Dialog open title={recoveryCodes.length ? '回復コードを保存' : '二段階認証を設定'} onCancel={onClose} footer={recoveryCodes.length ? undefined : <Button variant="primary" onClick={() => void save()} disabled={saving || !uri} busy={saving}>確認して登録する</Button>}>
+    {recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => window.location.assign('/login')} /> : <>
+      {error ? <Notice tone="danger" message={error} /> : null}
+      <TotpQr qr={qr} manualKey={manualKey} />
+      <Field label="認証アプリに表示された6桁コード"><SaveErrorField names={["code"]}><OtpInput value={code} onChange={setCode} onComplete={entered => void save(entered)} label="認証アプリに表示された6桁コード" invalid={Boolean(error)} busy={saving} /></SaveErrorField></Field>
+    </>}
+  </Dialog></SaveErrorScope>
 }
 
 /*
@@ -715,7 +722,7 @@ const V8_ROLE_LABEL: Record<RoleKey, string> = {
   owner: 'オーナー', administrator: '管理者', operations: '運用', reception: '受付', view_only: '見るだけ', custom: '個別設定',
 }
 function RoleChip({ role }: { role: RoleKey }) {
-  return <span data-status-pill="" className={styles.roleChip} data-role={role}>{V8_ROLE_LABEL[role]}</span>
+  return <StatusBadge tone={role === 'administrator' ? 'success' : role === 'operations' ? 'info' : role === 'reception' ? 'warning' : 'neutral'} dot={false} data-role={role}>{V8_ROLE_LABEL[role]}</StatusBadge>
 }
 
 const STAFF_TAB_KEYS = [
@@ -1060,7 +1067,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     if (editable && member) items.push({ id: 'edit', label: '役割を変える', qaOpen: 'EOTS4-edit', onSelect: () => { close(); router.push(`/staff/edit?id=${encodeURIComponent(member.id)}`) } })
     items.push({ id: 'scope', label: administrator ? '見える画面' : '見える画面を見る', onSelect: () => { close(); openPermissions(user) } })
     if (isSelf && member) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '2段階の確認を解除する' : '2段階の確認を設定する', onSelect: () => { close(); openTwoFactor(member) } })
-    if (resendable && member) items.push({ id: 'resend', label: 'もう一度送る', disabled: resendingId !== null, onSelect: () => { close(); void runResend(member) } })
+    if (resendable && member) items.push({ id: 'resend', label: 'もう一度送る', disabled: resendingId !== null, disabledReason: resendingId === member.id ? '送信中…' : undefined, onSelect: () => { close(); void runResend(member) } })
     if (administrator && member && !isSelf) {
       const policy = staffActionPolicy({ member, currentUserId: me?.id ?? null, administrator: true, activeAdministratorCount })
       items.push(member.isActive
@@ -1083,10 +1090,10 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
         </div>
         <div className={styles.cardTools}>
           <div className={styles.toolSelect}><SaveErrorField names={["roleFilter","role_filter"]}><Select aria-label="役割で絞り込む" size="full" value={roleFilter} onChange={(value) => setRoleFilter(value as AccessRoleBundle | 'all')} options={[{ value: 'all', label: 'すべての役割' }, ...(['administrator', 'operations', 'reception', 'view_only', 'custom'] as const).map((role) => ({ value: role, label: summaryReady ? `${V8_ROLE_LABEL[role]} ${tabUsers.filter((user) => user.roleBundle === role).length}` : V8_ROLE_LABEL[role] }))]} /></SaveErrorField></div>
-          <div className={styles.toolSelect}><SaveErrorField names={["sort"]}><Select aria-label="並び順" size="full" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></SaveErrorField></div>
+          <SaveErrorField names={["sort"]}><ListToolbarSort value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></SaveErrorField>
         </div>
       </div>
-      <GridTable className={styles.table} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: 'var(--tpl-sa-staff-card-gap)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
+      <GridTable className={`${styles.table} ${viewer ? styles.readOnlyTable : ''}`} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: 'var(--tpl-sa-staff-card-gap)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
         <GridHeadRow>
           <GridCell className={styles.colPerson} role="columnheader">人</GridCell>
           <GridCell className={styles.colScope} role="columnheader" title="担当のLINEアカウント">担当のLINEアカウント</GridCell>
@@ -1102,9 +1109,9 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             const items = rowMenuItems(user)
             return (
               <GridRow key={user.id}>
-                <GridNameCell className={styles.colPerson} name={<button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={user.name}>{user.name}</button>} />
+                <GridNameCell className={styles.colPerson} name={<button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? user.name : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>} />
                 <GridCell className={styles.colScope} role="cell" title={accessScopeLabel(user, accountNames)}>{scopeShort(user, accountNames)}</GridCell>
-                <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : undefined}>{user.status === 'suspended' ? <span className={styles.roleChip} data-role="view_only">止めた</span> : <RoleChip role={roleOf(user)} />}</GridCell>
+                <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}</GridCell>
                 <GridCell className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
                   <RowMenu size="row" label={`${user.name}の操作`} items={items} open={openMenuId === user.id} onOpenChange={(next) => setOpenMenuId(next ? user.id : null)} />
@@ -1136,6 +1143,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       <div className={styles.body}>
         <SettingsInnerNav inline />
         <div className={styles.main}>
+          {administrator ? <MfaPolicy /> : null}
+          <SelfMfa />
           {tab === 'audit' ? (
             <>
               {tabAction ? <div className={styles.toolbar}><span className={styles.spacer} />{tabAction}</div> : null}

@@ -1,7 +1,11 @@
+// @vitest-environment happy-dom
+import React from 'react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import ScenarioResultsV8 from '@/v8/scenarios/results'
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 /*
  * ★V8 シナリオ配信の編集・配信結果の契約（#1161）。
@@ -10,26 +14,57 @@ import { describe, expect, it } from 'vitest'
  * - detail-v8.tsx … `PMLkX`（有効）/ `nMSiE`（始めた直後）/ `ARuZ4`（停止中）、
  *   小窓 `F1LK4e`（開始の確認）・`OPGU2`（停止の確認）・`Al4Ek`（複製）
  * - results-v8.tsx … `X4STXS`（配信結果）
- * - page.tsx 2 つ … data-theme="v8" のときだけ V8 を描く
+ * - page.tsx 2 つ … 現役 V8 に固定
  *
  * 動きの契約（API・確認キー・購読操作）はここに固定する。
  * 板の文言の一字一句は固定しない（V8 の直しで文言が変わるたびに
  * 試験を書き換えることになるため）。
  */
 
-const V8_DETAIL = fs.readFileSync(path.join(__dirname, 'detail-v8.tsx'), 'utf8')
+const V8_DETAIL = fs.readFileSync(path.join(__dirname, '../../../v8/scenario-detail/detail.tsx'), 'utf8')
 const V8_DETAIL_PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const V8_DETAIL_CSS = fs.readFileSync(path.join(__dirname, 'detail-v8.module.css'), 'utf8')
-const RESULTS_CURRENT = fs.readFileSync(new URL('../../scenarios/results/results-v8.tsx', import.meta.url), 'utf8')
+const V8_DETAIL_CSS = fs.readFileSync(path.join(__dirname, '../../../v8/scenario-detail/detail.module.css'), 'utf8')
+const RESULTS_CURRENT = fs.readFileSync(path.join(__dirname, '../../../v8/scenarios/results.tsx'), 'utf8')
 const V8_RESULTS = fs.readFileSync(
-  path.join(__dirname, '..', 'results', 'results-v8.tsx'),
+  path.join(__dirname, '../../../v8/scenarios/results.tsx'),
   'utf8',
 )
-const V8_RESULTS_PAGE = fs.readFileSync(new URL('../../../v8/scenarios/results.tsx', import.meta.url), 'utf8')
+const V8_RESULTS_PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/scenarios/results.tsx'), 'utf8')
 const V8_RESULTS_CSS = fs.readFileSync(
-  path.join(__dirname, '..', 'results', 'results-v8.module.css'),
+  path.join(__dirname, '../../../v8/scenarios/results.module.css'),
   'utf8',
 )
+
+const resultFixture = vi.hoisted(() => ({
+  stats: { enrolledTotal: 10, activeNow: 3, completed: 5, paused: 1, steps: [] },
+  scenario: { id: 'sc-1', name: '新規登録フォロー', lineAccountId: 'account-a', steps: [] },
+  runs: vi.fn(),
+}))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('id=sc-1'), usePathname: () => '/scenarios/results' }))
+vi.mock('next/link', () => ({ default: ({ children, href }: React.ComponentProps<'a'>) => React.createElement('a', { href }, children) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', loading: false }) }))
+vi.mock('@/lib/use-feature-access', () => ({ useFeatureAccess: () => true }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('@/components/scenarios/scenario-reference-data', () => ({ scenarioReferenceData: {
+  scenario: () => Promise.resolve({ success: true, data: resultFixture.scenario }),
+  stats: () => Promise.resolve({ success: true, data: resultFixture.stats }),
+} }))
+vi.mock('@/lib/api', async (original) => {
+  const actual = await original<typeof import('@/lib/api')>()
+  return { ...actual, api: { ...actual.api, scenarios: { ...actual.api.scenarios, runs: resultFixture.runs } } }
+})
+afterEach(() => { cleanup(); vi.clearAllMocks() })
+async function renderResults() {
+  resultFixture.runs.mockResolvedValue({ success: true, data: {
+    summary: { active: 2, paused: 1, completed: 5, delivering: 1 },
+    subscriptions: [], pagination: { total: 0, limit: 50, cursor: '', nextCursor: null },
+    steps: [{ stepOrder: 1, failed: { state: 'available', value: 2 } }],
+  } })
+  const result = render(React.createElement(ScenarioResultsV8))
+  await waitFor(() => expect(screen.getByRole('heading', { name: '配信結果：新規登録フォロー' })).toBeTruthy())
+  await waitFor(() => expect(screen.getByText('始まった')).toBeTruthy())
+  return result
+}
 
 describe('★V8 シナリオ編集（PMLkX / nMSiE / ARuZ4）の契約', () => {
 
@@ -40,8 +75,8 @@ describe('★V8 シナリオ編集（PMLkX / nMSiE / ARuZ4）の契約', () => {
   })
 
   it('数の帯と「最後の1通の後」の行を持つ', () => {
-    for (const label of ['予約中', '届いた', '送れなかった', '終わった']) {
-      expect(V8_DETAIL).toContain(`<p className={styles.kpiLabel}>${label}</p>`)
+    for (const label of ['購読中', '読み終えた', '始まる見込み（試算）', '離脱が多い所']) {
+      expect(V8_DETAIL).toContain(`title="${label}"`)
     }
     // ON_COMPLETE_LABEL の実設定から読む（固定文を置かない）。
     expect(V8_DETAIL).toContain('ON_COMPLETE_LABEL[')
@@ -89,22 +124,29 @@ describe('★V8 シナリオ編集（PMLkX / nMSiE / ARuZ4）の契約', () => {
   })
 
   it('閲覧のみの人は直す操作が押せない', () => {
-    expect(V8_DETAIL).toContain('canManageRole(staffRole)')
+    expect(V8_DETAIL).toContain("useFeatureAccess('scenarios')")
     expect(V8_DETAIL).toContain('readonlyReason')
   })
 })
 
 describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
 
-  it('板の印（X4STXS）と数の帯を持つ', () => {
-    for (const label of ['届いた', '送れなかった', '進んでいる途中', '全部終わった']) {
-      expect(V8_RESULTS).toContain(`<p className={styles.kpiLabel}>${label}</p>`)
+  it('配信結果の数の帯は人数と購読の件数を分けて描く', async () => {
+    const { container } = await renderResults()
+    const band = container.querySelector('[data-design="KPIs"]')!
+    const expected = [['始まった', '10', '人'], ['読み終えた', '5', '件'], ['途中', '4', '件'], ['離れた', '—', '人']]
+    for (const [label, value, unit] of expected) {
+      const cell = within(band as HTMLElement).getByText(label).closest('[data-kpi-presentation]')!
+      expect(cell.querySelector('[data-kpi-number]')?.textContent).toBe(value)
+      expect(cell.textContent).toContain(value + unit)
     }
   })
 
-  it('送れずに止まった・いま送っているの帯を持つ', () => {
-    expect(V8_RESULTS).toContain('bandWarn')
-    expect(V8_RESULTS).toContain('bandInfo')
+  it('失敗した記録から停止中の購読へ絞り込み、送信中は別に知らせる', async () => {
+    await renderResults()
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('いま送っています（送信中の購読 1 件）'))
+    fireEvent.click(screen.getByRole('button', { name: '送れなかった記録 2 件・止まっている購読だけを見る' }))
+    await waitFor(() => expect(resultFixture.runs).toHaveBeenLastCalledWith('sc-1', 'account-a', expect.objectContaining({ status: 'paused' })))
   })
 
   it('購読操作（止める・再開・失敗を再送・移す）は既存の口を使う', () => {
@@ -124,9 +166,9 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
 })
 
 describe('★V8 シナリオの CSS モジュールの契約', () => {
-  it('新しい CSS Module は layer 宣言から始める', () => {
-    expect(V8_DETAIL_CSS.startsWith('@layer properties, theme, base, components, utilities;')).toBe(true)
-    expect(V8_RESULTS_CSS.startsWith('@layer properties, theme, base, components, utilities;')).toBe(true)
+  it('現役CSSは画面の寸法を共通のトークンから読む', () => {
+    expect(V8_DETAIL_CSS).toContain('var(--tpl-sd-')
+    expect(V8_RESULTS_CSS).toContain('var(--tpl-sc2-')
   })
 
   it('v7 に効かせる指定を持たない（data-theme セレクタの直書きは無い）', () => {
@@ -135,12 +177,12 @@ describe('★V8 シナリオの CSS モジュールの契約', () => {
      * [data-theme] を条件にする必要は無い。付いていたら v7 の
      * 見た目へ漏れ出す危険があるので契約で止める。
      */
-    expect(V8_DETAIL_CSS).not.toContain('[data-theme')
+    expect(V8_DETAIL_CSS.replace(/\/\*[\s\S]*?\*\//g, '')).not.toContain('[data-theme')
     expect(V8_RESULTS_CSS).not.toContain('[data-theme')
   })
   it('通ごとの結果と友だちごとの記録を持つ', () => {
-    expect(RESULTS_CURRENT).toContain('通ごとの結果')
-    expect(RESULTS_CURRENT).toContain('友だちごとの記録')
+    expect(RESULTS_CURRENT).toContain('通ごとの反応')
+    expect(RESULTS_CURRENT).toContain('参加中の友だち')
     expect(RESULTS_CURRENT).toContain('予定を見る')
     expect(RESULTS_CURRENT).toContain('さらに読み込む')
   })

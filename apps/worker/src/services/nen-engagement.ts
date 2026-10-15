@@ -223,14 +223,7 @@ function renderCampaignCopy(value: string, payload: Record<string, unknown>): st
  */
 function truncateForSend(value: string, maxLength: number, context: { campaignKey: string; field: string }): string {
   if (value.length <= maxLength) return value;
-  console.error(JSON.stringify({
-    event: 'nen_body_truncated_at_send',
-    campaignKey: context.campaignKey,
-    field: context.field,
-    beforeLength: value.length,
-    afterLength: maxLength,
-    droppedLength: value.length - maxLength,
-  }));
+  console.error(JSON.stringify({"code":"nen_body_truncated_at_send"}));
   return value.slice(0, maxLength);
 }
 
@@ -527,13 +520,7 @@ const NEN_COLUMN_INTRO_MAX_LENGTH = 1500;
  */
 function truncateColumnIntro(value: string, maxLength: number, context: { title: string }): string {
   if (value.length <= maxLength) return value;
-  console.error(JSON.stringify({
-    event: 'nen_column_intro_truncated',
-    title: context.title.slice(0, 120),
-    beforeLength: value.length,
-    afterLength: maxLength,
-    droppedLength: value.length - maxLength,
-  }));
+  console.error(JSON.stringify({"code":"nen_column_intro_truncated"}));
   return value.slice(0, maxLength);
 }
 
@@ -932,11 +919,11 @@ export async function enqueueBirthdayCoupons(
   let queued = 0;
   let failed = 0;
   const report = async (failure: NenCouponIssueFailure) => {
-    console.error(JSON.stringify({ event: 'nen_birthday_coupon_issue_failed', ...failure }));
+    console.error(JSON.stringify({"code":"nen_birthday_coupon_issue_failed"}));
     try {
       await onIssueFailed?.(failure);
     } catch (notifyError) {
-      console.error('nen birthday coupon failure notify error:', notifyError);
+      console.error(JSON.stringify({"code":"services_nen_engagement_failed"}));
     }
   };
   for (const pet of pets.results) {
@@ -1282,7 +1269,7 @@ export async function processNenDeliveries(
       await db.prepare(
         `UPDATE nen_delivery_jobs SET status = 'failed', last_error = ?, updated_at = ? WHERE id = ?`,
       ).bind(message, jstNow(), job.id).run();
-      console.error(JSON.stringify({ event: 'nen_delivery_failed', jobId: job.id, error: message }));
+      console.error(JSON.stringify({"code":"nen_delivery_failed"}));
       failed++;
     }
   }

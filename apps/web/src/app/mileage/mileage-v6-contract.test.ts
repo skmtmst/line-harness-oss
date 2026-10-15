@@ -9,10 +9,10 @@ const LEGACY = readFileSync(join(HERE, '..', 'scoring', 'page.tsx'), 'utf8')
 const LEGACY_NEW = readFileSync(join(HERE, '..', 'scoring', 'new', 'page.tsx'), 'utf8')
 const NEW_RULE = readFileSync(join(HERE, 'earning-rules', 'new', 'v8-earning-rule-new.tsx'), 'utf8')
 const RULE_FIELDS = readFileSync(join(HERE, 'earning-rules', 'rule-fields.ts'), 'utf8')
-const HISTORY = readFileSync(join(HERE, 'mileage-history-tab.tsx'), 'utf8')
+const HISTORY = readFileSync(join(HERE, '../../v8/mileage/history.tsx'), 'utf8')
 const FRIEND_DETAIL = readFileSync(join(HERE, 'friends', 'detail', 'page.tsx'), 'utf8')
-const ADJUSTMENT = readFileSync(join(HERE, 'friends', 'detail', 'mileage-adjustment-dialog.tsx'), 'utf8')
-const ACTION_SCORE = readFileSync(join(HERE, 'action-score-tab.tsx'), 'utf8')
+const ADJUSTMENT = readFileSync(join(HERE, '..', '..', 'v8', 'mileage', 'adjust-dialog.tsx'), 'utf8')
+const ACTION_SCORE = readFileSync(join(HERE, '../../v8/mileage/score.tsx'), 'utf8')
 const BROADCAST_NEW = readFileSync(join(HERE, '..', 'broadcasts', 'new', 'page.tsx'), 'utf8')
 const SEGMENT = readFileSync(join(HERE, '..', '..', 'lib', 'segment-condition.ts'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
@@ -25,11 +25,12 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(LEGACY_NEW).toContain("permanentRedirect('/mileage/earning-rules/new')")
   })
 
-  it('履歴と友だち別明細をV6の実Nodeへ接続する', () => {
-    expect(HISTORY).toMatch(/(?:data-design-node|boardId)="MvZm5"/)
+  it('履歴と友だち別明細を現役の画面とAPIへ接続する', () => {
+    expect(HISTORY).toContain('<MileageFrame')
+    expect(HISTORY).toContain("key: 'history', label: '履歴', board: 'oRbJi'")
     expect(HISTORY).toContain('api.mileage.history')
-    expect(HISTORY).toContain("kind=\"error\"")
-    expect(FRIEND_DETAIL).toMatch(/(?:data-design-node|boardId)="HIU5O"/)
+    expect(HISTORY).toContain('tone="error"')
+    expect(FRIEND_DETAIL).toMatch(/(?:data-design-node|boardId)="R6kIG"/)
     expect(FRIEND_DETAIL).toContain('api.friends.mileage')
     expect(FRIEND_DETAIL).toContain('api.mileage.friendsV6')
     expect(FRIEND_DETAIL).toContain('api.mileage.history')
@@ -49,7 +50,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(FRIEND_DETAIL).toContain('rankUnpublished')
     expect(FRIEND_DETAIL).toContain('使い道・ランクを作る')
     expect(FRIEND_DETAIL).toContain("href=\"/mileage?tab=rewards\"")
-    expect(FRIEND_DETAIL).toContain('いちばん上のランクです')
+    expect(readFileSync(new URL('../../v8/mileage/display.ts', import.meta.url), 'utf8')).toContain('いちばん上のランクです')
   })
 
   it('APIの入れ子が欠けても画面を落とさず、0件とも書かない', () => {
@@ -74,7 +75,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(PAGE).toContain('kind="loading"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('まだ決めごとがありません')
+    expect(PAGE).toContain('title="まだたまる決めごとがありません"')
     expect(PAGE).toContain('もうすぐ消えるマイル')
     expect(PAGE).toContain('summary?.expiringMiles30d')
     expect(PAGE).toContain('member.expiringMiles30d')
@@ -83,16 +84,16 @@ describe('V6 マイルの正本URLと概念分離', () => {
   })
 
   it('残高一覧を設計の20件表示・絞り込み札・2操作にそろえる', () => {
-    expect(PAGE).toContain('const PAGE_SIZE = 20')
+    expect(PAGE).toContain("useListUrlValue('pageSize', 20)")
     for (const label of ['ゴールド', 'シルバー', 'ブロンズ', '消える予定', '残高が多い順']) {
       expect(PAGE).toContain(label)
     }
     expect(PAGE).toContain("rank === 'gold'")
-    expect(PAGE).toContain('displayRank')
-    expect(PAGE).toContain("friend_added: '友だち登録'")
+    expect(PAGE).toContain('rankLabel(member.rank)')
+    expect(PAGE).toContain("friend_added: '友だち追加'")
     expect(PAGE).toContain("broadcast_link_clicked: '配信リンククリック'")
     expect(PAGE).toContain("inflow_return: 'LINE帰還'")
-    expect(PAGE).toContain('増やす・減らす')
+    expect(PAGE).toContain('増減')
     expect(PAGE).toContain('&adjust=1')
     expect(FRIEND_DETAIL).toContain("searchParams.get('adjust') === '1'")
     expect(FRIEND_DETAIL).toContain('setAdjustmentOpen(true)')
@@ -100,11 +101,11 @@ describe('V6 マイルの正本URLと概念分離', () => {
 
   it('V6の一覧契約を読み、既存の更新APIから停止と再開を操作できる', () => {
     expect(PAGE).toContain('api.mileage.earningRulesV6')
-    expect(PAGE).toContain("updateRule(rule.id, { isActive: rule.published.status !== 'published' })")
-    expect(PAGE).toContain("rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開'")
+    expect(PAGE).toContain("updateRule(rule.id, { isActive: next === 'published' })")
+    expect(PAGE).toContain("active ? '止める' : '再開する'")
     // 2026-09-02: 一覧をカード格子から設計の表へ移し、状態を共通Chipで出す。
     // 言い方は変えていない。
-    expect(PAGE).toContain('<Chip tone="ok">動いています</Chip> : <Chip>止めています</Chip>')
+    expect(PAGE).toContain('動いています')
   })
 
   it('作成画面も mileage_rules のAPIと正本URLを使う', () => {
@@ -130,10 +131,10 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(NEW_RULE).not.toContain('api.scoring.create')
   })
 
-  it('手動増減はV6実Node・確認段階・冪等キーを通して追記する', () => {
-    expect(FRIEND_DETAIL).toContain('<MileageAdjustmentDialog')
-    expect(ADJUSTMENT).toContain('designNode="vz0Ji"')
-    expect(ADJUSTMENT).toContain("useState<'input' | 'confirm' | 'requested' | 'completed'>('input')")
+  it('手動増減は現役の窓で変更前後を確認し、冪等キーを通して追記する', () => {
+    expect(FRIEND_DETAIL).toContain('<MileageAdjustDialog')
+    expect(ADJUSTMENT).toContain('designNode="M8zhjL"')
+    expect(ADJUSTMENT).toContain("useState<'input' | 'requested' | 'completed'>('input')")
     expect(ADJUSTMENT).toContain('変更前')
     expect(ADJUSTMENT).toContain('変更量')
     expect(ADJUSTMENT).toContain('変更後')
@@ -153,14 +154,16 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(ADJUSTMENT).toContain('notifyFriend,')
     expect(API).toContain('expiresAt?: string')
     expect(API).toContain('notifyFriend?: boolean')
-    expect(ADJUSTMENT).toContain('変更後の残高が0未満になる操作は実行しません')
+    expect(ADJUSTMENT).toContain('利用可能な残高を超えて減らすことはできません')
     expect(ADJUSTMENT).not.toContain('API error:')
   })
 
   it('R: 確定待ちの確定・取消は理由を取って履歴の操作列から行う', () => {
     expect(HISTORY).toContain('確定する')
     expect(HISTORY).toContain('取り消す')
-    expect(HISTORY).toContain('理由（必須）')
+    expect(HISTORY).toContain('<Field label="理由" required>')
+    expect(HISTORY).toContain('const reason = pendingReason.trim()')
+    expect(HISTORY).toContain('理由を入力してください。')
     expect(HISTORY).toContain("api.mileage.confirmMileageEntry")
     expect(HISTORY).toContain("api.mileage.voidMileageEntry")
     expect(HISTORY).toContain("item.status === 'pending'")
@@ -187,12 +190,13 @@ describe('V6 マイルの正本URLと概念分離', () => {
   })
 
   it('行動スコアを既存の現在値・履歴から選択アカウント単位で表示する', () => {
-    expect(ACTION_SCORE).toMatch(/(?:data-design-node|boardId)="z3PB2"/)
+    expect(ACTION_SCORE).toContain("<MileageFrame")
+    expect(ACTION_SCORE).toContain("key: 'score', label: '行動スコア', board: 'IRPw8'")
     expect(ACTION_SCORE).toContain('api.actionScores.friends')
     /* 断り文は下の「3つの言い方で断る」で見る。ここは口と印だけ。 */
     expect(ACTION_SCORE).toContain('kind="loading"')
-    expect(ACTION_SCORE).toContain('kind="empty"')
-    expect(ACTION_SCORE).toContain('kind="error"')
+    expect(ACTION_SCORE).toContain('title="条件に合う友だちがいません"')
+    expect(ACTION_SCORE).toContain('tone="error"')
     expect(API).toContain('/api/action-scores/friends')
   })
 
@@ -216,7 +220,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
 
   it('スコアはマイルではないと3つの言い方で断る', () => {
     /*
-      設計 `z3PB2` の断り文そのまま。**「顧客には表示されず」だけでは足りない。**
+      現役の補足で概念の区別を保つ。**「顧客には表示されず」だけでは足りない。**
       「マイルが減るのでは」と聞かれたときに答えられるよう、
       **交換できないこと・残高が動かないこと**を先に言う。
       1文ではなく3つとも見る。言い換えると1つ落ちても気づけない。

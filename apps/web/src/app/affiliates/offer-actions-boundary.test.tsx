@@ -42,7 +42,19 @@ vi.mock('@/components/shared/select', () => ({
     </select>
   ),
 }))
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
+
+// 選ぶ窓自体は共通部品の試験で確認する。ここでは現役が渡す候補と保存値を確かめる。
+vi.mock('@/components/shared/entity-select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: { 'aria-label': string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) => <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
+  entityOptionMetadata: () => ({}),
+}))
+vi.mock('@/components/shared/entity-picker-sources', () => ({
+  EntityKindField: ({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ id: string; name: string }> }) => <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}><option value="">— 選択しない —</option>{options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select>,
+}))
+
+vi.mock('@/lib/api', async (original) => ({
+  ...await original<typeof import('@/lib/api')>(),
   api: {
     conversionApprovals: {
       list: (params?: unknown) => fixture.listImpl!(params),
@@ -93,7 +105,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { ApprovalQueue, OffersTab } = await import('./tabs')
+const { ApprovalQueue, OffersTab } = await import('@/test-utils/affiliate-tabs')
 
 function approvalItem(eventId: string, friendName: string) {
   return {
@@ -170,10 +182,10 @@ afterEach(() => {
 async function openOfferEdit() {
   render(<OffersTab />)
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: 'そのほかの操作' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '案件Aの操作' })).toBeTruthy()
   })
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '案件Aの操作' }))
   })
   await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '編集する' })) })
   const title = await screen.findByText('案件を編集')

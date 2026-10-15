@@ -85,7 +85,7 @@ export function legalBody(kind, config, production) {
       section("1. 個人情報取扱事業者", company) +
       section(
         "2. 取り扱う情報",
-        "利用者の会社・店舗情報、氏名、メールアドレス、アカウント情報、契約・請求情報、お問い合わせ内容、アクセスログ等を取り扱います。また、利用者の業務に伴い、LINEのユーザー識別情報、プロフィール、メッセージ、タグ・属性、フォームの回答、予約情報、アップロード画像等を利用者から預かって処理する場合があります。Googleビジネスプロフィールを接続した場合にGoogleから取得する情報とその取扱いは、第6項に定めます。",
+        "利用者の会社・店舗情報、氏名、メールアドレス、アカウント情報、契約・請求情報、お問い合わせ内容、アクセスログ等を取り扱います。また、利用者の業務に伴い、LINEのユーザー識別情報、プロフィール、メッセージ、タグ・属性、フォームの回答、予約情報、アップロード画像等を利用者から預かって処理する場合があります。Googleビジネスプロフィールを接続した場合にGoogleから取得する情報とその取扱いは第6項に、Instagramを接続した場合にInstagramから取得する情報とその取扱いは第7項に、それぞれ定めます。",
       ) +
       section(
         "3. 利用目的",
@@ -97,38 +97,42 @@ export function legalBody(kind, config, production) {
       ) +
       section(
         "5. 委託と外部サービス",
-        "運用基盤としてXserverおよびCloudflare、メッセージ連携としてLINE、店舗情報・口コミ連携としてGoogle（Googleビジネスプロフィール）、課金機能としてStripe、AIによる文章・画像生成としてOpenAI等の外部サービスを利用する構成です。利用する機能に応じて、提供に必要な情報が各サービスで処理されます。AI画像生成では、入力した生成条件および選択した参照画像を画像生成サービスへ送信します。不要な個人情報や秘密情報は入力しないでください。当社は、必要な範囲で委託先を選定・監督します。",
+        "運用基盤としてXserverおよびCloudflare、メッセージ連携としてLINE、店舗情報・口コミ連携としてGoogle（Googleビジネスプロフィール）、写真・文章の同時投稿としてMeta（Instagram）、課金機能としてStripe、AIによる文章・画像生成としてOpenAI等の外部サービスを利用する構成です。利用する機能に応じて、提供に必要な情報が各サービスで処理されます。AI画像生成では、入力した生成条件および選択した参照画像を画像生成サービスへ送信します。不要な個人情報や秘密情報は入力しないでください。当社は、必要な範囲で委託先を選定・監督します。",
       ) +
       section(
         "6. Googleビジネスプロフィール連携で取り扱うGoogleユーザーデータ",
         "利用者が管理画面からGoogleアカウントを接続した場合、Googleの許可画面で同意された範囲に限り、Google Business Profile APIを通じて次の情報を取得します。（1）接続したGoogleアカウントのメールアドレスおよび識別情報、（2）利用者が管理権限を持つ店舗のGoogleビジネスプロフィール情報（店舗名、所在地、電話番号、営業時間、臨時営業時間、ウェブサイトのURL、紹介文、掲載されている写真、およびGoogle側で行われた変更の案内）、（3）その店舗に投稿された口コミの本文、評価、投稿日時、投稿者の表示名および既存の返信、（4）その店舗のGoogleビジネスプロフィール投稿、（5）その店舗の実績指標（プロフィールの表示回数、ルート検索数、電話ボタンのクリック数、ウェブサイトへのクリック数等の日次集計値）、（6）接続を維持するためのアクセストークンおよびリフレッシュトークン。これらは、管理画面での店舗情報・口コミ・写真・投稿・実績の表示、返信および変更内容の下書き作成、利用者が内容を確認して実行した操作に基づくGoogleビジネスプロフィールの更新（口コミへの返信の投稿、営業時間・臨時営業時間・店舗名・所在地・電話番号・ウェブサイトのURL・紹介文の変更、写真の追加・削除、投稿の作成・削除）、ならびに接続状態の維持にのみ使用し、それ以外の目的には利用しません。Googleへの投稿および更新は、利用者が管理画面で内容を確認して実行したときにのみ送信し、当社が自動で送信することはありません。自動の口コミ返信、定期投稿、店舗情報の自動変更、およびGoogle側で行われた変更を自動で元に戻す機能は提供しません。裏側で定期的に動く処理は、管理画面の表示を最新にするための読み取り（再取得）のみです。将来自動送信を伴う機能を追加する場合は、初期状態を無効とし、対象店舗、送信内容、実行条件、頻度および停止方法を示した上で、利用者が別途有効化したときにのみ動作させます。Googleビジネスプロフィールに関わる操作は、利用者が管理画面にログインした状態でのみ実行でき、長期間有効なAPIキーを用いた外部プログラムからの利用はできません。店舗の新規作成・削除、および利用者が管理権限を持たないアカウントへのアクセスは行いません。利用者が「AIで下書きを作る」等のAI機能を実行した場合に限り、対象の口コミ本文、店舗情報および利用者が入力した内容をAI文章生成サービスへ送信します。当社は、Googleから取得した情報を販売せず、広告配信、ユーザープロファイリング、与信判断、および汎用的なAI・機械学習モデルの開発や学習には一切利用しません。本サービスの提供に必要な委託先での処理と、法令に基づく場合を除き、第三者に提供しません。当社担当者による内容の閲覧は、利用者からの明示的な依頼に基づくサポート、セキュリティ上の調査、法令上の要請、または集計・匿名化された形で行う場合に限ります。トークンは暗号化して保存します。Googleから取得した口コミ、店舗情報、投稿および実績指標は、管理画面に表示するための一時的な控えとして保存し、定期処理が取得から28日後に削除します。したがって、Google Business Profile APIのポリシーが定める30暦日の上限を超えて保持することはなく、他の情報と集約したり再配布したりすることもありません。利用者が内容を確認してGoogleへ送信した操作の記録（いつ誰がどの店舗に何を送信したか）は、利用者自身が履歴を確認できるように保存しますが、その記録に含まれるGoogle由来の本文も同じく28日後に削除します。利用者が管理画面で接続を解除した場合、またはGoogleアカウント側でアクセス権を取り消した場合は、Googleに対するアクセス権の取り消しを送信してトークンを無効化し、トークンおよびその店舗についてGoogleから取得した内容（口コミ、店舗情報、投稿、実績指標、接続したGoogleアカウントのメールアドレス）を直ちに削除します。Googleから取得した情報の取扱いは、Google API Services User Data Policy（Limited Use requirementsを含む）に従います。",
       ) +
       section(
-        "7. 第三者提供と国外での取扱い",
+        "7. Instagram連携で取り扱うInstagramユーザーデータ",
+        "利用者が管理画面からInstagramのプロフェッショナルアカウント（ビジネスまたはクリエイター）を接続した場合、Instagramの許可画面で同意された範囲に限り、Instagram API with Instagram Login を通じて次の情報を取得します。（1）接続したInstagramアカウントの識別情報、ユーザー名およびアカウント種別、（2）そのアカウントの公開プロフィール情報および直近の投稿の一覧（接続状態と投稿先を管理画面に表示するための控え）、（3）当社から送信した投稿の識別情報および公開URL、（4）接続を維持するためのアクセストークン。これらは、管理画面での接続状態と投稿先アカウントの表示、利用者が内容を確認して実行した操作に基づくInstagramへの投稿の送信、送信結果の表示、ならびに接続状態の維持にのみ使用し、それ以外の目的には利用しません。Instagramへの投稿は、利用者が管理画面で画像と文章を確認し、「Instagramにも投稿する」を自ら有効にして投稿ボタンを押したときにのみ送信し、当社が自動で送信することはありません。自動の定期投稿、一括投稿、および利用者が接続したアカウント以外への投稿は行いません。ダイレクトメッセージおよびコメントの取得・送信・返信は行わず、その権限を求めません。将来自動送信を伴う機能を追加する場合は、初期状態を無効とし、対象店舗、送信内容、実行条件、頻度および停止方法を示した上で、利用者が別途有効化したときにのみ動作させます。Instagramに関わる操作は、利用者が管理画面にログインした状態でのみ実行でき、長期間有効なAPIキーを用いた外部プログラムからの利用はできません。当社は、Instagramから取得した情報を販売せず、広告配信、ユーザープロファイリング、与信判断、および汎用的なAI・機械学習モデルの開発や学習には一切利用しません。本サービスの提供に必要な委託先での処理と、法令に基づく場合を除き、第三者に提供しません。当社担当者による内容の閲覧は、利用者からの明示的な依頼に基づくサポート、セキュリティ上の調査、法令上の要請、または集計・匿名化された形で行う場合に限ります。アクセストークンは暗号化して保存し、管理画面にも記録にも表示しません。利用者が管理画面で接続を解除した場合、またはInstagram側でアクセス権を取り消した場合は、トークンおよびそのアカウントについてInstagramから取得した内容（識別情報、ユーザー名、アカウント種別、プロフィール、投稿の一覧）を直ちに削除します。利用者が退会した場合も同様に削除します。Instagramから取得した情報の取扱いは、Metaのプラットフォーム利用規約および開発者向け方針に従います。",
+      ) +
+      section(
+        "8. 第三者提供と国外での取扱い",
         `本人の同意がある場合、法令で認められる場合等を除き、個人データを第三者に提供しません。委託に伴う取扱い、国外の事業者による処理、所在国・制度・保護措置および必要な情報提供・同意の方法について：${pending(legal.overseasProcessing, "確認中")}。`,
       ) +
       section(
-        "8. 安全管理",
+        "9. 安全管理",
         "アクセス権限の管理、認証、通信の保護、取扱い状況の確認等により、不正アクセスや漏えい等の防止に努めます。障害調査やサポートに必要な場合は、担当者を限定して情報を確認します。漏えい等が生じた場合には、法令に従って報告・通知等を行います。安全管理措置についてのお問い合わせは、下記窓口で受け付けます。",
       ) +
       section(
-        "9. Cookieとアクセス情報",
+        "10. Cookieとアクセス情報",
         "サービスサイト自体には広告配信・アクセス解析タグを設置しておらず、独自のCookieやブラウザーへの情報保存も行いません。サーバー等では安全な運用のため、IPアドレスやアクセス日時等のログが記録される場合があります。リンク先の管理システムでは、ログインの維持や不正登録の防止等のためCookie等を使用します。",
       ) +
       section(
-        "10. 保存期間と削除",
+        "11. 保存期間と削除",
         `情報は利用目的、契約上の必要性および法令に基づく保存義務に応じて管理します。契約終了後の保存期間、削除時期、バックアップの取扱い：${pending(legal.retention, "確認中")}。`,
       ) +
       section(
-        "11. 開示・訂正・利用停止等の請求",
+        "12. 開示・訂正・利用停止等の請求",
         "本人または正当な代理人から、保有個人データの開示、利用目的の通知、訂正、利用停止、第三者提供の停止等の請求があった場合には、本人確認と請求内容の確認を行い、法令に従って対応します。請求方法、必要な書類、手数料がある場合の内容は窓口で案内します。",
       ) +
       section(
-        "12. お問い合わせ・苦情相談",
+        "13. お問い合わせ・苦情相談",
         `${support}<br>電話：${pending(operator.phone, "取得中")}<br>受付時間：${pending(operator.supportHours, "準備中")}<br>個人情報の取扱いに関するご相談である旨をお知らせください。`,
       ) +
       section(
-        "13. 本方針の変更",
+        "14. 本方針の変更",
         "本方針を変更する場合は、内容と適用開始日を当サイト等で案内します。法令上必要な場合は、別途通知または同意の取得を行います。",
       );
   } else if (kind === "legal") {
@@ -195,5 +199,28 @@ export function legalBody(kind, config, production) {
   } else {
     content = `<p class="legal-lead">サービスに関するご質問は、musuboの公式LINEで受け付ける予定です。</p><div class="contact-panel"><div><h2>musubo お問い合わせ窓口</h2><p>${isSupportLine(operator.supportLineUrl) ? "下のリンクから公式LINEへお進みください。" : "現在、専用の公式LINEを準備しています。受付開始後にこちらからご案内します。"}</p>${isSupportLine(operator.supportLineUrl) ? button(operator.supportLineUrl, "公式LINEで問い合わせる") : '<span class="contact-status">窓口の準備中</span>'}</div><div><p>${company}<br>電話：${pending(operator.phone, "取得中")}<br>受付時間：${pending(operator.supportHours, "準備中")}</p></div></div><p class="legal-lead">パスワード、APIキー、カード番号、お客さまの個人情報等を、お問い合わせに記載しないでください。</p>`;
   }
-  return `<div class="legal-wrap"><nav class="breadcrumb" aria-label="パンくず"><a href="/">ホーム</a><span aria-hidden="true">/</span><span aria-current="page">${title}</span></nav><h1>${title}</h1>${notice}${kind !== "contact" ? `<p class="legal-date">${production ? `施行日：${e(legal.effectiveDate)}` : "文面作成日：2026年9月13日 · 運営者確認待ち"}</p>` : ""}<nav class="legal-nav" aria-label="関連するご案内"><a href="/terms/">利用規約</a><a href="/privacy/">プライバシーポリシー</a><a href="/legal/">特定商取引法に基づく表記</a></nav>${content}<p class="legal-back"><a href="/">← musuboのサービス紹介に戻る</a></p></div>`;
+  const en = { terms: "Terms", privacy: "Privacy", legal: "Legal", contact: "Contact" }[kind];
+  const heading =
+    kind === "legal"
+      ? '<span class="ib">特定商取引法に</span><span class="ib">基づく表記</span>'
+      : title;
+  const date =
+    kind !== "contact"
+      ? `<p class="legal-date">${production ? `施行日：${e(legal.effectiveDate)}` : "文面作成日：2026年9月13日 · 運営者確認待ち"}</p>`
+      : "";
+  // Number the articles so the table of contents can link to them.
+  const toc = [];
+  const body = content.replace(
+    /<section class="legal-section"><h2>([^<]*)<\/h2>/g,
+    (_, h) => {
+      toc.push(`<li><a href="#s${toc.length + 1}">${h}</a></li>`);
+      return `<section class="legal-section" id="s${toc.length}"><h2>${h}</h2>`;
+    },
+  );
+  const aside = toc.length
+    ? `<aside class="toc" aria-label="目次"><details><summary>CONTENTS<span class="chev" aria-hidden="true"></span></summary><ol>${toc.join("")}</ol></details></aside>`
+    : "";
+  const deco =
+    '<svg class="hero-deco" aria-hidden="true" viewBox="0 0 1400 600" preserveAspectRatio="xMaxYMid slice" fill="none"><path d="M 1500 120 C 1300 160, 1240 420, 1040 430 S 820 300, 700 520" stroke="#F3D3B8" stroke-width="80" stroke-linecap="round" opacity=".7"/><path d="M 1500 380 C 1380 400, 1320 560, 1180 640" stroke="#8FD1AC" stroke-width="56" stroke-linecap="round" opacity=".45"/></svg>';
+  return `<section class="sub-hero"><div class="sub-hero-card">${deco}<div class="sub-watermark" aria-hidden="true">${en}</div><div class="sub-hero-inner"><nav class="crumbs" aria-label="パンくず"><a href="/">ホーム</a><span aria-hidden="true">/</span><span aria-current="page">${title}</span></nav><div class="sub-label"><div class="rule"></div><div class="en">${en.toUpperCase()}</div></div><h1>${heading}</h1>${date}</div></div></section><section class="sub-body"><div class="wrap ${aside ? "sub-grid" : "sub-single"}">${aside}<article class="doc doc-${kind}">${notice}${body}<nav class="legal-nav" aria-label="関連するご案内"><a href="/terms/">利用規約</a><a href="/privacy/">プライバシーポリシー</a><a href="/legal/">特定商取引法に基づく表記</a></nav><p class="legal-back"><a href="/">← musuboのサービス紹介に戻る</a></p></article></div></section>`;
 }

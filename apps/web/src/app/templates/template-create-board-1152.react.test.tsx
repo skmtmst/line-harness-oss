@@ -14,7 +14,7 @@ vi.mock('next/link', () => ({
     <a href={typeof href === 'string' ? href : '#'}>{children}</a>
   ),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/templates/edit',
   useSearchParams: () => new URLSearchParams(),
@@ -22,9 +22,9 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [], selectedAccountId: 'account-1', loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {} }))
 
-import TemplateEditV8 from './edit-v8'
+import TemplateEditV8 from './edit/page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 

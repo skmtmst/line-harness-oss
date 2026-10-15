@@ -1,3 +1,4 @@
+import { screen } from '@testing-library/react'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -18,12 +19,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
  */
 
 const account = vi.hoisted(() => ({ id: 'account-1' }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.id }) }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 
 // 権限フックは happy-dom の localStorage を読むため、固定で通す。
 vi.mock('@/components/automations/use-common-action-permission', () => ({ useCanManageCommonActions: () => true }))
@@ -52,6 +54,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      tagGroups: { ...actual.api.tagGroups, list: vi.fn().mockResolvedValue({ success: true, data: [] }) },
       // 条件部品が選択肢を読みに行く口。本物へ飛ばさない。
       tags: { ...actual.api.tags, list: vi.fn() },
       scenarios: { ...actual.api.scenarios, list: vi.fn() },
@@ -74,7 +77,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { api } from '@/lib/api'
-import NewAutomationPage from './page'
+import { NewAutomationV8 as NewAutomationPage } from '@/v8/automations/create/create'
+import { pickAutomationTag, clickAutomationButton } from '@/test-utils/automation-v8-interactions'
 
 const mockList = api.automations.list as unknown as ReturnType<typeof vi.fn>
 const mockResources = api.automations.draftResources as unknown as ReturnType<typeof vi.fn>
@@ -102,6 +106,7 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   account.id = 'account-1'
   window.sessionStorage.clear()
   window.history.replaceState(null, '', '/automations/new')
@@ -138,6 +143,7 @@ afterEach(async () => {
   root = null
   container = null
   document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })
 
@@ -155,15 +161,6 @@ async function mountPage(): Promise<HTMLDivElement> {
   return container
 }
 
-/** ネイティブselectへ値を入れる。 */
-async function chooseOption(select: HTMLSelectElement, value: string): Promise<void> {
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')?.set
-    setter?.call(select, value)
-    select.dispatchEvent(new Event('change', { bubbles: true }))
-  })
-}
-
 async function typeText(input: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
@@ -173,33 +170,30 @@ async function typeText(input: HTMLInputElement, value: string): Promise<void> {
 }
 
 async function clickButton(el: HTMLElement | Document, text: string): Promise<void> {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === text)
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]'))
   if (!button) throw new Error(`ボタンが見つかりません: ${text}`)
   await act(async () => { (button as HTMLButtonElement).click() })
 }
 
 /** 名前・すること・タグを埋めた、保存できる最小の入力。 */
 async function fillMinimum(el: HTMLElement): Promise<void> {
-  await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, '監査確認ルール')
-  await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
+  await typeText(el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement, '監査確認ルール')
+  await pickAutomationTag('予約')
 }
 
 /** 条件部品で「名前に『田中』を含む」を組み立てる。 */
 async function addNameCondition(el: HTMLElement): Promise<void> {
-  // m22c: 札ボタンではなく検索できる足し口（Combobox）で足す。
-  const picker = el.querySelector('input[aria-label="追加する条件を選ぶ"]') as HTMLInputElement
+  await act(async () => { el.querySelector<HTMLButtonElement>('[aria-labelledby="v8-target-label"]')!.click() })
+  // 現役の条件の窓で、共通の検索できる足し口を操作する。
+  const picker = document.querySelector('button[aria-label="追加する条件を選ぶ"]') as HTMLButtonElement
   expect(picker, '条件の足し口が出ていない').toBeTruthy()
-  await act(async () => { picker.focus() })
-  await typeText(picker, '名前')
-  await act(async () => {
-    picker.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
-  })
-  await act(async () => {
-    picker.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-  })
-  const input = el.querySelector('input[aria-label="名前に含む文字"]') as HTMLInputElement
+  await act(async () => { picker.click() })
+  await act(async () => { screen.getByRole('radio', { name: '名前' }).click() })
+  await act(async () => { screen.getByRole('button', { name: '条件を足す' }).click() })
+  const input = document.querySelector('input[aria-label="名前に含む文字"]') as HTMLInputElement
   expect(input, '名前の条件の入力欄が出ていない').toBeTruthy()
   await typeText(input, '田中')
+  await clickAutomationButton('この条件にする')
   await act(async () => { await drainMicrotasks() })
 }
 
@@ -213,7 +207,7 @@ describe('AUTOMATION-02/04: 条件は保存する形のまま要約へ出る', (
     expect(el.textContent).toContain('名前に「田中」を含む人')
     expect(el.textContent).not.toContain('条件なし')
 
-    await clickButton(el, '下書きを保存する')
+    await clickButton(el, '下書きを保存')
     await act(async () => { await drainMicrotasks() })
 
     // A04: 計算側（buildSegmentWhere）が読める { text, targets } の形で送る。
@@ -241,7 +235,7 @@ describe('AUTOMATION-02/04: 条件は保存する形のまま要約へ出る', (
     expect(el.textContent).toContain('名前に「田中」を含む人')
     expect(el.textContent).not.toContain('条件なし')
     // 読めた条件なら、読めなかった旨の案内は出ない。
-    expect(el.textContent).not.toContain('保存されていた条件は読めませんでした')
+    expect(el.textContent).not.toContain('保存されていた「だれに」の条件は古い形のため読めませんでした')
   })
 
   it('古い形（文字列のまま）の条件が保存された下書きは、読めないと出して付け直すまで保存しない', async () => {
@@ -256,17 +250,17 @@ describe('AUTOMATION-02/04: 条件は保存する形のまま要約へ出る', (
     const el = await mountPage()
 
     // 読めない条件は黙って消さない。理由を出して、保存を止める。
-    expect(el.textContent).toContain('保存されていた条件は読めませんでした')
-    await clickButton(el, '下書きを保存する')
+    expect(el.textContent).toContain('保存されていた「だれに」の条件は古い形のため読めませんでした')
+    await clickButton(el, '下書きを保存')
     await act(async () => { await drainMicrotasks() })
     expect(el.textContent).toContain('条件を付け直してください')
     expect(mockUpdate).not.toHaveBeenCalled()
 
     // 「外して付け直す」は本人の明示操作。押すと新しい条件を選べる。
     await clickButton(el, '以前の条件を外して付け直す')
-    expect(el.textContent).not.toContain('保存されていた条件は読めませんでした')
+    expect(el.textContent).not.toContain('保存されていた「だれに」の条件は古い形のため読めませんでした')
 
-    await clickButton(el, '下書きを保存する')
+    await clickButton(el, '下書きを保存')
     await act(async () => { await drainMicrotasks() })
     // 条件を外す判断をしたあとなので、空の条件として保存できる。
     expect(mockUpdate).toHaveBeenCalledWith(
@@ -281,14 +275,14 @@ describe('AUTOMATION-03: 人数の確認は保存とは別の成否', () => {
     mockPreview.mockRejectedValue(new Error('server error'))
     const el = await mountPage()
     await fillMinimum(el)
-    await clickButton(el, '下書きを保存する')
+    await clickButton(el, '下書きを保存')
     await act(async () => { await drainMicrotasks() })
 
     // 保存は済んでいる。失敗しているのは人数の確認だけ。
     expect(el.textContent).toContain('下書きに保存しました')
     expect(el.textContent).toContain('人数の確認に失敗しました。通信を確かめて、もう一度お試しください。')
     expect(el.textContent).not.toContain('保存できませんでした')
-    expect(el.textContent).toContain('人数を数えられませんでした。下書きは保存されています。')
+    expect(el.textContent).toContain('人数を数えられませんでした（下書きは保存済み）')
 
     // 再試行は保存済みの版へだけ問い合わせる。下書きは作り直さない。
     mockPreview.mockResolvedValue(ok({ automationId: 'draft-9', versionId: 'v2', matched: 7, total: 10, freshness: 'available', calculatedAt: '2026-09-22T00:00:00+09:00' }))
@@ -298,6 +292,6 @@ describe('AUTOMATION-03: 人数の確認は保存とは別の成否', () => {
     expect(mockPreview).toHaveBeenLastCalledWith('draft-9', 'account-1', 'v2')
     expect(mockUpdate).toHaveBeenCalledTimes(1)
     expect(mockCreate).toHaveBeenCalledTimes(1)
-    expect(el.textContent).toContain('7人')
+    expect(el.textContent).toContain('7 人')
   })
 })

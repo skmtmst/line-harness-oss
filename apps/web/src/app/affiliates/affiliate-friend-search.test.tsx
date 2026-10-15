@@ -1,94 +1,55 @@
 // @vitest-environment happy-dom
-/*
- * R294: 紹介者作成の友だち検索が0件でも「該当なし」を案内する。
- * 検索中・結果あり・0件・失敗を言い分けて、失敗は再試行できる。
- */
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import React from 'react'
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
-const fixture = vi.hoisted(() => ({
-  listImpl: null as null | ((params: unknown) => Promise<unknown>),
-}))
+const fixture = vi.hoisted(() => ({ list: vi.fn() }))
+vi.mock('@/lib/api', async original => ({ ...await original<typeof import('@/lib/api')>(), api: { friends: { list: fixture.list } } }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: { id: 'acc-1', name: '本店' } }) }))
+const { default: CreateAffiliateV8 } = await import('@/v8/affiliates/create')
+afterEach(cleanup)
 
-vi.mock('@/lib/api', () => ({
-  api: {
-    friends: {
-      list: (params: unknown) => fixture.listImpl!(params),
-    },
-    affiliates: {
-      create: async () => ({ success: true, data: {}, link: null }),
-    },
-  },
-}))
-
-const { CreateAffiliateModal } = await import('./tabs')
-
-;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
-beforeEach(() => {
-  vi.useFakeTimers({ shouldAdvanceTime: true })
-})
-
-afterEach(() => {
-  vi.useRealTimers()
-  cleanup()
-})
-
-function typeSearch(value: string) {
-  fireEvent.change(screen.getByPlaceholderText('名前で検索...'), { target: { value } })
+async function search(name: string) {
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'LINE の友だちと結びつける' })) })
+  fireEvent.change(screen.getByLabelText('友だちの名前で探す'), { target: { value: name } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '検索' })) })
 }
 
-async function settleDebounce() {
-  await act(async () => { vi.advanceTimersByTime(300) })
-}
-
-describe('R294 友だち検索の0件・失敗を案内する', () => {
-  test('0件でも候補枠が開いたまま「該当なし」が出る', async () => {
-    fixture.listImpl = async () => ({ success: true, data: { items: [] } })
-    render(
-      <CreateAffiliateModal accountId="acc-1" onClose={() => {}} onCreated={() => {}} />,
-    )
-    typeSearch('QA_R69_NO_MATCH')
-    await settleDebounce()
-    await screen.findByText('該当なし。検索語を変えてお試しください。')
-    // 作成は押せないまま。
-    expect((screen.getByRole('button', { name: '作る' }) as HTMLButtonElement).disabled).toBe(true)
+describe('R294 現役V8の友だち検索は0件と失敗を言い分ける', () => {
+  test('0件は0件と案内し、友だち未連携のままにする', async () => {
+    fixture.list.mockResolvedValue({ success: true, data: { items: [], total: 0 } })
+    render(<CreateAffiliateV8 />)
+    await search('QA_R69_NO_MATCH')
+    expect(await screen.findByText('全0 件')).toBeTruthy()
+    expect(screen.getByText('結びつけると、本人が LINE で成果を見られます')).toBeTruthy()
+    expect(fixture.list).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'QA_R69_NO_MATCH', accountId: 'acc-1' }))
   })
 
-  test('失敗は「読み込めませんでした」と再試行。直れば候補が出る', async () => {
-    fixture.listImpl = async () => ({ success: false, error: '落ちた' })
-    render(
-      <CreateAffiliateModal accountId="acc-1" onClose={() => {}} onCreated={() => {}} />,
-    )
-    typeSearch('Kenta')
-    await settleDebounce()
-    await screen.findByText('候補を読み込めませんでした')
-
-    // 直して「もう一度試す」を押すと候補が出る。
-    fixture.listImpl = async () => ({
-      success: true,
-      data: { items: [{ id: 'friend-kenta', displayName: 'Kenta Kawano(Obama)' }] },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))
-    await settleDebounce()
-    await screen.findByText('Kenta Kawano(Obama)')
+  test('失敗は再試行でき、直れば候補が出る', async () => {
+    fixture.list.mockResolvedValue({ success: false, error: '落ちた' })
+    render(<CreateAffiliateV8 />)
+    await search('Kenta')
+    expect(await screen.findByText(/友だちを読み込めませんでした/)).toBeTruthy()
+    fixture.list.mockResolvedValue({ success: true, data: { items: [{ id: 'friend-kenta', displayName: 'Kenta Kawano(Obama)' }], total: 1 } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' })) })
+    await screen.findByText('全1 件')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'LINEの友だちと結びつける' })) })
+    expect(await within(screen.getByRole('dialog')).findByText('Kenta Kawano(Obama)')).toBeTruthy()
   })
 
-  test('候補ありは選べて、入力を消すと枠が閉じる', async () => {
-    fixture.listImpl = async () => ({
-      success: true,
-      data: { items: [{ id: 'friend-kenta', displayName: 'Kenta Kawano(Obama)' }] },
-    })
-    render(
-      <CreateAffiliateModal accountId="acc-1" onClose={() => {}} onCreated={() => {}} />,
-    )
-    typeSearch('Kenta')
-    await settleDebounce()
-    const option = await screen.findByText('Kenta Kawano(Obama)')
-    fireEvent.click(option)
-    // 選んだら作成できる。
-    expect((screen.getByRole('button', { name: '作る' }) as HTMLButtonElement).disabled).toBe(false)
+  test('候補を選べて、結びつける欄を畳んでも選択が残る', async () => {
+    fixture.list.mockResolvedValue({ success: true, data: { items: [{ id: 'friend-kenta', displayName: 'Kenta Kawano(Obama)' }], total: 1 } })
+    render(<CreateAffiliateV8 />)
+    await search('Kenta')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'LINEの友だちと結びつける' })) })
+    const dialog = await screen.findByRole('dialog')
+    await act(async () => { fireEvent.click(await within(dialog).findByRole('radio', { name: /Kenta Kawano/ })) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' })) })
+    expect(screen.getByText('結びつける友だち：Kenta Kawano(Obama)')).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'LINE の友だちと結びつける' })) })
+    expect(screen.queryByRole('button', { name: 'LINEの友だちと結びつける' })).toBeNull()
+    expect(screen.getByText('結びつける友だち：Kenta Kawano(Obama)')).toBeTruthy()
   })
 })

@@ -9,14 +9,14 @@ const fixture = vi.hoisted(() => ({
   validateDraft: vi.fn(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
-vi.mock('@/lib/api', () => ({ api: { reminders: { getDraft: fixture.getDraft, validateDraft: fixture.validateDraft } } }))
+vi.mock('@/lib/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/api')>()), api: { staff: { me: vi.fn(async () => ({ success: true, data: { role: 'owner' } })) }, reminders: { getDraft: fixture.getDraft, validateDraft: fixture.validateDraft } } }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: { id: 'account-1', name: 'LINE' }, loading: false }),
 }))
 vi.mock('@/lib/use-feature-visibility', () => ({
   useFeatureVisibility: () => ({ status: 'ready' as const, features: null, enabled: () => false }),
@@ -31,7 +31,7 @@ vi.mock('@/components/shared/condition-builder', async (importOriginal) => {
   return { ...mod, default: Stub }
 })
 
-import ReminderPublishFlow from './reminder-publish-flow'
+import ReminderPublishFlow from '../../test-utils/reminder-stages'
 
 const SETTINGS: ReminderDraftSettings = {
   name: '予約前のお知らせ',
@@ -88,7 +88,7 @@ describe('対象フローの読み込み失敗表示', () => {
     // 司令塔の撮影：reminder-1 で開いたのに reminder-3 の下書きが返る。
     fixture.getDraft.mockResolvedValue({ success: true, data: { ...DRAFT, reminderId: 'reminder-3' } })
     render(<ReminderPublishFlow reminderId="rem-1" stage="target" />)
-    await waitFor(() => expect(screen.getByText('下書きを表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('下書きを読み込めませんでした。')).toBeTruthy())
     expect(screen.queryByText('下書きを読み込んでいます')).toBeNull()
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   })
@@ -98,10 +98,10 @@ describe('対象フローの読み込み失敗表示', () => {
       .mockRejectedValueOnce(new Error('network'))
       .mockResolvedValue({ success: true, data: DRAFT })
     render(<ReminderPublishFlow reminderId="rem-1" stage="target" />)
-    await waitFor(() => expect(screen.getByText('下書きを表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('下書きを読み込めませんでした。')).toBeTruthy())
     expect(screen.queryByText('下書きを読み込んでいます')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
-    await waitFor(() => expect(screen.getByText('対象者の条件')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('radiogroup', { name: '対象者' })).toBeTruthy())
     expect(fixture.getDraft).toHaveBeenCalledTimes(2)
   })
 })

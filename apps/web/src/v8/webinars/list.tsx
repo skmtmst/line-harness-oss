@@ -1,7 +1,7 @@
 'use client'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { RowNameLink } from '@/components/shared/table';
 
 
@@ -13,7 +13,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Archive, Bookmark, CalendarClock, Download, FilePen, Inbox, MousePointerClick, Plus, Radio, Users, Video } from 'lucide-react';
+import { Archive, Bookmark, Download, FilePen, Inbox, Plus, Radio, Video } from 'lucide-react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye } from 'lucide-react';
 import { ListPage, ListPagePagination } from '@/components/templates';
@@ -47,8 +47,8 @@ import { publicationStateLabel } from '@/components/webinars/publication-label';
 import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { runUndoable } from '@/lib/undoable';
-import { formatDateTime, formatNumber } from '@/lib/format';
-import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview, type WebinarOverviewMetric } from '@/lib/api';
+import { formatListTimestamp, formatNumber } from '@/lib/format';
+import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview } from '@/lib/api';
 import { beforeStart, publicPath, showsCounts, statusLabel, statusTone, webinarListCsv, webinarLoadFailure, type WebinarLoadFailure } from './helpers';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -56,6 +56,7 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { kpiCells } from './overview'
 
 /*
  * ★V8 ウェビナーの一覧（Pencil：一覧 `UyUMw`・1152 `uBMuB`・閲覧のみ `jiNg0`・
@@ -66,8 +67,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  * 「…」と右クリックは同じ操作（参加者・分析・コメント演出・アーカイブ）。
  * 行を押すと右に詳細が出る（↑↓で次の行へ・名前はその場で直せる）。
  *
- * データの口・保存の口・権限・失敗の扱いは app/webinars/list-v8.tsx と同じ
- * （BEHAVIOR.md）。違うのは見せ方だけ。
+ * データの口・保存の口・権限・失敗の扱いは BEHAVIOR.md に記録。
  */
 
 type SortKey = 'updated' | 'created' | 'name'
@@ -75,8 +75,6 @@ type SavedFilter = '' | 'active' | 'draft' | 'archived'
 
 const UNFILED = '__unfiled__'
 const READONLY_REASON = 'この操作にはオーナーか管理者の権限が要ります'
-/** 検索入力を口へ渡すまでの待ち時間。1文字ごとの取り直しを束ねる。 */
-const SEARCH_DEBOUNCE_MS = 300
 
 function scheduleSummary(w: Webinar): string {
   if (w.schedule.length === 0) return '未設定'
@@ -102,52 +100,21 @@ function scheduleSummary(w: Webinar): string {
   }
   otherRules.forEach((rule) => {
     if (rule.type === 'weekly') parts.push(`毎週${(rule.days ?? []).map((day) => DAYS[day]).join('・')} ${rule.time}`)
-    if (rule.type === 'once') parts.push(rule.at ? formatDateTime(rule.at) : '単発・日時未設定')
+    if (rule.type === 'once') parts.push(rule.at ? formatListTimestamp(rule.at) : '単発・日時未設定')
   })
   return parts.join(' / ')
 }
 
 function periodSummary(webinar: WebinarListItem): string {
+  if (webinar.publicationState === 'scheduled') return formatListTimestamp(webinar.publicationStartsAt)
+  if (webinar.publicationState === 'period' && webinar.publicationStartsAt && webinar.publicationEndsAt)
+    return `${formatListTimestamp(webinar.publicationStartsAt)}〜${formatListTimestamp(webinar.publicationEndsAt)}`
   return publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt)
     ?? scheduleSummary(webinar)
 }
 
 function peopleText(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : emptyValue('unknown')
-}
-
-function metricValue(metric: WebinarOverviewMetric | undefined): number | null {
-  return metric && metric.state === 'available' && metric.value !== null ? metric.value : null
-}
-
-/*
- * 数の帯の4つ。口にある数だけ（無い数は「—」。0 にしない）。
- * 補足の行も口にある数だけで書く（先月比・フォーム送信は口に無い）。
- */
-function kpiCells(overview: WebinarOverview | null) {
-  const m = overview?.metrics
-  const active = metricValue(m?.activeWebinars)
-  const bookings = metricValue(m?.registrationBookings)
-  const rate = metricValue(m?.viewRate)
-  const people = metricValue(m?.ctaUniquePeople)
-  return [
-    {
-      key: 'webinars', title: 'ウェビナー', icon: Video, value: metricValue(m?.webinars), unit: '件',
-      detail: active === null ? emptyValue('unknown') : `公開中 ${formatNumber(active)}件`, help: '登録済みの件数です。',
-    },
-    {
-      key: 'registrations', title: '申込', icon: Users, value: metricValue(m?.registrations), unit: '人',
-      detail: bookings === null ? emptyValue('unknown') : `延べ予約 ${formatNumber(bookings)}件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
-    },
-    {
-      key: 'viewers', title: '視聴', icon: CalendarClock, value: metricValue(m?.viewers), unit: '人',
-      detail: rate === null ? emptyValue('unknown') : `申込の ${Math.round(rate * 1000) / 10}%`, help: '視聴開始の人数です。視聴完了は一覧の集計では出していません。',
-    },
-    {
-      key: 'cta', title: 'CTAクリック', icon: MousePointerClick, value: metricValue(m?.ctaTotalClicks), unit: '回',
-      detail: people === null ? emptyValue('unknown') : `押した人 ${formatNumber(people)}人`, help: '全期間にCTAが押された延べ回数です。',
-    },
-  ]
 }
 
 /** 行の「…」と右クリックの中身。2箇所で別々に書くとずれるので1つにする。 */
@@ -185,7 +152,7 @@ function toContextItems(items: ActionMenuItem[]): ContextMenuItem[] {
 
 function StatusPill({ webinar }: { webinar: WebinarListItem }) {
   return (
-    <SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'info' : 'neutral'}>{statusLabel(webinar)}</SharedStatusPill>
+    <SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'neutral' : 'neutral'}>{statusLabel(webinar)}</SharedStatusPill>
   )
 }
 
@@ -544,8 +511,8 @@ function WebinarList() {
   useEffect(() => { setQuery((current) => (current.trim() === view.q ? current : view.q)) }, [view.q])
   useEffect(() => {
     if (query.trim() === view.q) return
-    const timer = setTimeout(() => setView({ q: query.trim(), page: '1' }), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+    // 共通SearchFieldが300ms束ねた値を受ける。ここで二重に待たせない。
+    setView({ q: query.trim(), page: '1' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
   useEffect(() => { void refreshOverview() }, [refreshOverview])
@@ -805,14 +772,12 @@ function WebinarList() {
     </div>
   )
   const sortBox = (
-    <div className={styles.sortBox}>
-      <SortSelect
+    <SortSelect
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}
         options={[{ value: 'updated', label: '更新順' }, { value: 'created', label: '作成順' }, { value: 'name', label: '名前順' }]}
         label="並び："
       />
-    </div>
   )
   const savedBox = (
     <div className={styles.savedBox}>
@@ -832,9 +797,7 @@ function WebinarList() {
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (
-    <div className={styles.noticeRow}>
-      <Notice tone="info">公開すると、申込ページとLINEの案内が使えるようになります。申込から相談までの流れは、各ウェビナーの「分析」で見られます。</Notice>
-    </div>
+    null
   )
   const searchBox = (
     <SearchField
@@ -846,26 +809,10 @@ function WebinarList() {
     />
   )
   /* 1152 の板（uBMuB）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … 並び・よく使う絞り込み・件数」。 */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      {notice}
-      <ListToolbarRow>
-        {createButton}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>{searchBox}</ListToolbarSearchSlot>
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {sortBox}
-        {savedBox}
-        {perPageBox}
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
   const wideToolbar = (
     <>
-      {notice}
+
       <ListToolbar
         search={{ placeholder: 'ウェビナー名で探す', label: 'ウェビナー名で探す', width: 240, value: query, onChange: setQuery }}
         filters={filterChips}
@@ -976,12 +923,10 @@ function WebinarList() {
     )
   }
 
-  const pager = hasListData && pageCount > 1 ? (
+  const pager = hasListData ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visibleItems.length} / {formatNumber(visibleTotal)} 件
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り"
+        range={{ total: visibleTotal, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + visibleItems.length }} />
     </ListPagePagination>
   ) : null
 
@@ -989,8 +934,11 @@ function WebinarList() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      heightMode="content"
       skeleton
-      help={<>{"録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"}{"行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"}</>}
+      help={<>{"録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"}{"行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"}{kpis.map((kpi) => kpi.help).join(" ")}</>}
+      noticeSpacing="section"
+      explanation="公開すると、申込ページとLINEの案内が使えるようになります。申込から相談までの流れは、各ウェビナーの「分析」で見られます。"
       boardId="UyUMw"
       headingSize="regular"
       title="ウェビナー"
@@ -1023,7 +971,6 @@ function WebinarList() {
               presentation="band"
               title={kpi.title}
               icon={<kpi.icon size={13} aria-hidden="true" />}
-              help={kpi.help}
               value={kpi.value}
               unit={kpi.value === null ? '' : kpi.unit}
               detail={kpi.detail}
@@ -1044,8 +991,8 @@ function WebinarList() {
           <FolderPanelNote>フォルダを消しても、中のウェビナーは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
-      collapsedFolders={narrow ? undefined : foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>{createButton}{folderSelect}</>}
-      toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{narrow ? narrowToolbar : wideToolbar}</>}
+      collapsedFolders={foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>{createButton}{folderSelect}</>}
+      toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{wideToolbar}</>}
       pagination={pager}
       overlays={<>
         {archiveTarget ? (

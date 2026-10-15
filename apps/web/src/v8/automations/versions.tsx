@@ -4,7 +4,7 @@
  * ★V8 共通アクションの版と使われている場所（Pencil `ziSgL`）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
- * （app/common-actions/common-action-versions-v8.tsx）と同じ（版の履歴・公開・前の版から新版・
+ * （共通アクションの既存API）と同じ（版の履歴・公開・前の版から新版・
  * 利用先の版切り替え・月次集計・読めないときの扱い）。違いは見せ方だけ——
  * 型（DetailPage）に、戻る道・題・説明・右上の操作・4つの数のマス・版の履歴・呼び出し元の表を渡す。
  */
@@ -22,8 +22,11 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import KpiCard from '@/components/shared/kpi-card'
-import kpiStyles from '@/components/shared/kpi-card.module.css'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import KpiBand from '@/components/shared/kpi-band'
+import Card, { CardHeader } from '@/components/shared/card'
+import StatusBadge from '@/components/shared/status-badge'
+import TruncatedText from '@/components/shared/truncated-text'
+import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell } from '@/components/shared/table'
 import { useAutomationManage } from './shell'
 import { describeVersionChanges } from './version-diff'
 import styles from './versions.module.css'
@@ -228,6 +231,12 @@ function VersionsInner() {
       headingSize="regular"
       title={`${detail.name}（版と使われている場所）`}
       help="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
+      stats={<KpiBand aria-label="版と利用先の集計">
+        <KpiCard presentation="band" title="いまの版" icon={<GitBranch size={13} aria-hidden="true" />} value={null} valueText={published ? `v${published.versionNumber}` : emptyValue('unknown')} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
+        <KpiCard presentation="band" title="呼び出し元" icon={<Link2 size={13} aria-hidden="true" />} value={detail.bindings.length} unit="か所" detail={consumerBreakdown(detail.bindings)} />
+        <KpiCard presentation="band" title="古い版のまま" icon={<History size={13} aria-hidden="true" />} value={outdatedCount} unit="か所" detail={outdatedCount > 0 ? '新版あり' : 'すべて最新の版です'} />
+        <KpiCard presentation="band" title="今月 動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}`} />
+      </KpiBand>}
       actions={<>
         {canEdit && draft ? (
           <Button href={editHref}><Pencil size={15} aria-hidden="true" />下書きの中身を編集</Button>
@@ -241,22 +250,17 @@ function VersionsInner() {
         ) : null}
       </>}
     >
-      <div className={styles.body}>
+
       {summaryError ? (
         <Notice tone="danger" ><span>月次件数を読み込めませんでした。版と利用先は表示しています。</span><Button variant="secondary" disabled={summaryRetrying} onClick={() => void reloadSummary()}>月次件数をもう一度読み込む</Button></Notice>
       ) : null}
 
-      <div className={`${kpiStyles.strip} ${styles.cards}`}>
-        <KpiCard presentation="cell" title="いまの版" icon={<GitBranch size={13} aria-hidden="true" />} value={null} valueText={published ? `v${published.versionNumber}` : emptyValue('unknown')} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
-        <KpiCard presentation="cell" title="呼び出し元" icon={<Link2 size={13} aria-hidden="true" />} value={detail.bindings.length} unit="か所" detail={consumerBreakdown(detail.bindings)} />
-        <KpiCard presentation="cell" title="古い版のまま" icon={<History size={13} aria-hidden="true" />} value={outdatedCount} unit="か所" detail={outdatedCount > 0 ? '新版あり' : 'すべて最新の版です'} />
-        <KpiCard presentation="cell" title="今月 動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}`} />
-      </div>
+
 
       {error ? <Notice tone="danger" >{error}</Notice> : null}
 
-      <section className={styles.historyCard} aria-labelledby="versions-history-title">
-        <h2 id="versions-history-title" className={styles.cardTitle}>版の履歴</h2>
+      <Card variant="form" aria-labelledby="versions-history-title">
+        <CardHeader size="stacked" titleId="versions-history-title" title="版の履歴" />
         <p className={styles.cardLead}>公開しても、使っている所は今の版のまま。使う所ごとに新しい版へ切り替えます。</p>
         <ul className={styles.versionList}>
           {versions.map((version) => {
@@ -266,10 +270,7 @@ function VersionsInner() {
             return (
               <li key={version.id} className={styles.versionRow}>
                 <span className={styles.versionName}>{`v${version.versionNumber}`}</span>
-                <span className={styles.pill} data-tone={isCurrent ? 'active' : 'neutral'}>
-                  <span className={styles.pillDot} aria-hidden="true" />
-                  {label}
-                </span>
+                <StatusBadge tone={isCurrent ? 'success' : 'neutral'}>{label}</StatusBadge>
                 <span className={styles.versionChain} title={stepChain(version.actions)}>{stepChain(version.actions)}</span>
                 {!canEdit ? null : isDraft ? (
                   <Button
@@ -296,18 +297,17 @@ function VersionsInner() {
             )
           })}
         </ul>
-      </section>
+      </Card>
 
       <section className={styles.usage} aria-labelledby="versions-usage-title">
-        <h2 id="versions-usage-title" className={styles.usageTitle}>どこから呼ばれているか</h2>
+        <CardHeader size="stacked" titleId="versions-usage-title" title="どこから呼ばれているか" />
         {detail.bindings.length === 0 ? (
           <p className={styles.cardLead}>まだどこからも呼ばれていません。</p>
         ) : (
-          <div className={styles.tableBox}>
-            <DataTable className={styles.table}>
+          <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--polish-table-row)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
               <thead>
-                <TableHeadRow className={styles.headRow} data-table-layout="columns">
-                  <Th className={styles.colWhere}>利用先</Th>
+                <TableHeadRow data-table-layout="columns">
+                  <Th grow>利用先</Th>
                   <Th className={styles.colPinned}>固定中の版</Th>
                   <Th className={styles.colNum} align="right">実行中</Th>
                   <Th className={styles.colNum} align="right">待機中</Th>
@@ -317,9 +317,9 @@ function VersionsInner() {
               </thead>
               <tbody>
                 {detail.bindings.map((binding) => (
-                  <Tr key={binding.id} className={styles.row} data-table-layout="columns" data-row-id={binding.id}>
-                    <Td className={styles.colWhere}>
-                      <span className={styles.where} title={binding.consumerPath || '全体'}>{binding.consumerPath || '全体'}</span>
+                  <Tr key={binding.id} data-table-layout="columns" data-row-id={binding.id}>
+                    <Td grow>
+                      <TruncatedText value={binding.consumerPath || '全体'} />
                       <span className={styles.whereSub}>{CONSUMER_LABELS[binding.consumerType] ?? binding.consumerType}</span>
                     </Td>
                     <Td className={styles.colPinned}><span className={styles.cell}>{`v${binding.versionNumber}`}</span></Td>
@@ -332,27 +332,22 @@ function VersionsInner() {
                       {binding.olderWaitingCount ? <span className={styles.whereSub}>{`旧版 ${binding.olderWaitingCount}`}</span> : null}
                     </Td>
                     <Td className={styles.colState}>
-                      <span className={styles.pill} data-tone={binding.hasNewerVersion ? 'info' : 'active'}>
-                        <span className={styles.pillDot} aria-hidden="true" />
-                        {binding.hasNewerVersion ? '新版あり' : '最新'}
-                      </span>
+                      <StatusBadge tone={binding.hasNewerVersion ? 'info' : 'success'}>{binding.hasNewerVersion ? '新版あり' : '最新'}</StatusBadge>
                     </Td>
-                    <Td className={styles.colOps}>
+                    <ActionCell className={styles.colOps}>
                       {canEdit && binding.hasNewerVersion && published ? (
                         <Button disabled={Boolean(working)} onClick={() => { setPendingBindingId(binding.id); setDialogError('') }}>
                           {`v${published.versionNumber} へ更新する`}
                         </Button>
                       ) : <span className={styles.cellMuted}>{emptyValue('unknown')}</span>}
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 ))}
               </tbody>
             </DataTable>
-          </div>
         )}
       </section>
-      <p className={styles.footBox}>更新しても、実行中・待機中の処理は変えず、次に始まる処理から新版を使います。</p>
-      </div>
+      <Notice tone="info">更新しても、実行中・待機中の処理は変えず、次に始まる処理から新版を使います。</Notice>
 
       <Dialog
         open={Boolean(pendingBinding && published)}

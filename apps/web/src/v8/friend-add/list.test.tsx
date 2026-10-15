@@ -149,7 +149,8 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     expect(regular).toEqual(expect.arrayContaining(['編集する', '実行結果を見る', '止める', '保管する']))
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
     const sink = await openMenu('経路が分からなかった人')
-    expect(sink).toContain('止める')
+    expect(sink).toContain('止められない理由を見る')
+    expect(sink).not.toContain('止める')
     expect(sink).not.toContain('保管する')
   })
 
@@ -171,6 +172,8 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(buttons().some((text) => text.includes('初回案内を作る'))).toBe(false)
     expect(buttons().some((text) => text.includes('フォルダを追加'))).toBe(false)
+    expect(host.querySelector('[data-reorder-handle]')).toBeNull()
+    expect(host.querySelector('[data-row-id="rule-shop"] [data-reorder-disabled]')).not.toBeNull()
     const menu = await openMenu('店頭QRの初回案内')
     expect(menu).toEqual(['実行結果を見る'])
   })

@@ -188,7 +188,7 @@ function RecipeClone() {
 
   return (
     <div className={styles.page}>
-      <div className="v8-only"><PageHeading title="レシピを複製する" /></div>
+      <div><PageHeading title="レシピを複製する" /></div>
       <nav className={styles.breadcrumb} aria-label="パンくず">
         <Link href="/recipes">レシピ</Link>
         <span aria-hidden>›</span>

@@ -67,8 +67,6 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
 }))
 
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
-
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, replace: mocks.replace, refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(mocks.query),

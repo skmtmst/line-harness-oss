@@ -24,7 +24,7 @@ import { ApiError } from '@/lib/api';
 import { nenPetsApi, petAnimalTypeLabel, type NenHealthKpis, type NenHealthListData, type NenHealthRow, type NenHealthSort, type NenHealthSummaryData } from '@/lib/nen-pets-api';
 import HealthItemsV8 from './items'
 import SummaryDrawerV8, { SummarySheet } from './summary';
-import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, rangeText, type HealthFilters, type HealthTabKey } from './parts';
+import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, type HealthFilters, type HealthTabKey } from './parts';
 import styles from './health.module.css'
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
@@ -178,6 +178,7 @@ export default function HealthV8({
       headingSize="regular"
       title="健康日記"
       help="お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。"
+      explanation="「気になる変化」は、体重が8週で±10%以上変わった・便の異常が3回続いた・食いつき不良が3回続いた、のどれかに当てはまるペットです。行の「…」から 30日のまとめ を開けます。"
       actions={(
         <Button type="button" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? 'ブラウザの印刷で PDF に保存します' : '一覧の行の「…」から「30日のまとめ」を開くと書き出せます'}>
           <FileText size={15} aria-hidden="true" />獣医師向け PDF を書き出す
@@ -295,9 +296,7 @@ function HealthListV8({
 
   return (
     <>
-      <div className={styles.noteRow}>
-        <Notice tone="info" message="「気になる変化」は、体重が8週で±10%以上変わった・便の異常が3回続いた・食いつき不良が3回続いた、のどれかに当てはまるペットです。行の「…」から 30日のまとめ を開けます。" />
-      </div>
+
 
       <ListToolbarRow data-design="ListControls">
         <ListToolbarSearchSlot>
@@ -369,11 +368,7 @@ function HealthListV8({
             </tbody>
           </DataTable>
           <div className={styles.pagerRow}>
-            {data.total > data.pageSize ? (
-              <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} summary={rangeText(data.total, data.page, data.pageSize)} />
-            ) : (
-              <div className={styles.pager}><span className={styles.pagerCount}>{rangeText(data.total, data.page, data.pageSize)}</span></div>
-            )}
+            <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} range={{ total: data.total, first: (data.page - 1) * data.pageSize + 1, last: Math.min(data.total, data.page * data.pageSize) }} />
           </div>
           <p className={styles.hint}>行の「…」から 30日のまとめ・獣医師向け PDF・飼い主にトークで声をかける。</p>
         </>

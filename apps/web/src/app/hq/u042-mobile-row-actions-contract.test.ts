@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..', '..')
 const HQ_LIST = readFileSync(join(SRC, 'components', 'hq', 'account-list.tsx'), 'utf8')
-const ACCOUNTS = readFileSync(join(SRC, 'app', 'accounts', 'page.tsx'), 'utf8')
+const ACCOUNTS = readFileSync(join(SRC, 'v8/settings/accounts/accounts.tsx'), 'utf8')
 const MEMBERS = readFileSync(join(SRC, 'v8', 'hq', 'members.tsx'), 'utf8')
 
 /*
@@ -28,18 +28,19 @@ describe('行操作を見える位置へ（#975 U042）', () => {
     expect(HQ_LIST).toContain('<details')
   })
 
-  it('アカウント一覧はスマホでカードになり、「詳細」が各カードにある', () => {
-    expect(ACCOUNTS).toContain('data-design="List"')
-    expect(ACCOUNTS).toContain('md:hidden')
-    expect(ACCOUNTS).toContain('hidden overflow-x-auto md:block')
+  it('現役のアカウント一覧は共有の表の各行に詳細へ行く操作がある', () => {
+    expect(ACCOUNTS).toContain('<DataTable')
+    expect(ACCOUNTS).toContain('<RowMenu')
+    expect(ACCOUNTS).toContain('items={menuItems(account)}')
     expect(ACCOUNTS).toContain('/accounts/detail?id=')
   })
 
   it('権限者の変更・再送は各行にあり、操作権限がある人だけに出す', () => {
-    expect(MEMBERS).toContain('role="table"')
-    expect(MEMBERS).toContain('onClick={() => openChange(member)}')
-    expect(MEMBERS).toContain('canManage && canResendInvite(member)')
-    expect(MEMBERS).toContain('onClick={() => void resend(member)}')
-    expect(MEMBERS).toContain('aria-label={`${member.name}さんの権限を変更`}')
+    expect(MEMBERS).toContain('<GridTable label="権限者の一覧"')
+    expect(MEMBERS).toContain('onClick: () => openChange(member)')
+    expect(MEMBERS).toContain('canManage ? <RowActions')
+    expect(MEMBERS).toContain('menuItems={canResendInvite(member)')
+    expect(MEMBERS).toContain('onSelect: () => { void resend(member) }')
+    expect(MEMBERS).toContain("subjectName={member.name} edit={{ label: '権限を変更する'")
   })
 })
