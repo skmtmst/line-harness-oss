@@ -91,3 +91,4 @@ export * from './hq-catalog-templates.js';
 export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentWrite, BookingAssignmentSettings } from './booking-assignment.js';
 
 export * from './booking-entitlements.js';
+export * from './style-api.js';

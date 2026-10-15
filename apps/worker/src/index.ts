@@ -1,6 +1,7 @@
 import type { Env } from './worker-env.js';
 export type { Env } from './worker-env.js';
 import { liffNotificationPreferences } from './routes/liff-notification-preferences.js';
+import { styles } from './routes/styles.js';
 import { processScenarioSourceJobs } from './services/scenario-source-jobs.js';
 import { formDocuments } from './routes/form-documents.js';
 import { purgeExpiredFormDocuments } from './services/form-documents.js';
@@ -466,6 +467,7 @@ app.route('/', fileScan);
 app.route('/', analytics);
 app.route('/', analyticsExports);
 app.route('/', dashboard);
+app.route('/', styles);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', visitStamps);

@@ -219,6 +219,16 @@ CREATE TABLE account_skipped_deliveries (
   UNIQUE (kind, ref_id)
 );
 
+CREATE TABLE account_styles (
+ line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id),
+ style TEXT NOT NULL CHECK(style IN('standard','ec','restaurant','salon','consult','lesson')),
+ answers_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(answers_json)),
+ cards_json TEXT CHECK(cards_json IS NULL OR json_valid(cards_json)),
+ selected_at TEXT,
+settings_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(settings_json)),
+ version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL, updated_by TEXT
+, selection_mode TEXT NOT NULL DEFAULT 'configured' CHECK(selection_mode IN ('configured','later','manual')));
+
 CREATE TABLE action_score_rule_sets (
   id                           TEXT PRIMARY KEY,
   line_account_id              TEXT NOT NULL UNIQUE REFERENCES line_accounts(id),
@@ -918,16 +928,11 @@ CREATE TABLE analytics_result_audience_members (
   PRIMARY KEY (audience_id, friend_id)
 );
 
-CREATE TABLE analytics_result_audiences (
-  id                  TEXT PRIMARY KEY,
-  line_account_id     TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
-  source_kind         TEXT NOT NULL CHECK (source_kind IN ('funnel','cross')),
-  source_result_id    TEXT NOT NULL,
-  selection_key       TEXT NOT NULL,
-  member_count        INTEGER NOT NULL DEFAULT 0,
-  expires_at          TEXT NOT NULL,
-  created_by          TEXT,
-  created_at          TEXT NOT NULL
+CREATE TABLE "analytics_result_audiences" (
+ id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+ source_kind TEXT NOT NULL CHECK(source_kind IN('funnel','cross','booking')),
+ source_result_id TEXT NOT NULL, selection_key TEXT NOT NULL, member_count INTEGER NOT NULL DEFAULT 0,
+ expires_at TEXT NOT NULL, created_by TEXT, created_at TEXT NOT NULL
 );
 
 CREATE TABLE analytics_saved_analyses (
@@ -1639,6 +1644,8 @@ CREATE TABLE booking_operation_runs (
   UNIQUE (line_account_id, idempotency_key)
 );
 
+CREATE TABLE booking_page_views(id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id), menu_id TEXT REFERENCES menus(id), friend_id TEXT REFERENCES friends(id), entry_point TEXT, viewed_at TEXT NOT NULL);
+
 CREATE TABLE booking_payment_choices (
   booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1903,7 +1910,7 @@ CREATE TABLE "bookings" (
   cancelled_at                 TEXT,
   completed_at                 TEXT,
   created_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)), cancel_claim_id TEXT, waitlist_entry_id TEXT,
+  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)), cancel_claim_id TEXT, waitlist_entry_id TEXT, meeting_mode TEXT CHECK(meeting_mode IN('online','in_person')), meeting_url TEXT, meeting_location TEXT, consultation_outcome TEXT CHECK(consultation_outcome IN('considering','won','lost')), outcome_recorded_at TEXT, outcome_recorded_by TEXT, cancellation_reason TEXT, designation TEXT NOT NULL DEFAULT 'unspecified' CHECK(designation IN('designated','any','unspecified')), entry_point TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
@@ -2769,7 +2776,7 @@ CREATE TABLE event_bookings (
     answer_snapshot_json IS NULL OR json_valid(answer_snapshot_json)
   ), first_participation INTEGER CHECK (first_participation IN (0, 1)), first_participation_attended_count INTEGER CHECK (
     first_participation_attended_count IS NULL OR first_participation_attended_count >= 0
-  ), first_participation_checked_at TEXT, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)), approval_expires_at TEXT,
+  ), first_participation_checked_at TEXT, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)), approval_expires_at TEXT, participation_mode TEXT NOT NULL DEFAULT 'classroom' CHECK(participation_mode IN('classroom','online')),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (event_id) REFERENCES events(id),
   FOREIGN KEY (slot_id) REFERENCES event_slots(id),
@@ -2835,7 +2842,7 @@ CREATE TABLE event_slots (
   sort_order  INTEGER NOT NULL DEFAULT 0,
   deleted_at  TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), client_key TEXT,
+  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), client_key TEXT, instructor_id TEXT REFERENCES staff(id), classroom_capacity INTEGER CHECK(classroom_capacity IS NULL OR classroom_capacity>=0), online_capacity INTEGER CHECK(online_capacity IS NULL OR online_capacity>=0),
   FOREIGN KEY (event_id) REFERENCES events(id)
 );
 
@@ -2881,7 +2888,7 @@ CREATE TABLE "event_waitlist" (
   notified_at                    TEXT,
   version                        INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
   created_at                     TEXT NOT NULL,
-  updated_at                     TEXT NOT NULL, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)), sort_order INTEGER NOT NULL DEFAULT 0,
+  updated_at                     TEXT NOT NULL, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)), sort_order INTEGER NOT NULL DEFAULT 0, participation_mode TEXT NOT NULL DEFAULT 'classroom' CHECK(participation_mode IN('classroom','online')),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (event_id) REFERENCES events(id),
   FOREIGN KEY (slot_id) REFERENCES event_slots(id),
@@ -2934,7 +2941,7 @@ CREATE TABLE events (
   CHECK (approval_deadline_hours IN (2, 24, 72)), questions_json TEXT CHECK (
     questions_json IS NULL OR json_valid(questions_json)
   ), lifecycle_status TEXT NOT NULL DEFAULT 'draft'
-  CHECK (lifecycle_status IN ('draft', 'published', 'paused', 'ended', 'cancelled')), lifecycle_changed_at TEXT, lifecycle_change_reason TEXT, venue_address TEXT,
+  CHECK (lifecycle_status IN ('draft', 'published', 'paused', 'ended', 'cancelled')), lifecycle_changed_at TEXT, lifecycle_change_reason TEXT, venue_address TEXT, is_trial INTEGER NOT NULL DEFAULT 0 CHECK(is_trial IN(0,1)),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
@@ -4221,6 +4228,14 @@ CREATE TABLE integration_api_tokens (
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE lesson_memberships (
+ id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id), friend_id TEXT NOT NULL REFERENCES friends(id),
+ plan_name TEXT, joined_at TEXT NOT NULL, ended_at TEXT, withdrawal_reason TEXT, expires_at TEXT,
+ remaining_uses INTEGER CHECK(remaining_uses IS NULL OR remaining_uses>=0), updated_by TEXT,
+ version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL,
+ UNIQUE(line_account_id,friend_id)
+);
+
 CREATE TABLE line_account_connection_checks (
   id                TEXT PRIMARY KEY,
   line_account_id   TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -4548,7 +4563,7 @@ CREATE TABLE meet_consultations (
                     CHECK (status IN ('confirmed', 'cancelled', 'completed')),
   created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, booking_id TEXT, booking_version INTEGER, cancel_claim_id TEXT);
+, booking_id TEXT, booking_version INTEGER, cancel_claim_id TEXT, staff_id TEXT REFERENCES staff(id), attendance TEXT CHECK(attendance IN('visited','late','no_show')), consultation_outcome TEXT CHECK(consultation_outcome IN('considering','won','lost')), outcome_recorded_at TEXT, outcome_recorded_by TEXT);
 
 CREATE TABLE menu_versions (
   id TEXT PRIMARY KEY,
@@ -4589,7 +4604,7 @@ CREATE TABLE menus (
   auto_tag_id           TEXT,                  -- 予約申込時に friend に自動付与するタグ
   created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), concurrent_capacity INTEGER NOT NULL DEFAULT 1, booking_window_days INTEGER, cutoff_hours_before INTEGER, cancel_deadline_hours_before INTEGER, intake_question TEXT, price_mode TEXT NOT NULL DEFAULT 'fixed'
-  CHECK (price_mode IN ('fixed', 'free', 'inquiry') AND (price_mode = 'fixed' OR base_price = 0)), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  CHECK (price_mode IN ('fixed', 'free', 'inquiry') AND (price_mode = 'fixed' OR base_price = 0)), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), meeting_mode TEXT NOT NULL DEFAULT 'in_person' CHECK(meeting_mode IN('online','in_person','customer_choice')), meeting_location TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (auto_tag_id) REFERENCES tags(id) ON DELETE SET NULL
 );
@@ -7294,7 +7309,7 @@ CREATE TABLE "rt_reservations" (
   source_updated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT, dining_snapshot_json TEXT CHECK(dining_snapshot_json IS NULL OR json_valid(dining_snapshot_json)), departed_at TEXT);
+, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT, dining_snapshot_json TEXT CHECK(dining_snapshot_json IS NULL OR json_valid(dining_snapshot_json)), departed_at TEXT, staff_id TEXT REFERENCES staff(id));
 
 CREATE TABLE rt_resource_locks (
   resource_key TEXT PRIMARY KEY,
@@ -7869,6 +7884,27 @@ CREATE TABLE stripe_events (
   metadata         TEXT,
   processed_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
+
+CREATE TABLE style_analytics_results(id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id), style TEXT NOT NULL, selection_json TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
+
+CREATE TABLE style_change_logs(id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL, actor_id TEXT, action TEXT NOT NULL, before_json TEXT, after_json TEXT, created_at TEXT NOT NULL);
+
+CREATE TABLE style_holidays(line_account_id TEXT NOT NULL REFERENCES line_accounts(id), date TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY(line_account_id,date));
+
+CREATE TABLE style_starter_items (
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id), style TEXT NOT NULL, item_key TEXT NOT NULL,
+ kind TEXT NOT NULL, target_id TEXT NOT NULL, is_sample INTEGER NOT NULL DEFAULT 1,
+ feature TEXT, set_id TEXT, set_version INTEGER NOT NULL, applied_at TEXT NOT NULL,
+ PRIMARY KEY(line_account_id,style,item_key)
+);
+
+CREATE TABLE style_starter_sets (
+ id TEXT PRIMARY KEY, tenant_id TEXT REFERENCES tenants(id), style TEXT NOT NULL, name TEXT NOT NULL,
+ definition_json TEXT NOT NULL CHECK(json_valid(definition_json)),
+ version INTEGER NOT NULL DEFAULT 1, archived_at TEXT, updated_at TEXT NOT NULL, updated_by TEXT
+, auto_insert INTEGER NOT NULL DEFAULT 1 CHECK(auto_insert IN (0,1)));
+
+CREATE TABLE style_targets(line_account_id TEXT NOT NULL REFERENCES line_accounts(id), metric TEXT NOT NULL, period TEXT NOT NULL, value REAL NOT NULL CHECK(value>=0), PRIMARY KEY(line_account_id,metric,period));
 
 CREATE TABLE "support_email_messages" (
   id                TEXT PRIMARY KEY,
@@ -8952,8 +8988,7 @@ CREATE INDEX idx_analytics_report_runs_history
 CREATE INDEX idx_analytics_report_schedules_due
   ON analytics_report_schedules(status, next_run_at, line_account_id);
 
-CREATE INDEX idx_analytics_result_audiences_expiry
-  ON analytics_result_audiences(line_account_id, expires_at);
+CREATE INDEX idx_analytics_result_audiences_expiry ON analytics_result_audiences(line_account_id,expires_at);
 
 CREATE INDEX idx_analytics_saved_analyses_account
   ON analytics_saved_analyses(line_account_id, status, updated_at DESC, id DESC);
@@ -10672,6 +10707,10 @@ CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
 
 CREATE INDEX idx_stripe_events_type ON stripe_events (event_type);
 
+CREATE INDEX idx_style_page_views ON booking_page_views(line_account_id,viewed_at);
+
+CREATE UNIQUE INDEX idx_style_starter_tenant_style ON style_starter_sets(COALESCE(tenant_id,''),style) WHERE archived_at IS NULL;
+
 CREATE INDEX idx_support_email_messages_reply_lookup
   ON support_email_messages (message_id);
 
@@ -11708,6 +11747,62 @@ CREATE TRIGGER rt_waitlist_reservation_update BEFORE UPDATE OF departed_at,table
 
 CREATE TRIGGER rt_walkin_arrival_event AFTER INSERT ON rt_seat_visit_marks WHEN NEW.kind='visited' AND NEW.undone_at IS NULL BEGIN INSERT OR IGNORE INTO rt_reservation_events(id,reservation_id,store_id,event_type,reservation_version,occurred_at,request_id,line_account_id,friend_id,payload_json) SELECT 'rt:'||r.id||':'||r.customer_version||':restaurant.arrived',r.id,r.store_id,'restaurant.arrived',r.customer_version,NEW.marked_at,COALESCE(NEW.request_id,NEW.id),s.line_account_id,(SELECT id FROM friends WHERE line_account_id=s.line_account_id AND line_user_id=r.line_uid),json_object('reservationId',r.id,'storeId',r.store_id,'startsAt',r.starts_at,'endsAt',r.ends_at,'status',r.status,'guestCount',r.guest_count) FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=NEW.reservation_id AND r.status IN('visited','seated'); END;
 
+CREATE TRIGGER style_booking_meeting_snapshot AFTER INSERT ON bookings
+WHEN NEW.meeting_mode IS NULL OR NEW.meeting_location IS NULL
+BEGIN UPDATE bookings SET meeting_mode=COALESCE(NEW.meeting_mode,(SELECT CASE WHEN meeting_mode='customer_choice' THEN NULL ELSE meeting_mode END FROM menus WHERE id=NEW.menu_id AND line_account_id=NEW.line_account_id)),meeting_location=COALESCE(NEW.meeting_location,(SELECT meeting_location FROM menus WHERE id=NEW.menu_id AND line_account_id=NEW.line_account_id)) WHERE id=NEW.id; END;
+
+CREATE TRIGGER style_bookings_stage AFTER UPDATE OF consultation_outcome ON bookings
+ WHEN NEW.consultation_outcome IS NOT NULL AND NEW.consultation_outcome IS NOT OLD.consultation_outcome AND NEW.friend_id IS NOT NULL
+ BEGIN INSERT INTO tags(id,name,line_account_id,normalized_name) SELECT lower(hex(randomblob(16))),CASE NEW.consultation_outcome WHEN 'considering' THEN '面談：検討中' WHEN 'won' THEN '面談：成約' ELSE '面談：見送り' END,NEW.line_account_id,CASE NEW.consultation_outcome WHEN 'considering' THEN '面談：検討中' WHEN 'won' THEN '面談：成約' ELSE '面談：見送り' END WHERE NOT EXISTS(SELECT 1 FROM tags WHERE line_account_id=NEW.line_account_id AND name=CASE NEW.consultation_outcome WHEN 'considering' THEN '面談：検討中' WHEN 'won' THEN '面談：成約' ELSE '面談：見送り' END); DELETE FROM friend_tags WHERE friend_id=NEW.friend_id AND tag_id IN(SELECT id FROM tags WHERE line_account_id=NEW.line_account_id AND name IN('面談：検討中','面談：成約','面談：見送り')); INSERT OR IGNORE INTO friend_tags(friend_id,tag_id) SELECT NEW.friend_id,id FROM tags WHERE line_account_id=NEW.line_account_id AND name=CASE NEW.consultation_outcome WHEN 'considering' THEN '面談：検討中' WHEN 'won' THEN '面談：成約' ELSE '面談：見送り' END; END;
+
+CREATE TRIGGER style_event_bookings_insert_capacity BEFORE INSERT ON event_bookings
+WHEN NEW.status IN('requested','confirmed') AND EXISTS(SELECT 1 FROM event_slots s WHERE s.id=NEW.slot_id AND (s.classroom_capacity IS NOT NULL OR s.online_capacity IS NOT NULL)
+ AND CASE WHEN NEW.participation_mode='classroom' THEN s.classroom_capacity ELSE s.online_capacity END IS NOT NULL
+ AND COALESCE((SELECT SUM(b.party_size) FROM event_bookings b WHERE b.slot_id=s.id AND b.id<>NEW.id AND b.participation_mode=NEW.participation_mode AND b.status IN('requested','confirmed')),0)
+ + COALESCE((SELECT SUM(w.party_size) FROM event_waitlist w WHERE w.slot_id=s.id AND w.participation_mode=NEW.participation_mode AND w.status IN('offered','accepted') AND w.identity_key IS NOT NEW.identity_key),0)
+ + NEW.party_size > CASE WHEN NEW.participation_mode='classroom' THEN s.classroom_capacity ELSE s.online_capacity END)
+BEGIN SELECT RAISE(IGNORE); END;
+
+CREATE TRIGGER style_event_bookings_update_capacity BEFORE UPDATE ON event_bookings
+WHEN NEW.status IN('requested','confirmed') AND EXISTS(SELECT 1 FROM event_slots s WHERE s.id=NEW.slot_id AND (s.classroom_capacity IS NOT NULL OR s.online_capacity IS NOT NULL)
+ AND CASE WHEN NEW.participation_mode='classroom' THEN s.classroom_capacity ELSE s.online_capacity END IS NOT NULL
+ AND COALESCE((SELECT SUM(b.party_size) FROM event_bookings b WHERE b.slot_id=s.id AND b.id<>NEW.id AND b.participation_mode=NEW.participation_mode AND b.status IN('requested','confirmed')),0)
+ + COALESCE((SELECT SUM(w.party_size) FROM event_waitlist w WHERE w.slot_id=s.id AND w.participation_mode=NEW.participation_mode AND w.status IN('offered','accepted') AND w.identity_key IS NOT NEW.identity_key),0)
+ + NEW.party_size > CASE WHEN NEW.participation_mode='classroom' THEN s.classroom_capacity ELSE s.online_capacity END)
+BEGIN SELECT RAISE(ABORT,'style_mode_capacity_full'); END;
+
+CREATE TRIGGER style_event_waitlist_insert_capacity BEFORE INSERT ON event_waitlist
+WHEN NEW.status IN('offered','accepted') AND EXISTS(SELECT 1 FROM event_slots s WHERE s.id=NEW.slot_id AND (s.classroom_capacity IS NOT NULL OR s.online_capacity IS NOT NULL)
+ AND CASE WHEN NEW.participation_mode='classroom' THEN s.classroom_capacity ELSE s.online_capacity END IS NOT NULL
+ AND COALESCE((SELECT SUM(b.party_size) FROM event_waitlist b WHERE b.slot_id=s.id AND b.id<>NEW.id AND b.participation_mode=NEW.participation_mode AND b.status IN('offered','accepted')),0)
+ + COALESCE((SELECT SUM(w.party_size) FROM event_bookings w WHERE w.slot_id=s.id AND w.participation_mode=NEW.participation_mode AND w.status IN('requested','confirmed') AND w.identity_key IS NOT NEW.identity_key),0)
+ + NEW.party_size > CASE WHEN NEW.participation_mode='classroom' THEN s.classroom_capacity ELSE s.online_capacity END)
+BEGIN SELECT RAISE(IGNORE); END;
+
+CREATE TRIGGER style_event_waitlist_update_capacity BEFORE UPDATE ON event_waitlist
+WHEN NEW.status IN('offered','accepted') AND EXISTS(SELECT 1 FROM event_slots s WHERE s.id=NEW.slot_id AND (s.classroom_capacity IS NOT NULL OR s.online_capacity IS NOT NULL)
+ AND CASE WHEN NEW.participation_mode='classroom' THEN s.classroom_capacity ELSE s.online_capacity END IS NOT NULL
+ AND COALESCE((SELECT SUM(b.party_size) FROM event_waitlist b WHERE b.slot_id=s.id AND b.id<>NEW.id AND b.participation_mode=NEW.participation_mode AND b.status IN('offered','accepted')),0)
+ + COALESCE((SELECT SUM(w.party_size) FROM event_bookings w WHERE w.slot_id=s.id AND w.participation_mode=NEW.participation_mode AND w.status IN('requested','confirmed') AND w.identity_key IS NOT NEW.identity_key),0)
+ + NEW.party_size > CASE WHEN NEW.participation_mode='classroom' THEN s.classroom_capacity ELSE s.online_capacity END)
+BEGIN SELECT RAISE(IGNORE); END;
+
+CREATE TRIGGER style_meet_consultations_stage AFTER UPDATE OF consultation_outcome ON meet_consultations
+ WHEN NEW.consultation_outcome IS NOT NULL AND NEW.consultation_outcome IS NOT OLD.consultation_outcome AND 1=1
+ BEGIN INSERT INTO tags(id,name,line_account_id,normalized_name) SELECT lower(hex(randomblob(16))),CASE NEW.consultation_outcome WHEN 'considering' THEN '面談：検討中' WHEN 'won' THEN '面談：成約' ELSE '面談：見送り' END,(SELECT line_account_id FROM friends WHERE id=NEW.friend_id),CASE NEW.consultation_outcome WHEN 'considering' THEN '面談：検討中' WHEN 'won' THEN '面談：成約' ELSE '面談：見送り' END WHERE NOT EXISTS(SELECT 1 FROM tags WHERE line_account_id=(SELECT line_account_id FROM friends WHERE id=NEW.friend_id) AND name=CASE NEW.consultation_outcome WHEN 'considering' THEN '面談：検討中' WHEN 'won' THEN '面談：成約' ELSE '面談：見送り' END); DELETE FROM friend_tags WHERE friend_id=NEW.friend_id AND tag_id IN(SELECT id FROM tags WHERE line_account_id=(SELECT line_account_id FROM friends WHERE id=NEW.friend_id) AND name IN('面談：検討中','面談：成約','面談：見送り')); INSERT OR IGNORE INTO friend_tags(friend_id,tag_id) SELECT NEW.friend_id,id FROM tags WHERE line_account_id=(SELECT line_account_id FROM friends WHERE id=NEW.friend_id) AND name=CASE NEW.consultation_outcome WHEN 'considering' THEN '面談：検討中' WHEN 'won' THEN '面談：成約' ELSE '面談：見送り' END; END;
+
+CREATE TRIGGER style_membership_insert AFTER INSERT ON lesson_memberships
+ BEGIN INSERT INTO tags(id,name,line_account_id,normalized_name) SELECT lower(hex(randomblob(16))),'会員',NEW.line_account_id,'会員' WHERE NEW.ended_at IS NULL AND NOT EXISTS(SELECT 1 FROM tags WHERE line_account_id=NEW.line_account_id AND name='会員'); INSERT OR IGNORE INTO friend_tags(friend_id,tag_id,assigned_at) SELECT NEW.friend_id,id,NEW.joined_at FROM tags WHERE NEW.ended_at IS NULL AND line_account_id=NEW.line_account_id AND name='会員'; DELETE FROM friend_tags WHERE NEW.ended_at IS NOT NULL AND friend_id=NEW.friend_id AND tag_id IN(SELECT id FROM tags WHERE line_account_id=NEW.line_account_id AND name='会員'); END;
+
+CREATE TRIGGER style_membership_update AFTER UPDATE ON lesson_memberships
+ BEGIN INSERT INTO tags(id,name,line_account_id,normalized_name) SELECT lower(hex(randomblob(16))),'会員',NEW.line_account_id,'会員' WHERE NEW.ended_at IS NULL AND NOT EXISTS(SELECT 1 FROM tags WHERE line_account_id=NEW.line_account_id AND name='会員'); INSERT OR IGNORE INTO friend_tags(friend_id,tag_id,assigned_at) SELECT NEW.friend_id,id,NEW.joined_at FROM tags WHERE NEW.ended_at IS NULL AND line_account_id=NEW.line_account_id AND name='会員'; DELETE FROM friend_tags WHERE NEW.ended_at IS NOT NULL AND friend_id=NEW.friend_id AND tag_id IN(SELECT id FROM tags WHERE line_account_id=NEW.line_account_id AND name='会員'); END;
+
+CREATE TRIGGER style_slot_capacity_update BEFORE UPDATE OF classroom_capacity,online_capacity ON event_slots
+WHEN EXISTS(SELECT 1 FROM (SELECT 'classroom' mode,NEW.classroom_capacity capacity UNION ALL SELECT 'online',NEW.online_capacity) c WHERE c.capacity IS NOT NULL
+ AND COALESCE((SELECT SUM(party_size) FROM event_bookings b WHERE b.slot_id=NEW.id AND b.participation_mode=c.mode AND b.status IN('requested','confirmed')),0)
+ +COALESCE((SELECT SUM(party_size) FROM event_waitlist w WHERE w.slot_id=NEW.id AND w.participation_mode=c.mode AND w.status IN('offered','accepted')),0)>c.capacity)
+BEGIN SELECT RAISE(ABORT,'style_mode_capacity_full'); END;
+
 CREATE TRIGGER trg_action_score_published_version_immutable
 BEFORE UPDATE ON action_score_rule_versions
 WHEN OLD.status = 'published'
@@ -11752,23 +11847,17 @@ ON analytics_report_runs
 WHEN OLD.state != 'running'
 BEGIN SELECT RAISE(ABORT, 'analytics_report_snapshot_immutable'); END;
 
-CREATE TRIGGER trg_analytics_result_audiences_cross_reference
-BEFORE INSERT ON analytics_result_audiences
-WHEN NEW.source_kind = 'cross'
- AND NOT EXISTS (
-   SELECT 1 FROM analytics_cross_runs r
-    WHERE r.id = NEW.source_result_id AND r.line_account_id = NEW.line_account_id
- )
-BEGIN SELECT RAISE(ABORT, 'analytics_result_source_not_found'); END;
+CREATE TRIGGER trg_analytics_result_audiences_booking_reference BEFORE INSERT ON analytics_result_audiences
+WHEN NEW.source_kind='booking' AND NOT EXISTS(SELECT 1 FROM style_analytics_results WHERE id=NEW.source_result_id AND line_account_id=NEW.line_account_id)
+BEGIN SELECT RAISE(ABORT,'analytics_result_source_not_found'); END;
 
-CREATE TRIGGER trg_analytics_result_audiences_funnel_reference
-BEFORE INSERT ON analytics_result_audiences
-WHEN NEW.source_kind = 'funnel'
- AND NOT EXISTS (
-   SELECT 1 FROM analytics_funnel_runs r
-    WHERE r.id = NEW.source_result_id AND r.line_account_id = NEW.line_account_id
- )
-BEGIN SELECT RAISE(ABORT, 'analytics_result_source_not_found'); END;
+CREATE TRIGGER trg_analytics_result_audiences_cross_reference BEFORE INSERT ON analytics_result_audiences
+WHEN NEW.source_kind='cross' AND NOT EXISTS(SELECT 1 FROM analytics_cross_runs WHERE id=NEW.source_result_id AND line_account_id=NEW.line_account_id)
+BEGIN SELECT RAISE(ABORT,'analytics_result_source_not_found'); END;
+
+CREATE TRIGGER trg_analytics_result_audiences_funnel_reference BEFORE INSERT ON analytics_result_audiences
+WHEN NEW.source_kind='funnel' AND NOT EXISTS(SELECT 1 FROM analytics_funnel_runs WHERE id=NEW.source_result_id AND line_account_id=NEW.line_account_id)
+BEGIN SELECT RAISE(ABORT,'analytics_result_source_not_found'); END;
 
 CREATE TRIGGER trg_analytics_saved_snapshots_no_update
 BEFORE UPDATE ON analytics_saved_analysis_snapshots

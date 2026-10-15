@@ -587,11 +587,19 @@
     "642_booking_entitlements.sql",
     "643_booking_entitlement_uses.sql",
     "644_booking_customer_payment_choice.sql",
+    "646_booking_style_details.sql",
+    "647_lesson_style_details.sql",
+    "648_style_analytics_settings.sql",
+    "649_account_styles_and_starter_sets.sql",
+    "650_booking_analytics_audiences.sql",
+    "651_lesson_mode_capacity_guards.sql",
+    "652_style_outcomes_and_member_tags.sql",
     "661_hq_catalog_templates.sql",
     "663_booking_payment_connections.sql",
     "664_booking_payment_events.sql",
     "665_booking_course_event_payment_settings.sql",
+    "681_style_setup_selection_and_auto_insert.sql",
     "682_booking_stripe_connect_states.sql"
   ],
-  "migrationCount": 592
+  "migrationCount": 600
 }
