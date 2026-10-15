@@ -1,14 +1,20 @@
 'use client'
 import React, { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Camera, RefreshCw, Settings } from 'lucide-react'
+import { ArrowRight, Check, Link2, RefreshCw } from 'lucide-react'
 import type { InstagramConnectionStatus } from '@line-crm/shared'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { RowActions } from '@/components/shared/row-actions'
+import HelpTip from '@/components/shared/help-tip'
+import Checkbox from '@/components/shared/checkbox'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { usePageTitle, usePageCrumbs, useHideSettingsNav } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
@@ -30,20 +36,28 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 
 /* lucide には Instagram の印が無いので、写真の印（Camera）を使う。 */
 
-const GOOGLE_STATE: Record<string, string> = {
-  connected: '接続しています',
-  pending_location: '店舗を選んでいません',
-  expired: '認可が切れています',
-  no_permission: '権限がありません',
-  disconnected: '未接続',
+const GOOGLE_BADGE: Record<string, { label: string; tone: StatusBadgeTone }> = {
+  connected: { label: 'つながっている', tone: 'success' },
+  pending_location: { label: '店舗を選んでいません', tone: 'warning' },
+  expired: { label: '認可が切れています', tone: 'warning' },
+  no_permission: { label: '権限がありません', tone: 'warning' },
+  disconnected: { label: 'まだつないでいません', tone: 'neutral' },
 }
 
-const INSTAGRAM_STATE: Record<InstagramConnectionStatus['state'], string> = {
-  connected: '接続しています',
-  disconnected: '未接続',
-  expired: '認可が切れています',
-  unconfigured: '設定がありません',
+const IG_BADGE: Record<InstagramConnectionStatus['state'], { label: string; tone: StatusBadgeTone }> = {
+  connected: { label: 'つながっている', tone: 'success' },
+  disconnected: { label: 'まだつないでいません', tone: 'neutral' },
+  expired: { label: '認可が切れています', tone: 'warning' },
+  unconfigured: { label: '設定がありません', tone: 'neutral' },
 }
+
+const IG_CAPABILITIES = ['DM を受信箱で読む・返す', '投稿へのコメントに返す', '投稿を予約する', 'プロフィールのリンクを LINE の友だち追加へ向ける']
+
+/* 受信箱での見え方の見本（実際のデータではない）。 */
+const SAMPLE_INBOX = [
+  { name: '@yuki_gourmet', kind: 'Instagram の DM', state: '未対応', tone: 'danger' as StatusBadgeTone, owner: '担当：なし', text: '金曜 20時に4名で入れますか？', at: '01/13 18:02', route: 'Instagram' },
+  { name: '鈴木 美咲', kind: 'LINE の友だち', state: '対応済み', tone: 'success' as StatusBadgeTone, owner: '担当：Kenta', text: '明日 19時、2名で予約できますか', at: '01/13 17:40', route: 'LINE' },
+]
 
 /** 戻り先（`/settings/sns?instagram=…`）で出す案内。Worker の折り返しが付ける。 */
 const FLASH: Record<string, { tone: 'success' | 'danger'; text: string }> = {
@@ -164,6 +178,10 @@ export default function SnsSettingsPage() {
     }
   }
 
+  const googleBadge = googleError || !google ? null : GOOGLE_BADGE[google.connection.status] ?? GOOGLE_BADGE.disconnected
+  const igBadge = igState ? IG_BADGE[igState] : null
+  const googleLocation = google?.connection.locationTitle ?? google?.store.name ?? null
+
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="list" boardId="y3GGTs">
       <PageHeading
@@ -181,8 +199,14 @@ export default function SnsSettingsPage() {
 
         <section className={styles.card} aria-labelledby="sns-google-title">
           <div className={styles.cardHead}>
-            <h2 id="sns-google-title" className={styles.cardTitle}>Googleビジネス プロフィール</h2>
-            <p className={styles.cardSub}>お店の情報と投稿を、Google 検索とマップに出します</p>
+            <span className={styles.mark} aria-hidden>G</span>
+            <h2 id="sns-google-title" className={styles.cardTitle}>Google ビジネス</h2>
+            <span className={styles.rowSpacer} />
+            {googleBadge ? <StatusBadge tone={googleBadge.tone} size="compact">{googleBadge.label}</StatusBadge> : null}
+            {googleConnected && canManage ? (
+              <RowActions menuAppearance="box" menuSize="row" subjectName="Google ビジネスの連携"
+                destructiveItem={{ id: 'disconnect', label: '接続を解除する', onSelect: () => { setActionError(''); setConfirm('google') } }} />
+            ) : null}
           </div>
           {googleError ? (
             <ListState kind="error" error={googleError} onRetry={() => void load()} />
@@ -190,22 +214,14 @@ export default function SnsSettingsPage() {
             <ListState kind="loading" />
           ) : (
             <>
-              <Row label="いまの状態" value={GOOGLE_STATE[google.connection.status] ?? '—'} />
-              <Row label="接続しているビジネス" value={google.connection.locationTitle ?? '—'} />
+              <Row label="店舗" value={googleLocation ?? '—'} />
               <Row label="最終同期" value={formatDate(google.connection.lastSyncedAt, { style: 'detail', fallback: '—' })} />
-              <div className={styles.actions}>
-                <Button variant="secondary" href="/restaurant-test/google?tab=settings">
-                  <Settings size={16} />
-                  Googleビジネスの設定を開く
-                </Button>
-                {googleConnected && canManage ? (
-                  <>
-                    <span className={styles.rowSpacer} />
-                    <Button variant="text" onClick={() => { setActionError(''); setConfirm('google') }}>
-                      接続を解除する
-                    </Button>
-                  </>
-                ) : null}
+              <Row label="口コミ" value={google.summary.storedCount > 0 ? `${google.summary.storedCount}件・未返信 ${google.summary.unrepliedCount}件` : '—'} />
+              <Row label="投稿" value={google.summary.postsAttentionCount > 0 ? `要対応 ${google.summary.postsAttentionCount}件` : '—'} />
+              <div className={styles.links}>
+                <Link className={styles.link} href="/restaurant-test/google?tab=reviews">口コミへ<ArrowRight size={14} aria-hidden /></Link>
+                <Link className={styles.link} href="/restaurant-test/google?tab=posts">投稿へ<ArrowRight size={14} aria-hidden /></Link>
+                <Link className={styles.link} href="/restaurant-test/google?tab=settings">プロフィールへ<ArrowRight size={14} aria-hidden /></Link>
               </div>
             </>
           )}
@@ -213,8 +229,14 @@ export default function SnsSettingsPage() {
 
         <section className={styles.card} aria-labelledby="sns-instagram-title">
           <div className={styles.cardHead}>
+            <span className={styles.mark} aria-hidden>IG</span>
             <h2 id="sns-instagram-title" className={styles.cardTitle}>Instagram</h2>
-            <p className={styles.cardSub}>Googleビジネスの投稿を、Instagram にも同時に出せます</p>
+            <span className={styles.rowSpacer} />
+            {igBadge ? <StatusBadge tone={igBadge.tone} size="compact">{igBadge.label}</StatusBadge> : null}
+            {(igState === 'connected' || igState === 'expired') && canManage ? (
+              <RowActions menuAppearance="box" menuSize="row" subjectName="Instagram の連携"
+                destructiveItem={{ id: 'disconnect', label: '接続を解除する', onSelect: () => { setActionError(''); setConfirm('instagram') } }} />
+            ) : null}
           </div>
           {instagramError ? (
             <ListState kind="error" error={instagramError} onRetry={() => void load()} />
@@ -222,23 +244,19 @@ export default function SnsSettingsPage() {
             <ListState kind="loading" />
           ) : (
             <>
-              <Row label="いまの状態" value={INSTAGRAM_STATE[igState]} />
               {igState === 'connected' && igConnection ? (
-                <>
-                  <Row
-                    label="接続しているアカウント"
-                    value={igConnection.username ? `@${igConnection.username}（ビジネス）` : igConnection.pageName || emptyValue('unknown')}
-                  />
-                  <Row label="できること" value="写真つき投稿の同時公開" />
-                </>
+                <Row
+                  label="接続しているアカウント"
+                  value={igConnection.username ? `@${igConnection.username}（ビジネス）` : igConnection.pageName || emptyValue('unknown')}
+                />
               ) : null}
+              <p className={styles.listTitle}>{igState === 'connected' ? 'できること' : 'つなぐとできること'}</p>
+              <ul className={styles.checks}>
+                {IG_CAPABILITIES.map((text) => <li key={text}><Check size={14} aria-hidden />{text}</li>)}
+              </ul>
               {igState === 'unconfigured' ? (
                 <p className={styles.note}>この環境には Instagram 接続の設定がありません。</p>
-              ) : igState === 'connected' ? null : (
-                <p className={styles.note}>
-                  Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。
-                </p>
-              )}
+              ) : null}
               {canManage && igState !== 'unconfigured' ? (
                 <div className={styles.actions}>
                   {igState === 'connected' ? (
@@ -247,23 +265,42 @@ export default function SnsSettingsPage() {
                       接続を確かめる
                     </Button>
                   ) : (
-                    <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
-                      <Camera size={15} aria-hidden />
-                      Instagram にログインして接続
-                    </Button>
-                  )}
-                  {igState === 'connected' || igState === 'expired' ? (
                     <>
-                      <span className={styles.rowSpacer} />
-                      <Button variant="text" onClick={() => { setActionError(''); setConfirm('instagram') }}>
-                        接続を解除する
+                      <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
+                        <Link2 size={15} aria-hidden />
+                        Instagram とつなぐ
                       </Button>
+                      <span className={styles.note}>プロアカウント（ビジネス）が必要です。個人のアカウントは接続できません。</span>
                     </>
-                  ) : null}
+                  )}
                 </div>
               ) : null}
             </>
           )}
+        </section>
+
+        <section className={styles.sample} aria-labelledby="sns-sample-title">
+          <h2 id="sns-sample-title" className={styles.sampleTitle}>受信箱での見え方（見本）<HelpTip label="受信箱での見え方の説明">Instagram の DM をつなぐと、LINE の友だちと同じ受信箱に並びます。ここは見え方の見本で、実際のデータではありません。</HelpTip></h2>
+          <DataTable className={styles.sampleTable} columnSizing="controls" label="受信箱での見え方（見本）">
+            <thead><TableHeadRow>
+              <Th className={styles.colCheck}><span className="sr-only">選択</span></Th>
+              <Th className={styles.colWho}>相手</Th>
+              <Th className={styles.colState}>対応・担当</Th>
+              <Th grow>最新のメッセージ</Th>
+              <Th className={styles.colRoute}>経路</Th>
+              <Th className={styles.colLast}>最終接触</Th>
+            </TableHeadRow></thead>
+            <tbody>
+              {SAMPLE_INBOX.map((row) => <Tr key={row.name}>
+                <Td><Checkbox checked={false} onCheckedChange={() => {}} disabled aria-label={`${row.name}（見本）`} /></Td>
+                <Td><span className={styles.who}><span className={styles.face} aria-hidden>山</span><span className={styles.whoText}><strong>{row.name}</strong><small>{row.kind}</small></span></span></Td>
+                <Td><span className={styles.whoText}><StatusBadge tone={row.tone} size="compact">{row.state}</StatusBadge><small>{row.owner}</small></span></Td>
+                <Td><span className={styles.whoText}><span>{row.text}</span><small>{row.at}</small></span></Td>
+                <Td><StatusBadge tone="info" size="compact">{row.route}</StatusBadge></Td>
+                <Td>今日</Td>
+              </Tr>)}
+            </tbody>
+          </DataTable>
         </section>
       </div>
 
