@@ -7,3 +7,7 @@
 - 満席/休業時は同組織・同組・両店の参加許可・確認済み座標・設定距離・同人数同時刻の空き・入口と機能有効を再確認。店名/距離/空き/入口だけ返し顧客情報を渡さない。移動先で本人確認/友だち追加/コース選択を行い同名コースを自動対応しない。紹介受諾と確定は同じ書込、失敗で両方戻す。仮押さえで送らず既存のできごとと共通フォローを使う。
 - 客用 `/api/liff/restaurant/courses` とavailabilityにcourseId、holdsにcourseId、reservations/:id/confirmにexpectedVersionと任意referralId。referralsのGET/POSTはstoreId/date/guestCount/startsAt/任意courseId（POSTはtargetStoreId）、form-bookingはformId/blockId/submissionKey。本人は検証済みLIFF ID tokenから。
 - 管理 `/api/restaurant-test/store-groups` のGET/POST、`store-groups/:id/members/:storeId` のPATCH（referralEnabled/maxDistance km）、`stores/:id/referral-location` のPUT（latitude/longitude/confirmed:true）。更新はowner/admin、一覧はowner/admin/staffかつ全参加店が読める組だけ。紹介設定で閲覧権限を広げない。追加3表と参照は顧客削除の結合試験へ含める。
+
+## 操作と挙動（受け入れ）
+
+操作したらどう動くか・連携とエラー・日々の手順・今の作りとの食い違いは [飲食 操作と挙動](behavior/restaurant-fusion.md) にまとめた（2026-10-16 B-333）。 お金まわり・業種のダッシュボードは [style-and-money](behavior/style-and-money.md)、外のサービスの失敗は [integration-failures](behavior/integration-failures.md)、毎日の流れは [daily-operations](behavior/daily-operations.md)。

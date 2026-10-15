@@ -10,3 +10,7 @@
 - 管理は `/api/restaurant-test/followups/:storeId`（template/bindings/jobs/editor:`common_scenario`）、同配下 `bindings/:stepId`（POST/PATCH/DELETE、expectedVersion/trigger/offsetMinutes/enabled）、`request-start`（expectedVersion→approvalId/pending）、`stop`、`review-history`。予約詳細と `reservations/:id/confirmations` に返事・予約時アレルゲンの写しと出どころを返す。変更はowner/admin、読取はowner/admin/staff、店の可視範囲を守る。
 - 客用 `POST /api/liff/restaurant/confirmations/:requestId/respond` はexpectedVersionとgoing/change_requested/cancel。日時・人数・取消・退店訂正は古い仕事を無効にするが、注意・来店更新で結果通知を失わせない。
 - 差し込みは予約日時/終了/人数/コース/店名、going/change/cancel、待ちのbook/decline URL。予約はUTC保存・店の時間帯表示、共通の今日は日本時間。口コミは評価で分けず全員同じ行。確認済みGoogle口コミの対応は未承認で空配列、名前/星/時刻で由来を推測しない。新しい返事・仕事は顧客削除の分類と結合試験へ含める。
+
+## 操作と挙動（受け入れ）
+
+操作したらどう動くか・連携とエラー・日々の手順・今の作りとの食い違いは [飲食 操作と挙動](behavior/restaurant-fusion.md) にまとめた（2026-10-16 B-333）。 お金まわり・業種のダッシュボードは [style-and-money](behavior/style-and-money.md)、外のサービスの失敗は [integration-failures](behavior/integration-failures.md)、毎日の流れは [daily-operations](behavior/daily-operations.md)。

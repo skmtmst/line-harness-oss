@@ -40,3 +40,7 @@
 ## 手順の復元（作業報告からの移記・2026-10-11）
 
 予約・席予約・来店スタンプの手順をURLに残す。再読込で入力を復元できなければ最初の手順へ戻し、入力を失った状態で確定へ進ませない。
+
+## 操作と挙動（受け入れ）
+
+操作したらどう動くか・連携とエラー・日々の手順・今の作りとの食い違いは [LIFF 操作と挙動](behavior/v8-liff.md) にまとめた（2026-10-16 B-333）。 お金まわり・業種のダッシュボードは [style-and-money](behavior/style-and-money.md)、外のサービスの失敗は [integration-failures](behavior/integration-failures.md)、毎日の流れは [daily-operations](behavior/daily-operations.md)。

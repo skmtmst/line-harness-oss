@@ -664,3 +664,7 @@ DBの予約を正本とする。Googleが失敗しても予約を消さず、`�
 - 7画面の1440px・1920px画像比較
 
 現時点の判定は「一部実装」であり、「全機能完了」には数えない。
+
+## 操作と挙動（受け入れ）
+
+操作したらどう動くか・連携とエラー・日々の手順・今の作りとの食い違いは [27 操作と挙動](../v8-requirements/behavior/27-booking-management.md) にまとめた（2026-10-16 B-333）。 お金まわり・業種のダッシュボードは [style-and-money](../v8-requirements/behavior/style-and-money.md)、外のサービスの失敗は [integration-failures](../v8-requirements/behavior/integration-failures.md)、毎日の流れは [daily-operations](../v8-requirements/behavior/daily-operations.md)。

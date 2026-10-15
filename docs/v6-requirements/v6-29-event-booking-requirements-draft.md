@@ -461,3 +461,7 @@ published → paused → published
 ## 19. 最終判断
 
 V6 29は要件定義へ進める。Lステップ越えの核は、画面数ではなく「参加人数を含む安全な定員確保」「本人同意つきの期限付きキャンセル待ち」「申込時点の内容保存」「申込者から配信・トーク・出席までつながる運用」である。既存実装を捨てず、この4点を足せば現実的に100点へ近づけられる。
+
+## 操作と挙動（受け入れ）
+
+操作したらどう動くか・連携とエラー・日々の手順・今の作りとの食い違いは [29 操作と挙動](../v8-requirements/behavior/29-event-booking.md) にまとめた（2026-10-16 B-333）。 お金まわり・業種のダッシュボードは [style-and-money](../v8-requirements/behavior/style-and-money.md)、外のサービスの失敗は [integration-failures](../v8-requirements/behavior/integration-failures.md)、毎日の流れは [daily-operations](../v8-requirements/behavior/daily-operations.md)。
