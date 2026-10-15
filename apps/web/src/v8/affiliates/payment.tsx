@@ -19,14 +19,14 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import TruncatedText from '@/components/shared/truncated-text'
-import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { PAYMENT_SECURITY_NOTICE, PaymentPagination } from './payment-footer'
 import { currentSettlementPeriod, formatDate, formatMonthDay, formatYen, pageCountOf, pageOf, periodText } from './display'
 import { AffiliatePaymentConfirmDialog } from './dialogs'
 import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import { PayoutStepUpDialog, SettlementCloseDialog } from './payment-dialogs'
-import { AffiliateToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, StatusPill, ToolbarNotices } from './parts'
+import { AffiliateToolbar, PerPageSelect, RetryButton, RowMenu, SavedSelect, StateCard, StatusPill, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -423,11 +423,13 @@ export default function PaymentTab() {
                     {item.bankProfileRegistered && summary?.holdDays ? <span className={styles.rowPlan}>{`認めてから ${formatNumber(summary.holdDays)}日保留`}</span> : null}
                   </span>
                 </Td>
-                <Td className={styles.colPayOps}>
-                  <span className={styles.rowActions}>
-                    <Button type="button" onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}>明細を見る</Button>
-                  </span>
-                </Td>
+                <ActionCell className={styles.colPayOps}>
+                  {/* 行の右端は「…」1つ（B-253・絵 aINnz）。明細はその中から開く。 */}
+                  <RowMenu
+                    label={`${item.affiliateName}の支払いの操作`}
+                    items={[{ id: 'detail', label: '明細を見る', onSelect: () => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName }) }]}
+                  />
+                </ActionCell>
               </Tr>
             )
           })}
