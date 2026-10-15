@@ -74,11 +74,11 @@ export default function OpsLoginV8() {
     }
     resetAuthSelectionCleared(localStorage, sessionStorage)
     if (res.data.twoFactorSetup && res.data.challengeToken) {
-      window.location.assign(`/login/two-factor/setup?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      window.location.assign(`/login/two-factor/setup?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken, lh_method: 'password' }).toString()}`)
       return
     }
     if (res.data.twoFactor && res.data.challengeToken) {
-      window.location.assign(`/login/two-factor?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      window.location.assign(`/login/two-factor?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken, lh_method: 'password' }).toString()}`)
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
