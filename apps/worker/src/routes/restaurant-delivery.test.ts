@@ -1671,21 +1671,61 @@ describe('Uber Sandbox 接続確認の口', () => {
   const PROBE_SECRET = 'ubereats-probe-secret-0123456789ab';
 
   /** 合言葉で署名して投げる。`署名なし` のときは見出しを付けない。 */
-  async function postProbe(options: { secret?: string | null; skew?: number } = {}) {
+  async function postProbe(options: { secret?: string | null; skew?: number; body?: string } = {}) {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const body = options.body ?? '{}';
     if (options.secret) {
       const timestamp = String(Math.floor(Date.now() / 1000) + (options.skew ?? 0));
       headers['x-nen-timestamp'] = timestamp;
-      headers['x-nen-signature'] = await signSupportRelay(options.secret, timestamp, '{}');
+      headers['x-nen-signature'] = await signSupportRelay(options.secret, timestamp, body);
     }
-    return app().request(PROBE_PATH, { method: 'POST', headers, body: '{}' }, env);
+    return app().request(PROBE_PATH, { method: 'POST', headers, body }, env);
   }
 
-  it('合言葉が未設定なら口は開かない。署名があっても実行しない', async () => {
+  it('合言葉が届いていないときは口は開かない。署名があっても実行しない', async () => {
     const response = await postProbe({ secret: PROBE_SECRET });
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toMatchObject({ code: 'probe_not_configured' });
+    // 「届いていない」と「短すぎる」を分けて返す。配備先の切り分けに使う。
+    await expect(response.json()).resolves.toMatchObject({ code: 'probe_secret_missing' });
     expect(deliveryCalls).toHaveLength(0);
+  });
+
+  it('合言葉が短すぎるときは、その理由を分けて返す。長さと値は返さない', async () => {
+    const short = 'too-short-probe-secret';
+    env = { ...env, RT_DELIVERY_UBEREATS_PROBE_SECRET: short } as Env['Bindings'];
+    const response = await postProbe({ secret: short });
+    expect(response.status).toBe(503);
+    const body = await response.text();
+    expect(JSON.parse(body)).toEqual({ success: false, code: 'probe_secret_too_short' });
+    expect(body).not.toContain(String(short.length));
+    expect(body).not.toContain(short);
+    expect(deliveryCalls).toHaveLength(0);
+  });
+
+  it('下見の本文は Uber へ送らず、冷却時間も使わない', async () => {
+    env = {
+      ...env,
+      RT_DELIVERY_UBEREATS_PROBE_SECRET: PROBE_SECRET,
+      RT_DELIVERY_UBEREATS_ENVIRONMENT: 'sandbox',
+    } as Env['Bindings'];
+
+    const response = await postProbe({ secret: PROBE_SECRET, body: '{"mode":"check"}' });
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(JSON.parse(body)).toEqual({
+      success: true,
+      mode: 'check',
+      environment: 'sandbox',
+      oauthConfigured: true,
+    });
+    expect(body).not.toContain('test-client-secret');
+    expect(body).not.toContain(PROBE_SECRET);
+    // Uber へは1回も送らず、1回分として数えもしない。
+    expect(deliveryCalls).toHaveLength(0);
+    const rows = testDb.raw
+      .prepare('SELECT value FROM platform_settings WHERE key = ?')
+      .all(UBER_PROBE_LAST_RUN_KEY);
+    expect(rows).toHaveLength(0);
   });
 
   it('署名がない・違う・時刻がずれている依頼は実行しない', async () => {
