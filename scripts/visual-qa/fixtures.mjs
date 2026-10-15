@@ -6308,6 +6308,7 @@ export const BOOKING_CHANNELS = {
     { staffId: 'bs-ch-1', displayName: '高田 誠', status: 'connected', externalEventsThisWeek: 12, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
     { staffId: 'bs-ch-2', displayName: '中川 由美', status: 'connected', externalEventsThisWeek: 8, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
     { staffId: 'bs-ch-3', displayName: '佐野 直人', status: 'not_connected', externalEventsThisWeek: null, lastReadAt: null, readError: null },
+    { staffId: 'bs-1', displayName: 'Kenta Kawano', status: 'connected', externalEventsThisWeek: 3, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
     { staffId: 'bs-ch-4', displayName: '森 涼太', status: 'expired', externalEventsThisWeek: null, lastReadAt: '2026-09-28T01:02:00.000Z', readError: null },
   ],
   channels: [
