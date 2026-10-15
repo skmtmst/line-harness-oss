@@ -1,9 +1,9 @@
 'use client'
 import PageSizeSelect from '@/components/shared/page-size-select'
 
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarLeading, ListToolbarOptional, ListToolbarEnd } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarOptional, ListToolbarEnd } from '@/components/shared/list-toolbar';
 
-import { RowNameLink } from '@/components/shared/table';
+import { PersonCell, RowNameLink } from '@/components/shared/table';
 import TagOverflow from '@/components/shared/tag-overflow'
 import { collectListRows } from '@/components/shared/collect-list-rows';
 import { useListUrlJsonValue, useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
@@ -31,7 +31,6 @@ import { ListPage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import TagPill from '@/components/shared/tag-pill'
 import Checkbox from '@/components/shared/checkbox'
-import Avatar from '@/components/shared/avatar'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import FilterChip from '@/components/shared/filter-chip'
@@ -655,8 +654,7 @@ export default function FriendsListV8() {
   )
 
   const toolbar = (
-    <ListToolbarLeading leading={primaryFilter}>
-    <ListToolbarFrame data-design="V8SearchPanel">
+    <ListToolbarFrame layout="stacked" data-design="V8SearchPanel">
       <ListToolbarRow as="form"
         onSubmit={(event) => {
           event.preventDefault()
@@ -679,7 +677,7 @@ export default function FriendsListV8() {
             placeholder="名前・LINE名・タグ・メモで探す"
           />
         </ListToolbarSearchSlot>
-        {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。 */}
+        {primaryFilter}
 
         <ListToolbarOptional collapse="overflow" label="ほかの絞り込み・操作">
         <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
@@ -711,7 +709,6 @@ export default function FriendsListV8() {
             この条件で配信を作成
           </Link>
         ) : null}
-        {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
         </ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
@@ -728,6 +725,7 @@ export default function FriendsListV8() {
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
         {columnsOpen && !readOnly ? <DisplayItemsDialog presentation="columns" items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
         <ListToolbarEnd>
+        {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
         <SaveErrorField names={["pageSize","limit","page_size"]}><PageSizeSelect label={null} options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(value) => resetPageWith(() => setPageSize(value as PageSize))} /></SaveErrorField>
         <SaveErrorField names={["sortMode","sort","sort_mode"]}><ListToolbarSort
           aria-label="並び順"
@@ -764,7 +762,6 @@ export default function FriendsListV8() {
         </p>
       ) : null}
     </ListToolbarFrame>
-    </ListToolbarLeading>
   )
 
   const colCount = 4 + displayColumns.length
@@ -808,7 +805,7 @@ export default function FriendsListV8() {
             const attention = String(friend.metadata?.__attention ?? '') === '1'
             const tags = splitTags(friend.tags)
             return (
-              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
+              <Tr key={friend.id} interactive href={`/friends/detail?id=${friend.id}`} onOpen={() => router.push(`/friends/detail?id=${friend.id}`)} selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
                 <Td className={styles.tdCheck}>
                   <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
                 </Td>
@@ -830,9 +827,8 @@ export default function FriendsListV8() {
                     </span>
                   )}
                 </Td>
-                <Td className={styles.td}>
-                  <RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>
-                </Td>
+                <PersonCell avatarName={friend.displayName} avatarSrc={friend.pictureUrl}
+                  name={<RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>} />
                 {displayColumns.map(column => {
                   if (column.key === 'support') return (
                   <Td key={column.key} className={styles.td}>

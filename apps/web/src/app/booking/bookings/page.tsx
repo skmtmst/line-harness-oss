@@ -25,6 +25,7 @@ import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
 import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame'
 import BookingLedgerBody from '@/v8/booking-bookings/ledger-body'
+import LedgerMonthNavigation, { monthKey, monthLabel } from '@/v8/booking-bookings/month-navigation'
 import FilterChip from '@/components/shared/filter-chip'
 import { ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
@@ -140,18 +141,6 @@ function formatJpDay(iso: string): string {
 
 function jstDay(iso: string): string {
   return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
-}
-
-function monthKey(offset: number): string {
-  const now = new Date(Date.now() + 9 * 3600_000)
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1))
-  return d.toISOString().slice(0, 7)
-}
-
-/** R90: 「2026-09」→「2026年9月」。対象期間の明示に使う。 */
-function monthLabel(key: string): string {
-  const [year, month] = key.split('-').map(Number)
-  return `${year}年${month}月`
 }
 
 /**
@@ -405,8 +394,8 @@ export default function BookingsPage() {
     let from: string | undefined
     let to: string | undefined
     if (view === 'month') {
-      from = new Date(`${monthKey(0)}-01T00:00:00+09:00`).toISOString()
-      to = new Date(`${monthKey(1)}-01T00:00:00+09:00`).toISOString()
+      from = new Date(`${monthKey(0, calendarAnchor)}-01T00:00:00+09:00`).toISOString()
+      to = new Date(`${monthKey(1, calendarAnchor)}-01T00:00:00+09:00`).toISOString()
     }
     if (range !== 'all') {
       const today = jstDay(new Date().toISOString())
@@ -419,7 +408,7 @@ export default function BookingsPage() {
       to = to && to < rangeTo ? to : rangeTo
     }
     return { ...(from ? { from } : {}), ...(to ? { to } : {}) }
-  }, [range, view])
+  }, [range, view, calendarAnchor])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -973,6 +962,7 @@ export default function BookingsPage() {
     <BookingLedgerFrame view={view}>
       {pageHead}
       <BookingLedgerBody view={view} readOnly={!canOperate}
+        navigation={<LedgerMonthNavigation anchor={calendarAnchor} onChange={(date) => { setCalendarAnchor(date); setRange('all'); setPage(1) }} shareUrl={shareUrl ?? ''} historyUrl={historyUrl ?? ''} />}
         stats={<>
           {summaryError && (
             // 集計の失敗でも一覧は使える。
@@ -1028,7 +1018,7 @@ export default function BookingsPage() {
           rows: [{ id: 'all', label: 'すべて', count: summary.total }, ...menus.map(menu => ({ id: menu.name, label: menu.name, count: menuCounts.get(menu.name) ?? 0 }))],
         }}
         toolbar={<>
-          {view === 'month' ? <Notice tone="info" role="status">今月（{monthLabel(monthKey(0))}）の予約を「{STATUS_TABS.find(item => item.key === tab)?.label ?? ''}」で表示しています。</Notice> : null}
+          {view === 'month' ? <Notice tone="info" role="status">{monthKey(0, calendarAnchor) === monthKey(0) ? '今月' : '表示月'}（{monthLabel(monthKey(0, calendarAnchor))}）の予約を「{STATUS_TABS.find(item => item.key === tab)?.label ?? ''}」で表示しています。</Notice> : null}
             <ListToolbar
             search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }}
             filters={
@@ -1246,7 +1236,7 @@ export default function BookingsPage() {
             </DataTable>
           )}
 
-          <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
+          {view !== 'month' || !shareUrl ? <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
             <p className="text-ink-secondary text-xs leading-5">
               友だち予約URLと、友だちが自分の予約履歴を見るURLをそれぞれ発行できます。予約履歴URLを配ると「自分の予約を確認したい」という問い合わせを減らせます。
             </p>
@@ -1301,7 +1291,7 @@ export default function BookingsPage() {
                 で LIFF ID を登録してください。
               </p>
             )}
-          </div>
+          </div> : null}
       </BookingLedgerBody>
 
       {/* V8「サクサク感」C①・E：表の行の詳細パネル。確認の窓は残す。v7は引き出しのまま。 */}
