@@ -57,9 +57,10 @@ export function useMenuPayment(kind: MenuPaymentKind, accountId: string | null, 
           : bookingPaymentAdminApi.eventMode(accountId, id).then((response) => response.data.mode))
     void Promise.allSettled([Promise.resolve().then(() => bookingApi.getPaymentConfig(accountId)), Promise.resolve().then(() => bookingPaymentAdminApi.connection(accountId)), current]).then(([config, link, mode]) => {
       if (mine !== generation.current) return
-      if (config.status === 'rejected') { setStatus('error'); return }
-      setDefaultMode(normal(config.value.data.mode))
-      setConnected(link.status === 'fulfilled' ? link.value.data.connected : config.value.data.provider === 'stripe')
+      const configData = config.status === 'fulfilled' ? config.value?.data : undefined
+      if (!configData) { setStatus('error'); return }
+      setDefaultMode(normal(configData.mode))
+      setConnected(link.status === 'fulfilled' && link.value?.data ? link.value.data.connected : configData.provider === 'stripe')
       const next = mode.status === 'fulfilled' ? mode.value : null
       setSaved(next)
       setValue(next)

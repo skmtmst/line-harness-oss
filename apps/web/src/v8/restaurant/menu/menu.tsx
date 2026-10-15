@@ -1,35 +1,25 @@
 'use client'
 
-import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 
 import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import { Check, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr, ActionCell, NameCell, RowNameButton } from '@/components/shared/table'
-import { TextField } from '@/components/shared/text-field'
-import DateTimeField from '@/components/shared/date-time-field'
 import { useAccount } from '@/contexts/account-context'
 import { formatYen } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
 import RestaurantShell, { Panel, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
-import { DialogField, DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
+import { DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
 import styles from './menu.module.css'
 import { formatDateTime as polishFormatDateTime } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { CreateSummaryCard } from '@/components/templates/create-parts'
-import { DialogFormRow } from '@/components/shared/dialog-form-row'
-import { notifyToast } from '@/components/shared/toast'
-import { MenuPaymentFields, useMenuPayment } from '../../booking-payments/menu-payment'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * ★V8 メニュー管理（板 `MJoJR`・停止の確認 `MV5Os`・追加と変更 `NkmwU`）。
@@ -49,25 +39,8 @@ export function safeArray(value: string): string[] {
   }
 }
 
-function periodLabel(periods: string[]): string {
+export function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
-}
-
-type Period = 'lunch' | 'dinner' | 'both'
-type Draft = { kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string }
-
-const emptyDraft: Draft = { kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '' }
-
-function draftOf(item: RestaurantMenuItem): Draft {
-  const periods = safeArray(item.service_periods_json)
-  return {
-    kind: item.kind,
-    name: item.name,
-    price: String(item.price),
-    period: periods.length > 1 ? 'both' : periods[0] === 'lunch' ? 'lunch' : 'dinner',
-    effectiveAt: '',
-    allergens: safeArray(item.allergens_json).join(', '),
-  }
 }
 
 function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
@@ -78,44 +51,14 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const canEdit = canManageRole(role)
   const rows = store ? data.menuItems.filter((row) => row.store_id === store.id) : data.menuItems
   const pendingApprovals = data.approvals.filter((item) => item.kind === 'menu_change' && item.status === 'pending')
-  /* 窓：'new' は追加、品目の id は変更。 */
-  const [editor, setEditor] = useState<string | null>(null)
-  const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [stopId, setStopId] = useState('')
   const [deleteId, setDeleteId] = useState('')
-  const editing = editor && editor !== 'new' ? rows.find((row) => row.id === editor) ?? null : null
   const stopping = rows.find((row) => row.id === stopId)
   const deleting = rows.find((row) => row.id === deleteId)
-  /* コースのお支払い（B-305 追記 3・絵 mauOC）。単品には出さない。 */
-  const coursePayment = useMenuPayment('course', selectedAccountId, editing && editing.kind === 'course' ? editing.id : null)
-  const priceChanged = Boolean(editing && draft.price !== '' && Number(draft.price) !== editing.price)
-
-  const openNew = () => { setDraft(emptyDraft); setEditor('new') }
-  const openEdit = (item: RestaurantMenuItem) => { setDraft(draftOf(item)); setEditor(item.id) }
-
-  const save = async () => {
-    if (!canEdit || !selectedAccountId || !draft.name.trim() || draft.price === '') return
-    const body = {
-      kind: draft.kind,
-      name: draft.name,
-      price: Number(draft.price),
-      effectiveAt: draft.effectiveAt ? datetimeLocalJstToUtcIso(draft.effectiveAt) : null,
-      allergens: draft.allergens.split(',').map((part) => part.trim()).filter(Boolean),
-      servicePeriods: draft.period === 'both' ? ['lunch', 'dinner'] : [draft.period],
-    }
-    const ok = editing
-      ? await mutate(
-        () => restaurantTestApi.updateMenu(selectedAccountId, editing.id, body),
-        priceChanged ? '価格変更を承認待ちとして申請しました。現在の価格は変わりません。' : 'メニューを更新しました。',
-      )
-      : store
-        ? await mutate(() => restaurantTestApi.createMenu(selectedAccountId, { storeId: store.id, ...body }), 'メニューを追加しました。')
-        : false
-    if (ok && editing && editing.kind === 'course' && coursePayment.dirty) {
-      try { await coursePayment.save(editing.id) } catch { notifyToast('メニューは保存しましたが、お支払いの方法を保存できませんでした。もう一度お試しください。'); return }
-    }
-    if (ok) setEditor(null)
-  }
+  /* 追加・変更は 1 枚の編集ページ（mauOC）。前の窓（NkmwU）は消した（B-319）。 */
+  const router = useRouter()
+  const openNew = () => router.push(`/restaurant-test/menu/edit${store ? `?store=${encodeURIComponent(store.id)}` : ''}`)
+  const openEdit = (item: RestaurantMenuItem) => router.push(`/restaurant-test/menu/edit?id=${encodeURIComponent(item.id)}`)
 
   const stop = (item: RestaurantMenuItem) => {
     if (!selectedAccountId) return
@@ -219,70 +162,6 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
           </tbody>
         </DataTable>
       </Panel>
-      <RsDialog
-        open={editor !== null}
-        title={editing ? `「${editing.name}」を${canEdit ? '変更' : '見る'}` : 'メニューを追加する'}
-        width={560}
-        top={180}
-        busy={busy}
-        designNode="NkmwU"
-        onCancel={() => setEditor(null)}
-        onSubmit={canEdit ? () => void save() : undefined}
-        actions={(
-          <>
-            <Button type="button" onClick={() => setEditor(null)} disabled={busy}>キャンセル</Button>
-            {canEdit ? <Button type="submit" variant="primary" disabled={busy || !draft.name.trim() || draft.price === ''}>
-              <Check size={15} aria-hidden="true" />{editing ? (priceChanged ? '保存して申請する' : '保存する') : '保存して追加する'}
-            </Button> : null}
-          </>
-        )}
-      >
-        {!canEdit ? <ReadOnlyNotice /> : null}
-        {editing ? <Notice tone="info">{`提供時間：${periodLabel(safeArray(editing.service_periods_json))} ／ 所要時間：${editing.duration_minutes ? `${editing.duration_minutes}分` : emptyValue('unknown')}`}</Notice> : null}
-        {canEdit ? <DialogFormRow><fieldset className={styles.fields} disabled={busy}>
-        <DialogField label="種類" kind="select">
-          <SaveErrorField names={["kind","draft.kind"]}><Select aria-label="種類" size="full" value={draft.kind} onChange={(value) => setDraft({ ...draft, kind: value === 'a_la_carte' ? 'a_la_carte' : 'course' })} options={[{ value: 'course', label: 'コース' }, { value: 'a_la_carte', label: '単品' }]} /></SaveErrorField>
-        </DialogField>
-        <DialogField label="メニュー名" htmlFor="rs-menu-name">
-          <SaveErrorField names={["name","draft.name"]}><TextField id="rs-menu-name" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></SaveErrorField>
-        </DialogField>
-        <SettingsFormRow layout="columns">
-          <DialogField label="価格（税込）" htmlFor="rs-menu-price">
-            <SaveErrorField names={["price","draft.price"]}><NumberInput id="rs-menu-price" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></SaveErrorField>
-          </DialogField>
-          <DialogField label="提供時間" kind="select">
-            <SaveErrorField names={["period","draft.period"]}><Select
-              aria-label="提供時間"
-              size="full"
-              value={draft.period}
-              onChange={(value) => setDraft({ ...draft, period: value === 'lunch' ? 'lunch' : value === 'both' ? 'both' : 'dinner' })}
-              options={[{ value: 'lunch', label: 'ランチ' }, { value: 'dinner', label: 'ディナー' }, { value: 'both', label: 'ランチ・ディナー' }]}
-            /></SaveErrorField>
-          </DialogField>
-        </SettingsFormRow>
-        <DialogField label={editing ? '新しい価格の開始日時' : '価格の開始日時'} htmlFor="rs-menu-effective">
-          <SaveErrorField names={["effectiveAt","draft.effectiveAt","effective_at","draft.effective_at"]}><DateTimeField id="rs-menu-effective" value={draft.effectiveAt} onChange={(next) => setDraft({ ...draft, effectiveAt: next })} /></SaveErrorField>
-        </DialogField>
-        <DialogField label="アレルギー（カンマ区切り）" htmlFor="rs-menu-allergens">
-          <SaveErrorField names={["allergens","draft.allergens"]}><TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} /></SaveErrorField>
-        </DialogField>
-        <DialogNote>
-          {editing
-            ? `価格を変えると承認ワークフローへ申請されます。承認されるまで、いまの価格（${formatYen(editing.price)}）のまま出ます。空欄の開始日時は承認後すぐに反映します。`
-            : '追加したメニューは、予約台帳・Google投稿・LINEカードで同じマスターとして使われます。あとから価格を変えるときは承認ワークフローへ申請されます。'}
-        </DialogNote>
-        {editing && editing.kind === 'course' ? <DialogField label="お支払い" kind="select" optional={false}><MenuPaymentFields state={coursePayment} name="course" price={draft.price === '' ? editing.price : Number(draft.price)} people={2} /></DialogField> : null}
-        </fieldset></DialogFormRow> : <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? '変更予定の価格は承認後に反映します。開始日時が未設定のときは、承認後すぐに反映します。' : undefined} rows={[
-          { label: '種類', value: draft.kind === 'course' ? 'コース' : '単品' },
-          { label: 'メニュー名', value: draft.name || emptyValue('unconfigured') },
-          { label: '価格（税込）', value: editing ? formatYen(editing.price) : draft.price.trim() ? formatYen(Number(draft.price)) : emptyValue('unconfigured') },
-          ...(editing?.pendingPrice != null ? [{ label: '変更予定の価格', value: formatYen(editing.pendingPrice) }] : []),
-          { label: '提供時間', value: editing ? periodLabel(safeArray(editing.service_periods_json)) : periodLabel([draft.period]) },
-          { label: '所要時間', value: editing?.duration_minutes ? `${editing.duration_minutes}分` : emptyValue('unknown') },
-          { label: 'アレルギー', value: draft.allergens || emptyValue('none') },
-          { label: '変更後の価格の開始日時', value: editing?.pendingEffectiveAt ? polishFormatDateTime(new Date(editing.pendingEffectiveAt)) : emptyValue('unconfigured') },
-        ]} />}
-      </RsDialog>
       <RsDialog
         open={Boolean(stopping)}
         title="このメニューを停止しますか？"
