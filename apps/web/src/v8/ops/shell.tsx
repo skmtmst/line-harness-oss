@@ -215,15 +215,19 @@ export function OpsHead({
   description,
   actions,
   environment,
+  band,
 }: {
   title: string
   description?: ReactNode
   actions?: ReactNode
   environment?: 'production' | 'staging'
+  /** 見出しと注意帯の間に置く数の帯（絵 P0jhqO：見出し→数の帯→注意帯の順）。 */
+  band?: ReactNode
 }) {
   return (
     <div className={styles.head}>
       <PageHeading title={title} help={description} actions={actions} inset="none" />
+      {band}
       <Notice tone="warn" presentation="ops" className={styles.caution} data-ops-env={environment} icon={<ShieldCheck aria-hidden="true" />}>
         運営コンソール：契約先のデータを扱います。操作はすべて記録されます
       </Notice>
