@@ -1,3 +1,4 @@
+import { liffNotificationPreferences } from './routes/liff-notification-preferences.js';
 import { processScenarioSourceJobs } from './services/scenario-source-jobs.js';
 import { formDocuments } from './routes/form-documents.js';
 import { purgeExpiredFormDocuments } from './services/form-documents.js';
@@ -600,6 +601,7 @@ app.route('/', usersGrouped);
 app.route('/', inbox);
 app.route('/', openapi);
 app.route('/', liffRoutes);
+app.route('/', liffNotificationPreferences);
 app.route('/', affiliateSelfRoutes);
 app.route('/', affiliatePayouts);
 
