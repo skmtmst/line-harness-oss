@@ -567,7 +567,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
   const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
-  const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
+  const [forms, setForms] = useState<Array<{ id: string; name: string; folderId?: string | null; updatedAt?: string | null }>>([])
   const [trackedLinks, setTrackedLinks] = useState<Array<{ id: string; name: string }>>([])
   const [otherMenus, setOtherMenus] = useState<RichMenuGroupListItem[]>([])
   const staffRole = useStaffRole()
@@ -746,7 +746,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       setTemplates(templateRes.value.data.map(({ id, name }) => ({ id, name })))
     else noteFailure('テンプレート', templateRes)
     if (formRes.status === 'fulfilled' && formRes.value.success)
-      setForms(formRes.value.data.map(({ id, name }) => ({ id, name })))
+      setForms(formRes.value.data.map((row) => {
+        // 選ぶ窓（Pen dJZ7Q）の左のフォルダ列と行の更新日に使う。一覧と同じ応答の項目。
+        const extra = row as { folderId?: string | null; updatedAt?: string | null }
+        return { id: row.id, name: row.name, folderId: extra.folderId, updatedAt: extra.updatedAt }
+      }))
     else noteFailure('フォーム', formRes)
     if (linkRes.status === 'fulfilled' && linkRes.value.success)
       setTrackedLinks(linkRes.value.data.map(({ id, name }) => ({ id, name })))

@@ -20,7 +20,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import TapSideEffects from '@/components/shared/tap-side-effects'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
-type Option = { id: string; name: string }
+type Option = { id: string; name: string; folderId?: string | null; updatedAt?: string | null }
 
 type Props = {
   area: Area
@@ -434,7 +434,7 @@ export function AreaProperties({
             hasLiff={Boolean(liffId)}
             liffSettingsHref={account?.selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(account.selectedAccountId)}` : '/accounts'}
             readOnly={readOnly}
-            sources={{ ...shopSources, form: forms.map((f) => ({ id: f.id, name: f.name })) }}
+            sources={{ ...shopSources, form: forms.map((f) => ({ id: f.id, name: f.name, folderId: f.folderId, updatedAt: f.updatedAt })) }}
             textMax={300}
             renderBody={(kind) => kind === 'uri' ? urlBody : kind === 'form' && forms.length === 0 ? formEmpty : extraIntentOf(kind) ? null : undefined}
           /></SaveErrorField>
