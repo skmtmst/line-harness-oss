@@ -2,13 +2,13 @@
 import dynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
-import type { IndustryStyle, UsageStyle } from '@/lib/api-style-dashboard'
+import type { IndustryStyle, UsageStyle } from './model'
 import StandardDashboard from '@/v8/dashboard/dashboard'
 
 /*
  * ホーム（/）の入口。アカウントの使い方のスタイル（B-294）で出し分ける。
  * 飲食・サロン・面談・教室は業種ダッシュボード、それ以外（標準・EC・読めない）は今の標準のダッシュボード（変えない）。
- * 前に読んだスタイルを店ごとに覚えておき、次からは最初からその画面を出す（標準の画面が一瞬出ないように）。
+ * スタイルは GET /api/dashboard/style（styleApi.get）。前に読んだスタイルを店ごとに覚えておき、次からは最初からその画面を出す（標準の画面が一瞬出ないように）。
  */
 
 const StyleDashboard = dynamic(() => import('./style-dashboard'), { ssr: false })
@@ -33,15 +33,16 @@ export default function HomeDashboard() {
     if (!selectedAccountId) return
     let active = true
     setStyle(remembered(selectedAccountId))
-    import('@/lib/api-style-dashboard')
-      .then((m) => m.styleDashboardApi.accountStyle(selectedAccountId))
+    import('@/lib/api-styles')
+      .then((m) => m.styleApi.get(selectedAccountId))
       .then((res) => {
         if (!active) return
         const next = res.data?.style ?? 'standard'
         setStyle(next)
         try { window.localStorage.setItem(storageKey(selectedAccountId), next) } catch { /* 覚えられなくても毎回読むだけ */ }
       })
-      .catch(() => { /* 読めないときは今の表示（初めは標準）のまま */ })
+      // 読めないときは前に読んだ表示（初めは標準）のまま。ホームを失敗の画面にはしない（標準のダッシュボードは変えない決まり）。
+      .catch(() => {})
     return () => { active = false }
   }, [selectedAccountId])
   if (INDUSTRY.includes(style)) return <StyleDashboard key={style} style={style as IndustryStyle} />

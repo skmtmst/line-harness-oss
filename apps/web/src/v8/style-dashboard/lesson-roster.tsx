@@ -4,7 +4,7 @@ import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import { RowMenu } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
-import type { StyleRoster } from '@/lib/api-style-dashboard'
+import type { StyleRoster } from './model'
 import styles from './style-dashboard.module.css'
 
 /*
@@ -43,7 +43,7 @@ export function LessonRoster({ roster, canWrite, onClose, onPay, onAttend, onLin
           <div key={m.name} className={styles.rosterRow}>
             <span className={styles.rosterName}><strong>{m.name}</strong><span className={styles.cellSub}>{m.sub}</span></span>
             <span className={styles.grow} />
-            <StatusBadge tone={m.pay.tone}>{m.pay.label}</StatusBadge>
+            {m.pay.label === '—' ? <span className={styles.cellMuted}>—</span> : <StatusBadge tone={m.pay.tone}>{m.pay.label}</StatusBadge>}
             <span className={styles.rosterAttend}>
               {m.attend === 'done' ? <span className={styles.attendDone}>✓ 出席</span> : m.attend === 'cancel' ? <span className={styles.cellMuted}>取消</span> : canWrite ? <Button size="compact" onClick={() => onAttend(m.name)}>出席</Button> : <span className={styles.cellMuted}>—</span>}
             </span>

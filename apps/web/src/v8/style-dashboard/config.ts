@@ -1,4 +1,4 @@
-import type { DashboardRange, IndustryStyle } from '@/lib/api-style-dashboard'
+import type { DashboardRange, IndustryStyle } from './model'
 
 /*
  * 4 業種のダッシュボードの違い（B-309・B-318。絵 XBkC2：NqAvL 飲食・mOAX5 サロン・R0FFqz 面談・k2MBw 教室）。

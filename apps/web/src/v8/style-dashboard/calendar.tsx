@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import StatusBadge from '@/components/shared/status-badge'
-import type { StyleMonth, StyleWeek } from '@/lib/api-style-dashboard'
+import type { StyleMonth, StyleWeek } from './model'
 import styles from './style-dashboard.module.css'
 
 /*

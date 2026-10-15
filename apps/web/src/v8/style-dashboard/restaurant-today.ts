@@ -1,5 +1,5 @@
 import { formatDate } from '@/lib/format'
-import type { StyleAlert, StyleKpi, StyleRow, StyleToday } from '@/lib/api-style-dashboard'
+import type { StyleAlert, StyleKpi, StyleRow, StyleToday } from './model'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 import { isWalkIn } from '../restaurant/front-desk/walk-in'
 import { sourceName } from '../restaurant/reservations/format'

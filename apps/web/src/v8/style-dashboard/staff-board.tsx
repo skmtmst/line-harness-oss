@@ -5,7 +5,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import SearchField from '@/components/shared/search-field'
 import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
-import type { StyleBoard, StyleBoardEntry } from '@/lib/api-style-dashboard'
+import type { StyleBoard, StyleBoardEntry } from './model'
 import styles from './style-dashboard.module.css'
 
 /*

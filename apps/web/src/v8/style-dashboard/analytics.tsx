@@ -8,7 +8,7 @@ import ListState from '@/components/shared/list-state'
 import { RowMenu } from '@/components/shared/row-actions'
 import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
-import type { StyleAnalytics } from '@/lib/api-style-dashboard'
+import type { StyleAnalytics } from './model'
 import { SideCard } from './parts'
 import styles from './style-dashboard.module.css'
 
@@ -42,7 +42,7 @@ export function StyleAnalyticsView({ data, error, onTab, onRetry, onRowOpen }: {
         </div>
         <Card className={styles.chartCard} contentPadding="var(--polish-space-card)" gap="var(--polish-space-field)" aria-label={chart.title}>
           <h3 className={styles.sectionTitle}>{chart.title}<HelpTip label={`${chart.title}の説明`}>{chart.help}</HelpTip></h3>
-          <span className={styles.calLegend}><i data-k="now" />この期間<i data-k="prev" />前の期間</span>
+          <span className={styles.calLegend}><i data-k="now" />この期間{chart.points.some((p) => p.prev > 0) ? <><i data-k="prev" />前の期間</> : null}</span>
           <div className={styles.pairChart} role="img" aria-label={`${chart.title}のグラフ`}>
             <div className={styles.pairTicks}>{chart.ticks.map((t) => <span key={t}>{t}</span>)}</div>
             <div className={styles.pairPlot}>

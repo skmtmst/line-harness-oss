@@ -1,5 +1,5 @@
 'use client'
-import { ArrowDown, ArrowUp, Info, Lock, Plus, RotateCcw, Scissors, CalendarX2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Info, Lock, RotateCcw, Scissors, CalendarX2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
@@ -13,7 +13,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import TimeFieldV8 from '@/components/shared/time-field-v8'
 import Toggle from '@/components/shared/toggle'
-import type { StyleClosureInput, StyleLayout, StyleLayoutItem } from '@/lib/api-style-dashboard'
+import type { StyleClosureInput, StyleLayout, StyleLayoutItem } from './model'
 import styles from './style-dashboard.module.css'
 
 /*
@@ -26,49 +26,43 @@ export function ViewDrawer({ open, layout, busy, onClose, onSave, onReset }: {
   layout: StyleLayout | null
   busy: boolean
   onClose: () => void
-  onSave: (next: Pick<StyleLayout, 'kpis' | 'cards'>) => void
+  onSave: (next: StyleLayoutItem[]) => void
   onReset: () => void
 }) {
-  const [kpis, setKpis] = useState<StyleLayoutItem[]>([])
   const [cards, setCards] = useState<StyleLayoutItem[]>([])
-  useEffect(() => { if (open && layout) { setKpis(layout.kpis); setCards(layout.cards) } }, [open, layout])
-  const dirty = Boolean(layout) && (JSON.stringify(kpis) !== JSON.stringify(layout?.kpis) || JSON.stringify(cards) !== JSON.stringify(layout?.cards))
-  const max = layout?.maxKpis ?? 5
-  const move = (list: StyleLayoutItem[], index: number, step: -1 | 1) => {
-    const next = [...list]; const [item] = next.splice(index, 1); next.splice(index + step, 0, item); return next
-  }
-  const section = (title: string, help: string, note: string, list: StyleLayoutItem[], set: (next: StyleLayoutItem[]) => void, limit?: number) => (
-    <section className={styles.drawerSection} aria-label={title}>
-      <div className={styles.drawerSectionHead}><h3>{title}</h3><HelpTip label={`${title}の説明`}>{help}</HelpTip><span className={styles.grow} /><span className={styles.cellMuted}>{note}</span></div>
-      {list.map((item, i) => {
-        const full = limit !== undefined && !item.on && list.filter((x) => x.on).length >= limit
-        return (
-          <div key={item.id} className={styles.drawerRow}>
-            <Toggle checked={item.on} disabled={full} label={item.label} onChange={(on) => set(list.map((x) => (x.id === item.id ? { ...x, on } : x)))} />
-            <span className={styles.drawerLabel}>{item.label}</span>
-            <span className={styles.grow} />
-            <IconButton size="row" aria-label={`${item.label}を上へ`} disabled={i === 0} onClick={() => set(move(list, i, -1))}><ArrowUp size={16} /></IconButton>
-            <IconButton size="row" aria-label={`${item.label}を下へ`} disabled={i === list.length - 1} onClick={() => set(move(list, i, 1))}><ArrowDown size={16} /></IconButton>
-          </div>
-        )
-      })}
-    </section>
-  )
+  useEffect(() => { if (open && layout) setCards(layout.cards) }, [open, layout])
+  const dirty = Boolean(layout) && JSON.stringify(cards) !== JSON.stringify(layout?.cards)
+  const move = (index: number, step: -1 | 1) => setCards((list) => { const next = [...list]; const [item] = next.splice(index, 1); next.splice(index + step, 0, item); return next })
+  const shown = cards.filter((c) => !c.locked)
   return (
-    <Drawer open={open} title="表示を変える" titleAccessory={<HelpTip label="表示を変えるの説明">ダッシュボードに出す数とカードを選び、上下を入れ替えます。業種の型は初期の組みです。いつでも型に戻せます。</HelpTip>} closeAppearance="box" dirty={dirty} busy={busy} onClose={onClose}
-      footer={<div className={styles.drawerFoot}><Button onClick={onClose}>キャンセル</Button><Button variant="primary" busy={busy} busyLabel="保存しています" disabled={!dirty} onClick={() => onSave({ kpis, cards })}>保存する</Button></div>}>
+    <Drawer open={open} title="表示を変える" titleAccessory={<HelpTip label="表示を変えるの説明">ダッシュボードに出すカードを選び、上下を入れ替えます。業種の型は初期の組みです。いつでも型に戻せます。</HelpTip>} closeAppearance="box" dirty={dirty} busy={busy} onClose={onClose}
+      footer={<div className={styles.drawerFoot}><Button onClick={onClose}>キャンセル</Button><Button variant="primary" busy={busy} busyLabel="保存しています" disabled={!dirty} onClick={() => onSave(cards)}>保存する</Button></div>}>
       {layout ? (
         <div className={styles.drawerBody}>
           <div className={styles.drawerBase}>
             <Scissors size={16} aria-hidden="true" />
             <span className={styles.drawerBaseText}><strong>いまの型：{layout.base}</strong><span className={styles.cellMuted}>{layout.changed}か所を変えています</span></span>
             <span className={styles.grow} />
-            <Button size="compact" onClick={onReset} disabled={busy || layout.changed === 0}><RotateCcw size={16} aria-hidden="true" />型に戻す</Button>
+            <Button size="compact" onClick={onReset} disabled={busy}><RotateCcw size={16} aria-hidden="true" />型に戻す</Button>
           </div>
-          {section('数の帯', '画面の上の数です。5つまで出せます。', `${max}つまで`, kpis, setKpis, max)}
-          {section('横のカード', '右の列のカードです。上下だけ入れ替えられます。', '上下だけ入れ替え', cards, setCards)}
-          <div><Button size="compact" disabled disabledReason="足せるカードは今出ているものだけです。"><Plus size={16} aria-hidden="true" />カードを足す</Button></div>
-          <div className={styles.drawerLocked}><Lock size={16} aria-hidden="true" /><span className={styles.drawerBaseText}><strong>接続の異常の帯</strong><span className={styles.cellMuted}>異常の時だけ必ず出ます（隠せません）</span></span></div>
+          <section className={styles.drawerSection} aria-label="カード">
+            <div className={styles.drawerSectionHead}><h3>カード</h3><HelpTip label="カードの説明">ダッシュボードのタブとカードです。上下だけ入れ替えられます。</HelpTip><span className={styles.grow} /><span className={styles.cellMuted}>上下だけ入れ替え</span></div>
+            {shown.map((item) => {
+              const i = cards.indexOf(item)
+              return (
+                <div key={item.id} className={styles.drawerRow}>
+                  <Toggle checked={item.on} label={item.label} onChange={(on) => setCards((list) => list.map((x) => (x.id === item.id ? { ...x, on } : x)))} />
+                  <span className={styles.drawerLabel}>{item.label}</span>
+                  <span className={styles.grow} />
+                  <IconButton size="row" aria-label={`${item.label}を上へ`} disabled={i <= 0 || cards[i - 1]?.locked} onClick={() => move(i, -1)}><ArrowUp size={16} /></IconButton>
+                  <IconButton size="row" aria-label={`${item.label}を下へ`} disabled={i === cards.length - 1} onClick={() => move(i, 1)}><ArrowDown size={16} /></IconButton>
+                </div>
+              )
+            })}
+          </section>
+          {cards.filter((c) => c.locked).map((c) => (
+            <div key={c.id} className={styles.drawerLocked}><Lock size={16} aria-hidden="true" /><span className={styles.drawerBaseText}><strong>{c.label}</strong><span className={styles.cellMuted}>異常・知らせがある時だけ必ず出ます（隠せません）</span></span></div>
+          ))}
         </div>
       ) : null}
     </Drawer>

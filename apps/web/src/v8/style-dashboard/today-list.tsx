@@ -5,7 +5,7 @@ import ListState from '@/components/shared/list-state'
 import { RowMenu } from '@/components/shared/row-actions'
 import TruncatedText from '@/components/shared/truncated-text'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
-import type { IndustryStyle, StyleRow } from '@/lib/api-style-dashboard'
+import type { IndustryStyle, StyleRow } from './model'
 import { Badge } from './parts'
 import styles from './style-dashboard.module.css'
 
@@ -84,8 +84,8 @@ export function TodayList({ style, rows, note, canWrite, busyId, selectedId, men
       case 'meet': return <Badge badge={row.meet} />
       case 'pay': return <Badge badge={row.pay} />
       case 'state': return <Badge badge={row.state} />
-      case 'fill': return <span className={styles.fill}><span className={styles.cellStrong}>{row.booked ?? 0}／{row.capacity ?? 0}</span><span className={styles.fillTrack}><span className={styles.fillBar} data-tone={fillTone(row)} style={{ inlineSize: `${Math.min(100, Math.round(((row.booked ?? 0) / Math.max(1, row.capacity ?? 1)) * 100))}%` }} /></span></span>
-      case 'waiting': return <span className={styles.cellText}>{row.waiting ?? 0}</span>
+      case 'fill': return row.capacity === undefined ? <span className={styles.cellText}>{row.remaining !== undefined ? `残り ${row.remaining}` : '—'}</span> : <span className={styles.fill}><span className={styles.cellStrong}>{row.booked ?? 0}／{row.capacity ?? 0}</span><span className={styles.fillTrack}><span className={styles.fillBar} data-tone={fillTone(row)} style={{ inlineSize: `${Math.min(100, Math.round(((row.booked ?? 0) / Math.max(1, row.capacity ?? 1)) * 100))}%` }} /></span></span>
+      case 'waiting': return <span className={styles.cellText}>{row.waiting ?? '—'}</span>
       case 'vacancy': return <span className={styles.cellText} aria-label={row.vacancy === '×' ? '空きなし' : row.vacancy === '△' ? '残りわずか' : '空きあり'}>{row.vacancy ?? '—'}</span>
       case 'action': return actionCell(row)
       default: return null

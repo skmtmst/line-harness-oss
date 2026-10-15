@@ -12,12 +12,16 @@
 - `?range=`：`week`・`month`（省くと今日）。カレンダーは 1か月なら月の形、ほかは週の形。
 - 分析：`?sub=`（小タブ）・`?days=`（7・30・90）。
 
-## 読む口（`lib/api-style-dashboard.ts`。本物は API 組4 が作り中・撮影は `scripts/visual-qa/style-dashboard-mock.mjs`）
-- `GET /api/style-dashboard/today?style&range&date&staff&compare`：数の帯 5・異常の帯・一覧の行・盤・週／月・名簿・右の列。
-- `GET /api/style-dashboard/analytics?style&days&tab&staff&compare`：小タブ・数のカード 6・日ごとのグラフ（この期間と前の期間）・切り口の表・右の列。
-- `GET/PUT/DELETE /api/style-dashboard/layout?style`：［表示を変える］（数の帯 5 つまで・横のカードの出し入れ・上下の入れ替え・型に戻す）。
-- `POST /api/style-dashboard/closures?style`：［休みを入れる］（日付・終日／時間・店全体／担当者／卓・理由）。既存の予約は取り消さない。
-- 口が読めないとき：飲食は今の飲食の口（今日の予約・卓・枠を閉じる知らせ。`restaurant-today.ts`）から組み立てる（前との比べ・支払い・右の列は出さない）。ほかは「ダッシュボードを読み込めませんでした」と［もう一度］。
+## 読む口（API 組4 `lib/api-styles.ts` の styleApi・API-CONTRACT-4。生の値は `adapter.ts` が画面の形 `model.ts` へ組み立てる）
+- スタイル：`styleApi.get`（GET `/api/dashboard/style`）。読めないときはホームを前に読んだ表示（初めは標準）のまま。
+- 数の帯・新着予約：`styleApi.summary`（metrics・previous・newBookings）。率は 0〜1 を %、null は「—」と理由（数が少ない・未設定）、0 は実測の 0。前との比べは previous から（無断率・取消率は下がると緑）。
+- 盤・一覧・週／月：`styleApi.schedule`（columns・entries・days・closures・availability）。担当の候補は columns、空きは availability.slots、担当の休みは closures。飲食の盤は `axis=table`。
+- 分析：`styleApi.analytics`（日数→ from/to。periodMetrics・daily・menus・staff・funnel）。前の期間の日ごとの値は返らないので、グラフはこの期間だけ。
+- ［表示を変える］：`styleApi.get` の cards と版 → `saveCards`・`resetCards`（配列の順が上から下。接続の異常・媒体の知らせは隠せない）。
+- ［休みを入れる］：飲食は既存の `restaurantTestApi.createClosure`（卓は tableIds）、ほかは `styleApi.closeHours` を担当 1 人ずつ（途中の失敗をまとめて成功にしない）。既存の予約は取り消さない。
+- 教室の名簿：既存の `eventsApi.listBookings`（回＝slot_id）、出席は `eventsApi.updateBooking(status=attended)`。
+- 飲食：口が読めないときは今の飲食の口から組み立てる（`restaurant-today.ts`）。異常の帯は今の「枠を閉じる知らせ」。
+- 口が無い物（支払いの札・今日の入金・支払いのリンク・返金・お支払いのカード）は値を作らず、押すと共通の準備中の窓（`preparing-dialog.tsx`・B-314）。
 
 ## 操作
 - 頭：［ウォークイン］（飲食だけ・今の窓）［LINE を送る］（一斉配信へ）［休みを入れる］［表示を変える］［主ボタン］（飲食＝電話予約の引き出し、サロン・面談＝予約を入れる、教室＝イベント予約へ）。

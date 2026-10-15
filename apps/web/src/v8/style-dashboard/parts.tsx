@@ -7,7 +7,7 @@ import HelpTip from '@/components/shared/help-tip'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
-import type { IndustryStyle, StyleBadge, StyleRow, StyleSideCard } from '@/lib/api-style-dashboard'
+import type { IndustryStyle, StyleBadge, StyleRow, StyleSideCard } from './model'
 import styles from './style-dashboard.module.css'
 
 /** 支払い・状態などの丸い札。 */
