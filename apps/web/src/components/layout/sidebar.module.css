@@ -5,15 +5,11 @@
   padding: 0 12px 8px;
 }
 
-/* まだ下に続くときは下端を薄く消し、項目が線で半分に切れて見えないようにする。 */
-.nav[data-more] {
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
-}
-.nav[data-more-above] {
-  mask-image: linear-gradient(to bottom, transparent, #000 40px);
-}
-.nav[data-more][data-more-above] {
-  mask-image: linear-gradient(to bottom, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+/* 送られているとき、端で途中まで出ている項目は丸ごと隠す（帯の線で半分に切れて見せない）。 */
+.nav[data-clipped] {
+  mask-image: linear-gradient(to bottom,
+    transparent var(--nav-cut-top, 0px), #000 var(--nav-cut-top, 0px),
+    #000 calc(100% - var(--nav-cut-bottom, 0px)), transparent calc(100% - var(--nav-cut-bottom, 0px)));
 }
 
 .section {
