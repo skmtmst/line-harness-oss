@@ -4462,6 +4462,16 @@
       "parentColumn": "id"
     }
   },
+  "security_alerts": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "security_monitor_state": {
+    "category": "global"
+  },
   "rt_reservation_referrals": {
     "category": "purge",
     "scope": {
