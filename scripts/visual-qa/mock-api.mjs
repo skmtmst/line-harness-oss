@@ -1852,7 +1852,9 @@ const REJECTED_APPROVALS = [
   duplicateFlag: false,
 }))
 
+/* 成果承認は選んだアカウントの分だけ出す（lineAccountId で絞る）。見本は撮影のアカウントに付ける。 */
 const CONVERSION_APPROVALS = [...PENDING_APPROVALS, ...APPROVED_APPROVALS, ...REJECTED_APPROVALS]
+  .map((item) => ({ lineAccountId: ACCOUNT.id, ...item }))
 
 const SHAPES = {
   '/api/public/brand': { name: '株式会社 然', iconUrl: null },
