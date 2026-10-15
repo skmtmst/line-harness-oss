@@ -28,11 +28,13 @@ import AllergyField from '@/components/shared/allergy-field'
 export const BASIC_GROUP = 'basic'
 export const ALL_GROUP = 'all'
 
-function FieldInput({ field, value, onChange, disabled, id }: {
+function FieldInput({ field, value, onChange, disabled, computed = false, id }: {
   field: FriendField
   value: string
   onChange: (v: string) => void
   disabled: boolean
+  /** ほかの値から計算した値（年齢＝生年月日から）。灰色の読むだけの欄で見せる（絵 vX3wQ）。 */
+  computed?: boolean
   id: string
 }) {
   // 変えられないとき（権限が無い・ECが正本の項目）は、押せない部品を置かずに読み取りだけの欄で見せる（2026-10-06 オーナー決定）。
@@ -75,6 +77,7 @@ function FieldInput({ field, value, onChange, disabled, id }: {
   if (field.type === 'date') {
     return <SaveErrorField names={["value"]}><DateField id={id} value={value} onChange={onChange} aria-labelledby={`${id}-label`} placeholder="未設定" /></SaveErrorField>
   }
+  if (computed) return <TextField id={id} value={value} disabled readOnly aria-readonly="true" placeholder="未設定" />
   const inputType = field.type === 'number' ? 'number' : field.type === 'url' ? 'url' : field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'
   return <SaveErrorField names={["value"]}><TextField id={id} type={inputType} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} placeholder="未設定" onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
 }
@@ -108,6 +111,9 @@ export default function InfoTab({ friendId, group, data, perms }: {
   /* vX3wQ：題の横の補足。決まった欄は回答フォームの答え、ほかはお店が作った項目。 */
   const groupNote = (key: string) => key === 'basic' ? '回答フォームの答えが入ります' : key === 'dining' ? '飲食を使うアカウントの決まった欄' : 'お店が作った項目・分類ごとに出ます'
   const firstShopGroup = groups.find(key => key !== 'basic' && key !== 'dining')
+  // 「情報欄を管理」はお店が作った分類の頭に出す。お店の分類が無いときは最初の分類の頭に出す。
+  const manageGroup = firstShopGroup ?? groups[0]
+  const dirty = fields.some((field) => (field.value ?? '') !== (values[field.id] ?? ''))
   const groupOf = (field: FriendField) => isBasic(field) ? 'basic' : field.fixedKey ? 'dining' : field.folderId ?? 'unfiled'
 
   const folderCount = new Map<string, number>()
@@ -163,7 +169,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
           {groups.map(groupKey => <section key={groupKey} className={styles.infoGroup} aria-label={groupAria(groupKey)}>
           <div className={styles.infoGroupHead}>
             <h3 className={styles.infoGroupTitle}>{groupName(groupKey)}<span className={styles.infoGroupNote}>{groupNote(groupKey)}</span></h3>
-            {groupKey === firstShopGroup ? <Link className={styles.manageLink} href="/friend-fields">情報欄を管理<ArrowUpRight size={13} aria-hidden="true" /></Link> : null}
+            {groupKey === manageGroup ? <Link className={styles.manageLink} href="/friend-fields">情報欄を管理<ArrowUpRight size={13} aria-hidden="true" /></Link> : null}
           </div>
           <div className={styles.fieldGrid}>
             {ordered.filter(field => groupOf(field) === groupKey).map((field) => {
@@ -180,7 +186,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
                     <span className={styles.fieldLabelText}>{label}</span>
                     {field.isPersonal ? <span className={styles.faint}>個人情報</span> : null}
                     {/* 値の出どころ（手で入れた・回答フォーム…）は題の横に1行で（vX3wQ）。全文は title。 */}
-                    {fixed?.source ? <span className={styles.fieldSource} title={fixed.source}>{fixed.source}</span> : null}
+                    {fixed?.label ? <span className={styles.fieldSource} title={fixed.source ?? undefined}>{fixed.label}</span> : null}
                   </label>
                   <FieldInput
                     id={id}
@@ -188,6 +194,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
                     value={fixed?.derived ? fixed.value ?? '' : values[field.id] ?? ''}
                     onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
                     disabled={!perms.canEditField(field) || !!fixed?.derived}
+                    computed={!!fixed?.derived}
                   />
                   {field.type === 'multi_select' && field.fixedKey !== 'allergy' ? <p className={styles.fieldNote}>複数選択の項目はこの画面では変更できません。</p> : null}
                   {field.ecIsMaster ? <p className={styles.fieldNote}>EC側の値が正のため、ここからは変更できません。</p> : null}
@@ -199,17 +206,19 @@ export default function InfoTab({ friendId, group, data, perms }: {
           {hiddenPersonalCount > 0 ? <p className={styles.hiddenNote}>個人情報の項目が {hiddenPersonalCount} 件あります。表示には個人情報の閲覧権限が要ります。</p> : null}
           {data.warnings.length > 0 ? <ul className={styles.warnList}>{data.warnings.map((w) => <li key={w}>{w}</li>)}</ul> : null}
 
-          <div className={styles.saveBar}>
-            <p className={styles.saveNote}>
-              {data.saveError ? <span className={styles.danger} role="alert">{data.saveError}</span>
-                : data.saveNotice ? <span className={styles.success} role="status">{data.saveNotice}</span>
-                  : <><Lock size={13} aria-hidden />保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。</>}
-            </p>
-            {perms.manage ? <Button href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}>項目を作る</Button> : null}
-            {perms.saveFields ? (
-              <Button variant="primary" onClick={() => void data.saveFields()} disabled={data.saving} busy={data.saving} busyLabel="保存中…">保存する</Button>
-            ) : null}
-          </div>
+          {/* 下の帯：［キャンセル］［保存する］を真ん中に（絵 vX3wQ）。項目を作るのは「情報欄を管理」から。 */}
+          {perms.saveFields ? (
+            <div className={styles.saveBar}>
+              {data.saveError ? <p className={styles.saveNote}><span className={styles.danger} role="alert">{data.saveError}</span></p>
+                : data.saveNotice ? <p className={styles.saveNote}><span className={styles.success} role="status">{data.saveNotice}</span></p> : null}
+              <div className={styles.saveActions}>
+                <Button variant="secondary" onClick={() => setValues(Object.fromEntries(fields.map((field) => [field.id, field.value ?? ''])))} disabled={data.saving || !dirty}>キャンセル</Button>
+                <Button variant="primary" onClick={() => void data.saveFields()} disabled={data.saving} busy={data.saving} busyLabel="保存中…">保存する</Button>
+              </div>
+            </div>
+          ) : (
+            <p className={styles.saveNote}><Lock size={13} aria-hidden />保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。</p>
+          )}
         </>
       )}
     </div>
