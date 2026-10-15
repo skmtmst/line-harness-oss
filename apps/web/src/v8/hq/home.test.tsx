@@ -119,4 +119,11 @@ describe('統括のアカウント', () => {
     const card = container.querySelector('article')!
     expect([...card.querySelectorAll('button')].some((button) => button.textContent === '更新する')).toBe(false)
   })
+  it.each(['owner', 'admin', 'viewer'])('アカウントの用途文から権限を推測せず、現在の人%sで設定の入口を決める', async viewerRole => {
+    role.value = viewerRole
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, role: '本店の配信に使う', connection: { status: 'ok', issues: [] } }] })
+    await render()
+    expect(container.querySelector('button[aria-label$="の設定"]') !== null).toBe(viewerRole !== 'viewer')
+  })
+
 })

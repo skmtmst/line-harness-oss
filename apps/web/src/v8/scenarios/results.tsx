@@ -2,7 +2,7 @@
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Download, Eye, PencilLine } from 'lucide-react';
+import { Calendar, CalendarSearch, Download, PencilLine } from 'lucide-react';
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared';
 import { api, ApiError, type ScenarioRuns } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
@@ -509,7 +509,7 @@ export default function ScenarioResultsV8() {
                   setPlanOpen(true)
                 }}
               >
-                <Eye size={15} aria-hidden="true" />友だちを選んで配信予定を見る
+                <CalendarSearch size={15} aria-hidden="true" />友だちを選んで配信予定を見る
               </Button>
             </div>
             {runsState === 'idle' ? (
@@ -590,7 +590,7 @@ export default function ScenarioResultsV8() {
                               setPlanOpen(true)
                             }}
                           >
-                            <Eye size={15} aria-hidden="true" />予定を見る
+                            <Calendar size={15} aria-hidden="true" />予定を見る
                           </Button>
                         </GridCell>
                         <GridCell data-list-action-cell>

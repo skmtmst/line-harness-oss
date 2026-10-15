@@ -5,12 +5,10 @@ import { PageContent } from '@/components/templates/page-frame'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 
 export function OpsListPage({ stats, ...props }: ListPageProps) {
-  const environment = opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)
   return <ListPage {...props} stats={<>
-    <PageContent><Notice tone="warn" icon={<ShieldCheck aria-hidden="true" />} action={environment === 'staging' ? <span>検証環境</span> : undefined}>運営コンソール：契約先のデータを扱います。操作はすべて記録されます</Notice></PageContent>
+    <PageContent><Notice tone="warn" presentation="ops" icon={<ShieldCheck aria-hidden="true" />}>運営コンソール：契約先のデータを扱います。操作はすべて記録されます</Notice></PageContent>
     {stats}
   </>} />
 }

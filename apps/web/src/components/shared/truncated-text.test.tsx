@@ -27,6 +27,7 @@ describe('省略した文字の全文確認', () => {
     const text = screen.getByText('長い項目の名前')
     expect(text.tabIndex).toBe(0)
     expect(text.getAttribute('aria-label')).toBe('長い項目の名前')
+    expect(text.title).toBe('長い項目の名前')
     fireEvent.focus(text)
     expect(screen.getByRole('tooltip').textContent).toBe('長い項目の名前')
     fireEvent.blur(text)
@@ -35,6 +36,7 @@ describe('省略した文字の全文確認', () => {
     rerender(<TruncatedText value="短い名前" />)
     expect(screen.getByText('短い名前').hasAttribute('tabindex')).toBe(false)
     expect(screen.getByText('短い名前').hasAttribute('aria-label')).toBe(false)
+    expect(screen.getByText('短い名前').title).toBe('短い名前')
   })
 
   it('リンク中の名前は親リンクのfocusで確認し、Tab停止を重ねない', () => {

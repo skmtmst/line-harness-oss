@@ -43,6 +43,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { visitStampsApi } from '@/lib/visit-stamps-api';
 import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from './display';
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs';
+import HistoryTable from './history-table'
 import styles from './visit-stamps.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TruncatedText from '@/components/shared/truncated-text'
@@ -727,34 +728,10 @@ function VisitStampsScreen() {
                   : log === null ? <ListState kind="loading" />
                     : rows.length === 0 ? <p className={styles.empty}>この店の記録はまだありません。来店・会計で押したり、店で手入力したりすると、ここに出ます。</p>
                         : (
-                          <DataTable className={`${styles.table} ${styles.historyTable}`} data-design="visit-stamp-history">
-                            <thead>
-                              <TableHeadRow className={styles.headRow}>
-                                <Th className={styles.colWhen}>いつ</Th>
-                                <Th className={styles.colFriend}>誰に</Th>
-                                <Th className={styles.colCount}>何個</Th>
-                                <Th className={styles.colWhy}>何で</Th>
-                                <Th className={styles.colActor}>誰が</Th>
-                                <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
-                              </TableHeadRow>
-                            </thead>
-                            <tbody>
-                              {rows.map((row) => (
-                                <Tr key={row.id} className={styles.row} data-row-id={row.id}>
-                                  <Td className={styles.colWhen}><span className={styles.plain}>{shortDateTime(row.at)}</span></Td>
-                                  <Td><span className={styles.name} title={friendById(row.friendId) ? friendNames(friendById(row.friendId)!).name : undefined}>{friendById(row.friendId) ? friendNames(friendById(row.friendId)!).name : '友だち'}</span></Td>
-                                  <Td className={styles.colCount}><span className={`${styles.countText} ${row.reversed ? styles.countReversed : ''}`} title={row.count}>{row.count}</span></Td>
-                                  <Td className={styles.colWhy}><span className={styles.muted} title={row.why}>{row.why}</span></Td>
-                                  <Td className={styles.colActor}><span className={styles.muted} title={row.actor}>{row.actor}</span></Td>
-                                  <Td className={styles.colMenu}>
-                                    <RowActions subjectName={`${shortDateTime(row.at)} の記録`}
-                                      menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: false, href: `/friends/detail?id=${encodeURIComponent(row.friendId)}`, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friendId)}`) } }]}
-                                      destructiveItem={canManage && row.reversible ? { id: 'reverse', label: 'この記録を取り消す', onSelect: () => { setDialogError(''); setReversing(row.id) } } : undefined} />
-                                  </Td>
-                                </Tr>
-                              ))}
-                            </tbody>
-                          </DataTable>
+                          <HistoryTable rows={rows} canManage={canManage}
+                            friendName={id => { const friend = friendById(id); return friend ? friendNames(friend).name : '友だち' }}
+                            onOpenFriend={id => router.push(`/friends/detail?id=${encodeURIComponent(id)}`)}
+                            onReverse={id => { setDialogError(''); setReversing(id) }} />
                         )}
                 {log ? (
                   <div className={styles.historyFooter}>
