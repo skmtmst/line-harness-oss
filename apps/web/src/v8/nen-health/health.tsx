@@ -67,6 +67,8 @@ export default function HealthV8({
    * 選択中のペットの面だけが出る。要求世代で古い応答を捨てる。
    */
   const [summaryPetId, setSummaryPetId] = useState<string | null>(null)
+  // 一覧の「気になる変化」で体重が当たっているペットは、まとめの体重の増減も注意の色にする。
+  const [summaryWeightWarn, setSummaryWeightWarn] = useState(false)
   const [summaryStatus, setSummaryStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [summaryError, setSummaryError] = useState<unknown>(null)
   const [summary, setSummary] = useState<SummaryState | null>(null)
@@ -187,7 +189,7 @@ export default function HealthV8({
       tabs={tabs}
       stats={stats}
       overlays={summaryPetId !== null ? (
-        <SummaryDrawerV8 status={summaryStatus} summary={activeSummary} error={summaryError} onClose={closeSummary} onRetry={() => void loadSummary()} onPrint={() => window.print()} />
+        <SummaryDrawerV8 status={summaryStatus} summary={activeSummary} weightWarn={summaryWeightWarn} error={summaryError} onClose={closeSummary} onRetry={() => void loadSummary()} onPrint={() => window.print()} />
       ) : null}
     >
       {!accountId ? (
@@ -202,8 +204,8 @@ export default function HealthV8({
           filters={filters}
           onFiltersChange={setFilters}
           onKpis={setKpis}
-          onOpenSummary={setSummaryPetId}
-          onOpenPdf={(petId) => { setPrintPetId(petId); setSummaryPetId(petId) }}
+          onOpenSummary={(petId, weightWarn) => { setSummaryWeightWarn(weightWarn); setSummaryPetId(petId) }}
+          onOpenPdf={(petId, weightWarn) => { setSummaryWeightWarn(weightWarn); setPrintPetId(petId); setSummaryPetId(petId) }}
         />
       )}
       {canPrint && activeSummary ? <SummarySheet summary={activeSummary} /> : null}
@@ -229,9 +231,9 @@ function HealthListV8({
   filters: HealthFilters
   onFiltersChange: (next: HealthFilters) => void
   onKpis: (kpis: NenHealthKpis) => void
-  onOpenSummary: (petId: string) => void
+  onOpenSummary: (petId: string, weightWarn: boolean) => void
   /** 「獣医師向け PDF」：まとめを開き、読めたら印刷の窓を出す。 */
-  onOpenPdf: (petId: string) => void
+  onOpenPdf: (petId: string, weightWarn: boolean) => void
 }) {
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenHealthListData | null>(null)
@@ -377,7 +379,7 @@ function HealthListV8({
   )
 }
 
-function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpenSummary: (petId: string) => void; onOpenPdf: (petId: string) => void }) {
+function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpenSummary: (petId: string, weightWarn: boolean) => void; onOpenPdf: (petId: string, weightWarn: boolean) => void }) {
   const router = useRouter()
   const kind = petAnimalTypeLabel(row.pet.animalType)
   const name = row.pet.name || row.pet.callName || '（名前なし）'
@@ -385,9 +387,9 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
   const weightWarn = row.changes.some((c) => c.key === 'weight_drop' || c.key === 'weight_gain')
   const friendId = encodeURIComponent(row.owner.friendId)
   const items: ActionMenuItem[] = [
-    { id: 'summary', label: '30日のまとめ', onSelect: () => onOpenSummary(row.pet.id) },
+    { id: 'summary', label: '30日のまとめ', onSelect: () => onOpenSummary(row.pet.id, weightWarn) },
     /* 1匹の PDF は「30日のまとめ」を開いてから印刷する（開いた引き出しの「印刷・PDF に保存する」）。 */
-    { id: 'pdf', label: '獣医師向け PDF', onSelect: () => onOpenPdf(row.pet.id) },
+    { id: 'pdf', label: '獣医師向け PDF', onSelect: () => onOpenPdf(row.pet.id, weightWarn) },
     { id: 'owner', label: '飼い主を開く', external: false, href: `/friends/detail?id=${friendId}`, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
     { id: 'talk', label: '飼い主にトークで声をかける', external: false, href: `/chats?friend=${friendId}`, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
   ]

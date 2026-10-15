@@ -51,6 +51,37 @@ export function LineChart({ points, label, unit = '', maxX, maxY, marker }: { po
 }
 
 /**
+ * 幅いっぱいの推移の線（絵 BVuYh 健康日記の体重）。描く面の実寸を測って座標を取るので、
+ * 狭い欄でも文字や線が縮まない。縦は 0 から maxY を3本の目盛り、横は軸の名前を
+ * axisLabels（位置 x と文字）で置く。値の無い位置は点を置かず、ある点どうしを線でつなぐ。
+ */
+export function TrendLineChart({ points, label, unit = '', maxX, maxY, axisLabels, height = 160 }: { points: { x: number; value: number; label: string }[]; label: string; unit?: string; maxX: number; maxY: number; axisLabels: { x: number; label: string }[]; height?: number }) {
+ const ref = useRef<HTMLDivElement>(null)
+ const [width, setWidth] = useState(0)
+ useEffect(() => {
+  const node = ref.current
+  if (!node) return
+  const update = () => setWidth(node.clientWidth)
+  update()
+  if (typeof ResizeObserver === 'undefined') return
+  const observer = new ResizeObserver(update)
+  observer.observe(node)
+  return () => observer.disconnect()
+ }, [])
+ const left = 40, right = 8, top = 8, bottom = 24
+ const plotW = Math.max(1, width - left - right), plotH = height - top - bottom
+ const px = (x: number) => left + (maxX > 0 ? x / maxX : 0) * plotW
+ const py = (v: number) => top + plotH - Math.max(0, Math.min(maxY, v)) / Math.max(1e-9, maxY) * plotH
+ const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${px(p.x)} ${py(p.value)}`).join(' ')
+ return <div ref={ref} className={styles.trend} role="group" aria-label={label}>{width > 0 ? <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label}>
+  {[0, maxY / 2, maxY].map((t) => <g key={t}><line x1={left} x2={left + plotW} y1={py(t)} y2={py(t)} stroke="var(--color-hairline)" /><text x={left - 8} y={py(t) + 4} textAnchor="end">{chartNumber(t, unit)}</text></g>)}
+  <path d={path} fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinejoin="round" />
+  {points.map((p) => <circle key={p.x} cx={px(p.x)} cy={py(p.value)} r="2.5" fill="var(--color-accent)"><title>{p.label} {chartNumber(p.value, unit)}</title></circle>)}
+  {axisLabels.map((a) => <text key={a.x} x={px(a.x)} y={height - 6} textAnchor="middle">{a.label}</text>)}
+ </svg> : null}</div>
+}
+
+/**
  * 横棒（絵 v0SbYR「集まった回答」）：名前120・細い棒（全体に占める割合）・数と割合。
  * 行は押せない読み物なので、枠の付いた箱にしない。total を渡さなければ並べた数の合計を全体にする。
  */

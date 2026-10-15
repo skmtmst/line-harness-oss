@@ -25,6 +25,9 @@
 .track span { display: block; height: 100%; }
 .line { display: block; width: 100%; height: 200px; overflow: visible; }
 .line text { fill: var(--color-ink-faint); font-size: 12px; }
+.trend { width: 100%; min-width: 0; }
+.trend svg { display: block; overflow: visible; }
+.trend text { fill: var(--color-ink-faint); font-size: var(--text-micro); }
 
 }
 
