@@ -283,7 +283,7 @@ export function TagEditForm({
             <CardHeader size="stacked" title={<>タグ連動（このタグが付いたときの動き）<HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。<p>タグは分類の目印、友だち情報欄は名前・日付・回答などの値、対応マークは対応の状態、保存した検索は複数の条件をまとめて探すときに使います。</p></HelpTip></>}
               meta="上から順に動きます。並べ替えは上下の印で"
               action={<><span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>{readOnly ? null : <SaveErrorField names={["linked", "linkedEnabled", "tag.linkedEnabled"]}><SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField>}</>} />
-            {actionsOpen ? <Button variant="text" onClick={() => setActionsOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button> : (
+            {actionsOpen ? <div className={styles.summaryRow}><span className={styles.titleSpacer} /><Button variant="text" onClick={() => setActionsOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button></div> : (
               <div className={styles.summaryRow}>
                 <span className={styles.summaryText}>{host && actions.length === 0 ? 'まだありません。［開く］から連動アクションを足せます' : actionsSummary(actions, linked)}</span>
                 <span className={styles.titleSpacer} />
@@ -305,7 +305,7 @@ export function TagEditForm({
           {linked || host ? (
             <Card variant="form" gap="normal" aria-label="マイル">
               <CardHeader size="stacked" title="マイル" meta="このタグが付いている人の、これからのマイルの倍率" />
-              {mileageOpen ? <Button variant="text" onClick={() => setMileageOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button> : (
+              {mileageOpen ? <div className={styles.summaryRow}><span className={styles.titleSpacer} /><Button variant="text" onClick={() => setMileageOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button></div> : (
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryText}>{host && !multiplier && !Number(reward) && !Number(referralReward) ? '変えない（ひな形の既定）' : mileageSummary(multiplier, Number(reward) || 0, Number(referralReward) || 0)}</span>
                   <span className={styles.titleSpacer} />

@@ -49,7 +49,7 @@ export function ActionAddButton<T>({ choices, onAdd, disabled = false, id, label
       aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
       <Plus size={16} aria-hidden="true" />{label}
     </Button>
-    <ActionMenu open={open} anchorRef={anchor} ariaLabel="行うことの種類" onClose={() => setOpen(false)}
+    <ActionMenu open={open} anchorRef={anchor} align="start" ariaLabel="行うことの種類" onClose={() => setOpen(false)}
       items={choices.map(choice => ({ id: choice.id, label: choice.label, disabled: choice.disabled, disabledReason: choice.disabledReason,
         icon: choice.icon ? <choice.icon size={16} aria-hidden="true" /> : undefined,
         onSelect: () => { if (choice.picker) setPendingId(choice.id); else onAdd(choice.make()) },

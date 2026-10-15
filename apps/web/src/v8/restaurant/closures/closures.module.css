@@ -18,7 +18,7 @@
   gap: var(--tpl-e1-gap-l);
   padding: var(--tpl-e1-band-pad);
   border-radius: var(--tpl-e1-radius-l);
-  background: var(--color-status-warn-soft);
+  background: var(--color-notice-warning-bg);
 }
 
 .bandIcon {
@@ -309,7 +309,7 @@
   flex-direction: column;
   gap: var(--tpl-e1-gap-xs);
   min-width: 0;
-  padding: var(--tpl-e10-card-pad);
+  padding: var(--tpl-e10-side-card-pad);
   border-radius: var(--tpl-e1-radius-l);
   border: 1px solid var(--card-edge);
   box-shadow: var(--card-shadow);
