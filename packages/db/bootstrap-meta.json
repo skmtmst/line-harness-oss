@@ -579,7 +579,7 @@
     "634_customer_deletion_retained_references.sql",
     "635_restaurant_delivery_orders.sql",
     "636_restaurant_delivery_uber_connections.sql",
-    "689_security_monitor.sql"
+    "691_security_monitor.sql"
   ],
   "migrationCount": 580
 }

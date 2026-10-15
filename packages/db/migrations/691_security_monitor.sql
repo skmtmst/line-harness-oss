@@ -1,4 +1,4 @@
--- B-343: owner-approved reserve 689. Prepare only; applying needs separate approval.
+-- B-343: owner-approved B-344 reserve 691. Prepare only; applying needs separate approval.
 -- Store counts and fixed rule keys only. No request bodies, URLs, names, IPs or secrets.
 CREATE TABLE security_monitor_state (
   id TEXT PRIMARY KEY CHECK (id = 'security'),
