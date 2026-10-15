@@ -1,0 +1,100 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Hono } from 'hono';
+import type { Env } from '../index.js';
+import type { AuthenticatedStaff } from '../middleware/auth.js';
+import { securityAlerts } from './security-alerts.js';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { observeSecurityAlert } from '../services/security-monitor-store.js';
+
+let store: ReturnType<typeof createTestD1>;
+const member = { id: 'admin-a', role: 'admin', name: 'A', readOnly: false, tenantId: 'tenant-a' } satisfies AuthenticatedStaff;
+function app(staff: AuthenticatedStaff | null = member, impersonation = false) {
+  const a = new Hono<Env>();
+  a.use('*', async (c, next) => {
+    if (staff) c.set('staff', { ...staff });
+    if (impersonation) c.set('impersonation', { tenantId: 'tenant-a' } as Env['Variables']['impersonation'] & {});
+    await next();
+  });
+  a.route('/', securityAlerts);
+  return a;
+}
+function bindings() { return { DB: store.db } as Env['Bindings']; }
+async function request(path: string, staff: AuthenticatedStaff | null = member, body?: unknown, impersonation = false) {
+  return app(staff, impersonation).request(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : undefined, bindings());
+}
+async function seedAlert(tenant: string, account: string | null, key = 'key_rotations') {
+  await observeSecurityAlert(store.db, { tenant_id: tenant, line_account_id: account, rule_key: key as 'key_rotations', count: 1 }, 1, new Date().toISOString());
+  return store.raw.prepare('SELECT id FROM security_alerts WHERE tenant_id = ? AND line_account_id IS ?').get(tenant, account) as { id: string };
+}
+
+beforeEach(() => {
+  store = createTestD1();
+  store.raw.exec(`INSERT INTO tenants (id, name) VALUES ('tenant-a','A'),('tenant-b','B');
+    INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+      VALUES ('a1','c1','A1','test','test','tenant-a'),('a2','c2','A2','test','test','tenant-a'),('b','cb','B','test','test','tenant-b');
+    INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope)
+      VALUES ('admin-a','A','admin','test-a','tenant-a','accounts'),('platform','P','owner','test-p','tenant-a','all');
+    INSERT INTO staff_account_scopes (staff_id,line_account_id,created_at) VALUES ('admin-a','a1','2026-10-16T00:00:00');
+    INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES ('platform',1,'active')`);
+});
+afterEach(() => store.raw.close());
+
+describe('security alert HTTP permissions and operator actions', () => {
+  it('only returns the permitted account, never tenant-wide or hidden platform records', async () => {
+    const first = await seedAlert('tenant-a', 'a1');
+    await seedAlert('tenant-a', 'a2');
+    await seedAlert('tenant-b', 'b');
+    await seedAlert('tenant-a', null, 'impersonation');
+    const response = await request('/api/operations/security-alerts?account_id=a1');
+    expect(response.status).toBe(200);
+    const result = await response.json() as { data: { items: Array<{ id: string }>; monitor: { status: string } } };
+    expect(result.data.items.map(row => row.id)).toEqual([first.id]);
+    expect(result.data.monitor.status).toBe('unknown');
+    const later = await request('/api/operations/security-alerts?account_id=a1&offset=1');
+    expect(await later.json()).toMatchObject({ data: { items: [], total: 1, offset: 1 } });
+    expect(JSON.stringify(result)).not.toContain('tenant-b');
+    for (const account of ['a2', 'b', 'missing', '']) expect((await request(`/api/operations/security-alerts?account_id=${account}`)).status).toBe(403);
+  });
+
+  it('denies anonymous/staff and unregistered owners at the platform boundary', async () => {
+    for (const staff of [null, { ...member, role: 'staff' as const }]) {
+      expect((await request('/api/operations/security-alerts?account_id=a1', staff)).status).toBe(403);
+    }
+    expect((await request('/api/ops/security-alerts', { ...member, role: 'owner' })).status).toBe(403);
+    await seedAlert('tenant-a', null, 'impersonation');
+    const response = await request('/api/ops/security-alerts', { ...member, id: 'platform', role: 'owner' });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('代理ログイン');
+  });
+
+  it('read-only may read, but read-only and impersonated sessions cannot acknowledge or resolve', async () => {
+    const alert = await seedAlert('tenant-a', 'a1');
+    expect((await request('/api/operations/security-alerts?account_id=a1', { ...member, readOnly: true })).status).toBe(200);
+    for (const verb of ['acknowledge', 'resolve']) {
+      const path = `/api/operations/security-alerts/${alert.id}/${verb}?account_id=a1`;
+      expect((await request(path, { ...member, readOnly: true }, { expectedVersion: 1 })).status).toBe(403);
+      expect((await request(path, member, { expectedVersion: 1 }, true)).status).toBe(403);
+    }
+    expect(store.raw.prepare('SELECT status FROM security_alerts').get()).toEqual({ status: 'open' });
+  });
+
+  it('checks resource scope and current version and records successful human decisions', async () => {
+    const own = await seedAlert('tenant-a', 'a1');
+    const other = await seedAlert('tenant-a', 'a2');
+    const base = '/api/operations/security-alerts/';
+    expect((await request(`${base}${other.id}/resolve?account_id=a1`, member, { expectedVersion: 1 })).status).toBe(404);
+    expect((await request(`${base}${own.id}/acknowledge?account_id=a1`, member, { expectedVersion: 1 })).status).toBe(200);
+    expect((await request(`${base}${own.id}/resolve?account_id=a1`, member, { expectedVersion: 1 })).status).toBe(409);
+    expect((await request(`${base}${own.id}/resolve?account_id=a1`, member, { expectedVersion: 2 })).status).toBe(200);
+    expect((await request('/api/operations/security-alerts?account_id=a1')).status).toBe(200);
+    expect(store.raw.prepare("SELECT action FROM audit_events WHERE action GLOB 'security.alert.*' ORDER BY action").all())
+      .toEqual([{ action: 'security.alert.acknowledged' }, { action: 'security.alert.resolved' }]);
+  });
+
+  it('unapplied schema returns unavailable rather than an empty healthy result', async () => {
+    store.raw.exec('DROP TABLE security_alerts');
+    const response = await request('/api/operations/security-alerts?account_id=a1');
+    expect(response.status).toBe(503);
+    expect(await response.text()).toContain('SECURITY_MONITOR_UNAVAILABLE');
+  });
+});

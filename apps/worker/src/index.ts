@@ -211,6 +211,7 @@ import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
+import { securityAlerts } from './routes/security-alerts.js';
 import { runScheduledOperationHealthChecks } from './services/operations-health.js';
 import { observeOperationDispatcher } from './services/operation-dispatch-health.js';
 import { processOperationNotificationOutbox } from './services/operation-notifications.js';
@@ -505,6 +506,7 @@ app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);
 app.route('/', operations);
+app.route('/', securityAlerts);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -1898,7 +1900,7 @@ async function scheduled(
   try {
     await runScheduledOperationHealthChecks(env.DB, {
       r2: env.IMAGES,
-      queue: env.CODEX_MENTION_QUEUE,
+      queue: env.CODEX_MENTION_QUEUE, security: env,
     });
   } catch (error) {
     console.error(JSON.stringify({"code":"src_index_failed"}));
