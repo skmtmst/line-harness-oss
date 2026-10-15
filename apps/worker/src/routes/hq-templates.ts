@@ -1,3 +1,5 @@
+import { searchHqResources } from '../services/hq-templates/resource-search.js';
+import { listDistributionTargets } from '../services/hq-templates/distribution-display.js';
 import { testHqForm, issueHqFormTestToken, revokeHqFormTestToken } from '../services/hq-templates/form-test.js';
 import { restoreArchivedTemplate, templateArchiveStatus } from '../services/hq-templates/archive.js';
 import { importHqTags } from '../services/hq-templates/tag-import.js';
@@ -173,6 +175,17 @@ hqTemplates.post('/api/hq/templates/:id/duplicate', inputJsonBoundary(), async c
 hqTemplates.post('/api/hq/templates/:id/restore', inputJsonBoundary({expectedRevision:['number']}), async c => {
   const data=await restoreArchivedTemplate(dbFor(c.env),await authority(c),c.req.param('id'),(await body(c)).expectedRevision);
   c.set('auditRecorded',true);
+  return c.json({success:true,data});
+});
+hqTemplates.get('/api/hq/templates/resources',async c=>{
+ const auth=await authority(c);
+ return c.json({success:true,data:await searchHqResources(dbFor(c.env),auth.tenantId,c.req.query())});
+});
+hqTemplates.get('/api/hq/templates/:id/distribution-targets',async c=>{
+  const ids=c.req.query('accountIds')?.split(',')??[];
+  if(ids.length>30||new Set(ids).size!==ids.length||ids.some(id=>!id||id.length>100)) throw new HqTemplateError('INVALID_REQUEST');
+  const auth=await authority(c),data=await listDistributionTargets(dbFor(c.env),auth.tenantId,c.req.param('id'),ids);
+  if(!data)throw new HqTemplateError('NOT_FOUND',404);
   return c.json({success:true,data});
 });
 hqTemplates.get('/api/hq/templates/:id/versions',async c=>c.json({success:true,data:await templateVersions(dbFor(c.env),await authority(c),c.req.param('id'))}));

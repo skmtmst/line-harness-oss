@@ -1,7 +1,7 @@
 import { fetchApi } from './api'
 import type { HqTemplateArchiveCounts, HqTemplateArchiveStatus, HqTemplateListDisplay } from '@line-crm/shared'
 
-type HqArchiveTemplateType = 'tag' | 'friend_field' | 'mark' | 'template' | 'rich_menu' | 'form' | 'scenario' | 'auto_reply' | 'friend_add_rule' | 'reminder'
+type HqArchiveTemplateType = 'tag' | 'friend_field' | 'mark' | 'template' | 'rich_menu' | 'form' | 'scenario' | 'auto_reply' | 'friend_add_rule' | 'reminder' | 'booking_menu' | 'mileage_reward'
 export interface HqArchiveTemplate extends HqTemplateListDisplay {
   id: string; name: string; description: string | null; template_type: HqArchiveTemplateType
   revision: number; folder_id: string | null; updated_at: string; archived_at: string | null

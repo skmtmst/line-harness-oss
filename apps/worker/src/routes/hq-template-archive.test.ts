@@ -163,3 +163,16 @@ test('restoring a form revokes old public test tokens; failure rolls back the wh
   expect(newToken.status).toBe(201);
   expect(fetch).not.toHaveBeenCalled();
 });
+
+ test('distribution targets include unserved active accounts without making a confirmation',async()=>{
+  const t=await create('tag');
+  sql.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id) VALUES('b','Other','b','x','x','t'),('foreign','Hidden','f','x','x','other')");
+  const before=sql.raw.prepare('SELECT count(*) n FROM hq_template_preflights').get();
+  const result=await call<{requiresPreflight:boolean;stores:{accountId:string;targetVersion:{version:number|null;status:string}}[]}>(`/${t.id}/distribution-targets`);
+  expect(result.status).toBe(200);expect(result.body.data.requiresPreflight).toBe(true);
+  expect(result.body.data.stores.map(s=>s.accountId).sort()).toEqual(['a','b']);
+  expect(result.body.data.stores.every(s=>s.targetVersion.version===null&&s.targetVersion.status==='undistributed')).toBe(true);
+  expect((await call(`/${t.id}/distribution-targets?accountIds=foreign`)).status).toBe(404);
+  expect((await call(`/${t.id}/distribution-targets?accountIds=a,a`)).status).toBe(400);
+  expect(sql.raw.prepare('SELECT count(*) n FROM hq_template_preflights').get()).toEqual(before);
+ });

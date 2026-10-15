@@ -580,7 +580,8 @@
     "635_restaurant_delivery_orders.sql",
     "636_restaurant_delivery_uber_connections.sql",
     "639_hq_form_test_tokens.sql",
-    "640_hq_broadcast_saved_views.sql"
+    "640_hq_broadcast_saved_views.sql",
+    "661_hq_catalog_templates.sql"
   ],
-  "migrationCount": 581
+  "migrationCount": 582
 }

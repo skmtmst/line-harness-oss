@@ -23,6 +23,8 @@ export function templateContentSummary(type: HqTemplateType, definitionJson: str
         return 'タグ 1';
       case 'form':
         return `質問 ${parseFormTemplateDefinition(input).form.fields.length}`;
+      case 'booking_menu': return '予約メニュー 1';
+      case 'mileage_reward': return 'マイルの景品 1';
       case 'auto_reply': return '自動応答';
       case 'friend_add_rule': return '友だち追加時の配信';
       case 'reminder': { const d=JSON.parse(definitionJson); return Array.isArray(d.settings?.steps)?`通知 ${d.settings.steps.length}`:null; }
