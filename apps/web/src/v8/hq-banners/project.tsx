@@ -677,14 +677,14 @@ function ProjectInner() {
               <StickyBar
                 outlined
                 className={styles.footer}
-                /* 1つの帯（zOpMG）：左に選んだ画像の操作か残りの枚数、右に書き出しの大きさと生成の操作。入らない文は文節で2行に折る。 */
+                /* 1つの帯（zOpMG）：左に選んだ画像の操作か残りの枚数、右に書き出しの大きさと生成の操作。上限の枚数は右の欄の知らせと title にあるので、帯では1行に収まる短い形。入らない幅では文の切れ目で2行に折る。 */
                 destructive={selectedImages.length > 0 ? <>
                   <span className={styles.selectionCount} aria-live="polite">{`${selectedImages.length} 枚を選んでいます`}</span>
                   <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
                   <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
                 </> : undefined}
                 status={selectedImages.length > 0 ? undefined : usage && input.count > usage.month.remaining
-                  ? <span className={styles.limitText}>{`今月の上限 ${usage.month.limit}枚に達しています`}<span className={styles.nowrap}>{`（必要 ${input.count}枚）`}</span></span>
+                  ? <span className={styles.limitText} title={`今月の上限 ${usage.month.limit}枚に達しています（必要 ${input.count}枚）`}>今月の上限に達しています<span className={styles.nowrap}>{`（必要 ${input.count}枚）`}</span></span>
                   : usageStatusText(usage, input.count)}
                 info={exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span className={styles.generationInfo}>寸法 —</span>}
                 actions={
