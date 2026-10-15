@@ -2302,6 +2302,13 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
     return { ...SCENARIO_SIMULATION, scenarioId: scenarioSimulation[1] }
   }
   if (method === 'PUT' && /^\/api\/scenarios\/[^/]+\/draft$/.test(pathname)) return SCENARIO_DRAFT
+  /* Al4Ek（B-177 ③）：シナリオの複製。止めたコピーを作って返す（保存はしない）。通・きっかけは取得の口が同じ形を返すので足さずに済む。 */
+  if ((method === 'POST' && pathname === '/api/scenarios') || (method === 'PUT' && pathname === '/api/scenarios/scenario-copy')) {
+    return { ...FRIEND_SCENARIOS[0], id: 'scenario-copy', name: `${FRIEND_SCENARIOS[0].name} のコピー`, isActive: false }
+  }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/actions') return { ...SCENARIO_ACTIONS[0], id: `scenario-copy-action-${Date.now()}`, scenarioId: 'scenario-copy' }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/triggers') return { ...SCENARIO_TRIGGERS[0], id: 'scenario-copy-trigger' }
+  if (method === 'POST' && pathname === '/api/scenarios/scenario-copy/steps') return { ...SCENARIO_STEPS[0], id: `scenario-copy-step-${Date.now()}`, scenarioId: 'scenario-copy' }
   /*
    * リマインダの公開フロー（下書き保存・検査・予定・試し送り・公開）。
    * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
