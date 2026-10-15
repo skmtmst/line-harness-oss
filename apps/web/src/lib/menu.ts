@@ -250,6 +250,8 @@ export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
    * 案件タブを開いても「コンバージョン」が光り、画面名と食い違う。
    */
   '/conversions?tab=affiliates': 'affiliates',
+  // 紹介者の明細・レポートは /affiliates でも開く（絵 Eo56k）。左メニューは同じ項目を光らせ、組を開く。
+  '/affiliates': 'affiliates',
   '/conversions?tab=offers': 'affiliates',
   '/conversions?tab=approvals': 'affiliates',
   '/conversions?tab=payment': 'affiliates',
