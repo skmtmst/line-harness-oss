@@ -154,6 +154,28 @@ describe('監査 R90: 今月は今月の予約に絞る', () => {
     // 対象の期間と状態を画面に明示する。
     expect(screen.getByRole('status').textContent).toMatch(/今月（\d+年\d+月）の予約を/)
   })
+  it('月を進めた一覧とCSVは同じ期間になり、今日で今月へ戻る', async () => {
+    fixture.downloadLedgerCsv.mockResolvedValue(undefined)
+    render(<BookingsPage />)
+    fireEvent.click(screen.getByRole('button', { name: /^今月/ }))
+    fireEvent.click(await screen.findByRole('button', { name: '次の月' }))
+    const now = new Date(Date.now() + 9 * 3600_000)
+    const key = (offset: number) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1)).toISOString().slice(0, 7)
+    const expected = {
+      from: new Date(`${key(1)}-01T00:00:00+09:00`).toISOString(),
+      to: new Date(`${key(2)}-01T00:00:00+09:00`).toISOString(),
+    }
+    await waitFor(() => expect(fixture.listRequests).toHaveBeenLastCalledWith('account-a', 'requested', expect.objectContaining(expected)))
+    fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' }))
+    await waitFor(() => expect(fixture.downloadLedgerCsv).toHaveBeenCalledWith('account-a', expect.objectContaining(expected)))
+    expect(screen.getByRole('status').textContent).toContain('表示月')
+    expect(JSON.parse(sessionStorage.getItem('booking-ledger-state-v1')!).date).toBe(`${key(1)}-01`)
+    fireEvent.click(screen.getByRole('button', { name: '前の月' }))
+    await waitFor(() => expect(fixture.listRequests).toHaveBeenLastCalledWith('account-a', 'requested', expect.objectContaining(monthBounds())))
+    fireEvent.click(screen.getByRole('button', { name: '次の月' }))
+    fireEvent.click(within(document.querySelector('[data-template-region="stats"]') as HTMLElement).getByRole('button', { name: '今日' }))
+    await waitFor(() => expect(fixture.listRequests).toHaveBeenLastCalledWith('account-a', 'requested', expect.objectContaining(monthBounds())))
+  })
 })
 
 describe('タブの数は期間の有効な予約だけ（取消・拒否・期限切れを除く）', () => {
