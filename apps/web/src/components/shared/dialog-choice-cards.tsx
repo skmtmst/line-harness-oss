@@ -21,7 +21,8 @@ export default function DialogChoiceCards({ choices, onChoose, columns = 3 }: {
   columns?: 3 | 4
 }) {
   const id = useId()
-  return <div className={styles.grid} data-dialog-choice-cards data-columns={columns}>
+  /* 高さは CSS（絵の 184）を下限に、グリッドの行でそろえる。共通の高さ合わせ（自然な高さ）は使わない。 */
+  return <div className={styles.grid} data-dialog-choice-cards data-card-height="natural" data-columns={columns}>
     {choices.map(choice => <Card key={choice.key} layout="vertical" padding="compact" gap="tight" className={styles.card}>
       <a href={choice.href} className={styles.link} aria-describedby={`${id}-${choice.key}`} onClick={event => {
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return

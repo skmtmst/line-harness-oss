@@ -49,7 +49,7 @@ export function ActionAddButton<T>({ choices, onAdd, disabled = false, id, label
       aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
       <Plus size={16} aria-hidden="true" />{label}
     </Button>
-    <ActionMenu open={open} anchorRef={anchor} ariaLabel="行うことの種類" onClose={() => setOpen(false)}
+    <ActionMenu open={open} anchorRef={anchor} align="start" ariaLabel="行うことの種類" onClose={() => setOpen(false)}
       items={choices.map(choice => ({ id: choice.id, label: choice.label, disabled: choice.disabled, disabledReason: choice.disabledReason,
         icon: choice.icon ? <choice.icon size={16} aria-hidden="true" /> : undefined,
         onSelect: () => { if (choice.picker) setPendingId(choice.id); else onAdd(choice.make()) },
@@ -131,7 +131,9 @@ export default function ActionList<T>({ value, onChange, choices, idOf, titleOf,
   const slots = value.map((item, index) => ({ item, id: idOf(item, index) }))
   const reorder = useReorder({ items: slots, idOf: slot => slot.id,
     onReorder: ({ ids }) => { setEditing(null); onChange(ids.map(id => slots.find(slot => slot.id === id)!.item)) } })
-  return <div className={styles.list} data-action-list data-shared-part="event-actions" data-event-actions>
+  /* 種類の列は全行で同じ幅。いちばん長い種類の言葉が切れない幅まで広げる（既定の幅より狭くはしない・最大 12 字）。 */
+  const kindChars = Math.min(12, Math.max(0, ...value.map((item) => kindOf?.(item)?.length ?? 0)))
+  return <div className={styles.list} data-action-list data-shared-part="event-actions" data-event-actions style={kindChars ? { ['--action-kind-fit' as string]: `${kindChars}em` } : undefined}>
     {value.length === 0 ? <p className={styles.empty}>行うことはまだありません。</p> : null}
     {reorder.shown.map(({ item, id }, index) => <ActionRow key={id} number={numberOf?.(item, index) ?? index + 1} title={titleOf(item)} kind={kindOf?.(item)} icon={iconOf?.(item)}
       readOnly={readOnly} open={editing === id} onToggle={() => setEditing(editing === id ? null : id)}

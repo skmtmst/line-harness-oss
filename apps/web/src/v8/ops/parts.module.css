@@ -213,3 +213,9 @@
 }
 
 .alert, .alertNoticePlacement { margin: 0; }
+
+/* 運営の帯（OpsListPage）：頭のすぐ下に置く。左右は本文と同じ、上の余白は頭の下の余白だけ（絵 XWtYC：題の下 14）、下は数の帯まで 16。 */
+.opsNotice {
+  padding: 0 var(--polish-space-section) var(--polish-space-card);
+  min-width: 0;
+}

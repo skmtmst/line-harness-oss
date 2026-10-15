@@ -27,7 +27,8 @@ const minutes=(iso:string)=>civil(iso).getUTCHours()*60+civil(iso).getUTCMinutes
 const source=(s:string)=>({line:'LINE',restaurant_board:'レストランボード',tabelog:'食べログ',hotpepper:'ホットペッパー',ikyu:'一休',phone:'電話',manual:'電話',walk_in:'ウォークイン'}[s]??s)
 const state=(s:string)=>({confirmed:'予約あり',requested:'承認待ち',pending:'承認待ち',visited:'来店済み',seated:'着席中',cancelled:'取消',no_show:'無断取消'}[s]??s)
 const axisName={resource:'時間',floor:'座席表',list:'一覧',month:'月'}
-export function ReservationSource({value,note}:{value:string;note?:string|null}){return <span className={styles.source} data-source={value}>{value==='manual'&&note?.startsWith('ウォークイン')?'ウォークイン':source(value)}</span>}
+/** 経路の札。label を渡すと、その名前で出す（予約経路の連携の表のように、口が媒体の名前を持つとき）。 */
+export function ReservationSource({value,note,label}:{value:string;note?:string|null;label?:string}){return <span className={styles.source} data-source={value} title={label}>{label??(value==='manual'&&note?.startsWith('ウォークイン')?'ウォークイン':source(value))}</span>}
 export function ReservationDetailsActions({children}:{children:ReactNode}){return <div className={styles.detailActions}>{children}</div>}
 export function ReservationFacts({items}:{items:Array<{label:string;value:ReactNode}>}){return <dl className={styles.facts}>{items.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>}
 export function ReservationDining({entry,dense=false}:{entry:ReservationBoardEntry;dense?:boolean}) {

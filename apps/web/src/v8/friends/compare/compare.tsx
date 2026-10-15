@@ -199,7 +199,7 @@ function CompareInner() {
 
               {panelOpen ? (
                 <div className={styles.pair}>
-                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide"><Field label={<>判定の理由</>} htmlFor="compare-reason" required><p id="compare-decide" className={styles.panelTitle}>「この2件を判定する」の画面</p>
+                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide"><p id="compare-decide" className={styles.panelTitle}>判定</p>
 <div className={styles.radios} role="radiogroup" aria-label="判定">
                       {DECISIONS.map((item) => (
                         <SaveErrorField names={["compare-decision","value","item.value","decision"]} key={item.value}><Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>
@@ -224,12 +224,12 @@ function CompareInner() {
                         </div>
                       </>
                     ) : null}
-<SaveErrorField names={["reason"]}><TextField
+<Field label="判定の理由" htmlFor="compare-reason" required><SaveErrorField names={["reason"]}><TextField
                       id="compare-reason"
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
                       placeholder={decisive ? `${decisive.label}` : '何を見てそう判断したか'}
-                    /></SaveErrorField>
+                    /></SaveErrorField></Field>
 {review.decideError ? <Notice tone="danger" >{review.decideError}</Notice> : null}
 {!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
                       <p className={styles.note} role="status">3つの確認をそろえると判定できます。</p>
@@ -237,7 +237,7 @@ function CompareInner() {
 <div className={styles.panelActions}>
                       <Button type="button" variant="secondary" onClick={() => setPanelOpen(false)} disabled={review.deciding}>キャンセル</Button>
                       <Button type="button" variant="primary" onClick={submit} disabled={!ready} disabledReason={!detail.canDecide ? 'この候補は今は判定できません' : !reason.trim() ? '判定の理由を入れてください' : !linkedReady ? '使う値と3つの確認を選んでください' : undefined} busy={review.deciding} busyLabel="処理中…">判定する</Button>
-                    </div></Field></div>
+                    </div></div>
                   <div className={styles.historyCard}>
                     <p className={styles.panelTitle}>判定の履歴</p>
                     <ul className={styles.lines}>

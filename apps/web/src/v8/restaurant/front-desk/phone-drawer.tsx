@@ -13,7 +13,6 @@ import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { STAY_MINUTES, freeTables, openTimes, startOf, tableNote, toYmd } from './slots'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -188,7 +187,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><Drawer open={open} width="narrow" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
+    <SaveErrorScope errors={saveErrors}><Drawer open={open} width="narrow" heightMode="viewport" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
       <div className={styles.form} data-design-node="wEzuG">
         <Field label="電話番号"><SaveErrorField names={["phone","customerPhone"]}><TextField type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" /></SaveErrorField></Field>
         {friends.length > 0 ? (
@@ -281,7 +280,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
         <Field label="メモ"><SaveErrorField names={["memo","note"]}><TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="アレルギー・記念日など" /></SaveErrorField></Field>
         {friend ? (
           <div className={styles.notifyRow}>
-            <SaveErrorField names={["notify"]}><SettingCheckbox checked={notify} onChange={setNotify} label="LINE で確認を送る" /></SaveErrorField>
+            <SaveErrorField names={["notify"]}><Toggle checked={notify} onChange={setNotify} label="LINE で確認を送る" /></SaveErrorField>
             <span className={styles.notifyText}>
               <span className={styles.notifyTitle}>LINE で確認を送る</span>
               <span className={styles.notifySub}>友だちのときだけ出ます</span>

@@ -1099,6 +1099,9 @@ function EditCommonVarV8Inner() {
       noticeSpacing="band"
       identity={<></>}
       preview={preview}
+      /* 1152（C67dE）は右の列を畳まず、スマホだけをボタンにして「決めた日に変える」を右に残す（畳むと予定の欄が見えなくなっていた）。 */
+      hidePreviewWhenNarrow={!narrow}
+      previewCompactWhenNarrow
       destructive={canWrite && item ? (
         <StickyBarAction destructive icon={Trash2} label="削除する" onClick={() => openDelete()} />
       ) : undefined}

@@ -367,10 +367,13 @@
 
 .channelCards {
   display: flex;
+  align-items: flex-start;
   gap: var(--tpl-rs-panel-head-gap);
 }
 
 .card { flex: 1 1 0; min-width: 0; }
+/* 今日の取り込み（絵 mVUo3：幅 300・中身の高さ） */
+.todayCard { flex: 0 0 var(--tpl-rs-inv-today-card-w); min-width: 0; }
 
 .cardText {
   margin: 0;
@@ -383,24 +386,14 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-rs-table-row-gap);
-  padding: var(--tpl-rs-dlg-note-pad);
-  border-radius: var(--radius-segment);
-  background: var(--color-surface-pearl);
 }
 
-.addressText {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-rs-lh-12);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.addressBox > :first-child { flex: 1 1 0; min-width: 0; }
+
 
 .cardActions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--tpl-rs-table-row-gap);
 }
 
@@ -409,44 +402,18 @@
   gap: var(--tpl-rs-inv-today-gap);
 }
 
-.todayStat { flex: 0 0 var(--tpl-rs-inv-today-w); }
+.todayStat { flex: none; width: var(--tpl-rs-inv-today-w); }
 
-.warnNote {
-  margin: 0;
-  padding: var(--tpl-rs-dlg-note-pad);
-  border-radius: var(--radius-segment);
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-rs-lh-12);
-}
 
-.chName { width: auto; }
+.chName { width: var(--tpl-rs-inv-ch-name); }
 .chMethod { width: var(--tpl-rs-inv-ch-method); }
 .chStatus { width: var(--tpl-rs-inv-ch-status); }
 .chToday { width: var(--tpl-rs-inv-ch-today); }
 .chLast { width: var(--tpl-rs-inv-ch-last); }
 .chUnread { width: var(--tpl-rs-inv-ch-unread); }
-.chOps { width: var(--tpl-rs-inv-ch-ops); }
+.chOps { width: auto; }
 
-.channelName {
-  margin: 0;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 700;
-  line-height: var(--tpl-rs-lh-12);
-  text-overflow: ellipsis;
-}
 
-.channelSub {
-  margin: var(--tpl-rs-inv-today-inner) 0 0;
-  overflow: hidden;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-rs-lh-11);
-  text-overflow: ellipsis;
-}
 
 .unreadRow {
   display: flex;
@@ -457,6 +424,10 @@
 .unreadMain {
   flex: 1 1 0;
   min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
 }
 
 .howTo {

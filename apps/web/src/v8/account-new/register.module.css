@@ -50,6 +50,11 @@
 
 /* ③ 基本情報 */
 .tagRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-chip-gap); }
+/* タグの選ぶ欄は残りの幅いっぱい、［タグを追加］は同じ行の右。 */
+.tagPick { flex: 1 1 0; min-width: 0; }
+/* 表示名・LINE ID の2列と［LINEから取得］を1行に。ボタンは欄の下端にそろえる。 */
+.idRow { display: flex; align-items: flex-end; gap: var(--tpl-htn-chip-gap); min-width: 0; }
+.idRow > :first-child { flex: 1 1 0; min-width: 0; }
 .tagAdd { display: inline-flex; align-items: center; gap: var(--tpl-htn-chip-gap); width: var(--tpl-htn-tag-input-w); }
 .infoBox {
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary);
