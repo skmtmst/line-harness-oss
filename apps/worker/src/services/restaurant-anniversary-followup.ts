@@ -3,7 +3,7 @@ import { activeTenantLineAccountSql, parseScenarioVersionSteps, type ScenarioVer
 import type { ScenarioSourceJob } from './scenario-source-jobs.js';
 
 type Candidate=ScenarioVersion & {store_id:string;line_account_id:string;friend_id:string;line_uid:string;timezone:string;store_name:string;value:string;template_version:number;approved_version_id:string;live_step_id:string;offset_minutes:number};
-const sql=`SELECT v.*,s.id store_id,s.line_account_id,s.name store_name,s.timezone,f.id friend_id,f.line_user_id line_uid,
+const anniversarySql=()=>`SELECT v.*,s.id store_id,s.line_account_id,s.name store_name,s.timezone,f.id friend_id,f.line_user_id line_uid,
  ff.value,t.template_version,t.approved_version_id,b.step_id live_step_id,b.offset_minutes
  FROM rt_store_followup_templates t JOIN rt_stores s ON s.id=t.store_id AND s.status='active'
  JOIN scenarios sc ON sc.id=t.scenario_id AND sc.line_account_id=s.line_account_id AND sc.current_published_version_id=t.approved_version_id
@@ -42,7 +42,7 @@ function dates(row:Candidate,now:Date) {
 }
 /** Reuses the common approved scenario job, retry key, entitlement and send-stop checks. */
 export async function scheduleRestaurantAnniversaries(db:D1Database,now=new Date()) {
-  const rows=(await db.prepare(sql).all<Candidate>()).results;
+  const rows=(await db.prepare(anniversarySql()).all<Candidate>()).results;
   for(const row of rows) for(const {date,at} of dates(row,now)) {
     if(at>now.getTime()||at<=now.getTime()-86400000)continue;
     const step=parseScenarioVersionSteps(row).find(s=>s.live_step_id===row.live_step_id&&!s.is_draft); if(!step)continue;
@@ -56,7 +56,7 @@ export async function scheduleRestaurantAnniversaries(db:D1Database,now=new Date
   }
 }
 export async function restaurantAnniversaryState(db:D1Database,job:ScenarioSourceJob,now=new Date()) {
-  const rows=(await db.prepare(sql+' AND s.id=? AND f.id=? AND s.line_account_id=? AND v.id=? AND t.template_version=?').bind(job.source_id,job.friend_id,job.line_account_id,job.scenario_version_id,job.source_version).all<Candidate>()).results;
+  const rows=(await db.prepare(anniversarySql()+' AND s.id=? AND f.id=? AND s.line_account_id=? AND v.id=? AND t.template_version=?').bind(job.source_id,job.friend_id,job.line_account_id,job.scenario_version_id,job.source_version).all<Candidate>()).results;
   for(const row of rows)for(const {date,at} of dates(row,now)) {
     const step=parseScenarioVersionSteps(row).find(s=>s.id===job.step_id&&s.live_step_id===row.live_step_id&&!s.is_draft);
     if(!step||await key(row,date)!==job.source_event_id||at!==Date.parse(job.scheduled_at))continue;
