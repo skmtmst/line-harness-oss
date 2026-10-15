@@ -14,7 +14,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Calendar, CalendarPlus, CalendarX, CircleAlert, Phone, X } from 'lucide-react'
+import { Calendar, CalendarPlus, CalendarX, CircleAlert, Download, Phone, X } from 'lucide-react'
 import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -26,9 +26,14 @@ import Notice from '@/components/shared/notice'
 import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame'
 import BookingLedgerBody from '@/v8/booking-bookings/ledger-body'
 import FilterChip from '@/components/shared/filter-chip'
-import { ResponsiveFilterChips } from '@/components/shared/list-toolbar'
+import { ListToolbarEnd, ListToolbarRow, ListToolbarSearchSlot, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
+import StatusPill from '@/components/shared/status-pill'
+import type { StatusBadgeTone } from '@/components/shared/status-badge'
+import { RowMenu } from '@/components/shared/row-actions'
+import { BookingChipsLabel, BookingMonthBar, BookingUrlCopy } from '@/v8/booking-bookings/month-bar'
+import ledgerStyles from '@/v8/booking-bookings/month-bar.module.css'
 import Select from '@/components/shared/select'
-import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, DateCell, StatusCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import FolderPanel from '@/components/shared/folder-panel'
@@ -46,7 +51,7 @@ import BookingCalendar, {
   type CalendarAvailability,
   type CalendarSlot,
 } from './booking-calendar'
-import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
+import { formatDate, formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
 
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
@@ -91,8 +96,31 @@ const statusBadgeColor: Record<string, string> = {
   no_show: 'bg-danger-bg text-danger',
 }
 
+/** 状態の札の色（StatusPill）。 */
+const statusTone: Record<string, StatusBadgeTone> = {
+  requested: 'warning',
+  confirmed: 'success',
+  completed: 'neutral',
+  no_show: 'danger',
+  cancelled: 'danger',
+  rejected: 'neutral',
+  expired: 'neutral',
+}
+
+/** 表の予約経路（LINE 以外）。絞り込みの名前と同じ語。古い応答は「電話」。 */
+function sourceLabel(b: BookingRequest): string {
+  const found = SOURCE_FILTERS.find((item) => item.key !== 'all' && item.key === b.source)
+  return found?.label ?? '電話'
+}
+
+/** 表の日時：MM/DD（曜）HH:mm（B-152 の一覧の形）。 */
+function formatLedgerDateTime(iso: string): string {
+  if (Number.isNaN(new Date(iso).getTime())) return '—'
+  return `${formatDate(iso, { style: 'list-day-weekday' })} ${formatTime(iso)}`
+}
+
 const statusLabel: Record<string, string> = {
-  requested: 'リクエスト',
+  requested: '未承認',
   confirmed: '確定',
   rejected: '拒否',
   expired: '期限切れ',
@@ -114,12 +142,6 @@ const PAGE_SIZE = 20
 
 function formatJpDateTime(iso: string): string {
   // 不正な日時が来たら Invalid Date を出さず「—」に逃がす(点検#516軽6)。
-  if (Number.isNaN(new Date(iso).getTime())) return '—'
-  return formatDateTime(iso)
-}
-
-/** 表の日時。設計は年を出していない（08/18 14:00）。 */
-function formatShort(iso: string): string {
   if (Number.isNaN(new Date(iso).getTime())) return '—'
   return formatDateTime(iso)
 }
@@ -194,6 +216,8 @@ export default function BookingsPage() {
   const [tab, setTab] = useState<string>('requested')
   /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
   const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
+  /** 「今月」の表の月送り（0＝今月）。数の帯は今月のまま。 */
+  const [monthOffset, setMonthOffset] = useState(0)
   /*
    * R317: URLの条件（`?view=` `?status=` `?range=` `?date=` `?q=` …）で
    * 絞り込み済みの一覧を開ける（IDEA-01）。ダッシュボードの「予約状況」
@@ -405,8 +429,8 @@ export default function BookingsPage() {
     let from: string | undefined
     let to: string | undefined
     if (view === 'month') {
-      from = new Date(`${monthKey(0)}-01T00:00:00+09:00`).toISOString()
-      to = new Date(`${monthKey(1)}-01T00:00:00+09:00`).toISOString()
+      from = new Date(`${monthKey(monthOffset)}-01T00:00:00+09:00`).toISOString()
+      to = new Date(`${monthKey(monthOffset + 1)}-01T00:00:00+09:00`).toISOString()
     }
     if (range !== 'all') {
       const today = jstDay(new Date().toISOString())
@@ -419,7 +443,7 @@ export default function BookingsPage() {
       to = to && to < rangeTo ? to : rangeTo
     }
     return { ...(from ? { from } : {}), ...(to ? { to } : {}) }
-  }, [range, view])
+  }, [range, view, monthOffset])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -773,7 +797,7 @@ export default function BookingsPage() {
       return
     }
     setPage(1)
-  }, [tab, menuFilter, query, range, staffFilter, sourceFilter, view])
+  }, [tab, menuFilter, query, range, staffFilter, sourceFilter, view, monthOffset])
 
   /*
    * R317: 表示方法・対象日・絞り込み・ページをURLへ写す。再読み込みで
@@ -997,7 +1021,9 @@ export default function BookingsPage() {
               title="変更依頼"
               value={summaryReady ? summary.requested : null}
               unit="件"
-              detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '要対応'}
+              badge={view === 'month' && summaryReady && summary.requested > 0 ? '要対応' : undefined}
+              badgeTone="warning"
+              detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : view === 'month' ? `お客さまから ${summary.requested}件` : '要対応'}
             />
             <KpiCard icon={view === 'month' ? <CalendarX size={16} aria-hidden="true" /> : null} presentation="band"
               title="キャンセル"
@@ -1006,6 +1032,18 @@ export default function BookingsPage() {
               detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
             />
           </KpiBand>
+          <BookingMonthBar
+            monthLabel={view === 'month' ? monthLabel(monthKey(monthOffset)) : undefined}
+            isThisMonth={monthOffset === 0}
+            onPrev={() => setMonthOffset((n) => n - 1)}
+            onNext={() => setMonthOffset((n) => n + 1)}
+            onToday={() => setMonthOffset(0)}
+            urls={shareUrl ? <>
+              <BookingUrlCopy label="友だち予約URL" copied={isCopied(shareUrl)} onCopy={() => void copyUrl(shareUrl)} />
+              {historyUrl ? <BookingUrlCopy label="予約履歴URL" copied={isCopied(historyUrl)} onCopy={() => void copyUrl(historyUrl)} /> : null}
+            </> : null}
+            caption={view === 'month' ? <>{monthOffset === 0 ? `今月（${monthLabel(monthKey(0))}）` : monthLabel(monthKey(monthOffset))}の予約を「{STATUS_TABS.find(item => item.key === tab)?.label ?? ''}」で表示しています。</> : undefined}
+          />
         </>}
         folders={<FolderPanel
             heading="メニュー"
@@ -1027,19 +1065,40 @@ export default function BookingsPage() {
           onSelect: setMenuFilter,
           rows: [{ id: 'all', label: 'すべて', count: summary.total }, ...menus.map(menu => ({ id: menu.name, label: menu.name, count: menuCounts.get(menu.name) ?? 0 }))],
         }}
-        toolbar={<>
-          {view === 'month' ? <Notice tone="info" role="status">今月（{monthLabel(monthKey(0))}）の予約を「{STATUS_TABS.find(item => item.key === tab)?.label ?? ''}」で表示しています。</Notice> : null}
+        toolbar={view === 'month' ? <>
+          {/* R8tlbw：1段目＝探す・担当・経路 … CSV、2段目＝「よく使う」と状態の札。 */}
+          <ListToolbarRow>
+            <ListToolbarSearchSlot search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }} />
+            <EntitySelect
+              aria-label="担当者で絞り込む"
+              valuePrefix="担当: "
+              value={staffFilter}
+              onChange={setStaffFilter}
+              options={[
+                { value: 'all', label: 'すべて' },
+                ...staffList.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.display_name })),
+              ]}
+            />
+            <Select
+              aria-label="予約経路で絞り込む"
+              value={sourceFilter}
+              onChange={setSourceFilter}
+              options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
+            />
+            {selectedAccountId ? <ListToolbarEnd>
+              <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv} busy={csvBusy} busyLabel="書き出しています…"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
+            </ListToolbarEnd> : null}
+          </ListToolbarRow>
+          <ListToolbarRow>
+            <BookingChipsLabel />
+            <ResponsiveFilterChips label="状態">{STATUS_TABS.map(({ key, label }) => <FilterChip key={key} selected={tab === key} onChange={() => setTab(key)}>{label}</FilterChip>)}</ResponsiveFilterChips>
+          </ListToolbarRow>
+        </> : <>
             <ListToolbar
             search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }}
             filters={
               <>
-                {view === 'month' ? <>
-                  <ResponsiveFilterChips label="状態">{STATUS_TABS.map(({ key, label }) => <FilterChip key={key} selected={tab === key} onChange={() => setTab(key)}>{label}</FilterChip>)}</ResponsiveFilterChips>
-                  <ResponsiveFilterChips label="期間">
-                    <FilterChip selected={range === 'today'} onChange={() => setRange(range === 'today' ? 'all' : 'today')}>今日</FilterChip>
-                    <FilterChip selected={range === 'week'} onChange={() => setRange(range === 'week' ? 'all' : 'week')}>今週</FilterChip>
-                  </ResponsiveFilterChips>
-                </> : <>
+                <>
                 <span className="text-ink-faint text-xs">よく使う</span>
                 {STATUS_TABS.map(({ key, label }) => (
                   <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
@@ -1066,15 +1125,14 @@ export default function BookingsPage() {
                   今週
                 </Button>
 
-                </>}
+                </>
                 {/* 担当者と予約経路は一覧と件数の両方を絞り込む。 */}
                 <EntitySelect
                   aria-label="担当者で絞り込む"
-                  valuePrefix={view === 'month' ? '担当：' : undefined}
                   value={staffFilter}
                   onChange={setStaffFilter}
                   options={[
-                    { value: 'all', label: view === 'month' ? 'すべて' : '担当: すべて' },
+                    { value: 'all', label: '担当: すべて' },
                     ...staffList.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.display_name })),
                   ]}
                 />
@@ -1151,14 +1209,14 @@ export default function BookingsPage() {
                   担当は予約の詳細で読める補助情報。畳んでいる間も操作列は右端に留める。 */}
                   <thead>
                     <TableHeadRow>
-                      <Th style={{ width: '12%' }}>日時</Th>
-                      <Th style={{ width: '16%' }}>お客さま</Th>
-                      <Th style={{ width: '16%' }}>メニュー</Th>
-                      <Th style={{ width: '12%' }} className="cq-hide-below-830">担当</Th>
-                      <Th style={{ width: '10%' }}>予約経路</Th>
-                      <Th style={{ width: '10%' }} align="right">料金</Th>
-                      <Th style={{ width: '12%' }}>状態</Th>
-                      <Th style={{ width: '12%' }} align="right" className="sticky right-0 bg-canvas-sunken">操作</Th>
+                      <Th style={{ width: '15%' }}>日時</Th>
+                      <Th style={{ width: '13%' }}>お客さま</Th>
+                      <Th style={{ width: '17%' }}>メニュー</Th>
+                      <Th style={{ width: '10%' }} className="cq-hide-below-830">担当</Th>
+                      <Th style={{ width: '9%' }}>予約経路</Th>
+                      <Th style={{ width: '9%' }} align="right">料金</Th>
+                      <Th style={{ width: '11%' }}>状態</Th>
+                      <Th style={{ width: 120 }} align="right">操作</Th>
                     </TableHeadRow>
                   </thead>
                   <tbody>
@@ -1179,66 +1237,38 @@ export default function BookingsPage() {
                               },
                             })}
                       >
-                        <Td className="whitespace-nowrap">
-                          {formatShort(b.starts_at)}
-                        </Td>
+                        <DateCell>{formatLedgerDateTime(b.starts_at)}</DateCell>
                         <Td>
                           {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
-                          {(
-                            <ContextMenu label={`予約「${b.friend_name ?? 'お客様'}」の操作`} items={bookingContextItems(b)}>
-                              <span className="text-ink" title={b.friend_name ?? undefined}>
-                                {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
-                              </span>
-                            </ContextMenu>
-                          )}
+                          <ContextMenu label={`予約「${b.friend_name ?? 'お客様'}」の操作`} items={bookingContextItems(b)}>
+                            <span className={ledgerStyles.name} title={b.friend_name ?? undefined}>
+                              {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
+                            </span>
+                          </ContextMenu>
                         </Td>
-                        <Td>{b.menu_name}</Td>
-                        <Td className="cq-hide-below-830">{b.staff_name}</Td>
-                        <Td>
-                          {/* R88: 受付経路は source で分ける。担当者の代理入力をLINEにしない。 */}
-                          <span
-                            className={`${isLineBooking(b) ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
-                          >
-                            {isLineBooking(b) ? 'LINE' : '電話'}
-                          </span>
-                        </Td>
+                        <Td><span className={ledgerStyles.cellText} title={b.menu_name}>{b.menu_name}</span></Td>
+                        <Td className="cq-hide-below-830"><span className={ledgerStyles.cellText} title={b.staff_name ?? undefined}>{b.staff_name}</span></Td>
+                        {/* R88: 受付経路は source で分ける。担当者の代理入力をLINEにしない。 */}
+                        <Td>{isLineBooking(b) ? 'LINE' : sourceLabel(b)}</Td>
                         <Td align="right" className="tabular-nums">
                           ¥{formatNumber(b.price_at_booking)}
                         </Td>
-                        <Td>
-                          <span
-                            className={`inline-block rounded-mini px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
-                          >
-                            {statusLabel[b.status] ?? b.status}
-                          </span>
-                        </Td>
-                        <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
-                          {/* V8では行全体が詳細パネルを開くので、操作列の押下は行へ伝えない。v7は今のまま。 */}
-                          <div className="inline-flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
-                            <button
-                              onClick={() => (openBookingDetail(b.id))}
-                              className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
-                            >
-                              詳細
-                            </button>
-                            {/* R11: 受信箱への行き先は名前ではなく操作列の明示のボタンから。 */}
-                            {b.friend_id ? (
-                              <Link
-                                href={`/chats?friend=${b.friend_id}`}
-                                aria-label={`${b.friend_name ?? 'お客さま'}さんとの会話を受信箱で開く`}
-                                className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
-                              >
-                                会話
-                              </Link>
-                            ) : null}
+                        <StatusCell primary={<StatusPill tone={statusTone[b.status] ?? 'neutral'}>{statusLabel[b.status] ?? b.status}</StatusPill>} />
+                        <ActionCell>
+                          {/* 行全体が詳細パネルを開くので、操作列の押下は行へ伝えない。
+                              主な1つ（承認待ちは［承認］、ほかは［詳細］）＋「…」（B-253）。 */}
+                          <span className={ledgerStyles.actions} onClick={(event) => event.stopPropagation()}>
                             {/* N-401: 閲覧のみの人には状態を変えるボタンを出さない */}
-                            {canOperate ? (
-                              <ActionButtons
-                                status={b.status}
-                                onAction={(a) => handleDecide(b.id, a)}
-                              />
-                            ) : null}
-                          </div>
+                            {canOperate && b.status === 'requested'
+                              ? <Button variant="primary" size="compact" onClick={() => handleDecide(b.id, 'approve')}>承認</Button>
+                              : <Button size="compact" onClick={() => openBookingDetail(b.id)}>詳細</Button>}
+                            <RowMenu
+                              label={`予約「${b.friend_name ?? 'お客様'}」のその他の操作`}
+                              items={bookingContextItems(b)
+                                .filter((item) => !(canOperate && b.status === 'requested' && item.id === 'approve') && !(item.id === 'open' && !(canOperate && b.status === 'requested')))
+                                .map((item) => ({ id: item.id, label: item.label, tone: item.danger ? 'danger' as const : undefined, onSelect: () => item.onSelect?.(item.id) }))}
+                            />
+                          </span>
                         </ActionCell>
                       </Tr>
                     ))}
@@ -1246,7 +1276,8 @@ export default function BookingsPage() {
             </DataTable>
           )}
 
-          <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
+          {/* URLは数の帯の下の［コピーする］から。ここは作れないときの案内と、コピーできなかったときに全文を選ぶ欄だけ。 */}
+          {!shareUrl || copyFailedUrl ? <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
             <p className="text-ink-secondary text-xs leading-5">
               友だち予約URLと、友だちが自分の予約履歴を見るURLをそれぞれ発行できます。予約履歴URLを配ると「自分の予約を確認したい」という問い合わせを減らせます。
             </p>
@@ -1301,7 +1332,7 @@ export default function BookingsPage() {
                 で LIFF ID を登録してください。
               </p>
             )}
-          </div>
+          </div> : null}
       </BookingLedgerBody>
 
       {/* V8「サクサク感」C①・E：表の行の詳細パネル。確認の窓は残す。v7は引き出しのまま。 */}
