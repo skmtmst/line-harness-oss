@@ -73,6 +73,8 @@ vi.mock('@line-crm/db', async () => {
 
 const { authMiddleware, ADMIN_SESSION_BEARER_PREFIX } = await import('../middleware/auth.js');
 const { restaurantDelivery } = await import('./restaurant-delivery.js');
+const { signSupportRelay } = await import('../services/support-relay.js');
+const { UBER_PROBE_LAST_RUN_KEY } = await import('../services/ubereats-token-probe.js');
 type Env = import('../index.js').Env;
 
 const TENANT = '00000000-0000-4000-8000-000000000001';
@@ -1654,6 +1656,113 @@ describe('受信口の応答時間（出前館QA#10）', () => {
     // 1秒の約束を守れる根拠は「受け取って即返す」こと。
     // 受信の処理の中で外へ繋ぎに行くと、相手の遅さがそのまま応答時間になる。
     await postWebhook(orderCreatedPayload({ eventId: 'evt-no-egress', externalOrderId: 'UE-7800' }));
+    expect(deliveryCalls).toHaveLength(0);
+  });
+});
+
+/**
+ * Uber Sandbox への接続確認（トークン1回）の口。
+ * 配備先の秘密設定を外へ出さずに「中から1回だけ送る」ための運用の口なので、
+ * 管理画面の認証ではなく合言葉の署名で守る。ここでは守りの側を確かめる。
+ */
+describe('Uber Sandbox 接続確認の口', () => {
+  const PROBE_PATH = '/internal/ubereats/sandbox-token-probe';
+  /** 32文字以上でないと口は開かない（uberProbeSecret）。本物の値ではない。 */
+  const PROBE_SECRET = 'ubereats-probe-secret-0123456789ab';
+
+  /** 合言葉で署名して投げる。`署名なし` のときは見出しを付けない。 */
+  async function postProbe(options: { secret?: string | null; skew?: number } = {}) {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (options.secret) {
+      const timestamp = String(Math.floor(Date.now() / 1000) + (options.skew ?? 0));
+      headers['x-nen-timestamp'] = timestamp;
+      headers['x-nen-signature'] = await signSupportRelay(options.secret, timestamp, '{}');
+    }
+    return app().request(PROBE_PATH, { method: 'POST', headers, body: '{}' }, env);
+  }
+
+  it('合言葉が未設定なら口は開かない。署名があっても実行しない', async () => {
+    const response = await postProbe({ secret: PROBE_SECRET });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ code: 'probe_not_configured' });
+    expect(deliveryCalls).toHaveLength(0);
+  });
+
+  it('署名がない・違う・時刻がずれている依頼は実行しない', async () => {
+    env = { ...env, RT_DELIVERY_UBEREATS_PROBE_SECRET: PROBE_SECRET } as Env['Bindings'];
+
+    const noSignature = await postProbe();
+    expect(noSignature.status).toBe(401);
+    await expect(noSignature.json()).resolves.toMatchObject({ code: 'probe_unauthorized' });
+
+    const wrongSecret = await postProbe({ secret: 'wrong-probe-secret-0123456789abcdef' });
+    expect(wrongSecret.status).toBe(401);
+
+    // 署名は正しいが時刻が10分先。使い回しを防ぐため受け取らない。
+    const stale = await postProbe({ secret: PROBE_SECRET, skew: 600 });
+    expect(stale.status).toBe(401);
+
+    expect(deliveryCalls).toHaveLength(0);
+  });
+
+  it('接続先が Sandbox でないときは実行しない。本番の Uber へは送らない', async () => {
+    env = { ...env, RT_DELIVERY_UBEREATS_PROBE_SECRET: PROBE_SECRET } as Env['Bindings'];
+    const response = await postProbe({ secret: PROBE_SECRET });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: 'probe_sandbox_only' });
+    expect(deliveryCalls).toHaveLength(0);
+  });
+
+  it('成功したら権限の名と残り秒だけを返す。トークンの値・秘密値は返さない', async () => {
+    env = {
+      ...env,
+      RT_DELIVERY_UBEREATS_PROBE_SECRET: PROBE_SECRET,
+      RT_DELIVERY_UBEREATS_ENVIRONMENT: 'sandbox',
+    } as Env['Bindings'];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        deliveryCalls.push({ url, init });
+        return new Response(
+          JSON.stringify({ access_token: 'probe-access-token', expires_in: 2_592_000, scope: 'eats.order' }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+
+    const response = await postProbe({ secret: PROBE_SECRET });
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(JSON.parse(body)).toEqual({
+      success: true,
+      environment: 'sandbox',
+      scope: ['eats.order'],
+      expiresInSec: 2_592_000,
+    });
+    expect(body).not.toContain('probe-access-token');
+    expect(body).not.toContain('test-client-secret');
+    expect(body).not.toContain(PROBE_SECRET);
+    // 外へ出たのは Sandbox のトークンの口へ1回だけ。
+    expect(deliveryCalls).toHaveLength(1);
+    expect(deliveryCalls[0]?.url).toBe('https://sandbox-login.uber.com/oauth/v2/token');
+  });
+
+  it('冷却時間の中の2回目は実行せず、待ち秒を返す', async () => {
+    env = {
+      ...env,
+      RT_DELIVERY_UBEREATS_PROBE_SECRET: PROBE_SECRET,
+      RT_DELIVERY_UBEREATS_ENVIRONMENT: 'sandbox',
+    } as Env['Bindings'];
+    testDb.raw
+      .prepare('INSERT OR REPLACE INTO platform_settings (key, value) VALUES (?, ?)')
+      .run(UBER_PROBE_LAST_RUN_KEY, String(Date.now()));
+
+    const response = await postProbe({ secret: PROBE_SECRET });
+    expect(response.status).toBe(429);
+    const body = (await response.json()) as { code: string; retryAfterSec: number };
+    expect(body.code).toBe('probe_cooldown');
+    expect(body.retryAfterSec).toBeGreaterThan(0);
     expect(deliveryCalls).toHaveLength(0);
   });
 });
