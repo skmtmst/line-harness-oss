@@ -1443,7 +1443,7 @@
   --tpl-preview-title-size: var(--polish-text-section); --tpl-preview-title-lh: 23px; --tpl-tabs-pad-bottom: 10px; --tpl-tabs-text-lh: 18px; --tpl-tabs-compact-lh: 18.5px; --tpl-tabs-compact-line-overlap: -2px;
   --tpl-chip-h: 36px; --tpl-chip-pad: 0 10px; --tpl-chip-gap: 5px; --tpl-body-pad: var(--polish-space-card); --tpl-body-gap: var(--polish-space-row); --tpl-body-lh: 22px; --tpl-insert-pad: 0 14px; --tpl-body-spacer: 24px; --tpl-chip-row-gap: 4px; --tpl-rule-row-gap: 12px; --tpl-chip-label-lh: 20px; --tpl-kw-chip-pad: 4px 6px 4px 10px; --tpl-kw-input-w: 200px; --tpl-kw-input-pad: 0 12px; --tpl-seg-btn-h: 32px; --tpl-seg-btn-pad: 0 12px; --tpl-weekday-w: 48px; --tpl-field-gap-basic: var(--polish-space-row); --tpl-count-num-size: 24px; --tpl-count-num-lh: 29px; --tpl-summary-key-w: 140px; --tpl-summary-val-lh: 21px; --tpl-summary-gap: var(--polish-space-field); --tpl-conflict-desc-lh: 18px; --tpl-rule-note-lh: 16px;
   /* B-169: 共通の行（★V8 XXFT4）の44pxの高さ・52pxの行間。 */
-  --tpl-action-row-compact-pad: 8px 12px; --tpl-action-kind-w: 100px; --tpl-action-list-gap: 8px; --tpl-action-icon-box: 24px; --tpl-action-grip-w: 16px;
+  --tpl-action-row-compact-pad: 8px 12px; --tpl-action-kind-w: 112px; --tpl-dic-available-h: 232px; --tpl-dic-gap-tight: 4px; --tpl-action-list-gap: 8px; --tpl-action-icon-box: 24px; --tpl-action-grip-w: 16px;
   --tpl-action-row-pad: 10px 12px; --tpl-action-row-gap: 10px; --tpl-action-select-w: 140px;
   /* LINEアカウントの詳細（ihjfd）・送受信を止める（CFAyf）・資格情報（Msb1j）・アーカイブ（WOfBN）・登録の編集（n9Z2P）・乗り換え（x2dSNv）。 */
   /* acct：登録の手順の下と、乗り換えの本文の寸法（既定の設定フォームは保つ）。 */
@@ -1794,7 +1794,7 @@
   --tpl-rs-dlg-gap: 14px; --tpl-rs-dlg-pull: -14px; --tpl-rs-dlg-actions-gap: 8px; --tpl-rs-field-gap: var(--polish-space-field); --tpl-rs-dlg-note-pad: 10px 12px; --tpl-rs-pair-gap: var(--polish-space-field);
   /* 下の線が無い窓のボタンの段は、線のぶんが無いので上の間を 8 に詰める（線ありは上の 14）。 */
   --tpl-rs-dlg-actions-pad-plain: 8px;
-  --tpl-rs-menu-col-kind: 80px; --tpl-rs-menu-col-price: 104px; --tpl-rs-menu-col-period: 136px; --tpl-rs-menu-col-duration: 88px; --tpl-rs-menu-col-allergy: 116px; --tpl-rs-menu-col-status: 96px; --tpl-rs-menu-col-ops: 150px;
+  --tpl-rs-menu-col-kind: 64px; --tpl-rs-menu-col-price: 72px; --tpl-rs-menu-col-period: 120px; --tpl-rs-menu-col-duration: 72px; --tpl-rs-menu-col-allergy: 100px; --tpl-rs-menu-col-status: 92px; --tpl-rs-menu-col-ops: 122px;
   --tpl-rs-lh-10: 14px; --tpl-rs-chip-pad: 2px 8px; --tpl-rs-line-green: #06c755;
   --tpl-rs-table-detail-w: 360px; --tpl-rs-table-card-h: 104px; --tpl-rs-table-card-pad: 0 8px; --tpl-rs-table-card-line: 2px; --tpl-rs-table-row-gap: 8px; --tpl-rs-table-row-side: 16px; --tpl-rs-table-chip-w: 64px;
   --tpl-rs-inv-band-gap: 10px; --tpl-rs-inv-conflict-pad: 12px 16px; --tpl-rs-inv-side-w: 320px; --tpl-rs-inv-date-h: 32px; --tpl-rs-inv-date-pad: 10px; --tpl-rs-inv-total-pad: 12px 14px; --tpl-rs-inv-remainder-pad: 9px 12px;

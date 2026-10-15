@@ -167,7 +167,20 @@
 .railButtonsWide > * {
   width: 100%;
 }
+.railHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+/* 題の行に「…」を並べるので、行の高さは「…」に合わせて詰めない（MKQyJ）。 */
+.railHead > :last-child:not(:first-child) { flex: none; margin-block: -6px; }
 .railTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin: 0;
   color: var(--color-ink);
   font-size: var(--text-label);

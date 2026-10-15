@@ -264,11 +264,12 @@ export default function AffiliateDrawer({
     : null
 
   const summary = (
-    <>
+    <div className={styles.stack}>
       <KpiBand density="compact">
-        <KpiCard icon={null} title="今月の成果" value={report?.conversions} unit="件" detail={report ? `認めた ${formatNumber(report.conversionsApproved)}・待っている ${formatNumber(report.conversionsPending)}` : '読み込めませんでした'} />
+        <KpiCard icon={null} title="今月の成果" value={report?.conversions} unit="件" detail={report ? `認めた ${formatNumber(report.conversionsApproved)}・待ち ${formatNumber(report.conversionsPending)}` : '読み込めませんでした'} />
         <KpiCard icon={null} title="今月の報酬" value={null} valueText={monthReward == null ? '—' : formatYen(monthReward)} unit="" detail={rewardDetail} />
-        <KpiCard icon={null} title="支払いを確定していない報酬" value={null} valueText={settlementState === 'ready' ? formatYen(settlement?.amount ?? 0) : '—'} unit="" detail={settlementState === 'ready' ? `認めた ${formatNumber(settlement?.conversionCount ?? 0)} 件分` : settlementState === 'loading' ? '読み込んでいます' : '読み込めませんでした'} />
+        {/* 引き出しの幅（3つ並び）では「支払いを確定していない報酬」が切れるので短く言う（tnTn9）。 */}
+        <KpiCard icon={null} title="支払い前の報酬" value={null} valueText={settlementState === 'ready' ? formatYen(settlement?.amount ?? 0) : '—'} unit="" detail={settlementState === 'ready' ? `認めた ${formatNumber(settlement?.conversionCount ?? 0)} 件分` : settlementState === 'loading' ? '読み込んでいます' : '読み込めませんでした'} />
       </KpiBand>
 
       <section className={styles.section} aria-label="発行ずみの紹介リンク">
@@ -289,7 +290,7 @@ export default function AffiliateDrawer({
                     <span className={styles.listName}>{link.offer_name ?? link.label ?? link.ref_code}{link.is_active ? '' : '（止めている）'}</span>
                     <span className={styles.listSub} title={url}>{`${shown}・${count}`}</span>
                   </span>
-                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} icon={<Copy size={16} aria-hidden />} aria-label="紹介リンクをコピー"  />
+                  <CopyTextButton variant="secondary" label="コピーする" value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} icon={<Copy size={16} aria-hidden />} aria-label="紹介リンクをコピー" />
                 </div>
               )
             })}
@@ -338,7 +339,7 @@ export default function AffiliateDrawer({
           付けた：最後に開いたリンク・数える期間は案件ごとの決まり。リンクを開いた記録が期間内に無い成果は、誰にも付けません。
         </p>
       </section>
-    </>
+    </div>
   )
 
   const breakdown = !report ? (

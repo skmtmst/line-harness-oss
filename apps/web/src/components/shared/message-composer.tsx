@@ -7,7 +7,7 @@ import Button from './button'
 import Card from './card'
 import HelpTip from './help-tip'
 import IconButton from './icon-button'
-import InsertTextField, { type InsertTextFieldHandle, type InsertTextFieldProps } from './insert-text-field'
+import InsertTextField, { InsertText, type InsertTextFieldHandle, type InsertTextFieldProps } from './insert-text-field'
 import { MessageBody } from './message-insert-row'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { MAX_BUBBLES, MAX_TEXT_LENGTH, messageLengthLabel } from '@/components/broadcasts/message-limits'
@@ -91,7 +91,7 @@ export default function MessageComposer(props: MessageComposerProps) {
       const KindIcon = KIND_ICONS[bubble.type] ?? MessageSquare
       return <Card key={bubble.id} className={styles.bubble} padding="rows" overflow="hidden" aria-label={`${index + 1}通目の吹き出し`}>
         <div className={styles.header}>
-          <span className={styles.number}>{index + 1}</span><span className={styles.kind}><KindIcon size={16} aria-hidden />{composerLabel(bubble.type)}</span><span className={styles.summary} title={composerSummary(bubble)}>{composerSummary(bubble)}</span><ErrorCountBadge count={props.bubbleErrors?.[index] ? 1 : 0} label={`${index + 1}通目`} />
+          <span className={styles.number}>{index + 1}</span><span className={styles.kind}><KindIcon size={16} aria-hidden />{composerLabel(bubble.type)}</span><span className={styles.summary} title={composerSummary(bubble)}>{bubble.type === 'text' && String(bubble.content.text ?? '').trim() ? <InsertText value={composerSummary(bubble)} /> : composerSummary(bubble)}</span><ErrorCountBadge count={props.bubbleErrors?.[index] ? 1 : 0} label={`${index + 1}通目`} />
           <div className={styles.controls}><IconButton size="row" aria-label={`${index + 1}通目を上へ移動`} disabled={busy || index === 0} title={busyReason ?? (index === 0 ? '最初のメッセージです。' : undefined)} onClick={() => onMove(index, -1)}><ArrowUp size={14} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を下へ移動`} disabled={busy || index === bubbles.length - 1} title={busyReason ?? (index === bubbles.length - 1 ? '最後のメッセージです。' : undefined)} onClick={() => onMove(index, 1)}><ArrowDown size={14} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を削除する`} disabled={busy || bubbles.length === 1} title={busyReason ?? (bubbles.length === 1 ? 'メッセージは1通以上必要です。' : undefined)} onClick={() => onDelete(index)}><Trash2 size={14} aria-hidden /></IconButton></div>
         </div>
         <div className={styles.tabs} role="tablist" aria-label={`${index + 1}通目のメッセージ形式`} onKeyDown={(event) => {

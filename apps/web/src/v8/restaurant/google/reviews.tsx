@@ -183,7 +183,8 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         </div>
       ) : null}
       {list && list.total > 0 ? (
-        <DataTable density="reviews" columnSizing="controls" data-design="google-reviews"><thead>
+        /* 絵 j0Wcg：口コミの表は角丸の枠のカードに入る。 */
+        <Card overflow="hidden"><DataTable density="reviews" columnSizing="controls" data-design="google-reviews"><thead>
           <TableHeadRow data-table-layout="columns">
             <Th className={`${styles.colReviewer}`}>投稿者・評価</Th>
             <Th grow>口コミ</Th>
@@ -211,7 +212,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
               </Tr>
             )
           })}
-        </tbody></DataTable>
+        </tbody></DataTable></Card>
       ) : null}
       <Notice tone="info" icon={null}>返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</Notice>
       {list && pageCount > 1 ? (
