@@ -21,6 +21,7 @@ import PageSizeSelect from '@/components/shared/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
+import { RowMenu } from '@/components/shared/row-actions'
 import {
   ApiError,
   downloadApiFile,
@@ -189,7 +190,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
     body = <ListState kind="empty" title={filter || query.trim() !== '' ? 'この条件に当てはまる人はいません' : 'まだ参加者はいません'} />
   } else {
     body = (
-      <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--tpl-wb-col-gap)', padding: '0 var(--tpl-list-inset)' }} aria-label="参加者一覧">
+      <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--tpl-wb-col-gap)', padding: '0 var(--tpl-list-inset)' }} aria-label="参加者一覧">
         <thead>
           <TableHeadRow data-table-layout="columns">
             <Th grow>参加者</Th>
@@ -219,7 +220,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
                   <StatusBadge tone={badge.done ? 'success' : 'neutral'}>{badge.label}</StatusBadge>
                 </Td>
                 <ActionCell className={styles.colDetail}>
-                  <Button href={`/chats?friend=${encodeURIComponent(participant.friendId)}`}>チャットを見る →</Button>
+                  <RowMenu label={`${name}の操作`} items={[{ id: 'open-chat', label: 'チャットを見る', href: `/chats?friend=${encodeURIComponent(participant.friendId)}` }]} />
                 </ActionCell>
               </Tr>
             )
@@ -236,7 +237,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   return (
     <PageFrame kind="list" boardId="uNsEy">
       <DetailHead {...chrome} current="participants" actions={csvButton} />
-      <ListPageBody listHelpPlacement="end" listHelp={<> 名前から友だちの詳細、「チャットを見る」からトークを開きます。
+      <ListPageBody listHelpPlacement="end" listHelp={<> 名前から友だちの詳細、行の右端の「…」の「チャットを見る」からトークを開きます。
             {rule ? ` 視聴完了＝動画の9割（${fmtSec(rule.completionThresholdSeconds)}）以上を見た人。` : ''}
             {measurement?.state === 'unavailable' ? ` ${measurement.reason}。個人の分類は「計測外」になります。` : ''} </>}
         stats={<>
