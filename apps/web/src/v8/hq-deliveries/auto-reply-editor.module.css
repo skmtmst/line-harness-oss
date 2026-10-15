@@ -2,14 +2,14 @@
 /* 統括の自動応答のひな形を作る（T5ljMA）。欄の並びと細かい決まりの行だけ。部品の見た目は共通部品が持つ。 */
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--polish-space-card); }
 .talk { display: flex; flex-direction: column; gap: var(--space-12); }
-.note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--text-lh); }
-.choice { display: inline-flex; align-items: center; gap: var(--space-4, 4px); white-space: nowrap; }
+.note { margin: var(--polish-space-none); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--text-lh); }
+.choice { display: inline-flex; align-items: center; gap: var(--tpl-hq-auto-reply-gap-1); white-space: nowrap; }
 .rules { display: flex; flex-direction: column; gap: var(--space-12); }
 .rule { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); font-size: var(--text-caption); color: var(--color-ink); }
-.rule > span:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rule > span:first-child { display: flex; flex-direction: column; gap: var(--tpl-hq-auto-reply-gap-2); min-width: 0; }
 .rule small { color: var(--color-ink-secondary); font-size: var(--text-micro); }
 .ruleEnd { display: inline-flex; align-items: center; gap: var(--space-8); flex-shrink: 0; }
-.confirm { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-8) var(--space-16); margin: 0; font-size: var(--text-caption); }
+.confirm { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-8) var(--space-16); margin: var(--polish-space-none); font-size: var(--text-caption); }
 .confirm dt { color: var(--color-ink-secondary); }
-.confirm dd { margin: 0; color: var(--color-ink); }
+.confirm dd { margin: var(--polish-space-none); color: var(--color-ink); }
 }

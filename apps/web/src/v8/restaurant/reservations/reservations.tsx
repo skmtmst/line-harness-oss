@@ -7,52 +7,33 @@
  * 今日は時間×卓、今週・今月・一覧は予約タイムラインの表。電話の予約は作る型の画面に切り替わる。
  * 口・絞り込み・送る形は今の画面（app/restaurant-test/v8/reservations.tsx）と同じ。動きは BEHAVIOR.md。
  */
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Lock, Phone } from 'lucide-react'
-import {RowActions} from '@/components/shared/row-actions'
-import SeatWaitlistDialog from './waitlist'
-import SegmentedControl from '@/components/shared/segmented'
-import {notifyToast} from '@/components/shared/toast'
-import Notice from '@/components/shared/notice'
-import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
-import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListState from '@/components/shared/list-state'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import Notice from '@/components/shared/notice'
+import { RowActions } from '@/components/shared/row-actions'
 import TextLink from '@/components/shared/text-link'
-import { restaurantTestApi, type ReservationQuery, type RestaurantClosure, type RestaurantReservation } from '@/lib/restaurant-test-api'
-import { KIND_LABEL, dayTitle, scopeText } from '../closures/format'
-import RestaurantShell, { type RestaurantV8Context } from '../booking-kit/shell'
-import { CancelReservationDialog, EditReservationDialog, InboundTrialDialog, type ReservationPatch } from './dialogs'
-import ListView, { PAGE_SIZE } from './list'
-import PhoneReservation from './phone'
-import TodayView, { type PhonePreset } from './today'
+import { notifyToast } from '@/components/shared/toast'
+import { useAccount } from '@/contexts/account-context'
+import { restaurantTestApi,type ReservationQuery,type RestaurantClosure,type RestaurantReservation } from '@/lib/restaurant-test-api'
+import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { Lock,Phone } from 'lucide-react'
+import { useCallback,useEffect,useMemo,useState,type ReactNode } from 'react'
 import ReservationDetailDialog from '../../restaurant-reservations/detail-dialog'
-import { type LedgerView, dayRange, monthRange, sameDay, toYmd, weekRange } from './format'
+import RestaurantShell,{ type RestaurantV8Context } from '../booking-kit/shell'
+import { KIND_LABEL,dayTitle,scopeText } from '../closures/format'
+import { CancelReservationDialog,EditReservationDialog,InboundTrialDialog,type ReservationPatch } from './dialogs'
+import { dayRange,monthRange,sameDay,toYmd,weekRange,type LedgerView } from './format'
+import ListView,{ PAGE_SIZE } from './list'
+import PhoneReservation from './phone'
 import styles from './reservations.module.css'
+import TodayView,{ type PhonePreset } from './today'
+import SeatWaitlistDialog from './waitlist'
+
 
 /** 予約を変えられる役割か（口は owner・admin・staff。閲覧のみは 403）。読めるまでは出す（最後の守りは口の 403）。 */
 function canWriteRole(role: string | null | undefined): boolean {
   return role === 'owner' || role === 'admin' || role === 'staff'
-}
-
-const VIEWS: Array<{ key: LedgerView; label: string }> = [
-  { key: 'today', label: '今日' },
-  { key: 'week', label: '今週' },
-  { key: 'month', label: '今月' },
-  { key: 'list', label: '一覧' },
-]
-
-/** 頭の見方の切り替え（今日 8・今週 31・今月 112・一覧）。 */
-function ViewSwitch({ view, counts, onChange }: {
-  view: LedgerView
-  counts: Record<'today' | 'week' | 'month', number> | null
-  onChange: (view: LedgerView) => void
-}) {
-  return (
-    <SegmentedControl aria-label="見方の切り替え" size="panel" value={view} onChange={onChange}
-      options={VIEWS.map((item) => ({ value: item.key, label: `${item.label}${item.key !== 'list' && counts ? ` ${counts[item.key]}` : ''}` }))} />
-  )
 }
 
 /* 頭の右：見方の切り替え（数はその月を取り直して今日・今週・今月で数える。遅い応答は捨てる）と主ボタン。 */

@@ -1,39 +1,41 @@
 'use client'
-import SegmentedControl from '@/components/shared/segmented'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import dynamic from 'next/dynamic'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { Calendar, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
-import type { DashboardCardId } from '@line-crm/shared'
-import { DashboardColumns, DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
+import { dashboardPeriodLabel } from '@/components/dashboard/freshness'
+import { partialFailureLabels,partialFailuresWithoutCard } from '@/components/dashboard/partial-failure-labels'
+import ShipmentPanel from '@/components/dashboard/shipment-panel'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
+import { emptyValue } from '@/components/shared/empty-value'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import SectionHeader from './head'
-import PeriodPicker from '@/components/shared/period-picker'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { STATE_TEXT } from '@/components/shared/not-connected'
-import ShipmentPanel from '@/components/dashboard/shipment-panel'
-import { dashboardPeriodLabel, formatDashboardAsOf } from '@/components/dashboard/freshness'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { useAccount } from '@/contexts/account-context'
 import Notice from '@/components/shared/notice'
-import { partialFailureLabels, partialFailuresWithoutCard } from '@/components/dashboard/partial-failure-labels'
-import { formatWaitRough } from '@/lib/format-duration'
-import { formatNumber, formatTime } from '@/lib/format'
-import { PERIODS, jstDay, useDashboard, type PeriodKey } from './use-dashboard'
-import { FirstStepsCard, useFirstSteps } from './first-steps'
-import { useSearchParams } from 'next/navigation'
-import { useStyleSetup } from '@/v8/onboarding/use-style-setup'
-import { SetupCard, SetupWarningBands, setupSummary } from '@/v8/onboarding/setup-card'
-import { FriendTrend, trendRangeNote } from './trend'
-import { InboxSection } from './inbox'
-import { FriendAddLink } from './friend-add'
-import { ConnectionStatus, DeliveryFailures, FriendStatus, Loading, Metric, MonthlyDelivery, OperationalAlerts, RecentActivity, RecentResults, SendQuota, SupportStatus, Tag, Unavailable, Upcoming } from './sections'
+import PeriodPicker from '@/components/shared/period-picker'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RetryLabel } from '@/components/shared/retry-label'
+import { DashboardColumns,DashboardPage,DashboardRow } from '@/components/templates/dashboard-page'
+import { useAccount } from '@/contexts/account-context'
+import { formatNumber,formatTime } from '@/lib/format'
+import { formatWaitRough } from '@/lib/format-duration'
+import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { SetupCard,SetupWarningBands,setupSummary } from '@/v8/onboarding/setup-card'
+import { useStyleSetup } from '@/v8/onboarding/use-style-setup'
+import type { DashboardCardId } from '@line-crm/shared'
+import { Calendar,Image as ImageIcon,Inbox,Package,Plus,SlidersHorizontal } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { useSearchParams } from 'next/navigation'
+import { Fragment,useEffect,useState,type ReactNode } from 'react'
+import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
+import { FirstStepsCard,useFirstSteps } from './first-steps'
+import { FriendAddLink } from './friend-add'
+import SectionHeader from './head'
+import { InboxSection } from './inbox'
+import { ConnectionStatus,DeliveryFailures,FriendStatus,Loading,Metric,MonthlyDelivery,OperationalAlerts,RecentActivity,RecentResults,SendQuota,SupportStatus,Tag,Unavailable,Upcoming } from './sections'
+import { FriendTrend,trendRangeNote } from './trend'
+import { PERIODS,jstDay,useDashboard } from './use-dashboard'
+export { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
+
 
 /* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
 /* はじめの質問の窓（xxpM9 ほか）も開くまで読まない。 */
@@ -42,30 +44,6 @@ const StyleSetupWizard = dynamic(() => import('@/v8/onboarding/wizard').then((mo
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,
 })
-
-/**
- * ダッシュボード編集（自分の並び）を出してよい役割か。隠すのは閲覧のみ（読み取り専用。
- * `/api/staff/me` の role が 'viewer'＝サーバーが保存を断る人）だけ。書き込みできる
- * スタッフは押せるので出す（決まりは「押せないボタンを隠す」）。読めるまで（null）は出す。
- */
-export function canEditDashboardLayout(role: string | null): boolean {
-  return role !== 'viewer'
-}
-
-/** 時間帯のあいさつ（日本時間）。 */
-export function greeting(name: string | null, now = new Date()): string {
-  const hour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Asia/Tokyo' }).format(now))
-  const word = hour >= 4 && hour < 10 ? 'おはようございます' : hour >= 10 && hour < 18 ? 'こんにちは' : 'こんばんは'
-  const first = name?.trim().split(/\s+/)[0]
-  return first ? `${word}、${first} さん` : word
-}
-
-/** 見出しの下の1行：「更新 1月13日（火）9:30 ・ 正常に動いています」。 */
-export function headline(asOf: string | null | undefined, risk: 'normal' | 'warning' | 'danger' | null): string {
-  const time = formatDashboardAsOf(asOf)?.replace(/） /, '）')
-  const health = risk === 'normal' ? '正常に動いています' : risk === 'warning' ? '確かめることがあります' : risk === 'danger' ? '止まっているところがあります' : '動きを確かめています'
-  return time ? `更新 ${time} ・ ${health}` : health
-}
 
 /* 右の列の組み合わせ（WQmep）：どの本文の段の右に、どの右の列のカードを置くか。 */
 const ASIDE_OF: Partial<Record<DashboardCardId, DashboardCardId[]>> = {

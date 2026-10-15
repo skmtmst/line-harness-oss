@@ -10,7 +10,7 @@
 }
 
 .minor {
-  margin: 0;
+  margin: var(--polish-space-none);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-18);
@@ -119,7 +119,7 @@
 
 .connectTitle {
   align-self: stretch;
-  margin: 0;
+  margin: var(--polish-space-none);
   color: var(--color-ink);
   font-size: var(--tpl-bm-15);
   font-weight: 700;
@@ -131,8 +131,8 @@
   align-self: stretch;
   flex-direction: column;
   gap: var(--tpl-bm-12);
-  margin: 0;
-  padding: 0;
+  margin: var(--polish-space-none);
+  padding: var(--polish-space-none);
   list-style: none;
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-13);
@@ -169,8 +169,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-bm-24);
-  margin: 0;
-  padding: 0;
+  margin: var(--polish-space-none);
+  padding: var(--polish-space-none);
   list-style: none;
 }
 
@@ -197,7 +197,7 @@
 
 .sideValue {
   flex: none;
-  margin: 0;
+  margin: var(--polish-space-none);
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 700;
@@ -225,7 +225,7 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-bm-6);
-  margin: 0;
+  margin: var(--polish-space-none);
   color: var(--color-ink);
   font-size: var(--tpl-bm-15);
   font-weight: 700;
@@ -261,7 +261,7 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-bm-6);
-  margin: 0;
+  margin: var(--polish-space-none);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-18);
@@ -296,7 +296,7 @@
 }
 
 .amountNote {
-  margin-left: auto;
+  margin-left: var(--polish-space-auto);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
   font-weight: 400;
@@ -316,14 +316,14 @@
 }
 
 .sideCardTitle {
-  margin: 0;
+  margin: var(--polish-space-none);
   color: var(--color-ink);
   font-size: var(--tpl-bm-12);
   font-weight: 700;
 }
 
 .sideCardText {
-  margin: 0;
+  margin: var(--polish-space-none);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-18);
@@ -343,7 +343,7 @@
 }
 
 .readValue {
-  margin: 0;
+  margin: var(--polish-space-none);
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 700;

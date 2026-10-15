@@ -8,8 +8,8 @@
 /* 送られているとき、端で途中まで出ている項目は丸ごと隠す（帯の線で半分に切れて見せない）。 */
 .nav[data-clipped] {
   mask-image: linear-gradient(to bottom,
-    transparent var(--nav-cut-top, 0px), #000 var(--nav-cut-top, 0px),
-    #000 calc(100% - var(--nav-cut-bottom, 0px)), transparent calc(100% - var(--nav-cut-bottom, 0px)));
+    transparent var(--nav-cut-top, 0px), var(--tpl-sidebar-mask-color) var(--nav-cut-top, 0px),
+    var(--tpl-sidebar-mask-color) calc(100% - var(--nav-cut-bottom, 0px)), transparent calc(100% - var(--nav-cut-bottom, 0px)));
 }
 
 .section {

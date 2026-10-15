@@ -1,26 +1,23 @@
 'use client'
-import { File as FileIcon, FileAudio, FileUp, Loader } from 'lucide-react'
+import { FileAudio,File as FileIcon,FileUp,Loader } from 'lucide-react'
 import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ClipboardEvent,
-  type DragEvent,
-  type KeyboardEvent,
-  type MouseEvent,
-  type ReactNode,
-  type RefObject,
+useCallback,
+useEffect,
+useRef,
+useState,
+type ClipboardEvent,
+type DragEvent,
+type KeyboardEvent,
+type MouseEvent,
+type ReactNode,
+type RefObject,
 } from 'react'
+import { joinDescribedBy,useFieldContext } from './field-context'
+import HelpTip from './help-tip'
 import styles from './media-slot.module.css'
 import { TextField } from './text-field'
-import HelpTip from './help-tip'
-import { joinDescribedBy, useFieldContext } from './field-context'
+export { MediaLimitNote } from './media-slot-limit'
 
-/** 公開前にも同じ上限を示す。確認欄が独自の上限文を持たない。 */
-export function MediaLimitNote({ kind = '画像', maxMb }: { kind?: string; maxMb: number }) {
-  return <p>{kind}は{maxMb}MBまで。超えると登録できません</p>
-}
 
 /**
  * 画像・動画・ファイルを入れる所。Pencil ★V8 の採用案 Z7vd2（B-128「画像を追加する所」）。

@@ -325,10 +325,10 @@
 | V8 | YChR6 | リマインダ 作る② 対象者と止める条件 V8 | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
 | V8-B | n4DT7 | 承認ワークフロー（閲覧のみ）V8 | /restaurant-test/approvals | `app/restaurant-test/approvals/page.tsx` | `v8/restaurant/approvals/approvals.tsx` |
 | V8-B | t8WgD8 | 承認ワークフロー V8 | /restaurant-test/approvals | `app/restaurant-test/approvals/page.tsx` | `v8/restaurant/approvals/approvals.tsx` |
-| V8-B | ao15G | 飲食店向け 店舗を追加 ①利用規約への同意 V8 | /restaurant-test/dashboard | `app/restaurant-test/dashboard/page.tsx` | `v8/restaurant/dashboard/dashboard.tsx` |
-| V8-B | CHz31 | 店舗ダッシュボード V8 | /restaurant-test/dashboard | `app/restaurant-test/dashboard/page.tsx` | `v8/restaurant/dashboard/dashboard.tsx` |
-| V8-B | faGn4 | 飲食店向け 店舗を追加 ②店舗の基本情報 V8 | /restaurant-test/dashboard | `app/restaurant-test/dashboard/page.tsx` | `v8/restaurant/dashboard/dashboard.tsx` |
-| V8-B | VdKOK | 飲食店向け 利用規約 V8 | /restaurant-test/dashboard | `app/restaurant-test/dashboard/page.tsx` | `v8/restaurant/dashboard/dashboard.tsx` |
+| V8-B | ao15G | 飲食店向け 店舗を追加 ①利用規約への同意 V8 | /restaurant-test/dashboard | `app/restaurant-test/dashboard/page.tsx` | `v8/restaurant/dashboard/entry.tsx` |
+| V8-B | CHz31 | 店舗ダッシュボード V8 | /restaurant-test/dashboard | `app/restaurant-test/dashboard/page.tsx` | `v8/restaurant/dashboard/entry.tsx` |
+| V8-B | faGn4 | 飲食店向け 店舗を追加 ②店舗の基本情報 V8 | /restaurant-test/dashboard | `app/restaurant-test/dashboard/page.tsx` | `v8/restaurant/dashboard/entry.tsx` |
+| V8-B | VdKOK | 飲食店向け 利用規約 V8 | /restaurant-test/dashboard | `app/restaurant-test/dashboard/page.tsx` | `v8/restaurant/dashboard/entry.tsx` |
 | V8-B | j0Wcg | Googleビジネス V8 | /restaurant-test/google | `app/restaurant-test/google/page.tsx` | `v8/restaurant/google/google.tsx` |
 | V8-B | SrmVs | Googleビジネス パフォーマンス V8 | /restaurant-test/google?tab=performance | `app/restaurant-test/google/page.tsx` | `v8/restaurant/google/google.tsx` |
 | V8-B | Cfed0 | Googleビジネス 投稿 V8 | /restaurant-test/google?tab=posts | `app/restaurant-test/google/page.tsx` | `v8/restaurant/google/google.tsx` |

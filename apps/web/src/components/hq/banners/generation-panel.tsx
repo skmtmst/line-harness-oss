@@ -1,40 +1,42 @@
 'use client'
 
-import { ChevronDown, FileUp, Images, Layers, Plus, Scissors, Sparkles, Upload, X } from 'lucide-react'
-import { useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
 import FileDropzone from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
-import LimitState from './limit-state'
-import styles from './generation-panel.module.css'
 import Radio from '@/components/shared/radio'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import RadioCard,{ RadioCardGroup } from '@/components/shared/radio-card'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import { TextArea, TextField } from '@/components/shared/text-field'
+import { TextArea,TextField } from '@/components/shared/text-field'
 import {
-  BANNER_MAX_REFERENCE_IMAGES,
-  BANNER_REFERENCE_MODES,
-  BANNER_REFERENCE_MODE_DESCRIPTION,
-  BANNER_REFERENCE_MODE_LABEL,
-  COLOR_ROLES,
-  CUSTOM_PROMPT_MAX,
-  TEXT_LINE_LENGTH_MAX,
-  TEXT_LINE_MAX,
-  alignEmphasis,
-  groupPresets,
-  presetCardLabel,
-  presetSizeLabel,
-  tileCaption,
-  type BannerColorRoleKey,
-  type BannerGenerationInput,
-  type BannerImage,
-  type BannerPreset,
-  type BannerReferenceMode,
-  type BannerUsage,
+BANNER_MAX_REFERENCE_IMAGES,
+BANNER_REFERENCE_MODES,
+BANNER_REFERENCE_MODE_DESCRIPTION,
+BANNER_REFERENCE_MODE_LABEL,
+COLOR_ROLES,
+CUSTOM_PROMPT_MAX,
+TEXT_LINE_LENGTH_MAX,
+TEXT_LINE_MAX,
+alignEmphasis,
+groupPresets,
+presetCardLabel,
+presetSizeLabel,
+tileCaption,
+type BannerColorRoleKey,
+type BannerGenerationInput,
+type BannerImage,
+type BannerPreset,
+type BannerReferenceMode,
+type BannerUsage,
 } from '@/lib/hq-banners'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { ChevronDown,FileUp,Images,Layers,Plus,Scissors,Sparkles,Upload,X } from 'lucide-react'
+import { useId,useRef,useState,type ReactNode } from 'react'
+import styles from './generation-panel.module.css'
+import { UsageBars } from './generation-usage'
+import LimitState from './limit-state'
+
 
 /**
  * 使い方の説明に添える印。★BG-B `R6MBHf` の子の icon そのまま（lucide・14px・`$ink-secondary`）。
@@ -434,37 +436,6 @@ export default function GenerationPanel({
           */}
       </div>
     </aside>
-  )
-}
-
-/**
- * パネル内の利用量の棒（板 iMnph）。空きがあるときだけ出す。上限のときは下の帯が出る。
- * `heading` を渡すと上に「利用量」を置く（★BG-B `qIp42` の `ta8eS`。棒と同時に出る）。
- * 文字は `ta8eS` 3文字 w=37・h=17 ＝ 12px・太さ600 で、同じパネルの「色の決め方」と同じ見た目。
- */
-function UsageBars({ usage, heading, v8Layout }: { usage: BannerUsage | null; heading?: boolean; v8Layout?: boolean }) {
-  if (!usage) return null
-  if (usage.blocked || usage.paused || usage.month.remaining <= 0 || usage.today.remaining <= 0) return null
-  const rows = [
-    { label: '今月', bucket: usage.month },
-    { label: '今日', bucket: usage.today },
-  ]
-  return (
-    <div data-design-node="iMnph-usage" className={v8Layout ? 'flex flex-col gap-2 rounded-control bg-canvas-sunken p-3' : 'flex flex-col gap-1.5'}>
-      {heading ? <p className={v8Layout ? styles.v8Caption : "text-caption font-semibold text-ink"}>利用量</p> : null}
-      {rows.map(({ label, bucket }) => {
-        const pct = bucket.limit > 0 ? Math.max(0, Math.min(100, (bucket.remaining / bucket.limit) * 100)) : 0
-        return (
-          <div key={label} className={v8Layout ? 'flex flex-col gap-1' : 'flex items-center gap-2'}>
-            {v8Layout ? <div className={styles.v8UsageLabels}><span>{label}</span><span>{`残り ${bucket.remaining} / ${bucket.limit} 枚`}</span></div> : <span className="w-8 shrink-0 text-micro text-ink-secondary">{label}</span>}
-            <span className={v8Layout ? 'h-1.5 w-full shrink-0 overflow-hidden rounded-pill bg-hairline' : 'h-1.5 min-w-0 flex-1 overflow-hidden rounded-pill bg-hairline'}>
-              <span className="block h-full rounded-pill bg-success" style={{ width: `${pct}%` }} />
-            </span>
-            {v8Layout ? null : <span className="shrink-0 text-micro text-ink-secondary">残り{bucket.remaining}/{bucket.limit}枚</span>}
-          </div>
-        )
-      })}
-    </div>
   )
 }
 

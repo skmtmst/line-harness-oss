@@ -142,11 +142,11 @@
 .colName { width: calc(var(--tpl-fr-avatar) + var(--tpl-fr-avatar-gap) + var(--tpl-fr-name-content-min)); }
 .colSupport { width: var(--tpl-fr-col-support); }
 /* 1152：名前は顔の丸なし、対応・シナリオは中身の幅まで。残りをタグ・最新の列へ回す。 */
-.colNameNarrow { width: 160px; }
-.colSupportNarrow { width: 132px; }
-.colScenarioNarrow { width: 88px; }
-.colLatestNarrow { width: 160px; }
-.colFieldNarrow { width: 112px; }
+.colNameNarrow { width: var(--tpl-friend-list-width-1); }
+.colSupportNarrow { width: var(--tpl-friend-list-width-2); }
+.colScenarioNarrow { width: var(--tpl-friend-list-width-3); }
+.colLatestNarrow { width: var(--tpl-friend-list-width-4); }
+.colFieldNarrow { width: var(--tpl-friend-list-width-5); }
 .colScenario { width: var(--tpl-fr-col-scenario); }
 .colLatest { width: var(--tpl-fr-col-latest); }
 .colTags { width: var(--tpl-fr-col-tags); }

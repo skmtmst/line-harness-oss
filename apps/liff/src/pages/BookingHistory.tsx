@@ -1,70 +1,24 @@
-import { useEffect, useState } from 'react';
 import liff from '@line/liff';
-import { loadPaymentViews, type PaymentView } from '../lib/booking-payment-view.js';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { api, type BookingHistoryItem } from '../lib/api.js';
-import { addDays, slotStartsAtIso, jstToday, formatMd, formatWeekday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
-import ConfirmDialog from '../components/ui/ConfirmDialog.js';
-import { logFailure } from '../lib/user-message.js';
+import { useEffect,useState } from 'react';
+import { useLocation,useNavigate } from 'react-router-dom';
+import HistoryCard from '../components/HistoryCard.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
-import HistoryCard from '../components/HistoryCard.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import StatusView from '../components/ui/StatusView.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
+import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import Icon from '../components/ui/Icon.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
+import StatusView from '../components/ui/StatusView.js';
+import { api,type BookingHistoryItem } from '../lib/api.js';
+import { loadPaymentViews,type PaymentView } from '../lib/booking-payment-view.js';
+import { addDays,formatMd,formatWeekday,jstToday,slotStartsAtIso,utcToJstHm,utcToJstMd } from '../lib/datetime.js';
+import { logFailure } from '../lib/user-message.js';
+import { CHANGE_RANGE_DAYS,CHANGE_SLOT_LIMIT,cancelFailureMessage,changeFailureMessage,errorCode,type ChangeSlot } from './BookingHistory-messages';
 
-/** 日時を変える窓で、今日から何日先までの空きを出すか（空きの口は28日までまとめて読める）。 */
-const CHANGE_RANGE_DAYS = 14;
-/** 窓に並べる空きの数の上限（多すぎると選べない）。 */
-const CHANGE_SLOT_LIMIT = 24;
 
-type ChangeSlot = { date: string; start: string; startUtc?: string };
-
-/** 取消の失敗を、お客さまが次に何をすればよいかの1文にする。 */
-function cancelFailureMessage(code: string | undefined): string {
-  switch (code) {
-    case 'self_deadline_passed': return 'キャンセルの期限を過ぎています。トークでご連絡ください。';
-    case 'version_conflict':
-    case 'not_editable':
-    case 'booking_not_found': return '予約の内容が変わっていました。一覧を読み直しました。';
-    case 'send_in_flight_retry': return 'お知らせを送っている途中でした。少し待ってから、もう一度お試しください。';
-    default: return 'キャンセルできませんでした。電波のよいところで、もう一度お試しください。';
-  }
-}
-
-/** 日時変更の失敗の1文。 */
-function changeFailureMessage(code: string | undefined): string {
-  switch (code) {
-    case 'slot_not_available':
-    case 'slot_conflict': return '選んだ日時は埋まりました。別の日時を選んでください。';
-    case 'self_deadline_passed': return '変更の期限を過ぎています。トークでご連絡ください。';
-    case 'past_cutoff':
-    case 'past_datetime':
-    case 'invalid_starts_at': return '選んだ日時は受付を終えています。別の日時を選んでください。';
-    case 'version_conflict':
-    case 'not_editable':
-    case 'booking_not_found': return '予約の内容が変わっていました。一覧を読み直してから、もう一度お試しください。';
-    case 'send_in_flight_retry': return 'お知らせを送っている途中でした。少し待ってから、もう一度お試しください。';
-    default: return '日時を変えられませんでした。電波のよいところで、もう一度お試しください。';
-  }
-}
-
-function errorCode(err: unknown): string | undefined {
-  const body = (err as { body?: { error?: unknown } } | null)?.body;
-  return typeof body?.error === 'string' ? body.error : undefined;
-}
-
-/**
- * 予約の履歴 (★V8・nWby5。前の板 YvTJ3)。「これから／これまで」の切り替え。
- * カードに支払いの状態（未払い・支払い済み・返金済み・期限切れ・お店で払う）と領収書。
- * これからの予約のカードに「日時を変える／キャンセル」(F-6 本人の変更・取消)。
- * 送るには予約の版 (lock_version) が要るので、履歴の口が返した予約にだけ出す
- * (日時を変えるはメニューと担当も要る)。返さない予約には出さず、下の文で「トークでご連絡ください」と案内する。
- * 進む操作は下の帯の「新しく予約する」。
- */
+/** 予約履歴と本人の変更・取消。版が返る予約に操作を出し、支払いの状態と領収書も表示する。 */
 export default function BookingHistory() {
   const [data, setData] = useState<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] } | null>(
     null,

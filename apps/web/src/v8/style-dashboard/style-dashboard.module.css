@@ -28,7 +28,7 @@
 /* 右の列のカード */
 .sideCard { min-inline-size: 0; }
 .sideHead { display: flex; align-items: center; gap: var(--polish-space-row); min-inline-size: 0; }
-.sideTitle { margin: 0; color: var(--color-ink); font-size: var(--text-callout); font-weight: 700; line-height: var(--text-body--line-height); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sideTitle { margin: var(--tpl-sd-text-margin); color: var(--color-ink); font-size: var(--text-callout); font-weight: 700; line-height: var(--text-body--line-height); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sideLink { display: inline-flex; align-items: center; gap: var(--polish-space-row); color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 500; white-space: nowrap; text-decoration: none; }
 .sideRow { display: flex; align-items: baseline; gap: var(--polish-space-row); min-inline-size: 0; }
 .sideLabel { color: var(--color-ink-secondary); font-size: var(--text-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-inline-size: 0; }
@@ -36,7 +36,7 @@
 .sideValue[data-tone='danger'] { color: var(--color-danger); }
 .sideMore { color: var(--color-link); font-size: var(--text-body); font-weight: 600; text-decoration: none; }
 .sideAction { display: flex; }
-.cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--text-caption--line-height); }
+.cardNote { margin: var(--tpl-sd-text-margin); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--text-caption--line-height); }
 
 /* 一覧（表） */
 .listTools { display: flex; align-items: center; gap: var(--polish-space-row); }
@@ -61,7 +61,7 @@
 .resultChoices { display: flex; gap: var(--polish-space-card); }
 .actionPair { display: inline-flex; gap: var(--polish-space-row); }
 .menuCell { display: flex; flex: 0 0 var(--tpl-sd-col-menu); justify-content: flex-end; inline-size: var(--tpl-sd-col-menu); }
-.listNote { margin: 0; padding-block-start: var(--polish-space-field); color: var(--color-ink-faint); font-size: var(--text-label); }
+.listNote { margin: var(--tpl-sd-text-margin); padding-block-start: var(--polish-space-field); color: var(--color-ink-faint); font-size: var(--text-label); }
 .fill { display: flex; flex-direction: column; gap: var(--polish-space-row); }
 .fillTrack { display: block; inline-size: var(--tpl-sd-fill-w); block-size: var(--tpl-sd-fill-h); border-radius: var(--radius-pill); background: var(--color-track); overflow: hidden; }
 .fillBar { display: block; block-size: 100%; border-radius: var(--radius-pill); background: var(--color-success); }
@@ -141,7 +141,7 @@
 .calendar { display: flex; flex-direction: column; gap: var(--polish-space-field); min-inline-size: 0; }
 .calTools { display: flex; align-items: center; gap: var(--polish-space-row); }
 .calPager { display: flex; align-items: center; gap: var(--polish-space-row); }
-.calTitle { margin: 0; color: var(--color-ink); font-size: var(--text-section); font-weight: 700; white-space: nowrap; }
+.calTitle { margin: var(--tpl-sd-text-margin); color: var(--color-ink); font-size: var(--text-section); font-weight: 700; white-space: nowrap; }
 .calLegend { display: inline-flex; align-items: center; gap: var(--polish-space-row); color: var(--color-ink-secondary); font-size: var(--text-label); white-space: nowrap; }
 .calLegend i { display: inline-block; inline-size: var(--polish-space-field); block-size: var(--polish-space-field); border-radius: var(--radius-mini); background: var(--tpl-sd-booked); }
 .calLegend i[data-k='free'] { background: var(--tpl-sd-free); }
@@ -150,14 +150,14 @@
 .calLegend i[data-k='full'] { background: var(--polish-status-danger-bg); }
 .calLegend i[data-k='now'] { background: var(--color-success); }
 .calLegend i[data-k='prev'] { background: var(--color-ink-disabled); }
-.weekFrame, .monthFrame { border: 1px solid var(--color-hairline); border-radius: var(--radius-card); overflow: hidden; }
+.weekFrame, .monthFrame { border: 1px solid var(--card-edge); box-shadow: var(--card-shadow); border-radius: var(--radius-card); overflow: hidden; }
 .weekHead { border-block-end: 1px solid var(--color-hairline); background: var(--polish-table-head-bg); }
 .weekDay { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; justify-content: center; min-inline-size: 0; color: var(--color-ink-secondary); font-size: var(--text-micro); }
 .weekDay strong { color: var(--color-ink); font-size: var(--text-body); }
 .weekDay[data-today] { background: var(--tpl-sd-week-today); }
 .weekDay[data-today] strong { color: var(--color-accent-deep); }
 .weekEntry, .weekFree { all: unset; box-sizing: border-box; position: absolute; display: flex; flex-direction: column; padding: var(--polish-space-row); border-radius: var(--radius-control); cursor: pointer; overflow: hidden; font-size: var(--text-micro); }
-.weekEntry { border-inline-start: var(--tpl-sd-accent-w) solid var(--color-info); background: var(--tpl-sd-booked); color: var(--color-ink-secondary); box-shadow: inset 0 0 0 1px var(--color-hairline); }
+.weekEntry { border-inline-start: var(--tpl-sd-accent-w) solid var(--color-info); background: var(--tpl-sd-booked); color: var(--color-ink-secondary); box-shadow: var(--tpl-style-inset-line); }
 .weekEntry strong { color: var(--color-ink); font-size: var(--text-micro); }
 .weekFree { flex-direction: row; align-items: flex-start; gap: var(--polish-space-row); background: var(--tpl-sd-free); color: var(--color-accent-deep); font-weight: 600; }
 .weekEntry, .weekFree { inline-size: auto; }
@@ -183,13 +183,13 @@
 .dayTime { color: var(--color-ink); font-size: var(--text-body); }
 .dayName { display: flex; flex-direction: column; min-inline-size: 0; }
 .dayName a { color: var(--color-accent-deep); font-size: var(--text-body); font-weight: 600; text-decoration: none; white-space: nowrap; }
-.dayHint { display: flex; gap: var(--polish-space-row); margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
+.dayHint { display: flex; gap: var(--polish-space-row); margin: var(--tpl-sd-text-margin); color: var(--color-ink-secondary); font-size: var(--text-label); }
 
 /* 教室の名簿 */
 .roster { display: flex; flex-direction: column; gap: var(--polish-space-field); padding: var(--polish-space-section) var(--polish-space-section) var(--polish-space-card); border-radius: var(--radius-card); background: var(--color-canvas); box-shadow: var(--card-shadow), var(--card-edge); }
 .rosterHead { display: flex; align-items: flex-start; gap: var(--polish-space-row); }
 .rosterTitle { display: flex; flex: 1 1 auto; flex-direction: column; min-inline-size: 0; }
-.rosterTitle h3 { margin: 0; color: var(--color-ink); font-size: var(--text-title); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rosterTitle h3 { margin: var(--tpl-sd-text-margin); color: var(--color-ink); font-size: var(--text-title); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rosterMeta, .rosterTools, .rosterFoot { display: flex; align-items: center; gap: var(--polish-space-row); }
 .rosterList { display: flex; flex-direction: column; }
 .rosterRow { display: flex; align-items: center; gap: var(--polish-space-field); min-block-size: var(--tpl-sd-row-h); border-block-end: 1px solid var(--color-hairline); }
@@ -208,7 +208,7 @@
 .metricValue strong { color: var(--color-ink); font-size: var(--text-title); font-weight: 700; }
 .metricValue span { color: var(--color-ink-secondary); font-size: var(--text-label); }
 .chartCard { min-inline-size: 0; }
-.sectionTitle { display: flex; align-items: center; gap: var(--polish-space-row); margin: 0; color: var(--color-ink); font-size: var(--text-callout); font-weight: 700; white-space: nowrap; }
+.sectionTitle { display: flex; align-items: center; gap: var(--polish-space-row); margin: var(--tpl-sd-text-margin); color: var(--color-ink); font-size: var(--text-callout); font-weight: 700; white-space: nowrap; }
 .pairChart { display: grid; grid-template-columns: var(--tpl-sd-time-col) minmax(0, 1fr); grid-template-rows: var(--tpl-sd-chart-h) auto; }
 .pairTicks { display: flex; flex-direction: column; justify-content: space-between; color: var(--color-ink-faint); font-size: var(--text-nano); }
 .pairPlot { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--polish-space-row); border-block-end: 1px solid var(--tpl-sd-line); background-image: linear-gradient(var(--tpl-sd-line) 1px, transparent 1px); background-size: 100% 50%; }
@@ -229,14 +229,14 @@
 .drawerBaseText { display: flex; flex-direction: column; min-inline-size: 0; font-size: var(--text-body); }
 .drawerSection { display: flex; flex-direction: column; gap: var(--polish-space-row); }
 .drawerSectionHead { display: flex; align-items: center; gap: var(--polish-space-row); }
-.drawerSectionHead h3 { margin: 0; font-size: var(--text-callout); font-weight: 700; }
+.drawerSectionHead h3 { margin: var(--tpl-sd-text-margin); font-size: var(--text-callout); font-weight: 700; }
 .drawerRow { display: flex; align-items: center; gap: var(--polish-space-field); min-block-size: var(--polish-table-head); }
 .drawerLabel { color: var(--color-ink); font-size: var(--text-body); font-weight: 500; white-space: nowrap; }
 .drawerFoot { display: flex; justify-content: center; gap: var(--polish-space-field); }
 .dialogBody { display: flex; flex-direction: column; gap: var(--polish-space-card); }
 .dialogInline { display: flex; align-items: center; gap: var(--polish-space-row); }
 .chipRow { display: flex; flex-wrap: wrap; gap: var(--polish-space-row); padding-block-start: var(--polish-space-row); }
-.dialogNote { display: flex; gap: var(--polish-space-row); margin: 0; padding: var(--polish-space-field) var(--polish-space-card); border-radius: var(--radius-control); background: var(--color-info-bg); color: var(--color-ink-secondary); font-size: var(--text-body); }
+.dialogNote { display: flex; gap: var(--polish-space-row); margin: var(--tpl-sd-text-margin); padding: var(--polish-space-field) var(--polish-space-card); border-radius: var(--radius-control); background: var(--color-info-bg); color: var(--color-ink-secondary); font-size: var(--text-body); }
 
 /* 白い板が 1100 未満のときは右の列を畳む（決まり：右の欄は 1100 未満で畳む）。日付の段は折り返す。 */
 .asideToggle { display: none; }

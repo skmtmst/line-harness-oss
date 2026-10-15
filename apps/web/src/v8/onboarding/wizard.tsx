@@ -1,29 +1,32 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Circle, CircleCheck, CircleDot, Hourglass, Info, Play } from 'lucide-react'
-import Link from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
-import Dialog, { DialogActions } from '@/components/shared/dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog,{ DialogActions } from '@/components/shared/dialog'
+import Link from '@/components/shared/list-navigation'
 import Notice from '@/components/shared/notice'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
+import RadioCard,{ RadioCardGroup } from '@/components/shared/radio-card'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
-import { notifySaved } from '@/components/shared/toast'
-import { usePreparingDialog, PREPARING_WORD } from '@/components/shared/preparing-dialog'
-import { describeApiFailure } from '@/components/shared/api-error-message'
-import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
-import { styleApi, type StarterSetItem } from '@/lib/api-styles'
-import Select from '@/components/shared/select'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { type StarterSetItem } from '@/lib/api-styles'
+import type { AccountStyle,SetupAnswer } from '@line-crm/shared'
+import { ArrowRight,Circle,CircleCheck,CircleDot,Hourglass,Info,Play } from 'lucide-react'
 import { SetupIcon } from './icons'
-import { SampleMenuTiles } from './sample-menu'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
-  LOOK_CHOICES, SETTINGS_KEYS, STYLE_CHOICES, answerOf, answersForApi, changedAnswers, isBookingConfirmSample, settingsChanges, choiceLabel, needsActivation, pairStarterItems, questionsFor, recommendedValue, selectedValue, stepNames, styleLabel,
-  type Question, type StarterItemState, type StyleState,
+LOOK_CHOICES,
+STYLE_CHOICES,
+choiceLabel,
+styleLabel,
+type StarterItemState,type StyleState
 } from './model'
+import { SampleMenuTiles } from './sample-menu'
+import { useWizard } from './use-wizard'
+import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
+
+
 
 /*
  * はじめの質問（★V8 修正案の列 VHp7p：xxpM9 スタイル選び・RZW83 見た目・lS1Gh/rJ36f 1問の画面・
@@ -34,7 +37,7 @@ import styles from './wizard.module.css'
 
 export type WizardStep = number | 'summary'
 
-type Props = {
+export type Props = {
   accountId: string
   state: StyleState
   /** 開く手順（0＝スタイル、1＝見た目、2〜＝質問、'summary'＝最後の一覧）。 */
@@ -42,14 +45,8 @@ type Props = {
   onClose: (changed: boolean) => void
 }
 
-type Pair = { item: StarterSetItem; state: StarterItemState }
-type SummaryData = { inserted: Pair[]; activation: Pair[] }
-
-const KIND_WORD: Record<string, { label: string; icon: string; href: (style: AccountStyle) => string }> = {
-  rich_menu: { label: 'リッチメニュー', icon: 'grid', href: (style) => `/rich-menus/sample?style=${style}` },
-  template: { label: 'テンプレート', icon: 'file', href: () => '/templates' },
-  booking_menu: { label: '予約メニュー', icon: 'utensils', href: () => '/booking/menus' },
-}
+export type Pair = { item: StarterSetItem; state: StarterItemState }
+export type SummaryData = { inserted: Pair[]; activation: Pair[] }
 
 /*
  * B-335 (1)：スタイルを変えると、ダッシュボードが数える予約が変わる（前の予約は消えないが、出なくなる）。
@@ -61,207 +58,7 @@ const BOOKING_PLACE: Record<AccountStyle, string> = {
 
 
 export default function StyleSetupWizard({ accountId, state, initialStep = 0, onClose }: Props) {
-  const [style, setStyle] = useState<AccountStyle>(state.style)
-  const [answers, setAnswers] = useState<Record<string, SetupAnswer>>(state.answers ?? {})
-  const [choices, setChoices] = useState<Record<string, { mode: 'sample' | 'existing' | 'configured'; resourceId?: string }>>({})
-  const [version, setVersion] = useState(state.version)
-  const [step, setStep] = useState<WizardStep>(initialStep)
-  const [dirty, setDirty] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const router = useRouter()
-  const [summary, setSummary] = useState<SummaryData | null>(null)
-  const [enabled, setEnabled] = useState<Record<string, boolean>>({})
-  const [resources, setResources] = useState<Array<{ id: string; name: string; kind: string }> | null>(null)
-  const [resource, setResource] = useState('')
-  const preparing = usePreparingDialog()
-
-  const steps = useMemo(() => stepNames(style), [style])
-  const questions = useMemo(() => questionsFor(style), [style])
-  const total = steps.length
-  const index = step === 'summary' ? total : step
-  const question: Question | null = typeof step === 'number' && step >= 2 ? questions[step - 2] ?? null : null
-
-  /* 今の手順で選んでいる値（まだ答えていなければおすすめ）。 */
-  const current = (() => {
-    if (step === 0) return style
-    /* 「あとで」「手動」にした質問を開き直したときは、答えに来たのでおすすめを選んでおく。 */
-    const picked = (key: string) => (answers[key]?.mode === 'configured' ? selectedValue(answers[key], questions.find((q) => q.key === key)) : null)
-    if (step === 1) return picked('image') ?? 'keep'
-    if (question) return picked(question.key) ?? recommendedValue(question, style)
-    return ''
-  })()
-  const [choice, setChoice] = useState<string>(current)
-  useEffect(() => { setChoice(current) }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  /* 「同じアカウントの中にある物を使う」：同じアカウントのリッチメニュー・画像の候補（styleApi.resources）。 */
-  useEffect(() => {
-    if (choice !== 'existing' || resources) return
-    void styleApi.resources(accountId).then((res) => { if (res.success) setResources(res.data.items.filter((item) => item.kind === 'rich_menu' || item.kind === 'image')) }).catch((caught) => setError(describeApiFailure(caught, '読み込み')))
-  }, [choice, resources, accountId])
-
-  const answer = (key: string, value: SetupAnswer) => {
-    setAnswers((prev) => ({ ...prev, [key]: value }))
-    setDirty(true)
-  }
-
-  /* B-335 (2)：開き直して保存するときは、変えた答えだけを送る（前の答えで予約設定を書き戻さない）。 */
-  const [saved, setSaved] = useState<Record<string, SetupAnswer>>(answersForApi(state.answers ?? {}))
-  const [confirm, setConfirm] = useState<{ lines: string[]; run: () => void; cancel: () => void } | null>(null)
-
-  const save = async (next: Record<string, SetupAnswer>, nextChoices = choices, options: { skipSettings?: boolean } = {}) => {
-    let changed = changedAnswers(saved, answersForApi(next))
-    if (options.skipSettings) changed = Object.fromEntries(Object.entries(changed).filter(([key]) => !SETTINGS_KEYS.includes(key)))
-    const res = await styleApi.save(accountId, { expectedVersion: version, style, answers: changed, choices: Object.keys(nextChoices).length ? nextChoices : undefined })
-    if (!res.success) throw new Error('save failed')
-    setVersion(res.data.version)
-    setSaved((prev) => ({ ...prev, ...changed }))
-    setDirty(false)
-  }
-
-  /* 予約設定が変わる答え（承認の仕方）を送るときは、何が変わるかを確かめの窓で出してから保存する。 */
-  const confirmThenSave = (next: Record<string, SetupAnswer>, nextChoices = choices) => new Promise<boolean>((resolve, reject) => {
-    const lines = settingsChanges(saved, answersForApi(next))
-    if (lines.length === 0) { save(next, nextChoices).then(() => resolve(true), reject); return }
-    setConfirm({
-      lines,
-      run: () => { setConfirm(null); save(next, nextChoices).then(() => resolve(true), reject) },
-      cancel: () => { setConfirm(null); resolve(false) },
-    })
-  })
-
-  const loadSummary = async () => {
-    const [set, items] = await Promise.all([styleApi.starterSet(accountId, style), styleApi.starterItems(accountId)])
-    if (!set.success || !items.success) throw new Error('summary failed')
-    const pairs = pairStarterItems(set.data.definition.items, items.data.items)
-    /* B-335 (3)：予約確定の見本の自動送信は、いつもの確定の知らせと重なるので一覧に出さない（動かさせない）。 */
-    const activation = pairs.filter((pair) => needsActivation(pair.state) && !isBookingConfirmSample(pair.item))
-    setSummary({ inserted: pairs.filter((pair) => pair.item.kind in KIND_WORD), activation })
-    /* B-335 (3)：自動で送る物・予約メニューは最初から全部止めた状態。オンにするのは利用者が自分で。 */
-    setEnabled(Object.fromEntries(activation.map((pair) => [pair.state.target_id, false])))
-  }
-
-  /* 最後の一覧から開いたときは、入った物を読んでから出す。 */
-  useEffect(() => {
-    if (step !== 'summary' || summary) return
-    let cancelled = false
-    setBusy(true)
-    loadSummary().catch((caught) => { if (!cancelled) setError(describeApiFailure(caught, '読み込み')) }).finally(() => { if (!cancelled) setBusy(false) })
-    return () => { cancelled = true }
-  }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const go = async (next: WizardStep, nextAnswers = answers, nextChoices = choices) => {
-    setError('')
-    if (next === 'summary') {
-      setBusy(true)
-      try {
-        if (!(await confirmThenSave(nextAnswers, nextChoices))) return
-        setSummary(null)
-        setStep('summary')
-      } catch (caught) {
-        setError(describeApiFailure(caught, '保存'))
-      } finally {
-        setBusy(false)
-      }
-      return
-    }
-    setStep(next)
-  }
-
-  const nextOf = (i: number): WizardStep => (i + 1 >= total ? 'summary' : i + 1)
-
-  const commitAndNext = (key: string, value: SetupAnswer, nextChoices = choices) => {
-    const nextAnswers = { ...answers, [key]: value }
-    answer(key, value)
-    setChoices(nextChoices)
-    void go(nextOf(index), nextAnswers, nextChoices)
-  }
-
-  const onNext = async () => {
-    if (step === 0) {
-      /* スタイルの「あとで」「手動」は口の styleMode で保存する（別の人・別の端末でも同じ）。 */
-      if (choice === 'later' || choice === 'manual') { await saveStyleMode(choice); return }
-      if (choice !== style) { setStyle(choice as AccountStyle); setDirty(true) }
-      void go(1)
-      return
-    }
-    if (step === 1) {
-      if (choice === 'configured') { preparing.open(LOOK_CHOICES.find((c) => c.value === choice)!.label); return }
-      if (choice === 'later') { commitAndNext('image', { mode: 'later' }); return }
-      if (choice === 'manual') { commitAndNext('image', { mode: 'manual' }); return }
-      if (choice === 'existing') {
-        const picked = resources?.find((item) => item.id === resource)
-        if (!picked) { setError('使うリッチメニューか画像を選んでください。'); return }
-        if (picked.kind === 'image') { commitAndNext('image', { mode: 'configured', resourceId: picked.id }); return }
-        /* 今あるリッチメニューをそのまま使う：初期セットのリッチメニューの代わりにする（choices）。 */
-        try {
-          const set = await styleApi.starterSet(accountId, style)
-          const menuKey = set.success ? set.data.definition.items.find((item) => item.kind === 'rich_menu')?.key : undefined
-          commitAndNext('image', { mode: 'configured', value: 'keep' }, menuKey ? { ...choices, [menuKey]: { mode: 'existing', resourceId: picked.id } } : choices)
-        } catch (caught) { setError(describeApiFailure(caught, '読み込み')) }
-        return
-      }
-      commitAndNext('image', { mode: 'configured', value: choice })
-      return
-    }
-    if (question) commitAndNext(question.key, answerOf(choice, question))
-  }
-
-  const close = async () => {
-    if (busy) return
-    if (dirty && step !== 'summary' && step !== 0) {
-      /* 閉じるときは確かめの窓を出さず、予約設定が変わる答えだけは送らない（勝手に予約設定を変えない）。 */
-      try { await save(answers, choices, { skipSettings: true }) } catch { /* 閉じるのは止めない。答えは次に開いたとき聞き直す */ }
-    }
-    onClose(true)
-  }
-
-  /* スタイルを「あとで」（はじめにやることに残る）・「手動」（スタイルを使わず設定の画面で決める）。 */
-  const saveStyleMode = async (mode: 'later' | 'manual') => {
-    setBusy(true)
-    setError('')
-    try {
-      const res = await styleApi.save(accountId, { expectedVersion: version, styleMode: mode })
-      if (!res.success) throw new Error('save failed')
-      onClose(true)
-      if (mode === 'manual') router.push('/settings')
-    } catch (caught) {
-      setError(describeApiFailure(caught, '保存'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const activate = async () => {
-    const targets = (summary?.activation ?? []).filter((pair) => enabled[pair.state.target_id])
-    setBusy(true)
-    setError('')
-    try {
-      /* 予約メニューは今の版を読んで渡す。オートメーションは下書きの版（draftRevision）。 */
-      const items = await Promise.all(targets.map(async ({ state: target }) => {
-        if (target.kind === 'automation') return { id: target.target_id, kind: 'automation' as const, expectedDraftVersionId: target.draftRevision ?? undefined }
-        const menu = await styleApi.menu(accountId, target.target_id)
-        if (!menu.success) throw new Error('menu failed')
-        return { id: target.target_id, kind: 'booking_menu' as const, expectedVersion: menu.data.version }
-      }))
-      const res = await styleApi.activate(accountId, items)
-      if (!res.success) throw new Error('activate failed')
-      const failed = res.data.items.filter((item) => !item.success)
-      if (!res.data.complete || failed.length > 0) {
-        /* 途中の失敗を成功で隠さない（API-CONTRACT-4）。動いた物は動いたまま、動かなかった物の名前を出す。 */
-        const names = failed.map((item) => targets.find((pair) => pair.state.target_id === item.id)?.item.name ?? item.id)
-        setError(`動かせなかった物があります：${names.join('・')}。中身を確かめて、もう一度押してください。`)
-        await loadSummary()
-        return
-      }
-      notifySaved(`${items.length}件を動かしました`)
-      onClose(true)
-    } catch (caught) {
-      setError(describeApiFailure(caught, '動かす操作'))
-    } finally {
-      setBusy(false)
-    }
-  }
+  const { style, answers, step, setStep, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, close, activate } = useWizard({ accountId, state, initialStep, onClose })
 
   const label = styleLabel(style)
   const head = step === 0

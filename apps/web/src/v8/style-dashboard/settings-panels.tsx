@@ -1,6 +1,5 @@
 'use client'
-import { ArrowDown, ArrowUp, Info, Lock, RotateCcw, Scissors, CalendarX2, Send, Shapes } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ClosureOverlapStep,type OverlapInput,type OverlapRow } from '@/components/shared/booking-confirm-dialogs'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
@@ -13,9 +12,10 @@ import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import TimeFieldV8 from '@/components/shared/time-field-v8'
 import Toggle from '@/components/shared/toggle'
-import type { StyleClosureInput, StyleLayout, StyleLayoutItem } from './model'
-import { ClosureOverlapStep, type OverlapInput, type OverlapRow } from '@/components/shared/booking-confirm-dialogs'
 import { Steps } from '@/components/templates/steps'
+import { ArrowDown,ArrowUp,CalendarX2,Info,Lock,RotateCcw,Scissors,Send,Shapes } from 'lucide-react'
+import { useEffect,useState } from 'react'
+import type { StyleClosureInput,StyleLayout,StyleLayoutItem } from './model'
 import styles from './style-dashboard.module.css'
 
 /*
@@ -118,7 +118,7 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
   useEffect(() => { if (open) { setDay(date); setStep(1); setOverlap([]); setMode('ask') } }, [open, date])
   const choices = target === 'seat' ? targets.seats : target === 'staff' ? targets.staff : []
   const current = (): StyleClosureInput => ({ date: day, allDay: allDay === 'all', from: allDay === 'time' ? from : undefined, to: allDay === 'time' ? to : undefined, target, ids: target === 'store' ? [] : ids, reason })
-  const confirm = async () => {
+  const confirmClosure = async () => {
     const input = current()
     if (step === 2) { onSave(input, { mode, message }); return }
     if (!preview) { onSave(input); return }
@@ -133,7 +133,7 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
     <Dialog open={open} designWidth={step === 2 ? 540 : 480} titleHelp={<HelpTip label="休みを入れるの説明">臨時休業・貸切・急な休みを入れます。入れた時間は予約を受け付けません。</HelpTip>} busy={busy || checking} error={error} confirmLabel={step === 2 ? `休みを入れて LINE を送る` : '休みを入れる'} confirmIcon={step === 2 ? <Send size={16} aria-hidden="true" /> : <CalendarX2 size={16} aria-hidden="true" />} busyLabel="入れています" onCancel={() => (step === 2 ? setStep(1) : onClose())} cancelLabel={step === 2 ? '戻る' : 'キャンセル'} footerAlign="center"
       title={step === 2 ? `重なる予約が ${overlap.length}件あります` : '休みを入れる'} description={step === 2 ? `${day} を休みにします` : undefined}
       confirmDisabled={target !== 'store' && ids.length === 0} confirmDisabledReason="対象を選んでください" dirty={false}
-      onConfirm={() => void confirm()}
+      onConfirm={() => void confirmClosure()}
       steps={overlap.length ? <Steps label="休みを入れる手順" currentKey={String(step)} steps={[{ key: '1', label: '日と時間', state: step > 1 ? 'done' : 'todo' }, { key: '2', label: '重なる予約', state: 'todo' }]} /> : undefined} stepKey={step}
       footerLead={overlap.length ? <span className={styles.cellMuted}>手順 {step} / 2</span> : undefined}>
       {step === 2 ? <ClosureOverlapStep rows={overlap} message={message} mediaNote={mediaNote} mode={mode} onMode={setMode} onMessage={setMessage} /> : <div className={styles.dialogBody}>

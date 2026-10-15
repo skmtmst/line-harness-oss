@@ -1,46 +1,46 @@
 'use client'
-import { HorizontalBarChart } from '@/components/shared/charts'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from '@/components/shared/list-navigation'
-import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Download, Filter, Pencil, RotateCw, User } from 'lucide-react'
-import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
-import { fetchApi, ApiError } from '@/lib/api'
-import { formAnswerText } from '@/lib/form-answer'
-import { csvCell } from '@/lib/presentation'
-import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/lib/format'
-import { useAccount } from '@/contexts/account-context'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import Notice from '@/components/shared/notice'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { DetailPage, DetailColumns } from '@/components/templates'
-import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
+import { classifyApiFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
+import Card,{ CardHeader } from '@/components/shared/card'
+import { HorizontalBarChart } from '@/components/shared/charts'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { emptyValue } from '@/components/shared/empty-value'
+import FilterChip from '@/components/shared/filter-chip'
 import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
-import TargetMissing from '@/components/shared/target-missing'
-import { ActionCell, DataTable, DateCell, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import Card, { CardHeader } from '@/components/shared/card'
-import StatusBadge from '@/components/shared/status-badge'
-import { Tabs } from '@/components/shared/tabs'
-import ListRange from '@/components/ui/list-range'
-import FilterChip from '@/components/shared/filter-chip'
-import { postActionStepLabel, ratingAverageText, type DestinationWrite, type FormSubmissionSummary, type SubmissionPostActions } from './summary'
-import styles from './responses.module.css'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { RowMenu } from '@/components/shared/row-actions'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { useCustomerDeletion } from '@/lib/use-customer-deletion'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import SearchField from '@/components/shared/search-field'
 import ListToolbar from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { RowMenu } from '@/components/shared/row-actions'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import SearchField from '@/components/shared/search-field'
+import StatusBadge from '@/components/shared/status-badge'
+import { ActionCell,DataTable,DateCell,NameCell,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
+import TargetMissing from '@/components/shared/target-missing'
 import TruncatedText from '@/components/shared/truncated-text'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { DetailColumns,DetailPage } from '@/components/templates'
+import ListRange from '@/components/ui/list-range'
+import { useAccount } from '@/contexts/account-context'
+import { ApiError,fetchApi } from '@/lib/api'
+import { csvFileName } from '@/lib/csv-file-name'
+import { formAnswerText } from '@/lib/form-answer'
+import { formatDateTime,formatNumber,formatDate as polishFormatDate } from '@/lib/format'
+import { csvCell } from '@/lib/presentation'
+import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { useCustomerDeletion } from '@/lib/use-customer-deletion'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import type { FormBlock,FormInputType,FormLayout } from '@line-crm/shared'
+import { ArrowRight,Download,Filter,Pencil,RotateCw,User } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense,useCallback,useEffect,useMemo,useRef,useState } from 'react'
+import styles from './responses.module.css'
+import { retryEffectsFailureText } from './retry-failure'
+import { postActionStepLabel,ratingAverageText,type DestinationWrite,type FormSubmissionSummary,type SubmissionPostActions } from './summary'
+
 
 /*
  * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
@@ -92,17 +92,6 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
   anchor.download = filename
   anchor.click()
   URL.revokeObjectURL(url)
-}
-function retryEffectsFailureText(error: unknown): string {
-  if (error instanceof ApiError) {
-    return describeApiFailure(error, '後処理の再実行', {
-      scope: 'store',
-    })
-  }
-  if (error instanceof Error && error.message && error.message !== 'retry_failed' && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) {
-    return error.message
-  }
-  return describeApiFailure(error, '後処理の再実行')
 }
 /** 「9/30 17:40」（日本時間）。絵どおり年と曜日は出さない。 */
 function shortWhen(iso: string): string {

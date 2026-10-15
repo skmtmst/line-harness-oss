@@ -1,76 +1,76 @@
 'use client'
 
-import { scoreBoundary, validAdvancedSearch } from './list-search-validation'
-import Avatar from '@/components/shared/avatar'
-import PageSizeSelect from '@/components/shared/page-size-select'
+import Avatar from '@/components/shared/avatar';
+import PageSizeSelect from '@/components/shared/page-size-select';
+import { scoreBoundary,validAdvancedSearch } from './list-search-validation';
 
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarOptional, ListToolbarEnd, ResponsiveFilterChips } from '@/components/shared/list-toolbar';
+import { ListToolbarEnd,ListToolbarFrame,ListToolbarOptional,ListToolbarRow,ListToolbarSearchSlot,ListToolbarSort,ResponsiveFilterChips } from '@/components/shared/list-toolbar';
 
-import { PersonCell, RowNameLink } from '@/components/shared/table';
-import TagOverflow from '@/components/shared/tag-overflow'
 import { collectListRows } from '@/components/shared/collect-list-rows';
-import { useListUrlJsonValue, useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
+import Link from '@/components/shared/list-navigation';
+import { useListScrollMemory,useListUrlJsonValue,useListUrlValue } from '@/components/shared/list-url-state';
+import StatusBadge from '@/components/shared/status-badge';
 import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
-import StatusBadge from '@/components/shared/status-badge'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RowNameLink } from '@/components/shared/table';
+import TagOverflow from '@/components/shared/tag-overflow';
+import { Bookmark,CircleDot,Columns3,Download,Megaphone,MessageSquare,SlidersHorizontal,Star,TrendingUp,Upload,UserPlus,UserRoundX,Users } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { CircleDot, Bookmark, Columns3, Download, Megaphone, MessageSquare, UserRoundX, SlidersHorizontal, Star, TrendingUp, Upload, UserPlus, Users } from 'lucide-react';
-import Link from '@/components/shared/list-navigation'
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
 
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Eye } from 'lucide-react';
-import { BASIC_FRIEND_FIELDS, type FriendField, type Folder, type Scenario, type Tag } from '@line-crm/shared';
+import AdvancedSearchDialog,{ type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog';
+import BulkRunDialog from '@/components/friends/bulk-run-dialog';
+import { canRunBulk } from '@/components/friends/bulk-run-view';
+import FriendRowMenu from '@/components/friends/friend-row-menu';
+import NoticeDialog from '@/components/friends/notice-dialog';
+import SavedSearchDialog from '@/components/friends/saved-search-dialog';
+import { conditionsToEditorState,savedSearchParams,savedSearchSummary } from '@/components/friends/saved-search-utils';
+import SingleFriendActions,{ type FriendAction } from '@/components/friends/single-friend-actions';
+import BulkBar from '@/components/shared/bulk-bar';
+import Button from '@/components/shared/button';
+import Checkbox from '@/components/shared/checkbox';
+import Chip from '@/components/shared/chip';
+import Dialog from '@/components/shared/dialog';
 import DisplayItemsDialog from '@/components/shared/display-items-dialog';
-import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { api, ApiError, fetchApi, type FriendListItem, type FriendStats, type SupportMarkListItem } from '@/lib/api';
-import { formatNumber } from '@/lib/format';
-import { useAccount } from '@/contexts/account-context';
-import { useFeatureVisibility } from '@/lib/use-feature-visibility';
-import { loadOperators } from '@/lib/operators-cache';
-import { useStaffRole, canManageRole } from '@/lib/staff-role';
-import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition';
+import { emptyValue } from '@/components/shared/empty-value';
+import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select';
+import FilterChip from '@/components/shared/filter-chip';
+import KpiBand from '@/components/shared/kpi-band';
+import KpiCard from '@/components/shared/kpi-card';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import ListState from '@/components/shared/list-state';
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
+import Pagination,{ paginationSummary } from '@/components/shared/pagination';
+import ReadOnlyNotice from '@/components/shared/read-only-notice';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import SearchField from '@/components/shared/search-field';
+import Select from '@/components/shared/select';
+import { DelayedSkeleton,Skeleton } from '@/components/shared/skeleton';
+import { DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/table';
+import { TableBody } from '@/components/shared/table-body';
+import TagPill from '@/components/shared/tag-pill';
+import { notifyToast } from '@/components/shared/toast';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { ListPage } from '@/components/templates';
-import Button from '@/components/shared/button'
-import TagPill from '@/components/shared/tag-pill'
-import Checkbox from '@/components/shared/checkbox'
-import KpiCard from '@/components/shared/kpi-card'
-import KpiBand from '@/components/shared/kpi-band'
-import FilterChip from '@/components/shared/filter-chip'
-import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
-import ListState from '@/components/shared/list-state'
-import { notifyToast } from '@/components/shared/toast';
-import MenuPortal from '@/components/shared/menu-portal'
-import BulkBar from '@/components/shared/bulk-bar'
-import Chip from '@/components/shared/chip'
-import Dialog from '@/components/shared/dialog'
-import { TableBody } from '@/components/shared/table-body';
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
-import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog';
-import SavedSearchDialog from '@/components/friends/saved-search-dialog'
-import SingleFriendActions, { type FriendAction } from '@/components/friends/single-friend-actions';
-import NoticeDialog from '@/components/friends/notice-dialog'
-import BulkRunDialog from '@/components/friends/bulk-run-dialog'
-import FriendRowMenu from '@/components/friends/friend-row-menu'
-import { canRunBulk } from '@/components/friends/bulk-run-view';
-import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils';
-import { hasEditKey } from '../shared/nav';
-import { FriendsTabs } from '../shared/head';
-import { emptyMessageOf } from './empty';
-import { csvExportLine } from './csv-export';
-import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state';
-import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from './words';
-import styles from './list.module.css'
-import { csvFileName } from '@/lib/csv-file-name';
-import { emptyValue } from '@/components/shared/empty-value';
-import { SaveErrorField } from '@/components/shared/save-form-errors';
 import { ListPager } from '@/components/templates/list-page';
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
+import { useAccount } from '@/contexts/account-context';
+import { api,ApiError,fetchApi,type FriendListItem,type FriendStats,type SupportMarkListItem } from '@/lib/api';
+import { csvFileName } from '@/lib/csv-file-name';
+import { formatNumber } from '@/lib/format';
+import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition';
+import { loadOperators } from '@/lib/operators-cache';
+import { canManageRole,useStaffRole } from '@/lib/staff-role';
+import { useFeatureVisibility } from '@/lib/use-feature-visibility';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { BASIC_FRIEND_FIELDS,type Folder,type FriendField,type Scenario,type Tag } from '@line-crm/shared';
+import { FriendsTabs } from '../shared/head';
+import { hasEditKey } from '../shared/nav';
+import { csvExportLine } from './csv-export';
+import { emptyMessageOf } from './empty';
+import { prefixed } from './list-filter-options';
+import { readFriendsListSnapshot,writeFriendsListSnapshot } from './list-state';
+import styles from './list.module.css';
+import { lastContactOf,messageWord,monthDay,monthDayTime,splitTags,statusOf } from './words';
+
 
 /*
  * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
@@ -100,10 +100,6 @@ const COLUMNS: Array<{ key: Column; label: string }> = [
 ]
 
 const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
-
-function prefixed(label: string, options: Array<{ value: string; label: string }>) {
-  return options.map((option) => ({ value: option.value, label: `${label}：${option.label}` }))
-}
 
 function isPageSize(value: number): value is PageSize {
   return (PAGE_SIZE_OPTIONS as readonly number[]).includes(value)
@@ -803,7 +799,7 @@ export default function FriendsListV8() {
             const attention = String(friend.metadata?.__attention ?? '') === '1'
             const tags = splitTags(friend.tags)
             return (
-              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
+              <Tr key={friend.id} interactive href={`/friends/detail?id=${friend.id}`} onOpen={() => router.push(`/friends/detail?id=${friend.id}`)} selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
                 {selectable ? (
                   <Td className={styles.tdCheck}>
                     <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />

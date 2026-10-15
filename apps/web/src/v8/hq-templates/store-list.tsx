@@ -1,78 +1,57 @@
 'use client'
 import { FOLDER_SELECT_COLORS } from '@/components/shared/folder-select'
 
-import { STARTER_SET_TAB, KIND_TABS, KIND_LABEL, WORDS, type TagQuickFilter, TAG_QUICK_FILTERS } from './store-list-options'
-export { KIND_TABS, hqTemplateTabsForStarterSets } from './store-list-options'
-
-import { type HqStoreListProps } from './store-list-types'
+import { KIND_LABEL,KIND_TABS,STARTER_SET_TAB,TAG_QUICK_FILTERS,WORDS,type TagQuickFilter } from './store-list-options'
+export { KIND_TABS,hqTemplateTabsForStarterSets } from './store-list-options'
+export { sentLabel,stateOf } from './store-list-stats'
 export { type HqStoreListProps } from './store-list-types'
 
-import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
-import ListDateTime from '@/components/shared/list-date-time'
-import StatusBadge from '@/components/shared/status-badge'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import TagPill from '@/components/shared/tag-pill'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useMemo, useState, type ReactNode } from 'react'
-import { Archive, Bookmark, Braces, Check, Layers, CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link, MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users } from 'lucide-react'
-import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
-import { ListPage } from '@/components/templates'
+import { type HqStoreListProps } from './store-list-types'
+
+import ActionMenu,{ type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import EmptyList from '@/components/shared/empty-list'
+import { emptyValue } from '@/components/shared/empty-value'
+import FilterChip from '@/components/shared/filter-chip'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { describeFolderFailure } from '@/components/shared/folder-failure'
-import { notifyToast } from '@/components/shared/toast'
-import EmptyList from '@/components/shared/empty-list'
-import FilterChip from '@/components/shared/filter-chip'
-import Checkbox from '@/components/shared/checkbox'
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
+import FolderPanel,{ FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import ListDateTime from '@/components/shared/list-date-time'
 import ListToolbar from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import Notice from '@/components/shared/notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import { RowMenu } from '@/components/shared/row-actions'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Select from '@/components/shared/select'
-import { RowNameLink, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { Tabs, type TabItem } from '@/components/shared/tabs'
+import StatusBadge from '@/components/shared/status-badge'
+import { DataTable,NameCell,RowNameLink,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
+import { Tabs,type TabItem } from '@/components/shared/tabs'
+import TagPill from '@/components/shared/tag-pill'
+import { notifyToast } from '@/components/shared/toast'
+import { ListPage } from '@/components/templates'
 import { formatNumber } from '@/lib/format'
-import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
-import { distributedAccountsLine, templateSubLine, hqMessageTypeLabel } from './list-row'
-import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, cleanupTagIds, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
+import type { HqTemplate } from '@/lib/hq-templates-api'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import type { HqTemplateFolder,TemplateKind } from '@line-crm/shared'
+import { Archive,Bookmark,Braces,Check,CircleDashed,Copy,FileText,Inbox,Layers,Link,MessageSquare,Pencil,Plus,Send,Sparkles,Trash2,Unlink,Users } from 'lucide-react'
+import { useMemo,useState,type ReactNode } from 'react'
 import storeStyles from '../templates/list.module.css'
-import hqStyles from './store-list.module.css'
+import { AttributeTabs,OtherTabPanel,assignmentMethods,cleanupTagCount,cleanupTagIds,matchesTagFilters,unusedTagCount,useAttributeTab,type TagUsageFilter } from './attribute-tabs'
 import attributeStyles from './attribute-tabs.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import Notice from '@/components/shared/notice'
+import { distributedAccountsLine,hqMessageTypeLabel,templateSubLine } from './list-row'
+import { sentLabel,stateOf,sumOrNull } from './store-list-stats'
+import hqStyles from './store-list.module.css'
+
 
 const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
-
-/** M月D日（店の一覧と同じ。時刻は title）。 */
-
-/**
- * 公開の札（店と同じ3つ：公開中／未公開の変更／下書きだけ。絵 i0Ao0R）。統括では「配ったか」で決める：
- * 配った先がいまの版を持っている＝公開中、直したあと配っていない先がある（API-18 の outdated_account_count）＝未公開の変更、まだ配っていない＝下書きだけ。
- */
-export function stateOf(row: HqTemplate): { label: string; tone: 'live' | 'changes' | 'draft' } {
-  if ((row.distributed_account_count ?? 0) === 0) return { label: '下書きだけ', tone: 'draft' }
-  if ((row.outdated_account_count ?? 0) > 0) return { label: '未公開の変更', tone: 'changes' }
-  return { label: '公開中', tone: 'live' }
-}
-
-/** 合計（API-18）。1つでも数えていない行があれば null（「—」）。 */
-function sumOrNull(values: Array<number | null | undefined>): number | null {
-  if (values.some((value) => value == null)) return null
-  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
-}
-
-/** 今月送った数（API-18）。取れない種類（別資産のクーポン等）は null＝「—」。0 は「0通」。 */
-export function sentLabel(count: number | null | undefined): string {
-  return count == null ? emptyValue('unknown') : `${formatNumber(count)}通`
-}
 
 export default function HqStoreList(props: HqStoreListProps) {
   const saveErrors = useSaveFormErrors()
@@ -364,7 +343,6 @@ export default function HqStoreList(props: HqStoreListProps) {
                 aria-expanded={tagQuickOpen}
                 aria-label="よく使う絞り込み"
                 title="よく使う絞り込み"
-                className={hqStyles.quickButton}
                 onClick={() => setTagQuickOpen((open) => !open)}
               >
                 <Bookmark size={15} aria-hidden="true" />

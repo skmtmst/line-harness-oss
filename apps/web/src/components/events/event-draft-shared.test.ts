@@ -1,24 +1,24 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { EVENT_DEFAULT_DRAFT as CREATE_DEFAULT_DRAFT,ENTRY_CUTOFF_OPTIONS } from '@/v8/events/shared'
+import { dirname,join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe,expect,it } from 'vitest'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import {
-  EVENT_CANCEL_DEADLINE_OPTIONS,
-  EVENT_DEFAULT_DRAFT,
-  EVENT_DESCRIPTION_MAX_LENGTH,
-  EVENT_ENTRY_CUTOFF_OPTIONS,
-  EVENT_NAME_MAX_LENGTH,
-  deadlineOptionsWithSaved,
-  deadlineSelectValue,
-  parseDeadlineSelect,
-  resolveEventMultiAccountIds,
+EVENT_CANCEL_DEADLINE_OPTIONS,
+EVENT_DEFAULT_DRAFT,
+EVENT_DESCRIPTION_MAX_LENGTH,
+EVENT_ENTRY_CUTOFF_OPTIONS,
+EVENT_NAME_MAX_LENGTH,
+deadlineOptionsWithSaved,
+deadlineSelectValue,
+parseDeadlineSelect,
+resolveEventMultiAccountIds,
 } from './event-draft-shared'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 const FORM = read('..', '..', 'v8', 'events', 'edit-form.tsx')
 const CREATE = read('..', '..', 'v8', 'events', 'create.tsx')
-import { EVENT_DEFAULT_DRAFT as CREATE_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS } from '@/v8/events/shared'
 const LIST_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
 const BOOKINGS_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'bookings.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'events', 'edit', 'page.tsx'), 'utf8')

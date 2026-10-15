@@ -319,7 +319,7 @@
 }
 
 .previewMenuAreaIcon { flex-shrink: 0; color: var(--color-ink); }
-.previewMenuAreaName { max-width: 100%; padding-inline: 4px; overflow: hidden; color: var(--color-ink); font-size: var(--text-micro); font-weight: 600; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 0 3px var(--color-canvas), 0 0 3px var(--color-canvas); }
+.previewMenuAreaName { max-width: 100%; padding-inline: var(--tpl-rich-menu-area-label-pad); overflow: hidden; color: var(--color-ink); font-size: var(--text-micro); font-weight: 600; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 0 3px var(--color-canvas), 0 0 3px var(--color-canvas); }
 
 .previewMenuEmpty {
   position: relative;

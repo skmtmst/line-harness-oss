@@ -43,7 +43,7 @@
 .tileImage {
   display: flex;
   height: var(--tpl-hb-project-tile-h);
-  padding: 0;
+  padding: var(--polish-space-none);
   overflow: hidden;
   border: 0;
   border-radius: var(--tpl-hb-tile-radius);
@@ -88,7 +88,7 @@
 
 .dot { width: var(--tpl-hb-dot); height: var(--tpl-hb-dot); border-radius: var(--radius-pill); background: currentColor; }
 
-.star { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--tpl-hb-star); height: var(--tpl-hb-star); padding: 0; border: 0; border-radius: var(--radius-mini); background: transparent; cursor: pointer; }
+.star { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--tpl-hb-star); height: var(--tpl-hb-star); padding: var(--polish-space-none); border: 0; border-radius: var(--radius-mini); background: transparent; cursor: pointer; }
 .star svg { width: var(--tpl-hb-star-glyph); height: var(--tpl-hb-star-glyph); }
 .starOn { fill: var(--color-status-warn); color: var(--color-status-warn); }
 .starOff { color: var(--color-ink-faint); }

@@ -1,60 +1,60 @@
 'use client'
 
-import { statusTone } from './booking-status-tone'
-import ReservationBoard, { ReservationLegend } from '@/components/shared/reservation-board'
-import PeopleDayList from '@/v8/booking-bookings/day-list'
+import ReservationBoard,{ ReservationLegend } from '@/components/shared/reservation-board'
+import { allBoardPages,reservationBoardApi } from '@/lib/api-reservation-board'
 import PeopleDayFrame from '@/v8/booking-bookings/day-frame'
+import PeopleDayList from '@/v8/booking-bookings/day-list'
 import { usePeopleVisitMarks } from '@/v8/booking-bookings/use-visit-marks'
-import {peopleBoardEntry} from '@line-crm/shared'
-import {reservationBoardApi,allBoardPages} from '@/lib/api-reservation-board'
+import { peopleBoardEntry } from '@line-crm/shared'
+import { statusTone } from './booking-status-tone'
 
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ContextMenu,{ type ContextMenuItem } from '@/components/shared/context-menu'
+import DetailPanel,{ useDetailPanelUrl } from '@/components/shared/detail-panel'
+import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select'
+import FilterChip from '@/components/shared/filter-chip'
+import FolderPanel from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import { PageHeading } from '@/components/templates/page-frame'
-import SegmentedControl from '@/components/shared/segmented'
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Calendar, CalendarPlus, CalendarX, CircleAlert, Download, Phone, X } from 'lucide-react'
-import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Button from '@/components/shared/button'
-import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import ListToolbar,{ ListToolbarEnd,ListToolbarRow,ListToolbarSearchSlot,ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
-import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame'
-import BookingLedgerBody from '@/v8/booking-bookings/ledger-body'
-import LedgerMonthNavigation, { monthKey, monthLabel, monthDifference } from '@/v8/booking-bookings/month-navigation'
-import FilterChip from '@/components/shared/filter-chip'
-import { ListToolbarEnd, ListToolbarRow, ListToolbarSearchSlot, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
-import StatusBadge from '@/components/shared/status-badge'
-import type { StatusBadgeTone } from '@/components/shared/status-badge'
-import { RowMenu } from '@/components/shared/row-actions'
-import { BookingChipsLabel, BookingMonthBar, BookingUrlCopy } from '@/v8/booking-bookings/month-bar'
-import ledgerStyles from '@/v8/booking-bookings/month-bar.module.css'
-import Select from '@/components/shared/select'
-import { ActionCell, DataTable, DateCell, StatusCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Pagination from '@/components/shared/pagination'
-import ListRange from '@/components/ui/list-range'
-import FolderPanel from '@/components/shared/folder-panel'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import SegmentedControl from '@/components/shared/segmented'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import { ActionCell,DataTable,DateCell,StatusCell,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import BookingDetailV8 from './booking-detail-v8'
+import { PageHeading } from '@/components/templates/page-frame'
+import ListRange from '@/components/ui/list-range'
+import { useAccount } from '@/contexts/account-context'
+import { api,ApiError,bookingApi,type BookingAdminDetail,type BookingMenu,type BookingRequest,type BookingStaff } from '@/lib/api'
+import { formatDate,formatDateTime,formatDay,formatNumber,formatTime } from '@/lib/format'
+import BookingLedgerBody from '@/v8/booking-bookings/ledger-body'
+import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame'
+import { BookingChipsLabel,BookingMonthBar,BookingUrlCopy } from '@/v8/booking-bookings/month-bar'
+import ledgerStyles from '@/v8/booking-bookings/month-bar.module.css'
+import LedgerMonthNavigation,{ monthDifference,monthKey,monthLabel } from '@/v8/booking-bookings/month-navigation'
+import { Calendar,CalendarPlus,CalendarX,CircleAlert,Download,Phone,X } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter,useSearchParams } from 'next/navigation'
+import { useCallback,useEffect,useRef,useState,type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { canOperateBookings } from '../lib/booking-permissions'
-import { fetchAllPages } from './fetch-all-pages'
-import BookingCalendar, {
-  isLineBooking,
-  moveDay,
-  startOfWeek,
-  type CalendarAvailability,
-  type CalendarSlot,
+import {
+isLineBooking,
+moveDay,
+startOfWeek,
+type CalendarAvailability,
+type CalendarSlot,
 } from './booking-calendar'
-import { formatDate, formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
+import BookingDetailV8 from './booking-detail-v8'
+import { DetailRow } from './detail-row'
+import { fetchAllPages } from './fetch-all-pages'
+
 
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
@@ -685,9 +685,9 @@ export default function BookingsPage() {
   useEffect(() => {
     if (!selectedAccountId || view !== 'day' || staffList.length === 0) return
     let alive = true
-    void Promise.all(staffList.map(staff => Promise.resolve().then(() => bookingApi.getBreaks(selectedAccountId, staff.id)).then(res => [staff.id, res.breaks] as const).catch(() => [staff.id, []] as const))).then(pairs => {
+    void Promise.all(staffList.map(staff => Promise.resolve().then(() => bookingApi.getBreaks(selectedAccountId, staff.id)).then(res => [staff.id, res.breaks] as const))).then(pairs => {
       if (alive) setStaffBreaks(Object.fromEntries(pairs))
-    })
+    }, () => { if (alive) setAvailability({ status: 'error', slots: [] }) })
     return () => { alive = false }
   }, [selectedAccountId, view, staffList])
 
@@ -1388,15 +1388,6 @@ export default function BookingsPage() {
 
       {dialogs}
     </BookingLedgerFrame>
-  )
-}
-
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="border-hairline flex gap-4 border-b py-2.5 last:border-b-0">
-      <span className="text-ink-faint w-28 shrink-0 pt-0.5 text-xs font-medium">{label}</span>
-      <div className="text-ink flex-1 text-sm break-words">{children}</div>
-    </div>
   )
 }
 

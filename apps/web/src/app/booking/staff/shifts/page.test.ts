@@ -1,6 +1,6 @@
-import { readUiSource as readFileSync } from '../../../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe,expect,it } from 'vitest'
+import { readUiSource as readFileSync } from '../../../../../scripts/test-ui-source.mjs'
 
 const PAGE = readFileSync(join(__dirname, '../../../../v8/booking-menus/settings.tsx'), 'utf8')
 const PREVIEW = readFileSync(join(__dirname, '../../../../v8/booking-staff/phone.tsx'), 'utf8')
@@ -32,7 +32,7 @@ describe('受付枠と休業日のV8の動作契約', () => {
     expect(PREVIEW).not.toContain('ご希望の日をえらんでください')
     expect(PAGE).toContain('mergeStaffSlots')
     expect(PAGE).toMatch(/bookingApi\s*\.listResources\(accountId\)/)
-    expect(PAGE.replace(/^\s*\/\/.*$/gm, '')).not.toContain('準備中')
+    expect(PAGE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')).not.toContain('準備中')
   })
 
   it('画面確認APIが通常状態を本番と同じ器で返す', () => {

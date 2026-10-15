@@ -1,52 +1,52 @@
 'use client'
 
-import { jstDate } from '@/lib/jst-datetime'
-import { RowActions } from '@/components/shared/row-actions'
-import { RowMenu } from '@/components/shared/row-actions'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import StickyBar from '@/components/shared/sticky-bar'
-import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { api, ApiError, EventSlotsPartialError, eventsApi, type EventDetail, type EventSlot, type EventSlotInput } from '@/lib/api'
-import ImageUploader from '@/components/shared/image-uploader'
-import OgEditor from '@/components/shared/og-editor'
-import { useAccount } from '@/contexts/account-context'
-import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from '@/components/events/bulk-slot-generator'
-import { jstHHMMToUtcIso, splitBand, utcIsoToJstDate, utcIsoToJstHHMM } from '@/components/events/jst'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import Dialog from '@/components/shared/dialog'
+import { BULK_SLOT_LIMIT,generateBulkSlots,type BulkSlotInput } from '@/components/events/bulk-slot-generator'
+import {
+EVENT_CANCEL_DEADLINE_OPTIONS,
+EVENT_DEFAULT_DRAFT,
+EVENT_DESCRIPTION_MAX_LENGTH,
+EVENT_ENTRY_CUTOFF_OPTIONS,
+EVENT_NAME_MAX_LENGTH,
+deadlineOptionsWithSaved,
+deadlineSelectValue,
+parseDeadlineSelect,
+} from '@/components/events/event-draft-shared'
+import EventQuestionsEditor from '@/components/events/event-questions-editor'
+import { jstHHMMToUtcIso,splitBand,utcIsoToJstDate,utcIsoToJstHHMM } from '@/components/events/jst'
 import Button from '@/components/shared/button'
-import SelectionButton from '@/components/shared/selection-button'
-import Notice from '@/components/shared/notice'
-import { notifyToast } from '@/components/shared/toast'
-import Select from '@/components/shared/select'
 import Checkbox from '@/components/shared/checkbox'
-import { Field, TextInput } from '@/components/shared/form-controls'
-import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
-import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TimeField } from '@/components/shared/date-time-field'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import { MenuPaymentCard, PaymentConflictError, useMenuPayment } from '../booking-payments/menu-payment'
+import Dialog from '@/components/shared/dialog'
+import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select'
+import { Field,TextInput } from '@/components/shared/form-controls'
 import FormSection from '@/components/shared/form-section'
+import ImageUploader from '@/components/shared/image-uploader'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import OgEditor from '@/components/shared/og-editor'
+import RadioCard,{ RadioCardGroup } from '@/components/shared/radio-card'
+import { RowActions,RowMenu } from '@/components/shared/row-actions'
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Select from '@/components/shared/select'
+import SelectionButton from '@/components/shared/selection-button'
+import StickyBar from '@/components/shared/sticky-bar'
+import { ActionCell,DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea } from '@/components/shared/text-field'
-import {
-  EVENT_CANCEL_DEADLINE_OPTIONS,
-  EVENT_DEFAULT_DRAFT,
-  EVENT_DESCRIPTION_MAX_LENGTH,
-  EVENT_ENTRY_CUTOFF_OPTIONS,
-  EVENT_NAME_MAX_LENGTH,
-  deadlineOptionsWithSaved,
-  deadlineSelectValue,
-  parseDeadlineSelect,
-} from '@/components/events/event-draft-shared'
-import { formatDateTime, formatDay, formatTime } from '@/lib/format'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { notifyToast } from '@/components/shared/toast'
+import { useAccount } from '@/contexts/account-context'
+import { ApiError,EventSlotsPartialError,api,eventsApi,type EventDetail,type EventSlot,type EventSlotInput } from '@/lib/api'
+import { jstDate } from '@/lib/jst-datetime'
+import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useRouter } from 'next/navigation'
+import { useEffect,useRef,useState } from 'react'
+import { MenuPaymentCard,PaymentConflictError,useMenuPayment } from '../booking-payments/menu-payment'
+import { formatJpDateTime,formatJpSlotRange,toEventDraft } from './edit-format'
+export { formatJpDateTime,formatJpSlotRange,toEventDraft } from './edit-format'
 
 
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
@@ -69,40 +69,6 @@ const APPROVAL_DEADLINE_OPTIONS = [
 export interface EventFormProps {
   accountId: string
   eventId: string | null
-}
-
-export function formatJpDateTime(iso: string): string {
-  const d = new Date(iso)
-  /*
-    EVENT-05: 一覧(app/events/page.tsx)は Asia/Tokyo 固定で出す。
-    ここが端末の時間帯に依存すると、同じ開催回が一覧と編集で
-    時差分ずれて見える。保存値(UTC)は変えず、表示だけ日本時間に固定する。
-  */
-  return formatDateTime(d)
-}
-
-/**
- * 枠の日時の出し方。「2026/09/20 23:30 〜 01:00」。
- *
- * 日をまたぐ枠は終了側の日付も出す(DETAIL-10)。時刻だけにすると
- * 「9/20 23:30〜01:00」が当日深夜なのか翌日なのか読めない。
- */
-export function formatJpSlotRange(startsAt: string, endsAt: string): string {
-  const start = formatJpDateTime(startsAt)
-  const end = formatJpDateTime(endsAt)
-  const sameDay = formatDay(startsAt) === formatDay(endsAt)
-  return `${start} 〜 ${sameDay ? formatTime(endsAt) : end}`
-}
-
-/**
- * 保存・読込の応答を draft の形へ戻す（R82）。
- *
- * Worker は質問の定義を questions_json の文字列で返す。ほぐさず
- * `setDraft` すると questions が消え、次の保存で questions:null を送って
- * 定義ごと消してしまう。読み込み時と同じほぐし方を保存後にも使う。
- */
-export function toEventDraft(row: EventDetail): EventDetail {
-  return { ...row, questions: parseEventQuestions(row.questions_json) }
 }
 
 export default function EventForm({ accountId, eventId }: EventFormProps) {
@@ -912,7 +878,6 @@ function AddSlotDialog({
   </Dialog></SaveErrorScope>
 }
 
-
 /*
  * 入口29: 既存の予約枠の日時・定員を直す窓。
  *
@@ -981,7 +946,6 @@ function EditSlotDialog({
     <Field label="定員（空欄=無制限）"><SaveErrorField names={["capacity"]}><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></SaveErrorField></Field>
   </Dialog></SaveErrorScope>
 }
-
 
 /*
  * R84: 予約枠の一括追加の窓は共通 Dialog を使う。
@@ -1068,7 +1032,6 @@ export function BulkSlotDialog({
     <Field label="定員（各枠共通・空欄=無制限）"><SaveErrorField names={["capacity"]}><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></SaveErrorField></Field>
   </Dialog></SaveErrorScope>
 }
-
 
 // ----------------------------------------------------------------
 // Tab 3: Publish settings

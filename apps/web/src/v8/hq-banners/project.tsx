@@ -1,58 +1,59 @@
 'use client'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Send, Sparkles, Star, Upload, X } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ListPage } from '@/components/templates'
-import Button from '@/components/shared/button'
-import MediaSlot from '@/components/shared/media-slot'
-import { RowMenu } from '@/components/shared/row-actions'
-import FilterChip from '@/components/shared/filter-chip'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import StickyBar from '@/components/shared/sticky-bar'
-import TargetMissing from '@/components/shared/target-missing'
-import Checkbox from '@/components/shared/checkbox'
-import SavedDistributionDialog from '../hq-templates/saved-distribution-dialog'
-import { useDistributionFolders } from '../hq-templates/distribution-accounts'
 import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
-import ReferenceFrame from './reference-frame'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import type { AccountWithStats } from '@/contexts/account-context'
-import { api, ApiError } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import {
-  BANNER_MAX_REFERENCE_IMAGES,
-  EMPTY_GENERATION_INPUT,
-  activeGeneration,
-  exportSizeText,
-  presetSizeLabel,
-  inputFromGeneration,
-  packedTextLines,
-  readFileAsBase64,
-  usageRefusal,
-  usageStatusText,
-  validateGenerationInput,
-  type BannerCropPosition,
-  type BannerGeneration,
-  type BannerGenerationInput,
-  type BannerImage,
-  type BannerPreset,
-  type BannerProject,
-  type BannerReference,
-  type BannerReferenceMode,
-  type BannerUsage,
-} from '@/lib/hq-banners'
-import { BannerImageDetailV8 } from './image-detail'
-import { BANNER_UPLOAD_ACCEPT, BannerConfirmDialogV8, CreateProjectDialogV8, uploadRefusal } from './dialogs'
-import { bannerLimitKind } from './limit-notice'
-import { bannerFailureMessage, tileLabel } from './words'
-import styles from './project.module.css'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import FilterChip from '@/components/shared/filter-chip'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import ListState from '@/components/shared/list-state'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import MediaSlot from '@/components/shared/media-slot'
+import Notice from '@/components/shared/notice'
+import { RowMenu } from '@/components/shared/row-actions'
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
+import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
+import { ListPage } from '@/components/templates'
+import type { AccountWithStats } from '@/contexts/account-context'
+import { api,ApiError } from '@/lib/api'
+import {
+activeGeneration,
+BANNER_MAX_REFERENCE_IMAGES,
+EMPTY_GENERATION_INPUT,
+exportSizeText,
+inputFromGeneration,
+packedTextLines,
+presetSizeLabel,
+readFileAsBase64,
+usageRefusal,
+usageStatusText,
+validateGenerationInput,
+type BannerGeneration,
+type BannerGenerationInput,
+type BannerImage,
+type BannerPreset,
+type BannerProject,
+type BannerReference,
+type BannerReferenceMode,
+type BannerUsage
+} from '@/lib/hq-banners'
+import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { Archive,ArchiveRestore,Copy,Hourglass,LoaderCircle,Pencil,Send,Sparkles,Star,Upload,X } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense,useCallback,useEffect,useId,useMemo,useRef,useState } from 'react'
+import { useDistributionFolders } from '../hq-templates/distribution-accounts'
+import SavedDistributionDialog from '../hq-templates/saved-distribution-dialog'
+import { BANNER_UPLOAD_ACCEPT,BannerConfirmDialogV8,CreateProjectDialogV8,uploadRefusal } from './dialogs'
+import { BannerImageDetailV8 } from './image-detail'
+import { bannerLimitKind } from './limit-notice'
+import { PendingTile,Thumb } from './project-tiles'
+import styles from './project.module.css'
+import ReferenceFrame from './reference-frame'
+import { bannerFailureMessage,tileLabel } from './words'
+
 
 
 /*
@@ -839,29 +840,5 @@ function ProjectInner() {
         onUpload={(file) => { setPickerOpen(false); void uploadReference(file) }}
       />
     </ListPage></SaveErrorScope>
-  )
-}
-
-/** 作っている途中の1枚（絵 p03ImY の「作っています…」「待っています」）。 */
-function PendingTile({ running, label }: { running: boolean; label: string }) {
-  return (
-    <article className={styles.tile} role="status" aria-live="polite">
-      <div className={`${styles.tileImage} ${styles.pending}`}>
-        <Hourglass aria-hidden="true" className={styles.pendingIcon} />
-        <span className={styles.pendingText}>{running ? '作っています…' : '待っています'}</span>
-      </div>
-      <div className={styles.tileMeta}><span className={styles.metaText}>{label}</span></div>
-    </article>
-  )
-}
-
-/** 画像の1枚。読めない画像は壊れた印を出さず、地の色のままにする。 */
-function Thumb({ image }: { image: BannerImage }) {
-  const [failed, setFailed] = useState(false)
-  return (
-    <span className={styles.thumb}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {!failed ? <img src={image.media.url} alt="" loading="lazy" onError={() => setFailed(true)} /> : null}
-    </span>
   )
 }

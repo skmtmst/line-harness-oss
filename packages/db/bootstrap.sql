@@ -1644,6 +1644,8 @@ CREATE TABLE booking_operation_runs (
   UNIQUE (line_account_id, idempotency_key)
 );
 
+CREATE TABLE booking_page_views(id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id), menu_id TEXT REFERENCES menus(id), friend_id TEXT REFERENCES friends(id), entry_point TEXT, viewed_at TEXT NOT NULL);
+
 CREATE TABLE booking_payment_choices (
   booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,

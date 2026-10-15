@@ -1,13 +1,13 @@
 /* 絵 GcyTr「次の予約」のカード：顔と名前／状態の札と経路／印つきの行／操作2つを横に。 */
-.card { display: flex; flex-direction: column; gap: 12px; }
-.who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.card { display: flex; flex-direction: column; gap: var(--tpl-next-booking-gap-1); }
+.who { display: flex; align-items: center; gap: var(--tpl-next-booking-gap-2); min-width: 0; }
 .names { display: flex; flex-direction: column; min-width: 0; }
-.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: 20px; }
-.menu { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: 18px; }
-.state { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.rows { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
-.row { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--color-ink); font-size: var(--text-label); line-height: 20px; }
+.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-next-booking-line); }
+.menu { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-next-booking-meta-line); }
+.state { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-next-booking-gap-3); }
+.rows { display: flex; flex-direction: column; gap: var(--tpl-next-booking-gap-4); margin: var(--polish-space-none); padding: var(--polish-space-none); list-style: none; }
+.row { display: flex; align-items: center; gap: var(--tpl-next-booking-gap-5); min-width: 0; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-next-booking-line); }
 .row > svg { flex-shrink: 0; color: var(--color-ink-secondary); }
 .rowText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.actions { display: flex; gap: 8px; }
+.actions { display: flex; gap: var(--tpl-next-booking-gap-6); }
 .actions > * { flex: 1 1 0; min-width: max-content; }

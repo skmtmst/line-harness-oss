@@ -1,17 +1,17 @@
-import { useRequestGeneration } from '../lib/use-request-generation.js';
-import BookingIntake from './BookingIntake.js';
+import { useEffect,useState } from 'react';
+import { api,type BookingEntitlement,type CreateBookingResponse,type MenuItem,type StaffItem } from '../lib/api.js';
 import { bookingPriceText } from '../lib/booking-price.js';
-import { useEffect, useState } from 'react';
-import { api, type BookingEntitlement, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
-import { addMinutesHm, formatJpLong, slotStartsAtIso } from '../lib/datetime.js';
+import { addMinutesHm,formatJpLong,slotStartsAtIso } from '../lib/datetime.js';
 import { isNotReadyYet } from '../lib/not-ready.js';
-import { logFailure } from '../lib/user-message.js';
+import { useRequestGeneration } from '../lib/use-request-generation.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
-import Icon from './ui/Icon.js';
-import Button from './ui/Button.js';
-import BottomBar from './ui/BottomBar.js';
-import PrivacyNote from './ui/PrivacyNote.js';
+import { logFailure } from '../lib/user-message.js';
+import BookingIntake from './BookingIntake.js';
 import type { SlotPick } from './DateTimePicker.js';
+import BottomBar from './ui/BottomBar.js';
+import Button from './ui/Button.js';
+import Icon from './ui/Icon.js';
+import PrivacyNote from './ui/PrivacyNote.js';
 
 /**
  * 1-d 内容の確認 (★V8・gLReL)。送った中身のカード＋ご要望＋案内の帯。
@@ -52,6 +52,7 @@ export default function Confirm({
   const [idemKey] = useState(() => crypto.randomUUID());
   /* 使う回数券・月謝（組3）。口が無い間は 'soon'＝準備中の 1 行だけ出す。使えるものが無ければ段ごと出さない。 */
   const [entitlements, setEntitlements] = useState<BookingEntitlement[] | 'soon' | null>(null);
+  const [entitlementError, setEntitlementError] = useState<string | null>(null);
   const [entitlementId, setEntitlementId] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
@@ -61,6 +62,7 @@ export default function Confirm({
       if (!alive) return;
       if (isNotReadyYet(e)) { setEntitlements('soon'); return; }
       logFailure('confirm-entitlements', e);
+      setEntitlementError('使える回数券を読み込めませんでした。前の画面へ戻り、もう一度お試しください。');
       setEntitlements([]);
     });
     return () => { alive = false; };
@@ -131,6 +133,7 @@ export default function Confirm({
           value={chosenEntitlement ? `${chosenEntitlement.name}を使う` : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
         />
       </dl>
+      {entitlementError ? <p role="status" className="text-[13px] leading-6 text-danger">{entitlementError}</p> : null}
       {entitlements === 'soon' ? (
         <p className="flex items-center gap-2 text-xs text-liff-sub">
           <Icon name="ticket" className="h-4 w-4 shrink-0" />

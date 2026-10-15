@@ -1,8 +1,8 @@
-import { AreaIcon, type Area } from '@/components/rich-menus/canvas-editor'
-import { Circle, CircleCheck, CircleAlert } from 'lucide-react'
-import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
+import { AreaIcon,type Area } from '@/components/rich-menus/canvas-editor'
 import type { RichMenuTargetPreview } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
+import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
+import { Circle,CircleAlert,CircleCheck } from 'lucide-react'
 import type { CheckState } from './create-types'
 import styles from './create-v8.module.css'
 /* ---------- 小部品 ---------- */
@@ -52,7 +52,7 @@ export function MenuContent({
             width: `${(a.w / dims.width) * 100}%`,
             height: `${(a.h / dims.height) * 100}%`,
           }}
-        >{a.label ? <><AreaIcon intent={a.intent} size={14} className={styles.previewMenuAreaIcon} /><span className={styles.previewMenuAreaName}>{a.label}</span></> : null}</span>
+        >{a.label ? <><AreaIcon intent={a.intent} size={14} presentation="preview" /><span className={styles.previewMenuAreaName}>{a.label}</span></> : null}</span>
       ))}
     </div>
   ) : null

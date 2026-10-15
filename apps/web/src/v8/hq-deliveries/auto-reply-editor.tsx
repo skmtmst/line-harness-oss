@@ -108,10 +108,10 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
       <Card variant="form" gap="normal">
         <CardHeader size="stacked" title="細かい決まり" />
         <div className={styles.rules}>
-          <div className={styles.rule}><span>返すまで待つ時間</span><Select aria-label="返すまで待つ時間" disabled={!canEdit || busy} value={String(s.replyDelaySeconds ?? 0)} options={DELAYS} onChange={(value) => onSetting('replyDelaySeconds', Number(value) || null)} /></div>
-          <div className={styles.rule}><span>同じ人へ続けて返さない</span><span className={styles.ruleEnd}>{s.cooldownMinutes ? <small>{`${s.cooldownMinutes}分あける`}</small> : null}<Toggle label="同じ人へ続けて返さない" disabled={!canEdit || busy} checked={Boolean(s.cooldownMinutes)} onChange={(on) => onSetting('cooldownMinutes', on ? 60 : null)} /></span></div>
-          <div className={styles.rule}><span>担当者が対応中のトークには返さない</span><Toggle label="担当者が対応中のトークには返さない" disabled={!canEdit || busy} checked={Boolean(s.skipWhenOperatorActive)} onChange={(on) => onSetting('skipWhenOperatorActive', on)} /></div>
-          <div className={styles.rule}><span>1人につき1回だけ返す<small>オフのときは、同じ人が何度送っても返す（上の「続けて返さない」の時間は守る）</small></span><Toggle label="1人につき1回だけ返す" disabled={!canEdit || busy} checked={Boolean(s.oncePerFriend)} onChange={(on) => onSetting('oncePerFriend', on)} /></div>
+          <div className={styles.rule}><span>返すまで待つ時間</span>{canEdit ? <Select aria-label="返すまで待つ時間" disabled={busy} value={String(s.replyDelaySeconds ?? 0)} options={DELAYS} onChange={(value) => onSetting('replyDelaySeconds', Number(value) || null)} /> : <span>{DELAYS.find((item) => item.value === String(s.replyDelaySeconds ?? 0))?.label ?? '—'}</span>}</div>
+          <div className={styles.rule}><span>同じ人へ続けて返さない</span><span className={styles.ruleEnd}>{s.cooldownMinutes ? <small>{`${s.cooldownMinutes}分あける`}</small> : null}{canEdit ? <Toggle label="同じ人へ続けて返さない" disabled={busy} checked={Boolean(s.cooldownMinutes)} onChange={(on) => onSetting('cooldownMinutes', on ? 60 : null)} /> : <span>{s.cooldownMinutes ? 'オン' : 'オフ'}</span>}</span></div>
+          <div className={styles.rule}><span>担当者が対応中のトークには返さない</span>{canEdit ? <Toggle label="担当者が対応中のトークには返さない" disabled={busy} checked={Boolean(s.skipWhenOperatorActive)} onChange={(on) => onSetting('skipWhenOperatorActive', on)} /> : <span>{s.skipWhenOperatorActive ? 'オン' : 'オフ'}</span>}</div>
+          <div className={styles.rule}><span>1人につき1回だけ返す<small>オフのときは、同じ人が何度送っても返す（上の「続けて返さない」の時間は守る）</small></span>{canEdit ? <Toggle label="1人につき1回だけ返す" disabled={busy} checked={Boolean(s.oncePerFriend)} onChange={(on) => onSetting('oncePerFriend', on)} /> : <span>{s.oncePerFriend ? 'オン' : 'オフ'}</span>}</div>
         </div>
       </Card>
     </> : null}

@@ -1,35 +1,35 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Check } from 'lucide-react'
-import { CreatePage } from '@/components/templates/create-page'
-import PreviewLauncher from '@/components/templates/preview-launcher'
-import { CreateSummaryCard } from '@/components/templates/create-parts'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
-import Card, { CardHeader } from '@/components/shared/card'
+import Card,{ CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Select from '@/components/shared/select'
-import TargetMissing from '@/components/shared/target-missing'
-import { Field } from '@/components/shared/form-controls'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import TargetMissing from '@/components/shared/target-missing'
 import { TextField } from '@/components/shared/text-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifySaved } from '@/components/shared/toast'
-import { emptyValue } from '@/components/shared/empty-value'
+import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
+import { CreatePage } from '@/components/templates/create-page'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
+import PreviewLauncher from '@/components/templates/preview-launcher'
 import { useAccount } from '@/contexts/account-context'
 import { fetchApi } from '@/lib/api'
-import { formatDateTime as polishFormatDateTime, formatYen } from '@/lib/format'
+import { formatYen,formatDateTime as polishFormatDateTime } from '@/lib/format'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
-import { MenuPaymentFields, PaymentConflictError, PaymentSideCard, useMenuPayment } from '../../booking-payments/menu-payment'
+import { restaurantTestApi,type RestaurantMenuItem } from '@/lib/restaurant-test-api'
+import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { Check } from 'lucide-react'
+import { useRouter,useSearchParams } from 'next/navigation'
+import { Suspense,useCallback,useEffect,useMemo,useState } from 'react'
+import { MenuPaymentFields,PaymentConflictError,PaymentSideCard,useMenuPayment } from '../../booking-payments/menu-payment'
 import styles from './edit.module.css'
 
 /*
@@ -45,13 +45,11 @@ type Draft = { kind: 'course' | 'a_la_carte'; name: string; price: string; perio
 const LIST_HREF = '/restaurant-test/menu'
 
 function safeArray(value: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
-  } catch {
-    return []
-  }
+  const parsed: unknown = JSON.parse(value)
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) throw new Error('保存済みのメニュー設定を読み込めませんでした。')
+  return parsed
 }
+
 function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
 }

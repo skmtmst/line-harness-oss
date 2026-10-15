@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname,join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe,expect,it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const LIST_PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
@@ -9,6 +9,7 @@ const EDIT_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const PUBLISH_HISTORY = readFileSync(join(HERE, '../../v8/rich-menu-edit/detail.tsx'), 'utf8')
 const TEST_APPLY = readFileSync(join(HERE, '../../v8/rich-menu-edit/test-apply.tsx'), 'utf8')
 const NEW_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
+  + readFileSync(join(HERE, 'new', 'create-draft.ts'), 'utf8')
 const CREATE_FORM = readFileSync(
   join(HERE, '../../v8/rich-menu-edit/compatibility-form.tsx'),
   'utf8',
