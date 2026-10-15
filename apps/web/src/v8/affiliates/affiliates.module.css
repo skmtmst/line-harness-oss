@@ -458,7 +458,9 @@
   font-size: var(--text-micro);
   line-height: normal;
 }
-.noticeStack { display: flex; flex-direction: column; }
+.noticeStack { display: flex; flex-direction: column; gap: var(--tpl-af-notice-stack-gap); }
+/* 注意の帯の下に続く時は、締めの箱を上へ引き上げない（帯と箱が重なって見えた）。 */
+.noticeStack > * + .closeBox { margin-top: 0; }
 .rowWrapEnd {
   display: block;
   max-width: 100%;
