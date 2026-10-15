@@ -294,6 +294,7 @@ export async function deliverMileageReward(
       const actions = parseActions(plan.actionConfig);
       if (!actions.length) throw new Error('交換後の動きがありません');
       const executors = createAutomationActionExecutors({
+        webhookDeliveryMode: 'immediate',
         credentialEncryptionKey: options.credentialEncryptionKey,
         fetch: options.fetch,
         now: options.now,

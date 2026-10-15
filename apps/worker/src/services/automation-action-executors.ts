@@ -12,6 +12,7 @@ import {
 import { LineClient, type Message } from '@line-crm/line-sdk';
 import {
   AutomationActionError,
+  AutomationActionDeferred,
   type AutomationActionContext,
   type AutomationActionExecutor,
 } from './automation-engine.js';
@@ -40,6 +41,8 @@ interface AutomationLineClient {
 
 export interface AutomationActionExecutorDependencies {
   credentialEncryptionKey?: string;
+  /** Immediate callers own their delivery ledger and require the external acknowledgement. */
+  webhookDeliveryMode?: 'queued' | 'immediate';
   resolveLineAccessToken?: (db: D1Database, lineAccountId: string) => Promise<string | null>;
   createLineClient?: (accessToken: string) => AutomationLineClient;
   fetch?: typeof fetch;
@@ -295,6 +298,11 @@ async function tagExecutor(context: AutomationActionContext, operation: 'add' | 
     });
   } else {
     await removeTagFromFriend(context.db, friend.id, tagId);
+  }
+  const depth=Number(context.inputEvent?.automationDepth??0);
+  if(depth<3) {
+    const {fireEvent}=await import('./event-bus.js');
+    await fireEvent(context.db,'tag_change',{friendId:friend.id,sourceEventId:`automation-tag:${context.idempotencyKey}`,sourceKind:'automation',occurredAt:new Date().toISOString(),eventData:{tagId,action:operation,automationDepth:depth+1}},undefined,context.lineAccountId);
   }
 }
 
@@ -595,6 +603,19 @@ async function webhookExecutor(
     data: { friendId: context.friendId ?? null, event: context.inputEvent },
     attempt: context.attemptNumber,
   });
+  if (dependencies.webhookDeliveryMode !== 'immediate') {
+    const { enqueueOutgoingWebhookDelivery, findOutgoingDeliveryByKey } = await import('./outgoing-webhook-delivery.js');
+    const queued = await enqueueOutgoingWebhookDelivery(context.db, {
+      lineAccountId: context.lineAccountId, webhookId, eventType: 'automation.send_webhook',
+      body, idempotencyKey: context.idempotencyKey, maxAttempts: 8,
+    });
+    const delivery = queued ?? await findOutgoingDeliveryByKey(context.db, webhookId, context.idempotencyKey);
+    if (!delivery) throw new Error('webhook_delivery_not_recorded');
+    if (delivery.status === 'delivered') return { output: { webhookId, deliveryId: delivery.id, delivered: true } };
+    if (delivery.status === 'failed') throw invalid('webhook_delivery_failed', '送信Webhookを届けられませんでした');
+    // Acceptance into the outbox is not completion: dependent actions must wait for acknowledgement.
+    throw new AutomationActionDeferred();
+  }
   const headers = await buildOutgoingWebhookHeaders({ eventId: context.idempotencyKey, body, secret: sendSecret });
   // 送信直前の再検査は配送側と共有する。転送先の各段も送る前に確かめる。
   let outcome: SafePostOutcome;

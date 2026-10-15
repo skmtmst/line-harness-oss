@@ -137,6 +137,9 @@ export class AutomationActionError extends Error {
   }
 }
 
+/** The delivery outbox owns retries; polling must not spend this action's retry budget. */
+export class AutomationActionDeferred extends Error {}
+
 export class AutomationRunRetryError extends Error {
   constructor(
     public readonly code: 'not_found' | 'not_retryable' | 'retry_conflict',
@@ -620,7 +623,8 @@ async function claimStep(
   const result = await db.prepare(
     `UPDATE automation_run_steps
         SET status = 'running',
-            attempt_number = CASE WHEN status = 'queued' THEN attempt_number ELSE attempt_number + 1 END,
+            attempt_number = CASE WHEN status = 'queued' OR error_code = 'webhook_delivery_pending'
+              THEN attempt_number ELSE attempt_number + 1 END,
             started_at = COALESCE(started_at, ?), retry_at = NULL, lease_expires_at = ?
       WHERE id = ? AND (
         status = 'queued'
@@ -937,6 +941,17 @@ export async function processAutomationRun(
       await db.prepare(`UPDATE automation_runs SET current_step = ? WHERE id = ?`)
         .bind(index + 1, run.id).run();
     } catch (error) {
+      if (error instanceof AutomationActionDeferred) {
+        const retryAt = addMinutes(now, 5);
+        await db.batch([
+          db.prepare(`UPDATE automation_run_steps SET status = 'waiting',
+            error_code = 'webhook_delivery_pending', error_message = NULL, retry_at = ?, lease_expires_at = NULL
+            WHERE id = ? AND status = 'running'`).bind(retryAt, step.id),
+          db.prepare(`UPDATE automation_runs SET status = 'waiting', resume_at = ?, lease_expires_at = NULL
+            WHERE id = ? AND status = 'running'`).bind(retryAt, run.id),
+        ]);
+        return 'waiting';
+      }
       const failure = normalizeError(error);
       const outcome = await markStepFailure(db, step, failure, now);
       if (outcome === 'retry') return 'waiting';

@@ -1443,10 +1443,12 @@ friends.delete('/api/friends/:id/tags/:tagId', requireRole('owner', 'admin', 'st
     const friendId = c.req.param('id');
     const tagId = c.req.param('tagId');
 
-    await removeTagFromFriend(c.env.DB, friendId, tagId);
+    const removed = await c.env.DB.prepare('DELETE FROM friend_tags WHERE friend_id=? AND tag_id=?').bind(friendId,tagId).run();
+    if (!removed.meta.changes) return c.json({ success: true, data: null });
 
     // イベントバス発火: tag_change
-    await fireEvent(c.env.DB, 'tag_change', { friendId, eventData: { tagId, action: 'remove' } });
+    const friend = await getFriendById(c.env.DB, friendId);
+    await fireEvent(c.env.DB, 'tag_change', { friendId, sourceEventId: `manual_tag_remove:${crypto.randomUUID()}`, sourceKind: 'manual', occurredAt: new Date().toISOString(), eventData: { tagId, action: 'remove' } }, undefined, friend?.line_account_id);
 
     return c.json({ success: true, data: null });
   } catch (err) {

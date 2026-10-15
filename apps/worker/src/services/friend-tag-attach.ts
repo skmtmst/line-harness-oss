@@ -120,11 +120,20 @@ const STEP_DEFINITIONS: Record<FriendTagSideEffectStep, StepDefinition> = {
   event_tag_change: {
     propagatesFailure: true,
     label: 'タグ変化イベントの発火',
-    async run(db, friendId, tagId) {
-      await fireEvent(db, 'tag_change', { friendId, eventData: { tagId, action: 'add' } });
+    async run(db, friendId, tagId, assignedAt) {
+      await emitTagChange(db, friendId, tagId, 'add', assignedAt);
     },
   },
 };
+
+/** Carry a stable change identity across every producer, including workflow replay. */
+async function emitTagChange(db: D1Database, friendId: string, tagId: string, action: 'add'|'remove', sourceId: string): Promise<void> {
+  const friend = await db.prepare('SELECT line_account_id FROM friends WHERE id=?').bind(friendId).first<{line_account_id:string|null}>();
+  await fireEvent(db, 'tag_change', {
+    friendId, sourceEventId: `tag:${friendId}:${tagId}:${action}:${sourceId}`,
+    sourceKind: 'friend_tag', occurredAt: new Date().toISOString(), eventData: {tagId, action},
+  }, undefined, friend?.line_account_id);
+}
 
 /** 台帳への書き込みは本題を巻き添えにしない。落ちても記録だけ残して先へ進む。 */
 async function recordLedger(what: string, write: () => Promise<void>): Promise<void> {
@@ -362,7 +371,7 @@ export async function detachTagAndFireSideEffects(
   const removed = (result.meta?.changes ?? 0) > 0;
   if (!removed) return { removed: false };
 
-  await fireEvent(db, 'tag_change', { friendId, eventData: { tagId, action: 'remove' } });
+  await emitTagChange(db, friendId, tagId, 'remove', crypto.randomUUID());
   return { removed: true };
 }
 
@@ -404,7 +413,7 @@ async function detachTagWithReceipt(db: D1Database, friendId: string, tagId: str
     WHERE id=? AND json_extract(after_json,'$.status')='pending'`).bind(receipt.id).run();
   if (!(claimed.meta?.changes ?? 0)) return hold();
   try {
-    await fireEvent(db,'tag_change',{friendId,eventData:{tagId,action:'remove'}});
+    await emitTagChange(db, friendId, tagId, 'remove', receipt.id);
     await db.prepare(`UPDATE audit_events SET after_json='{"status":"completed"}',result='success',reason=NULL WHERE id=?`)
       .bind(receipt.id).run();
   } catch {
