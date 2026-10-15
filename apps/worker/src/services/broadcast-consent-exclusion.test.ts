@@ -81,6 +81,17 @@ describe('637: 停止者を外して一斉配信を続ける', () => {
     await processQueuedBroadcasts(f.db,calls as never);
     expect(sentIds()).not.toContain('U-allowed');expect(new Set(sentIds()).size).toBe(sentIds().length);expect(row()).toMatchObject({status:'sent'});
   });
+  it('全員が配信停止の店は0人として完了し、別の店の配信を止めない',async()=>{
+    for(const id of ['allowed','stopped','unknown'])consent(id);
+    const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-zero',title:'一括配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop','other'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
+    expect((await preflightHqBroadcast(f.db,run)).find(p=>p.accountId==='shop')).toMatchObject({audienceCount:0,consentExcluded:3,blockedReasons:[]});
+    await dispatchHqBroadcast(f.db,run,'owner',1);await processScheduledBroadcasts(f.db,calls as never);await processQueuedBroadcasts(f.db,calls as never);
+    expect(sentIds()).toEqual(['U-other-friend']);
+    expect(f.raw.prepare("SELECT status,success_count FROM broadcasts WHERE line_account_id='shop'").get()).toEqual({status:'sent',success_count:0});
+    const {readHqBroadcastResult}=await import('./hq-broadcasts.js');
+    const result=await readHqBroadcastResult(f.db,run);
+    expect(result.targets.find(t=>t.accountId==='shop')?.failureReasons).toEqual([{code:'consent_excluded',label:'配信を止めているため送りませんでした',count:3,retryable:false}]);
+  });
   it('統括の全員指定も店別に人数と警告を返し、停止者がいる店を除外せず送れる',async()=>{
     consent('stopped');consent('unknown','unknown');
     const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-consent',title:'一括配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop','other'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
