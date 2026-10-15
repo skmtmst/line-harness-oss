@@ -3,7 +3,7 @@
 /*
  * 日付の選択。Pencil ★V8（V8.pen）「日付の入力（カレンダー）」。
  *
- *   欄     高さ 40・余白 [0,12]・角丸 8・枠 $hairline（開いている間は $accent-deep 1.5px）
+ *   欄     高さ 36（ほかの欄と同じ・B-145）・余白 [0,12]・角丸 8・枠 $hairline（開いている間は $accent-deep 1.5px）
  *   暦     幅 296・余白 16・角丸 12・影 beautiful-shadows md・欄の 6px 下、左をそろえる
  *   日付   36×36。選んだ日は濃い緑の丸、今日は線の丸、指を乗せた日は $canvas-sunken の角丸 8
  *   動き   暦は motion-fast で出る（不透明度＋大きさ 0.97→1、左上が起点）
@@ -18,7 +18,7 @@
 .field {
   display: flex;
   width: 100%;
-  height: 40px;
+  height: 36px;
   align-items: center;
   gap: 8px;
   padding: 0 36px 0 12px;
@@ -89,9 +89,9 @@
 }
 
 /*
- * 消すボタンは欄の右端に収める（40px の欄の中・上下1px空け）。
+ * 消すボタンは欄の右端に収める（36px の欄の中・上下1px空け）。
  * 素のボタン扱い（globals の min-height:32px）で 32px に伸びると、
- * 隣の欄（40px）と高さがずれて見える。
+ * 隣の欄（36px）と高さがずれて見える。
  */
 .clear {
   position: absolute;

@@ -26,6 +26,12 @@
   display: grid;
 }
 
+:root .items[data-choice-columns] {
+  width: 100%;
+  grid-template-columns: repeat(var(--choice-columns), minmax(0, 1fr));
+  gap: var(--polish-space-row);
+}
+
 .card {
   grid-template-columns: 20px minmax(0, 1fr);
   cursor: pointer;
@@ -268,7 +274,7 @@
   cursor: pointer;
 }
 .row:hover { background: transparent; }
-.row.checked, .row.checked:hover { border-color: transparent; background: transparent; }
+.row.checked, .row.checked:hover { border-color: transparent; background: transparent; outline-color: transparent; }
 .row.disabled { background: transparent; }
 .row.invalid { border-color: transparent; }
 .row .topIcon { display: none; }
@@ -353,6 +359,7 @@ html:root .card:not(.row) > .radio { position: absolute; top: var(--space-16); r
 html:root .card.row { outline-color: transparent; box-shadow: none; background: transparent; }
 /* 行型の部品は .card を持たないので、選んだ行にも同じく枠を出さない（絵 pUT4L・E1CeT：選んだ文の周りに細い緑の四角が出ていた）。 */
 html:root .row.checked, html:root .row.checked:hover { outline-color: transparent; box-shadow: none; background: transparent; }
+html:root .row, html:root .row.checked, html:root .row.checked:hover { outline-color: transparent; box-shadow: none; background: transparent; }
 
 html:root .card[data-choice-indicator='check'] > .radio { width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 html:root .card[data-choice-indicator='check'] .body { padding-right: 0; }

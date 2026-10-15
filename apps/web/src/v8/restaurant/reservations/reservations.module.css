@@ -469,22 +469,6 @@
   gap: var(--tpl-rs-stat-gap);
 }
 
-.personRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rs-table-row-gap);
-  padding: var(--tpl-rs-dlg-note-pad);
-  border-radius: var(--radius-segment);
-  background: var(--color-canvas);
-}
-
-.personName {
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 700;
-  line-height: var(--tpl-rs-lh-13);
-}
-
 .timeBlock {
   display: flex;
   flex-direction: column;

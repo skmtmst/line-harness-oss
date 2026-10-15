@@ -449,7 +449,8 @@ function MenuPreview({
         </div>
       ) : null}
       {imageUrl ? (
-        <div className={styles.previewMenuImage}>
+        /* 枠の比は大きさ（大 2500×1686・小 2500×843）で決める。画像が別の比・読み途中でも高さが潰れない（OxEMM）。 */
+        <div className={styles.previewMenuImage} data-rich-menu-size={size} style={{ aspectRatio: `${dims.width} / ${dims.height}` }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL */}
           <img src={imageUrl} alt="メニューの画像" />
           {areaBoxes}
@@ -1825,14 +1826,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const stepIndex = STEP_KEYS.indexOf(step)
   /*
    * 居場所は currentKey が決める。state は「済みか」だけを表すので、
-   * いまいる段は done にしない（まだ入力中）。
+   * いまいる段は done にしない（まだ入力中）。最後の「公開」は押して出すまで済みにしない
+   * （開き直した下書きで、まだ公開していないのに済みの印が付いていた。OxEMM）。
    */
   const stepperSteps = STEP_KEYS.map((key, i) => ({
     key,
     label: stepLabel(key),
-    /* 統括（UgZPJ・BVSbe・ME78d）：今の手順より先は、直すときに押して進めても番号のまま（済みの印は前の手順だけ）。 */
-    state: (host ? i < stepIndex : i !== stepIndex && i <= maxStepIndex) ? 'done' as const : 'todo' as const,
+    /* 統括（UgZPJ・BVSbe・ME78d）：今の手順より先は、直すときに押して進めても番号のまま（済みの印は前の手順だけ）。まだ公開していない「公開」の段は番号のまま（OxEMM）。 */
+    state: (host ? i < stepIndex : i !== stepIndex && i <= maxStepIndex && (key !== 'publish' || done !== null)) ? 'done' as const : 'todo' as const,
     onSelect: i !== stepIndex && i <= maxStepIndex ? () => goToStep(key) : undefined,
+    reachable: i !== stepIndex && i <= maxStepIndex,
   }))
 
   const headNote =

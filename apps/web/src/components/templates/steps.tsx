@@ -13,7 +13,7 @@ type DotState = 'done' | 'current' | 'todo' | 'attention'
  *
  * - 置き場所：作る画面の題と説明のすぐ下・左寄せ・1行（型の PageHeading の `steps` に渡す）。横いっぱいに広げない
  * - 段：丸24（済み＝緑に白い✓・今＝墨に白い数字・まだ＝薄い枠に灰の数字）・名13（今だけ太字）・段の間に線24
- * - 済みの段（と直すところがある段）は押して戻れる。まだの段・今の段は押せない
+ * - 済みの段（と直すところがある段）は押して戻れる。まだの段・今の段は押せない（reachable の付いたまだの段だけ、番号のまま押して進める）
  * - 入らない幅では各名を1行で省略し、全文は読み上げと title に残す
  *
  * 渡し方は共通の型（label・steps・currentKey）。手順の見た目はこのV8部品だけを使う。
@@ -47,7 +47,8 @@ export function Steps({
         {items.map((step, index) => {
           const state = stateOf(index)
           const isCurrent = state === 'current'
-          const clickable = (state === 'done' || state === 'attention') && Boolean(step.anchor || step.onSelect)
+          const forward = state === 'todo' && step.reachable === true
+          const clickable = (state === 'done' || state === 'attention' || forward) && Boolean(step.anchor || step.onSelect)
           const lineDone = index > 0 && stateOf(index - 1) === 'done'
           const dot = (
             <span className={styles.dot} data-step-dot={state} title={state === 'attention' ? '直すところがあります' : undefined}>
@@ -67,7 +68,7 @@ export function Steps({
                   type="button"
                   className={styles.step}
                   title={step.label}
-                  aria-label={`${step.label}に戻る`}
+                  aria-label={`${step.label}に${forward ? '進む' : '戻る'}`}
                   onClick={() => {
                     if (step.onSelect) {
                       step.onSelect?.()

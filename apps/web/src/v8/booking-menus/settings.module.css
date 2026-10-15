@@ -166,7 +166,7 @@
 
 .sideTitle {
   display: flex;
-  align-self: flex-start;
+  align-self: stretch;
   align-items: center;
   gap: var(--tpl-bm-6);
   margin: 0;
@@ -527,30 +527,6 @@
   background: currentcolor;
 }
 
-/* 行末の「…」。28角・細い枠。 */
-.rowMenuButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-bm-28);
-  height: var(--tpl-bm-28);
-  padding: 0;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-}
-
-.rowMenuButton:hover:not(:disabled) {
-  background: var(--color-canvas-sunken);
-}
-
-.rowMenuButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
 /* ===== 状態（空・0件・読込中・失敗） ===== */
 
 .stateCard {
@@ -716,27 +692,9 @@
   white-space: nowrap;
 }
 
-/* TimeField は中に自分の欄（枠・時計・消す）を持つ。外には幅だけを当てて、
-   内側の欄を見本の大きさ（高さ32・12px）へ揃える。 */
 .timeInput {
   width: var(--tpl-bm-84);
   flex-shrink: 0;
-}
-
-.timeInput > button:first-of-type {
-  height: var(--tpl-bm-32);
-  padding: 0 var(--tpl-bm-10);
-  font-size: var(--tpl-bm-12);
-}
-
-/* 見本の箱は「9:00」だけ。時計アイコンと中の消すボタンは隠す
-   （時間帯の消去は行はしの×でできる）。 */
-.timeInput > button:first-of-type :global(svg) {
-  display: none;
-}
-
-.timeInput > button:not(:first-of-type) {
-  display: none;
 }
 
 .numInput {
@@ -1111,34 +1069,22 @@
 
 .staffName {
   display: flex;
-  flex: 1 1 0;
+  flex: 0 0 var(--tpl-bk2-staff-col-name);
   flex-direction: column;
   gap: var(--tpl-bm-2);
   min-width: 0;
 }
 
-.staffNameLink {
-  width: fit-content;
+.staffRole {
   overflow: hidden;
-  color: var(--color-accent-deep);
-  font-size: var(--tpl-bm-13);
-  font-weight: 600;
-  text-decoration: none;
+  color: var(--color-ink-faint);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.staffNameLink:hover {
-  text-decoration: underline;
-}
-
-.staffRole {
-  color: var(--color-ink-faint);
   font-size: var(--tpl-bm-11);
 }
 
 .staffColMenus {
-  width: var(--tpl-bk2-staff-col-menus);
+  width: calc(var(--tpl-bk2-staff-col-menus) + var(--polish-space-card));
   flex-shrink: 0;
 }
 
@@ -1157,9 +1103,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--tpl-bm-4);
-  width: var(--tpl-bk2-staff-col-link);
-  flex-shrink: 0;
-  min-width: 0;
+  flex: 1 1 var(--tpl-bk2-staff-col-link);
+  min-width: var(--tpl-bk2-staff-col-link);
 }
 
 .staffColStatus {
@@ -1174,14 +1119,11 @@
   flex-shrink: 0;
 }
 
-.staffNote {
-  margin: 0;
-  padding: var(--tpl-bm-10) var(--tpl-bm-12);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bm-12);
-  line-height: var(--tpl-bm-18);
+.staffMenuWarning {
+  margin-top: var(--tpl-bm-2);
+  color: var(--color-warning);
+  font-size: var(--text-micro);
+  white-space: nowrap;
 }
 
 .staffColLink .staffCellSub {
@@ -1193,10 +1135,21 @@
   line-height: var(--tpl-bm-16);
 }
 
+/* 絵 VLEaj：数の「0」は黒、下の注意文だけオレンジ。 */
 .staffRow .cellWarn {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  color: var(--color-ink);
   line-height: var(--tpl-bm-17);
+}
+
+/* 絵 VLEaj：「予約画面に出ません」は1行。狭いときは省略し、全文は title で見せる。 */
+.staffRow .cellWarn .staffCellSub {
+  overflow: hidden;
+  color: var(--color-warning);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .staffCellMain {

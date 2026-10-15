@@ -37,17 +37,20 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
 
-it.each(['回答フォーム', '一斉配信'])('未使用がない・未取得の%sには空の操作メニューを置かない', async label => {
+it.each(['回答フォーム', '一斉配信'])('未使用がない・未取得の%sは「…」の中に中身を見るだけを置き、片づけるは出さない（行の右端は「…」1つ・B-253）', async label => {
   render(<UsageV8 accountId="account-1" />)
   const cell = await screen.findByText(label, { selector: 'td span' })
   const row = cell.closest('tr')!
-  expect(within(row).queryByRole('button', { name: /その他操作|の操作/ })).toBeNull()
-  expect(within(row).getByRole('link', { name: '中身を見る' })).toBeTruthy()
+  expect(within(row).queryByRole('link', { name: '中身を見る' })).toBeNull()
+  fireEvent.click(within(row).getByRole('button', { name: `${label}の操作` }))
+  expect(screen.getByRole('menuitem', { name: '中身を見る' })).toBeTruthy()
+  expect(screen.queryByRole('menuitem', { name: '片づける' })).toBeNull()
 })
 
 it('未使用がある行だけ片づけるを開き、元の行き先を保つ', async () => {
   render(<UsageV8 accountId="account-1" />)
-  const menu = await screen.findByRole('button', { name: 'シナリオ配信のその他操作' })
+  const menu = await screen.findByRole('button', { name: 'シナリオ配信の操作' })
   fireEvent.click(menu)
+  expect(screen.getByRole('menuitem', { name: '中身を見る' }).getAttribute('href')).toContain('/scenarios')
   expect(screen.getByRole('menuitem', { name: '片づける' }).getAttribute('href')).toContain('/scenarios')
 })

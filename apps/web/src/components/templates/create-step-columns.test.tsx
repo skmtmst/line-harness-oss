@@ -5,8 +5,8 @@ import { CreateStepColumns } from './create-step-columns'
 
 afterEach(cleanup)
 
-it('右欄と同じ内容を役目名の窓で確認し、閉じても入力値を保つ', () => {
-  render(<CreateStepColumns previewTitle="登録内容" preview={<p>担当：店長</p>}><input aria-label="表示名" defaultValue="入力前" /></CreateStepColumns>)
+it.each([false, true])('単独の面=%sでも右欄と同じ内容を窓で読み、閉じたあと入力を保つ', (standalone) => {
+  render(<CreateStepColumns standalone={standalone} previewTitle="登録内容" preview={<p>担当：店長</p>}><input aria-label="表示名" defaultValue="入力前" /></CreateStepColumns>)
   const input = screen.getByRole('textbox', { name: '表示名' }) as HTMLInputElement
   fireEvent.change(input, { target: { value: '変更した店舗' } })
   expect(within(screen.getByRole('complementary', { name: '登録内容' })).getByText('担当：店長')).toBeTruthy()

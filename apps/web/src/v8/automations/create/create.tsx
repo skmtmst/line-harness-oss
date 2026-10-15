@@ -17,7 +17,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import type { Automation } from '@line-crm/shared'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 import { api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail, type AutomationDraftDetail } from '@/lib/api'
-import { ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, Pencil, Play, Tag as TagIcon, Trash2, UserPlus, UserRound, Zap } from 'lucide-react'
+import { ArrowDown, ArrowLeftRight, ArrowUp, Bell, FilePen, FileText, MessageCircle, Pencil, Play, Tag as TagIcon, Trash2, UserPlus, UserRound, Zap, type LucideIcon } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Card from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -31,6 +31,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import { Field, FieldError, RequiredBadge } from '@/components/shared/form-controls'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { EntityPickerSummary } from '@/components/shared/entity-picker'
 import { useAccount } from '@/contexts/account-context'
 import ConditionBuilder, { isEmptyCondition, isRuleComplete, pruneCondition, type SegmentCondition, type SegmentRule } from '@/components/shared/condition-builder'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
@@ -1220,7 +1221,8 @@ export function NewAutomationV8({
           testRun: null,
         }
         setResumeStatus('ready')
-        setNotice('保存した下書きを読み込みました。続きを直せます。')
+        /* 見本から作った下書き（J1VA8）は頭の下の帯がどこから来たかを伝えるので、読み込みの知らせは重ねない。 */
+        if (chrome !== 'draft') setNotice('保存した下書きを読み込みました。続きを直せます。')
         if (restored.conditionUnreadable) {
           /*
            * 古い保存口が残した読めない条件。黙って「条件なし」へ戻すと
@@ -1607,7 +1609,8 @@ export function NewAutomationV8({
             ? [
                 dirtySinceSave
                   ? '保存したあとに内容を変更しています'
-                  : `下書きに保存しました${savedAt === null ? '' : `（${formatClock(savedAt)}）`}`,
+                  /* 読み込んだだけ（この画面でまだ保存していない）なら、下の帯に保存の知らせを出さない（絵 J1VA8）。 */
+                  : savedAt === null ? null : `下書きに保存しました（${formatClock(savedAt)}）`,
                 // AUTOMATION-03: 人数の確認の失敗は、保存の結果とは別に添える。
                 previewFailed ? '人数の確認に失敗しました。通信を確かめて、もう一度お試しください。' : null,
               ].filter((part): part is string => part !== null).join('・')
@@ -2501,7 +2504,7 @@ export function NewAutomationV8({
   const isDraft = chrome === 'draft'
   const backHref = isDraft ? '/automations?tab=templates' : '/automations'
   const sourceBand = isDraft && resumeStatus === 'ready' ? (
-    <div className={styles.sourceBand} role="note">
+    <span className={styles.sourceBand} role="note">
       <FilePen size={16} aria-hidden="true" className={styles.sourceIcon} />
       <span>{`見本「${sourceName.trim() || '見本'}」から作った下書きです。${usedTagNames.length > 0 || usedScenarioNames.length > 0
         ? `${[
@@ -2509,7 +2512,7 @@ export function NewAutomationV8({
           ...usedScenarioNames.map((scenarioName) => `シナリオ「${scenarioName}」`),
         ].join('と')}を、このアカウントのものに選び直してください。`
         : 'タグやシナリオを、このアカウントのものに選び直してください。'}`}</span>
-    </div>
+    </span>
   ) : null
 
   return (
@@ -2522,17 +2525,18 @@ export function NewAutomationV8({
           <>
             見本に実データは入っていません。このアカウントで使うタグやシナリオを選び、下書きとして保存します。
             保存しても自動では動きません。公開するまでは下書きのままです。
-            {sourceBand}
           </>
         )
         : 'きっかけ・だれに・何をするかを決めます。1人で試してから動かすと、まちがいを防げます。'}
       /* 競合の帯（tJqST）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
+      /* 見本の帯（J1VA8）は頭の中、題のすぐ下（絵では頭の線より上）。 */
+      subtitle={sourceBand ?? undefined}
       notice={conflictBand}
       noticeSpacing="band"
       previewLabel="設定内容を見る"
       previewTitle="設定内容"
       preview={sideColumn}
-      status={saveStatusText}
+      status={saveStatusText || undefined}
       footerActions={(
         <>
           <Button href={backHref}>キャンセル</Button>
@@ -2701,19 +2705,14 @@ export function NewAutomationV8({
             <div className={styles.field}>
               <span className={styles.subLabel} id="v8-target-label">動かす相手</span>
               {/* 条件は一斉配信・シナリオと同じ部品（ConditionBuilder）で作る。押すと窓で開く。 */}
-              <button
-                type="button"
-                className={styles.selectBox}
-                aria-labelledby="v8-target-label"
-                aria-haspopup="dialog"
-                onClick={() => setConditionOpen(true)}
-                title={conditionSummaries.join('・') || undefined}
-              >
-                <span className={styles.selectText}>
-                  {conditionSummaries.length > 0 ? conditionSummaries.join('・') : 'すべての友だち'}
-                </span>
-                <ChevronDown size={14} aria-hidden="true" />
-              </button>
+              <EntityPickerSummary
+                label="動かす相手"
+                noun="動かす相手"
+                name={conditionSummaries.length > 0 ? conditionSummaries.join('・') : 'すべての友だち'}
+                ariaLabel="動かす相手を変える"
+                aria-describedby="v8-target-label"
+                onOpen={() => setConditionOpen(true)}
+              />
             </div>
             <button type="button" className={styles.linkButton} onClick={() => setConditionOpen(true)}>
               ＋「いずれか1つ以上を満たす」条件を足す
@@ -2728,7 +2727,7 @@ export function NewAutomationV8({
           <p className={styles.cardDesc}>上から順に動きます</p>
         </div>
         <ActionList<ActionDraft> value={actions} onChange = {setActions} readOnly ={!canEdit} idOf={row => String(row.key)} addId="v8-add-action" editingId={editingActionKey === null ? null : String(editingActionKey)}
-          titleOf={actionRowDetail} kindOf={row =>actionRowTitle(row.type)}
+          titleOf={actionRowDetail} kindOf={row =>actionRowTitle(row.type)} iconOf={row => actionRowIcon(row.type)} quickAddChoiceId="common_action"
           choices={EDITABLE_ACTIONS.map(kind =>{
             const target= kind.value === 'add_tag' ? { items: tags,key : 'tagId', title: 'タグ'}
               : kind.value=== 'start_scenario' ?{ items: scenarios, key: 'scenarioId', title: 'シナリオ' }
@@ -2890,6 +2889,15 @@ export function NewAutomationV8({
 }
 
 /* することの行の見出し（行の種類が変わっても番号は動かない）。 */
+/* 行の印（絵 J1VA8）：タグ＝札・メッセージ＝紙・知らせ＝ベル・シナリオ＝再生・共通アクション＝稲妻。 */
+function actionRowIcon(type: string): LucideIcon {
+  if (type === 'add_tag') return TagIcon
+  if (type === 'start_scenario') return Play
+  if (type === 'common_action') return Zap
+  if (type === 'notify_staff') return Bell
+  return FileText
+}
+
 function actionRowTitle(type: string): string {
   if (type === 'add_tag') return 'タグを付ける'
   if (type === 'start_scenario') return 'シナリオを始める'

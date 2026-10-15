@@ -7,6 +7,7 @@ import { X } from 'lucide-react'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
 import Dialog from './dialog'
+import IconButton from './icon-button'
 import { useFormInputDirty } from './form-input-dirty'
 import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
 import { drawerWidth } from './destination-policy'
@@ -17,9 +18,12 @@ export type DrawerProps = {
   open: boolean
   title: string
   titleAccessory?: ReactNode
+  closeAppearance?: 'box'
   description?: ReactNode
   contentSpacing?: 'sections'
   dirty?: boolean
+  /** 未保存の確認を保ち、題の印だけ省く場合は false。 */
+  showDirtyIndicator?: boolean
   busy?: boolean
   error?: string
   onClose: () => void
@@ -55,9 +59,11 @@ export default function Drawer({
   open,
   title,
   titleAccessory,
+  closeAppearance,
   description,
   contentSpacing,
   dirty,
+  showDirtyIndicator = true,
   busy = false,
   error,
   onClose,
@@ -90,11 +96,11 @@ export default function Drawer({
 
   const titleBlock = (
     <div>
-      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty ? ' *' : ''}</h2>{titleAccessory}</div>
+      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty && showDirtyIndicator ? ' *' : ''}</h2>{titleAccessory}</div>
       {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
     </div>
   )
-  const closeButton = <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>
+  const closeButton = closeAppearance === 'box' ? <IconButton onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></IconButton> : <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>
 
   const panel = (
     <aside

@@ -136,7 +136,7 @@ describe('届かなかった交換', () => {
 
   it('同時クリック・再送を1回にまとめる', () => {
     // 先に立てた旗でボタンも関数も止める。
-    expect(code).toMatch(/disabled=\{retryingId !== null\}/)
+    expect(code).toMatch(/disabled(=\{|: )retryingId !== null/)
     expect(code).toMatch(/if\s*\(!accountId \|\| retryingId\) return/)
     expect(code).toMatch(/setRetryingId\(item\.id\)/)
   })

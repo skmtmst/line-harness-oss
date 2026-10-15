@@ -109,6 +109,8 @@
   overflow-y: auto;
 }
 
+/* 概要の段どうしの間（絵 tnTn9：数の帯・リンク・待っている成果・付け方の間は 16）。 */
+.stack { display: flex; flex-direction: column; gap: var(--tpl-af-dr-gap); min-width: 0; }
 .section {
   display: flex;
   flex-direction: column;

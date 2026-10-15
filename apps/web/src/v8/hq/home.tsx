@@ -489,7 +489,7 @@ export default function HqHomeV8() {
             onChange={setView}
             options={[{ value: 'cards', label: 'カード' }, { value: 'table', label: '表' }]}
           /></SaveErrorField>
-          <SaveErrorField names={["sort"]}><Select aria-label="アカウントの並び順" value={sort} width={134} onChange={(value) => { setSort(value); resetPage() }} options={SORT_OPTIONS} /></SaveErrorField>
+          <SaveErrorField names={["sort"]}><Select aria-label="アカウントの並び順" value={sort} width={140} onChange={(value) => { setSort(value); resetPage() }} options={SORT_OPTIONS} /></SaveErrorField>
           <SaveErrorField names={["size"]}><Select
             aria-label="アカウントの表示件数"
             value={String(size)}

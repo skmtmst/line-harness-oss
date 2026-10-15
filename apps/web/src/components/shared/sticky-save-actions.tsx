@@ -1,5 +1,5 @@
 import { Children, cloneElement, isValidElement, type ReactNode } from 'react'
-import { Save } from 'lucide-react'
+import { Check, Save } from 'lucide-react'
 import Button from './button'
 
 type ActionChildren = { children?: ReactNode; 'aria-hidden'?: boolean | 'true' | 'false' }
@@ -26,7 +26,8 @@ export function normalizeStickySaveActions(node: ReactNode): ReactNode {
   if (!isValidElement<ActionChildren & { variant?: string; href?: unknown; icon?: ReactNode }>(node)) return node
   if (node.type === Button && node.props.variant === 'primary' && node.props.href === undefined
     && /(保存|登録|作る|つくって|動かす|変更|公開|発行|有効|追加|やり直す)/.test(actionText(node.props.children))) {
-    return cloneElement(node, {}, <>{node.props.icon === undefined ? <Save size={16} aria-hidden="true" data-sticky-save-icon /> : null}{withoutDecorations(node.props.children)}</>)
+    const Mark = /保存/.test(actionText(node.props.children)) && !/(登録|作る|つくって|動かす|公開|発行|有効|追加|やり直す)/.test(actionText(node.props.children)) ? Check : Save
+    return cloneElement(node, {}, <>{node.props.icon === undefined ? <Mark size={16} aria-hidden="true" data-sticky-save-icon /> : null}{withoutDecorations(node.props.children)}</>)
   }
   if (node.props.children === undefined) return node
   const children = normalizeStickySaveActions(node.props.children)

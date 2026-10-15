@@ -30,7 +30,7 @@ export function ValueBarChart({ items, label, unit = '', presentation = 'standar
  const max = Math.max(1,...items.map(p=>p.value ?? 0)); const ticks = barChartTicks(max); const top=ticks.at(-1) || 1
  return <div className={styles.root} role="group" aria-label={label}>
   <div className={styles.plot} data-presentation={presentation}>{presentation === 'standard' && ticks.map(tick=><span className={styles.grid} key={tick} style={{bottom:`${tick/top*100}%`}} aria-hidden="true"><span>{chartNumber(tick,unit)}</span></span>)}
-   <div ref={columnsRef} className={styles.columns}>{items.map((item,index)=><div className={styles.column} key={item.key}><button type="button" className={styles.hit} aria-label={`${item.label} ${chartNumber(item.value,unit)}${item.note ? `・${item.note}`:''}`}><span className={styles.bar} style={{height:`${Math.max(0,item.value??0)/top*100}%`,background:presentation === 'summary' && !item.emphasis ? 'var(--color-accent)' : CHART_COLORS.primary}}/><span className={styles.tooltip}>{item.label} {chartNumber(item.value,unit)}{item.note}</span></button><span className={styles.axis} data-chart-axis data-axis-edge={items.length > 1 ? index === 0 ? 'first' : index === items.length - 1 ? 'last' : undefined : undefined} hidden={index !== 0 && index !== items.length - 1 && (index % labelStep !== 0 || items.length - 1 - index < labelStep)}>{chartDate(item.label)}</span></div>)}</div>
+   <div ref={columnsRef} className={styles.columns} data-dense={items.length > 14 || undefined}>{items.map((item,index)=><div className={styles.column} key={item.key}><button type="button" className={styles.hit} aria-label={`${item.label} ${chartNumber(item.value,unit)}${item.note ? `・${item.note}`:''}`}><span className={styles.bar} style={{height:`${Math.max(0,item.value??0)/top*100}%`,background:presentation === 'summary' && !item.emphasis ? 'var(--color-accent)' : CHART_COLORS.primary}}/><span className={styles.tooltip}>{item.label} {chartNumber(item.value,unit)}{item.note}</span></button><span className={styles.axis} data-chart-axis data-axis-edge={items.length > 1 ? index === 0 ? 'first' : index === items.length - 1 ? 'last' : undefined : undefined} hidden={index !== 0 && index !== items.length - 1 && (index % labelStep !== 0 || items.length - 1 - index < labelStep)}>{chartDate(item.label)}</span></div>)}</div>
   </div>
  </div>
 }
@@ -50,4 +50,19 @@ export function LineChart({ points, label, unit = '', maxX, maxY, marker }: { po
  </svg></div>
 }
 
-export function HorizontalBarChart(props: Parameters<typeof FunnelChart>[0]) { return <FunnelChart {...props} numbered={false} /> }
+/**
+ * 横棒（絵 v0SbYR「集まった回答」）：名前120・細い棒（全体に占める割合）・数と割合。
+ * 行は押せない読み物なので、枠の付いた箱にしない。total を渡さなければ並べた数の合計を全体にする。
+ */
+export function HorizontalBarChart({ items, label, unit = '件', total }: { items: ChartPoint[]; label: string; unit?: string; total?: number }) {
+ const whole = Math.max(1, total ?? items.reduce((sum, item) => sum + Math.max(0, item.value ?? 0), 0))
+ return <div className={styles.hbar} role="group" aria-label={label}>{items.map(item => {
+  const share = Math.round(Math.max(0, item.value ?? 0) / whole * 100)
+  const text = `${chartNumber(item.value, unit)}（${share}%）`
+  return <div className={styles.hbarRow} key={item.key} role="group" aria-label={`${item.label} ${text}`}>
+   <span className={styles.hbarLabel} title={item.label}>{item.label}</span>
+   <span className={styles.hbarTrack} aria-hidden="true"><span style={{ width: `${share}%` }} /></span>
+   <span className={styles.hbarValue}>{text}</span>
+  </div>
+ })}</div>
+}
