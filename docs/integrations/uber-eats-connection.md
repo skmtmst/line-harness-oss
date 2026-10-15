@@ -354,14 +354,32 @@ requesting production access.
 6. 最小の実接続（トークンを1回取得する）→ アプリ連携 → 異常系 → 検証環境での配備後確認、
    の順に1操作ずつ確認する。
 
-   **次の1手（2026-10-15 時点）**：検証環境 `nen-line-stg` へ
-   `RT_DELIVERY_UBEREATS_ENVIRONMENT=sandbox` を入れて配備し、
-   `client_credentials`（`scope=eats.order`）で Sandbox のトークンを**1回だけ**取る。
-   見るのは「取れたかどうか」と「返ってきた権限（`scope`）」だけで、
-   トークンの値は記録も転記もしない。ここは `tokenUrl` しか使わないため、
-   §5-2 で推定値と書いた認可画面のURLは踏まない。
-   これが通ったら、推定値である `sandbox-login.uber.com/oauth/v2/authorize` を
-   実際の認可画面で確かめ、そのあと 4(d) の署名の差し替えへ進む。
+   `RT_DELIVERY_UBEREATS_ENVIRONMENT=sandbox` の検証環境への配備は
+   **済み**（Worker Version `d74cf03c-0062-4a60-90b5-aa6074ac32aa`）。
+
+   ### 6-1. 接続確認（トークン1回）の口
+
+   Application ID と Client Secret は Cloudflare の暗号化された秘密設定で読み戻せないため、
+   外から `curl` で叩くには秘密値を取り出すことになる。取り出さずに
+   **「配備先の中から1回だけ送る」** ための口を用意した。画面は持たない。
+
+   - 宛先: `POST /internal/ubereats/sandbox-token-probe`
+   - 守り: 合言葉 `RT_DELIVERY_UBEREATS_PROBE_SECRET`（32文字以上）の HMAC-SHA256 署名。
+     見出しは `x-nen-timestamp`（通算秒10桁）と `x-nen-signature`（`${timestamp}.${body}` の16進）。
+     未設定なら 503、署名違い・時刻が5分以上ずれていれば 401 で、送らない。
+   - 接続先が Sandbox でないときは 403 で止める。**本番の Uber へは送らない。**
+   - 冷却時間10分。送る**前**に時刻を残すので、途中で落ちても1回分として数える
+     （Uber のトークンの口は1時間100回まで）。
+   - 返すのは `success` / `environment` / `scope` / 残り秒だけ。失敗時はHTTP状態と
+     分類済みの符号だけ。**トークンの値と Client Secret は返さない・記録しない。**
+   - 実装: `apps/worker/src/services/ubereats-token-probe.ts`、
+     口は `apps/worker/src/routes/restaurant-delivery.ts`。
+
+   **次の1手（2026-10-15 時点）**：この口を配備し、Codex が合言葉を検証環境の秘密設定へ
+   登録して**1回だけ**叩く。ここは `tokenUrl` しか使わないため、§5-2 で推定値と書いた
+   認可画面のURLは踏まない。これが通ったら、推定値である
+   `sandbox-login.uber.com/oauth/v2/authorize` を実際の認可画面で確かめ、
+   そのあと 4(d) の署名の差し替えへ進む。
 
 **まだ実際の接続は1回も成功していません。** 上の試験77件（通信の層16件＋設定の読み取り6件＋
 受け口55件）はすべて作り物の応答に対するもので、接続の成功を示すものではありません。
