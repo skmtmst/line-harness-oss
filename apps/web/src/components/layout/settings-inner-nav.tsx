@@ -164,13 +164,14 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   }
 
   const byHref = new Map([...settingsSectionItems, ...SETTINGS_ONLY_ITEMS].map((item) => [item.href, item]))
+  const itemActive = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`)
+
+  // いま開いている画面は、権限の出し分けで隠れる項目でも必ず出す（選ばれた形が消えないように）。
   const items = SETTINGS_ORDER
     .map((href) => byHref.get(href))
     .filter((item): item is MenuItem => Boolean(item))
-    .filter(itemVisible)
-
-  const itemActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`)
+    .filter((item) => itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item))
 
   const renderItem = (item: MenuItem) => {
     const active = item.href === '/settings'

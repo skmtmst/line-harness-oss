@@ -169,6 +169,17 @@ describe('★V8 設定の中のメニュー', () => {
     expect(labels).toContain('機能設定')
   })
 
+  it('隠れる項目でも、いま開いている画面なら選ばれた形で出す（閲覧のみのログインユーザー A35Gh）', async () => {
+    window.localStorage.setItem('lh_staff_role', 'staff')
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
+    fixture.pathname = '/staff'
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    const link = view.getByRole('link', { name: 'ログインユーザー' })
+    expect(link.getAttribute('aria-current')).toBe('page')
+    expect(view.queryByRole('link', { name: 'LINEアカウント' })).toBeNull()
+  })
+
   it('任意機能がオフなら専用の項目は出ない', async () => {
     fixture.visibility.mockResolvedValue({
       success: true,
