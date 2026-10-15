@@ -1794,7 +1794,7 @@
   --tpl-rs-dlg-gap: 14px; --tpl-rs-dlg-pull: -14px; --tpl-rs-dlg-actions-gap: 8px; --tpl-rs-field-gap: var(--polish-space-field); --tpl-rs-dlg-note-pad: 10px 12px; --tpl-rs-pair-gap: var(--polish-space-field);
   /* 下の線が無い窓のボタンの段は、線のぶんが無いので上の間を 8 に詰める（線ありは上の 14）。 */
   --tpl-rs-dlg-actions-pad-plain: 8px;
-  --tpl-rs-menu-col-kind: 80px; --tpl-rs-menu-col-price: 104px; --tpl-rs-menu-col-period: 136px; --tpl-rs-menu-col-duration: 88px; --tpl-rs-menu-col-allergy: 116px; --tpl-rs-menu-col-status: 96px; --tpl-rs-menu-col-ops: 150px;
+  --tpl-rs-menu-col-kind: 64px; --tpl-rs-menu-col-price: 72px; --tpl-rs-menu-col-period: 120px; --tpl-rs-menu-col-duration: 72px; --tpl-rs-menu-col-allergy: 100px; --tpl-rs-menu-col-status: 92px; --tpl-rs-menu-col-ops: 122px;
   --tpl-rs-lh-10: 14px; --tpl-rs-chip-pad: 2px 8px; --tpl-rs-line-green: #06c755;
   --tpl-rs-table-detail-w: 360px; --tpl-rs-table-card-h: 104px; --tpl-rs-table-card-pad: 0 8px; --tpl-rs-table-card-line: 2px; --tpl-rs-table-row-gap: 8px; --tpl-rs-table-row-side: 16px; --tpl-rs-table-chip-w: 64px;
   --tpl-rs-inv-band-gap: 10px; --tpl-rs-inv-conflict-pad: 12px 16px; --tpl-rs-inv-side-w: 320px; --tpl-rs-inv-date-h: 32px; --tpl-rs-inv-date-pad: 10px; --tpl-rs-inv-total-pad: 12px 14px; --tpl-rs-inv-remainder-pad: 9px 12px;
