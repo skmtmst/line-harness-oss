@@ -5120,11 +5120,28 @@ export const AFFILIATES = [
 ]
 
 /** 案件。V8 の板（`h7dmB`）の「案件 4」（公開中 3・下書き 1）。名前・報酬・動きは板どおり。 */
+/* 案件のフォルダ（板 h7dmB）：定期便 2・新商品 1・キャンペーン 1・未分類 0。 */
+export const AFFILIATE_OFFER_FOLDERS = [
+  ['aof-teiki', '定期便', '#3B82F6', 2],
+  ['aof-new', '新商品', '#10B981', 1],
+  ['aof-campaign', 'キャンペーン', '#F59E0B', 1],
+].map(([id, name, color, itemCount], index) => ({
+  id: String(id),
+  kind: 'affiliate_offer',
+  name: String(name),
+  parentId: null,
+  displayOrder: index,
+  itemCount: Number(itemCount),
+  color: String(color),
+  createdAt: '2026-08-01T00:00:00.000Z',
+  updatedAt: '2026-08-01T00:00:00.000Z',
+}))
+
 export const AFFILIATE_OFFERS = [
-  { id: 'ao-1', name: '定期便の初回', description: '初回の定期便が確定したとき', rewardAmount: 2000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-1', scenarioId: null, isActive: true, createdAt: '2026-09-01T00:00:00.000Z' },
-  { id: 'ao-2', name: '夏の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 0, rewardMiles: 100, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-07-01T00:00:00.000Z' },
-  { id: 'ao-3', name: '資料請求', description: '資料をダウンロードしたとき', rewardAmount: 0, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-06-01T00:00:00.000Z' },
-  { /* 下書き。 */ id: 'ao-4', name: '秋の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-05-01T00:00:00.000Z' },
+  { id: 'ao-1', folderId: 'aof-teiki', name: '定期便の初回', description: '初回の定期便が確定したとき', rewardAmount: 2000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-1', scenarioId: null, isActive: true, createdAt: '2026-09-01T00:00:00.000Z' },
+  { id: 'ao-2', folderId: 'aof-campaign', name: '夏の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 0, rewardMiles: 100, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-07-01T00:00:00.000Z' },
+  { id: 'ao-3', folderId: 'aof-new', name: '資料請求', description: '資料をダウンロードしたとき', rewardAmount: 0, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-06-01T00:00:00.000Z' },
+  { /* 下書き。 */ id: 'ao-4', folderId: 'aof-teiki', name: '秋の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-05-01T00:00:00.000Z' },
 ]
 
 /*
