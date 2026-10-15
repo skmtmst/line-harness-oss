@@ -21,7 +21,7 @@ function openList(initial: LinkedAction[] = []) {
 
 function addText(buttonName = '行うことを足す') {
   fireEvent.click(screen.getByRole('button', { name: buttonName, exact: true }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'テキスト送信' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'テキストを送る' }))
 }
 
 describe('現役V8の連動アクションの実行タイミング', () => {

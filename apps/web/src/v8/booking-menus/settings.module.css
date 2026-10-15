@@ -332,8 +332,13 @@
   white-space: nowrap;
 }
 
+/*
+ * 一覧の行の高さは中身の行数で決まる（§6.5 の 3・B-254：2行・3行は 60）。
+ * 名前・分類の札・説明の3段は 60 に入りきらないので、60 を下限に中身の高さ＋上下 8 で伸ばす。
+ */
 .menuRow {
-  height: calc(var(--tpl-bm-84) + var(--tpl-bm-6));
+  min-height: var(--tpl-list-row-multi-h);
+  padding-block: var(--tpl-bm-8);
   box-shadow: var(--shadow-row-line);
 }
 
@@ -406,9 +411,10 @@
   padding: 0;
   line-height: var(--tpl-bm-19);
   overflow: hidden;
-  color: var(--color-action);
+  /* 一覧の名前は黒の太字（§6.5 の 2・絵 owaS3）。押せることは下線で示す。 */
+  color: var(--color-ink);
   font-size: var(--tpl-bm-13);
-  font-weight: 600;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-decoration: none;
