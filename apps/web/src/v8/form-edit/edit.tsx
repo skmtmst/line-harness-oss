@@ -782,7 +782,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const statusLine = host ? host.statusLine : !publishedVersionId
     ? '下書き・まだ公開していません'
     : dirty || (publishedContentRevision !== null && contentRevision !== null && publishedContentRevision !== contentRevision)
-      ? '下書き・公開中の版と違うところがあります'
+      ? '下書き・公開中と違います'
       : '公開中の版と同じです'
   const saveStatus = host ? (dirty ? '保存していない変更があります' : undefined) : autosave.label
     ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
