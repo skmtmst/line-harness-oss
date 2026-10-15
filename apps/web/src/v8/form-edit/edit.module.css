@@ -237,6 +237,8 @@
 .phoneButton { flex: none; height: var(--tpl-fe-phone-next-h); display: flex; align-items: center; justify-content: center; border-radius: var(--tpl-fe-phone-r); box-shadow: none; outline: 1px solid var(--fe-phone-main, var(--color-accent)); outline-offset: -1px; color: var(--fe-phone-main, var(--color-accent)); font-size: var(--tpl-fe-body-size); font-weight: 700; }
 .phoneProgress { flex: none; display: flex; gap: var(--tpl-fe-phone-progress-gap); }
 .phoneProgress > span { flex: 1; height: var(--tpl-fe-phone-progress-h); border-radius: var(--tpl-fe-phone-progress-r); background: var(--tpl-fe-phone-track); }
+.phoneProgressHead { flex: none; display: flex; flex-direction: column; gap: var(--tpl-fe-phone-progress-head-gap); }
+.phonePageNo { font-size: var(--tpl-fe-tiny-size); line-height: var(--tpl-fe-tiny-lh); color: var(--tpl-fe-phone-sub); white-space: nowrap; }
 .phoneProgress > span[data-done] { background: var(--fe-phone-main, var(--color-accent)); }
 .phoneQ[data-kind='booking'] { gap: var(--tpl-fe-open-gap); }
 .phoneQ { flex: none; display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); }
