@@ -167,8 +167,9 @@
   width: var(--tpl-op-ann-ops-w);
 }
 
+/* 操作の列は［編集する］が切れずに入る幅（tQ2MJ）。 */
 .colOps {
-  width: var(--tpl-op-ann-ops-w);
+  width: var(--tpl-op-ann-action-w);
 }
 
 .faint {
