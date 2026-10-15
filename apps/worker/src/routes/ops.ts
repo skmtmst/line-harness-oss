@@ -1,5 +1,6 @@
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { opsTenantMetrics } from '../services/ops-tenant-metrics.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -196,6 +197,7 @@ ops.get('/api/ops/tenants/:id', async (c) => {
       accounts: accounts.results ?? [],
       members: members.results ?? [],
       audit: audit.rows,
+      metrics: await opsTenantMetrics(db,tenant.id),
     },
   });
 });

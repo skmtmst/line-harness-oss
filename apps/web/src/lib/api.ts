@@ -6148,6 +6148,7 @@ export type OpsTenantDetail = {
   accounts: Array<{ id: string; name: string; is_active: number; archived_at: string | null; updated_at: string; friend_count: number }>
   members: Array<{ id: string; name: string; email: string | null; role: string; access_level: string; is_active: number; invite_status: string; last_login_at: string | null }>
   audit: OpsAuditRow[]
+  metrics: {monthlyListPriceYen:number|null;monthlyListPriceSource:string;thisMonthBilledYen:number|null;invoiceSource:string;accountCount:number;activeAccountCount:number;friendCount:number;friendChangeLastMonth:null;supportCount:number;unresolvedSupportCount:number}
 }
 
 export type OpsAuditRow = {
