@@ -3768,7 +3768,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   // ★V8 L48eY：本移行と照合が終わった履歴（/friends/migrations?tab=uid&run=visual-uid-run-done）。
   if (pathname === '/api/friends/migrations/visual-uid-run-done') {
-    return { success: true, data: { ...UID_MIGRATION_DONE, items: [], itemTotal: 0, decisionCounts: { pending: 0, link: 1844, create: 0, exclude: 3 } } }
+    return { success: true, data: { ...UID_MIGRATION_DONE, items: [
+      { id: 'uid-done-1', oldUid: 'old_uid_00018', newUid: 'new_uid_00018', candidateName: '高橋 直人', evidenceType: 'operator_csv', classification: 'auto', conflictReason: null, decision: 'link', result: 'applied', errorMessage: null },
+      { id: 'uid-done-2', oldUid: 'old_uid_00291', newUid: 'new_uid_00291', candidateName: 'Kyohei Yamamoto', evidenceType: 'operator_csv', classification: 'review', conflictReason: null, decision: 'link', result: 'applied', errorMessage: null },
+    ], itemTotal: 2, decisionCounts: { pending: 0, link: 1844, create: 0, exclude: 3 } } }
   }
   if (pathname === '/api/friends/migrations/visual-uid-run') {
     return { success: true, data: {
