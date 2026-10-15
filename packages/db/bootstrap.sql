@@ -3953,6 +3953,19 @@ CREATE TABLE hq_template_preflights (
     REFERENCES hq_template_versions(id, template_id, tenant_id)
 );
 
+CREATE TABLE hq_template_saved_views (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  owner_staff_id TEXT NOT NULL REFERENCES staff_members(id),
+  name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 100),
+  filters_json TEXT NOT NULL CHECK(json_valid(filters_json)),
+  scope TEXT NOT NULL CHECK(scope IN ('personal','tenant')),
+  revision INTEGER NOT NULL DEFAULT 1 CHECK(revision > 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  archived_at TEXT
+);
+
 CREATE TABLE hq_template_versions (
   id TEXT NOT NULL,
   tenant_id TEXT NOT NULL,
@@ -8004,7 +8017,8 @@ CREATE TABLE support_marks (
   auto_on_inbound INTEGER NOT NULL DEFAULT 0,
   display_order   INTEGER NOT NULL DEFAULT 0,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-, archived_at TEXT, version INTEGER NOT NULL DEFAULT 1, updated_at TEXT, created_by TEXT, updated_by TEXT);
+, archived_at TEXT, version INTEGER NOT NULL DEFAULT 1, updated_at TEXT, created_by TEXT, updated_by TEXT, display_locations_json TEXT NOT NULL DEFAULT '["inbox","friends","friend_detail"]'
+  CHECK(json_valid(display_locations_json) AND json_type(display_locations_json)='array'));
 
 CREATE TABLE tag_groups (
   id         TEXT PRIMARY KEY,
@@ -9822,6 +9836,8 @@ CREATE INDEX idx_hq_template_results_status
 
 CREATE INDEX idx_hq_template_runs_template
   ON hq_template_distribution_runs(tenant_id, template_id, created_at);
+
+CREATE INDEX idx_hq_template_saved_views_scope ON hq_template_saved_views(tenant_id,scope,owner_staff_id,archived_at);
 
 CREATE INDEX idx_hq_template_versions_template
   ON hq_template_versions(tenant_id, template_id, version DESC);

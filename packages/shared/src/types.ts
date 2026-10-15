@@ -293,6 +293,7 @@ export interface Folder {
 /** 対応マーク */
 export interface SupportMark {
   archivedAt?: string | null;
+  displayLocations?: import('./support-mark-display.js').SupportMarkLocation[];
   id: string;
   name: string;
   color: string;

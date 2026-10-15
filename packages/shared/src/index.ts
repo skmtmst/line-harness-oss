@@ -92,3 +92,5 @@ export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmen
 
 export * from './booking-entitlements.js';
 export * from './style-api.js';
+
+export * from './support-mark-display.js';

@@ -32,7 +32,9 @@ export interface TemplateVersionRow {
   created_at: string;
 }
 
+/** 名前は同じ組織の現在の名簿から取得。保存時の名前の写しではない。 */
 export interface TemplateVersionView extends TemplateVersionRow {
+  creator_name: string | null;
   status: TemplateVersionStatus;
 }
 
@@ -69,12 +71,17 @@ export async function listTemplateVersions(
 ): Promise<TemplateVersionView[]> {
   const result = await db
     .prepare(
-      `SELECT * FROM template_versions
-        WHERE template_id = ?
-        ORDER BY version_number DESC`,
+      `SELECT v.*, s.name AS creator_name
+         FROM template_versions v
+         JOIN templates t ON t.id = v.template_id
+         LEFT JOIN line_accounts a ON a.id = t.line_account_id
+         LEFT JOIN staff_members s ON s.id = v.created_by_staff_id
+           AND s.tenant_id = a.tenant_id
+        WHERE v.template_id = ?
+        ORDER BY v.version_number DESC`,
     )
     .bind(templateId)
-    .all<TemplateVersionRow>();
+    .all<TemplateVersionRow & { creator_name: string | null }>();
   const rows = (result.results ?? []).map((row) => ({
     ...row,
     version_number: Number(row.version_number),

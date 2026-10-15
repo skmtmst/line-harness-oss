@@ -1,3 +1,4 @@
+import { parseSupportMarkLocations, type SupportMarkLocation } from '@line-crm/shared';
 import { recordOperation } from './operation-audit.js';
 import { jstNow } from './utils.js';
 
@@ -24,6 +25,7 @@ export interface SupportMark {
   is_default: number;
   auto_on_inbound: number;
   display_order: number;
+  display_locations_json: string;
   created_at: string;
   archived_at: string | null;
   version: number;
@@ -67,7 +69,7 @@ export function supportMarkImpactRevision(mark: SupportMarkWithUsage): string {
 
 const MARK_SELECT = `
   SELECT sm.id, sm.name, sm.color, sm.is_default, sm.auto_on_inbound,
-         sm.display_order, sm.created_at, sm.archived_at, sm.version,
+         sm.display_order, sm.display_locations_json, sm.created_at, sm.archived_at, sm.version,
          COALESCE(sm.updated_at, sm.created_at) AS updated_at,
          sm.created_by, sm.updated_by,
          sms.line_account_id,
@@ -598,10 +600,12 @@ export async function updateSupportMark(
     isDefault?: boolean;
     autoOnInbound?: boolean;
     displayOrder?: number;
+    displayLocations?: SupportMarkLocation[];
     actorId?: string | null;
     expectedVersion?: number;
   },
 ): Promise<SupportMark | null | 'conflict'> {
+  if(input.displayLocations!==undefined)input.displayLocations=parseSupportMarkLocations(input.displayLocations);
   const existing = await getSupportMarkById(db, id, scope);
   if (!existing) return null;
   if (input.expectedVersion !== undefined
@@ -653,8 +657,8 @@ export async function updateSupportMark(
         .prepare(
           `INSERT INTO support_marks
              (id, name, color, is_default, auto_on_inbound, display_order, created_at,
-              version, updated_at, created_by, updated_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+              version, updated_at, created_by, updated_by, display_locations_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
         )
         .bind(
           cloneId,
@@ -667,6 +671,7 @@ export async function updateSupportMark(
           now,
           input.actorId ?? null,
           input.actorId ?? null,
+          JSON.stringify(input.displayLocations ?? JSON.parse(existing.display_locations_json)),
         ),
       db
         .prepare(
@@ -706,6 +711,7 @@ export async function updateSupportMark(
   if (input.isDefault !== undefined) put('is_default', input.isDefault ? 1 : 0);
   if (input.autoOnInbound !== undefined) put('auto_on_inbound', input.autoOnInbound ? 1 : 0);
   if (input.displayOrder !== undefined) put('display_order', input.displayOrder);
+  if (input.displayLocations !== undefined) put('display_locations_json', JSON.stringify(input.displayLocations));
   if (sets.length > 0) {
     sets.push('version = version + 1');
     put('updated_at', jstNow());

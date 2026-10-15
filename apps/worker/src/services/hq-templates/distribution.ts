@@ -5,6 +5,7 @@ import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attrib
 import { templateKind } from '@line-crm/shared';
 import { parseTextOverrides } from './text-overrides.js';
 import type { HqTemplateArchiveStatus, HqTemplateListDisplay } from '@line-crm/shared';
+import { messageListFacts } from './message-list-facts.js';
 import { templateContentSummary } from './list-display.js';
 import { captureDistributionName, targetDistributionVersion } from './distribution-display.js';
 import { parseScenarioDefinition, scenarioSnapshot, inspectScenario, planScenario } from './scenario.js';
@@ -131,6 +132,7 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
     return {
       ...template,
       message_type: null,
+      ...(template.template_type === 'template' ? messageListFacts(definition_json) : {}),
       ...(() => {
         try {
           if(template.template_type==='template'&&definition_json) {
@@ -148,7 +150,7 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
           }
           if(template.template_type==='mark'&&definition_json) {
             const mark=parseMarkDefinition(JSON.parse(definition_json)).mark;
-            return {assignment_method:mark.autoOnInbound?'受信時に自動':'手動',manual_assignment_allowed:true};
+            return {display_locations:mark.displayLocations??['inbox','friends','friend_detail'],assignment_method:mark.autoOnInbound?'受信時に自動':'手動',manual_assignment_allowed:true};
           }
           if(template.template_type==='rich_menu'&&definition_json) {
             const menu=parseRichMenuTemplateDefinition({templateVersionId:'list',definitionJson:definition_json},authority.tenantId).richMenu;

@@ -469,6 +469,14 @@ const spec = {
     ...hqBroadcastPaths,
 
     // V8 API integration: authenticated endpoints, with account scope and revision checks.
+  '/api/hq/templates/saved-views': {
+    get: {tags:['HQ Templates'],summary:'統括テンプレートの保存した絞り込みを取得',responses:{200:{description:'個人と統括で共有された条件'},403:{description:'統括の閲覧権限が必要'}}},
+    post: {tags:['HQ Templates'],summary:'テンプレートの絞り込みを保存',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['name','filters'],properties:{name:{type:'string',maxLength:100},scope:{type:'string',enum:['personal','tenant'],default:'personal'},filters:{type:'object',description:'kind・messageCount・hasInterpolations・undistributed・search・folderIdだけを許可'}}}}}},responses:{201:{description:'保存済みの条件とrevision'},403:{description:'統括の編集権限が必要'},422:{description:'条件または分類が不正'}}},
+  },
+  '/api/hq/templates/saved-views/{viewId}': {
+    patch:{parameters:[{name:'viewId',in:'path',required:true,schema:{type:'string'}}],tags:['HQ Templates'],summary:'保存した絞り込みを変更',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['name','filters','expectedRevision'],properties:{name:{type:'string',maxLength:100},filters:{type:'object'},scope:{type:'string',enum:['personal','tenant']},expectedRevision:{type:'integer',minimum:1}}}}}},responses:{200:{description:'更新後のrevisionと条件'},403:{description:'統括の編集権限が必要'},404:{description:'見える条件がありません'},409:{description:'版が変更されました'},422:{description:'入力が不正'}}},
+    delete:{parameters:[{name:'viewId',in:'path',required:true,schema:{type:'string'}}],tags:['HQ Templates'],summary:'保存した絞り込みを保管',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['expectedRevision'],properties:{expectedRevision:{type:'integer',minimum:1}}}}}},responses:{200:{description:'保管済み'},403:{description:'統括の編集権限が必要'},404:{description:'見える条件がありません'},409:{description:'版が変更されました'}}},
+  },
   "/api/hq/templates/folders": {
     "get": {
       "tags": [
@@ -2178,8 +2186,13 @@ const spec = {
       get: {
         tags: ['HQ Templates'],
         summary: '統括ひな形一覧を取得',
-        description: 'statusはactive（既定）/archived/all。archive_countsは同じtype/kindに対するactive/archivedの件数で、選択中statusには依存しない。保管行もarchived_atとrevisionを返す。',
-        parameters: [{name:'status',in:'query',schema:{type:'string',enum:['active','archived','all'],default:'active'}},{name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag']},description:'メッセージの6種類またはtagで絞る。type=templateと併用可能。応答のkind_countsは絞り込み前の件数。'},{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form','scenario','friend_field','mark','auto_reply','friend_add_rule','reminder','booking_menu','mileage_reward'] } }],
+        description: 'statusはactive（既定）/archived/all。archive_countsは同じtype/kindに対するactive/archivedの件数で、選択中statusには依存しない。保管行もarchived_atとrevisionを返す。各メッセージ行に message_count（保存版のLINE通数、カルーセルは1通）と has_interpolations（差し込みの有無）を返す。未取得はnull。type=mark/kind=support_markではstats.supportStatusに受信箱の状態別人数、stats.markChangesに現在の有効店の可視友だちについて記録された直近168時間の変更件数を返す。自由なマークの名前で対応状況を推測しない。変更履歴はrecorded_events_onlyで完全性を保証しない。',
+        parameters: [{name:'status',in:'query',schema:{type:'string',enum:['active','archived','all'],default:'active'}},
+          {name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag','friend_field','support_mark']},description:'メッセージの種類または友だち属性で絞る。kind_countsは絞り込み前の件数。'},
+          {name:'type',in:'query',schema:{type:'string',enum:['tag','rich_menu','template','form','scenario','friend_field','mark','auto_reply','friend_add_rule','reminder','booking_menu','mileage_reward']}},
+          {name:'message_count',in:'query',schema:{type:'string',enum:['single','multiple']},description:'1通・複数通で絞る。未取得の版はどちらにも含めない。複数通の作成機能とは別。'},
+          {name:'has_interpolations',in:'query',schema:{type:'boolean'},description:'本文・カード・質問・素材の差し込みの有無。名前・ファイル名は含めない。未取得をfalseにしない。'},
+        ],
         responses: { '200': { description: 'Tenant-scoped template list' }, '400': { description: 'Invalid template type' }, '403': { description: 'Owner or admin role required' } },
       },
       post: {
@@ -6316,7 +6329,7 @@ const spec = {
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],
         responses: {
-          '200': { description: '版の一覧 { versionNumber・status・messageType・messageContent・effectiveFrom・createdAt }' },
+          '200': { description: '版の一覧 { versionNumber・status・messageType・messageContent・effectiveFrom・createdAt・createdByStaffId・creatorName・creatorNameSource }。creatorNameは同じ組織の現在の名簿名（source=current_staff_profile）。旧版・不明・別組織はnull。公開時の名前の写しではない。' },
           '404': { description: 'Not found in account scope' },
         },
       },
