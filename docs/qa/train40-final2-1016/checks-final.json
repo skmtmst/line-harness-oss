@@ -13,5 +13,8 @@
   "scriptsPassed": 1035,
   "sourceCapsAndAllowlistsRaised": false,
   "formalPenApprovalsAdded": 0,
-  "pushPrDbDeploy": false
+  "pushPrDbDeploy": false,
+  "completionObservedOrigin": "5ace6976dc519607874959df2b9f6396868e27a2",
+  "completionOriginIncluded": false,
+  "completionOriginPr": 1738
 }
