@@ -749,7 +749,7 @@ const EmergencyControlV8 = (
         open={confirmMode !== null}
         busy={mutationLocked}
         designNode={confirmMode === 'stop' ? 'EA8rM' : 'OHwbU-confirm'}
-        tone="default" contentLayout="form" confirmation
+        tone="default" role={confirmMode === 'stop' ? 'alertdialog' : 'dialog'} contentLayout="form" confirmation
         designTop={confirmMode === 'stop' ? 150 : undefined} fitViewport
         title={confirmMode === 'stop' ? '緊急停止を確認' : '止める前の状態に戻しますか？'}
         description={confirmMode === 'stop'

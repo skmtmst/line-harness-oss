@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .list { margin: 0; padding: 0; list-style: none; }
 .row { display: flex; align-items: center; gap: var(--polish-space-field); padding: var(--polish-space-field) var(--polish-space-card); box-shadow: var(--shadow-row-line); }
 .row:last-child { box-shadow: none; }
@@ -7,3 +9,4 @@
 .title { flex-shrink: 0; color: var(--color-ink); font-size: var(--text-caption); font-weight: var(--polish-weight-title); line-height: var(--text-lh); }
 .detail { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--text-lh); }
 .row[data-verification-state='failed'] .detail { color: var(--color-danger); white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+}

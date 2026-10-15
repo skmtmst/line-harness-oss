@@ -15,6 +15,7 @@ import Link from '@/components/shared/list-navigation'
 import { Link as LinkIcon } from 'lucide-react'
 import { ecEventLabel } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import SectionHeader from '@/components/shared/section-header'
 import ListState from '@/components/shared/list-state'
 import TruncatedText from '@/components/shared/truncated-text'
 import Drawer from '@/components/shared/drawer'
@@ -237,7 +238,7 @@ export default function OrderDrawer({
               </section>
 
               <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>この注文に届いた出来事</h3>
+                <SectionHeader title="この注文に届いた出来事" helpLabel="もう一度行うときの説明" help="もう一度行う・再取込では、届き済みの通知や入った成果・マイルは重ねません。" />
                 {detail.events.length === 0 ? <p className={styles.empty}>届いた出来事はありません。</p> : (
                   <ul className={styles.timeline}>
                     {detail.events.map((event) => <EventRow key={event.id} canEdit={canEdit} event={event} retryingId={retryingId} onRetry={(action) => void retry(action)} />)}

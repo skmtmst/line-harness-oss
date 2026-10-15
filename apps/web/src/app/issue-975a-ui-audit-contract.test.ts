@@ -122,7 +122,10 @@ describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる'
   })
   it('共通アクションの見本選択は内容に合わせて広がる', () => {
     const page = read('common-actions/new/page.tsx')
-    expect(page).toContain('<EntityKindField kind="common_action"label="見本から受け渡す"')
+    expect(page).toContain('<CommonActionAddActions')
+    const sequence = read('../v8/automations/common-action-sequence.tsx')
+    expect(sequence).toContain('<ActionAddButton direct label="見本から受け渡す"')
+    expect(sequence).toContain("choices.filter(choice => choice.id === 'common_action')")
     const picker = read('../components/shared/entity-picker-sources.tsx')
     expect(picker).toContain('<EntityPickerField')
     expect(page).not.toContain('[data-example-select] .min-w-48')

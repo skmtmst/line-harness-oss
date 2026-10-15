@@ -7,7 +7,7 @@ const PAGE = ['page.tsx', 'control-v8.tsx', '../../v8/settings/emergency/history
 describe('点検・軽 第7便運用状態(#585)', () => {
   it('補足は1000文字の上限と残り字数を見せる(#518 7)', () => {
     expect(PAGE).toContain('maxLength={1000}')
-    expect(PAGE).toContain('あと{1000 - reasonDetail.length}文字')
+    expect(PAGE).toContain('note={`あと${1000 - reasonDetail.length}文字`}')
   })
 
   it('最終確認は低い画面でも閉じ込めない(#518 8)', () => {

@@ -17,7 +17,7 @@
 .body[data-presentation='columns'] .blockHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .body[data-presentation='columns'] .title { margin: 0; font-size: 13px; line-height: 20px; font-weight: 600; color: var(--color-ink); }
 .body[data-presentation='columns'] .count { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--color-ink-secondary); white-space: nowrap; }
-.body[data-presentation='columns'] .chosen { flex-shrink: 0; max-height: none; overflow: hidden; border-radius: 8px; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.body[data-presentation='columns'] .chosen { flex-shrink: 0; max-height: none; overflow: hidden; border-radius: var(--radius-primary-action); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 .body[data-presentation='columns'] .chosen .row { height: 40px; gap: 12px; padding: 0 16px; border-top: 1px solid var(--color-hairline); }
 .body[data-presentation='columns'] .chosen .row > button:last-child { margin-left: 0; }
 .fixedRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 40px; padding: 0 16px; background: var(--color-table-head); color: var(--color-ink-secondary); font-size: 13px; line-height: 20px; }

@@ -165,19 +165,19 @@ export default function OpsAuditV8() {
         ) : (
           <Card padding="rows" overflow="hidden"><DataTable density="records" columnSizing="content" label="監査ログ">
             <colgroup><col className={styles.colAt} /><col className={styles.colWho} /><col className={styles.colWhat} /><col className={styles.colTenant} /><col /></colgroup>
-            <thead><TableHeadRow><Th>日時</Th><Th>運営者</Th><Th><span>操作</span></Th><Th>契約先</Th><Th>理由</Th></TableHeadRow></thead>
+            <thead><TableHeadRow><Th>日時</Th><Th>運営者</Th><Th><span>操作</span></Th><Th>契約先</Th><Th grow>理由</Th></TableHeadRow></thead>
             <tbody>{rows.map((row) => (
               <Tr key={row.id}>
                 <Td title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</Td>
                 <Td><TruncatedText value={row.staff_name ?? ''} /></Td>
                 <Td><TruncatedText value={actionWord(row.action)} /></Td>
                 <Td title={row.tenant_name ?? ''}><TruncatedText value={row.tenant_name ?? emptyValue('unknown')} /></Td>
-                <Td title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}><TruncatedText value={row.reason ?? emptyValue('unknown')} /></Td>
+                <Td grow title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}><TruncatedText value={row.reason ?? emptyValue('unknown')} /></Td>
               </Tr>
             ))}</tbody>
           </DataTable></Card>
         )}
-        {rows.length > 0 && pageCount > 1 ? (
+        {rows.length > 0 ? (
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         ) : null}
         <p className={parts.note} title={`${total}件中 ${total === 0 ? 0 : (page - 1) * PAGE + 1}〜${Math.min(page * PAGE, total)}件を表示`}>記録は運営メンバーでも消せません。理由は4文字以上が必須です。</p>

@@ -187,9 +187,9 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         /* 絵 j0Wcg：口コミの表は角丸の枠のカードに入る。 */
         <Card overflow="hidden"><DataTable density="reviews" columnSizing="controls" data-design="google-reviews"><thead>
           <TableHeadRow data-table-layout="columns">
-            <Th className={`${styles.colReviewer}`}>投稿者・評価</Th>
+            <Th>投稿者・評価</Th>
             <Th grow>口コミ</Th>
-            <Th className={`${styles.colReceived}`}>受信</Th>
+            <Th>受信</Th>
             <Th>状態</Th>
             <Th><span className="sr-only">操作</span></Th>
           </TableHeadRow></thead><tbody>
@@ -198,14 +198,14 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
             const actionable = review.replyStatus === 'unreplied' || review.replyStatus === 'draft' || review.replyStatus === 'pending_confirm'
             return (
               <Tr key={review.id} data-row-id={review.id} data-table-layout="columns">
-                <Td className={`${styles.colReviewer}`}>
+                <Td>
                   <span className={styles.reviewer}>{review.reviewerDisplayName ?? '匿名'}</span>
                   <Stars rating={review.starRating} />
                 </Td>
                 <Td grow>
                   <span className={styles.comment} title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</span>
                 </Td>
-                <Td className={`${styles.colReceived}`}>{formatShortStamp(reviewReceivedAt(review))}</Td>
+                <Td>{formatShortStamp(reviewReceivedAt(review))}</Td>
                 <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
                 <ActionCell>
                   <Button onClick={() => go({ tab: 'reviews', view: 'draft', id: review.id })}>{actionable ? '下書きを作る' : '返信を見る'}</Button>
@@ -215,7 +215,6 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
           })}
         </tbody></DataTable></Card>
       ) : null}
-      <Notice tone="info" icon={null}>返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</Notice>
       {list && pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${list.total} 件 ・ 新着と未返信は別に管理`} />
       ) : null}

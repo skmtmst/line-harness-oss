@@ -549,3 +549,6 @@ shared-button-importer v8/mileage/history-table.tsx
 shared-button-importer v8/tags/fields-table.tsx
 shared-button-importer v8/tags/fields-view.tsx
 shared-button-importer v8/restaurant/organization/organization-forms.tsx
+shared-button-importer components/shared/reservation-people-grid.tsx
+shared-button-importer v8/automations/common-action-sequence.tsx
+shared-button-importer v8/booking-bookings/day-frame.tsx

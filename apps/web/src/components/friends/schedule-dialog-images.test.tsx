@@ -3,12 +3,14 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const { schedule, image } = vi.hoisted(() => ({ schedule: vi.fn(), image: vi.fn() }))
+const { schedule, image, media } = vi.hoisted(() => ({ schedule: vi.fn(), image: vi.fn(), media: { id: 'image', filename: '予約する画像', kind: 'image', mimeType: 'image/png', sizeBytes: 20, url: 'https://images.test/notice.png' } }))
+vi.mock('@/components/shared/media-picker-dialog', () => ({ default: ({ onSelect }: { onSelect: (item: unknown) => void }) => <button onClick={() => onSelect(media)}>見本画像を選ぶ</button> }))
 vi.mock('@/lib/api', () => ({ api: { templates: { list: vi.fn(async () => ({ success: true, data: [] })) }, uploads: { image }, chats: { schedule } } }))
 import ScheduleDialog from './schedule-dialog'
 
 const uploadedUrl = 'https://images.test/notice.png'
 beforeEach(() => {
+  media.sizeBytes = 20
   image.mockReset().mockResolvedValue({ success: true, data: { url: uploadedUrl } })
   schedule.mockReset().mockResolvedValue({ success: true, data: { id: 'scheduled' } })
 })
@@ -19,7 +21,9 @@ function open(closeOnReserved = false) {
   return { onClose, onReserved }
 }
 async function upload(size = 20) {
-  fireEvent.change(document.querySelector('input[type=file]')!, { target: { files: [new File(['x'.repeat(size)], 'notice.png', { type: 'image/png' })] } })
+  media.sizeBytes = size
+  fireEvent.click(screen.getByRole('button', { name: '画像', exact: true }))
+  fireEvent.click(screen.getByRole('button', { name: '見本画像を選ぶ' }))
   if (size <= 1024 * 1024) await screen.findByAltText('予約する画像')
 }
 const reserve = () => fireEvent.click(screen.getByRole('button', { name: /に予約$/ }))
@@ -81,7 +85,7 @@ it('画像の結果が不明なら画像を残し、同じ日時と内容では�
 it('1MBを超える画像は準備せず、理由を表示する', async () => {
   open()
   await upload(1024 * 1024 + 1)
-  await screen.findByText(/画像が大きすぎます/)
+  await screen.findByText(/の画像を選んでください。/)
   expect(image).not.toHaveBeenCalled()
   expect(schedule).not.toHaveBeenCalled()
 })

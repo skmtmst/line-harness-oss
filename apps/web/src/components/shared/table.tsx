@@ -13,12 +13,54 @@ import shell from './data-table.module.css'
 import { loadFailureCopy } from './api-error-message'
 import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
-import { Th, type ThProps } from './table-head-cell'
-export { Th, type ThProps } from './table-head-cell'
+import type { ThProps } from './table-head-cell'
+export type { ThProps } from './table-head-cell'
+import TruncatedText from './truncated-text'
+import HelpTip from './help-tip'
 import { DelayedSkeleton, ListSkeleton } from './skeleton'
 import presentationStyles from './table-presentation.module.css'
 import PageLink, { RowNavigation, useListNavigationHref } from './list-navigation'
 import { isRowControl } from './destination-policy'
+/** Pencil V5/V6の `tPTMp` を正本にした表見出しセル。 */
+export function Th({
+  children,
+  align = 'left',
+  className,
+  scope = 'col',
+  help,
+  helpLabel,
+  helpHref,
+  truncate,
+  showActionLabel = false,
+  collapseAt,
+  grow,
+  inset,
+  ...cellProps
+}: ThProps) {
+  const classes = [
+    styles.cell,
+    align === 'right' && styles.right,
+    align === 'center' && styles.center,
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const hasHelp = help !== undefined && help !== null
+  const actionHeading = children === '操作' && !showActionLabel
+  const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
+  return (
+    <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
+      {actionHeading ? <span className="sr-only">操作</span> : truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
+      {hasHelp ? (
+        <HelpTip label={`${heading}の説明`}>
+          {help}
+          {helpHref ? <a href={helpHref}>くわしく</a> : null}
+        </HelpTip>
+      ) : null}
+    </th>
+  )
+}
+
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
   className?: string

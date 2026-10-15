@@ -14,12 +14,11 @@
 
 /* 確認の窓は本文の有無によらず上寄せし、短い画面にも収める。 */
 .confirmationOverlay {
-  --dialog-confirm-top: clamp(var(--space-16), 260px, calc(50dvh - var(--space-16)));
   align-items: flex-start;
-  padding-top: var(--dialog-confirm-top);
+  padding-top: clamp(var(--space-16), 260px, calc(50dvh - var(--space-16)));
 }
 .confirmationOverlay:not([data-design-top]) > .panel {
-  max-height: calc(100dvh - var(--dialog-confirm-top) - var(--space-16));
+  max-height: calc(100dvh - clamp(var(--space-16), 260px, calc(50dvh - var(--space-16))) - var(--space-16));
 }
 
 .panel {
@@ -334,11 +333,10 @@
 :root .panel[data-design-width] { width: min(var(--dialog-design-width), 100%); }
 :root .overlay[data-design-top] { align-items: flex-start; padding-top: var(--dialog-design-top); }
 :root .overlay[data-viewport-fit][data-design-top] {
-  --dialog-top-inset: clamp(var(--space-16), var(--dialog-design-top), calc(50dvh - var(--space-16)));
-  padding-top: var(--dialog-top-inset);
+  padding-top: clamp(var(--space-16), var(--dialog-design-top), calc(50dvh - var(--space-16)));
 }
 :root .overlay[data-viewport-fit][data-design-top] > .panel {
-  max-height: calc(100dvh - var(--dialog-top-inset) - var(--space-16));
+  max-height: calc(100dvh - clamp(var(--space-16), var(--dialog-design-top), calc(50dvh - var(--space-16))) - var(--space-16));
 }
 :root .headerRow { width: 100%; padding: 20px 24px 8px; gap: 12px; }
 /* 絵の頭の余白・高さを画面が渡したとき（designHeaderPadding・designHeaderHeight）。上の共通の値の後ろに置く。 */
@@ -395,7 +393,7 @@
 :root .close svg { width: 16px; height: 16px; }
 :root .content { width: 100%; padding: 24px; }
 :root .panel[data-design-content-padding] > .content { padding: var(--dialog-design-content-padding); }
-:root .footer { --radius-control: var(--radius-primary-action); display: block; width: 100%; flex-shrink: 0; }
+:root .footer { display: block; width: 100%; flex-shrink: 0; }
 :root .footer:empty { display: none; }
 :root .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }
 html:root .actions[data-padding='none'] { padding: 0; border: 0; }
@@ -491,3 +489,5 @@ html:root .panel[data-confirm-placement='start'] .actions > button:last-of-type 
   grid-area: 1 / 1;
   justify-self: start;
 }
+
+:root .footer :is(button, a) { border-radius: var(--radius-primary-action); }
