@@ -815,7 +815,7 @@ export default function HqBroadcastCreate() {
   const shows = (key: BroadcastStepKey) => step === key
   const nextLabel = step === 'basic' ? '対象設定へ' : step === 'audience' ? 'メッセージ設定へ' : step === 'message' ? '送信設定へ' : '配信前チェックへ'
 
-  const previewContent = <>            <div className={formStyles.previewHead}>
+  const previewContent = <>            <div className={`${formStyles.previewHead} ${styles.spaceScale}`}>
               <h3>LINE の見え方</h3>
               <div className={formStyles.deviceSwitch} role="group" aria-label="プレビューの端末">
                 <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button>
@@ -935,7 +935,7 @@ export default function HqBroadcastCreate() {
 
             {/* ② 配信対象（AL5vR）。上に統括だけの「送るアカウント」（J5DH6o）。 */}
             {shows('audience') ? (
-              <section id="broadcast-step-audience" className={formStyles.section}>
+              <section id="broadcast-step-audience" className={`${formStyles.section} ${styles.spaceScale}`}>
                 <div className={styles.accounts} data-design-node="J5DH6o">
                   <h3>送るアカウント{fields.requirement('accountIds').required ? <RequiredBadge /> : null}</h3>
                   {loadError && !stores ? <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => window.location.reload()} /> : !stores ? <ListState permissionScope="hq" kind="loading" /> : (
