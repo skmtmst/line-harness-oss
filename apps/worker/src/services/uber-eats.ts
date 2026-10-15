@@ -12,20 +12,8 @@
  * - トークン・秘密値（Application ID・client_secret）をログや例外メッセージに含めない。
  */
 
-export const UBER_AUTHORIZE_URL = 'https://auth.uber.com/oauth/v2/authorize';
-export const UBER_TOKEN_URL = 'https://auth.uber.com/oauth/v2/token';
-export const UBER_API_BASE_URL = 'https://api.uber.com';
-
-/** 認可画面で店舗の人に許してもらう権限（店舗一覧の取得と連携の有効化だけに使う）。 */
-export const UBER_PROVISIONING_SCOPES = ['eats.pos_provisioning'] as const;
-
-/** 連携済みの店舗を動かすための権限。認可画面側の権限とは混ぜない。 */
-export const UBER_OPERATION_SCOPES = [
-  'eats.store',
-  'eats.store.status.write',
-  'eats.order',
-  'eats.store.orders.read',
-] as const;
+// 接続先（Sandbox／本番）と権限の組は uber-eats-hosts.ts が持つ。この層は渡された側へ出す。
+import { UBER_OPERATION_SCOPES, UBER_PROVISIONING_SCOPES, type UberHosts } from './uber-eats-hosts.js';
 
 /** 公式仕様の既定の有効期間（30日）。応答に expires_in が無いときの控え。 */
 const DEFAULT_TOKEN_LIFETIME_SECONDS = 2_592_000;
@@ -61,6 +49,8 @@ export interface UberOAuthClient {
   clientSecret: string;
   /** 認可画面から戻ってくる先。Uber のアプリ登録と完全に同じ文字列でなければならない。 */
   redirectUri: string;
+  /** Sandbox と本番のどちら側へ出すか。認証とAPIを必ず同じ側に揃えるため束で持つ。 */
+  hosts: UberHosts;
 }
 
 export interface UberTokenSet {
@@ -106,9 +96,10 @@ export function buildAuthorizeUrl(input: {
   clientId: string;
   redirectUri: string;
   state: string;
+  hosts: UberHosts;
   scopes?: readonly string[];
 }): string {
-  const url = new URL(UBER_AUTHORIZE_URL);
+  const url = new URL(input.hosts.authorizeUrl);
   url.searchParams.set('client_id', input.clientId);
   url.searchParams.set('redirect_uri', input.redirectUri);
   url.searchParams.set('response_type', 'code');
@@ -179,7 +170,7 @@ export async function exchangeAuthorizationCode(input: {
   nowMs?: number;
   requiredScopes?: readonly string[];
 }): Promise<UberTokenSet> {
-  const response = await postForm(input.fetch, UBER_TOKEN_URL, {
+  const response = await postForm(input.fetch, input.client.hosts.tokenUrl, {
     client_id: input.client.clientId,
     client_secret: input.client.clientSecret,
     grant_type: 'authorization_code',
@@ -197,13 +188,13 @@ export async function exchangeAuthorizationCode(input: {
  * 更新用のトークンは無いので、切れる前にこれをもう一度呼ぶ。
  */
 export async function fetchApplicationToken(input: {
-  client: Pick<UberOAuthClient, 'clientId' | 'clientSecret'>;
+  client: Pick<UberOAuthClient, 'clientId' | 'clientSecret' | 'hosts'>;
   fetch: FetchLike;
   scopes?: readonly string[];
   nowMs?: number;
 }): Promise<UberTokenSet> {
   const scopes = input.scopes ?? UBER_OPERATION_SCOPES;
-  const response = await postForm(input.fetch, UBER_TOKEN_URL, {
+  const response = await postForm(input.fetch, input.client.hosts.tokenUrl, {
     client_id: input.client.clientId,
     client_secret: input.client.clientSecret,
     grant_type: 'client_credentials',
@@ -226,6 +217,8 @@ const RETRY_DELAYS_MS = [500, 1500, 4000];
 export interface RequestOptions {
   fetch: FetchLike;
   accessToken: string;
+  /** 呼ぶ先。トークンを取った側と必ず同じ側にする。 */
+  hosts: UberHosts;
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -316,7 +309,7 @@ interface StoresResponse {
  * ここで出た店舗を musubo のお店と突き合わせて、どれにつなぐかを選んでもらう。
  */
 export async function listStores(options: RequestOptions): Promise<UberStore[]> {
-  const body = await authorizedJson<StoresResponse>(options, `${UBER_API_BASE_URL}/v1/eats/stores`);
+  const body = await authorizedJson<StoresResponse>(options, `${options.hosts.apiBaseUrl}/v1/eats/stores`);
   const stores: UberStore[] = [];
   for (const store of body.stores ?? []) {
     if (!store.store_id) continue;
@@ -339,8 +332,8 @@ export async function listStores(options: RequestOptions): Promise<UberStore[]> 
 
 // ---------- 連携の有効化と状態 ----------
 
-function posDataUrl(storeId: string): string {
-  return `${UBER_API_BASE_URL}/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`;
+function posDataUrl(options: RequestOptions, storeId: string): string {
+  return `${options.hosts.apiBaseUrl}/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`;
 }
 
 /**
@@ -357,7 +350,7 @@ export async function activatePosIntegration(
   if (input.integratorBrandId) body.integrator_brand_id = input.integratorBrandId;
   if (input.isOrderManager !== undefined) body.is_order_manager = input.isOrderManager;
   // 二重に送ると連携が重なるので再試行しない。
-  await authorizedRequest(options, posDataUrl(storeId), { method: 'POST', body, retry: false });
+  await authorizedRequest(options, posDataUrl(options, storeId), { method: 'POST', body, retry: false });
 }
 
 interface PosDataResponse {
@@ -370,7 +363,7 @@ interface PosDataResponse {
 
 /** 連携の今の状態。接続の確認（DL-2 の「接続を確かめる」）はこれを読む。 */
 export async function fetchPosData(options: RequestOptions, storeId: string): Promise<UberPosData> {
-  const body = await authorizedJson<PosDataResponse>(options, posDataUrl(storeId));
+  const body = await authorizedJson<PosDataResponse>(options, posDataUrl(options, storeId));
   return {
     integrationEnabled: body.integration_enabled === true,
     integratorStoreId: body.integrator_store_id?.trim() || null,
@@ -386,7 +379,7 @@ export async function setPosIntegrationEnabled(
   storeId: string,
   enabled: boolean,
 ): Promise<void> {
-  await authorizedRequest(options, posDataUrl(storeId), {
+  await authorizedRequest(options, posDataUrl(options, storeId), {
     method: 'PATCH',
     body: { integration_enabled: enabled },
   });
@@ -394,7 +387,7 @@ export async function setPosIntegrationEnabled(
 
 /** 連携を解除する（DL-3 の「連携を解除する」）。 */
 export async function deactivatePosIntegration(options: RequestOptions, storeId: string): Promise<void> {
-  await authorizedRequest(options, posDataUrl(storeId), { method: 'DELETE', retry: false });
+  await authorizedRequest(options, posDataUrl(options, storeId), { method: 'DELETE', retry: false });
 }
 
 // ---------- 受信の署名 ----------
