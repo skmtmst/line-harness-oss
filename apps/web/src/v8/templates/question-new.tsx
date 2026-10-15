@@ -24,7 +24,7 @@ import QuestionEditor, { emptyQuestion, newChoiceKey, type QuestionChoice, type 
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import { EntityPickerSummary } from '@/components/shared/entity-picker'
+import QuestionChoiceBehavior from './question-choice-behavior'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -349,7 +349,6 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           <CardHeader title="選択肢" titleId="q-choices" size="stacked" meta="答えをどこに残すかを、選択肢ごとに決めます" />
           <div className={styles.choices}>
             {question.choices.map((choice, index) => {
-              const extras = <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={host ? null : selectedAccountId} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
               return (
               <div key={choice.key ?? index} className={styles.choice}>
                 <div className={styles.choiceHead}>
@@ -361,10 +360,10 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                 {host ? (
                   <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={null} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
                 ) : (
-                  <Field label="押されたら" optional={false}>
-                    <div {...fields.bind(`extras-${index}`)}><EntityPickerSummary label={`選択肢 ${index + 1} の押されたら`} noun="押したときの動き" icon={choiceActionIcon(choice)} name={choiceActionText(choice, tags, scenarios)} invalid={fields.invalid(`extras-${index}`)} compact onOpen={() => openAction(index)} /></div>
+                  <div {...fields.bind(`extras-${index}`)}>
+                    <QuestionChoiceBehavior index={index} icon={choiceActionIcon(choice)} summary={choiceActionText(choice, tags, scenarios)} invalid={fields.invalid(`extras-${index}`)} onOpen={() => openAction(index)} />
                     <FieldError id={`q-extras-${index}-error`}>{fields.error(`extras-${index}`)}</FieldError>
-                  </Field>
+                  </div>
                 )}
                 <Field label="押したときの返信"><SaveErrorField names={[`choices.${index}.reply`,"reply","choice.reply"]}><TextField value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} /></SaveErrorField></Field>
               </div>

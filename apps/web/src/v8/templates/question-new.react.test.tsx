@@ -74,7 +74,7 @@ describe('質問を作る：保存で欄に知らせる（B-139）', () => {
     const extra = screen.getAllByRole('button', { name: '押されたときにあわせて行うことを足す' })[0]
     const reply = screen.getAllByLabelText('押したときの返信')[0]
     expect(extra.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '選択肢 1 の動きを変える' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '選択肢 1 の押されたら：変える' })).toBeNull()
   })
 
   it('閉じた動きの欄に保存エラーが返ると、その選択肢だけ開いて理由を出す', async () => {
@@ -86,8 +86,8 @@ describe('質問を作る：保存で欄に知らせる（B-139）', () => {
     expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await frames()
-    expect(screen.getByRole('region', { name: '選択肢 1 の動き' })).toBeTruthy()
-    expect(screen.queryByRole('region', { name: '選択肢 2 の動き' })).toBeNull()
+    expect(screen.getByRole('dialog', { name: /選択肢 1.*を押されたら/ })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: /選択肢 2.*を押されたら/ })).toBeNull()
     const message = screen.getByLabelText('ユーザーメッセージ')
     expect(message.getAttribute('aria-invalid')).toBe('true')
     expect(screen.getByText('発言を短くしてください。')).toBeTruthy()
@@ -125,9 +125,9 @@ describe('質問を作る：保存で欄に知らせる（B-139）', () => {
     await act(async () => { fireEvent.click(hideMessage) })
     expect(message.disabled).toBe(false)
     expect(message.value).toBe('入力を保つ')
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '設定を閉じる' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '決める', exact: true })) })
     expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の動きを変える' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変える' })) })
     expect((screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement).value).toBe('入力を保つ')
     expect(templatesApi.create).not.toHaveBeenCalled()
   })
