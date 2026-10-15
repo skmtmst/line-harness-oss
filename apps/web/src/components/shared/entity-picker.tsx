@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronRight, ArrowUpRight, Check, Plus, type LucideIcon } from 'lucide-react'
+import { ChevronRight, ArrowUpRight, Plus, type LucideIcon } from 'lucide-react'
 import { folderDisplayColor, FolderDot } from './folder-dot'
 import { useFieldContext, joinDescribedBy } from './field-context'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
@@ -180,7 +180,7 @@ function SingleEntityPickerDialog({
       </div>
       <div className={styles.tpFootActions}>
       <Button disabled={busy} onClick={onCancel}>{readOnly ? '閉じる' : 'キャンセル'}</Button>
-      {readOnly ? null : <Button variant="primary" busy={busy} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} title={listState ? '候補を読み込める状態になってから選んでください。' : !picked ? '候補を選んでください。' : picked.disabled ? picked.meta : confirmDisabled ? error : undefined} onClick={() => onConfirm(selected)}><Check size={16} aria-hidden />{confirmLabel}</Button>}
+      {readOnly ? null : <Button variant="primary" widthReserve="idle" busy={busy} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} title={listState ? '候補を読み込める状態になってから選んでください。' : !picked ? '候補を選んでください。' : picked.disabled ? picked.meta : confirmDisabled ? error : undefined} onClick={() => onConfirm(selected)}>{confirmLabel}</Button>}
     </div>
     </>}
   >
@@ -395,7 +395,7 @@ export function EntityMultiPickerDialog({ title, description, items, folders, fo
       </div>
       <div className={styles.tpFootActions}>
         <Button disabled={busy} onClick={onCancel}>{readOnly ? '閉じる' : 'キャンセル'}</Button>
-      {readOnly ? null : <Button variant="primary" busy={busy} disabled={busy || Boolean(state) || (maxSelected !== undefined && selected.length > maxSelected) || (!allowEmpty && selected.length === 0)} onClick={() => onConfirm(selected)}>{`選ぶ（${countText}）`}</Button>}
+      {readOnly ? null : <Button variant="primary" widthReserve="idle" busy={busy} disabled={busy || Boolean(state) || (maxSelected !== undefined && selected.length > maxSelected) || (!allowEmpty && selected.length === 0)} onClick={() => onConfirm(selected)}>{`選ぶ（${countText}）`}</Button>}
     </div>
     </>}
   >
