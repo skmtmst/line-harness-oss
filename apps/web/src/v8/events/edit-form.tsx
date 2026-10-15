@@ -387,7 +387,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
     {tab === 'slots' ? <SlotsTab accountId={accountId} eventId={eventId} slots={slots} setSlots={setSlots} /> : null}
     {tab === 'publish' ? <PublishTab draft={draft} update={update} tags={tags} /> : null}
     {tab !== 'slots' ? <StickyBar destructive={tab === 'overview' && eventId && canDelete ? <Button variant="danger" onClick={() => { setDeleteError(''); setDeleteOpen(true) }} disabled={saving}>削除する</Button> : undefined} status={tab === 'overview'
-      ? eventId ? '変更を「概要を保存する」で確定します' : '保存するとイベントが作成され、予約枠タブに進みます'
+      /* 変更のときは左端に［削除する］が入り幅が足りないので、説明の文は出さない（ボタンの名前で分かる）。 */
+      ? eventId ? undefined : '保存するとイベントが作成され、予約枠タブに進みます'
       : '「公開する」ON で友だちに予約 URL を案内できます'} actions={<>
         {tab === 'overview' && eventId ? <Button onClick={() => save('slots')} disabled={saving}>保存して次へ →</Button> : null}
         <Button variant="primary" onClick={() => save()} disabled={saving} busy={saving} busyLabel="保存中...">

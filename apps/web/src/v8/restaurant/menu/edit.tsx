@@ -104,7 +104,7 @@ function MenuEditBody() {
   const dirty = state === 'ready' && (JSON.stringify(draft) !== JSON.stringify(saved) || payment.dirty)
   const title = editing ? editing.name : course ? 'コースを追加する' : 'メニューを追加する'
   usePageTitle(title)
-  usePageCrumbs([{ label: 'メニュー管理', href: LIST_HREF }, { label: editing ? '変更' : '追加' }])
+  usePageCrumbs([{ label: 'メニュー管理', href: LIST_HREF }])
   const valid = draft.name.trim() !== '' && draft.price !== '' && Number(draft.price) >= 0
 
   async function save() {
