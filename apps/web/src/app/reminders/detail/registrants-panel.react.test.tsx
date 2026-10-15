@@ -90,6 +90,12 @@ async function render() {
     await Promise.resolve()
   })
 }
+async function clickAria(label: string) {
+  const button = document.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement | null
+  if (!button) throw new Error(`${label} が見つかりません`)
+  await act(async () => { button.click(); await Promise.resolve() })
+}
+
 async function click(label: string) {
   const button = Array.from(document.querySelectorAll('button')).find((item) => item.textContent === label)
   if (!button) throw new Error(`${label} が見つかりません`)
@@ -169,9 +175,12 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
 
   it('取消後は再開だけを表示し、再開には取消後の版番号を渡す', async () => {
     await render()
+    // 行の操作は「…」1つの中（B-253）。
+    await clickAria('田中 花子の操作')
     await click('取り消す')
     expect(apiMock.cancel).toHaveBeenCalledWith('reminder-1', 'registration-1', 4)
     expect(host.textContent).toContain('取消済み')
+    await clickAria('田中 花子の操作')
     await click('再開する')
     expect(apiMock.resume).toHaveBeenCalledWith('reminder-1', 'registration-1', 5)
     expect(host.textContent).toContain('未送信分だけを次の配信処理で組み直します。')
