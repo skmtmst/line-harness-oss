@@ -261,7 +261,7 @@
 | V8-B | BnrQp | マイル たまる決めごとを作る（競合）V8 | /mileage/earning-rules/new | `app/mileage/earning-rules/new/page.tsx` | `v8/mileage/earning-rule-new/create.tsx` |
 | V8-B | ctLwT | マイル たまる決めごとを作る V8 | /mileage/earning-rules/new | `app/mileage/earning-rules/new/page.tsx` | `v8/mileage/earning-rule-new/create.tsx` |
 | V8-B | M8zhjL | マイル マイルを手で増やす・減らす V8 | /mileage/friends/detail?id=friend-1&adjust=1 | `app/mileage/friends/detail/page.tsx` | `v8/mileage/friend-detail.tsx` |
-| V8-B | Jxmqh | NEN配信 コラム一覧 V8 | /nen-campaigns | `app/nen-campaigns/page.tsx` | `v8/nen-campaigns/list.tsx` |
+| V8-B | Jxmqh | NEN配信 コラム一覧 V8 | /nen-campaigns?tab=columns | `app/nen-campaigns/page.tsx` | `v8/nen-campaigns/list.tsx` |
 | V8-B | MuhWR | NEN配信 一覧（自動配信）V8 | /nen-campaigns | `app/nen-campaigns/page.tsx` | `v8/nen-campaigns/list.tsx` |
 | V8-B | oqSJP | NEN配信 誕生日クーポンの決めごと（引き出し）V8 | /nen-campaigns | `app/nen-campaigns/page.tsx` | `v8/nen-campaigns/list.tsx` |
 | V8-B | Tj7n4 | NEN配信 送った履歴 V8 | /nen-campaigns | `app/nen-campaigns/page.tsx` | `v8/nen-campaigns/list.tsx` |
@@ -279,7 +279,7 @@
 | V8-B | AOWoJ | 会員 一覧 V8（機能追加 F-19・API待ち） | /nen/members | `app/nen/members/page.tsx` | `v8/nen-members/members.tsx` |
 | V8-B | dEv6G | 会員 ランクを消す（確認）V8 | /nen/members | `app/nen/members/page.tsx` | `v8/nen-members/members.tsx` |
 | V8-B | dzx5D | 専用機能 状態 V8 | /nen/members | `app/nen/members/page.tsx` | `v8/nen-members/members.tsx` |
-| V8-B | e5yBLx | 会員 ランク設定（競合）V8 | /nen/members | `app/nen/members/page.tsx` | `v8/nen-members/members.tsx` |
+| V8-B | e5yBLx | 会員 ランク設定（競合）V8 | /nen/members?tab=ranks | `app/nen/members/page.tsx` | `v8/nen-members/members.tsx` |
 | V8-B | fb9NJ | 会員 ランク設定 V8 | /nen/members | `app/nen/members/page.tsx` | `v8/nen-members/members.tsx` |
 | V8-B | zQ5vY | 会員 ライフタイム V8 | /nen/members | `app/nen/members/page.tsx` | `v8/nen-members/members.tsx` |
 | V8-B | eLjeQ | マイペット ペットの情報を直す V8 | /nen/pets | `app/nen/pets/page.tsx` | `v8/nen-pets/pets.tsx` |
@@ -320,7 +320,7 @@
 | V8 | ltAaq | リマインダ 作る⑤ 確認 V8（機能追加 F-10・API待ち） | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
 | V8 | p5YuP | リマインダ 作る③ 通知の中身 V8（機能追加 F-10・API待ち） | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
 | V8 | r1l0bT | リマインダ 作る③（1152）V8 | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
-| V8 | T0nis | リマインダ 作る④ 配信予定 V8 | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
+| V8 | T0nis | リマインダ 作る④ 配信予定 V8｜状態は型の見本 CS のとおり | /reminders/edit?id=reminder-new&stage=schedule | `app/reminders/edit/page.tsx` | `v8/reminders/edit.tsx` |
 | V8 | VE1u5 | リマインダ 作る① 基本設定 V8 | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
 | V8 | YChR6 | リマインダ 作る② 対象者と止める条件 V8 | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
 | V8-B | n4DT7 | 承認ワークフロー（閲覧のみ）V8 | /restaurant-test/approvals | `app/restaurant-test/approvals/page.tsx` | `v8/restaurant/approvals/approvals.tsx` |
@@ -424,7 +424,7 @@
 | V8 | u5YC6 | テンプレート メッセージを作る V8 | /templates/edit | `app/templates/edit/page.tsx` | `v8/template-edit/edit.tsx` |
 | V8 | l87p1J | テンプレート 質問を作る V8 | /templates/questions/new | `app/templates/questions/new/page.tsx` | `v8/templates/question-new.tsx` |
 | V8-B | AsfFB | 外部連携 一覧 1152 V8 | /webhooks | `app/webhooks/page.tsx` | `v8/webhooks/outgoing.tsx`<br>`v8/webhooks/interactions.tsx`<br>`v8/webhooks/incoming.tsx`<br>`v8/webhooks/api-tokens.tsx`<br>`v8/webhooks/sheets.tsx`<br>`v8/webhooks/samples.tsx` |
-| V8-B | DA0Ag | 外部連携 やり取りの中身 V8（機能追加 F-18・API待ち） | /webhooks | `app/webhooks/page.tsx` | `v8/webhooks/outgoing.tsx`<br>`v8/webhooks/interactions.tsx`<br>`v8/webhooks/incoming.tsx`<br>`v8/webhooks/api-tokens.tsx`<br>`v8/webhooks/sheets.tsx`<br>`v8/webhooks/samples.tsx` |
+| V8-B | DA0Ag | 外部連携 やり取りの中身 V8（機能追加 F-18・API待ち） | /webhooks?tab=interactions | `app/webhooks/page.tsx` | `v8/webhooks/outgoing.tsx`<br>`v8/webhooks/interactions.tsx`<br>`v8/webhooks/incoming.tsx`<br>`v8/webhooks/api-tokens.tsx`<br>`v8/webhooks/sheets.tsx`<br>`v8/webhooks/samples.tsx` |
 | V8-B | DxAAA | 外部連携 Google Sheets V8 | /webhooks | `app/webhooks/page.tsx` | `v8/webhooks/outgoing.tsx`<br>`v8/webhooks/interactions.tsx`<br>`v8/webhooks/incoming.tsx`<br>`v8/webhooks/api-tokens.tsx`<br>`v8/webhooks/sheets.tsx`<br>`v8/webhooks/samples.tsx` |
 | V8-B | gW0F2 | 外部連携 こちらで受け取る V8 | /webhooks | `app/webhooks/page.tsx` | `v8/webhooks/outgoing.tsx`<br>`v8/webhooks/interactions.tsx`<br>`v8/webhooks/incoming.tsx`<br>`v8/webhooks/api-tokens.tsx`<br>`v8/webhooks/sheets.tsx`<br>`v8/webhooks/samples.tsx` |
 | V8-B | l5SRfT | 外部連携 一覧（閲覧のみ）V8 | /webhooks | `app/webhooks/page.tsx` | `v8/webhooks/outgoing.tsx`<br>`v8/webhooks/interactions.tsx`<br>`v8/webhooks/incoming.tsx`<br>`v8/webhooks/api-tokens.tsx`<br>`v8/webhooks/sheets.tsx`<br>`v8/webhooks/samples.tsx` |
