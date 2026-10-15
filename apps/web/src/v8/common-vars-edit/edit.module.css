@@ -123,9 +123,7 @@
 }
 .sideTitle { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-chip-label-lh); }
 .sideFields { display: flex; flex-direction: column; gap: var(--tpl-body-gap); }
-/* 使える期間：日付の欄（共通部品）は高さ40、絵は36。欄の間を 4 ずつ詰めて下の行を絵にそろえる。 */
 .periodCard { gap: var(--tpl-body-gap); }
-.periodCard .sideFields:first-of-type { gap: var(--tpl-sub-gap); }
 .inlineError { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-sub-gap); }
 
 /* 決めた日に変える：箱 余白16・間6・題13/700。行は 34.5（線は下）。 */

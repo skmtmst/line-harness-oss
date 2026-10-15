@@ -14,7 +14,7 @@ import styles from './date-time-field.module.css'
  *
  * ブラウザ任せの `<input type="datetime-local">` / `<input type="time">` は、
  * 表示が英語の書式になり、画面ごとに見た目も違った。欄の見た目は DateField と
- * 同じ（高さ40・14px）で、表示は日本語（例：`2026年10月1日（木）10:00`）。
+ * 同じ（高さ36・14px）で、表示は日本語（例：`2026年10月1日（木）10:00`）。
  *
  * 値は今までどおりの文字列で受け渡す（日本時間）。
  * - 日時：`datetime-local` と同じ `YYYY-MM-DDTHH:mm`（空は `''`）。秒付き
@@ -55,7 +55,7 @@ export default function DateTimeField({
 }: {
   value?: string
   defaultValue?: string
-  /** 36pxの欄と並べる場合。既定は日付と同じ40px。 */
+  /** 細い欄（32px）。既定は日付と同じ36px（ほかの欄と同じ・B-145）。 */
   size?: 'default' | 'compact'
   onChange?: (value: string) => void
   min?: string
@@ -281,7 +281,7 @@ type TimeFieldProps = {
   step?: number
   /** 分のきざみ（分）。`step` より優先。分の刻みを決める。 */
   minuteStep?: number
-  /** ★V8 の欄の高さ。`field`＝40（日付の欄と並ぶ）、`compact`＝32（表の中の細い欄）。 */
+  /** ★V8 の欄の高さ。`field`＝36（日付の欄と並ぶ）、`compact`＝32（表の中の細い欄）。 */
   size?: TimeFieldSize
   disabled?: boolean
   /** 閲覧のみ。値を見せて打てない・時計を出さない。 */
