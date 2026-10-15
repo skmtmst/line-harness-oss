@@ -1,0 +1,103 @@
+/* 割り当て方（★V8 修正案 f4bLF：QJMoY・jmVYJ）。値は変数だけ。 */
+
+.headRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+}
+
+.minor {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+.fixedRule {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+  margin: 0;
+  padding: var(--tpl-bm-10) var(--tpl-bm-16);
+  border-radius: var(--tpl-bm-8);
+  background: var(--color-table-head);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+}
+
+.fixedRule svg {
+  flex: none;
+  color: var(--color-ink-secondary);
+}
+
+.subTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
+}
+
+.periodRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-16);
+  min-width: 0;
+}
+
+.periodLabel {
+  flex: none;
+  width: var(--tpl-bm-88);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
+}
+
+.periodSelect {
+  flex: none;
+  min-width: var(--tpl-bm-200);
+}
+
+.periodRow .minor {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-16);
+}
+
+.compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--tpl-bm-12);
+}
+
+.compare th,
+.compare td {
+  padding: var(--tpl-bm-12) var(--tpl-bm-16);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  text-align: left;
+  font-weight: 400;
+}
+
+.compare thead th {
+  background: var(--color-table-head);
+  font-weight: 700;
+}
+
+.priorityCell,
+.limitCell {
+  flex-shrink: 0;
+}
+
+.priorityCell {
+  width: var(--tpl-bm-96);
+}
+
+.limitCell {
+  width: var(--tpl-bm-84);
+}

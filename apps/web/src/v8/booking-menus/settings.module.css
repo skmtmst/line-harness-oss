@@ -1838,3 +1838,16 @@
   align-items: center;
   min-height: var(--tpl-bm-36);
 }
+
+/* 割り当て方（QJMoY）で優先度・1日の上限の列が増えた。狭い表では「指名なし」「勤務（今週）」を畳み、行の高さと重なりを守る。 */
+.staffTable {
+  container-type: inline-size;
+  container-name: v8-staff-table;
+}
+
+@container v8-staff-table (max-width: 1000px) {
+  .staffColNoAssign,
+  .staffColWork {
+    display: none;
+  }
+}
