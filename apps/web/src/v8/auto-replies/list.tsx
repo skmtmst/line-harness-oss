@@ -1604,6 +1604,8 @@ export default function AutoRepliesListV8() {
               disabled={deleting || deleteTargetStale}
               busy={deleting}
               busyLabel="削除中…"
+              /* 絵 u8sKN：幅は「削除する」の文字で決める（結果の文字の分を控えない）。 */
+              widthReserve="idle"
               onClick={() => void runDelete()}
             >
               削除する
