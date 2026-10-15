@@ -216,6 +216,7 @@ html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface=
 }
 html:root .paddingCompact { padding: var(--space-16); }
 html:root .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
+html:root .card[data-card-spacing][data-card-spacing-sides] { padding: var(--card-content-padding); }
 /* B-208 の16は箱の端。中の見出しと本文・欄の間は指定した8〜12も使える。 */
 html:root .vertical { gap: max(var(--space-8), var(--card-content-gap, var(--space-16))); }
 
