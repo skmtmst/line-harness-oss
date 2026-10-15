@@ -42,6 +42,12 @@
     "missingFixtureExports": [
       "ListNavigationAccount",
       "ListReturnAccountGuard"
-    ]
+    ],
+    "repairedByTrain39": "d837d6d229",
+    "postRepairTests": {
+      "passed": 4,
+      "failed": 0,
+      "log": "/tmp/train40-evidence/fixture-post.log"
+    }
   }
 }

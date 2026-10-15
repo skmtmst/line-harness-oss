@@ -449,5 +449,12 @@
     "equalSources": [
       "packages/shared/src/form-layout.ts"
     ]
+  },
+  {
+    "target": "apps/web/src/app/rich-menus/new/image-upload-error.ts",
+    "name": "imageUploadErrorText",
+    "sourceRef": "7fbcc45371",
+    "source": "apps/web/src/app/rich-menus/new/create-v8.tsx",
+    "functionBodyAndCommentIdentical": true
   }
 ]
