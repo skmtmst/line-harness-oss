@@ -41,7 +41,7 @@ import te from '../template-edit/edit.module.css'
 import styles from './question-new.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import InlineSettings from '@/components/shared/inline-settings'
+import QuestionChoiceBehavior from './question-choice-behavior'
 
 /*
  * ★V8 テンプレート「質問を作る・編集」（Pencil `l87p1J`）。
@@ -113,7 +113,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<Tag[]>([])
-  const [, setScenarios] = useState<Scenario[]>([])
+  const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
   const [initialQuestion] = useState<ScenarioQuestion>(() => hostInitial?.question ?? emptyQuestion())
   const [question, setQuestion] = useState<ScenarioQuestion>(initialQuestion)
@@ -338,9 +338,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                 </div>
                 <Field label="ボタンの文字（20文字まで）" requirement={fields.requirement(`choice-${index}`)}><SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><TextField {...fields.bind(`choice-${index}`)} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} /></SaveErrorField></Field>
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
-                {host ? null : <QuestionEditor value={question} onChange={setQuestion} choiceOnly={index} choiceColumns/>}
-                <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={host ? null : selectedAccountId} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
+                {host ? null : <QuestionChoiceBehavior index={index} summary={choiceActionText(choice, tags, scenarios)}><QuestionEditor value={question} onChange={setQuestion} choiceOnly={index} choiceColumns /></QuestionChoiceBehavior>}
                 <Field label="押したときの返信"><SaveErrorField names={[`choices.${index}.reply`,"reply","choice.reply"]}><TextField value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} /></SaveErrorField></Field>
+                <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={host ? null : selectedAccountId} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
               </div>
             ))}
           </div>

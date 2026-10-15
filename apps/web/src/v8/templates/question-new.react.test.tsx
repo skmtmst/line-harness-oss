@@ -87,6 +87,8 @@ describe('質問を作る：保存で欄に知らせる（B-139）', () => {
     await act(async () => { fireEvent.click(last) })
     expect(screen.getAllByLabelText('ボタンの文字（20文字まで）')).toHaveLength(1)
     expect(name.value).toBe('継続を確認する')
+    expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の動きを変える' })) })
     const message = screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement
     await act(async () => { fireEvent.change(message, { target: { value: '入力を保つ' } }) })
     const hideMessage = screen.getByRole('checkbox', { name: 'ユーザーメッセージを使用しない' })
@@ -97,6 +99,10 @@ describe('質問を作る：保存で欄に知らせる（B-139）', () => {
     await act(async () => { fireEvent.click(hideMessage) })
     expect(message.disabled).toBe(false)
     expect(message.value).toBe('入力を保つ')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '設定を閉じる' })) })
+    expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の動きを変える' })) })
+    expect((screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement).value).toBe('入力を保つ')
     expect(templatesApi.create).not.toHaveBeenCalled()
   })
 
