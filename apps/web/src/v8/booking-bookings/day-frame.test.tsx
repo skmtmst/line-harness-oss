@@ -35,3 +35,8 @@ test('未取得の一覧に前の数と次の予約を出さず、閲覧者の�
   expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
   expect(screen.getByText('読み込めませんでした')).toBeTruthy()
 })
+
+test('日付やアカウントを読み直している間は、前の空き枠の数も残さない', () => {
+  const { container } = render(<PeopleDayFrame view="day" date="2026-10-15" rows={[row]} ready={false} availability={{ status: 'ready', slots: [slot] }} actions={null} canWrite={false} onOpen={() => {}}>盤</PeopleDayFrame>)
+  expect([...container.querySelectorAll('[data-kpi-number]')].map(node => node.textContent)).toEqual(['—', '—', '—', '—'])
+})
