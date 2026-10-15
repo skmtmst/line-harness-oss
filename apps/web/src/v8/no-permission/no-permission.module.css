@@ -38,8 +38,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--tpl-section-pad);
-  /* 真ん中より少し上（目で見た真ん中）。絵は下に数の帯の分を空けて札を置いている。 */
-  padding-bottom: var(--tpl-hb2-np-optical-bottom);
+  /* 札は題の下から板の下までの真ん中（絵 O5tUeE：上 291・下 303）。 */
 }
 
 .card {
