@@ -18,7 +18,7 @@ const compiled = await build({
     import {CardHeader} from './src/components/shared/card';
     import LiffPhoneFrame from './src/components/shared/liff-phone-frame';
     import StickyBar from './src/components/shared/sticky-bar';
-    
+
     import Button from './src/components/shared/button';
     function Fixture(){const [value,setValue]=useState('one');
       return <main>
