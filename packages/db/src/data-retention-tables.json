@@ -1790,6 +1790,20 @@
       "column": "tenant_id"
     }
   },
+  "hq_broadcast_saved_views": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_form_test_tokens": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
   "hq_template_versions": {
     "category": "purge",
     "scope": {

@@ -1,3 +1,4 @@
+import { generateGoogleReviewDraft } from './api-google-review-draft'
 import { fetchApi } from './api'
 
 /** 飲食店向け「Googleビジネス」のAPI。第1段（設定＋口コミ）★V6 GB-1〜GB-3、GB-13、GB-15、GB-16。第2段（プロフィール・営業時間・変更履歴）GB-10〜GB-12、GB-17〜GB-19。 */
@@ -287,11 +288,7 @@ export const restaurantGoogleApi = {
     ),
   review: (accountId: string, id: string) =>
     fetchApi<{ success: true; review: GoogleReview; store: { id: string; name: string }; connection: GoogleConnection }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}`, accountId)),
-  generateDraft: (accountId: string, id: string, options: { mode?: 'generate' | 'shorten' | 'polite'; replyDraft?: string } = {}) =>
-    fetchApi<{ success: true; draft: string; aiGenerated: true; generatedAt: string }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}/draft/generate`, accountId), {
-      method: 'POST',
-      body: JSON.stringify(options),
-    }),
+  generateDraft: (accountId: string, id: string) => generateGoogleReviewDraft(accountId, id),
   saveDraft: (accountId: string, id: string, replyDraft: string) =>
     fetchApi<{ success: true; review: GoogleReview }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}/draft`, accountId), { method: 'PUT', body: JSON.stringify({ replyDraft }) }),
   publishReply: (accountId: string, id: string, comment: string) =>

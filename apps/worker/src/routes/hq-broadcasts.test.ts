@@ -197,9 +197,20 @@ describe('統括の配信一覧・複製・追送',()=>{
    const b=(await r.json() as HqRunResponse).data;expect(globalThis.fetch).not.toHaveBeenCalled();expect(b).toMatchObject({status:'prepared',sent:0,followupAudienceCount:1,input:{followupOfRunId:source.id,targetType:'segment'}});
    // The normal send flow resolves the per-account source again, even after the draft is saved.
    const {resolveHqBroadcastAudience,countHqAudience}=await import('../services/hq-broadcast-audience.js');
-   const condition=await resolveHqBroadcastAudience(f.db,tenant,'shop',b.input);expect(await countHqAudience(f.db,'shop',condition)).toBe(1);
+   const condition=await resolveHqBroadcastAudience(f.db,tenant,'shop',b.input);expect(await countHqAudience(f.db,'shop',condition)).toEqual({count:1,consentExcluded:0});
    expect((f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get() as {n:number}).n).toBe(1);
    actor('owner',true);expect((await call(`/api/hq/broadcasts/${source.id}/followup`,'POST',{requestId:'forbidden',expectedVersion:1})).status).toBe(403);
+ });
+ it('追送人数は配信を止めた人を除いた数値を返す',async()=>{
+   const source=await sentWithLink();
+   f.raw.exec("INSERT INTO friend_delivery_consents(line_account_id,friend_id,purpose,state,reason,source) VALUES('shop','friend','marketing','revoked','本人希望','manual');INSERT INTO friends(id,line_user_id,line_account_id) VALUES('allowed-followup','U-followup','shop');INSERT INTO messages_log(id,friend_id,direction,message_type,content,broadcast_id,line_account_id) VALUES('log3','allowed-followup','outgoing','text','本文','sent-child','shop')");
+   const r=await call(`/api/hq/broadcasts/${source.id}/followup`,'POST',{requestId:'followup-consent',expectedVersion:1});
+   expect(r.status,await r.clone().text()).toBe(201);
+   const b=(await r.json() as HqRunResponse).data;
+   expect(b).toMatchObject({followupAudienceCount:1,followupAudience:[{accountId:'shop',count:1}],sent:0});
+   const {resolveHqBroadcastAudience,countHqAudience}=await import('../services/hq-broadcast-audience.js');
+   expect(await countHqAudience(f.db,'shop',await resolveHqBroadcastAudience(f.db,tenant,'shop',b.input))).toEqual({count:1,consentExcluded:1});
+   expect(globalThis.fetch).not.toHaveBeenCalled();
  });
  it('計測のない追送と別組織の追送元は断り、少人数の反応は未取得表示にする',async()=>{
    const source=await sentWithLink();const reactions=await call(`/api/hq/broadcasts/${source.id}/reactions`);expect(reactions.status).toBe(200);

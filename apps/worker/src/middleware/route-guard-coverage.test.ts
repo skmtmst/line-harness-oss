@@ -574,6 +574,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PUT /api/ops/notice-line-account',
     'PUT /api/ops/support/tickets/:id/draft',
     'PUT /api/restaurant-test/floors/:id',
+    // 新しい保存口も担当者には拒否する。許可を増やす表ではない。
+    'PUT /api/restaurant-test/followups/:storeId/steps/:stepId/messages',
     'PUT /api/restaurant-test/gbp/reviews/:id/draft',
     'PUT /api/restaurant-test/inventory/:id',
     'PUT /api/restaurant-test/inventory/allocation',

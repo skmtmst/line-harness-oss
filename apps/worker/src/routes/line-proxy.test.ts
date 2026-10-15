@@ -104,6 +104,10 @@ function fakeDb(opts: {
           return { results: (opts.broadcastFriendIds ?? []).map((id) => ({ id })) };
         },
         async first() {
+          if(sql.includes('AS delivery_suppressed')) {
+            const friend = await getFriendByLineUserIdForAccount(db as unknown as D1Database, String(stmt.params[2]), String(stmt.params[0]));
+            return friend ? {...friend, delivery_suppressed: opts.suppressed ? 1 : 0} : null;
+          }
           if(sql.includes('friend_delivery_consents'))return opts.suppressed?{suppressed:1}:null;
           return null;
         },
@@ -584,10 +588,19 @@ describe('push', () => {
   });
 
   test('logging failure does not break the 200 response', async () => {
+    const { db } = fakeDb();
+    vi.spyOn(db, 'batch').mockRejectedValueOnce(new Error('db down'));
+    const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  test('同意を確認できなければ上流へ送らず止める', async () => {
     vi.mocked(getFriendByLineUserIdForAccount).mockRejectedValue(new Error('db down'));
     const { db } = fakeDb();
     const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

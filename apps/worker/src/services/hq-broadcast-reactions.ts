@@ -36,7 +36,7 @@ export async function copyHqBroadcast(db:D1Database,run:Run,actorId:string,input
   const body:HqBroadcastInput={...source,requestId:input.requestId,title:typeof input.title==='string'?input.title:`${source.title}（${followup?'追送':'複製'}）`,scheduledAt:null,saveAsDraft:true,
     ...(followup?{...(source.afterActionVersionIds?{afterActionVersionIds:Object.fromEntries(Object.entries(source.afterActionVersionIds).filter(([id])=>accountIds.includes(id)))}:{}),accountIds,accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},targetType:'segment',segmentConditions:null,savedSearchId:null,excludedTagIds:[],targetTagId:null,followupOfRunId:run.id}:{}),};
   const counts=[];
-  if(followup)for(const accountId of accountIds)counts.push({accountId,count:await countHqAudience(db,accountId,await resolveHqBroadcastAudience(db,run.tenant_id,accountId,body))});
+  if(followup)for(const accountId of accountIds)counts.push({accountId,count:(await countHqAudience(db,accountId,await resolveHqBroadcastAudience(db,run.tenant_id,accountId,body))).count});
   const created=await prepareHqBroadcast(db,run.tenant_id,actorId,body);
   return {...await readHqBroadcastResult(db,created),...(followup?{followupAudience:counts,followupAudienceCount:counts.reduce((n,r)=>n+r.count,0)}:{}),sent:0};
 }

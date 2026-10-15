@@ -17,7 +17,7 @@ export const hqFormTestsApi={
 export async function readHqFormTest(apiOrigin:string,id:string,token:string,answers?:Record<string,unknown>):Promise<HqFormTest> {
   const response=await fetch(new URL(`/api/liff/hq-form-tests/${encodeURIComponent(id)}${answers===undefined?'':'/submit'}`,apiOrigin),{
     method:answers===undefined?'GET':'POST',credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',
-    headers:{'X-Form-Test-Token':token,...(answers===undefined?{}:{'Content-Type':'application/json'})},
+    headers:{Authorization:`Bearer ${token}`,...(answers===undefined?{}:{'Content-Type':'application/json'})},
     ...(answers===undefined?{}:{body:JSON.stringify({answers})}),
   })
   const result=await response.json() as {success:boolean;data:HqFormTest;error?:string}

@@ -43,6 +43,14 @@ function columnsOf(table: string): Set<string> {
 }
 
 describe('保存期限の分類表', () => {
+  it('統括のテスト票と保存した検索は参照先を消す前に消す', () => {
+    const order = purgeTablesChildFirst();
+    expect(order.indexOf('hq_form_test_tokens')).toBeLessThan(order.indexOf('hq_template_versions'));
+    expect(order.indexOf('hq_form_test_tokens')).toBeLessThan(order.indexOf('staff_members'));
+    expect(order.indexOf('hq_broadcast_saved_views')).toBeLessThan(order.indexOf('staff_members'));
+    expect(tenantScopeCondition('hq_form_test_tokens')).toContain('hq_form_test_tokens.tenant_id = ?');
+    expect(tenantScopeCondition('hq_broadcast_saved_views')).toContain('hq_broadcast_saved_views.tenant_id = ?');
+  });
   it('bootstrap.sql の表がすべて分類されている', () => {
     const missing = [...schemaTables].filter((name) => !RETENTION_TABLES[name]).sort();
     expect(
