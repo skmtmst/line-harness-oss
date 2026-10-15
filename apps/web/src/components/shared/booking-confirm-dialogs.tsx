@@ -56,7 +56,7 @@ export function CancelReservationDialog({ open, title, subtitle, facts, fullAmou
   useEffect(() => { if (open) { setRefund(fullAmount ? 'full' : 'none'); setReason(''); setNotify(true) } }, [open, fullAmount])
   const input = { refund, reason, notify }
   return (
-    <Dialog open={open} title={title} description={subtitle} designWidth={480} tone="destructive" confirmation busy={busy} error={error}
+    <Dialog contentLayout="form" open={open} title={title} description={subtitle} designWidth={480} tone="destructive" confirmation busy={busy} error={error}
       confirmLabel="予約を取り消す" cancelLabel="やめる" footerLead={<span className={styles.lead}>取り消すと元に戻せません</span>}
       confirmDisabled={!reason.trim()} confirmDisabledReason="取り消す理由を入れてください" onCancel={onClose} onConfirm={() => onConfirm(input)}>
       <div className={styles.body}>
@@ -108,7 +108,7 @@ export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy
   const yen = (n: number) => `¥${n.toLocaleString('ja-JP')}`
   const steps = <Steps label="返金の手順" currentKey={String(step)} steps={[{ key: '1', label: '金額と理由', state: step > 1 ? 'done' : 'todo' }, { key: '2', label: '確かめ', state: 'todo' }]} />
   return (
-    <Dialog open={open} title={step === 1 ? '返金する' : `${yen(amount)} を返金しますか？`} description={subtitle} designWidth={480} busy={busy} error={error} steps={steps} stepKey={step}
+    <Dialog contentLayout="form" open={open} title={step === 1 ? '返金する' : `${yen(amount)} を返金しますか？`} description={subtitle} designWidth={480} busy={busy} error={error} steps={steps} stepKey={step}
       footerLead={<span className={styles.lead}>手順 {step} / 2</span>}
       confirmLabel={step === 1 ? '次へ' : `${yen(amount)}を返金する`} confirmIcon={step === 1 ? <ArrowRight size={16} aria-hidden="true" /> : undefined}
       tone={step === 2 ? 'destructive' : 'default'} confirmation={step === 2} cancelLabel={step === 1 ? 'キャンセル' : '戻る'}
@@ -169,7 +169,7 @@ export function CancelClassDialog({ open, subtitle, facts, counts, testMode, bus
   useEffect(() => { if (open) { setRefundPaid(true); setRestoreTickets(true); setStopPaymentLinks(true); setReason('') } }, [open])
   const input = { refundPaid, restoreTickets, stopPaymentLinks, reason }
   return (
-    <Dialog open={open} title="この回を休講にしますか？" description={subtitle} designWidth={480} tone="destructive" confirmation busy={busy} error={error}
+    <Dialog contentLayout="form" open={open} title="この回を休講にしますか？" description={subtitle} designWidth={480} tone="destructive" confirmation busy={busy} error={error}
       confirmLabel="休講にする" cancelLabel="やめる" footerLead={<span className={styles.lead}>{counts.members}人に LINE を送ります</span>}
       confirmDisabled={!reason.trim()} confirmDisabledReason="休講の理由を入れてください" onCancel={onClose} onConfirm={() => onConfirm(input)}>
       <div className={styles.body}>
