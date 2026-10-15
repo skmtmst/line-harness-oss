@@ -261,6 +261,7 @@ export default function PaymentTab() {
         valueText="—"
         unit=""
         detail="支払日はアフィリエイターごとの取り決めです"
+        detailLayout="single"
       />
       <KpiCard
         presentation="band"
@@ -408,7 +409,13 @@ export default function PaymentTab() {
                       <span className={styles.cellNum}>登録済み</span>
                       <span className={styles.rowPlan}>口座番号は本人だけに表示</span>
                     </span>
-                  ) : <span className={styles.cellNum}>未登録</span>}
+                  ) : (
+                    /* 絵 aINnz：赤い「未登録」の下に、だれの手待ちかを添える。 */
+                    <span className={styles.stack}>
+                      <span className={`${styles.cellNum} ${styles.cellDanger}`}>未登録</span>
+                      <span className={styles.rowPlan}>本人の登録待ち</span>
+                    </span>
+                  )}
                 </Td>
                 <Td className={styles.colPayState}>
                   <span className={styles.stack}>

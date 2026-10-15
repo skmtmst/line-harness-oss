@@ -48,6 +48,10 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+.cellNum.cellDanger {
+  color: var(--color-danger);
+}
 .rowCode {
   display: block;
   overflow: hidden;
