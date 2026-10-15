@@ -270,6 +270,9 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
       if (m[0].length === 0) { signal._re.lastIndex += 1; continue }
       const proof = sourceEvidence(rel, content, m.index, m[0].length)
       if (proof?.comment) continue
+      // searchSlot内の検索も正の道具列の中。実在する持ち主へのimportを照合し、隣の手書きは残す。
+      if (signal.id === 'search-alone' && codeRoot && proof?.enclosingTags?.some(tag =>
+        isRegisteredComponent(codeRoot, proof.imports?.[tag], pattern.owner?.code ?? { files: [], components: [] }))) continue
       // 題の型へ直接渡した説明の文字は、操作の手書きとは分ける。
       // help内のbuttonや偽の型は、この照合を通らない。
       if (signal.id === 'own-extra' && proof?.attribute === 'help' && proof.literalAttribute && codeRoot

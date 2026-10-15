@@ -30,7 +30,6 @@ import { Tabs } from '@/components/shared/tabs'
 import ListRange from '@/components/ui/list-range'
 import { postActionStepLabel, ratingAverageText, type DestinationWrite, type FormSubmissionSummary, type SubmissionPostActions } from './summary'
 import styles from './responses.module.css'
-import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -39,6 +38,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import TruncatedText from '@/components/shared/truncated-text'
 
 /*
@@ -444,7 +444,7 @@ function Responses() {
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
       <Card variant="aside" aria-labelledby="fr-filter">
         <CardHeader size="stacked" title="絞り込み" titleId="fr-filter" meta={total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`} />
-        <Field label="名前・答えで探す（全件から）" labelHidden><SaveErrorField names={["query"]}><SearchField updateMode="immediate" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・答えで探す（全件から）" aria-label="名前・答えで探す（全件から）" /></SaveErrorField></Field>
+        <ListToolbar searchSlot={<SaveErrorField names={["query"]}><SearchField updateMode="immediate" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・答えで探す（全件から）" aria-label="名前・答えで探す（全件から）" /></SaveErrorField>} />
       </Card>
     </div>
   )
