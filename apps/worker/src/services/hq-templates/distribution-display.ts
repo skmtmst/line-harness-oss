@@ -20,6 +20,8 @@ export function captureDistributionName(runId: string, tenantId: string, account
   return {
     sql: `UPDATE hq_template_distribution_results SET created_name=(
       SELECT CASE r.item_kind
+        WHEN 'booking_menu' THEN (SELECT name FROM menus WHERE id=r.target_id AND line_account_id=r.target_account_id)
+        WHEN 'mileage_reward' THEN (SELECT name FROM mileage_rewards WHERE id=r.target_id AND line_account_id=r.target_account_id)
         WHEN 'tag' THEN (SELECT name FROM tags WHERE id=r.target_id AND line_account_id=r.target_account_id)
         WHEN 'auto_reply' THEN (SELECT name FROM auto_replies WHERE id=r.target_id AND line_account_id=r.target_account_id)
         WHEN 'friend_add_rule' THEN (SELECT name FROM friend_add_rules WHERE id=r.target_id AND line_account_id=r.target_account_id)
@@ -38,11 +40,21 @@ export function captureDistributionName(runId: string, tenantId: string, account
       WHERE r.preflight_id=hq_template_distribution_results.preflight_id
         AND r.tenant_id=hq_template_distribution_results.tenant_id
         AND r.target_account_id=hq_template_distribution_results.target_account_id
-        AND r.item_kind=COALESCE(t.delivery_type,t.extended_type,t.template_type)
+        AND r.item_kind=COALESCE(t.catalog_type,t.delivery_type,t.extended_type,t.template_type)
         AND (t.delivery_type IS NULL OR r.source_id=t.delivery_type)
-        AND (t.template_type<>'template' OR t.extended_type IS NOT NULL OR t.delivery_type IS NOT NULL OR r.source_id='template:' || json_extract(v.definition_json,'$.template.id'))
+        AND (t.template_type<>'template' OR t.catalog_type IS NOT NULL OR t.extended_type IS NOT NULL OR t.delivery_type IS NOT NULL OR r.source_id='template:' || json_extract(v.definition_json,'$.template.id'))
       LIMIT 1)
       WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='succeeded' AND created_name IS NULL`,
     bindings: [runId, tenantId, accountId],
   };
+}
+
+/** まだ配っていない店も含む、確認前の読取り。実行許可や上書き可否には使わない。 */
+export async function listDistributionTargets(db: D1Database, tenantId: string, templateId: string, accountIds: string[]) {
+  const template = await db.prepare(`SELECT v.version FROM hq_templates t JOIN hq_template_versions v ON v.id=t.current_version_id AND v.tenant_id=t.tenant_id AND v.template_id=t.id WHERE t.id=? AND t.tenant_id=? AND t.archived_at IS NULL`).bind(templateId,tenantId).first<{version:number}>();
+  if (!template) return null;
+  const accounts = (await db.prepare(`SELECT id,name FROM line_accounts WHERE tenant_id=? AND is_active=1 AND archived_at IS NULL ORDER BY name,id`).bind(tenantId).all<{id:string;name:string}>()).results;
+  if (accountIds.some(id=>!accounts.some(a=>a.id===id))) return null;
+  const selected = accountIds.length ? accounts.filter(a=>accountIds.includes(a.id)) : accounts;
+  return {templateId, latestVersion:template.version, requiresPreflight:true, stores:await Promise.all(selected.map(async a=>({accountId:a.id,accountName:a.name,targetVersion:await targetDistributionVersion(db,tenantId,templateId,a.id,template.version)})))};
 }

@@ -1,5 +1,9 @@
+export type HqTemplateArchiveStatus = 'active' | 'archived' | 'all';
+export interface HqTemplateArchiveCounts { active: number; archived: number }
+
 /** 統括のひな形一覧にだけ付く表示用の材料。本文や画像URLは含めない。 */
 export interface HqTemplateListDisplay {
+  archived_at?: string | null;
   kind?: import('./template-definition').TemplateKind | null;
   /** 保存したメッセージの形だけ。本文・URLは返さない。旧応答では未取得。 */
   message_type?: import('./template-definition').MessageTemplateDefinition['template']['messageType'] | null;

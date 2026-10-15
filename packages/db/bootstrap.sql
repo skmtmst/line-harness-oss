@@ -3587,11 +3587,38 @@ CREATE TABLE hq_broadcast_runs (
  created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')), approval_json TEXT CHECK(approval_json IS NULL OR json_valid(approval_json)), UNIQUE(tenant_id,request_id)
 );
 
+CREATE TABLE hq_broadcast_saved_views (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  staff_id TEXT NOT NULL REFERENCES staff_members(id),
+  scope TEXT NOT NULL DEFAULT 'hq' CHECK(scope IN ('private','hq')),
+  name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 100),
+  conditions_json TEXT NOT NULL CHECK(json_valid(conditions_json) AND json_type(conditions_json)='object'),
+  revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  archived_at TEXT
+);
+
 CREATE TABLE hq_broadcast_targets (
  run_id TEXT NOT NULL REFERENCES hq_broadcast_runs(id), line_account_id TEXT NOT NULL,
  account_name TEXT NOT NULL, tag_id TEXT, excluded INTEGER NOT NULL DEFAULT 0 CHECK(excluded IN (0,1)),
  broadcast_id TEXT UNIQUE, preflight_json TEXT CHECK(preflight_json IS NULL OR json_valid(preflight_json)),
  PRIMARY KEY(run_id,line_account_id)
+);
+
+CREATE TABLE hq_form_test_tokens (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  template_id TEXT NOT NULL,
+  template_version_id TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE CHECK(length(token_hash)=64),
+  created_by_staff_id TEXT NOT NULL REFERENCES staff_members(id),
+  expires_at TEXT NOT NULL,
+  revoked_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  FOREIGN KEY(template_id,tenant_id) REFERENCES hq_templates(id,tenant_id),
+  FOREIGN KEY(template_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id)
 );
 
 CREATE TABLE hq_support_messages (
@@ -3797,7 +3824,8 @@ CREATE TABLE hq_templates (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   archived_at TEXT, folder_id TEXT, extended_type TEXT CHECK (extended_type IS NULL OR extended_type='scenario'), friend_attribute_type TEXT
   CHECK (friend_attribute_type IS NULL OR friend_attribute_type IN ('friend_field','mark')), delivery_type TEXT
-  CHECK (delivery_type IS NULL OR delivery_type IN ('auto_reply','friend_add_rule','reminder')),
+  CHECK (delivery_type IS NULL OR delivery_type IN ('auto_reply','friend_add_rule','reminder')), catalog_type TEXT
+  CHECK (catalog_type IS NULL OR catalog_type IN ('booking_menu','mileage_reward')),
   PRIMARY KEY (id, tenant_id),
   FOREIGN KEY (current_version_id, id, tenant_id)
     REFERENCES hq_template_versions(id, template_id, tenant_id)
@@ -9539,7 +9567,13 @@ CREATE UNIQUE INDEX idx_hq_broadcast_folder_name ON hq_broadcast_folders(tenant_
 
 CREATE INDEX idx_hq_broadcast_folders_order ON hq_broadcast_folders(tenant_id,archived_at,display_order,name,id);
 
+CREATE UNIQUE INDEX idx_hq_broadcast_saved_views_name ON hq_broadcast_saved_views(tenant_id,staff_id,scope,name) WHERE archived_at IS NULL;
+
+CREATE INDEX idx_hq_broadcast_saved_views_visible ON hq_broadcast_saved_views(tenant_id,scope,staff_id,archived_at,updated_at);
+
 CREATE UNIQUE INDEX idx_hq_folder_name ON hq_template_folders(tenant_id, name) WHERE archived_at IS NULL;
+
+CREATE INDEX idx_hq_form_test_tokens_active ON hq_form_test_tokens(tenant_id,template_id,expires_at);
 
 CREATE INDEX idx_hq_support_messages_request
   ON hq_support_messages(request_id, created_at);
@@ -10985,6 +11019,10 @@ WHEN NEW.id != OLD.id
   OR NEW.tenant_id != OLD.tenant_id
   OR NEW.template_type != OLD.template_type
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER hq_template_catalog_insert BEFORE INSERT ON hq_templates WHEN NEW.catalog_type IS NOT NULL AND (NEW.template_type<>'template' OR NEW.extended_type IS NOT NULL OR NEW.friend_attribute_type IS NOT NULL OR NEW.delivery_type IS NOT NULL) BEGIN SELECT RAISE(ABORT,'HQ_TYPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_catalog_update BEFORE UPDATE ON hq_templates WHEN NEW.catalog_type IS NOT OLD.catalog_type OR (NEW.catalog_type IS NOT NULL AND (NEW.template_type<>'template' OR NEW.extended_type IS NOT NULL OR NEW.friend_attribute_type IS NOT NULL OR NEW.delivery_type IS NOT NULL)) BEGIN SELECT RAISE(ABORT,'HQ_TYPE_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_delivery_insert BEFORE INSERT ON hq_templates
 WHEN NEW.delivery_type IS NOT NULL AND

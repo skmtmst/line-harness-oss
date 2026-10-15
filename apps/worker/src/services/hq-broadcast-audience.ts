@@ -47,9 +47,17 @@ export async function resolveHqBroadcastAudience(db: D1Database, tenantId: strin
     groups.push(await resolve(parsed.condition));
   }
   const rules:SegmentRule[]=[{type:'is_following',value:true}];
+  if(input.followupOfRunId) {
+    const source=await db.prepare(`SELECT b.id FROM hq_broadcast_runs r JOIN hq_broadcast_targets t ON t.run_id=r.id AND t.excluded=0
+      JOIN broadcasts b ON b.id=t.broadcast_id AND b.line_account_id=t.line_account_id
+      WHERE r.id=? AND r.tenant_id=? AND t.line_account_id=? AND b.status='sent' AND b.track_links=1
+      AND EXISTS(SELECT 1 FROM broadcast_tracked_links l WHERE l.broadcast_id=b.id)`).bind(input.followupOfRunId,tenantId,accountId).first<{id:string}>();
+    if(!source)throw new StampError('追送元の送信記録と計測リンクを確認してください',409);
+    rules.push({type:'broadcast_link_clicked',value:{broadcastId:source.id,clicked:false}});
+  }
   if(input.audience.kind==='tag')rules.push({type:'tag_exists',value:await accountReference('tags',input.audience.tagName)});
   else if(input.targetType==='tag')rules.push({type:'tag_exists',value:await accountReference('tags',input.targetTagId)});
-  if(input.targetType==='segment'&&!input.segmentConditions&&!input.savedSearchId) throw new StampError('詳細条件を指定してください');
+  if(input.targetType==='segment'&&!input.segmentConditions&&!input.savedSearchId&&!input.followupOfRunId) throw new StampError('詳細条件を指定してください');
   for(const tag of input.excludedTagIds??[])rules.push({type:'tag_not_exists',value:await accountReference('tags',tag)});
   const condition:SegmentCondition={operator:'AND',rules,...(groups.length?{groups}:{})};
   try{buildSegmentWhere(condition);}catch{throw new StampError('詳細条件を確認してください');}

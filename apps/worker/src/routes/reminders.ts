@@ -1,5 +1,7 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { buildReminderStepMessage } from '../services/reminder-delivery.js';
+import { getTemplateById } from '@line-crm/db';
 import { Hono, type Context } from 'hono';
 import {
   getFriendById,
@@ -42,7 +44,7 @@ import {
 } from '@line-crm/db';
 import { describeReminderTiming, LEAP_YEAR_POLICIES, REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE, resolveReminderSendAt } from '@line-crm/shared';
 import type { Env } from '../index.js';
-import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   completeOutboundSendStatement,
@@ -1190,6 +1192,25 @@ reminders.post('/api/reminders/:id/audience', requireDeliveryAccess('reminders')
     console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/audience"}));
     return c.json({ success: false, error: '対象者を数え直せませんでした' }, 500);
   }
+});
+
+reminders.post('/api/reminders/:id/message-preview',requireRole('owner','admin'),denyReadOnly(),inputJsonBoundary({friendId:['string'],stableStepId:['string'],expectedDraftVersionId:['string'],expectedDraftUpdatedAt:['string'],deliveredAt:['string']}),async c=>{
+  const draft=await getReminderDraftVersion(c.env.DB,c.req.param('id'));
+  if(!draft)return c.json({success:false,error:'下書きが見つかりません'},404);
+  const input=await c.req.json<{friendId:string;stableStepId:string;expectedDraftVersionId:string;expectedDraftUpdatedAt:string;deliveredAt?:string}>();
+  if(input.expectedDraftVersionId!==draft.id||input.expectedDraftUpdatedAt!==draft.updated_at)return c.json({success:false,error:'下書きが更新されました。読み直してください'},409);
+  const settings=parseReminderVersionSettings(draft),friend=typeof input.friendId==='string'?await getFriendById(c.env.DB,input.friendId):null;
+  if(!friend||friend.line_account_id!==settings.lineAccountId||!friend.is_following)return c.json({success:false,error:'友だちが見つかりません'},404);
+  const step=(await getReminderVersionSteps(c.env.DB,draft.id)).find(step=>step.id===input.stableStepId);
+  if(!step)return c.json({success:false,error:'通知が見つかりません'},404);
+  if(step.template_id){const template=await getTemplateById(c.env.DB,step.template_id);if(!template||template.line_account_id!==settings.lineAccountId)return c.json({success:false,error:'テンプレートが見つかりません'},404);}
+  const deliveredAt=input.deliveredAt===undefined?new Date():new Date(input.deliveredAt);
+  if(Number.isNaN(deliveredAt.getTime()))return inputError(c,{success:false,error:'日時を確認してください'},400,['deliveredAt']);
+  const built=await buildReminderStepMessage(c.env.DB,step,friend,deliveredAt,'test_send',{previewOnly:true});
+  const current=await getReminderDraftVersion(c.env.DB,c.req.param('id'));
+  if(current?.id!==draft.id||current.updated_at!==draft.updated_at)return c.json({success:false,error:'下書きが更新されました。読み直してください'},409);
+  c.header('Cache-Control','no-store');
+  return c.json({success:true,data:{dryRun:true,sent:0,persistsSchedule:false,draftVersionId:draft.id,draftUpdatedAt:draft.updated_at,friendId:friend.id,friendName:friend.display_name,stableStepId:step.id,deliveredAt:deliveredAt.toISOString(),messageType:built.messageType,messageContent:built.messageContent,message:built.message}});
 });
 
 reminders.post('/api/reminders/:id/preview', inputJsonBoundary(), async (c) => {

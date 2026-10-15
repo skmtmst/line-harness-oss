@@ -1149,6 +1149,7 @@ export type RichMenuScheduleInput = {
 
 /** 公開run1件。版の要約・状態・試行に使ったLINE ID・最終エラー。 */
 export type RichMenuPublishRun = {
+  versionNumber?: number | null
   id: string
   status: 'running' | 'succeeded' | 'failed'
   lastErrorCode: string | null
@@ -6147,6 +6148,7 @@ export type OpsTenantDetail = {
   accounts: Array<{ id: string; name: string; is_active: number; archived_at: string | null; updated_at: string; friend_count: number }>
   members: Array<{ id: string; name: string; email: string | null; role: string; access_level: string; is_active: number; invite_status: string; last_login_at: string | null }>
   audit: OpsAuditRow[]
+  metrics: {monthlyListPriceYen:number|null;monthlyListPriceSource:string;thisMonthBilledYen:number|null;invoiceSource:string;accountCount:number;activeAccountCount:number;friendCount:number;friendChangeLastMonth:null;supportCount:number;unresolvedSupportCount:number}
 }
 
 export type OpsAuditRow = {
@@ -7556,9 +7558,10 @@ export const api = {
       fetchApi<ApiResponse<FormSubmissionDetail>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}?account_id=${encodeURIComponent(accountId)}`,
       ),
-    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string } = {}) => {
+    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string; from?: string; to?: string; period?: 'this_month' | 'last_month' | 'all' } = {}) => {
       const query = new URLSearchParams({ account_id: accountId, page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
       if (params.query) query.set('q', params.query)
+      for (const key of ['from','to','period'] as const) if (params[key] !== undefined) query.set(key, params[key]!)
       return fetchApi<ApiResponse<FormSubmissionPage>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions?${query}`,
       )
@@ -7592,6 +7595,7 @@ export const api = {
            * されていた。型に無いものは、来ていないことに誰も気づけない。
            */
           contentRevision: number
+          latestEdit?: {staffId:string;staffName:string;savedAt:string}|null
           /** お客さまに出している不変版。null は未公開。 */
           publishedVersionId: string | null
           /** 現在公開版の元になった編集版。 */

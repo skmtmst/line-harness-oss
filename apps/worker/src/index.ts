@@ -1,3 +1,4 @@
+import { liffNotificationPreferences } from './routes/liff-notification-preferences.js';
 import { processScenarioSourceJobs } from './services/scenario-source-jobs.js';
 import { formDocuments } from './routes/form-documents.js';
 import { purgeExpiredFormDocuments } from './services/form-documents.js';
@@ -89,6 +90,7 @@ import { lineAccounts } from './routes/line-accounts.js';
 import { gettingStarted } from './routes/getting-started.js';
 import { recipes } from './routes/recipes.js';
 import { hqTemplates } from './routes/hq-templates.js';
+import { hqFormTests } from './routes/hq-form-tests.js';
 import { manualLinks } from './routes/manual-links.js';
 import { errorMessages } from './routes/error-messages.js';
 import { accountHandovers } from './routes/account-handovers.js';
@@ -564,6 +566,7 @@ app.route('/', webhook);
 app.route('/', gettingStarted);
 app.route('/', recipes);
 app.route('/', hqTemplates);
+app.route('/', hqFormTests);
 app.route('/', hqBroadcasts);
 app.route('/', ops);
 app.route('/', manualLinks);
@@ -598,6 +601,7 @@ app.route('/', usersGrouped);
 app.route('/', inbox);
 app.route('/', openapi);
 app.route('/', liffRoutes);
+app.route('/', liffNotificationPreferences);
 app.route('/', affiliateSelfRoutes);
 app.route('/', affiliatePayouts);
 
