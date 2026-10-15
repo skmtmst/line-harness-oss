@@ -124,7 +124,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
   return (
     <SaveErrorScope errors={saveErrors}><AuthPage layout={scope} brandName={brandName} title={recovery ? "回復コードでログイン" : scope === 'admin' ? "二段階認証" : "6桁の確認"} steps={ready && challenge ? <Steps label="ログインの手順" steps={[{ label: method === 'password' ? 'メールログイン' : 'LINEログイン', state: 'done' }, { label: recovery ? '回復コード' : '二段階認証', state: 'current' }]} /> : undefined} boardId={recovery ? undefined : 'tOPeY'} titleId="ops-two-factor-title" help={scope === 'admin' && recovery ? '登録の時に控えた回復コードを1つ入れてください。使ったコードは、もう使えません。' : undefined}>
 
-        {scope === 'ops' ? <AuthHelp>{recovery ? '登録の時に控えた回復コードを1つ入れてください。使ったコードは、もう使えません。' : 'パスワードを確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。'}</AuthHelp> : null}
+        {scope === 'ops' && ready && challenge ? <AuthHelp>{recovery ? '登録の時に控えた回復コードを1つ入れてください。使ったコードは、もう使えません。' : 'パスワードを確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。'}</AuthHelp> : null}
 
         {missingChallenge ? (
           <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Button variant="text" size="inline" href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>} />
