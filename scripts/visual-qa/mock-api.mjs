@@ -6723,7 +6723,7 @@ const server = createServer((req, res) => {
   }
 
   // 業種ダッシュボード（XBkC2）と使い方のスタイル。PUT の中身を読むので、ここで受ける。
-  if (url.pathname === '/api/account-style' || url.pathname.startsWith('/api/style-dashboard/')) {
+  if (url.pathname === '/api/dashboard/style' || url.pathname.startsWith('/api/dashboard/style/')) {
     let raw = ''
     req.on('data', (chunk) => { raw += chunk })
     req.on('end', () => {

@@ -1,7 +1,8 @@
 /*
  * 業種ダッシュボード（B-294・B-304・B-309・B-318。絵 XBkC2）の撮影の見本。
- * 本物の口は API 組4 が作り中。形は apps/web/src/lib/api-style-dashboard.ts と同じ。
- * 使い方のスタイルは PUT /api/account-style { style } で変えられる（撮影で 4 業種を順に撮るため）。
+ * 口は API 組4（/api/dashboard/style、apps/web/src/lib/api-styles.ts の styleApi・API-CONTRACT-4）。
+ * 下の TODAY は絵の中身の控え。ここから口の生の形（summary・schedule・analytics・cards）を組み立てて返す。
+ * 使い方のスタイルは PUT /api/dashboard/style { style } で変えられる（撮影で 4 業種を順に撮るため）。
  */
 
 let accountStyle = 'standard'
@@ -251,119 +252,117 @@ const LESSON = {
 
 const TODAY = { restaurant: RESTAURANT, salon: SALON, consult: CONSULT, lesson: LESSON }
 
-const series = (seed, max) => Array.from({ length: 15 }, (_, i) => {
-  const now = Math.round(((Math.sin((i + seed) * 1.7) + 1.2) / 2.4) * max * 0.9 + max * 0.08)
-  const prev = Math.round(((Math.cos((i + seed) * 1.3) + 1.2) / 2.4) * max * 0.85 + max * 0.05)
-  return { label: `${i * 2 + 1}`, now, prev }
-})
-const AXIS = ['9/16', '9/23', '9/30', '10/7', '10/15']
-const card = (id, title, valueText, unit, delta, help) => ({ id, title, valueText, unit, delta, help })
-const cells = (...v) => v.map((x) => (typeof x === 'string' ? { text: x } : x))
 
-const ANALYTICS = {
-  restaurant: {
-    tabs: [['reservations', '予約'], ['seats', '来店と席'], ['lost', '取りこぼし'], ['customers', 'お客さま'], ['line', 'LINE の効果'], ['payments', 'お支払い']],
-    cards: [card('sales', '売上（料金×確定数）', '¥1,284,000', '', up('+8.2%'), '料金×確定した予約の数です。会計の額ではありません。'), card('income', '入金額（オンライン）', '¥612,400', '', up('+12.5%'), 'Stripe で受け取った額です。'), card('ratio', '先払いの割合', '48', '%', up('+4pt'), '確定した予約のうち先払いの割合です。'), card('store', '店舗払い（予定の額）', '¥671,600', '', down('−2.1%'), '当日お店で払う予定の額です。'), card('refund', '返金', '¥36,800', '4件', down('+1件'), '返した額と件数です。'), card('lost', '未払いで流れた枠', '6', '枠', up('−3枠'), '先払いの期限が切れて流れた枠です。')],
-    chart: { title: '日ごとの入金（オンライン）・前の30日と比べる', help: '日は来店日で数えます。', ticks: ['¥6万', '¥3万', '0'], axis: AXIS, points: series(1, 60), max: 60 },
-    table: { title: 'コースごとのお支払い', help: 'コースごとの払い方と額です。', columns: [{ label: 'コース' }, { label: '払い方' }, { label: '確定', align: 'right' }, { label: '売上（料金×確定数）', align: 'right' }, { label: '入金（オンライン）', align: 'right' }, { label: '返金', align: 'right' }, { label: '未払いで流れた枠', align: 'right' }], rows: [
-      { id: 'a', name: '季節のおまかせ', sub: '1人 ¥8,800', cells: cells({ text: '', badge: PAY.pre }, '62', '¥545,600', '¥545,600', '¥26,400', '2') },
-      { id: 'b', name: '記念日コース', sub: '1人 ¥6,000', cells: cells({ text: '', badge: PAY.pre }, '18', '¥108,000', '¥66,800', '¥10,400', '4') },
-      { id: 'c', name: '宴会コース', sub: '1人 ¥6,500', cells: cells({ text: '', badge: PAY.store }, '40', '¥260,000', '—', '—', '—') },
-      { id: 'd', name: '席のみ', sub: '—', cells: cells({ text: '', badge: PAY.store }, '124', '—', '—', '—', '—') },
-      { id: 'e', name: '貸切プラン', sub: '1組 ¥120,000', cells: cells({ text: '', badge: PAY.pre }, '2', { text: '—', note: '出せない（5件未満）' }, { text: '—', note: '出せない' }, '—', '0') },
-    ] },
-    side: [
-      { ...side('mix', '払い方の内訳（この30日）', [['オンライン先払い', '48%・82件'], ['店舗払い', '52%・164件']], { help: '確定した予約の払い方です。' }), split: { ratio: 0.48 } },
-      side('lost', '未払いで流れた枠', [['10/03（土）19:00', '記念日コース 2名'], ['10/10（土）18:30', '記念日コース 2名'], ['10/12（月）20:00', '季節のおまかせ 4名'], ['ほか 3枠', '']], { help: '先払いの期限が切れて流れた枠です。', link: link('人・LINE', '/friends') }),
-      { ...side('how', '数え方', []), note: '日は来店日で数えます。売上は料金×確定数で、会計の額ではありません。入金は Stripe で受け取った額です。' },
-    ],
-  },
-  salon: {
-    tabs: [['overview', '概要'], ['customers', 'お客さま'], ['staff', 'スタッフ'], ['menu', 'メニュー'], ['route', '経路と LINE'], ['cancel', 'キャンセル'], ['payments', 'お支払い']],
-    cards: [card('bookings', '予約数', '312', '件', up('+6.1%'), '来店日で数えた予約の数です。'), card('visits', '来店数', '284', '件', up('+4.8%'), '来店の印が付いた数です。'), card('sales', '見込み売上', '¥2,486,000', '', up('+7.4%'), '料金×確定数です（見込み）。'), card('income', '入金額（オンライン）', '¥1,102,300', '', up('+11.0%'), 'Stripe で受け取った額です。'), card('rebook', '次回予約率', '38', '%', up('+5pt'), '施術後24時間以内に次の予約を入れた割合です。'), card('noshow', '無断キャンセル率', '1.9', '%', down('+0.3pt'), '無断 ÷（予約 − 取消）です。')],
-    chart: { title: '日ごとの来店（2日ずつ）・前の30日と比べる', help: '来店日で数えます。', ticks: ['30', '15', '0'], axis: AXIS, points: series(2, 30), max: 30 },
-    table: { title: 'スタッフ', help: 'スタッフごとの数です。', columns: [{ label: 'スタッフ' }, { label: '予約', align: 'right' }, { label: '稼働率', align: 'right' }, { label: '指名率', align: 'right' }, { label: '次回予約率', align: 'right' }, { label: '再来率（90日）', align: 'right' }, { label: '見込み売上', align: 'right' }], note: '「出せない」：その人の新規が 10 人未満のときは率を出しません（0% とは違います）。', rows: [
-      { id: 's1', name: '高田 誠', sub: '店長', cells: cells('98', '84%', '62%', '45%', '71%', '¥842,000') },
-      { id: 's2', name: '中川 由美', sub: 'スタイリスト', cells: cells('86', '78%', '48%', '39%', '66%', '¥701,500') },
-      { id: 's3', name: '森 涼太', sub: 'スタイリスト', cells: cells('74', '69%', '31%', '33%', '58%', '¥552,300') },
-      { id: 's4', name: '佐野 直人', sub: '4月から', cells: cells('48', '52%', '12%', '28%', { text: '—', note: '出せない' }, '¥390,200') },
-    ] },
-    side: [
-      { ...side('pay', 'お支払い（この30日）', [['入金額（オンライン）', '¥1,102,300'], ['先払いの割合', '44%'], ['店舗払い（予定の額）', '¥1,383,700'], ['返金', '3件 ¥26,400'], ['未払いで流れた枠', '4枠', 'danger']], { help: PAY_HELP, link: link('一覧', '/booking/bookings') }), note: '見込み売上（料金×確定数）と入金額は別の数です。' },
-      { ...side('newcomers', '新規の段（90日）', [], { help: '初めて来た人が何回目まで来たかです。', link: link('人・LINE', '/friends') }), bars: [{ label: '初めて来た', value: '64人', ratio: 1 }, { label: '2回目に来た', value: '29人・45%', ratio: 0.45 }, { label: '3回目に来た', value: '17人・27%', ratio: 0.27 }] },
-      side('winback', '呼び戻し待ち', [['いつもの間隔×1.5 を過ぎた', '23人'], ['送った人の 30日の再来', '9人・39%']], { help: 'いつもの来店の間隔を過ぎた人です。', link: link('人・LINE', '/friends') }),
-    ],
-  },
-  consult: {
-    tabs: [['overview', '概要'], ['staff', '担当者'], ['kinds', '面談の種類'], ['funnel', '流入と成果'], ['time', '時間帯'], ['cancel', '取消と無断'], ['payments', 'お支払い']],
-    cards: [card('bookings', '予約', '96', '件', up('+9.1%'), '面談日で数えた予約です。'), card('done', '実施', '81', '件', up('+6.6%'), '実施した面談です。'), card('won', '成約率（90日）', '18', '%', up('+2pt'), '実施した面談のうち成約の割合です。'), card('noshow', '無断欠席率', '4.2', '%', up('−1.1pt'), '無断 ÷（予約 − 取消）です。'), card('sales', '有料相談の売上', '¥181,500', '', up('+¥22,000'), '料金×確定数です。'), card('income', '入金額（オンライン）', '¥143,000', '', up('+¥16,500'), 'Stripe で受け取った額です。')],
-    chart: { title: '実施した面談（2日ずつ・面談日で数える）・前の30日と比べる', help: '面談日で数えます。', ticks: ['10', '5', '0'], axis: AXIS, points: series(3, 10), max: 10 },
-    table: { title: '流入と成果（友だち→予約→実施→成約）', help: '流入経路ごとの数です。', link: link('人・LINE', '/friends'), columns: [{ label: '流入経路' }, { label: '友だち', align: 'right' }, { label: '予約', align: 'right' }, { label: '実施', align: 'right' }, { label: '成約', align: 'right' }, { label: '成約率', align: 'right' }, { label: '予約→実施', align: 'right' }], note: '「出せない」：実施が 10 件未満のときは率を出しません（0% とは違います）。', rows: [
-      { id: 'a', name: 'Instagram の広告', sub: '広告', cells: cells('412', '38', '33', '7', '21%', '87%') },
-      { id: 'b', name: 'LINE の友だち紹介', sub: '紹介コード', cells: cells('126', '24', '22', '5', '23%', '92%') },
-      { id: 'c', name: 'Google 検索', sub: 'Web の予約ページ', cells: cells('88', '21', '17', '2', '12%', '81%') },
-      { id: 'd', name: '士業の先生から', sub: '紹介', cells: cells('14', '6', '6', '1', { text: '—', note: '出せない' }, { text: '—', note: '出せない' }) },
-    ] },
-    side: [
-      { ...side('pay', 'お支払い（この30日）', [['入金額（オンライン）', '¥143,000'], ['先払いの割合', '79%'], ['店舗払い・無料', '無料 58件・対面払い 4件'], ['返金', '2件 ¥11,000'], ['未払いで流れた枠', '3枠', 'danger']], { help: PAY_HELP, link: link('一覧', '/booking/bookings') }), note: '有料相談の売上（料金×確定数）と入金額は別の数です。' },
-      side('staff', '担当者（この30日）', [['山口', '実施 44・無断 3%・成約 21%'], ['石井', '実施 37・無断 5%・成約 14%']], { help: '担当者ごとの数です。' }),
-      { ...side('how', '数える日', []), note: '面談日で数えます。予約が入った日で数えるのは「新着予約」だけです。' },
-    ],
-  },
-  lesson: {
-    tabs: [['overview', '概要'], ['classes', '出席とクラス'], ['retention', '継続と退会'], ['trial', '体験と入会'], ['teachers', '講師'], ['line', 'LINE の効果'], ['payments', 'お支払い']],
-    cards: [card('sales', '売上（料金×確定数）', '¥684,000', '', up('+5.4%'), '料金×確定数です。'), card('income', '入金額（オンライン）', '¥452,100', '', up('+9.8%'), 'Stripe で受け取った額です。'), card('ratio', '先払いの割合', '66', '%', up('+3pt'), '確定した予約のうち先払いの割合です。'), card('store', '店舗払い（予定の額）', '¥231,900', '', down('−1.2%'), '月謝・体験など当日払う予定の額です。'), card('refund', '返金', '¥18,700', '6件', down('+2件'), '返した額と件数です。'), card('lost', '未払いで流れた枠', '9', '枠', up('−4枠'), '先払いの期限が切れて流れた枠です。')],
-    chart: { title: '日ごとの入金（オンライン・2日ずつ）・前の30日と比べる', help: 'クラスの日で数えます。', ticks: ['¥4万', '¥2万', '0'], axis: AXIS, points: series(4, 40), max: 40 },
-    table: { title: 'クラスごとのお支払い', help: 'クラスごとの払い方と額です。', columns: [{ label: 'クラス' }, { label: '払い方' }, { label: '確定', align: 'right' }, { label: '売上（料金×確定数）', align: 'right' }, { label: '入金（オンライン）', align: 'right' }, { label: '返金', align: 'right' }, { label: '未払いで流れた枠', align: 'right' }], note: '「出せない」：確定が 5 件未満のときは数を出しません（0 とは違います）。', rows: [
-      { id: 'a', name: 'リフレッシュヨガ', sub: '1回 ¥2,200', cells: cells({ text: '', badge: PAY.pre }, '118', '¥259,600', '¥251,200', '¥8,800', '3') },
-      { id: 'b', name: 'ボディメイク', sub: '1回 ¥2,750', cells: cells({ text: '', badge: PAY.pre }, '64', '¥176,000', '¥165,000', '¥5,500', '4') },
-      { id: 'c', name: '朝ヨガ（初級）', sub: '1回 ¥1,650', cells: cells({ text: '', badge: PAY.pre }, '22', '¥36,300', '¥35,900', '¥4,400', '2') },
-      { id: 'd', name: 'キッズダンス', sub: '月謝 ¥8,800', cells: cells({ text: '', badge: PAY.store }, '24', '¥211,200', '—', '—', '—') },
-      { id: 'e', name: '体験ヨガ', sub: '1回 ¥500', cells: cells({ text: '', badge: PAY.store }, '3', { text: '—', note: '出せない' }, '—', '—', '—') },
-    ] },
-    side: [
-      { ...side('mix', '払い方の内訳（この30日）', [['オンライン先払い', '66%・204件'], ['店舗払い（月謝・体験）', '34%・27件']], { help: '確定した予約の払い方です。' }), split: { ratio: 0.66 } },
-      { ...side('trial', '体験→入会（今月）', [], { help: '体験の申し込みから入会までです。', link: link('人・LINE', '/friends') }), bars: [{ label: '体験の申込', value: '24人', ratio: 1 }, { label: '体験に来た', value: '19人・79%', ratio: 0.79 }, { label: '入会した', value: '7人・37%', ratio: 0.37 }] },
-      side('lost', '未払いで流れた枠', [['10/12（月）19:30', 'ボディメイク 2人'], ['10/10（土）18:00', 'リフレッシュヨガ 1人'], ['ほか 6枠', '']], { help: '先払いの期限が切れて流れた枠です。', link: link('人・LINE', '/friends') }),
-    ],
-  },
-}
+/* ── 口の生の形へ ── */
+const TZ = 'Asia/Tokyo'
+const iso = (date, hm) => `${date}T${hm}:00+09:00`
+const metric = (value, unit = '件', formula = '見本') => ({ value, status: 'available', formula, unit })
+const rate = (value, numerator, denominator, formula = '見本') => ({ value, numerator, denominator, status: 'available', formula, unit: '' })
+const STATUS = { 来店済み: 'visited', 着席中: 'seated', 予約中: 'confirmed', 承認待ち: 'requested', 取消: 'cancelled', 施術中: 'seated', 確定: 'confirmed', 実施: 'completed', 済み: 'completed', '': 'confirmed' }
+const booking = (o) => ({ id: o.id, version: 1, updatedAt: '2026-10-15T00:00:00.000Z', kind: o.kind ?? 'booking', friendId: null, personKey: o.id, name: o.name, startsAt: o.startsAt, endsAt: o.endsAt, requestedAt: o.startsAt, status: o.status, staffId: o.staffId ?? null, menuId: null, storeId: null, slotId: null, partySize: o.partySize ?? 1, price: o.price ?? 0, visited: Boolean(o.visited), attendance: o.attendance ?? null, held: false, meetingMode: o.meetingMode ?? null, meetingUrl: o.meetingUrl ?? null, location: o.location ?? null, outcome: null, source: o.source ?? 'line', entryPoint: null, refCode: null, designation: o.designated ? 'designated' : null, cancelledAt: null, confirmedResponse: null, participationMode: null })
+const yenOf = (t) => Number(String(t ?? '').replace(/[^0-9]/g, '')) || 0
 
-const LAYOUT = {
-  restaurant: { base: '飲食店', kpis: ['今日の予約', '対応待ち', '空席（いま）', '無断キャンセル率', '新着予約', '来店予定（人）'], cards: ['新着予約（今日入った）', 'お支払い（今日）', '今日気をつけること', '席のキャンセル待ち', 'Google の口コミ'] },
-  salon: { base: 'サロン', kpis: ['今日の予約', '対応待ち', '次回予約率', '今日の入金', '新着予約', '指名率'], cards: ['新着予約（今日入った）', 'お支払い（今日）', '次回予約がまだ', '今日気をつけること'] },
-  consult: { base: '面談・相談', kpis: ['今日の面談', '結果待ち', '今週の面談', '無断欠席率', '新着予約', '成約率'], cards: ['次の面談の準備', 'お支払い（今日）', '今日の空き', '結果待ちの一覧'] },
-  lesson: { base: '教室・レッスン', kpis: ['今日のクラス', '出欠待ち', '今週の埋まり', '今日の入金', '新着予約', '最近来ていない人'], cards: ['新着予約（今日入った）', 'お支払い（今日）', '体験の人', '最近来ていない人'] },
-}
-
-function layoutFor(style) {
-  const l = LAYOUT[style] ?? LAYOUT.salon
-  return {
-    base: l.base, changed: 2, maxKpis: 5,
-    kpis: l.kpis.map((label, i) => ({ id: `k${i}`, label, on: i < 5 })),
-    cards: l.cards.map((label, i) => ({ id: `c${i}`, label, on: i < l.cards.length - 1 })),
+function scheduleFor(style, query) {
+  const date = query.get('date') || '2026-10-15'
+  const range = query.get('range') || 'today'
+  const t = TODAY[style]
+  const board = t.board
+  const columns = board.columns.map((c) => ({ id: c.id, kind: style === 'restaurant' ? 'table' : 'staff', name: c.name }))
+  let entries = []
+  if (style === 'lesson') {
+    entries = t.rows.map((r) => ({ id: `class:${r.id}`, kind: 'class', columnIds: [board.entries.find((e) => e.id === r.id)?.columnId ?? columns[0].id], startsAt: iso(date, r.time), endsAt: iso(date, r.endTime.replace('〜', '')), title: r.name, booking: null, classId: `cls-${r.id}` }))
+  } else if (style === 'restaurant') {
+    entries = t.rows.map((r) => ({ id: `restaurant:${r.id}`, kind: 'restaurant', columnIds: [columns.find((c) => r.seat?.startsWith(c.name.slice(0, 2)))?.id ?? columns[0].id], startsAt: iso(date, r.time), endsAt: iso(date, `${String(Number(r.time.slice(0, 2)) + 2).padStart(2, '0')}${r.time.slice(2)}`), title: r.course, booking: booking({ id: r.id, kind: 'restaurant', name: r.name, startsAt: iso(date, r.time), endsAt: iso(date, r.time), status: STATUS[r.state.label] ?? 'confirmed', visited: r.action === 'undo', partySize: r.people, price: yenOf(r.courseNote), source: r.sub.includes('電話') ? 'phone' : r.sub.includes('予約サイト') ? 'hotpepper' : 'line' }) }))
+  } else {
+    entries = board.entries.filter((e) => e.state !== 'off').map((e) => {
+      const row = t.rows.find((r) => r.id === e.id)
+      return { id: `booking:${e.id}`, kind: 'booking', columnIds: [e.columnId], startsAt: iso(date, e.start), endsAt: iso(date, e.end), title: style === 'consult' ? row?.sub ?? e.menu : e.menu, booking: booking({ id: e.id, name: e.name, startsAt: iso(date, e.start), endsAt: iso(date, e.end), status: STATUS[e.stateLabel] ?? 'confirmed', visited: e.state === 'done', staffId: e.columnId, designated: e.nominated, meetingMode: row?.meet ? (row.meet.label === '対面' ? 'in_person' : 'online') : null, meetingUrl: row?.action === 'meet' ? row.actionHref ?? null : null, location: row?.action === 'place' ? '本社 3階 面談室' : null, attendance: e.state === 'active' ? 'visited' : null }) }
+    })
   }
+  const slots = [
+    ...board.free.map((f) => ({ columnId: f.columnId, menuId: null, date, startsAt: iso(date, f.start), endsAt: iso(date, `${String(Number(f.start.slice(0, 2)) + 1).padStart(2, '0')}${f.start.slice(2)}`), remaining: 1 })),
+    ...(style === 'lesson' ? t.rows.map((r) => ({ columnId: columns[0].id, menuId: null, date, startsAt: iso(date, r.time), endsAt: iso(date, r.endTime.replace('〜', '')), remaining: r.capacity - r.booked, entryId: `class:${r.id}` })) : []),
+  ]
+  const closures = style === 'salon' ? [{ id: 'cl-1', target: 'staff', targetIds: ['s4'], dateFrom: date, dateTo: date, kind: 'closed', hours: [{ start: '16:00', end: '20:00' }], reason: '急な休み' }] : []
+  const days = [{ date, entryIds: entries.map((e) => e.id), bookings: entries.length, people: entries.reduce((n, e) => n + (e.booking?.partySize ?? 1), 0) }]
+  let closedDates = []
+  if (range === 'week' && t.week) {
+    entries = t.week.entries.map((e) => ({ id: `booking:${e.id}`, kind: 'booking', columnIds: ['s1'], startsAt: iso(e.day, e.start), endsAt: iso(e.day, e.end), title: e.title, booking: booking({ id: e.id, name: e.name, startsAt: iso(e.day, e.start), endsAt: iso(e.day, e.end), status: 'confirmed' }) }))
+    days.length = 0
+    for (const d of t.week.days) days.push({ date: d.date, entryIds: entries.filter((e) => e.startsAt.startsWith(d.date)).map((e) => e.id), bookings: entries.filter((e) => e.startsAt.startsWith(d.date)).length, people: 0 })
+    closedDates = t.week.days.filter((d) => d.closed).map((d) => d.date)
+    slots.length = 0
+    for (const f of t.week.free) slots.push({ columnId: 's1', menuId: null, date: f.day, startsAt: iso(f.day, f.start), endsAt: iso(f.day, f.end), remaining: 1 })
+    return { style, asOf: new Date().toISOString(), timeZone: TZ, range, display: 'calendar', calendarView: 'week', from: iso(t.week.from, '00:00'), to: iso(t.week.to, '23:59'), columns, entries, days, closures: [], availability: { status: 'available', reason: null, resources: [], slots, closedDates } }
+  }
+  if (range === 'month' && t.month) {
+    days.length = 0
+    for (const d of t.month.days.filter((x) => x.inMonth)) days.push({ date: d.date, entryIds: d.date === date ? entries.map((e) => e.id) : [], bookings: d.groups ?? 0, people: d.people ?? 0 })
+    closedDates = t.month.days.filter((x) => x.inMonth && x.closed).map((x) => x.date)
+    return { style, asOf: new Date().toISOString(), timeZone: TZ, range, display: 'calendar', calendarView: 'month', from: '2026-10-01T00:00:00+09:00', to: '2026-11-01T00:00:00+09:00', columns, entries, days, closures: [], availability: { status: 'available', reason: null, resources: [], slots: [], closedDates } }
+  }
+  return { style, asOf: new Date().toISOString(), timeZone: TZ, range, display: query.get('display') || 'list', calendarView: 'day', from: iso(date, '00:00'), to: iso(date, '23:59'), columns, entries, days, closures, availability: { status: 'available', reason: null, resources: [], slots, closedDates } }
 }
+
+const METRICS = {
+  restaurant: { now: { bookings: metric(7, '組'), guests: metric(23, '人'), firstTime: metric(2), regular: metric(3), attention: metric(3), unseated: metric(1), mediaCloseTasks: metric(2), freeTables: metric(5, '卓'), noShowRate: rate(0.012, 3, 246), visits: metric(18, '人'), nextBookingRate: rate(0.31, 40, 129), returnRate: rate(0.44, 57, 129) }, prev: { bookings: metric(5, '組'), noShowRate: rate(0.018, 4, 222), nextBookingRate: rate(0.28, 35, 125), returnRate: rate(0.41, 50, 122), visits: metric(15, '人') } },
+  salon: { now: { bookings: metric(12), estimatedRevenue: metric(96800, '円'), attention: metric(2), nextBookingRate: rate(0.38, 46, 121), visits: metric(284, '人'), returnRate: rate(0.66, 80, 121), noShowRate: rate(0.019, 6, 312), guests: metric(12, '人') }, prev: { bookings: metric(9), nextBookingRate: rate(0.33, 40, 121), estimatedRevenue: metric(2314000, '円'), visits: metric(271, '人'), noShowRate: rate(0.016, 5, 300), returnRate: rate(0.62, 75, 121) } },
+  consult: { now: { bookings: metric(6), visits: metric(2, '人'), resultPending: metric(3), weekBookings: metric(18), noShowRate: rate(0.042, 4, 96), conversionRate: rate(0.18, 15, 81), cancelRate: rate(0.06, 6, 100), returnRate: rate(0.21, 17, 81) }, prev: { bookings: metric(5), weekBookings: metric(14), noShowRate: rate(0.053, 5, 94), conversionRate: rate(0.16, 12, 75), visits: metric(1, '人') } },
+  lesson: { now: { classes: metric(6, '回'), capacity: metric(64, '人'), unlimitedClasses: metric(0, '回'), attendancePending: metric(2, '回'), classroomOccupancy: rate(0.72, 48, 66), onlineOccupancy: rate(0.61, 22, 36), trialConversion: rate(0.37, 7, 19), visits: metric(42, '人'), noShowRate: rate(0.03, 2, 66) }, prev: { classes: metric(5, '回'), classroomOccupancy: rate(0.66, 44, 66), visits: metric(38, '人'), trialConversion: rate(0.3, 6, 20) } },
+}
+
+function snapshotFor(style, query) {
+  const date = query.get('date') || '2026-10-15'
+  const m = METRICS[style]
+  const fresh = TODAY[style].side.find((c) => c.id === 'new')?.rows ?? []
+  const newBookings = fresh.map((r, i) => {
+    const [md, hm] = r.label.split(' ')
+    const day = `2026-${md.slice(0, 2)}-${md.slice(3, 5)}`
+    const [name, extra] = r.value.split('さま')
+    return booking({ id: `new-${i}`, name: name.trim(), startsAt: iso(day, hm ?? '10:00'), endsAt: iso(day, hm ?? '10:00'), status: 'confirmed', partySize: Number((extra ?? '').replace(/[^0-9]/g, '')) || 1 })
+  })
+  return { style, asOf: new Date().toISOString(), timeZone: TZ, from: iso(date, '00:00'), to: iso(date, '23:59'), dateBasis: 'visit', range: query.get('range') || 'today', metrics: m.now, previous: m.prev, items: [], newBookings, resultId: 'qa-result' }
+}
+
+function analyticsFor(style, query) {
+  const snap = snapshotFor(style, query)
+  const daily = Array.from({ length: 30 }, (_, i) => { const d = new Date(Date.UTC(2026, 8, 16 + i)); const v = Math.round((Math.sin(i * 1.7) + 1.2) * (style === 'consult' ? 3 : 10)); return { date: d.toISOString().slice(0, 10), bookings: v + 2, visits: v, noShowRate: rate(0.02, 1, 50), cancellations: 1, estimatedRevenue: style === 'salon' ? v * 8000 : null } })
+  const staffNames = TODAY[style].board.columns
+  const analytics = {
+    periodMetrics: snap.metrics, daily,
+    menus: style === 'restaurant' ? [['季節のおまかせ', 62, 58], ['記念日コース', 18, 16], ['宴会コース', 40, 38], ['席のみ', 124, 120], ['貸切プラン', 2, 2]].map(([menuId, b, v]) => ({ menuId, bookings: b, visits: v, cancellations: 2, noShowRate: b < 5 ? { value: null, status: 'insufficient_sample', formula: '見本', unit: '' } : rate(0.016, 1, b), estimatedRevenue: null })) : [],
+    staff: staffNames.map((c, i) => ({ staffId: c.id, bookings: 98 - i * 12, utilization: rate(0.84 - i * 0.07, 1, 1), designationRate: rate(0.62 - i * 0.15, 1, 1), nextBookingRate: rate(0.45 - i * 0.05, 1, 1), returnRate: i === 3 ? { value: null, status: 'insufficient_sample', formula: '見本', unit: '' } : rate(0.71 - i * 0.05, 1, 1) })),
+    funnel: [['Instagram の広告', 412, 38, 33, 7], ['LINE の友だち紹介', 126, 24, 22, 5], ['Google 検索', 88, 21, 17, 2], ['士業の先生から', 14, 6, 6, 1]].map(([route, friends, b, p, w]) => ({ route, friends, bookings: b, performed: p, won: w })),
+  }
+  return { ...snap, analytics }
+}
+
+const CARDS = {
+  restaurant: ['connection-alert', 'channel-close-alert', 'today-seats', 'reservations', 'customers', 'analytics'],
+  salon: ['connection-alert', 'ledger', 'reservations', 'customers', 'analytics'],
+  consult: ['connection-alert', 'consultations', 'results-pending', 'customers', 'staff', 'analytics'],
+  lesson: ['connection-alert', 'classes', 'members', 'trials', 'analytics'],
+}
+let styleVersion = 1
 
 /** 業種ダッシュボードの口の見本。当たらなければ null。 */
 export function styleDashboardMock(method, pathname, query, body) {
-  if (pathname === '/api/account-style') {
-    if (method === 'PUT') { if (body?.style) accountStyle = body.style; return { success: true, data: { style: accountStyle } } }
-    if (method === 'GET') return { success: true, data: { style: accountStyle } }
+  const root = '/api/dashboard/style'
+  if (pathname === root) {
+    if (method === 'PUT') { if (body?.style) accountStyle = body.style; styleVersion += 1 }
+    const cards = (CARDS[accountStyle] ?? []).map((id) => ({ id, visible: true }))
+    return { success: true, data: { style: accountStyle, styleSelected: accountStyle !== 'standard', version: styleVersion, answers: {}, settings: {}, cards, questions: [] } }
   }
-  if (!pathname.startsWith('/api/style-dashboard/')) return null
-  const style = query.get('style') || 'restaurant'
-  if (method === 'GET' && pathname === '/api/style-dashboard/today') {
-    const data = TODAY[style]
-    return data ? { success: true, data } : null
+  if (!pathname.startsWith(root + '/')) return null
+  const style = query.get('style') || accountStyle
+  if (method === 'GET' && pathname === root + '/summary') return TODAY[style] ? { success: true, data: snapshotFor(style, query) } : null
+  if (method === 'GET' && pathname === root + '/schedule') return TODAY[style] ? { success: true, data: scheduleFor(style, query) } : null
+  if (method === 'GET' && pathname === root + '/analytics') return TODAY[style] ? { success: true, data: analyticsFor(style, query) } : null
+  if (pathname === root + '/cards' && (method === 'PUT' || method === 'DELETE')) {
+    styleVersion += 1
+    const cards = method === 'PUT' && Array.isArray(body?.cards) ? body.cards : (CARDS[accountStyle] ?? []).map((id) => ({ id, visible: true }))
+    return { success: true, data: { cards, version: styleVersion } }
   }
-  if (method === 'GET' && pathname === '/api/style-dashboard/analytics') {
-    const a = ANALYTICS[style]
-    if (!a) return null
-    const tab = query.get('tab') || a.tabs.at(-1)[0]
-    return { success: true, data: { ...a, tab, tabs: a.tabs.map(([id, label]) => ({ id, label })) } }
-  }
-  if (pathname === '/api/style-dashboard/layout') return { success: true, data: layoutFor(style) }
-  if (method === 'POST' && pathname === '/api/style-dashboard/closures') return { success: true, data: { id: 'closure-qa', affected: 1 } }
+  if (method === 'POST' && pathname === root + '/closures') return { success: true, data: { id: 'closure-qa', existingReservationsCancelled: false } }
   return null
 }
