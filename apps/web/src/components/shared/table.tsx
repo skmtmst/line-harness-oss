@@ -185,7 +185,7 @@ export function RowNameLink({ onOpen, onClick, ...props }: React.ComponentProps<
 
 /** 名前から既存の詳細を開く操作。行き先の切り替え方は画面が保つ。 */
 export function RowNameButton({ className, selected, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }) {
-  return <button type="button" aria-pressed={selected} {...props} className={[styles.rowNameLink, className].filter(Boolean).join(' ')} />
+  return <button type="button" aria-pressed={selected} data-part="row-name" {...props} className={[styles.rowNameLink, className].filter(Boolean).join(' ')} />
 }
 
 export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'children' | 'className'> & {

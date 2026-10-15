@@ -29,6 +29,49 @@ import {
   LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Trophy, Type, UserPlus, Users, Video, type LucideIcon,
 } from 'lucide-react'
 
+
+/*
+ * 高さが足りずメニューが縦に送られるとき、端の項目が「設定」の線などで半分に
+ * 切れて見えないよう、見えている端で途中まで出ている項目は丸ごと隠す
+ * （--nav-cut-top / --nav-cut-bottom の分だけ消す）。送れば次の項目が丸ごと出る。
+ */
+function watchNavOverflow(nav: HTMLElement | null) {
+  if (!nav || typeof ResizeObserver === 'undefined') return
+  const update = () => {
+    const more = nav.scrollHeight - nav.clientHeight - nav.scrollTop > 1
+    const above = nav.scrollTop > 1
+    let cutTop = 0
+    let cutBottom = 0
+    if (more || above) {
+      const box = nav.getBoundingClientRect()
+      for (const row of Array.from(nav.querySelectorAll<HTMLElement>('a, button'))) {
+        const rect = row.getBoundingClientRect()
+        if (rect.height === 0) continue
+        if (more && rect.top < box.bottom && rect.bottom > box.bottom) cutBottom = Math.max(cutBottom, box.bottom - rect.top)
+        if (above && rect.top < box.top && rect.bottom > box.top) cutTop = Math.max(cutTop, rect.bottom - box.top)
+      }
+    }
+    nav.style.setProperty('--nav-cut-top', `${Math.ceil(cutTop)}px`)
+    nav.style.setProperty('--nav-cut-bottom', `${Math.ceil(cutBottom)}px`)
+    if (more || above) nav.setAttribute('data-clipped', '')
+    else nav.removeAttribute('data-clipped')
+  }
+  update()
+  nav.addEventListener('scroll', update, { passive: true })
+  const observer = new ResizeObserver(update)
+  observer.observe(nav)
+  for (const child of Array.from(nav.children)) observer.observe(child)
+  // 区分が後から足される・開閉されるときも測り直す。
+  const mutations = new MutationObserver(update)
+  mutations.observe(nav, { childList: true, subtree: true })
+  return () => {
+    nav.removeEventListener('scroll', update)
+    observer.disconnect()
+    mutations.disconnect()
+  }
+}
+
+
 /*
  * ★V8 の左メニューの印（絵 d8X09・WQmep の「項目 〇〇 / 印」は lucide）。
  * V8 のときだけ使い、v7 は MENU_SECTIONS の線画のまま。載っていない項目も v7 の線画。鍵は MENU_SECTIONS の id。
@@ -764,7 +807,7 @@ export default function Sidebar({
       <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
-      <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
+      <nav ref={watchNavOverflow} className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
         {/*
           ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
           小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
@@ -898,10 +941,11 @@ export default function Sidebar({
 
       {/*
         ★V8（夕41・部品 njl8e）：左メニューのいちばん下、版の上に「設定」。
-        オーナー・管理者にだけ出す。設定の画面ではここが選ばれた形にする。
+        オーナー・管理者にだけ出す（閲覧専用のオーナー・管理者にも出す。設定は見るだけで開ける）。
+        設定の画面ではここが選ばれた形にする。
         nav は中身が多いときだけ縦に送り、この入口と版は下端に固定される。
       */}
-      {!isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
+      {!isHq && !preview && (staffReadRole === 'owner' || staffReadRole === 'admin') && (
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"

@@ -6,18 +6,6 @@
 /* 閲覧のみの帯（見出しの下・タブの上）。 */
 .viewerBand { margin-bottom: var(--tpl-fm-band-after); }
 
-/* 閲覧のみで隠したボタンの場所（隣のボタンを動かさない）。 */
-.hiddenSlot {
-  visibility: hidden;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-fr-btn-gap);
-  height: var(--tpl-fr-control-h);
-  padding: 0 var(--tpl-fr-btn-pad);
-  font-size: var(--text-label);
-  font-weight: 600;
-  white-space: nowrap;
-}
 
 .delta {
   display: inline-flex;
@@ -149,6 +137,7 @@
 
 .colCheck { width: var(--tpl-fr-col-check); }
 .colStar { width: var(--tpl-fr-col-star); }
+.colStar:first-child { width: calc(var(--tpl-fr-col-star) + var(--tpl-fr-row-side)); }
 /* 名前の列は顔の丸＋名前（「Kyohei Yamamoto」が切れない幅）を最低限とる（nF4ts）。 */
 .colName { width: calc(var(--tpl-fr-avatar) + var(--tpl-fr-avatar-gap) + 160px); }
 .colSupport { width: var(--tpl-fr-col-support); }
@@ -194,6 +183,9 @@
 }
 
 :global(:root) .table td.tdCheck { padding-left: var(--tpl-fr-row-side); }
+/* 閲覧のみは選ぶ列が無いので、先頭の注目・友だちの列が端の余白を持つ。 */
+:global(:root) .table th.thFriend:first-child,
+:global(:root) .table td.tdStar:first-child { padding-left: var(--tpl-fr-row-side); }
 :global(:root) .table td.tdMenu { padding-right: var(--tpl-fr-row-side); }
 
 /*

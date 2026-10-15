@@ -192,7 +192,7 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
     })
 
     expect(screen.getByText('前日案内')).toBeTruthy()
-    expect(screen.getByText('版1で固定（変わらない）')).toBeTruthy()
+    expect(screen.getByText('版1で固定')).toBeTruthy()
     expect(screen.getByText('送信待ち')).toBeTruthy()
     const hrefs = screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))
     expect(hrefs).toEqual(['/reminders/detail?id=re-1'])

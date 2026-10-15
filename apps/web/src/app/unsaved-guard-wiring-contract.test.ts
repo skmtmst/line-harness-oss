@@ -20,6 +20,8 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  // 友だち詳細の情報欄（vX3wQ）。保存前の入力があればタブ・ほかの画面へ移る前に確認する。
+  'v8/friend-detail/info-tab.tsx',
   'v8/restaurant/organization/store-groups.tsx',
   'v8/inbox-chat/screen.tsx',
   'v8/settings/customer-look/screen.tsx',

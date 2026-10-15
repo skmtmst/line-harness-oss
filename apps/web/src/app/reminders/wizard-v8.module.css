@@ -965,6 +965,10 @@
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+  /* 行末の1字だけが次の行へ落ちないよう、文節で折る（共通の LINE の見本と同じ）。 */
+  word-break: auto-phrase;
+  overflow-wrap: break-word;
+  text-wrap: pretty;
 }
 .phoneBubbleTime {
   align-self: flex-end;

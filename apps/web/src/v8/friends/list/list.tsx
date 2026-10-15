@@ -633,18 +633,13 @@ export default function FriendsListV8() {
         <Download size={14} aria-hidden="true" />
         表示中をCSVで書き出す
       </Button>
+      {/* 閲覧のみは押せないボタンを置かない。CSV が右端へ寄る（絵 x6QsVz）。 */}
       {canImport ? (
         <Button variant="primary" href="/friends/migrations">
           <Upload size={14} aria-hidden="true" />
           友だちを取り込む
         </Button>
-      ) : (
-        /* 閲覧のみは押せないボタンを置かない。場所だけ空けて、隣のボタンを動かさない。 */
-        <span className={styles.hiddenSlot} aria-hidden="true">
-          <Upload size={14} aria-hidden="true" />
-          友だちを取り込む
-        </span>
-      )}
+      ) : null}
     </>
   )
 
@@ -774,12 +769,14 @@ export default function FriendsListV8() {
     </>
   )
 
-  const colCount = 4 + displayColumns.length
+  // 閲覧のみは選んでできる操作が無いので、選ぶチェックの列を出さない（絵 x6QsVz）。
+  const selectable = !readOnly
+  const colCount = (selectable ? 4 : 3) + displayColumns.length
   const table = (
     <div className={refreshing ? `${styles.tableWrap} ${styles.refreshing}` : styles.tableWrap} aria-busy={loadStatus === 'loading' || refreshing || undefined}>
       <DataTable className={styles.table} data-design="V8FriendTable">
         <colgroup>
-          <col className={styles.colCheck} />
+          {selectable ? <col className={styles.colCheck} /> : null}
           <col className={styles.colStar} />
           {/* 1152（y2n1z）：顔の丸を外して名前の列を詰め、対応・シナリオの列を狭めてタグ名を全部入れる。 */}
           <col className={narrow ? styles.colNameNarrow : styles.colName} />
@@ -788,14 +785,16 @@ export default function FriendsListV8() {
         </colgroup>
         <thead>
           <TableHeadRow>
-            <Th className={styles.thCheck}>
-              <SaveErrorField names={["allSelected","selectedIds","all_selected","selected_ids"]}><Checkbox
-                checked={allSelected}
-                indeterminate={selectedCount > 0 && !allSelected}
-                onCheckedChange={(checked) => setSelectedIds(checked ? new Set(friends.map((friend) => friend.id)) : new Set())}
-                aria-label="表示中の友だちをすべて選ぶ"
-              /></SaveErrorField>
-            </Th>
+            {selectable ? (
+              <Th className={styles.thCheck}>
+                <SaveErrorField names={["allSelected","selectedIds","all_selected","selected_ids"]}><Checkbox
+                  checked={allSelected}
+                  indeterminate={selectedCount > 0 && !allSelected}
+                  onCheckedChange={(checked) => setSelectedIds(checked ? new Set(friends.map((friend) => friend.id)) : new Set())}
+                  aria-label="表示中の友だちをすべて選ぶ"
+                /></SaveErrorField>
+              </Th>
+            ) : null}
             <Th colSpan={2} className={styles.thFriend}>
               <span className={styles.thFriendInner}><Star size={14} aria-label="注目" className={styles.thStar} />友だち</span>
             </Th>
@@ -817,9 +816,11 @@ export default function FriendsListV8() {
             const tags = splitTags(friend.tags)
             return (
               <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
-                <Td className={styles.tdCheck}>
-                  <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
-                </Td>
+                {selectable ? (
+                  <Td className={styles.tdCheck}>
+                    <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
+                  </Td>
+                ) : null}
                 <Td className={styles.tdStar}>
                   {rowCanEdit ? (
                     <button
