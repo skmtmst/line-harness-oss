@@ -57,6 +57,7 @@ export const MEDIA_REF_KINDS = [
 export type MediaRefKind = (typeof MEDIA_REF_KINDS)[number];
 
 export interface Media {
+  revision?: number;
   id: string;
   line_account_id: string | null;
   folder_id: string | null;
@@ -395,6 +396,7 @@ export async function updateMedia(
   id: string,
   lineAccountId: string,
   input: {
+    expectedRevision?: number;
     filename?: string;
     folderId?: string | null;
     usageExpiresAt?: string | null;
@@ -422,8 +424,11 @@ export async function updateMedia(
     values.push(input.usageConsentNote ?? null);
   }
   if (sets.length > 0) {
+    sets.push('revision = revision + 1');
     values.push(id, lineAccountId);
-    await db.prepare(`UPDATE media SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`).bind(...values).run();
+    if (input.expectedRevision !== undefined) values.push(input.expectedRevision);
+    const result = await db.prepare(`UPDATE media SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?${input.expectedRevision === undefined ? '' : ' AND revision = ?'}`).bind(...values).run();
+    if (Number(result.meta?.changes ?? 0) !== 1) return null;
   }
   return getMediaById(db, id, lineAccountId);
 }
@@ -1360,7 +1365,8 @@ export type MediaUsageReferenceErrorCode =
   | 'media_usage_shared'
   | 'media_reference_unsupported'
   | 'media_version_not_found'
-  | 'media_reference_stale';
+  | 'media_reference_stale'
+  | 'media_metadata_conflict';
 
 export class MediaUsageReferenceError extends Error {
   constructor(readonly code: MediaUsageReferenceErrorCode) {
@@ -1389,7 +1395,7 @@ export async function retargetMediaUsageReference(
     refId: string;
     target: { mode: 'live' } | { mode: 'pinned'; versionNo: number };
     /** 同じPATCHで保存するメディア名・フォルダ。参照切替と同じbatchへ載せる。 */
-    mediaUpdate?: { filename?: string; folderId?: string | null };
+    mediaUpdate?: { expectedRevision?: number; filename?: string; folderId?: string | null };
   },
 ): Promise<{ changed: boolean; state: MediaUsageReferenceState }> {
   if (input.refKind === 'webinar') {
@@ -1430,14 +1436,17 @@ export async function retargetMediaUsageReference(
     mediaValues.push(input.mediaUpdate.folderId ?? null);
   }
   const mediaUpdateStatement = mediaSets.length > 0
-    ? db.prepare(`UPDATE media SET ${mediaSets.join(', ')} WHERE id = ? AND line_account_id = ?`)
-      .bind(...mediaValues, input.media.id, input.lineAccountId)
+    ? db.prepare(`UPDATE media SET ${mediaSets.join(', ')}, revision = revision + 1 WHERE id = ? AND line_account_id = ?${input.mediaUpdate?.expectedRevision === undefined ? '' : ' AND revision = ?'}`)
+      .bind(...mediaValues, input.media.id, input.lineAccountId, ...(input.mediaUpdate?.expectedRevision === undefined ? [] : [input.mediaUpdate.expectedRevision]))
     : null;
   const already = input.target.mode === 'live'
     ? state.mode === 'live'
     : state.mode === 'pinned' && state.versionNo === input.target.versionNo;
   if (already) {
-    if (mediaUpdateStatement) await db.batch([mediaUpdateStatement]);
+    if (mediaUpdateStatement) {
+      const [result] = await db.batch([mediaUpdateStatement]);
+      if (Number(result.meta?.changes ?? 0) !== 1) throw new MediaUsageReferenceError('media_metadata_conflict');
+    }
     return { changed: false, state };
   }
   if (state.mode === 'unknown') {
@@ -1513,7 +1522,7 @@ export async function retargetMediaUsageReference(
       const guard = chunk.map(() => `instr(${column}, ?) > 0`).join(' OR ');
       statements.push(db.prepare(
         `UPDATE ${targetTable} SET ${column} = ${expression}
-          WHERE id = ? AND ${scope.sql} AND (${guard})`,
+          WHERE id = ? AND ${scope.sql} AND (${guard})${mediaUpdateStatement ? ' AND changes() = 1' : ''}`,
       ).bind(
         ...chunk.flatMap(([from, to]) => [from, to]),
         input.refId,
@@ -1526,6 +1535,7 @@ export async function retargetMediaUsageReference(
     throw new MediaUsageReferenceError('media_reference_stale');
   }
   const results = await db.batch(statements);
+  if (mediaUpdateStatement && Number(results[0].meta?.changes ?? 0) !== 1) throw new MediaUsageReferenceError('media_metadata_conflict');
   const changed = results.some((result) => Number(result.meta?.changes ?? 0) > 0);
 
   // 書いた結果を読み直して確認する。途中で本文が変わっていた場合に

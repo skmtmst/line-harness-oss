@@ -328,6 +328,7 @@ export interface SupportMark {
 
 /** メディアライブラリの1件 */
 export interface MediaItem {
+  revision?: number;
   id: string;
   lineAccountId: string | null;
   folderId: string | null;
