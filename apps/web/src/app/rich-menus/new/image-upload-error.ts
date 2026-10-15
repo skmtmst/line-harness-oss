@@ -22,4 +22,3 @@ export function imageUploadErrorText(err: unknown): string {
   }
   return message
 }
-
