@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ListOrdered, Lock, Scale, Shuffle, Wrench } from 'lucide-react'
 import type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentSettings } from '@line-crm/shared'
-import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -199,10 +198,7 @@ export function AssignmentRowDialog({ open, name, unit, value, onClose, onApply 
   const limitNumber = limit.trim() === '' ? null : Number(limit)
   const invalid = limitNumber !== null && (!Number.isInteger(limitNumber) || limitNumber < 1)
   return (
-    <Dialog open={open} title={`${name}の割り当ての設定`} onCancel={onClose} size="small" footer={<>
-      <Button onClick={onClose}>キャンセル</Button>
-      <Button variant="primary" disabled={invalid} onClick={() => { onApply({ priority, dailyLimit: limitNumber }); onClose() }}>決める</Button>
-    </>}>
+    <Dialog open={open} title={`${name}の割り当ての設定`} onCancel={onClose} size="small" cancelLabel="キャンセル" confirmLabel="決める" confirmDisabled={invalid} onConfirm={() => { onApply({ priority, dailyLimit: limitNumber }); onClose() }}>
       <div className={styles.dialogBody}>
         <Field label="優先度">
           <Select aria-label="優先度" value={priority} onChange={(next) => setPriority(next as BookingAssignmentPriority)}
@@ -230,10 +226,7 @@ export function AssignmentConflict({ state, names, unit, order }: { state: Assig
     if (mine !== theirs) rows.push({ label: `${names[id] ?? id} の上限`, mine: mine === null ? '上限なし' : `${mine} ${unit}`, theirs: theirs === null ? '上限なし' : `${theirs} ${unit}` })
   }
   return (
-    <Dialog open title="ほかの人が先に保存しました" description="あとから保存された内容があります。どちらにしますか？" onCancel={state.useLatest} size="small" footer={<>
-      <Button onClick={state.useLatest}>最新を使う</Button>
-      <Button variant="primary" busy={state.saving} onClick={() => void state.overwrite(order)}>あなたの値で保存</Button>
-    </>}>
+    <Dialog open title="ほかの人が先に保存しました" description="あとから保存された内容があります。どちらにしますか？" onCancel={state.useLatest} size="small" busy={state.saving} cancelLabel="最新を使う" confirmLabel="あなたの値で保存" onConfirm={() => void state.overwrite(order)}>
       <table className={styles.compare}>
         <thead><tr><th scope="col"><span className="sr-only">項目</span></th><th scope="col">あなた</th><th scope="col">最新</th></tr></thead>
         <tbody>{rows.map((row) => <tr key={row.label}><th scope="row">{row.label}</th><td>{row.mine}</td><td>{row.theirs}</td></tr>)}</tbody>
