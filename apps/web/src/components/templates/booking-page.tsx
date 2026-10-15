@@ -29,3 +29,8 @@ export function BookingPageStats({ children }: { children: ReactNode }) {
 export function BookingPageContent({ children }: { children: ReactNode }) {
   return <div className={styles.bookingContent} data-template-region="content">{children}</div>
 }
+
+/** 予約の補助欄の区画。画面は題と実データだけを渡す。 */
+export function BookingSidebarSection({ title, children }: { title: ReactNode; children: ReactNode }) {
+  return <section className={dayStyles.sidebarSection}><h3>{title}</h3>{children}</section>
+}
