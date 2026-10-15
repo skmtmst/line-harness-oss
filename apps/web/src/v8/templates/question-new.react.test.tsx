@@ -69,6 +69,32 @@ afterEach(() => {
 })
 
 describe('質問を作る：保存で欄に知らせる（B-139）', () => {
+  it('統括では追加処理→返信の既存の順番と、店専用の動きを出さない形を保つ', async () => {
+    await act(async () => { root.render(<QuestionNewV8 host={{ description: '配った先で使います', folders: [], folder: '', onFolderChange: vi.fn(), busy: false, onSave: vi.fn(), onCancel: vi.fn() }} />) })
+    const extra = screen.getAllByRole('button', { name: '押されたときにあわせて行うことを足す' })[0]
+    const reply = screen.getAllByLabelText('押したときの返信')[0]
+    expect(extra.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '選択肢 1 の動きを変える' })).toBeNull()
+  })
+
+  it('閉じた動きの欄に保存エラーが返ると、その選択肢だけ開いて理由を出す', async () => {
+    templatesApi.create.mockRejectedValue({ status: 422, fields: { 'choices.0.userMessage': '発言を短くしてください。' } })
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '質問' } })
+      fireEvent.change(screen.getByLabelText('質問文（160文字まで）'), { target: { value: '続けますか？' } })
+    })
+    expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await frames()
+    // 窓で直す形（l87p1J）：エラーのある選択肢 1 の窓だけが開く。
+    expect(screen.getByRole('dialog', { name: /選択肢 1「.*」を押されたら/ })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: /選択肢 2「.*」を押されたら/ })).toBeNull()
+    const message = screen.getByLabelText('ユーザーメッセージ')
+    expect(message.getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByText('発言を短くしてください。')).toBeTruthy()
+    expect(document.activeElement).toBe(message)
+  })
+
   it('答え方を矢印で変えても名前を保ち、選択肢の上限と最後の1つの理由を出す', async () => {
     const name = screen.getByLabelText('テンプレート名') as HTMLInputElement
     await act(async () => { fireEvent.change(name, { target: { value: '継続を確認する' } }) })
@@ -99,6 +125,10 @@ describe('質問を作る：保存で欄に知らせる（B-139）', () => {
     await act(async () => { fireEvent.click(hideMessage) })
     expect(message.disabled).toBe(false)
     expect(message.value).toBe('入力を保つ')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '決める' })) })
+    expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変える' })) })
+    expect((screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement).value).toBe('入力を保つ')
     expect(templatesApi.create).not.toHaveBeenCalled()
   })
 

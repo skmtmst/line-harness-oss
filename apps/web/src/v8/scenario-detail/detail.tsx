@@ -2804,7 +2804,7 @@ export default function ScenarioDetailV8({
               ) : null}
               {canEdit ? (
                 <Button
-                  variant="primary" icon={conflict ? <GitCompareArrows aria-hidden /> : undefined}
+                  variant="primary" icon={conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
                   onClick={() => {
                     if (conflict) {
                       setCompareOpen(true)

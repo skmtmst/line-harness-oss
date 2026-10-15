@@ -979,7 +979,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           disabledReason={stopping ? '止めています。' : stopImpactLoading ? '利用先と影響を確認しています。' : !stopReason.trim() ? '止める理由を入力してください。' : stopAction === 'replace' && !replacementId ? '差し替え先を選んでください。' : undefined}
           onClick={() => void runStop()}
           busy={stopping || stopImpactLoading}
-          busyLabel="止めています"
+          busyLabel="止めています" widthReserve="idle"
         >
           {stopAction === 'delete' ? '削除する' : '止める'}
         </Button>

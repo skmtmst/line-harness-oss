@@ -135,9 +135,8 @@ describe('日時を選ぶ・文字をコピーするボタン（O）', () => {
 
   it('種類の選択肢に日時・コピーが増えている', () => {
     render(<Harness />)
-    fireEvent.click(screen.getByRole('button', { name: '押したときの動き' }))
-    const listbox = screen.getByRole('listbox')
-    expect(within(listbox).getByRole('option', { name: /日時を選ぶ/ })).toBeTruthy()
-    expect(within(listbox).getByRole('option', { name: /文字をコピーする/ })).toBeTruthy()
+    const group = screen.getByRole('group', { name: '押したときの動き' })
+    expect(within(group).getByRole('radio', { name: '日時を選ぶ' })).toBeTruthy()
+    expect(within(group).getByRole('radio', { name: '文字をコピーする' })).toBeTruthy()
   })
 })

@@ -1130,7 +1130,7 @@ function EditCommonVarV8Inner() {
             ) : (
               <Button
                 type="button"
-                variant="primary" icon={<Check size={16} aria-hidden="true" />}
+                variant="primary" widthReserve="dynamic" icon={<Check size={16} aria-hidden="true" />}
                 disabled={saving || blocked.length > 0}
                 onClick={() => void save()}
                 busy={saving}
