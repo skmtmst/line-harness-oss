@@ -296,3 +296,9 @@ html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) 
    every width; it never reserves an empty rail or a one-option select. */
 html:root .leading[data-toolbar-persistent] { display: inline-flex; align-items: center; gap: var(--tpl-toolbar-gap); flex: none; flex-wrap: nowrap; }
 html:root .leading > :is(button, a) { width: max-content; flex: none; }
+
+/*
+ * 設定の板の本文の中の道具の段は、上の知らせ・下の表と左端をそろえる（絵 PfA4o・cIdA2。
+ * 2026-10-15 判定役：約16px 右へずれていた）。本文の段が左右の余白を持つので、部品は二重に持たない。
+ */
+:root :global([data-page-template='settings'] [data-template-region='content']) .toolbar { padding-inline: 0; }
