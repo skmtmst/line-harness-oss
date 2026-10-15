@@ -482,7 +482,7 @@ export default function AccountRegisterV8() {
         help={shownStep.lead}
         /* ★V8 xj3zz〜TvXII：手順は題と同じ行（題・手順・？の順）。 */
         titleAccessory={(
-          <div className={styles.titleSteps}><Steps
+          <div><Steps
             label="登録の進捗"
             currentKey={String(createdId ? 5 : currentStep)}
             steps={V8_STEPS.map((step) => ({

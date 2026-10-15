@@ -7,37 +7,34 @@
 .flowList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-8);
   min-width: 0;
 }
 
 .flowItem {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-8);
   min-width: 0;
 }
 
-.flowRow[data-selected] {
-  --card-edge: var(--color-accent-deep);
-  background: var(--color-accent-soft);
-}
+
 
 .flowButton {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 132px auto;
+  grid-template-columns: var(--space-32) minmax(0, 1fr) var(--tpl-rt-flow-timing-w) auto;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-12);
   width: 100%;
-  min-height: 58px;
-  padding: 10px 12px;
+  min-height: var(--tpl-rt-flow-row-h);
+  padding: var(--space-10) var(--space-12);
   border: 0;
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  border-radius: inherit;
+  border-radius: var(--radius-card);
 }
 
 .flowButton:focus-visible {
@@ -49,8 +46,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--space-32);
+  height: var(--space-32);
   border-radius: var(--polish-radius-control);
   background: var(--color-surface-pearl);
   color: var(--color-ink-secondary);
@@ -59,7 +56,7 @@
 .flowText {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -75,13 +72,13 @@
   color: var(--color-ink);
   font-size: var(--text-body);
   font-weight: 600;
-  line-height: 20px;
+  line-height: var(--tpl-rt-flow-name-lh);
 }
 
 .flowNote {
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  line-height: 18px;
+  line-height: var(--tpl-rt-flow-note-lh);
 }
 
 .flowTiming {
@@ -99,7 +96,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   min-width: 0;
 }
 

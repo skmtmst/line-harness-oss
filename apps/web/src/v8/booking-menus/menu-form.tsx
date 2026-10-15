@@ -1265,7 +1265,7 @@ export default function MenuFormV8() {
             </Card>
 
             {/* 絵 v5L19Z・QqER7：題の横に「準備中」、説明、3つの選ぶ箱（お店で払うだけ選べる）。 */}
-            <CardHeader size="stacked" title={<span className={styles.titleWithMark}>お支払い<StatusBadge tone="warning" size="compact">準備中</StatusBadge></span>} meta={<span id="menu-payment-note">決済サービスをつなぐと選べるようになります。いまは「お店で払う」だけです。</span>} />
+            <CardHeader size="stacked" title={<span className={styles.titleWithMark}>お支払い<StatusBadge tone="warning" size="compact">未接続</StatusBadge></span>} meta={<span id="menu-payment-note">決済サービスをつなぐと選べるようになります。いまは「お店で払う」だけです。</span>} />
             <RadioCardGroup legend="お支払い方法" aria-describedby="menu-payment-note" className={styles.paymentChoices}>
               {PAYMENT_CHOICES.map((choice) => (
                 <RadioCard key={choice.value} variant="form" name="menu-payment" value={choice.value} title={choice.label}

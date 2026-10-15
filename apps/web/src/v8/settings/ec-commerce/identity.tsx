@@ -246,6 +246,7 @@ export default function EcIdentityCandidatesScreen() {
                 <ActionCell>
                   {/* 行の右端は「…」1つ（B-253・絵 w1W8h）。候補を見る・決める・友だちを探すはその中。 */}
                   <RowMenu
+                    triggerProps={{ 'data-qa-open': 'ELayY' }}
                     label={`${item.left.label}の候補の操作`}
                     items={hasCandidate ? [
                       { id: 'view', label: '候補を見る', onSelect: () => { setCandidateId(item.id); review.select(item.id) } },

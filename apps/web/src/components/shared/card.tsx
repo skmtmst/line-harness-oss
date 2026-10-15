@@ -28,6 +28,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   /** 'tight' | 'normal' | 'loose' は決まった段。それ以外はトークン（例 'var(--tpl-...)'）を中の間として渡す。 */
   gap?: 'tight' | 'normal' | 'loose' | (string & {})
   /** 内側の線で寸法を保つカード（inset）・薄い面（muted）・NEN の設定の枠（bordered）。指定した面だけに適用。 */
+  /** 選んだカードの枠と面。指定したカードだけ共通の選択色にする。 */
+  selected?: boolean
   surface?: 'standard' | 'inset' | 'muted' | 'bordered' | 'danger'
 }
 
@@ -56,6 +58,7 @@ export default function Card({
   appearance,
   gap,
   surface = 'standard',
+  selected,
   spacing,
   ...props
 }: CardProps) {
@@ -89,7 +92,7 @@ export default function Card({
 
   return (
     <section ref={cardRef} className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
-      data-card-padding={padding} data-card-variant={variant}
+      data-card-selected={selected || undefined} data-card-padding={padding} data-card-variant={variant}
       data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
       data-card-spacing-sides={contentPadding && hasSides(contentPadding) ? '' : undefined}

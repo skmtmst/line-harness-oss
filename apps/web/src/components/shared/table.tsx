@@ -255,13 +255,15 @@ export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>)
 }
 
 /** 顔と名前を同じ1行に保つ。狭い列では名前だけを省略する。 */
-export function PersonCell({ name, avatarName, avatarSrc, ...cellProps }: Omit<TdProps, 'children'> & {
+export function PersonCell({ name, avatarName, avatarSrc, avatarSize = 24, gap, ...cellProps }: Omit<TdProps, 'children'> & {
   name: ReactNode
   avatarName?: string | null
   avatarSrc?: string | null
+  avatarSize?: 24 | 32
+  gap?: string
 }) {
-  return <Td {...cellProps} data-list-person-cell><span className={styles.person}>
-    <Avatar name={avatarName} src={avatarSrc} size={24} />
+  return <Td {...cellProps} data-list-person-cell><span className={styles.person} style={gap ? { gap } : undefined}>
+    <Avatar name={avatarName} src={avatarSrc} size={avatarSize} />
     <span className={styles.personName}>{name}</span>
   </span></Td>
 }

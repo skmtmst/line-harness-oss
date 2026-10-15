@@ -730,4 +730,4 @@
 .viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
 
 /* 削除の窓（xxKtW）：理由の欄は左の空き（1fr）に収まる幅にし、キャンセルを絵の位置に残す。全文は title。 */
-.deleteFooter .footerReason { width: 92px; min-width: 0; }
+.deleteFooter .footerReason { width: var(--tpl-cv-delete-reason-w); min-width: 0; }

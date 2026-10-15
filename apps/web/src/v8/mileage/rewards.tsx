@@ -821,8 +821,7 @@ export default function RewardsTab() {
                 <Td className={styles.colRewardOps}>
                   {/* 行の右端は「…」1つ（B-253）。もう一度届けるはその中。閲覧のみの人には置かない。 */}
                   {!readonly ? (
-                    <span className={styles.rowActions}>
-                      <div className={styles.menuBox}>
+                    <div className={styles.menuBox}>
                         <RowMenu
                           label={`${item.rewardName}の交換の操作`}
                           items={[{
@@ -833,8 +832,7 @@ export default function RewardsTab() {
                             onSelect: () => void retryRedemption(item),
                           }]}
                         />
-                      </div>
-                    </span>
+                    </div>
                   ) : null}
                 </Td>
               </Tr>

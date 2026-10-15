@@ -120,6 +120,8 @@
 <a id="card"></a>
 ## card カード（中身のまとまりの箱）
 
+- 選んだカードの枠と面は `Card.selected` へ渡す。既定のカードは変更しない。
+
 - 一覧のカード配置は一覧型の `ListPageCards`（`list-page.tsx` と `page-templates.module.css`）が列数と共通16の間隔を持つ。カードの面と内側は `Card`・`CardContent`・`CardHeader`（card.tsx）、操作は `RowNameButton`・`IconButton` が持つ（L7メディア・バナー）。CardContentは端の16を1回だけ持つ。
 - 分析のカード本文は `ListPageSection` が共通16/24の余白、`DetailColumns(presentation="analysis")` が左右の列と狭幅の折り畳みを持つ。カードの面/題はCard/CardHeader。ほかの提示と既定は保つ（L11 ws9wt）。
 
@@ -210,6 +212,8 @@
 
 <a id="filter"></a>
 ## filter 絞り込み
+
+- URLで分類を切り替える札は `shared/filter-link`。リンク先・現在地・再読込を保つ。
 
 - **役目**：一覧を状態・種類などで絞る札。数が増える物は選ぶ窓で絞る
 - **持ち主（コード）**：`apps/web/src/components/shared/filter-chip.tsx`・`apps/web/src/components/shared/filter-chip.css`（部品 `FilterChip`）
@@ -440,6 +444,8 @@
 <a id="tap-action"></a>
 ## tap-action 押したら（TapActionField）
 
+- 窓を開く要約欄は `shared/tap-action-summary` が共通の選択欄へ接続する。
+
 - **役目**：ボタン・面を押したときの動き（URL・テキスト・予約・回答フォーム・予約履歴・来店スタンプ）を選ぶ
 - **持ち主（コード）**：`apps/web/src/components/shared/tap-action-field.tsx`・`apps/web/src/components/shared/tap-action-field.module.css`・`apps/web/src/lib/tap-actions.ts`・`apps/web/src/components/shared/use-tap-action-sources.ts`（部品 `TapActionField`・`TapTargetPicker`）
 - **持ち主（Pen）**：`Vx8Ny`「押したら（TapActionField）/閉じた」・`XVGg5`「押したら/開いた」・`c1qBx`「押したら/選んだ後」
@@ -459,6 +465,8 @@
 
 <a id="tap-extra"></a>
 ## tap-extra 押されたときにあわせて行うこと
+
+- タグとスコアの行は `shared/tap-extras-rows` が共通の ActionList へ接続する。画面の保存値は変えない。
 
 - **役目**：押したらに付けて、タグを付ける・スコアを足す
 - **持ち主（コード）**：`apps/web/src/components/shared/tap-action-field.tsx`（部品 `TapActionField`）

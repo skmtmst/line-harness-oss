@@ -1,4 +1,6 @@
 'use client'
+
+import { statusTone } from './booking-status-tone'
 import ReservationBoard, { ReservationLegend } from '@/components/shared/reservation-board'
 import PeopleDayList from '@/v8/booking-bookings/day-list'
 import PeopleDayFrame from '@/v8/booking-bookings/day-frame'
@@ -25,10 +27,10 @@ import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
 import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame'
 import BookingLedgerBody from '@/v8/booking-bookings/ledger-body'
-import LedgerMonthNavigation, { monthKey, monthLabel } from '@/v8/booking-bookings/month-navigation'
+import LedgerMonthNavigation, { monthKey, monthLabel, monthDifference } from '@/v8/booking-bookings/month-navigation'
 import FilterChip from '@/components/shared/filter-chip'
 import { ListToolbarEnd, ListToolbarRow, ListToolbarSearchSlot, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
-import StatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { RowMenu } from '@/components/shared/row-actions'
 import { BookingChipsLabel, BookingMonthBar, BookingUrlCopy } from '@/v8/booking-bookings/month-bar'
@@ -95,17 +97,6 @@ const statusBadgeColor: Record<string, string> = {
   cancelled: 'bg-canvas-sunken text-ink-secondary',
   completed: 'bg-info-bg text-info',
   no_show: 'bg-danger-bg text-danger',
-}
-
-/** 状態の札の色（StatusPill）。 */
-const statusTone: Record<string, StatusBadgeTone> = {
-  requested: 'warning',
-  confirmed: 'success',
-  completed: 'neutral',
-  no_show: 'danger',
-  cancelled: 'danger',
-  rejected: 'neutral',
-  expired: 'neutral',
 }
 
 /** 表の予約経路（LINE 以外）。絞り込みの名前と同じ語。古い応答は「電話」。 */
@@ -206,7 +197,6 @@ export default function BookingsPage() {
   /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
   const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
   /** 「今月」の表の月送り（0＝今月）。数の帯は今月のまま。 */
-  const [monthOffset, setMonthOffset] = useState(0)
   /*
    * R317: URLの条件（`?view=` `?status=` `?range=` `?date=` `?q=` …）で
    * 絞り込み済みの一覧を開ける（IDEA-01）。ダッシュボードの「予約状況」
@@ -301,6 +291,8 @@ export default function BookingsPage() {
    * 読まれず全マスが空きに見えた。表示範囲と取得範囲を一致させる。
    */
   const [calendarAnchor, setCalendarAnchor] = useState(() => jstDay(new Date().toISOString()))
+  const monthOffset = monthDifference(calendarAnchor)
+  const setMonthOffset = (next: number | ((previous: number) => number)) => setCalendarAnchor(`${monthKey(typeof next === 'function' ? next(monthOffset) : next)}-01`)
   const calendarFrom = view === 'week' ? startOfWeek(calendarAnchor) : calendarAnchor
   const calendarTo = view === 'week' ? moveDay(calendarFrom, 6) : calendarAnchor
   /*
@@ -973,7 +965,7 @@ export default function BookingsPage() {
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<p>担当者か予約メニューが未設定です</p>:null}
             slots={availability.status==='ready'?availability.slots.filter(s=>s.remaining>0&&['available','limited'].includes(s.state)).map(s=>({resourceId:staffList.find(t=>t.display_name===s.staffName)?.id??'',startsAt:s.startUtc??`${s.date}T${s.start}:00+09:00`,href:`/booking/bookings/new?${new URLSearchParams({date:s.date,time:s.start,staff:s.staffName,menu:s.menuId})}`})):[]} entries={(calendarStatus==='ready'?calendarItems:[]).map(r=>peopleBoardEntry({...r,customer_name:r.friend_name,lock_version:(r as unknown as {lock_version:number}).lock_version,line_account_id:selectedAccountId}))}
-            trailingToolbar={view==='day'?<><ReservationLegend label="予約元の色" items={[{label:'LINE',tone:'success'},{label:'電話',tone:'neutral'}]}/><Select aria-label="担当者で絞り込む" value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'担当者：すべて'},...staffList.map(r=>({value:r.id,label:`担当者：${r.display_name}`}))]}/></>:undefined}
+            trailingToolbar={view==='day'?<><ReservationLegend label="予約元の色" items={[{label:'LINE',tone:'success'},{label:'電話',tone:'neutral'}]}/><EntitySelect aria-label="担当者で絞り込む" value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'担当者：すべて'},...staffList.map(r=>({value:r.id,label:`担当者：${r.display_name}`}))]}/></>:undefined}
             resources={staffList.filter(r=>view!=='day'||boardStaff==='all'||r.id===boardStaff).map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
             onOpen={setDetailId} canWrite={canOperate}
             renderList={view === 'day' ? () => <PeopleDayList rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
@@ -1246,7 +1238,7 @@ export default function BookingsPage() {
                         <Td align="right" className="tabular-nums">
                           ¥{formatNumber(b.price_at_booking)}
                         </Td>
-                        <StatusCell primary={<StatusPill tone={statusTone[b.status] ?? 'neutral'}>{statusLabel[b.status] ?? b.status}</StatusPill>} />
+                        <StatusCell primary={<StatusBadge tone={statusTone[b.status] ?? 'neutral'}>{statusLabel[b.status] ?? b.status}</StatusBadge>} />
                         <ActionCell>
                           {/* 行全体が詳細パネルを開くので、操作列の押下は行へ伝えない。
                               行の右端は「…」1つ（B-253）。詳細・会話・承認などは中へ。承認待ちは状態の札で分かる。 */}

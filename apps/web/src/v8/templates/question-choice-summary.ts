@@ -1,3 +1,4 @@
+import type { ScenarioQuestion } from '@/components/scenarios/question-editor'
 import type { Tag, Scenario } from '@line-crm/shared'
 import type { QuestionChoice } from '@/components/scenarios/question-editor'
 import { Tag as TagIcon, GitBranch, MousePointerClick, type LucideIcon } from 'lucide-react'
@@ -25,4 +26,20 @@ export function choiceActionIcon(choice: QuestionChoice): LucideIcon {
   if (choice.addTagIds?.length || choice.removeTagIds?.length) return TagIcon
   if (choice.scenario?.op) return GitBranch
   return MousePointerClick
+}
+
+export function displayText(value: string): string {
+  return value
+    .replaceAll('{{name}}', '山田 太郎')
+    .replace(/\{\{field\.[^}]+\}\}/g, '登録済みの情報')
+    .replace(/\{\{var\.[^}]+\}\}/g, '共通情報')
+}
+
+export function isEditableQuestion(value: unknown): value is ScenarioQuestion {
+  if (!value || typeof value !== 'object') return false
+  const question = value as Record<string, unknown>
+  if (typeof question.text !== 'string') return false
+  if (question.tapMode !== 'single' && question.tapMode !== 'multiple') return false
+  if (!Array.isArray(question.choices)) return false
+  return question.choices.every((choice) => !!choice && typeof choice === 'object' && typeof (choice as Record<string, unknown>).label === 'string')
 }

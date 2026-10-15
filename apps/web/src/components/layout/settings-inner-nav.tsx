@@ -216,9 +216,8 @@ export function SettingsMenu({ heading, label, entries, placement = 'inline', fi
   /** 型のフォルダの列を中身の高さで止める（data-folder-fit）。 */
   fit?: boolean
 }) {
-  const className = placement === 'folder' ? styles.folder : `${styles.root} ${placement === 'inline' ? styles.inline : ''}`
   return (
-    <nav className={className} aria-label={label} data-settings-nav={placement === 'outer' ? 'outer' : placement} data-folder-fit={fit ? '' : undefined}>
+    <nav className={placement === 'folder' ? styles.folder : `${styles.root} ${placement === 'inline' ? styles.inline : ''}`} aria-label={label} data-settings-nav={placement === 'outer' ? 'outer' : placement} data-folder-fit={fit ? '' : undefined}>
       <p className={styles.heading}>{heading}</p>
       <ul className={styles.list}>
         {entries.map(({ href, label: itemLabel, Icon, active, children = [] }) => (

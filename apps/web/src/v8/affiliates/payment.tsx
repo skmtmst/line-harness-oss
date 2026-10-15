@@ -1,4 +1,6 @@
 'use client'
+
+import { daysUntilClose } from './payment-dates'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -44,18 +46,6 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  */
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
-
-/** 締め日（periodTo の暦日・日本時間）までの残り日数。取れなければ null。 */
-function daysUntilClose(periodTo: string | null | undefined): number | null {
-  if (!periodTo) return null
-  const end = new Date(periodTo)
-  if (Number.isNaN(end.getTime())) return null
-  const nowJst = new Date(Date.now() + 9 * 3600_000)
-  const today = Date.UTC(nowJst.getUTCFullYear(), nowJst.getUTCMonth(), nowJst.getUTCDate())
-  const endJst = new Date(end.getTime() + 9 * 3600_000)
-  const closing = Date.UTC(endJst.getUTCFullYear(), endJst.getUTCMonth(), endJst.getUTCDate())
-  return Math.round((closing - today) / 86_400_000)
-}
 
 const SAVED_VIEWS = [
   { value: '', label: 'よく使う絞り込み' },

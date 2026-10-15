@@ -1,5 +1,9 @@
 'use client'
 
+import { type ResearchFormat, type ResearchQuestion, visualQuestions, assetInitial } from './asset-initial'
+export type { ResearchQuestion } from './asset-initial'
+export { assetInitial } from './asset-initial'
+
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import Toggle from '@/components/shared/toggle'
@@ -69,47 +73,12 @@ const META: Record<AssetKind, { title: string; heading: string; lead: string; bo
 export const MAX_QUESTIONS = 10
 /** LINE のクイックリプライは13件まで。 */
 export const MAX_CHOICES = 13
-type ResearchFormat = 'single' | 'multiple' | 'free'
 const FORMAT_OPTIONS: Array<{ value: ResearchFormat; label: string }> = [
   { value: 'single', label: '1つだけ選ぶ' },
   { value: 'multiple', label: 'いくつでも選ぶ' },
   { value: 'free', label: '自由に書く' },
 ]
-export interface ResearchQuestion { key: string; text: string; format: ResearchFormat; required: boolean; choices: string[]; choiceTapExtras?: TapExtras[] }
 const newQuestion = (): ResearchQuestion => ({ key: crypto.randomUUID(), text: '', format: 'single', required: true, choices: ['', ''] })
-const visualQuestions = (): ResearchQuestion[] => [
-  { key: 'vq-1', text: '来月も定期便を続けたいと思いますか？', format: 'single', required: true, choices: ['続けたい', 'どちらともいえない', '止めたい'], choiceTapExtras: [{}, {}, { scoreChange: 10 }] },
-  { key: 'vq-2', text: 'よく使っている商品を教えてください', format: 'multiple', required: false, choices: ['フード', 'おやつ', 'ケア用品'] },
-  { key: 'vq-3', text: '改善してほしいところがあれば教えてください', format: 'free', required: false, choices: [] },
-]
-
-/** 保存してある payload（クーポン・リサーチ）を欄の値に戻す。統括の編集で使う（host.initialContent）。 */
-export function assetInitial(payload: Record<string, unknown>) {
-  const str = (value: unknown) => (typeof value === 'string' ? value : '')
-  const num = (value: unknown, fallback: string) => (typeof value === 'number' && Number.isFinite(value) ? String(value) : fallback)
-  const questions = Array.isArray(payload.questions)
-    ? payload.questions.flatMap((item): ResearchQuestion[] => {
-      if (!item || typeof item !== 'object') return []
-      const q = item as Record<string, unknown>
-      const format: ResearchFormat = q.format === 'multiple' || q.format === 'free' ? q.format : 'single'
-      return [{ key: crypto.randomUUID(), text: str(q.text), format, choiceTapExtras: Array.isArray(q.choiceTapExtras) ? q.choiceTapExtras as TapExtras[] : [], required: q.required !== false, choices: Array.isArray(q.choices) ? q.choices.map(str) : [] }]
-    })
-    : []
-  return {
-    tapExtras: payload.tapExtras as TapExtras | undefined,
-    description: str(payload.description),
-    couponTitle: str(payload.title),
-    imageUrl: str(payload.imageUrl),
-    couponOnce: payload.oncePerFriend === false ? 'unlimited' as const : 'once' as const,
-    couponVisibility: payload.visibility === 'link' ? 'link' as const : 'friends' as const,
-    lottery: payload.lottery === true,
-    lotteryRate: num(payload.lotteryRate, '20'),
-    winnerLimit: num(payload.winnerLimit, '500'),
-    startsAt: str(payload.startsAt),
-    endsAt: str(payload.endsAt),
-    questions,
-  }
-}
 
 /** `2026-08-01T00:00` → `8/1`（見本の札に出す短い日付）。 */
 function shortDate(value: string): string {

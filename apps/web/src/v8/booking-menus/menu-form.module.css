@@ -223,7 +223,7 @@
 }
 
 /* お支払いの3つの箱は横に並べる（絵 v5L19Z・QqER7）。 */
-.paymentChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.paymentChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-8); width: 100%; }
 
 /* 題の横の「？」・札（準備中）は字から 6 空ける。 */
-.titleWithMark { display: inline-flex; align-items: center; gap: 6px; }
+.titleWithMark { display: inline-flex; align-items: center; gap: var(--space-6); }

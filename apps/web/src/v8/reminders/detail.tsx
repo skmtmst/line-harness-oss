@@ -1,4 +1,7 @@
 'use client'
+
+import { JST_LOCAL, dateTimeLocalJst } from './detail-dates'
+export { dateTimeLocalJst } from './detail-dates'
 import { scheduledJstIso } from '@/lib/jst-datetime';
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state';
@@ -111,18 +114,6 @@ function formatMonthDay(value: string | null): string {
 
 function formatJst(value: string | null): string {
   return polishFormatDate(value, { style: 'detail', fallback: '—' })
-}
-
-/** API の UTC ISO を、どの端末でも同じ JST の datetime-local 値へ変える。 */
-const JST_LOCAL = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Asia/Tokyo',
-  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-})
-export function dateTimeLocalJst(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const parts = Object.fromEntries(JST_LOCAL.formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]))
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
 }
 
 /** datetime-local の JST の壁時計時刻を、曖昧さなく UTC ISO へ変える。 */
@@ -481,7 +472,7 @@ function ReminderDetailV8() {
       <PageHeading title={data.reminder.name}
         help="登録した友だちごとに、基準日から決めた日時に通知を送ります。"
         explanationToggle={tab === 'registrants' ? <PageExplanationToggle /> : undefined}
-        crumbs={<><p className={styles.meta}>{meta}</p></>}
+        crumbs={<><p>{meta}</p></>}
         tabs={<><Tabs
           label="リマインダの詳細"
           items={[
@@ -1105,7 +1096,7 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
                     </span>
                     <span role="cell" className={styles.colDate}>
                       <SaveErrorField names={["draftDates","draft_dates"]}><DateTimeField
-                        className={styles.dateField}
+
                         labelFormat="short"
                         clearable={false}
                         aria-label={`${item.friendName || '登録者'}の基準日`}

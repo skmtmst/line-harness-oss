@@ -25,7 +25,7 @@ export function CheckIcon({ state }: { state: CheckState }) {
  * 無ければ面の線（点線）だけ出し「画像を選ぶと、ここに出ます」（仕様書・公式照合より）。
  * 下の帯（トーク画面の下の文言 ∨）は LinePreview が1本だけ描く（gobhu）。
  */
-export function MenuPreview({
+export function MenuContent({
   size,
   imageUrl,
   areas,

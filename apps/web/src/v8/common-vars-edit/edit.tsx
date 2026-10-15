@@ -1,5 +1,8 @@
 'use client'
 
+import { scheduleStamp, changeText } from './edit-text'
+export { scheduleStamp, changeText } from './edit-text'
+
 import { TextField } from '@/components/shared/text-field'
 import { requiredText } from '@/lib/form-requirement'
 const b244Requirements = {
@@ -52,34 +55,6 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-
-/*
- * ★V8 共通情報の編集（板 `AYc6O`、編集（1152）`C67dE`、競合 `piWhz`）。
- *
- * 型は作る（CreatePage）：頭（戻る・名前・差し込み名と使っている数）→ 左に「中身を変える」
- * 「変える前に影響を見る」、右の列に名前とフォルダ・使える期間・社内メモ（ひとまとまり）・
- * 決めた日に変える・これまでの変更・差し込んだときの見え方、下の帯に削除・キャンセル・止める・
- * 反映して保存。1152 では右の列の上に「LINEでの見え方を見る」を置き、スマホは窓で開く。
- * 競合は頭の下の琥珀の帯と比べる窓で扱う。
- * データの口・影響確認・保存・予約・削除・状態切替は `app/contents/vars/edit/edit-v8.tsx` から
- * 写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
- */
-
-/** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
-export function scheduleStamp(value: string): string {
-  const match = /^\d{4}-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(value)
-  if (!match) return value
-  const [, m, d, hh, mm] = match
-  return `${Number(m)}/${Number(d)}${hh ? ` ${Number(hh)}:${mm}` : ''}`
-}
-
-/** 履歴の「前 → 後」。先頭の同じ言葉（「平日 」など）は後ろで繰り返さない。 */
-export function changeText(before: string, after: string): string {
-  const from = before || '（空）'
-  const to = after || '（空）'
-  const head = /^(\S+\s)/.exec(from)?.[1]
-  return `${from} → ${head && to.startsWith(head) && to.length > head.length ? to.slice(head.length) : to}`
-}
 
 /** 履歴の日時（ISO）を日本時間の「9/01 10:00」の形にする。 */
 export function historyStamp(value: string): string {

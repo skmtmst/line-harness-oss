@@ -1,4 +1,6 @@
 'use client'
+
+import { formatDelay } from './schedule-label'
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -169,21 +171,6 @@ function stepWhenLabel(mode: DeliveryMode, step: ScenarioStep, index: number): s
   if (!step.deliveryTime) return '時刻を入力してください'
   const days = step.offsetDays ?? 0
   return index === 0 ? `購読開始から${days}日後 ${step.deliveryTime}` : `${days}日後 ${step.deliveryTime}`
-}
-
-function formatDelay(minutes: number): string {
-  if (minutes === 0) return '即時'
-  if (minutes < 60) return `${minutes}分後`
-  if (minutes < 1440) {
-    const h = Math.floor(minutes / 60)
-    const m = minutes % 60
-    return m === 0 ? `${h}時間後` : `${h}時間${m}分後`
-  }
-  const d = Math.floor(minutes / 1440)
-  const remaining = minutes % 1440
-  if (remaining === 0) return `${d}日後`
-  const h = Math.floor(remaining / 60)
-  return h > 0 ? `${d}日${h}時間後` : `${d}日${remaining}分後`
 }
 
 function formatScheduleLabel(mode: DeliveryMode | undefined, step: ScenarioStep): string {

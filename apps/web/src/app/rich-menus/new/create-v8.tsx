@@ -2,7 +2,7 @@
 
 import { imageUploadErrorText } from './image-upload-error'
 
-import { MetricValue, CheckIcon, MenuPreview } from './create-preview'
+import { MetricValue, CheckIcon, MenuContent } from './create-preview'
 
 import { type PendingImage, type Page, type Group, type CheckState, type PrepublishState } from './create-types'
 
@@ -2397,7 +2397,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <SectionHeader title="確かめる" />
           <div className={styles.hqReview}>
             <div className={styles.hqReviewShape}>
-              <MenuPreview
+              <MenuContent
                 size={group?.size ?? size}
                 imageUrl={shapeUrl}
                 areas={firstPage ? firstPage.areas.map((a) => ({ x: a.boundsX, y: a.boundsY, w: a.boundsWidth, h: a.boundsHeight })) : null}
@@ -2528,9 +2528,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     const reviewSize = group?.size ?? size
     const reviewDims = `${RICH_MENU_DIMENSIONS[reviewSize].width}×${RICH_MENU_DIMENSIONS[reviewSize].height}`
     const reviewSizeLabel = SIZE_OPTIONS.find((o) => o.value === reviewSize)?.label ?? ''
-    const missingFaces = pages.flatMap((p) => p.areas
-      .map((area, i) => ({ area, letter: String.fromCharCode(65 + i), page: p }))
-      .filter((x) => !isAreaActionConfigured(x.area)))
+    const missingPages = pages.filter(page => !page.areas.length || page.areas.some(area => !isAreaActionConfigured(area)))
     const missingImages = pages.filter((p) => !p.imageR2Key)
     const review = group ? (
       <>
@@ -2538,7 +2536,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <SectionHeader title="確かめる" />
           <div className={styles.reviewRow}>
             <div className={styles.reviewThumb}>
-              <MenuPreview size={reviewSize} imageUrl={previewImageUrl} areas={previewAreas} pages={[]} activePageId={null} />
+              <MenuContent size={reviewSize} imageUrl={previewImageUrl} areas={previewAreas} pages={[]} activePageId={null} />
               <p className={styles.reviewCaption}>{reviewSizeLabel}・{totalAreaCount}面・{pages.length > 1 ? `切替タブ${pages.length}つ` : '切替タブなし'}</p>
             </div>
             <div className={styles.reviewFaces}>
@@ -2568,18 +2566,21 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         <Card variant="form" gap="normal" aria-label="足りないもの">
           <SectionHeader title="足りないもの" help="公開する前に、押しても何も起きない面や画像の抜けがないかを見ます。直すときは、それを決める手順へ戻ります。" helpLabel="足りないものの説明" />
           <ul className={styles.checkList}>
-            {missingFaces.length > 0 ? (
-              <li className={styles.checkRow}>
+            {missingPages.map(page => {
+              const unset = page.areas.filter(area => !isAreaActionConfigured(area))
+              const prefix = pages.length > 1 ? `${page.name}：` : ''
+              const label = `${prefix}${page.areas.length ? `面 ${unset.map(area => String.fromCharCode(65 + page.areas.indexOf(area))).join('・')} の動きが未設定` : '面が未設定'}`
+              return <li key={page.id} className={styles.checkRow}>
                 <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
                 <div className={styles.checkBody}>
-                  <p className={styles.checkName}>{pages.length > 1 ? `${missingFaces.length}つの面の動きが未設定` : `面 ${missingFaces.map((x) => x.letter).join('・')} の動きが未設定`}</p>
+                  <p className={styles.checkName}>{label}</p>
                   <p className={styles.checkNote}>押しても何も起きません。②で決めます</p>
                 </div>
                 <span className={styles.checkAction}>
-                  <Button type="button" variant="text" size="inline" onClick={() => goToStep('buttons')}>②で決める</Button>
+                  <Button type="button" variant="text" size="inline" onClick={() => { setActivePageId(page.id); setSelectedAreaId(unset[0]?.id ?? null); goToStep('buttons') }}>②で決める</Button>
                 </span>
               </li>
-            ) : null}
+            })}
             <li className={styles.checkRow}>
               {missingImages.length > 0
                 ? <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
@@ -2773,7 +2774,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         note="メニューの見え方の見本です。"
         chatBarText={chatBarText}
         richMenu={(
-          <MenuPreview
+          <MenuContent
             size={group?.size ?? size}
             imageUrl={previewImageUrl}
             areas={previewAreas}

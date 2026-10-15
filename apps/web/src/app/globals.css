@@ -3152,4 +3152,4 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 
 :root { --tpl-onboarding-step-ring: inset 0 0 0 var(--choice-ring) var(--color-hairline); --tpl-op-support-negative-gap: calc(-1 * var(--tpl-op-me-gap)); --tpl-op-support-band-bleed: calc(-1 * var(--polish-space-section)); }
 
-:root { --tpl-rm-review-label-lh: 17px; --tpl-rm-review-action-h: 38px; --tpl-rm-review-letter: 22px; }
+:root { --tpl-rm-review-thumb-w: 165px; --tpl-rm-face-row-h: 38px; --tpl-rm-face-label-lh: 18px; --tpl-rm-face-name-lh: 19px; --tpl-rm-face-summary-lh: 16px; --tpl-ledger-month-lh: normal; --tpl-cv-delete-reason-w: 92px; --tpl-fr-name-content-min: 160px; --tpl-rt-flow-timing-w: 132px; --tpl-rt-flow-row-h: 58px; --tpl-rt-flow-name-lh: 20px; --tpl-rt-flow-note-lh: 18px; --tpl-rm-review-label-lh: 17px; --tpl-rm-review-action-h: 38px; --tpl-rm-review-letter: 22px; }

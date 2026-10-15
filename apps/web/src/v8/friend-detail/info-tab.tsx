@@ -1,4 +1,5 @@
 'use client'
+import FilterLink from '@/components/shared/filter-link'
 import Link from '@/components/shared/list-navigation'
 import { ArrowUpRight, Lock } from 'lucide-react'
 import { BASIC_FRIEND_FIELDS, ageFromBirthday, type FriendField } from '@line-crm/shared'
@@ -132,14 +133,13 @@ export default function InfoTab({ friendId, group, data, perms }: {
     <div className={styles.pane}>
       <div className={styles.chips} role="group" aria-label="情報欄の分類">
         {chips.map((chip) => (
-          <Link
+          <FilterLink
             key={chip.id}
-            className={styles.chip}
             href={chip.id === ALL_GROUP ? base : `${base}&group=${encodeURIComponent(chip.id)}`}
-            aria-current={group === chip.id ? 'true' : undefined}
+            selected={group === chip.id}
           >
             {`${chip.label} ${chip.count}`}
-          </Link>
+          </FilterLink>
         ))}
       </div>
 
@@ -163,7 +163,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
           {groups.map(groupKey => <section key={groupKey} className={styles.infoGroup} aria-label={groupAria(groupKey)}>
           <div className={styles.infoGroupHead}>
             <h3 className={styles.infoGroupTitle}>{groupName(groupKey)}<span className={styles.infoGroupNote}>{groupNote(groupKey)}</span></h3>
-            {groupKey === firstShopGroup ? <Link className={styles.manageLink} href="/friend-fields">情報欄を管理<ArrowUpRight size={13} aria-hidden="true" /></Link> : null}
+            {groupKey === firstShopGroup ? <Link className={styles.manageLink} href="/tags?tab=fields">情報欄を管理<ArrowUpRight size={13} aria-hidden="true" /></Link> : null}
           </div>
           <div className={styles.fieldGrid}>
             {ordered.filter(field => groupOf(field) === groupKey).map((field) => {

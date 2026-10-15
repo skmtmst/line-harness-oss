@@ -1,4 +1,5 @@
 'use client'
+import { RadioCardGroup } from '@/components/shared/radio-card'
 
 import { useEffect, useState } from 'react'
 import { couponDate, couponPayloadError } from '@line-crm/shared'
@@ -61,12 +62,12 @@ export default function CouponSettings({ accountId, value, onChange, onOptionsLo
           ariaLabel={selected ? 'クーポンを変える' : 'クーポンを選ぶ'} disabled={disabled || !accountId} onOpen={() => setOpen(true)} />
       </Field>
       <Field label="渡す相手">
-        <div className={styles.couponAudience} role="radiogroup" aria-label="渡す相手">
+        <RadioCardGroup className={styles.couponAudience} legend="渡す相手">
           {([['new_friends', '新しく友だちになった人だけ'], ['all_friends', 'すでに友だちの人にも']] as const).map(([key, text]) => (
             <Radio key={key} name="coupon-audience" value={key} checked={value.couponAudience === key} disabled={disabled}
               onChange={() => onChange({ ...value, couponAudience: key })}>{text}</Radio>
           ))}
-        </div>
+        </RadioCardGroup>
       </Field>
       <Notice tone="info" message="1人1回だけ渡します。同じ人が何度読み取っても、2枚目は渡しません。すでに友だちの人にも渡す設定では、読み取るとクーポンの画面が開きます。" />
       {open ? <EntityPickerDialog title="クーポンを選ぶ" initialId={value.couponAssetId ?? undefined}

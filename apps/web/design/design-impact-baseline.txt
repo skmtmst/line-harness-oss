@@ -193,7 +193,6 @@ shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/common-vars/export-panel.tsx
 shared-button-importer v8/common-vars/list.tsx
-shared-button-importer v8/inflow-links/coupon-settings.tsx
 shared-button-importer v8/inflow-links/bulk-dialog.tsx
 shared-button-importer v8/inflow-links/edit-route-dialog.tsx
 shared-button-importer v8/inflow-links/list.tsx
@@ -356,7 +355,7 @@ shared-button-importer v8/restaurant/google/posts.tsx
 shared-button-importer v8/restaurant/google/profile.tsx
 shared-button-importer v8/restaurant/google/reviews.tsx
 shared-button-importer v8/restaurant/google/settings.tsx
-shared-button-importer v8/restaurant/line-followup/flow-editor.tsx
+shared-button-importer v8/restaurant/line-followup/line-followup.tsx
 shared-button-importer v8/restaurant/organization/organization.tsx
 shared-button-importer v8/restaurant/store-new/store-new.tsx
 # ★V8 飲食店テスト（在庫 Y8SjT2・予約台帳 l9NlC0・座席 BERxg・メニュー MJoJR）。src/v8/restaurant に一から書いた。
@@ -553,3 +552,4 @@ shared-button-importer v8/restaurant/organization/organization-forms.tsx
 shared-button-importer components/shared/reservation-people-grid.tsx
 shared-button-importer v8/automations/common-action-sequence.tsx
 shared-button-importer v8/booking-bookings/day-frame.tsx
+shared-button-importer v8/booking-bookings/month-bar.tsx

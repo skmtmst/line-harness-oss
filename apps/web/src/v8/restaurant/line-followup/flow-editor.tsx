@@ -30,7 +30,7 @@ export function FlowEditor({ flow, name, draft, readOnly, busy, onChange }: {
 }) {
   const bubble: BroadcastBubble = { id: flow.id, type: 'text', content: { text: draft.body } }
   const noop = () => {}
-  return <Card variant="form" padding="default" gap="normal" aria-label={`${name} の中身`} className={styles.content}>
+  return <Card variant="form" padding="default" gap="normal" aria-label={`${name} の中身`}>
     <div className={styles.contentHead}>
       <h3 className={styles.contentTitle}>{`${name} の中身`}</h3>
       <span className={styles.contentNote}>右の LINE での見え方がそのまま変わります</span>

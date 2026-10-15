@@ -37,3 +37,10 @@ export default function LedgerMonthNavigation({ anchor, onChange, shareUrl, hist
     </ListToolbarRow>
   </ListToolbarFrame>
 }
+
+/** 月送り・URL・タブ内保存で、同じ対象日を使うための月差。 */
+export function monthDifference(anchor: string): number {
+  const current = monthKey(0).split('-').map(Number)
+  const target = monthKey(0, anchor).split('-').map(Number)
+  return (target[0] - current[0]) * 12 + target[1] - current[1]
+}

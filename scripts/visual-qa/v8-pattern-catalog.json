@@ -331,11 +331,14 @@
           "files": [
             "apps/web/src/components/shared/list-toolbar.tsx",
             "apps/web/src/components/shared/list-toolbar.module.css",
-            "apps/web/src/components/shared/search-field.tsx"
+            "apps/web/src/components/shared/search-field.tsx",
+            "apps/web/src/components/shared/distribution-table.tsx"
           ],
           "components": [
             "ListToolbar",
             "ListToolbarSearch",
+            "ListToolbarSearchSlot",
+            "DistributionToolbar",
             "ListToolbarOptional"
           ],
           "vars": [
@@ -411,10 +414,13 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/filter-chip.tsx",
-            "apps/web/src/components/shared/filter-chip.css"
+            "apps/web/src/components/shared/filter-chip.css",
+            "apps/web/src/components/shared/filter-link.tsx",
+            "apps/web/src/components/shared/filter-link.module.css"
           ],
           "components": [
-            "FilterChip"
+            "FilterChip",
+            "FilterLink"
           ],
           "vars": [
             "--color-control-border"
@@ -1229,10 +1235,14 @@
             "apps/web/src/components/shared/tap-action-field.module.css",
             "apps/web/src/lib/tap-actions.ts",
             "apps/web/src/components/shared/use-tap-action-sources.ts"
+          ,
+            "apps/web/src/components/shared/tap-action-summary.tsx"
           ],
           "components": [
             "TapActionField",
             "TapTargetPicker"
+          ,
+            "TapActionSummary"
           ],
           "vars": []
         },
@@ -1307,9 +1317,13 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/tap-action-field.tsx"
+          ,
+            "apps/web/src/components/shared/tap-extras-rows.tsx"
           ],
           "components": [
             "TapActionField"
+          ,
+            "ChoiceExtrasRows"
           ],
           "vars": []
         },

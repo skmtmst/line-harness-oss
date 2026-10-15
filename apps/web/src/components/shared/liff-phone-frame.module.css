@@ -57,7 +57,7 @@
   left: 97px;
   width: 96px;
   height: 28px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-ink);
 }
 

@@ -118,17 +118,14 @@ a.recentTitle:hover { text-decoration: underline; }
 
 /* ---- 情報欄タブ ---- */
 .chips { display: flex; flex-wrap: wrap; gap: var(--tpl-fdt-tag-gap); }
-.chip { display: inline-flex; align-items: center; gap: var(--tpl-fdt-link-gap); padding: var(--tpl-fdt-chip-pad); border-radius: var(--radius-pill); outline: 1px solid var(--color-hairline); outline-offset: -0.5px; background: var(--color-canvas); font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-ink-secondary); white-space: nowrap; text-decoration: none; }
-/* 選んでいる分類は、絞り込み札の選択と同じ薄い緑＋緑の枠（§6.30・B-211）。 */
-.chip[aria-current='true'] { outline-color: var(--color-selection-border); background: var(--color-selection-bg); color: var(--color-selection-border); font-weight: 600; }
 .fieldGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--tpl-fdt-info-col-gap); row-gap: var(--tpl-fdt-info-row-gap); }
 .infoGroup { display: flex; flex-direction: column; gap: var(--tpl-fdt-info-gap); }
 .infoGroup + .infoGroup { padding-top: var(--tpl-fdt-info-gap); border-top: 1px solid var(--color-hairline); }
-.infoGroupTitle { margin: var(--tpl-fdt-info-heading-margin); font-size: var(--tpl-fdt-text-size); font-weight: 600; color: var(--color-ink); display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.infoGroupHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.infoGroupTitle { margin: var(--tpl-fdt-info-heading-margin); font-size: var(--tpl-fdt-text-size); font-weight: 600; color: var(--color-ink); display: flex; align-items: baseline; gap: var(--space-8); min-width: 0; }
+.infoGroupHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-12); }
 .infoGroupNote { font-size: var(--tpl-fdt-small-size); font-weight: 400; color: var(--color-ink-faint); white-space: nowrap; }
 .fieldLabelText { flex-shrink: 0; white-space: nowrap; }
-.manageLink { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; white-space: nowrap; font-size: var(--tpl-fdt-small-size); font-weight: 500; color: var(--color-action); }
+.manageLink { display: inline-flex; align-items: center; gap: var(--space-2); flex-shrink: 0; white-space: nowrap; font-size: var(--tpl-fdt-small-size); font-weight: 500; color: var(--color-action); }
 .manageLink:hover { text-decoration: underline; }
 .fieldSource { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; color: var(--color-ink-faint); }
 .field { display: flex; flex-direction: column; gap: var(--tpl-fdt-field-gap); min-width: 0; padding-left: 0; }

@@ -74,7 +74,7 @@ function LineFollowupBoard({ ctx, selectedId, setSelectedId, drafts, setDrafts, 
             const Icon = kind.icon
             const isSelected = selected?.id === flow.id
             return <div key={flow.id} className={styles.flowItem}>
-              <Card padding="none" contentPadding="0px 0px" className={styles.flowRow} data-selected={isSelected || undefined}>
+              <Card padding="none" contentPadding="0px 0px" selected={isSelected}>
                 <button type="button" className={styles.flowButton} aria-expanded={isSelected} aria-label={kind.name} onClick={() => setSelectedId(flow.id)}>
                   <span className={styles.flowIcon}><Icon size={16} aria-hidden /></span>
                   <span className={styles.flowText}>

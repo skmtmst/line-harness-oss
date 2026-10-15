@@ -1,5 +1,7 @@
 'use client'
 
+import { formatMonthDay, stopMinutes } from './control-time'
+
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { GitBranch, OctagonPause, ShieldCheck, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
@@ -94,14 +96,6 @@ const capabilityShort = (capability: keyof typeof CAPABILITY_LABEL) => CAPABILIT
 /** 記録の表に出す件数。全部は更新履歴のタブで見る。 */
 const RECORD_LIMIT = 10
 
-/** 「8/14」の形。記録の表のいつ・いちばん長かった停止の注に使う。 */
-function formatMonthDay(value: string | null): string {
-  if (!value) return '日時不明'
-  const parsed = new Date(value)
-  if (!Number.isFinite(parsed.getTime())) return '日時不明'
-  return `${parsed.getMonth() + 1}/${parsed.getDate()}`
-}
-
 /** 「8/14 19:02〜19:40」の形。終わりが無ければ始まりだけ出す。 */
 function formatStopRange(start: string | null, end: string | null): string {
   if (!start) return '日時不明'
@@ -114,12 +108,6 @@ function formatStopRange(start: string | null, end: string | null): string {
   if (!Number.isFinite(to.getTime())) return head
   const sameDay = from.getFullYear() === to.getFullYear() && from.getMonth() === to.getMonth() && from.getDate() === to.getDate()
   return `${head}〜${sameDay ? time(to) : `${to.getMonth() + 1}/${to.getDate()} ${time(to)}`}`
-}
-
-function stopMinutes(start: string | null, end: string | null): number | null {
-  if (!start || !end) return null
-  const diff = Math.round((Date.parse(end) - Date.parse(start)) / 60_000)
-  return Number.isFinite(diff) && diff >= 0 ? diff : null
 }
 
 export type EmergencyControlV8Handle = { openStop: () => void }

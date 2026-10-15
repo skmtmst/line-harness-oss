@@ -1,4 +1,6 @@
 'use client'
+
+import { SORT_OPTIONS, type SortKey } from './list-options'
 import FolderSelect from '@/components/shared/folder-select'
 import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageCircle, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
@@ -68,6 +70,13 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
+
+const PAGE_SIZE_OPTIONS = [
+  { value: '20', label: '20件表示' },
+  { value: '50', label: '50件表示' },
+  { value: '100', label: '100件表示' },
+]
+
 
 /*
  * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
@@ -148,20 +157,6 @@ interface PendingToggle {
   accountId: string | null
 }
 
-type SortKey = 'hits' | 'priority' | 'name' | 'created'
-
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: 'priority', label: '評価順' },
-  { value: 'hits', label: 'ヒットが多い順' },
-  { value: 'name', label: '名前順' },
-  { value: 'created', label: '作った順' },
-]
-
-const PAGE_SIZE_OPTIONS = [
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-  { value: '100', label: '100件表示' },
-]
 
 /**
  * よく使う絞り込みの選ぶ欄（設計の札3つ＋選ぶ欄）。

@@ -135,9 +135,9 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
 
   return (
     <Dialog
-      footer={<DialogActions><Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button><Button type="button" variant="primary" icon={<Clock3 aria-hidden="true" />} onClick={() => void reserve()} disabled={busy} busy={busy}>{scheduledAt ? formatReserveLabel(scheduledAt) : '日時を選んで予約'}</Button></DialogActions>}
       open
       designWidth={520}
+      footerAlign="center"
       title={`${friendName}さんに予約して送る`}
       busy={busy}
       error={error}
@@ -196,12 +196,12 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
         </div>
         <p className={styles.note}>受信箱の会話にも「これから送る予約」として出ます。</p>
         {/* 絵は注意の下 12 にボタンが並ぶ（窓の下の線・帯なし）。共通の窓の帯は余白が 24 あるので、本文の続きに置く。 */}
-        <div className={styles.footer}>
+        <DialogActions padding="none">
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" icon={<Clock3 aria-hidden="true" />} onClick={() => void reserve()} disabled={busy} busy={busy}>
             {scheduledAt ? formatReserveLabel(scheduledAt) : '日時を選んで予約'}
           </Button>
-        </div>
+        </DialogActions>
       </div>
     </Dialog>
   )

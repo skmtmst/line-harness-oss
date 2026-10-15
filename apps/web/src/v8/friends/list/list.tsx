@@ -1,4 +1,6 @@
 'use client'
+
+import { scoreBoundary, validAdvancedSearch } from './list-search-validation'
 import Avatar from '@/components/shared/avatar'
 import PageSizeSelect from '@/components/shared/page-size-select'
 
@@ -99,26 +101,12 @@ const COLUMNS: Array<{ key: Column; label: string }> = [
 
 const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
 
-function scoreBoundary(raw: string | null) {
-  if (raw === null || !/^-?\d+$/.test(raw)) return undefined
-  const value = Number(raw)
-  return Number.isSafeInteger(value) ? value : undefined
-}
-
 function prefixed(label: string, options: Array<{ value: string; label: string }>) {
   return options.map((option) => ({ value: option.value, label: `${label}：${option.label}` }))
 }
 
 function isPageSize(value: number): value is PageSize {
   return (PAGE_SIZE_OPTIONS as readonly number[]).includes(value)
-}
-
-function validAdvancedSearch(value: unknown): value is AdvancedSearchResult | null {
-  if (value === null) return true
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-  const result = value as Partial<AdvancedSearchResult>
-  return !!result.params && typeof result.params === 'object' && !Array.isArray(result.params)
-    && Array.isArray(result.summary) && result.summary.every(item => typeof item === 'string')
 }
 
 export default function FriendsListV8() {
@@ -727,9 +715,8 @@ export default function FriendsListV8() {
         <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : emptyValue('unknown')}</span>
         <span className={styles.spacer} />
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
-        {columnsOpen && !readOnly ? <DisplayItemsDialog presentation="columns" items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
+        {columnsOpen && !readOnly ? <DisplayItemsDialog presentation="columns" items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/tags?tab=fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
         {/* 絵 nF4ts：表示項目を編集は2段目、件数の切り替えの左。 */}
-        {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
         <ListToolbarEnd>
         {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
         <SaveErrorField names={["pageSize","limit","page_size"]}><PageSizeSelect label={null} options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(value) => resetPageWith(() => setPageSize(value as PageSize))} /></SaveErrorField>
@@ -835,13 +822,8 @@ export default function FriendsListV8() {
                     </span>
                   )}
                 </Td>
-                <Td className={styles.td}>
-                  {/* 絵 nF4ts・x6QsVz：名前の前に顔の丸（写真が無ければ頭文字）。 */}
-                  <div className={styles.friendCell}>
-                    <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />
-                    <RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>
-                  </div>
-                </Td>
+                <PersonCell avatarName={friend.displayName} avatarSrc={friend.pictureUrl} avatarSize={32} gap="var(--tpl-fr-avatar-gap)"
+                  name={<RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>} />
                 {displayColumns.map(column => {
                   if (column.key === 'support') return (
                   <Td key={column.key} className={styles.td}>

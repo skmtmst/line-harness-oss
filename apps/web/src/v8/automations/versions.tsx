@@ -1,5 +1,7 @@
 'use client'
 
+import { CONSUMER_LABELS } from './version-consumer-labels'
+
 /*
  * ★V8 共通アクションの版と使われている場所（Pencil `ziSgL`）。
  *
@@ -35,18 +37,6 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import Notice from '@/components/shared/notice'
 import { useManualHref } from '@/lib/use-manual-href'
-
-/** 利用先の種類（今の画面と同じ言葉）。 */
-const CONSUMER_LABELS: Record<string, string> = {
-  scenario: 'シナリオ',
-  automation: 'オートメーション',
-  auto_reply: '自動応答',
-  broadcast: '一斉配信',
-  reminder: 'リマインダ',
-  form: '回答フォーム',
-  rich_menu: 'リッチメニュー',
-  entry_route: '流入リンク',
-}
 
 /** 処理の短い名前（版の履歴の1行：「タグ → 待つ 1日 → メッセージ「お礼」」）。 */
 const STEP_SHORT: Record<string, string> = {

@@ -1,4 +1,6 @@
 'use client'
+
+import { shortPublishAt, longPublishAt } from './announcement-dates'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { Pencil, Send } from 'lucide-react'
@@ -84,21 +86,6 @@ function previewLabel(p: OpsAudiencePreview | null, channels: OpsAnnouncementCha
   if (channels.includes('line')) words.push(`うち契約者専用LINEに登録済みの${p.lineLinked} 人へ届きます`)
   if (channels.includes('email')) words.push(`メールは${p.withEmail} 人に届きます`)
   return words.join('。')
-}
-
-/** 「2026-10-05T10:00」を「10/5 10:00」にする。送るボタンの文字用。 */
-function shortPublishAt(local: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local.trim())
-  if (!match) return local.trim()
-  return `${Number(match[2])}/${Number(match[3])} ${match[4]}:${match[5]}`
-}
-
-/** 「10/5（月）10:00」の形。 */
-function longPublishAt(local: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local.trim())
-  if (!match) return local.trim()
-  const week = '日月火水木金土'[new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getDay()]
-  return `${Number(match[2])}/${Number(match[3])}（${week}）${match[4]}:${match[5]}`
 }
 
 /** 一覧の小さい日時（9/18 10:00）。 */
