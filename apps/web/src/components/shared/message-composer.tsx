@@ -61,6 +61,12 @@ export interface MessageComposerProps {
    */
   bubbleErrors?: ReadonlyArray<string | null | undefined>
   bubbleFieldProps?: (index: number) => { ref?: (el: HTMLElement | null) => void; onBlur?: () => void }
+  /**
+   * 吹き出しの枠だけを出す（頭の「メッセージ（n / 5）」・テンプレートの操作・［メッセージを追加する］を出さない）。
+   * 保存先が1通しか持てない画面（飲食の LINE来店フォロー）で、押しても保存できない操作を置かないための口。
+   * 渡さない画面は今までどおり。
+   */
+  bubblesOnly?: boolean
 }
 
 function ComposerText({ bubble, index, onChange, inserts, extraTokens }: Pick<MessageComposerProps, 'inserts' | 'extraTokens'> & { bubble: BroadcastBubble; index: number; onChange: (next: BroadcastBubble) => void }) {
@@ -78,11 +84,11 @@ function ComposerText({ bubble, index, onChange, inserts, extraTokens }: Pick<Me
 export default function MessageComposer(props: MessageComposerProps) {
   const { bubbles, accountId, onChange, onMove, onDelete, onAdd, onPickTemplate, onSaveTemplate, onCompose, unavailable = {}, busy = false } = props
   const busyReason = busy ? '処理中です。完了してから操作してください。' : undefined
-  return <section className={styles.root} data-message-composer>
-    <div className={styles.heading}>
+  return <section className={styles.root} data-message-composer data-bubbles-only={props.bubblesOnly || undefined}>
+    {props.bubblesOnly ? null : <div className={styles.heading}>
       <div className={styles.title}><h3>{`メッセージ（${bubbles.length} / ${MAX_BUBBLES}）`}</h3><HelpTip label="メッセージの説明">1回の配信に5つまで入れられます。上から順に届きます。</HelpTip></div>
       <div className={styles.actions}><Button size="composer" disabled={busy} onClick={() => onPickTemplate(0)}><FileText size={14} aria-hidden />テンプレートから選ぶ</Button><Button size="composer" disabled={busy} onClick={() => onSaveTemplate(0)}><Save size={14} aria-hidden />保存してテンプレートにする</Button></div>
-    </div>
+    </div>}
     {bubbles.map((bubble, index) => {
       const activeType = COMPOSER_TYPES.some(([type]) => type === bubble.type) ? bubble.type : 'coupon'
       const composed = ['carousel', 'rich_message', 'rich_video'].includes(bubble.type)
@@ -121,7 +127,7 @@ export default function MessageComposer(props: MessageComposerProps) {
         </div>
       </Card>
     })}
-    <div className={styles.add}><Button size="composer" disabled={busy || bubbles.length >= MAX_BUBBLES} title={bubbles.length >= MAX_BUBBLES ? '1回の配信は5つまでです' : undefined} onClick={onAdd}><Plus size={15} aria-hidden />メッセージを追加する</Button>{bubbles.length >= MAX_BUBBLES ? <span>1回の配信は5つまでです</span> : null}</div>
+    {props.bubblesOnly ? null : <div className={styles.add}><Button size="composer" disabled={busy || bubbles.length >= MAX_BUBBLES} title={bubbles.length >= MAX_BUBBLES ? '1回の配信は5つまでです' : undefined} onClick={onAdd}><Plus size={15} aria-hidden />メッセージを追加する</Button>{bubbles.length >= MAX_BUBBLES ? <span>1回の配信は5つまでです</span> : null}</div>}
   </section>
 }
 
