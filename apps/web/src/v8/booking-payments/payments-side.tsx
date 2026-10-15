@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import StatusBadge from '@/components/shared/status-badge'
-import { PaymentOnsiteBadge, TestModeBadge } from '@/components/shared/payment-badges'
+import TestModeNote from '@/components/shared/test-mode-note'
+import { PAYMENT_METHOD_ONSITE } from '@/components/shared/payment-status'
 import TextLink from '@/components/shared/text-link'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -53,7 +54,7 @@ export default function PaymentsSide({ accountId, menus, connected = true }: { a
             <li key={menu.id} className={styles.sideRow}>
               <span className={styles.sideName}><TruncatedText value={menu.name} /></span>
               {/* つなぐ前（r1zRK）はどのメニューもお店で払う。 */}
-              {!connected ? <PaymentOnsiteBadge size="compact" />
+              {!connected ? <StatusBadge tone={PAYMENT_METHOD_ONSITE.tone} size="compact">{PAYMENT_METHOD_ONSITE.label}</StatusBadge>
                 : overrides === null ? <span className={styles.sideValue}>{emptyValue('unknown')}</span>
                   : override ? <StatusBadge tone={MODE_TONE[mode]} size="compact">{MODE_SHORT[mode]}</StatusBadge>
                     : <StatusBadge tone="neutral" size="compact">{`いつもの方法（${MODE_SHORT[mode]}）`}</StatusBadge>}
@@ -65,7 +66,7 @@ export default function PaymentsSide({ accountId, menus, connected = true }: { a
       <TextLink href="/booking/menus?tab=menus">メニューの一覧で変える</TextLink>
 
       {connected ? <>
-      <h2 className={styles.sideTitle}><span className={styles.headRow}>今月のお支払い{testMode ? <TestModeBadge /> : null}</span></h2>
+      <h2 className={styles.sideTitle}><span className={styles.headRow}>今月のお支払い{testMode ? <TestModeNote size="compact">{null}</TestModeNote> : null}</span></h2>
       <dl className={styles.sideList}>
         <div className={styles.sideRow}><dt className={styles.sideName}>入金</dt><dd className={styles.sideValue}>{summary && summary !== 'not-ready' ? formatYen(summary.paidAmount) : emptyValue('unknown')}</dd></div>
         <div className={styles.sideRow}><dt className={styles.sideName}>返金</dt><dd className={styles.sideValue}>{summary && summary !== 'not-ready' ? formatYen(summary.refundedAmount) : emptyValue('unknown')}</dd></div>
