@@ -145,6 +145,8 @@ const ALLOWLIST_MAX = 770;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/friends/{id}/delivery-consents',
+  'PUT /api/friends/{id}/delivery-consents/{purpose}',
   'GET /api/hq/support/summary',
   'GET /api/manual-links/lookup',
   'GET /api/restaurant-test/channel-close-tasks',

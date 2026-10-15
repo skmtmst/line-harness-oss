@@ -7,13 +7,19 @@ const responses = {
 };
 const body = (properties: Record<string, unknown>, required: string[]) => ({ required: true, content: { 'application/json': { schema: { type: 'object', properties, required } } } });
 export const api2FollowupPaths = {
+  '/api/friends/{id}/delivery-consents': {get:{summary:'担当範囲の友だちの配信停止・同意を読む。未登録は明示同意の証拠ではない。',parameters:[id],responses}},
+  '/api/friends/{id}/delivery-consents/{purpose}': {put:{
+    summary:'owner/adminが配信停止・同意の状態を理由と読込版付きで保存。全ての目的のうち1つでもunknown/revokedなら自動配信を止める。',
+    parameters:[id,{name:'purpose',in:'path',required:true,schema:{type:'string',pattern:'^[a-z][a-z0-9_-]{0,79}$'}}],
+    requestBody:body({state:{type:'string',enum:['granted','unknown','revoked']},reason:{type:'string',minLength:1,maxLength:1000},expectedVersion:{type:'integer',minimum:0}},['state','reason','expectedVersion']),responses,
+  }},
   '/api/booking/admin/channels/{channel}/settings': { put: {
     summary: '外部予約経路の連携希望を開始・停止する（外部接続は行わない）',
     parameters: [account, { name: 'channel', in: 'path', required: true, schema: { type: 'string', enum: ['hot_pepper_beauty','google_reserve','epark'] } }],
     requestBody: body({ enabled: { type: 'boolean' }, expectedVersion: { type: 'integer', minimum: 0 } }, ['enabled','expectedVersion']), responses,
   } },
   '/api/restaurant-test/channel-close-tasks': { get: {
-    summary: '媒体作業を予約経路・媒体で絞る。source=nullは起点の経路を記録していない知らせ。openedは同世代の再開確認。',
+    summary: '媒体作業を予約経路・媒体で絞る。sourceは発生時の経路。複数起点はtriggerSourcesに保持し、どの起点経路でも絞れる。source=nullは複数経路・過去の不明・休業。openedは同世代の再開確認。',
     parameters: [account, ...['storeId','source','channel'].map(name=>({ name, in:'query', required:name==='storeId', schema:{type:'string'} }))], responses,
   } },
   '/api/restaurant-test/channel-close-tasks/{id}/opened': { post: {

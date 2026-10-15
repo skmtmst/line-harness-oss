@@ -24,14 +24,20 @@ export async function restaurantResponsibleMembers(db:D1Database,storeId:string,
  AND ((?='manager' AND m.role='store_manager') OR (?='selected' AND m.id IN (SELECT value FROM json_each(?)))) ORDER BY m.id`)
  .bind(storeId,settings.recipientMode,settings.recipientMode,JSON.stringify(settings.membershipIds)).all<{id:string;line_uid:string|null}>()).results;
 }
-async function upsertTask(db:D1Database,input:{storeId:string;slotId:string;channel:string;reason:string;remaining:number;recipientIds:string[]}) {
+async function upsertTask(db:D1Database,input:{storeId:string;slotId:string;channel:string;reason:string;remaining:number;recipientIds:string[];sources?:Array<{reservationId:string;source:string;event:string}>;originGeneration?:number}) {
  const id=crypto.randomUUID();
- await db.prepare(`INSERT INTO rt_channel_close_tasks(id,store_id,slot_id,channel,status,reason,remaining_seats,recipient_ids_json)
- VALUES(?,?,?,?,'close',?,?,?) ON CONFLICT(slot_id,channel) DO UPDATE SET
+ const sources=input.sources??[];
+ const reservations=[...new Set(sources.map(r=>r.reservationId))],channels=[...new Set(sources.map(r=>r.source))];
+ const written=await db.prepare(`INSERT INTO rt_channel_close_tasks(id,store_id,slot_id,channel,status,reason,remaining_seats,recipient_ids_json,trigger_reservation_id,trigger_source,trigger_sources_json)
+ SELECT ?,?,?,?,'close',?,?,?,?,?,? WHERE ? IS NULL OR EXISTS(SELECT 1 FROM rt_inventory_rule_queue WHERE store_id=? AND generation=?) ON CONFLICT(slot_id,channel) DO UPDATE SET
+ trigger_reservation_id=CASE WHEN status='reopen' OR reason<>excluded.reason THEN excluded.trigger_reservation_id ELSE trigger_reservation_id END,
+ trigger_source=CASE WHEN status='reopen' OR reason<>excluded.reason THEN excluded.trigger_source ELSE trigger_source END,
+ trigger_sources_json=CASE WHEN status='reopen' OR reason<>excluded.reason THEN excluded.trigger_sources_json ELSE trigger_sources_json END,
  status=CASE WHEN status='reopen' OR reason<>excluded.reason THEN 'close' ELSE status END,
  generation=generation+CASE WHEN status='reopen' OR reason<>excluded.reason THEN 1 ELSE 0 END,
  reason=excluded.reason,remaining_seats=excluded.remaining_seats,recipient_ids_json=excluded.recipient_ids_json,updated_at=datetime('now')`)
- .bind(id,input.storeId,input.slotId,input.channel,input.reason,input.remaining,JSON.stringify(input.recipientIds)).run();
+ .bind(id,input.storeId,input.slotId,input.channel,input.reason,input.remaining,JSON.stringify(input.recipientIds),reservations.length===1?reservations[0]:null,channels.length===1?channels[0]:null,JSON.stringify(sources),input.originGeneration??null,input.storeId,input.originGeneration??null).run();
+ if(!written.meta.changes)return;
  const task=await db.prepare('SELECT id,generation FROM rt_channel_close_tasks WHERE slot_id=? AND channel=?').bind(input.slotId,input.channel).first<{id:string;generation:number}>();
  if(!task)return;
  for(const memberId of input.recipientIds)await db.prepare(`INSERT OR IGNORE INTO rt_inventory_notification_outbox
@@ -83,7 +89,8 @@ export async function reconcileRestaurantInventory(env:Env['Bindings'],storeId:s
  const db=dbFor(env,storeId);
  const rule=await getRestaurantInventoryRules(db,storeId);
 
- const queue=await db.prepare('SELECT generation FROM rt_inventory_rule_queue WHERE store_id=?').bind(storeId).first<{generation:number}>();
+ const queue=await db.prepare('SELECT generation,cause FROM rt_inventory_rule_queue WHERE store_id=?').bind(storeId).first<{generation:number;cause:string}>();
+ const sourceCursor=await db.prepare('SELECT MAX(id) AS id FROM rt_inventory_rule_source_events WHERE store_id=?').bind(storeId).first<{id:number|null}>();
  const store=await db.prepare('SELECT timezone FROM rt_stores WHERE id=?').bind(storeId).first<{timezone:string}>();
  if(!store)return;
  await reconcileDirectBookingTasks(db,storeId,store.timezone,rule.notify);
@@ -100,12 +107,22 @@ export async function reconcileRestaurantInventory(env:Env['Bindings'],storeId:s
    continue;
   }
   const members=await restaurantResponsibleMembers(db,storeId,tzDateStr(store.timezone,new Date(slot.starts_at)));
-  for(const m of media.results)await upsertTask(db,{storeId,slotId:slot.id,channel:m.code,reason:slot.remaining<=0?'full':'limited',remaining:slot.remaining,recipientIds:members.map(m=>m.id)});
+  // Attribute only reservation changes in this stable reconciliation. Rule/table/closure edits have no reservation origin.
+  const sources=queue?.cause.startsWith('rt_reservations:')?(await db.prepare(`SELECT DISTINCT e.reservation_id AS reservationId,e.source,e.event
+    FROM rt_inventory_rule_source_events e JOIN rt_reservations r ON r.id=e.reservation_id AND r.store_id=e.store_id
+    JOIN rt_inventory_slots i ON i.id=e.slot_id WHERE e.store_id=? AND e.slot_id=? AND e.id<=?
+    AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now'))
+    AND julianday(r.starts_at)<julianday(i.starts_at,'+'||i.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(i.starts_at) ORDER BY e.id`)
+    .bind(storeId,slot.id,sourceCursor?.id??0).all<{reservationId:string;source:string;event:string}>()).results:[];
+  for(const m of media.results)await upsertTask(db,{storeId,slotId:slot.id,channel:m.code,reason:slot.remaining<=0?'full':'limited',remaining:slot.remaining,recipientIds:members.map(m=>m.id),sources,originGeneration:queue?.generation});
  }
  const reopen=(await db.prepare(`SELECT t.id,t.generation,i.starts_at FROM rt_channel_close_tasks t JOIN rt_inventory_slots i ON i.id=t.slot_id WHERE t.store_id=? AND t.status='reopen'`).bind(storeId).all<{id:string;generation:number;starts_at:string}>()).results;
  for(const t of reopen)for(const m of await restaurantResponsibleMembers(db,storeId,tzDateStr(store.timezone,new Date(t.starts_at))))await db.prepare('INSERT OR IGNORE INTO rt_inventory_notification_outbox(id,task_id,generation,membership_id,retry_key) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),t.id,t.generation,m.id,crypto.randomUUID()).run();
  // 古い回収が新しい予約の変更を消さない。
- if(queue)await db.prepare('DELETE FROM rt_inventory_rule_queue WHERE store_id=? AND generation=?').bind(storeId,queue.generation).run();
+ if(queue)await db.batch([
+  db.prepare('DELETE FROM rt_inventory_rule_queue WHERE store_id=? AND generation=?').bind(storeId,queue.generation),
+  db.prepare('DELETE FROM rt_inventory_rule_source_events WHERE store_id=? AND id<=? AND NOT EXISTS(SELECT 1 FROM rt_inventory_rule_queue WHERE store_id=?)').bind(storeId,sourceCursor?.id??0,storeId),
+ ]);
  await dispatchRestaurantInventoryNotices(env,storeId);
  await dispatchDirectBookingNotices(env,storeId);
  await dispatchClosureNotices(env,storeId);

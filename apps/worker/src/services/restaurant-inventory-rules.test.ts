@@ -104,3 +104,72 @@ it('在庫枠がなくてもLINE・電話の予約ごとに設定した媒体だ
  fixture.raw.exec("UPDATE rt_reservations SET status='cancelled' WHERE id='direct'");await reconcileRestaurantInventory({DB:fixture.db} as Env['Bindings'],'store');
  expect(fixture.raw.prepare("SELECT COUNT(*) n FROM rt_reservation_close_tasks WHERE status='reopen'").get()).toEqual({n:2});
 });
+
+it('枠の知らせに発生時の予約経路を保存し、後の編集・取消・削除でも起点を保つ',async()=>{
+ await saveRestaurantInventoryRules(fixture.db,rules);reserve('origin','confirmed',3,null);
+ fixture.raw.exec("UPDATE rt_reservations SET source='hotpepper' WHERE id='origin'");
+ const env={DB:fixture.db} as Env['Bindings'];await reconcileRestaurantInventory(env,'store');
+ const {listRestaurantCloseTasks}=await import('@line-crm/db');
+ let tasks=await listRestaurantCloseTasks(fixture.db,'store',{source:'hotpepper'});
+ expect(tasks).toHaveLength(1);
+ expect(tasks[0]).toMatchObject({triggerReservationId:'origin',triggerSources:expect.arrayContaining([{reservationId:'origin',source:'hotpepper',event:'update'}])});
+ fixture.raw.exec("UPDATE rt_reservations SET source='tabelog',status='cancelled' WHERE id='origin'");
+ await reconcileRestaurantInventory(env,'store');
+ tasks=await listRestaurantCloseTasks(fixture.db,'store',{source:'hotpepper'});
+ expect(tasks[0]).toMatchObject({status:'reopen',triggerReservationId:'origin'});
+ fixture.raw.exec("DELETE FROM rt_reservations WHERE id='origin'");
+ expect(await listRestaurantCloseTasks(fixture.db,'store',{source:'hotpepper'})).toHaveLength(1);
+ expect(await listRestaurantCloseTasks(fixture.db,'store',{source:'tabelog'})).toHaveLength(0);
+});
+it('まとめて照合する複数予約の起点を1件に決め付けず、各経路から絞れる',async()=>{
+ await saveRestaurantInventoryRules(fixture.db,rules);
+ reserve('a','confirmed',2,null);reserve('b','confirmed',2,null);
+ fixture.raw.exec("UPDATE rt_reservations SET source='hotpepper' WHERE id='a';UPDATE rt_reservations SET source='tabelog' WHERE id='b'");
+ await reconcileRestaurantInventory({DB:fixture.db} as Env['Bindings'],'store');
+ const {listRestaurantCloseTasks}=await import('@line-crm/db');
+ for(const source of ['hotpepper','tabelog']) {
+  const tasks=await listRestaurantCloseTasks(fixture.db,'store',{source});
+  expect(tasks).toHaveLength(1);expect(tasks[0]).toMatchObject({source:null,triggerReservationId:null});
+  expect(tasks[0].triggerSources?.map(s=>s.reservationId)).toEqual(expect.arrayContaining(['a','b']));
+ }
+ expect(fixture.raw.prepare('SELECT COUNT(*) n FROM rt_inventory_rule_source_events').get()).toEqual({n:0});
+});
+it('過去の枠の起点は補完せず、直接予約の経路も発生時の値を保つ',async()=>{
+ fixture.raw.exec(`INSERT INTO rt_channel_close_tasks(id,store_id,slot_id,channel,status,reason,remaining_seats) VALUES('legacy','store','slot','tabelog','close','limited',1)`);
+ reserve('direct-origin');fixture.raw.exec("UPDATE rt_reservations SET source='phone' WHERE id='direct-origin'");
+ await reconcileRestaurantInventory({DB:fixture.db} as Env['Bindings'],'store');
+ fixture.raw.exec("UPDATE rt_reservations SET source='line' WHERE id='direct-origin'");
+ const {listRestaurantCloseTasks}=await import('@line-crm/db');
+ expect((await listRestaurantCloseTasks(fixture.db,'store')).find(t=>t.id==='legacy')).toMatchObject({source:null,triggerReservationId:null,triggerSources:[]});
+ expect((await listRestaurantCloseTasks(fixture.db,'store',{source:'phone'})).filter(t=>t.reservationId==='direct-origin')).toHaveLength(1);
+ expect((await listRestaurantCloseTasks(fixture.db,'store',{source:'line'})).filter(t=>t.reservationId==='direct-origin')).toHaveLength(0);
+});
+it('照合中に次の予約変更が来ても、古い起点で新しい知らせを作らず、未処理の起点を残す',async()=>{
+ await saveRestaurantInventoryRules(fixture.db,rules);reserve('first','confirmed',3,null);
+ fixture.raw.exec("UPDATE rt_reservations SET source='hotpepper' WHERE id='first'");
+ const base=fixture.db;let injected=false;
+ const db={...base,prepare(sql:string){
+  const statement=base.prepare(sql);
+  if(!sql.startsWith('SELECT MAX(id) AS id FROM rt_inventory_rule_source_events'))return statement;
+  return {...statement,bind(...args:unknown[]){const bound=statement.bind(...args);return {...bound,async first<T>(){
+   const value=await bound.first<T>();
+   if(!injected){injected=true;reserve('second','confirmed',1,null);fixture.raw.exec("UPDATE rt_reservations SET source='tabelog' WHERE id='second'");}
+   return value;
+  }}}};
+ }} as D1Database;
+ await reconcileRestaurantInventory({DB:db} as Env['Bindings'],'store');
+ expect(fixture.raw.prepare('SELECT COUNT(*) n FROM rt_channel_close_tasks').get()).toEqual({n:0});
+ expect(fixture.raw.prepare('SELECT COUNT(*) n FROM rt_inventory_rule_queue').get()).toEqual({n:1});
+ expect((fixture.raw.prepare('SELECT COUNT(*) n FROM rt_inventory_rule_source_events').get() as {n:number}).n).toBeGreaterThan(0);
+ await reconcileRestaurantInventory({DB:base} as Env['Bindings'],'store');
+ const {listRestaurantCloseTasks}=await import('@line-crm/db');
+ expect(await listRestaurantCloseTasks(base,'store',{source:'hotpepper'})).toHaveLength(1);
+ expect(await listRestaurantCloseTasks(base,'store',{source:'tabelog'})).toHaveLength(1);
+ expect(fixture.raw.prepare('SELECT COUNT(*) n FROM rt_inventory_rule_source_events').get()).toEqual({n:0});
+});
+it('ルールの保存で起きた閉鎖へ、先にあった予約の起点を推測して付けない',async()=>{
+ reserve('old-change','confirmed',3,null);await saveRestaurantInventoryRules(fixture.db,rules);
+ await reconcileRestaurantInventory({DB:fixture.db} as Env['Bindings'],'store');
+ const {listRestaurantCloseTasks}=await import('@line-crm/db');
+ expect((await listRestaurantCloseTasks(fixture.db,'store'))[0]).toMatchObject({source:null,triggerReservationId:null,triggerSources:[]});
+});

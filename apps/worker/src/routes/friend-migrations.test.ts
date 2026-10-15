@@ -66,7 +66,7 @@ describe('UID移行API', () => {
   it('配信停止の引き継ぎは照合できない間、0やずれなしにしない', async () => {
     const response=await appFor().request('/api/friends/migrations/run-1',{},env);
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({data:{suppressionReconciliation:{status:'unavailable',transferredCount:null,mismatchCount:null,reason:'delivery_suppression_ledger_missing'}}});
+    expect(await response.json()).toMatchObject({data:{suppressionReconciliation:{status:'unavailable',transferredCount:null,mismatchCount:null,reason:'delivery_consent_snapshot_missing'}}});
   });
   it('dry-runは対象アカウントの権限を確認する', async () => {
     accountAccess.canAccessAllLineAccounts.mockResolvedValue(false);
@@ -276,7 +276,7 @@ describe('切り戻しの可否と照合（FRIEND-34/35/36）', () => {
     ] });
     // R396: ペア2件の書き戻しは1文で2件一致する。
     run.mockResolvedValue({ meta: { changes: 2 } });
-    vi.mocked(env.DB.batch).mockResolvedValue([{ meta: { changes: 1 } }, { meta: { changes: 1 } }, { meta: { changes: 1 } }] as never);
+    vi.mocked(env.DB.batch).mockResolvedValue([{ meta: { changes: 2 } }, { meta: { changes: 1 } }, { meta: { changes: 1 } }] as never);
     const response = await appFor().fetch(post('/api/friends/migrations/run-1/rollback', {}), env);
     expect(response.status).toBe(200);
     const body = await response.json() as { data: { status: string; rolledBack: number; rollbackable: boolean } };
@@ -289,7 +289,9 @@ describe('切り戻しの可否と照合（FRIEND-34/35/36）', () => {
     expect(sqls.some((sql) => /UPDATE friends\s+SET user_id = CASE/i.test(sql))).toBe(true);
     expect(sqls.some((sql) => /user_id IS \?/.test(sql))).toBe(true);
     // 失敗行（item-2）へは何も書かない。
-    expect(env.DB.batch).toHaveBeenCalledTimes(1);
+    expect(env.DB.batch).toHaveBeenCalledTimes(2);
+    // 友だちの復元と配信停止・同意の復元は同一batch。
+    expect(vi.mocked(env.DB.batch).mock.calls[0][0]).toHaveLength(2);
   });
 
   it('移行後に統合ユーザーが変わった行は1件も書き戻さず競合を返す', async () => {

@@ -1,3 +1,4 @@
+import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 import { reserveOutboundSend, hashOutboundPayload, completeOutboundSendStatement } from './outbound-idempotency.js';
 import { decorateTapExtras } from './tap-extras.js';
@@ -411,6 +412,10 @@ async function processSingleDelivery(
   if (!friend) {
     await pauseFriendScenarioDelivery(db, fs.id);
     console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+    return false;
+  }
+  if (await isFriendDeliverySuppressed(db, friend.id)) {
+    await pauseFriendScenarioDelivery(db, fs.id);
     return false;
   }
   if (!friend.is_following) {

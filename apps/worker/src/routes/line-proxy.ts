@@ -1,3 +1,4 @@
+import { hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
 import { Hono } from 'hono';
 import { readBoundedBytes, readBoundedText } from '../lib/input-errors.js';
 import type { Context } from 'hono';
@@ -614,6 +615,20 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
         { message: 'Message dispatch is stopped by emergency operation control' },
         409,
       );
+    }
+
+    if(isBulkDispatch) {
+      let uids:string[]|undefined;
+      if(path.endsWith('/push')||path.endsWith('/multicast')) {
+        let payload: {to?:unknown};
+        try {payload=JSON.parse(rawBody??'{}');} catch {return c.json({message:'Invalid message payload'},400);}
+        if(typeof payload.to==='string') uids=[payload.to];
+        else if(Array.isArray(payload.to)&&payload.to.every(v=>typeof v==='string')) uids=payload.to;
+        else return c.json({message:'Invalid message recipients'},400);
+      }
+      if(await hasSuppressedDeliveryRecipients(c.env.DB,caller.lineAccountId,uids)) {
+        return c.json({message:'Message dispatch contains recipients with delivery suppression',code:'DELIVERY_CONSENT_SUPPRESSED'},409);
+      }
     }
 
     let upstream: Response;

@@ -1,3 +1,4 @@
+import { consentRollbackConflicts, suppressionReconciliation } from '@line-crm/db/src/friend-delivery-consents.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -265,11 +266,7 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
         itemOffset: offset,
         unresolved,
         decisionCounts,
-        // 独立した配信停止・同意台帳が無く、移行の記録にも照合値が無い。
-        suppressionReconciliation: {
-          status: 'unavailable', transferredCount: null, mismatchCount: null,
-          reason: 'delivery_suppression_ledger_missing',
-        },
+        suppressionReconciliation: await suppressionReconciliation(c.env.DB, run.id),
       },
     });
   } catch (error) {
@@ -351,6 +348,8 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
       return inputError(c, { success: false, error: '要確認をすべて判断してから本移行してください' }, 422, []);
     }
     const items = await listUidMigrationItems(c.env.DB, run.id);
+    const targets=items.filter(i=>i.decision==='link'||i.decision==='create').map(i=>i.new_friend_id??i.new_uid).filter(Boolean);
+    if(new Set(targets).size!==targets.length) return c.json({success:false,error:'同じ移行先が複数行あります。対応表を直してください'},409);
     const now = new Date().toISOString();
     /*
       二重実行はここで止める。status を 'executing' へ進められたのは
@@ -529,7 +528,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
          * 条件付きの付け替えだけを先に行い、2件とも一致したときだけ次へ進む。
          * 新規作成の本人行は付け替えの後に足す（競合時はゴミ行を作らない）。
          */
-        const pairResult = await c.env.DB.prepare(
+        const pairWrite = c.env.DB.prepare(
           `UPDATE friends
               SET user_id = CASE id WHEN ? THEN ? WHEN ? THEN ? END, updated_at = ?
             WHERE id IN (?, ?)
@@ -538,26 +537,8 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
           oldFriend.id, userId, newFriend.id, userId, now,
           oldFriend.id, newFriend.id,
           oldFriend.id, oldFriend.user_id, newFriend.id, newFriend.user_id,
-        ).run();
-        if ((pairResult.meta?.changes ?? 0) !== 2) {
-          /*
-           * R395/R396: 片方だけ動いた場合は、今書いた値のままの行だけを
-           * 確認時の値へ戻す（ペア全体で変更0へ寄せる）。競合側の行は
-           * 今書いた値を持たないので触らない。
-           */
-          await c.env.DB.batch([
-            c.env.DB.prepare(
-              `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`,
-            ).bind(oldFriend.user_id, now, oldFriend.id, userId),
-            c.env.DB.prepare(
-              `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`,
-            ).bind(newFriend.user_id, now, newFriend.id, userId),
-          ]);
-          await compensateCreated();
-          await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
-          continue;
-        }
-        const recordWrites: D1PreparedStatement[] = [];
+        );
+        const recordWrites: D1PreparedStatement[] = [pairWrite];
         if (!oldFriend.user_id && !newFriend.user_id) {
           recordWrites.push(c.env.DB.prepare(`INSERT INTO users
             (id, display_name, primary_display_name, created_by, created_at, updated_at)
@@ -582,7 +563,16 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
           c.env.DB.prepare(`UPDATE users SET revision = revision + 1, updated_at = ? WHERE id = ?`)
             .bind(now, userId),
         );
-        await c.env.DB.batch(recordWrites);
+        try {
+          await c.env.DB.batch(recordWrites);
+        } catch(error) {
+          if(String(error).includes('delivery_consent_identity_conflict')) {
+            await compensateCreated();
+            await failItem(item.id,'本移行前に結び付きが変わりました。確認してからもう一度実行してください');
+            continue;
+          }
+          throw error;
+        }
       }
     } catch (error) {
       /*
@@ -700,7 +690,12 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
     const conflicts: Array<{ itemId: string; oldUid: string; reason: string }> = [];
     const prepared: Prepared[] = [];
     let alreadyRestored = 0;
+    const consentConflicts = new Set(await consentRollbackConflicts(c.env.DB, run.id));
     for (const item of appliedItems) {
+      if (consentConflicts.has(item.id)) {
+        conflicts.push({itemId:item.id,oldUid:item.old_uid,reason:'移行後に配信停止・同意の状態が変更されています'});
+        continue;
+      }
       const before = parseSnapshot(item.before_json);
       const after = parseAfter(item.after_json);
       if (!before || !after?.userId || !item.old_friend_id || !item.new_friend_id) {
@@ -754,7 +749,7 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
        * 変わらなかった行は applied のまま残り、移行後の状態も保たれるので
        * 再試行できる。`IS` 比較で未連携（NULL）の一致も見られる。
        */
-      const restored = await c.env.DB.prepare(
+      const restorePair = c.env.DB.prepare(
         `UPDATE friends
             SET user_id = CASE id WHEN ? THEN ? WHEN ? THEN ? END, updated_at = ?
           WHERE id IN (?, ?)
@@ -763,7 +758,22 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
         item.old_friend_id, before.oldUserId, item.new_friend_id, before.newUserId, now,
         item.old_friend_id, item.new_friend_id,
         item.old_friend_id, afterUserId, item.new_friend_id, afterUserId,
-      ).run();
+      );
+      let restored: D1Result;
+      try {
+        [restored] = await c.env.DB.batch([
+          restorePair,
+          c.env.DB.prepare(`UPDATE uid_migration_items SET result='rolled_back',updated_at=? WHERE id=? AND result='applied'
+            AND (SELECT user_id FROM friends WHERE id=?) IS ? AND (SELECT user_id FROM friends WHERE id=?) IS ?`)
+            .bind(now,item.id,item.old_friend_id,before.oldUserId,item.new_friend_id,before.newUserId),
+        ]);
+      } catch(error) {
+        if(String(error).includes('delivery_consent_conflict')) {
+          lateConflicts.push({itemId:item.id,oldUid:item.old_uid,reason:'切り戻しの直前に配信停止・同意が変更されました'});
+          continue;
+        }
+        throw error;
+      }
       if ((restored.meta?.changes ?? 0) !== 2) {
         /*
          * R396: 片方だけ戻った場合は、今書いた値のままの行だけを移行後の

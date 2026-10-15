@@ -5744,7 +5744,7 @@ export interface UidMigrationItem {
   errorMessage: string | null
 }
 export interface UidMigrationRun {
-  suppressionReconciliation?: { status: 'unavailable'; transferredCount: null; mismatchCount: null; reason: 'delivery_suppression_ledger_missing' }
+  suppressionReconciliation?: { status: 'unavailable'; transferredCount: null; mismatchCount: null; reason: 'delivery_consent_snapshot_missing' } | { status: 'matched' | 'mismatch' | 'rolled_back'; transferredCount: number; mismatchCount: number; reason: null }
   id: string
   fromAccountId: string
   toAccountId: string

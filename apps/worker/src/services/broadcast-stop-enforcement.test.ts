@@ -749,3 +749,15 @@ it('タグ配信は非表示・ブロック中・別店の相手を送らず、�
       .toEqual({ total_count: 1, success_count: 1 });
   } finally { raw.close(); }
 });
+
+describe('友だちの配信停止・同意を送信前に参照',()=>{
+ it('キュー配信は停止した人を送らず、別の人は送り、未送信理由を残す',async()=>{
+  const fixture=createTestD1();seedAccount(fixture.raw);seedFriends(fixture.raw,2);seedSendingSegmentBroadcast(fixture.raw);
+  fixture.raw.exec("INSERT INTO friend_delivery_consents(line_account_id,friend_id,purpose,state,reason,source) VALUES('acc1','f0000','marketing','revoked','停止希望','manual')");
+  const line=makeLineClient();await processQueuedBroadcasts(fixture.db,line.client);
+  const stopped=fixture.raw.prepare("SELECT line_user_id FROM friends WHERE id='f0000'").get() as {line_user_id:string};
+  expect(line.sentUserIds()).not.toContain(stopped.line_user_id);expect(line.sentUserIds()).toHaveLength(1);
+  expect(fixture.raw.prepare("SELECT state,error_code,dispatched_at FROM broadcast_send_claims WHERE friend_id='f0000'").get()).toEqual({state:'failed',error_code:'delivery_consent_suppressed',dispatched_at:null});
+  fixture.raw.close();
+ });
+});

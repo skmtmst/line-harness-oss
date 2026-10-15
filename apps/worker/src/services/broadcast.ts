@@ -1,3 +1,4 @@
+import { recordSuppressedBroadcastRecipients, suppressedFriendIds, hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
 import { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
 import { buildBroadcastAudienceQuery as buildSegmentQuery } from './broadcast-audience-query.js';
 import { buildMessage } from './line-message.js';
@@ -369,6 +370,7 @@ export async function processBroadcastSend(
         'broadcast',
         JSON.stringify(messages),
       );
+      if(await hasSuppressedDeliveryRecipients(db,broadcastAccountId)) throw new Error('DELIVERY_CONSENT_SUPPRESSED: 宛先を絞った配信で送ってください');
       const { requestId } = await lineClient.broadcast(messages, retryKey);
       await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
       if (broadcastAccountId) {
@@ -449,7 +451,9 @@ export async function processBroadcastSend(
             await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) break;
         const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
         const batch = followingFriends.slice(i, i + MULTICAST_BATCH_SIZE);
-        const sendable = batch.filter((f) => !blocked.has(f.id));
+        const suppressed = await suppressedFriendIds(db,batch.map(f=>f.id));
+        await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
+        const sendable = batch.filter((f) => !blocked.has(f.id)&&!suppressed.has(f.id));
         if (sendable.length === 0) continue;
         const sendableIds = sendable.map((f) => f.id);
         const lineUserIds = sendable.map((f) => f.line_user_id);
@@ -1060,6 +1064,7 @@ async function processQueuedBroadcastBatches(
       'queued-broadcast',
       JSON.stringify(messages),
     );
+    if(await hasSuppressedDeliveryRecipients(db,accountId)) throw new Error('DELIVERY_CONSENT_SUPPRESSED: 宛先を絞った配信で送ってください');
     const { requestId } = await lineClient.broadcast(messages, retryKey);
     await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
     await createBroadcastInsight(db, broadcast.id);
@@ -1149,6 +1154,8 @@ async function processQueuedBroadcastBatches(
       return;
     }
     const batch = friends.slice(currentOffset, currentOffset + deliveryBatchSize);
+    const suppressed = await suppressedFriendIds(db,batch.map(f=>f.id));
+    await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
     const batchIndex = Math.floor(currentOffset / deliveryBatchSize);
 
     if (personalized) {
@@ -1156,7 +1163,7 @@ async function processQueuedBroadcastBatches(
         // 台帳が「送達済み」「送達不明」と覚えている相手は飛ばす（#662）。
         // 送達不明を飛ばすのは at-most-once のため——外へ出たかもしれない
         // 相手を送り直すと、相手のトークに2通残って取り消せない。
-        if (blocked.has(friend.id)) {
+        if (blocked.has(friend.id)||suppressed.has(friend.id)) {
           currentOffset++;
           continue;
         }
@@ -1284,7 +1291,7 @@ async function processQueuedBroadcastBatches(
      * 失敗分の再送は先頭から歩き直すので、ここで叩いてしまうと送り終えた
      * 相手へ2通目が出る。
      */
-    const sendable = batch.filter((friend) => !blocked.has(friend.id));
+    const sendable = batch.filter((friend) => !blocked.has(friend.id)&&!suppressed.has(friend.id));
     if (sendable.length === 0) {
       currentOffset += batch.length;
       continue;
