@@ -4122,7 +4122,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         },
       }
     }
-    return { success: true, data: TEMPLATES }
+    // 本物はアカウントの分だけ返し、各行にアカウントを持つ。送れる候補の絞り込み（accountId 一致）で落ちないようにする（f63Jza）。
+    return { success: true, data: TEMPLATES.map((item) => ({ accountId: query.get('account_id') ?? ACCOUNT.id, ...item })) }
   }
   const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
   /* 設計 NCbYn（編集中に競合）：一覧に出ない ID。使われる場所は無く、本文に URL が1つある。 */
