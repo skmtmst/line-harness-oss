@@ -224,7 +224,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
    */
   const toListRef = useRef<() => void>(() => {})
   usePageTitle((stage === 'list' || stage === 'saved') ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : stage === 'detail' ? (detail?.template.name ?? PAGE_TITLES[type]) : pageTitle)
-  usePageCrumbs(stage === 'list' || stage === 'saved'
+  /* 回答フォームの編集は、編集画面が上の帯の題を「回答フォーム」にする（絵 u5MM7・P90Vp0）。一覧の段を重ねると「回答フォーム › 回答フォーム」になるので足さない。 */
+  usePageCrumbs(stage === 'list' || stage === 'saved' || (stage === 'edit' && type === 'form')
     ? [{ label: 'ホーム', href: '/' }]
     : [{ label: PAGE_TITLES[type], href: LIST_HREFS[type], onSelect: () => toListRef.current() }])
 
