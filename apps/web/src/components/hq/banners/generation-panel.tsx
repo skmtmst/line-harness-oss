@@ -562,7 +562,7 @@ function Field({
 /**
  * 出力サイズ。Pencil ★BG-B `xy4EW` の小さい箱（`o2XyUk`/`aCyxg`）。
  *
- * LINE の規格を2列の小さいカードで並べ、選んだカードを淡い緑にする（共通のラジオカード）。
+ * LINE の規格を小さいカードで並べ（V8 は1列＝名前を省略せず大・小が読める。p03ImY・tSgl6）、選んだカードを淡い緑にする（共通のラジオカード）。
  * 390px の脇のパネルに収まる細さにするため `variant="compact"` を使う
  * （2026-10-06 オーナー指示「出力サイズのボタンが大きい。もっとスマートな幅に」）。
  * Instagram・X・OGP などは普段使わないので、最初は畳んで「ほかの用途から選ぶ」の
@@ -596,7 +596,7 @@ function OutputSize({
         <span className="shrink-0 text-caption font-semibold text-ink">出力サイズ</span>
         <span className="min-w-0 text-micro text-ink-faint">LINEの規格から選ぶ</span>
       </div>
-      <SaveErrorField names={["key","preset.key","value"]}><RadioCardGroup legend="出力サイズ" className={v8Layout ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-2 gap-1.5'}>
+      <SaveErrorField names={["key","preset.key","value"]}><RadioCardGroup legend="出力サイズ" className={v8Layout ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-1.5'}>
         {[...line, ...(showOthers ? others : [])].map((preset) => (
           <RadioCard
             key={preset.key}

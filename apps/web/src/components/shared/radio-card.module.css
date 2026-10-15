@@ -365,3 +365,6 @@ html:root .card[data-choice-indicator='check'] > .radio { width: 1px; height: 1p
 html:root .card[data-choice-indicator='check'] .body { padding-right: 0; }
 html:root .card[data-choice-indicator='check'] .title { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
 .check { width: var(--space-16); height: var(--space-16); flex-shrink: 0; color: var(--color-accent-deep); }
+/* バナー生成の出力サイズ（V8・1列）：絵（p03ImY・tSgl6）の小さい箱は上下8・左右12。共通の板の余白16を当てると1枚が高くなり、脇のパネルが画面の下の帯にかぶった。 */
+html:root .card.compact[data-compact-typography='banner'] { padding: var(--space-8) var(--space-12); }
+html:root .card.compact[data-compact-typography='banner'] > .radio { top: var(--space-12); right: var(--space-12); }

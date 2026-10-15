@@ -112,4 +112,8 @@
 .distributionProgress { margin-top: var(--tpl-hb-tool-gap); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); color: var(--color-ink-secondary); }
 .tileImage:focus-visible, .star:focus-visible { outline: var(--tpl-hb-selection-outline); outline-offset: var(--tpl-hb-selection-outset); }
 
-.footer { margin-inline: var(--tpl-hb-footer-margin); }
+.footer { margin-inline: var(--tpl-hb-footer-margin); margin-top: auto; }
+/* 下の帯は白い板の下端（p03ImY・tSgl6）。型の本文の段を縦に伸ばし、帯を中身の直後に浮かせない。 */
+:global(:root) :has(> * > .body) { display: flex; flex-direction: column; }
+:global(:root) :has(> .body) { display: flex; flex: 1 0 auto; flex-direction: column; }
+:global(:root) .body { flex: 1 0 auto; }
