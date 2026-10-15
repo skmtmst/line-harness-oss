@@ -33,8 +33,10 @@ export default function scanYRules() {
   if(!visible(button)||!/(保存|登録|作る|つくって|動かす|変更|公開|発行|有効|追加|やり直す)/.test(button.textContent)||button.getAttribute('aria-busy')==='true')continue;
   if(![...button.classList].some(c=>c.includes('_primary')))continue;
   const icons=[...button.querySelectorAll('svg')].map(e=>({classes:e.getAttribute('class'),canonical:e.hasAttribute('data-sticky-save-icon')}));
-  saves.push({text:button.textContent,icons});
-  if(icons.length!==1||!icons[0].classes?.split(' ').includes('lucide-save'))add('Y4',button,{icons},{iconCountDifference:Math.abs(icons.length-1),wrongIconCount:icons.filter(icon=>!icon.classes?.split(' ').includes('lucide-save')).length});
+  const expected=/保存/.test(button.textContent)&&!/(登録|作る|つくって|動かす|公開|発行|有効|追加|やり直す)/.test(button.textContent)?'lucide-check':'lucide-save';
+  const wrong=icons.filter(icon=>icon.canonical&&!icon.classes?.split(' ').includes(expected));
+  saves.push({text:button.textContent,icons,expected});
+  if(icons.length!==1||wrong.length)add('Y4',button,{icons,expected},{iconCountDifference:Math.abs(icons.length-1),wrongIconCount:wrong.length});
  }
  return {counts:Object.fromEntries(['Y1','Y2','Y3','Y4'].map(k=>[k,findings.filter(f=>f.kind===k).length])),findings,rows,previews,title,breadcrumb,saves};
 }

@@ -3,6 +3,9 @@
 .content { min-width: 0; padding: var(--polish-space-card) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
 .aside { min-width: 0; border-left: 1px solid var(--color-hairline); }
 .launcher { display: none; }
+.sidebarSection { min-width: 0; padding: var(--polish-space-card); border-bottom: 1px solid var(--color-hairline); font-size: var(--text-caption); }
+.sidebarSection h3 { margin-bottom: var(--polish-space-field); font-size: var(--text-label); font-weight: 600; }
+.sidebarSection p + p { margin-top: var(--polish-space-row); }
 @container v8-page (width < 1100px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
   .aside { display: none; }

@@ -546,5 +546,5 @@
 }
 
 /* 絵 T1j2Sw：本文は横いっぱい、画像はその下に左寄せで置く。 */
-.postCompose { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; gap: var(--tpl-rt-half-gap); min-width: 0; }
+.postCompose { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; align-items: start; gap: var(--tpl-rt-half-gap); min-width: 0; }
 .postCompose > :first-child { justify-self: stretch; }

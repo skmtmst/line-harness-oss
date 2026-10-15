@@ -2727,7 +2727,7 @@ export function NewAutomationV8({
           <p className={styles.cardDesc}>上から順に動きます</p>
         </div>
         <ActionList<ActionDraft> value={actions} onChange = {setActions} readOnly ={!canEdit} idOf={row => String(row.key)} addId="v8-add-action" editingId={editingActionKey === null ? null : String(editingActionKey)}
-          titleOf={actionRowDetail} kindOf={row =>actionRowTitle(row.type)} iconOf={row => actionRowIcon(row.type)}
+          titleOf={actionRowDetail} kindOf={row =>actionRowTitle(row.type)} iconOf={row => actionRowIcon(row.type)} quickAddChoiceId="common_action"
           choices={EDITABLE_ACTIONS.map(kind =>{
             const target= kind.value === 'add_tag' ? { items: tags,key : 'tagId', title: 'タグ'}
               : kind.value=== 'start_scenario' ?{ items: scenarios, key: 'scenarioId', title: 'シナリオ' }

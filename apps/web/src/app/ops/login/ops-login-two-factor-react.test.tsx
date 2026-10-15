@@ -11,9 +11,11 @@ vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: 'musubo' }) }))
 let host: HTMLDivElement
 let root: Root
 let requestBody: Record<string, unknown> | null
+let needsSetup: boolean
 
 beforeEach(() => {
   requestBody = null
+  needsSetup = true
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   window.history.replaceState(null, '', '/ops/login')
   window.sessionStorage.clear()
@@ -21,7 +23,7 @@ beforeEach(() => {
     if (init?.body) requestBody = JSON.parse(String(init.body)) as Record<string, unknown>
     return new Response(JSON.stringify({
       success: true,
-      data: { twoFactor: false, twoFactorSetup: true, challengeToken: 'ops-setup-token' },
+      data: { twoFactor: !needsSetup, twoFactorSetup: needsSetup, challengeToken: 'ops-setup-token' },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }))
   host = document.createElement('div')
@@ -51,7 +53,11 @@ describe('運営ログインの二段階認証', () => {
     )
   })
 
-  it('運営用途をWorkerへ渡し、未設定ならnext=opsを保って初回設定へ進む', async () => {
+  it.each([
+    { setup: true, path: '/login/two-factor/setup' },
+    { setup: false, path: '/login/two-factor' },
+  ])('運営用途とパスワード認証方法を保って $path へ進む', async ({ setup, path }) => {
+    needsSetup = setup
     await act(async () => { root.render(<OpsLoginPage />) })
     const email = host.querySelector('#ops-login-email') as HTMLInputElement
     const password = host.querySelector('#ops-login-password') as HTMLInputElement
@@ -66,8 +72,9 @@ describe('運営ログインの二段階認証', () => {
     })
 
     expect(requestBody).toMatchObject({ email: 'ops@example.com', password: 'Abcdefg1', next: 'ops' })
-    expect(window.location.pathname).toBe('/login/two-factor/setup')
+    expect(window.location.pathname).toBe(path)
     expect(window.location.search).toBe('?next=ops')
     expect(new URLSearchParams(window.location.hash.slice(1)).get('lh_2fa')).toBe('ops-setup-token')
+    expect(new URLSearchParams(window.location.hash.slice(1)).get('lh_method')).toBe('password')
   })
 })

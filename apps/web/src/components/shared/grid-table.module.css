@@ -78,3 +78,10 @@ html:root :global([data-page-template='settings']) .table[data-framed] {
   outline-offset: -1px;
   box-shadow: var(--card-shadow);
 }
+
+/* 時刻×担当の表もカレンダー型の枠を部品が持つ。通常の一覧は変えない。 */
+html:root .table[data-table-presentation='calendar'] {
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}

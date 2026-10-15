@@ -68,7 +68,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
   return (
     <BannerDialogFrame
       open={open}
-      kind="create"
+      kind="create" contentLayout="form"
       title={project ? '名前と説明を変える' : 'プロジェクトを作る'}
       description={project ? undefined : '案件やキャンペーンごとに作ります。画像はプロジェクトの中で生成・取り込みします。'}
       busy={busy}

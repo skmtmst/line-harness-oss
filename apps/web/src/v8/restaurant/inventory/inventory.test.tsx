@@ -103,6 +103,13 @@ describe('Y8SjT2 予約枠・在庫', () => {
     const dialog = document.querySelector('[data-design-node="Yyw6i"]') as HTMLElement
     expect(dialog.textContent).toContain('19:00 が残り 2 席になりました')
     expect(within(dialog).getAllByRole('checkbox')).toHaveLength(1)
+    const record = within(dialog).getByRole('button', { name: '閉じたものを記録する' }) as HTMLButtonElement
+    expect(record.disabled).toBe(true)
+    expect(record.title).toContain('チェック')
+    fireEvent.click(within(dialog).getByRole('checkbox'))
+    expect(record.disabled).toBe(false)
+    fireEvent.click(record)
+    expect(document.querySelector('[data-design-node="Yyw6i"]')).toBeNull()
   })
 
   it('予約経路の連携（hQQlt）は媒体ごとの受け取りと読めなかったものを出す', async () => {

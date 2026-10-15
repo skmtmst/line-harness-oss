@@ -113,8 +113,11 @@ export function CardHeader({
   actionTone = 'accent',
   headingLevel = 2,
   titleId,
+  help,
 }: {
   title: ReactNode
+  /** 題の右の「？」（HelpTip）。題とは間 6 で、題の行の高さの真ん中にそろえる。 */
+  help?: ReactNode
   optional?: boolean
   meta?: ReactNode
   action?: ReactNode
@@ -130,7 +133,12 @@ export function CardHeader({
       data-design-node="t0jk8p"
     >
       <div className={styles.titleGroup}>
-        <Heading id={titleId} className={styles.title}>{title}{optional ? <OptionalBadge /> : null}</Heading>
+        {help ? (
+          <span className={styles.titleRow}>
+            <Heading id={titleId} className={styles.title}>{title}{optional ? <OptionalBadge /> : null}</Heading>
+            {help}
+          </span>
+        ) : <Heading id={titleId} className={styles.title}>{title}{optional ? <OptionalBadge /> : null}</Heading>}
         {meta ? <span className={styles.meta}>{meta}</span> : null}
       </div>
       {action ? (

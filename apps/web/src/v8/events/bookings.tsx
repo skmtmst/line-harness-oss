@@ -711,7 +711,7 @@ function Bookings({ eventId }: { eventId: string }) {
                 placeholder="当日は動きやすい服装でお越しください"
               /></SaveErrorField>
               <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} title={broadcastMessage.trim() === '' ? 'メッセージを入力してください' : undefined} busy={broadcastBusy} busyLabel="確認中…">
-                送る
+                <Send size={15} aria-hidden="true" />送る
               </Button>
             </div></Field></div>
           {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}
