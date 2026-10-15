@@ -562,13 +562,25 @@ function Field({
 /**
  * 出力サイズ。Pencil ★BG-B `xy4EW` の小さい箱（`o2XyUk`/`aCyxg`）。
  *
- * LINE の規格を小さいカードで並べ（V8 は1列＝名前を省略せず大・小が読める。p03ImY・tSgl6）、選んだカードを淡い緑にする（共通のラジオカード）。
+ * LINE の規格を2列の小さいカードで並べ（V8 は箱に入る短い名前にして「…」で切らない。大・小が読める。p03ImY・tSgl6）、選んだカードを淡い緑にする（共通のラジオカード）。
  * 390px の脇のパネルに収まる細さにするため `variant="compact"` を使う
  * （2026-10-06 オーナー指示「出力サイズのボタンが大きい。もっとスマートな幅に」）。
  * Instagram・X・OGP などは普段使わないので、最初は畳んで「ほかの用途から選ぶ」の
  * 1行だけ置く。畳んだ中に選択中の規格が入っている場合（「同じ設定でもう一度」など）は
  * 開いた状態で出す。選べない選択肢は描かない（`docs/v8-design-rules.md` §5）。
  */
+/** 2列の小さい箱に入る短い名前（オーナー 2026-10-06「出力サイズのボタンを小さく」）。読み上げは元の名前のまま。 */
+const PRESET_SHORT_LABELS: Record<string, string> = {
+  '画像メッセージ・クーポン': '画像・クーポン',
+  'カードタイプ・カルーセル': 'カルーセル',
+  'リッチメニュー（大）': 'リッチメニュー大',
+  'リッチメニュー（小）': 'リッチメニュー小',
+}
+function presetShortLabel(preset: BannerPreset): string {
+  const label = presetCardLabel(preset)
+  return PRESET_SHORT_LABELS[label] ?? label
+}
+
 function OutputSize({
   name,
   presets,
@@ -596,7 +608,7 @@ function OutputSize({
         <span className="shrink-0 text-caption font-semibold text-ink">出力サイズ</span>
         <span className="min-w-0 text-micro text-ink-faint">LINEの規格から選ぶ</span>
       </div>
-      <SaveErrorField names={["key","preset.key","value"]}><RadioCardGroup legend="出力サイズ" className={v8Layout ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-1.5'}>
+      <SaveErrorField names={["key","preset.key","value"]}><RadioCardGroup legend="出力サイズ" className={v8Layout ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-2 gap-1.5'}>
         {[...line, ...(showOthers ? others : [])].map((preset) => (
           <RadioCard
             key={preset.key}
@@ -607,7 +619,8 @@ function OutputSize({
             onChange={onSelect}
             variant="compact"
             compactTypography={v8Layout ? 'banner' : 'default'}
-            title={presetCardLabel(preset)}
+            title={v8Layout ? presetShortLabel(preset) : presetCardLabel(preset)}
+            ariaLabel={v8Layout ? presetCardLabel(preset) : undefined}
             note={presetSizeLabel(preset)}
           />
         ))}
