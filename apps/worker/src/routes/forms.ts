@@ -17,6 +17,7 @@ import {
   getFormsWithStats,
   FORM_SUBMIT_CLAIM_STALE_MS,
   getFormById,
+  getFormLatestEdit,
   type FormSubmitClaim,
   type FormSubmitClaimScope,
   getFormAccountIds,
@@ -977,7 +978,7 @@ forms.get('/api/forms/:id', async (c) => {
       layout = {...layout, options: {...layout.options, theme: resolveCustomerFormTheme(layout.options, look)}};
     }
     const data = adminView
-      ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
+      ? {...serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' }),latestEdit:await getFormLatestEdit(c.env.DB,id,form.content_revision)}
       : { ...serializePublicForm(form, layout), availability: await formAvailability({
         db: c.env.DB, formId: id, layout, active: !!form.is_active,
         submitCount: form.submit_count ?? 0, friendId,
@@ -1393,7 +1394,7 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
     if (body.ogDescription !== undefined) updates.ogDescription = body.ogDescription;
     if (body.ogImageUrl !== undefined) updates.ogImageUrl = body.ogImageUrl;
 
-    const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision);
+    const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision,c.get('staff')?.id);
 
     if (updated.kind === 'not_found') {
       return c.json({ success: false, error: 'Form not found' }, 404);
@@ -1408,11 +1409,12 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
         data: {
           contentRevision: updated.form.content_revision,
           updatedAt: updated.form.updated_at,
+          latestEdit:await getFormLatestEdit(c.env.DB,id,updated.form.content_revision),
         },
       }, 409);
     }
 
-    return c.json({ success: true, data: serializeForm(updated.form) });
+    return c.json({ success: true, data: {...serializeForm(updated.form),latestEdit:await getFormLatestEdit(c.env.DB,id,updated.form.content_revision)} });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_forms_failed","route":"PUT /api/forms/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);

@@ -7595,6 +7595,7 @@ export const api = {
            * されていた。型に無いものは、来ていないことに誰も気づけない。
            */
           contentRevision: number
+          latestEdit?: {staffId:string;staffName:string;savedAt:string}|null
           /** お客さまに出している不変版。null は未公開。 */
           publishedVersionId: string | null
           /** 現在公開版の元になった編集版。 */
