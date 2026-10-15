@@ -1,5 +1,5 @@
 import { ImageIcon } from 'lucide-react'
-import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewCarousel, LinePreviewMessage } from '@/components/shared/line-preview'
 import BroadcastMessagePreview from '@/components/broadcasts/broadcast-message-preview'
 import type { BroadcastBubble, BroadcastMessageButton } from '@/lib/api'
 import styles from './phone.module.css'
@@ -35,6 +35,15 @@ export default function BroadcastPhone({
   const plainText = broadcast.messageType === 'text' && single && !broadcast.messageOptions?.buttons?.length
   /* 写真1枚は絵の「画像」（200×200・角丸16）。URL が読めないときは枠と「写真」だけ。 */
   const photo = broadcast.messageType === 'image' && single ? { url: imageUrlOf(broadcast.messageContent) } : null
+  /* カルーセル1通は吹き出しに入れず、カードを横に並べる（絵 F3X1Mo）。読めない中身は今までどおり種別名。 */
+  const carousel = broadcast.messageType === 'carousel' && single ? carouselColumnsOf(broadcast.messageContent) : null
+  if (carousel) {
+    return (
+      <LinePreview title={null} accountName={accountName} caption={chip}>
+        <LinePreviewCarousel columns={carousel} />
+      </LinePreview>
+    )
+  }
   return (
     <LinePreview title={null} accountName={accountName} caption={chip}>
       <LinePreviewMessage accountName={accountName} avatar={initial} time={time}>
@@ -71,6 +80,26 @@ function imageUrlOf(content: string): string | null {
     const parsed = JSON.parse(content) as { previewImageUrl?: unknown; originalContentUrl?: unknown }
     const url = typeof parsed.previewImageUrl === 'string' ? parsed.previewImageUrl : parsed.originalContentUrl
     return typeof url === 'string' && /^https?:\/\//.test(url) ? url : null
+  } catch {
+    return null
+  }
+}
+
+/** カルーセルの中身（columns の配列）から見本のカードを読む。読めなければ null。 */
+function carouselColumnsOf(content: string): Array<{ title: string; text: string; imageUrl: string | null; actions: string[] }> | null {
+  try {
+    const parsed: unknown = JSON.parse(content)
+    if (!Array.isArray(parsed) || parsed.length === 0) return null
+    return parsed.map((raw) => {
+      const column = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+      const actions = Array.isArray(column.actions) ? column.actions.map((action) => (action && typeof action === 'object' ? String((action as Record<string, unknown>).label ?? '') : '')).filter(Boolean) : []
+      return {
+        title: typeof column.title === 'string' ? column.title : '',
+        text: typeof column.text === 'string' ? column.text : '',
+        imageUrl: typeof column.thumbnailImageUrl === 'string' ? column.thumbnailImageUrl : null,
+        actions,
+      }
+    })
   } catch {
     return null
   }
