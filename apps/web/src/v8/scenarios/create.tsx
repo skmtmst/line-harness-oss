@@ -19,7 +19,6 @@ import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';
 import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
-import HelpTip from '@/components/shared/help-tip'
 import { TextField } from '@/components/shared/text-field';
 import { Field } from '@/components/shared/form-controls';
 import { SettingsFormRow } from '@/components/shared/settings-form-card';
@@ -30,7 +29,7 @@ import { useAccount } from '@/contexts/account-context';
 import { useStaffRole } from '@/lib/staff-role';
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
 import styles from './create.module.css'
-import DeliveryModeDiagram from './delivery-mode-diagram'
+import DeliveryModeExample from './delivery-mode-example'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
@@ -494,7 +493,7 @@ export default function ScenarioCreateV8() {
       </Card>
 
       <Card variant="form" gap="normal" aria-label="配信方式">
-        <CardHeader title={<>配信方式 <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip></>} />
+        <CardHeader title="配信方式" meta="作ったあとは変えられません" size="stacked" />
         <SaveErrorField names={["delivery-mode","selectedMode"]}><RadioCardGroup legend="配信方式" className={styles.modeRow}>
           <RadioCard
             name="delivery-mode"
@@ -504,10 +503,8 @@ export default function ScenarioCreateV8() {
             disabled={fieldsDisabled}
             icon={<CalendarClock size={16} aria-hidden="true" />}
             title="時刻で指定"
-            note="購読開始から〇日後の〇時に届きます。決まった時刻の定期配信（メルマガ・朝の配信）に"
-          >
-            <DeliveryModeDiagram mode="absolute_time" selected={selectedMode === 'absolute_time'} />
-          </RadioCard>
+            note="購読開始から〇日後の〇時。メルマガ・朝夜の定期配信に"
+          />
           <RadioCard
             name="delivery-mode"
             value="elapsed"
@@ -516,11 +513,10 @@ export default function ScenarioCreateV8() {
             disabled={fieldsDisabled}
             icon={<Timer size={16} aria-hidden="true" />}
             title="経過時間で指定"
-            note="購読開始から〇日と〇時間後に届きます。買った直後・予約直後のフォローに"
-          >
-            <DeliveryModeDiagram mode="elapsed" selected={selectedMode === 'elapsed'} />
-          </RadioCard>
+            note="購読開始から〇時間〇分後。買った直後・予約直後のフォローに"
+          />
         </RadioCardGroup></SaveErrorField>
+        <DeliveryModeExample mode={selectedMode} />
       </Card>
     </CreatePage></SaveErrorScope>
   )
