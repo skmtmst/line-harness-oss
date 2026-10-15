@@ -2185,7 +2185,13 @@ const spec = {
       get: {
         tags: ['HQ Templates'],
         summary: '統括ひな形一覧を取得',
-        parameters: [{name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag']},description:'メッセージの6種類またはtagで絞る。type=templateと併用可能。応答のkind_countsは絞り込み前の件数。'},{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] } }],
+        description: '各メッセージ行に message_count（保存版のLINE通数、カルーセルは1通）と has_interpolations（差し込みの有無）を返す。未取得はnull。type=mark/kind=support_markではstats.supportStatusに受信箱の状態別人数、stats.markChangesに現在の有効店の可視友だちについて記録された直近168時間の変更件数を返す。自由なマークの名前で対応状況を推測しない。変更履歴はrecorded_events_onlyで完全性を保証しない。',
+        parameters: [
+          {name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag','friend_field','support_mark']},description:'メッセージの種類または友だち属性で絞る。kind_countsは絞り込み前の件数。'},
+          {name:'type',in:'query',schema:{type:'string',enum:['tag','rich_menu','template','form','scenario','friend_field','mark','auto_reply','friend_add_rule','reminder']}},
+          {name:'message_count',in:'query',schema:{type:'string',enum:['single','multiple']},description:'1通・複数通で絞る。未取得の版はどちらにも含めない。複数通の作成機能とは別。'},
+          {name:'has_interpolations',in:'query',schema:{type:'boolean'},description:'本文・カード・質問・素材の差し込みの有無。名前・ファイル名は含めない。未取得をfalseにしない。'},
+        ],
         responses: { '200': { description: 'Tenant-scoped template list' }, '400': { description: 'Invalid template type' }, '403': { description: 'Owner or admin role required' } },
       },
       post: {
@@ -6322,7 +6328,7 @@ const spec = {
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],
         responses: {
-          '200': { description: '版の一覧 { versionNumber・status・messageType・messageContent・effectiveFrom・createdAt }' },
+          '200': { description: '版の一覧 { versionNumber・status・messageType・messageContent・effectiveFrom・createdAt・createdByStaffId・creatorName・creatorNameSource }。creatorNameは同じ組織の現在の名簿名（source=current_staff_profile）。旧版・不明・別組織はnull。公開時の名前の写しではない。' },
           '404': { description: 'Not found in account scope' },
         },
       },

@@ -3,6 +3,7 @@ import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attrib
 import { templateKind } from '@line-crm/shared';
 import { parseTextOverrides } from './text-overrides.js';
 import type { HqTemplateListDisplay } from '@line-crm/shared';
+import { messageListFacts } from './message-list-facts.js';
 import { templateContentSummary } from './list-display.js';
 import { captureDistributionName, targetDistributionVersion } from './distribution-display.js';
 import { parseScenarioDefinition, scenarioSnapshot, inspectScenario, planScenario } from './scenario.js';
@@ -145,6 +146,7 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
     return {
       ...template,
       message_type: null,
+      ...(template.template_type === 'template' ? messageListFacts(definition_json) : {}),
       ...(() => {
         try {
           if(template.template_type==='template'&&definition_json) {
