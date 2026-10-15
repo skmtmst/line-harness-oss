@@ -18,7 +18,7 @@ import styles from './search-console.module.css'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import TruncatedText from '@/components/shared/truncated-text'
-import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
+import { DataTable, TableHeadRow, Tr, Th, Td } from '@/components/shared/table'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -44,25 +44,25 @@ function pagePath(key: string) {
 function Ranking({ title, rows, kind }: { title: string; rows: SearchConsoleMetricRow[]; kind: 'query' | 'page' }) {
   return <Card variant="form" aria-label={title}>
     <CardHeader size="stacked" title={title} />
-    {rows.length === 0 ? <p>データがありません</p> : <GridTable label={title} framed={false} design={{
-      columns: 'minmax(0, 1fr) var(--tpl-an-col-60) var(--tpl-an-col-70) var(--tpl-an-col-58)',
-      gap: 'var(--polish-space-row)', rowPadding: '0', headPadding: '0',
-      rowHeight: 'var(--tpl-list-row-h)', headHeight: 'var(--tpl-thead-h)',
-      fontSize: 'var(--text-caption)', headFontSize: 'var(--text-micro)',
+    {rows.length === 0 ? <p>データがありません</p> : <DataTable label={title} grid={{
+      columns: 'minmax(0, 1fr) var(--tpl-an-col-60) var(--tpl-an-col-70) var(--tpl-an-sc-col-64)',
+      gap: 'var(--polish-space-row)', padding: '0 var(--polish-space-field)', headPadding: '0 var(--polish-space-field)',
+      rowHeight: 'var(--tpl-list-row-h)',
+      bodyTextSize: 'var(--text-caption)', headTextSize: 'var(--text-micro)',
     }}>
-      <GridHeadRow>
-        <GridCell role="columnheader">{kind === 'query' ? 'キーワード' : 'ページ'}</GridCell>
-        <GridCell role="columnheader" align="right">クリック</GridCell>
-        <GridCell role="columnheader" align="right">表示回数</GridCell>
-        <GridCell role="columnheader" align="right">掲載順位</GridCell>
-      </GridHeadRow>
-      {rows.map(row => <GridRow key={row.key}>
-        <GridCell><TruncatedText value={kind === 'query' ? (row.key || '（検索語句なし）') : pagePath(row.key)} /></GridCell>
-        <GridCell align="right" title={`CTR ${formatNumber(row.ctr * 100, { digits: 1 })}%`}>{formatNumber(row.clicks)}</GridCell>
-        <GridCell align="right">{formatNumber(row.impressions)}</GridCell>
-        <GridCell align="right">{formatNumber(row.position, { digits: 1 })}</GridCell>
-      </GridRow>)}
-    </GridTable>}
+      <thead><TableHeadRow>
+        <Th>{kind === 'query' ? 'キーワード' : 'ページ'}</Th>
+        <Th align="right">クリック</Th>
+        <Th align="right">表示回数</Th>
+        <Th align="right">掲載順位</Th>
+      </TableHeadRow></thead>
+      <tbody>{rows.map(row => <Tr key={row.key}>
+        <Td><TruncatedText value={kind === 'query' ? (row.key || '（検索語句なし）') : pagePath(row.key)} /></Td>
+        <Td align="right" title={`CTR ${formatNumber(row.ctr * 100, { digits: 1 })}%`}>{formatNumber(row.clicks)}</Td>
+        <Td align="right">{formatNumber(row.impressions)}</Td>
+        <Td align="right">{formatNumber(row.position, { digits: 1 })}</Td>
+      </Tr>)}</tbody>
+    </DataTable>}
   </Card>
 }
 
@@ -169,18 +169,18 @@ export default function SearchConsoleV8() {
               <ValueBarChart label="日別クリック数の推移" unit="クリック" presentation="summary" items={data.daily.map((row, index) => ({ key: row.key, label: index === data.daily.length - 1 ? `${shortDay(row.key)}（反映待ち）` : shortDay(row.key), value: row.clicks }))} />
             </>}
           </Card>
-          <DashboardColumns layout="cards">{[
-            <Ranking key="queries" title="検索キーワード 上位10件" rows={data.queries} kind="query" />,
-            <Ranking key="pages" title="検索流入ページ 上位10件" rows={data.pages} kind="page" />,
-            <Card key="devices" variant="form" aria-labelledby="sc-devices-title">
+          <div className={styles.rankings}>
+            <Ranking title="検索キーワード 上位10件" rows={data.queries} kind="query" />
+            <Ranking title="検索流入ページ 上位10件" rows={data.pages} kind="page" />
+            <Card variant="form" aria-labelledby="sc-devices-title">
               <CardHeader size="stacked" titleId="sc-devices-title" title="デバイス別" />
-              {data.devices.map((device) => {
+              <DataTable label="デバイス別のクリック数" grid={{ columns: 'minmax(0, 1fr) max-content', padding: '0 var(--polish-space-field)', headPadding: '0 var(--polish-space-field)', gap: 'var(--polish-space-row)', rowHeight: 'var(--tpl-list-row-h)', bodyTextSize: 'var(--text-caption)' }}><tbody>{data.devices.map((device) => {
                 const ratio = data.summary.clicks ? device.clicks / data.summary.clicks * 100 : 0
                 const label = DEVICE_LABELS[device.key] ?? device.key
-                return <div key={device.key} className={styles.compareRow} title={`${label}：${ratio.toFixed(1)}%`}><span >{label}</span><span className={styles.spacer} /><strong data-weight="bold">{formatNumber(device.clicks)}</strong></div>
-              })}
-            </Card>,
-          ]}</DashboardColumns>
+                return <Tr key={device.key} title={`${label}：${ratio.toFixed(1)}%`}><Td><TruncatedText value={label} /></Td><Td align="right">{formatNumber(device.clicks)}</Td></Tr>
+              })}</tbody></DataTable>
+            </Card>
+          </div>
           <Notice tone="info" title={`集計期間 ${data.startDate}〜${data.endDate} ／ 読み取り専用で取得・最終更新 ${formatDateTime(data.fetchedAt)}`}>見かたの注意：Search Console のデータは反映まで2〜3日かかります。直近の数字は出ません。掲載順位は平均値です。「検索から友だち追加」はサイトスクリプトで結びついた分だけを数えるものですが、その突き合わせはまだありません。</Notice>
         </div>
       </>}
