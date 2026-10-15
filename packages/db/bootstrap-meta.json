@@ -582,7 +582,10 @@
     "641_booking_assignment_settings.sql",
     "642_booking_entitlements.sql",
     "643_booking_entitlement_uses.sql",
-    "644_booking_customer_payment_choice.sql"
+    "644_booking_customer_payment_choice.sql",
+    "663_booking_payment_connections.sql",
+    "664_booking_payment_events.sql",
+    "665_booking_course_event_payment_settings.sql"
   ],
-  "migrationCount": 583
+  "migrationCount": 586
 }

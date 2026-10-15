@@ -27,6 +27,7 @@ import {
   type PaymentProvider,
 } from '../services/payment-providers.js';
 import { reconcileExpiredBookingPayment, reconcilePaidBookingPayment } from '../services/booking-payment-recovery.js';
+import { receivePaymentEvent } from '../services/booking-payment-events.js';
 
 /**
  * 予約の支払い（決済サービスを差し替えられる作り）。
@@ -397,32 +398,20 @@ bookingPayments.post(
     if (!provider) return c.json({ success: false, error: 'unknown provider' }, 404);
     const outcome = await provider.verifyWebhook(rawBody, signature);
     if (!outcome) return c.json({ success: false, error: 'Invalid signature' }, 401);
-    if (outcome.status !== 'paid') {
-      await markUnpaidBookingPaymentByProviderId(c.env.DB, outcome.providerPaymentId, 'failed');
-      return c.json({ success: true, status: 'failed' });
+    const result = await receivePaymentEvent(c.env.DB, providerName, outcome, rawBody);
+    if (['event_conflict','busy_or_missing'].includes(result.status) || result.result==='failed') {
+      return c.json({success:false,error:'payment_event_unavailable',code:'payment_event_unavailable'},503);
     }
-    const applied = await applyPaidBookingPayment(c.env.DB, outcome.providerPaymentId, {
-      email: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-    });
-    if (!applied) return c.json({ success: true, status: 'unknown_payment' });
-    return c.json({ success: true, status: applied.duplicate ? 'duplicate' : 'paid' });
+    if (outcome.status==='paid' && ['paid','duplicate'].includes(result.status)) {
+      const payment=await c.env.DB.prepare('SELECT id FROM booking_payments WHERE provider=? AND provider_payment_id=?')
+        .bind(providerName,outcome.providerPaymentId).first<{id:string}>();
+      if (payment) await reconcilePaidBookingPayment(c.env.DB,payment.id,new Date(),false,{
+        email:c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+      });
+    }
+    return c.json({ success: true, status: result.status });
   },
 );
-
-async function markUnpaidBookingPaymentByProviderId(
-  db: D1Database,
-  providerPaymentId: string,
-  status: 'failed',
-): Promise<void> {
-  const row = await db.prepare(
-    `SELECT id, line_account_id FROM booking_payments
-      WHERE provider_payment_id = ? AND status IN ('unpaid', 'pending')`,
-  ).bind(providerPaymentId).first<{ id: string; line_account_id: string }>();
-  if (!row) return;
-  await db.prepare(`UPDATE booking_payments SET status = ?, updated_at = ?
-    WHERE id = ? AND line_account_id = ? AND status IN ('unpaid', 'pending')`)
-    .bind(status, new Date().toISOString(), row.id, row.line_account_id).run();
-}
 
 /**
  * 支払い済みを予約へ反映する。二重の知らせは2回目を受け付け済みで返す。

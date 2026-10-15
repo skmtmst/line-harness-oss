@@ -28,7 +28,7 @@ const recordsCte = `WITH records AS (
  SELECT p.id,p.booking_id AS bookingId,b.friend_id AS friendId,f.display_name AS friendName,
  b.starts_at AS bookingStartsAt,m.name AS bookingLabel,b.internal_note AS bookingNote,p.amount,
  CASE WHEN p.status IN ('unpaid','pending') THEN 'pending' ELSE p.status END AS status,
- 'online' AS method,p.created_at AS createdAt,NULL AS receiptUrl
+ 'online' AS method,p.created_at AS createdAt,p.receipt_url AS receiptUrl
  FROM booking_payments p LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
  LEFT JOIN friends f ON f.id=b.friend_id AND f.line_account_id=p.line_account_id
  LEFT JOIN menus m ON m.id=b.menu_id AND m.line_account_id=p.line_account_id
@@ -64,22 +64,22 @@ export async function paymentRecords(db: D1Database, account: string, filter: Pa
 /** 集計は検索・ページ・一覧の期間と独立した店の今月。入金総額と返金額は別々に数える。 */
 export async function paymentSummary(db: D1Database, account: string, now = new Date()) {
   const { from, to } = await paymentPeriod(db, account, 'month', now);
-  const rows = await db.prepare(`SELECT p.amount,p.status,p.paid_at,p.updated_at,p.created_at,b.status AS booking_status
+  const rows = await db.prepare(`SELECT p.amount,p.status,p.paid_at,p.updated_at,COALESCE(p.refunded_at,p.updated_at) AS refunded_at,p.created_at,b.status AS booking_status
     FROM booking_payments p LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
     WHERE p.line_account_id=? AND (
       (julianday(p.paid_at)>=julianday(?) AND julianday(p.paid_at)<julianday(?)) OR
-      (julianday(p.updated_at)>=julianday(?) AND julianday(p.updated_at)<julianday(?)) OR
+      (julianday(COALESCE(p.refunded_at,p.updated_at))>=julianday(?) AND julianday(COALESCE(p.refunded_at,p.updated_at))<julianday(?)) OR
       (julianday(p.created_at)>=julianday(?) AND julianday(p.created_at)<julianday(?)))`)
     .bind(account, from, to, from, to, from, to).all<{
-      amount:number; status:string; paid_at:string|null; updated_at:string; created_at:string; booking_status:string|null;
+      amount:number; status:string; paid_at:string|null; updated_at:string; refunded_at:string; created_at:string; booking_status:string|null;
     }>();
   const inMonth = (at: string | null) => at !== null && Date.parse(at) >= Date.parse(from) && Date.parse(at) < Date.parse(to);
   const summary = { paidAmount:0, paidCount:0, refundedAmount:0, refundedCount:0, expiredCount:0, pendingCount:0,
     holdMinutes:(await getBookingPaymentConfig(db, account)).holdMinutes };
   for (const row of rows.results) {
     if (['paid','refunded'].includes(row.status) && inMonth(row.paid_at)) { summary.paidAmount += row.amount; summary.paidCount++; }
-    // 既存の返金処理が更新した時刻。正確な返金履歴の保存は追加migrationの承認待ち。
-    if (row.status==='refunded' && inMonth(row.updated_at)) { summary.refundedAmount+=row.amount; summary.refundedCount++; }
+    // 移行前の返金は元のupdated_atを使う。新規返金は固定した返金日時を使う。
+    if (row.status==='refunded' && inMonth(row.refunded_at)) { summary.refundedAmount+=row.amount; summary.refundedCount++; }
     if (row.status==='expired' && row.booking_status==='expired' && inMonth(row.updated_at)) summary.expiredCount++;
     if (['unpaid','pending'].includes(row.status) && inMonth(row.created_at)) summary.pendingCount++;
   }

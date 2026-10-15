@@ -120,6 +120,8 @@ export interface BookingPaymentRecord {
   idempotency_key: string;
   hold_until: string | null;
   paid_at: string | null;
+  refunded_at?: string | null;
+  receipt_url?: string | null;
 }
 
 /** 予約保存のbatch用。枠の競合で予約が作られなければ支払い行も作らない。 */
@@ -193,10 +195,11 @@ export async function markBookingPayment(
     `UPDATE booking_payments
         SET status = ?, provider_payment_id = COALESCE(?, provider_payment_id),
             paid_at = CASE WHEN ? = 'paid' THEN COALESCE(paid_at, ?) ELSE paid_at END,
+            refunded_at = CASE WHEN ? = 'refunded' THEN COALESCE(refunded_at, ?) ELSE refunded_at END,
             updated_at = ?
       WHERE id = ? AND line_account_id = ?`,
   ).bind(
-    input.status, input.providerPaymentId ?? null, input.status, now, now,
+    input.status, input.providerPaymentId ?? null, input.status, now, input.status, now, now,
     input.paymentId, input.lineAccountId,
   ).run();
   return await db.prepare(

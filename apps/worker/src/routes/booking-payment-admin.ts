@@ -4,11 +4,14 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { paymentCsv, paymentRecordFilter, paymentRecords, paymentSummary, staffTodayCounts } from '../services/booking-payment-admin.js';
 import { startBookingPayment } from './booking-payments.js';
+import { paymentSettingResponse } from './booking-payment-settings.js';
+import { paymentEvent, paymentEventFilter, paymentEventList, processPaymentEvent } from '../services/booking-payment-events.js';
 
 export const bookingPaymentAdmin = new Hono<Env>();
 bookingPaymentAdmin.onError((error,c)=>{
-  const notReady=/no such table: (?:booking_payment_choices|booking_payments|booking_payment_configs|booking_payment_menu_settings)\b/.test(String(error));
-  const code=notReady?'payment_storage_not_ready':'payment_admin_unavailable';
+  const missing=/no such table: (booking_payment_choices|booking_payments|booking_payment_configs|booking_payment_menu_settings|booking_payment_connections|booking_payment_events|booking_payment_event_replays|restaurant_course_payment_settings|event_payment_settings)\b/.exec(String(error))?.[1];
+  const code=!missing?'payment_admin_unavailable':missing==='booking_payment_connections'?'payment_connection_storage_not_ready'
+    :['booking_payment_events','booking_payment_event_replays'].includes(missing)?'payment_events_storage_not_ready':'payment_storage_not_ready';
   console.error(JSON.stringify({code}));
   return c.json({success:false,error:code,code},503);
 });
@@ -29,15 +32,27 @@ const guard = (write = false): MiddlewareHandler<Env> => async (c, next) => {
 };
 
 bookingPaymentAdmin.get('/api/booking/admin/payment-connection',guard(),async c => {
-  // この予約決済は外へ通信しない模擬プロバイダ。Webhook鍵だけで「接続済み」と表示しない。
-  return c.json({success:true,data:{connected:false,testMode:true,accountIdTail:null,connectedAt:null,dashboardUrl:null}});
+  const row=await c.env.DB.prepare(`SELECT provider_account_id,test_mode,connected_at,disconnected_at
+    FROM booking_payment_connections WHERE line_account_id=? AND provider='stripe'`)
+    .bind(c.req.query('account_id')!.trim()).first<{provider_account_id:string;test_mode:number;connected_at:string;disconnected_at:string|null}>();
+  const connected=Boolean(row && !row.disconnected_at);
+  return c.json({success:true,data:{connected,testMode:row?Boolean(row.test_mode):true,
+    accountIdTail:connected?row!.provider_account_id.slice(-4):null,connectedAt:connected?row!.connected_at:null,dashboardUrl:null}});
 });
 bookingPaymentAdmin.get('/api/booking/admin/menu-payments',guard(),async c => {
   const rows=await c.env.DB.prepare(`SELECT s.menu_id AS menuId,s.mode FROM booking_payment_menu_settings s
     JOIN menus m ON m.id=s.menu_id AND m.line_account_id=s.line_account_id
     WHERE s.line_account_id=? AND m.deleted_at IS NULL ORDER BY m.sort_order,m.id`)
     .bind(c.req.query('account_id')!.trim()).all<{menuId:string;mode:string}>();
-  return c.json({success:true,data:{menus:rows.results}});
+  const other=await c.env.DB.prepare(`SELECT p.menu_id AS menuId,p.mode FROM restaurant_course_payment_settings p
+    JOIN rt_menu_items m ON m.id=p.menu_id AND m.store_id=p.store_id AND m.kind='course' AND m.status<>'archived'
+    JOIN rt_stores s ON s.id=p.store_id AND s.line_account_id=p.line_account_id
+    WHERE p.line_account_id=? AND p.mode IS NOT NULL
+    UNION ALL SELECT p.event_id AS menuId,p.mode FROM event_payment_settings p
+    JOIN events e ON e.id=p.event_id AND e.line_account_id=p.line_account_id AND e.deleted_at IS NULL
+    WHERE p.line_account_id=? AND p.mode IS NOT NULL ORDER BY menuId`)
+    .bind(c.req.query('account_id')!.trim(),c.req.query('account_id')!.trim()).all<{menuId:string;mode:string}>();
+  return c.json({success:true,data:{menus:[...rows.results,...other.results]}});
 });
 bookingPaymentAdmin.get('/api/booking/admin/payments',guard(),async c => {
   const filter=paymentRecordFilter(c.req.query());
@@ -77,10 +92,20 @@ bookingPaymentAdmin.post('/api/booking/admin/payments/:id/send-link',guard(true)
   return c.json({success:true,data:{paymentId:result.paymentId,checkoutUrl:result.checkoutUrl,sent:false,simulation:true}});
 });
 
-// 通知原本・再試行の履歴を保存する表がまだない。空の一覧や架空の成功を返さない。
-const eventsNotReady: MiddlewareHandler<Env> = async c => c.json({success:false,error:'payment_events_storage_not_ready',code:'payment_events_storage_not_ready'},503);
-bookingPaymentAdmin.get('/api/booking/admin/payment-events',guard(),eventsNotReady);
-bookingPaymentAdmin.post('/api/booking/admin/payment-events/:id/replay',guard(true),eventsNotReady);
+bookingPaymentAdmin.get('/api/booking/admin/payment-events',guard(),async c => {
+  const filter=paymentEventFilter(c.req.query());
+  if (!filter) return inputError(c,{success:false,error:'invalid_payment_event_filter'},400,['result','period','limit']);
+  return c.json({success:true,data:await paymentEventList(c.env.DB,c.req.query('account_id')!.trim(),filter)});
+});
+bookingPaymentAdmin.post('/api/booking/admin/payment-events/:id/replay',guard(true),inputJsonBoundary(),async c => {
+  const account=c.req.query('account_id')!.trim(),id=c.req.param('id');
+  if (!await paymentEvent(c.env.DB,account,id)) return c.json({success:false,error:'not_found'},404);
+  const result=await processPaymentEvent(c.env.DB,account,id,c.get('staff').id);
+  if (result.status==='busy_or_missing') return c.json({success:false,error:'payment_event_busy',code:'payment_event_busy'},409);
+  const data=await paymentEvent(c.env.DB,account,id);
+  if (result.result==='failed') return c.json({success:false,error:'payment_event_apply_failed',code:'payment_event_apply_failed',data},503);
+  return c.json({success:true,data});
+});
 
 for (const suffix of ['payment','price'] as const) {
   const path=`/api/events/admin/events/:id/${suffix}`;
@@ -90,7 +115,8 @@ for (const suffix of ['payment','price'] as const) {
     if (!event) return c.json({success:false,error:'not_found'},404);
     return next();
   };
-  const notReady: MiddlewareHandler<Env> = async c => c.json({success:false,error:'event_payment_storage_not_ready',code:'event_payment_storage_not_ready'},503);
-  bookingPaymentAdmin.get(path,guard(),eventGuard,notReady);
-  bookingPaymentAdmin.put(path,guard(true),eventGuard,notReady);
+  const handle: MiddlewareHandler<Env> = c => paymentSettingResponse(c,c.env.DB,
+    {kind:'event',id:c.req.param('id')!,account:c.req.query('account_id')!.trim()},suffix==='price'?'unitPrice':'mode');
+  bookingPaymentAdmin.get(path,guard(),eventGuard,handle);
+  bookingPaymentAdmin.put(path,guard(true),eventGuard,inputJsonBoundary(),handle);
 }

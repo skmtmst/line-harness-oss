@@ -1655,6 +1655,51 @@ CREATE TABLE "booking_payment_configs" (
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 
+CREATE TABLE booking_payment_connections (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL CHECK(provider='stripe'),
+  provider_account_id TEXT NOT NULL CHECK(length(provider_account_id) BETWEEN 6 AND 255),
+  test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode IN (0,1)),
+  connected_at TEXT NOT NULL CHECK(julianday(connected_at) IS NOT NULL),
+  disconnected_at TEXT CHECK(disconnected_at IS NULL OR julianday(disconnected_at) IS NOT NULL),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE booking_payment_event_replays (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES booking_payment_events(id),
+  actor_id TEXT NOT NULL,
+  occurred_at TEXT NOT NULL,
+  source_version INTEGER NOT NULL,
+  result TEXT NOT NULL CHECK(result IN ('applied','duplicate','failed')),
+  error_code TEXT,
+  UNIQUE(event_id,source_version)
+);
+
+CREATE TABLE booking_payment_events (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  provider TEXT NOT NULL,
+  provider_event_id TEXT NOT NULL,
+  payment_id TEXT REFERENCES booking_payments(id) ON DELETE SET NULL,
+  provider_payment_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK(kind IN ('paid','refunded','expired','other')),
+  outcome TEXT NOT NULL CHECK(outcome IN ('paid','failed','refunded','expired')),
+  amount INTEGER CHECK(amount IS NULL OR (typeof(amount)='integer' AND amount>=0)),
+  currency TEXT,
+  receipt_url TEXT,
+  received_at TEXT NOT NULL,
+  result TEXT NOT NULL DEFAULT 'failed' CHECK(result IN ('applied','duplicate','failed')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),
+  repeat_count INTEGER NOT NULL DEFAULT 0 CHECK(repeat_count>=0),
+  version INTEGER NOT NULL DEFAULT 0 CHECK(version>=0),
+  lease_token TEXT,
+  lease_until TEXT,
+  applied_at TEXT,
+  error_code TEXT,
+  UNIQUE(provider,line_account_id,provider_event_id)
+);
+
 CREATE TABLE "booking_payment_menu_settings" (
   menu_id TEXT PRIMARY KEY REFERENCES menus(id) ON DELETE CASCADE,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1677,7 +1722,7 @@ CREATE TABLE "booking_payments" (
   hold_until TEXT,
   paid_at TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL, refunded_at TEXT, receipt_url TEXT,
   UNIQUE (line_account_id, idempotency_key)
 );
 
@@ -2758,6 +2803,16 @@ CREATE TABLE event_occurrence_applicant_snapshots (
   payload_json    TEXT NOT NULL CHECK (json_valid(payload_json)),
   expires_at      TEXT NOT NULL,
   created_at      TEXT NOT NULL
+);
+
+CREATE TABLE event_payment_settings (
+  event_id TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  mode TEXT CHECK(mode IS NULL OR mode IN ('none','onsite','online','customer_choice')),
+  unit_price INTEGER NOT NULL DEFAULT 0 CHECK(typeof(unit_price)='integer' AND unit_price BETWEEN 0 AND 9007199254740991),
+  version INTEGER NOT NULL DEFAULT 1 CHECK(version>0),
+  updated_by TEXT NOT NULL,
+  updated_at TEXT NOT NULL
 );
 
 CREATE TABLE event_slots (
@@ -6123,6 +6178,16 @@ CREATE TABLE "reminders" (
   CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), trigger_event_id TEXT, leap_year_policy TEXT NOT NULL DEFAULT 'mar1'
   CHECK (leap_year_policy IN ('feb28', 'mar1', 'skip')));
 
+CREATE TABLE restaurant_course_payment_settings (
+  menu_id TEXT PRIMARY KEY REFERENCES rt_menu_items(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  mode TEXT CHECK(mode IS NULL OR mode IN ('none','onsite','online','customer_choice')),
+  version INTEGER NOT NULL DEFAULT 1 CHECK(version>0),
+  updated_by TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE rich_menu_area_taps (
   id              TEXT PRIMARY KEY,
   area_id         TEXT NOT NULL,
@@ -9014,6 +9079,8 @@ CREATE INDEX idx_booking_operation_runs_booking
 CREATE INDEX idx_booking_operation_runs_status
   ON booking_operation_runs(status, scheduled_at);
 
+CREATE INDEX idx_booking_payment_events_account_received ON booking_payment_events(line_account_id,received_at DESC,id);
+
 CREATE INDEX idx_booking_payments_booking
   ON booking_payments(booking_id, created_at DESC);
 
@@ -10997,6 +11064,14 @@ WHEN EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'conversion point with events or usages cannot be deleted'); END;
 
+CREATE TRIGGER event_payment_scope_insert BEFORE INSERT ON event_payment_settings
+WHEN NOT EXISTS(SELECT 1 FROM events e WHERE e.id=NEW.event_id AND e.line_account_id=NEW.line_account_id)
+BEGIN SELECT RAISE(ABORT,'event_payment_scope_mismatch'); END;
+
+CREATE TRIGGER event_payment_scope_update BEFORE UPDATE ON event_payment_settings
+WHEN NOT EXISTS(SELECT 1 FROM events e WHERE e.id=NEW.event_id AND e.line_account_id=NEW.line_account_id)
+BEGIN SELECT RAISE(ABORT,'event_payment_scope_mismatch'); END;
+
 CREATE TRIGGER fixed_friend_field_definition_guard BEFORE UPDATE ON friend_fields WHEN EXISTS(SELECT 1 FROM friend_fixed_fields WHERE field_id=OLD.id) AND (NEW.name IS NOT OLD.name OR NEW.field_key IS NOT OLD.field_key OR NEW.type IS NOT OLD.type OR NEW.type_v6 IS NOT OLD.type_v6 OR NEW.type_v8 IS NOT OLD.type_v8 OR NEW.folder_id IS NOT NULL OR NEW.is_personal<>1 OR NEW.ec_is_master<>0 OR NEW.status<>'active') BEGIN SELECT RAISE(ABORT,'FIXED_FRIEND_FIELD_IMMUTABLE'); END;
 
 CREATE TRIGGER fixed_name_friend_insert AFTER INSERT ON friends
@@ -11310,6 +11385,16 @@ CREATE TRIGGER outgoing_webhooks_folder_update BEFORE UPDATE OF folder_id, line_
 WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
 ) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER restaurant_course_payment_scope_insert BEFORE INSERT ON restaurant_course_payment_settings
+WHEN NOT EXISTS(SELECT 1 FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id
+  WHERE m.id=NEW.menu_id AND m.kind='course' AND s.id=NEW.store_id AND s.line_account_id=NEW.line_account_id)
+BEGIN SELECT RAISE(ABORT,'course_payment_scope_mismatch'); END;
+
+CREATE TRIGGER restaurant_course_payment_scope_update BEFORE UPDATE ON restaurant_course_payment_settings
+WHEN NOT EXISTS(SELECT 1 FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id
+  WHERE m.id=NEW.menu_id AND m.kind='course' AND s.id=NEW.store_id AND s.line_account_id=NEW.line_account_id)
+BEGIN SELECT RAISE(ABORT,'course_payment_scope_mismatch'); END;
 
 CREATE TRIGGER rt_closure_reservation_insert BEFORE INSERT ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND NEW.departed_at IS NULL AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) p WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND julianday(json_extract(p.value,'$.startsAt'))<julianday(NEW.ends_at) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at) AND (json_array_length(c.table_ids_json)=0 OR NEW.table_id IS NULL OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) t WHERE t.value=NEW.table_id))) BEGIN SELECT RAISE(ABORT,'closure_conflict'); END;
 

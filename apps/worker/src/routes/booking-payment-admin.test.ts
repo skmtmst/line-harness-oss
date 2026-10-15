@@ -119,6 +119,57 @@ describe('支払い管理の読取・集計・書出し',()=>{
 });
 
 describe('範囲・未準備・模擬リンク',()=>{
+  it('接続情報の実データから末尾だけを返し、切断済みを接続中と表示しない',async()=>{
+    f.raw.exec(`INSERT INTO booking_payment_connections(line_account_id,provider,provider_account_id,test_mode,connected_at)
+      VALUES('a','stripe','acct_test123456',1,'2026-10-01T00:00:00Z')`);
+    const data=await (await request(path('payment-connection'))).json();
+    expect(data).toMatchObject({data:{connected:true,testMode:true,accountIdTail:'3456',connectedAt:'2026-10-01T00:00:00Z'}});
+    expect(JSON.stringify(data)).not.toContain('acct_test123456');
+    f.raw.exec("UPDATE booking_payment_connections SET disconnected_at='2026-10-02T00:00:00Z'");
+    expect(await (await request(path('payment-connection'))).json()).toMatchObject({data:{connected:false,accountIdTail:null,connectedAt:null}});
+  });
+  it('クラスの単価と支払い方法を独立に保存し、古い版と不正な金額を拒否する',async()=>{
+    const p='/api/events/admin/events/ev/';
+    expect(await (await request(p+'price?account_id=a')).json()).toMatchObject({data:{unitPrice:0,version:0}});
+    expect(await (await request(p+'payment?account_id=a','PUT',{mode:'online',expectedVersion:0})).json()).toMatchObject({data:{mode:'online',version:1}});
+    expect((await request(p+'price?account_id=a','PUT',{unitPrice:1500,expectedVersion:0})).status).toBe(409);
+    expect(await (await request(p+'price?account_id=a','PUT',{unitPrice:1500,expectedVersion:1})).json()).toMatchObject({data:{unitPrice:1500,version:2}});
+    expect(await (await request(p+'payment?account_id=a')).json()).toMatchObject({data:{mode:'online',version:2}});
+    expect((await request(p+'payment?account_id=a','PUT',{mode:null,expectedVersion:2})).status).toBe(200);
+    expect(await (await request(p+'price?account_id=a')).json()).toMatchObject({data:{unitPrice:1500,version:3}});
+    for(const unitPrice of [-1,1.5,'100',null,Number.MAX_SAFE_INTEGER+1])
+      expect((await request(p+'price?account_id=a','PUT',{unitPrice})).status).toBe(400);
+    expect((await request(p+'payment?account_id=a','PUT',{mode:'cash'})).status).toBe(400);
+    expect((await request(p+'price?account_id=a','PUT',{})).status).toBe(400);
+    role='staff';expect((await request(p+'price?account_id=a','PUT',{unitPrice:0})).status).toBe(403);
+  });
+  it('コースの解除はnullを保存し、同じ版の同時更新は片方だけが成功する',async()=>{
+    const p='/api/restaurant-test/menus/course/payment?account_id=a';
+    const results=await Promise.all(['online','onsite'].map(mode=>request(p,'PUT',{mode,expectedVersion:0})));
+    expect(results.map(r=>r.status).sort()).toEqual([200,409]);
+    expect((await request(p,'PUT',{mode:null,expectedVersion:1})).status).toBe(200);
+    expect(await (await request(p)).json()).toMatchObject({data:{mode:null,version:2}});
+    expect((await request(p,'PUT',{mode:'bad'})).status).toBe(400);
+    f.raw.exec('DROP TABLE restaurant_course_payment_settings');
+    expect(await (await request(p)).json()).toMatchObject({code:'course_payment_storage_not_ready'});
+  });
+  it('上書きの一覧にコースとクラスも含め、解除済み・別店を混ぜない',async()=>{
+    await request('/api/restaurant-test/menus/course/payment?account_id=a','PUT',{mode:'onsite'});
+    await request('/api/events/admin/events/ev/payment?account_id=a','PUT',{mode:'customer_choice'});
+    expect(await (await request(path('menu-payments'))).json()).toMatchObject({data:{menus:[{menuId:'course',mode:'onsite'},{menuId:'ev',mode:'customer_choice'}]}});
+    await request('/api/events/admin/events/ev/payment?account_id=a','PUT',{mode:null});
+    expect(await (await request(path('menu-payments'))).json()).toMatchObject({data:{menus:[{menuId:'course',mode:'onsite'}]}});
+    f.raw.exec("UPDATE rt_menu_items SET status='archived' WHERE id='course'");
+    expect(await (await request(path('menu-payments'))).json()).toMatchObject({data:{menus:[]}});
+  });
+  it('返金日時を後の更新から独立させ、保存した領収書URLを返す',async()=>{
+    payment('refund','refunded','a','2026-09-01T00:00:00Z','2026-09-01T00:00:00Z','2026-10-10T00:00:00Z');
+    f.raw.exec("UPDATE booking_payments SET refunded_at='2026-09-30T14:59:59Z',receipt_url='https://pay.stripe.com/receipts/test'");
+    expect(await paymentSummary(f.db,'a',now)).toMatchObject({refundedAmount:0,refundedCount:0});
+    expect(await (await request(path('payments')+'&period=90d')).json()).toMatchObject({data:{items:[{receiptUrl:'https://pay.stripe.com/receipts/test'}]}});
+    f.raw.exec("UPDATE booking_payments SET refunded_at='2026-09-30T15:00:00Z'");
+    expect(await paymentSummary(f.db,'a',now)).toMatchObject({refundedAmount:1000,refundedCount:1});
+  });
   it.each(['payment-connection','menu-payments','payments','payments/export','staff/today-counts','payment-events'])('所属外・存在しないアカウントを拒否する: %s',async endpoint=>{
     access.allow=false;expect((await request(path(endpoint))).status).toBe(404);access.allow=true;
     expect((await request(`/api/booking/admin/${endpoint}`)).status).toBe(400);
@@ -133,20 +184,21 @@ describe('範囲・未準備・模擬リンク',()=>{
     expect(await missing.json()).toMatchObject({code:'payment_storage_not_ready'});
   });
   it('通知原本の保存先がなければ一覧・再読込は503。閲覧のみとstaffの再読込は403',async()=>{
+    f.raw.exec('DROP TABLE booking_payment_event_replays; DROP TABLE booking_payment_events');
     expect((await request(path('payment-events'))).status).toBe(503);
     expect((await request(path('payment-events/evt/replay'),'POST',{})).status).toBe(503);
     readOnly=true;expect((await request(path('payment-events/evt/replay'),'POST',{})).status).toBe(403);
     readOnly=false;role='staff';expect((await request(path('payment-events/evt/replay'),'POST',{})).status).toBe(403);
   });
-  it.each(['payment','price'])('クラスの%sは所属確認後に503、別店は404、閲覧のみ保存は403',async suffix=>{
+  it.each(['payment','price'])('クラスの%sは所属確認後に保存、別店は404、閲覧のみ保存は403',async suffix=>{
     const p=`/api/events/admin/events/ev/${suffix}?account_id=a`;
-    expect((await request(p)).status).toBe(503);expect((await request(p,'PUT',{mode:'online',unitPrice:1000})).status).toBe(503);
+    expect((await request(p)).status).toBe(200);expect((await request(p,'PUT',{mode:'online',unitPrice:1000})).status).toBe(200);
     expect((await request(p.replace('/ev/','/evb/'))).status).toBe(404);
     readOnly=true;expect((await request(p,'PUT',{})).status).toBe(403);
   });
-  it('コースの支払いは飲食の機能・店・所属を守り、保存先の承認待ちを返す',async()=>{
+  it('コースの支払いは飲食の機能・店・所属を守って保存する',async()=>{
     const p='/api/restaurant-test/menus/course/payment?account_id=a';
-    expect((await request(p)).status).toBe(503);expect((await request(p,'PUT',{mode:'onsite'})).status).toBe(503);
+    expect((await request(p)).status).toBe(200);expect((await request(p,'PUT',{mode:'onsite'})).status).toBe(200);
     expect((await request(p.replace('/course/','/other-course/'))).status).toBe(404);
     expect((await request(p,'GET',undefined,{RESTAURANT_TEST_ENABLED:'false'})).status).toBe(404);
     readOnly=true;expect((await request(p,'PUT',{mode:null})).status).toBe(403);
