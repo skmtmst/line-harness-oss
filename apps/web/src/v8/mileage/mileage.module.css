@@ -271,6 +271,13 @@
   justify-content: space-between;
   gap: var(--tpl-toolbar-gap);
 }
+/* ページ送りの段と、その下の案内を縦に積む（絵 oRbJi）。 */
+.pagerStack {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
 /* ページ送りの下の案内（枠の余白の中）。 */
 .footNoteFlush {
   margin: var(--tpl-ml-foot-after-pager) 0 0;
