@@ -317,6 +317,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       {
         id: 'archive',
         label: '保管する',
+        icon: <Archive size={16} aria-hidden="true" />,
         tone: 'danger',
         dividerBefore: true,
         disabled: mark.isDefault || mark.isInherited,
