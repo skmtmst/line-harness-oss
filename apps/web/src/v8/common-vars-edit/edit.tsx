@@ -840,7 +840,8 @@ function EditCommonVarV8Inner() {
               aria-label="フォルダ"
               label="フォルダ"
               id="cv-folder"
-              {...(narrow ? { size: 'full' as const } : { width: 240 })}
+              // 右の列の幅いっぱい（絵 AYc6O）。固定 240 は列（約206）より広く、縮んで字が真ん中に寄っていた。
+              size="full"
               value={folderId}
               onChange={(next) => { setSaved(false); setFolderId(next) }}
               // 絵は「フォルダ：お店の情報」を1つの文で見せる（閉じたボタンの頭は label）。
