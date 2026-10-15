@@ -21,6 +21,7 @@ import Card from '@/components/shared/card'
 import { Field } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import {RowActions} from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
@@ -50,8 +51,10 @@ export const LEDGER_STATUS_OPTIONS = [
   { value: 'cancelled,no_show', label: '取消・無断のみ' },
 ]
 
-export default function ListView({ view, rows, total, tables, page, period, status, busy, canWrite, canImport, onPeriod, onStatus, onPage, onImport, onCreate, onOpen, onEdit, onCancel, onRestore,day,storeId,storeName,detail,onView,selectedId }: {
+export default function ListView({ view, rows, total, tables, page, period, status, busy, canWrite, canImport, onPeriod, onStatus, onPage, onImport, onCreate, onOpen, onEdit, onCancel, onRestore,day,storeId,storeName,detail,onView,selectedId,pageSize=PAGE_SIZE,onPageSize }: {
   selectedId?:string
+  pageSize?:number
+  onPageSize?:(size:number)=>void
   onView:(view:LedgerView)=>void
   detail?:ReactNode
   storeName?:string
@@ -90,7 +93,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
   const lineCount = live.filter((item) => item.source === 'line').length
   const mediaCount = live.filter((item) => sourceKind(item.source) === 'media' || item.source === 'restaurant_board').length
   const unseated = live.filter((item) => !item.table_id).length
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const tableById = new Map(tables.map((table) => [table.id, table]))
 
   return (
@@ -123,12 +126,13 @@ export default function ListView({ view, rows, total, tables, page, period, stat
           </>
         ) : null}
 </>} trailingToolbar={<>        <span className={styles.dateSpacer} />
+        {view === 'list' && onPageSize ? <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => onPageSize(Number(value))} options={PAGE_SIZE_SELECT_OPTIONS} /> : null}
         {canImport ? <Button presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={15} aria-hidden="true" />受信データを試す</Button> : null}
         {canWrite ? <Button presentation="restaurant" disabled={busy} onClick={onCreate}><Plus size={15} aria-hidden="true" />手動予約を登録する</Button> : null}
       </>} renderBody={body=><DetailColumns variant="restaurant-ledger" asideLabel="予約の詳細を見る" expanded={detailExpanded} onExpandedChange={setDetailExpanded} aside={detail}>
         {rows.length===0?<ListState kind="empty" title="条件に合う予約はありません。"/>:body}
         {view === 'list' && pageCount > 1 ? (
-          <Pagination spacing="restaurant" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total} 件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min((page - 1) * PAGE_SIZE + rows.length, total)} 件`} />
+          <Pagination spacing="restaurant" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total} 件中 ${(page - 1) * pageSize + 1}〜${Math.min((page - 1) * pageSize + rows.length, total)} 件`} />
         ) : null}
       <Panel fusion title="顧客カルテ" description="電話番号または LINE UID で名寄せする設計です。">
         <div className={styles.karte}>

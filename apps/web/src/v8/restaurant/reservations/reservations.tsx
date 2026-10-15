@@ -87,7 +87,9 @@ function HeadControls({ storePicker, view, day, storeId, busy, canWrite, onView,
   )
 }
 
-function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay, onPeriod, onStatus, onPage, onSource, onPhone,onView }: {
+function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay, onPeriod, onStatus, onPage, onSource, onPhone,onView, pageSize, onPageSize }: {
+  pageSize: number
+  onPageSize: (size: number) => void
   onView:(view:LedgerView)=>void
   ctx: RestaurantV8Context
   view: LedgerView
@@ -233,7 +235,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onDetail={id=>{const r=rows.find(r=>r.id===id);if(r?.hold_expires_at)setOpenId(id);else setDetailId(id)}}
         />
       ) : (
-        <ListView selectedId={detailId==='closed'?undefined:(detailed??rows[0])?.id} onEdit={setOpenId} onView={onView} day={day} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:rows.find(r=>r.id===id)?.customer_version??1}),'予約を有効に戻しました。')}}/>}
+        <ListView pageSize={pageSize} onPageSize={(next) => { onPageSize(next); onPage(1) }} selectedId={detailId==='closed'?undefined:(detailed??rows[0])?.id} onEdit={setOpenId} onView={onView} day={day} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:rows.find(r=>r.id===id)?.customer_version??1}),'予約を有効に戻しました。')}}/>}
           view={view}
           rows={rows}
           total={total}
@@ -328,6 +330,7 @@ export default function ReservationsPage() {
   const [period, setPeriod] = useState('upcoming')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useState(PAGE_SIZE)
   const [source, setSource] = useState('all')
   const [phone, setPhone] = useState<PhonePreset | null>(null)
 
@@ -351,11 +354,11 @@ export default function ReservationsPage() {
         : period === 'upcoming'
           ? { from: today.from, to: undefined }
           : { from: undefined, to: undefined }
-      return { ...range, status: status === 'all' ? undefined : status, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }
+      return { ...range, status: status === 'all' ? undefined : status, limit: pageSize, offset: (page - 1) * pageSize }
     }
     const m = monthRange(day)
     return { from: m.from, to: m.to, limit: 500, offset: 0 }
-  }, [view, day, period, status, page])
+  }, [view, day, period, status, page, pageSize])
 
   const changeView = (next: LedgerView) => { setView(next); setPage(1) }
   const canWrite = canWriteRole(useStaffRole())
@@ -366,7 +369,7 @@ export default function ReservationsPage() {
         {(ctx) => (
           <LedgerBody onView={changeView}
             ctx={ctx} view={view} day={day} period={period} status={status} page={page} source={source} phone={phone}
-            onDay={setDay} onPeriod={setPeriod} onStatus={setStatus} onPage={setPage} onSource={setSource} onPhone={setPhone}
+            onDay={setDay} onPeriod={setPeriod} onStatus={setStatus} onPage={setPage} pageSize={pageSize} onPageSize={setPageSize} onSource={setSource} onPhone={setPhone}
           />
         )}
       </RestaurantShell>
@@ -397,7 +400,7 @@ export default function ReservationsPage() {
     >
       {(ctx) => (
         <LedgerBody onView={changeView}
-          ctx={ctx} view={view} day={day} period={period} status={status} page={page} source={source} phone={null}
+          ctx={ctx} view={view} day={day} period={period} status={status} page={page} pageSize={pageSize} onPageSize={setPageSize} source={source} phone={null}
           onDay={setDay}
           onPeriod={(value) => { setPeriod(value); setPage(1) }}
           onStatus={(value) => { setStatus(value); setPage(1) }}
