@@ -1,5 +1,6 @@
 'use client'
 
+import { TextField } from '@/components/shared/text-field'
 import { requiredText } from '@/lib/form-requirement'
 const b244Requirements = {
   changeReason: requiredText("変える理由を入力してください"),
@@ -926,14 +927,13 @@ function EditCommonVarV8Inner() {
 
       <section className={styles.sideCard} aria-labelledby="cv-edit-memo-heading">
         <h2 id="cv-edit-memo-heading" className={styles.sideTitle}>社内メモ</h2>
-        <div className={styles.field}><Field label="メモ（お客さまには出ません）" htmlFor="cv-memo"><SaveErrorField names={["memo","saved"]}><input
+        <div className={styles.field}><Field label="メモ（お客さまには出ません）" htmlFor="cv-memo"><SaveErrorField names={["memo","saved"]}><TextField
             id="cv-memo"
-            type="text"
             value={memo}
             onChange={(e) => { setSaved(false); setMemo(e.target.value) }}
             maxLength={1000}
             placeholder="店舗ごとに違うときは店舗の共通情報へ"
-            className={styles.fieldInput}
+            title="店舗ごとに違うときは店舗の共通情報へ"
             readOnly={!canWrite}
           /></SaveErrorField></Field></div>
       </section>
