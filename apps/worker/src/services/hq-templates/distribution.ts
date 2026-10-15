@@ -1,3 +1,5 @@
+import { listTemplateAccounts, requireTargetAccounts } from './accounts.js';
+export { listTemplateAccounts, requireTargetAccounts } from './accounts.js';
 import { isDeliveryType, parseDeliveryDefinition, deliverySnapshot, inspectDelivery, planDelivery, validateDeliveryReferences, deliveryReferenceItems } from './delivery.js';
 import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
 import { templateKind } from '@line-crm/shared';
@@ -35,15 +37,6 @@ async function batch(db: D1Database, statements: HqTemplateStatement[]) {
 function audit(authority: HqTemplateAuthority, action: string, targetId: string, accountId: string | null = null, result = 'success', runId: string | null = null): HqTemplateStatement {
   return { sql: `INSERT INTO audit_events(id,tenant_id,line_account_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,?,?,'business',?, ?,?,'hq_template',?,?,?)`,
     bindings: [crypto.randomUUID(), authority.tenantId, accountId, authority.actorId, authority.role, `hq_template.${action}`, targetId, result, runId ? JSON.stringify({ runId }) : null] };
-}
-export async function listTemplateAccounts(db: D1Database, authority: HqTemplateAuthority) {
-  return (await db.prepare(`SELECT id,name FROM line_accounts WHERE tenant_id=? AND is_active=1 AND archived_at IS NULL ORDER BY name,id`).bind(authority.tenantId).all<{ id: string; name: string }>()).results;
-}
-export async function requireTargetAccounts(db: D1Database, authority: HqTemplateAuthority, ids: string[]) {
-  if (!ids.length || ids.length > 30 || new Set(ids).size !== ids.length) throw new HqTemplateError('INVALID_ACCOUNTS');
-  const allowed = await listTemplateAccounts(db, authority);
-  if (ids.some(id => !allowed.some(a => a.id === id))) throw new HqTemplateError('FORBIDDEN', 403);
-  return ids.map(id => allowed.find(a => a.id === id)!);
 }
 export async function templateDetail(db: D1Database, authority: HqTemplateAuthority, id: string) {
   const template = await getHqTemplate(db, authority.tenantId, id);
@@ -99,6 +92,10 @@ export async function saveTemplate(db: D1Database, authority: HqTemplateAuthorit
   const type = current?.template.template_type ?? body.type;
   if (!HQ_TEMPLATE_TYPES.includes(type as HqTemplateType) || (body.type !== undefined && body.type !== type)) throw new HqTemplateError('INVALID_TYPE');
   const definition = await canonicalDefinition(db,type as HqTemplateType, body.definition, authority), json = JSON.stringify(definition);
+  if(isDeliveryType(String(type))) for(const ref of (definition as import('@line-crm/shared').HqDeliveryTemplateDefinition).references ?? []) if(ref.accountId) {
+    if(!await db.prepare('SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL').bind(ref.accountId,authority.tenantId).first()) throw new HqTemplateError('REFERENCE_UNAVAILABLE',422);
+    await deliveryReferenceItems(db,ref.accountId,{...(definition as import('@line-crm/shared').HqDeliveryTemplateDefinition),references:[ref]});
+  }
   const name = boundedText(body.name, 200, 'name'), description = body.description == null || body.description === '' ? null : boundedText(body.description, 2000, 'description');
   const templateId = id ?? `hqt_${await digest(JSON.stringify([authority.tenantId, requestId]))}`;
   const versionId = crypto.randomUUID(), revision = current?.template.revision ?? 0, createdAt = new Date().toISOString();
@@ -168,7 +165,7 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
           }
           if(template.template_type==='rich_menu'&&definition_json) {
             const menu=parseRichMenuTemplateDefinition({templateVersionId:'list',definitionJson:definition_json},authority.tenantId).richMenu;
-            return {display_order:menu.displayOrder??0,display_audience:menu.displayAudience==='all'?'全員':'配布先で店が決める'};
+            return {display_order:menu.displayOrder??0,display_audience:menu.displayAudience==='all'?'全員':menu.displayAudience==='tag'?`タグが付いた人（${menu.displayTagName}）`:'配布先で店が決める'};
           }
         } catch { /* 壊れた版は未取得。 */ }
         return {message_type:null,manual_assignment_allowed:null,assignment_method:null,display_order:null,display_audience:null};
@@ -241,6 +238,7 @@ function resultReason(status: string): string | null {
 }
 function rethrowR2(error: unknown): never {
   if (!(error instanceof HqR2RuntimeError)) throw error;
+  if (error.code === 'DISPLAY_TAG_UNAVAILABLE') throw new HqTemplateError('DISPLAY_TAG_UNAVAILABLE', 409);
   if (error.code === 'LIFF_UNAVAILABLE') throw new HqTemplateError('LIFF_UNAVAILABLE', 409);
   if (error.code === 'CARD_REFERENCE_UNAVAILABLE') throw new HqTemplateError('CARD_REFERENCE_UNAVAILABLE', 409);
   if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);

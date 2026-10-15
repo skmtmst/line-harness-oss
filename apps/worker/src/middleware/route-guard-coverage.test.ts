@@ -185,6 +185,10 @@ function collectStaffApiClassification(extraRoutes: string[] = []): { all: strin
  * この一覧へ足す。どちらも PR の差分に残る。
  */
 const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
+    // Google 接続の connect/start と同じく店舗管理者以上に限る。
+    // Uber Eats のログイン連携の入口。店舗の代理で使えるトークンを得る操作なので
+    // デリバリー受注のうち、店舗の売上と受付そのものを止める4操作は店舗管理者以上に限る。
+    // 担当者が進める受注→準備完了→受け渡しと品切れ設定は auth.ts の対応表に載せている。
     'DELETE /api/ad-platforms/:id',
     'DELETE /api/affiliates/:id',
     'DELETE /api/broadcast-message-assets/:id',
@@ -267,6 +271,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/hq/support/requests/:id',
     'GET /api/hq/templates',
     'GET /api/hq/templates/:id',
+    'GET /api/hq/templates/:id/distribution-targets',
     'GET /api/hq/templates/:id/distributions/:runId',
     'GET /api/hq/templates/:id/received-versions',
     'GET /api/hq/templates/:id/versions',
@@ -275,7 +280,9 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/hq/templates/attribute-kind-counts',
     'GET /api/hq/templates/folders',
     'GET /api/hq/templates/kind-counts',
+    'GET /api/hq/templates/media',
     'GET /api/hq/templates/message-references',
+    'GET /api/hq/templates/resources',
     'GET /api/hq/templates/saved-views',
     'GET /api/identity-candidates',
     'GET /api/identity-candidates/:id',
@@ -433,12 +440,14 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/hq/templates/:id/distribute',
     'POST /api/hq/templates/:id/duplicate',
     'POST /api/hq/templates/:id/preflight',
+    'POST /api/hq/templates/:id/test-send',
     'POST /api/hq/templates/:id/versions/:version/restore',
     'POST /api/hq/templates/folders',
     'POST /api/hq/templates/folders/:id/swap-order',
     'POST /api/hq/templates/media',
     'POST /api/hq/templates/media/upload-sessions',
     'POST /api/hq/templates/media/upload-sessions/:id/complete',
+    'POST /api/hq/templates/rich-menu-preview',
     'POST /api/hq/templates/saved-views',
     'POST /api/identity-candidates/:id/decide',
     'POST /api/identity-candidates/:id/undo',
@@ -500,14 +509,10 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/support/tickets/:id/reply',
     'POST /api/recipes',
     'POST /api/recipes/:id/clone',
-    // デリバリー受注のうち、店舗の売上と受付そのものを止める4操作は店舗管理者以上に限る。
-    // 担当者が進める受注→準備完了→受け渡しと品切れ設定は auth.ts の対応表に載せている。
     'POST /api/restaurant-test/delivery/intake/resume',
     'POST /api/restaurant-test/delivery/intake/stop',
     'POST /api/restaurant-test/delivery/orders/:id/cancel',
     'POST /api/restaurant-test/delivery/orders/:id/reject',
-    // Uber Eats のログイン連携の入口。店舗の代理で使えるトークンを得る操作なので
-    // Google 接続の connect/start と同じく店舗管理者以上に限る。
     'POST /api/restaurant-test/delivery/ubereats/connect/start',
     'POST /api/restaurant-test/floors',
     'POST /api/restaurant-test/followups/:storeId/bindings/:stepId',
@@ -569,6 +574,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PUT /api/ops/notice-line-account',
     'PUT /api/ops/support/tickets/:id/draft',
     'PUT /api/restaurant-test/floors/:id',
+    'PUT /api/restaurant-test/followups/:storeId/steps/:stepId/messages',
     'PUT /api/restaurant-test/gbp/reviews/:id/draft',
     'PUT /api/restaurant-test/inventory/:id',
     'PUT /api/restaurant-test/inventory/allocation',

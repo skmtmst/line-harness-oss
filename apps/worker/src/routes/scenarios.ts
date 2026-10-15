@@ -1,3 +1,4 @@
+import type { ActionBody } from './scenario-action-input-types.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -225,6 +226,7 @@ function serializeStep(row: DbScenarioStep) {
     deliveryTime: row.delivery_time ?? null,
     messageType: row.message_type,
     messageContent: row.message_content,
+    messageBubbles: parseJson(row.message_bubbles_json),
     conditionType: row.condition_type ?? null,
     conditionValue: row.condition_value ?? null,
     nextStepOnFalse: row.next_step_on_false ?? null,
@@ -1008,6 +1010,13 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenari
       }
     }
 
+    // 旧1通の編集で複数吹き出しを黙って消さない。来店フォローの版付き保存へ戻す。
+    if (body.messageType !== undefined || body.messageContent !== undefined || body.templateId !== undefined) {
+      const stored = await c.env.DB.prepare('SELECT message_bubbles_json FROM scenario_steps WHERE id=? AND scenario_id=?')
+        .bind(stepId,scenarioId).first<{message_bubbles_json:string|null}>();
+      if (stored?.message_bubbles_json) return c.json({success:false,code:'MULTIPLE_MESSAGES_REQUIRE_EDITOR',error:'複数の吹き出しは来店フォローの編集で保存してください'},409);
+    }
+
     // conditionType / conditionValue の partial-update 検証（OSS issue #120 回帰防止）。
     // どちらかが touched なときだけ走らせる。effective 値は、body に来た値を優先しつつ
     // 既存行で穴埋めして組み立て、validateStepCondition で pair を検証する。
@@ -1032,7 +1041,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenari
     let templateSnapshot: { message_type: string; message_content: string } | null = null;
     if (body.templateId !== undefined && body.templateId !== null) {
       const tpl = await c.env.DB
-        .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ?`)
+        .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ? AND message_bubbles_json IS NULL`)
         .bind(body.templateId)
         .first<{ id: string; message_type: string; message_content: string }>();
       if (!tpl) return inputError(c, { success: false, error: 'templateId not found' }, 400, ["templateId"]);
@@ -1639,17 +1648,6 @@ scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, inputJ
 
 const VALID_ACTION_HOOKS = ['step_sent', 'scenario_completed', 'choice_selected'] as const;
 const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var', 'send_message', 'send_template', 'reminder', 'event_booking'] as const;
-
-interface ActionBody {
-  hook?: string;
-  stepId?: string | null;
-  choiceIndex?: number | null;
-  actionType?: string;
-  config?: unknown;
-  condition?: unknown;
-  repeatOnRefire?: boolean;
-  sortOrder?: number;
-}
 
 function serializeAction(row: {
   id: string;

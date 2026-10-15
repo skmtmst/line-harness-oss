@@ -1,3 +1,4 @@
+import { api5Paths } from './api5-openapi.js';
 import { restaurantRest4Paths } from './restaurant-rest4-openapi.js';
 import { restaurantFollowupPaths } from './restaurant-followup-openapi.js';
 import { reservationBoardPaths } from './reservation-board-openapi.js';
@@ -448,6 +449,7 @@ const spec = {
     },
     ...audit3Paths,
     ...auditstepsPaths,
+    ...api5Paths,
     ...api18Paths,
     ...api17Paths,
     ...api9Paths,
@@ -655,36 +657,6 @@ const spec = {
               ]
             }
           }
-        }
-      }
-    }
-  },
-  "/api/hq/templates/message-references": {
-    "get": {
-      "tags": [
-        "HQ Templates"
-      ],
-      "summary": "配布先の回答フォーム・シナリオの候補を取得",
-      "parameters": [],
-      "responses": {
-        "200": {
-          "description": "成功",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiResponse"
-              }
-            }
-          }
-        },
-        "403": {
-          "description": "権限がありません"
-        },
-        "409": {
-          "description": "確認した版や対象が変わりました"
-        },
-        "422": {
-          "description": "入力を確認してください"
         }
       }
     }
@@ -2163,6 +2135,7 @@ const spec = {
       },
     },
     '/api/hq/templates/media': {
+      get: api5Paths['/api/hq/templates/media'].get,
       post: {
         tags: ['HQ Templates'], summary: '統括ひな形のPNG/JPEG画像を登録',
         parameters: [

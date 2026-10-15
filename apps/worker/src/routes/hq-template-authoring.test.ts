@@ -323,3 +323,140 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
     const id=await save('template',value),p=await request(`/${id}/preflight`,'POST',{accountIds:['a']});expect(p.status).toBe(409);expect(sql.raw.prepare('SELECT count(*) n FROM templates').get()).toEqual({n:0});expect(objects.size).toBe(1);
   });
 });
+
+describe('HQ rich-menu draft checks and targeting',()=>{
+  async function menu() {
+    const u=await upload('rich_menu');expect(u.status).toBe(201);
+    return {schemaVersion:1,richMenu:{id:'menu',name:'通常メニュー',chatBarText:'開く',size:'large',defaultPageId:'page',displayAudience:'tag',displayTagName:'会員',defaultOpen:true,pages:[{id:'page',name:'ページ',imageR2Key:u.body.data.r2Key,areas:[{id:'area',bounds:{x:0,y:0,width:100,height:100},actionType:'message',intent:'text',label:'案内',actionData:{text:'案内'}}]}]}};
+  }
+  function tags(){for(const a of ['a','b','c'])sql.raw.prepare("INSERT INTO tags(id,name,line_account_id) VALUES (?,'会員',?)").run(`member-${a}`,a);}
+  test('same-name targeting tags and default-open are copied into independent drafts',async()=>{
+    tags();const d=await menu(),id=await save('rich_menu',d);
+    expect((await request(`/${id}`)).body.data.definition.richMenu).toMatchObject({displayAudience:'tag',displayTagName:'会員',defaultOpen:true});
+    await distribute(id);
+    for(const a of ['a','b','c']){
+      const g=sql.raw.prepare('SELECT status,default_open,is_default_for_all,targeting_enabled,targeting_condition FROM rich_menu_groups WHERE account_id=?').get(a) as {status:string;default_open:number;is_default_for_all:number;targeting_enabled:number;targeting_condition:string};
+      expect(g).toMatchObject({status:'draft',default_open:1,is_default_for_all:0,targeting_enabled:1});
+      expect(JSON.parse(g.targeting_condition)).toEqual({operator:'AND',rules:[{type:'tag_exists',value:`member-${a}`}]});
+    }
+  });
+  test('preview returns duplicates, coverage, missing tags and server image sizes without saving',async()=>{
+    tags();sql.raw.exec("DELETE FROM tags WHERE line_account_id='c';INSERT INTO rich_menu_groups(id,account_id,name,chat_bar_text,size) VALUES ('existing','a','通常メニュー','開く','large')");
+    const d=await menu();
+    const r=await request('/rich-menu-preview','POST',{name:d.richMenu.name,accountIds:['a','b','c'],definition:d});
+    expect(r.status,JSON.stringify(r.body)).toBe(200);
+    expect(r.body.data.summary).toEqual({accountCount:3,sameNameAccountCount:1,overwriteCount:1,createCount:2,missingReferences:1,missingTags:1});
+    expect(r.body.data.references[0]).toMatchObject({kind:'audience_tag',name:'会員',availableAccountCount:2,totalAccountCount:3});
+    expect(r.body.data.images[0]).toMatchObject({sizeBytes:32,sizeKb:32/1024,available:true});
+    expect(sql.raw.prepare('SELECT COUNT(*) n FROM hq_templates').get()).toEqual({n:0});
+    expect(sql.raw.prepare('SELECT COUNT(*) n FROM hq_template_preflights').get()).toEqual({n:0});
+    expect(bucket.put).toHaveBeenCalledTimes(1);
+  });
+  test('missing audience tags stop real preflight and are never silently created',async()=>{
+    const id=await save('rich_menu',await menu());const r=await request(`/${id}/preflight`,'POST',{accountIds:['a']});
+    expect(r.status,JSON.stringify(r.body)).toBe(409);expect(r.body.code).toBe('DISPLAY_TAG_UNAVAILABLE');
+    expect(sql.raw.prepare('SELECT COUNT(*) n FROM tags').get()).toEqual({n:0});
+  });
+  test('targeting tag changes invalidate a confirmed distribution',async()=>{
+    tags();const id=await save('rich_menu',await menu());const p=await request(`/${id}/preflight`,'POST',{accountIds:['a']});expect(p.status).toBe(200);
+    sql.raw.exec("UPDATE tags SET name='別の会員' WHERE id='member-a'");
+    const r=await request(`/${id}/distribute`,'POST',{preflightId:p.body.data.preflightId,resolutions:p.body.data.stores[0].items.map((i:{sourceId:string})=>({accountId:'a',sourceId:i.sourceId,mode:'create'}))});
+    expect(r.body.data.stores[0].status).not.toBe('succeeded');expect(sql.raw.prepare('SELECT COUNT(*) n FROM rich_menu_groups').get()).toEqual({n:0});
+  });
+  test('draft checks reject foreign accounts and editing by a read-only operator',async()=>{
+    sql.raw.exec("UPDATE line_accounts SET tenant_id='other' WHERE id='c'");
+    expect((await request('/rich-menu-preview','POST',{name:'通常',accountIds:['c']})).status).toBe(403);
+    staff.readOnly=true;expect((await request('/rich-menu-preview','POST',{name:'通常',accountIds:['a']})).status).toBe(403);
+  });
+  test.each([{displayTagName:''},{defaultOpen:'yes'},{displayAudience:'store',displayTagName:'会員'}])('invalid display settings are rejected before saving: %j',async value=>{
+    const d=await menu();Object.assign(d.richMenu,value);expect((await request('','POST',{type:'rich_menu',name:'通常',definition:d,requestId:crypto.randomUUID()})).status).toBe(400);
+  });
+});
+
+test('保存前にフォームと押した人のタグの同名参照・LIFFの不足を店舗別に返す',async()=>{
+  const image=await upload('rich_menu');
+  for(const a of ['a','b']){
+    sql.raw.prepare("INSERT INTO forms(id,name) VALUES (?,'相談フォーム')").run(`form-${a}`);
+    sql.raw.prepare('INSERT INTO form_accounts(form_id,line_account_id) VALUES (?,?)').run(`form-${a}`,a);
+  }
+  for(const a of ['a','c'])sql.raw.prepare("INSERT INTO tags(id,name,line_account_id) VALUES (?,'予約ボタン',?)").run(`tag-${a}`,a);
+  sql.raw.exec("UPDATE line_accounts SET liff_id='liff-a' WHERE id='a'");
+  const definition={schemaVersion:1,richMenu:{id:'menu',name:'相談',chatBarText:'メニュー',size:'large',defaultPageId:'page',pages:[{id:'page',name:'相談',imageR2Key:image.body.data.r2Key,areas:[
+    {id:'form-area',bounds:{x:0,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'form-a',label:'相談'},
+    {id:'tag-area',bounds:{x:100,y:0,width:100,height:100},actionType:'message',actionData:{text:'予約'},intent:'text',tagIds:['tag-a'],label:'予約'},
+  ]}]}};
+  const r=await request('/rich-menu-preview','POST',{name:'相談',accountIds:['a','b','c'],definition});expect(r.status,JSON.stringify(r.body)).toBe(200);
+  expect(r.body.data.references.map((ref:{kind:string;availableAccountCount:number;totalAccountCount:number})=>[ref.kind,ref.availableAccountCount,ref.totalAccountCount]).sort()).toEqual([['form',2,3],['liff',1,3],['tag',2,3]]);
+  expect(r.body.data.stores.find((s:{accountId:string;missingReferences:Array<{kind:string}>})=>s.accountId==='b').missingReferences.map((ref:{kind:string})=>ref.kind).sort()).toEqual(['liff','tag']);
+  expect(sql.raw.prepare('SELECT COUNT(*) n FROM hq_templates').get()).toEqual({n:0});
+});
+
+test.each([
+ ['tel','uri',{uri:'tel:0312345678'}],['datetime','postback',{mode:'date',initial:'2026-10-16'}],
+ ['clipboard','postback',{text:'予約番号'}],['postback','postback',{data:'contact',displayText:'問い合わせ'}],
+])('組5: %s の保存→配布→店の公開用組立に同じ動きを保持する',async(intent,actionType,actionData)=>{
+ const image=await upload('rich_menu');
+ const d={schemaVersion:1,richMenu:{id:'menu',name:'追加の動き',chatBarText:'メニュー',size:'large',defaultPageId:'page',pages:[{id:'page',name:'ページ',imageR2Key:image.body.data.r2Key,areas:[{id:'action',bounds:{x:0,y:0,width:100,height:100},intent,actionType,actionData,label:'実行'}]}]}};
+ const id=await save('rich_menu',d);await distribute(id);
+ const areas=sql.raw.prepare('SELECT intent,action_type,action_data FROM rich_menu_areas').all() as Array<{intent:string;action_type:string;action_data:string}>;
+ expect(areas).toHaveLength(3);expect(areas.every(a=>a.intent===intent&&a.action_type===actionType&&JSON.stringify(JSON.parse(a.action_data))===JSON.stringify(actionData))).toBe(true);
+});
+
+test('組5: 同じ名前の予約ページと店のタグを計測リンクへ保存し、確認後の変更を拒否する',async()=>{
+ const image=await upload('rich_menu');
+ for(const a of ['a','b','c']){
+  sql.raw.prepare("UPDATE line_accounts SET liff_id=? WHERE id=?").run('liff-'+a,a);
+  sql.raw.prepare("INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES (?,?,'基本の予約',30,0)").run('m-'+a,a);
+  sql.raw.prepare("INSERT INTO tags(id,name,line_account_id) VALUES (?,'予約ボタン',?)").run('tag-'+a,a);
+ }
+ const d={schemaVersion:1,richMenu:{id:'menu',name:'計測',chatBarText:'メニュー',size:'large',defaultPageId:'page',pages:[{id:'page',name:'ページ',imageR2Key:image.body.data.r2Key,areas:[{id:'book',bounds:{x:0,y:0,width:100,height:100},actionType:'uri',intent:'booking',actionData:{},bookingMenuName:'基本の予約',useTrackedLink:true,tagIds:['tag-a'],label:'予約'}]}]}};
+ const check=await request('/rich-menu-preview','POST',{name:'計測',accountIds:['a','b','c'],definition:d});expect(check.status,JSON.stringify(check.body)).toBe(200);expect(check.body.data.summary.missingReferences).toBe(0);
+ const id=await save('rich_menu',d);await distribute(id);
+ const links=sql.raw.prepare('SELECT l.line_account_id,l.original_url,l.tag_id,a.tracked_link_id,l.id FROM tracked_links l JOIN rich_menu_areas a ON a.tracked_link_id=l.id ORDER BY l.line_account_id').all() as Array<{line_account_id:string;original_url:string;tag_id:string;tracked_link_id:string;id:string}>;
+ expect(links).toHaveLength(3);for(const l of links){expect(l.tag_id).toBe('tag-'+l.line_account_id);expect(l.original_url).toContain('menu_id=m-'+l.line_account_id);expect(l.tracked_link_id).toBe(l.id);}
+ const p=await request(`/${id}/preflight`,'POST',{accountIds:['a']});expect(p.status).toBe(200);
+ sql.raw.exec("UPDATE menus SET is_active=0 WHERE id='m-a'");
+ const r=await request(`/${id}/distribute`,'POST',{preflightId:p.body.data.preflightId,resolutions:p.body.data.stores.flatMap((s:{accountId:string;items:Array<{sourceId:string;duplicate:boolean}>})=>s.items.map((i:{sourceId:string;duplicate:boolean})=>({accountId:s.accountId,sourceId:i.sourceId,mode:i.duplicate?'overwrite':'create'})))});
+ expect(r.body.data.stores[0].status).not.toBe('succeeded');expect(sql.raw.prepare('SELECT count(*) n FROM tracked_links').get()).toEqual({n:3});
+});
+
+test('組5: 複数通を作成→版へ固定→配布→同じ順で配信素材に展開し、過多を拒否する',async()=>{
+ const original=freshDefinition('template') as MessageTemplateDefinition;
+ const d={...original,template:{...original.template,name:'複数通',messageContent:'最初'},messageBubbles:[{id:'one',type:'text',content:{text:'最初 {{name}}'}},{id:'two',type:'text',content:{text:'次のご案内'}}]};
+ const id=await save('template',d);expect((await request('?message_count=multiple')).body.data).toMatchObject([{id,message_count:2,has_interpolations:true}]);
+ await distribute(id);
+ const locals=sql.raw.prepare('SELECT id,message_bubbles_json FROM templates').all() as Array<{id:string;message_bubbles_json:string}>;
+ expect(locals).toHaveLength(3);expect(locals.every(r=>JSON.parse(r.message_bubbles_json).length===2)).toBe(true);
+ expect(sql.raw.prepare('SELECT COUNT(*) n FROM template_versions WHERE json_array_length(message_bubbles_json)=2').get()).toEqual({n:3});
+ const detail=(await request(`/${id}`)).body.data;
+ const {resolveHqBroadcastMaterials}=await import('../services/hq-broadcast-materials.js');
+ const {parseBroadcastMessageParts,buildMessages}=await import('../services/broadcast-message-set.js');
+ const input={messageType:'text',messageContent:'',messageBubbles:[{id:'chosen',type:'text',content:{text:'表示用',hqTemplateId:id,hqTemplateVersionId:detail.template.current_version_id}}]};
+ const resolved=await resolveHqBroadcastMaterials(sql.db,'tenant','a',input as never);
+ expect(buildMessages(parseBroadcastMessageParts(resolved))).toEqual([{type:'text',text:'最初 {{name}}'},{type:'text',text:'次のご案内'}]);
+ await expect(resolveHqBroadcastMaterials(sql.db,'tenant','a',{...input,messageBubbles:Array.from({length:3},(_,i)=>({...input.messageBubbles[0],id:String(i)}))} as never)).rejects.toThrow('5通');
+ for(const messageBubbles of [[],Array(6).fill(d.messageBubbles[0]),[{id:'bad',type:'text',content:{text:''}}]])expect((await request('','POST',{type:'template',name:'不正',requestId:crypto.randomUUID(),definition:{...d,messageBubbles}})).status).toBe(400);
+});
+
+test('組5: 電話番号の差し込みは各店の同じ名前の共通情報を使い、無効な値や変更後の配布を拒否する',async()=>{
+ const image=await upload('rich_menu');
+ for(const a of ['a','b','c'])sql.raw.prepare("INSERT INTO common_vars(id,name,var_key,type,value,line_account_id) VALUES (?,'店の電話','phone','text',?,?)").run('var-'+a,'031234000'+['a','b','c'].indexOf(a),a);
+ sql.raw.exec("UPDATE common_vars SET valid_from=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour'),valid_until=strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 hour')");
+ const d={schemaVersion:1,richMenu:{id:'menu',name:'電話',chatBarText:'メニュー',size:'large',defaultPageId:'page',pages:[{id:'page',name:'ページ',imageR2Key:image.body.data.r2Key,areas:[{id:'phone',label:'電話をかける',bounds:{x:0,y:0,width:100,height:100},actionType:'uri',intent:'tel',actionData:{uri:'tel:0312340000'},dataBindings:{uri:'店の電話'}}]}]}};
+ const preview=await request('/rich-menu-preview','POST',{name:'電話',accountIds:['a','b','c'],definition:d});expect(preview.status,JSON.stringify(preview.body)).toBe(200);expect(preview.body.data.references[0]).toMatchObject({kind:'common_var',availableAccountCount:3});
+ const id=await save('rich_menu',d);await distribute(id);
+ const rows=sql.raw.prepare('SELECT g.account_id,a.action_data FROM rich_menu_areas a JOIN rich_menu_pages p ON p.id=a.page_id JOIN rich_menu_groups g ON g.id=p.group_id ORDER BY g.account_id').all() as Array<{account_id:string;action_data:string}>;
+ expect(rows.map(r=>JSON.parse(r.action_data).uri)).toEqual(['tel:0312340000','tel:0312340001','tel:0312340002']);
+ const p=await request(`/${id}/preflight`,'POST',{accountIds:['a']});expect(p.status).toBe(200);
+ sql.raw.exec("UPDATE common_vars SET value='javascript:bad' WHERE id='var-a'");
+ const r=await request(`/${id}/distribute`,'POST',{preflightId:p.body.data.preflightId,resolutions:p.body.data.stores.flatMap((s:{accountId:string;items:Array<{sourceId:string;duplicate:boolean}>})=>s.items.map((i:{sourceId:string;duplicate:boolean})=>({accountId:s.accountId,sourceId:i.sourceId,mode:i.duplicate?'overwrite':'create'})))});
+ expect(r.body.data.stores[0].status).not.toBe('succeeded');
+});
+
+
+test('組5: カルーセルから始まる複数通もメッセージ一覧で2通として返す',async()=>{
+ const original=freshDefinition('template') as MessageTemplateDefinition;
+ const d={...original,template:{...original.template,name:'カードから始める'},messageBubbles:[{id:'card',type:'carousel',content:{columnsJson:JSON.stringify([{text:'確認',actions:[{type:'message',label:'確認',text:'確認'}]}])}},{id:'text',type:'text',content:{text:'次のご案内'}}]};
+ const id=await save('template',d);
+ expect((await request('?kind=message&message_count=multiple')).body.data.find((row:{id:string})=>row.id===id)).toMatchObject({kind:'message',message_count:2,content_summary:'メッセージ 2通'});
+});

@@ -260,7 +260,7 @@ async function resolveMessage(
     });
     const template = await context.db.prepare(
       `SELECT message_type, message_content FROM templates
-        WHERE id = ? AND line_account_id = ?`,
+        WHERE id = ? AND line_account_id = ? AND message_bubbles_json IS NULL`,
     ).bind(id, context.lineAccountId).first<{ message_type: string; message_content: string }>();
     if (!template) throw invalid('template_not_found', 'テンプレートが見つかりません');
     return {

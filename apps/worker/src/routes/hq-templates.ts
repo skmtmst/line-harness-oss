@@ -1,5 +1,9 @@
+import { searchHqResources } from '../services/hq-templates/resource-search.js';
+import { listDistributionTargets } from '../services/hq-templates/distribution-display.js';
 import { messageTemplateSearchIds, listTemplateViews, saveTemplateView, archiveTemplateView } from '../services/hq-templates/saved-views.js';
 import { markListStats } from '../services/hq-templates/mark-list-stats.js';
+import { testHqForm } from '../services/hq-templates/form-test.js';
+import { previewRichMenu } from '../services/hq-templates/rich-menu-preview.js';
 import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { swapHqFolderOrder, HqFolderError } from '@line-crm/db';
 import { isFriendAttributeType, preflightFriendAttribute, distributeFriendAttribute, friendAttributeResult } from '../services/hq-templates/friend-attribute-distribution.js';
@@ -8,7 +12,7 @@ import { listTemplateFolders, saveTemplateFolder, deleteTemplateFolder, duplicat
 import { listMessageReferences } from '../services/hq-templates/message-card-references.js';
 import { deleteHqImage, uploadHqImage, uploadHqImagemap } from '../services/hq-templates/authoring-media.js';
 import { TemplateHqTemplateError } from '../services/hq-templates/template.js';
-import { createHqMediaSession, completeHqMediaSession, cancelHqMediaSession } from '../services/hq-media.js';
+import { createHqMediaSession, completeHqMediaSession, cancelHqMediaSession, listHqRegisteredMedia } from '../services/hq-media.js';
 import { Hono, type Context } from 'hono';
 import { HQ_TEMPLATE_TYPES, getStaffById, getHqTemplate, type HqTemplateType } from '@line-crm/db';
 import { dbFor } from '../services/db-router.js';
@@ -42,6 +46,7 @@ const reasons: Record<string, string> = {
   MEDIA_SCAN_PENDING: 'ファイルの安全性を確かめています。少し待って再確認してください',
   MEDIA_IN_USE: '保存済みのファイルは削除できません',
   SOURCE_MEDIA_UNAVAILABLE: 'ファイルを確認できません。選び直してください',
+  DISPLAY_TAG_UNAVAILABLE: '配り先に同じ名前の有効なタグが1件あるか確認してください',
   LIFF_UNAVAILABLE: '配り先のLINEアカウントにLIFFが設定されていません。LIFFを設定してから配り直してください',
   CARD_REFERENCE_UNAVAILABLE: '配り先に同じ名前のフォーム・シナリオ・予約メニュー・スタンプカードが1件だけあるか、LIFFが設定されているか確認してください',
   INVALID_REQUEST_ID: '作成依頼の識別情報を確認してください',
@@ -76,6 +81,7 @@ hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, 
     return inputError(c, { success: false, ...(typed && (error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。しばらくしてから再確認してください'), code }, typed ? error.status : 500);
   }
 });
+hqTemplates.get('/api/hq/templates/media',async c=>c.json({success:true,data:await listHqRegisteredMedia(dbFor(c.env),c.env.IMAGES,await authority(c),{kind:c.req.query('kind'),cursor:c.req.query('cursor'),limit:c.req.query('limit')})}));
 hqTemplates.post('/api/hq/templates/media/upload-sessions', async c => {
   return c.json({ success: true, data: await createHqMediaSession(c.env, dbFor(c.env), await authority(c), await body(c)) }, 201);
 });
@@ -122,6 +128,7 @@ hqTemplates.get('/api/hq/templates/saved-views', async c => c.json({success:true
 hqTemplates.post('/api/hq/templates/saved-views', inputJsonBoundary(), async c => c.json({success:true,data:await saveTemplateView(dbFor(c.env),await authority(c),await body(c))},201));
 hqTemplates.patch('/api/hq/templates/saved-views/:viewId', inputJsonBoundary(), async c => c.json({success:true,data:await saveTemplateView(dbFor(c.env),await authority(c),await body(c),c.req.param('viewId'))}));
 hqTemplates.delete('/api/hq/templates/saved-views/:viewId', async c => c.json({success:true,data:await archiveTemplateView(dbFor(c.env),await authority(c),c.req.param('viewId'),(await body(c)).expectedRevision)}));
+hqTemplates.post('/api/hq/templates/rich-menu-preview', inputJsonBoundary(), async c => c.json({success:true,data:await previewRichMenu(dbFor(c.env),await authority(c),await body(c),c.env.IMAGES)}));
 hqTemplates.get('/api/hq/templates/accounts', async c => c.json({ success: true, data: await listTemplateAccounts(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates/message-references', async c => c.json({ success: true, data: await listMessageReferences(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates/kind-counts', async c => {
@@ -179,6 +186,17 @@ hqTemplates.post('/api/hq/templates/folders', inputJsonBoundary({ name: ['string
 hqTemplates.patch('/api/hq/templates/folders/:id', inputJsonBoundary({ name: ['string'], color: ['string', 'null'] }), async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c),c.req.param('id')) }));
 hqTemplates.delete('/api/hq/templates/folders/:id', async c => c.json({ success:true, data:await deleteTemplateFolder(dbFor(c.env),await authority(c),c.req.param('id'),(await body(c)).expectedRevision) }));
 hqTemplates.post('/api/hq/templates/:id/duplicate', inputJsonBoundary(), async c => c.json({ success:true, data:await duplicateTemplate(dbFor(c.env),await authority(c),c.req.param('id'),await body(c)) },201));
+hqTemplates.get('/api/hq/templates/resources',async c=>{
+ const auth=await authority(c);
+ return c.json({success:true,data:await searchHqResources(dbFor(c.env),auth.tenantId,c.req.query())});
+});
+hqTemplates.get('/api/hq/templates/:id/distribution-targets',async c=>{
+  const ids=c.req.query('accountIds')?.split(',')??[];
+  if(ids.length>30||new Set(ids).size!==ids.length||ids.some(id=>!id||id.length>100)) throw new HqTemplateError('INVALID_REQUEST');
+  const auth=await authority(c),data=await listDistributionTargets(dbFor(c.env),auth.tenantId,c.req.param('id'),ids);
+  if(!data)throw new HqTemplateError('NOT_FOUND',404);
+  return c.json({success:true,data});
+});
 hqTemplates.get('/api/hq/templates/:id/versions',async c=>c.json({success:true,data:await templateVersions(dbFor(c.env),await authority(c),c.req.param('id'))}));
 hqTemplates.get('/api/hq/templates/:id/versions/compare',async c=>c.json({success:true,data:await compareTemplateVersions(dbFor(c.env),await authority(c),c.req.param('id'),Number(c.req.query('from')),Number(c.req.query('to')))}));
 hqTemplates.post('/api/hq/templates/:id/versions/:version/restore',inputJsonBoundary(), async c=>{
@@ -204,6 +222,7 @@ hqTemplates.delete('/api/hq/templates/:id', async c => {
   const data = await deleteTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.expectedRevision);
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
+hqTemplates.post('/api/hq/templates/:id/test-send',inputJsonBoundary(),async c=>c.json({success:true,data:await testHqForm(dbFor(c.env),await authority(c),c.req.param('id'),await body(c))}));
 hqTemplates.post('/api/hq/templates/:id/preflight', inputJsonBoundary(), async c => {
   const input = await body(c);
   if (!Array.isArray(input.accountIds) || input.accountIds.some(v => typeof v !== 'string')) throw new HqTemplateError('INVALID_ACCOUNTS');

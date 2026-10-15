@@ -169,3 +169,23 @@ describe('store materialization',()=>{
     expect(bucket.get.mock.calls.every(([,opts]:any)=>opts.range.length<=8*1024*1024)).toBe(true);
   });
 });
+
+describe('HQ登録メディアの選択',()=>{
+  test('自組織の登録済み動画を一覧にし、未検査は選べず、ページ送りを保つ',async()=>{
+    const media=(await complete(await pending('video',mp4('video')))).body.data;
+    bucket.list=vi.fn(async()=>({objects:[objects.get(media.r2Key),{key:'hq-templates/other/uploads/foreign.mp4',customMetadata:objects.get(media.r2Key).customMetadata,size:media.sizeBytes}],truncated:true,cursor:'next'}));
+    const r=await request('/media?kind=video&limit=5');expect(r.status,JSON.stringify(r.body)).toBe(200);
+    expect(r.body.data.items).toHaveLength(1);expect(r.body.data.items[0]).toMatchObject({id:media.id,r2Key:media.r2Key,selectable:true});expect(r.body.data.nextCursor).toBe('next');
+    expect(bucket.list).toHaveBeenCalledWith(expect.objectContaining({prefix:'hq-templates/tenant/uploads/',limit:5}));
+    sql.raw.exec("UPDATE media_file_scans SET status='quarantined'");
+    expect((await request('/media?kind=video&cursor=next')).body.data.items[0].selectable).toBe(false);
+    expect(bucket.list).toHaveBeenLastCalledWith(expect.objectContaining({cursor:'next'}));
+    staff.readOnly=true;expect((await request('/media?kind=video')).status).toBe(200);
+  });
+  test('権限・不正な種類とページ指定を検査する',async()=>{
+    bucket.list=vi.fn(async()=>({objects:[],truncated:false}));
+    expect((await request('/media?kind=other')).status).toBe(422);
+    expect((await request('/media?limit=0')).status).toBe(400);
+    staff={id:'outsider',role:'owner',tenantId:'tenant'};expect((await request('/media')).status).toBe(403);expect(bucket.list).not.toHaveBeenCalled();
+  });
+});

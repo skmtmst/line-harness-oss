@@ -50,6 +50,7 @@ function isCoveredRoute(method: string, path: string): boolean {
     '/api/restaurant-test/closures/:id/contact-status', '/api/restaurant-test/close-notification-settings',
     '/api/restaurant-test/opening-hours', '/api/restaurant-test/reservation-link',
     '/api/restaurant-test/followups/:storeId',
+    '/api/restaurant-test/followups/:storeId/steps/:stepId/messages',
     '/api/restaurant-test/followups/:storeId/review-history',
     '/api/restaurant-test/followups/:storeId/bindings/:stepId',
     '/api/restaurant-test/followups/:storeId/request-start',
@@ -142,6 +143,11 @@ const ALLOWLIST_MAX = 771;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/hq/templates/media',
+  'GET /api/hq/templates/resources',
+  'GET /api/hq/templates/{id}/distribution-targets',
+  'POST /api/hq/templates/rich-menu-preview',
+  'POST /api/hq/templates/{id}/test-send',
   'GET /api/hq/templates/saved-views',
   'POST /api/hq/templates/saved-views',
   'PATCH /api/hq/templates/saved-views/{viewId}',
@@ -169,6 +175,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/restaurant-test/stores/{id}/referral-location',
   'PATCH /api/restaurant-test/reservations/{id}',
   'GET /api/restaurant-test/followups/{storeId}',
+  'PUT /api/restaurant-test/followups/{storeId}/steps/{stepId}/messages',
   'GET /api/restaurant-test/followups/{storeId}/review-history',
   'POST /api/restaurant-test/followups/{storeId}/bindings/{stepId}',
   'PATCH /api/restaurant-test/followups/{storeId}/bindings/{stepId}',

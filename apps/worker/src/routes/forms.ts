@@ -1,3 +1,5 @@
+import type { FormFieldDef } from './form-field-types.js';
+import { reportPeriod, type ReportPeriodInput } from '@line-crm/shared';
 import { callFormWebhook } from '../services/form-webhook.js';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
@@ -239,16 +241,6 @@ function validFormListFilter(value: string | undefined): FormListFilter {
 /** 一覧の並び順。知らない値は「最新の回答順」へ落とす（画面と同じ規則）。 */
 function validFormListSort(value: string | undefined): FormListSort {
   return value === 'answers' || value === 'updated' || value === 'name' ? value : 'latest-answer';
-}
-
-/** フォームの項目定義。forms.fields は JSON の配列で持っている。 */
-interface FormFieldDef {
-  id?: string;
-  name?: string;
-  label?: string;
-  type?: string;
-  /** 回答の登録先。友だち情報欄の項目ID。未設定なら情報欄には書かない */
-  friendFieldId?: string | null;
 }
 
 /**
@@ -1669,6 +1661,9 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
+    let period: ReturnType<typeof reportPeriod>;
+    try { period = reportPeriod({from:c.req.query('from'),to:c.req.query('to'),period:c.req.query('period') as ReportPeriodInput['period']}); }
+    catch { return c.json({success:false,error:'期間は正しい日付（YYYY-MM-DD）、または this_month・last_month・all で指定してください'},400); }
     const hasPagination = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
     if (!hasPagination) {
       // SDKなど既存利用先との互換性を保つ。V6管理画面だけが明示的にページ分けを要求する。
@@ -1680,7 +1675,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
        * 残る（実際、逆変異で確かめた: DB 側を 500 にしても slice があると
        * 試験が緑のままだった）。数も切る場所も1か所にする。
        */
-      const submissions = await getFormSubmissions(c.env.DB, id, NON_PAGINATED_SUBMISSIONS_MAX);
+      const submissions = await getFormSubmissions(c.env.DB, id, NON_PAGINATED_SUBMISSIONS_MAX, {...period,lineAccountId:c.req.query('account_id')});
       // Header 値は ASCII のみ。日本語の案内は PR と票に残す。
       // 数は直書きしない。名乗りと実際がずれると、取り落としに気づけない。
       c.header(
@@ -1698,13 +1693,14 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     // N-171/N-179: 一覧・件数・CSV が同じ検索条件になるよう、検索語をページング前に渡す。
     const search = (c.req.query('q') ?? '').trim().slice(0, 200) || undefined;
     const [submissions, summary] = await Promise.all([
-      getFormSubmissionsPage(c.env.DB, id, { page, limit, lineAccountId: c.req.query('account_id')!, search }),
+      getFormSubmissionsPage(c.env.DB, id, { ...period, page, limit, lineAccountId: c.req.query('account_id')!, search }),
       getFormSubmissionAnalytics(
         c.env.DB,
         id,
         c.req.query('account_id')!,
         dateFieldsOfForm(form),
         ratingFieldsOfForm(form),
+        period,
       ),
     ]);
     // N-168: 後処理の未完を運用者へ見せる。予約(claim)の工程記録と
@@ -1718,6 +1714,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
         page: submissions.page,
         limit: submissions.limit,
         summary,
+        period,
       },
     });
   } catch (err) {

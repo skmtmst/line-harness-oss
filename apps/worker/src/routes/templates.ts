@@ -1,3 +1,4 @@
+import { publishedInfoOf, versionInfoOf } from './../services/template-display.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateTapExtraReferences } from '../services/tap-extras.js';
 import { tapExtrasError } from '@line-crm/shared';
@@ -158,26 +159,6 @@ function draftCarouselTapLimitTextOf(t: TemplateRow): string | null {
   return hasTemplateDraft(t) ? t.draft_carousel_tap_limit_text : t.carousel_tap_limit_text;
 }
 
-/** 347: 公開版の固定情報。編集・保存では変わらない。 */
-function publishedInfoOf(t: TemplateRow) {
-  return {
-    messageType: t.message_type,
-    messageContent: t.message_content,
-    question: questionValue(t.question_json),
-    questionStatus: t.question_status,
-  };
-}
-
-function versionInfoOf(t: TemplateRow) {
-  return {
-    hasDraft: hasTemplateDraft(t),
-    publishedVersion: Number(t.published_version ?? 0),
-    publishedAt: t.published_at ?? null,
-    draftRevision: Number(t.draft_revision ?? 0),
-    published: publishedInfoOf(t),
-  };
-}
-
 /**
  * カルーセルなら中身を確かめる。
  *
@@ -321,6 +302,7 @@ templates.get('/api/templates', async (c) => {
       category: t.category,
       messageType: t.message_type,
       messageContent: t.message_content,
+      messageBubbles: t.message_bubbles_json ? JSON.parse(t.message_bubbles_json) : null,
       /*
        * R194: 管理一覧の抜粋・検索が読む最新の下書き。公開版しか無ければ null。
        * 送信の候補選びは `messageContent`（公開版）だけを見る決まりは変えない。
@@ -431,6 +413,7 @@ templates.get('/api/templates/:id', async (c) => {
         category: item.category,
         messageType: draftMessageTypeOf(item),
         messageContent: draftMessageContentOf(item),
+        messageBubbles: (hasTemplateDraft(item) ? item.draft_message_bubbles_json : item.message_bubbles_json) ? JSON.parse((hasTemplateDraft(item) ? item.draft_message_bubbles_json : item.message_bubbles_json)!) : null,
         question: questionValue(draftQuestionJsonOf(item)),
         questionStatus: draftQuestionStatusOf(item),
         folderId: item.folder_id ?? null,
@@ -650,6 +633,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
     )) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
+    if(existing.message_bubbles_json || existing.draft_message_bubbles_json) return c.json({success:false,code:'MULTIPLE_MESSAGES_REQUIRE_EDITOR',error:'複数通のテンプレートは統括の編集から保存してください'},409);
     /*
      * N-146: 部分更新なので「来なかった項目」はいまのまま残すが、
      * 来た項目が空・空白だけなら断る。画面側は保存前に止めているが、
@@ -910,6 +894,7 @@ templates.get('/api/templates/:id/versions', async (c) => {
         status: v.status,
         messageType: v.message_type,
         messageContent: v.message_content,
+        messageBubbles: v.message_bubbles_json ? JSON.parse(v.message_bubbles_json) : null,
         carouselActions: v.carousel_actions_json ? JSON.parse(v.carousel_actions_json) : null,
         carouselTapLimitMode: v.carousel_tap_limit_mode,
         carouselTapLimitText: v.carousel_tap_limit_text,

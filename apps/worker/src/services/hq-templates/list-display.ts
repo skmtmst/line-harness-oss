@@ -1,3 +1,4 @@
+import { messageListFacts } from './message-list-facts.js';
 import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
 import type { HqTemplateType } from '@line-crm/db';
 import { parseTagDefinition } from './tag.js';
@@ -35,6 +36,7 @@ export function templateContentSummary(type: HqTemplateType, definitionJson: str
       }
       case 'template': {
         const definition = parseMessageTemplateDefinition(JSON.parse(definitionJson));
+        if(definition.messageBubbles) return `メッセージ ${messageListFacts(definitionJson).message_count}通`;
         if (definition.template.messageType === 'imagemap') return 'リッチビデオ';
         if(definition.asset) {
           const {kind,payload}=definition.asset;
