@@ -98,10 +98,11 @@
 | D-7 | 画面のルート `/auto-replies/new`・`/conflicts`・`/test`（§2） | 別の画面は無く、`/auto-replies/edit` の中の手順として競合とテストを出す。他は `/auto-replies/publish`・`/auto-replies/runs` | apps/web/src/app/auto-replies/（edit・publish・runs だけ）、apps/web/src/app/auto-replies/edit/wizard-v8.tsx:480・:630-632 |
 
 ### 仕様が無い
+> 2026-10-16 オーナー「おすすめで」（B-337）で下の項目は全部決まった。各行の → が決定。問いは design/v8/review/SPEC-QUESTIONS-1016.md。
 
-- クールダウンの範囲。今は「その人へのどの自動応答でも」最後の返信から数える（ルールごとではない）（apps/worker/src/services/auto-reply-conditions.ts:177-193）。ルールごとか全体か決まっていない。
-- 遅延返信（○秒後に返す）は要件に無い。push で送るので送信数に数え、見回りの間隔で数分遅れる（apps/worker/src/services/auto-reply-delivery.ts、apps/worker/src/routes/auto-replies.ts:427-437、上限 86,400 秒）。使う場面・上限・遅れの許容が決まっていない。
-- 画像・スタンプ等に「すべてに応答」ルールが種別の指定なしで当たるか（今は種別の指定が無いと全部の種別に当たる。apps/worker/src/services/auto-reply.ts:175-191）。
-- Webhook の処理が途中で落ちて「進行中」のまま残った評価を、誰がいつ片づけるか（自動で返し直すか・受信箱へ出すか）。
-- 受信本文の短期保存の日数（§13「短期保存」の具体の日数）。
-- 臨時休業（店の休みの日）を自動応答の時間外として扱う設定。
+- クールダウンの範囲。今は「その人へのどの自動応答でも」最後の返信から数える（ルールごとではない）（apps/worker/src/services/auto-reply-conditions.ts:177-193）。ルールごとか全体か決まっていない。 → 決定 B-337 Q-45：その人へのどの自動応答でも数える（今のまま）。
+- 遅延返信（○秒後に返す）は要件に無い。push で送るので送信数に数え、見回りの間隔で数分遅れる（apps/worker/src/services/auto-reply-delivery.ts、apps/worker/src/routes/auto-replies.ts:427-437、上限 86,400 秒）。使う場面・上限・遅れの許容が決まっていない。 → 決定 B-337 Q-69：上限は 1 時間。送信数に数えると画面に書く。
+- 画像・スタンプ等に「すべてに応答」ルールが種別の指定なしで当たるか（今は種別の指定が無いと全部の種別に当たる。apps/worker/src/services/auto-reply.ts:175-191）。 → 決定 B-337 Q-45：種類を指定しないルールは文字だけに当てる。
+- Webhook の処理が途中で落ちて「進行中」のまま残った評価を、誰がいつ片づけるか（自動で返し直すか・受信箱へ出すか）。 → 決定 B-337 Q-45：「進行中」のまま 10 分残った物は返し直さず、受信箱へ「自動応答できなかった」と出す。
+- 受信本文の短期保存の日数（§13「短期保存」の具体の日数）。 → 決定 B-337 Q-04：受信本文の短期保存は 30 日。 （仮の値・専門家に確かめる（B-337））
+- 臨時休業（店の休みの日）を自動応答の時間外として扱う設定。 → 決定 B-337 Q-45：臨時休業の日は時間外として扱う。
