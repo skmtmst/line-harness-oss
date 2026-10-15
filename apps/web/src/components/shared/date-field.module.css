@@ -33,6 +33,11 @@
   transition: border-color var(--motion-fast) var(--motion-ease-out);
 }
 
+/* 消すボタンを置かない欄（日時の欄の clearable={false}）は右の空きを詰める。 */
+.field[data-no-clear] {
+  padding-right: 12px;
+}
+
 :root .field:not([data-open]):not([data-invalid]) {
   border-color: var(--color-control-border);
   box-shadow: var(--control-shadow);
