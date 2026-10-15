@@ -8,6 +8,8 @@ import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
+import { Tabs } from '@/components/shared/tabs'
+import { hqTemplateTabsForStarterSets } from '@/v8/hq-templates/store-list'
 import { RowMenu } from '@/components/shared/row-actions'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
@@ -79,6 +81,7 @@ export default function HqStarterSetsV8() {
     <ListPage
       boardId="J6647"
       title="スタイルの初期セット"
+      tabs={<Tabs size="compact" label="テンプレートの種類" items={hqTemplateTabsForStarterSets()} />}
       help="スタイルごとに、新しいアカウントへ最初から入れる物です。入った物には「見本」の札が付き、店で直せます。"
       actions={canEdit ? <>
         <Button onClick={() => preparing.open('標準に戻す')}>標準に戻す</Button>

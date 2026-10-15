@@ -29,7 +29,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
 import { RowNameLink, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { Tabs } from '@/components/shared/tabs'
+import { Tabs, type TabItem } from '@/components/shared/tabs'
 import { formatNumber } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
 import { distributedAccountsLine, templateSubLine, hqMessageTypeLabel } from './list-row'
@@ -64,6 +64,13 @@ export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof Messag
   { kind: 'coupon', label: 'クーポン', icon: Ticket },
   { kind: 'research', label: 'リサーチ', icon: ClipboardList },
 ]
+/** B-322：テンプレートのタブの最後に「初期セット」（統括のスタイルの初期セット J6647）。 */
+export const STARTER_SET_TAB: TabItem = { label: '初期セット', href: '/hq/templates/starter-sets' }
+
+/** 初期セットの画面で出す同じタブの並び（種類のタブは `?kind=` でテンプレートの一覧へ戻る）。 */
+export function hqTemplateTabsForStarterSets(): TabItem[] {
+  return [...KIND_TABS.map((tab) => ({ label: tab.label, href: `/hq/templates?kind=${tab.kind}` })), { ...STARTER_SET_TAB, current: true }]
+}
 const KIND_LABEL: Record<TemplateKind, string> = Object.fromEntries(KIND_TABS.map((tab) => [tab.kind, tab.label])) as Record<TemplateKind, string>
 
 /** 種類ごとの言葉（店の同じ機能の一覧と同じ）。 */
@@ -229,12 +236,12 @@ export default function HqStoreList(props: HqStoreListProps) {
       <Tabs
         size="compact"
         label={`${words.title}の種類`}
-        items={KIND_TABS.map((tab) => ({
+        items={[...KIND_TABS.map((tab): TabItem => ({
           label: tab.label,
           count: kindCounts?.[tab.kind],
           current: kind === tab.kind,
           onClick: () => { onKindChange(tab.kind); setPage(1) },
-        }))}
+        })), STARTER_SET_TAB]}
       />
   ) : undefined
 

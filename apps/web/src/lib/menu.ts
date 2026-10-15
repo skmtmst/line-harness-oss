@@ -19,7 +19,7 @@ export interface MenuItem {
   /** V8 だけ違う形にするときの path（lucide の形）。無ければ icon を使う。 */
   iconV8?: string
   /** 出す数の種類（仕様 §5）。無ければバッジを出さない。 */
-  badge?: 'unanswered' | 'photos' | 'unmatched' | 'operations'
+  badge?: 'unanswered' | 'photos' | 'unmatched' | 'operations' | 'hq-attention'
   /** 機能設定に出す一行説明。 */
   note: string
   /**
@@ -66,6 +66,8 @@ export const HQ_MENU_SECTIONS: MenuSection[] = [
     label: null,
     title: '統括コンソール',
     items: [
+      /* B-312・B-322（2026-10-16 司令塔）：統括の一番上に「対応が要るもの」（Kyf8U）。札は全アカウントの件数の合計。印は lucide の circle-alert。 */
+      { href: '/hq/attention', label: '対応が要るもの', icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8v4M12 16h.01', badge: 'hq-attention', id: 'hq-attention', note: '各アカウントの未対応のトーク・承認待ちの予約などをまとめて見ます', required: true },
       { href: '/hq', label: 'アカウント', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', iconV8: 'M10 12h4M10 8h4M14 21v-3a2 2 0 0 0-4 0v3M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
       { href: '/hq/friend-attributes', label: 'タグ', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', id: 'hq-tags', note: 'タグのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', id: 'hq-templates', note: 'メッセージのひな形を作成し、アカウントへ配布します', required: true },
