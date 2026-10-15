@@ -3013,7 +3013,8 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --tpl-list-cell-side: 16px;
 }
 
-:root { --tpl-image-frame-w: 160px; --tpl-image-frame-h: 106px; }
+/* 画像の枠：中に印・題・説明2行・上限が入る大きさ（絵 J60utH・e875x・D6fh3 の 180×160）。 */
+:root { --tpl-image-frame-w: 180px; --tpl-image-frame-h: 160px; --tpl-image-frame-ratio: 9 / 8; --tpl-slot-links-gap-below: 2px; --tpl-slot-links-pad-below: 8px; }
 :root { --tpl-floor-map-inset: 32px; --tpl-floor-aside-w: 400px; --tpl-floor-detail-row-h: 59px; --tpl-board-tabs-top: 18px; --tpl-board-body-top: 10px; --tpl-board-section-gap: 13px; --tpl-board-detail-w: 330px; --tpl-board-side-w: 304px; --tpl-board-resource-w: 86px; --tpl-board-row-h: 52px; --tpl-board-block-top: 4px; }
 /* 印刷の内容は body 直下へ置き、画面のスクロール枠・高さ制限から外す。 */
 @media print {
