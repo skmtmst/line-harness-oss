@@ -21,6 +21,17 @@ function hasDetail(node: ReactNode): boolean {
   })
 }
 
+/**
+ * 題の終わりの「（…）」（添え書き）は、マスに入らないときだけ行ごと隠す。本体の言葉は切らない。
+ * 「始まる見込み（試算）」が狭いマスで「始まる見込み（…」と切れていた（ARuZ4・PMLkX・Al4Ek・nMSiE・kz2B6）。
+ * 全文は title と読み上げで残る。添え書きの無い題は今までどおり。
+ */
+function titleParts(title: string) {
+  const m = /^(.+?)(（[^（）]+）)$/u.exec(title)
+  if (!m) return title
+  return <><span className={styles.labelMain}>{m[1]}</span><span className={styles.labelQualifier}>{m[2]}</span></>
+}
+
 /** B-145・B-158：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */
 function staticMenuDescription(menu: ReactNode): string | undefined {
   if (!React.isValidElement<React.ButtonHTMLAttributes<HTMLButtonElement>>(menu) || menu.type !== 'button') return
@@ -220,11 +231,11 @@ export default function KpiCard({
             </span>
           )}
           {hasTip && helpDisplay === 'label' ? (
-            <HelpTip label={explanationLabel} className={styles.labelHelp} trigger={<span className={styles.labelText}>{title}</span>}>
+            <HelpTip label={explanationLabel} className={styles.labelHelp} trigger={<span className={styles.labelText}>{titleParts(title)}</span>}>
               {explanation}
             </HelpTip>
           ) : <span className={styles.labelText}>
-            {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
+            {title ? titleParts(title) : (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
           </span>}
           {hasTip && helpDisplay === 'question' ? (
             <HelpTip label={explanationLabel} className={styles.tip}>
