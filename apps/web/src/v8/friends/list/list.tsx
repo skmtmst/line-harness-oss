@@ -851,10 +851,10 @@ export default function FriendsListV8() {
                   <Td key={column.key} className={styles.td}>
                     <div className={styles.supportCell}>
                       <span className={styles.statusRow}>
-                        <StatusBadge tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusBadge>
+                        <StatusBadge tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']} title={friend.supportMark && friend.supportMark.name !== status.label ? `対応マーク：${friend.supportMark.name}` : undefined}>{status.label}</StatusBadge>
                       </span>
-                      {/* 絵 y2n1z：札は対応の状態1つ。対応マークは担当の行に添える（状態と同じ言葉なら出さない）。 */}
-                      <span className={styles.sub}><span>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>{friend.supportMark && friend.supportMark.name !== status.label ? <span title={`対応マーク：${friend.supportMark.name}`}>{`・${friend.supportMark.name}`}</span> : null}</span>
+                      {/* 絵 y2n1z：札は対応の状態1つ、下の行は担当だけ。対応マークは札の title で読む（札と違う言葉を並べない）。 */}
+                      <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
                     </div>
                   </Td>
                   )
