@@ -1429,6 +1429,9 @@ const RESTAURANT_SNAPSHOT = {
     { id: 'flow-2', store_id: null, flow_type: 'reservation_2h', title: '本日のご来店をお待ちしております', body: 'お店までの道順と、駐車場のご案内です。', timing_minutes: -120, is_enabled: 1, delivery_mode: 'preview_only' },
     { id: 'flow-3', store_id: null, flow_type: 'post_visit', title: '本日はありがとうございました', body: '次回使えるデザートのサービス券をお送りします。', timing_minutes: 180, is_enabled: 0, delivery_mode: 'preview_only' },
     { id: 'flow-4', store_id: null, flow_type: 'review_request', title: 'よろしければご感想をお聞かせください', body: 'Google の口コミに書いていただけるとうれしいです。', timing_minutes: 1440, is_enabled: 0, delivery_mode: 'preview_only' },
+    /* 融合の板 n9vvGx の「会員証」「ワンタップ予約」（常設）。 */
+    { id: 'flow-5', store_id: null, flow_type: 'member_card', title: 'デジタル会員証', body: 'スタンプカードと来店履歴を見られます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
+    { id: 'flow-6', store_id: null, flow_type: 'one_tap_booking', title: '前回と同じ内容で予約', body: '店舗・人数・コースを前回と同じにして予約できます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
   ],
 }
 /*
