@@ -2,7 +2,7 @@
 import type { Alloc, Hours, SlotInfo, Conflict } from './stock-types'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useState } from 'react'
-import { Armchair, BookOpen, Check, Trash2 } from 'lucide-react'
+import { Armchair, BookOpen, Check, X } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
@@ -19,7 +19,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StockListHeading from './stock-list-heading'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import TimeField from '@/components/shared/time-field-v8'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -492,7 +492,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                   <div className={styles.dayHead}>
                     {/* 閲覧のみ：つまみ・時刻を選ぶ部品は置かず、いまの時間を文字で見せる（2026-10-06 オーナー決定）。 */}
                     {canEdit ? (
-                      <SaveErrorField names={["open","day"]}><SettingCheckbox
+                      <SaveErrorField names={["open","day"]}><Toggle
                         checked={open}
                         label={`${name}曜日に予約を受ける`}
                         onChange={(next) => setDay(weekday, next ? [{ opensAt: '17:00', closesAt: '22:00' }] : [])}
@@ -529,8 +529,8 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                             <span aria-label={`${name}曜日 ${index + 1}つ目の時間帯`}>{`${period.opensAt}〜${period.closesAt}`}</span>
                           )}
                           {canEdit ? (
-                            <IconButton aria-label={`${name}曜日の${index + 1}つ目の時間帯を外す`} onClick={() => setDay(weekday, day.periods.filter((_, i) => i !== index))}>
-                              <Trash2 size={16} aria-hidden="true" />
+                            <IconButton variant="plain" size="row" aria-label={`${name}曜日の${index + 1}つ目の時間帯を外す`} onClick={() => setDay(weekday, day.periods.filter((_, i) => i !== index))}>
+                              <X size={14} aria-hidden="true" />
                             </IconButton>
                           ) : null}
                         </div>

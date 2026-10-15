@@ -17,10 +17,6 @@
 
 /* ===== 競合の帯（頭の下・左右の列をまたぐ） ===== */
 
-.conflictRow {
-  padding: 0 var(--tpl-bm-24) var(--tpl-bm-8);
-}
-
 .conflictBand {
   display: flex;
   align-items: center;

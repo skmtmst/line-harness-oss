@@ -13,7 +13,6 @@ import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
 import StatusBadge from '@/components/shared/status-badge'
-import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
 import CheckCard from '@/components/shared/check-card'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -481,16 +480,11 @@ export default function MenuFormV8() {
     })
   }
 
-  function toggleResource(id: string) {
+  function selectResources(ids: string[]) {
     if (editTarget && (!canManageResources || resourceSaving || saving)) return
     setResourceMessage(null)
-    if (!resourceIds.has(id)) setResourceQuantities((current) => ({ ...current, [id]: '1' }))
-    setResourceIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    setResourceQuantities((current) => ({ ...current, ...Object.fromEntries(ids.map((id) => [id, current[id] ?? '1'])) }))
+    setResourceIds(new Set(ids))
   }
 
   function validate(): string | null {
@@ -911,6 +905,8 @@ export default function MenuFormV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage elementRef={formRef} boardId={conflict ? 'v5L19Z' : 'QqER7'} dirty={false}
+        noticeSpacing="band"
+        notice={conflict ? <div ref={conflictRef} data-design="Bar" data-design-node="v5L19Z"><SaveConflictBand title={`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`} onCompare={() => setComparing(true)} onReload={() => void reloadLatest()} /></div> : undefined}
         status={conflict ? 'ほかの人の変更を確かめてから保存してください' : undefined}
         footerActions={(
             <>
@@ -941,12 +937,6 @@ export default function MenuFormV8() {
        title={editTarget ? '予約メニューを直す' : '予約メニューを作る'}
         help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>} >
 
-      {conflict && (
-        <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
-          <SaveConflictBand title={`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`} onCompare={() => setComparing(true)} onReload={() => void reloadLatest()} />
-        </div>
-      )}
-
           {/* ① メニューの中身 */}
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="メニューの中身" />
@@ -970,7 +960,7 @@ export default function MenuFormV8() {
                   <span className={styles.fieldError} role="alert">{fieldErrors.name}</span>
                 ) : null}</Field>
               <Field label="分類">
-                <SaveErrorField names={["categoryLabel","categoryPicking","category_label","category_picking"]}><EntitySelect
+                <SaveErrorField names={["categoryLabel","categoryPicking","category_label","category_picking"]}><Select
                   size="full"
                   aria-label="分類"
                   value={categoryPicking ? '__new__' : categoryLabel}
@@ -1093,7 +1083,7 @@ export default function MenuFormV8() {
                 {fieldErrors.staff && assigned.size === 0 ? <p className={styles.fieldError} role="alert">{fieldErrors.staff}</p> : null}
                 <div className={styles.toggleLine}>
                   <span className={styles.toggleLineLabel}>「指名なし」でも受ける</span>
-                  <SaveErrorField names={["noAssign","no_assign"]}><SettingCheckbox
+                  <SaveErrorField names={["noAssign","no_assign"]}><Toggle
                     label="「指名なし」でも受ける"
                     checked={noAssign}
                     onChange={toggleNoAssign}
@@ -1208,7 +1198,7 @@ export default function MenuFormV8() {
               )}
               {unavailableTag && <Notice tone="warn" role="alert">設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。</Notice>}
               <div className={styles.toggleLineLead}>
-                <SaveErrorField names={["askQuestion","ask_question"]}><SettingCheckbox
+                <SaveErrorField names={["askQuestion","ask_question"]}><Toggle
                   label="予約するときに質問を出す"
                   checked={askQuestion}
                   onChange={setAskQuestion}
@@ -1238,18 +1228,11 @@ export default function MenuFormV8() {
               ) : resourceChoices.length === 0 ? (
                 <p className="text-ink-faint text-sm">使える設備はまだありません。受付枠の設備から登録できます。</p>
               ) : (
-                <div className={styles.checkRow}>
-                  {resourceChoices.map((item) => {
-                    const on = resourceIds.has(item.id)
-                    return (
-                      <Checkbox key={item.id} checked={on}
-                        disabled={Boolean(editTarget && (!canManageResources || resourceSaving || saving || !item.isActive && !on))}
-                        onCheckedChange={() => toggleResource(item.id)}>
-                        {item.name}{!item.isActive ? '（停止中）' : ''}
-                      </Checkbox>
-                    )
-                  })}
-                </div>
+                <EntitySelect size="full" noun="設備" aria-label="使う設備" values={[...resourceIds]}
+                  readOnly={Boolean(editTarget && !canManageResources)} disabled={resourceSaving || saving !== null}
+                  onChange={selectResources}
+                  options={resourceChoices.map((item) => ({ value: item.id, label: `${item.name}${!item.isActive ? '（停止中）' : ''}`, disabled: !item.isActive && !resourceIds.has(item.id) }))}
+                />
               )}
               {editTarget && resourceChoices.filter((item) => resourceIds.has(item.id)).map((item) => (
                 <Field key={item.id} label={`${item.name}の必要数`}>

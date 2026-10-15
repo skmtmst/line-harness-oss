@@ -6,6 +6,7 @@
  * - 064：開いただけで「直しかけ」にしない（受付の日数・時間の欄）
  */
 import React from 'react'
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 import buttonStyles from '@/components/shared/button.module.css'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -96,7 +97,7 @@ describe('予約メニューを作る・直す（WEB062/063/064）', () => {
     net.saveMenuResources.mockResolvedValue({ data: { version: 5 } })
     render(<MenuFormV8 />)
     await settle()
-    fireEvent.click(screen.getByRole('checkbox', { name: /台1/ }))
+    await pickEntities('使う設備', ['台1'])
     await act(async () => { screen.getByRole('button', { name: /変更を保存する/ }).click() })
     await settle()
     expect(net.saveMenuResources).toHaveBeenCalledWith('a', 'm1', expect.objectContaining({ resources: [] }))
@@ -139,22 +140,20 @@ it('担当の一覧に新しいメニューがまだなくても、割当を明�
 })
 
 
-it('担当と設備を本物のチェックで選び、選択と解除を独立して保持する', async () => {
+it('担当と設備を独立して選び、設備の窓を閉じても選択と解除を保持する', async () => {
   render(<MenuFormV8 />)
   await settle()
   const staff = screen.getByRole('checkbox', { name: '高田', exact: true }) as HTMLInputElement
-  const resource = screen.getByRole('checkbox', { name: '台1', exact: true }) as HTMLInputElement
   expect(staff.checked).toBe(false)
-  expect(resource.checked).toBe(false)
   fireEvent.click(staff)
-  fireEvent.click(resource)
+  await pickEntities('使う設備', ['台1'])
   expect(staff.checked).toBe(true)
-  expect(resource.checked).toBe(true)
+  expect(screen.getByRole('button', { name: '台1を外す' })).toBeTruthy()
   fireEvent.click(staff)
   expect(staff.checked).toBe(false)
-  expect(resource.checked).toBe(true)
-  fireEvent.click(resource)
-  expect(resource.checked).toBe(false)
+  expect(screen.getByRole('button', { name: '台1を外す' })).toBeTruthy()
+  await pickEntities('使う設備', ['台1'])
+  expect(screen.queryByRole('button', { name: '台1を外す' })).toBeNull()
 })
 
 it('作成の道順は親のリンクだけを渡し、現在地を共通の題へ任せる', async () => {
