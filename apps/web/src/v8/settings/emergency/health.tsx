@@ -1,4 +1,5 @@
 'use client'
+import TruncatedText from '@/components/shared/truncated-text'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { TriangleAlert, CircleCheck, Info, OctagonAlert } from 'lucide-react'
@@ -589,7 +590,7 @@ export function HealthPanelV8({
                   </GridCell>
                   <GridCell role="cell" className={styles.judge}><StatusPill severity={check.severity} stale={check.stale} /></GridCell>
                   <GridCell role="cell" className={styles.time}>{formatCheckedAt(check.observedAt)}</GridCell>
-                  <GridCell role="cell" className={styles.how} title={abnormal ? check.threshold : undefined}>{abnormal ? check.summary : check.threshold}</GridCell>
+                  <GridCell role="cell" className={styles.how} title={abnormal ? check.threshold : undefined}><TruncatedText value={abnormal ? (check.summary ?? '') : check.threshold} /></GridCell>
                 </GridRow>
               )
             })}
