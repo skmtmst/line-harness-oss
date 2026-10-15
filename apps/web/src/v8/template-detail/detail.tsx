@@ -2,7 +2,7 @@
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, ChevronDown, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react';
+import { ChevronDown, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -10,7 +10,7 @@ import { validateFlexContent } from '@line-crm/shared';
 import { api, ApiError } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageTitle } from '@/components/shell/page-chrome';
-import { PageFrame, PageHeading } from '@/components/templates/page-frame';
+import { CreatePage } from '@/components/templates/create-page';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
@@ -18,7 +18,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TemplateDeleteDialog from '@/v8/templates/delete-dialog'
 import Dialog from '@/components/shared/dialog'
 import DialogUsageTable from '@/components/shared/dialog-usage-table'
-import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview';
+import LinePreview, { LinePreviewFlex as FlexPreviewComponent, LinePreviewMessage } from '@/components/shared/line-preview';
 import { InsertText } from '@/components/shared/insert-text-field';
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor';
 import TargetMissing from '@/components/shared/target-missing'
@@ -26,6 +26,8 @@ import { buildUsageRows, insertionNames, isTemplateDetailData, lineChanges, mess
 import styles from './detail.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TruncatedText from '@/components/shared/truncated-text'
+import Card, { CardHeader } from '@/components/shared/card'
+import { RowNameLink } from '@/components/shared/table'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value';
 import { DetailLoading } from '@/components/templates/detail-page';
@@ -81,7 +83,7 @@ export default function TemplateDetailV8() {
   const [deleteError, setDeleteError] = useState('')
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
-  const usageRef = useRef<HTMLElement>(null)
+  const usageRef = useRef<HTMLDivElement>(null)
 
   /* N-144：編集・公開・削除の口は owner/admin だけ。閲覧のみには押せない操作を置かない（隠す）。 */
   const canMutate = useFeatureAccess('templates')
@@ -328,12 +330,12 @@ export default function TemplateDetailV8() {
     <div key={row.key} className={styles.usageRow}>
       <span className={styles.usageKind}>{row.kind}</span>
       {row.href
-        ? <Link href={row.href} className={styles.usageName} ><TruncatedText value={String(row.name ?? '')} /></Link>
+        ? <RowNameLink href={row.href} className={styles.usageName}><TruncatedText value={String(row.name ?? '')} /></RowNameLink>
         : <span className={styles.usageNameQuiet} title="旧形式・開ける画面がありません"><TruncatedText value={String(row.name ?? '')} /></span>}
       <span className={row.fixed ? styles.usageVersionFixed : styles.usageVersion} title={row.version}>{row.version}</span>
       <span className={styles.usageState}>{row.status ?? emptyValue('unknown')}</span>
       {row.href
-        ? <TextLink external href={row.href} className={styles.ghostButton}>開く</TextLink>
+        ? <TextLink external href={row.href}>開く</TextLink>
         : <span className={styles.ghostSpacer} aria-hidden="true" />}
     </div>
   )
@@ -362,35 +364,28 @@ export default function TemplateDetailV8() {
               複製する
             </Button>
           ) : null}
-          <RowMenu className={styles.moreButton} label="そのほかの操作" menuLabel={`テンプレート「${template.name}」の操作`} items={menuItems} />
+          <RowMenu appearance="box" label="そのほかの操作" menuLabel={`テンプレート「${template.name}」の操作`} items={menuItems} />
         </div>
       ) : null}
       {duplicateError ? <Notice tone="danger" >{duplicateError}</Notice> : null}
-      <section className={styles.aboutBox} aria-label="このテンプレートについて">
-        <h2 className={styles.aboutTitle}>このテンプレートについて</h2>
+      <Card variant="aside" aria-label="このテンプレートについて">
+        <CardHeader size="content" title="このテンプレートについて" />
         <dl className={styles.aboutList}>
           <div className={styles.aboutRow}><dt>種類</dt><dd>{messageTypeText(template.messageType)}</dd></div>
           <div className={styles.aboutRow}><dt>フォルダ</dt><dd>{folderLabel}</dd></div>
           <div className={styles.aboutRow}><dt>今月送った数</dt><dd>{monthlySends === undefined ? '読み込み中…' : monthlySends === null ? '—' : `${polishFormatNumber(monthlySends)} 通`}</dd></div>
           <div className={styles.aboutRow}><dt>差し込み</dt><dd title={insertions.join('・')}>{insertions.length > 0 ? insertions.join('・') : 'なし'}</dd></div>
         </dl>
-      </section>
+      </Card>
       {flexError ? (
         <Notice tone="danger" heading={<> {flexError} </>} >このままでは公開できません。
             {canMutate ? <Link href={editHref} className={styles.inlineLink}>再編集で直してください。</Link> : 'オーナー・管理者に再編集を依頼してください。'}</Notice>
       ) : (
         <LinePreview title="届き方" accountName="然 - NEN -" note="受け取る人のLINEでの見え方です。{ } の差し込みは、送るときに受け取る人ごとの値に変わります。">
           {template.messageType === 'flex' ? <FlexPreviewComponent content={draftContent} /> : (
-            <div className={styles.talkRow}>
-              <span className={styles.talkIcon} aria-hidden="true">然</span>
-              <div className={styles.talkCol}>
-                <span className={styles.talkName}>然 - NEN -</span>
-                <div className={styles.talkBubbleRow}>
-                  <p className={styles.talkBubble}>{buildTemplatePreview(draftContent, EMPTY_TEMPLATE_REFERENCES).content}</p>
-                  <span className={styles.talkTime}>18:00</span>
-                </div>
-              </div>
-            </div>
+            <LinePreviewMessage accountName="然 - NEN -" avatar="然" time="18:00">
+              {buildTemplatePreview(draftContent, EMPTY_TEMPLATE_REFERENCES).content}
+            </LinePreviewMessage>
           )}
         </LinePreview>
       )}
@@ -407,72 +402,36 @@ export default function TemplateDetailV8() {
       >
         {canMutate ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・公開・削除はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>}
         {template.hasDraft ? (
-          <div className={styles.draftBand} role="status">
-            <CircleAlert size={18} aria-hidden="true" className={styles.draftIcon} />
-            <div className={styles.draftText}>
-              <p className={styles.draftTitle}>{template.publishedVersion > 0 ? '未公開の変更があります' : 'まだ公開していません'}</p>
-              <p className={styles.draftNote}>{publishDraftText}</p>
-            </div>
-            {canMutate ? (
-              <>
-                {inUseVersion ? (
-                  <Button variant="secondary" onClick={() => setCompareTarget((current) => (current === 'draft' ? null : 'draft'))} aria-pressed={compareTarget === 'draft'}>
-                    <GitCompare size={14} aria-hidden="true" />
-                    比べる
-                  </Button>
-                ) : null}
-                <Button variant="primary" onClick={() => { setPublishError(''); setPublishOpen(true) }}>
-                  <Upload size={14} aria-hidden="true" />
-                  公開する
-                </Button>
-              </>
-            ) : null}
-          </div>
+          <Notice tone="warn" role="status" heading={template.publishedVersion > 0 ? '未公開の変更があります' : 'まだ公開していません'} icon={<CircleAlert size={16} aria-hidden="true" />} action={canMutate ? <>
+            {inUseVersion ? <Button variant="secondary" onClick={() => setCompareTarget((current) => current === 'draft' ? null : 'draft')} aria-pressed={compareTarget === 'draft'} icon={<GitCompare aria-hidden="true" />}>比べる</Button> : null}
+            <Button variant="primary" onClick={() => { setPublishError(''); setPublishOpen(true) }} icon={<Upload aria-hidden="true" />}>公開する</Button>
+          </> : undefined}>{publishDraftText}</Notice>
         ) : null}
         {compareTarget === 'draft' ? compareBox : null}
 
-        <section className={styles.card} aria-label="本文">
-          <div className={styles.cardHead}>
-            <div className={styles.cardTitles}>
-              <h2 className={styles.cardTitle}>{template.hasDraft ? '本文（下書き）' : '本文'}</h2>
-              <p className={styles.cardNote}>緑の札は差し込み。受け取る人ごとに変わります。</p>
-            </div>
-            {canMutate ? (
-              <Button href={editHref} variant="secondary">
-                <Pencil size={14} aria-hidden="true" />
-                編集する
-              </Button>
-            ) : null}
-          </div>
+        <Card variant="form" aria-label="本文">
+          <CardHeader size="content" title={template.hasDraft ? '本文（下書き）' : '本文'} meta="緑の札は差し込み。受け取る人ごとに変わります。" action={canMutate ? <Button href={editHref} variant="secondary" icon={<Pencil aria-hidden="true" />}>編集する</Button> : undefined} />
           <div className={styles.bodyBox}>{template.messageType === 'text' ? <InsertText value={draftContent} /> : draftContent}</div>
-        </section>
+        </Card>
 
-        <section className={styles.card} aria-label="使っている所" ref={usageRef}>
-          <div className={styles.cardTitles}>
-            <h2 className={styles.cardTitle}>使っている所</h2>
-            <p className={styles.cardNote}>
-              {usageCount > 0
-                ? `${usageCount} か所。「いまの版」を使う ${latestCount} か所に反映されます${fixedCount > 0 ? `（版を決めた ${fixedCount} か所は変わりません）` : ''}。`
-                : 'どこからも呼ばれていません。使われると、ここに並びます。'}
-            </p>
-          </div>
+        <div ref={usageRef}><Card variant="form" aria-label="使っている所">
+          <CardHeader size="content" title="使っている所" meta={usageCount > 0
+            ? `${usageCount} か所。「いまの版」を使う ${latestCount} か所に反映されます${fixedCount > 0 ? `（版を決めた ${fixedCount} か所は変わりません）` : ''}。`
+            : 'どこからも呼ばれていません。使われると、ここに並びます。'} />
           {usageCount > 0 ? (
             <>
               {visibleUsages.map(usageRow)}
               {usageCount > USAGE_VISIBLE && !showAllUsages ? (
                 <div className={styles.moreRow}>
-                  <button type="button" className={styles.ghostButton} onClick={() => setShowAllUsages(true)}><ChevronDown size={16} aria-hidden="true" />ほか {usageCount - USAGE_VISIBLE} か所を見る</button>
+                  <Button variant="text" onClick={() => setShowAllUsages(true)} icon={<ChevronDown aria-hidden="true" />}>ほか {usageCount - USAGE_VISIBLE} か所を見る</Button>
                 </div>
               ) : null}
             </>
           ) : <ListEmptyMessage>まだ使われていません</ListEmptyMessage>}
-        </section>
+        </Card></div>
 
-        <section className={styles.card} aria-label="版の履歴">
-          <div className={styles.cardTitles}>
-            <h2 className={styles.cardTitle}>版の履歴</h2>
-            <p className={styles.cardNote}>戻すと、その版を下書きとして作り直します。公開するまで使っている所は変わりません。</p>
-          </div>
+        <Card variant="form" aria-label="版の履歴">
+          <CardHeader size="content" title="版の履歴" meta="戻すと、その版を下書きとして作り直します。公開するまで使っている所は変わりません。" />
           {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>
               <p className={styles.errorText}>{versionsError}</p>
@@ -489,7 +448,7 @@ export default function TemplateDetailV8() {
                   </div>
                   {inUseVersion ? (
                     <div className={styles.versionActions}>
-                      <Button variant="secondary" onClick={() => setCompareTarget((current) => (current === 'draft' ? null : 'draft'))}>いまの版と比べる</Button>
+                      <Button variant="secondary" onClick={() => setCompareTarget((current) => (current === 'draft' ? null : 'draft'))} icon={<GitCompare aria-hidden="true" />}>いまの版と比べる</Button>
                     </div>
                   ) : null}
                 </div>
@@ -507,7 +466,7 @@ export default function TemplateDetailV8() {
                   {version.status !== 'in_use' ? (
                     <div className={styles.versionActions}>
                       {inUseVersion ? (
-                        <Button variant="secondary" onClick={() => setCompareTarget((current) => (current === version.versionNumber ? null : version.versionNumber))}>比べる</Button>
+                        <Button variant="secondary" onClick={() => setCompareTarget((current) => (current === version.versionNumber ? null : version.versionNumber))} icon={<GitCompare aria-hidden="true" />}>比べる</Button>
                       ) : null}
                       {canMutate ? (
                         <Button variant="secondary" onClick={() => { setRevertError(''); setRevertTarget(version.versionNumber) }}><RotateCcw size={14} aria-hidden="true" />この版に戻す</Button>
@@ -520,7 +479,7 @@ export default function TemplateDetailV8() {
               {typeof compareTarget === 'number' ? compareBox : null}
             </>
           )}
-        </section>
+        </Card>
       </DetailFrame>
 
       {/* 公開の確かめ（cuR8I）：反映される所と変わるところを見せてから公開する。 */}
@@ -637,20 +596,13 @@ export function ChangeBox({ title, before, after }: { title: string; before: str
   )
 }
 
-/**
- * 型の「作る」の頭（戻る・名前・説明）と左右の列。詳細には保存が無いので下の帯を置かない
- * （型の CreatePage は帯が必須で、帯があると本文が画面の高さで切られるため、枠と頭だけ型から使う）。
- */
+/** 本文と、同じ内容を窓でも読める右欄を型へ渡す。 */
 export function DetailFrame({ title, identity, description, preview, children }: {
   title: string; identity: ReactNode; description: string; preview: ReactNode; children: ReactNode
 }) {
   return (
-    <PageFrame kind="create">
-      <PageHeading title={title} identity={identity} help={description} />
-      <div className={styles.split}>
-        <div className={styles.content}>{children}</div>
-        <aside className={styles.aside}>{preview}</aside>
-      </div>
-    </PageFrame>
+    <CreatePage title={title} identity={identity} help={description} preview={preview} previewLabel="テンプレートの情報と届き方を見る" previewTitle="テンプレートの情報と届き方" footerActions={null}>
+      {children}
+    </CreatePage>
   )
 }

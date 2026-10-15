@@ -21,8 +21,6 @@ import { isImeComposing } from './ime'
  *   キー 上下で動く・左右で列を移る・Enter で決める・Esc で閉じる。
  *        日本語の変換中の Enter では決めない。外を押すと閉じる。
  *   動き 提案 F：開く 150ms（不透明度＋大きさ 0.97→1）。動きを減らす設定では動かさない。
- *
- * 値の形は v7 と同じ `HH:mm`（日本時間・空は `''`）。保存の動きは呼ぶ側のまま。
  */
 export type TimeFieldV8Props = {
   value?: string
@@ -37,6 +35,7 @@ export type TimeFieldV8Props = {
    * （絵 FU2aU・BBRDb・ZU4Ae）。`compact` は 32＝表の中の細い欄（予約の受付枠）。
    */
   size?: TimeFieldSize
+  pickerTrigger?: 'clock' | 'field'
   disabled?: boolean
   /** 閲覧のみ。値は見せるが打てず、時計も出さない（押せないボタンを置かない決まり）。 */
   readOnly?: boolean
@@ -55,7 +54,6 @@ type Column = 'hours' | 'minutes'
 
 export type TimeFieldSize = 'default' | 'field' | 'compact'
 
-/** 1行の高さ（30）＋行の間（2）。開いたときの位置合わせに使う。 */
 const ROW_PITCH = 32
 
 export default function TimeFieldV8({
@@ -65,6 +63,7 @@ export default function TimeFieldV8({
   minuteStep = 1,
   allowEndOfDay = false,
   size = 'default',
+  pickerTrigger = 'clock',
   disabled = false,
   readOnly = false,
   invalid = false,
@@ -321,8 +320,9 @@ export default function TimeFieldV8({
           }}
           onBlur={() => commitText()}
           onKeyDown={onInputKeyDown}
+          onClick={pickerTrigger === 'field' ? () => { if (!open) openPanel() } : undefined}
         />
-        {readOnly ? null : (
+        {readOnly || pickerTrigger === 'field' ? null : (
         <button
           type="button"
           className={styles.open}

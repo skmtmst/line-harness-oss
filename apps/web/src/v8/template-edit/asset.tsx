@@ -615,16 +615,16 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <span className={styles.spacer} />
                     <span className={styles.toggleLabelSmall}>必ず答えてもらう</span>
                     <SaveErrorField names={[`shown.${index}.required`,"required","question.required"]}><Toggle checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} /></SaveErrorField>
-                    <button
+                    <Button
                       type="button"
-                      className={`${styles.insertChip} ${styles.questionRemove}`}
+                      variant="text" size="compact" icon={<Trash2 aria-hidden="true" />}
                       disabled={questions.length <= 1}
                       title={questions.length <= 1 ? '質問は1つ必要です' : `問 ${index + 1} を消す`}
                       aria-label={`問 ${index + 1} を消す`}
                       onClick={() => setQuestions((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))}
                     >
-                      <Trash2 size={16} aria-hidden="true" />削除する
-                    </button>
+                      削除する
+                    </Button>
                   </div>
                   <SettingsFormRow layout="columns">
                     <div className={styles.field}><Field label="質問文" htmlFor={`te-q-${question.key}`} requirement={fields.requirement(`q-${question.key}`)}><SaveErrorField names={[`shown.${index}.text`,"text","question.text"]}><TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" /></SaveErrorField>

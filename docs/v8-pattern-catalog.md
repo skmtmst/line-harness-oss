@@ -393,6 +393,8 @@
 <a id="picker-field"></a>
 ## picker-field 選ぶ欄（選ぶ前・選んだ後）
 
+- 電話予約で検索した友だちの行は `shared/friend-match-row.tsx` の `FriendMatchRow`。選択の薄い帯、名前/補足、選ぶ/選び直すを1行で持ち、行の内側へ別の選択枠を重ねない。
+
 - **役目**：選ぶ前は「〇〇を選ぶ」の副ボタン、選んだ後は見本・札＋「変える」
 - 候補自身の印の色は `EntityPickerItem.color` から共通 `TagPill` へ渡す。基本の追加URLの青い印もこの口を使い、画面で札のCSSを上書きしない。
 - **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`（部品 `EntityPickerSummary`・`EntityPickerField`・`HqAccountPickerField`・`HqAccountSelectField`）
@@ -558,7 +560,7 @@
 <a id="sticky-bar"></a>
 ## sticky-bar 作る・編集の下の帯
 
-- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。 **10-14 C14差し戻しの例外**：役目の印を保持する操作は`Button.icon`へ明示する（シナリオ・共通情報のCheck／競合のGitCompare）。帯は明示iconを置き換えず、指定なしの保存印と待機/完了の状態印は維持。
+- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。 **10-14 C14差し戻しの例外**：役目の印を保持する操作は`Button.icon`へ明示する（シナリオ・共通情報のCheck／競合のGitCompare）。帯は明示iconを置き換えず、指定なしの保存印と待機/完了の状態印は維持。 件数で保存文が変わる操作は`Button.widthReserve="dynamic"`を指定し現在の全文で測り直す。既定の`states`/`idle`の幅は保つ（合格済みの窓と競合の帯を動かさない）。
 
 - **役目**：画面の下に追従。キャンセル・保存は中央、削除は左端
 - **持ち主（コード）**：`apps/web/src/components/shared/sticky-bar.tsx`・`apps/web/src/components/shared/sticky-bar.module.css`・`apps/web/src/components/templates/create-page.tsx`・`apps/web/src/components/shared/create-page.tsx`（部品 `StickyBar`・`CreatePage`・`PageFooter`）
@@ -1102,3 +1104,10 @@
 - 持ち主は`shared/bar-chart.tsx`・CSS。`distribution="diverging"`で同じ人数の単位を基準線の上（増加）と下（減少）へ。指定のない形は保つ。
 - `BarChartLegend`の`layout="analytics"`とtoneの`broadcast`/`scenario`、`BarChartEventMark`は出来事の青/紫を共有する。`toBarChartItems`へ渡すcampaignsのkindから日付の印を出す。人数の緑/灰と分け、名前は読み上げに残す。
 - 寸法の見張りは`scripts/v8-guard/bar-chart-layout-browser.mjs`、数と日選択の描画は`shared/bar-chart.test.tsx`。画面接続前の部品検査を板の合格へ数えない。
+
+<a id="verification-list"></a>
+## verification-list 接続のチェックの行
+
+- 役目：入力した接続情報の検査結果。一般の表ではなく、検査の印・題・説明・状態を並べる。
+- 持ち主：`shared/verification-list.tsx` の `VerificationList`。箱は共通Card、状態はStatusBadge、行は文字と上下12の自然高。
+- 失敗の説明は全文を折り返して高さを増やす。その他は1行で省略し、titleで全文を残す。使用先：LINEアカウント登録の接続確認（v2KMj）。

@@ -36,3 +36,19 @@ test('未変更の理由を出し、変更後は理由を外して保存でき�
  const save = screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement
  expect(save.disabled).toBe(false); expect(save.hasAttribute('aria-description')).toBe(false)
 })
+
+test('型の下からカスタムへ進み、色と書体を変えて保存できる',async()=>{
+ mock.get.mockResolvedValue({success:true,data:{look:DEFAULT_CUSTOMER_LOOK,version:3}})
+ mock.save.mockResolvedValue({success:true,data:{look:{...DEFAULT_CUSTOMER_LOOK,preset:'custom',headingFont:'mincho'},version:4}})
+ render(<CustomerLookScreen/>);await screen.findByRole('radio',{name:/モダン/})
+ const summary=screen.getByText('カスタムの色と書体').closest('summary')!
+ expect(summary.parentElement?.hasAttribute('open')).toBe(false)
+ expect(summary.textContent).toContain('主の色・背景の色・見出しの書体')
+ fireEvent.click(screen.getByRole('radio',{name:/カスタム/}))
+ expect(screen.getByText('カスタムの色と書体').closest('details')?.hasAttribute('open')).toBe(true)
+ fireEvent.click(screen.getByRole('button',{name:'見出しの書体'}))
+ fireEvent.click(screen.getByRole('option',{name:'明朝'}).querySelector('button')!)
+ await vi.waitFor(()=>expect(screen.getByRole('button',{name:'見出しの書体'}).textContent).toContain('明朝'))
+ fireEvent.click(screen.getByRole('button',{name:'保存する'}))
+ await vi.waitFor(()=>expect(mock.save).toHaveBeenCalledWith('a',expect.objectContaining({preset:'custom',headingFont:'mincho'}),3))
+})

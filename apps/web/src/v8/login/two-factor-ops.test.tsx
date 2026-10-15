@@ -49,11 +49,31 @@ describe('運営 ログイン 2段目（V8 の入口）', () => {
     await open('/login/two-factor?next=ops#lh_2fa=challenge-1&lh_method=password', 'v8')
     expect(host.querySelector('[data-design-node="tOPeY"]')).not.toBeNull()
     expect(host.textContent).toContain('6桁の確認')
-    await act(async () => { (host.querySelector('button[aria-label="6桁の確認の説明"]') as HTMLButtonElement).click() })
+    expect(host.querySelector('button[aria-label="6桁の確認の説明"]')).toBeNull()
     expect(host.textContent).toContain('パスワードを確かめました。')
     expect(host.textContent).toContain('認証アプリが使えないときは、運営のオーナーに連絡してください。')
     const login = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('ログイン'))
     expect(login?.hasAttribute('disabled')).toBe(false)
+    const recover = [...host.querySelectorAll('button')].find(button => button.textContent === '回復コードを使う')
+    await act(async () => { recover?.click() })
+    expect(host.querySelector('h1')?.textContent).toBe('回復コードでログイン')
+    expect(host.textContent).toContain('登録の時に控えた回復コードを1つ入れてください。')
+    const back = [...host.querySelectorAll('button')].find(button => button.textContent === '6桁のコードで入る')
+    await act(async () => { back?.click() })
+    expect(host.querySelector('h1')?.textContent).toBe('6桁の確認')
+    expect(host.textContent).toContain('認証アプリに出ている6桁を入れてください。')
+  })
+
+  it('LINEで認証したときは、パスワードを確認したとは案内しない', async () => {
+    await open('/login/two-factor?next=ops#lh_2fa=challenge-1&lh_method=line', 'v8')
+    expect(host.textContent).toContain('LINEでのログインを確かめました。')
+    expect(host.textContent).not.toContain('パスワードを確かめました。')
+  })
+
+  it('認証の情報が無いときは、確認済みの案内を出さずログインのやり直しを案内する', async () => {
+    await open('/login/two-factor?next=ops', 'v8')
+    expect(host.textContent).toContain('ログインの情報が見つかりませんでした。')
+    expect(host.textContent).not.toContain('パスワードを確かめました。')
   })
 
   it('管理画面の2段目もV8で出し、LINEでのログイン方法を保つ', async () => {

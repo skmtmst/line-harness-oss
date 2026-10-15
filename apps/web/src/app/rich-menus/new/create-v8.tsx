@@ -53,6 +53,7 @@ import Dialog from '@/components/shared/dialog'
 import VersionCompare from '@/components/shared/version-compare'
 import LinePreview from '@/components/shared/line-preview'
 import TapAreaEditor from '@/components/shared/tap-area-editor'
+import HqMenuReview from '@/components/rich-menus/hq-menu-review'
 import MediaSlot from '@/components/shared/media-slot'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
@@ -2574,17 +2575,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   /* ======== 手順④：公開 ======== */
   function renderPublish() {
-    if (host) {
-      return (
-        <>
-          {host.distribute}
-          <div className={styles.infoBand}>
-            <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
-            <span>配ると、選んだアカウントにリッチメニューが下書きとして届きます。既定のメニューにするか・LINE に出すかは、各アカウントで決めます。</span>
-          </div>
-        </>
-      )
-    }
+    if (host) return <HqMenuReview pages={pages} size={size} host={host} onEditPage={(id, step) => {
+      setActivePageId(id); setSelectedAreaId(pages.find(page => page.id === id)?.areas[0]?.id ?? null); goToStep(step)
+    }} />
     const timingIsScheduled = publishPlan.mode !== 'now'
     if (done) {
       return (

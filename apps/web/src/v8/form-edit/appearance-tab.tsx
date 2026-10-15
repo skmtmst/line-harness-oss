@@ -181,8 +181,8 @@ export function AppearanceTab(props: Props) {
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>色と文字</h3>
           <RadioCardGroup legend="見た目の使い方" className={styles.designModes}>
-            <RadioCard name="form-design-mode" value="account" checked={mode === 'account'} onChange={() => onChangeOptions({customerDesign:{mode:'account',preset:'line'}})} icon={props.portable ? <Store size={16} /> : undefined} title={props.portable?'配った先の店のデザインに合わせる（おすすめ）':'店の設定に合わせる'} note={props.portable?'店ごとに決めたデザインで出ます':`今：${accountLabel}`} />
-            <RadioCard name="form-design-mode" value="fixed" checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} icon={props.portable ? <Palette size={16} /> : undefined} title={props.portable?'色を決めて配る（型かカスタム）':'このフォームだけ変える'} note={props.portable?'どの店でも同じ色で出ます':'型かカスタムを選ぶ'} />
+            <RadioCard name="form-design-mode" value="account" checked={mode === 'account'} onChange={() => onChangeOptions({customerDesign:{mode:'account',preset:'line'}})} icon={<Store aria-hidden="true" />} title={props.portable?'配った先の店のデザインに合わせる（おすすめ）':'店の設定に合わせる'} note={props.portable?'店ごとに決めたデザインで出ます':`今：${accountLabel}`} />
+            <RadioCard name="form-design-mode" value="fixed" checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} icon={<Palette aria-hidden="true" />} title={props.portable?'色を決めて配る（型かカスタム）':'このフォームだけ変える'} note={props.portable?'どの店でも同じ色で出ます':'型かカスタムを選ぶ'} />
           </RadioCardGroup>
           {!props.portable ? <Link href="/settings/customer-look">店のデザインを変える ↗</Link> : mode === 'fixed' ? <Notice tone="info" compact>このフォームは色を固定して配ります。配った先の店のデザインは使いません。</Notice> : null}
           {props.accountLookError && !props.portable ? <FieldError id="account-look-error">{props.accountLookError}</FieldError> : null}

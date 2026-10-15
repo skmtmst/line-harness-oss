@@ -61,26 +61,6 @@
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary);
 }
 
-/* ④ 接続確認 */
-.checkList {
-  margin: 0; padding: 0; list-style: none; border-radius: var(--tpl-htn-radius-l);
-  background: var(--color-canvas); box-shadow: var(--tpl-htn-ring);
-}
-.checkRow {
-  display: flex; align-items: center; gap: var(--tpl-htn-panel-gap); height: var(--tpl-htn-check-row-h);
-  padding: var(--tpl-htn-check-pad); box-shadow: var(--tpl-htn-line-bottom);
-}
-.checkRow:last-child { box-shadow: none; }
-.checkIcon { flex-shrink: 0; color: var(--color-ink-faint); }
-.checkRow[data-state='passed'] .checkIcon { color: var(--color-accent-deep); }
-.checkRow[data-state='failed'] .checkIcon { color: var(--color-danger); }
-.checkTitle { flex-shrink: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink); }
-.checkDetail {
-  flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary);
-}
-.checkRow[data-state='failed'] { height: auto; min-height: var(--tpl-htn-check-row-h); padding-block: var(--polish-space-row); }
-.checkRow[data-state='failed'] .checkDetail { color: var(--color-danger); white-space: normal; overflow: visible; overflow-wrap: anywhere; }
 .importText { display: flex; flex: 1; flex-direction: column; gap: var(--tpl-htn-import-gap); min-width: 0; }
 .importText strong { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink); }
 .importText span { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }

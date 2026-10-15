@@ -11,7 +11,7 @@ import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import TextLink from '@/components/shared/text-link'
 import { TimeField } from '@/components/shared/date-time-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { RowMenu } from '@/components/shared/row-actions'
 import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
 import { slotReasonLabel } from '../lib/slot-reason'
@@ -23,8 +23,6 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-
-/* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
@@ -96,7 +94,6 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
     const validationError = validateBusinessHours(draft)
     if (validationError) {
       setSaveError(validationError.message)
-      /* 落ちた区間の欄を赤くして移る（B-139）。理由の文は表の下に出す。 */
       setBadHours(validationError.at ?? null)
       const at = validationError.at
       const dayLabel = at ? DAYS.find((day) => day.weekday === at.weekday)?.label : undefined
@@ -207,7 +204,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             return (
               <div key={weekday} className={styles.dayRow}>
                 <div className={styles.dayName}>
-                  <SaveErrorField names={["isOpen","is_open"]}><SettingCheckbox
+                  <SaveErrorField names={["isOpen","is_open"]}><Toggle
                     label={`${label}を${isOpen ? '休みにする' : '開ける'}`}
                     checked={isOpen}
                     onChange={(next) => updateDay(weekday, () => next ? [{ start: '09:00', end: '18:00', capacity: 1 }] : [])}
@@ -227,6 +224,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, start: value } : entry))}
                       className={styles.timeInput}
                       size="compact"
+                      pickerTrigger="field"
                     /></SaveErrorField>
                     <span className={styles.intervalTilde}>〜</span>
                     <SaveErrorField names={[`intervals.${index}.end`,"end","interval.end"]}><TimeField
@@ -236,6 +234,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, end: value } : entry))}
                       className={styles.timeInput}
                       size="compact"
+                      pickerTrigger="field"
                     /></SaveErrorField>
                     <span className={styles.sameTimeLabel}>同時</span>
                     <SaveErrorField names={[`intervals.${index}.capacity`,"capacity","interval.capacity"]}><NumberInput
@@ -244,6 +243,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       type="number"
                       min={1}
                       max={1000}
+                      note={false}
                       value={interval.capacity ?? 1}
                       onChange={(event) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, capacity: Number(event.target.value) } : entry))}
                       className={styles.numInput}
@@ -438,8 +438,8 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
       <span className={styles.equipCap}>{resource.capacity}</span>
       <span className={styles.colMenu}>
         {canEdit ? <RowMenu
-          appearance="plain"
-          className={styles.rowMenuButton}
+          appearance="box"
+          size="row"
           label={`「${resource.name}」のそのほかの操作`}
           menuLabel={`「${resource.name}」の操作`}
           items={menuItems}

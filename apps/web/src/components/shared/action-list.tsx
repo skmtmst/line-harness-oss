@@ -9,6 +9,7 @@ import { RowActions, useReorder } from './row-actions'
 import { EntityPickerDialog, EntityMultiPickerDialog, type EntityPickerItem } from './entity-picker'
 import ReorderHandle, { type ReorderHandleProps } from './reorder-handle'
 import styles from './action-list.module.css'
+import NumberedActionRow from './numbered-action-row'
 
 export type ActionChoice<T> = {
   id: string
@@ -28,12 +29,13 @@ export type ActionChoice<T> = {
 }
 
 /** B-169: 種類を選んでから対象を確定する。取消では空の行を追加しない。 */
-export function ActionAddButton<T>({ choices, onAdd, disabled = false, id, label = '行うことを足す' }: {
+export function ActionAddButton<T>({ choices, onAdd, disabled = false, id, label = '行うことを足す', direct = false }: {
   choices: ActionChoice<T>[]
   onAdd: (item: T) => void
   disabled?: boolean
   id?: string
   label?: string
+  direct?: boolean
 }) {
   const anchor = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
@@ -45,8 +47,8 @@ export function ActionAddButton<T>({ choices, onAdd, disabled = false, id, label
     setPendingId(null)
   }
   return <>
-    <Button id={id} ref={anchor} type="button" variant="secondary" disabled={disabled || choices.length === 0}
-      aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+    <Button id={id} ref={anchor} type="button" variant={direct ? 'text' : 'secondary'} disabled={disabled || choices.length === 0 || (direct && choices[0]?.disabled)}
+      aria-haspopup={direct ? 'dialog' : 'menu'} aria-expanded={direct ? Boolean(pendingId) : open} onClick={() => { if (direct) { const choice = choices[0]; if (choice?.picker) setPendingId(choice.id); else if (choice) onAdd(choice.make()) } else setOpen(!open) }}>
       <Plus size={16} aria-hidden="true" />{label}
     </Button>
     <ActionMenu open={open} anchorRef={anchor} align="start" ariaLabel="行うことの種類" onClose={() => setOpen(false)}
@@ -106,7 +108,7 @@ export function ActionRow({ title, kind, icon: Icon = Zap, number, open, readOnl
 }
 
 /** 保存形式を変えず、追加・その場の編集・ドラッグ／キー／メニューの並べ替えを共通化。 */
-export default function ActionList<T>({ value, onChange, choices, idOf, titleOf, kindOf, iconOf, renderEditor, renderExtra, renderHint, readOnly = false, addId, reorderable = true, numberOf, editingId, minItems = 0, duplicateOf }: {
+export default function ActionList<T>({ value, onChange, choices, idOf, titleOf, kindOf, iconOf, renderEditor, renderExtra, renderHint, readOnly = false, addId, reorderable = true, numberOf, editingId, minItems = 0, duplicateOf, quickAddChoiceId, appearance = 'inline', addActions }: {
   value: T[]
   onChange: (next: T[]) => void
   choices: ActionChoice<T>[]
@@ -125,6 +127,9 @@ export default function ActionList<T>({ value, onChange, choices, idOf, titleOf,
   editingId?: string | null
   minItems?: number
   duplicateOf?: (item: T) => T
+  quickAddChoiceId?: string
+  appearance?: 'inline' | 'numbered'
+  addActions?: ReactNode
 }) {
   const [editing, setEditing] = useState<string | null>(null)
   useEffect(() => { if (editingId !== undefined) setEditing(editingId) }, [editingId])
@@ -133,12 +138,20 @@ export default function ActionList<T>({ value, onChange, choices, idOf, titleOf,
     onReorder: ({ ids }) => { setEditing(null); onChange(ids.map(id => slots.find(slot => slot.id === id)!.item)) } })
   return <div className={styles.list} data-action-list data-shared-part="event-actions" data-event-actions>
     {value.length === 0 ? <p className={styles.empty}>行うことはまだありません。</p> : null}
-    {reorder.shown.map(({ item, id }, index) => <ActionRow key={id} number={numberOf?.(item, index) ?? index + 1} title={titleOf(item)} kind={kindOf?.(item)} icon={iconOf?.(item)}
+    {reorder.shown.map(({ item, id }, index) => appearance === 'numbered' ? <NumberedActionRow key={id}
+      number={numberOf?.(item, index) ?? index + 1} title={kindOf?.(item) ?? titleOf(item)} summary={titleOf(item)}
+      readOnly={readOnly} open={editing === id} onToggle={() => setEditing(editing === id ? null : id)}
+      onMoveUp={reorderable && index > 0 ? () => { setEditing(null); onChange([...value.slice(0, index - 1), item, value[index - 1], ...value.slice(index + 1)]) } : undefined}
+      onMoveDown={reorderable && index < value.length - 1 ? () => { setEditing(null); onChange([...value.slice(0, index), value[index + 1], item, ...value.slice(index + 2)]) } : undefined}
+      reorderable={reorderable} onRemove={value.length > minItems ? () => { setEditing(null); onChange(value.filter((_, slot) => slot !== index)) } : undefined}>
+      {renderHint?.(item, index)}
+      {renderEditor(item, next => onChange(value.map((entry, slot) => slot === index ? next : entry)), index)}
+    </NumberedActionRow> : <ActionRow key={id} number={numberOf?.(item, index) ?? index + 1} title={titleOf(item)} kind={kindOf?.(item)} icon={iconOf?.(item)}
       readOnly={readOnly} open={editing === id} onToggle={() => setEditing(editing === id ? null : id)}
       rowProps={reorderable ? reorder.rowProps(id) : undefined} handle={reorderable ? <ActionDragHandle label={`${index + 1}つ目の行うこと`} ariaLabel={`${index + 1}つ目の行うことを並べ替える`} {...reorder.handle(id)} {...reorder.handleProps(id)} /> : null}
       menuItems={[...(duplicateOf ? [{ id: 'duplicate', label: '複製する', onSelect: () => { const copy = duplicateOf(item); onChange([...value.slice(0, index + 1), copy, ...value.slice(index + 1)]); setEditing(idOf(copy, index + 1)) } }] : []), ...(reorderable ? reorder.menuItems(id) : [])]} onRemove={value.length > minItems ? () => { setEditing(null); onChange(slots.filter(slot => slot.id !== id).map(slot => slot.item)) } : undefined} extra={renderExtra?.(item, index)} hint={renderHint?.(item, index)}>
       {renderEditor(item, next => onChange(slots.map(slot => slot.id === id ? next : slot.item)), index)}
     </ActionRow>)}
-    {readOnly || choices.length === 0 ? null : <div className={styles.add}><ActionAddButton id={addId} choices={choices} onAdd={item => { setEditing(idOf(item, value.length)); onChange([...value, item]) }} /></div>}
+    {readOnly ? null : addActions ?? (choices.length === 0 ? null : <div className={styles.add}><ActionAddButton id={addId} choices={choices} onAdd={item => { setEditing(idOf(item, value.length)); onChange([...value, item]) }} />{quickAddChoiceId && choices.some(choice => choice.id === quickAddChoiceId) ? <ActionAddButton direct label="共通アクションから選ぶ" choices={choices.filter(choice => choice.id === quickAddChoiceId)} onAdd={item => { setEditing(idOf(item, value.length)); onChange([...value, item]) }} /> : null}</div>)}
   </div>
 }

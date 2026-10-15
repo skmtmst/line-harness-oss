@@ -47,7 +47,10 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
 
 
         preview={tab === 'channels' ? undefined : previewContent}
-        previewToggle={tab === 'channels' ? undefined : <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>}
+        previewToggle={tab === 'channels' ? undefined : <>
+          <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>
+          {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
+        </>}
         footerActions={tabEdit && tabEdit.showBar !== false && !tabEdit.saveDisabled ? (
                 <>
                   <Button onClick={() => tabEdit.onReset()} disabled={tabEdit.saving}>キャンセル</Button>
