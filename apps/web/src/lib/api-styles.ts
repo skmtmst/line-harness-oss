@@ -47,6 +47,7 @@ export type StyleQuery = {
 export type StyleSelection = {
   expectedVersion: number;
   style?: AccountStyle;
+  styleMode?: SetupAnswer['mode'];
   answers?: Record<string, SetupAnswer>;
   settings?: Record<string, number>;
   choices?: Record<
@@ -111,6 +112,10 @@ export type StyleStarterSet = {
   name: string;
   version: number;
   definition: { items: StarterSetItem[] };
+  accountCount: number;
+  updatedAt: string;
+  updatedBy: string | null;
+  autoInsert: boolean;
 };
 export const styleApi = {
   get: (accountId: string) =>
@@ -118,13 +123,14 @@ export const styleApi = {
       Result<{
         style: AccountStyle;
         styleSelected: boolean;
+        styleMode: SetupAnswer['mode'];
         version: number;
         answers: Record<string, SetupAnswer>;
         settings: Record<string, number>;
         cards: StyleCard[];
         questions: Array<{
           key: string;
-          changeAt: string;
+          changeAt?: string;
           canChangeLater: boolean;
           recommended: string | boolean;
           modes: Array<SetupAnswer['mode']>;
@@ -135,6 +141,8 @@ export const styleApi = {
     fetchApi<
       Result<{
         style: AccountStyle;
+        styleMode: SetupAnswer['mode'];
+        styleSelected: boolean;
         version: number;
         inserted: Array<{
           key: string;
@@ -153,11 +161,11 @@ export const styleApi = {
           feature: string;
           areaId: string;
           groupId: string;
-          href: string;
+          href?: string;
           customerState: 'preparing';
         }>;
-        pending: Array<{ key: string; href: string; mode: string }>;
-        manual: Array<{ key: string; href: string }>;
+        pending: Array<{ key: string; href?: string; mode: string }>;
+        manual: Array<{ key: string; href?: string }>;
       }>
     >(url(root + '/warnings', accountId)),
   starterSet: (accountId: string, style: AccountStyle) =>
@@ -165,6 +173,7 @@ export const styleApi = {
       Result<{
         id: string;
         version: number;
+        autoInsert: boolean;
         definition: { items: StarterSetItem[] };
       }>
     >(url(root + '/starter-set', accountId, { style })),
@@ -483,7 +492,7 @@ export const styleApi = {
         ready: boolean;
         state: 'ready' | 'preparing';
         message: string | null;
-        href: string;
+        href?: string;
       }>
     >(
       `/api/liff/booking/style-readiness?${new URLSearchParams({ liffId, feature })}`,
@@ -514,10 +523,11 @@ export const hqStyleApi = {
     body: {
       expectedVersion: number;
       name: string;
+      autoInsert?: boolean;
       definition: { items: StarterSetItem[] };
     },
   ) =>
-    fetchApi<Result<{ id: string; version: number }>>(
+    fetchApi<Result<{ id: string; version: number; autoInsert: boolean }>>(
       '/api/hq/style-starter-sets/' + encodeURIComponent(style),
       write('PUT', body),
     ),
@@ -527,9 +537,10 @@ export const hqStyleApi = {
         asOf: string;
         items: Array<{
           accountId: string;
+          style: AccountStyle;
           name: string;
           counts: Record<string, number>;
-          details: Record<string, Array<{ id: string; href: string }>>;
+          details: Record<string, Array<{ id: string; href?: string }>>;
         }>;
       }>
     >('/api/hq/style-attention'),

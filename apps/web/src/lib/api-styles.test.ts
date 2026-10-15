@@ -40,6 +40,36 @@ describe('style client scope and consent', () => {
     expect(params.get('display')).toBe('calendar');
     expect(params.get('staff_id')).toBe('s');
   });
+  it('sends style deferral and the HQ automatic insertion preference with versions', async () => {
+    await styleApi.save('a', {
+      expectedVersion: 2,
+      styleMode: 'later',
+      answers: {
+        cancelDeadline: { mode: 'manual' },
+        hours: { mode: 'later' },
+        partySize: { mode: 'configured', value: '1-6' },
+      },
+    });
+    expect(
+      JSON.parse(mocks.fetchApi.mock.calls[0][1]!.body as string),
+    ).toMatchObject({
+      expectedVersion: 2,
+      styleMode: 'later',
+      answers: { cancelDeadline: { mode: 'manual' }, hours: { mode: 'later' } },
+    });
+    await hqStyleApi.saveStarterSet('restaurant', {
+      expectedVersion: 3,
+      name: '飲食',
+      autoInsert: false,
+      definition: { items: [] },
+    });
+    expect(mocks.fetchApi.mock.calls[1][0]).toBe(
+      '/api/hq/style-starter-sets/restaurant',
+    );
+    expect(
+      JSON.parse(mocks.fetchApi.mock.calls[1][1]!.body as string),
+    ).toMatchObject({ expectedVersion: 3, autoInsert: false });
+  });
   it('encodes account and staff IDs without changing the query scope', async () => {
     await styleApi.summary('a&account_id=b', {
       style: 'consult',
