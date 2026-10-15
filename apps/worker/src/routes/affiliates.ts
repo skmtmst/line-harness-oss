@@ -174,8 +174,17 @@ function readAffiliateSettlement(
 // GET /api/affiliates - list all
 affiliates.get('/api/affiliates', async (c) => {
   try {
-    const { scope } = await getAffiliateScope(c);
-    const items = await getAffiliates(c.env.DB, scope);
+    const accountId = c.req.query('accountId') ?? c.req.query('lineAccountId');
+    if (!accountId || (c.req.query('lineAccountId') && c.req.query('lineAccountId') !== accountId)) {
+      return inputError(c, { success: false, error: 'LINE公式アカウントを1つ選んでください', code: 'ACCOUNT_REQUIRED' }, 400, ['accountId']);
+    }
+    const { visible, scope } = await getAffiliateScope(c);
+    if (!visible.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'このアカウントを閲覧する権限がありません' }, 403);
+    }
+    const items = await getAffiliates(c.env.DB, {
+      ...scope, allowedLineAccountIds: [accountId], includeUnassigned: false,
+    });
     return c.json({ success: true, data: items.map(serializeAffiliate) });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliates"}));
