@@ -8,6 +8,24 @@ export const ACCOUNT_STYLES = [
 ] as const;
 export type AccountStyle = (typeof ACCOUNT_STYLES)[number];
 export type IndustryStyle = Exclude<AccountStyle, 'standard' | 'ec'>;
+export type StyleRange = 'today' | 'week' | 'month';
+export type StyleDisplay = 'board' | 'list' | 'calendar';
+export type StyleCalendarView = 'day' | 'week' | 'month';
+export type StyleTemplateSample = {
+  key: string;
+  name: string;
+  category: 'common' | IndustryStyle;
+  text: string;
+  placeholders: Array<{
+    token: string;
+    label: string;
+    requiresConfiguration: boolean;
+  }>;
+  preparation: string;
+  starterItem: { key: string; kind: 'template'; name: string; text: string };
+  hqDefinition: MessageTemplateDefinition;
+};
+import type { MessageTemplateDefinition } from './template-definition.js';
 export type SetupAnswer = {
   mode: 'configured' | 'later' | 'manual';
   value?: string | boolean;
@@ -62,9 +80,71 @@ export type StyleSnapshot = {
   from: string;
   to: string;
   dateBasis: 'visit';
+  range: StyleRange;
   metrics: Record<string, StyleMetric>;
   previous: Record<string, StyleMetric>;
   items: StyleBooking[];
   newBookings: StyleBooking[];
   resultId: string;
+};
+
+export type StyleScheduleEntry = {
+  id: string;
+  kind: StyleBooking['kind'] | 'class';
+  columnIds: string[];
+  startsAt: string;
+  endsAt: string;
+  title: string;
+  booking: StyleBooking | null;
+  classId?: string;
+};
+export type StyleSchedule = {
+  style: IndustryStyle;
+  asOf: string;
+  timeZone: string;
+  range: StyleRange;
+  display: StyleDisplay;
+  calendarView: StyleCalendarView;
+  from: string;
+  to: string;
+  columns: Array<{
+    id: string;
+    kind: 'staff' | 'table' | 'unassigned';
+    name: string;
+    storeId?: string;
+  }>;
+  entries: StyleScheduleEntry[];
+  days: Array<{
+    date: string;
+    entryIds: string[];
+    bookings: number;
+    people: number;
+  }>;
+  closures: Array<{
+    id: string;
+    target: 'store' | 'staff' | 'table' | 'resource';
+    targetIds: string[];
+    dateFrom: string;
+    dateTo: string;
+    kind: string;
+    hours: Array<{ start: string; end: string }>;
+    reason: string | null;
+  }>;
+  availability: {
+    status: 'available' | 'unconfigured' | 'unavailable';
+    reason: string | null;
+    resources: Array<{ id: string; name: string; storeId?: string }>;
+    slots: Array<{
+      columnId: string;
+      menuId: string | null;
+      date: string;
+      startsAt: string;
+      endsAt: string;
+      remaining: number | null;
+      mode?: 'classroom' | 'online';
+      resourceIds?: string[];
+      entryId?: string;
+    }>;
+    closedDates: string[];
+  };
 };

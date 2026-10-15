@@ -141,7 +141,7 @@ describe('style setup', () => {
       raw
         .prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'")
         .get(),
-    ).toEqual({ n: 1 });
+    ).toEqual({ n: 16 });
     expect(
       raw
         .prepare(
@@ -343,13 +343,13 @@ describe('industry metrics', () => {
       db,
       'a',
       'salon',
-      { view: 'tomorrow' },
+      { range: 'today', date: '2026-10-16' },
       undefined,
     );
     expect(tomorrow.items.map((r) => r.id)).toEqual(['tomorrow']);
     expect(
-      readWindow({ view: 'future' }, 'Asia/Tokyo', Date.now()).fromDate,
-    ).toBe('2026-10-16');
+      readWindow({ range: 'week' }, 'Asia/Tokyo', Date.now()).fromDate,
+    ).toBe('2026-10-12');
     expect(ratio(0, 0, 'test').value).toBeNull();
     expect(ratio(0, 3, 'test').value).toBe(0);
   });
@@ -867,5 +867,5 @@ test('changing an answer back to later keeps an old booking sample stopped durin
 });
 
 test('deferring content does not add new templates or rich menus for the selected style',async()=>{
- const result=await value(await write('',{expectedVersion:1,style:'consult',answers:{content:{mode:'later'}}}));expect(result.data.inserted).not.toEqual(expect.arrayContaining([expect.objectContaining({kind:'template'})]));expect(result.data.inserted).not.toEqual(expect.arrayContaining([expect.objectContaining({kind:'rich_menu'})]));expect(raw.prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'").get()).toEqual({n:1});
+ const result=await value(await write('',{expectedVersion:1,style:'consult',answers:{content:{mode:'later'}}}));expect(result.data.inserted).not.toEqual(expect.arrayContaining([expect.objectContaining({kind:'template'})]));expect(result.data.inserted).not.toEqual(expect.arrayContaining([expect.objectContaining({kind:'rich_menu'})]));expect(raw.prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'").get()).toEqual({n:16});
 });

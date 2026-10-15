@@ -67,25 +67,60 @@ export function addDate(date: string, days: number) {
     .slice(0, 10);
 }
 export function readWindow(
-  query: { date?: string; view?: string; from?: string; to?: string },
+  query: {
+    date?: string;
+    range?: string;
+    view?: string;
+    calendar_view?: string;
+    from?: string;
+    to?: string;
+  },
   timeZone: string,
   now: number,
 ) {
   const today = query.date ?? civilDate(now, timeZone);
+  const calendarRange = query.calendar_view
+    ? (
+        { day: 'today', week: 'week', month: 'month' } as Record<string, string>
+      )[query.calendar_view]
+    : undefined;
+  if (query.calendar_view && !calendarRange)
+    throw new StyleError('invalid_display');
+  const range =
+    query.range ??
+    (query.view === 'date' ? 'today' : query.view) ??
+    calendarRange ??
+    'today';
   if (
     !validRestaurantDate(today) ||
-    (query.view &&
-      !['today', 'tomorrow', 'future', 'date'].includes(query.view))
+    !['today', 'week', 'month'].includes(range) ||
+    (query.view && !['today', 'week', 'month', 'date'].includes(query.view))
   )
     throw new StyleError('invalid_date');
-  const fromDate =
-    query.from ??
-    addDate(
-      today,
-      query.view === 'tomorrow' ? 1 : query.view === 'future' ? 1 : 0,
-    );
+  if (
+    query.range &&
+    query.view &&
+    query.view !== 'date' &&
+    query.range !== query.view
+  )
+    throw new StyleError('invalid_range');
+  if (calendarRange && calendarRange !== range)
+    throw new StyleError('invalid_range');
+  const weekday = new Date(today + 'T00:00:00Z').getUTCDay();
+  const start =
+    range === 'week'
+      ? addDate(today, -(weekday + 6) % 7)
+      : range === 'month'
+        ? today.slice(0, 8) + '01'
+        : today;
+  const nextMonth = new Date(start + 'T00:00:00Z');
+  nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1, 1);
+  const fromDate = query.from ?? start;
   const toDate =
-    query.to ?? addDate(fromDate, query.view === 'future' ? 30 : 1);
+    query.to ??
+    (range === 'month'
+      ? nextMonth.toISOString().slice(0, 10)
+      : addDate(fromDate, range === 'week' ? 7 : 1));
   if (
     !validRestaurantDate(fromDate) ||
     !validRestaurantDate(toDate) ||
@@ -98,6 +133,7 @@ export function readWindow(
     to: restaurantCivilTime(toDate, 0, timeZone),
     fromDate,
     toDate,
+    range: range as 'today' | 'week' | 'month',
   };
 }
 
@@ -319,6 +355,28 @@ export function personMetrics(
   };
 }
 
+export async function styleWindow(
+  db: D1Database,
+  account: string,
+  query: Record<string, string | undefined>,
+  now = Date.now(),
+) {
+  const setting = await db
+    .prepare('SELECT timezone FROM booking_settings WHERE line_account_id=?')
+    .bind(account)
+    .first<{ timezone: string }>();
+  const accountRow = await db
+    .prepare('SELECT timezone FROM line_accounts WHERE id=?')
+    .bind(account)
+    .first<{ timezone: string }>();
+  const timeZone = setting?.timezone ?? accountRow?.timezone ?? 'Asia/Tokyo';
+  return {
+    ...readWindow(query, timeZone, now),
+    timeZone,
+    asOf: new Date(now).toISOString(),
+  };
+}
+
 export async function styleSnapshot(
   db: D1Database,
   account: string,
@@ -337,16 +395,8 @@ export async function styleSnapshot(
     !['previous', 'last_week', 'last_year'].includes(query.compare)
   )
     throw new StyleError('invalid_comparison');
-  const setting = await db
-    .prepare('SELECT timezone FROM booking_settings WHERE line_account_id=?')
-    .bind(account)
-    .first<{ timezone: string }>();
-  const accountRow = await db
-    .prepare('SELECT timezone FROM line_accounts WHERE id=?')
-    .bind(account)
-    .first<{ timezone: string }>();
-  const timeZone = setting?.timezone ?? accountRow?.timezone ?? 'Asia/Tokyo';
-  const window = readWindow(query, timeZone, now),
+  const window = await styleWindow(db, account, query, now),
+    timeZone = window.timeZone,
     from = instant(window.from),
     to = instant(window.to);
   const raw = await styleRows(db, account, style);
@@ -1060,6 +1110,7 @@ export async function styleSnapshot(
     from: window.from,
     to: window.to,
     dateBasis: 'visit',
+    range: window.range,
     metrics,
     previous,
     items: selected,

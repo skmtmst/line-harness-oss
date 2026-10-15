@@ -1,4 +1,5 @@
 import { validateStampSettings } from './visit-stamps.js';
+import { templateSamples } from './style-template-samples.js';
 import type { VisitStampSettings } from '@line-crm/shared';
 import {
   ACCOUNT_STYLES,
@@ -181,6 +182,7 @@ export function standardStarter(style: AccountStyle): StarterDefinition {
         name: 'ダッシュボードの型',
         cards: defaultCards(style),
       },
+      ...templateSamples(style).map((sample) => sample.starterItem),
     ],
   };
 }

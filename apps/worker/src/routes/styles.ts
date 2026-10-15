@@ -26,7 +26,13 @@ import {
   starter,
   styleWarnings,
 } from '../services/style-setup.js';
-import { instant, styleSnapshot } from '../services/style-analytics.js';
+import {
+  instant,
+  styleSnapshot,
+  styleWindow,
+} from '../services/style-analytics.js';
+import { styleSchedule } from '../services/style-schedule.js';
+import { templateSamples } from '../services/style-template-samples.js';
 import { validRestaurantDate } from '../services/restaurant-booking.js';
 
 export const styles = new Hono<Env>();
@@ -203,6 +209,24 @@ styles.get(base + '/starter-set', async (c) => {
     data: await starter(c.env.DB, c.get('staff').tenantId ?? null, style),
   });
 });
+styles.get(base + '/template-samples', async (c) => {
+  await account(c);
+  if (!hasStaffPermission(c, '/templates'))
+    throw new StyleError('forbidden', 403);
+  const style = checkStyle(c.req.query('style'));
+  return c.json({
+    success: true,
+    data: { style, items: templateSamples(style) },
+  });
+});
+styles.get('/api/hq/style-template-samples', async (c) => {
+  await hq(c);
+  const style = checkStyle(c.req.query('style'));
+  return c.json({
+    success: true,
+    data: { style, items: templateSamples(style) },
+  });
+});
 styles.get(base + '/resources', requireRole('owner', 'admin'), async (c) => {
   const id = await account(c);
   const resources: Array<{ id: string; name: string; kind: string }> = [];
@@ -276,7 +300,13 @@ styles.delete(base + '/cards', async (c) => {
     data: { cards: defaultCards(p.style), version: p.version + 1 },
   });
 });
-for (const path of ['/summary', '/analytics', '/bookings', '/people'])
+for (const path of [
+  '/summary',
+  '/analytics',
+  '/bookings',
+  '/people',
+  '/schedule',
+])
   styles.get(base + path, async (c) => {
     const id = await account(c),
       p = await profile(c.env.DB, id),
@@ -300,12 +330,28 @@ for (const path of ['/summary', '/analytics', '/bookings', '/people'])
     const permission = style === 'lesson' ? '/events' : '/booking/bookings';
     if (style !== 'restaurant' && !hasStaffPermission(c, permission))
       throw new StyleError('forbidden', 403);
+    const staffId = await staffFilter(c, id, style);
+    if (path === '/schedule')
+      return c.json({
+        success: true,
+        data: await styleSchedule(
+          c.env.DB,
+          id,
+          { style, ...(await styleWindow(c.env.DB, id, c.req.query())) },
+          c.req.query(),
+          staffId,
+          {
+            email: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            privateKey: c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+          },
+        ),
+      });
     const data = await styleSnapshot(
       c.env.DB,
       id,
       style,
       c.req.query(),
-      await staffFilter(c, id, style),
+      staffId,
     );
     return c.json({ success: true, data });
   });
