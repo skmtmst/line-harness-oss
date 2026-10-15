@@ -1,3 +1,6 @@
+import { extractBroadcastTemplateIds, refreshScenarioReferences } from '@line-crm/db';
+import { parseBroadcastMessageParts, buildMessages } from '../services/broadcast-message-set.js';
+import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { isCalendarDate as isExistingCalendarDate, scheduledJstIso } from '@line-crm/shared';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { processScenarioSourceJobs } from '../services/scenario-source-jobs.js';
@@ -2237,6 +2240,38 @@ restaurantTest.get('/api/restaurant-test/followups/:storeId',requireRole('owner'
  return c.json({success:true,data:{template,bindings,jobs,editor:'common_scenario'}});
 });
 
+// 同じ共通シナリオの行へ保存し、既存トリガーで旧承認を失効させる。
+restaurantTest.put('/api/restaurant-test/followups/:storeId/steps/:stepId/messages',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c),storeId=c.req.param('storeId');
+ if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
+ const body=await c.req.json<{expectedVersion?:unknown;messageBubbles?:unknown}>();
+ if(!Number.isSafeInteger(body.expectedVersion)||Number(body.expectedVersion)<1)
+  return inputError(c,{success:false,error:'最新の版を指定してください'},400,['expectedVersion']);
+ if(!Array.isArray(body.messageBubbles)||body.messageBubbles.length<1||body.messageBubbles.length>5)
+  return inputError(c,{success:false,error:'吹き出しは1〜5個で指定してください'},400,['messageBubbles']);
+ let parts:ReturnType<typeof parseBroadcastMessageParts>;
+ try {
+  parts=parseBroadcastMessageParts({messageType:'text',messageContent:'',messageBubbles:body.messageBubbles});
+  buildMessages(parts);
+  for(const part of parts){const checked=validateTemplateMessage(part.messageType,part.messageContent);if(!checked.ok)throw new Error(checked.error);}
+ }catch(error){return inputError(c,{success:false,error:error instanceof Error?error.message:'吹き出しを確認してください'},422,['messageBubbles']);}
+ const db=dbFor(c.env,storeId),stepId=c.req.param('stepId');
+ const target=await db.prepare(`SELECT step.id,step.scenario_id,s.line_account_id FROM scenario_steps step JOIN rt_store_followup_templates t ON t.scenario_id=step.scenario_id JOIN rt_stores s ON s.id=t.store_id WHERE t.store_id=? AND step.id=?`).bind(storeId,stepId).first<{id:string;scenario_id:string;line_account_id:string}>();
+ if(!target)return c.json({success:false,error:'not_found'},404);
+ const templateIds=extractBroadcastTemplateIds(JSON.stringify(body.messageBubbles));
+ if(templateIds.length){
+  const found=await db.prepare('SELECT id FROM templates WHERE line_account_id=? AND id IN (SELECT value FROM json_each(?))').bind(target.line_account_id,JSON.stringify(templateIds)).all<{id:string}>();
+  if(found.results.length!==templateIds.length)return inputError(c,{success:false,error:'この店舗のテンプレートを選んでください'},422,['messageBubbles']);
+ }
+ const changed=await db.prepare(`UPDATE scenario_steps SET message_bubbles_json=?,message_type=?,message_content=?,template_id=NULL
+   WHERE id=? AND EXISTS(SELECT 1 FROM rt_store_followup_templates t WHERE t.store_id=? AND t.scenario_id=scenario_steps.scenario_id AND t.template_version=?)`)
+   .bind(JSON.stringify(body.messageBubbles),parts[0].messageType,parts[0].messageContent,stepId,storeId,body.expectedVersion).run();
+ if(!changed.meta.changes)return c.json({success:false,error:'version_conflict'},409);
+ await refreshScenarioReferences(db,target.scenario_id);
+ return c.json({success:true,data:{stepId,messageBubbles:body.messageBubbles,version:Number(body.expectedVersion)+1,sendingStatus:'stopped'}});
+});
+
 const updateRestaurantFollowupBinding=async(c:Context<Env>)=>{
  if(!hasOrganizationSelector(c))return requiredAccount(c);
  const org=await organizationFor(c),storeId=c.req.param('storeId')??'';
@@ -2557,7 +2592,28 @@ restaurantTest.get('/api/restaurant-test/channel-close-tasks',requireRole('owner
  if(!hasOrganizationSelector(c))return requiredAccount(c);
  const org=await organizationFor(c);const storeId=c.req.query('storeId')||org?.scopedStoreId;
  if(!org||!storeId||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'店舗が正しくありません'},404);
- return c.json({success:true,data:await listRestaurantCloseTasks(dbFor(c.env,storeId),storeId)});
+ const source=c.req.query('source'),channel=c.req.query('channel');
+ return c.json({success:true,data:await listRestaurantCloseTasks(dbFor(c.env,storeId),storeId,{source:source&&source!=='all'?source:undefined,channel:channel&&channel!=='all'?channel:undefined})});
+});
+restaurantTest.post('/api/restaurant-test/channel-close-tasks/:id/opened',requireRole('owner','admin','staff'),inputJsonBoundary(),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c);if(!org)return c.json({success:false,error:'組織がありません'},404);
+ const body=await c.req.json<{expectedGeneration?:unknown}>().catch(()=>null);
+ if(!body||!Number.isSafeInteger(body.expectedGeneration)||Number(body.expectedGeneration)<1)return inputError(c,{success:false,error:'読み込んだ知らせの世代を確認してください'},400,['expectedGeneration']);
+ const db=dbFor(c.env),id=c.req.param('id');
+ const task=await db.prepare(`SELECT store_id,generation,status,'rt_channel_close_tasks' AS task_table FROM rt_channel_close_tasks WHERE id=?
+ UNION ALL SELECT store_id,generation,status,'rt_reservation_close_tasks' FROM rt_reservation_close_tasks WHERE id=?
+ UNION ALL SELECT store_id,generation,status,'rt_closure_close_tasks' FROM rt_closure_close_tasks WHERE id=?`).bind(id,id,id)
+ .first<{store_id:string;generation:number;status:string;task_table:'rt_channel_close_tasks'|'rt_reservation_close_tasks'|'rt_closure_close_tasks'}>();
+ if(!task||!await storeBelongsTo(c,org.id,task.store_id))return c.json({success:false,error:'知らせがありません'},404);
+ const generation=Number(body.expectedGeneration);
+ const saved=await db.prepare(`INSERT INTO account_settings(id,line_account_id,key,value)
+ SELECT ?,s.line_account_id,?,? FROM ${task.task_table} t JOIN rt_stores s ON s.id=t.store_id
+ WHERE t.id=? AND t.store_id=? AND t.status='reopen' AND t.generation=? AND s.line_account_id IS NOT NULL
+ ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value,updated_at=datetime('now')`)
+ .bind(crypto.randomUUID(),'restaurant_close_opened:'+id,String(generation),id,task.store_id,generation).run();
+ if(!saved.meta.changes)return c.json({success:false,error:'知らせが更新されました。読み直してください'},409);
+ return c.json({success:true,data:{id,status:'reopen',opened:true,generation}});
 });
 restaurantTest.post('/api/restaurant-test/channel-close-tasks/:id/done',requireRole('owner','admin','staff'),inputJsonBoundary(), async c=>{
  if(!hasOrganizationSelector(c))return requiredAccount(c);

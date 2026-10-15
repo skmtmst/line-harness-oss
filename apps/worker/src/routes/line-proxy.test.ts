@@ -77,6 +77,7 @@ const U = (n: number) => `U${n.toString(16).padStart(32, '0')}`;
 function fakeDb(opts: {
   friendsByUserId?: Record<string, { id: string; line_user_id: string }>;
   broadcastFriendIds?: string[];
+  suppressed?: boolean;
 } = {}) {
   const executed: Exec[] = [];
   const db = {
@@ -103,6 +104,7 @@ function fakeDb(opts: {
           return { results: (opts.broadcastFriendIds ?? []).map((id) => ({ id })) };
         },
         async first() {
+          if(sql.includes('friend_delivery_consents'))return opts.suppressed?{suppressed:1}:null;
           return null;
         },
       };
@@ -1021,4 +1023,18 @@ describe('emergency stop (broadcast_dispatch)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(isOperationCapabilityStopped).not.toHaveBeenCalled();
   });
+});
+
+
+describe('配信停止・同意の送信直前検査',()=>{
+ test.each(['/v2/bot/message/push','/v2/bot/message/multicast','/v2/bot/message/broadcast','/v2/bot/message/narrowcast'])('停止対象を含む%sは上流へ出さない',async path=>{
+  const {db}=fakeDb({suppressed:true});
+  const response=await setupApp().request(new Request('http://worker.test/line-api'+path,{method:'POST',headers:{Authorization:'Bearer acc-token','Content-Type':'application/json'},body:JSON.stringify({to:path.endsWith('/multicast')?[USER_A]:USER_A,messages:[{type:'text',text:'案内'}]})}),{},env(db));
+  expect(response.status).toBe(409);expect(fetchMock).not.toHaveBeenCalled();
+ });
+ test('manualの個別返信は配信停止中でも担当者が送れる',async()=>{
+  const {db}=fakeDb({suppressed:true});
+  const response=await setupApp().request(pushRequest('acc-token',undefined,{'X-Line-Harness-Source':'manual'}),{},env(db));
+  expect(response.status).toBe(200);expect(fetchMock).toHaveBeenCalledOnce();
+ });
 });

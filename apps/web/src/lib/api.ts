@@ -1931,6 +1931,7 @@ import type { BroadcastMessageOptions } from '@line-crm/shared';
 export type BroadcastPreflight = {
   audienceCount: number
   hiddenExcluded: number
+  consentExcluded?: number
   warnings: Array<{ level: 'info' | 'warning'; message: string }>
   audience?: {
     matched: number
@@ -3630,6 +3631,7 @@ export type MileageFriendV6 = {
   lifetimeEarned: number
   spent: number
   lastChangedAt: string | null
+  lastAction?: { name: string; amount: number; occurredAt: string; entryType: string; status: string } | null
   walletScope: 'verified_user' | 'friend'
   lineAccount: { id: string; name: string }
 }
@@ -5744,6 +5746,7 @@ export interface UidMigrationItem {
   errorMessage: string | null
 }
 export interface UidMigrationRun {
+  suppressionReconciliation?: { status: 'unavailable'; transferredCount: null; mismatchCount: null; reason: 'delivery_consent_snapshot_missing' } | { status: 'matched' | 'mismatch' | 'rolled_back'; transferredCount: number; mismatchCount: number; reason: null }
   id: string
   fromAccountId: string
   toAccountId: string
@@ -7631,7 +7634,10 @@ export const api = {
         name?: string
         description?: string | null
         fields?: unknown
-        /** 送ると fields もこちらから作り直される */
+        /**
+         * 送ると fields もこちらから作り直される。
+         * 予約のつまみは各ブロックのbooking.allowMenuSelection/requireApproval。
+         */
         layout?: FormLayout
         onSubmitTagId?: string | null
         onSubmitMessageType?: string | null
@@ -9189,6 +9195,7 @@ export const api = {
   },
   /** 統括から運営へのお問い合わせ（★V6 36-3）。形は `apps/worker/src/routes/hq-support.ts`。 */
   hqSupport: {
+    summary: () => fetchApi<ApiResponse<{ total: number; newCount: number; inProgressCount: number; assignedInProgressCount: number; resolvedThisMonth: number; resolvedPreviousMonth: number; averageFirstReplyHours: number | null; firstReplySampleCount: number }>>('/api/hq/support/summary'),
     context: () => fetchApi<ApiResponse<HqSupportContext>>('/api/hq/support/context'),
     kinds: () => fetchApi<ApiResponse<Array<{ key: HqSupportKind; label: string }>>>('/api/hq/support/kinds'),
     list: () => fetchApi<ApiResponse<HqSupportRequest[]>>('/api/hq/support/requests'),
@@ -9397,9 +9404,9 @@ export const api = {
   */
   manualLinks: {
     /** 画面から1つ引く。**開けないと分かっているものは URL が null で返る。** */
-    lookup: (screen: string) =>
+    lookup: (screen: string, keyKind: 'screen' | 'task' = 'screen') =>
       fetchApi<ApiResponse<{ key: string; url: string | null; status: 'ok' | 'broken' | 'unset' }>>(
-        `/api/manual-links/lookup?screen=${encodeURIComponent(screen)}`,
+        `/api/manual-links/lookup?screen=${encodeURIComponent(screen)}${keyKind === 'task' ? '&keyKind=task' : ''}`,
       ),
     list: () =>
       fetchApi<ApiResponse<{ items: ManualLink[]; total: number; brokenCount: number }>>(
@@ -13572,7 +13579,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<CreateEntryRouteInput>) =>
+    update: (id: string, data: Partial<CreateEntryRouteInput> & { expectedUpdatedAt?: string }) =>
       fetchApi<ApiResponse<EntryRoute>>(`/api/entry-routes/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -14847,6 +14854,16 @@ export interface BookingSalesSummary {
 }
 
 export const bookingApi = {
+  getChannels: (accountId: string) => fetchApi<ApiResponse<{
+    timeZone: string; autoAssign: boolean;
+    staff: Array<{ staffId: string; displayName: string; status: 'connected' | 'disconnected' | 'expired'; externalEventsThisWeek: number | null; lastReadAt: string | null; readError: string | null }>;
+    channels: Array<{ key: string; status: string; todayCount: number | null; enabled?: boolean; version?: number; connectionStatus?: 'requested' | 'disabled'; operational?: false }>;
+  }>>(withAccount('/api/booking/admin/channels', accountId)),
+  /** 外部サービスの実接続ではなく、連携を希望する設定だけを保存する。 */
+  saveChannelSetting: (accountId: string, channel: 'hot_pepper_beauty' | 'google_reserve' | 'epark', data: { enabled: boolean; expectedVersion: number }) =>
+    fetchApi<ApiResponse<{ key: string; enabled: boolean; version: number; connectionStatus: 'requested' | 'disabled'; operational: false }>>(
+      withAccount(`/api/booking/admin/channels/${channel}/settings`, accountId), { method: 'PUT', body: JSON.stringify(data) },
+    ),
   getPaymentConfig: (accountId: string) =>
     fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
       withAccount('/api/booking/admin/payment-config', accountId),

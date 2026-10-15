@@ -50,6 +50,7 @@ export interface ScenarioStep {
   delay_minutes: number;
   message_type: MessageType;
   message_content: string;
+  message_bubbles_json?: string | null;
   condition_type: string | null;
   condition_value: string | null;
   next_step_on_false: number | null;
@@ -709,6 +710,7 @@ async function buildVersionSnapshotSteps(
       delay_minutes: s.delay_minutes,
       message_type: resolved.messageType,
       message_content: resolved.messageContent,
+      ...(s.message_bubbles_json ? { message_bubbles_json: s.message_bubbles_json } : {}),
       condition_type: s.condition_type,
       condition_value: s.condition_value,
       next_step_on_false: s.next_step_on_false,
@@ -742,6 +744,7 @@ function normalizeVersionStepSnapshot(
     delay_minutes: entry['delay_minutes'] ?? 0,
     message_type: entry['message_type'] ?? 'text',
     message_content: entry['message_content'] ?? '',
+    ...(entry['message_bubbles_json'] ? { message_bubbles_json: entry['message_bubbles_json'] } : {}),
     condition_type: entry['condition_type'] ?? null,
     condition_value: entry['condition_value'] ?? null,
     next_step_on_false: entry['next_step_on_false'] ?? null,
@@ -851,6 +854,7 @@ export function parseScenarioVersionSteps(version: ScenarioVersion): PinnedScena
       delay_minutes: (r['delay_minutes'] as number) ?? 0,
       message_type: (r['message_type'] as ScenarioStep['message_type']) ?? 'text',
       message_content: (r['message_content'] as string) ?? '',
+      ...(r['message_bubbles_json'] ? { message_bubbles_json: r['message_bubbles_json'] as string } : {}),
       condition_type: (r['condition_type'] as string | null) ?? null,
       condition_value: (r['condition_value'] as string | null) ?? null,
       next_step_on_false: (r['next_step_on_false'] as number | null) ?? null,

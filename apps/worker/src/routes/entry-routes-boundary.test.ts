@@ -71,6 +71,22 @@ describe('N-011 流入経路一覧のアカウント境界', () => {
   });
 });
 
+it('流入リンクは古い更新日時を409にし、同じ時刻の連続保存でも版を進める',async()=>{
+  const testDb=createTestD1();seed(testDb);
+  try {
+    const client=app(testDb,owner(DEFAULT_TENANT_ID));
+    const read=async()=>((await (await client.request('/api/entry-routes/route-1')).json()) as {data:{updatedAt:string;name:string}}).data;
+    const save=(name:string,expectedUpdatedAt:unknown)=>client.request('/api/entry-routes/route-1',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,expectedUpdatedAt})});
+    const before=await read();
+    expect((await save('保存A',before.updatedAt)).status).toBe(200);
+    expect((await save('上書きB',before.updatedAt)).status).toBe(409);
+    const after=await read();expect(after.name).toBe('保存A');expect(after.updatedAt).not.toBe(before.updatedAt);
+    expect((await save('保存C',after.updatedAt)).status).toBe(200);
+    expect((await save('不正',4)).status).toBe(400);
+    expect((await read()).name).toBe('保存C');
+  }finally{testDb.raw.close();}
+});
+
 describe('R39 選択中アカウントでの流入リンク作成', () => {
   function post(testDb: SqliteD1, body: unknown) {
     return app(testDb, owner(DEFAULT_TENANT_ID)).request('/api/entry-routes', {

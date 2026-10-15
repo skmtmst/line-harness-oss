@@ -287,10 +287,10 @@ export const restaurantGoogleApi = {
     ),
   review: (accountId: string, id: string) =>
     fetchApi<{ success: true; review: GoogleReview; store: { id: string; name: string }; connection: GoogleConnection }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}`, accountId)),
-  generateDraft: (accountId: string, id: string) =>
+  generateDraft: (accountId: string, id: string, options: { mode?: 'generate' | 'shorten' | 'polite'; replyDraft?: string } = {}) =>
     fetchApi<{ success: true; draft: string; aiGenerated: true; generatedAt: string }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}/draft/generate`, accountId), {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify(options),
     }),
   saveDraft: (accountId: string, id: string, replyDraft: string) =>
     fetchApi<{ success: true; review: GoogleReview }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}/draft`, accountId), { method: 'PUT', body: JSON.stringify({ replyDraft }) }),

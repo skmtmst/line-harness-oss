@@ -118,10 +118,10 @@ export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true
     if(!connected)reasons.push('LINEに接続されていません');
     if(/\{\{\s*liff_id\s*\}\}/.test(JSON.stringify(input))&&!account?.liff_id)reasons.push('店舗のLIFF IDを確認してください');
 
-    let audienceCount:number|null=null;
-    try{audienceCount=await countHqAudience(db,t.line_account_id,await resolveHqBroadcastAudience(db,run.tenant_id,t.line_account_id,input));}
+    let audienceCount:number|null=null,consentExcluded:number|null=null;
+    try{const counts=await countHqAudience(db,t.line_account_id,await resolveHqBroadcastAudience(db,run.tenant_id,t.line_account_id,input));audienceCount=counts.count;consentExcluded=counts.consentExcluded;}
     catch(e){reasons.push(e instanceof StampError?e.message:'対象条件を確認できません');}
-    if(audienceCount===0)reasons.push('友だちが0人です');
+    if(audienceCount===0&&!consentExcluded)reasons.push('友だちが0人です');
     const quota=connected?await fetchQuota(account!.channel_access_token):{limit:null,used:null};
     const remaining=quota.limit===null||quota.used===null?null:Math.max(0,quota.limit-quota.used);
     // APIエラーも接続不明として人に返す。別の店舗の枠では補えない。
@@ -131,7 +131,7 @@ export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true
     catch(e) {reasons.push(e instanceof StampError?e.message:'店舗の共通情報を確認してください');}
     let afterAction:null|{versionId:string;name:string;versionNumber:number;actionCount:number}=null;
     try {const a=await hqAfterAction(db,input,t.line_account_id);if(a)afterAction={versionId:a.id,name:a.name,versionNumber:a.versionNumber,actionCount:a.actionCount};}catch(e){reasons.push(e instanceof StampError?e.message:'配信後の処理を確認してください');}
-    const p={afterAction,accountId:t.line_account_id,accountName:account?.name??t.account_name,audienceCount,remaining,connected:connected&&remaining!==null,paused,blockedReasons:reasons,excluded:!!t.excluded,broadcastId:t.broadcast_id};
+    const p={afterAction,accountId:t.line_account_id,accountName:account?.name??t.account_name,audienceCount,consentExcluded,warnings:consentExcluded? [`配信を止めている ${consentExcluded} 人には送りません。`]:[],remaining,connected:connected&&remaining!==null,paused,blockedReasons:reasons,excluded:!!t.excluded,broadcastId:t.broadcast_id};
     result.push(p);
     if(persist)await db.prepare('UPDATE hq_broadcast_targets SET preflight_json=? WHERE run_id=? AND line_account_id=?').bind(JSON.stringify(p),run.id,t.line_account_id).run();
   }
@@ -226,6 +226,7 @@ export async function retryHqBroadcastTarget(db:D1Database,run:RunRow,accountId:
 }
 
 export function classifyHqFailure(state:string,errorCode:string|null,count:number) {
+ if(errorCode==='delivery_consent_suppressed')return {code:'consent_excluded',label:'配信を止めているため送りませんでした',count,retryable:false};
  if(state==='unknown')return {code:'delivery_unknown',label:'LINEの応答なし（届いたか確認が必要）',count,retryable:false};
  if(errorCode==='line_http_429')return {code:'line_busy',label:'LINEが混雑しています',count,retryable:true};
  if(errorCode==='stopped_before_dispatch')return {code:'stopped',label:'送信前に停止しました',count,retryable:true};

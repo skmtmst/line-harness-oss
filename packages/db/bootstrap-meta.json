@@ -579,9 +579,11 @@
     "634_customer_deletion_retained_references.sql",
     "635_restaurant_delivery_orders.sql",
     "636_restaurant_delivery_uber_connections.sql",
+    "637_friend_delivery_consents.sql",
+    "638_restaurant_close_task_sources.sql",
     "639_hq_form_test_tokens.sql",
     "640_hq_broadcast_saved_views.sql",
     "661_hq_catalog_templates.sql"
   ],
-  "migrationCount": 582
+  "migrationCount": 584
 }

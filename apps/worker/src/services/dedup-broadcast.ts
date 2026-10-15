@@ -1,3 +1,4 @@
+import { recordSuppressedBroadcastRecipients, suppressedFriendIds } from '@line-crm/db/src/friend-delivery-consents.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
@@ -511,7 +512,11 @@ export async function processMultiAccountDedupBroadcast(
     try {
       for (let i = 0; i < remaining.length; i += deliveryBatchSize) {
         const batchIdx = Math.floor(i / deliveryBatchSize);
-        const batch = remaining.slice(i, i + deliveryBatchSize);
+        const candidates = remaining.slice(i, i + deliveryBatchSize);
+        const suppressed = await suppressedFriendIds(db,candidates.map(r=>r.friendId));
+        await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
+        const batch = candidates.filter(r=>!suppressed.has(r.friendId));
+        if(!batch.length) continue;
 
         // 時間バジェットを超えたら、残りは次の cron tick に回して yield する。
         // ただし最低 1 batch は必ず送る (sentAnyBatch ガード) ことで毎 tick 前進を保証。

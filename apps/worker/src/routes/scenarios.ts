@@ -225,6 +225,7 @@ function serializeStep(row: DbScenarioStep) {
     deliveryTime: row.delivery_time ?? null,
     messageType: row.message_type,
     messageContent: row.message_content,
+    messageBubbles: parseJson(row.message_bubbles_json),
     conditionType: row.condition_type ?? null,
     conditionValue: row.condition_value ?? null,
     nextStepOnFalse: row.next_step_on_false ?? null,
@@ -1006,6 +1007,13 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenari
         const { ok: _ok, ...failure } = message;
         return inputError(c, { success: false, ...failure }, 422, ["messageType","messageContent"]);
       }
+    }
+
+    // 旧1通の編集で複数吹き出しを黙って消さない。来店フォローの版付き保存へ戻す。
+    if (body.messageType !== undefined || body.messageContent !== undefined || body.templateId !== undefined) {
+      const stored = await c.env.DB.prepare('SELECT message_bubbles_json FROM scenario_steps WHERE id=? AND scenario_id=?')
+        .bind(stepId,scenarioId).first<{message_bubbles_json:string|null}>();
+      if (stored?.message_bubbles_json) return c.json({success:false,code:'MULTIPLE_MESSAGES_REQUIRE_EDITOR',error:'複数の吹き出しは来店フォローの編集で保存してください'},409);
     }
 
     // conditionType / conditionValue の partial-update 検証（OSS issue #120 回帰防止）。

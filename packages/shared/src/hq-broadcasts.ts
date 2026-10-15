@@ -10,6 +10,7 @@ export type HqBroadcastInput = BroadcastDefinitionInput & {
 };
 export interface HqBroadcastPreflight {
  accountId:string;accountName:string;audienceCount:number|null;remaining:number|null;connected:boolean;paused:boolean;
+ consentExcluded?:number|null;warnings?:string[];
  blockedReasons:string[];excluded:boolean;broadcastId:string|null;
  afterAction?:{versionId:string;name:string;versionNumber:number;actionCount:number}|null;
 }

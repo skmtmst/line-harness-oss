@@ -290,8 +290,15 @@ entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), inputJ
         runAccountFriendAddScenarios: boolean;
         isActive: boolean;
         stoppedReason?: string | null;
+        expectedUpdatedAt: string;
       }>
     >();
+    if (body.expectedUpdatedAt !== undefined && (typeof body.expectedUpdatedAt !== 'string' || !body.expectedUpdatedAt)) {
+      return inputError(c,{success:false,error:'読み込んだ更新日時を指定してください'},400,['expectedUpdatedAt']);
+    }
+    if (body.expectedUpdatedAt !== undefined && body.expectedUpdatedAt !== existing.updated_at) {
+      return c.json({success:false,code:'VERSION_CONFLICT',error:'先に保存された変更があります。最新を読み直してください',data:{current:serialize(existing)}},409);
+    }
     if (body.refCode !== undefined && body.refCode.trim() !== existing.ref_code) {
       return inputError(c, { success: false, error: 'ref_code は作成後に変更できません' }, 400, ["refCode"]);
     }
@@ -316,6 +323,9 @@ entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), inputJ
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(row) });
   } catch (err) {
+    if (err instanceof Error && err.message === 'ENTRY_ROUTE_VERSION_CONFLICT') {
+      return c.json({success:false,code:'VERSION_CONFLICT',error:'先に保存された変更があります。最新を読み直してください'},409);
+    }
     console.error(JSON.stringify({"code":"routes_entry_routes_failed","route":"PATCH /api/entry-routes/:id"}));
     if (String(err).includes('UNIQUE constraint failed: entry_routes.ref_code')) {
       return c.json({ success: false, error: 'この ref_code は既に使われています' }, 409);

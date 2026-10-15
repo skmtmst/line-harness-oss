@@ -13,6 +13,7 @@ export const restaurantFollowupPaths={
   patch:{summary:'起点の時刻・停止を版付きで変更（管理者）',...edit},
   delete:{summary:'起点を解除して旧承認を無効にする（管理者）',...edit,requestBody:json({expectedVersion:version,trigger:binding.trigger},['expectedVersion','trigger'])},
  },
+ '/api/restaurant-test/followups/{storeId}/steps/{stepId}/messages':{put:{summary:'共通フォローの1つの行へ複数吹き出しを版付き保存し、旧承認を無効にする',parameters:[account,store,{name:'stepId',in:'path',required:true,schema:{type:'string'}}],requestBody:json({expectedVersion:version,messageBubbles:{type:'array',minItems:1,maxItems:5,items:{type:'object'}}},['expectedVersion','messageBubbles']),responses:{...result,'422':{description:'吹き出しの内容が不正'}}}},
  '/api/restaurant-test/followups/{storeId}/request-start':{post:{summary:'公開版と起点の版で本送信の承認を申請',parameters:[account,store],requestBody:json({expectedVersion:version},['expectedVersion']),responses:result}},
  '/api/restaurant-test/followups/{storeId}/stop':{post:{summary:'本送信を停止し旧承認を無効にする',parameters:[account,store],responses:result}},
  '/api/restaurant-test/followups/{storeId}/review-history':{get:{summary:'LINEの口コミ依頼履歴。実口コミの由来を推測しない',parameters:[account,store],responses:result}},

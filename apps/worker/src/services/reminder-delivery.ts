@@ -1,3 +1,4 @@
+import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
 /**
  * リマインダ配信処理 — cronトリガーで定期実行
  *
@@ -540,6 +541,11 @@ export async function processReminderDeliveries(
           now: nowIso,
           expectedLeaseExpiresAt: claimLease ? [claimLease] : [],
         });
+        result.skipped++;
+        continue;
+      }
+      if (await isFriendDeliverySuppressed(db, friend.id)) {
+        await skipReminderDeliveryRun(db, {id:run.id,code:'delivery_consent_suppressed',message:'配信停止・同意の状態により送信しませんでした。',now:nowIso,expectedLeaseExpiresAt:claimLease?[claimLease]:[]});
         result.skipped++;
         continue;
       }

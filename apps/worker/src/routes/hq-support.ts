@@ -141,6 +141,21 @@ function parseAttachments(raw: unknown): { uploads: Upload[] } | { error: string
   return { uploads };
 }
 
+/** 一覧のページ数に左右されない、所属する統括のお問い合わせ集計。 */
+hqSupport.get('/api/hq/support/summary', async (c) => {
+  const data = await c.env.DB.prepare(`SELECT COUNT(*) AS total,
+    COALESCE(SUM(stage='new'),0) AS newCount,
+    COALESCE(SUM(stage='in_progress'),0) AS inProgressCount,
+    COALESCE(SUM(stage='in_progress' AND assignee_staff_id IS NOT NULL),0) AS assignedInProgressCount,
+    COALESCE(SUM(strftime('%Y-%m',resolved_at)=strftime('%Y-%m','now','+9 hours')),0) AS resolvedThisMonth,
+    COALESCE(SUM(strftime('%Y-%m',resolved_at)=strftime('%Y-%m','now','+9 hours','start of month','-1 month')),0) AS resolvedPreviousMonth,
+    AVG(CASE WHEN julianday(first_replied_at)>=julianday(created_at)
+      THEN (julianday(first_replied_at)-julianday(created_at))*24 END) AS averageFirstReplyHours,
+    COUNT(CASE WHEN julianday(first_replied_at)>=julianday(created_at) THEN 1 END) AS firstReplySampleCount
+    FROM hq_support_requests WHERE tenant_id=?`).bind(tenantOf(c)).first();
+  return c.json({ success: true, data });
+});
+
 hqSupport.get('/api/hq/support/requests', async (c) => {
   try {
     const rows = await listHqSupportRequests(c.env.DB, tenantOf(c));

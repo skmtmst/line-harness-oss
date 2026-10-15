@@ -1,3 +1,4 @@
+import { parseBroadcastMessageParts } from './broadcast-message-set.js';
 import { reservationInstant } from '@line-crm/shared';
 import { getLineAccountById, getFriendById, parseScenarioVersionSteps, activeTenantLineAccountSql, isOperationCapabilityStopped, type ScenarioVersion } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
@@ -152,13 +153,17 @@ export async function processScenarioSourceJobs(env: Env['Bindings'], send: Sour
                 waitlist_book_url: `${(env.LIFF_URL ?? '').replace(/\/$/, '')}/booking?seat_waitlist=${encodeURIComponent(j.source_id)}`,
                 waitlist_decline_url: `${(env.LIFF_URL ?? '').replace(/\/$/, '')}/booking?seat_waitlist=${encodeURIComponent(j.source_id)}&action=decline`,
                 restaurant_going: `rc:${j.id}:going`, restaurant_change: `rc:${j.id}:change_requested`, restaurant_cancel: `rc:${j.id}:cancel` };
-            // 予約起点の値を共通情報の設定値と混同しない。残りは既存の厳格解決を使う。
-            const scanned = step.message_content.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g, (m, key: string) => key in vars ? '' : m);
-            const extra = await resolveSendInterpolationExtra(db, friend.id, scanned, { kind: 'scenario', id: j.id });
+            // 公開版の吹き出しだけを順番どおりに展開する。下書きは読み直さない。
+            const parts = parseBroadcastMessageParts({ messageType: step.message_type, messageContent: step.message_content, messageBubblesJson: step.message_bubbles_json });
             const metadata = await resolveMetadata(db, friend as never);
-            const content = expandVariables(step.message_content, { ...friend, metadata } as never, env.WORKER_PUBLIC_URL, step.message_type, { ...extra, vars: { ...extra.vars, ...vars }, deliveredAt: new Date() });
-            const tracked = await decorateForFriendPush(db, step.message_type, content, env.WORKER_PUBLIC_URL, { lineAccountId: j.line_account_id, friendId: j.friend_id });
-            const messages = [buildMessage(tracked.messageType, tracked.content)];
+            const messages: Message[] = [];
+            for (const part of parts) {
+                const scanned = part.messageContent.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g, (m, key: string) => key in vars ? '' : m);
+                const extra = await resolveSendInterpolationExtra(db, friend.id, scanned, { kind: 'scenario', id: j.id });
+                const content = expandVariables(part.messageContent, { ...friend, metadata } as never, env.WORKER_PUBLIC_URL, part.messageType, { ...extra, vars: { ...extra.vars, ...vars }, deliveredAt: new Date() });
+                const tracked = await decorateForFriendPush(db, part.messageType, content, env.WORKER_PUBLIC_URL, { lineAccountId: j.line_account_id, friendId: j.friend_id });
+                messages.push(buildMessage(tracked.messageType, tracked.content));
+            }
             // 返事の依頼はこの予約版で固定し、再試行は同じID・押し口を使う。
             if (state.trigger === 'reservation_24h')
                 await db.prepare(`INSERT OR IGNORE INTO rt_reservation_confirmations

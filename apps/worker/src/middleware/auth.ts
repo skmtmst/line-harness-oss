@@ -345,6 +345,7 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['GET', '/api/tenants/me'],
   // 自社の表示設定だけ読む。PUTは会社全体のowner/adminに限定する。
   ['GET', '/api/settings/company'],
+  ['GET', '/api/hq/support/summary'],
   ['POST', '/api/client-errors'],
   ['GET', '/api/capabilities'],
   ['GET', '/api/line-accounts'],
@@ -504,7 +505,7 @@ const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = 
   ['DELETE', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
   ['PATCH', /^\/api\/restaurant-test\/closures\/[^/]+$/],
   ['DELETE', /^\/api\/restaurant-test\/closures\/[^/]+$/],
-  ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/done$/],
+  ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/(?:done|opened)$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],

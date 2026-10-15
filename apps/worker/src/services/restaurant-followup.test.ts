@@ -38,6 +38,26 @@ beforeEach(()=>{
 });
 afterEach(()=>{vi.useRealTimers();t.raw.close();});
 describe('飲食3・承認した共通版と予約ごとの送り方',()=>{
+ it('複数吹き出しを公開版へ固定し、テキストとカルーセルを1回の送信で同じ順に送る',async()=>{
+  const step='restaurant-followup:s:reservation_created';
+  const bubbles=[{id:'text',type:'text',content:{text:'{{name}}さん、{{var.guest_count}}名のご予約を承りました。'}},
+   {id:'carousel',type:'carousel',content:{columnsJson:JSON.stringify([{text:'{{var.store_name}}のご案内',actions:[{type:'uri',label:'地図',uri:'https://example.test/map'}]}])}}];
+  t.raw.prepare('UPDATE scenario_steps SET message_bubbles_json=? WHERE id=?').run(JSON.stringify(bubbles),step);
+  await activate();
+  const first=(t.raw.prepare('SELECT approved_version_id id FROM rt_store_followup_templates').get() as {id:string}).id;
+  const snapshot=(t.raw.prepare('SELECT steps_snapshot FROM scenario_versions WHERE id=?').get(first) as {steps_snapshot:string}).steps_snapshot;
+  expect(JSON.parse(snapshot).find((s:any)=>s.live_step_id===step).message_bubbles_json).toBe(JSON.stringify(bubbles));
+  const event=reservation();await scheduleRestaurantFollowup(t.db,event);expect(await processScenarioSourceJobs(env,sender)).toBe(1);
+  expect(sender).toHaveBeenCalledTimes(1);
+  const messages=(sender.mock.calls[0] as unknown[])[2] as any[];
+  expect(messages.map(m=>m.type)).toEqual(['text','template']);expect(messages[0].text).toBe('友だちさん、2名のご予約を承りました。');
+  expect(messages[1].template.columns[0].text).toBe('店舗のご案内');
+  expect(await processScenarioSourceJobs(env,sender)).toBe(0);
+  bubbles[0].content.text='改稿';t.raw.prepare('UPDATE scenario_steps SET message_bubbles_json=? WHERE id=?').run(JSON.stringify(bubbles),step);
+  expect(t.raw.prepare('SELECT sending_status FROM rt_store_followup_templates').get()).toEqual({sending_status:'stopped'});
+  expect((t.raw.prepare('SELECT steps_snapshot FROM scenario_versions WHERE id=?').get(first) as {steps_snapshot:string}).steps_snapshot).toBe(snapshot);
+  await activate();expect((t.raw.prepare('SELECT approved_version_id id FROM rt_store_followup_templates').get() as {id:string}).id).not.toBe(first);
+ });
  it('店の追加は下書き・停止、再接続でひな形を二重作成しない',()=>{
   expect(t.raw.prepare('SELECT sending_status,approved_version_id FROM rt_store_followup_templates').get()).toEqual({sending_status:'stopped',approved_version_id:null});
   t.raw.exec("UPDATE rt_stores SET line_account_id='a' WHERE id='s'");
