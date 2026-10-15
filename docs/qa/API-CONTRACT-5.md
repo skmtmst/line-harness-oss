@@ -1,3 +1,64 @@
+# API 組5 — 10-16 04:30 の担当変更に対応（この節が以前の担当表より優先）
+
+## 今の進捗を全体像から整理するとこれ
+
+34板のうち、B-299以外の16板について、以下のAPI・共有型・Web関数を用意した。W5Wxr/rSRFKは既存APIを試験して接続先を明示、iN6npは組2のため変更しない。B-299の18板は下の初回の案を維持し、製品を追加していない。EpTBBも組1のため変更しない。画面の実装・撮影の合格はこの作業に含めない。
+
+組1・組2の既存コミット（bdc414be84 / 03d4534e82 / ecac723a92 / 08ee227fe0 / 5288ca360d）から該当するAPI部分を再利用し、不足した機能を組5で補完した。他組の作業ツリーは変更していない。初回に「他組の物」として保留した範囲は、04:30の再指定でこの節の担当へ変更した。
+
+## 板ごとの受け口と接続
+
+すべての統括APIは、自組織の有効なowner/admin・全体スコープ。読取りは閲覧のみ可、更新は不可。店のAPIは既存の担当アカウント・機能権限を使用。外部への実送信・公開・DB適用は行っていない。
+
+| 板 | 作った口・既存の接続先 | Web関数・画面側でつなぐ所 |
+|---|---|---|
+| J7HNK / Ft2Ey | `GET /api/hq/templates/:id/distribution-targets?accountIds=a,b`。省略は自組織の全有効店、最大30/重複不可。`{templateId,latestVersion,requiresPreflight:true,stores:[{accountId,accountName,folderId,targetVersion:{version,latestVersion,status,label}}]}`。未配布はversion:null。実際の上書き可否は既存preflightを取り直す | `fetchHqDistributionTargets(id,accountIds)`と`fetchHqDistributionAccounts()`。既存`GET /api/hq/templates/accounts`にもfolderIdを返す。`api.lineAccountFolders.list()`と結び、返された有効店だけで分類別の件数を数える。選択集合は画面で保持。確認は`POST /:id/preflight {accountIds}`、実行は`POST /:id/distribute {preflightId,resolutions}`。取得時点の未配布を同名項目なしとみなさない |
+| Fkv3w / Ft2Ey | `GET /api/hq/templates/resources?kind=tag/coupon/scenario&q=...&accountIds=...&limit=30&cursor=0`。`{kind,items:[{id,name,accountId,accountName}],total,nextCursor}`。タグは有効、クーポンは公開版あり、シナリオは有効。本文・コード・顧客情報を返さない。既存保存の`definition.references[]`へ`{sourceId,kind,name,accountId?}`を保存。指定元の店・素材IDもサーバーで検査。同じ配布先はIDを保持、ほかの店では同名の1件に結び直す | `searchHqTemplateResources`。選んだ店と素材IDをreferencesへ入れ、`hqDeliveriesApi.create/update/preflight/distribute`へ。店をまたぐIDをそのまま使わない。couponは`responseType:'coupon',responseContent:JSON.stringify({assetId:sourceId})`と宣言し、店の公開素材の内容・IDへ固定 |
+| T5ljMA | 既存auto_reply保存/配布。`settings.priority`は整数-9999〜9999、小さい順。`responseType/responseContent/templateId/actions`と宣言した参照を保持。カードはflex、画像はimage、返信なしはsilent。後の処理は順序と`onFailure:'stop'/'continue'`を保持。通知ルールは配布先の版へ固定 | `hqDeliveriesApi.create/update`。タグは`{actionType:'tag',config:{op:'add',tagIds:[sourceId]},onFailure:'stop'}`、対応マークはsupport_mark、通知は`notify_staff`の既存処理。通知先IDはnotification_ruleの参照で宣言する |
+| UgZPJ | 既存rich_menu保存へ`displayAudience:'all'/'store'/'tag',displayTagName?,defaultOpen?`。タグ指定は各店の有効な同名タグが1件必要。`POST /api/hq/templates/rich-menu-preview {name,accountIds,definition?}`は書込みなしで店別の同名メニュー/上書き可否・参照の充足/画像サイズを返す | `saveHqRichMenu` / `previewHqRichMenu`。全員向け・タグ対象・店に任せる、開く/閉じるを保存。配布は各店の下書きまで。LINE上の公開は既存の店の公開工程 |
+| ME78d / cmRZc | 同じrich_menu定義のareasへ電話tel、日時datetime、コピーclipboard、上級postbackを追加。既存のURL/テキスト/テンプレート/フォーム/予約/予約履歴/スタンプ/タブを保持。`bookingMenuName`は各店の受付中の同名メニューへ一意解決。`useTrackedLink:true`はURI動作に限り、各店の計測リンクと`tracked_link_id`を配布と同じ原子処理で保存。URL系の押した人へのタグは`tagIds`1個まで。postback/日時は既存の押下処理でタグ付け | `saveHqRichMenu` / `previewHqRichMenu`。datetime/clipboardはDBのactionTypeをpostbackにしintentで本来の動きを保持。URI計測は既存の店の公開時に生成URLへ。`dataBindings:{uri:'店の電話',initial:'日付の名前',text:'共通情報の名前'}`で各店の有効な同名共通情報を使用。未取得・曖昧・期限切れ・不正な値は配布しない。通常のactionDataは同じ動きの入力見本として検査する |
+| N4T9mO | フォームの`booking.allowMenuSelection/requireApproval`を保存。統括から配る際は同名の店メニュー/担当へIDを写す。既存`POST /api/liff/booking/requests?liffId=...`へ`{formAnswer:{formId,blockId,submissionKey}}`を追加。認証本人・同店の完了回答・回答に固定した公開版・非テストを検査し、メニュー/担当/日時を回答から読む。選択ONは同店の受付中メニュー、OFFは固定メニュー。期間/担当/空き枠/支払いの既存検査を維持。承認ONはrequested、OFFは店の設定に従う。同じ回答と欄は画面のキーを変えても1回だけ | `bookFromForm(liffId,idToken,formAnswer)`。メニュー候補と空き枠は既存のLIFF booking API。回答の送信完了後に受付を呼ぶ。画面からmenu_idやrequireApprovalを足しても保存済み設定を上書きしない。公開前の確認は`testHqForm`（実送信/回答保存なし） |
+| n9vvGx | `PUT /api/restaurant-test/followups/:storeId/steps/:stepId/messages?account_id=... {expectedVersion,messageBubbles}`。1〜5通、展開後も5通。保存で版が増え本送信は停止、再承認が必要。GET scenariosのstepsにmessageBubbles。`anniversary_before`の行も追加（既定7日前、初期は無効）。既存bindingのPOST/PATCHで`trigger:'anniversary_before',offsetMinutes:-10080,enabled`を保存。記念日は固定の友だち情報欄を使用、店の時刻10:00・平年の2/29は2/28。承認済み固定版/送信停止/同じ起点の再送防止を共通ジョブで使用 | `restaurantFollowupApi.get/saveMessages/binding/addBinding`、`api.scenarios.get`。来店フォローの行と複数吹き出しへ接続。「記念日の前」はGETのbindingsから取得し、押されたら対応するstepIdを編集。保存→公開→本送信開始の承認は既存工程。今回の作業で本送信は開始していない |
+| v0SbYR | `GET /api/forms/:id/submissions?period=this_month/last_month/all`。日本時間の暦月、終端は翌月1日未満。一覧・件数・開始/完了・日付回答・評価平均等を同期間で絞る。from/toとの併用・未知値は400 | 既存`api.forms.submissions`の検索オプションにperiod。期間の丸ボタン変更で同じオプションを一覧と集計へ。件数0と取得失敗を区別 |
+| Upx1c | 既存`POST/PATCH /api/hq/templates`のメッセージ定義に`messageBubbles:BroadcastBubble[1..5]`。text/image/flex/carousel/imagemap、展開後も最大5通。単一通と同じ固定版・配布前確認・配布を使用。店の公開版/版履歴に全吹き出しを保持。統括一括配信の素材選択を展開するときは、配った固定版から全通を順番どおり読む。kind=messageの件数/差し込み/検索条件にも反映 | `saveHqMessageTemplate`と既存detail/preflight/distribute。選択する素材の`content.hqTemplateId/hqTemplateVersionId`は従来どおり。複数通は統括一括配信の経路で展開する。1通しか扱わない既存の自動応答・リマインダ等には結び付けず、後ろの通を黙って落とさない。店側の旧1通編集は409で拒否し統括の編集へ案内 |
+| Qgjmc / UTbi1 | 前回のマーク表示場所/保存した絞り込みと、公開版を作った人を維持 | 下記の前回の接続表を使用 |
+| W5Wxr | 既存の`/api/hq/banners/folders`のkind=image、画像一覧のfolderId。分類CRUD/色/順序/版検査/保管時の中身維持を既存経路で使用 | `api.hqBanners.folders.list/create/update/swapOrder/delete`、`api.hqBanners.images.list({folderId})`。画像ライブラリの分類なのでkind=projectではない |
+| rSRFK | 組織snapshot・stores・memberships・staffの既存APIを使用 | 下記rSRFK接続表。名簿の追加と実ログイン権限の付与は別。新たな組織/権限台帳を作らない |
+| iN6np | 組2の物 | 変更なし |
+
+## 保存先と適用の境界
+
+番号はB-324で承認された666〜680のみ。今回の追加は666（複数通の公開/下書き/版履歴・配布元の版ID）と669（記念日前の行と新店舗の初期化）。前回の667/668も維持。663〜665は組3、670〜680は未使用。作成前の本線最大636、公開中PRのmigration最大565、666〜680の公開PRとの重複0を確認。push直前の再照合は司令塔。
+
+669を適用すると、既存の起点変更トリガーにより、対象店の共通フォローは停止し承認が失効する。配備時は、保存した新しい行を含む版の公開・本送信開始の再承認を司令塔が扱う。記念日の行自体は初期無効。今回その工程は行っていない。
+
+検証・本番D1への適用0。ローカルのbootstrap生成と試験用のメモリ内SQLiteだけを使用。司令塔が統合・クリーン・対象SHA・バックアップを確認してから行う検証用dry-run（今回は実行していない）：
+
+```sh
+gh workflow run migrate-d1.yml -R skmtmst/line-harness-oss --ref codex/development -f operation=migrate -f environment=staging -f mode=dry-run -f migration=666_template_message_bundles.sql
+gh workflow run migrate-d1.yml -R skmtmst/line-harness-oss --ref codex/development -f operation=migrate -f environment=staging -f mode=dry-run -f migration=669_restaurant_anniversary_followup.sql
+```
+
+## 次のタスクはこれ
+
+司令塔が下記の最終コミットと検証を確認して統合し、666〜669のDB工程を別途進める。画面担当A・Bが上の関数/型へ接続してから撮影をやり直す。B-299の18枚の案は下記を判断してから着手する。PR採番後の反映履歴案：「配布するテンプレートに複数通を保存し、店ごとの素材と予約受付の設定を引き継げるようにした」「来店フォローで複数通と記念日の前の案内を設定できるようにした」。実番号・@kenta・日本時間の日時は司令塔が付ける。
+
+## 検証結果・コミット
+
+実装コミット：`6035e8e9e4`（承認済み保存先・DB/共有型・Web関数）、`ff04f970f5`（Workerの保存/配布/受付と試験）。
+
+- doctor合格、開始時の未コミット/未追跡0。元の本線は`cd63dd961f5dc2613a8b16c39a21d01e2cf7c8ba`。作成済みの組5 worktree/枝を再利用した。
+- heavy.sh経由の関連Worker **30ファイル819件成功**。公開/配布の固定版、複数通の順序・件数、店別の参照/電話/計測、フォーム受付の本人/完了回答/承認、記念日の重複防止と変更直前の再検査、権限、OpenAPIを含む。全Worker/全CIの成功ではない。
+- DB **5ファイル35件成功**（公開版の原子処理・履歴・参照・631とbootstrap再生成一致）。WebのAPI関数 **2ファイル8件成功**。DBはメモリ内SQLiteのみ、LINE認証・送信は人工応答。
+- sharedビルド、Worker/DB/Webの型検査、Worker SSR/クライアントのビルド成功。既存のimport混在・500KB超chunk警告は保持。Web画面のビルド・撮影・画面合格の検証ではない。
+- migration666〜669の静的検査4件・bootstrap一致・差分検査成功。コード長の違反は0。上限/許可/凍結記録は変更せず、型と表示/入力処理を分割して収めた。
+- 試験で見つけた版履歴の単独IDへの不正な外部キーを除き、元の統括版IDは所属を確認した固定版の参照で照合する。新しい記念日行と手書きのstep_order=6が衝突した試験は、次の空き順序を使う形へ修正した。API一覧・権限一覧の登録漏れ、通知先の店別の版、電話差し込みのUTC有効期限も修正して成功を確認。
+- 作業中に本線が更新されたため、取り込み後のSHAと再検証は次に追記する。DB適用・配備・本送信・push・PRは0。
+
+---
+
+# 以下は初回/前回の記録（担当の分け方・未実装の記述は上の節が優先）
+
 # API 組5 — 機能待ちの板の口（B-323 / 2026-10-16）
 
 ## 10-16 続き：B-324 の承認後（この節が初回記録より新しい）
