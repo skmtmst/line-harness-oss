@@ -19,6 +19,7 @@ import { tagTextColor } from '@/lib/presentation'
 import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import TagPill from '@/components/shared/tag-pill'
+import { EntityPickerField, type EntityPickerFolder } from '@/components/shared/entity-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
@@ -765,6 +766,29 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     })
   }, [friendId, effectiveTags])
 
+  const [tagFolders, setTagFolders] = useState<EntityPickerFolder[]>([])
+  const loadTagFolders = useCallback(() => {
+    api.tagGroups.list(accountId ?? undefined).then((res) => {
+      if (res.success && Array.isArray(res.data)) setTagFolders(res.data.map((group) => ({ id: group.id, name: group.name, color: group.color ?? null })))
+    }).catch(() => {})
+  }, [accountId])
+  /** 選ぶ窓で決めたタグの組へ、足りない物を付け、外した物を外す。窓で作ったタグは候補を読み直してから付ける。 */
+  const applyTagSelection = async (ids: string[]) => {
+    const current = new Set((effectiveTags ?? []).map((tag) => tag.id))
+    const added = ids.filter((id) => !current.has(id))
+    const removed = [...current].filter((id) => !ids.includes(id))
+    let known = tagOptions
+    if (added.some((id) => !known.some((tag) => tag.id === id))) {
+      const res = await api.tags.list().catch(() => null)
+      if (res?.success && Array.isArray(res.data)) { known = res.data as Tag[]; setTagOptions(known) }
+    }
+    for (const id of added) {
+      const target = known.find((tag) => tag.id === id)
+      if (target) addTagById(id, { name: target.name, color: target.color })
+    }
+    for (const id of removed) removeTagById(id)
+  }
+
   // 購入（EC の直近3件と合計）。今ある口だけを使い、結びつきが無い人は「—」で出す。
   const createAndAddTag = async (query: string) => {
     const name = query.trim()
@@ -1069,18 +1093,21 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {canEditFriend ? (
                 /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
                 <div id="inbox-panel-tag-picker" hidden={!tagPickerOpen} className={v8.editField}>
-                  <EntitySelect clearable size="full" kind="tag"
+                  {/* GBTyR：タグは選ぶ窓（S2Vgi の形）でまとめて選ぶ。付け外しは1つずつ送る（ほかの人の変更を消さない）。 */}
+                  <EntityPickerField multiple
                     id="inbox-panel-tag"
-                    aria-label="タグを探して付ける"
-                    placeholder="タグを探して付ける"
-                    value=""
-                    options={tagOptions
-                      .filter((t) => !(effectiveTags ?? []).some((own) => own.id === t.id))
-                      .map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
-                    onChange={(tagId) => { if (tagId) addTagById(tagId) }}
-                    createLabel={(query) => `＋「${query}」を作って付ける`}
-                    onCreate={(query) => { void createAndAddTag(query) }}
-                    loading={tagSaving}
+                    label="タグ"
+                    ariaLabel="タグを探して付ける"
+                    noun="タグ"
+                    title="タグを選ぶ"
+                    unit="件"
+                    searchPlaceholder="タグの名前で探す"
+                    items={tagOptions.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ id: t.id, name: t.name, color: t.color, folderId: t.groupId ?? null, frequent: t.isStarred || undefined, meta: t.friendCount == null ? undefined : `${formatNumber(t.friendCount)} 人` }))}
+                    folders={tagFolders}
+                    onOpen={loadTagFolders}
+                    disabled={tagSaving}
+                    value={(effectiveTags ?? []).map((tag) => tag.id)}
+                    onChange={(ids) => { void applyTagSelection(ids) }}
                   />
                 </div>
               ) : canEditFriend ? (
