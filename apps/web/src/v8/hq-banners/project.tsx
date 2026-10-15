@@ -33,6 +33,7 @@ import {
   packedTextLines,
   readFileAsBase64,
   usageRefusal,
+  usageStatusText,
   validateGenerationInput,
   type BannerCropPosition,
   type BannerGeneration,
@@ -706,7 +707,9 @@ function ProjectInner() {
               <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
             </> : (
               /* 絵 iMnph：選んでいないときの左は残りの枚数と、この生成で使う枚数。 */
-              <span className={styles.generationInfo}>{`今月の残り ${usage?.month.remaining ?? emptyValue('unknown')}枚・今日の残り ${usage?.today.remaining ?? emptyValue('unknown')}枚。この生成で${input.count}枚使います`}</span>
+              usage && input.count > usage.month.remaining
+                ? <span className={`${styles.generationInfo} ${styles.warnText}`}>{`今月の上限 ${usage.month.limit}枚に達しています（必要 ${input.count}枚）`}</span>
+                : <span className={styles.generationInfo}>{usageStatusText(usage, input.count)}</span>
             ) }}
             info={exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span className={styles.generationInfo}>寸法 —</span>}
             actions={
