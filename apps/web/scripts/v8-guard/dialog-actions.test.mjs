@@ -84,8 +84,10 @@ for (const width of [1152, 1440, 1920]) {
       const actionEdge = () => page.locator('[data-dialog-actions]').evaluate(el => ({ padding: getComputedStyle(el).paddingRight, gap: el.getBoundingClientRect().right - el.lastElementChild.getBoundingClientRect().right, border: getComputedStyle(el).borderTopWidth }))
       assert.deepEqual(await actionEdge(), { padding: '0px', gap: 0, border: '0px' })
       await page.locator('[data-dialog-actions]').evaluate(el => { delete el.dataset.padding })
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-dialog-actions]')).paddingRight === '24px')
       assert.equal((await actionEdge()).gap, 24)
       await page.locator('[data-dialog-actions]').evaluate(el => { el.dataset.padding = 'none' })
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-dialog-actions]')).paddingRight === '0px')
       assert.equal((await actionEdge()).gap, 0)
     } finally { await browser.close() }
   })
