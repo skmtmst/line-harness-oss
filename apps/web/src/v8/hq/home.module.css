@@ -4,7 +4,6 @@
  */
 .folderBox { min-width: 0; }
 
-.createButton { width: 100%; }
 .buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
 .full { width: 100%; }
 
@@ -20,33 +19,19 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-hq-body-gap);
-  padding: var(--tpl-hq-home-pad);
+  padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block);
   min-width: 0;
 }
 
 .progress { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
 
 /* 道具の段（1段目：探す欄 280、2段目：札・切り替え・並び・件数） */
-.tools {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hq-plan-head-gap);
-}
-
 .searchBox {
   width: var(--tpl-hq-search-w);
   max-width: 100%;
 }
 
-.toolRow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--tpl-hq-plan-head-gap);
-}
-
 .chips { display: flex; flex-wrap: wrap; gap: var(--tpl-hq-plan-head-gap); }
-.spacer { flex: 1; }
 
 /* アカウントのカード（3列・横の間16・縦の間14・余白18） */
 .grid {
@@ -73,7 +58,6 @@
   box-shadow: var(--card-shadow);
 }
 
-.cardWarn { outline-color: var(--color-status-warn-deep); }
 /* 帯を含む中身に高さを合わせ、並ぶカードは grid の高さを共有する。 */
 
 .cardHead {
@@ -252,6 +236,7 @@
 
 .footNote {
   flex: 1;
+  text-align: right;
   /* 絵は言葉のまとまりで折らず、行の端まで詰めて折る（全体の auto-phrase を外す）。 */
   word-break: normal;
   min-width: 0;

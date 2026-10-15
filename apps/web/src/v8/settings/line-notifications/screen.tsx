@@ -1348,7 +1348,7 @@ function LineNotificationsPage() {
         : <DataTable label="顧客へのお知らせ" grid={{ columns: 'minmax(0, 1fr) var(--tpl-sb-ln-col-when) var(--tpl-sb-ln-col-who) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) var(--tpl-sb-ln-col-edit)', compactColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) var(--tpl-sb-ln-col-edit)', padding: 'var(--tpl-sb-ec-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)' }}>
           <thead>
             <TableHeadRow>
-              <Th>お知らせの種類（きっかけ）</Th>
+              <Th title="お知らせの種類（きっかけ）">種類</Th>
               <Th>いつ送るか</Th>
               <Th>だれに</Th>
               <Th>この30日</Th>
