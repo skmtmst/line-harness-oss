@@ -159,6 +159,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/hq/templates/tags/import/preview',
   'POST /api/hq/templates/{id}/test-send',
   'POST /api/hq/templates/{id}/test-token',
+  'POST /api/hq/templates/{id}/restore',
   'POST /api/liff/hq-form-tests/{id}/submit',
   'GET /api/webhooks/interactions/export.csv',
   'POST /api/reminders/{id}/message-preview',

@@ -2,7 +2,7 @@ import { isDeliveryType, parseDeliveryDefinition, deliverySnapshot, inspectDeliv
 import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
 import { templateKind } from '@line-crm/shared';
 import { parseTextOverrides } from './text-overrides.js';
-import type { HqTemplateListDisplay } from '@line-crm/shared';
+import type { HqTemplateArchiveStatus, HqTemplateListDisplay } from '@line-crm/shared';
 import { templateContentSummary } from './list-display.js';
 import { captureDistributionName, targetDistributionVersion } from './distribution-display.js';
 import { parseScenarioDefinition, scenarioSnapshot, inspectScenario, planScenario } from './scenario.js';
@@ -138,8 +138,8 @@ export async function deleteTemplate(db: D1Database, authority: HqTemplateAuthor
   } catch { throw new HqTemplateError('VERSION_CONFLICT', 409); }
   return { id, archived: true };
 }
-export async function listTemplates(db: D1Database, authority: HqTemplateAuthority, type?: HqTemplateType): Promise<(HqTemplate & HqTemplateListDisplay)[]> {
-  const rows = await listHqTemplateDisplaySources(db, authority.tenantId, type);
+export async function listTemplates(db: D1Database, authority: HqTemplateAuthority, type?: HqTemplateType, status: HqTemplateArchiveStatus = 'active'): Promise<(HqTemplate & HqTemplateListDisplay)[]> {
+  const rows = await listHqTemplateDisplaySources(db, authority.tenantId, type, status);
   return rows.map(({ definition_json, distributed_account_names_json, display_type: _displayType, ...template }) => {
     const names = JSON.parse(distributed_account_names_json) as string[];
     return {
@@ -280,6 +280,7 @@ export async function distributionResult(db: D1Database, authority: HqTemplateAu
 export async function distributeTemplate(db: D1Database, authority: HqTemplateAuthority, templateId: string, runId: string, selections: DistributionSelection[], bucket?: R2Bucket, publicBaseUrl?: string) {
   const preflights = (await db.prepare(`SELECT * FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id`).bind(authority.tenantId, templateId, runId).all<HqTemplatePreflight>()).results;
   if (!preflights.length || preflights.some(p => p.created_by !== authority.actorId)) throw new HqTemplateError('NOT_FOUND', 404);
+  if (preflights.some(p => p.status === 'expired')) throw new HqTemplateError('VERSION_CONFLICT', 409);
   await requireTargetAccounts(db, authority, preflights.map(p => p.target_account_id));
   const { template } = await templateDetail(db, authority, templateId);
   if (preflights.some(p => p.template_version_id !== preflights[0].template_version_id)) throw new HqTemplateError('INVALID_PREFLIGHT', 409);

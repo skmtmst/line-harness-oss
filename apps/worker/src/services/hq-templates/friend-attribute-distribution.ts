@@ -145,6 +145,7 @@ export async function distributeFriendAttribute(db:D1Database,auth:HqTemplateAut
  const {template,definition}=await templateDetail(db,auth,id);if(!isFriendAttributeType(template.template_type))throw new HqTemplateError('INVALID_TYPE');const type=template.template_type;
  const preflights=(await db.prepare('SELECT * FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id').bind(auth.tenantId,id,runId).all<HqTemplatePreflight>()).results;
  if(!preflights.length||preflights.some(p=>p.created_by!==auth.actorId))throw new HqTemplateError('NOT_FOUND',404);
+ if(preflights.some(p=>p.status==='expired'))throw new HqTemplateError('VERSION_CONFLICT',409);
  await requireTargetAccounts(db,auth,preflights.map(p=>p.target_account_id));
  if(preflights.some(p=>p.template_version_id!==preflights[0].template_version_id))throw new HqTemplateError('INVALID_PREFLIGHT',409);
  const version=await db.prepare('SELECT definition_json FROM hq_template_versions WHERE tenant_id=? AND template_id=? AND id=?').bind(auth.tenantId,id,preflights[0].template_version_id).first<{definition_json:string}>();

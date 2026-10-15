@@ -1,3 +1,5 @@
+import type { HqTemplateArchiveStatus } from '@line-crm/shared';
+
 export const HQ_TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form', 'scenario', 'friend_field', 'mark', 'auto_reply', 'friend_add_rule', 'reminder'] as const;
 export type HqTemplateType = (typeof HQ_TEMPLATE_TYPES)[number];
 
@@ -220,11 +222,13 @@ export async function listHqTemplateDisplaySources(
   db: D1Database,
   tenantId: string,
   type?: HqTemplateType,
+  status: HqTemplateArchiveStatus = 'active',
 ): Promise<HqTemplateListSource[]> {
   const result = await db.prepare(`
     WITH templates AS (
       SELECT *, COALESCE(delivery_type,friend_attribute_type,extended_type,template_type) AS display_type
-      FROM hq_templates WHERE tenant_id=?1 AND archived_at IS NULL
+      FROM hq_templates WHERE tenant_id=?1
+        AND (?3='all' OR (?3='active' AND archived_at IS NULL) OR (?3='archived' AND archived_at IS NOT NULL))
         AND (?2 IS NULL OR COALESCE(delivery_type,friend_attribute_type,extended_type,template_type)=?2)
     ), successful_accounts AS (
       SELECT DISTINCT r.template_id, a.id AS account_id, a.name
@@ -313,7 +317,7 @@ export async function listHqTemplateDisplaySources(
     LEFT JOIN mark_population mp ON mp.template_id=t.id
     LEFT JOIN menu_taps mt ON mt.template_id=t.id
     ORDER BY t.updated_at DESC,t.id
-  `).bind(tenantId, type ?? null).all<HqTemplateListSource>();
+  `).bind(tenantId, type ?? null, status).all<HqTemplateListSource>();
   return result.results ?? [];
 }
 
