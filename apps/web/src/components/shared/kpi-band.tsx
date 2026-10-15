@@ -30,7 +30,7 @@ export default function KpiBand({
   /** 型が下の区切りを持つ帯では、上だけ内側に引く。 */
   border?: 'inset-top'
   /** 段や引き出しの中で使う小さい帯。 */
-  layout?: 'booking'
+  layout?: 'booking' | 'link-row'
   density?: 'compact'
 } & Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'className'>) {
   return (

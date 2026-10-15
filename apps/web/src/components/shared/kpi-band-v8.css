@@ -121,3 +121,11 @@ html:root [data-list-skeleton] [data-kpi-detail-layout='qualifier'] [data-kpi-de
   overflow: visible;
   text-overflow: clip;
 }
+
+/* 業種ダッシュボード（XBkC2・NqAvL ほか）：補足と行き先を同じ行に置く（補足は左・1行＋省略、行き先は右）。layout="link-row" の帯だけ。 */
+html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] { flex-direction: row; align-items: center; gap: var(--polish-space-row); }
+html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { flex: 1 1 auto; width: auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 狭い板（白い板が 1100 未満）では数と前との比べの札を折り返し、札を切らない。 */
+@container v8-page (max-width: 1099px) {
+  html:root [data-kpi-strip][data-kpi-layout='link-row'] [data-unit-spacing] { flex-wrap: wrap; row-gap: var(--space-2); }
+}
