@@ -145,6 +145,10 @@ const ALLOWLIST_MAX = 770;
  */
 const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/booking/admin/payment-connection',
+  'DELETE /api/booking/admin/payment-connection',
+  'GET /api/booking/admin/payment-connection/callback',
+  'POST /api/booking/admin/payment-connection/authorize',
+  'POST /api/booking/admin/payment-connection/callback',
   'GET /api/booking/admin/menu-payments',
   'GET /api/booking/admin/payments',
   'GET /api/booking/admin/payments/export',

@@ -585,7 +585,8 @@
     "644_booking_customer_payment_choice.sql",
     "663_booking_payment_connections.sql",
     "664_booking_payment_events.sql",
-    "665_booking_course_event_payment_settings.sql"
+    "665_booking_course_event_payment_settings.sql",
+    "682_booking_stripe_connect_states.sql"
   ],
-  "migrationCount": 586
+  "migrationCount": 587
 }
