@@ -55,13 +55,53 @@ export interface UberProbeCooldownStore {
   write(nowMs: number): Promise<void>;
 }
 
+/** 合言葉の長さの下限。総当たりで当てられない長さ。配備先で作って秘密設定へ入れる。 */
+export const UBER_PROBE_SECRET_MIN_LENGTH = 32;
+
 /**
- * 口を開ける合言葉を読む。未設定・短すぎるときは null を返し、口は閉じたままにする。
- * 32文字は総当たりで当てられない長さの下限。配備先で作って秘密設定へ入れる。
+ * 口が開かない理由。配備先で「秘密設定の名前はあるのに未設定と返る」ときの切り分けに使う。
+ *
+ * - `probe_secret_missing`: その要求を受けた配備先に値が届いていない。
+ *   別の Worker へ入れた、版が入れ替わる前に叩いた、名前の綴りが違う、のどれか。
+ * - `probe_secret_too_short`: 値はあるが下限より短い。作り方の取り違え。
+ *
+ * 返すのは理由の符号だけ。**長さも値も返さない**（この分岐は署名の確認より前に通るため）。
  */
-export function uberProbeSecret(env: UberProbeEnv): string | null {
+export type UberProbeSecretProblem = 'probe_secret_missing' | 'probe_secret_too_short';
+
+/** 合言葉の読み取り結果。開いているときだけ値を持つ。 */
+export type UberProbeSecretState =
+  | { ok: true; secret: string }
+  | { ok: false; code: UberProbeSecretProblem };
+
+/** 口を開ける合言葉を読む。読めないときは理由の符号を添えて閉じたままにする。 */
+export function uberProbeSecret(env: UberProbeEnv): UberProbeSecretState {
   const secret = env.RT_DELIVERY_UBEREATS_PROBE_SECRET?.trim();
-  return secret && secret.length >= 32 ? secret : null;
+  if (!secret) return { ok: false, code: 'probe_secret_missing' };
+  if (secret.length < UBER_PROBE_SECRET_MIN_LENGTH) return { ok: false, code: 'probe_secret_too_short' };
+  return { ok: true, secret };
+}
+
+/** 下見の本文。これを署名して送ると、Uber へは送らずに設定の状態だけが返る。 */
+export const UBER_PROBE_CHECK_BODY = '{"mode":"check"}';
+
+/**
+ * 下見の答え。合言葉と署名が通ることの確認に使う。
+ *
+ * Uber へは送らないので、トークンの口の回数（1時間100回）も冷却時間も使わない。
+ * 返すのは接続先の名と「OAuth の設定が揃っているか」だけで、ID・秘密値は返さない。
+ */
+export function uberProbeReadiness(env: UberProbeEnv): {
+  environment: 'sandbox' | 'other' | 'unknown';
+  oauthConfigured: boolean;
+} {
+  const hosts = uberHosts(env);
+  const environment = !hosts
+    ? 'unknown'
+    : hosts.tokenUrl === UBER_SANDBOX_HOSTS.tokenUrl
+      ? 'sandbox'
+      : 'other';
+  return { environment, oauthConfigured: uberOAuthClient(env) !== null };
 }
 
 /** `platform_settings` を使う冷却時間の置き場。配備済みの表なので移行は要らない。 */

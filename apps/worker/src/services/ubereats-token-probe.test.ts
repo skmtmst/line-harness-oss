@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { UBER_SANDBOX_HOSTS } from './uber-eats-hosts.js';
 import {
   UBER_PROBE_COOLDOWN_MS,
+  UBER_PROBE_SECRET_MIN_LENGTH,
   probeUberSandboxToken,
+  uberProbeReadiness,
+  uberProbeSecret,
   type UberProbeCooldownStore,
   type UberProbeEnv,
 } from './ubereats-token-probe.js';
@@ -170,5 +173,74 @@ describe('Uber Sandbox への接続確認', () => {
     const { fetch } = fetchFrom(() => tokenResponse(okBody));
     await probeUberSandboxToken({ env: sandboxEnv, store: counter, fetch, nowMs: NOW_MS });
     expect(counter.written).toEqual([]);
+  });
+});
+
+/**
+ * 合言葉の読み取り。
+ *
+ * 配備先で「秘密設定の名前はあるのに未設定と返る」ときに、
+ * 「値が届いていない」のか「短すぎる」のかを分けて返せることを確かめる。
+ */
+describe('接続確認の口の合言葉', () => {
+  const LONG = 'probe-secret-0123456789abcdefghij';
+
+  it('値が届いていないときは、届いていないと分かる符号を返す', () => {
+    for (const value of [undefined, '', '   ']) {
+      expect(uberProbeSecret({ ...sandboxEnv, RT_DELIVERY_UBEREATS_PROBE_SECRET: value })).toEqual({
+        ok: false,
+        code: 'probe_secret_missing',
+      });
+    }
+  });
+
+  it('下限より短いときは、短いと分かる符号を返す。値は返さない', () => {
+    const short = 'x'.repeat(UBER_PROBE_SECRET_MIN_LENGTH - 1);
+    const state = uberProbeSecret({ ...sandboxEnv, RT_DELIVERY_UBEREATS_PROBE_SECRET: short });
+    expect(state).toEqual({ ok: false, code: 'probe_secret_too_short' });
+    expect(JSON.stringify(state)).not.toContain(short);
+  });
+
+  it('下限を満たすときは前後の空白を落として渡す', () => {
+    expect(LONG.length).toBeGreaterThanOrEqual(UBER_PROBE_SECRET_MIN_LENGTH);
+    expect(uberProbeSecret({ ...sandboxEnv, RT_DELIVERY_UBEREATS_PROBE_SECRET: ` ${LONG}\n` })).toEqual({
+      ok: true,
+      secret: LONG,
+    });
+  });
+});
+
+/**
+ * 下見の答え。Uber へは送らないので、トークンの口の回数も冷却時間も使わない。
+ * 返すのは接続先の名と設定の有無だけで、ID・秘密値は返さない。
+ */
+describe('接続確認の口の下見', () => {
+  it('Sandbox 向けで設定が揃っているときは、そのまま伝える', () => {
+    const readiness = uberProbeReadiness(sandboxEnv);
+    expect(readiness).toEqual({ environment: 'sandbox', oauthConfigured: true });
+    expect(JSON.stringify(readiness)).not.toContain(SECRET);
+    expect(JSON.stringify(readiness)).not.toContain('test-client-id');
+  });
+
+  it('本番向けのときは Sandbox とは言わない', () => {
+    expect(uberProbeReadiness({ ...sandboxEnv, RT_DELIVERY_UBEREATS_ENVIRONMENT: 'production' })).toEqual({
+      environment: 'other',
+      oauthConfigured: true,
+    });
+  });
+
+  // 書き間違いは本番へ落とさず接続先を決めないので、設定も揃っていない扱いになる。
+  it('接続先の書き間違いは分からないとして返す', () => {
+    expect(uberProbeReadiness({ ...sandboxEnv, RT_DELIVERY_UBEREATS_ENVIRONMENT: 'stg' })).toEqual({
+      environment: 'unknown',
+      oauthConfigured: false,
+    });
+  });
+
+  it('ID・秘密値が足りないときは、揃っていないと返す', () => {
+    expect(uberProbeReadiness({ ...sandboxEnv, RT_DELIVERY_UBEREATS_CLIENT_SECRET: undefined })).toEqual({
+      environment: 'sandbox',
+      oauthConfigured: false,
+    });
   });
 });
