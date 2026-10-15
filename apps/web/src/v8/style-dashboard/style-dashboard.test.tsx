@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest'
+import { STYLE_CONFIG, rangeFromParam, tabFromParam, viewFromParam } from './config'
+import { rowMenuItems } from './parts'
+import { restaurantRow } from './restaurant-today'
+import type { RestaurantReservation } from '@/lib/restaurant-test-api'
+
+const noop = { open: () => {}, visit: () => {}, line: () => {}, copy: () => {}, roster: () => {} }
+
+describe('業種ダッシュボード（XBkC2）', () => {
+  it('題は業種の名前、1枚目のタブは業種ごとの名前（B-318）', () => {
+    expect(STYLE_CONFIG.restaurant.title).toBe('お店')
+    expect(STYLE_CONFIG.salon.title).toBe('サロン')
+    expect(Object.values(STYLE_CONFIG.restaurant.tabs)).toEqual(['席', '予約', 'お客さま', '分析'])
+    expect(Object.values(STYLE_CONFIG.salon.tabs)).toEqual(['台帳', '予約', 'お客さま', '分析'])
+    expect(Object.values(STYLE_CONFIG.consult.tabs)).toEqual(['面談', '結果待ち', '相談者', '分析'])
+    expect(Object.values(STYLE_CONFIG.lesson.tabs)).toEqual(['クラス', '会員', '体験', '分析'])
+  })
+
+  it('URL の ?tab= ?view= ?range= は知らない値なら初期に戻す', () => {
+    expect(tabFromParam('analytics')).toBe('analytics')
+    expect(tabFromParam('なにか')).toBe('main')
+    expect(viewFromParam('salon', 'floor')).toBe('board')
+    expect(viewFromParam('restaurant', 'floor')).toBe('floor')
+    expect(viewFromParam('restaurant', null)).toBe('list')
+    expect(rangeFromParam('month')).toBe('month')
+    expect(rangeFromParam('year')).toBe('today')
+  })
+
+  it('閲覧のみの行の「…」は「詳細を開く」だけ（押せない操作を置かない）', () => {
+    for (const style of ['restaurant', 'salon', 'consult'] as const) {
+      expect(rowMenuItems(style, { id: 'r', time: '10:00', name: 'A' }, false, noop).map((i) => i.id)).toEqual(['detail'])
+    }
+  })
+
+  it('決済の操作は Stripe をつなぐまで理由つきで押せない', () => {
+    const items = rowMenuItems('restaurant', { id: 'r', time: '10:00', name: 'A' }, true, noop)
+    const pay = items.find((i) => i.id === 'pay-link')
+    expect(pay?.disabled).toBe(true)
+    expect(pay?.disabledReason).toContain('Stripe')
+    expect(items.at(-1)?.tone).toBe('danger')
+  })
+
+  it('飲食の口が無いときの行：来店できる予約は［来店］、来店済みは［取り消す］', () => {
+    const base = { id: 'x', store_id: 's', store_name: '店', source: 'line', external_id: null, customer_name: '佐藤', customer_phone: null, line_uid: null, guest_count: 2, starts_at: '2026-10-15T09:00:00.000Z', ends_at: '2026-10-15T10:30:00.000Z', table_id: null, table_label: 'T3', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' } as RestaurantReservation
+    expect(restaurantRow(base)).toMatchObject({ reservationId: 'x', seat: 'T3', course: '席のみ', action: 'visit' })
+    expect(restaurantRow({ ...base, status: 'visited' }).action).toBe('undo')
+  })
+})
