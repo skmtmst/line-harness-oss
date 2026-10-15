@@ -76,15 +76,16 @@
 
 .status {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* 状態の文は切らない（「下書き（保存してから配ると…」が「…」で切れていた：N4T9mO・u5MM7・e875x）。入らなければ文節で2行に折る。 */
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: auto-phrase;
+  line-break: strict;
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: var(--text-caption); /* fontSize: $size-caption */
   font-weight: 600; /* fontWeight: 600 */
 }
 /* 状態の文字を2つ渡す画面（公開の状態＋下書きの保存）は行を分け、1行に詰めて途中で切らない。 */
-.status:has(> :global([data-status-line])) { white-space: normal; }
 .status > :global([data-status-line]) { display: block; line-break: strict; }
 
 /*
