@@ -170,6 +170,10 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
             open={showStoreForm || editingStore !== undefined}
             busy={busy}
             designNode="vCEKM"
+            designWidth={560}
+            designTop={160}
+            designHeaderPadding="24px 24px 0"
+            designHeaderHeight={50}
             title={editingStore ? `${editingStore.name}を編集` : '店舗を追加する'}
             onCancel={closeStoreDialog}
           >
