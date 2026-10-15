@@ -7,7 +7,7 @@
  */
 import React from 'react'
 import buttonStyles from '@/components/shared/button.module.css'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const nav = vi.hoisted(() => ({ menu: null as string | null, push: vi.fn(), crumbs: [] as unknown[] }))
@@ -96,7 +96,7 @@ describe('予約メニューを作る・直す（WEB062/063/064）', () => {
     net.saveMenuResources.mockResolvedValue({ data: { version: 5 } })
     render(<MenuFormV8 />)
     await settle()
-    fireEvent.click(screen.getByRole('checkbox', { name: /台1/ }))
+    fireEvent.click(screen.getByRole('button', { name: '台1を外す' }))
     await act(async () => { screen.getByRole('button', { name: /変更を保存する/ }).click() })
     await settle()
     expect(net.saveMenuResources).toHaveBeenCalledWith('a', 'm1', expect.objectContaining({ resources: [] }))
@@ -139,22 +139,25 @@ it('担当の一覧に新しいメニューがまだなくても、割当を明�
 })
 
 
-it('担当と設備を本物のチェックで選び、選択と解除を独立して保持する', async () => {
+it('担当は本物のチェック、設備は札＋選ぶ窓で選び、選択と解除を独立して保持する', async () => {
   render(<MenuFormV8 />)
   await settle()
   const staff = screen.getByRole('checkbox', { name: '高田', exact: true }) as HTMLInputElement
-  const resource = screen.getByRole('checkbox', { name: '台1', exact: true }) as HTMLInputElement
   expect(staff.checked).toBe(false)
-  expect(resource.checked).toBe(false)
+  expect(screen.queryByRole('button', { name: '台1を外す' })).toBeNull()
   fireEvent.click(staff)
-  fireEvent.click(resource)
+  fireEvent.click(screen.getByRole('button', { name: '使う設備：選ぶ' }))
+  const picker = await screen.findByRole('dialog')
+  fireEvent.click(within(picker).getByRole('checkbox', { name: '台1' }))
+  fireEvent.click(within(picker).getByRole('button', { name: 'この 1件にする' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(staff.checked).toBe(true)
-  expect(resource.checked).toBe(true)
+  expect(screen.getByRole('button', { name: '台1を外す' })).toBeTruthy()
   fireEvent.click(staff)
   expect(staff.checked).toBe(false)
-  expect(resource.checked).toBe(true)
-  fireEvent.click(resource)
-  expect(resource.checked).toBe(false)
+  expect(screen.getByRole('button', { name: '台1を外す' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '台1を外す' }))
+  expect(screen.queryByRole('button', { name: '台1を外す' })).toBeNull()
 })
 
 it('作成の道順は親のリンクだけを渡し、現在地を共通の題へ任せる', async () => {
@@ -166,7 +169,7 @@ it('作成の道順は親のリンクだけを渡し、現在地を共通の題�
   ])
 })
 
-it('メニュー固有ルールの操作と支払いは共通の部品で、選べない方法を操作にしない', async () => {
+it('メニュー固有ルールの操作と支払いは共通の部品で、選べない方法は押せない形にする', async () => {
   render(<MenuFormV8 />)
   await settle()
   const rules = screen.getByRole('button', { name: 'このメニューだけ変える', exact: true })
@@ -175,9 +178,11 @@ it('メニュー固有ルールの操作と支払いは共通の部品で、選�
   expect(screen.getByRole('spinbutton', { name: '受付の締め切り（時間前）' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'お店のきまりに戻す', exact: true }))
   expect(screen.queryByRole('spinbutton', { name: '受付の締め切り（時間前）' })).toBeNull()
-  expect(screen.getByRole('heading', { name: 'お支払い', exact: true }).closest('[data-design-node="t0jk8p"]')).toBeTruthy()
-  const payment = screen.getByRole('textbox', { name: 'お支払い方法', exact: true }) as HTMLInputElement
-  expect(payment.readOnly).toBe(true)
-  expect(payment.value).toBe('お店で払う')
-  expect(screen.queryByRole('radiogroup', { name: 'お支払い方法' })).toBeNull()
+  expect(screen.getByRole('heading', { name: /^お支払い/ }).closest('[data-design-node="t0jk8p"]')).toBeTruthy()
+  // 絵 v5L19Z：3つの箱を並べ、選べるのは「お店で払う」だけ（ほかは押せない形）。
+  const store = screen.getByRole('radio', { name: 'お店で払う' }) as HTMLInputElement
+  expect(store.checked).toBe(true)
+  expect(store.disabled).toBe(false)
+  expect((screen.getByRole('radio', { name: 'オンラインで先払い' }) as HTMLInputElement).disabled).toBe(true)
+  expect((screen.getByRole('radio', { name: 'どちらでも' }) as HTMLInputElement).disabled).toBe(true)
 })
