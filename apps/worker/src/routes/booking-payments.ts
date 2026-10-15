@@ -6,6 +6,7 @@ import {
   getBookingPaymentConfig,
   markBookingPayment,
   resolveBookingPaymentConfig,
+  resolveBookingPaymentForBooking,
   saveBookingPaymentConfig,
   saveBookingPaymentMenuSetting,
   type BookingPaymentMode,
@@ -53,7 +54,7 @@ export function registerTestPaymentProvider(provider: PaymentProvider): void {
 }
 
 function validMode(value: unknown): BookingPaymentMode | null {
-  return value === 'none' || value === 'onsite' || value === 'online' ? value : null;
+  return value === 'none' || value === 'onsite' || value === 'online' || value === 'customer_choice' ? value : null;
 }
 
 function validProvider(value: unknown): BookingPaymentProviderName | null {
@@ -106,10 +107,10 @@ bookingPayments.put(
     if (!Number.isInteger(holdMinutes) || holdMinutes < 5 || holdMinutes > 1440) {
       return inputError(c, { success: false, error: 'holdMinutes は 5〜1440 の整数で指定してください' }, 400, ["holdMinutes"]);
     }
-    if (mode === 'online' && provider !== 'stripe') {
+    if ((mode === 'online' || mode === 'customer_choice') && provider !== 'stripe') {
       return inputError(c, { success: false, error: 'online の provider は stripe を指定してください' }, 400, ["mode","provider"]);
     }
-    if (mode !== 'online' && provider === 'stripe') {
+    if (mode !== 'online' && mode !== 'customer_choice' && provider === 'stripe') {
       return inputError(c, { success: false, error: 'stripe を使うときは mode を online にしてください' }, 400, ["mode","provider"]);
     }
     const saved = await saveBookingPaymentConfig(c.env.DB, accountId, { mode, provider, holdMinutes });
@@ -137,6 +138,10 @@ bookingPayments.put(
     const provider = validProvider(body?.provider);
     if (!mode || !provider) {
       return inputError(c, { success: false, error: 'mode と provider を指定してください' }, 400, ["mode","provider"]);
+    }
+    if (((mode === 'online' || mode === 'customer_choice') && provider !== 'stripe')
+      || (mode !== 'online' && mode !== 'customer_choice' && provider === 'stripe')) {
+      return inputError(c, {success:false,error:'invalid_payment_provider'},400,['mode','provider']);
     }
     await saveBookingPaymentMenuSetting(c.env.DB, accountId, menuId, { mode, provider });
     const effective = await resolveBookingPaymentConfig(c.env.DB, accountId, menuId);
@@ -180,8 +185,8 @@ async function startBookingPayment(
   const bookingMenu = await db.prepare(
     `SELECT menu_id FROM bookings WHERE id = ?`,
   ).bind(booking.id).first<{ menu_id: string }>();
-  const config = await resolveBookingPaymentConfig(
-    db, booking.line_account_id, bookingMenu?.menu_id ?? '',
+  const config = await resolveBookingPaymentForBooking(
+    db, booking.line_account_id, booking.id, bookingMenu?.menu_id ?? '',
   );
   if (config.mode !== 'online') {
     return { ok: false, error: 'この予約はオンライン支払いの対象ではありません', status: 409 };

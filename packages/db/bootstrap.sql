@@ -1444,6 +1444,17 @@ CREATE TABLE billing_invoices (
   created_at          TEXT NOT NULL
 );
 
+CREATE TABLE booking_assignment_settings (
+  scope_kind TEXT NOT NULL CHECK(scope_kind IN ('staff','table')),
+  scope_id TEXT NOT NULL,
+  method TEXT NOT NULL DEFAULT 'balanced' CHECK(method IN ('balanced','priority','random')),
+  balance_period TEXT NOT NULL DEFAULT 'day' CHECK(balance_period IN ('day','week')),
+  resources_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(resources_json) AND json_type(resources_json)='array'),
+  version INTEGER NOT NULL CHECK(version>0),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY(scope_kind,scope_id)
+);
+
 CREATE TABLE "booking_audit_logs" (
   booking_id_history TEXT,
   id              TEXT PRIMARY KEY,
@@ -1507,6 +1518,57 @@ CREATE TABLE booking_customers (
   pet_name              TEXT,
   created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE booking_entitlement_events (
+  id TEXT PRIMARY KEY,
+  entitlement_id TEXT NOT NULL REFERENCES booking_entitlements(id) ON DELETE RESTRICT,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  action TEXT NOT NULL CHECK(action IN ('grant','adjust','extend','revoke','consume')),
+  reason TEXT NOT NULL CHECK(length(trim(reason)) BETWEEN 1 AND 1000),
+  actor_type TEXT NOT NULL CHECK(actor_type IN ('staff','system')),
+  actor_id TEXT NOT NULL,
+  request_key TEXT NOT NULL,
+  request_json TEXT NOT NULL CHECK(json_valid(request_json)),
+  before_json TEXT CHECK(before_json IS NULL OR json_valid(before_json)),
+  after_json TEXT NOT NULL CHECK(json_valid(after_json)),
+  created_at TEXT NOT NULL,
+  UNIQUE(line_account_id,request_key)
+);
+
+CREATE TABLE booking_entitlement_month_limits (
+  entitlement_id TEXT NOT NULL REFERENCES booking_entitlements(id) ON DELETE RESTRICT,
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  allowance INTEGER NOT NULL CHECK(allowance>=0),
+  PRIMARY KEY(entitlement_id,period_start)
+);
+
+CREATE TABLE booking_entitlement_uses (
+  booking_id TEXT UNIQUE REFERENCES bookings(id) ON DELETE SET NULL,
+  booking_id_history TEXT PRIMARY KEY NOT NULL,
+  entitlement_id TEXT NOT NULL REFERENCES booking_entitlements(id) ON DELETE RESTRICT,
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL CHECK(julianday(period_end)>julianday(period_start)),
+  consumed_at TEXT
+);
+
+CREATE TABLE booking_entitlements (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id TEXT REFERENCES friends(id) ON DELETE SET NULL,
+  menu_id TEXT REFERENCES menus(id) ON DELETE RESTRICT,
+  kind TEXT NOT NULL CHECK(kind IN ('ticket','monthly')),
+  name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 100),
+  remaining INTEGER CHECK(remaining IS NULL OR remaining>=0),
+  monthly_limit INTEGER CHECK(monthly_limit IS NULL OR monthly_limit>0),
+  valid_from TEXT NOT NULL,
+  expires_at TEXT NOT NULL CHECK(julianday(expires_at)>julianday(valid_from)),
+  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','revoked')),
+  version INTEGER NOT NULL DEFAULT 1 CHECK(version>0),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  CHECK((kind='ticket' AND remaining IS NOT NULL AND monthly_limit IS NULL)
+    OR (kind='monthly' AND remaining IS NULL AND monthly_limit IS NOT NULL))
 );
 
 CREATE TABLE booking_idempotency_keys (
@@ -1577,24 +1639,27 @@ CREATE TABLE booking_operation_runs (
   UNIQUE (line_account_id, idempotency_key)
 );
 
-CREATE TABLE booking_payment_configs (
-  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
-  mode TEXT NOT NULL DEFAULT 'none'
-    CHECK (mode IN ('none', 'onsite', 'online')),
-  -- プロバイダ名は差し替えのために絞らない。新しいサービスは登録表へ足すだけ。
-  provider TEXT NOT NULL DEFAULT 'none',
-  hold_minutes INTEGER NOT NULL DEFAULT 30 CHECK (hold_minutes BETWEEN 5 AND 1440),
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+CREATE TABLE booking_payment_choices (
+  booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL CHECK(mode IN ('onsite','online')),
+  provider TEXT NOT NULL CHECK(provider IN ('onsite','stripe')),
+  hold_minutes INTEGER NOT NULL CHECK(hold_minutes BETWEEN 5 AND 1440)
 );
 
-CREATE TABLE booking_payment_menu_settings (
+CREATE TABLE "booking_payment_configs" (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'none' CHECK(mode IN ('none','onsite','online','customer_choice')),
+  provider TEXT NOT NULL DEFAULT 'none',
+  hold_minutes INTEGER NOT NULL DEFAULT 30 CHECK(hold_minutes BETWEEN 5 AND 1440),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
+CREATE TABLE "booking_payment_menu_settings" (
   menu_id TEXT PRIMARY KEY REFERENCES menus(id) ON DELETE CASCADE,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
-  mode TEXT NOT NULL CHECK (mode IN ('none', 'onsite', 'online')),
-  provider TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  mode TEXT NOT NULL CHECK(mode IN ('none','onsite','online','customer_choice')),
+  provider TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 
 CREATE TABLE "booking_payments" (
@@ -8989,6 +9054,12 @@ CREATE INDEX idx_booking_customers_account_name
 CREATE INDEX idx_booking_customers_account_phone
   ON booking_customers(line_account_id, phone_normalized_hash);
 
+CREATE INDEX idx_booking_entitlement_events_history ON booking_entitlement_events(entitlement_id,created_at,id);
+
+CREATE INDEX idx_booking_entitlement_uses_balance ON booking_entitlement_uses(entitlement_id,consumed_at);
+
+CREATE INDEX idx_booking_entitlements_friend ON booking_entitlements(line_account_id,friend_id,status);
+
 CREATE INDEX idx_booking_exceptions_account_dates
   ON booking_availability_exceptions(line_account_id, date_from, date_to, scope_kind);
 
@@ -10887,6 +10958,33 @@ CREATE TRIGGER booking_audit_logs_history_insert AFTER INSERT ON booking_audit_l
 CREATE TRIGGER booking_auto_assign_sync_rules_insert AFTER INSERT ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
 
 CREATE TRIGGER booking_auto_assign_sync_rules_update AFTER UPDATE ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
+
+CREATE TRIGGER booking_entitlement_confirm AFTER UPDATE OF status ON bookings
+WHEN NEW.status='confirmed' AND OLD.status<>'confirmed'
+BEGIN  UPDATE booking_entitlement_uses SET consumed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE booking_id=NEW.id AND consumed_at IS NULL; END;
+
+CREATE TRIGGER booking_entitlement_consume AFTER UPDATE OF consumed_at ON booking_entitlement_uses
+WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL
+BEGIN  UPDATE booking_entitlements SET remaining=CASE WHEN kind='ticket' THEN remaining-1 ELSE NULL END,version=version+1,updated_at=NEW.consumed_at WHERE id=NEW.entitlement_id;  INSERT INTO booking_entitlement_events(id,entitlement_id,line_account_id,action,reason,actor_type,actor_id,request_key,request_json,after_json,created_at) SELECT lower(hex(randomblob(16))),e.id,e.line_account_id,'consume','予約確定による1回利用','system',NEW.booking_id,'consume:'||NEW.booking_id,json_object('bookingId',NEW.booking_id),json_object('remaining',e.remaining,'version',e.version),NEW.consumed_at FROM booking_entitlements e WHERE e.id=NEW.entitlement_id; END;
+
+CREATE TRIGGER booking_entitlement_consume_guard BEFORE UPDATE OF consumed_at ON booking_entitlement_uses
+WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL
+BEGIN  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM booking_entitlements e JOIN bookings b ON b.id=NEW.booking_id WHERE e.id=NEW.entitlement_id AND b.line_account_id=e.line_account_id AND b.friend_id=e.friend_id AND (e.menu_id IS NULL OR e.menu_id=b.menu_id) AND e.status='active' AND julianday(b.starts_at)>=julianday(e.valid_from) AND julianday(b.starts_at)<julianday(e.expires_at) AND (e.kind='ticket' AND e.remaining>0 OR e.kind='monthly' AND julianday(b.starts_at)>=julianday(NEW.period_start) AND julianday(b.starts_at)<julianday(NEW.period_end) AND (SELECT COUNT(*) FROM booking_entitlement_uses u JOIN bookings other ON other.id=u.booking_id WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND julianday(other.starts_at)>=julianday(NEW.period_start) AND julianday(other.starts_at)<julianday(NEW.period_end))<COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=NEW.period_start),e.monthly_limit))) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_entitlement_immediate AFTER INSERT ON booking_entitlement_uses
+WHEN (SELECT status FROM bookings WHERE id=NEW.booking_id)='confirmed'
+BEGIN  UPDATE booking_entitlement_uses SET consumed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE booking_id=NEW.booking_id AND consumed_at IS NULL; END;
+
+CREATE TRIGGER booking_entitlement_month_change BEFORE UPDATE OF starts_at ON bookings
+WHEN EXISTS(SELECT 1 FROM booking_entitlement_uses u JOIN booking_entitlements e ON e.id=u.entitlement_id WHERE u.booking_id=NEW.id AND e.kind='monthly' AND (julianday(NEW.starts_at)<julianday(u.period_start) OR julianday(NEW.starts_at)>=julianday(u.period_end)))
+BEGIN  SELECT RAISE(ABORT,'entitlement_month_change'); END;
+
+CREATE TRIGGER booking_entitlement_reschedule BEFORE UPDATE OF starts_at,menu_id,friend_id,line_account_id ON bookings
+WHEN EXISTS(SELECT 1 FROM booking_entitlement_uses u JOIN booking_entitlements e ON e.id=u.entitlement_id WHERE u.booking_id=NEW.id AND (NEW.line_account_id<>e.line_account_id OR NEW.friend_id IS NOT NULL AND NEW.friend_id IS NOT e.friend_id OR e.menu_id IS NOT NULL AND NEW.menu_id<>e.menu_id OR julianday(NEW.starts_at)<julianday(e.valid_from) OR julianday(NEW.starts_at)>=julianday(e.expires_at)))
+BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+
+CREATE TRIGGER booking_entitlement_use_validate BEFORE INSERT ON booking_entitlement_uses
+BEGIN  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM bookings b JOIN booking_entitlements e ON e.id=NEW.entitlement_id WHERE b.id=NEW.booking_id AND b.line_account_id=e.line_account_id AND b.friend_id=e.friend_id AND e.status='active' AND (e.menu_id IS NULL OR e.menu_id=b.menu_id) AND julianday(b.starts_at)>=julianday(e.valid_from) AND julianday(b.starts_at)<julianday(e.expires_at) AND b.status IN ('requested','confirmed') AND NEW.consumed_at IS NULL) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
 
 CREATE TRIGGER booking_payments_history_detach AFTER UPDATE OF booking_id ON booking_payments BEGIN UPDATE booking_payments SET booking_id_history = COALESCE(NEW.booking_id, OLD.booking_id, OLD.booking_id_history) WHERE id = NEW.id; END;
 

@@ -13,6 +13,7 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Env } from '../index.js';
+import { d1AssignmentSettingsStore } from '../services/booking-assignment-settings.js';
 
 const availabilityMocks = vi.hoisted(() => ({
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
@@ -349,6 +350,35 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
     expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
     expect((await create('enabled')).status).toBe(201);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM bookings').get()).toEqual({ n:1 });
+  });
+
+  test('新方式は同じ枠の連続予約を交互に割り当て、優先順と上限もHTTP作成へ反映する', async () => {
+    sqlite.prepare('UPDATE menus SET concurrent_capacity=10 WHERE id=?').run('m1');
+    sqlite.prepare('INSERT INTO account_settings(id,line_account_id,key,value) VALUES(?,?,?,?)').run('auto','acc1','booking_auto_assign','true');
+    const settings = { method: 'balanced' as const, balancePeriod: 'day' as const, expectedVersion: 0,
+      resources: [{ resourceId: 's1', priority: 'preferred' as const, dailyLimit: 2, sortOrder: 0 },
+        { resourceId: 's2', priority: 'normal' as const, dailyLimit: null, sortOrder: 1 }] };
+    await d1AssignmentSettingsStore(db).save({kind:'staff',id:'acc1'}, settings);
+    const original = availabilityMocks.getAvailability.getMockImplementation()!;
+    availabilityMocks.getAvailability.mockImplementation(async (...args) => {
+      const result = await original(...args);
+      if (args[1].staffId) return result;
+      return { ...result, by_staff: [result.by_staff[0], { ...result.by_staff[0], staff_id: 's2' }] };
+    });
+    try {
+      const { app, env } = makeApp(db);
+      for (let i=0; i<4; i++) {
+        const customerId = `allocation-customer-${i}`;
+        sqlite.prepare(`INSERT INTO booking_customers(id,line_account_id,display_name,phone_normalized_hash,phone_encrypted,phone_last4)
+          VALUES(?,'acc1','予約者',?,'cipher','5678')`).run(customerId,`hash-${i}`);
+        if (i===2) await d1AssignmentSettingsStore(db).save({kind:'staff',id:'acc1'},{...settings, method:'priority',expectedVersion:1});
+        const result = await app.request('/api/booking/admin/bookings?account_id=acc1', {method:'POST',
+          headers:{'Content-Type':'application/json','Idempotency-Key':`allocation-${i}`},
+          body:JSON.stringify({booking_customer_id:customerId,menu_id:'m1',starts_at:futureStartsAt(),send_line_confirmation:false})}, env as never, execCtx);
+        expect(result.status, `request ${i}: ${await result.text()}`).toBe(201);
+      }
+      expect(sqlite.prepare('SELECT staff_id FROM bookings ORDER BY rowid').all()).toEqual([{staff_id:'s1'},{staff_id:'s2'},{staff_id:'s1'},{staff_id:'s2'}]);
+    } finally { availabilityMocks.getAvailability.mockImplementation(original); }
   });
 
   test('LINEの指名なし（未指定・指名なし行）は実スタッフに割り当て、空きなしなら拒否する', async () => {

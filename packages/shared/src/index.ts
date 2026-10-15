@@ -88,3 +88,6 @@ export * from './restaurant-followup.js';
 export * from './report-period.js';
 
 export * from './hq-catalog-templates.js';
+export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentWrite, BookingAssignmentSettings } from './booking-assignment.js';
+
+export * from './booking-entitlements.js';

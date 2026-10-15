@@ -583,7 +583,11 @@
     "638_restaurant_close_task_sources.sql",
     "639_hq_form_test_tokens.sql",
     "640_hq_broadcast_saved_views.sql",
+    "641_booking_assignment_settings.sql",
+    "642_booking_entitlements.sql",
+    "643_booking_entitlement_uses.sql",
+    "644_booking_customer_payment_choice.sql",
     "661_hq_catalog_templates.sql"
   ],
-  "migrationCount": 584
+  "migrationCount": 588
 }

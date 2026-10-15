@@ -44,6 +44,7 @@ function isCoveredRoute(method: string, path: string): boolean {
   if (method === 'ALL' || method === 'OPTIONS') return false;
   if (INFRASTRUCTURE_PATHS.has(path)) return false;
   if (path.startsWith('/api/restaurant-test') && ![
+    '/api/restaurant-test/assignment-settings',
     '/api/restaurant-test/store-groups', '/api/restaurant-test/store-groups/:id/members/:storeId', '/api/restaurant-test/stores/:id/referral-location',
     '/api/restaurant-test/closures', '/api/restaurant-test/closures/preview', '/api/restaurant-test/closures/:id',
     '/api/restaurant-test/availability', '/api/restaurant-test/google/hours/from-closure',
@@ -179,6 +180,16 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/restaurant-test/channel-close-tasks/{id}/opened',
   'POST /api/restaurant-test/google/reviews/{id}/draft/generate',
   'PUT /api/booking/admin/channels/{channel}/settings',
+  'POST /api/liff/booking/requests',
+  'GET /api/booking/admin/entitlements',
+  'POST /api/booking/admin/entitlements',
+  'POST /api/booking/admin/entitlements/{id}/operations',
+  'GET /api/booking/admin/entitlements/{id}/history',
+  'GET /api/liff/booking/entitlements',
+  'GET /api/booking/admin/assignment-settings',
+  'PUT /api/booking/admin/assignment-settings',
+  'GET /api/restaurant-test/assignment-settings',
+  'PUT /api/restaurant-test/assignment-settings',
   'GET /api/auth/api-key',
   'POST /api/auth/api-key',
   'DELETE /api/auth/api-key',
@@ -1086,7 +1097,6 @@ const ALLOWLIST = new Set<string>([
   'POST /api/liff/affiliate/links',
   'POST /api/liff/affiliate/offers/{id}/enroll',
   'POST /api/liff/affiliate/register',
-  'POST /api/liff/booking/requests',
   'POST /api/liff/events/me/{bookingId}/cancel',
   'POST /api/liff/events/{id}/bookings',
   'POST /api/liff/friend-add-intent',

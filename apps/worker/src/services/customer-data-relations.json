@@ -28,6 +28,7 @@
   "booking_idempotency_keys": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
   "booking_noshow_flag_events": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "booking_noshow_flags": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
+  "booking_payment_choices": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"bookings","columns":[{"column":"booking_id","parentColumn":"id"}]}]},
   "booking_operation_runs": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"bookings","columns":[{"column":"booking_id","parentColumn":"id"}]}]},
   "booking_reminders": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"bookings","columns":[{"column":"booking_id","parentColumn":"id"}]}]},
   "booking_resource_consumptions": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"bookings","columns":[{"column":"booking_id","parentColumn":"id"}]}]},

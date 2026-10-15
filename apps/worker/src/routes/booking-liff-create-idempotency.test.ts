@@ -1,3 +1,6 @@
+import { grantEntitlement } from '../services/booking-entitlements.js';
+import { bookingEntitlements } from './booking-entitlements.js';
+import { bookingPayments } from './booking-payments.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
@@ -66,7 +69,7 @@ beforeEach(() => {
     }
     return result;
   } } as D1Database;
-  app = new Hono<Env>(); app.route('/', booking);
+  app = new Hono<Env>(); app.route('/', booking); app.route('/', bookingEntitlements); app.route('/',bookingPayments);
   availability.getAvailability.mockResolvedValue({ by_staff: [{ staff_id: 'w1-staff', display_name: '担当', slots: [{
     date: '2026-10-26', start: '10:00', end: '11:00', timeZone: 'Asia/Tokyo', startUtc: startsAt,
     endUtc: '2026-10-26T02:00:00.000Z', capacity: 2, remaining: 2, state: 'available',
@@ -78,10 +81,10 @@ beforeEach(() => {
   });
 });
 afterEach(async () => { await Promise.allSettled(tasks); sql.raw.close(); vi.useRealTimers(); vi.unstubAllGlobals(); });
-function create(key = 'w1-key') {
+function create(key = 'w1-key',extra:Record<string,unknown>={}) {
   return app.request('/api/liff/booking/requests?liffId=w1-liff', { method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key, Authorization: 'Bearer local-token' },
-    body: JSON.stringify({ menu_id: 'w1-menu', staff_id: 'w1-staff', starts_at: startsAt }),
+    body: JSON.stringify({ menu_id: 'w1-menu', staff_id: 'w1-staff', starts_at: startsAt,...extra }),
   }, { DB: db } as Env['Bindings'], { waitUntil: (task: Promise<unknown>) => tasks.push(task), passThroughOnException() {} } as unknown as ExecutionContext);
 }
 function count(table: 'bookings' | 'booking_audit_logs') {
@@ -174,4 +177,54 @@ describe('W1 LIFF予約のキー確保と保存失敗回収（実SQL・FK有効�
     expect(sql.raw.prepare('SELECT key FROM booking_idempotency_keys').all()).toEqual([]);
     expect((await create()).status).toBe(201); expect(count('bookings')).toBe(1);
   });
+});
+
+describe('B-308/B-316 LIFFの券と本人が選ぶ支払い',()=>{
+ const choice=()=>sql.raw.exec(`INSERT INTO booking_payment_configs(line_account_id,mode,provider,hold_minutes,created_at,updated_at)
+ VALUES('w1-account','customer_choice','stripe',10,'2026-10-01','2026-10-01')`);
+ it.each(['onsite','online'] as const)('本人が%sを選んだ方法を保存し、再送/設定変更後も同じ予約を返す',async method=>{
+  choice();sql.raw.exec("UPDATE booking_settings SET approval_mode='automatic'");
+  const first=await create('choice',{payment_method:method});expect(first.status).toBe(201);
+  const data=await first.json<{booking_id:string;status:string;payment_required:boolean}>();
+  expect(data).toMatchObject({status:method==='onsite'?'confirmed':'requested',payment_required:method==='online'});
+  expect(sql.raw.prepare('SELECT mode FROM booking_payment_choices').get()).toEqual({mode:method});
+  sql.raw.exec("UPDATE booking_payment_configs SET mode='online'");
+  const again=await create('choice',{payment_method:method});expect(again.status).toBe(201);expect((await again.json<{booking_id:string}>()).booking_id).toBe(data.booking_id);
+  expect(count('bookings')).toBe(1);
+  if(method==='onsite'){
+   const pay=await app.request('/api/liff/booking/payments/start?liffId=w1-liff',{method:'POST',headers:{Authorization:'Bearer local-token','Content-Type':'application/json'},body:JSON.stringify({bookingId:data.booking_id})},{DB:db} as Env['Bindings']);
+   expect(pay.status).toBe(409);
+  }
+ });
+ it('本人が選ぶ設定では選択必須。不正な選択・別の固定方式への変更は拒否',async()=>{
+  choice();expect((await create('missing')).status).toBe(400);
+  expect((await create('bad',{payment_method:'none'})).status).toBe(400);
+  sql.raw.exec("UPDATE booking_payment_configs SET mode='online'");
+  expect((await create('wrong',{payment_method:'onsite'})).status).toBe(400);
+  expect(count('bookings')).toBe(0);
+ });
+ async function grant(){return grantEntitlement(db,'w1-account','operator','manual:test',{
+  friendId:'w1-friend',kind:'ticket',name:'2回券',remaining:2,validFrom:'2026-01-01T00:00:00Z',expiresAt:'2027-01-01T00:00:00Z',reason:'現金販売',
+ });}
+ it('券を選んで予約し、確定で1回減る。本人は残りを読め、理由/担当者は見えない',async()=>{
+  const e=await grant();
+  const response=await create('ticket',{entitlement_id:e.data.id});expect(response.status).toBe(201);
+  const saved=await response.json<{booking_id:string}>();
+  expect(sql.raw.prepare('SELECT remaining FROM booking_entitlements').get()).toEqual({remaining:2});
+  sql.raw.prepare("UPDATE bookings SET status='confirmed' WHERE id=?").run(saved.booking_id);
+  expect(sql.raw.prepare('SELECT remaining FROM booking_entitlements').get()).toEqual({remaining:1});
+  expect((await create('ticket',{entitlement_id:e.data.id})).status).toBe(201);
+  const mine=await app.request('/api/liff/booking/entitlements?liffId=w1-liff', {headers:{Authorization:'Bearer local-token'}},{DB:db} as Env['Bindings']);
+  expect(mine.status).toBe(200);const body=await mine.json<{data:{remaining:number}[]}>();expect(body.data[0].remaining).toBe(1);expect(JSON.stringify(body)).not.toContain('現金販売');expect(JSON.stringify(body)).not.toContain('operator');
+  verifiedUserId='someone-else';const other=await app.request('/api/liff/booking/entitlements?liffId=w1-liff',{headers:{Authorization:'Bearer local-token'}},{DB:db} as Env['Bindings']);expect(other.status).toBe(404);
+ });
+ it('券を選んだ即時確定はオンライン請求せず、DBの減算失敗は予約/枠を残さない',async()=>{
+  const e=await grant();choice();sql.raw.exec("UPDATE booking_settings SET approval_mode='automatic'");
+  sql.raw.exec("CREATE TRIGGER fail_consume BEFORE UPDATE ON booking_entitlements BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;");
+  expect((await create('auto-ticket',{entitlement_id:e.data.id})).status).toBe(409);expect(count('bookings')).toBe(0);
+  sql.raw.exec('DROP TRIGGER fail_consume');
+  const response=await create('auto-ticket',{entitlement_id:e.data.id});expect(response.status).toBe(201);expect(await response.json()).toMatchObject({status:'confirmed',payment_required:false});
+  expect(sql.raw.prepare('SELECT remaining FROM booking_entitlements').get()).toEqual({remaining:1});
+  expect(sql.raw.prepare('SELECT count(*) n FROM booking_payments').get()).toEqual({n:0});
+ });
 });
