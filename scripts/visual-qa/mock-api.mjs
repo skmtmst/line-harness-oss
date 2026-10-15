@@ -2135,7 +2135,9 @@ const SHAPES = {
   // メニューが基本の9項目だけになる（2026-09-24 の点検で発覚）。
   // 設定の画面（★V8 設定の中のメニュー・プール管理 u3iab3）は「プール管理」が見える統括で描かれている。
   // 機能設定の既定（multi_store_hierarchy は既定オフ）はそのまま、表示の出し分けだけオンで返す。
-  '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true } },
+  // 成果とアフィリエイト（affiliates）も絵は機能がある前提で描かれている（Eo56k ほか。2026-10-15 司令塔）。
+  // 本物の既定値（affiliates は既定オフ）は変えず、表示の出し分けだけオンで返す。
+  '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true, affiliates: true } },
   '/api/inbox/unanswered/count': { total: 5, byAccount: [{ accountId: 'visual-qa-account', accountName: '然-NEN-TEST', count: 5 }], oldestWaitMinutes: 9110 },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
