@@ -485,3 +485,15 @@ test('explicit picker widths remain readable in a flex toolbar; allowing shrink 
     assert.match(source,/style=\{width \? \{ width, maxWidth: '100%', flexShrink: 0 \}/)
   } finally { await browser.close() }
 })
+
+test('grid controls reserve the full action width and preserve the right inset', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<style>${read('../../src/app/globals.css')}\n${css('data-table')}\n*{box-sizing:border-box}.frame{width:600px}button{width:117px;height:20px;flex:none}</style><div class="frame" data-grid-table data-column-sizing="controls"><table class="table" style="--table-columns:minmax(0,1fr) 108px;--table-row-padding:0 16px;--table-head-padding:8px 16px;--table-grid-gap:8px"><thead><tr><th>した人</th><th>状態</th></tr></thead><tbody><tr><td data-cell-grow>担当者</td><td><button>CSVで書き出す</button></td></tr></tbody></table></div>`)
+    const rightInset = () => page.locator('tbody tr').evaluate(row => row.getBoundingClientRect().right - row.querySelector('button').getBoundingClientRect().right)
+    assert.equal(await rightInset(), 7, 'the old 108px column lets the reserved 117px action consume the inset')
+    await page.locator('.frame').evaluate(fitListColumns)
+    assert.equal(await rightInset(), 16)
+  } finally { await browser.close() }
+})

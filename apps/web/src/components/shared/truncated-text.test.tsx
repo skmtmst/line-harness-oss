@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Dialog from './dialog'
-import TruncatedText, { compactUrl } from './truncated-text'
+import TruncatedText, { compactUrl, TruncatedTextFocus } from './truncated-text'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
@@ -81,4 +81,18 @@ it('タグ幅専用の不可視コピーは測らず、表示する文字の全�
     fireEvent.focus(visible)
     expect(screen.getByRole('tooltip').textContent).toBe('表示する長い名前')
   } finally { vi.unstubAllGlobals() }
+})
+
+it('全文を開く操作が別にある群は重複するTab停止を作らず、単独では戻す', () => {
+  vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(180)
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(80)
+  const value = '長いタグの名前'
+  const { rerender } = render(<TruncatedTextFocus.Provider value={false}><TruncatedText value={value} /></TruncatedTextFocus.Provider>)
+  expect(screen.getByText(value).hasAttribute('tabindex')).toBe(false)
+  expect(screen.getByText(value).title).toBe(value)
+  fireEvent.mouseEnter(screen.getByText(value))
+  expect(screen.getByRole('tooltip').textContent).toBe(value)
+  fireEvent.keyDown(document, { key: 'Escape' })
+  rerender(<TruncatedTextFocus.Provider value={true}><TruncatedText value={value} /></TruncatedTextFocus.Provider>)
+  expect(screen.getByText(value).tabIndex).toBe(0)
 })

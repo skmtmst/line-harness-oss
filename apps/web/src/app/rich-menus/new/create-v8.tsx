@@ -2661,8 +2661,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   value={publishPlan.endsAt}
                   onChange={(v) => updatePublishPlan({ ...publishPlan, endsAt: v })}
                   aria-label="終わる日時"
-                  aria-describedby={!endEnabled ? 'rich-menu-end-note' : undefined}
-                  disabled={!endEnabled}
+                  aria-describedby={!endEnabled ? 'rich-menu-end-note' : undefined} disabled={!endEnabled}
                 /></SaveErrorField></Field>
               </span>
               <span>に終わり、</span>

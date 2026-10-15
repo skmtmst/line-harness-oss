@@ -616,4 +616,4 @@ html:root .frame:is([data-column-sizing='content'], [data-column-sizing='control
 }
 
 /* 中身で測る設定表でも、全行が同じ列幅を使う。外部リンクの印も幅に含める。 */
-:root .frame[data-grid-table][data-column-sizing='content'] .table tr { grid-template-columns: var(--table-content-columns, var(--table-columns)); }
+:root .frame[data-grid-table]:is([data-column-sizing='content'], [data-column-sizing='controls']) .table tr { grid-template-columns: var(--table-content-columns, var(--table-columns)); }

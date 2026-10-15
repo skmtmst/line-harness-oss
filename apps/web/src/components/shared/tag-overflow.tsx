@@ -2,6 +2,7 @@
 
 import { Children, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import Dialog from './dialog'
+import { TruncatedTextFocus } from './truncated-text'
 import styles from './tag-overflow.module.css'
 
 // Read all rows before committing fit counts. Updating one row before measuring
@@ -72,7 +73,7 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
   const rest = items.length - shown
   return <>
     <span ref={root} className={styles.line} data-tag-overflow="" onClick={(event) => event.stopPropagation()}>
-      {items.slice(0, shown).map((item, index) => <span key={index} className={styles.item} data-shrink={shown === 1 && rest > 0 ? '' : undefined}>{item}</span>)}
+      <TruncatedTextFocus.Provider value={rest === 0}>{items.slice(0, shown).map((item, index) => <span key={index} className={styles.item} data-shrink={shown === 1 && rest > 0 ? '' : undefined}>{item}</span>)}</TruncatedTextFocus.Provider>
       {rest > 0 ? <button type="button" className={styles.more} aria-label={`${label}（ほか${rest}件）`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>+{rest}</button> : null}
       <span ref={measure} className={styles.measure} data-tag-overflow-measure="" aria-hidden="true" inert>{items.map((item, index) => <span key={index} className={styles.item}>{item}</span>)}</span>
       <button ref={more} type="button" className={`${styles.more} ${styles.sampleMore}`} aria-hidden="true" tabIndex={-1} inert>+{items.length}</button>
