@@ -2388,3 +2388,542 @@ export default function BroadcastForm({
         </section>
         {showTemplatePicker && (
           <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ" scrollBody searchPlaceholder="テンプレート名・本文で探す"
+            folders={templateFolders} busy={composerBusy} error={templateApplyError}
+            state={templateCandidatesStatus === 'loading' ?
+                <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><Notice tone="danger">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</Notice></SaveErrorField> : undefined}
+            items={[
+                    ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, frequent: false, meta:`${typeLabel(asset.kind)}・更新 ${formatListDay(asset.updatedAt)}`})),
+              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, frequent: frequentTemplateIds.has(template.id), content: template.messageType === 'text' ? template.messageContent : undefined, keywords: template.messageContent, meta : `${typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}・更新 ${formatListDay(template.updatedAt)}`}
+              )),
+            ]}
+            preview=
+              {(item) => { const template = messageTemplates.find((row) => row.id === item?.id
+              ); const asset = assets.find((row) => `asset:${row.id}` === item?.id
+              ); const bubble = template ? messageTemplateToBubble (template
+              ) : asset ? contentTemplateToBubble(asset) : null; return bubble ?
+            <LinePreview accountName={selectedAccount?.name}><BubblePreview bubble={bubble} accountName={selectedAccount?.name}/>
+          </LinePreview> : null }}
+            onCancel={() => setShowTemplatePicker(false)}
+            onConfirm={(id) => { const asset = assets.find((row) => `asset:${row.id}` === id); if (asset) { placeTemplateBubble(contentTemplateToBubble(asset)); setShowTemplatePicker(false); return }; const template = messageTemplates.find((row) => row.id === id); if (template) void applyTemplate(template) }} />
+        )}
+        {!showTemplatePicker && <section className="rounded-card border content-card bg-canvas p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4>{currentStep !== 'message' && <p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p>}</div>
+            </div>
+          <ActionList
+            <string> value={afterActionVersionId ? [afterActionVersionId] : []} onChange={next =>setAfterActionVersionId(next[next.length - 1] ?? '')}
+            idOf={id => id} titleOf={id => publishedActions.find(action => action.versionId === id)?.name ?? '設定済みの共通アクション'}
+            choices={afterActionVersionId ? [] :[{ id: 'common_action', label: '共通アクションを実行する', make: () => '', picker: {
+              title: '公開済みの共通アクションを選ぶ', items:publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` })), apply: (_, ids) => ids[0],
+            } }]}
+            renderEditor={(id, update) =>
+          <EntityPickerField label="配信後のアクション" noun="共通アクション" items={publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` }))} value={id} onChange={update}/>}/>
+        </section>}
+        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <details ref={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><summary>ほかの設定</summary><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></details> : null}
+        {!currentStep && error && <Notice tone="danger" message={error} />}
+        </div>
+        <section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
+          <h3>配信日</h3>
+          <SaveErrorField names={["broadcast-send-mode","sendMode","spreadMinutes"]}><RadioCardGroup legend="配信日" className={styles.methodCards}>
+            <RadioCard name="broadcast-send-mode" value="now" checked={sendMode === 'now' && Number(spreadMinutes) === 0} onChange={() => { setSendMode('now'); setSpreadMinutes('0') }} title="今すぐ配信" note="最終確認で送ると、すぐに届きます" />
+            <RadioCard name="broadcast-send-mode" value="scheduled" checked={sendMode === 'scheduled'} onChange={() => setSendMode('scheduled')} title="日時を指定して予約" note="決めた日時に送ります" />
+            <RadioCard name="broadcast-send-mode" value="spread" checked={sendMode === 'now' && Number(spreadMinutes) > 0} onChange={() => { setSendMode('now'); setSpreadMinutes(Number(spreadMinutes) > 0 ? spreadMinutes : '30') }} title="時間を分散して送る" note="少しずつ送り、集中を避けます" />
+          </RadioCardGroup></SaveErrorField>
+          {sendMode === 'scheduled' && (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
+                  配信日（日本時間）
+                </label>
+                <SaveErrorField names={["scheduledDate","scheduled_date"]}><DateField
+                  id="bc-date"
+                  value={scheduledDate}
+                  onChange={setScheduledDate}
+                  aria-label="配信日（日本時間）"
+                /></SaveErrorField>
+              </div>
+              <div>
+                <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
+                  時刻（日本時間）
+                </label>
+                <SaveErrorField names={["scheduledTime","scheduled_time"]}><TimeField
+                  id="bc-time"
+                  size="field"
+                  value={scheduledTime}
+                  onChange={setScheduledTime}
+                  aria-label="時刻（日本時間）"
+                /></SaveErrorField>
+              </div>
+              {/*
+                設計 `Bw0zt` の注意書き。予約は条件を保存するだけで、実際の
+                宛先は**予約の時刻に条件をもう一度あてて**決まる
+                （`services/broadcast.ts` の cron が `buildSegmentQuery` を
+                その場で組み直す）。いま出ている人数のまま固定されると
+                思われると、増減したときに「数が合わない」と読まれる。
+
+                **送信枠には触れない。** 残り通数を読む口がこの画面には無く、
+                「送信枠も再確認します」と書くと出せない数を約束することになる。
+              */}
+              <Notice tone="warn" className="sm:col-span-2">
+                予約した時刻に、そのときの条件でもう一度対象を数え直してから送ります。
+                いま出ている人数から増減することがあります。
+              </Notice>
+            </div>
+          )}
+
+          <div className="border-hairline mt-4 border-t pt-4">
+      <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-medium">
+        時間を分散して送る
+        <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-micro font-normal">
+          推奨
+        </span>
+      </label>
+      <div className="flex items-center gap-1.5">
+        <SaveErrorField names={["spreadMinutes","spread_minutes"]}><input
+          id="bc-spread"
+          type="number"
+          min={0}
+          max={720}
+          value={spreadMinutes}
+          onChange={(e) => setSpreadMinutes(e.target.value)}
+          className="border-hairline rounded-control w-24 border px-3 py-2 text-sm tabular-nums"
+        /></SaveErrorField>
+        <span className="text-ink-faint text-xs">分かけて</span>
+      </div>
+      <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+        指定した時刻から、その分数をかけて少しずつ送ります。同時刻に大量送信するとLINE側で制限を受けることがあるため、通常はオンのままにしてください。
+        0 なら一気に送ります。途中で止まっても、続きから送り直します（同じ人に二度は届きません）。
+      </p>
+          </div>
+          <div className={styles.quota}>
+            <div className={styles.quotaHead}><strong>送信枠</strong><HelpTip label="送信枠の説明">LINE公式アカウントの月間送信枠です。テスト送信も枠を使用します</HelpTip><span>今月 残り {quota?.remaining == null ? '—' : formatNumber(quota.remaining)}通</span></div>
+            <div className={styles.quotaTrack}><div style={{ width: quota?.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div>
+            <p>{quota?.monthlyUsed == null || quota.monthlyLimit == null ? '送信枠は配信前チェックで確認します' : `使った ${formatNumber(quota.monthlyUsed)} + 今回 ${formatNumber(quota.planned)} / 上限 ${formatNumber(quota.monthlyLimit)}通`}</p>
+            {quotaInsufficient && <p className="text-danger">送信枠が不足しています。配信する人数を減らしてください</p>}
+          </div>
+          <SaveErrorField names={["measureOpens","measure_opens"]}><Checkbox checked={measureOpens} onCheckedChange={setMeasureOpens}>開封数の集計を取る</Checkbox></SaveErrorField>
+          {sendMode === 'scheduled' && (
+            <section className="mt-4 rounded-control border border-hairline p-4">
+              <h4 className="text-sm font-bold text-ink">配信スケジュール</h4>
+              <p className="mt-1 text-xs text-ink-faint">前後の配信と重ならないかを確認します。</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                {[-1, 0, 1, 2].map((offset) => {
+                  const base = scheduledDate ? new Date(`${scheduledDate}T00:00:00+09:00`) : null
+                  if (base) base.setDate(base.getDate() + offset)
+                  const ymd = base ? formatDay(base) : '日付未設定'
+                  const concurrent = offset === 0 ? concurrentBroadcasts : []
+                  return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-semibold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
+                })}
+              </div>
+              {concurrentBroadcasts.length > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
+            </section>
+          )}
+        </section>
+
+    <div id="broadcast-step-confirm" className={shows('confirm') ? styles.section : 'hidden'}>
+      <h3>配信前チェック</h3>
+      <div className={styles.checkList}>
+        {([
+          { key: 'basic', label: '配信名', value: title.trim() || '配信名を入力してください', done: Boolean(title.trim()) && title.trim().length <= TITLE_MAX, move: '基本設定へ戻る' },
+          { key: 'audience', label: '配信対象', value: `${confirmAudienceLabel} ・ ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`} ・ ${exclusionNote ?? '除外の内訳は未取得'}`, done: canConfirm, move: '対象を一覧で見る' },
+          { key: 'message', label: 'メッセージ', value: `${bubbles.length}件 ・ ${bubblesError(bubbles) || (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}`, done: !bubblesError(bubbles) && previewConfirmed, move: 'メッセージへ戻る' },
+          { key: 'schedule', label: '送信設定', value: `${sendWhenLabel ?? '未設定'} ・ ${quotaNote ?? '送信枠は未確認'}`, done: sendMode === 'now' || Boolean(scheduledDate && scheduledTime), move: '送信設定へ戻る' },
+        ] as const).map((row) => <div className={styles.checkRow} key={row.key}>
+          {row.done ? <CheckCircle2 size={18} className="text-success" aria-hidden /> : <AlertTriangle size={18} className="text-warning" aria-hidden />}
+          <div><strong>{row.label}</strong><p>{row.value}</p></div><Button variant="secondary" className={styles.textButton} size="compact" onClick={() => goToStep(row.key)}>{row.move}</Button>
+        </div>)}
+      </div>
+      <Notice tone={unconfirmedCount || !canConfirm ? 'warn' : 'info'} action={<Button variant="secondary" className={styles.textButton} size="compact" onClick={() => setPreflightDialogOpen(true)}>配信前チェックを確認</Button>}>
+        {audienceCount === 0 ? 'この条件に当てはまる友だちがいません。条件を変えてください' : audienceCount === null ? '人数を確認してから送れます' : unconfirmedCount ? `${unconfirmedCount}件の確認が残っています` : '配信する内容を確認してください'}
+      </Notice>
+      <details className={styles.details}>
+        <summary>最終確認の内訳</summary>
+        <dl className={styles.confirmDetails}>{[
+          ['対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
+          ['除外', exclusionNote ?? '—'], ['除くタグ', tags.find((tag) => tag.id === excludeTagId)?.name ?? 'なし'],
+          ['配信日時', sendWhenLabel ?? '未設定'], ['送信枠', quotaNote ?? '—'], ['計算時刻', evaluatedAtLabel ?? '—'],
+          ['メッセージ', `${bubbles.length}通`], ['開封計測', measureOpens ? '有効' : '無効'],
+          ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
+        ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      </details>
+      {concurrentBroadcasts.length > 0 && <Notice tone="warn">同じ時刻の前後1時間に別の予約配信があります。対象が重なる場合は間隔を空けてください<ul>{concurrentBroadcasts.map((item) => <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>)}</ul></Notice>}
+      <p className="text-xs text-ink-faint">{sendMode === 'scheduled' ? '予約後も配信開始前までは編集・取消できます。' : '「今すぐ送る」で確認の画面を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
+    </div>
+    {/*
+      **上限を超えたまま保存・送信させない。**
+
+      本文の欄は `maxLength` で止まるが、下書きやテンプレートから読み込むと
+      上限を超えた本文がそのまま入ることがある。**そのとき保存の口だけが
+      静かに 400 で失敗する**——押した人には「保存中…」が戻るだけで、
+      どの通のどこが長いのか分からない。押す前に、押せない理由を出す。
+
+      右の点検欄（`preflight`）は宛先と本文が決まるまで出ないので、
+      **こちらは常に出す。**
+    */}
+    {shows('message') && lengthNotice.tone === 'error' && (
+      <Notice tone="danger" className="mb-3">
+        <p className="text-danger text-sm font-bold">{lengthNotice.title}</p>
+        <p className="text-danger mt-1 text-xs">{lengthNotice.description}</p>
+      </Notice>
+    )}
+      </div>
+      <aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label="LINEの見え方">
+        <div className={styles.previewHead}><h3>LINE の見え方</h3><div className={styles.deviceSwitch} role="group" aria-label="プレビューの端末"><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button></div><Button ref={previewCloseRef} className={styles.previewClose} size="compact" onClick={() => { setPreviewOpen(false); previewToggleRef.current?.focus() }}>閉じる</Button></div>
+        <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
+          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={ Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
+            <div className="flex flex-col gap-3 text-ink">{ bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
+          </LinePreview>
+        </div>
+        <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>
+        <div className={styles.previewSummary}><h3>設定内容</h3><dl>{[
+          ['送る相手', `${confirmAudienceLabel}${audienceDisplayCount === null ? '' : `（${formatNumber(audienceDisplayCount)}人）`}`],
+          ...(currentStep === 'message' ? [] : [['除くタグ', tags.find((tag) => tag.id === excludeTagId)?.name ?? 'なし']]),
+          ['送る日時', sendWhenLabel ?? '未設定'],
+          ['配信後のアクション', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'],
+        ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
+        <div className={styles.previewActions}><Button type="button" disabled={Boolean(validate()) || saving} title={validate() || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
+        {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
+        <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
+      </aside>
+    </CreateColumns>
+
+    <StickyBar className={styles.footer} actions={(
+      <>
+      {currentStep ? (
+        <>
+          {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
+          <Button variant="secondary" className={styles.textButton} type="button" disabled={saving || composerBusy} onClick={() => void saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
+          {currentStep !== 'confirm' ? (
+            <Button variant="primary" disabled={composerBusy} onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
+              {currentStep === 'basic' ? '対象設定へ'
+                : currentStep === 'audience' ? 'メッセージ設定へ'
+                  : currentStep === 'message' ? <><span>送信設定へ</span><ArrowRight size={15} aria-hidden /></>
+                    : '配信前チェックへ'}
+            </Button>
+          ) : (
+            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={openConfirm} busy={saving}>
+              {sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
+            </Button>
+          )}
+        </>
+      ) : (
+        <>
+          <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
+          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
+        </>
+      )}
+      </>
+    )} />
+
+    {/*
+      書きかけのまま離れようとしたときの確認（★V7 sTJsh §5）。
+      「保存して移る」は下書きへ保存できたらそのまま移動し、
+      保存できないときはこの画面へ戻って直す。
+    */}
+    <UnsavedLeaveDialog
+      open={leaveTarget !== null}
+      subject="配信の変更"
+      busy={saving}
+      onSave={saveDraftNow}
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    />
+
+    {/*
+      最終確認（設計 `FpgxH` 6-1-H）。
+
+      **押した瞬間に予約が確定しないようにする。** 出す値はどれも
+      いま画面が持っているものだけで、固定値は使わない。人数は
+      `runPreflight()` が数えたぶん（`preflight.audienceCount`）。
+    */}
+
+    <ConfirmDialog
+      open={conditionDialogOpen}
+      title="配信対象の条件を設定"
+      description="条件を組み合わせて、この配信を届ける友だちを決めます。"
+      confirmLabel="この条件を反映"
+      cancelLabel="キャンセル"
+      designNode="sqFXf"
+      onCancel={() => setConditionDialogOpen(false)}
+      onConfirm={() => {
+        setCondition(conditionDraft)
+        setConditionDialogOpen(false)
+      }}
+    >
+      <div className="space-y-4">
+        <section className="rounded-control border border-hairline bg-canvas-sunken p-4">
+          <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-bold text-ink">現在の条件</h3><button type="button" className="text-xs font-semibold text-action" onClick={() => setConditionDraft(null)}>条件を初期化</button></div>
+          <p className="mt-2 text-xs text-ink-secondary">{conditionDraft ? '設定中の詳細条件を編集しています。' : '条件はまだ設定されていません。'}</p>
+        </section>
+        <section className="rounded-control border border-hairline p-4">
+          <h3 className="mb-3 text-sm font-bold text-ink">条件 1</h3>
+          <ConditionBuilder value={conditionDraft} onChange={setConditionDraft} showCount={false} />
+        </section>
+        <section>
+          <h3 className="text-sm font-bold text-ink">利用できる条件軸</h3>
+          <p className="mt-2 text-xs font-medium text-ink-secondary">標準互換（15軸）</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">{STANDARD_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-secondary">{axis}</span>)}</div>
+          <p className="mt-3 text-xs font-medium text-ink-secondary">この画面だけの軸（6軸）</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">{BROADCAST_ONLY_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-faint">{axis}</span>)}</div>
+          <Notice tone="info" className="mt-3">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。未接続の軸は選択肢に出ません。</Notice>
+        </section>
+      </div>
+    </ConfirmDialog>
+
+    <ConfirmDialog
+      open={preflightDialogOpen}
+      title={quotaInsufficient ? '配信枠が不足しています' : '配信前チェック'}
+      description={quotaInsufficient
+        ? `現在の送信枠では${formatNumber(quota?.planned)}通を送信できません。対象を絞るか、配信設定を確認してください。`
+        : '対象・メッセージ・日時・送信枠を確認しました。'}
+      confirmLabel="対象を見直す"
+      cancelLabel="キャンセル"
+      designNode="vW4Es"
+      titleIcon={quotaInsufficient ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}
+      onCancel={() => setPreflightDialogOpen(false)}
+      onConfirm={() => {
+        setPreflightDialogOpen(false)
+        goToStep('audience')
+      }}
+    >
+      <ul className="space-y-2 rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
+        <li className={audienceCount === null ? "text-warning" : "text-success"}>{audienceCount === null ? "対象人数をまだ取得できていません" : `対象人数 ${formatNumber(audienceCount)}人を確認してください`}</li>
+        <li className={previewConfirmed ? 'text-success' : 'text-warning'}>{previewConfirmed ? '✓' : '!'} メッセージ表示を確認しました</li>
+        <li className={scheduledLabel ? 'text-success' : 'text-ink-faint'}>{scheduledLabel ? '✓' : '○'} 配信日時を確認しました</li>
+      </ul>
+    </ConfirmDialog>
+
+    <div data-design-node="FpgxH">
+      <ConfirmDialog
+        open={confirmOpen}
+        title={sendMode === 'scheduled' ? 'この内容で予約しますか？' : 'この内容で送りますか？'}
+        description={
+          needsApproval && !needsApprovalSingle
+            ? '送る相手・日時・内容を確認し、承認をお願いする人を選んでください。承認されるまで送られません。'
+            : sendMode === 'scheduled' ? '送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。' : '送ると友だちに届きます。送信は取り消せません。対象と内容を確認してください。'
+        }
+        confirmLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
+        cancelLabel="戻って修正"
+        busy={saving}
+        error={error || undefined}
+        onCancel={() => { if (!saving) setConfirmOpen(false) }}
+        onConfirm={canConfirm && (!currentStep || approvalConfigState === 'ready') ? () => void save() : undefined}
+      >
+        {currentStep && approvalConfigState === 'loading' ? <p role="status" className="text-xs text-ink-faint">承認の設定を確認しています…</p> : currentStep && approvalConfigState === 'error' ? <Notice tone="danger">承認の設定を確認できません。戻ってから確認画面を開き直してください</Notice> : null}
+        <dl className="border-hairline divide-hairline divide-y rounded-control border text-sm">
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">管理名</dt>
+            <dd className="text-ink text-right font-medium">{title.trim() || '（未入力）'}</dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">配信対象</dt>
+            <dd className="text-ink text-right font-medium">
+              {confirmAudienceLabel}
+              <span className="ml-2 tabular-nums">
+                {audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}
+              </span>
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">除外</dt>
+            <dd className="text-ink-secondary text-right">
+              {/* **0人と書かない。** 数としての口がまだ無い。 */}
+              {exclusionNote ?? <span className="text-ink-faint">—<span className="ml-2 text-xs">除外した人数はまだ取れません</span></span>}
+            </dd>
+          </div>
+          {/* 送信枠・計算時刻・把握できる重複配信もここへまとめる（IDEA-06）。 */}
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">送信枠</dt>
+            <dd className={`text-right ${quotaInsufficient ? 'font-medium text-danger' : 'text-ink-secondary'}`}>
+              {quotaNote ?? '—'}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">計算時刻</dt>
+            <dd className="text-ink-secondary text-right tabular-nums">{evaluatedAtLabel ?? '—'}</dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">配信日時</dt>
+            <dd className="text-ink text-right font-medium tabular-nums">{sendWhenLabel ?? '—'}</dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">送る中身</dt>
+            <dd className="text-ink text-right font-medium">
+              {bubbles.length}通（{bubbles.map((b) => TYPE_LABELS[b.type] ?? b.type).join('・')}）
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">開封の集計</dt>
+            <dd className="text-ink-secondary text-right">
+              {measureOpens
+                ? audienceCount === null
+                  ? '有効（対象人数が分かってから判定します）'
+                  : audienceCount >= 20 ? '有効' : '有効（20人未満のため集計されません）'
+                : '取らない'}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">URLの短縮</dt>
+            <dd className="text-ink-secondary text-right">{trackLinks ? 'する（クリックを数えます）' : 'しない'}</dd>
+          </div>
+        </dl>
+
+        {/*
+          把握できる重複配信（IDEA-06）。同じ時刻の前後1時間に入っている
+          別の予約をここでも出す。送信設定の節でだけ出すと、確認の窓で
+          読み合わせるときに見落とす。
+        */}
+        {concurrentBroadcasts.length > 0 && (
+          <Notice tone="warn" className="mt-3">
+            <p className="font-semibold">同じ時刻の前後1時間に別の予約配信があります</p>
+            <ul className="mt-1 list-disc pl-4">
+              {concurrentBroadcasts.map((item) => (
+                <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>
+              ))}
+            </ul>
+          </Notice>
+        )}
+
+        {/*
+          **未確認のまま送らせないのではなく、数えて見せる。**
+          「テスト送信がまだ」は止める理由にならないが、押す前に
+          目に入っていないと、あとから気づけない。
+        */}
+        {unconfirmedCount !== null && unconfirmedCount > 0 ? (
+          <Notice tone="warn" className="mt-3">
+            <p className="font-semibold">配信前チェックに {unconfirmedCount}件 の未確認があります</p>
+            <ul className="mt-1 list-disc pl-4">
+              {(preflight?.warnings ?? []).filter((w) => w.level === 'warning').map((w) => (
+                <li key={w.message}>{w.message}</li>
+              ))}
+              {testResult?.kind === 'success' ? null : testResult ? <li>テスト送信で届かなかった宛先があります</li> : <li>テスト送信がまだです</li>}
+              {previewConfirmed ? null : <li>LINEプレビューが未確認です</li>}
+            </ul>
+          </Notice>
+        ) : null}
+
+        {/*
+          二者承認（設計 A-1・A-4）。承認が要る人数のときだけ出す。
+          境目が読めているときだけ判定し、取得失敗中は確定させない。
+        */}
+        {needsApproval && !needsApprovalSingle && audienceCount !== null && approvalConfig !== null ? (
+          <ApprovalRequestFields
+            recipientCount={audienceCount}
+            threshold={approvalConfig.threshold}
+            candidates={approvalCandidates}
+            candidatesState={approvalCandidatesState}
+            approverId={approverId}
+            onApproverChange={setApproverId}
+            note={approvalNote}
+            onNoteChange={setApprovalNote}
+          />
+        ) : null}
+        {needsApprovalSingle && audienceCount !== null ? (
+          <SingleOperatorFields
+            recipientCount={audienceCount}
+            value={approvalCountInput}
+            onChange={setApprovalCountInput}
+          />
+        ) : null}
+
+        {/* 人数が無いなら送らせない。上で確認のボタン自体を出していない。 */}
+        {audienceCount === null ? (
+          <Notice tone="danger" className="mt-3">
+            対象の人数を数えられていないため、送信・予約できません。
+            宛先と本文を確かめてから、もう一度お試しください。
+          </Notice>
+        ) : audienceCount === 0 ? (
+          <Notice tone="danger" className="mt-3">
+            いま届く人が0人です。宛先の条件を見直してください。
+          </Notice>
+        ) : null}
+      </ConfirmDialog>
+    </div>
+
+    <ConfirmDialog
+      open={testDialogOpen}
+      title="テストを送る"
+      description="登録済みのテスト送信先全員のLINEへ、表示確認用のメッセージを送ります。"
+      confirmLabel={testSending ? '送信中…' : 'テストを送る'}
+      cancelLabel="キャンセル"
+      busy={testSending}
+      designNode="h0kahp"
+      titleIcon={<Send size={22} />}
+      confirmIcon={<Send size={16} />}
+      onCancel={() => { if (!testSending) setTestDialogOpen(false) }}
+      onConfirm={testRecipientState === 'ready' && testRecipients.length > 0 ? () => void handleTestSend() : undefined}
+    >
+      <div className="space-y-3">
+        {testRecipientState === 'loading' && <p className="text-sm text-ink-faint">読み込んでいます</p>}
+        {testRecipientState === 'error' && <Notice tone="danger">テスト送信先を読み込めませんでした。</Notice>}
+        {testRecipientState === 'ready' && testRecipients.length === 0 && (
+          <p className="rounded-control bg-canvas-sunken p-3 text-sm text-ink-faint">
+            テスト送信先が登録されていません。アカウント設定で、LINE連携済みの担当者を登録してください。
+          </p>
+        )}
+        {testRecipientState === 'ready' && testRecipients.length > 0 && (
+          <>
+            {/*
+              **宛先は選ばない。** 送信APIは宛先を受け取らず、Workerは
+              登録済みのテスト送信先全員へ送る。先頭だけ緑の丸を付けると
+              1人を選んだように見えるので、全員を同じ見た目で並べる。
+              役職はAPIが返さないので、名前から推定して表示しない。
+            */}
+            <p className="rounded-control bg-canvas-sunken p-3 text-sm text-ink-secondary">
+              登録済みのテスト送信先 {testRecipients.length}名全員へ送信します。
+            </p>
+            <ul className="space-y-2">
+              {testRecipients.map((recipient) => (
+                <li key={recipient.id} className="flex items-center gap-3 rounded-control border border-hairline p-3">
+                  {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-pill object-cover" /> : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-pill bg-ink-secondary text-sm font-bold text-on-accent">{recipient.displayName.slice(0, 1)}</span>
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{recipient.displayName}</span>
+                </li>
+              ))}
+            </ul>
+            {/*
+              テスト送信も通常の pushMessage を通すので、LINE公式アカウントの
+              送信枠を使う。「消費しません」と書くと実装と食い違う。
+            */}
+            <Notice tone="info">
+              テスト送信もLINE公式アカウントの送信枠を使用します（見込み {formatNumber((testRecipients.length * bubbles.length))}通）。
+            </Notice>
+          </>
+        )}
+        {testResult && (
+          <p className={
+            testResult.kind === 'success'
+              ? 'rounded-control bg-success-bg p-3 text-sm text-success'
+              : testResult.kind === 'partial'
+                ? 'rounded-control bg-warning-bg p-3 text-sm text-warning'
+                : 'rounded-control bg-danger-bg p-3 text-sm text-danger'
+          }>{testResult.message}</p>
+        )}
+        {testHistory.length > 1 && (
+          <section>
+            <h4 className="text-xs font-bold text-ink-faint">これ以前の実行履歴</h4>
+            <ul className="mt-1 space-y-1">
+              {testHistory.slice(1).map((entry, index) => (
+                <li
+                  key={index}
+                  className={
+                    entry.kind === 'success'
+                      ? 'rounded-control bg-success-bg p-2 text-xs text-success'
+                      : entry.kind === 'partial'
+                        ? 'rounded-control bg-warning-bg p-2 text-xs text-warning'
+                        : 'rounded-control bg-danger-bg p-2 text-xs text-danger'
+                  }
+                >{entry.message}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+    </ConfirmDialog>
+
+  {inlineComposer && inlineHost ? inlineComposer.kind === 'carousel' ? <CarouselV8 key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : inlineComposer.kind === 'rich_message' ? <TemplateRichEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : <TemplateRichVideoEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : null}
+  <Dialog open={templateSaveIndex !== null} title="テンプレートにする" description={`${(templateSaveIndex ?? 0) + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。`} onCancel={() => setTemplateSaveIndex(null)} confirmLabel="保存する" onConfirm={() => void saveComposerTemplate()} busy={composerBusy} error={templateSaveError || undefined}><label>テンプレートの名前<SaveErrorField names={["templateSaveName","name","template_save_name"]}><input aria-label="テンプレートの名前" value={templateSaveName} onChange={(event) => setTemplateSaveName(event.target.value)} className={styles.textInput} /></SaveErrorField></label></Dialog>
+  </div></MessageComposerPage></SaveErrorScope>
+}
