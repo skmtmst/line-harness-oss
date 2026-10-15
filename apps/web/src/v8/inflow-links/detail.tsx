@@ -603,6 +603,7 @@ function InflowDetailContent() {
             <div className={styles.periodBox}>
               <SaveErrorField names={["friendPeriod","friend_period"]}><Select
                 aria-label="期間"
+                size="content"
                 value={friendPeriod}
                 options={PERIOD_OPTIONS}
                 onChange={(value) => { setFriendPeriod(value as FriendPeriod); setFriendPage(1) }}
