@@ -2,7 +2,7 @@
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CircleDot, Star, Repeat2, Play, Pause, CreditCard } from 'lucide-react'
+import { CircleDot, Repeat2, Play, Pause, CreditCard } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
@@ -121,7 +121,7 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
     </KpiBand>
     <div className={styles.toolbar}>
       <SearchField className={styles.search} value={search} onChange={setSearch} placeholder="お客様の名前・ペット名・契約番号・中身で探す" aria-label="定期便を検索" />
-      {FILTERS.map((item) => <FilterChip key={item.key} selected={filter === item.key} icon={item.key === 'all' ? <CircleDot size={13} /> : <Star size={13} />} onChange={() => setFilter(item.key)}>{item.label}</FilterChip>)}
+      {FILTERS.map((item) => <FilterChip key={item.key} selected={filter === item.key} icon={item.key === 'all' ? <CircleDot size={13} /> : undefined} onChange={() => setFilter(item.key)}>{item.label}</FilterChip>)}
     </div>
     {shown.length === 0 ? <ListState kind="empty" title="条件に合う定期便はありません" description="検索する言葉か表示条件を変えてください。" action={filter !== 'all' || search ? <Button onClick={() => { setFilter('all'); setSearch('') }}>条件を外す</Button> : undefined} /> : <DataTable label="定期便" density="compact" columns="var(--tpl-ecc-sub-columns)">
       <thead><TableHeadRow><Th>お客様と中身</Th><Th align="right">1回の金額</Th><Th>次の発送</Th><Th align="right">続いた回数</Th><Th>ようす</Th><Th aria-label="操作" /></TableHeadRow></thead>
