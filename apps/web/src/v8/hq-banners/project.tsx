@@ -687,7 +687,7 @@ function ProjectInner() {
                   <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
                   <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
                 </> : undefined}
-                status={selectedImages.length > 0 ? undefined : usage && input.count > usage.month.remaining
+                status={selectedImages.length > 0 ? undefined : running ? `${running.requestedCount}枚中${doneSoFar}枚できました・今月の残り${usage?.month.remaining ?? emptyValue('unknown')}枚` : usage && input.count > usage.month.remaining
                   ? <span className={styles.limitText} title={`今月の上限 ${usage.month.limit}枚に達しています（必要 ${input.count}枚）`}>今月の上限に達しています<span className={styles.nowrap}>{`（必要 ${input.count}枚）`}</span></span>
                   : usageStatusText(usage, input.count)}
                 info={sizeChipText ? <ExportSizeChip text={sizeChipText} /> : <span className={styles.generationInfo}>寸法 —</span>}
@@ -695,7 +695,8 @@ function ProjectInner() {
                   running ? (
                     <>
                       <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる</Button>
-                      <Button variant="primary" disabled>
+                      {/* key：生成する→生成中で同じボタンを使い回すと、前の言葉の幅のまま固まり文字が切れた（p03ImY）。 */}
+                      <Button key="running" variant="primary" disabled>
                         <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
                         生成中… 画面を離れても続きます
                       </Button>

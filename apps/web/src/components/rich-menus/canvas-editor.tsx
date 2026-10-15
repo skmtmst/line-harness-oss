@@ -97,9 +97,9 @@ const INTENT_ICON: Record<RichMenuAreaIntent, LucideIcon> = {
   switch: Repeat, postback: Zap, datetime: CalendarClock, clipboard: Copy,
   booking: CalendarCheck, booking_history: History, visit_stamp: Stamp,
 }
-function AreaIcon({ intent }: { intent?: RichMenuAreaIntent | null }) {
+export function AreaIcon({ intent, size = 20, className }: { intent?: RichMenuAreaIntent | null; size?: number; className?: string }) {
   const Icon = intent ? INTENT_ICON[intent] ?? MousePointerClick : MousePointerClick
-  return <Icon size={20} aria-hidden="true" className={styles.areaIcon} />
+  return <Icon size={size} aria-hidden="true" className={className ?? styles.areaIcon} />
 }
 
 function isOverlapping(a: Area, others: Area[]): boolean {

@@ -2,4 +2,5 @@
 .fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--tpl-htn-gap); }
 .field { display: grid; align-content: start; gap: var(--tpl-htn-chip-gap); min-width: 0; color: var(--color-ink); font-size: var(--tpl-htn-text-12); font-weight: 600; }
 .field > :last-child { min-width: 0; }
+.fieldLabel { display: inline-flex; align-items: center; gap: var(--tpl-htn-chip-gap); }
 .distribution { display: flex; flex-direction: column; gap: var(--tpl-htn-gap); }

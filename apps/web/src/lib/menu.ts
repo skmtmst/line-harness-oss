@@ -56,8 +56,8 @@ export interface MenuSection {
 /** 統括の外側（左メニュー・上の帯）を出す住所（/hq の下と、統括から開く LINEアカウントの登録）。 */
 export function isHqShellPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false
-  // 統括の「アカウント」から開く登録の画面（LINEアカウントを登録・飲食店の店舗を追加）も統括の外側（絵 xj3zz・faGn4）。
-  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new' || pathname === '/restaurant-test/stores/new'
+  // 統括の「アカウント」から開く登録の画面（LINEアカウントを登録・飲食店の店舗を追加とその利用規約）も統括の外側（絵 xj3zz・faGn4・VdKOK）。
+  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new' || pathname === '/restaurant-test/stores/new' || pathname === '/restaurant-test/terms'
 }
 
 export const HQ_MENU_SECTIONS: MenuSection[] = [
@@ -245,6 +245,8 @@ export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
   '/accounts/new': 'hq-stores',
   // 飲食店の店舗を追加（ao15G・faGn4）も統括の「アカウント」から開く。左メニューは「アカウント」を選んだ形。
   '/restaurant-test/stores/new': 'hq-stores',
+  // 店舗を追加の「利用規約を別画面で読む」（VdKOK）も統括の「アカウント」の中。
+  '/restaurant-test/terms': 'hq-stores',
   // 共通アクション（一覧・作る・編集・版と使われている場所 ziSgL）はオートメーションの中。左メニューは自動化の組を開いて「オートメーション」を選んだ形。
   '/common-actions': 'automations',
   '/common-actions/new': 'automations',
