@@ -23,9 +23,9 @@ export default function PaymentsSide({ accountId, menus }: { accountId: string; 
   useEffect(() => {
     let alive = true
     void Promise.allSettled([
-      bookingApi.getPaymentConfig(accountId),
-      bookingPaymentAdminApi.menuOverrides(accountId),
-      bookingPaymentAdminApi.records(accountId, { period: 'month', limit: 1 }),
+      Promise.resolve().then(() => bookingApi.getPaymentConfig(accountId)),
+      Promise.resolve().then(() => bookingPaymentAdminApi.menuOverrides(accountId)),
+      Promise.resolve().then(() => bookingPaymentAdminApi.records(accountId, { period: 'month', limit: 1 })),
     ]).then(([config, menuModes, records]) => {
       if (!alive) return
       setDefaultMode(config.status === 'fulfilled' ? config.value.data.mode : null)

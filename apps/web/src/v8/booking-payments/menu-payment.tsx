@@ -52,11 +52,10 @@ export function useMenuPayment(kind: MenuPaymentKind, accountId: string | null, 
     if (!accountId) return
     const mine = ++generation.current
     setStatus('loading')
-    const current: Promise<BookingPaymentMode | null> = !id ? Promise.resolve(null)
-      : kind === 'booking' ? bookingPaymentAdminApi.menuOverrides(accountId).then((response) => response.data.menus.find((item) => item.menuId === id)?.mode ?? null)
+    const current: Promise<BookingPaymentMode | null> = !id ? Promise.resolve(null) : Promise.resolve().then(() => kind === 'booking' ? bookingPaymentAdminApi.menuOverrides(accountId).then((response) => response.data.menus.find((item) => item.menuId === id)?.mode ?? null)
         : kind === 'course' ? bookingPaymentAdminApi.courseMode(accountId, id).then((response) => response.data.mode)
-          : bookingPaymentAdminApi.eventMode(accountId, id).then((response) => response.data.mode)
-    void Promise.allSettled([bookingApi.getPaymentConfig(accountId), bookingPaymentAdminApi.connection(accountId), current]).then(([config, link, mode]) => {
+          : bookingPaymentAdminApi.eventMode(accountId, id).then((response) => response.data.mode))
+    void Promise.allSettled([Promise.resolve().then(() => bookingApi.getPaymentConfig(accountId)), Promise.resolve().then(() => bookingPaymentAdminApi.connection(accountId)), current]).then(([config, link, mode]) => {
       if (mine !== generation.current) return
       if (config.status === 'rejected') { setStatus('error'); return }
       setDefaultMode(normal(config.value.data.mode))
@@ -107,7 +106,8 @@ export function MenuPaymentFields({ state, name, price, people, unit, readOnly =
   const own = state.value !== null
   const effective = state.value ?? state.defaultMode
   const count = people && people > 0 ? people : 1
-  const locked = readOnly || state.status === 'not-ready'
+  const locked = state.status === 'not-ready'
+  if (readOnly) return <p className={styles.readValue}>{own ? `このメニューだけ：${MODE_LABEL[effective]}` : `いつもの方法（${MODE_LABEL[state.defaultMode]}）`}</p>
   return (
     <>
       {state.status === 'not-ready' ? <Notice tone="info">{NOT_READY}このメニューだけ変える設定は、データの準備が済むと保存できます（今はいつもの方法で受けます）。</Notice> : null}

@@ -341,3 +341,10 @@
   flex: none;
   color: var(--color-link);
 }
+
+.readValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
+}
