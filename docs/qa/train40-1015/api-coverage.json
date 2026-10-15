@@ -1,0 +1,47 @@
+{
+  "baseline": {
+    "sha": "1ae0e9e3dd896d42054ae0f1a294fc2d505fa85a",
+    "files": 2,
+    "passed": 22,
+    "failed": 0,
+    "log": "/tmp/train40-evidence/worker-baseline-coverage.log"
+  },
+  "fullWorkerBeforeRepair": {
+    "sha": "689f74bf9c9b897ae6c0a8f1e36e3b7873921cf8",
+    "files": 985,
+    "passed": 11708,
+    "failed": 3
+  },
+  "openApiRepair": {
+    "relatedFiles": 4,
+    "passed": 152,
+    "failed": 0,
+    "log": "/tmp/train40-evidence/worker-spec-v2.log",
+    "accessPolicyChanged": false,
+    "allowlistChanged": false,
+    "newlyDocumentedRoutes": [
+      "GET /api/hq/billing/metrics",
+      "GET /api/hq/broadcasts/quota",
+      "GET /api/hq/broadcasts/{id}/reactions",
+      "GET /api/hq/templates/media",
+      "POST /api/hq/broadcasts/{id}/duplicate",
+      "POST /api/hq/broadcasts/{id}/followup",
+      "POST /api/hq/templates/rich-menu-preview",
+      "POST /api/hq/templates/{id}/test-send"
+    ]
+  },
+  "pendingDenyInventory": {
+    "applied": false,
+    "questionPending": true,
+    "remainingFailedTests": 2,
+    "proposal": "staff-deny-inventory-proposal.patch"
+  },
+  "existingFooterFixtureFailure": {
+    "reproducedOnBaseline": true,
+    "baselineLog": "/tmp/train40-evidence/footer-baseline.log",
+    "missingFixtureExports": [
+      "ListNavigationAccount",
+      "ListReturnAccountGuard"
+    ]
+  }
+}
