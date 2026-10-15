@@ -51,7 +51,7 @@ test('staff roles stay before login dates at all widths; the former narrow reord
     const page = await browser.newPage()
     for (const width of [1152, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 })
-      const cells = '<span class="colPerson">人</span><span class="colScope">アカウント</span><span class="colRole">役割</span><span class="colLast">最後に入った</span><span class="colMenu">…</span>'
+      const cells = '<span class="colPerson">人</span><span class="colRole">役割</span><span class="colLast">最後に入った</span><span class="colMenu">…</span>'
       await page.setContent(`<style>${read('../../src/app/globals.css')}${css('../../src/components/shared/grid-table.module.css')}${css('../../src/v8/settings/staff/staff.module.css')}*{box-sizing:border-box}.table{width:calc(100vw - 440px);--grid-table-columns:var(--sett-staff-columns);--grid-table-gap:16px;--grid-table-row-padding:0 24px}</style><div class="table"><div class="row" data-head>${cells}</div><div class="row">${cells}</div></div>`)
       const ordered = () => page.locator('.row').evaluateAll(rows => rows.every(row => {
         const boxes = [...row.children].map(cell => cell.getBoundingClientRect())

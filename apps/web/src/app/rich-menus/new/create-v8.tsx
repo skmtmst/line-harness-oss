@@ -2661,12 +2661,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   value={publishPlan.endsAt}
                   onChange={(v) => updatePublishPlan({ ...publishPlan, endsAt: v })}
                   aria-label="終わる日時"
+                  aria-describedby={!endEnabled ? 'rich-menu-end-note' : undefined}
                   disabled={!endEnabled}
                 /></SaveErrorField></Field>
               </span>
               <span>に終わり、</span>
               <Field label="終わったらどうする" labelHidden optional={false}><SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
                 aria-label="終わったらどうする"
+                aria-describedby={!endEnabled ? 'rich-menu-end-note' : undefined}
                 value={publishPlan.restoreGroupId}
                 onChange={(v) => updatePublishPlan({ ...publishPlan, restoreGroupId: v })}
                 disabled={!endEnabled}
@@ -2678,7 +2680,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               <span>に戻す</span>
             </div>
             {/* 欄ごとに出すと狭い欄の下で折り返すので、行の下に1つだけ出す。 */}
-            {!endEnabled ? <p className={styles.endNote} role="note">「終わりを決める」をオンにすると設定できます</p> : null}
+            {!endEnabled ? <p id="rich-menu-end-note" className={styles.endNote} role="note">「終わりを決める」をオンにすると設定できます</p> : null}
           </div>
         </Card>
 

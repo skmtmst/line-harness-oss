@@ -124,7 +124,8 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       if (el.matches('[data-kpi-detail] [role="note"]')) {
         const oneLine = css.whiteSpace === 'nowrap' && css.overflowX === 'hidden' && css.textOverflow === 'ellipsis'
           && el.getBoundingClientRect().height <= parseFloat(css.lineHeight) + 1
-        if (!oneLine) add('F1', el, 'KPI note must stay on one line with ellipsis')
+        const single = el.closest('[data-kpi-detail-layout]')?.getAttribute('data-kpi-detail-layout') === 'single'
+        if (single && !oneLine) add('F1', el, 'KPI note must stay on one line with ellipsis')
         if (oneLine && el.title.trim() === el.textContent.trim()) continue
       }
       const rects = textRects(el)

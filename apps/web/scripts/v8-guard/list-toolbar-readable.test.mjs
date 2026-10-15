@@ -281,7 +281,7 @@ test('U6/V3: one-line KPI notes preserve the full title, actions and equal cells
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    const card = (detail, action='') => `<div class="card" data-design-version="v8" data-kpi-presentation="band"><div class="head"><p class="label">未設定</p></div><p class="value"><span class="number" data-kpi-number>2</span></p><p class="detail" data-kpi-detail data-kpi-detail-present><span class="detailText" role="note" title="${detail}">${detail}</span>${action}</p></div>`
+    const card = (detail, action='') => `<div class="card" data-design-version="v8" data-kpi-presentation="band" data-kpi-detail-layout="single"><div class="head"><p class="label">未設定</p></div><p class="value"><span class="number" data-kpi-number>2</span></p><p class="detail" data-kpi-detail data-kpi-detail-present><span class="detailText" role="note" title="${detail}">${detail}</span>${action}</p></div>`
     for (const width of [1440, 1152, 1920]) {
       await page.setViewportSize({ width, height: 900 })
       await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('kpi-card')}\n${read('../../src/components/shared/kpi-band-v8.css')}\n*{box-sizing:border-box}</style><section data-page-template="list" data-list-skeleton style="width:520px"><div class="strip" data-kpi-strip data-kpi-presentation="band">${card('友だちになっても何も起きない', '<button type="button" class="link">未設定を見る</button>')}${card('「やり取りの記録」からやり直せます')}${card('空欄のまま送られます', '<a class="link" href="/edit">編集する</a>')}</div></section></html>`)
@@ -311,8 +311,8 @@ test('U6/V3: one-line KPI notes preserve the full title, actions and equal cells
       await note.evaluate(el=>{el.style.whiteSpace='';el.style.overflow='';el.style.textOverflow=''})
       assert.ok(!(await page.evaluate(scanListSkeleton)).failures.some(rule=>rule.startsWith('U6')))
       await note.evaluate(el=>{el.closest('.card').dataset.kpiDetailLayout='qualifier';el.textContent='購読の数\n（再参加を含む）';el.title=el.textContent})
-      assert.equal(await note.evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap')
-      assert.equal(await note.evaluate(el=>el.getBoundingClientRect().height),18)
+      assert.equal(await note.evaluate(el=>getComputedStyle(el).whiteSpace),'pre-line')
+      assert.equal(await note.evaluate(el=>el.getBoundingClientRect().height),36)
       assert.ok(!(await page.evaluate(scanListSkeleton)).failures.some(rule=>rule.startsWith('U6')))
     }
   } finally { await browser.close() }

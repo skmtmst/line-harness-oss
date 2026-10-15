@@ -89,3 +89,5 @@ export function MenuContent({
     </div>
   )
 }
+
+export { MenuContent as MenuPreview }

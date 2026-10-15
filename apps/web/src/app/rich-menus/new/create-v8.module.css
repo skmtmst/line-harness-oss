@@ -15,9 +15,9 @@
 .backLink {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: 4px;
   color: var(--color-action);
-  font-size: var(--text-body);
+  font-size: 13px;
   font-weight: 600;
   text-decoration: none;
 }
@@ -51,9 +51,9 @@
 .stack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-16);
+  gap: 16px;
   min-width: 0;
-  padding: var(--space-24) 28px;
+  padding: 24px 28px;
 }
 
 .cardTitle {
@@ -67,7 +67,7 @@
 .cardNote {
   margin: 0;
   color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
+  font-size: 12px;
   line-height: 17px;
 }
 
@@ -77,19 +77,19 @@
 .fieldGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 200px;
-  gap: var(--space-12);
+  gap: 12px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: 6px;
   min-width: 0;
 }
 
 .fieldLabel {
   color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -100,7 +100,7 @@
   border-radius: var(--radius-control, 8px);
   background: var(--color-canvas);
   color: var(--color-ink);
-  font-size: var(--text-body);
+  font-size: 13px;
 }
 
 .input:focus-visible {
@@ -111,13 +111,13 @@
 .fieldError {
   margin: 0;
   color: var(--color-danger);
-  font-size: var(--text-caption);
+  font-size: 12px;
 }
 
 .fieldHint {
   margin: 0;
   color: var(--color-ink-faint);
-  font-size: var(--text-micro);
+  font-size: 11px;
   line-height: 1.5;
 }
 
@@ -125,13 +125,13 @@
 .segRow {
   display: flex;
   align-items: center;
-  gap: var(--space-12);
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .segLabel {
   color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -143,14 +143,14 @@
 .segHint {
   margin: 0;
   color: var(--color-ink-faint);
-  font-size: var(--text-caption);
+  font-size: 12px;
 }
 
 /* 板 `JeINq`「画像」：文の列の間は 8。絵の置き場は上そろえ。 */
 .imageRow {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-12);
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -160,9 +160,9 @@
 .imageMeta {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: 8px;
   min-width: 0;
-  font-size: var(--text-caption);
+  font-size: 12px;
   color: var(--color-ink-secondary);
 }
 
@@ -176,14 +176,14 @@
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  gap: var(--space-6);
+  gap: 6px;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--color-ink-secondary);
-  font-size: var(--text-body);
+  font-size: 13px;
   font-weight: 600;
-  line-height: var(--space-20);
+  line-height: 20px;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -191,9 +191,9 @@
 .imageGuideLink {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: 4px;
   color: var(--color-action);
-  font-size: var(--text-caption);
+  font-size: 12px;
   text-decoration: none;
 }
 
@@ -214,19 +214,19 @@
 .pageChips {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-8);
+  gap: 8px;
 }
 
 .pageChip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-6);
-  padding: var(--space-6) var(--space-14);
+  gap: 6px;
+  padding: 6px 14px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-pill, 999px);
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
-  font-size: var(--text-body);
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -246,7 +246,7 @@
 }
 
 .pageChipDefault {
-  font-size: var(--text-micro);
+  font-size: 11px;
   font-weight: 400;
   opacity: 0.85;
 }
@@ -255,22 +255,22 @@
 .pageTools {
   display: flex;
   align-items: flex-end;
-  gap: var(--space-12);
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 /* 切替タブの中で面を描くときの帯（見本表示用）。 */
 .previewMenuTabs {
   display: flex;
-  gap: var(--space-2);
+  gap: 2px;
   border-bottom: 1px solid var(--color-hairline);
   background: var(--color-canvas-sunken);
-  padding: var(--space-2) var(--space-4) 0;
+  padding: 2px 4px 0;
 }
 
 .previewMenuTab {
   flex: 1;
-  padding: 3px var(--space-4);
+  padding: 3px 4px;
   border-radius: var(--radius-mini) var(--radius-mini) 0 0;
   font-size: var(--text-nano);
   line-height: 1.4;
@@ -329,7 +329,7 @@
 /* 画像が無いときも面の区切り（点線）を出し、文はその上に重ねる。 */
 .previewMenuEmptyText {
   position: relative;
-  padding: 0 var(--space-4);
+  padding: 0 4px;
   background: var(--color-canvas-sunken);
 }
 
@@ -338,7 +338,7 @@
 .orderList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -347,14 +347,14 @@
 .orderRow {
   display: flex;
   align-items: center;
-  gap: var(--space-10);
-  padding: var(--space-10) var(--space-12);
+  gap: 10px;
+  padding: 10px 12px;
   border: 0;
   border-radius: var(--radius-control, 8px);
   outline: 1px solid var(--color-hairline);
   outline-offset: -1px;
   background: var(--color-canvas);
-  font-size: var(--text-body);
+  font-size: 13px;
 }
 
 .orderRowSelf {
@@ -365,7 +365,7 @@
 .orderNum {
   flex: none;
   color: var(--color-ink-faint);
-  font-size: var(--text-body);
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -390,14 +390,14 @@
 /* 板 `F4gELj` の注意の帯：絵の青い地・13px・印は青。段の中に置く。 */
 .infoBand {
   display: flex;
-  gap: var(--space-10);
+  gap: 10px;
   align-items: flex-start;
-  padding: var(--space-10) var(--space-14);
+  padding: 10px 14px;
   border-radius: var(--radius-control, 8px);
   background: var(--color-status-info-soft, #e9f1ff);
   color: var(--color-ink-secondary);
-  font-size: var(--text-body);
-  line-height: var(--space-20);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .infoBandIcon {
@@ -427,8 +427,8 @@
 .checkRow {
   display: flex;
   align-items: center;
-  gap: var(--space-10);
-  padding: var(--space-10) 0;
+  gap: 10px;
+  padding: 10px 0;
   border-bottom: 0;
   box-shadow: var(--shadow-row-line);
 }
@@ -458,7 +458,7 @@
 .checkBody {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 2px;
   min-width: 0;
   flex: 1;
 }
@@ -472,9 +472,9 @@
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-ink-secondary);
-  font-size: var(--text-body);
+  font-size: 13px;
   font-weight: 600;
-  line-height: var(--space-20);
+  line-height: 20px;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -487,7 +487,7 @@
 .checkName {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--text-body);
+  font-size: 13px;
   font-weight: 600;
   line-height: var(--tpl-eds-name-lh);
 }
@@ -495,7 +495,7 @@
 .checkNote {
   margin: 0;
   color: var(--color-ink-faint);
-  font-size: var(--text-micro);
+  font-size: 11px;
   line-height: var(--tpl-eds-hint-lh);
 }
 
@@ -514,9 +514,9 @@
 .endRow {
   display: flex;
   align-items: center;
-  gap: var(--space-8);
+  gap: 8px;
   flex-wrap: wrap;
-  font-size: var(--text-caption);
+  font-size: 12px;
   color: var(--color-ink-secondary);
 }
 
@@ -530,18 +530,18 @@
 
 /* 読み込み・失敗の板。 */
 .stateCard {
-  padding: var(--space-32) var(--space-20);
+  padding: var(--tpl-rm-state-pad);
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
   text-align: center;
   color: var(--color-ink-secondary);
-  font-size: var(--text-body);
+  font-size: 13px;
   box-shadow: var(--card-shadow);
 }
 
-.pageHead { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-8); padding: var(--space-20) var(--space-24) var(--space-16); border-bottom: 1px solid var(--color-hairline); }
-.previewColumn { display: flex; flex-direction: column; gap: var(--space-14); min-width: 0; padding: var(--space-24); border-left: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
+.pageHead { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: var(--tpl-rm-head-pad); border-bottom: 1px solid var(--color-hairline); }
+.previewColumn { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 24px; border-left: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
 
 
 @container (max-width: 560px) { .fieldGrid { grid-template-columns: minmax(0, 1fr); } }

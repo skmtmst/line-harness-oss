@@ -122,3 +122,11 @@ html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] {
   font-size: var(--text-caption);
   line-height: 18px;
 }
+
+/* 括弧の補足を分ける指定は、明示した改行を残す。 */
+html:root [data-list-skeleton] [data-kpi-detail-layout='qualifier'] [data-kpi-detail] > span:first-child {
+  white-space: pre-line;
+  word-break: normal;
+  overflow: visible;
+  text-overflow: clip;
+}

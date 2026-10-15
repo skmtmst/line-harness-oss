@@ -84,11 +84,11 @@ test('選ぶ操作・欄のラベル・説明・スマホ見本の題は役目�
         assert.equal(result.labels.length,3)
         for(const label of result.labels){assert.equal(label.color,'rgb(74, 85, 101)');assert.equal(label.size,'12px');assert.equal(label.weight,'500')}
         for(const meta of result.meta)assert.equal(meta.size,'12px')
-        assert.equal(result.caption.size,'15px');assert.equal(result.caption.weight,'700');assert.equal(result.caption.line,'23px')
+        assert.equal(result.caption.size,'15px');assert.equal(result.caption.weight,'600');assert.equal(result.caption.line,'23px')
         assert.equal(result.bar.size,'13px');assert.equal(result.overflow,0)
       }
       const normal=await styles();check(normal)
-      const targets=[['#controls span:has(>svg)','font-size:12px'],['#controls span:has(>svg)','font-weight:400'],['#controls label','color:var(--color-ink)'],['[data-fixture-meta="stacked"]','font-size:11px'],['[data-fixture-meta="panel"]','font-size:11px'],['[data-liff-phone-frame]>p','font-size:12px'],['[data-liff-phone-frame]>p','font-weight:600'],['[data-liff-phone-frame]>p','line-height:18px'],['[data-liff-phone-frame] span','font-size:12px']]
+      const targets=[['#controls span:has(>svg)','font-size:12px'],['#controls span:has(>svg)','font-weight:400'],['#controls label','color:var(--color-ink)'],['[data-fixture-meta="stacked"]','font-size:11px'],['[data-fixture-meta="panel"]','font-size:11px'],['[data-liff-phone-frame]>p','font-size:12px'],['[data-liff-phone-frame]>p','font-weight:700'],['[data-liff-phone-frame]>p','line-height:18px'],['[data-liff-phone-frame] span','font-size:12px']]
       for(const [selector,declaration] of targets){
         // Meta inherits its actual header container's rule.
         const target=selector.includes('data-fixture-meta')?page.locator(selector).locator('..'):page.locator(selector)

@@ -136,7 +136,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
           <FilterLink
             key={chip.id}
             href={chip.id === ALL_GROUP ? base : `${base}&group=${encodeURIComponent(chip.id)}`}
-            selected={group === chip.id}
+            aria-current={group === chip.id ? 'true' : undefined}
           >
             {`${chip.label} ${chip.count}`}
           </FilterLink>

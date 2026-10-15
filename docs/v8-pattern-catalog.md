@@ -147,7 +147,7 @@
 ## kpi-band 数の帯
 
 - **役目**：数（KPI）を線で区切った1本の帯で並べる
-- **補足**：既定は1行＋省略、全文は同じ補足の `title` へ残す（10-14 i8F12差し戻し）。行き先は次の行。旧 `detailLayout="qualifier"` 指定でも同じ1行表示。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。
+- **補足**：Gの最新版に従い、既定は文節で折り返す。`detailLayout="single"` は1行＋省略で全文を `title` に残し、`qualifier` は括弧の前で改行する。行き先は次の行。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。
 - **持ち主（コード）**：`apps/web/src/components/shared/kpi-band.tsx`・`apps/web/src/components/shared/kpi-card.tsx`・`apps/web/src/components/shared/kpi-card.module.css`・`apps/web/src/components/shared/kpi-band-v8.css`・`apps/web/src/components/shared/list-kpis.tsx`（部品 `KpiBand`・`KpiCard`・`ListKpis`）
   - 読む変数：`--color-hairline`
 - **持ち主（Pen）**：`Pp3nS`「数のマス」

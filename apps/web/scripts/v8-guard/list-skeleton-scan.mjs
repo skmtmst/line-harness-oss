@@ -77,7 +77,8 @@ export function scanListSkeleton() {
       if (!note || !visible(note) || !note.textContent.trim()) continue
       const css = getComputedStyle(note)
       const ellipsis = css.whiteSpace === 'nowrap' && css.overflowX === 'hidden' && css.textOverflow === 'ellipsis'
-      if (!ellipsis || note.getBoundingClientRect().height > parseFloat(css.lineHeight) + 1) fail('U6 数の補足の折り返し', note)
+      const single = note.closest('[data-kpi-detail-layout]')?.getAttribute('data-kpi-detail-layout') === 'single'
+      if (single && (!ellipsis || note.getBoundingClientRect().height > parseFloat(css.lineHeight) + 1)) fail('U6 数の補足の折り返し', note)
       if (note.scrollHeight > note.clientHeight + 1 || note.scrollWidth > note.clientWidth + 1
         && (!ellipsis || note.title.trim() !== note.textContent.trim())) fail('U6 数の補足の切れ', note)
       for (const action of detail.querySelectorAll('a,button')) {

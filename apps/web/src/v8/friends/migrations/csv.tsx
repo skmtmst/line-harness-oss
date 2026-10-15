@@ -195,7 +195,7 @@ export default function CsvMigrationsV8() {
         {m.jobs.length === 0 ? (
           <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" />
         ) : (
-          <DataTable grid={{
+          <DataTable columnSizing="controls" grid={{
             columns: 'var(--tpl-fr-mig-col-date) var(--tpl-fr-mig-col-kind) var(--tpl-fr-mig-col-kind) minmax(0, 1fr) var(--tpl-fr-mig-col-state)',
             padding: '0 var(--polish-space-card)',
             headPadding: 'var(--polish-space-field) var(--polish-space-card)',
