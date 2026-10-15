@@ -355,14 +355,15 @@ export function AreaProperties({
 
   return (
     <div className="space-y-3 text-sm">
-      <div className="flex items-center justify-between">
+      {/* V8 の作る画面（showManagementDetails=false）は上に「面 A「…」の動き」の題があるので、同じ意味の題を重ねない（cmRZc・rE0ML）。 */}
+      {showManagementDetails ? <div className="flex items-center justify-between">
         <h3 className="text-ink-secondary font-semibold">選択中のボタン</h3>
-        {showManagementDetails && onDelete ? (
+        {onDelete ? (
           <button type="button" onClick={onDelete} className="text-xs text-danger hover:underline">
             削除する
           </button>
         ) : null}
-      </div>
+      </div> : null}
 
       <Field label="ボタン名" htmlFor={`${inputId}-name`} hint="管理用の呼び名。友だちには表示されません。">
         <SaveErrorField names={["label","area.label"]}><input
