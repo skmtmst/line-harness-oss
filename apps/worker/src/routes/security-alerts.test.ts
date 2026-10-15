@@ -61,10 +61,18 @@ describe('security alert HTTP permissions and operator actions', () => {
       expect((await request('/api/operations/security-alerts?account_id=a1', staff)).status).toBe(403);
     }
     expect((await request('/api/ops/security-alerts', { ...member, role: 'owner' })).status).toBe(403);
-    await seedAlert('tenant-a', null, 'impersonation');
+    const hidden = await seedAlert('tenant-a', null, 'impersonation');
+    for (const action of ['acknowledge', 'resolve']) {
+      const path = `/api/ops/security-alerts/${hidden.id}/${action}`;
+      for (const staff of [null, member, { ...member, role: 'owner' as const }, { ...member, id: 'platform', role: 'owner' as const, readOnly: true }]) {
+        expect((await request(path, staff, { expectedVersion: 1 })).status).toBe(403);
+      }
+      expect((await request(path, { ...member, id: 'platform', role: 'owner' }, { expectedVersion: 1 }, true)).status).toBe(403);
+    }
     const response = await request('/api/ops/security-alerts', { ...member, id: 'platform', role: 'owner' });
     expect(response.status).toBe(200);
     expect(await response.text()).toContain('代理ログイン');
+    expect((await request(`/api/ops/security-alerts/${hidden.id}/acknowledge`, { ...member, id: 'platform', role: 'owner' }, { expectedVersion: 1 })).status).toBe(200);
   });
 
   it('read-only may read, but read-only and impersonated sessions cannot acknowledge or resolve', async () => {
