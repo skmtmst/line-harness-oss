@@ -8,5 +8,10 @@ export interface RestaurantChannelCloseTask {
  startDate?:string; endDate?:string; allDay?:boolean; startTime?:string|null; endTime?:string|null; tableIds?:string[]; endsAt?:string;
   id: string; storeId: string; slotId: string | null; startsAt: string; channel: string;
   status: 'close' | 'done' | 'reopen'; reason: 'full' | 'limited' | 'table_conflict' | 'closure';
+  /** 予約に直接結び付く場合だけ経路を返す。在庫・休業の知らせは不明。 */
+  source?: string | null;
+  generation?: number;
+  /** 再開の確認は、閉鎖済みと別にこの世代だけへ記録する。 */
+  opened?: boolean;
   remainingSeats: number | null; recipientIds: string[]; createdAt: string; updatedAt: string;
 }

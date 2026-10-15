@@ -68,7 +68,7 @@ async function dispatchDirectBookingNotices(env:Env['Bindings'],storeId:string) 
  const db=dbFor(env,storeId),rows=(await db.prepare(`SELECT o.id,o.retry_key,t.channel,t.starts_at,t.status,o.membership_id,s.line_account_id,s.name,s.timezone,m.line_uid
    FROM rt_reservation_close_outbox o JOIN rt_reservation_close_tasks t ON t.id=o.task_id JOIN rt_stores s ON s.id=t.store_id
    JOIN rt_memberships m ON m.id=o.membership_id LEFT JOIN rt_inventory_rules r ON r.store_id=t.store_id
-   WHERE t.store_id=? AND t.status IN ('close','reopen') AND o.generation=t.generation AND o.sent_at IS NULL AND m.status='active'
+   WHERE t.store_id=? AND t.status IN ('close','reopen') AND NOT EXISTS(SELECT 1 FROM account_settings ack WHERE ack.line_account_id=s.line_account_id AND ack.key='restaurant_close_opened:'||t.id AND ack.value=CAST(t.generation AS TEXT) AND t.status='reopen') AND o.generation=t.generation AND o.sent_at IS NULL AND m.status='active'
    AND COALESCE(r.notify,1)=1 AND (t.status<>'reopen' OR COALESCE((SELECT notify_reopen FROM rt_close_notification_settings n WHERE n.store_id=t.store_id),1)=1) AND (o.lease_until IS NULL OR datetime(o.lease_until)<=datetime('now')) LIMIT 100`).bind(storeId)
    .all<{id:string;retry_key:string;channel:string;starts_at:string;status:'close'|'reopen';membership_id:string;line_account_id:string|null;name:string;timezone:string;line_uid:string|null}>()).results;
  for(const r of rows){if(!r.line_account_id||!r.line_uid||!(await restaurantResponsibleMembers(db,storeId,tzDateStr(r.timezone,new Date(r.starts_at)))).some(m=>m.id===r.membership_id))continue;const token=crypto.randomUUID();
@@ -130,7 +130,7 @@ export async function dispatchRestaurantInventoryNotices(env:Env['Bindings'],sto
  LEFT JOIN rt_inventory_rules ru ON ru.store_id=t.store_id JOIN rt_inventory_slots i ON i.id=t.slot_id
  JOIN rt_stores s ON s.id=t.store_id JOIN rt_memberships m ON m.id=o.membership_id
  WHERE o.sent_at IS NULL AND (o.lease_until IS NULL OR datetime(o.lease_until)<=datetime('now'))
- AND o.generation=t.generation AND t.status IN ('close','reopen') AND COALESCE(ru.notify,1)=1 AND (t.status<>'reopen' OR COALESCE((SELECT notify_reopen FROM rt_close_notification_settings n WHERE n.store_id=t.store_id),1)=1) AND m.status='active'
+ AND o.generation=t.generation AND t.status IN ('close','reopen') AND NOT EXISTS(SELECT 1 FROM account_settings ack WHERE ack.line_account_id=s.line_account_id AND ack.key='restaurant_close_opened:'||t.id AND ack.value=CAST(t.generation AS TEXT) AND t.status='reopen') AND COALESCE(ru.notify,1)=1 AND (t.status<>'reopen' OR COALESCE((SELECT notify_reopen FROM rt_close_notification_settings n WHERE n.store_id=t.store_id),1)=1) AND m.status='active'
  AND (? IS NULL OR t.store_id=?) LIMIT 100`).bind(storeId??null,storeId??null).all<{id:string;retry_key:string;membership_id:string;status:string;reason:string;channel:string;remaining_seats:number;store_id:string;starts_at:string;line_account_id:string;name:string;timezone:string;line_uid:string|null}>();
  for(const row of rows.results) {
   if(!row.line_uid||!row.line_account_id||!(await restaurantResponsibleMembers(db,row.store_id,tzDateStr(row.timezone,new Date(row.starts_at)))).some(m=>m.id===row.membership_id))continue;
@@ -169,7 +169,7 @@ async function dispatchClosureNotices(env:Env['Bindings'],storeId:string) {
  }
  const rows=(await db.prepare(`SELECT o.id,o.retry_key,t.channel,t.kind,t.start_date,t.end_date,t.all_day,t.start_time,t.end_time,t.status,o.membership_id,s.name,s.line_account_id,m.line_uid
  FROM rt_closure_close_outbox o JOIN rt_closure_close_tasks t ON t.id=o.task_id JOIN rt_stores s ON s.id=t.store_id JOIN rt_memberships m ON m.id=o.membership_id
- LEFT JOIN rt_inventory_rules r ON r.store_id=t.store_id WHERE t.store_id=? AND o.generation=t.generation AND t.status IN ('close','reopen') AND o.sent_at IS NULL
+ LEFT JOIN rt_inventory_rules r ON r.store_id=t.store_id WHERE t.store_id=? AND o.generation=t.generation AND t.status IN ('close','reopen') AND NOT EXISTS(SELECT 1 FROM account_settings ack WHERE ack.line_account_id=s.line_account_id AND ack.key='restaurant_close_opened:'||t.id AND ack.value=CAST(t.generation AS TEXT) AND t.status='reopen') AND o.sent_at IS NULL
  AND m.status='active' AND COALESCE(r.notify,1)=1 AND (t.status<>'reopen' OR COALESCE((SELECT notify_reopen FROM rt_close_notification_settings n WHERE n.store_id=t.store_id),1)=1) AND (o.lease_until IS NULL OR datetime(o.lease_until)<=datetime('now')) LIMIT 100`).bind(storeId)
  .all<{id:string;retry_key:string;channel:string;kind:string;start_date:string;end_date:string;all_day:number;start_time:string|null;end_time:string|null;status:string;membership_id:string;name:string;line_account_id:string|null;line_uid:string|null}>()).results;
  for(const r of rows){if(!r.line_account_id||!r.line_uid||!(await restaurantResponsibleMembers(db,storeId,r.start_date)).some(m=>m.id===r.membership_id))continue;const token=crypto.randomUUID();

@@ -3,6 +3,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { getRestaurantInventoryRules, saveRestaurantInventoryRules } from '@line-crm/db';
 import { reconcileRestaurantInventory, restaurantResponsibleMembers } from './restaurant-inventory-rules.js';
 import type { Env } from '../index.js';
+import { sendAutomaticBookingLine } from './booking-automatic-line.js';
 vi.mock('./booking-automatic-line.js',()=>({sendAutomaticBookingLine:vi.fn(async()=>false)}));
 let fixture:SqliteD1;
 const rules={storeId:'store',threshold:1,stopLine:true,stopSameDay:true,notify:true,expectedVersion:0};
@@ -22,6 +23,18 @@ beforeEach(()=>{fixture=createTestD1();fixture.raw.exec(`
 afterEach(()=>fixture.raw.close());
 function slot(){return fixture.raw.prepare('SELECT * FROM rt_inventory_slots WHERE id=\'slot\'').get() as Record<string,number|null>;}
 describe('飲食店の枠の自動調整',()=>{
+ it('開けた確認のある世代の未送信通知は再送せず、次世代の通知は送る',async()=>{
+  fixture.raw.exec(`INSERT INTO rt_memberships(id,organization_id,store_id,staff_name,role,line_uid,status) VALUES('manager','org','store','責任者','store_manager','uid','active')`);
+  await saveRestaurantInventoryRules(fixture.db,rules);reserve();
+  const env={DB:fixture.db} as Env['Bindings'];await reconcileRestaurantInventory(env,'store');
+  fixture.raw.exec("UPDATE rt_reservations SET status='cancelled'");await reconcileRestaurantInventory(env,'store');
+  const task=fixture.raw.prepare("SELECT id,generation FROM rt_channel_close_tasks LIMIT 1").get() as {id:string;generation:number};
+  fixture.raw.prepare("INSERT INTO account_settings(id,line_account_id,key,value) VALUES('ack','account',?,?)").run('restaurant_close_opened:'+task.id,String(task.generation));
+  vi.mocked(sendAutomaticBookingLine).mockClear();await reconcileRestaurantInventory(env,'store');
+  expect(sendAutomaticBookingLine).not.toHaveBeenCalled();
+  fixture.raw.exec("UPDATE rt_reservations SET status='confirmed'");await reconcileRestaurantInventory(env,'store');
+  expect(sendAutomaticBookingLine).toHaveBeenCalled();
+ });
  it('初期版0から保存し、古い版と存在しない版を拒否する',async()=>{
   expect((await getRestaurantInventoryRules(fixture.db,'store')).version).toBe(0);
   expect(await saveRestaurantInventoryRules(fixture.db,{...rules,expectedVersion:4})).toBe(false);
