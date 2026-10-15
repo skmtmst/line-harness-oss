@@ -97,7 +97,7 @@ import {
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, MEASUREMENT_SITES, AD_PLATFORMS, AD_CONVERSION_LOGS, AD_CONVERSION_LOG_SUMMARY, AD_EVENT_MAPPINGS, TRACKED_LINKS,
   AD_COST_ROWS, AD_COST_PLATFORMS, AD_COST_MANUAL_ENTRIES, AD_CONVERSION_COST,
   STAFF_MEMBERS, LOGIN_AUDIT,
-  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_OFFER_FOLDERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
+  AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_OFFER_FOLDERS, MILEAGE_REWARD_FOLDERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
   OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
@@ -4329,6 +4329,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
     // 板 `NtCE3`：未分類は `folderId: null` の5件。
     return { success: true, data: BROADCAST_FOLDERS, unfiledCount: BROADCASTS.filter((broadcast) => !broadcast.folderId).length }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'mileage_reward') {
+    return { success: true, data: MILEAGE_REWARD_FOLDERS, unfiledCount: 0 }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'affiliate_offer') {
     return { success: true, data: AFFILIATE_OFFER_FOLDERS, unfiledCount: AFFILIATE_OFFERS.filter((offer) => !offer.folderId).length }

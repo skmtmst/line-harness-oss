@@ -7403,14 +7403,24 @@ function mileageRewardVersion(requiredMiles, stockLimit, extra = {}) {
   }
 }
 
+/* 使い道のフォルダ（板 S35pO）：クーポン 3・商品 2・体験 0・未分類 0。 */
+export const MILEAGE_REWARD_FOLDERS = [
+  ['mrf-coupon', 'クーポン', '#3B82F6', 3],
+  ['mrf-goods', '商品', '#10B981', 2],
+  ['mrf-experience', '体験', '#F59E0B', 0],
+].map(([id, name, color, itemCount], index) => ({
+  id: String(id), kind: 'mileage_reward', name: String(name), parentId: null, displayOrder: index,
+  itemCount: Number(itemCount), color: String(color), createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+}))
+
 export const MILEAGE_REWARDS = {
   rewards: [
-    { id: 'mr-1', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', benefitName: '送料無料', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
-    { id: 'mr-2', name: '500円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '500円引き', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1000, null), exchangedThisMonth: 18, availableCodeCount: 168 },
-    { id: 'mr-3', name: '1,000円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '1,000円引き', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(1800, null), exchangedThisMonth: 6, availableCodeCount: 94 },
-    { id: 'mr-4', name: '新商品の先行案内', description: 'ふつうより3日早くお知らせします', rewardKind: 'early_access', benefitName: '先行案内', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(3000, null), exchangedThisMonth: 2, availableCodeCount: null },
+    { id: 'mr-1', folderId: 'mrf-coupon', name: '送料無料', description: '次のお買い物の送料が無料になります', rewardKind: 'coupon', benefitName: '送料無料', status: 'published', sortOrder: 1, currentVersion: mileageRewardVersion(500, null), exchangedThisMonth: 32, availableCodeCount: null },
+    { id: 'mr-2', folderId: 'mrf-coupon', name: '500円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '500円引き', status: 'published', sortOrder: 2, currentVersion: mileageRewardVersion(1000, null), exchangedThisMonth: 18, availableCodeCount: 168 },
+    { id: 'mr-3', folderId: 'mrf-coupon', name: '1,000円ぶんのクーポン', description: '1回のお買い物で使えます', rewardKind: 'coupon', benefitName: '1,000円引き', status: 'published', sortOrder: 3, currentVersion: mileageRewardVersion(1800, null), exchangedThisMonth: 6, availableCodeCount: 94 },
+    { id: 'mr-4', folderId: 'mrf-goods', name: '新商品の先行案内', description: 'ふつうより3日早くお知らせします', rewardKind: 'early_access', benefitName: '先行案内', status: 'published', sortOrder: 4, currentVersion: mileageRewardVersion(3000, null), exchangedThisMonth: 2, availableCodeCount: null },
     // 引換コードを数える経路がまだ無い使い道。**残りを 0 と書かない。**
-    { id: 'mr-5', name: 'オリジナルトートバッグ', description: '数量に限りがあります', rewardKind: 'template', benefitName: '発送先の確認メッセージ', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(5000, 12), exchangedThisMonth: 0, availableCodeCount: 12 },
+    { id: 'mr-5', folderId: 'mrf-goods', name: 'オリジナルトートバッグ', description: '数量に限りがあります', rewardKind: 'template', benefitName: '発送先の確認メッセージ', status: 'draft', sortOrder: 5, currentVersion: mileageRewardVersion(5000, 12), exchangedThisMonth: 0, availableCodeCount: 12 },
   ].map((reward) => ({
     lineAccountId: 'visual-qa-account', programId: 'mp-1', imageUrl: null,
     currentDraftVersionId: null, currentPublishedVersionId: reward.currentVersion.id,
