@@ -3575,7 +3575,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
     /* API-17：テンプレートは店と同じ6種類（?kind=）。種類の無い古い行はメッセージ。 */
     const rows = (type ? HQ_TEMPLATES_HTN.filter((row) => row.template_type === type) : HQ_TEMPLATES_HTN)
-      .map((row) => (row.template_type === 'template' ? { ...row, kind: row.kind ?? 'message' } : row))
+      .map((row, index) => (row.template_type === 'template' ? { ...row, kind: row.kind ?? 'message', message_type: row.message_type ?? ['text', 'text', 'text', 'flex', 'image', 'text'][index % 6], message_count: row.message_count ?? 1, has_interpolations: row.has_interpolations ?? (index % 3 === 0) } : row))
     /* API-18：一覧の集計（今月送った数・新しい版を未配布）。 */
     const stats = { thisMonthSentCount: rows.some((row) => row.this_month_sent_count === null) ? null : rows.reduce((n, row) => n + (row.this_month_sent_count ?? 0), 0), outdatedTemplateCount: rows.filter((row) => (row.outdated_account_count ?? 0) > 0).length }
     return { success: true, data: kind ? rows.filter((row) => row.kind === kind) : rows, stats }
