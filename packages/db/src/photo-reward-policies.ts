@@ -28,7 +28,7 @@ export interface PhotoRewardPolicyView extends PhotoRewardPolicyRow {
   status: PhotoRewardPolicyStatus;
 }
 
-/** 第1版は既存の 'legacy-5' と同じ鍵。無いときの fallback も同じ。 */
+/** 適用済みの旧5点版と付与済み履歴は保持する。新規・未設定の既定は100点。 */
 export const LEGACY_PHOTO_REWARD_POLICY_KEY = 'legacy-5';
 export const LEGACY_PHOTO_REWARD_POINTS = 5;
 
@@ -37,11 +37,11 @@ export function photoPolicyKeyForVersion(versionNumber: number): string {
 }
 
 /*
- * 第1版（既存の5pt固定）の確保。
+ * 版がまだ無いDBで第1版（B-337：100pt）を確保。
  *
  * 移行済みのDBには migration 460 の種行があるが、新しいDB
  * （bootstrap は表の形だけを持ち、種行を持たない）には無い。
- * どちらのDBでも「第1版は5ptの legacy-5」が1つだけあるよう、
+ * 既存の版を変えず、空のDBにだけ100ptの版が1つあるよう、
  * 読む・作る前に INSERT OR IGNORE で足す。番号・鍵の重なりは
  * 無視されるので、あるDBでは何もしない。
  */
@@ -50,7 +50,7 @@ export async function ensureLegacyPhotoRewardPolicy(db: D1Database): Promise<voi
     .prepare(
       `INSERT OR IGNORE INTO photo_reward_policies
         (id, version_number, policy_key, points, summary, effective_from, created_at)
-       VALUES ('photo-reward-legacy-5', 1, 'legacy-5', 5, '最初の報酬の決まり', NULL, datetime('now'))`,
+       VALUES ('photo-reward-default-100', 1, 'default-100', 100, '最初の報酬の決まり', NULL, datetime('now'))`,
     )
     .run();
 }
@@ -106,7 +106,7 @@ export async function getPhotoRewardPolicy(
 
 /**
  * いま使っている版。表が空のとき（移行前の古いDB）は
- * 既存の5pt固定へ倒す。黙って付け直さない。
+ * B-337の100ptを使う。付与済みの履歴は付け直さない。
  */
 export async function getEffectivePhotoRewardPolicy(
   db: D1Database,
@@ -124,8 +124,8 @@ export async function getEffectivePhotoRewardPolicy(
   if (!row) {
     return {
       versionNumber: 1,
-      policyKey: LEGACY_PHOTO_REWARD_POLICY_KEY,
-      points: LEGACY_PHOTO_REWARD_POINTS,
+      policyKey: 'default-100',
+      points: 100,
     };
   }
   return {
