@@ -24,7 +24,7 @@ import { LiffPhoneMenuStep, LiffPhoneDatetimeStep, LiffPhoneStaffStep } from './
 
 export function useBookingSettings(accountId: string | null) {
   usePageTitle('予約設定')
-  usePageCrumbs([{ label: '予約', href: '/booking/bookings' }, { label: '予約設定' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const rawTab = searchParams.get('tab')
