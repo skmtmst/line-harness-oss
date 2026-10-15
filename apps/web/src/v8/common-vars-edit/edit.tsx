@@ -977,6 +977,7 @@ function EditCommonVarV8Inner() {
             <div className={styles.schedActions}>
               <Button
                 variant="text"
+                size="slot"
                 type="button"
                 onClick={() => {
                   const now = jstNowLocalInput()
@@ -990,6 +991,7 @@ function EditCommonVarV8Inner() {
               {schedules.length > 0 ? (
                 <Button
                   variant="text"
+                  size="slot"
                   type="button"
                   onClick={() => {
                     setClearSchedulesError('')

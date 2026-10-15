@@ -143,7 +143,8 @@
 }
 .schedTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-ar-cv-sched-title-lh); }
 .schedNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
-.schedActions { display: flex; flex-wrap: wrap; gap: var(--tpl-body-gap); }
+/* 予定を足す・消すは1行（絵 C67dE：字12・余白16）。1152 の右の欄は枠線の1px だけ絵より狭いので、間は 4 に詰めて折り返さない。 */
+.schedActions { display: flex; flex-wrap: wrap; row-gap: var(--tpl-body-gap); column-gap: 4px; }
 .kv { display: flex; flex-direction: column; margin: 0; }
 .kvRow {
   display: flex;
