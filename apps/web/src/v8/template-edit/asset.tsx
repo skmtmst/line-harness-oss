@@ -10,7 +10,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { GripVertical, Plus, Send, X } from 'lucide-react'
+import { GripVertical, Plus, Send, Trash2, X } from 'lucide-react'
 import { tapExtrasError, type TapExtras, type Folder, type MediaItem } from '@line-crm/shared'
 import { tapExtraSaveError } from '@/lib/tap-actions'
 import { api } from '@/lib/api'
@@ -614,7 +614,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <span className={styles.questionNo}>問 {index + 1}</span>
                     <span className={styles.spacer} />
                     <span className={styles.toggleLabelSmall}>必ず答えてもらう</span>
-                    <SaveErrorField names={[`shown.${index}.required`,"required","question.required"]}><SettingCheckbox checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} /></SaveErrorField>
+                    <SaveErrorField names={[`shown.${index}.required`,"required","question.required"]}><Toggle checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} /></SaveErrorField>
                     <button
                       type="button"
                       className={`${styles.insertChip} ${styles.questionRemove}`}
@@ -623,7 +623,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                       aria-label={`問 ${index + 1} を消す`}
                       onClick={() => setQuestions((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))}
                     >
-                      消す
+                      <Trash2 size={16} aria-hidden="true" />削除する
                     </button>
                   </div>
                   <SettingsFormRow layout="columns">
