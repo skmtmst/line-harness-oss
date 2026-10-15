@@ -362,7 +362,7 @@ describe('店舗営業時間の編集', () => {
     await screen.findByText('受付時間への変更を捨てて移りますか？')
     fireEvent.click(screen.getByRole('button', { name: '編集に戻る' }))
     await waitFor(() => expect(screen.queryByText('受付時間への変更を捨てて移りますか？')).toBeNull())
-    expect((screen.getByLabelText('月曜日を休みにする') as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByRole('checkbox', { name: '月曜日を開ける' }) as HTMLInputElement).checked).toBe(true)
   })
 
   test('R161: 変えていなければ離脱確認を出さない', async () => {

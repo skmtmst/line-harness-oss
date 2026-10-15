@@ -5,35 +5,33 @@ const b244Requirements = {
   name: requiredText("共通アクション名を入力してください"),
 }
 
-
-import { CommonActionConfig, commonActionChoices } from '@/components/automations/common-action-editor';
+import { CommonActionAddActions, CommonActionStepEditor } from './common-action-sequence'
+import ActionList from '@/components/shared/action-list'
+import { ACTION_LABELS } from './version-diff'
+import { stepSummary } from './common-action-summary'
+export { stepSummary } from './common-action-summary'
 import { createPageReturnHref } from '@/components/shared/create-page'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ArrowDown, ArrowUp, Save, Trash2 } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, describeSaveFailure, type CommonActionResources, type CommonActionStep } from '@/lib/api'
-import CommonActionEditor, { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
+import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
+
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
-import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from './branch-editor'
-import { stepNumbers } from './action-order'
-import { ACTION_LABELS } from './version-diff'
+
 import styles from './common-action-new.module.css'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import ActionList from '@/components/shared/action-list'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B 共通アクションを作る（Pencil `j2hfkS`）。
@@ -54,49 +52,6 @@ const FAILURE_OPTIONS = [
   { value: 'continue', label: '次の処理へ進む' },
 ]
 
-/** 処理の行の2行目（どれを・どれだけ）。選んでいないときは「〇〇を選ぶ」。 */
-export function stepSummary(step: CommonActionStep, resources: CommonActionResources): string {
-  const nameOf = (list: Array<{ id: string; name: string }>, id: unknown, label: string) => {
-    const found = list.find((item) => item.id === String(id ?? ''))
-    return found ? `${label}「${found.name}」` : `${label}を選ぶ`
-  }
-  switch (step.type) {
-    case 'add_tag':
-    case 'remove_tag':
-      return nameOf(resources.tags, step.params.tagId, 'タグ')
-    case 'start_scenario':
-    case 'stop_scenario':
-    case 'resume_scenario':
-      return nameOf(resources.scenarios, step.params.scenarioId, 'シナリオ')
-    case 'send_webhook':
-      return nameOf(resources.webhooks, step.params.webhookId, '送信先')
-    case 'switch_rich_menu':
-      return nameOf(resources.richMenus, step.params.richMenuPageId, 'リッチメニュー')
-    case 'common_action':
-      return nameOf(resources.commonActions, step.params.commonActionId, '共通アクション')
-    case 'send_message': {
-      if (step.params.templateId) return nameOf(resources.templates, step.params.templateId, 'テンプレート')
-      const content = String(step.params.content ?? '').trim()
-      return content ? content.slice(0, 40) : '送る文を入れる'
-    }
-    case 'wait': {
-      const minutes = Number(step.params.durationMinutes ?? step.params.minutes ?? 0)
-      if (!minutes) return '待つ時間を決める'
-      if (minutes % 1440 === 0) return `${minutes / 1440} 日`
-      if (minutes % 60 === 0) return `${minutes / 60} 時間`
-      return `${minutes} 分`
-    }
-    case 'set_metadata': {
-      const keys = Object.keys((step.params.values as Record<string, unknown> | undefined) ?? {}).filter(Boolean)
-      return keys.length ? `友だち情報「${keys.join('・')}」` : '友だち情報を選ぶ'
-    }
-    case 'branch':
-      return '条件に合うとき・合わないときで分ける'
-    default:
-      return ''
-  }
-}
-
 export function CommonActionNew() {
   const saveErrors = useSaveFormErrors()
   usePageTitle('共通アクションを作る')
@@ -116,7 +71,6 @@ export function CommonActionNew() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [inputError, setInputError] = useState<{ target: string; message: string } | null>(null)
-  const [exampleId, setExampleId] = useState('')
   const [requestKey] = useState(() => newStepId())
 
   useEffect(() => {
@@ -191,20 +145,6 @@ export function CommonActionNew() {
       setSaving(false)
     }
   }
-  /* 足した行は閉じたまま（2行目の「〇〇を選ぶ」で何を決めるかが分かる）。押すと設定を開く。 */
-  const addStep = (step: CommonActionStep) => {
-    setActions((current) => [...current, step])
-    if (inputError?.target === 'ca-add-step') setInputError(null)
-  }
-  const addExample = (id: string) => {
-    if (!id) return
-    addStep({ ...newCommonActionStep('common_action'), params: { commonActionId: id } })
-    setExampleId('')
-  }
-  /* 開いた設定（1つの処理）を直す・消す。 */
-  const updateBranch = (id: string, patch: BranchPatch) => {
-    setActions((current) => current.map((step) => step.id === id ? updateBranchStep(step, patch) : step))
-  }
   /* 失敗したとき：全部の処理が同じならその値、違えば「処理ごとに違う」。 */
   const failureValues = new Set(actions.map((step) => step.onFailure))
   const failureValue = failureValues.size === 1 ? [...failureValues][0] : 'mixed'
@@ -268,7 +208,7 @@ export function CommonActionNew() {
           busy={saving}
           busyLabel="保存中"
         >
-          <Save size={15} aria-hidden="true" />下書きを保存
+          <Check size={16} aria-hidden="true" />下書きを保存
         </Button>
       </>}
     >
@@ -291,23 +231,11 @@ export function CommonActionNew() {
         {!resourcesLoading && resourcesFailed ? (
           <Notice tone="danger" ><p>{`${resourcesError} 入力した名前や処理はそのままです。`}</p><Button onClick={() => setResourcesReloadKey((key) => key + 1)}>選択肢をもう一度読み込む</Button></Notice>
         ) : null}
-            <ActionList value={actions} onChange={setActions} idOf={step =>step.id} addId="ca-add-step"
-          choices={[...commonActionChoices(resources), { id: 'branch', label: '条件で分ける', make: newBranchStep}]}
-          titleOf={step => stepSummary( step, resources)} kindOf={step=>ACTION_LABELS[step.type] ?? '処理'}
-          renderEditor={(step, update) =>step.type === 'branch' ?
-                    <BranchEditors
-                      steps={[step]}
-                      resources={resources}
-                      onUpdate={updateBranch}
-                      onRemove={id => setActions(current => current.filter(item => item.id !== id))}
-                    /> :
-                    <CommonActionConfig step={step}
-                      resources={resources}
-                      resourcesFailed={resourcesFailed}
-                      onChange={update}
-                    />}/>
-          {resources.commonActions.length > 0 ?
-              <SaveErrorField names={["exampleId","example_id"]}><EntityKindField kind="common_action"label="見本から受け渡す" options={resources.commonActions} value={exampleId} onChange={value => { setExampleId(value); addExample(value) }} /></SaveErrorField> : null}
+        <ActionList value={actions} onChange={setActions} choices={[]} appearance="numbered" idOf={step => step.id}
+          kindOf={step => ACTION_LABELS[step.type] ?? '処理'} titleOf={step => stepSummary(step, resources)}
+          addActions={<CommonActionAddActions actions={actions} onChange={next => { setActions(next); if (inputError?.target === 'ca-add-step') setInputError(null) }} resources={resources} resourcesFailed={resourcesFailed} />}
+          renderEditor={(step, _update, index) => <CommonActionStepEditor step={step} index={index} actions={actions} onChange={setActions} resources={resources} resourcesFailed={resourcesFailed} />}
+        />
         {inputError?.target === 'ca-add-step' ? <p className={styles.inputError} role="alert">{inputError.message}</p> : null}
       </section>
 

@@ -10,7 +10,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import SectionHeader from '@/components/shared/section-header'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
-import Toggle from '@/components/shared/toggle'
+import Checkbox from '@/components/shared/checkbox'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
@@ -191,9 +191,9 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
           <SectionHeader size="small" title={`${formatYmdShort(edited.date)}の営業時間`} />
           <p className={styles.muted}>現在：{describeDay(original)}{original.special ? '（特別営業時間として登録済み）' : ''}</p>
           {edited.remove ? <Notice tone="warn" action={<Button variant="text" onClick={() => undoDay(edited.date)} disabled={!editable}>外すのをやめる</Button>}>この日の特別営業時間を外し、通常の営業時間（{formatPeriods(regularFor(edited.date).periods, '定休日')}）に戻します。</Notice> : <>
-            <Toggle checked={edited.closed} label="この日は休業にする" disabled={!editable} onChange={(next) => setDay({ ...edited, closed: next, periods: next ? [] : (profile.regularHours[weekdayOf(edited.date)] ?? []) })} />
+            <Checkbox checked={edited.closed} disabled={!editable} onCheckedChange={(next) => setDay({ ...edited, closed: next, periods: next ? [] : (profile.regularHours[weekdayOf(edited.date)] ?? []) })}>この日は休業にする</Checkbox>
             {!edited.closed ? <HoursPeriods periods={edited.periods} label="" disabled={!editable} readOnly={!canEdit} onChange={(periods) => setDay({ ...edited, periods })} /> : null}
-            {!edited.closed && edited.periods.length === 0 ? <Notice tone="warn">営業する日は枠を1つ以上入れてください（休業なら上のスイッチを入れてください）。</Notice> : null}
+            {!edited.closed && edited.periods.length === 0 ? <Notice tone="warn">営業する日は枠を1つ以上入れてください（休業なら上の「この日は休業にする」にチェックを入れてください）。</Notice> : null}
             {original.special && canEdit ? <Button disabled={!editable} onClick={() => setDay({ ...regularFor(edited.date), remove: true })}>特別営業時間を外す（通常の営業時間に戻す）</Button> : null}
           </>}
         </Card> : null}
@@ -213,7 +213,8 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
           const setPeriods = (values: GoogleHoursPeriod[]) => setWeekly({ ...weekly, [day]: values })
           return <Card key={day} appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label={`${WEEKDAY_JA[day]}曜の営業時間`}>
             <SectionHeader size="small" title={`${WEEKDAY_JA[day]}曜${weeklyChanged.includes(day) ? '（変更）' : ''}`} />
-            <Toggle checked={periods.length === 0} label={`${WEEKDAY_JA[day]}曜を定休日にする`} disabled={!editable} onChange={(next) => setPeriods(next ? [] : (profile.regularHours[day]?.length ? profile.regularHours[day] : [{ open: '11:00', close: '22:00' }]))} />
+            {/* 保存（確かめて送る）してから効くのでチェック（決まり14：スイッチはその場で効く物だけ）。 */}
+            <Checkbox checked={periods.length === 0} disabled={!editable} onCheckedChange={(next) => setPeriods(next ? [] : (profile.regularHours[day]?.length ? profile.regularHours[day] : [{ open: '11:00', close: '22:00' }]))}>{`${WEEKDAY_JA[day]}曜を定休日にする`}</Checkbox>
             {periods.length ? <HoursPeriods periods={periods} label={`${WEEKDAY_JA[day]}曜 `} disabled={!editable} readOnly={!canEdit} removeLastOnly onChange={setPeriods} /> : <p className={styles.muted}>定休日</p>}
           </Card>
         })}

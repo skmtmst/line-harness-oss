@@ -46,6 +46,8 @@ import { notifyToast } from '@/components/shared/toast';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import StatusChip from '@/components/shared/status-chip'
+import TagPill from '@/components/shared/tag-pill'
+import { InsertText } from '@/components/shared/insert-text-field'
 import Notice from '@/components/shared/notice'
 import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';
@@ -2271,8 +2273,7 @@ export default function ScenarioDetailV8({
         crumbs={<><p className={styles.meta}>
             {`フォルダ：${scenarioFolderName}・配信方式：${modeLabel}（作ったあとは変えられません）・${(scenario.allowConcurrent ?? true) ? '同時購読を許可中' : '同時に1つだけ'}`}
           </p></>}
-        titleAccessory={<><StatusChip status={scenario.isActive ? 'running' : 'paused'} /></>}
-        actions={<>{canEdit ? (
+        titleAccessory={<><StatusChip status={scenario.isActive ? 'running' : 'paused'} />{canEdit ? (
               <button
                 type="button"
                 className={styles.iconButton}
@@ -2282,7 +2283,8 @@ export default function ScenarioDetailV8({
               >
                 <Pencil aria-hidden />
               </button>
-            ) : null}<Button variant="secondary" href={`/scenarios/results?id=${id}`}>
+            ) : null}</>}
+        actions={<><Button variant="secondary" href={`/scenarios/results?id=${id}`}>
             <BarChart3 aria-hidden />
             配信結果を見る
           </Button><Button
@@ -2554,13 +2556,13 @@ export default function ScenarioDetailV8({
                           }}
                           title="この通を編集する"
                         >
-                          {title}
+                          <InsertText value={title} />
                         </button>
                       ) : (
-                        <span className={styles.stepTitle}>{title}</span>
+                        <span className={styles.stepTitle}><InsertText value={title} /></span>
                       )}
                       {step.isDraft === true && <StatusChip status="draft" />}
-                      <span className={styles.kindChip}>{kindLabel}</span>
+                      <TagPill size="sm" name={kindLabel} color="var(--color-status-info)" aria-label={`種類「${kindLabel}」`} />
                       {canEdit ? (
                         <span className={styles.stepOps}>
                           <IconButton
@@ -2803,7 +2805,7 @@ export default function ScenarioDetailV8({
               ) : null}
               {canEdit ? (
                 <Button
-                  variant="primary" icon={conflict ? <GitCompareArrows aria-hidden /> : undefined}
+                  variant="primary" icon={conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
                   onClick={() => {
                     if (conflict) {
                       setCompareOpen(true)

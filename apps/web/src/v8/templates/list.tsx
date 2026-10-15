@@ -12,7 +12,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
 import { runOptimistic } from '@/lib/undoable';
-import { Bookmark, Braces, ClipboardList, Copy, FileText, Folder as FolderIcon, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Layers, Link2, List, Mail, MessageSquare, Plus, Send, SquareArrowOutUpRight, Ticket, Trash2, Unlink, Video } from 'lucide-react';
+import { Bookmark, Braces, ClipboardList, Copy, FileText, Folder as FolderIcon, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, LayoutGrid, Layers, Link2, List, Mail, MessageSquare, Plus, Send, SquareArrowOutUpRight, Ticket, Trash2, Unlink, Video } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { RowNameLink } from '@/components/shared/table';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -142,7 +142,7 @@ const KIND_CARDS: Array<{
 }> = [
   { key: 'message', title: 'メッセージ', icon: MessageSquare, desc: 'テキスト・カード型・画像。差し込みも使える', useFor: 'いちばんよく使う', cannot: 'できない：答えを集める（→ 質問・リサーチ）', href: '/templates/edit' },
   { key: 'card_message', title: 'カルーセル', icon: GalleryHorizontalEnd, desc: '横にめくるカードを最大10枚', useFor: '商品の紹介に', cannot: 'できない：1枚の画像を面に分ける（→ リッチ）', href: '/templates/carousel' },
-  { key: 'rich_message', title: 'リッチメッセージ', icon: ImageIcon, desc: '1枚の画像を面に分けて、押すと動く', useFor: 'キャンペーンの告知に', cannot: 'できない：文字だけの本文（→ メッセージ）', href: '/templates/edit?kind=rich_message' },
+  { key: 'rich_message', title: 'リッチメッセージ', icon: LayoutGrid, desc: '1枚の画像を面に分けて、押すと動く', useFor: 'キャンペーンの告知に', cannot: 'できない：文字だけの本文（→ メッセージ）', href: '/templates/edit?kind=rich_message' },
   { key: 'rich_video', title: 'リッチビデオ', icon: Video, desc: 'トーク画面で自動で流れる動画。見終わったらボタンで案内', useFor: '新商品・お店の紹介に', cannot: 'できない：画像を面に分ける（→ リッチメッセージ）', href: '/templates/edit?kind=rich_video' },
   { key: 'question', title: '質問', icon: HelpCircle, desc: 'ボタンで答えてもらい、答えでタグなどを付ける', useFor: '好みを聞くときに', cannot: 'できない：何問も続けて聞く（→ リサーチ）', href: '/templates/questions/new' },
   { key: 'coupon', title: 'クーポン', icon: Ticket, desc: '期間・回数・抽選を決めて配る', useFor: '来店・購入のきっかけに', cannot: 'できない：本文を自由に組む（→ メッセージ）', href: '/templates/edit?kind=coupon' },

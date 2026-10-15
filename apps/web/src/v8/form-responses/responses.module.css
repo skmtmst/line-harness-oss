@@ -281,3 +281,6 @@
 
 .colAnswer { width: var(--tpl-ev-fr-col-answer); }
 .colActions { width: var(--tpl-ev-fr-col-actions); }
+
+/* 絵 v0SbYR：ご意見の段の「1件ずつ見る」は下の右端。 */
+.cardFootEnd { display: flex; justify-content: flex-end; }

@@ -283,6 +283,7 @@ type TimeFieldProps = {
   minuteStep?: number
   /** ★V8 の欄の高さ。`field`＝36（日付の欄と並ぶ）、`compact`＝32（表の中の細い欄）。 */
   size?: TimeFieldSize
+  pickerTrigger?: 'clock' | 'field'
   disabled?: boolean
   /** 閲覧のみ。値を見せて打てない・時計を出さない。 */
   readOnly?: boolean
@@ -310,7 +311,6 @@ export function TimeField(props: TimeFieldProps) {
   return <TimeFieldV8 {...rest} size={size} minuteStep={minuteStep ?? stepSecondsToMinutes(step)} />
 }
 
-/** `type="time"` の秒の刻みを分へ。分にならない刻みは 1分。 */
 function stepSecondsToMinutes(step?: number): number {
   if (!step || step < 60 || step % 60 !== 0) return 1
   return step / 60

@@ -5,7 +5,6 @@ const projectNameRequirement = requiredText('プロジェクト名を入力し�
 import { Archive, Plus, Upload } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import Button from '@/components/shared/button'
-import { DialogActions } from '@/components/shared/dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -69,7 +68,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
   return (
     <BannerDialogFrame
       open={open}
-      kind="create"
+      kind="create" contentLayout="form"
       title={project ? '名前と説明を変える' : 'プロジェクトを作る'}
       description={project ? undefined : '案件やキャンペーンごとに作ります。画像はプロジェクトの中で生成・取り込みします。'}
       busy={busy}
@@ -198,12 +197,12 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
       error={error || undefined}
       designNode="AnwtH"
       actions={(
-          <DialogActions>
+          <>
             <Button onClick={onClose} disabled={uploading}>キャンセル</Button>
             <Button variant="primary" onClick={() => void takeIn()} disabled={!file || Boolean(uploadProjectRequirement.check(projectId)) || loading || uploading} title={loading ? 'プロジェクトを読み込んでいます。' : uploadProjectRequirement.check(projectId) ?? (!file ? '取り込む画像を選んでください。' : undefined)} busy={uploading} busyLabel="取り込み中…">
               <Upload aria-hidden="true" className={styles.icon} />取り込む
             </Button>
-        </DialogActions>
+        </>
       )}
     >
         {noProject ? (
@@ -227,7 +226,8 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
               value={filePreview}
               fit="contain"
               accept={BANNER_UPLOAD_ACCEPT.join(',')}
-              help={`1ファイル${BANNER_UPLOAD_MAX_BYTES / 1024 / 1024}メガバイト以内・PNG・JPEG・WebP`}
+              /* 絵 AnwtH：大きさの上限も形式と同じ行に書く（「？」に隠さない）。 */
+              maxBytes={BANNER_UPLOAD_MAX_BYTES}
               busy={uploading}
               onFile={(next) => pickFile(next)}
               onRemove={() => setFile(null)}

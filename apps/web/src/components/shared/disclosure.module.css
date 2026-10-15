@@ -18,6 +18,13 @@
   box-shadow: var(--card-shadow);
 }
 
+.root[data-appearance='inset'] { box-shadow: none; }
+.root[data-appearance='inset'] .body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+}
+
 .summary {
   display: flex;
   min-height: 48px;

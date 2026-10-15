@@ -209,8 +209,22 @@ function CompareInner() {
                     </div>
 {decision === 'linked' ? (
                       <>
-                        <p className={styles.fieldBox}>過去の扱い：これまでの履歴を1人分にまとめる</p>
-                        <p className={styles.fieldBox}>{selectionSummary}</p>
+                        {/* 選ぶ欄として▽を出す（絵 fcg2D）。友だちの結び付けで選べる過去の扱いは1つだけ。 */}
+                        <Select aria-label="過去の扱い" size="full" value="merge" onChange={() => undefined}
+                          options={[{ value: 'merge', label: '過去の扱い：これまでの履歴を1人分にまとめる' }]} />
+                        {/* 採用する値は表の「使う値」の要約。A・B どちらかにまとめて切り替えることもできる。 */}
+                        <Select aria-label="採用する値" size="full" disabled={!detail.canDecide}
+                          value="table"
+                          onChange={(value) => {
+                            if (value !== 'A' && value !== 'B') return
+                            const id = value === 'A' ? detail.left.id : detail.right.id
+                            setSelections((current) => ({ ...current, ...Object.fromEntries(profileCandidates.flatMap((field) => field.options.some((option) => option.sourceFriendId === id) ? [[field.fieldKey, id]] : [])) }))
+                          }}
+                          options={[
+                            { value: 'table', label: selectionSummary },
+                            { value: 'A', label: `採用する値：すべて A（${detail.left.label}）` },
+                            { value: 'B', label: `採用する値：すべて B（${detail.right.label}）` },
+                          ]} />
                         <div className={styles.checks}>
                           {CONSENTS.map((label, index) => (
                             <SaveErrorField names={["consents"]} key={label}><Checkbox

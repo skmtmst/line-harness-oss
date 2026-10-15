@@ -1,14 +1,14 @@
 'use client'
 import Link from '@/components/shared/list-navigation'
 import { ArrowLeft, Check } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { KNOWLEDGE_KINDS, knowledgeTime, knowledgeArticleKind } from '@/components/ops/knowledge-format'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -23,6 +23,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { CreateStepColumns } from '@/components/templates/create-step-columns'
 
 /**
  * ナレッジの記事 V8（絵 `R5ckwJ`）。一覧の「開く」から出す。
@@ -47,13 +48,32 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [closing, setClosing] = useState(false)
+  const [loadedTicket, setLoadedTicket] = useState<typeof ticket>(null)
+  const [ticketError, setTicketError] = useState('')
+  const [ticketAttempt, setTicketAttempt] = useState(0)
+  useEffect(() => {
+    if (!approving || ticket) return
+    let current = true
+    setLoadedTicket(null); setTicketError('')
+    void opsCall(api.ops.support.ticket(initial.sourceRequestId)).then(result => {
+      if (!current) return
+      if (!result.success || result.data.ticket.id !== initial.sourceRequestId) {
+        setTicketError('元の問い合わせの状態を確認できませんでした。もう一度読み込んでください。')
+        return
+      }
+      const source = result.data.ticket
+      setLoadedTicket({ label: source.ticketLabel, resolved: source.stage === 'resolved' || source.stage === 'closed', stageLabel: source.stageLabel })
+    })
+    return () => { current = false }
+  }, [approving, initial.sourceRequestId, ticket, ticketAttempt])
+  const sourceTicket = ticket ?? loadedTicket
 
   const editing = initial.reviewState === 'approved' && initial.sourceCurrent
   const eligible = article.sourceCurrent && (article.articleKind === 'verified'
     ? article.reviewState === 'pending' && article.evidence.length >= 2
     : (article.reviewState === 'pending' || article.reviewState === 'needs_review'))
   const canApprove = eligible && Boolean(form.question.trim()) && Boolean(form.answer.trim())
-  const ticketBlocked = Boolean(ticket && !ticket.resolved)
+  const ticketBlocked = !sourceTicket?.resolved
 
   const input = () => ({ ...form, keywords: keywords.split(/[、,\n]/).map((v) => v.trim()).filter(Boolean) })
   const change = <K extends keyof OpsKnowledgeInput>(key: K, value: OpsKnowledgeInput[K]) => {
@@ -117,23 +137,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
       {/* 現役の全画面と、問い合わせから開く共通の窓で同じ保存・承認を使う。 */}
       {error && !approving ? <Notice tone="danger" >{error}</Notice> : null}
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
-      <div className={fullPage ? styles.article : parts.stack}>
-        <section className={styles.fields} aria-label="記事の中身">
-          <div className={styles.field}><Field label="題名" htmlFor="ka-title" requirement={fields.requirement('title')}><SaveErrorField names={["title","form.title"]}><TextField {...fields.bind('title')} id="ka-title" invalid={fields.invalid('title')} aria-describedby={fields.invalid('title') ? 'ka-title-error' : undefined} value={form.title} maxLength={120} disabled={busy} onChange={(e) => change('title', e.target.value)} /></SaveErrorField>
-<FieldError id="ka-title-error">{fields.error('title')}</FieldError></Field></div>
-          <div className={styles.field}>
-            <span className={styles.smallLabel} id="ops-article-kind">種類</span>
-            <div className={styles.wideSelect}>
-              <SaveErrorField names={["kind","form.kind"]}><Select aria-label="種類" size="full" options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy} onChange={(value) => change('kind', value as OpsKnowledgeInput['kind'])} /></SaveErrorField>
-            </div>
-          </div>
-          <div className={styles.field}><Field label="質問" htmlFor="ka-question" requirement={fields.requirement('question')}><SaveErrorField names={["question","form.question"]}><TextArea {...fields.bind('question')} id="ka-question" invalid={fields.invalid('question')} aria-describedby={fields.invalid('question') ? 'ka-question-error' : undefined} className={styles.question} value={form.question} maxLength={1000} disabled={busy} onChange={(e) => change('question', e.target.value)} /></SaveErrorField>
-<FieldError id="ka-question-error">{fields.error('question')}</FieldError></Field></div>
-          <div className={styles.field}><Field label="答え" htmlFor="ka-answer" requirement={fields.requirement('answer')}><SaveErrorField names={["answer","form.answer"]}><TextArea {...fields.bind('answer')} id="ka-answer" invalid={fields.invalid('answer')} aria-describedby={fields.invalid('answer') ? 'ka-answer-error' : undefined} className={styles.answer} value={form.answer} maxLength={12000} disabled={busy} onChange={(e) => change('answer', e.target.value)} /></SaveErrorField>
-<FieldError id="ka-answer-error">{fields.error('answer')}</FieldError></Field></div>
-          {!form.answer.trim() && article.articleKind === 'answer_example' ? <p className={parts.note}>運営の回答がありません。答えを書いて承認できます</p> : null}
-          <Field label="キーワード"><SaveErrorField names={["keywords"]}><TextField value={keywords} maxLength={480} disabled={busy} onChange={(e) => { setKeywords(e.target.value); setReadChecked(false) }} /></SaveErrorField></Field>
-        </section>
+      <KnowledgeBody fullPage={fullPage} preview={(
         <aside className={styles.side}>
           {editing ? (
             <Notice tone="info">変更を保存すると承認待ちに戻ります。再承認するまで、この記事は AI の返信に使われません。</Notice>
@@ -176,21 +180,36 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
             )}
           </div>
         </aside>
-      </div>
+      )}>
+        <section className={styles.fields} aria-label="記事の中身">
+          <div className={styles.field}><Field label="題名" htmlFor="ka-title" requirement={fields.requirement('title')}><SaveErrorField names={["title","form.title"]}><TextField {...fields.bind('title')} id="ka-title" invalid={fields.invalid('title')} aria-describedby={fields.invalid('title') ? 'ka-title-error' : undefined} value={form.title} maxLength={120} disabled={busy} onChange={(e) => change('title', e.target.value)} /></SaveErrorField>
+<FieldError id="ka-title-error">{fields.error('title')}</FieldError></Field></div>
+          <div className={styles.field}>
+            <span className={styles.smallLabel} id="ops-article-kind">種類</span>
+              <SaveErrorField names={["kind","form.kind"]}><Select size="full" aria-label="種類" options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy} onChange={(value) => change('kind', value as OpsKnowledgeInput['kind'])} /></SaveErrorField>
+          </div>
+          <div className={styles.field}><Field label="質問" htmlFor="ka-question" requirement={fields.requirement('question')}><SaveErrorField names={["question","form.question"]}><TextArea {...fields.bind('question')} id="ka-question" invalid={fields.invalid('question')} aria-describedby={fields.invalid('question') ? 'ka-question-error' : undefined} className={styles.question} value={form.question} maxLength={1000} disabled={busy} onChange={(e) => change('question', e.target.value)} /></SaveErrorField>
+<FieldError id="ka-question-error">{fields.error('question')}</FieldError></Field></div>
+          <div className={styles.field}><Field label="答え" htmlFor="ka-answer" requirement={fields.requirement('answer')}><SaveErrorField names={["answer","form.answer"]}><TextArea {...fields.bind('answer')} id="ka-answer" invalid={fields.invalid('answer')} aria-describedby={fields.invalid('answer') ? 'ka-answer-error' : undefined} className={styles.answer} value={form.answer} maxLength={12000} disabled={busy} onChange={(e) => change('answer', e.target.value)} /></SaveErrorField>
+<FieldError id="ka-answer-error">{fields.error('answer')}</FieldError></Field></div>
+          {!form.answer.trim() && article.articleKind === 'answer_example' ? <p className={parts.note}>運営の回答がありません。答えを書いて承認できます</p> : null}
+          <Field label="キーワード"><SaveErrorField names={["keywords"]}><TextField value={keywords} maxLength={480} disabled={busy} onChange={(e) => { setKeywords(e.target.value); setReadChecked(false) }} /></SaveErrorField></Field>
+        </section>
+      </KnowledgeBody>
 
       {editing ? null : (
         <Dialog
           open={approving}
           title="記事を承認する前に"
-          designNode="eSXxA"
+          designNode="eSXxA" designTop={240}
           busy={busy}
           error={error || undefined}
           onCancel={() => { if (!busy) setApproving(false) }}
           footer={(
-            <div className={styles.dialogActions}>
+            <DialogActions>
               <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
-              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}>保存して承認</Button>
-            </div>
+              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} title={ticketBlocked ? ticketError || (sourceTicket ? '元の問い合わせを解決にしてから承認してください' : '元の問い合わせの状態を確認しています') : !readChecked ? '本文と手順の確認にチェックを入れてください' : !canApprove ? '承認できる状態ではありません' : undefined} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}><Check aria-hidden="true" />保存して承認</Button>
+            </DialogActions>
           )}
         >
           <div className={parts.dialogBody}>
@@ -198,9 +217,10 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
             <SaveErrorField names={["readChecked","read_checked"]}><Checkbox checked={readChecked} disabled={busy || !eligible} onCheckedChange={setReadChecked}>
               本文と手順を読み、いまの作りと合っていることを確かめました
             </Checkbox></SaveErrorField>
-            {ticket ? <Checkbox checked={ticket.resolved} disabled onCheckedChange={() => {}}>元の問い合わせ {ticket.label} が「解決」になっている</Checkbox> : null}
-            {ticketBlocked ? <Notice tone="danger">元の問い合わせ {ticket?.label} がまだ「{ticket?.stageLabel}」です。解決にしてから承認できます。</Notice> : null}
-            <Notice tone="info">承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。</Notice>
+            {sourceTicket ? <Checkbox checked={sourceTicket.resolved} disabled title="元の問い合わせの状態は問い合わせ側で変更します。" onCheckedChange={() => {}}>元の問い合わせ {sourceTicket.label} が「解決」になっている</Checkbox> : null}
+            {sourceTicket && ticketBlocked ? <Notice tone="danger" appearance="soft" density="compact" icon={null}>{`元の問い合わせ ${sourceTicket.label} がまだ「${sourceTicket.stageLabel}」です。解決にしてから承認できます。`}</Notice> : null}
+            {!sourceTicket ? <Notice tone={ticketError ? 'danger' : 'info'} action={ticketError ? <Button onClick={() => setTicketAttempt(value => value + 1)}>もう一度読み込む</Button> : undefined}>{ticketError || '元の問い合わせの状態を確認しています。'}</Notice> : null}
+            <p className={styles.evidence}>承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。</p>
           </div>
         </Dialog>
       )}
@@ -214,4 +234,8 @@ function KnowledgeSurface({ fullPage, editing, busy, onCancel, actions, title, d
 }) {
   if (!fullPage) return <Dialog open title={editing ? '記事を直す' : '下書きの内容を確認'} designNode={editing ? 'ZAOc7' : 'DHdsw'} busy={busy} onCancel={onCancel} footer={actions}>{children}</Dialog>
   return <div data-design-node="R5ckwJ"><OpsHead title={title} description={description} environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)} actions={actions} />{children}</div>
+}
+
+function KnowledgeBody({ fullPage, preview, children }: { fullPage: boolean; preview: ReactNode; children: ReactNode }) {
+  return fullPage ? <CreateStepColumns standalone preview={preview} previewTitle="解決の根拠と操作">{children}</CreateStepColumns> : <div className={parts.stack}>{children}{preview}</div>
 }

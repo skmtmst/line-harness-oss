@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from '@/components/shared/list-navigation'
-import { Link2, ExternalLink } from 'lucide-react'
+import { Link as LinkIcon } from 'lucide-react'
 import { ecEventLabel } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -207,7 +207,7 @@ export default function OrderDrawer({
       </> : undefined}
       onClose={onClose}
       footer={order ? <>
-        <Button href="/ec-commerce/identity-candidates"><Link2 size={14} aria-hidden="true" />会員のつき合わせへ</Button>
+        <Button href="/ec-commerce/identity-candidates"><LinkIcon size={14} aria-hidden="true" />会員のつき合わせへ</Button>
         {order.detailUrl ? <Button external href={order.detailUrl}  >ECの管理画面で開く</Button> : null}
       </> : undefined}
     >
@@ -312,7 +312,6 @@ export default function OrderDrawer({
                   </ul>
                 )}
               </section>
-              <p className={styles.footHint}>もう一度行う・再取込では、届き済みの通知や入った成果・マイルは重ねません。</p>
             </>
           )}
     </Drawer>

@@ -16,11 +16,11 @@ import { SaveErrorField,SaveErrorScope } from '@/components/shared/save-form-err
 import { DelayedSkeleton,Skeleton } from '@/components/shared/skeleton'
 import StatusBadge from '@/components/shared/status-badge'
 import TruncatedText from '@/components/shared/truncated-text'
-import { DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
+import { ActionCell,DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import StepUpPrompt from '@/components/step-up-prompt'
 import { ListPage } from '@/components/templates'
-import { Check,KeyRound,LayoutTemplate,Plus,RefreshCw } from 'lucide-react'
+import { Check,KeyRound,LayoutTemplate,Plus } from 'lucide-react'
 import { SCOPES } from './api-token-words'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import styles from './api-tokens.module.css'
@@ -69,7 +69,7 @@ export default function WebhooksApiTokensV8() {
   const { saveErrors, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke } = useApiTokens()
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
-      help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」から止める。止めても、すでに付けたタグは残ります。"}</>}
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」から入れ替える・止める。止めても、すでに付けたタグは残ります。"}</>}
       boardId="ralAc"
       headingSize="regular"
       title="外部連携"
@@ -292,36 +292,35 @@ export default function WebhooksApiTokensV8() {
                       <Td>
                         <StatusBadge tone="success">使っている</StatusBadge>
                       </Td>
-                      <Td>
+                      {/* 行の右端は「…」1つ（B-253・絵 ralAc）。入れ替える・止めるはその中。 */}
+                      <ActionCell>
                         {canManage ? (
-                          <span className={styles.menuBox}>
-                            <Button
-                              onClick={() => {
+                          <RowMenu
+                            appearance="plain"
+                            label={`「${token.name}」の操作`}
+                            open={menuId === token.id}
+                            onOpenChange={(next) => setMenuId(next ? token.id : null)}
+                            items={[{
+                              id: 'rotate',
+                              label: '入れ替える',
+                              onSelect: () => {
+                                setMenuId(null)
                                 setDialogError('')
                                 setRotateTarget(token)
-                              }}
-                            >
-                              <RefreshCw size={15} aria-hidden="true" />入れ替える
-                            </Button>
-                            <RowMenu
-                              appearance="plain"
-                              label={`「${token.name}」の操作`}
-                              open={menuId === token.id}
-                              onOpenChange={(next) => setMenuId(next ? token.id : null)}
-                              items={[{
-                                id: 'revoke',
-                                label: '止める',
-                                tone: 'danger',
-                                onSelect: () => {
-                                  setMenuId(null)
-                                  setDialogError('')
-                                  setRevokeTarget(token)
-                                },
-                              }]}
-                            />
-                          </span>
+                              },
+                            }, {
+                              id: 'revoke',
+                              label: '止める',
+                              tone: 'danger',
+                              onSelect: () => {
+                                setMenuId(null)
+                                setDialogError('')
+                                setRevokeTarget(token)
+                              },
+                            }]}
+                          />
                         ) : null}
-                      </Td>
+                      </ActionCell>
                     </Tr>
                   )
                 })}

@@ -380,6 +380,14 @@
   width: var(--tpl-slot-w-compact);
 }
 
+/* 絵 T1j2Sw：投稿の画像は本文の下に幅320（4:3）。 */
+.postImageSlot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-slot-gap);
+  width: min(100%, 320px);
+}
+
 .imageName {
   overflow: hidden;
   color: var(--color-ink-secondary);
@@ -537,5 +545,6 @@
   gap: var(--tpl-rt-chip-row-gap);
 }
 
-.postCompose { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-slot-w-compact); align-items: start; gap: var(--tpl-rt-half-gap); min-width: 0; }
-@container v8-page (max-width: 600px) { .postCompose { grid-template-columns: minmax(0, 1fr); } }
+/* 絵 T1j2Sw：本文は横いっぱい、画像はその下に左寄せで置く。 */
+.postCompose { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; align-items: start; gap: var(--tpl-rt-half-gap); min-width: 0; }
+.postCompose > :first-child { justify-self: stretch; }
