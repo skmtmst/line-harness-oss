@@ -1216,7 +1216,7 @@ export default function BookingsPage() {
                       <Th style={{ width: '9%' }}>予約経路</Th>
                       <Th style={{ width: '9%' }} align="right">料金</Th>
                       <Th style={{ width: '11%' }}>状態</Th>
-                      <Th style={{ width: 120 }} align="right">操作</Th>
+                      <Th style={{ width: 64 }} align="right">操作</Th>
                     </TableHeadRow>
                   </thead>
                   <tbody>
@@ -1256,17 +1256,11 @@ export default function BookingsPage() {
                         <StatusCell primary={<StatusPill tone={statusTone[b.status] ?? 'neutral'}>{statusLabel[b.status] ?? b.status}</StatusPill>} />
                         <ActionCell>
                           {/* 行全体が詳細パネルを開くので、操作列の押下は行へ伝えない。
-                              主な1つ（承認待ちは［承認］、ほかは［詳細］）＋「…」（B-253）。 */}
+                              行の右端は「…」1つ（B-253）。詳細・会話・承認などは中へ。承認待ちは状態の札で分かる。 */}
                           <span className={ledgerStyles.actions} onClick={(event) => event.stopPropagation()}>
-                            {/* N-401: 閲覧のみの人には状態を変えるボタンを出さない */}
-                            {canOperate && b.status === 'requested'
-                              ? <Button variant="primary" size="compact" onClick={() => handleDecide(b.id, 'approve')}>承認</Button>
-                              : <Button size="compact" onClick={() => openBookingDetail(b.id)}>詳細</Button>}
                             <RowMenu
-                              label={`予約「${b.friend_name ?? 'お客様'}」のその他の操作`}
-                              items={bookingContextItems(b)
-                                .filter((item) => !(canOperate && b.status === 'requested' && item.id === 'approve') && !(item.id === 'open' && !(canOperate && b.status === 'requested')))
-                                .map((item) => ({ id: item.id, label: item.label, tone: item.danger ? 'danger' as const : undefined, onSelect: () => item.onSelect?.(item.id) }))}
+                              label={`予約「${b.friend_name ?? 'お客様'}」の操作`}
+                              items={bookingContextItems(b).map((item) => ({ id: item.id, label: item.label, tone: item.danger ? 'danger' as const : undefined, onSelect: () => item.onSelect?.(item.id) }))}
                             />
                           </span>
                         </ActionCell>
