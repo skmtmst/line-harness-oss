@@ -5,6 +5,7 @@
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import type { api } from '@/lib/api'
+import { resolveDefaultToken } from '@/components/shared/insert-tokens'
 
 /** 詳細口（GET /api/templates/:id）が返す1件分の形。 */
 export type TemplateDetailData = Extract<
@@ -87,11 +88,14 @@ function enrollmentStatusText(status: string): string {
   return status
 }
 
-/** 本文の {名前} のような差し込みを拾う（同じ物は1つ）。 */
+/**
+ * 本文の差し込みを拾う（同じ物は1つ）。保存の形 {{name}} は札と同じ名前（「名前」）にし、
+ * 古い {名前} の書き方はそのまま名前として拾う。
+ */
 export function insertionNames(content: string): string[] {
   const found = new Set<string>()
-  for (const match of content.matchAll(/\{([^{}]+)\}/g)) {
-    const name = match[1]?.trim()
+  for (const match of content.matchAll(/\{\{[^{}\n]*\}\}|\{([^{}]+)\}/g)) {
+    const name = match[0].startsWith('{{') ? resolveDefaultToken(match[0])?.label : match[1]?.trim()
     if (name) found.add(name)
   }
   return [...found]
