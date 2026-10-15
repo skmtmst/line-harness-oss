@@ -2434,7 +2434,7 @@ CREATE TABLE ec_events (
   error_message     TEXT,
   received_at       TEXT NOT NULL,
   processed_at      TEXT,
-  updated_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL, identity_recovery_mode TEXT CHECK(identity_recovery_mode IN ('analytics_snapshot','non_delivery_actions')),
   UNIQUE (source, external_event_id),
   FOREIGN KEY (friend_id) REFERENCES friends(id) ON DELETE SET NULL
 );
@@ -3946,6 +3946,19 @@ CREATE TABLE inbox_staff_reads (
   PRIMARY KEY (staff_id, channel, conversation_id)
 );
 
+CREATE TABLE incoming_webhook_queue (
+  source_event_id TEXT PRIMARY KEY,
+  webhook_id TEXT NOT NULL REFERENCES incoming_webhooks(id),
+  signature_hash TEXT NOT NULL,
+  body_hash TEXT NOT NULL,
+  payload_encrypted TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed','failed')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE incoming_webhook_receipts (
   webhook_id     TEXT NOT NULL REFERENCES incoming_webhooks(id) ON DELETE CASCADE,
   signature_hash TEXT NOT NULL,
@@ -4876,7 +4889,7 @@ CREATE TABLE nen_delivery_jobs (
   campaign_snapshot IS NULL OR json_valid(campaign_snapshot)
 ), version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), retry_generation INTEGER NOT NULL DEFAULT 0 CHECK (retry_generation >= 0), last_retry_reason TEXT CHECK (
     last_retry_reason IS NULL OR length(last_retry_reason) BETWEEN 1 AND 500
-  ), last_retry_requested_by TEXT, last_retry_requested_at TEXT,
+  ), last_retry_requested_by TEXT, last_retry_requested_at TEXT, next_attempt_at TEXT, claim_token TEXT,
   UNIQUE (campaign_key, friend_id, source_key)
 );
 
@@ -5002,7 +5015,7 @@ CREATE TABLE nen_pet_profiles (
   birthday TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT, weight_updated_at TEXT);
+, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT, weight_updated_at TEXT, archived_at TEXT);
 
 CREATE TABLE "nen_photo_assessment_runs" (
   photo_id_history TEXT,
@@ -5599,6 +5612,12 @@ CREATE TABLE operation_request_receipts (
   resource_id     TEXT NOT NULL,
   created_at      TEXT NOT NULL,
   PRIMARY KEY (action, actor_id, idempotency_key)
+);
+
+CREATE TABLE operator_notification_occurrences (
+ rule_id TEXT NOT NULL, line_account_id TEXT NOT NULL, source_event_id TEXT NOT NULL,
+ instance_id TEXT NOT NULL REFERENCES notification_instances(id) ON DELETE CASCADE,
+ PRIMARY KEY(rule_id,line_account_id,source_event_id)
 );
 
 CREATE TABLE operator_notification_teams (
@@ -9626,6 +9645,8 @@ CREATE INDEX idx_inbox_reply_leases_expiry ON inbox_reply_leases (expires_at);
 CREATE INDEX idx_inbox_staff_reads_conversation
   ON inbox_staff_reads (channel, conversation_id, staff_id);
 
+CREATE INDEX idx_incoming_webhook_queue_due ON incoming_webhook_queue(status,next_attempt_at);
+
 CREATE UNIQUE INDEX idx_incoming_webhook_receipts_body
   ON incoming_webhook_receipts (webhook_id, body_hash);
 
@@ -9885,6 +9906,8 @@ CREATE INDEX idx_nen_delivery_jobs_due
 
 CREATE INDEX idx_nen_delivery_jobs_friend
   ON nen_delivery_jobs(friend_id, created_at DESC);
+
+CREATE INDEX idx_nen_delivery_retry_due ON nen_delivery_jobs(status, next_attempt_at);
 
 CREATE INDEX idx_nen_feeding_products_account
   ON nen_feeding_products(line_account_id, sort_order);

@@ -579,9 +579,11 @@
     "634_customer_deletion_retained_references.sql",
     "635_restaurant_delivery_orders.sql",
     "636_restaurant_delivery_uber_connections.sql",
-    "681_public_ingress_receipts.sql",
-    "682_template_soft_delete.sql",
-    "683_media_metadata_revision.sql"
+    "686_public_ingress_receipts.sql",
+    "687_template_soft_delete.sql",
+    "688_media_metadata_revision.sql",
+    "689_behavior_delivery_recovery.sql",
+    "690_incoming_webhook_queue.sql"
   ],
-  "migrationCount": 582
+  "migrationCount": 584
 }
