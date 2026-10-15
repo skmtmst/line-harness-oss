@@ -25,6 +25,10 @@
 .multiRow { display: flex; flex: none; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-bd-ring); }
 .multiRow[data-selected] { background: var(--color-accent-soft); box-shadow: var(--tpl-bd-ring-accent); }
 /* 窓の中身の高さは「テンプレートを選ぶ」と同じ。候補が多くても下の帯を画面の外へ押し出さない。 */
+/* 1つ選ぶ窓も高さを決め、候補が多いときは一覧の中を送る（f63Jza：候補29件で下の段が画面の外へ出ていた）。 */
+.singleBody { height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); }
+:root .singleBody .tpList > * { flex-shrink: 0; }
+:root .singleBody .tpCard { padding: var(--tpl-picker-single-card-pad); }
 .multiBody { height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); }
 .multiBody .multiList > * { flex: none; }
 .multiBody .multiList > .multiRows { flex: 1 1 auto; }

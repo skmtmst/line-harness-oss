@@ -168,7 +168,7 @@ function SingleEntityPickerDialog({
   const visibleLimit = controlledQuery !== undefined ? rows.length : limit
   const picked = items.find((item) => item.id === selected) ?? null
   const folderRows = pickerFolderRows(items, folders, listState)
-  if (items.some((item) => item.frequent !== undefined)) folderRows.unshift ({id: '__frequent__', label: 'よく使う', kind: 'folder', count: listState ? null : items.filter((item) => item.frequent).length })
+  if (items.some((item) => item.frequent !== undefined)) folderRows.unshift ({id: '__frequent__', label: 'よく使う', kind: 'frequent', count: listState ? null : items.filter((item) => item.frequent).length })
   const previewNode = typeof preview === 'function' ? preview(picked) : preview
 
   return <EntityPickerDialog scrollBody={scrollBody} title={title} description={description} busy={busy} error={error} designNode={designNode} onCancel={onCancel} initialFocusId={`${id}-search`}
@@ -184,9 +184,9 @@ function SingleEntityPickerDialog({
     </div>
     </>}
   >
-    <div ref={panelRef} className={`${shell.body} ${scrollBody ? styles.tpBody : ''}`}>
+    <div ref={panelRef} className={`${shell.body} ${scrollBody ? styles.tpBody : styles.singleBody}`}>
       {hasFolders && !narrow ? <div className={shell.folders}>
-        <FolderPanel readOnly reserveCreateSpace={false} disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
+        <FolderPanel readOnly reserveCreateSpace={false} headingAfterAll disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
       </div> : null}
       <section className={styles.tpList} aria-label="候補の一覧"> <SearchField id={`${id}-search`} aria-label={`${title}：${searchPlaceholder}`} placeholder={searchPlaceholder} value={query} onChange={setQuery} onClear={() => setQuery('')} />
         {foldersFailed ? <p className={styles.note}>フォルダを読み込めませんでした。すべての候補から選べます。</p> : null}

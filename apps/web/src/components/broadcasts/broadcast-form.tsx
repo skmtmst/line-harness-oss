@@ -640,6 +640,11 @@ export default function BroadcastForm({
    * (`folders` / kind='broadcast') とは別物なので別に持つ。
    */
   const [templateFolders, setTemplateFolders] = useState<Folder[]>([])
+  /** 「よく使う」：使った回数が1回以上のテンプレートのうち多い順に5件（受信箱のテンプレートを選ぶ窓と同じ数え方）。 */
+  const frequentTemplateIds = useMemo(() => new Set([...messageTemplates]
+    .filter((template) => (template.usageCount ?? 0) > 0)
+    .sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0))
+    .slice(0, 5).map((template) => template.id)), [messageTemplates])
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
   const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'scenario')
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
@@ -2382,7 +2387,7 @@ export default function BroadcastForm({
                 <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><Notice tone="danger">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</Notice></SaveErrorField> : undefined}
             items={[
                     ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:typeLabel(asset.kind)})),
-              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, content:template.messageType === 'text' ?template.messageContent : undefined, keywords: template.messageContent, meta : typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}
+              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, frequent: frequentTemplateIds.has(template.id), content:template.messageType === 'text' ?template.messageContent : undefined, keywords: template.messageContent, meta : typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}
               )),
             ]}
             preview=
