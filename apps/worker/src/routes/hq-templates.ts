@@ -128,7 +128,6 @@ hqTemplates.get('/api/hq/templates/saved-views', async c => c.json({success:true
 hqTemplates.post('/api/hq/templates/saved-views', inputJsonBoundary(), async c => c.json({success:true,data:await saveTemplateView(dbFor(c.env),await authority(c),await body(c))},201));
 hqTemplates.patch('/api/hq/templates/saved-views/:viewId', inputJsonBoundary(), async c => c.json({success:true,data:await saveTemplateView(dbFor(c.env),await authority(c),await body(c),c.req.param('viewId'))}));
 hqTemplates.delete('/api/hq/templates/saved-views/:viewId', async c => c.json({success:true,data:await archiveTemplateView(dbFor(c.env),await authority(c),c.req.param('viewId'),(await body(c)).expectedRevision)}));
-hqTemplates.post('/api/hq/templates/rich-menu-preview', inputJsonBoundary(), async c => c.json({success:true,data:await previewRichMenu(dbFor(c.env),await authority(c),await body(c),c.env.IMAGES)}));
 hqTemplates.get('/api/hq/templates/accounts', async c => c.json({ success: true, data: await listTemplateAccounts(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates/message-references', async c => c.json({ success: true, data: await listMessageReferences(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates/kind-counts', async c => {
