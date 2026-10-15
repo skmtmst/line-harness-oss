@@ -84,6 +84,9 @@ const NOW = new Date('2026-10-09T03:00:00.000Z');
 const NOW_SEC = Math.floor(NOW.getTime() / 1000);
 /** 受信口の鍵は32文字以上でないと使われない（deliveryWebhookSecret）。 */
 const UBEREATS_WEBHOOK_SECRET = 'ubereats-webhook-secret-0123456789ab';
+const DEMAECAN_WEBHOOK_SECRET = 'demaecan-webhook-secret-0123456789ab';
+/** Uber の受信口の鍵は同じアプリの Secret。本物の値ではない。 */
+const UBEREATS_CLIENT_SECRET = 'test-client-secret';
 const CANCEL_CONFIRM_TOKEN = 'delivery-order-cancel';
 const INTAKE_STOP_CONFIRM_TOKEN = 'delivery-intake-stop';
 
@@ -203,8 +206,8 @@ function useStaffRole(role: 'admin' | 'staff'): void {
 
 /* ------------------------------ 受信口の署名 ------------------------------ */
 
-/** 受信口が求める署名を本番と同じ材料（`${timestamp}.${rawBody}`）で作る。 */
-async function signWebhook(timestamp: number, rawBody: string, secret = UBEREATS_WEBHOOK_SECRET) {
+/** HMAC-SHA256 の小文字16進。受信口が求める形をそのまま作る。 */
+async function hmacHex(secret: string, message: string) {
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -212,10 +215,23 @@ async function signWebhook(timestamp: number, rawBody: string, secret = UBEREATS
     false,
     ['sign'],
   );
-  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${rawBody}`));
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
   return Array.from(new Uint8Array(signature))
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
+}
+
+/** 自社方式（出前館・ロケットナウ）の署名。材料は本番と同じ `${timestamp}.${rawBody}`。 */
+async function signWebhook(timestamp: number, rawBody: string, secret = DEMAECAN_WEBHOOK_SECRET) {
+  return hmacHex(secret, `${timestamp}.${rawBody}`);
+}
+
+/**
+ * Uber Eats の方式。公式仕様どおり**本文だけ**の署名で、鍵は同じアプリの Secret。
+ * Uber は時刻の見出しを送らないので、ここでも作らない。
+ */
+async function signUberWebhook(rawBody: string, secret = UBEREATS_CLIENT_SECRET) {
+  return hmacHex(secret, rawBody);
 }
 
 function orderCreatedPayload(
@@ -253,19 +269,22 @@ async function postWebhook(
     headers?: Record<string, string>;
   } = {},
 ) {
+  const service = init.service ?? 'ubereats';
   const rawBody = init.rawBody ?? JSON.stringify(payload);
   const timestamp = init.timestamp ?? NOW_SEC;
-  const signature = init.signature ?? (await signWebhook(timestamp, rawBody, init.secret));
+  // 署名の作り方はサービスごとに違う。Uber は本文だけ・時刻の見出しなし。
+  const signed: Record<string, string> =
+    service === 'ubereats'
+      ? { 'x-uber-signature': init.signature ?? (await signUberWebhook(rawBody, init.secret)) }
+      : {
+          'x-nen-timestamp': String(timestamp),
+          'x-nen-signature': init.signature ?? (await signWebhook(timestamp, rawBody, init.secret)),
+        };
   return app().request(
-    `/api/restaurant-test/delivery/webhooks/${init.service ?? 'ubereats'}`,
+    `/api/restaurant-test/delivery/webhooks/${service}`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-nen-timestamp': String(timestamp),
-        'x-nen-signature': signature,
-        ...(init.headers ?? {}),
-      },
+      headers: { 'Content-Type': 'application/json', ...signed, ...(init.headers ?? {}) },
       body: rawBody,
     },
     env,
@@ -355,6 +374,7 @@ beforeEach(() => {
     RT_DELIVERY_UBEREATS_API_BASE_URL: 'https://ubereats.example.test',
     RT_DELIVERY_UBEREATS_API_TOKEN: 'ubereats-token',
     RT_DELIVERY_UBEREATS_WEBHOOK_SECRET: UBEREATS_WEBHOOK_SECRET,
+    RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET: DEMAECAN_WEBHOOK_SECRET,
   } as unknown as Env['Bindings'];
   seedStore();
 });
@@ -518,28 +538,83 @@ describe('受信口（受入条件3）', () => {
     const payload = orderCreatedPayload();
     const signed = JSON.stringify(payload);
     const tampered = JSON.stringify({ ...payload, order: { ...payload.order, total_amount: 1 } });
-    const signature = await signWebhook(NOW_SEC, signed);
+    const signature = await signUberWebhook(signed);
 
     const response = await postWebhook(null, { rawBody: tampered, signature });
     expect(response.status).toBe(401);
     expect(eventRows()).toHaveLength(0);
   });
 
-  it('5分より古い通知は401で断る', async () => {
-    const response = await postWebhook(orderCreatedPayload(), { timestamp: NOW_SEC - 301 });
+  // Uber は公式仕様で時刻の見出しを送らないため、Uber の受信口では時刻を見ない。
+  // 見ると本物の通知を落としてしまうので、ここでそのことを固定する。
+  it('Uber からの通知は時刻の見出しが無くても受け付ける', async () => {
+    const rawBody = JSON.stringify(orderCreatedPayload());
+    const response = await app().request(
+      '/api/restaurant-test/delivery/webhooks/ubereats',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-uber-signature': await signUberWebhook(rawBody),
+        },
+        body: rawBody,
+      },
+      env,
+    );
+    expect(response.status).toBe(200);
+    expect(eventRows()).toHaveLength(1);
+  });
+
+  it('Uber の受信口に自社方式の見出しだけで送っても401になる', async () => {
+    const rawBody = JSON.stringify(orderCreatedPayload());
+    const response = await app().request(
+      '/api/restaurant-test/delivery/webhooks/ubereats',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-nen-timestamp': String(NOW_SEC),
+          'x-nen-signature': await signWebhook(NOW_SEC, rawBody, UBEREATS_CLIENT_SECRET),
+        },
+        body: rawBody,
+      },
+      env,
+    );
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({ error: 'Invalid signature' });
+    expect(eventRows()).toHaveLength(0);
+  });
+
+  it('Uber の受信口は静的なトークン用の合言葉では通らない', async () => {
+    const response = await postWebhook(orderCreatedPayload(), { secret: UBEREATS_WEBHOOK_SECRET });
+    expect(response.status).toBe(401);
+    expect(eventRows()).toHaveLength(0);
+  });
+
+  it('自社方式のサービスで5分より古い通知は401で断る', async () => {
+    const response = await postWebhook(orderCreatedPayload(), {
+      service: 'demaecan',
+      timestamp: NOW_SEC - 301,
+    });
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toMatchObject({ error: 'Expired request' });
     expect(eventRows()).toHaveLength(0);
   });
 
-  it('5分より先の時刻の通知も401で断る', async () => {
-    const response = await postWebhook(orderCreatedPayload(), { timestamp: NOW_SEC + 301 });
+  it('自社方式のサービスで5分より先の時刻の通知も401で断る', async () => {
+    const response = await postWebhook(orderCreatedPayload(), {
+      service: 'demaecan',
+      timestamp: NOW_SEC + 301,
+    });
     expect(response.status).toBe(401);
     expect(eventRows()).toHaveLength(0);
   });
 
-  it('5分以内のずれは受け付ける', async () => {
-    const response = await postWebhook(orderCreatedPayload(), { timestamp: NOW_SEC - 299 });
+  it('自社方式のサービスで5分以内のずれは受け付ける', async () => {
+    const response = await postWebhook(orderCreatedPayload(), {
+      service: 'demaecan',
+      timestamp: NOW_SEC - 299,
+    });
     expect(response.status).toBe(200);
     expect(eventRows()).toHaveLength(1);
   });
@@ -584,8 +659,9 @@ describe('受信口（受入条件3）', () => {
     expect(eventRows()).toHaveLength(0);
   });
 
+  // Uber の受信口の鍵は同じアプリの Secret なので、欠けを見るのもそちら。
   it('鍵が設定されていないサービスは503で断り、署名の判定へ進まない', async () => {
-    env = { ...env, RT_DELIVERY_UBEREATS_WEBHOOK_SECRET: undefined } as Env['Bindings'];
+    env = { ...env, RT_DELIVERY_UBEREATS_CLIENT_SECRET: undefined } as Env['Bindings'];
     const response = await postWebhook(orderCreatedPayload());
     expect(response.status).toBe(503);
     expect(eventRows()).toHaveLength(0);
@@ -687,7 +763,7 @@ describe('受信口の送信元IPの制限（出前館QA#7）', () => {
     env = {
       ...env,
       RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5',
-      RT_DELIVERY_UBEREATS_WEBHOOK_SECRET: undefined,
+      RT_DELIVERY_UBEREATS_CLIENT_SECRET: undefined,
     } as Env['Bindings'];
     // 鍵が無ければ本来は503だが、IPで断る方が先なので403になる。
     const response = await postWebhook(orderCreatedPayload(), {
@@ -1522,7 +1598,8 @@ describe('受信口の応答時間（出前館QA#10）', () => {
     const calls: Array<() => Promise<Response>> = [];
     for (let index = 0; index < count; index += 1) {
       const rawBody = JSON.stringify(make(index));
-      const signature = await signWebhook(NOW_SEC, rawBody);
+      // Uber の受信口なので Uber の方式（本文だけの署名・時刻の見出しなし）で作る。
+      const signature = await signUberWebhook(rawBody);
       calls.push(async () =>
         instance.request(
           '/api/restaurant-test/delivery/webhooks/ubereats',
@@ -1530,8 +1607,7 @@ describe('受信口の応答時間（出前館QA#10）', () => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-nen-timestamp': String(NOW_SEC),
-              'x-nen-signature': signature,
+              'x-uber-signature': signature,
             },
             body: rawBody,
           },

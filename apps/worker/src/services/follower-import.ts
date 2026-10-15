@@ -1,346 +1,89 @@
-import { getAccountSetting, jstNow, setAccountSetting } from '@line-crm/db';
+import { getAccountSetting, jstNow } from '@line-crm/db';
 
-const LINE_USER_ID_PATTERN = /^U[0-9a-f]{32}$/;
-// `WHERE line_user_id IN (?, ?, ...)` の ? の数。D1 が 1 文に受け付ける
-// バインド変数は 100 個までなので、他の条件を足す余地を見て 90 に抑えている。
-// **この数はこの SQL 文の形に紐づく。** 文に条件を足すときは一緒に減らす。
-const LOOKUP_CHUNK_SIZE = 90;
-// db.batch() にまとめて渡す **文の数**。上の 90 とは別の理由で決まる。
-// batch は文ごとに独立してバインドするので、変数 100 個の制限には当たらない。
-// ここは 1 回のトランザクションをどこまで大きくするかの話で、
-// 大きすぎると失敗したときに巻き戻る範囲が広くなる。
-const WRITE_CHUNK_SIZE = 100;
+import {
+  FOLLOWER_IMPORT_STATE_KEY,
+  getFollowerImportState,
+  type FollowerImportClient,
+  type FollowerImportState,
+  type OwnershipGuard,
+} from './follower-import-state.js';
+import { hydrateProfilePage, importIdPage } from './follower-import-pages.js';
+
+export {
+  FOLLOWER_IMPORT_STATE_KEY,
+  detectFollowerImportCapability,
+  emptyFollowerImportState,
+  getFollowerImportState,
+  startFollowerImport,
+} from './follower-import-state.js';
+export type {
+  FollowerImportCapability,
+  FollowerImportClient,
+  FollowerImportPhase,
+  FollowerImportState,
+  OwnershipGuard,
+} from './follower-import-state.js';
+
 // LINE のプロフィール取得は 1 人ずつしか引けない（まとめて引く API が無い）。
-// 1 回の実行でこの人数だけ引き、続きは次の実行に回す。
-// LINE のレート制限に当たらないための数ではなく、1 回の実行を短く終わらせるための数。
-const PROFILE_BATCH_SIZE = 25;
-export const FOLLOWER_IMPORT_STATE_KEY = 'follower_import_v1';
-
-export interface FollowerImportClient {
-  getFollowerIds(limit: number, start?: string): Promise<{
-    userIds: string[];
-    next?: string;
-  }>;
-  getProfile(userId: string): Promise<{
-    displayName?: string;
-    pictureUrl?: string;
-    statusMessage?: string;
-  }>;
-}
-
-export type FollowerImportCapability = 'unknown' | 'available' | 'unavailable';
-export type FollowerImportPhase =
-  | 'not_started'
-  | 'importing_ids'
-  | 'hydrating_profiles'
-  | 'completed';
-
-export interface FollowerImportState {
-  version: 1;
-  capability: FollowerImportCapability;
-  phase: FollowerImportPhase;
-  eligibilityCheckedAt: string | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  updatedAt: string;
-  cursor: string | null;
-  profileCursor: string | null;
-  received: number;
-  imported: number;
-  reactivated: number;
-  claimedUnassigned: number;
-  alreadyPresent: number;
-  conflicts: number;
-  invalid: number;
-  profilesProcessed: number;
-  profilesUpdated: number;
-  profileErrors: number;
-  lastError: string | null;
-  lockToken?: string | null;
-  lockUntil?: string | null;
-}
-
-interface ExistingFriend {
-  line_user_id: string;
-  line_account_id: string | null;
-  is_following: number;
-}
-
-function chunks<T>(items: T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < items.length; i += size) result.push(items.slice(i, i + size));
-  return result;
-}
-
-export function emptyFollowerImportState(): FollowerImportState {
-  return {
-    version: 1,
-    capability: 'unknown',
-    phase: 'not_started',
-    eligibilityCheckedAt: null,
-    startedAt: null,
-    completedAt: null,
-    updatedAt: jstNow(),
-    cursor: null,
-    profileCursor: null,
-    received: 0,
-    imported: 0,
-    reactivated: 0,
-    claimedUnassigned: 0,
-    alreadyPresent: 0,
-    conflicts: 0,
-    invalid: 0,
-    profilesProcessed: 0,
-    profilesUpdated: 0,
-    profileErrors: 0,
-    lastError: null,
-  };
-}
-
-export async function getFollowerImportState(
-  db: D1Database,
-  lineAccountId: string,
-): Promise<FollowerImportState> {
-  const raw = await getAccountSetting(db, lineAccountId, FOLLOWER_IMPORT_STATE_KEY);
-  if (!raw) return emptyFollowerImportState();
-  try {
-    return { ...emptyFollowerImportState(), ...JSON.parse(raw) } as FollowerImportState;
-  } catch {
-    return emptyFollowerImportState();
-  }
-}
-
-async function saveState(
-  db: D1Database,
-  lineAccountId: string,
-  state: FollowerImportState,
-): Promise<void> {
-  state.updatedAt = jstNow();
-  await setAccountSetting(
-    db,
-    lineAccountId,
-    FOLLOWER_IMPORT_STATE_KEY,
-    JSON.stringify(state),
-  );
-}
-
-/**
- * LINE exposes no account-type field in /v2/bot/info. A one-item, read-only
- * followers request is therefore the authoritative capability probe.
- */
-export async function detectFollowerImportCapability(
-  db: D1Database,
-  client: Pick<FollowerImportClient, 'getFollowerIds'>,
-  lineAccountId: string,
-): Promise<FollowerImportState> {
-  const state = await getFollowerImportState(db, lineAccountId);
-  try {
-    await client.getFollowerIds(1);
-    state.capability = 'available';
-    state.lastError = null;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (/LINE API error:\s*403/i.test(message)) {
-      state.capability = 'unavailable';
-      state.lastError = null;
-    } else {
-      state.capability = 'unknown';
-      state.lastError = '利用可否を確認できませんでした';
-    }
-  }
-  state.eligibilityCheckedAt = jstNow();
-  await saveState(db, lineAccountId, state);
-  return state;
-}
-
-/** Start once or resume an interrupted migration. Completed jobs stay closed. */
-export async function startFollowerImport(
-  db: D1Database,
-  lineAccountId: string,
-): Promise<FollowerImportState> {
-  const state = await getFollowerImportState(db, lineAccountId);
-  if (state.capability !== 'available') {
-    throw new Error('FOLLOWER_IMPORT_NOT_AVAILABLE');
-  }
-  if (state.phase === 'completed') return state;
-  if (state.phase === 'not_started') {
-    const capability = state.capability;
-    const eligibilityCheckedAt = state.eligibilityCheckedAt;
-    Object.assign(state, emptyFollowerImportState(), {
-      capability,
-      eligibilityCheckedAt,
-      phase: 'importing_ids' as const,
-      startedAt: jstNow(),
-    });
-  }
-  state.lastError = null;
-  await saveState(db, lineAccountId, state);
-  return state;
-}
-
-async function importIdPage(
-  db: D1Database,
-  client: Pick<FollowerImportClient, 'getFollowerIds'>,
-  lineAccountId: string,
-  state: FollowerImportState,
-): Promise<void> {
-  const page = await client.getFollowerIds(1000, state.cursor ?? undefined);
-  const receivedIds = Array.isArray(page.userIds) ? page.userIds : [];
-  const validIds = [...new Set(receivedIds.filter((id) => LINE_USER_ID_PATTERN.test(id)))];
-  const invalid = receivedIds.filter((id) => !LINE_USER_ID_PATTERN.test(id)).length;
-
-  const existingById = new Map<string, ExistingFriend>();
-  for (const group of chunks(validIds, LOOKUP_CHUNK_SIZE)) {
-    const placeholders = group.map(() => '?').join(',');
-    const scopedRows = await db
-      .prepare(
-        `SELECT line_user_id, line_account_id, is_following
-           FROM friends
-          WHERE line_account_id = ?
-            AND line_user_id IN (${placeholders})`,
-      )
-      .bind(lineAccountId, ...group)
-      .all<ExistingFriend>();
-    for (const row of scopedRows.results ?? []) existingById.set(row.line_user_id, row);
-
-    // C-2bまでは、未割当行や別アカウント行を従来どおり競合として扱う。
-    // 指定アカウントで見つからなかったIDだけ無指定検索へフォールバックする。
-    const unresolved = group.filter((lineUserId) => !existingById.has(lineUserId));
-    if (unresolved.length > 0) {
-      const unresolvedPlaceholders = unresolved.map(() => '?').join(',');
-      const fallbackRows = await db
-        .prepare(
-          `SELECT line_user_id, line_account_id, is_following
-             FROM friends
-            WHERE line_user_id IN (${unresolvedPlaceholders})`,
-        )
-        .bind(...unresolved)
-        .all<ExistingFriend>();
-      for (const row of fallbackRows.results ?? []) existingById.set(row.line_user_id, row);
-    }
-  }
-
-  const writableIds: string[] = [];
-  for (const lineUserId of validIds) {
-    const existing = existingById.get(lineUserId);
-    if (!existing) {
-      state.imported += 1;
-      writableIds.push(lineUserId);
-    } else if (existing.line_account_id === null) {
-      state.claimedUnassigned += 1;
-      writableIds.push(lineUserId);
-    } else if (existing.line_account_id !== lineAccountId) {
-      // C-2b: 複合一意制約へ移行したら、競合ではなくこのアカウント用の行を取り込む。
-      state.conflicts += 1;
-    } else if (existing.is_following === 0) {
-      state.reactivated += 1;
-      writableIds.push(lineUserId);
-    } else {
-      state.alreadyPresent += 1;
-    }
-  }
-
-  const now = jstNow();
-  for (const group of chunks(writableIds, WRITE_CHUNK_SIZE)) {
-    await db.batch(group.map((lineUserId) =>
-      db.prepare(
-        `INSERT INTO friends
-           (id, line_user_id, display_name, picture_url, status_message,
-            is_following, line_account_id, created_at, updated_at)
-         VALUES (?, ?, NULL, NULL, NULL, 1, ?, ?, ?)
-         ON CONFLICT(line_user_id) DO UPDATE SET
-           line_account_id = COALESCE(friends.line_account_id, excluded.line_account_id),
-           is_following = 1,
-           updated_at = excluded.updated_at
-         WHERE (friends.line_account_id IS NULL OR friends.line_account_id = excluded.line_account_id)
-           AND (friends.line_account_id IS NULL OR friends.is_following != 1)`,
-      ).bind(crypto.randomUUID(), lineUserId, lineAccountId, now, now),
-    ));
-  }
-
-  state.received += receivedIds.length;
-  state.invalid += invalid;
-  state.cursor = typeof page.next === 'string' && page.next ? page.next : null;
-  if (!state.cursor) state.phase = 'hydrating_profiles';
-}
-
-async function hydrateProfilePage(
-  db: D1Database,
-  client: Pick<FollowerImportClient, 'getProfile'>,
-  lineAccountId: string,
-  state: FollowerImportState,
-): Promise<void> {
-  const rows = await db.prepare(
-    `SELECT id, line_user_id
-       FROM friends
-      WHERE line_account_id = ?
-        AND is_following = 1
-        AND display_name IS NULL
-        AND id > ?
-      ORDER BY id
-      LIMIT ?`,
-  ).bind(lineAccountId, state.profileCursor ?? '', PROFILE_BATCH_SIZE)
-    .all<{ id: string; line_user_id: string }>();
-  const batch = rows.results ?? [];
-
-  for (const group of chunks(batch, 5)) {
-    await Promise.all(group.map(async (row) => {
-      try {
-        const profile = await client.getProfile(row.line_user_id);
-        await db.prepare(
-          `UPDATE friends
-              SET display_name = ?, picture_url = ?, status_message = ?, updated_at = ?
-            WHERE id = ?`,
-        ).bind(
-          profile.displayName ?? null,
-          profile.pictureUrl ?? null,
-          profile.statusMessage ?? null,
-          jstNow(),
-          row.id,
-        ).run();
-        state.profilesUpdated += 1;
-      } catch {
-        state.profileErrors += 1;
-      }
-      state.profilesProcessed += 1;
-    }));
-  }
-
-  if (batch.length > 0) state.profileCursor = batch[batch.length - 1].id;
-  if (batch.length < PROFILE_BATCH_SIZE) {
-    state.phase = 'completed';
-    state.completedAt = jstNow();
-  }
-}
+// 1 回の実行で引くプロフィールの上限。有料プランのサブリクエストは
+// 1 invocation あたり 10,000 回までで、D1 の呼び出しもここに数えられる。
+// 1 人 1 回の取得に加えてページ読み出しと書き戻しの分を空けて 9,000 人で切る。
+const PROFILE_MAX_PER_RUN = 9_000;
+// 1 回の実行に使う時間の既定値。画面から呼ばれたときの応答がこの長さになる。
+// 使い切っても D1 のカーソルが残るので、続きは次の実行が引き継ぐ。
+const DEFAULT_RUN_BUDGET_MS = 20_000;
+// 時間予算に上乗せしてロックを押さえておく余白。
+// 実行中に別の経路が同じアカウントへ入ってこないようにするための余白で、
+// 予算を使い切った直後に解放されるよう短くしてある。
+// 予算の超過はページの途中でも時間を見るので、走っている途中の
+// プロフィール取得 1 本とそのページの書き戻しの分だけ。この余白で収まる。
+const LOCK_MARGIN_MS = 30_000;
 
 export interface FollowerImportStepResult {
   state: FollowerImportState;
   busy: boolean;
+  /** この実行で読み出したプロフィールの人数。呼び出し側が残りの枠を引くのに使う。 */
+  profilesFetched: number;
+}
+
+export interface FollowerImportStepOptions {
+  /** この実行に使える時間。使い切ると途中で返し、続きは次の実行が引き継ぐ。 */
+  budgetMs?: number;
+  /** この実行で引けるプロフィールの上限。1 invocation のサブリクエスト枠を分け合うのに使う。 */
+  maxProfiles?: number;
 }
 
 /**
- * Process one bounded unit. State/cursors live in D1, so closing the browser
- * continues in the scheduled lane; requests may also resume it under the same lock.
+ * Process as much as the given time/subrequest budget allows. State and cursors
+ * live in D1, so closing the browser continues in the scheduled lane; requests
+ * may also resume it under the same lock.
  */
 export async function processFollowerImportStep(
   db: D1Database,
   client: FollowerImportClient,
   lineAccountId: string,
+  options: FollowerImportStepOptions = {},
 ): Promise<FollowerImportStepResult> {
   let state = await getFollowerImportState(db, lineAccountId);
   if (state.phase === 'not_started' || state.phase === 'completed') {
-    return { state, busy: false };
+    return { state, busy: false, profilesFetched: 0 };
   }
 
   const nowMs = Date.now();
   if (state.lockUntil && new Date(state.lockUntil).getTime() > nowMs) {
-    return { state, busy: true };
+    return { state, busy: true, profilesFetched: 0 };
   }
 
+  const budgetMs = Math.max(1_000, options.budgetMs ?? DEFAULT_RUN_BUDGET_MS);
+  const maxProfiles = Math.max(1, options.maxProfiles ?? PROFILE_MAX_PER_RUN);
+  const deadlineMs = nowMs + budgetMs;
+
   const lockToken = crypto.randomUUID();
-  const lockUntil = new Date(nowMs + 60_000).toISOString();
+  // ロックは時間予算より少しだけ長く押さえる。予算を使い切った直後に
+  // 解放されるので、続きを次の実行がすぐ拾える。
+  const lockUntil = new Date(deadlineMs + LOCK_MARGIN_MS).toISOString();
   const oldRaw = await getAccountSetting(db, lineAccountId, FOLLOWER_IMPORT_STATE_KEY);
-  if (!oldRaw) return { state, busy: true };
+  if (!oldRaw) return { state, busy: true, profilesFetched: 0 };
   const locked = { ...state, lockToken, lockUntil, updatedAt: jstNow() };
   const claim = await db.prepare(
     `UPDATE account_settings
@@ -350,22 +93,100 @@ export async function processFollowerImportStep(
     JSON.stringify(locked), locked.updatedAt, lineAccountId,
     FOLLOWER_IMPORT_STATE_KEY, oldRaw,
   ).run();
-  if ((claim.meta.changes ?? 0) === 0) return { state, busy: true };
+  if ((claim.meta.changes ?? 0) === 0) return { state, busy: true, profilesFetched: 0 };
   state = locked;
 
-  try {
-    if (state.phase === 'importing_ids') {
-      await importIdPage(db, client, lineAccountId, state);
-    } else if (state.phase === 'hydrating_profiles') {
-      await hydrateProfilePage(db, client, lineAccountId, state);
+  // 今 DB に入っている文字列を覚えておく。この実行の保存はすべて
+  // 「自分が最後に書いた内容のまま」を条件にして書く。ロックの期限が
+  // 切れたあとに別の実行が続きを引き継いでいた場合、ここが食い違うので
+  // 書き込みは不成立になり、新しい進み具合を古い内容で巻き戻さない。
+  let currentRaw = JSON.stringify(locked);
+  let lockLost = false;
+
+  const persist = async (): Promise<boolean> => {
+    state.updatedAt = jstNow();
+    const raw = JSON.stringify(state);
+    const saved = await db.prepare(
+      `UPDATE account_settings
+          SET value = ?, updated_at = ?
+        WHERE line_account_id = ? AND key = ? AND value = ?`,
+    ).bind(
+      raw, state.updatedAt, lineAccountId,
+      FOLLOWER_IMPORT_STATE_KEY, currentRaw,
+    ).run();
+    if ((saved.meta.changes ?? 0) === 0) {
+      lockLost = true;
+      return false;
     }
-    state.lastError = null;
+    currentRaw = raw;
+    return true;
+  };
+
+  // 友だち行への書き込みも同じ条件で守る。状態の保存だけを守っても、
+  // 期限切れの旧実行が抱えている古いプロフィールが friends に入ってしまう。
+  // currentRaw は保存のたびに進むので、条件の値は文を組むたびに読み直す。
+  const guard: OwnershipGuard = {
+    sql: `EXISTS (
+            SELECT 1
+              FROM account_settings
+             WHERE line_account_id = ? AND key = ? AND value = ?
+          )`,
+    binds: () => [lineAccountId, FOLLOWER_IMPORT_STATE_KEY, currentRaw],
+    stillOwned: async () => (
+      await getAccountSetting(db, lineAccountId, FOLLOWER_IMPORT_STATE_KEY)
+    ) === currentRaw,
+  };
+
+  let profilesFetched = 0;
+  try {
+    // 1 ページ終わるたびに予算を見て、残っていれば続けて次のページへ進む。
+    // 以前は 1 回の実行で 1 ページだけ進めていたので、人数が多いと
+    // 刻みの回数だけ待つことになっていた。
+    while (state.phase === 'importing_ids' || state.phase === 'hydrating_profiles') {
+      if (state.phase === 'importing_ids') {
+        await importIdPage(db, client, lineAccountId, state, guard);
+      } else {
+        const page = await hydrateProfilePage(
+          db, client, lineAccountId, state, maxProfiles - profilesFetched, deadlineMs, guard,
+        );
+        profilesFetched += page.attempted;
+        // 書き戻しが交代後で成立しなかった。この実行は何も保存せず、
+        // ロックも解除せずに降りる（解除すると引き継いだ側のロックを外す）。
+        if (page.lockLost) {
+          lockLost = true;
+          break;
+        }
+        // 何も進まなかったページをもう一度引いても同じ結果になる。
+        // D1 が落ちている・時間切れ・全員取得失敗のいずれかなので、
+        // ここで切り上げて続きを次の実行へ渡す。
+        if (!page.progressed) break;
+      }
+      // 1 ページ分の進み具合をここで保存する。最後の finally だけに任せると、
+      // CPU 上限や立ち退きで実行が打ち切られたときに、DB には書けている
+      // のに件数とカーソルが古いまま残る。ロックの項目はそのまま残すので
+      // 他の実行は入ってこない。書き込みは 1 ページに 1 回だけ。
+      // 書けなかったときは、ロックの期限切れで別の実行が続きを持っている。
+      // 自分の手元の状態はもう古いので、何も書かずにここで降りる。
+      if (!(await persist())) break;
+      if (profilesFetched >= maxProfiles) break;
+      if (Date.now() >= deadlineMs) break;
+    }
+    if (!lockLost) state.lastError = null;
   } catch (err) {
     state.lastError = '取り込みを再試行しています。しばらくして進み具合を確認してください。';
   } finally {
-    state.lockToken = null;
-    state.lockUntil = null;
-    await saveState(db, lineAccountId, state);
+    // 続きを別の実行へ渡したあとに自分のロック解除を書くと、
+    // 相手のロックまで外してしまう。持っているときだけ解放する。
+    if (!lockLost) {
+      state.lockToken = null;
+      state.lockUntil = null;
+      await persist();
+    }
   }
-  return { state, busy: false };
+  if (lockLost) {
+    // 自分は追い抜かれた側。DB の最新を読み直して返す。
+    const fresh = await getFollowerImportState(db, lineAccountId);
+    return { state: fresh, busy: true, profilesFetched };
+  }
+  return { state, busy: false, profilesFetched };
 }
