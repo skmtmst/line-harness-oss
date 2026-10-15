@@ -18,7 +18,7 @@
  *
  * 作ってあるものを選ぶ窓は共通の選ぶ窓（EntityPicker・Pen dJZ7Q）。下の `TapTargetPicker` で呼ぶ。
  */
-import { useMemo, useState, type ReactNode } from 'react'
+import { useId, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { CalendarCheck, ChevronRight, ClipboardList, ExternalLink, History, Info, MessageSquare, Stamp, type LucideIcon } from 'lucide-react'
 import {
@@ -90,6 +90,8 @@ export interface TapActionFieldProps {
   sources?: TapActionSources
   /** 'row'＝押したら・中身を横に並べる（ボタンの行）。'stack'＝縦に積む（狭い右の列）。 */
   layout?: 'row' | 'stack'
+  /** 作成の面で種類を直接選ぶ。指定しない欄は既存のSelect。 */
+  kindPresentation?: 'select' | 'grid'
   /** テキストを送るの文字数の上限（LINE の決まりは画面ごとに違う）。 */
   textMax?: number
   /** URL の欄の薄い字（既定 https://example.com）。 */
@@ -116,27 +118,39 @@ export default function TapActionField({
   id, invalid, 'aria-describedby': saveDescription,
   name, value, onChange, kinds = TAP_ACTION_KINDS, extraKinds = [], renderBody,
   scope = 'shop', hasLiff, liffSettingsHref = '/accounts', readOnly = false, sources,
-  layout = 'row', textMax, kindLabel, allowExtras = false, accountId, extrasUnavailable, extrasError, uriPlaceholder = 'https://example.com',
+  layout = 'row', kindPresentation = 'select', textMax, kindLabel, allowExtras = false, accountId, extrasUnavailable, extrasError, uriPlaceholder = 'https://example.com',
 }: TapActionFieldProps) {
   const options = useMemo(() => kindOptionsOf(kinds, extraKinds, value.kind), [kinds, extraKinds, value.kind])
   const current = options.find((option) => option.value === value.kind)
   const CurrentIcon = current?.icon
   const def = tapActionDef(value.kind)
   const [picking, setPicking] = useState(false)
-  const PickRow = readOnly ? 'div' : 'button'
+  const kindName = useId()
+  const changeKind = (next: string) => { if (next !== value.kind) onChange({ kind: next, refId: '' }) }
 
   const kindControl = readOnly ? (
     <span className={styles.readKind} aria-label={`${kindLabel ?? `${name}を押したら`}：${current?.label ?? ''}`}>
       {CurrentIcon ? <CurrentIcon className={styles.icon} aria-hidden="true" /> : null}
       <span className={styles.readText}>{current?.label ?? '—'}</span>
     </span>
+  ) : kindPresentation === 'grid' ? (
+    <fieldset className={styles.choices} data-shared-part="tap-action-choices">
+      <legend className="sr-only">{kindLabel ?? `${name}を押したら`}</legend>
+      <div className={styles.choiceGrid}>{options.map(({ value: optionValue, label, description, icon: Icon }) => (
+        <label key={optionValue} className={styles.choice} title={description}>
+          <input className={styles.choiceInput} type="radio" name={kindName} value={optionValue} aria-label={label} checked={value.kind === optionValue} onChange={() => changeKind(optionValue)} />
+          <Icon className={styles.icon} aria-hidden="true" />
+          <span className={styles.readText}>{label}</span>
+        </label>
+      ))}</div>
+    </fieldset>
   ) : (
     <Select
       size="full"
       aria-label={kindLabel ?? `${name}を押したら`}
       value={value.kind}
       icon={CurrentIcon ? <CurrentIcon className={styles.icon} /> : undefined}
-      onChange={(next) => { if (next !== value.kind) onChange({ kind: next, refId: '' }) }}
+      onChange={changeKind}
       options={options.map(({ value: optionValue, label, description, icon: Icon }) => ({
         value: optionValue,
         label,
@@ -204,7 +218,7 @@ export default function TapActionField({
   }
 
   return (
-    <div id={id} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined} className={styles.withExtras}><div className={layout === 'stack' ? `${styles.root} ${styles.stack}` : `${styles.root} ${styles.row}`} data-tap-kind={value.kind}>
+    <div id={id} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined} className={styles.withExtras}><div className={`${styles.root} ${kindPresentation === 'grid' ? styles.grid : layout === 'stack' ? styles.stack : styles.row}`} data-tap-kind={value.kind}>
       <div className={styles.kind}>{kindControl}</div>
       <div className={styles.body}>{body}</div>
     </div>

@@ -297,10 +297,6 @@
 }
 .confirmSample {
   margin: 0;
-  padding: var(--tpl-rule-row-gap);
-  border-radius: var(--radius-segment);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
   color: var(--color-ink);
   font-size: var(--text-caption);
   line-height: var(--tpl-wh-cell-lh);

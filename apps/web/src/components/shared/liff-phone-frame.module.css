@@ -68,7 +68,7 @@
 
 .barMain {
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 700;
   line-height: var(--tpl-bks-ph-bar-title-lh);
 }
@@ -127,7 +127,7 @@
 
 .content { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
 .root { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 0; }
-.caption { align-self: stretch; margin: 0; font-size: var(--text-label); font-weight: 600; }
+.caption { align-self: stretch; margin: 0; font-size: var(--text-lead); font-weight: var(--polish-weight-title); line-height: var(--tpl-bks-ph-caption-lh); }
 /* 下端の印は下の余白に重ねる。中身や保存の段を20px持ち上げない。 */
 .home { position: absolute; inset-inline: 0; bottom: 0; height: 20px; display: grid; place-items: center; pointer-events: none; }
 .home span { width: 100px; height: 4px; border-radius: var(--radius-chart-bar); background: var(--color-ink); }

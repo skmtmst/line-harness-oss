@@ -11,7 +11,7 @@ import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import TextLink from '@/components/shared/text-link'
 import { TimeField } from '@/components/shared/date-time-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { RowMenu } from '@/components/shared/row-actions'
 import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
 import { slotReasonLabel } from '../lib/slot-reason'
@@ -207,7 +207,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             return (
               <div key={weekday} className={styles.dayRow}>
                 <div className={styles.dayName}>
-                  <SaveErrorField names={["isOpen","is_open"]}><SettingCheckbox
+                  <SaveErrorField names={["isOpen","is_open"]}><Toggle
                     label={`${label}を${isOpen ? '休みにする' : '開ける'}`}
                     checked={isOpen}
                     onChange={(next) => updateDay(weekday, () => next ? [{ start: '09:00', end: '18:00', capacity: 1 }] : [])}

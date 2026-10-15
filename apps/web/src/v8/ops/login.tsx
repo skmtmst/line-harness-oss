@@ -131,7 +131,7 @@ export default function OpsLoginV8() {
         </span>
       </div>
       <Card variant="form" className={styles.card} aria-labelledby="ops-login-title">
-        <PageHeading inset="none" title="ログイン" titleId="ops-login-title" titleAs="h1" help={<> 運営メンバーの招待を受けた方は、招待メールのリンクから設定してください</>} />
+        <PageHeading inset="none" title="ログイン" titleId="ops-login-title" titleAs="h1" />
         <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
           {error ? <Notice tone="danger" message={error} /> : null}
           <div className={styles.field}><Field label="メールアドレス" htmlFor="ops-login-email" required><SaveErrorField names={["email"]}><TextField
@@ -160,7 +160,7 @@ export default function OpsLoginV8() {
           <MessageCircle aria-hidden="true" />LINE でログイン
         </Button>
         <Link href="/password/forgot" className={styles.forgot}>パスワードを忘れた方はこちら</Link>
-
+        <p className={styles.note}>運営メンバーの招待を受けた方は、招待メールのリンクから設定してください</p>
       </Card>
       <p className={styles.foot}>この画面は運営メンバーだけが開けます。操作はすべて記録されます。</p>
     </main></SaveErrorScope>

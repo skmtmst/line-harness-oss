@@ -1,5 +1,4 @@
 'use client'
-
 import TagPickerField from '@/components/shared/tag-picker-field'
 import { useId } from 'react'
 import { ArrowLeftRight, CalendarClock, Copy, Phone, Send, Zap } from 'lucide-react'
@@ -423,6 +422,7 @@ export function AreaProperties({
         <span className="text-ink-secondary text-xs font-medium">押したときの動き</span>
         <div className="mt-1">
           <SaveErrorField names={["このボタン","area"]}><TapActionField
+            kindPresentation={showManagementDetails ? 'select' : 'grid'}
             layout="stack"
             name="このボタン"
             kindLabel="押したときの動き"

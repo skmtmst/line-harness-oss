@@ -8,11 +8,7 @@
 .loadingHead { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) 0; }
 .loading { margin: 0; padding: var(--tpl-eds-loading-pad); color: var(--color-ink-faint); font-size: var(--text-label); text-align: center; }
 
-/* 左右の列：左 余白24/28・間16、右 幅380・余白24・間14・左に線。 */
-.split { display: flex; flex: 1; min-width: 0; }
-.content { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-content-gap); min-width: 0; padding: var(--tpl-eds-content-pad); }
-.aside { display: flex; flex-direction: column; flex-shrink: 0; width: var(--tpl-eds-aside-w); padding: var(--tpl-eds-aside-pad); border-left: 1px solid var(--color-hairline); }
-.side { display: flex; flex-direction: column; gap: var(--tpl-eds-aside-gap); min-width: 0; }
+.side { display: flex; flex-direction: column; gap: var(--tpl-eds-aside-gap); min-width: 0; width: 100%; }
 
 /* 閲覧のみの帯。 */
 .roBand { margin: 0; }

@@ -17,7 +17,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import type { Automation } from '@line-crm/shared'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 import { api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail, type AutomationDraftDetail } from '@/lib/api'
-import { ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, Pencil, Play, Tag as TagIcon, Trash2, UserPlus, UserRound, Zap } from 'lucide-react'
+import { ArrowDown, ArrowLeftRight, ArrowUp, Bell, ChevronDown, FileText, FilePen, MessageCircle, Pencil, Play, Tag as TagIcon, Trash2, UserPlus, UserRound, Zap } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Card from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -2728,7 +2728,7 @@ export function NewAutomationV8({
           <p className={styles.cardDesc}>上から順に動きます</p>
         </div>
         <ActionList<ActionDraft> value={actions} onChange = {setActions} readOnly ={!canEdit} idOf={row => String(row.key)} addId="v8-add-action" editingId={editingActionKey === null ? null : String(editingActionKey)}
-          titleOf={actionRowDetail} kindOf={row =>actionRowTitle(row.type)}
+          titleOf={actionRowDetail} kindOf={row =>actionRowTitle(row.type)} iconOf={row => row.type === 'add_tag' ? TagIcon : row.type === 'send_message' ? FileText : row.type === 'notify_staff' ? Bell : Zap} quickAddChoiceId="common_action"
           choices={EDITABLE_ACTIONS.map(kind =>{
             const target= kind.value === 'add_tag' ? { items: tags,key : 'tagId', title: 'タグ'}
               : kind.value=== 'start_scenario' ?{ items: scenarios, key: 'scenarioId', title: 'シナリオ' }
