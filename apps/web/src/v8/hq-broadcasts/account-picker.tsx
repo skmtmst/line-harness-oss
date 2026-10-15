@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react'
 import type { Folder, LineAccount } from '@line-crm/shared'
-import StatusBadge from '@/components/shared/status-badge'
 import { PICKER_ALL, PICKER_UNFILED } from '@/components/shared/entity-picker'
 import { HqAccountPickerDialog, type HqAccountFolders } from '@/components/shared/hq-account-picker'
 import { formatNumber } from '@/lib/format'
@@ -10,16 +9,14 @@ import styles from './account-picker.module.css'
 
 export type BroadcastAccount = LineAccount & { friendCount: number | null }
 
+/** 行の2段目の状態（絵 WjFWW：「1,284 人・つながっています」）。送れない・要確認は色で分ける。 */
 function AccountConnection({ account }: { account: BroadcastAccount }) {
-  const blocked = account.isActive === false || account.channelAccessTokenConfigured === false
-  const reason = account.isActive === false ? 'アカウントを停止しているため、今は送れません。'
-    : account.channelAccessTokenConfigured === false ? 'LINE のトークンが未設定のため、今は送れません。'
-    : account.connection?.status === 'warn' ? 'LINE の接続設定を確認してください。送れるかは最終確認で確かめます。' : ''
-  const status = blocked ? '送れません' : account.connection?.status === 'ok' ? '正常' : account.connection?.status === 'warn' ? '要確認' : '未確認'
-  return <span className={styles.connection}>
-    <StatusBadge size="compact" tone={blocked ? 'danger' : status === '正常' ? 'success' : status === '要確認' ? 'warning' : 'neutral'}>{status}</StatusBadge>
-    {reason ? <small className={styles.reason} title={reason}>{reason}</small> : null}
-  </span>
+  const text = account.isActive === false ? '今は送れません（アカウントを停止中）'
+    : account.channelAccessTokenConfigured === false ? '今は送れません（LINE のトークンが未設定）'
+    : account.connection?.status === 'ok' ? 'つながっています'
+    : account.connection?.status === 'warn' ? '接続を確かめてください' : '接続は未確認'
+  const tone = account.isActive === false || account.channelAccessTokenConfigured === false ? 'danger' : account.connection?.status === 'warn' ? 'warning' : undefined
+  return <span className={styles.connection} data-tone={tone} title={tone === 'warning' ? '送れるかは最終確認で確かめます。' : undefined}>{`・${text}`}</span>
 }
 
 /** 送るアカウントを選ぶ窓（共通の配るアカウントの窓・dJZ7Q）。確定するまでは配信の宛先を変えない。 */
@@ -35,7 +32,8 @@ export default function BroadcastAccountPicker({ accounts, folders, foldersFaile
   }])) }), [accounts, folders, foldersFailed])
   const startFolder = !initialFolder || initialFolder === 'all' ? PICKER_ALL : initialFolder === 'none' ? PICKER_UNFILED : initialFolder
   return <HqAccountPickerDialog title="送るアカウントを選ぶ" accounts={accounts} data={data} initialIds={initialIds} initialFolder={startFolder}
-    meta={(account) => `友だち ${byId.get(account.id)?.friendCount == null ? '—（未取得）' : formatNumber(byId.get(account.id)!.friendCount!)} 人`}
+    meta={(account) => `${byId.get(account.id)?.friendCount == null ? '—（未取得）' : formatNumber(byId.get(account.id)!.friendCount!)} 人`}
     rowExtra={(item) => <AccountConnection account={byId.get(item.id)!} />}
+    note="除く人は次の手順で決めます" stacked
     onConfirm={onConfirm} onCancel={onCancel} />
 }

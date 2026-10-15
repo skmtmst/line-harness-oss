@@ -500,7 +500,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /^配る先：(選ぶ|変える)$/ }))
     const picker = await findPickerDialog('配るアカウントを選ぶ')
     for (const name of names) fireEvent.click(within(picker).getByRole('checkbox', { name }))
-    fireEvent.click(within(picker).getByRole('button', { name: `この ${names.length} アカウントにする` }))
+    fireEvent.click(within(picker).getByRole('button', { name: `選ぶ（${names.length}件）` }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '配るアカウントを選ぶ' })).toBeNull())
   }
   async function selectFolder() {

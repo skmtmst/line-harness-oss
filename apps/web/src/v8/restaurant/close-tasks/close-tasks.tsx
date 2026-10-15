@@ -135,7 +135,6 @@ export default function CloseTasksPage() {
     content = <ListState kind="empty" title={tab === 'open' ? '未対応の知らせはありません' : '閉じた知らせはありません'} description={tab === 'open' ? '他の予約サイトの枠を閉じる必要があると、ここに出ます。' : undefined} />
   } else {
     content = (
-      <div className={styles.tableWrap}>
       <DataTable presentation="columns" data-design="restaurant-close-tasks">
         <thead>
           <TableHeadRow data-table-layout="columns">
@@ -202,13 +201,13 @@ export default function CloseTasksPage() {
           })}
         </tbody>
       </DataTable>
-      </div>
     )
   }
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="YMVFD"
+      tableInset
       headingSize="compact"
       title="他のサイトの枠を閉じる知らせ"
       help="LINE や電話で予約が入って席が少なくなった枠を、ほかの予約サイトでも閉じるための知らせです。閉じたら［閉じた］を押します。キャンセルで席が戻った枠は「もう開けてよい」になります。"

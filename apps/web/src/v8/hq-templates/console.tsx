@@ -225,7 +225,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
    */
   const toListRef = useRef<() => void>(() => {})
   usePageTitle((stage === 'list' || stage === 'saved') ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : stage === 'detail' ? (detail?.template.name ?? PAGE_TITLES[type]) : pageTitle)
-  usePageCrumbs(stage === 'list' || stage === 'saved'
+  /* 回答フォームの編集は、編集画面が上の帯の題を「回答フォーム」にする（絵 u5MM7・P90Vp0）。一覧の段を重ねると「回答フォーム › 回答フォーム」になるので足さない。 */
+  usePageCrumbs(stage === 'list' || stage === 'saved' || (stage === 'edit' && type === 'form')
     ? [{ label: 'ホーム', href: '/' }]
     : [{ label: PAGE_TITLES[type], href: LIST_HREFS[type], onSelect: () => toListRef.current() }])
 
@@ -818,6 +819,25 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           setMessage('ひな形を複製しました。')
         })}
         onEnterAccount={(accountId) => { setSelectedAccountId(accountId); router.push('/templates') }}
+        onRemove={canEdit ? () => setRemove(detail.template) : undefined}
+      />
+      <ConfirmDialog
+        open={!!remove}
+        title="ひな形を削除"
+        deleteName={remove?.name ?? ''}
+        description={`「${remove?.name ?? ''}」を削除します。配布済みのアカウントデータは残ります。`}
+        destructive
+        confirmLabel="削除する"
+        busy={busy}
+        onCancel={() => { if (!busy) setRemove(null) }}
+        onConfirm={() => perform(async () => {
+          if (!remove) return
+          await hqTemplatesApi.remove(remove.id, remove.revision)
+          setTemplates((current) => current.filter((t) => t.id !== remove.id))
+          setKindRows((current) => current ? current.filter((t) => t.id !== remove.id) : current)
+          setRemove(null); setMessage('ひな形を削除しました。')
+          toList()
+        })}
       /></SaveErrorScope>
     )
   }
