@@ -3571,7 +3571,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     if (deliveries.length) return {success:true,data:deliveries.map(row=>row.template)}
     if (type === 'friend_field' || type === 'mark') {
       const rows = HQ_ATTRIBUTE_ROWS.filter((item) => item.template.template_type === type).map((item) => item.template)
-      return { success: true, data: rows, stats: { totalTemplates: rows.length, distributedAccountCount: 1, undistributedTemplateCount: 0, thisMonthSentCount: null, outdatedTemplateCount: 0 } }
+      return { success: true, data: rows, stats: { totalTemplates: rows.length, distributedAccountCount: 1, undistributedTemplateCount: 0, thisMonthSentCount: null, outdatedTemplateCount: 0, ...(type === 'mark' ? { supportStatus: { source: 'chats', friendCount: 76, unhandledFriendCount: 23, inProgressFriendCount: 19, unhandledPercent: 30.1 }, markChanges: { source: 'operation_audit', count: 74, coverage: 'recorded_events_only', since: '2026-09-24T00:00:00.000Z', until: '2026-10-01T00:00:00.000Z' }, scope: 'active_accounts_visible_friends', updatedAt: '2026-10-01T00:00:00.000Z' } : {}) } }
     }
     /* API-17：テンプレートは店と同じ6種類（?kind=）。種類の無い古い行はメッセージ。 */
     const rows = (type ? HQ_TEMPLATES_HTN.filter((row) => row.template_type === type) : HQ_TEMPLATES_HTN)
