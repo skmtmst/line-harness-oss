@@ -78,14 +78,17 @@ export const ENTITLEMENT_HISTORY = [
 /** GET の口。返す物が無い道は undefined。 */
 export function paymentGet(pathname, query, { restaurantTables = [] } = {}) {
   if (pathname === '/api/booking/admin/payment-config') return { success: true, data: PAYMENT_CONFIG }
+  if (pathname === '/api/booking/admin/payments/export') return { __csv: '\uFEFF記録ID,予約ID,お客さま,予約日時,メニュー,金額,状態,方法,作成日時\npay-1,bk-1,山田 花子,2026-10-18 18:00,ディナー,8800,paid,online,2026-10-15 21:52\n' }
   if (pathname === '/api/booking/admin/payment-connection') return { success: true, data: PAYMENT_CONNECTION }
   if (pathname === '/api/booking/admin/menu-payments') return { success: true, data: MENU_PAYMENT_OVERRIDES }
   if (pathname === '/api/booking/admin/payments') return { success: true, data: PAYMENT_RECORDS }
   if (pathname === '/api/booking/admin/payment-events') return { success: true, data: PAYMENT_EVENTS }
   if (pathname === '/api/booking/admin/assignment-settings') return { success: true, data: STAFF_ASSIGNMENT }
   if (pathname === '/api/restaurant-test/assignment-settings') return { success: true, data: tableAssignment(restaurantTables) }
-  if (/^\/api\/restaurant-test\/menus\/[^/]+\/payment$/.test(pathname)) return { success: true, data: { mode: 'online' } }
-  if (/^\/api\/events\/admin\/events\/[^/]+\/payment$/.test(pathname)) return { success: true, data: { mode: 'online' } }
+  if (/^\/api\/restaurant-test\/menus\/[^/]+\/payment$/.test(pathname)) return { success: true, data: { mode: 'online', version: 2 } }
+  if (/^\/api\/events\/admin\/events\/[^/]+\/payment$/.test(pathname)) return { success: true, data: { mode: 'online', version: 1 } }
+  if (/^\/api\/events\/admin\/events\/[^/]+\/price$/.test(pathname)) return { success: true, data: { unitPrice: 2200, version: 1 } }
+  if (pathname === '/api/booking/admin/staff/today-counts') return { success: true, data: { items: [{ staffId: 'bs-1', todayCount: 3 }, { staffId: 'bs-3', todayCount: 2 }, { staffId: 'bs-2', todayCount: 1 }], date: '2026-10-16', timezone: 'Asia/Tokyo' } }
   if (pathname === '/api/booking/admin/entitlements') {
     const friendId = query.get('friend_id')
     void friendId; return { success: true, data: ENTITLEMENTS }
@@ -98,7 +101,9 @@ export function paymentGet(pathname, query, { restaurantTables = [] } = {}) {
 export function paymentWrite(method, pathname, body) {
   if (method === 'PUT' && pathname === '/api/booking/admin/payment-config') return { success: true, data: { ...PAYMENT_CONFIG, ...body } }
   if ((method === 'PUT' || method === 'DELETE') && /^\/api\/booking\/admin\/menus\/[^/]+\/payment$/.test(pathname)) return { success: true, data: method === 'DELETE' ? { cleared: true } : { ...PAYMENT_CONFIG, ...body } }
-  if (method === 'PUT' && /^\/api\/(restaurant-test\/menus|events\/admin\/events)\/[^/]+\/payment$/.test(pathname)) return { success: true, data: { mode: body?.mode ?? null } }
+  if (method === 'PUT' && /^\/api\/(restaurant-test\/menus|events\/admin\/events)\/[^/]+\/payment$/.test(pathname)) return { success: true, data: { mode: body?.mode ?? null, version: (body?.expectedVersion ?? 0) + 1 } }
+  if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/price$/.test(pathname)) return { success: true, data: { unitPrice: body?.unitPrice ?? 0, version: (body?.expectedVersion ?? 0) + 1 } }
+  if (method === 'POST' && /^\/api\/booking\/admin\/payments\/[^/]+\/send-link$/.test(pathname)) return { success: true, data: { paymentId: pathname.split('/')[5], checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_visualqa', sent: false, simulation: true } }
   if (method === 'POST' && /^\/api\/booking\/payments\/[^/]+\/refund$/.test(pathname)) return { success: true, data: { payment: { status: 'refunded' } } }
   if (method === 'POST' && /^\/api\/booking\/admin\/payment-events\/[^/]+\/replay$/.test(pathname)) return { success: true, data: { ...PAYMENT_EVENTS.items[4], result: 'applied' } }
   if (method === 'PUT' && (pathname === '/api/booking/admin/assignment-settings' || pathname === '/api/restaurant-test/assignment-settings')) {

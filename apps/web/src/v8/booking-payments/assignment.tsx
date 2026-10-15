@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ListOrdered, Lock, Scale, Shuffle, Wrench } from 'lucide-react'
 import type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentSettings } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
+import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict, type SaveConflictDiffLine, type SaveConflictState } from '@/components/shared/save-conflict'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
@@ -42,14 +43,12 @@ export interface AssignmentState {
   dirty: boolean
   saving: boolean
   error: string | null
-  conflict: BookingAssignmentSettings | null
+  conflict: SaveConflictState<BookingAssignmentSettings>
   setMethod: (method: BookingAssignmentMethod) => void
   setPeriod: (period: BookingAssignmentPeriod) => void
   setResource: (id: string, patch: Partial<BookingAssignmentResource>) => void
   save: (order: string[]) => Promise<void>
   reset: () => void
-  useLatest: () => void
-  overwrite: (order: string[]) => Promise<void>
 }
 
 function toMap(list: BookingAssignmentResource[]) {
@@ -64,7 +63,6 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
   const [resources, setResources] = useState<Record<string, BookingAssignmentResource>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [conflict, setConflict] = useState<BookingAssignmentSettings | null>(null)
   const generation = useRef(0)
   const key = target ? JSON.stringify(target) : ''
 
@@ -88,6 +86,13 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
+  const fetchSettings = () => !target ? Promise.resolve(null) : (target.kind === 'staff' ? bookingAssignmentApi.get(target.accountId) : bookingAssignmentApi.getTables(target.accountId, target.storeId)).then((response) => response.data)
+  const conflict = useSaveConflict<BookingAssignmentSettings>({
+    contextKey: key,
+    fetchLatest: fetchSettings,
+    reload: async () => { const latest = await fetchSettings(); if (latest) { apply(latest); conflict.clear() } },
+  })
+
   const dirty = status === 'ready' && saved !== null && JSON.stringify({ method, period, resources }) !== JSON.stringify({ method: saved.method, period: saved.balancePeriod, resources: toMap(saved.resources) })
 
   const write = useCallback(async (order: string[], version: number) => {
@@ -99,14 +104,12 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
     setSaving(true); setError(null)
     try {
       const response = target.kind === 'staff' ? await bookingAssignmentApi.save(target.accountId, body) : await bookingAssignmentApi.saveTables(target.accountId, target.storeId, body)
-      apply(response.data); setConflict(null)
+      apply(response.data); conflict.clear()
       notifySaved('割り当て方を保存しました')
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) {
-        try {
-          const latest = target.kind === 'staff' ? await bookingAssignmentApi.get(target.accountId) : await bookingAssignmentApi.getTables(target.accountId, target.storeId)
-          setConflict(latest.data)
-        } catch { setError('ほかの人が先に保存しました。読み直してからもう一度保存してください。') }
+        /* 共通の帯と比べる窓（違いを比べる／最新を読み込んで続ける）。入力は捨てない。 */
+        conflict.mark()
       } else if (isNotReadyError(cause)) {
         setStatus('not-ready')
       } else {
@@ -115,7 +118,7 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
     } finally {
       setSaving(false)
     }
-  }, [target, method, period, resources])
+  }, [target, method, period, resources, conflict])
 
   return {
     status, method, period, resources, dirty, saving, error, conflict,
@@ -123,8 +126,6 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
     setResource: (id, patch) => setResources((current) => ({ ...current, [id]: { ...(current[id] ?? { resourceId: id, priority: 'normal' as const, dailyLimit: null, sortOrder: 0 }), ...patch } })),
     save: (order) => write(order, saved?.version ?? 0),
     reset: () => { if (saved) apply(saved); setError(null) },
-    useLatest: () => { if (conflict) apply(conflict); setConflict(null) },
-    overwrite: (order) => write(order, conflict?.version ?? saved?.version ?? 0),
   }
 }
 
@@ -215,24 +216,28 @@ export function AssignmentRowDialog({ open, name, unit, value, onClose, onApply 
   )
 }
 
-/** 先に保存されたとき（比べる窓・jmVYJ の右）。 */
-export function AssignmentConflict({ state, names, unit, order }: { state: AssignmentState; names: Record<string, string>; unit: string; order: string[] }) {
-  const latest = state.conflict
-  if (!latest) return null
-  const latestMap = toMap(latest.resources)
-  const rows: Array<{ label: string; mine: string; theirs: string }> = []
-  if (latest.method !== state.method) rows.push({ label: '選び方', mine: METHOD_LABEL[state.method], theirs: METHOD_LABEL[latest.method] })
-  for (const id of order) {
-    const mine = state.resources[id]?.dailyLimit ?? null
-    const theirs = latestMap[id]?.dailyLimit ?? null
-    if (mine !== theirs) rows.push({ label: `${names[id] ?? id} の上限`, mine: mine === null ? '上限なし' : `${mine} ${unit}`, theirs: theirs === null ? '上限なし' : `${theirs} ${unit}` })
+/** 先に保存されたとき（共通の帯と比べる窓。jmVYJ の右の比べる窓）。 */
+export function AssignmentConflict({ state, names, unit, order, subject }: { state: AssignmentState; names: Record<string, string>; unit: string; order: string[]; subject: string }) {
+  const { conflict } = state
+  if (!conflict.conflict) return null
+  const latest = conflict.latest
+  let lines: SaveConflictDiffLine[] | null = null
+  if (latest) {
+    lines = []
+    if (latest.method !== state.method) lines.push({ text: `選び方：あなた「${METHOD_LABEL[state.method]}」／最新「${METHOD_LABEL[latest.method]}」` })
+    const latestMap = toMap(latest.resources)
+    for (const id of order) {
+      const mine = state.resources[id]?.dailyLimit ?? null
+      const theirs = latestMap[id]?.dailyLimit ?? null
+      const show = (value: number | null) => value === null ? '上限なし' : `${value} ${unit}`
+      if (mine !== theirs) lines.push({ text: `${names[id] ?? id} の上限：あなた「${show(mine)}」／最新「${show(theirs)}」` })
+      const myPriority = state.resources[id]?.priority ?? 'normal'
+      const theirPriority = latestMap[id]?.priority ?? 'normal'
+      if (myPriority !== theirPriority) lines.push({ text: `${names[id] ?? id} の優先度：あなた「${PRIORITY[myPriority].label}」／最新「${PRIORITY[theirPriority].label}」` })
+    }
   }
-  return (
-    <Dialog open title="ほかの人が先に保存しました" description="あとから保存された内容があります。どちらにしますか？" onCancel={state.useLatest} size="small" busy={state.saving} cancelLabel="最新を使う" confirmLabel="あなたの値で保存" onConfirm={() => void state.overwrite(order)}>
-      <table className={styles.compare}>
-        <thead><tr><th scope="col"><span className="sr-only">項目</span></th><th scope="col">あなた</th><th scope="col">最新</th></tr></thead>
-        <tbody>{rows.map((row) => <tr key={row.label}><th scope="row">{row.label}</th><td>{row.mine}</td><td>{row.theirs}</td></tr>)}</tbody>
-      </table>
-    </Dialog>
-  )
+  return <>
+    <SaveConflictBand title={saveConflictTitle('', subject, '')} compareBusy={conflict.compareBusy} onCompare={() => void conflict.compare()} onReload={() => void conflict.reloadLatest()} />
+    <SaveConflictCompareDialog open={conflict.compareOpen} error={conflict.compareError} lines={lines} onReload={() => void conflict.reloadLatest()} onCancel={conflict.closeCompare} />
+  </>
 }

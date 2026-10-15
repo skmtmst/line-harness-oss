@@ -6498,6 +6498,10 @@ const server = createServer((req, res) => {
   /* お金まわり（③-1）の見本：お支払い・割り当て方・回数券（payment-fixtures.mjs）。 */
   {
     const paymentRead = method === 'GET' ? paymentGet(url.pathname, url.searchParams, { restaurantTables: RESTAURANT_TABLES }) : undefined
+    if (paymentRead?.__csv) {
+      res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8' }).end(paymentRead.__csv)
+      return
+    }
     if (paymentRead) {
       res.writeHead(200).end(JSON.stringify(paymentRead))
       return

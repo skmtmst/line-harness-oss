@@ -29,7 +29,7 @@ import { formatDateTime as polishFormatDateTime, formatYen } from '@/lib/format'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
-import { MenuPaymentFields, PaymentSideCard, useMenuPayment } from '../../booking-payments/menu-payment'
+import { MenuPaymentFields, PaymentConflictError, PaymentSideCard, useMenuPayment } from '../../booking-payments/menu-payment'
 import styles from './edit.module.css'
 
 /*
@@ -130,6 +130,8 @@ function MenuEditBody() {
       setSaved(draft)
       router.push(LIST_HREF)
     } catch (cause) {
+      /* お支払いの版が古い（409）ときは共通の帯と比べる窓で選んでもらう。ページの中身は保存済み。 */
+      if (cause instanceof PaymentConflictError) { setSaved(draft); return }
       saveErrors.capture(cause)
       setError('保存できませんでした。入力を確かめて、もう一度お試しください。')
     } finally {

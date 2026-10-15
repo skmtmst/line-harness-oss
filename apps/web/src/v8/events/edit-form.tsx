@@ -29,7 +29,7 @@ import DateField from '@/components/shared/date-field'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TimeField } from '@/components/shared/date-time-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import { MenuPaymentCard, useMenuPayment } from '../booking-payments/menu-payment'
+import { MenuPaymentCard, PaymentConflictError, useMenuPayment } from '../booking-payments/menu-payment'
 import FormSection from '@/components/shared/form-section'
 import ListState from '@/components/shared/list-state'
 import { Tabs } from '@/components/shared/tabs'
@@ -305,12 +305,13 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       }
       if (eventId) {
         const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
-        await eventPayment.save(eventId)
         // 応答は questions_json の文字列で返る。ほぐさず載せると次の保存で
         // questions:null を送り、質問を消してしまう（R82）。
         // 保存後は書きかけを解くので写しも揃える。
         setDraft(toEventDraft(updated))
         setSavedDraft(toEventDraft(updated))
+        /* お支払い・1回の値段は中身を保存したあとに書く（409 は比べる窓。中身の保存は済んでいる）。 */
+        await eventPayment.save(eventId)
         notifyToast('保存しました')
         if (nextTab) setTab(nextTab)
       } else {
@@ -319,6 +320,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         router.replace(`/events/edit?id=${created.id}`)
       }
     } catch (e) {
+      /* お支払い・1回の値段の版が古い（409）ときは、共通の帯と比べる窓（お支払いの段）で選んでもらう。 */
+      if (e instanceof PaymentConflictError) return
       saveErrors.capture(e)
       setError(
         e instanceof ApiError && e.status === 409 && e.code === 'version_conflict'
@@ -383,7 +386,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       onClick: () => { if (item.key === 'overview' || eventId) setTab(item.key) },
     }))} />
     {tab === 'overview' ? <OverviewTab draft={draft} update={update} accounts={accounts} currentAccountId={accountId}
-      afterBasics={eventId ? <MenuPaymentCard state={eventPayment} name="event" price={null} /> : null} /> : null}
+      afterBasics={eventId ? <MenuPaymentCard state={eventPayment} name="event" price={null} priceField unit="名" /> : null} /> : null}
     {tab === 'slots' ? <SlotsTab accountId={accountId} eventId={eventId} slots={slots} setSlots={setSlots} /> : null}
     {tab === 'publish' ? <PublishTab draft={draft} update={update} tags={tags} /> : null}
     {tab !== 'slots' ? <StickyBar destructive={tab === 'overview' && eventId && canDelete ? <Button variant="danger" onClick={() => { setDeleteError(''); setDeleteOpen(true) }} disabled={saving}>削除する</Button> : undefined} status={tab === 'overview'
