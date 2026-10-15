@@ -9,6 +9,12 @@
 .nav[data-more] {
   mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
 }
+.nav[data-more-above] {
+  mask-image: linear-gradient(to bottom, transparent, #000 40px);
+}
+.nav[data-more][data-more-above] {
+  mask-image: linear-gradient(to bottom, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+}
 
 .section {
   display: flex;

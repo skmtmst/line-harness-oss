@@ -33,7 +33,7 @@ import {
 /*
  * 高さが足りずメニューが縦に送られるとき、下端の項目が「設定」の線で半分に
  * 切れて見えないよう、まだ下に続くあいだだけ下端を薄く消す（data-more）。
- * 最後まで送ると消しを外す。
+ * 最後まで送ると消しを外す。上へ送られているときは上端も消す（data-more-above）。
  */
 function watchNavOverflow(nav: HTMLElement | null) {
   if (!nav || typeof ResizeObserver === 'undefined') return
@@ -41,6 +41,9 @@ function watchNavOverflow(nav: HTMLElement | null) {
     const more = nav.scrollHeight - nav.clientHeight - nav.scrollTop > 1
     if (more) nav.setAttribute('data-more', '')
     else nav.removeAttribute('data-more')
+    // 今の項目を見せるために下へ送られているときは、上端も同じように薄く消す。
+    if (nav.scrollTop > 1) nav.setAttribute('data-more-above', '')
+    else nav.removeAttribute('data-more-above')
   }
   update()
   nav.addEventListener('scroll', update, { passive: true })
