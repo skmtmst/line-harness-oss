@@ -493,10 +493,7 @@ export default function ScoreTab() {
   const toolbar = (
     <MileageToolbar
       narrow={narrow}
-      notices={<ToolbarNotices
-        info="点数は、オートメーション（点が下がったら動かす）・シナリオ／一斉配信の宛先（帯で選ぶ）・分析（帯ごとの成果）で使えます。下書きの変更は、公開するまで使われません。"
-        error={rulesActionError}
-      />}
+      notices={<ToolbarNotices error={rulesActionError} />}
       search={{
         placeholder: '友だちの名前で探す',
         value: searchInput,
@@ -743,6 +740,7 @@ export default function ScoreTab() {
 
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
+      explanation="点数は、オートメーション（点が下がったら動かす）・シナリオ／一斉配信の宛先（帯で選ぶ）・分析（帯ごとの成果）で使えます。下書きの変更は、公開するまで使われません。"
       help={<>
         行の「…」から、点数の手直し・この人を見る。表の下の「できごとの決めごと」を開くと、できごとの編集・外す・＋ できごとを足す（30日間反応がない、も選べる）。公開中のルールを止めるときは、その題の横の「…」から。
         スコアはマイルではありません。お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。
