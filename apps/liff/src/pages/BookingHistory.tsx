@@ -299,15 +299,26 @@ export default function BookingHistory() {
       )}
       <ConfirmDialog
         open={pendingCancel !== null}
+        surface={paidCancel ? 'sheet' : 'dialog'}
+        footer={paidCancel ? (
+          <div className="flex flex-col gap-2.5">
+            <Button variant="danger" disabled={busy} onClick={() => void runCancel()}>キャンセルして返金を受ける</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => setPendingCancel(null)}>やめる</Button>
+          </div>
+        ) : undefined}
         title={
-          pendingCancel
-            ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)} の${pendingCancel.menu_name}をキャンセルしますか`
-            : ''
+          paidCancel
+            ? 'この予約をキャンセルしますか？'
+            : pendingCancel
+              ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)} の${pendingCancel.menu_name}をキャンセルしますか`
+              : ''
         }
-        description="キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。"
+        description={paidCancel && pendingCancel
+          ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)}・${pendingCancel.menu_name}・${pendingCancel.staff_name}`
+          : 'キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。'}
         error={actionError ?? undefined}
         confirmLabel={paidCancel ? 'キャンセルして返金を受ける' : 'キャンセルする'}
-        cancelLabel="閉じる"
+        cancelLabel={paidCancel ? 'やめる' : '閉じる'}
         destructive
         busy={busy}
         onCancel={() => {
@@ -322,6 +333,7 @@ export default function BookingHistory() {
             <p className="text-[12px] leading-[18px] text-ink">カードへの反映まで 5〜10 日かかることがあります。</p>
           </div>
         ) : null}
+        {paidCancel ? <p className="text-[12px] leading-[18px] text-liff-sub">{pendingCancel?.cancel_deadline_at ? `キャンセルの期限：${utcToJstMd(pendingCancel.cancel_deadline_at)} ${utcToJstHm(pendingCancel.cancel_deadline_at)} まで。過ぎると返金はありません。` : 'キャンセルの期限を過ぎると返金はありません。'}</p> : null}
       </ConfirmDialog>
       <ConfirmDialog
         open={pendingChange !== null}
