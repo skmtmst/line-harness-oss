@@ -1580,8 +1580,8 @@
   --tpl-hb2-np-min-h: calc(100dvh - 72px); --tpl-hb2-np-pad: 40px 24px; --tpl-hb2-np-card-w: 520px; --tpl-hb2-np-card-pad: var(--polish-space-card); --tpl-hb2-np-card-radius: var(--polish-radius-card); --tpl-hb2-np-lock: 56px; --tpl-hb2-np-text-lh: 21px; --tpl-hb2-np-badge-pad: 2px 8px; --tpl-hb2-np-actions-pad: 8px;
   --tpl-hb2-sd-chip-pad: 6px 12px; --tpl-hb2-sd-text-h: 96px;
   /* リリース前の仕上げ：見つからない画面（Nx5dz）。 */
-  --tpl-release-404-min-h: calc(100dvh - 72px); --tpl-release-404-bleed: -20px -24px -28px; --tpl-release-404-w: 420px; --tpl-release-404-pad: 28px 24px; --tpl-release-404-gap: 8px;
-  --tpl-release-404-mark: 32px; --tpl-release-404-mark-radius: var(--polish-radius-small); --tpl-release-404-icon: 17px; --tpl-release-404-title: var(--polish-text-section); --tpl-release-404-title-lh: 30px; --tpl-release-404-desc-lh: 20px;
+  --tpl-release-404-min-h: 663px; --tpl-release-404-bleed: -20px -24px -28px; --tpl-release-404-w: 420px; --tpl-release-404-pad: 28px 24px; --tpl-release-404-gap: 8px;
+  --tpl-release-404-mark: 32px; --tpl-release-404-mark-radius: var(--polish-radius-small); --tpl-release-404-icon: 17px; --tpl-release-404-title: var(--text-title); --tpl-release-404-title-lh: 30px; --tpl-release-404-desc-lh: 20px;
   --tpl-release-404-actions-gap: 8px; --tpl-release-404-actions-pad: 8px;
   --tpl-settings-nav-width: 208px; --tpl-settings-nav-pad-block: 16px; --tpl-settings-nav-pad-side: 12px;
   /* 設定の中のメニュー（設定の板 ihjfd ほか 8 枚）。 */
