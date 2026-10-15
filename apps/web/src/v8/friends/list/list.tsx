@@ -655,7 +655,8 @@ export default function FriendsListV8() {
   )
 
   const toolbar = (
-    <ListToolbarFrame data-design="V8SearchPanel">
+    <>
+    <ListToolbarFrame layout="stacked" data-design="V8SearchPanel">
       <ListToolbarRow as="form"
         onSubmit={(event) => {
           event.preventDefault()
@@ -679,7 +680,7 @@ export default function FriendsListV8() {
           />
         </ListToolbarSearchSlot>
         {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。
-            タグは検索のすぐ右（絵 nF4ts・y2n1z）。前の段（作る・フォルダの口）に置くと 1440 で消えていた。 */}
+            先頭の口（leading）は白い板が狭い時だけ出るので、広い幅で消えないよう検索の隣に置く。 */}
         {primaryFilter}
 
         <ListToolbarOptional collapse="overflow" label="ほかの絞り込み・操作">
@@ -712,7 +713,6 @@ export default function FriendsListV8() {
             この条件で配信を作成
           </Link>
         ) : null}
-        {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
         </ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
@@ -728,6 +728,8 @@ export default function FriendsListV8() {
         <span className={styles.spacer} />
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
         {columnsOpen && !readOnly ? <DisplayItemsDialog presentation="columns" items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
+        {/* 絵 nF4ts：表示項目を編集は2段目、件数の切り替えの左。 */}
+        {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
         <ListToolbarEnd>
         <SaveErrorField names={["pageSize","limit","page_size"]}><PageSizeSelect label={null} options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(value) => resetPageWith(() => setPageSize(value as PageSize))} /></SaveErrorField>
         <SaveErrorField names={["sortMode","sort","sort_mode"]}><ListToolbarSort
@@ -765,6 +767,7 @@ export default function FriendsListV8() {
         </p>
       ) : null}
     </ListToolbarFrame>
+    </>
   )
 
   const colCount = 4 + displayColumns.length
@@ -774,7 +777,7 @@ export default function FriendsListV8() {
         <colgroup>
           <col className={styles.colCheck} />
           <col className={styles.colStar} />
-          <col />
+          <col className={styles.colName} />
           {displayColumns.map(column => <col key={column.key} />)}
           <col className={styles.colMenu} />
         </colgroup>
@@ -832,7 +835,11 @@ export default function FriendsListV8() {
                   )}
                 </Td>
                 <Td className={styles.td}>
-                  <RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>
+                  {/* 絵 nF4ts・x6QsVz：名前の前に顔の丸（写真が無ければ頭文字）。 */}
+                  <div className={styles.friendCell}>
+                    <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />
+                    <RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink>
+                  </div>
                 </Td>
                 {displayColumns.map(column => {
                   if (column.key === 'support') return (

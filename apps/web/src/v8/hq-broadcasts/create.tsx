@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { AlertTriangle, ArrowDown, ArrowRight, Building2, CheckCircle2, Eye, Send, Tag as TagIcon, Workflow } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowRight, Building2, CheckCircle2, Copy, Eye, FileText, Send, SquarePen, Tag as TagIcon, Workflow } from 'lucide-react'
 import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
@@ -895,12 +895,13 @@ export default function HqBroadcastCreate() {
               <section id="broadcast-step-basic" className={formStyles.section}>
                 <h3>配信方法</h3>
                 <SaveErrorField names={["hq-broadcast-method","value","method"]}><RadioCardGroup legend="配信方法" className={formStyles.methodCards}>
+                  {/* EpTBB：3つのカードは左上に印（書く・テンプレート・写す）。 */}
                   {([
-                    ['new', '新しいメッセージを作成', 'テキスト・画像・カルーセルなどを組み合わせて一から作ります。'],
-                    ['template', 'テンプレートを選択', '統括のテンプレートを呼び出して手直しします。'],
-                    ['duplicate', '過去の配信を複製', '送った一括配信をそのまま写して作り直します。'],
-                  ] as const).map(([value, label, note]) => (
-                    <RadioCard key={value} name="hq-broadcast-method" value={value} checked={method === value} title={label} note={note} onChange={(next) => setMethod(next as Method)} />
+                    ['new', '新しいメッセージを作成', 'テキスト・画像・カルーセルなどを組み合わせて一から作ります。', SquarePen],
+                    ['template', 'テンプレートを選択', '統括のテンプレートを呼び出して手直しします。', FileText],
+                    ['duplicate', '過去の配信を複製', '送った一括配信をそのまま写して作り直します。', Copy],
+                  ] as const).map(([value, label, note, Icon]) => (
+                    <RadioCard key={value} name="hq-broadcast-method" value={value} checked={method === value} title={label} note={note} icon={<Icon aria-hidden="true" />} onChange={(next) => setMethod(next as Method)} />
                   ))}
                 </RadioCardGroup></SaveErrorField>
                 {/* EpTBB：①は選ぶボタン／選んだ1行だけ。窓の仮選択は確定するまで反映しない。 */}

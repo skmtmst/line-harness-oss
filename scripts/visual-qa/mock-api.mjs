@@ -3442,6 +3442,19 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: found }
   }
   if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
+  /*
+    マニュアルの正本表から1つ引く口（API 組2 の契約：screen または key、keyKind=screen/task）。
+    画面のボタンは URL がある時だけ出るので、撮る板の分だけ URL を入れる：
+    手順キー onboarding-line-guide（店舗を追加 ao15G・faGn4 のガイド）と画面キー 25-1（共通アクションの版 ziSgL のマニュアル）。
+    一覧の正本表（MANUAL_LINKS・cIdA2 の3行）には足さない。
+  */
+  if (method === 'GET' && pathname === '/api/manual-links/lookup') {
+    const key = query.get('key') ?? query.get('screen') ?? ''
+    const keyKind = query.get('keyKind') ?? 'screen'
+    const urls = { 'task:onboarding-line-guide': 'https://help.musubo.example/guides/line-account', 'screen:25-1': 'https://help.musubo.example/automations' }
+    const url = urls[`${keyKind}:${key}`] ?? null
+    return { success: true, data: { key, url, status: url ? 'ok' : 'unset', version: url ? 1 : null } }
+  }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
   }
@@ -4124,11 +4137,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         },
       }
     }
-    // 一斉配信の「テンプレートから選ぶ」窓（f63Jza）は選んでいるアカウントの公開版だけを候補にする。
-    // 見本の行はアカウントを持たないので、account_id で頼まれたときだけそのアカウントの行として返す。
-    const accountId = query.get('account_id')
-    if (accountId) return { success: true, data: TEMPLATES.map((item) => ({ ...item, accountId })) }
-    return { success: true, data: TEMPLATES }
+    // 本物はアカウントの分だけ返し、各行にアカウントを持つ。送れる候補の絞り込み（accountId 一致）で落ちないようにする（f63Jza）。
+    return { success: true, data: TEMPLATES.map((item) => ({ accountId: query.get('account_id') ?? ACCOUNT.id, ...item })) }
   }
   const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
   /* 設計 NCbYn（編集中に競合）：一覧に出ない ID。使われる場所は無く、本文に URL が1つある。 */
