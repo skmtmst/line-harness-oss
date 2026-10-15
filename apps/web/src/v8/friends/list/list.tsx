@@ -817,6 +817,7 @@ export default function FriendsListV8() {
                     <button
                       type="button"
                       className={attention ? `${styles.star} ${styles.starOn}` : styles.star}
+                      data-part="attention-star"
                       aria-pressed={attention}
                       aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
                       onClick={() => void toggleAttention(friend)}

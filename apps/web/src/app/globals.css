@@ -3104,7 +3104,7 @@ html:root input[type='checkbox']:checked { border-color: var(--color-selection-b
 html:root input:is([type='radio'], [type='checkbox']):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 /* B-211：素の切り替えも同じ選択の色。ページ内タブはB-180の黒い下線を保つ。 */
-html:root button:not([role='tab']):is([aria-pressed='true'], [data-current]:not([data-current='false']), [aria-current='page'], [aria-current='step']) { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
+html:root button:not([role='tab'], [data-part='attention-star']):is([aria-pressed='true'], [data-current]:not([data-current='false']), [aria-current='page'], [aria-current='step']) { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
 
 :root { --tpl-list-state-w: 104px; }
 
