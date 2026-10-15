@@ -761,7 +761,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         notices={notices}
         overlays={(
           <>
-          {folderDistribution ? <FolderDistributionDialog name={folderDistribution.name} templates={folderDistribution.templates} templateFolders={folders} accounts={accounts} busy={busy} error={error}
+          {folderDistribution ? <FolderDistributionDialog name={folderDistribution.name} templates={folderDistribution.templates} templateFolders={folders} accounts={accounts} accountFolders={accountFolders} busy={busy} error={error}
             onCancel={() => { if (!busy) { setFolderDistribution(null); setError('') } }}
             onConfirm={(rows, ids) => startFolderDistribution(folderDistribution.name, rows, ids)} /> : null}
           {stage === 'saved' ? <SavedDistributionDialog accounts={accounts} folders={accountFolders} selected={selected} onChange={setSelected}
