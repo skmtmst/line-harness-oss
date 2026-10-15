@@ -28,6 +28,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import StatusBadge from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
 import ListRange from '@/components/ui/list-range'
+import FilterChip from '@/components/shared/filter-chip'
 import { postActionStepLabel, ratingAverageText, type DestinationWrite, type FormSubmissionSummary, type SubmissionPostActions } from './summary'
 import styles from './responses.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
@@ -169,6 +170,10 @@ function Responses() {
   const loadRequest = useRef(0)
   const queryRef = useRef(query)
   queryRef.current = query
+  /* 集計と一覧の期間（今月・先月・すべて）。口は submissions の period（組1）。 */
+  const [period, setPeriod] = useState<'this_month' | 'last_month' | 'all'>('this_month')
+  const periodRef = useRef(period)
+  periodRef.current = period
 
   const load = useCallback(async (nextPage = 1, nextLimit = 20, searchText?: string) => {
     if (!selectedAccountId || !formId) {
@@ -186,7 +191,7 @@ function Responses() {
       const search = needle ? `&q=${encodeURIComponent(needle)}` : ''
       const [formResult, responseResult] = await Promise.all([
         fetchApi<{ success: boolean; data: FormDetail }>(`/api/forms/${formId}?${account}`),
-        fetchApi<{ success: boolean; data: SubmissionPage }>(`/api/forms/${formId}/submissions?page=${nextPage}&limit=${nextLimit}&${account}${search}`),
+        fetchApi<{ success: boolean; data: SubmissionPage }>(`/api/forms/${formId}/submissions?page=${nextPage}&limit=${nextLimit}&${account}${search}&period=${periodRef.current}`),
       ])
       if (!formResult.success || !responseResult.success) throw new Error('load_failed')
       if (request !== loadRequest.current) return
@@ -219,6 +224,14 @@ function Responses() {
   useEffect(() => {
     void load(1, 20)
   }, [load])
+
+  const firstPeriod = useRef(true)
+  useEffect(() => {
+    if (firstPeriod.current) { firstPeriod.current = false; return }
+    if (!selectedAccountId || !formId) return
+    void load(1, pageSize)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period])
 
   /* 検索語が変わったら1ページ目から取り直す（打ち終わりを待つ）。 */
   const firstQuery = useRef(true)
@@ -446,6 +459,11 @@ function Responses() {
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
       <Card variant="aside" aria-labelledby="fr-filter">
         <CardHeader size="stacked" title="絞り込み" titleId="fr-filter" meta={total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`} />
+        <div role="group" aria-label="集計する期間" className={styles.periodChips}>
+          {([['this_month', '今月'], ['last_month', '先月'], ['all', 'すべて']] as const).map(([value, label]) => (
+            <FilterChip key={value} selected={period === value} onChange={() => setPeriod(value)}>{label}</FilterChip>
+          ))}
+        </div>
         <ListToolbar searchSlot={<SaveErrorField names={["query"]}><SearchField updateMode="immediate" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・答えで探す（全件から）" aria-label="名前・答えで探す（全件から）" /></SaveErrorField>} />
       </Card>
     </div>

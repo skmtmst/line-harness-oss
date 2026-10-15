@@ -25,6 +25,7 @@ import Select from '@/components/shared/select'
 import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import { PhoneDatetimeStep } from './phone'
+import { bookingChannelsApi } from '../booking-menus/lib/booking-channels'
 import layout from './layout.module.css'
 import styles from './shifts.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
@@ -337,6 +338,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const [calendarId, setCalendarId] = useState<string | null>(null)
   const [calendarVerifiedAt, setCalendarVerifiedAt] = useState<string | null>(null)
   const [calendarError, setCalendarError] = useState<string | null>(null)
+  const [externalEvents, setExternalEvents] = useState<number | null>(null)
   const [serviceConfigured, setServiceConfigured] = useState(true)
   const [slots, setSlots] = useState<BookingAvailabilitySlot[]>([])
   // 予約枠の返事に入っている休みの日（お店・担当が閉めている日）。
@@ -524,6 +526,11 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setCalendarId(calendarRes.connection?.calendar_id ?? null)
       setCalendarVerifiedAt(calendarRes.connection?.last_verified_at ?? null)
       setCalendarError(calendarRes.connection?.last_error ?? null)
+      // 今週の外の予定の件数（予約設定の予約経路の表と同じ受け口）。読めなくても画面は出す。
+      void bookingChannelsApi.channels(selectedAccountId).then((res) => {
+        if (requestId !== requestRef.current) return
+        setExternalEvents(res.success ? (res.data.staff.find((person) => person.staffId === staffId)?.externalEventsThisWeek ?? null) : null)
+      }).catch(() => { if (requestId === requestRef.current) setExternalEvents(null) })
       setServiceConfigured(calendarRes.service_account.configured)
       setCalendarInput('')
       setCalendarFormError(null)
@@ -1369,6 +1376,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               {calendarId ? (
                 <p className={styles.calMeta}>
                   <span>最後に読んだ {calendarVerifiedAt ? shortStamp(calendarVerifiedAt) : emptyValue('unknown')}</span>
+                  {externalEvents != null ? <span>今週の外の予定 {externalEvents}件</span> : null}
                   {calendarError ? <span className={styles.calMetaError}>最新の確認で失敗しています：{calendarError}</span> : null}
                 </p>
               ) : null}

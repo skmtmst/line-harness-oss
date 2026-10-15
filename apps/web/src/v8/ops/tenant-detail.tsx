@@ -1,7 +1,9 @@
 'use client'
 import { useUrlTab } from '@/lib/use-url-tab'
 import type { FormRequirement } from '@/lib/form-requirement'
-import { LogIn } from 'lucide-react'
+import { LogIn, Wallet, Store, Users, Inbox } from 'lucide-react'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type OpsTenantDetail } from '@/lib/api'
@@ -148,7 +150,7 @@ function DetailContent() {
         title={tenant.name}
         description={`${planLabel(tenant.plan_key)}・${PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status}・${formatDate(tenant.created_at).replace(/-/g, '/')} から`}
         environment={environment}
-        stats={<TenantOverviewStats detail={detail} />}
+        band={<TenantOverviewStats detail={detail} />}
         actions={(
           <>
             {!readOnly && tenant.status === 'active' ? <Button onClick={() => setStatusDialog('archived')}>アーカイブ</Button> : null}
@@ -263,7 +265,7 @@ function DetailContent() {
             {audit.length === 0 ? (
               <ListState permissionScope="hq" kind="empty" title="運営の操作はまだありません" description="運営がこの契約先に対して行った操作が、ここに残ります。" />
             ) : (
-              <GridTable label="運営の操作" framed={false} design={{ columns: 'var(--tpl-op-dt-at-w) var(--tpl-op-ann-state-w) var(--tpl-op-dt-what-w) minmax(0, 1fr)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
+              <GridTable label="運営の操作" framed={false} design={{ columns: 'var(--tpl-op-dt-at-w) var(--tpl-op-ann-state-w) calc(var(--tpl-op-dt-what-w) + 64px) minmax(0, 1fr)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
                 <GridHeadRow>
                   <GridCell role="columnheader">日時</GridCell>
                   <GridCell role="columnheader">運営者</GridCell>

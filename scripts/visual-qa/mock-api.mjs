@@ -79,7 +79,7 @@ import {
   BROADCAST_RECIPIENTS, BROADCAST_ACTIVITY,
   BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
   FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW, FRIEND_FIELD_MIGRATION_PREVIEW_DOG,
-  INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, BOOKING_TODAY_REQUESTS,
   TEMPLATES, TEMPLATE_FOLDERS, TEMPLATE_TEST_RECIPIENTS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
@@ -262,8 +262,8 @@ const TEMPLATE_1_DETAIL = (template) => ({
   },
 })
 const TEMPLATE_1_VERSIONS = [
-  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' },
-  { versionNumber: 1, status: 'past', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日のご予約をお待ちしています。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-07-14T09:40:00+09:00' },
+  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' , createdByStaffId: 'visual-qa-owner', creatorName: 'Kenta Kawano', creatorNameSource: 'current_staff_profile' },
+  { versionNumber: 1, status: 'past', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日のご予約をお待ちしています。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-07-14T09:40:00+09:00' , createdByStaffId: 'visual-qa-owner', creatorName: 'Masato', creatorNameSource: 'current_staff_profile' },
 ]
 
 
@@ -2519,6 +2519,9 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/publish$/.test(pathname)) {
     return AUTO_REPLY_PUBLISH_RESULT
   }
+  if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/pages\/[^/]+\/image$/.test(pathname)) {
+    return { imageR2Key: 'rich-menus/visual-qa.png', imageContentType: 'image/png', size: 'large' }
+  }
   if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
     return {
       matched: { value: 1020, state: 'available', reason: null },
@@ -3635,11 +3638,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     if (deliveries.length) return {success:true,data:deliveries.map(row=>row.template)}
     if (type === 'friend_field' || type === 'mark') {
       const rows = HQ_ATTRIBUTE_ROWS.filter((item) => item.template.template_type === type).map((item) => item.template)
-      return { success: true, data: rows, stats: { totalTemplates: rows.length, distributedAccountCount: 1, undistributedTemplateCount: 0, thisMonthSentCount: null, outdatedTemplateCount: 0 } }
+      return { success: true, data: rows, stats: { totalTemplates: rows.length, distributedAccountCount: 1, undistributedTemplateCount: 0, thisMonthSentCount: null, outdatedTemplateCount: 0, ...(type === 'mark' ? { supportStatus: { source: 'chats', friendCount: 76, unhandledFriendCount: 23, inProgressFriendCount: 19, unhandledPercent: 30.1 }, markChanges: { source: 'operation_audit', count: 74, coverage: 'recorded_events_only', since: '2026-09-24T00:00:00.000Z', until: '2026-10-01T00:00:00.000Z' }, scope: 'active_accounts_visible_friends', updatedAt: '2026-10-01T00:00:00.000Z' } : {}) } }
     }
     /* API-17：テンプレートは店と同じ6種類（?kind=）。種類の無い古い行はメッセージ。 */
     const rows = (type ? HQ_TEMPLATES_HTN.filter((row) => row.template_type === type) : HQ_TEMPLATES_HTN)
-      .map((row) => (row.template_type === 'template' ? { ...row, kind: row.kind ?? 'message' } : row))
+      .map((row, index) => (row.template_type === 'template' ? { ...row, kind: row.kind ?? 'message', message_type: row.message_type ?? ['text', 'text', 'text', 'flex', 'image', 'text'][index % 6], message_count: row.message_count ?? 1, has_interpolations: row.has_interpolations ?? (index % 3 === 0) } : row))
     /* API-18：一覧の集計（今月送った数・新しい版を未配布）。 */
     const stats = { thisMonthSentCount: rows.some((row) => row.this_month_sent_count === null) ? null : rows.reduce((n, row) => n + (row.this_month_sent_count ?? 0), 0), outdatedTemplateCount: rows.filter((row) => (row.outdated_account_count ?? 0) > 0).length }
     return { success: true, data: kind ? rows.filter((row) => row.kind === kind) : rows, stats }
@@ -4115,6 +4118,22 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       row('fs-4', '「返信した」の点が消えた（14日）', -5, 0, '2026-09-16T09:00:00+09:00'),
       row('fs-5', 'メッセージに返信した', 5, 5, '2026-09-02T19:20:00+09:00'),
     ] } }
+  }
+  if (pathname === '/api/booking/admin/today') {
+    // 予約管理「今日」（絵 O2Z8u・時計 2026-10-01）。人（スタッフ）ごとの 6 件。
+    const row = (id, staffId, staffName, customer, menu, start, end, status = 'confirmed') => ({
+      kind: 'staff', id, starts_at: `2026-10-01T${start}:00+09:00`, ends_at: `2026-10-01T${end}:00+09:00`, status, price_at_booking: 5500,
+      friend_id: null, booking_customer_id: null, menu_id: 'bm-1', menu_name: menu, staff_id: staffId, staff_name: staffName, customer_name: customer, visit_mark: null,
+    })
+    const bookings = [
+      row('tb-1', 'bs-1', '佐々木 亮太', 'ぽん太 さん', 'トリミング（小型犬）', '09:00', '10:00'),
+      row('tb-2', 'bs-3', '高田 誠', 'ハナ さん', '爪切り', '11:00', '11:15'),
+      row('tb-3', 'bs-2', '中川 由美', 'レオ さん', '足裏ケア', '11:00', '11:30'),
+      row('tb-4', 'bs-1', '佐々木 亮太', 'マロン さん', 'トリミング（中型犬）', '13:00', '14:30'),
+      row('tb-5', 'bs-3', '高田 誠', 'ココ さん', 'シャンプーのみ', '10:00', '10:30', 'pending'),
+      row('tb-6', 'bs-2', '中川 由美', 'きなこ さん', '初回相談', '15:00', '15:30'),
+    ]
+    return { date: '2026-10-01', mode: 'staff', has_seat_stores: false, bookings, seats: [], timeline: bookings }
   }
   if (pathname === '/api/friends/friend-1/timeline') {
     const item = (id, type, summary, occurredAt, source, account = { id: 'visual-qa-account', name: '然-NEN-TEST' }) => ({
@@ -5968,7 +5987,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (/^\/api\/rich-menu-groups\/[^/]+\/schedules$/.test(pathname)) return { success: true, data: [] }
   const richMenuGroup = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(pathname)
   if (richMenuGroup) {
-    const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]]
+    const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]] ?? (richMenuGroup[1] === 'rmg-new' && RICH_MENU_GROUP_DETAILS['rmg-1'] ? { ...RICH_MENU_GROUP_DETAILS['rmg-1'], id: 'rmg-new', name: 'テスト' } : undefined)
     return group
       ? { success: true, data: group }
       : { success: false, error: 'リッチメニューが見つかりません' }
@@ -6717,7 +6736,8 @@ const server = createServer((req, res) => {
     const menuName = url.searchParams.get('menu_name')
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
-    const filtered = BOOKING_REQUESTS.filter((item) =>
+    const pool = from && from.startsWith('2026-09-30T15') ? [...BOOKING_REQUESTS, ...BOOKING_TODAY_REQUESTS] : BOOKING_REQUESTS
+    const filtered = pool.filter((item) =>
       (status === 'all' || item.status === status)
       && (!query || (item.friend_name || '').includes(query))
       && (!menuName || item.menu_name === menuName)

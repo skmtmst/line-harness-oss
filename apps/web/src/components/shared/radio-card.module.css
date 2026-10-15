@@ -344,6 +344,7 @@ html:root .card:not(.row):has(.radio:focus-visible) { outline: var(--focus-ring)
 html:root .invalid, html:root .invalid .radio { border-color: var(--color-danger); outline-color: var(--color-danger); }
 
 html:root .card:is(.compact, .form) > .radio { width: var(--choice-size); height: var(--choice-size); opacity: 1; pointer-events: auto; top: var(--space-16); right: var(--space-16); }
+html:root .card:is(.compact, .form) > .radio:checked { background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
 html:root .card:not(.row) .body { padding-right: calc(var(--choice-size) + var(--space-8)); }
 /* 印の行がある標準カードは、本文が右上の丸より下に来る。横の余白を重ねない。 */
 html:root .card:not(.compact):not(.form):has(> .topIcon) .body { padding-right: 0; }

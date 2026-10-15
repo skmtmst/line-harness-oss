@@ -10286,6 +10286,9 @@ export const api = {
         questionStatus: string | null;
         effectiveFrom: string | null;
         createdAt: string;
+        createdByStaffId: string | null;
+        creatorName: string | null;
+        creatorNameSource: 'current_staff_profile' | null;
       }>>>(`/api/templates/${id}/versions`),
     /**
      * 466: この版に戻す。過去の版は変えず、その中身で新しい版を作る。

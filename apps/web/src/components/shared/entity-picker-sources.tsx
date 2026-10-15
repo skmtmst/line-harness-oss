@@ -160,5 +160,6 @@ export function EntityKindDialog({ kind, options, initialId = '', confirmLabel, 
   const categories = kind === 'template' ? TEMPLATE_CATEGORIES.filter((c) => items.some((item) => item.category === c.id)) : []
   return <EntityPickerDialog title={`${def.noun}を選ぶ`} items={items} folders={hasFolderInfo ? folders : undefined} foldersFailed={hasFolderInfo && failed}
     categories={categories.length > 1 ? categories : undefined} initialId={initialId} preview={preview} confirmLabel={confirmLabel}
+    description={kind === 'form' ? 'ボタンを押したときに開く回答フォームを1つ選びます。' : undefined} searchPlaceholder={kind === 'form' ? `${def.noun}名で探す` : undefined}
     createHref={def.createHref} createLabel={def.createLabel} designNode="dJZ7Q" onConfirm={onConfirm} onCancel={onCancel} />
 }

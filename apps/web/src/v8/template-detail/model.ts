@@ -26,6 +26,8 @@ export interface TemplateVersionItem {
   question?: unknown | null
   effectiveFrom: string | null
   createdAt: string
+  /** 公開した人の今の名簿名（API 組5）。旧い版・不明・別組織は null。 */
+  creatorName?: string | null
 }
 
 /*

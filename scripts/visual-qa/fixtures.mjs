@@ -6222,6 +6222,7 @@ export const BOOKING_AVAILABILITY_OCT = {
     {
       staff_id: 'bs-1', display_name: '佐々木',
       slots: [
+        OCT_SLOT('2026-10-01', '16:00', 1),
         OCT_SLOT('2026-10-02', '09:00', 1), OCT_SLOT('2026-10-02', '10:00', 0), OCT_SLOT('2026-10-02', '13:00', 1),
         OCT_SLOT('2026-10-02', '14:00', 1), OCT_SLOT('2026-10-02', '15:00', 1), OCT_SLOT('2026-10-02', '16:00', 0),
         OCT_SLOT('2026-10-03', '10:00', 1), OCT_SLOT('2026-10-03', '13:00', 1),
@@ -6236,11 +6237,12 @@ export const BOOKING_AVAILABILITY_OCT = {
     {
       staff_id: 'bs-3', display_name: '高田',
       slots: [
-        OCT_SLOT('2026-10-02', '15:00', 1), OCT_SLOT('2026-10-03', '09:00', 1),
+        OCT_SLOT('2026-10-01', '16:00', 1), OCT_SLOT('2026-10-02', '15:00', 1), OCT_SLOT('2026-10-03', '09:00', 1),
         OCT_SLOT('2026-10-06', '15:00', 1), OCT_SLOT('2026-10-08', '13:00', 1),
         OCT_SLOT('2026-10-14', '09:00', 1), OCT_SLOT('2026-10-16', '13:00', 1),
       ],
     },
+    { staff_id: 'bs-2', display_name: '中川', slots: [OCT_SLOT('2026-10-01', '16:00', 1)] },
   ],
   closed_dates: ['2026-10-05'],
 }
@@ -6308,6 +6310,7 @@ export const BOOKING_CHANNELS = {
     { staffId: 'bs-ch-1', displayName: '高田 誠', status: 'connected', externalEventsThisWeek: 12, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
     { staffId: 'bs-ch-2', displayName: '中川 由美', status: 'connected', externalEventsThisWeek: 8, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
     { staffId: 'bs-ch-3', displayName: '佐野 直人', status: 'not_connected', externalEventsThisWeek: null, lastReadAt: null, readError: null },
+    { staffId: 'bs-1', displayName: 'Kenta Kawano', status: 'connected', externalEventsThisWeek: 3, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
     { staffId: 'bs-ch-4', displayName: '森 涼太', status: 'expired', externalEventsThisWeek: null, lastReadAt: '2026-09-28T01:02:00.000Z', readError: null },
   ],
   channels: [
@@ -6539,6 +6542,18 @@ const booking = (id, friendId, name, start, end, menu, staff, price, status = 'c
   requested_at: '2026-09-02T02:00:00.000Z', decided_at: '2026-09-02T02:05:00.000Z',
   external_event_id: null,
 })
+
+/* 予約管理「今日」（絵 O2Z8u・時計 2026-10-01）用。この日の窓で読んだときだけ返す（ほかの画面の件数は変えない）。 */
+export const BOOKING_TODAY_REQUESTS = [
+  { ...booking('bt-1', 'friend-1', 'ぽん太 さん', '2026-10-01T00:00:00.000Z', '2026-10-01T01:00:00.000Z', 'トリミング（小型犬）', '佐々木', 8400), source: 'liff' },
+  { ...booking('bt-2', 'friend-2', 'ココ さん', '2026-10-01T01:00:00.000Z', '2026-10-01T01:30:00.000Z', 'シャンプーのみ', '高田', 4200), source: 'phone' },
+  { ...booking('bt-3', 'friend-3', 'ハナ さん', '2026-10-01T02:00:00.000Z', '2026-10-01T02:15:00.000Z', '爪切り', '高田', 1200), source: 'liff' },
+  { ...booking('bt-4', 'friend-4', 'レオ さん', '2026-10-01T02:00:00.000Z', '2026-10-01T02:30:00.000Z', '足裏ケア', '中川', 2000), source: 'liff' },
+  { ...booking('bt-5', 'friend-5', 'マロン さん', '2026-10-01T04:00:00.000Z', '2026-10-01T05:30:00.000Z', 'トリミング（中型犬）', '佐々木', 9800), source: 'liff' },
+  { ...booking('bt-6', 'friend-6', 'きなこ さん', '2026-10-01T06:00:00.000Z', '2026-10-01T06:30:00.000Z', '初回相談', '中川', 0), source: 'liff' },
+  /* 同じ人の同じ時間に重なった電話の予約（受付1人ずつを超える・赤い帯）。 */
+  { ...booking('bt-7', '', null, '2026-10-01T04:30:00.000Z', '2026-10-01T04:45:00.000Z', '爪切り', '佐々木', 1200), friend_name: 'チョコ さん', source: 'phone' },
+]
 
 export const BOOKING_REQUESTS = [
   booking('bk-1', 'friend-1', '高橋 直人', '2026-09-03T00:00:00.000Z', '2026-09-03T01:45:00.000Z', 'トリミング（小型犬）', '佐々木', 8400),
