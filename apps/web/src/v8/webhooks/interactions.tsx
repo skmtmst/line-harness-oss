@@ -290,7 +290,8 @@ export default function WebhooksInteractionsV8() {
   const known = loaded ? summary : null
   const bandCells: BandCell[] = [
     {
-      key: 'sent', title: '今月送った', icon: <History size={13} aria-hidden="true" />,
+      // 数の帯の題はタブをまたいで「直近30日 送った」にそろえる（絵 Uv9AA）。期間を変えたらその日数で出す。
+      key: 'sent', title: `直近${periodDays}日 送った`, icon: <History size={13} aria-hidden="true" />,
       value: known ? known.outgoing : null, unit: '回',
       detail: known ? `成功 ${formatNumber(Math.max(0, known.outgoing - known.outgoingFailed))}` : '集計を読み込めませんでした',
     },
