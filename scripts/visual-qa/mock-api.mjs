@@ -32,6 +32,7 @@ import { mockFingerprint } from './mock-fingerprint.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
+import { styleDashboardMock } from './style-dashboard-mock.mjs'
 import { encodePng } from './v8-png.mjs'
 import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
 import { BILLING_INVOICES, BILLING_SUMMARY } from './billing-fixture.mjs'
@@ -6718,6 +6719,20 @@ const server = createServer((req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="qr-${route.refCode}.pdf"`)
     res.setHeader('Cache-Control', 'no-store')
     res.writeHead(200).end(QR_PRINT_PDF_SAMPLE)
+    return
+  }
+
+  // 業種ダッシュボード（XBkC2）と使い方のスタイル。PUT の中身を読むので、ここで受ける。
+  if (url.pathname === '/api/account-style' || url.pathname.startsWith('/api/style-dashboard/')) {
+    let raw = ''
+    req.on('data', (chunk) => { raw += chunk })
+    req.on('end', () => {
+      let parsed = null
+      try { parsed = raw ? JSON.parse(raw) : null } catch { parsed = null }
+      const out = styleDashboardMock(method, url.pathname, url.searchParams, parsed)
+      if (!out) { res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' })); return }
+      res.writeHead(200).end(JSON.stringify(out))
+    })
     return
   }
 
