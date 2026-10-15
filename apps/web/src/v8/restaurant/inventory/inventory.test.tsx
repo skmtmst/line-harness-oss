@@ -118,8 +118,8 @@ describe('Y8SjT2 予約枠・在庫', () => {
     fireEvent.click(screen.getByRole('tab', { name: '予約経路の連携' }))
     await screen.findByText('Hot Pepper グルメ')
     expect(screen.getByText('7日届いていない')).not.toBeNull()
-    expect(screen.getByText('読めなかったもの 1 件')).not.toBeNull()
-    expect(screen.getByText('r-1@in.example.jp')).not.toBeNull()
+    expect(screen.getByText('読めなかったもの')).not.toBeNull()
+    expect(screen.getByDisplayValue('r-1@in.example.jp')).not.toBeNull()
   })
 
   it('読めなかった予約の空入力は欄で知らせ、最初の欄へ移動して取り込まない', async () => {

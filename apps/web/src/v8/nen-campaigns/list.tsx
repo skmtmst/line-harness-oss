@@ -482,7 +482,7 @@ function TestRecipientPicker({ friends, value, onChange, accountId }: { friends:
       </span>
     )
   }
-  return <SaveErrorField names={["value"]}><EntitySelect aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ ...entityOptionMetadata(friend), value: friend.id, label: friend.displayName || '名前未取得' }))} /></SaveErrorField>
+  return <SaveErrorField names={["value"]}><EntitySelect aria-label="テスト送信先" width={220} valuePrefix="送り先：" value={value} onChange={onChange} options={friends.map((friend) => ({ ...entityOptionMetadata(friend), value: friend.id, label: friend.displayName || '名前未取得' }))} /></SaveErrorField>
 }
 
 /* ───────────── 誕生日クーポンの決めごと（oqSJP） ───────────── */
@@ -801,7 +801,6 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
             <span className={styles.buttonRow}>
               <Button type="button" disabled={introDraft === selected.introText || props.savingColumnId === selected.id || !introDraft.trim()} busy={props.savingColumnId === selected.id} busyLabel="保存中…" onClick={() => props.onSaveIntro(selected)}>紹介文を保存する</Button>
               <Button type="button" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)} busy={props.duplicatingColumnId === selected.id} busyLabel="複製しています"><Copy size={15} aria-hidden="true" />同じ形で書く</Button>
-              <span className={styles.muted}>{`${introDraft.length}／1500文字`}</span>
             </span>
           ) : null}
         </div>

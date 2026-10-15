@@ -43,6 +43,8 @@ export default function DateTimeField({
   invalid = false,
   required = false,
   placeholder = '日時を選ぶ',
+  labelFormat = 'full',
+  clearable = true,
   minuteStep = 1,
   id,
   name,
@@ -67,6 +69,10 @@ export default function DateTimeField({
   placeholder?: string
   /** ★V8 の時刻の列の分のきざみ（分）。既定は 1。 */
   minuteStep?: number
+  /** 表の中の狭い欄は「10/2（木）14:00」（年を省く）。全文は title で読める。 */
+  labelFormat?: 'full' | 'short'
+  /** 空にできない欄（登録者の基準日など）は「日時を消す」を置かない。 */
+  clearable?: boolean
   id?: string
   name?: string
   className?: string
@@ -145,7 +151,7 @@ export default function DateTimeField({
           className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
           data-size={size}
           data-readonly=""
-          value={parsed ? formatDateTimeLabel(parsed) : ''}
+          value={parsed ? (labelFormat === 'short' ? formatShortDateTimeLabel(parsed) : formatDateTimeLabel(parsed)) : ''}
           placeholder="—"
           title={parsed ? formatDateTimeLabel(parsed) : undefined}
           aria-label={ariaLabel}
@@ -165,6 +171,7 @@ export default function DateTimeField({
         type="button"
         className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
         data-size={size}
+        data-no-clear={clearable ? undefined : ''}
         disabled={disabled}
         data-invalid={invalid || undefined}
         aria-invalid={invalid || undefined}
@@ -188,10 +195,10 @@ export default function DateTimeField({
       >
         <Calendar aria-hidden="true" className={dateStyles.icon} />
         <span className={parsed ? dateStyles.value : dateStyles.placeholder}>
-          {parsed ? formatDateTimeLabel(parsed) : placeholder}
+          {parsed ? (labelFormat === 'short' ? formatShortDateTimeLabel(parsed) : formatDateTimeLabel(parsed)) : placeholder}
         </span>
       </button>
-      {parsed && !disabled ? (
+      {parsed && !disabled && clearable ? (
         <button
           type="button"
           className={dateStyles.clear}
@@ -323,6 +330,12 @@ export function parseDateTime(value: string): ParsedDateTime | null {
 }
 
 /** 「2026年10月1日（木）10:00」 */
+/** 年を省いた短い形（例：10/2（木）14:00）。 */
+export function formatShortDateTimeLabel(parsed: ParsedDateTime): string {
+  const d = parsed.date
+  return `${d.getMonth() + 1}/${d.getDate()}（${'日月火水木金土'[d.getDay()]}）${pad(parsed.hours)}:${pad(parsed.minutes)}`
+}
+
 export function formatDateTimeLabel(parsed: ParsedDateTime): string {
   return `${formatDateLabel(parsed.date)}${pad(parsed.hours)}:${pad(parsed.minutes)}`
 }

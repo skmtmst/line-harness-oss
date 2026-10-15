@@ -1508,7 +1508,7 @@ export default function AutoRepliesListV8() {
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? () => { setConflictOnly(true); setPage(1) } : undefined} retryLabel="重なりを見る →" />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} action={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? { label: '重なりを見る', onClick: () => { setConflictOnly(true); setPage(1) } } : undefined} />
           ))}
         </KpiBand>
       </>}

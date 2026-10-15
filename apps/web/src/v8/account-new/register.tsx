@@ -572,17 +572,20 @@ export default function AccountRegisterV8() {
           {currentStep === 3 && !createdId && (
             <Card surface="standard" layout="vertical" contentPadding="var(--polish-space-section)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="基本情報" data-design-node="GwKE2" data-step="3">
               <h2 className={styles.panelTitle}>基本情報</h2>
+              {/* LINE ID の右に［LINEから取得］（絵 GwKE2：欄と同じ行の右端）。 */}
+              <div className={styles.idRow}>
               <SettingsFormRow layout="columns">
                 <Field label="表示名" htmlFor="v8-display-name"><SaveErrorField names={["name","form.name"]}><TextField id="v8-display-name" value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "v8-display-name-error" : undefined} /></SaveErrorField></Field>
                 <Field label="LINE ID" htmlFor="v8-line-id"><SaveErrorField names={["lineId","form.lineId","line_id","form.line_id"]}><TextField id="v8-line-id" value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly /></SaveErrorField></Field>
               </SettingsFormRow>
               <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…"><Download size={15} aria-hidden="true" />LINEから取得</Button>
+              </div>
               {fieldErrors.name && <p id="v8-display-name-error" role="alert" className={styles.fieldError}>{fieldErrors.name}</p>}
               <div className={styles.field}>
                 <span className={styles.groupLabel}>タグ</span>
                 <div className={styles.tagRow}>
-                  <EntitySelect aria-label="タグ" noun="タグ" values={form.tagIds} onChange={(ids) => update('tagIds', ids)} options=
-                  {(tags ?? []).map((tag) =>({ value:tag.id, label:tag.name}))} />
+                  <span className={styles.tagPick}><EntitySelect aria-label="タグ" noun="タグ" values={form.tagIds} onChange={(ids) => update('tagIds', ids)} options=
+                  {(tags ?? []).map((tag) =>({ value:tag.id, label:tag.name}))} /></span>
                   {tagInputOpen ? (
                     <span className={styles.tagAdd}>
                       <SaveErrorField names={["newTagName","new_tag_name"]}><TextField value={newTagName} onChange={(event) => setNewTagName(event.target.value)} placeholder="新しいタグの名前" aria-label="新しいタグの名前" maxLength={100} autoFocus /></SaveErrorField>
@@ -613,7 +616,7 @@ export default function AccountRegisterV8() {
               )}
               <div className={styles.field}>
                 <span className={styles.groupLabel}>Callback URL</span>
-                <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
+                <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--space-8) var(--space-8) var(--space-8) var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
                   <span className={styles.endpointValue} ><TruncatedText value={String(callbackUrl ?? '')} url /></span>
                   <CopyButton value={callbackUrl} />
                 </Card>
@@ -756,6 +759,6 @@ function ResultRow({ label, value, state }: { label: string; value: string; stat
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
   return (
-    <CopyTextButton value={value} aria-label="値をコピー" disabled={value === '—'} />
+    <CopyTextButton value={value} label="コピーする" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="値をコピー" disabled={value === '—'} />
   )
 }

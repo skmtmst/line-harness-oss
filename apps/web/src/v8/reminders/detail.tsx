@@ -6,7 +6,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowRight, Check, Copy, Download, Info, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react';
+import { ArrowRight, Check, Copy, Download, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -19,6 +19,7 @@ import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/
 import { csvCell } from '@/lib/presentation';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
+import { PageExplanationBody, PageExplanationProvider, PageExplanationToggle } from '@/components/shared/page-explanation';
 import { CreateSummaryCard } from '@/components/templates/create-parts';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
@@ -472,9 +473,10 @@ function ReminderDetailV8() {
   ].filter(Boolean).join('・')
 
   return (
-    <SaveErrorScope errors={saveErrors}><PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
+    <SaveErrorScope errors={saveErrors}><PageExplanationProvider pageKey="reminders:registrants"><PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
       <PageHeading title={data.reminder.name}
         help={<>{meta}</>}
+        explanationToggle={tab === 'registrants' ? <PageExplanationToggle /> : undefined}
         tabs={<><Tabs
           label="リマインダの詳細"
           items={[
@@ -606,7 +608,7 @@ function ReminderDetailV8() {
         onConfirm={() => runDelete()}
         onCancel={() => setConfirmDelete(false)}
       />
-    </PageFrame></SaveErrorScope>
+    </PageFrame></PageExplanationProvider></SaveErrorScope>
   )
 }
 
@@ -1043,10 +1045,7 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      <p className={styles.infoBand}>
-        <Info size={16} aria-hidden="true" className={styles.infoIcon} />
-        基準日を変えると、まだ送っていない通知だけ新しい日程で組み直します。送った履歴は消えません。
-      </p>
+      <PageExplanationBody keepMounted>基準日を変えると、まだ送っていない通知だけ新しい日程で組み直します。送った履歴は消えません。</PageExplanationBody>
 
       <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--tpl-rm-row-gap-lg)" aria-labelledby="rm-detail-registrants">
         <div className={styles.cardHead}>
@@ -1102,7 +1101,7 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
                     </Td>
                     <Td>
                       <SaveErrorField names={["draftDates","draft_dates"]}><DateTimeField
-                        size="compact"
+                        size="compact" labelFormat="short" clearable={false}
                         aria-label={`${item.friendName || '登録者'}の基準日`}
                         value={draftDates[item.id] ?? ''}
                         disabled={item.status !== 'active' || busy || !canManage}

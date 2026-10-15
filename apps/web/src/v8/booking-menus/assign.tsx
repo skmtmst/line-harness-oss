@@ -363,7 +363,7 @@ export default function AssignMatrixV8() {
                   busy={saving}
 
                 >
-                  保存する
+                  <Check size={15} aria-hidden="true" />保存する
                 </Button>
               </>
             ) : null}

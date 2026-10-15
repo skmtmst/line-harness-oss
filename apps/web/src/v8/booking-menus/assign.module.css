@@ -134,6 +134,7 @@
   line-height: var(--tpl-bm-20);
 }
 
+/* 2つの欄は残りを半分ずつ（絵 ooufy）。下の「メニューは…」の行があるので、ボタンは欄の高さにそろえる。 */
 .overrideFields {
   display: flex;
   align-items: center;
@@ -201,6 +202,7 @@
 
 .overrideClear {
   flex-shrink: 0;
+  margin-top: var(--tpl-field-control-offset);
 }
 
 /* 段の下の説明行：升の印の見本。 */

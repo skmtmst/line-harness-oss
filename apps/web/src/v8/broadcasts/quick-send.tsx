@@ -291,7 +291,7 @@ export default function QuickSendV8({
         </div>
       )}
     >
-      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text"><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
+      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}

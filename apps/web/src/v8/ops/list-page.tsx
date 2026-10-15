@@ -1,13 +1,13 @@
 import { Children, Fragment, cloneElement, isValidElement, type ComponentProps, type ReactNode } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { ListPage, type ListPageProps } from '@/components/templates'
-import { PageContent } from '@/components/templates/page-frame'
+import parts from './parts.module.css'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 
 export function OpsListPage({ stats, ...props }: ListPageProps) {
-  return <ListPage {...props} stats={<>
+  return <ListPage {...props} bottomSpacing={props.bottomSpacing ?? 'compact'} stats={<>
     <PageContent><Notice tone="warn" presentation="ops" icon={<ShieldCheck aria-hidden="true" />}>運営コンソール：契約先のデータを扱います。操作はすべて記録されます</Notice></PageContent>
     {stats ? <PageContent layout="stats">{stats}</PageContent> : null}
   </>} />
