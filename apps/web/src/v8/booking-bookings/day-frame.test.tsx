@@ -8,13 +8,18 @@ afterEach(() => { cleanup(); vi.useRealTimers() })
 const row = { id: 'r1', status: 'confirmed', source: 'liff', friend_name: '花子', menu_name: 'カット', staff_name: '担当A', starts_at: '2026-10-15T02:00:00Z', ends_at: '2026-10-15T03:00:00Z', price_at_booking: 5000 } as BookingRequest
 const slot = { staffId: 'a', date: '2026-10-15', start: '14:00', remaining: 1, state: 'available' }
 
-test('取消履歴を有効予約と売上から外し、同じ時刻のメニュー違いは1枠と数える', () => {
+test('取消履歴を有効予約から外し、売上は確定分、同時刻のメニュー違いは1枠と数える', () => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-15T01:00:00Z'))
   const result = dayBookingSummary([row, { ...row, id: 'cancelled', status: 'cancelled' }, { ...row, id: 'pending', source: 'phone', status: 'requested' }], '2026-10-15', { status: 'ready', slots: [slot, slot, { ...slot, start: '15:00', remaining: 0 }] })
-  expect(result).toMatchObject({ active: 2, line: 1, phone: 1, requested: 1, cancelled: 1, sales: 10000, available: 1 })
+  expect(result).toMatchObject({ active: 2, line: 1, phone: 1, requested: 1, cancelled: 1, sales: 5000, available: 1 })
   expect(result.next?.id).toBe('r1')
   expect(dayBookingSummary([row], '2026-10-15', { status: 'error', slots: [] }).available).toBeNull()
   expect(dayBookingSummary([row], '2026-10-15', { status: 'unconfigured', slots: [] }).available).toBeNull()
+})
+
+test.each(['requested', 'cancelled', 'rejected', 'expired', 'no_show', 'completed'])('売上見込みは確定分だけを数え、%sの料金を混ぜない', status => {
+  const result = dayBookingSummary([row, { ...row, id: status, status, price_at_booking: 1000 }], '2026-10-15', { status: 'ready', slots: [] })
+  expect(result.sales).toBe(5000)
 })
 
 test('次の予約は実データから詳細を開き、狭い板の入口からも同じ内容を読める', () => {

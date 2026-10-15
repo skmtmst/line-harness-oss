@@ -22,7 +22,7 @@ export function dayBookingSummary(rows: BookingRequest[], date: string, availabi
   const slots = availability.slots.filter(slot => slot.date === date && slot.remaining > 0 && ['available', 'limited'].includes(slot.state))
   return { active: active.length, line, phone: active.length - line, requested: active.filter(row => row.status === 'requested').length,
     cancelled: rows.filter(row => ['cancelled', 'rejected', 'no_show'].includes(row.status)).length,
-    sales: active.reduce((sum, row) => sum + row.price_at_booking, 0),
+    sales: rows.filter(row => row.status === 'confirmed').reduce((sum, row) => sum + row.price_at_booking, 0),
     available: availability.status === 'ready' ? new Set(slots.map(slot => `${slot.staffId}/${slot.start}`)).size : null,
     next: active.filter(row => ['requested', 'confirmed'].includes(row.status) && Date.parse(row.ends_at) > Date.now()).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))[0] }
 }
