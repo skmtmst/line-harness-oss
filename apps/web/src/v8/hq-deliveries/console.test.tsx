@@ -60,7 +60,8 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
   it('読込に失敗したひな形では配布先へ進まない', async () => {
     calls.detail.mockRejectedValue(new Error('offline'))
     render(<HqDeliveryConsole type="friend_add_rule" />)
-    fireEvent.click(await screen.findByRole('button', { name: 'アカウントへ配る', exact: true }))
+    fireEvent.click(await screen.findByRole('button', { name: 'ひな形「追加のお礼」の操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'アカウントへ配る' }))
     expect(await screen.findByText('ひな形を開けませんでした。一覧を読み直してください。')).toBeTruthy()
     expect(screen.queryByRole('checkbox', { name: '本店', exact: true })).toBeNull()
     expect(calls.preflight).not.toHaveBeenCalled()
@@ -70,7 +71,7 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
     role.value = value
     render(<HqDeliveryConsole type="friend_add_rule" />)
     const name = await screen.findByRole('button', { name: '追加のお礼', exact: true })
-    expect(screen.queryByRole('button', { name: 'アカウントへ配る', exact: true })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'ひな形「追加のお礼」の操作' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'ひな形を作る', exact: true })).toBeNull()
     fireEvent.click(name)
     expect(await screen.findByText('最初の本文')).toBeTruthy()
@@ -80,7 +81,8 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
 
   it('選んだアカウントと確認番号を使って配り、成功を表示する', async () => {
     render(<HqDeliveryConsole type="friend_add_rule" />)
-    fireEvent.click(await screen.findByRole('button', { name: 'アカウントへ配る', exact: true }))
+    fireEvent.click(await screen.findByRole('button', { name: 'ひな形「追加のお礼」の操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'アカウントへ配る' }))
     fireEvent.click(await screen.findByRole('checkbox', { name: '本店', exact: true }))
     fireEvent.click(screen.getByRole('button', { name: '選んだ1アカウントを確かめる' }))
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('delivery-1', ['account-1']))

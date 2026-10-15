@@ -14,7 +14,8 @@ import ResourceTable from '@/components/shared/resource-table'
 import { DistributionTable, DistributionProgress, DistributionAccountName, DistributionToolbar } from '@/components/shared/distribution-table'
 import Checkbox from '@/components/shared/checkbox'
 import { Tabs } from '@/components/shared/tabs'
-import { Plus, Send } from 'lucide-react'
+import { Pencil, Plus, Send } from 'lucide-react'
+import { RowMenu } from '@/components/shared/row-actions'
 import type { HqTemplateFolder } from '@line-crm/shared'
 import { useDistributionFolders, accountsInFolder, distributionFolderRows } from '../hq-templates/distribution-accounts'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -165,7 +166,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
       folderNav={{rows:folderRows,activeId:folderFilter,onSelect:setFolderFilter,createAction:canEdit ? <Button variant="primary" onClick={create}>ひな形を作る</Button> : undefined}}
       toolbar={<SearchField aria-label="ひな形を検索" placeholder="ひな形を探す" value={query} onChange={setQuery} />}>
       {notices}
-      {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:'—',updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<Button disabled={busy || accountsFailed} onClick={async()=>{if (await edit(row)) setView('accounts')}}><Send size={15} />アカウントへ配る</Button>}))} /> : <p>ひな形がありません。検索・フォルダを確認するか、新しく作ってください。</p>}
+      {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:'—',updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',/* 行の右端は「…」1つ（B-253）。配る・直すはメニューの中。 */actions:<RowMenu label={`ひな形「${row.name}」の操作`} triggerProps={{ disabled: busy }} items={[{ id: 'edit', label: '直す', icon: <Pencil size={15} aria-hidden="true" />, onSelect: () => void edit(row) }, { id: 'distribute', label: 'アカウントへ配る', icon: <Send size={15} aria-hidden="true" />, disabled: accountsFailed, onSelect: async () => { if (await edit(row)) setView('accounts') } }]} />}))} /> : <p>ひな形がありません。検索・フォルダを確認するか、新しく作ってください。</p>}
     </ListPage></SaveErrorScope>
   }
   if (view === 'edit' && selected) return <SaveErrorScope errors={saveErrors}><CreatePage dirty={false} busy={busy} boardId="X4JcOf" title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
