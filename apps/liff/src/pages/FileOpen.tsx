@@ -3,7 +3,6 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import LiffLookScope from '../components/LiffLookScope.js';
 import LoadingView from '../components/LoadingView.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
-import StatusView from '../components/ui/StatusView.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
 import Card from '../components/ui/Card.js';
@@ -15,6 +14,7 @@ import {
   type IssuedFile,
 } from '../lib/file-download-api.js';
 import { logFailure } from '../lib/user-message.js';
+import DownloadFailure from '../components/DownloadFailure.js';
 import { closeOrBackToLine } from './NotFound.js';
 
 /** 失敗の言葉は docs/security/SIGNED-DOWNLOADS.md「失敗の文言と画面の状態」と同じ。 */
@@ -157,48 +157,23 @@ function FileCard({ state }: { state: Extract<State, { name: 'ready' | 'fetching
 }
 
 function Failure({ state, onRetry }: { state: Extract<State, { name: 'failed' }>; onRetry: () => void }) {
-  switch (state.kind) {
-    case 'expired':
-      return (
-        <div data-file-state="expired">
-          <StatusView icon="rotate-cw" title={FILE_TEXT.expired} body={'もう一度開くと、新しいリンクを作ります。'} action={{ label: 'もう一度開く', onClick: onRetry }} />
-        </div>
-      );
-    case 'unavailable':
-      return (
-        <div data-file-state="unavailable" className="pt-[54px]">
-          <StatusView large tone="muted" icon="link-2-off" title="ファイルを開けません" body={FILE_TEXT.unavailable} />
-        </div>
-      );
-    case 'deleted':
-      return (
-        <div data-file-state="deleted" className="pt-[54px]">
-          <StatusView large tone="muted" icon="cloud-off" title={FILE_TEXT.deleted} body={'お店へお問い合わせください。'} />
-        </div>
-      );
-    case 'unconfigured':
-      return (
-        <div data-file-state="unconfigured" className="pt-[54px]">
-          <StatusView large tone="muted" icon="link-2-off" title="ファイルを開けません" body={FILE_TEXT.unconfigured} />
-        </div>
-      );
-    case 'login':
-      return (
-        <div data-file-state="login">
-          <StatusView icon="alert-triangle" title="本人確認ができませんでした" body={FILE_TEXT.login} action={{ label: 'もう一度試す', onClick: onRetry }} />
-        </div>
-      );
-    case 'wait':
-      return (
-        <div data-file-state="wait">
-          <StatusView icon="rotate-cw" title="混み合っています" body={`${state.waitSeconds ?? 30}秒ほど待ってから、もう一度お試しください。`} action={{ label: 'もう一度試す', onClick: onRetry }} />
-        </div>
-      );
-    default:
-      return (
-        <div data-file-state="retry">
-          <StatusView icon="wifi-off" title="取得できませんでした" body={'時間をおいて、もう一度お試しください。'} action={{ label: 'もう一度試す', onClick: onRetry }} />
-        </div>
-      );
-  }
+  return (
+    <div data-file-state={state.kind}>
+      <DownloadFailure
+        kind={state.kind}
+        waitSeconds={state.waitSeconds}
+        onRetry={onRetry}
+        copy={{
+          unavailableTitle: 'ファイルを開けません',
+          unavailableBody: FILE_TEXT.unavailable,
+          deletedTitle: FILE_TEXT.deleted,
+          expiredRetry: 'もう一度開く',
+          expiredBody: 'もう一度開くと、新しいリンクを作ります。',
+          unconfiguredBody: FILE_TEXT.unconfigured,
+          loginBody: FILE_TEXT.login,
+          retryBody: '時間をおいて、もう一度お試しください。',
+        }}
+      />
+    </div>
+  );
 }

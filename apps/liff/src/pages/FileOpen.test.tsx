@@ -118,3 +118,13 @@ test('署名リンクが別の origin なら認証情報を送らない', async 
   await waitFor(() => expect(screen.getByRole('button', { name: 'もう一度試す' })).toBeTruthy());
   expect(calls).toHaveLength(1);
 });
+
+test('混雑(429)は Retry-After の秒数を出し、［もう一度試す］で読み直せる', async () => {
+  routes.push(() => json({}, 429));
+  routes.push(() => json(issued()));
+  routes[0] = () => new Response('{}', { status: 429, headers: { 'Retry-After': '45' } });
+  mount();
+  expect(await screen.findByText('45秒ほど待ってから、もう一度お試しください。')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }));
+  expect(await screen.findByText('見積書.pdf')).toBeTruthy();
+});
