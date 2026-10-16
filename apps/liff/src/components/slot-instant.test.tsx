@@ -51,7 +51,7 @@ describe('監査 L10：開始の瞬間を運ぶ', () => {
 
   it('確認の画面から予約を送るとき、選んだ枠の開始の瞬間を送る', async () => {
     render(
-      <Confirm menu={MENU} staff={STAFF} slot={BANGKOK} autoConfirm={false} onBack={vi.fn()} onSubmitted={vi.fn()} />,
+      <Confirm menu={MENU} staff={STAFF} slot={BANGKOK} autoConfirm={false} onSubmitted={vi.fn()} />,
     );
     fireEvent.click(await screen.findByRole('button', { name: /予約をリクエスト|予約する|確定/ }));
     await vi.waitFor(() => expect(api.createRequest).toHaveBeenCalled());

@@ -14,10 +14,19 @@ import styles from './settings.module.css'
 import ChannelsTabV8 from './channels-tab'
 import PassesTabV8 from '../booking-passes/passes-tab'
 import type { useBookingSettings } from './settings'
-import { MenusTabV8, HoursTabV8, HolidaysTabV8, RulesTabV8, StaffTabV8, V8_TABS } from './settings-parts'
+import { MenusTabV8, HoursTabV8, HolidaysTabV8, RulesTabV8, StaffTabV8, PaymentsTabV8, V8_TABS } from './settings-parts'
+import { useSearchParams } from 'next/navigation'
 
 export default function BookingSettingsView({ accountId, tab, previewUrl, tabNode, canEditMenus, canEditSettings, tabReadOnly, menus, menusStatus, menusError, settings, settingsStatus, settingsError, staff, staffStatus, staffError, staffMatrices, staffExtras, members, resources, resourcesStatus, resourcesError, closedBookingCount, storeExceptions, tabEdit, hasChanges, registerTabEdit, switchTarget, setSwitchTarget, requestTab, confirmSwitch, reloadCore, saveSettings, saveResource, createResource, deleteResource, retryResources, closedWeekdays, phone }: ReturnType<typeof useBookingSettings> & { phone: ReactNode }) {
   const [channelsSummary, setChannelsSummary] = useState<ChannelsSummary | null>(null)
+  /* お支払いタブ：記録・届いた知らせ（?view=）は横いっぱい。設定のときは右の欄に「メニューごとの支払い方法」。 */
+  const paymentsView = useSearchParams().get('view')
+  const [, setPaymentsConnected] = useState(true)
+  /* つなぐ前（UteeA）も右の欄を出さない。 */
+  const paymentsWide = tab === 'payments' && (paymentsView === 'records' || paymentsView === 'events')
+  /* 担当スタッフは割り当て方（QJMoY）が入って横いっぱいの表になった。スマホの見本は出さない。 */
+  /* お支払い（FcGmv）はスマホの見本を右に出す。記録・届いた知らせは横いっぱい。 */
+  const noPhone = tab === 'channels' || tab === 'staff' || tab === 'passes' || paymentsWide
   const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
@@ -48,8 +57,8 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
 
 
         actions={tab === 'passes' && canEditSettings ? <Button variant="primary" href="/booking/passes/new">回数券・月謝を作る</Button> : undefined}
-        preview={tab === 'channels' || tab === 'passes' ? undefined : previewContent}
-        previewToggle={tab === 'channels' || tab === 'passes' ? undefined : (
+        preview={noPhone ? undefined : previewContent}
+        previewToggle={noPhone ? undefined : (
           /* 絵 VFxWU：畳んだときも「LINEでの見え方を見る」と「お客さまに見える画面を確かめる」の2つを並べる。 */
           <div className={styles.narrowActions}>
             <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>
@@ -152,6 +161,8 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
               />
             ) : tab === 'passes' ? (
               <PassesTabV8 accountId={accountId} canEdit={canEditSettings} />
+            ) : tab === 'payments' ? (
+              <PaymentsTabV8 accountId={accountId} canEdit={canEditSettings} onConnectedChange={setPaymentsConnected} />
             ) : (
               <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} staff={staff} onSummaryChange={setChannelsSummary} />
             )}

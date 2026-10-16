@@ -179,7 +179,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
     <EmptyList
       icon={<Gift aria-hidden="true" />}
       title="まだ回数券・月謝がありません"
-      description="回数券や月謝を作ると、お客さまが券で予約できます。"
+      description="回数券や月謝を作ると、お客さまが券で予約できます。回数券・月謝は、お客さまごとに入れます。店頭で売った物・紙の回数券の引き継ぎは、友だちの詳細の「予約」タブから手で入れられます。"
       create={{ label: '回数券・月謝を作る', href: '/booking/passes/new' }}
       canCreate={canEdit}
       filtered={Boolean(query.trim()) || kind !== ''}
@@ -244,6 +244,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
 
   return (
     <SaveErrorScope errors={errors}><section className={styles.panel} aria-label="回数券・月謝">
+      <Notice tone="info" message="回数券・月謝は、お客さまごとに入れます（店頭で売った物・紙の回数券の引き継ぎは、友だちの詳細の「予約」タブから）。" />
       {stats}
       {notice ? <Notice tone="danger" message={notice} /> : null}
       {toolbar}

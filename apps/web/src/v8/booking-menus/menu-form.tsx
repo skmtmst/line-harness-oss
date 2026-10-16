@@ -12,10 +12,11 @@ import Select from '@/components/shared/select'
 import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
-import StatusBadge from '@/components/shared/status-badge'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import CheckCard from '@/components/shared/check-card'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { useMenuPayment } from '../booking-payments/menu-payment'
+import { BookingMenuPaymentCard, useMenuDeposit } from '../booking-payments/menu-deposit'
+import { MeetingModeCard, useMenuMeeting, type MeetingMode } from './meeting-mode'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -465,7 +466,12 @@ export default function MenuFormV8() {
     askQuestion, intakeQuestion, autoTagId,
     [...assigned].sort().join(','), resourceSignature(resourceIds, resourceQuantities), noAssign,
   ])
-  const dirty = baselineRef.current !== '' && baselineRef.current !== currentSignature ||
+  /* お支払い（いつもの方法／このメニューだけ変える）。メニューを保存したあとに口へ書く。 */
+  const payment = useMenuPayment('booking', selectedAccountId, editTarget?.id ?? null)
+  /* デポジット（B1・CnV1I）と会い方・会議の URL（B7・ELruS）。どちらもメニューを保存したあとに口へ書く。 */
+  const deposit = useMenuDeposit(selectedAccountId, editTarget?.id ?? null)
+  const meeting = useMenuMeeting(selectedAccountId, editTarget?.id ?? null, ((editTarget as (BookingMenu & { meeting_mode?: MeetingMode | null }) | null)?.meeting_mode) ?? null)
+  const dirty = payment.dirty || deposit.dirty || meeting.dirty || baselineRef.current !== '' && baselineRef.current !== currentSignature ||
     (baselineRef.current === '' && Boolean(
       name || effectiveCategory || description || durationMinutes !== '60' ||
       bufferAfterMinutes !== '0' || basePrice || concurrentCapacity !== '1' ||
@@ -815,6 +821,14 @@ export default function MenuFormV8() {
         setCreatedMenuNeedingFollowUp({ menuId, remainingStaffIds: failedStaff, resourcesPending })
         throw new Error('メニューは保存されましたが、一部の担当・設備を保存できませんでした。もう一度押すと残りだけをやり直します。')
       }
+      try {
+        await payment.save(menuId)
+        await deposit.save(menuId)
+        version = await meeting.save(menuId, version)
+      } catch (paymentFailure) {
+        saveErrors.capture(paymentFailure)
+        throw new Error('メニューは保存されましたが、お支払いの方法・会い方を保存できませんでした。もう一度押してください。')
+      }
       setCreatedMenuNeedingFollowUp(null)
       notifySaved(editTarget ? 'メニューを保存しました' : publish ? 'メニューを公開しました' : '下書きを保存しました')
       if (editTarget) {
@@ -977,7 +991,7 @@ export default function MenuFormV8() {
           {/* ① メニューの中身 */}
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="メニューの中身" />
-            <SettingsFormRow layout="name-folder">
+            <SettingsFormRow layout="name-folder" keepColumns>
               <Field label="メニュー名" requirement={menuNameRequirement}><SaveErrorField names={["name"]}><TextField
                   type="text"
                   value={name}
@@ -1029,7 +1043,7 @@ export default function MenuFormV8() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="例：シャンプー・カット・爪切り"
               /></SaveErrorField></Field>
-            <SettingsFormRow layout="columns" columns={3}>
+            <SettingsFormRow layout="columns" columns={3} keepColumns>
               <Field label="かかる時間" requirement={menuDurationRequirement}>
                 <SaveErrorField names={["durationMinutes","duration_minutes"]}><NumberInput unit="分"
                   type="number"
@@ -1104,7 +1118,7 @@ export default function MenuFormV8() {
               </p>
             ) : (
               <>
-                <SettingsFormRow layout="columns" columns={3} role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
+                <SettingsFormRow layout="columns" columns={3} keepColumns role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
                   {staff.filter((person) => person.is_active).map((person) => {
                     const on = assigned.has(person.id)
                     // 絵 QqER7：トリマーは名前だけ、それ以外は（役割）を付ける。
@@ -1118,23 +1132,23 @@ export default function MenuFormV8() {
                   })}
                 </SettingsFormRow>
                 {fieldErrors.staff && assigned.size === 0 ? <p className={styles.fieldError} role="alert">{fieldErrors.staff}</p> : null}
+                {/* 保存する設定はチェック（決まり14・絵どおり：言葉は左、チェックは右）。 */}
                 <div className={styles.toggleLine}>
                   <span className={styles.toggleLineLabel}>「指名なし」でも受ける</span>
-                  <SaveErrorField names={["noAssign","no_assign"]}><Toggle
-                    label="「指名なし」でも受ける"
-                    checked={noAssign}
-                    onChange={toggleNoAssign}
-                  /></SaveErrorField>
+                  <SaveErrorField names={["noAssign","no_assign"]}><SettingCheckbox label="「指名なし」でも受ける" checked={noAssign} onChange={toggleNoAssign} /></SaveErrorField>
                 </div>
               </>
             )}
           </Card>
 
+          {/* 会い方（B7・ELruS）：担当スタッフと予約のきまりの間。 */}
+          <MeetingModeCard state={meeting} readOnly={Boolean(editTarget && !canEdit)} />
+
           {/* ③ 予約のきまり */}
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="予約のきまり" meta="空ならお店全体のきまり（予約のルール）を使います" />
             {ownRules ? (
-              <SettingsFormRow layout="columns" columns={3}>
+              <SettingsFormRow layout="columns" columns={3} keepColumns>
                 <Field label="先の予約が取れる範囲">
                   <SaveErrorField names={["windowDays","window_days"]}><NumberInput unit="日先まで" type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" /></SaveErrorField>
                 </Field>
@@ -1173,6 +1187,8 @@ export default function MenuFormV8() {
           {/* 見せる相手（B9・絵 L6ifay）。 */}
           <AudienceSection accountId={selectedAccountId ?? null} mode={audienceMode} tagIds={audienceTagIds} onMode={setAudienceMode} onTagIds={setAudienceTagIds} canEdit={canEditAudience}
             friendId={previewFriendId} onFriendId={setPreviewFriendId} onFriends={setPreviewFriends} />
+          {/* お支払い（B1・CnV1I）：予約のきまりのすぐ下に、独立した段で。 */}
+          <BookingMenuPaymentCard payment={payment} deposit={deposit} price={basePrice.trim() === '' ? null : Number(basePrice) || 0} readOnly={Boolean(editTarget && !canEdit)} />
 
           {/* ④ そのほか（受け方・予約を受けたとき・設備）と お支払い。絵 QqER7・v5L19Z は白い段に白い小段を積む。 */}
           <Card variant="form" gap="normal">
@@ -1293,15 +1309,6 @@ export default function MenuFormV8() {
               {resourceMessage && <p role="status" className="text-ink-secondary text-sm">{resourceMessage}</p>}
             </Card>
 
-            {/* 絵 v5L19Z・QqER7：題の横に「準備中」、説明、3つの選ぶ箱（お店で払うだけ選べる）。 */}
-            <CardHeader size="stacked" title={<span className={styles.titleWithMark}>お支払い<StatusBadge tone="warning" size="compact">未接続</StatusBadge></span>} meta={<span id="menu-payment-note">決済サービスをつなぐと選べるようになります。いまは「お店で払う」だけです。</span>} />
-            <RadioCardGroup legend="お支払い方法" aria-describedby="menu-payment-note" className={styles.paymentChoices}>
-              {PAYMENT_CHOICES.map((choice) => (
-                <RadioCard key={choice.value} variant="form" name="menu-payment" value={choice.value} title={choice.label}
-                  checked={choice.value === 'store'} disabled={choice.value !== 'store'}
-                  onChange={() => {}} />
-              ))}
-            </RadioCardGroup>
           </Card>
 
           {saveError && (
@@ -1330,12 +1337,6 @@ export default function MenuFormV8() {
   )
 }
 
-/** お支払いの選び方。決済サービスをつなぐまでは「お店で払う」だけ。 */
-const PAYMENT_CHOICES = [
-  { value: 'store', label: 'お店で払う' },
-  { value: 'online', label: 'オンラインで先払い' },
-  { value: 'either', label: 'どちらでも' },
-] as const
 
 function bookingErrorText(error: unknown, action: '読み込み' | '保存'): string {
   if (error instanceof ApiError) {

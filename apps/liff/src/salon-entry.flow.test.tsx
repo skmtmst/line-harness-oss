@@ -95,7 +95,7 @@ test.each(['成功', '失敗'])('XL-01: 現役Worker入口でも選び直した�
   fireEvent.click(await screen.findByRole('button', { name: '内容を確かめる' }));
   fireEvent.click(await screen.findByRole('button', { name: 'この内容で予約をリクエストする' }));
   await vi.waitFor(() => expect(requests.some(r => r.url.pathname.endsWith('/requests'))).toBe(true));
-  fireEvent.click(screen.getByRole('button', { name: /日時を選び直す/ }));
+  fireEvent.click(screen.getByRole('button', { name: '確かめを閉じて日時に戻る' }));
   await screen.findByRole('button', { name: /10:00/ });
   await act(async () => { finish(outcome === '成功' ? reply({ booking_id: 'old', status: 'confirmed' }) : reply({}, 503)); await pending; });
   expect(screen.queryByText('ご予約を受け付けました')).toBeNull();

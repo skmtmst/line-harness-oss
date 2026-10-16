@@ -38,6 +38,8 @@ export default function Booking() {
   const [slot, setSlot] = useState<SlotPick | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [paymentDue, setPaymentDue] = useState(false);
+  /* キャンセル料の決まりがオンの店は、確認の段から手順の帯に「お支払い」（カードの登録）を出す（kwC8E）。 */
+  const [cardStep, setCardStep] = useState(false);
   const [prepayNotice, setPrepayNotice] = useState<string | null>(null);
   const [doneStatus, setDoneStatus] = useState('requested');
   // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
@@ -98,7 +100,7 @@ export default function Booking() {
     setStaff(s);
   }
 
-  const steps = paymentDue ? [...STEPS, 'お支払い'] : STEPS;
+  const steps = paymentDue || cardStep ? [...STEPS, 'お支払い'] : STEPS;
   const stepIndex =
     step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : step === 'payment' ? 4 : 3;
   /**
@@ -109,7 +111,7 @@ export default function Booking() {
 
   return (
     <LiffLookScope className="min-h-screen bg-canvas">
-      <LiffHeader title="ご予約" />
+      <LiffHeader title="ご予約" onBack={step === 'confirm' ? () => setStep('datetime') : undefined} backLabel="確かめを閉じて日時に戻る" />
       {(params.get('waitlist')||params.get('seat_waitlist'))&&<WaitlistOfferSheet id={params.get('waitlist')||params.get('seat_waitlist')!} seat={!!params.get('seat_waitlist')} decline={params.get('action')==='decline'} onClose={()=>{const next=new URLSearchParams(params);next.delete('waitlist');next.delete('seat_waitlist');next.delete('action');navigate({pathname:'/booking',search:next.toString()},{replace:true});}} />}
       {step !== 'done' && !waiting && !(step === 'datetime' && emptyDatetime) && <Stepper steps={steps} current={stepIndex} />}
       <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>
@@ -159,7 +161,7 @@ export default function Booking() {
             slot={slot}
             autoConfirm={autoConfirm}
             cancelDeadlineMinutesBefore={cancelDeadline}
-            onBack={() => setStep('datetime')}
+            onPolicyChange={setCardStep}
             onSubmitted={(result) => {
               setBookingId(result.bookingId);
               setDoneStatus(result.status);
@@ -184,6 +186,7 @@ export default function Booking() {
           <Done
             menuName={menu.name}
             slot={slot}
+            durationMinutes={staff.duration_minutes}
             status={doneStatus}
             bookingId={bookingId}
             prepayNotice={prepayNotice}

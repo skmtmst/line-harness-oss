@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { api, type BookingHistoryItem } from '../lib/api.js';
+import { api, type BookingHistoryItem, type BookingPayment } from '../lib/api.js';
 import { addDays, slotStartsAtIso, jstToday, formatMd, formatWeekday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import { logFailure } from '../lib/user-message.js';
@@ -82,12 +82,18 @@ export default function BookingHistory() {
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  /* これからの予約のお支払い（B-338・nWby5）。先払いの予約だけ返る。読めないときは札を出さない。 */
+  const [payments, setPayments] = useState<Record<string, BookingPayment | null>>({});
 
   useEffect(() => {
     setFailed(false);
     api
       .me()
-      .then(setData)
+      .then((next) => {
+        setData(next);
+        void Promise.all(next.upcoming.map((b) => Promise.resolve().then(() => api.bookingPaymentStatus(b.id)).then((res) => [b.id, res?.payment ?? null] as const).catch(() => [b.id, null] as const)))
+          .then((pairs) => setPayments(Object.fromEntries(pairs)));
+      })
       .catch((e) => {
         logFailure('booking-history', e);
         setFailed(true);
@@ -101,6 +107,8 @@ export default function BookingHistory() {
     && withinDeadline(b, now);
   const canChange = (b: BookingHistoryItem) =>
     canCancel(b) && typeof b.menu_id === 'string' && typeof b.staff_id === 'string';
+
+  const paidCancel = pendingCancel && payments[pendingCancel.id]?.status === 'paid' ? payments[pendingCancel.id] : null;
 
   async function runCancel() {
     const target = pendingCancel;
@@ -123,6 +131,24 @@ export default function BookingHistory() {
       if (code === 'version_conflict' || code === 'not_editable' || code === 'booking_not_found') {
         setReloadKey((k) => k + 1);
       }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* ［お支払いへ進む］：同じ予約は同じ支払いページを返す（今の口）。試験モードの間は本当の請求は起きない。 */
+  async function startPayment(booking: BookingHistoryItem) {
+    if (busy) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      const res = await api.startBookingPayment(booking.id);
+      if (res.checkoutUrl) window.location.assign(res.checkoutUrl);
+      else setActionError('お支払いのページを開けませんでした。時間をおいて、もう一度お試しください。');
+    } catch (err) {
+      logFailure('booking-history-pay', err);
+      setActionError('お支払いのページを開けませんでした。お支払いの期限が過ぎたときは、もう一度予約してください。');
+      setReloadKey((k) => k + 1);
     } finally {
       setBusy(false);
     }
@@ -244,6 +270,8 @@ export default function BookingHistory() {
                     disabled={busy}
                     onChange={canChange(b) ? () => void openChange(b) : undefined}
                     onCancel={canCancel(b) ? () => { setActionError(null); setPendingCancel(b); } : undefined}
+                    payment={tab === 'upcoming' ? payments[b.id] ?? null : null}
+                    onPay={tab === 'upcoming' ? () => void startPayment(b) : undefined}
                   />
                 ))}
               </ul>
@@ -271,22 +299,42 @@ export default function BookingHistory() {
       )}
       <ConfirmDialog
         open={pendingCancel !== null}
+        surface={paidCancel ? 'sheet' : 'dialog'}
+        footer={paidCancel ? (
+          <div className="flex flex-col gap-2.5">
+            <Button variant="danger" disabled={busy} onClick={() => void runCancel()}>キャンセルして返金を受ける</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => setPendingCancel(null)}>やめる</Button>
+          </div>
+        ) : undefined}
         title={
-          pendingCancel
-            ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)} の${pendingCancel.menu_name}をキャンセルしますか`
-            : ''
+          paidCancel
+            ? 'この予約をキャンセルしますか？'
+            : pendingCancel
+              ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)} の${pendingCancel.menu_name}をキャンセルしますか`
+              : ''
         }
-        description="キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。"
+        description={paidCancel && pendingCancel
+          ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)}・${pendingCancel.menu_name}・${pendingCancel.staff_name}`
+          : 'キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。'}
         error={actionError ?? undefined}
-        confirmLabel="キャンセルする"
-        cancelLabel="閉じる"
+        confirmLabel={paidCancel ? 'キャンセルして返金を受ける' : 'キャンセルする'}
+        cancelLabel={paidCancel ? 'やめる' : '閉じる'}
         destructive
         busy={busy}
         onCancel={() => {
           if (!busy) setPendingCancel(null);
         }}
         onConfirm={() => void runCancel()}
-      />
+      >
+        {/* 払い済みの予約のキャンセル（hOILq・B-338）：期限内は全額返金を先に知らせる。 */}
+        {paidCancel ? (
+          <div className="flex flex-col gap-1 rounded-(--liff-radius) bg-liff-ok-bg px-3.5 py-3" data-refund-note>
+            <p className="text-[14px] leading-[20px] font-bold text-liff-ok-ink">{`お支払い済みの ¥${Math.round(paidCancel.amount ?? 0).toLocaleString('ja-JP')} は全額返金します`}</p>
+            <p className="text-[12px] leading-[18px] text-ink">カードへの反映まで 5〜10 日かかることがあります。</p>
+          </div>
+        ) : null}
+        {paidCancel ? <p className="text-[12px] leading-[18px] text-liff-sub">{pendingCancel?.cancel_deadline_at ? `キャンセルの期限：${utcToJstMd(pendingCancel.cancel_deadline_at)} ${utcToJstHm(pendingCancel.cancel_deadline_at)} まで。過ぎると返金はありません。` : 'キャンセルの期限を過ぎると返金はありません。'}</p> : null}
+      </ConfirmDialog>
       <ConfirmDialog
         open={pendingChange !== null}
         title={pendingChange ? `「${pendingChange.booking.menu_name}」の日時を変えますか` : ''}

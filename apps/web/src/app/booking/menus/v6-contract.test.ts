@@ -59,15 +59,16 @@ describe('V8 予約設定', () => {
   })
 
   it('表示している一覧操作は実際に使える', () => {
-    // 分割先のコメントは画面の文言ではない。
-    expect(LIST.replace(/^\s*\/\/.*$/gm, '')).not.toContain('準備中')
+    // 分割先のコメントは画面の文言ではない。口が来るまでの「現在準備中です」の案内は B-314（オーナー）で認められた形なので除く。
+    expect(LIST.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').replaceAll('現在準備中です', '')).not.toContain('準備中')
     expect(LIST).toContain('bookingApi.getSettings(accountId)')
     expect(LIST).toContain('<Pagination page={safePage} pageCount={pageCount}')
     expect(LIST).toContain("label: (visOverride[menu.id] ?? menu.is_active) ? '止める' : '出す'")
     expect(LIST).toContain('bookingApi.patchMenu(accountId, menu.id, version')
     expect(LIST).toContain('visibilityError ? <Notice')
     expect(LIST).not.toContain('メニュー名で検索')
-    expect(LIST).not.toContain('CSVで書き出す')
+    // メニュー一覧（menus-tab）に CSV の書き出しは置かない。お支払いの記録（B-305）の書き出しは別のタブ。
+    expect(SETTINGS_MENUS_TAB).not.toContain('CSVで書き出す')
   })
 
   it('作成後の担当保存だけが失敗した場合は、作成済みと伝えて設定導線を出す (DEEP-16)', () => {
@@ -147,7 +148,7 @@ describe('V8 予約設定', () => {
   // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('ZyDd6: 予約経路タブは経路の口から表を作る', () => {
-    expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路', node: 'ZyDd6' }")
+    expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路の連携', node: 'ZyDd6' }")
     expect(SETTINGS_V8).toContain('/api/booking/admin/channels?account_id=')
     expect(SETTINGS_V8).toContain('スタッフの Google カレンダー')
     expect(SETTINGS_V8).toContain('data-design-node="wJYQb"')

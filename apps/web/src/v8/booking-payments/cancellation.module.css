@@ -1,0 +1,20 @@
+/* キャンセル料・デポジット（★V8 FcGmv・i2iv4g・CnV1I）。値は変数だけ。 */
+.head { display: flex; align-items: center; gap: var(--tpl-bm-6); }
+.added { outline-color: var(--color-accent-border); }
+.minor { margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); line-height: var(--tpl-bm-18); }
+.readValue { margin: 0; color: var(--color-ink); font-size: var(--tpl-bm-13); font-weight: 700; }
+.subTitle { margin: var(--tpl-bm-4) 0 0; color: var(--color-ink); font-size: var(--tpl-bm-13); font-weight: 700; }
+.inline { display: flex; flex-wrap: wrap; gap: var(--tpl-bm-24); }
+.inlineState { display: flex; align-items: center; gap: var(--tpl-bm-12); }
+.switchRow { display: flex; align-items: center; gap: var(--tpl-bm-8); color: var(--color-ink); font-size: var(--tpl-bm-13); }
+.tierTable { display: flex; flex-direction: column; border-radius: var(--tpl-bm-8); overflow: hidden; }
+.tierRow { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-bm-200) var(--tpl-bm-36); align-items: center; gap: var(--tpl-bm-12); min-height: var(--tpl-bm-52, var(--tpl-bm-56)); padding: 0 var(--tpl-bm-16); box-shadow: var(--shadow-row-line); color: var(--color-ink); font-size: var(--tpl-bm-13); }
+.tierHead { min-height: var(--tpl-bm-40); background: var(--color-table-head); color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); }
+.dialogBody { display: flex; flex-direction: column; gap: var(--tpl-bm-16); width: 100%; }
+.depositRow { display: grid; grid-template-columns: var(--tpl-bm-160) minmax(0, 1fr); align-items: end; gap: var(--tpl-bm-16); }
+.depositCondition { min-width: 0; }
+/* 掛ける条件は残りの幅を埋め、入れる欄と同じ行の高さにする（絵 FcGmv）。 */
+.fill { width: 100%; }
+.connectRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-bm-12); }
+.connectText { display: flex; flex-direction: column; gap: var(--tpl-bm-2); min-width: 0; color: var(--color-ink); font-size: var(--tpl-bm-13); }
+.links { display: flex; flex-wrap: wrap; gap: var(--tpl-bm-16); margin: 0; font-size: var(--tpl-bm-12); }

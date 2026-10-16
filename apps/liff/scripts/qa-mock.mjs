@@ -632,6 +632,19 @@ const server = createServer(async (req, res) => {
     json(res, 200, { lock_version: 2, status: pathname.endsWith('/cancel') ? 'cancelled' : 'confirmed' });
     return;
   }
+  // お支払いの状態（B-338・nWby5）：1 件目は支払い済み、2 件目は未払い（払う期限つき）。
+  if (method === 'GET' && pathname === '/api/liff/booking/payments/by-booking') {
+    const id = url.searchParams.get('bookingId');
+    const payment = id === 'qa-history-1' ? { id: 'qa-pay-1', status: 'paid', amount: 8800, currency: 'jpy', hold_until: null }
+      : id === 'qa-history-2' ? { id: 'qa-pay-2', status: 'unpaid', amount: 4400, currency: 'jpy', hold_until: '2026-10-19T09:00:00.000Z' }
+        : null;
+    json(res, 200, { payment });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/liff/booking/payments/start') {
+    json(res, 200, { payment: null, checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_qa' });
+    return;
+  }
   if (method === 'GET' && pathname === '/api/liff/booking/me') {
     json(res, 200, {
       upcoming: [

@@ -1,0 +1,173 @@
+/* 回数券・月謝（★V8 修正案 f4bLF：t7AmhL・XrfOE）。値は変数だけ。 */
+
+.minor {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+  min-height: var(--tpl-bm-56);
+  box-shadow: var(--shadow-row-line);
+}
+
+.row:last-child {
+  box-shadow: none;
+}
+
+.rowIcon {
+  flex: none;
+  color: var(--color-ink-secondary);
+}
+
+.rowMain {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rowSub,
+.cellSub {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-11);
+  line-height: var(--tpl-bm-16);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialogBody {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--tpl-bm-16);
+}
+
+.fullSelect {
+  display: flex;
+  flex-direction: column;
+}
+
+.twoCols {
+  display: grid;
+  grid-template-columns: minmax(0, var(--tpl-bm-160)) minmax(0, 1fr);
+  gap: var(--tpl-bm-12);
+}
+
+.preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-16);
+  border-radius: var(--tpl-bm-10);
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+}
+
+.previewNum {
+  margin-left: var(--tpl-bm-12);
+  font-size: var(--tpl-bm-16);
+  font-weight: 700;
+}
+
+.previewNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  white-space: nowrap;
+}
+
+.drawerBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-16);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-bm-12);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-4);
+  padding: var(--tpl-bm-16);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.statLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+}
+
+.statValue {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-20);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.historyHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bm-12);
+}
+
+.historyTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  font-weight: 700;
+}
+
+.cellStack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cellMain {
+  color: var(--color-ink);
+}
+
+.footNote {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+.footNote svg {
+  flex: none;
+}
+
+.bookingsStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-16);
+}
