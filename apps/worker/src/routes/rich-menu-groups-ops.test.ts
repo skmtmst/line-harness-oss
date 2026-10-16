@@ -167,7 +167,7 @@ describe('GET /api/rich-menu-groups/:groupId/publish-runs', () => {
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue(GROUP_WITH_PAGES);
     dbMocks.listRichMenuManualPublishRequests.mockResolvedValue([
       {
-        id: 'req-1', group_id: 'g1', account_id: 'a1', status: 'failed',
+        id: 'req-1', group_id: 'g1', account_id: 'a1', status: 'failed', version_number: 3,
         idempotency_key: 'k1', last_error_code: 'LINE timeout',
         requested_by_staff_id: 'staff-1',
         definition_snapshot: JSON.stringify({ name: 'メイン', chatBarText: 'menu', pages: [{}, {}] }),
@@ -187,7 +187,7 @@ describe('GET /api/rich-menu-groups/:groupId/publish-runs', () => {
       };
     };
     expect(body.data.runs[0]).toMatchObject({
-      id: 'req-1', status: 'failed', lastErrorCode: 'LINE timeout',
+      id: 'req-1', versionNumber: 3, status: 'failed', lastErrorCode: 'LINE timeout',
       version: { name: 'メイン', chatBarText: 'menu', pageCount: 2 },
       pages: [{ pageId: 'p1', newRichMenuId: 'richmenu-new', oldRichMenuId: 'richmenu-old' }],
     });

@@ -323,3 +323,70 @@ describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
     const id=await save('template',value),p=await request(`/${id}/preflight`,'POST',{accountIds:['a']});expect(p.status).toBe(409);expect(sql.raw.prepare('SELECT count(*) n FROM templates').get()).toEqual({n:0});expect(objects.size).toBe(1);
   });
 });
+
+describe('HQ rich-menu draft checks and targeting',()=>{
+  async function menu() {
+    const u=await upload('rich_menu');expect(u.status).toBe(201);
+    return {schemaVersion:1,richMenu:{id:'menu',name:'通常メニュー',chatBarText:'開く',size:'large',defaultPageId:'page',displayAudience:'tag',displayTagName:'会員',defaultOpen:true,pages:[{id:'page',name:'ページ',imageR2Key:u.body.data.r2Key,areas:[{id:'area',bounds:{x:0,y:0,width:100,height:100},actionType:'message',intent:'text',label:'案内',actionData:{text:'案内'}}]}]}};
+  }
+  function tags(){for(const a of ['a','b','c'])sql.raw.prepare("INSERT INTO tags(id,name,line_account_id) VALUES (?,'会員',?)").run(`member-${a}`,a);}
+  test('same-name targeting tags and default-open are copied into independent drafts',async()=>{
+    tags();const d=await menu(),id=await save('rich_menu',d);
+    expect((await request(`/${id}`)).body.data.definition.richMenu).toMatchObject({displayAudience:'tag',displayTagName:'会員',defaultOpen:true});
+    await distribute(id);
+    for(const a of ['a','b','c']){
+      const g=sql.raw.prepare('SELECT status,default_open,is_default_for_all,targeting_enabled,targeting_condition FROM rich_menu_groups WHERE account_id=?').get(a) as {status:string;default_open:number;is_default_for_all:number;targeting_enabled:number;targeting_condition:string};
+      expect(g).toMatchObject({status:'draft',default_open:1,is_default_for_all:0,targeting_enabled:1});
+      expect(JSON.parse(g.targeting_condition)).toEqual({operator:'AND',rules:[{type:'tag_exists',value:`member-${a}`}]});
+    }
+  });
+  test('preview returns duplicates, coverage, missing tags and server image sizes without saving',async()=>{
+    tags();sql.raw.exec("DELETE FROM tags WHERE line_account_id='c';INSERT INTO rich_menu_groups(id,account_id,name,chat_bar_text,size) VALUES ('existing','a','通常メニュー','開く','large')");
+    const d=await menu();
+    const r=await request('/rich-menu-preview','POST',{name:d.richMenu.name,accountIds:['a','b','c'],definition:d});
+    expect(r.status,JSON.stringify(r.body)).toBe(200);
+    expect(r.body.data.summary).toEqual({accountCount:3,sameNameAccountCount:1,overwriteCount:1,createCount:2,missingReferences:1,missingTags:1});
+    expect(r.body.data.references[0]).toMatchObject({kind:'audience_tag',name:'会員',availableAccountCount:2,totalAccountCount:3});
+    expect(r.body.data.images[0]).toMatchObject({sizeBytes:32,sizeKb:32/1024,available:true});
+    expect(sql.raw.prepare('SELECT COUNT(*) n FROM hq_templates').get()).toEqual({n:0});
+    expect(sql.raw.prepare('SELECT COUNT(*) n FROM hq_template_preflights').get()).toEqual({n:0});
+    expect(bucket.put).toHaveBeenCalledTimes(1);
+  });
+  test('missing audience tags stop real preflight and are never silently created',async()=>{
+    const id=await save('rich_menu',await menu());const r=await request(`/${id}/preflight`,'POST',{accountIds:['a']});
+    expect(r.status,JSON.stringify(r.body)).toBe(409);expect(r.body.code).toBe('DISPLAY_TAG_UNAVAILABLE');
+    expect(sql.raw.prepare('SELECT COUNT(*) n FROM tags').get()).toEqual({n:0});
+  });
+  test('targeting tag changes invalidate a confirmed distribution',async()=>{
+    tags();const id=await save('rich_menu',await menu());const p=await request(`/${id}/preflight`,'POST',{accountIds:['a']});expect(p.status).toBe(200);
+    sql.raw.exec("UPDATE tags SET name='別の会員' WHERE id='member-a'");
+    const r=await request(`/${id}/distribute`,'POST',{preflightId:p.body.data.preflightId,resolutions:p.body.data.stores[0].items.map((i:{sourceId:string})=>({accountId:'a',sourceId:i.sourceId,mode:'create'}))});
+    expect(r.body.data.stores[0].status).not.toBe('succeeded');expect(sql.raw.prepare('SELECT COUNT(*) n FROM rich_menu_groups').get()).toEqual({n:0});
+  });
+  test('draft checks reject foreign accounts and editing by a read-only operator',async()=>{
+    sql.raw.exec("UPDATE line_accounts SET tenant_id='other' WHERE id='c'");
+    expect((await request('/rich-menu-preview','POST',{name:'通常',accountIds:['c']})).status).toBe(403);
+    staff.readOnly=true;expect((await request('/rich-menu-preview','POST',{name:'通常',accountIds:['a']})).status).toBe(403);
+  });
+  test.each([{displayTagName:''},{defaultOpen:'yes'},{displayAudience:'store',displayTagName:'会員'}])('invalid display settings are rejected before saving: %j',async value=>{
+    const d=await menu();Object.assign(d.richMenu,value);expect((await request('','POST',{type:'rich_menu',name:'通常',definition:d,requestId:crypto.randomUUID()})).status).toBe(400);
+  });
+});
+
+test('保存前にフォームと押した人のタグの同名参照・LIFFの不足を店舗別に返す',async()=>{
+  const image=await upload('rich_menu');
+  for(const a of ['a','b']){
+    sql.raw.prepare("INSERT INTO forms(id,name) VALUES (?,'相談フォーム')").run(`form-${a}`);
+    sql.raw.prepare('INSERT INTO form_accounts(form_id,line_account_id) VALUES (?,?)').run(`form-${a}`,a);
+  }
+  for(const a of ['a','c'])sql.raw.prepare("INSERT INTO tags(id,name,line_account_id) VALUES (?,'予約ボタン',?)").run(`tag-${a}`,a);
+  sql.raw.exec("UPDATE line_accounts SET liff_id='liff-a' WHERE id='a'");
+  const definition={schemaVersion:1,richMenu:{id:'menu',name:'相談',chatBarText:'メニュー',size:'large',defaultPageId:'page',pages:[{id:'page',name:'相談',imageR2Key:image.body.data.r2Key,areas:[
+    {id:'form-area',bounds:{x:0,y:0,width:100,height:100},actionType:'uri',actionData:{},intent:'form',formId:'form-a',label:'相談'},
+    {id:'tag-area',bounds:{x:100,y:0,width:100,height:100},actionType:'message',actionData:{text:'予約'},intent:'text',tagIds:['tag-a'],label:'予約'},
+  ]}]}};
+  const r=await request('/rich-menu-preview','POST',{name:'相談',accountIds:['a','b','c'],definition});expect(r.status,JSON.stringify(r.body)).toBe(200);
+  expect(r.body.data.references.map((ref:{kind:string;availableAccountCount:number;totalAccountCount:number})=>[ref.kind,ref.availableAccountCount,ref.totalAccountCount]).sort()).toEqual([['form',2,3],['liff',1,3],['tag',2,3]]);
+  expect(r.body.data.stores.find((s:{accountId:string;missingReferences:Array<{kind:string}>})=>s.accountId==='b').missingReferences.map((ref:{kind:string})=>ref.kind).sort()).toEqual(['liff','tag']);
+  expect(sql.raw.prepare('SELECT COUNT(*) n FROM hq_templates').get()).toEqual({n:0});
+});

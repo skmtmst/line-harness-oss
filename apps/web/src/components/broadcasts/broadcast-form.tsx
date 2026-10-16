@@ -1,4 +1,6 @@
 'use client'
+
+import type { BroadcastFormProps } from './broadcast-form-props'
 import { EntityPickerDialog } from '@/components/shared/entity-picker';
 
 import { LinePreviewFlex } from '@/components/shared/line-preview'
@@ -7,7 +9,7 @@ import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import type { Folder, Tag } from '@line-crm/shared'
+import type { Folder } from '@line-crm/shared'
 import { AlertTriangle, ArrowRight, CheckCircle2, Eye, FileText, Save, Send, Trash2 } from 'lucide-react'
 import {
   ApiError,
@@ -101,7 +103,7 @@ import {
   SingleOperatorFields,
 } from '@/components/broadcasts/broadcast-approval'
 import type { BroadcastApprovalCandidate } from '@/lib/api'
-import { formatDateTime, formatDay, formatNumber, formatRelative, formatTime } from '@/lib/format'
+import { formatDateTime, formatDay, formatListDay, formatNumber, formatRelative, formatTime } from '@/lib/format'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -110,39 +112,6 @@ import ActionList from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
-interface BroadcastFormProps {
-  tags: Tag[]
-  /**
-   * R581: タグ候補の取得状態。呼び側（作成ページ）が持つ。
-   * 取得失敗と真の0件を分け、同じ画面で再試行できるようにする。
-   * 未指定は取得ずみ扱い（一覧の埋め込みフォームは従来どおり）。
-   */
-  tagsStatus?: 'loading' | 'ready' | 'error'
-  /** R581: タグ候補の再取得。入力はフォームが持つので、再試行で消えない。 */
-  onRetryTags?: () => void
-  /** 作成された実物。予約だけを完了画面へ送り、下書きと取り違えない。 */
-  onSuccess: (broadcast: ApiBroadcast) => void
-  /**
-   * BROADCAST-16: 「下書き保存」でフォームが閉じない保存にも呼ぶ。
-   * 呼び側は一覧・フォルダ件数を読み直す（保存した下書きが未分類へ
-   * 増えるのに、再訪しないと件数が古いままだった）。
-   */
-  onDraftSaved?: (broadcast: ApiBroadcast) => void
-  onCancel: () => void
-  openTemplatePickerInitially?: boolean
-  initialTemplateId?: string | null
-  initialContentTemplateId?: string | null
-  initialCondition?: SegmentCondition | null
-  /** 分析画面から渡された一時対象者。人数・期限はAPIで読み直したもの。 */
-  audienceNotice?: { memberCount: number; expiresAt: string; label?: string } | null
-  initialScheduledDate?: string
-  initialScheduledTime?: string
-  /** 正本の `?step=`。未指定は一覧内の従来フォームとして全節を表示する。 */
-  currentStep?: BroadcastStepKey | null
-  onStepChange?: (step: BroadcastStepKey) => void
-  /** visual-qa-accountでだけ使う、Pencilの8月キャンペーン完成状態。 */
-  visualQaAugustCampaign?: boolean
-}
 
 /*
  * 右側のプレビューの枠は、LINEのトーク画面に近い共通部品
@@ -640,6 +609,11 @@ export default function BroadcastForm({
    * (`folders` / kind='broadcast') とは別物なので別に持つ。
    */
   const [templateFolders, setTemplateFolders] = useState<Folder[]>([])
+  /** 「よく使う」：使った回数が1回以上のテンプレートのうち多い順に5件（受信箱のテンプレートを選ぶ窓と同じ数え方）。 */
+  const frequentTemplateIds = useMemo(() => new Set([...messageTemplates]
+    .filter((template) => (template.usageCount ?? 0) > 0)
+    .sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0))
+    .slice(0, 5).map((template) => template.id)), [messageTemplates])
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
   const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'scenario')
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
@@ -2376,13 +2350,13 @@ export default function BroadcastForm({
           />
         </section>
         {showTemplatePicker && (
-          <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ"
+          <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ" searchPlaceholder="テンプレート名・本文で探す"
             folders={templateFolders} busy={composerBusy} error={templateApplyError}
             state={templateCandidatesStatus === 'loading' ?
                 <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><Notice tone="danger">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</Notice></SaveErrorField> : undefined}
             items={[
-                    ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:typeLabel(asset.kind)})),
-              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, content:template.messageType === 'text' ?template.messageContent : undefined, keywords: template.messageContent, meta : typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}
+                    ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:`${typeLabel(asset.kind)}・更新 ${formatListDay(asset.updatedAt)}`})),
+              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, frequent: frequentTemplateIds.has(template.id), keywords: template.messageContent, meta : `${typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}・更新 ${formatListDay(template.updatedAt)}`}
               )),
             ]}
             preview=

@@ -297,7 +297,8 @@
 .previewMenuImage img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
 }
 
 .previewMenuAreas {
@@ -529,7 +530,7 @@
 
 /* 読み込み・失敗の板。 */
 .stateCard {
-  padding: 32px 20px;
+  padding: var(--tpl-rm-state-pad);
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
@@ -539,7 +540,7 @@
   box-shadow: var(--card-shadow);
 }
 
-.pageHead { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px 24px 16px; border-bottom: 1px solid var(--color-hairline); }
+.pageHead { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: var(--tpl-rm-head-pad); border-bottom: 1px solid var(--color-hairline); }
 .previewColumn { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 24px; border-left: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
 
 
@@ -584,3 +585,34 @@
 .flatCard { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow); }
 /* 段の題は 15/700・行の高さ 22（共通の見出しは 23）。 */
 .flatCard h3 { line-height: var(--tpl-eds-card-title-lh); }
+
+/* 統括の④「確かめる」（BVSbe）：左に形（幅 240）、右に面ごとの動きの一覧（行の間は線）。 */
+.hqReview { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--space-24); align-items: start; }
+.hqReviewShape { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+.hqReviewActions { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.hqReviewLabel { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-rm-review-label-lh); }
+.hqActionList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.hqActionRow { display: flex; align-items: center; gap: var(--space-12); min-height: var(--tpl-rm-review-action-h); padding: var(--space-6) 0; box-shadow: var(--shadow-row-line); }
+.hqActionLetter {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--tpl-rm-review-letter); height: var(--tpl-rm-review-letter);
+  border-radius: var(--radius-pill); background: var(--color-canvas-sunken); color: var(--color-accent-deep);
+  font-size: var(--text-label); font-weight: 600;
+}
+.hqActionName { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.hqActionValue { flex: none; color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+
+/* 板 `F4gELj`「確かめる」：左に小さな見本（幅 165）、右に面ごとの動き。 */
+.reviewRow { display: flex; align-items: flex-start; gap: var(--polish-space-card); min-width: 0; }
+.reviewThumb { flex: none; width: var(--tpl-rm-review-thumb-w); display: flex; flex-direction: column; gap: var(--space-8); }
+.reviewCaption { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-rm-face-label-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reviewFaces { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-8); }
+.reviewFacesTitle { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-rm-face-label-lh); }
+.faceList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.faceGroup { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.faceGroupName { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-rm-face-label-lh); }
+.faceRow { display: flex; align-items: center; gap: var(--space-10); min-height: var(--tpl-rm-face-row-h); min-width: 0; }
+.faceLetter { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--space-20); height: var(--space-20); border-radius: var(--radius-pill); background: var(--color-surface-pearl); color: var(--color-ink-secondary); font-size: var(--text-micro); font-weight: 600; }
+.faceName { flex: 1; min-width: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-rm-face-name-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.faceSummary { flex: none; max-width: 55%; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-rm-face-summary-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.faceSummaryWarn { flex: none; color: var(--color-warning); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-rm-face-summary-lh); white-space: nowrap; }
+.endNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-rm-face-summary-lh); }

@@ -4,6 +4,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* 白い板いっぱいの高さにして、札を板の真ん中へ置く（絵 O5tUeE）。 */
+  min-height: var(--tpl-hb2-np-min-h);
   margin: var(--tpl-hb2-board-bleed);
 }
 
@@ -11,7 +13,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-hb2-head-gap);
-  padding: var(--tpl-hb2-head-pad);
+  /* 余白は共通の PageHeading が持つ（ここでも足すと題が右下へ 24・20 ずれる）。 */
 }
 
 .title {
@@ -31,11 +33,12 @@
 
 .center {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   padding: var(--tpl-section-pad);
+  /* 札は題の下から板の下までの真ん中（絵 O5tUeE：上 291・下 303）。 */
 }
 
 .card {

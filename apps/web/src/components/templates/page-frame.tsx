@@ -105,6 +105,6 @@ export function PageFrame({ kind, children, boardId, layout, heightMode, standal
 }
 
 /** 内容で終わる板の本文。下の24はPageFrameが持ち、本文と二重にしない。 */
-export function PageContent({ children, layout, ...props }: Omit<import('react').HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & { layout?: 'columns' }) {
+export function PageContent({ children, layout, ...props }: Omit<import('react').HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & { layout?: 'columns' | 'stats' }) {
   return <div {...props} className={styles.pageContent} data-content-layout={layout} data-template-region="content">{children}</div>
 }

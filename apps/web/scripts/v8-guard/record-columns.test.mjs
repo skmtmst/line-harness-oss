@@ -51,7 +51,7 @@ test('staff roles stay before login dates at all widths; the former narrow reord
     const page = await browser.newPage()
     for (const width of [1152, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 })
-      const cells = '<span class="colPerson">人</span><span class="colScope">アカウント</span><span class="colRole">役割</span><span class="colLast">最後に入った</span><span class="colMenu">…</span>'
+      const cells = '<span class="colPerson">人</span><span class="colRole">役割</span><span class="colLast">最後に入った</span><span class="colMenu">…</span>'
       await page.setContent(`<style>${read('../../src/app/globals.css')}${css('../../src/components/shared/grid-table.module.css')}${css('../../src/v8/settings/staff/staff.module.css')}*{box-sizing:border-box}.table{width:calc(100vw - 440px);--grid-table-columns:var(--sett-staff-columns);--grid-table-gap:16px;--grid-table-row-padding:0 24px}</style><div class="table"><div class="row" data-head>${cells}</div><div class="row">${cells}</div></div>`)
       const ordered = () => page.locator('.row').evaluateAll(rows => rows.every(row => {
         const boxes = [...row.children].map(cell => cell.getBoundingClientRect())
@@ -78,6 +78,33 @@ test('a 1px row divider keeps its text spacing; genuine adjacent card shadows an
       assert.equal(await touching(), 1, 'real touching card shadows are still detected')
       await page.addStyleTag({ content: 'li{box-shadow:none;border:1px solid #ccc}' })
       assert.equal(await touching(), 1, 'real touching card borders are still detected')
+    }
+  } finally { await browser.close() }
+})
+
+
+test('late calendar data refreshes flex column widths and keeps every row aligned', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    for (const width of [1152, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.setContent(`<style>${read('../../src/app/globals.css')}${css('../../src/components/shared/data-table.module.css')}${css('../../src/components/shared/table.module.css')}
+        *{box-sizing:border-box}.frame{width:calc(100vw - 280px)}.table tr{display:flex}.table tr>th,.table tr>td{flex:0 1 auto;white-space:nowrap}.calendar{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        </style><main><div class="frame" data-column-layout data-column-sizing="content" style="--table-column-gap:12px;--table-column-padding:0 24px;--table-head-padding:0 24px;--table-head-height:40px;--table-row-height:56px"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>スタッフ</th><th>カレンダー</th><th>状態</th></tr></thead><tbody>${['高田 誠', '中川 由美'].map(name => `<tr data-table-layout="columns"><td data-cell-grow>${name}</td><td><span class="calendar">—</span></td><td>つながっている</td></tr>`).join('')}</tbody></table></div></main>`)
+      await page.locator('.frame').evaluate(fitListColumns)
+      const before = await page.locator('tbody tr').first().locator('td').nth(1).evaluate(cell => cell.getBoundingClientRect().width)
+      await page.locator('tbody .calendar').evaluateAll(nodes => nodes.forEach(node => { node.textContent = 'takada@nen-salon.jp' }))
+      await page.locator('.frame').evaluate(fitListColumns)
+      const after = await page.locator('tbody tr').first().locator('td').nth(1).evaluate(cell => cell.getBoundingClientRect().width)
+      assert.ok(after > before, `late value must grow its column: ${before} -> ${after}`)
+      const clipping = await page.locator('tbody .calendar').evaluateAll(nodes => nodes.some(node => node.scrollWidth > node.clientWidth + 1))
+      assert.equal(clipping, false, `calendar is readable at ${width}`)
+      const positions = await page.locator('tr').evaluateAll(rows => rows.map(row => [...row.children].map(cell => cell.getBoundingClientRect().x)))
+      for (const row of positions.slice(1)) for (const [index, x] of row.entries()) assert.ok(Math.abs(x - positions[0][index]) <= 1)
+      for (let repeat = 0; repeat < 3; repeat++) await page.locator('.frame').evaluate(fitListColumns)
+      assert.equal(await page.locator('tbody tr').first().locator('td').nth(1).evaluate(cell => cell.getBoundingClientRect().width), after)
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0)
     }
   } finally { await browser.close() }
 })

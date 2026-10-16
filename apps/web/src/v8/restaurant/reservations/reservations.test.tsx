@@ -120,6 +120,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     fireEvent.click(screen.getByRole('button', { name: /電話の予約を入れる/ }))
     await screen.findByText('何を入れますか', { selector: 'h2' })
     expect(document.querySelector('[data-design-node="rm92Y"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '予約内容と卓を見る' })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'LINE 未連携の電話番号' }))
     fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '鈴木 花子' } })
     fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '090-0000-1111' } })

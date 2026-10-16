@@ -52,7 +52,7 @@ dashboard.get('/api/dashboard/activity', requireRole('owner', 'admin', 'staff'),
   }
 });
 
-const PERIODS: DashboardPeriod[] = ['today', 'last7', 'last28'];
+const PERIODS: DashboardPeriod[] = ['today', 'last7', 'last28', 'last30'];
 
 /*
  * 概要応答の中で送信枠の取得に使える時間（DASH-14）。

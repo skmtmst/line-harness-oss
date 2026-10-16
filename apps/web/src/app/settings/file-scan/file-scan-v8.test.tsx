@@ -89,6 +89,13 @@ describe('PfA4o 状態の札', () => {
     expect(screen.getByRole('button', { name: /確かめ中/ }).textContent).toContain('0')
     expect(screen.getByRole('button', { name: /戻した/ })).toBeTruthy()
     expect(screen.getByText('invoice.pdf')).toBeTruthy()
+    const safeguard = screen.getByText('確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。').closest('[data-design-part="notice"]')!
+    expect(safeguard).toBeTruthy()
+    expect(safeguard.querySelector('.lucide-shield-check')).toBeTruthy()
+    const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+    fireEvent.click(toggle)
+    expect(safeguard.isConnected).toBe(true)
+
 
     const safetyText = screen.getByText('確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。')
     const safety = safetyText.closest('[data-design-part="notice"]')

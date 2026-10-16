@@ -1,3 +1,5 @@
+import { isCalendarDateString } from './form-calendar-date.js'
+export { isCalendarDateString } from './form-calendar-date.js'
 import type { TapExtras } from './tap-extras.js';
 import type { ResearchAnswerAction, ResearchGate } from './research-form.js';
 import { FIXED_FRIEND_FIELDS, ageFromBirthday, validateAllergyValues, type FixedFriendFieldKey } from "./fixed-friend-fields.js";
@@ -276,6 +278,8 @@ export interface FormSection {
 // ---------------------------------------------------------------------------
 
 export interface FormOptions {
+  /** 回答の完了後：お礼・トークへ戻す・URL。未指定は従来のthanksUrl判定。 */
+  completionMode?: "thanks" | "chat" | "url";
   /** 送信後に飛ばす先。空なら thanksText を出す */
   thanksUrl?: string | null;
   thanksText?: string | null;
@@ -429,19 +433,6 @@ export function isFormAnswerEmpty(value: unknown): boolean {
     );
   }
   return false;
-}
-
-/** YYYY-MM-DD の形で、暦に存在する日付か（2/30 や 13/40 を通さない）。 */
-export function isCalendarDateString(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return (
-    !Number.isNaN(date.getTime()) &&
-    date.getUTCFullYear() === Number(match[1]) &&
-    date.getUTCMonth() + 1 === Number(match[2]) &&
-    date.getUTCDate() === Number(match[3])
-  );
 }
 
 /** 「その他」の選択肢がある設問で、回答値が自由記入の値（どの選択肢ラベルでもない文字列）か。 */
@@ -1411,7 +1402,11 @@ export function validateFormDefinition(layout: FormLayout): string | null {
     }
   }
 
+  const completionMode = layout.options.completionMode;
+  if (completionMode !== undefined && !["thanks", "chat", "url"].includes(completionMode)) return "答え終わったあとの動きを選び直してください";
   const thanksUrl = layout.options.thanksUrl?.trim() ?? "";
+  if (completionMode === "url" && !thanksUrl) return "答えたあとに開くURLを入力してください";
+  if ((completionMode === "chat" || completionMode === "thanks") && thanksUrl) return "URLを開く場合は、答え終わったあとの動きをURLにしてください";
   if (thanksUrl !== "" && !isHttpUrl(thanksUrl)) {
     return "答えたあとに開くページがURLの形ではありません";
   }

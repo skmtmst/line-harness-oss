@@ -9,9 +9,11 @@ import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import FilterChip from '@/components/shared/filter-chip'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import { OpsHead } from './shell'
+import { PageFrame } from '@/components/templates/page-frame'
 import parts from './parts.module.css'
 import styles from './audit.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -19,6 +21,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import Card from '@/components/shared/card'
 
 /**
  * 運営の監査ログ V8（絵 `e7ljE`）。
@@ -118,13 +121,13 @@ export default function OpsAuditV8() {
   const pageCount = Math.max(1, Math.ceil(total / PAGE))
 
   return (
-    <div data-design-node="e7ljE">
+    <PageFrame kind="list" boardId="e7ljE" standalone heightMode="content">
       <OpsHead
         title="監査ログ"
         description="運営が行った操作の記録です。代理ログイン・個人情報の表示・契約先の停止・運営メンバーの変更が残ります。"
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         actions={(
-          <Button onClick={() => void exportCsv()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
+          <Button onClick={() => void exportCsv()} title={exporting ? '書き出しています' : total === 0 ? '記録がないため書き出せません' : undefined} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
             <Download aria-hidden="true" />CSVで書き出す
           </Button>
         )}
@@ -138,14 +141,12 @@ export default function OpsAuditV8() {
             </FilterChip>
           ))}
           <span className={styles.spacer} />
-          <span className={styles.dateLabel}>開始日</span>
-          <div className={styles.date}>
-            <SaveErrorField names={["from"]}><DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" /></SaveErrorField>
-          </div>
-          <span className={styles.dateLabel}>終了日</span>
-          <div className={styles.date}>
-            <SaveErrorField names={["to"]}><DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" /></SaveErrorField>
-          </div>
+          <div className={styles.dateGroup} role="group" aria-label="開始日"><span className={styles.dateLabel}>開始日</span><span className={styles.date}>
+            <SaveErrorField names={["from"]}><DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" placeholder="指定なし" displayFormat="short" /></SaveErrorField>
+          </span></div>
+          <div className={styles.dateGroup} role="group" aria-label="終了日"><span className={styles.dateLabel}>終了日</span><span className={styles.date}>
+            <SaveErrorField names={["to"]}><DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" placeholder="指定なし" displayFormat="short" /></SaveErrorField>
+          </span></div>
         </div>
 
         {exportNote ? <p role="status" className={parts.status}>{exportNote}</p> : null}
@@ -162,30 +163,25 @@ export default function OpsAuditV8() {
             <ListState permissionScope="hq" kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
           </div>
         ) : (
-          <div className={parts.mini} role="table" aria-label="監査ログ">
-            <div className={parts.miniHead} role="row">
-              <span className={`${parts.fixed} ${styles.colAt}`} role="columnheader">日時</span>
-              <span className={`${parts.fixed} ${styles.colWho}`} role="columnheader">運営者</span>
-              <span className={`${parts.fixed} ${styles.colWhat}`} role="columnheader">操作</span>
-              <span className={`${parts.fixed} ${styles.colTenant}`} role="columnheader">契約先</span>
-              <span className={parts.grow} role="columnheader">理由</span>
-            </div>
-            {rows.map((row) => (
-              <div key={row.id} className={parts.miniRow} role="row">
-                <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
-                <span className={`${parts.fixed} ${styles.colWho}`} role="cell" ><TruncatedText value={String(row.staff_name ?? '')} /></span>
-                <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{actionWord(row.action)}</span>
-                <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? emptyValue('unknown')}</span>
-                <span className={parts.grow} role="cell" title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}>{row.reason ?? emptyValue('unknown')}</span>
-              </div>
-            ))}
-          </div>
+          <Card padding="rows" overflow="hidden"><DataTable density="records" columnSizing="content" label="監査ログ">
+            <colgroup><col className={styles.colAt} /><col className={styles.colWho} /><col className={styles.colWhat} /><col className={styles.colTenant} /><col /></colgroup>
+            <thead><TableHeadRow><Th>日時</Th><Th>運営者</Th><Th><span>操作</span></Th><Th>契約先</Th><Th grow>理由</Th></TableHeadRow></thead>
+            <tbody>{rows.map((row) => (
+              <Tr key={row.id}>
+                <Td title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</Td>
+                <Td><TruncatedText value={row.staff_name ?? ''} /></Td>
+                <Td><TruncatedText value={actionWord(row.action)} /></Td>
+                <Td title={row.tenant_name ?? ''}><TruncatedText value={row.tenant_name ?? emptyValue('unknown')} /></Td>
+                <Td grow title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}><TruncatedText value={row.reason ?? emptyValue('unknown')} /></Td>
+              </Tr>
+            ))}</tbody>
+          </DataTable></Card>
         )}
         {rows.length > 0 ? (
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         ) : null}
         <p className={parts.note} title={`${total}件中 ${total === 0 ? 0 : (page - 1) * PAGE + 1}〜${Math.min(page * PAGE, total)}件を表示`}>記録は運営メンバーでも消せません。理由は4文字以上が必須です。</p>
       </div>
-    </div>
+    </PageFrame>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, IdCard } from 'lucide-react'
+import { CalendarDays, IdCard, Ticket } from 'lucide-react'
 import type { FriendField, ReminderDraftSettings, ReminderDraftStep, ReminderTriggerType } from '@line-crm/shared'
 import { api, eventsApi, type EventListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -335,7 +335,7 @@ export function ReminderBasicsFormV8({
             value="event"
             checked={value.triggerType === 'event'}
             onChange={() => patch({ triggerType: 'event' })}
-            icon={<CalendarDays size={18} />}
+            icon={<Ticket size={18} />}
             title="イベントの予約日時"
             note="イベントの開始日時"
           /></SaveErrorField>

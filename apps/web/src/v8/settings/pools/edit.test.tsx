@@ -8,7 +8,7 @@ vi.mock('@/lib/api', async (load) => {
 })
 vi.mock('@/lib/pools-availability', () => ({ isPoolsFeatureAvailable: async () => true }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => net.role }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))

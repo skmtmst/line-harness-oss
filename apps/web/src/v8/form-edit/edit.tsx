@@ -5,7 +5,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation';
-import { FlaskConical, Smartphone, Upload } from 'lucide-react';
+import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react';
 import { emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, normalizeFormTheme, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
@@ -782,7 +782,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const statusLine = host ? host.statusLine : !publishedVersionId
     ? '下書き・まだ公開していません'
     : dirty || (publishedContentRevision !== null && contentRevision !== null && publishedContentRevision !== contentRevision)
-      ? '下書き・公開中の版と違うところがあります'
+      ? '下書き・公開中と違います'
       : '公開中の版と同じです'
   const saveStatus = host ? (dirty ? '保存していない変更があります' : undefined) : autosave.label
     ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
@@ -819,7 +819,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             <div className={styles.urlRow}>
               {/* 見せるのは短い形（絵どおり）。全文は title とコピーで渡す。 */}
               <span className={styles.urlValue} title={answerUrl}>{`https://liff.line.me/…/forms/${id}`}</span>
-              <CopyTextButton value={answerUrl} label="コピー" aria-label="回答用URLをコピー" />
+              <CopyTextButton variant="secondary" icon={<Copy size={15} aria-hidden="true" />} value={answerUrl} label="コピーする" aria-label="回答用URLをコピー" />
             </div>
             <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
             {canEdit ? (
@@ -855,7 +855,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             下書きを保存
           </Button>
           <Button variant="primary" onClick={() => void save(true)} disabled={hostBusy} title="保存したあとに、配るアカウントを選べます" busy={Boolean(hostBusy)} busyLabel="処理中…">
-            保存する
+            保存して配る
           </Button>
         </>
       )}
@@ -911,7 +911,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
-      status={<><span role="note">{statusLine}</span>{saveStatus ? <> · {saveStatus}</> : null}</>} dirty={false}
+      status={<><span role="note" data-status-line>{statusLine}</span>{saveStatus ? <span data-status-line>{saveStatus}</span> : null}</>} dirty={false}
     >
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>

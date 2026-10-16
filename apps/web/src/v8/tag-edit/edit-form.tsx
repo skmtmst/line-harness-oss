@@ -183,7 +183,7 @@ export function TagEditForm({
     <div className={styles.conflictSlot}>
       <SaveConflictBand
         title={`ほかの人がタグ「${tag.name}」を先に保存しました`}
-        designNode="xn95q"
+        reloadVariant="primary" designNode="xn95q"
         compareBusy={compareBusy}
         onCompare={onCompare}
         onReload={onReloadLatest}
@@ -244,7 +244,7 @@ export function TagEditForm({
           <>
             <Button onClick={onCancel}>キャンセル</Button>
             {/* 閲覧のみには押せない操作を置かない（隠す）。 */}
-            {readOnly ? null : host?.onSaveDraft ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveDraft?.(values)}>下書きを保存</Button> : host ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveAnother(values)}><Copy size={14} aria-hidden="true" />保存して続けて作る</Button> : <Button href={`/tags/new?copy=${tag.id}`}><Copy size={14} aria-hidden="true" />複製して作る</Button>}
+            {readOnly ? null : <>{host?.onSaveDraft ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveDraft?.(values)}>下書きを保存</Button> : null}{host ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveAnother(values)}><Plus size={14} aria-hidden="true" />保存して続けて作る</Button> : <Button href={`/tags/new?copy=${tag.id}`}><Copy size={14} aria-hidden="true" />複製して作る</Button>}</>}
             {readOnly ? null : (
               <Button variant="primary" onClick={conflict ? onCompare : requestSave} busy={saving} disabled={Boolean(host) && !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined}>
                 {conflict ? <GitCompare size={14} aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}
@@ -280,10 +280,10 @@ export function TagEditForm({
 
           <section aria-label="タグ連動" ref={actionsRef}>
             <Card variant="form" gap="normal">
-            <CardHeader size="stacked" title={<>タグ連動（このタグが付いたときの動き）<HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。<p>タグは分類の目印、友だち情報欄は名前・日付・回答などの値、対応マークは対応の状態、保存した検索は複数の条件をまとめて探すときに使います。</p></HelpTip></>}
+            <CardHeader size="stacked" title={<>{!host && 'タグ連動（このタグが付いたときの動き）'}<HelpTip label="タグ連動の説明" trigger={host ? 'タグ連動（このタグが付いたときの動き）' : undefined}>オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。<p>タグは分類の目印、友だち情報欄は名前・日付・回答などの値、対応マークは対応の状態、保存した検索は複数の条件をまとめて探すときに使います。</p></HelpTip></>}
               meta="上から順に動きます。並べ替えは上下の印で"
               action={<><span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>{readOnly ? null : <SaveErrorField names={["linked", "linkedEnabled", "tag.linkedEnabled"]}><SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField>}</>} />
-            {actionsOpen ? <Button variant="text" onClick={() => setActionsOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button> : (
+            {actionsOpen ? <div className={styles.summaryRow}><span className={styles.titleSpacer} /><Button variant="text" onClick={() => setActionsOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button></div> : (
               <div className={styles.summaryRow}>
                 <span className={styles.summaryText}>{host && actions.length === 0 ? 'まだありません。［開く］から連動アクションを足せます' : actionsSummary(actions, linked)}</span>
                 <span className={styles.titleSpacer} />
@@ -305,7 +305,7 @@ export function TagEditForm({
           {linked || host ? (
             <Card variant="form" gap="normal" aria-label="マイル">
               <CardHeader size="stacked" title="マイル" meta="このタグが付いている人の、これからのマイルの倍率" />
-              {mileageOpen ? <Button variant="text" onClick={() => setMileageOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button> : (
+              {mileageOpen ? <div className={styles.summaryRow}><span className={styles.titleSpacer} /><Button variant="text" onClick={() => setMileageOpen(false)} aria-expanded>閉じる<ChevronUp size={14} aria-hidden="true" /></Button></div> : (
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryText}>{host && !multiplier && !Number(reward) && !Number(referralReward) ? '変えない（ひな形の既定）' : mileageSummary(multiplier, Number(reward) || 0, Number(referralReward) || 0)}</span>
                   <span className={styles.titleSpacer} />

@@ -19,4 +19,9 @@ export interface StepperStep {
   anchor?: string
   /** anchor の代わりに押したときの動き。済み・要修正の段だけに付ける。 */
   onSelect?: () => void
+  /**
+   * まだ（todo）の段でも押して移れる。開き直した下書きの最後の段（公開）のように、
+   * 済みの印は付けないが入ってよい段だけに付ける。印は番号のまま、読み上げは「〇〇に進む」。
+   */
+  reachable?: boolean
 }

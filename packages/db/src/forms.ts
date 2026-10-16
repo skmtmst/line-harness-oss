@@ -1,3 +1,5 @@
+import { type FormSubmissionPeriod, submissionPeriodSql } from './form-submission-period.js'
+export { type FormSubmissionPeriod } from './form-submission-period.js'
 import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstDateString, jstNow, MAX_LIST_LIMIT, toJstString } from './utils.js';
 
@@ -908,33 +910,20 @@ export async function setFormFolder(
     .run();
   return Number(result.meta?.changes ?? 0) === 1;
 }
-
-// ── Submissions ───────────────────────────────────────────────────────────────
-
-/**
- * ページ分けなしの回答一覧（互換用）。
- *
- * **切る数は呼び出し側が渡す。**#722 の前はここが 200 の直書きで、呼び出し側の
- * 口は「500件まで」と名乗っていた。**数が2か所にあって食い違っていたので、
- * 利用先は 201件目から黙って取り落としていた。**名乗る側が渡せば、名乗りと
- * 実際は同じ数になる。
- *
- * `boundedListLimit` は残す。**渡し忘れ・渡しすぎのときの天井**で、
- * この現場の一覧ヘルパは全部これで `MAX_LIST_LIMIT` に抑えてある
- * （DB ヘルパを直接呼んでも一覧が無制限にならないようにするため）。
- */
 export async function getFormSubmissions(
   db: D1Database,
   formId: string,
   limit?: number,
+  options: FormSubmissionPeriod & {lineAccountId?: string} = {},
 ): Promise<FormSubmission[]> {
+  const period = submissionPeriodSql('fs.created_at', options);
   const result = await db
     .prepare(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
-       WHERE fs.form_id = ? AND fs.is_test = 0 ORDER BY fs.created_at DESC LIMIT ?`,
+       WHERE fs.form_id = ? AND fs.is_test = 0${options.lineAccountId ? ' AND f.line_account_id=?' : ''}${period.sql} ORDER BY fs.created_at DESC LIMIT ?`,
     )
-    .bind(formId, boundedListLimit(limit, MAX_LIST_LIMIT))
+    .bind(formId, ...(options.lineAccountId ? [options.lineAccountId] : []), ...period.bindings, boundedListLimit(limit, MAX_LIST_LIMIT))
     .all<FormSubmission & { friend_name: string | null }>();
   return result.results;
 }
@@ -958,8 +947,9 @@ function escapeLikeLiteral(value: string): string {
 export async function getFormSubmissionsPage(
   db: D1Database,
   formId: string,
-  options: { page?: number; limit?: number; lineAccountId?: string; search?: string } = {},
+  options: FormSubmissionPeriod & { page?: number; limit?: number; lineAccountId?: string; search?: string } = {},
 ): Promise<FormSubmissionPage> {
+  const period = submissionPeriodSql('fs.created_at', options);
   const requestedPage = options.page;
   const page = Number.isSafeInteger(requestedPage) && (requestedPage ?? 0) >= 1
     ? requestedPage!
@@ -978,19 +968,19 @@ export async function getFormSubmissionsPage(
       `SELECT COUNT(*) AS total
          FROM form_submissions fs
          LEFT JOIN friends f ON f.id = fs.friend_id
-        WHERE fs.form_id = ? AND fs.is_test = 0${accountClause}${searchClause}`,
+        WHERE fs.form_id = ? AND fs.is_test = 0${accountClause}${searchClause}${period.sql}`,
     )
-    .bind(formId, ...accountBindings, ...searchBindings)
+    .bind(formId, ...accountBindings, ...searchBindings, ...period.bindings)
     .first<{ total: number }>();
   const result = await db
     .prepare(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
-       WHERE fs.form_id = ? AND fs.is_test = 0${accountClause}${searchClause}
+       WHERE fs.form_id = ? AND fs.is_test = 0${accountClause}${searchClause}${period.sql}
        ORDER BY fs.created_at DESC, fs.id DESC
        LIMIT ? OFFSET ?`,
     )
-    .bind(formId, ...accountBindings, ...searchBindings, limit, offset)
+    .bind(formId, ...accountBindings, ...searchBindings, ...period.bindings, limit, offset)
     .all<FormSubmission & { friend_name: string | null }>();
   return { items: result.results, total: count?.total ?? 0, page, limit };
 }
@@ -1325,7 +1315,9 @@ export async function getFormSubmissionAnalytics(
   lineAccountId: string,
   dateFields: Array<{ key: string; label: string }>,
   ratingFields: Array<{ key: string; label: string }> = [],
+  period: FormSubmissionPeriod = {},
 ): Promise<FormSubmissionAnalytics> {
+  const submissionsPeriod = submissionPeriodSql('fs.created_at', period), opensPeriod = submissionPeriodSql('fo.opened_at', period);
   const [submissionSummary, openSummary] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS submitted,
@@ -1337,8 +1329,8 @@ export async function getFormSubmissionAnalytics(
               COALESCE(SUM(CASE WHEN fs.destination_write_status = 'unknown' THEN 1 ELSE 0 END), 0) AS write_unknown
          FROM form_submissions fs
          JOIN friends f ON f.id = fs.friend_id
-        WHERE fs.form_id = ? AND f.line_account_id = ? AND fs.is_test = 0`,
-    ).bind(formId, lineAccountId).first<{
+        WHERE fs.form_id = ? AND f.line_account_id = ? AND fs.is_test = 0${submissionsPeriod.sql}`,
+    ).bind(formId, lineAccountId, ...submissionsPeriod.bindings).first<{
       submitted: number;
       write_pending: number;
       write_succeeded: number;
@@ -1351,8 +1343,8 @@ export async function getFormSubmissionAnalytics(
       `SELECT COUNT(DISTINCT fo.friend_id) AS started_unique
          FROM form_opens fo
          JOIN friends f ON f.id = fo.friend_id
-        WHERE fo.form_id = ? AND f.line_account_id = ? AND fo.is_test = 0`,
-    ).bind(formId, lineAccountId).first<{ started_unique: number }>(),
+        WHERE fo.form_id = ? AND f.line_account_id = ? AND fo.is_test = 0${opensPeriod.sql}`,
+    ).bind(formId, lineAccountId, ...opensPeriod.bindings).first<{ started_unique: number }>(),
   ]);
 
   const submitted = Number(submissionSummary?.submitted ?? 0);
@@ -1372,11 +1364,11 @@ export async function getFormSubmissionAnalytics(
          JOIN json_each(CASE WHEN json_valid(fs.data) THEN fs.data ELSE '{}' END) answer
         WHERE fs.form_id = ?
           AND f.line_account_id = ?
-          AND fs.is_test = 0
+          AND fs.is_test = 0${submissionsPeriod.sql}
           AND answer.key = ?
           AND answer.value IS NOT NULL
           AND TRIM(CAST(answer.value AS TEXT)) <> ''`,
-    ).bind(formId, lineAccountId, field.key).first<{
+    ).bind(formId, lineAccountId, ...submissionsPeriod.bindings, field.key).first<{
       answered: number;
       unique_friends: number;
       min_date: string | null;
@@ -1402,11 +1394,11 @@ export async function getFormSubmissionAnalytics(
          JOIN json_each(CASE WHEN json_valid(fs.data) THEN fs.data ELSE '{}' END) answer
         WHERE fs.form_id = ?
           AND f.line_account_id = ?
-          AND fs.is_test = 0
+          AND fs.is_test = 0${submissionsPeriod.sql}
           AND answer.key IN (${placeholders})
           AND answer.value IS NOT NULL
           AND TRIM(CAST(answer.value AS TEXT)) <> ''`,
-    ).bind(formId, lineAccountId, ...sqlIdSet(normalizedDateFields.map(field => field.key)).binds)
+    ).bind(formId, lineAccountId, ...submissionsPeriod.bindings, ...sqlIdSet(normalizedDateFields.map(field => field.key)).binds)
       .first<{ unique_friends: number }>();
     dateAnsweredUniqueFriends = Number(row?.unique_friends ?? 0);
   }
@@ -1427,11 +1419,11 @@ export async function getFormSubmissionAnalytics(
          JOIN json_each(CASE WHEN json_valid(fs.data) THEN fs.data ELSE '{}' END) answer
         WHERE fs.form_id = ?
           AND f.line_account_id = ?
-          AND fs.is_test = 0
+          AND fs.is_test = 0${submissionsPeriod.sql}
           AND answer.key = ?
           AND answer.type IN ('integer', 'text')
           AND TRIM(CAST(answer.value AS TEXT)) IN ('1', '2', '3', '4', '5')`,
-    ).bind(formId, lineAccountId, field.key).first<{
+    ).bind(formId, lineAccountId, ...submissionsPeriod.bindings, field.key).first<{
       answered: number;
       average: number | null;
     }>();

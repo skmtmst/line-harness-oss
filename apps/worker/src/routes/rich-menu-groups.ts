@@ -1,3 +1,4 @@
+import { type ExternalLineArea } from './rich-menu-external-types.js'
 import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../services/rich-menu-group-input.js';
 import { Hono, type Context } from 'hono';
@@ -304,18 +305,6 @@ async function recoverManualPublishShellsFromLine(
   }
   return recovered;
 }
-
-type ExternalLineArea = {
-  bounds?: { x?: number; y?: number; width?: number; height?: number };
-  action?: {
-    type?: string;
-    label?: string;
-    uri?: string;
-    text?: string;
-    displayText?: string;
-    richMenuAliasId?: string;
-  };
-};
 
 /** LINE 未管理メニューの動きを、画面が安全に説明できる最小形へ絞る。 */
 function serializeExternalArea(area: ExternalLineArea) {
@@ -2829,6 +2818,7 @@ richMenuGroups.get(
       }
       runs.push({
         id: request.id,
+        versionNumber: request.version_number ?? null,
         status: request.status,
         lastErrorCode: request.last_error_code,
         idempotencyKey: request.idempotency_key,

@@ -60,11 +60,6 @@
   line-height: normal;
 }
 
-.footer {
-  display: flex;
-  justify-content: center;
-  gap: var(--tpl-footer-gap);
-  width: 100%;
-}
+
 
 /* 送るものの欄（絵：高さ 96）。 */

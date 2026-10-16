@@ -1,8 +1,8 @@
+import { rethrowR2 } from './distribution-errors.js'
 import { isDeliveryType, parseDeliveryDefinition, deliverySnapshot, inspectDelivery, planDelivery, validateDeliveryReferences, deliveryReferenceItems } from './delivery.js';
 import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
-import { templateKind } from '@line-crm/shared';
+import { templateKind, type HqTemplateListDisplay } from '@line-crm/shared'
 import { parseTextOverrides } from './text-overrides.js';
-import type { HqTemplateListDisplay } from '@line-crm/shared';
 import { templateContentSummary } from './list-display.js';
 import { captureDistributionName, targetDistributionVersion } from './distribution-display.js';
 import { parseScenarioDefinition, scenarioSnapshot, inspectScenario, planScenario } from './scenario.js';
@@ -166,7 +166,7 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
           }
           if(template.template_type==='rich_menu'&&definition_json) {
             const menu=parseRichMenuTemplateDefinition({templateVersionId:'list',definitionJson:definition_json},authority.tenantId).richMenu;
-            return {display_order:menu.displayOrder??0,display_audience:menu.displayAudience==='all'?'全員':'配布先で店が決める'};
+            return {display_order:menu.displayOrder??0,display_audience:menu.displayAudience==='all'?'全員':menu.displayAudience==='tag'?`タグが付いた人（${menu.displayTagName}）`:'配布先で店が決める'};
           }
         } catch { /* 壊れた版は未取得。 */ }
         return {message_type:null,manual_assignment_allowed:null,assignment_method:null,display_order:null,display_audience:null};
@@ -236,15 +236,6 @@ function resultReason(status: string): string | null {
   if (status === 'failed') return 'この店舗には配布できませんでした。もう一度確認してください';
   if (status === 'unsupported') return 'この種類の配布はまだ利用できません';
   return null;
-}
-function rethrowR2(error: unknown): never {
-  if (!(error instanceof HqR2RuntimeError)) throw error;
-  if (error.code === 'LIFF_UNAVAILABLE') throw new HqTemplateError('LIFF_UNAVAILABLE', 409);
-  if (error.code === 'CARD_REFERENCE_UNAVAILABLE') throw new HqTemplateError('CARD_REFERENCE_UNAVAILABLE', 409);
-  if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
-  if (error.code === 'VERSION_CONFLICT' || error.code.includes('UNAVAILABLE') || error.code.startsWith('AMBIGUOUS_')) throw new HqTemplateError('VERSION_CONFLICT', 409);
-  if (error.code.includes('UNSUPPORTED')) throw new HqTemplateError('UNSUPPORTED', 422);
-  throw new HqTemplateError('INVALID_DEFINITION');
 }
 export async function distributionResult(db: D1Database, authority: HqTemplateAuthority, templateId: string, runId: string, bucket?: R2Bucket) {
   const run = await db.prepare(`SELECT id,status FROM hq_template_distribution_runs WHERE id=? AND tenant_id=? AND template_id=?`).bind(runId, authority.tenantId, templateId).first<{ id: string; status: string }>();

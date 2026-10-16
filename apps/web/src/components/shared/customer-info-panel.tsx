@@ -20,7 +20,7 @@ import { notifyToast } from './toast'
 export type CustomerInfoSection = { key: string; label: string; action?: ReactNode; content: ReactNode }
 /** 友だち概要と受信箱の共通の欄。取得・保存は呼び出し側、表示項目の好みは共通。 */
 export default function CustomerInfoPanel({
-  friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false,
+  friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false, labelWidth = 'standard',
 }: {
   friendId: string
   profile?: { name: string | null; pictureUrl?: string | null; addedAt: string }
@@ -33,6 +33,8 @@ export default function CustomerInfoPanel({
   extraSections?: CustomerInfoSection[]
   actionWording?: boolean
   hiddenPersonalCount?: number
+  /** 見出しの幅。'wide'（84）は受信箱の右の列（絵 eovoG）。「次の自動配信」まで1行で値と離して置く。 */
+  labelWidth?: 'standard' | 'wide'
 }) {
   const [expanded, setExpanded] = useState(false)
   const [settings, setSettings] = useState(false)
@@ -71,7 +73,7 @@ export default function CustomerInfoPanel({
     return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
   })
   const choices = [{ key: 'names', label: '基本' }, ...[...sorted, ...extraSections].map(({ key, label }) => ({ key, label }))]
-  return <div className={styles.panel} data-customer-info-panel>
+  return <div className={styles.panel} data-customer-info-panel data-label-width={labelWidth === 'wide' ? 'wide' : undefined}>
     {profile ? <div className={styles.profile}>
       <Avatar name={profile.name} src={profile.pictureUrl} size={32} />
       <span className={styles.profileName} title={profile.name ?? '名前なし'}>{profile.name ?? '名前なし'}</span>

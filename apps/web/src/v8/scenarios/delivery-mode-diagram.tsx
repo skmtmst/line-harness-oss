@@ -20,9 +20,8 @@ export default function DeliveryModeDiagram({ mode, selected }: { mode: Mode; se
             <g key={row.who}>
               <circle className={styles.person} cx="14" cy={row.y} r="14" />
               <text className={styles.personName} x="14" y={row.y + 4} textAnchor="middle">{row.who}</text>
-              <rect className={styles.startBadge} x="32" y={row.y - 16} width="45" height="14" rx="4" />
-              <text className={styles.startLabel} x="54.5" y={row.y - 6} textAnchor="middle">購読開始</text>
-              <text className={styles.startDate} x="32" y={row.y + 9}>{row.start}</text>
+              <text className={styles.startLabel} x="38" y={row.y - 3}>購読開始</text>
+              <text className={styles.startDate} x="38" y={row.y + 12}>{row.start}</text>
               <line className={styles.track} x1={row.x} y1={row.y} x2="470" y2={row.y} />
               {!absolute ? <line className={styles.elapsedLine} x1={row.x} y1={row.y} x2={first - 30} y2={row.y} /> : null}
               <circle className={styles.startDot} cx={row.x} cy={row.y} r="4" />
@@ -49,7 +48,7 @@ export default function DeliveryModeDiagram({ mode, selected }: { mode: Mode; se
             <text className={styles.bubbleText} x={bubble.x} y="13" textAnchor="middle">{bubble.label}</text>
             <line className={styles.bubbleStem} x1={bubble.x} y1="19" x2={bubble.x} y2="30" />
             {/* 札の下端と次の札の上端の間だけ。札の外側には延ばさない。 */}
-            <line className={styles.sameTime} x1={bubble.x} y1="60" x2={bubble.x} y2="92" strokeDasharray="3 3" />
+            <line className={styles.sameTime} x1={bubble.x} y1="60" x2={bubble.x} y2="92" />
           </g>
         )) : null}
       </svg>

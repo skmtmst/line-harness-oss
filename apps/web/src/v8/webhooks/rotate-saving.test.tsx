@@ -40,7 +40,7 @@ it.each(['incoming', 'outgoing'] as const)('%sの合言葉の保存中は×・�
   await act(async () => {})
   if (kind === 'incoming') fireEvent.click(screen.getByRole('button', { name: '合言葉を更新する' }))
   else {
-    fireEvent.click(screen.getByRole('button', { name: '「予約台帳」の設定' }))
+    fireEvent.click(screen.getByRole('button', { name: '「予約台帳」の操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '鍵を作り直す' }))
   }
   fireEvent.change(screen.getByPlaceholderText('ランダムな英数字32文字以上'), { target: { value: 'x'.repeat(40) } })

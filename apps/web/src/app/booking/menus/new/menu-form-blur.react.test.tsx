@@ -176,7 +176,7 @@ describe('メニュー作成（V8）の欄を離れたときの確かめ', () =>
     const description = screen.getByLabelText('説明（お客さまに見えます）') as HTMLInputElement
     fireEvent.change(description, { target: { value: '紹介文のテスト' } })
     expect(description.value).toBe('紹介文のテスト')
-    fireEvent.click(screen.getByRole('checkbox', { name: '予約するときに質問を出す', exact: true }))
+    fireEvent.click(screen.getByRole('switch', { name: '予約するときに質問を出す', exact: true }))
     const question = screen.getByLabelText('質問文') as HTMLInputElement
     fireEvent.change(question, { target: { value: '気になることを教えてください' } })
     expect(question.value).toBe('気になることを教えてください')
