@@ -16,7 +16,7 @@ const calls = vi.hoisted(() => ({
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, api: { lineAccounts: calls, hqNotices: notices, lineAccountTags: { list: async () => ({success:true,data:[]}) }, staff: { list: async () => ({success:true,data:[]}) } } }
+  return { ...actual, api: { lineAccounts: calls, hqNotices: notices, friends: { list: async () => ({success:true,data:{total:0}}) }, lineAccountTags: { list: async () => ({success:true,data:[]}) }, staff: { list: async () => ({success:true,data:[]}) } } }
 })
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/accounts/new', useRouter: () => ({ push: vi.fn() }) }))
@@ -53,23 +53,30 @@ beforeEach(() => {
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
+const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
 
+/** v06: ①→②の3段→③Step1。5行の確認が全部通ると「登録する」が出る（5行 × 420ms）。 */
 async function enterSaveStep() {
   render(<NewLineAccountPage />)
   next()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  next()
   fill('v8-login-channel-id', '2007123456')
   fill('v8-login-channel-secret', 'synthetic-login-secret')
+  ack('友だち追加オプションで、この公式アカウントをリンクした')
+  ack('チャネルを「開発中」から「公開済み」にした')
   next()
+  ack('Webhookの利用をONにした')
+  ack('Webhookの再送をONにした')
+  ack('エラーの統計情報をONにした')
   next()
-  fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-  await screen.findByRole('dialog', { name: '接続を確かめた結果' })
-  fireEvent.click(screen.getByRole('checkbox', { name: /応答メッセージ.*オフ/ }))
+  fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '登録する' })).toBeTruthy(), { timeout: 5000 })
 }
 
 async function save() {
-  fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
+  fireEvent.click(screen.getByRole('button', { name: '登録する' }))
 }
 
 describe('R523 保存の応答消失と重複（本物のReact）', () => {
