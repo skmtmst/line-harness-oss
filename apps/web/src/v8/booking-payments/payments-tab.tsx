@@ -154,6 +154,8 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
       <CancellationSection state={cancellation} connected={connected} testMode={testMode} canEdit={canEdit} />
       <DepositSection state={cancellation} connected={connected} canEdit={canEdit} />
 
+      {/* 決済をつなぐ前（i2iv4g）は、つなぎ・キャンセル料・デポジットの 3 つだけ（いつもの方法はお店で払うだけなので出さない）。 */}
+      {connected ? (
       <section className={settings.section} aria-labelledby="payments-method-heading">
         <div className={styles.headRow}>
           <h2 id="payments-method-heading" className={settings.sectionTitle}>いつもの支払い方法</h2>
@@ -169,6 +171,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
         ) : <p className={styles.readValue}>{[...METHOD_CHOICES, CHOICE_CUSTOMER].find((choice) => choice.value === mode)?.title}</p>}
         <p className={styles.minor}>{METHOD_NOTE}</p>
       </section>
+      ) : null}
 
       {connected ? (
       <section className={settings.section} aria-labelledby="payments-hold-heading">

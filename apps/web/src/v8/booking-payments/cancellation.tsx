@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Plus } from 'lucide-react'
+import { AlertTriangle, Plug, Plus } from 'lucide-react'
 import type { BookingCancellationPolicy } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -300,7 +300,7 @@ export function ConnectionCard({ connected, testMode, checkedAt, canEdit, busy, 
           <span className={styles.minor}>{connected ? `${testMode ? '試験モードで' : ''}つながっています${checkedAt ? `・最後に確かめた ${checkedAt}` : ''}` : 'まだつないでいません。つなぐと、キャンセル料とデポジットを使えます'}</span>
         </span>
         {connected ? <StatusBadge tone="success">つながっている</StatusBadge>
-          : canEdit ? <Button variant="primary" busy={busy} onClick={onConnect}>決済をつなぐ</Button> : null}
+          : canEdit ? <Button variant="primary" busy={busy} onClick={onConnect}><Plug size={15} aria-hidden="true" />決済をつなぐ</Button> : null}
       </div>
       {/* 記録・届いた知らせへの入口（絵 FcGmv に無い。前の右の欄 T91bV から移した＝絵を直す）。 */}
       {connected ? <p className={styles.links}><TextLink href="/booking/menus?tab=payments&view=records">お支払いの記録を見る</TextLink><TextLink href="/booking/menus?tab=payments&view=events">Stripe から届いた知らせを見る</TextLink></p> : null}
