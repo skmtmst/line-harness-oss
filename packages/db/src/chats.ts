@@ -126,7 +126,7 @@ export async function createChat(
 export async function updateChat(
   db: D1Database,
   id: string,
-  updates: Partial<{ operatorId: string | null; status: string; notes: string; lastMessageAt: string }>,
+  updates: Partial<{ operatorId: string | null; status: string; notes: string; lastMessageAt: string; manualReply: boolean }>,
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -136,7 +136,7 @@ export async function updateChat(
   if (updates.lastMessageAt !== undefined) { sets.push('last_message_at = ?'); values.push(updates.lastMessageAt); }
   if (sets.length === 0) return;
   sets.push('revision = revision + 1');
-  if (updates.status === 'in_progress' && updates.lastMessageAt !== undefined) {
+  if (updates.status === 'in_progress' && updates.lastMessageAt !== undefined && updates.manualReply !== false) {
     sets.push('last_operator_message_at = ?');
     values.push(updates.lastMessageAt);
   }
@@ -163,7 +163,7 @@ export async function upsertChatOnMessage(
   // 適用されるが no-op 相当なので害はない。
   const chat = (await getChatByFriendId(db, friendId)) ?? (await createChat(db, { friendId }));
   const newStatus = chat.status === 'resolved' || chat.status === 'on_hold' ? 'unread' : chat.status;
-  await updateChat(db, chat.id, { status: newStatus, lastMessageAt: eventAt ?? now });
+  await updateChat(db, chat.id, { status: newStatus, lastMessageAt: eventAt ?? now, manualReply: false });
 
   // 受信の時刻を残し、初回返信の時計を巻き直す（107）。
   //

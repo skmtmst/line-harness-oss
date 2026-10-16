@@ -292,6 +292,7 @@ export interface GetAvailabilityParams {
    */
   applyStoreRules?: boolean;
   googleCredentials?: GoogleServiceAccountCredentials;
+  forceCalendarRefresh?: boolean;
   /**
    * 予約内容の変更で、変更対象そのものを空き枠計算から外す。
    * 自予約の古い枠が重なり判定に残ると、同じ担当のまま少しずらす
@@ -834,6 +835,7 @@ async function loadAvailabilityData(
       const busy = await getStaffGoogleBusy(db, params.googleCredentials ?? {}, {
         lineAccountId: params.lineAccountId,
         staffId: staff.id,
+        fresh: params.forceCalendarRefresh,
         timeMin: new Date(zonedTimeToUtcMs(timeZone, params.from, '00:00')).toISOString(),
         timeMax: new Date(zonedTimeToUtcMs(timeZone, addDays(params.to, 1), '00:00')).toISOString(),
       });

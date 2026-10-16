@@ -329,9 +329,9 @@ async function insertLogRows(
 }
 
 /** 1:1 push は operator 手動送信と同じ扱いでチャットを更新する (chats.ts:608 と同型)。 */
-async function touchChat(db: D1Database, friendId: string): Promise<void> {
+async function touchChat(db: D1Database, friendId: string, manualReply: boolean): Promise<void> {
   const chat = (await getChatByFriendId(db, friendId)) ?? (await createChat(db, { friendId }));
-  await updateChat(db, chat.id, { status: 'in_progress', lastMessageAt: jstNow() });
+  await updateChat(db, chat.id, { status: 'in_progress', lastMessageAt: jstNow(), manualReply });
 }
 
 /**
@@ -374,7 +374,7 @@ async function logProxySend(
         (await createFriendForRecipient(db, lineClient, parsed.to, lineAccountId));
       if (!friend) return;
       await insertLogRows(db, rowsFor(friend.id, 'push'), source, logKey);
-      await touchChat(db, friend.id);
+      await touchChat(db, friend.id, source === 'manual');
       return;
     }
 

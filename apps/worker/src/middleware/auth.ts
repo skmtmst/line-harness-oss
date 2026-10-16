@@ -254,7 +254,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   // 予約の細かい権限（N-411）。広い '/api/booking' → '/booking/bookings' より先に評価する。
   // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
   [/^\/api\/booking\/admin\/staff\/me(?:\/|$)/, 'booking.staff.own'],
-  [/^\/api\/booking\/admin\/staff\/[^/]+\/(?:availability-rules|breaks|break-dates|shifts|google-calendar)(?:\/|$)/, 'booking.staff.own'],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/(?:availability-rules|breaks|break-dates|shifts|google-calendar|calendar-sync|meeting-url)(?:\/|$)/, 'booking.staff.own'],
     // メニューと担当割当は「予約メニュー」の鍵。
   [/^\/api\/booking\/admin\/staff-menus(?:\/|$)/, '/booking/menus'],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/menus(?:\/|$)/, '/booking/menus'],
@@ -288,6 +288,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
 ];
 
 export function permissionForApiPath(path: string): string | null {
+  if (/^\/api\/line-accounts\/[^/]+\/senders(?:\/|$)/.test(path)) return '/chats';
   const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
   if (override) return override[1];
   return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;

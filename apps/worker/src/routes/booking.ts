@@ -1,3 +1,4 @@
+import { cancellationPolicy, cancellationQuote, bookingCancellationQuote, requireCancellationTestConnection } from '../services/booking-cancellation.js';
 import { syncSelfBookingMeet } from './booking-self-meet-sync.js';
 import type { SelfBookingChange } from './booking-self-meet-sync.js';
 import { EntitlementError, entitlementUseStatement, validateEntitlementSelection } from '../services/booking-entitlements.js';
@@ -235,6 +236,7 @@ async function reverifyLatestSlot(
     minLeadTimeMinutes: input.minLeadTimeMinutes,
     applyStoreRules: input.applyStoreRules,
     googleCredentials: googleCredentials(env),
+    forceCalendarRefresh: true,
     excludeBookingId: input.excludeBookingId,
     excludeWaitlistId:input.excludeWaitlistId,waitlistOffer:input.waitlistOffer,
   });
@@ -700,6 +702,10 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     customer_note?: string;
     party_size?: unknown;
     entitlement_id?: string;
+    policyAccepted?: boolean;
+    policyVersion?: number;
+    setupIntentId?: string;
+    meeting_mode?: 'online'|'in_person';
     payment_method?: 'onsite' | 'online';
     waitlist_id?: string;
     formAnswer?: {formId:string;blockId:string;submissionKey:string};
@@ -799,7 +805,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   const menuRow = await c.env.DB
     .prepare(
       `SELECT m.id, m.name, m.duration_minutes, m.buffer_after_minutes, m.base_price,
-              m.price_mode, m.version,
+              m.price_mode, m.version,m.meeting_mode,
               m.auto_tag_id, m.concurrent_capacity,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS dur,
               COALESCE(sm.override_price, m.base_price) AS price,
@@ -810,11 +816,22 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
           AND m.deleted_at IS NULL AND m.is_active = 1`,
     )
     .bind(body.menu_id, body.staff_id, accountId)
-    .first<{ name: string; duration_minutes: number; buffer_after_minutes: number; auto_tag_id: string | null; concurrent_capacity: number; dur: number; price: number; price_mode: string; version: number; is_offered: number | null }>();
+    .first<{ name: string; duration_minutes: number; buffer_after_minutes: number; auto_tag_id: string | null; concurrent_capacity: number; dur: number; price: number; price_mode: string; meeting_mode:'online'|'in_person'|'customer_choice'; version: number; is_offered: number | null }>();
   if (!menuRow || menuRow.is_offered !== 1) {
     return inputError(c, { error: 'menu_not_offered' }, 422, ["menu_id","staff_id"]);
   }
 
+  const cancellation = await cancellationPolicy(c.env.DB, accountId);
+  if(cancellation.enabled && !body.entitlement_id) {
+    if(body.policyAccepted!==true) return c.json({error:'policy_acceptance_required'},400);
+    if(body.policyVersion!==cancellation.version)return c.json({error:'policy_changed'},409);
+    try {await requireCancellationTestConnection(c.env.DB,accountId);} catch {return c.json({error:'payment_not_connected'},409);}
+    if(typeof body.setupIntentId!=='string' || !await c.env.DB.prepare("SELECT id FROM booking_payment_methods WHERE setup_id=? AND friend_id=? AND line_account_id=? AND status='ready' AND test_mode=1")
+      .bind(body.setupIntentId,friendId,accountId).first()) return c.json({error:'card_not_registered'},409);
+  }
+
+  const bookingMeetingMode=menuRow.meeting_mode==='customer_choice'?body.meeting_mode:menuRow.meeting_mode;
+  if(!['online','in_person'].includes(bookingMeetingMode??'') || (body.meeting_mode!==undefined&&body.meeting_mode!==bookingMeetingMode))return c.json({error:'meeting_mode_required'},400);
   const startsAt = new Date(body.starts_at);
   if (Number.isNaN(startsAt.getTime())) {
     return inputError(c, { error: 'invalid_starts_at' }, 422, ["starts_at"]);
@@ -895,9 +912,9 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         (id, line_account_id, friend_id, staff_id, menu_id,
          starts_at, ends_at, block_ends_at, status,
          customer_note, price_at_booking, requested_at, decided_at,
-         menu_version_number, menu_snapshot_json,waitlist_entry_id)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-        WHERE NOT EXISTS (
+         menu_version_number, menu_snapshot_json,waitlist_entry_id,policy_snapshot_json,meeting_mode)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+        WHERE COALESCE((SELECT version FROM booking_cancellation_policies WHERE line_account_id=?),0)=? AND NOT EXISTS (
           -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
           -- 1対1の施術とグループを同じ時間に入れることはできない。
           SELECT 1 FROM bookings
@@ -938,6 +955,9 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       menuSnapshot.version,
       menuSnapshot.json,
       body.waitlist_id??null,
+      JSON.stringify(body.entitlement_id?{...cancellation,enabled:false}:cancellation),
+      bookingMeetingMode,
+      accountId,cancellation.version,
       // 別メニューの重なりを見る副問い合わせ
       body.staff_id,
       blockEndsAt.toISOString(),
@@ -1207,7 +1227,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
   const accountId = caller.accountId;
   const bookingId = c.req.param('id');
-  const body = await c.req.json<{ lock_version?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ lock_version?: unknown; feeAccepted?:unknown;expectedFeeAmount?:unknown }>().catch(() => null);
   if (!body || !Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
     return inputError(c, { error: 'missing_lock_version' }, 400, ["lock_version"]);
   }
@@ -1299,14 +1319,17 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   if (Number(row.lock_version) !== expectedVersion) {
     return c.json({ error: 'version_conflict' }, 409);
   }
+  const cancellationAt=new Date();
+  const quote=await bookingCancellationQuote(c.env.DB,bookingId,accountId,cancellationAt);
+  if(quote.feeNow>0 && (body.feeAccepted!==true||body.expectedFeeAmount!==quote.feeNow))return c.json({error:'cancellation_fee_confirmation_required',data:quote},409);
   const rules = await readSelfBookingRules(c.env.DB, accountId, row.menu_id);
-  if (Date.now() > new Date(row.starts_at).getTime() - rules.cancelDeadlineMinutesBefore * 60_000) {
+  if (cancellationAt.getTime() >= new Date(row.starts_at).getTime() || (!quote.policyAcceptedRequired && cancellationAt.getTime() > new Date(row.starts_at).getTime() - rules.cancelDeadlineMinutesBefore * 60_000)) {
     return c.json({ error: 'self_deadline_passed' }, 403);
   }
   // 条件付き確定: 同時取消の race では片方だけが通る。副作用は通った方だけ走る。
   // 所有権は cancel_claim_id (uuid) を同じ UPDATE で書く単文 CAS。
   // 確定と主張が不可分のため、確定→監査の別 await 窓は存在しない。
-  const decidedAt = new Date().toISOString();
+  const decidedAt = cancellationAt.toISOString();
   const claimId = crypto.randomUUID();
   const updateResult = await c.env.DB
     .prepare(
@@ -1389,6 +1412,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
     console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"POST /api/liff/booking/:id/cancel"}));
   }
   return c.json({
+    ...(await bookingCancellationQuote(c.env.DB,bookingId,accountId)),
     status: 'cancelled',
     lock_version: expectedVersion,
     calendar_sync: calResult === 'succeeded' ? 'synced' : calResult === 'retry_wait' ? 'failed' : 'not_applicable',
@@ -1488,8 +1512,8 @@ booking.get('/api/liff/booking/me', async (c) => {
 
   const upcoming = await c.env.DB
     .prepare(
-      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.status, b.customer_note,
-              b.lock_version, b.menu_id, b.staff_id,
+      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.ends_at, b.status, b.customer_note,
+              b.lock_version, b.menu_id, b.staff_id,b.meeting_mode,CASE WHEN b.status='confirmed' THEN b.meeting_url ELSE NULL END meeting_url,b.meeting_url_source,b.policy_snapshot_json,b.price_at_booking,EXISTS(SELECT 1 FROM booking_entitlement_uses u WHERE u.booking_id=b.id) ticket,
               m.name AS menu_name,
               COALESCE(m.cancel_deadline_hours_before * 60, bs.cancel_deadline_minutes_before, 1440) AS cancel_deadline_minutes_before,
               s.display_name AS staff_name, s.profile_image_url
@@ -1503,11 +1527,11 @@ booking.get('/api/liff/booking/me', async (c) => {
         ORDER BY b.starts_at ASC`,
     )
     .bind(friendId, accountId, new Date().toISOString())
-    .all<BookingHistoryItem>();
+    .all<BookingHistoryItem & {policy_snapshot_json:string|null;price_at_booking:number;ticket:number}>();
 
   const past = await c.env.DB
     .prepare(
-      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.status, b.lock_version, b.menu_id, b.staff_id,
+      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.ends_at, b.status, b.lock_version, b.menu_id, b.staff_id,b.meeting_mode,CASE WHEN b.status='confirmed' THEN b.meeting_url ELSE NULL END meeting_url,b.meeting_url_source,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url
          FROM bookings b
@@ -1521,7 +1545,12 @@ booking.get('/api/liff/booking/me', async (c) => {
     .bind(friendId, accountId, new Date().toISOString())
     .all<BookingHistoryItem>();
 
-  return c.json({ upcoming: upcoming.results.map(row => ({ ...bookingHistoryItem(row), cancel_deadline_at: new Date(new Date(row.starts_at).getTime() - Number(row.cancel_deadline_minutes_before) * 60_000).toISOString() })), past: past.results.map(bookingHistoryItem) } satisfies BookingHistoryResponse);
+  return c.json({ upcoming: upcoming.results.map(row => {
+    const {policy_snapshot_json,price_at_booking,ticket,...item}=bookingHistoryItem(row);
+    const policy=policy_snapshot_json?JSON.parse(policy_snapshot_json):null;
+    const quote=policy?.enabled?cancellationQuote(policy,row.starts_at,price_at_booking,new Date(),!!ticket):null;
+    return {...item,...(quote?{cancellationQuote:quote}:{}),cancel_deadline_at:quote?.policyAcceptedRequired?row.starts_at:new Date(new Date(row.starts_at).getTime()-Number(row.cancel_deadline_minutes_before)*60000).toISOString()};
+  }), past: past.results.map(bookingHistoryItem) } satisfies BookingHistoryResponse);
 });
 
 // ================================================================
@@ -6696,6 +6725,7 @@ booking.get('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
 });
 
 booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingStaffOrAdmin(), inputJsonBoundary({"calendar_id":["string"]}), async (c) => {
+  if(c.get('impersonation'))return c.json({error:'IMPERSONATION_WRITE_BLOCKED'},403);
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const staffId = c.req.param('id');
@@ -6754,6 +6784,7 @@ booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
 });
 
 booking.delete('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingStaffOrAdmin(), async (c) => {
+  if(c.get('impersonation'))return c.json({error:'IMPERSONATION_WRITE_BLOCKED'},403);
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const staffId = c.req.param('id');
@@ -7193,7 +7224,8 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const id = c.req.param('id');
-  const b = await c.req.json<{ action: BookingAction }>();
+  const b = await c.req.json<{ action: BookingAction; cancellationReason?:'store'|'customer' }>();
+  if(b.cancellationReason!==undefined&&!['store','customer'].includes(b.cancellationReason))return c.json({error:'invalid_cancellation_reason'},400);
   const row = await c.env.DB
     .prepare(
       `SELECT id, status, starts_at, friend_id, menu_id, staff_id, decided_at
@@ -7260,11 +7292,11 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   // 状態を変えたので 409 を返し、副作用（reminders 作成・通知）は走らせない。
   const updateStatement = c.env.DB
     .prepare(
-      `UPDATE bookings SET status = ?, decided_at = ?,
+      `UPDATE bookings SET status = ?, decided_at = ?, cancellation_reason=COALESCE(?,cancellation_reason),
                             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND status = ?`,
     )
-    .bind(next, new Date().toISOString(), id, row.status);
+    .bind(next, new Date().toISOString(), next==='cancelled'?b.cancellationReason??null:null, id, row.status);
   let updateResult: D1Result;
   try { [updateResult] = await c.env.DB.batch([
     updateStatement, ...(next === 'confirmed' ? [confirmationWorkflowStatement(c.env.DB, id, true)] : []),

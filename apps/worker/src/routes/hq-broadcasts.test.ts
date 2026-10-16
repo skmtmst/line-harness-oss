@@ -266,3 +266,9 @@ it('店別の公開済み後処理を保存・確認・送信へ固定し、他�
  expect(start.mock.calls.map(([context])=>context.action.params.scenarioId)).toEqual(['scenario1','scenario2']);
  await processBroadcastAfterActions(f.db,{broadcastId:child.id,executors:{start_scenario:start}});expect(start).toHaveBeenCalledTimes(2);
 });
+it('UNS-19: send-previewは外へ照会せず、統括の合計と店ごとの内訳・承認閾値をそろえる',async()=>{
+ const r=await made();vi.mocked(fetch).mockClear();
+ const response=await call(`/api/hq/broadcasts/${r.id}/send-preview`);expect(response.status).toBe(200);
+ const data=(await response.json() as any).data;
+ expect(data.recipients).toBe(1);expect(data.perAccount.reduce((n:number,p:any)=>n+p.recipients,0)).toBe(data.recipients);expect(data.needsApproval).toBe(false);expect(fetch).not.toHaveBeenCalled();
+});

@@ -603,7 +603,14 @@
     "668_support_mark_display_locations.sql",
     "669_restaurant_anniversary_followup.sql",
     "681_style_setup_selection_and_auto_insert.sql",
-    "682_booking_stripe_connect_states.sql"
+    "682_booking_stripe_connect_states.sql",
+    "698_chat_corrections.sql",
+    "699_line_senders.sql",
+    "700_inbox_first_response.sql",
+    "701_booking_cancellation_policy.sql",
+    "702_booking_cancellation_charges.sql",
+    "703_booking_calendar_switches.sql",
+    "704_booking_fixed_meeting_urls.sql"
   ],
-  "migrationCount": 604
+  "migrationCount": 611
 }

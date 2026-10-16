@@ -1,3 +1,4 @@
+import {bookingCancellationQuote} from './booking-cancellation.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { queueBookingOperation, finishBookingOperation } from './booking-operation-runs.js';
 import { formatStartsAtForStore, notificationTiming, sendBookingNotification, type NotificationKind } from './booking-notifier.js';
@@ -12,7 +13,7 @@ export async function notifyForBooking(
 ): Promise<void> {
   const row = await db
     .prepare(
-      `SELECT b.starts_at, b.line_account_id, b.status,
+      `SELECT b.starts_at, b.line_account_id, b.status, b.meeting_mode, b.meeting_url, b.policy_snapshot_json,
               m.name AS menu_name,
               s.display_name AS staff_name,
               la.channel_access_token,
@@ -29,6 +30,7 @@ export async function notifyForBooking(
     )
     .bind(bookingId)
     .first<{
+      meeting_mode:string|null;meeting_url:string|null;policy_snapshot_json:string|null;
       starts_at: string;
       status: string;
       line_account_id: string;
@@ -78,6 +80,8 @@ export async function notifyForBooking(
       toLineUserId: row.line_user_id,
       kind,
       ctx: {
+        meetingMode:row.meeting_mode,meetingUrl:row.meeting_url,
+        ...(row.policy_snapshot_json?{cancellationText:(await bookingCancellationQuote(db,bookingId,row.line_account_id)).text}:{}),
         menuName: row.menu_name,
         staffName: row.staff_name,
         startsAt: formatStartsAtForStore(row.starts_at, timeZone),

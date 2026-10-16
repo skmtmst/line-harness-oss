@@ -218,7 +218,7 @@ export async function listPendingScheduledChatSends(
   return result.results;
 }
 
-export type ScheduledSendMutationResult = 'updated' | 'not_found' | 'locked';
+export type ScheduledSendMutationResult = 'updated' | 'not_found' | 'locked' | 'too_late';
 
 /**
  * 予約の取消。status='scheduled'の行だけをCASで書き換える。
@@ -226,7 +226,7 @@ export type ScheduledSendMutationResult = 'updated' | 'not_found' | 'locked';
  */
 export async function cancelScheduledChatSend(
   db: D1Database,
-  input: { id: string; friendId: string; staffId: string; now?: string },
+  input: { id: string; friendId: string; staffId: string; now?: string; reason?: string },
 ): Promise<ScheduledSendMutationResult> {
   const now = input.now ?? new Date().toISOString();
   const result = await db
@@ -235,16 +235,19 @@ export async function cancelScheduledChatSend(
           SET status = 'cancelled',
               cancelled_by_staff_id = ?,
               cancelled_at = ?,
+              cancellation_reason = ?,
               lease_token = NULL,
               lease_expires_at = NULL,
               updated_at = ?
-        WHERE id = ? AND friend_id = ? AND status = 'scheduled'`,
+        WHERE id = ? AND friend_id = ? AND status = 'scheduled'
+          AND julianday(scheduled_at) >= julianday(?) + 60.0/86400`,
     )
-    .bind(input.staffId, now, now, input.id, input.friendId)
+    .bind(input.staffId, now, input.reason ?? null, now, input.id, input.friendId, now)
     .run();
   if ((result.meta?.changes ?? 0) === 1) return 'updated';
   const row = await getScheduledChatSend(db, input.id);
-  return !row || row.friend_id !== input.friendId ? 'not_found' : 'locked';
+  return !row || row.friend_id !== input.friendId ? 'not_found'
+    : row.status === 'scheduled' && Date.parse(row.scheduled_at) - Date.parse(now) < 60_000 ? 'too_late' : 'locked';
 }
 
 /**

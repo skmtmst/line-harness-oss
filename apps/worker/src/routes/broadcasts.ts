@@ -1,3 +1,4 @@
+import { broadcastSendPreview,broadcastQuietHoursShift } from '../services/gap-send-preview.js';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -976,6 +977,14 @@ broadcasts.get('/api/broadcasts/:id/activity', async (c) => {
     console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/activity"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
+});
+
+// U1: 読み取りだけ。送信・外の残高照会・下書きの更新はしない。
+broadcasts.get('/api/broadcasts/:id/send-preview', async c => {
+  const b=await getBroadcastById(c.env.DB,c.req.param('id'));
+  if(!b || !await canAccessBroadcast(c.env.DB,c.get('staff'),b)) return c.json({success:false,error:'not_found'},404);
+  try { return c.json({success:true,data:await broadcastSendPreview(c.env.DB,b)}); }
+  catch { return c.json({success:false,error:'send_preview_unavailable'},503); }
 });
 
 // GET /api/broadcasts/:id/preview-count — 送信前の対象人数を計算する。
@@ -2286,6 +2295,7 @@ broadcasts.delete('/api/broadcasts/:id', requirePermission(BROADCAST_DEFINITION_
 // 守ったが、API direct 経路は未対応のままだった。
 // 友だちへ実際に届き、取り消せない。権限に加えて明示的な確認を要求する。
 broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('broadcast-send'), inputJsonBoundary(), async (c) => {
+  if(c.get('impersonation'))return c.json({success:false,code:'IMPERSONATION_SEND_BLOCKED',error:'代理ログイン中は送れません'},403);
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -2312,7 +2322,13 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
      */
     try {
       const { enforceBroadcastSendApproval } = await import('../services/broadcast-approval.js');
-      const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown }>().catch(() => null);
+      const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown; expectedVersion?:unknown; scheduledAt?:unknown }>().catch(() => null);
+      if(sendBody?.expectedVersion!==undefined) {
+        const current=await broadcastSendPreview(c.env.DB,existing);
+        if(sendBody.expectedVersion!==current.expectedVersion||sendBody.confirmedRecipientCount!==current.recipients||current.recipients===0)
+          return c.json({success:false,code:'SEND_PREVIEW_CHANGED',error:'送る相手が変わりました。もう一度確かめてください',data:current},409);
+      }
+
       const approvalGate = await enforceBroadcastSendApproval(c.env.DB, existing, {
         confirmedRecipientCount: sendBody?.confirmedRecipientCount,
       });
@@ -2325,6 +2341,17 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
             threshold: approvalGate.threshold,
           }, approvalGate.status as 409, []);
       }
+      if(sendBody?.expectedVersion!==undefined && existing.line_account_id) {
+        if(sendBody.scheduledAt!==undefined && (typeof sendBody.scheduledAt!=='string'||!Number.isFinite(Date.parse(sendBody.scheduledAt))||Date.parse(sendBody.scheduledAt)<=Date.now()))return c.json({success:false,error:'invalid_scheduled_at'},400);
+        const at=typeof sendBody.scheduledAt==='string'?sendBody.scheduledAt:new Date().toISOString();
+        const shifted=await broadcastQuietHoursShift(c.env.DB,existing.line_account_id,at),scheduled=shifted??(sendBody.scheduledAt as string|undefined);
+        if(scheduled){
+          const result=await c.env.DB.prepare("UPDATE broadcasts SET status='scheduled',scheduled_at=?,lock_version=lock_version+1 WHERE id=? AND status='draft' AND lock_version=?").bind(scheduled,id,sendBody.expectedVersion).run();
+          if(!result.meta.changes)return c.json({success:false,error:'version_conflict'},409);
+          return c.json({success:true,data:{scheduled:true,scheduledAt:scheduled,quietHoursShiftTo:shifted}});
+        }
+      }
+
     } catch (gateError) {
       // 数えられない（DB到達不能など）ときは送らない。誤送信より停止を選ぶ。
       console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
