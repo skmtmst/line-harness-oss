@@ -1,3 +1,4 @@
+import { calendarDirectionEnabled, readCalendarBusy } from './booking-calendar-settings.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { GoogleCalendarClient, type BusyInterval } from './google-calendar.js';
 import {
@@ -60,12 +61,9 @@ export async function clientForConnection(
 export async function getStaffGoogleBusy(
   db: D1Database,
   credentials: GoogleServiceAccountCredentials,
-  input: { lineAccountId: string; staffId: string; timeMin: string; timeMax: string },
+  input: { lineAccountId: string; staffId: string; timeMin: string; timeMax: string; fresh?:boolean },
 ): Promise<BusyInterval[] | null> {
-  const connection = await getStaffCalendarConnection(db, input.lineAccountId, input.staffId);
-  if (!connection) return null;
-  const client = await clientForConnection(connection, credentials);
-  return client.getFreeBusy(input.timeMin, input.timeMax);
+  return readCalendarBusy(db,credentials,input);
 }
 
 export async function verifyStaffCalendarConnection(
@@ -85,6 +83,8 @@ export async function syncConfirmedBookingToGoogle(
   /** 確定の回収では同じ操作行のIDを使い、応答消失後も外部予定を重ねない。 */
   recoveryEventId?: string,
 ): Promise<{ synced: boolean; eventId?: string; calendarId?: string }> {
+  const target=await db.prepare('SELECT line_account_id,staff_id,lock_version FROM bookings WHERE id=?').bind(bookingId).first<{line_account_id:string;staff_id:string;lock_version:number}>();
+  if(!target||!await calendarDirectionEnabled(db,target.line_account_id,target.staff_id,'write'))return {synced:false};
   const row = await db
     .prepare(
       `SELECT b.id, b.starts_at, b.ends_at, b.customer_note, b.external_event_id,
@@ -132,7 +132,7 @@ export async function syncConfirmedBookingToGoogle(
    * 作成に失敗したら置き場を空けて、次の再試行が作れる状態に戻す。
    * ID は Google 側の文字種 (a〜v と数字) に収まる形で採番する。
    */
-  const reservedEventId = recoveryEventId ?? `lh${crypto.randomUUID().replaceAll('-', '')}`;
+  const reservedEventId = recoveryEventId ?? `lh${Array.from(new TextEncoder().encode(`${bookingId}:v${target.lock_version}`)).map(b=>b.toString(16).padStart(2,'0')).join('')}`;
   const claim = await db
     .prepare(
       `UPDATE bookings
@@ -173,13 +173,12 @@ export async function syncConfirmedBookingToGoogle(
     const client = await clientForConnection(connection, credentials);
     const created = await client.createEvent({
       id: reservedEventId,
-      summary: `${row.customer_name ?? 'お客様'}｜${row.menu_name}`,
+      summary: `${row.menu_name}｜${row.customer_name ?? '予約'}`,
       start: row.starts_at,
       end: row.ends_at,
       description: [
         `musubo予約（担当: ${row.staff_name}）`,
         `予約ID: ${row.id}`,
-        row.customer_note ? `メモ: ${row.customer_note}` : '',
       ].filter(Boolean).join('\n'),
     });
     if (created.eventId !== reservedEventId) {
@@ -498,6 +497,7 @@ export async function runBookingGoogleSync(
     idempotencyKey,
     result: { direction: 'sync' },
   });
+  if(booking.status==='confirmed'&&!await calendarDirectionEnabled(db,input.lineAccountId,booking.staff_id,'write')) {await finishBookingOperation(db,{id:operationId,status:'skipped',completedAt:now,result:{direction:'sync',reason:'calendar_write_disabled'}});return 'skipped';}
   // 成功ずみの同版は外部へ再実行しない。同日時再送の delete/create・UUID再採番を止める。
   // 失敗 (retry_wait 等) だけが回復対象。
   if (!input.operationId) {

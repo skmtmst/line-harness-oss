@@ -13,6 +13,9 @@ export type NotificationKind =
   | 'waitlist_invite';
 
 export interface NotificationContext {
+  meetingUrl?:string|null;
+  meetingMode?:string|null;
+  cancellationText?:string;
   menuName: string;
   staffName: string;
   /** 店舗の時間帯で書いた予約日時（例: "2026-05-10 14:00"）。日本時間に固定しない (R332)。 */
@@ -59,7 +62,8 @@ export function renderNotificationText(
   kind: NotificationKind,
   ctx: NotificationContext,
 ): string {
-  const detail = `\nメニュー: ${ctx.menuName}\n担当: ${ctx.staffName}\n日時: ${ctx.startsAt}`;
+  const meeting=ctx.meetingMode==='online'?`\n${ctx.meetingUrl?`会議の URL: ${ctx.meetingUrl}`:'会議の URL は前日までにお送りします'}`:'';
+  const detail = `\nメニュー: ${ctx.menuName}\n担当: ${ctx.staffName}\n日時: ${ctx.startsAt}${meeting}${ctx.cancellationText?`\n${ctx.cancellationText}`:''}`;
   // 「本日」「明日」は店舗暦日での実際のずれ。2日以上離れている・遅れて
   // 当日を過ぎた場合は曖昧な言い方を避け、日時欄だけで伝える (R333)。
   const relDay = ctx.daysUntil === 0 ? '本日' : ctx.daysUntil === 1 ? '明日' : null;
