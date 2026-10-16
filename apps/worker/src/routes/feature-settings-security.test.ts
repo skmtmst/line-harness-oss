@@ -62,7 +62,7 @@ describe('feature settings scope and versioning', () => {
       for (const [accountId, visible] of [['account-1', expected], ['account-2', false]] as const) {
         const response = await app('staff').request(
           `/api/settings/features/visibility?account_id=${accountId}`, {},
-          { DB: testDb.db, RESTAURANT_TEST_ENABLED: environment },
+          { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: environment },
         );
         expect(response.status).toBe(200);
         const body = await response.json() as { data: { features: Record<string, boolean> } };

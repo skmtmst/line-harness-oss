@@ -1,7 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { inspectRouteSource } from './route-security-inventory.js';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { collectSecurityRoutes, inspectRouteSource } from './route-security-inventory.js';
 
 describe('security route inventory', () => {
+  it('follows invoked router factories and excludes unused factories sharing a parameter name', () => {
+    const root = mkdtempSync(join(tmpdir(), 'security-factory-'));
+    try {
+      mkdirSync(join(root, 'routes'));
+      const entry = `import { register as install, unused } from './routes/factory.js';
+        const app = new Hono(); const other = new Hono(); install(app); unused(other);`;
+      writeFileSync(join(root, 'index.ts'), entry);
+      writeFileSync(join(root, 'routes/factory.ts'), `const base = '/api/items';
+        export function register(app: Hono<Env>) { app.get(base, c => c.json({}));
+          app.put(base + '/:id', c => c.json({})); }
+        export function unused(app: Hono<Env>) { app.delete('/api/unused', c => c.json({})); }`);
+      expect(collectSecurityRoutes(root).map(r => r.method + ' ' + r.path)).toEqual([
+        'GET /api/items', 'PUT /api/items/:id',
+      ]);
+      writeFileSync(join(root, 'index.ts'), entry.replace('install(app);', ''));
+      expect(collectSecurityRoutes(root)).toEqual([]);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   it('includes reads, exports, writes and inherited guards, following called local helpers', () => {
     const source = `const router = new Hono();
       async function authorize(c, next) { await canAccessAllLineAccounts(); await next(); }

@@ -14,8 +14,13 @@ export function inspectRouteSource(file: string, source: string, importedConstan
   const locals = new Map<string, ts.Node>();
   const routers = new Set<string>();
   const registrations: ts.CallExpression[] = [];
+  const honoParameter = (parameter: ts.ParameterDeclaration) => ts.isIdentifier(parameter.name)
+    && parameter.type && ts.isTypeReferenceNode(parameter.type) && parameter.type.typeName.getText(ast) === 'Hono';
   function visit(node: ts.Node): void {
-    if (ts.isFunctionDeclaration(node) && node.name && ts.isSourceFile(node.parent)) locals.set(node.name.text, node);
+    if (ts.isFunctionDeclaration(node) && node.name && ts.isSourceFile(node.parent)) {
+      locals.set(node.name.text, node);
+      for (const parameter of node.parameters.filter(honoParameter)) routers.add(`${node.name.text}:${parameter.name.getText(ast)}`);
+    }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const topLevel = ts.isVariableDeclarationList(node.parent) && ts.isVariableStatement(node.parent.parent)
         && ts.isSourceFile(node.parent.parent.parent);
@@ -90,7 +95,16 @@ export function inspectRouteSource(file: string, source: string, importedConstan
     }
     return [];
   }
-  const routerName = (call: ts.CallExpression) => (call.expression as ts.PropertyAccessExpression | ts.ElementAccessExpression).expression.getText(ast);
+  const routerName = (call: ts.CallExpression) => {
+    const receiver = (call.expression as ts.PropertyAccessExpression | ts.ElementAccessExpression).expression.getText(ast);
+    let parent: ts.Node | undefined = call.parent;
+    while (parent && !ts.isSourceFile(parent)) {
+      if (ts.isFunctionDeclaration(parent) && parent.name
+        && parent.parameters.some(p => honoParameter(p) && p.name.getText(ast) === receiver)) return `${parent.name.text}:${receiver}`;
+      parent = parent.parent;
+    }
+    return receiver;
+  };
   const verb = (call: ts.CallExpression) => ts.isPropertyAccessExpression(call.expression) ? call.expression.name.text : 'computed';
   const registered = registrations.filter(call => routers.has(routerName(call))).flatMap(call => {
     const on = verb(call) === 'on';
@@ -144,6 +158,29 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
     const own = (routes.get(file) ?? []).filter(route => route.router === router)
       .map(route => ({ ...route, file: route.file.replace(resolve(srcDir), 'apps/worker/src'),
         path: prefix + (prefix && route.path === '*' ? '/*' : route.path) }));
+    // A factory can register routes on a router argument without creating a Hono.
+    // Follow only top-level invocations on this mounted router; unused factories
+    // and similarly named parameters in other functions never become routes.
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    for (const statement of ast.statements) {
+      if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression)) continue;
+      const call = statement.expression;
+      if (!ts.isIdentifier(call.expression)) continue;
+      const importedFactory = imported.get(call.expression.text);
+      const factoryFile = importedFactory ? resolve(dirname(file), importedFactory.module.replace(/\.js$/, '.ts')) : file;
+      const factorySource = sources.get(factoryFile);
+      if (!factorySource) continue;
+      const factoryAst = ts.createSourceFile(factoryFile, factorySource, ts.ScriptTarget.Latest, true);
+      const name = importedFactory?.exported ?? call.expression.text;
+      const factory = factoryAst.statements.find((node): node is ts.FunctionDeclaration =>
+        ts.isFunctionDeclaration(node) && node.name?.text === name);
+      if (!factory) continue;
+      for (const [index, parameter] of factory.parameters.entries()) {
+        if (!parameter.type || !ts.isTypeReferenceNode(parameter.type) || parameter.type.typeName.getText(factoryAst) !== 'Hono'
+          || call.arguments[index]?.getText(ast) !== router) continue;
+        own.push(...mounted(factoryFile, `${name}:${parameter.name.getText(factoryAst)}`, prefix, nextAncestors));
+      }
+    }
     for (const mount of registrations(source).filter(call => call.router === router && call.method === 'ROUTE')) {
       const importedRouter = imported.get(mount.mountedRouter ?? '');
       const childFile = importedRouter ? resolve(dirname(file), importedRouter.module.replace(/\.js$/, '.ts')) : file;
