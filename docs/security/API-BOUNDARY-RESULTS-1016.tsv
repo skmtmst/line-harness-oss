@@ -6,11 +6,13 @@ POST	/api/recipes	401	403	403	403
 GET	/api/recipes/:id	401	403	403	403
 POST	/api/recipes/:id/clone	401	403	403	403
 GET	/api/recipes/clone-runs/:runId	401	403	403	403
+GET	/api/hq/templates/media	401	403	403	403
 POST	/api/hq/templates/media/upload-sessions	401	403	403	403
 POST	/api/hq/templates/media/upload-sessions/:id/complete	401	403	403	403
 DELETE	/api/hq/templates/media/upload-sessions/:id	401	403	403	403
 POST	/api/hq/templates/media	401	403	403	403
 DELETE	/api/hq/templates/media	401	403	403	403
+POST	/api/hq/templates/rich-menu-preview	401	403	403	403
 GET	/api/hq/templates/accounts	401	403	403	403
 GET	/api/hq/templates/message-references	401	403	403	403
 GET	/api/hq/templates/kind-counts	401	403	403	403
@@ -30,10 +32,12 @@ GET	/api/hq/templates/:id	401	403	403	403
 POST	/api/hq/templates	401	403	403	403
 PATCH	/api/hq/templates/:id	401	403	403	403
 DELETE	/api/hq/templates/:id	401	403	403	403
+POST	/api/hq/templates/:id/test-send	401	403	403	403
 POST	/api/hq/templates/:id/preflight	401	403	403	403
 POST	/api/hq/templates/:id/distribute	401	403	403	403
 GET	/api/hq/templates/:id/distributions/:runId	401	403	403	403
 GET	/api/hq/broadcasts	401	403	403	403
+GET	/api/hq/broadcasts/quota	401	403	403	403
 POST	/api/hq/broadcasts	401	403	403	403
 GET	/api/hq/broadcasts/approvals/candidates	401	403	403	403
 POST	/api/hq/broadcasts/folders/:id/swap-order	401	403	403	403
@@ -47,6 +51,9 @@ PUT	/api/hq/broadcasts/:id/exclusions	401	403	403	403
 POST	/api/hq/broadcasts/:id/send	401	403	403	403
 POST	/api/hq/broadcasts/:id/stop	401	403	403	403
 POST	/api/hq/broadcasts/:id/cancel	401	403	403	403
+GET	/api/hq/broadcasts/:id/reactions	401	403	403	403
+POST	/api/hq/broadcasts/:id/duplicate	401	403	403	403
+POST	/api/hq/broadcasts/:id/followup	401	403	403	403
 POST	/api/hq/broadcasts/:id/targets/:accountId/retry	401	403	403	403
 PATCH	/api/hq/broadcasts/:id	401	403	403	403
 GET	/api/hq/broadcasts/:id/approval	401	403	403	403
@@ -1427,6 +1434,7 @@ GET	/api/hq/support/kinds	401	403	403	403
 POST	/api/hq/support/requests	401	403	403	403
 GET	/api/hq/support/requests/:id	401	403	403	403
 POST	/api/hq/support/requests/:id/messages	401	403	403	403
+GET	/api/hq/billing/metrics	401	403	403	403
 GET	/api/hq/billing/summary	401	403	403	403
 GET	/api/hq/billing/preview	401	403	403	403
 POST	/api/hq/billing/checkout	401	403	403	403
