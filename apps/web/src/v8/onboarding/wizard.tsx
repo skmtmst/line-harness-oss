@@ -1,5 +1,6 @@
 'use client'
 
+import { Steps } from '@/components/templates/steps'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog,{ DialogActions } from '@/components/shared/dialog'
@@ -13,7 +14,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
 import { type StarterSetItem } from '@/lib/api-styles'
 import type { AccountStyle,SetupAnswer } from '@line-crm/shared'
-import { ArrowRight,Circle,CircleCheck,CircleDot,Hourglass,Info,Play } from 'lucide-react'
+import { ArrowRight,Hourglass,Info,Play } from 'lucide-react'
 import { SetupIcon } from './icons'
 import {
 LOOK_CHOICES,
@@ -271,22 +272,8 @@ function groupInserted(pairs: Pair[]): Array<{ kind: string; note: string }> {
 
 /** 左の質問の一覧（lS1Gh）。済んだ手順は ✓、今の手順は地の色、まだは ○。押すとその質問へ。 */
 function StepList({ steps, index, answers, onSelect }: { steps: Array<{ key: string; short: string }>; index: number; answers: Record<string, SetupAnswer>; styleSelected: boolean; onSelect: (index: number) => void }) {
-  return (
-    <nav aria-label="はじめの質問の一覧">
-      <ol className={styles.stepList}>
-        {steps.map((item, i) => {
-          const state = i === index ? 'now' : i < index || answers[item.key] ? 'done' : 'idle'
-          const Icon = state === 'now' ? CircleDot : state === 'done' ? CircleCheck : Circle
-          return (
-            <li key={item.key} aria-current={state === 'now' ? 'step' : undefined}>
-              <button type="button" className={styles.stepItem} data-state={state} onClick={() => onSelect(i)}>
-                <Icon aria-hidden="true" className={styles.stepIcon} />
-                <span className={styles.stepName}>{item.short}</span>
-              </button>
-            </li>
-          )
-        })}
-      </ol>
-    </nav>
-  )
+  return <Steps label="はじめの質問の一覧" layout="sidebar" currentKey={steps[index]?.key}
+    steps={steps.map((item, i) => ({ key: item.key, label: item.short,
+      state: i < index || answers[item.key] ? 'done' : 'todo', onSelect: () => onSelect(i),
+    }))} />
 }

@@ -2,6 +2,7 @@
 import { Check, ClipboardCheck, MapPin, Video } from 'lucide-react'
 import type React from 'react'
 import Button from '@/components/shared/button'
+import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import ListState from '@/components/shared/list-state'
 import { RowMenu } from '@/components/shared/row-actions'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -116,18 +117,22 @@ export function TodayList({ style, rows, note, canWrite, busyId, selectedId, men
   }
   if (rows.length === 0) return <>{empty ?? <ListState kind="empty" title="この日の予約はまだありません" />}</>
   return (
-    <div className={styles.list} role="table" aria-label="一覧">
-      <div className={styles.listHead} role="row">
-        {columns.map((c) => <span key={c.key} role="columnheader" className={styles.headCell} style={c.width ? { inlineSize: c.width } : undefined} data-grow={c.width ? undefined : true}>{c.label}</span>)}
-        <span className={styles.menuCell} aria-hidden="true" />
-      </div>
+    <div className={styles.list}><GridTable label="一覧" presentation="dashboard" framed={false} design={{
+      columns: [...columns.map(c => c.width ?? 'minmax(var(--tpl-sd-name-min), 1fr)'), 'var(--tpl-sd-col-menu)'].join(' '),
+      gap: 'var(--polish-space-field)', rowPadding: '0 var(--polish-space-card)',
+      rowHeight: 'var(--tpl-sd-row-h)', headHeight: 'var(--tpl-sd-head-h)', fontSize: 'var(--text-body)',
+    }}>
+      <GridHeadRow>
+        {columns.map((c) => <GridCell key={c.key} role="columnheader">{c.label}</GridCell>)}
+        <GridCell aria-hidden="true" />
+      </GridHeadRow>
       {rows.map((row) => (
-        <div key={row.id} role="row" className={styles.listRow} data-selected={row.id === selectedId || (selectedId === undefined && row.highlight) || undefined}>
-          {columns.map((c) => <span key={c.key} role="cell" className={styles.cell} style={c.width ? { inlineSize: c.width } : undefined} data-grow={c.width ? undefined : true}>{cell(row, c.key)}</span>)}
-          <span className={styles.menuCell}><RowMenu appearance="box" size="row" label={`${row.name}の操作`} items={menuFor(row)} /></span>
-        </div>
+        <GridRow key={row.id} data-selected={row.id === selectedId || (selectedId === undefined && row.highlight) || undefined}>
+          {columns.map((c) => <GridCell key={c.key}>{cell(row, c.key)}</GridCell>)}
+          <GridCell align="right"><RowMenu appearance="box" size="row" label={`${row.name}の操作`} items={menuFor(row)} /></GridCell>
+        </GridRow>
       ))}
-      <p className={styles.listNote}>{note}</p>
-    </div>
+    </GridTable>
+    <p className={styles.listNote}>{note}</p></div>
   )
 }

@@ -3,8 +3,6 @@
   --ob-track-h: 6px;
   --ob-side-w: 320px;
   --ob-steps-w: 200px;
-  --ob-step-h: 30px;
-  --ob-step-pad: 10px;
   --ob-row-h: 48px;
   --ob-skip-row-h: 36px;
   --ob-small-icon: 14px;
@@ -135,64 +133,6 @@
   min-width: 0;
   flex-direction: column;
   gap: var(--polish-space-field);
-}
-
-.stepList {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--polish-space-row) / 4);
-  list-style: none;
-}
-
-.stepItem {
-  display: flex;
-  width: 100%;
-  height: var(--ob-step-h);
-  align-items: center;
-  gap: var(--polish-space-row);
-  border: 0;
-  border-radius: var(--polish-space-row);
-  padding-inline: var(--ob-step-pad);
-  background: transparent;
-  color: var(--color-ink-faint);
-  font: inherit;
-  font-size: var(--text-caption);
-  line-height: var(--ob-caption-lh);
-  text-align: left;
-  cursor: pointer;
-}
-
-.stepItem:hover {
-  background: var(--polish-hover);
-}
-
-.stepItem[data-state='done'] {
-  color: var(--color-ink-secondary);
-}
-
-:root .stepItem[data-state='now'] {
-  box-shadow: none;
-  background: var(--color-accent-soft);
-  color: var(--color-ink);
-  font-weight: 600;
-}
-
-.stepIcon {
-  width: var(--ob-small-icon);
-  height: var(--ob-small-icon);
-  flex: none;
-  color: var(--color-ink-faint);
-}
-
-.stepItem[data-state='done'] .stepIcon,
-.stepItem[data-state='now'] .stepIcon {
-  color: var(--color-accent-deep);
-}
-
-.stepName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* 最後の一覧（oKSsG）。 */

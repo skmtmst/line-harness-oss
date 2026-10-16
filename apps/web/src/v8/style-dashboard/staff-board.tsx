@@ -2,7 +2,7 @@
 import { CalendarX2, CircleHelp, Plus, Star } from 'lucide-react'
 import { useRef, useState, type CSSProperties } from 'react'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import StatusBadge from '@/components/shared/status-badge'
 import type { StyleBoard, StyleBoardEntry } from './model'
 import styles from './style-dashboard.module.css'
@@ -39,7 +39,7 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
       <div className={styles.boardTools}>
         {board.next ? <span className={styles.nextChip}><CircleHelp size={14} aria-hidden="true" />次の空き<strong>{board.next}</strong></span> : null}
         <span className={styles.grow} />
-        <div className={styles.search}><SearchField value={search} onChange={onSearch} placeholder="名前・電話で探す" aria-label="名前・電話で探す" /></div>
+        <div className={styles.search}><ListToolbar search={{ value: search, onChange: onSearch, placeholder: "名前・電話で探す", width: 220 }} /></div>
       </div>
       <div className={styles.boardStaff}>
         <span className={styles.boardTimeHead} />

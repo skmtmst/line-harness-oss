@@ -19,12 +19,6 @@
 .tabRow { padding-block-start: var(--polish-space-field); padding-inline: var(--polish-space-section); }
 .content { padding: var(--polish-space-card) var(--polish-space-section) var(--polish-space-section); }
 
-/* 本文｜右の列 */
-.columns { display: flex; align-items: flex-start; gap: var(--tpl-sd-col-gap); min-inline-size: 0; }
-.mainColumn { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--polish-space-field); min-inline-size: 0; }
-.sideColumn { display: flex; flex: 0 0 var(--tpl-sd-side-w); flex-direction: column; gap: var(--polish-space-field); inline-size: var(--tpl-sd-side-w); min-inline-size: 0; }
-.sideColumn[data-roster] { flex-basis: var(--tpl-sd-roster-w); inline-size: var(--tpl-sd-roster-w); }
-
 /* 右の列のカード */
 .sideCard { min-inline-size: 0; }
 .sideHead { display: flex; align-items: center; gap: var(--polish-space-row); min-inline-size: 0; }
@@ -39,18 +33,9 @@
 .cardNote { margin: var(--tpl-sd-text-margin); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--text-caption--line-height); }
 
 /* 一覧（表） */
+.list { display: flex; flex-direction: column; min-inline-size: 0; }
 .listTools { display: flex; align-items: center; gap: var(--polish-space-row); }
 .search { inline-size: var(--tpl-sd-search-w); flex: 0 0 auto; }
-.list { display: flex; flex-direction: column; min-inline-size: 0; }
-.listHead, .listRow { display: flex; align-items: center; gap: var(--polish-space-field); padding-inline: var(--polish-space-card); min-inline-size: 0; }
-.listHead { min-block-size: var(--tpl-sd-head-h); border-radius: var(--radius-control); background: var(--polish-table-head-bg); }
-.listRow { min-block-size: var(--tpl-sd-row-h); border-block-end: 1px solid var(--color-hairline); }
-.listRow[data-selected] { background: var(--color-accent-soft); }
-.headCell { flex: 0 0 auto; color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cell { display: flex; flex: 0 0 auto; flex-direction: column; justify-content: center; min-inline-size: 0; }
-.headCell[data-grow], .cell[data-grow] { flex: 1 1 auto; min-inline-size: 0; }
-.headCell[data-metric], .cell[data-metric] { flex: 0 0 auto; }
-.headCell[data-align='right'], .cell[data-align='right'] { text-align: end; align-items: flex-end; }
 .cellText { color: var(--color-ink); font-size: var(--text-body); white-space: nowrap; }
 .cellStrong { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-inline-size: 0; }
 .cellSub { color: var(--color-ink-secondary); font-size: var(--text-micro); line-height: var(--text-caption--line-height); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-inline-size: 0; }
@@ -60,25 +45,11 @@
 .textAction:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); }
 .resultChoices { display: flex; gap: var(--polish-space-card); }
 .actionPair { display: inline-flex; gap: var(--polish-space-row); }
-.menuCell { display: flex; flex: 0 0 var(--tpl-sd-col-menu); justify-content: flex-end; inline-size: var(--tpl-sd-col-menu); }
 .listNote { margin: var(--tpl-sd-text-margin); padding-block-start: var(--polish-space-field); color: var(--color-ink-faint); font-size: var(--text-label); }
 .fill { display: flex; flex-direction: column; gap: var(--polish-space-row); }
 .fillTrack { display: block; inline-size: var(--tpl-sd-fill-w); block-size: var(--tpl-sd-fill-h); border-radius: var(--radius-pill); background: var(--color-track); overflow: hidden; }
 .fillBar { display: block; block-size: 100%; border-radius: var(--radius-pill); background: var(--color-success); }
 .fillBar[data-tone='full'] { background: var(--tpl-sd-amber); }
-
-/* 分析の表（列の幅を見出しと行でそろえる格子） */
-.gridTable { display: grid; min-inline-size: 0; }
-.gridRow { display: contents; }
-.gridRow > * { display: flex; flex-direction: column; justify-content: center; min-inline-size: 0; min-block-size: var(--tpl-sd-row-h); border-block-end: 1px solid var(--color-hairline); }
-.gridRow[data-head] > * { min-block-size: var(--tpl-sd-head-h); border-block-end: 0; background: var(--polish-table-head-bg); }
-.gridRow > :first-child { padding-inline-start: var(--polish-space-card); }
-.gridRow > * + * { padding-inline-start: var(--polish-space-field); }
-.gridRow > :last-child { padding-inline-end: var(--polish-space-card); }
-.gridRow[data-head] > :first-child { border-start-start-radius: var(--radius-control); border-end-start-radius: var(--radius-control); }
-.gridRow[data-head] > :last-child { border-start-end-radius: var(--radius-control); border-end-end-radius: var(--radius-control); }
-.gridRow > [data-align='right'] { align-items: flex-end; text-align: end; }
-.gridTable .menuCell { inline-size: auto; align-items: flex-end; }
 
 /* 盤（時間×担当） */
 .board { display: flex; flex-direction: column; border-radius: var(--radius-card); background: var(--color-canvas); box-shadow: var(--card-shadow), var(--card-edge); overflow: hidden; }
@@ -239,14 +210,7 @@
 .dialogNote { display: flex; gap: var(--polish-space-row); margin: var(--tpl-sd-text-margin); padding: var(--polish-space-field) var(--polish-space-card); border-radius: var(--radius-control); background: var(--color-info-bg); color: var(--color-ink-secondary); font-size: var(--text-body); }
 
 /* 白い板が 1100 未満のときは右の列を畳む（決まり：右の欄は 1100 未満で畳む）。日付の段は折り返す。 */
-.asideToggle { display: none; }
-.cell[data-grow] { min-inline-size: var(--tpl-sd-name-min); }
 @container v8-page (max-width: 1099px) {
   .filters { flex-wrap: wrap; row-gap: var(--polish-space-row); }
-  .columns { flex-direction: column; align-items: stretch; }
-  .asideToggle { display: flex; }
-  .sideColumn, .sideColumn[data-roster] { display: none; flex-basis: auto; inline-size: auto; }
-  .sideColumn[data-expanded] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-  .sideColumn[data-roster][data-expanded] { display: flex; }
   .metricGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

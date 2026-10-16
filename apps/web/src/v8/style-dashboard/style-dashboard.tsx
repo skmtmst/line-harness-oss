@@ -13,7 +13,8 @@ import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import RestaurantFloorMap from '@/components/shared/restaurant-floor-map'
-import SearchField from '@/components/shared/search-field'
+import { DetailColumns } from '@/components/templates/detail-columns'
+import ListToolbar from '@/components/shared/list-toolbar'
 import SegmentedControl from '@/components/shared/segmented'
 import { Tabs } from '@/components/shared/tabs'
 import TestModeNote from '@/components/shared/test-mode-note'
@@ -146,14 +147,11 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   } else if (style === 'consult' && tab === 'bookings') {
     // 結果待ち（OJ4Vu）：実施した面談のうち、結果をまだ付けていない物。押すと結果を付ける窓。
     body = (
-      <div className={styles.columns}>
-        <div className={styles.mainColumn}>
+      <DetailColumns variant="style-dashboard" asideLabel="今日の動き" expanded={false} onExpandedChange={() => {}} showToggle={false} aside={side.length ? side : null}>
           <TodayList style={style} rows={resultRows} note={`${resultRows.length}件中 1〜${resultRows.length}件・結果を付けると、分析の成約率に入ります`} canWrite={canWrite} busyId={busy} menuFor={menuFor}
             onVisit={(r) => void markVisit(r)} onUndo={() => {}} onResult={(r) => setResultRow(r)}
             empty={<ListState kind="empty" title="結果待ちの面談はありません" description="実施した面談に結果を付けると、ここから消えます。" />} />
-        </div>
-        {side.length ? <aside className={styles.sideColumn} aria-label="今日の動き">{side}</aside> : null}
-      </div>
+      </DetailColumns>
     )
   } else if (tab !== 'main') {
     body = <ListState kind="empty" title={`${cfg.tabs[tab]}は今の画面で見られます`} action={<Button href={tab === 'bookings' ? cfg.links.bookings : cfg.links.people}>{`${cfg.tabs[tab]}を開く`}</Button>} />
@@ -179,7 +177,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     } else {
       main = (
         <>
-          {style !== 'lesson' ? <div className={styles.listTools}><span className={styles.grow} /><div className={styles.search}><SearchField value={search} onChange={setSearch} placeholder={cfg.search} aria-label={cfg.search} /></div></div> : null}
+          {style !== 'lesson' ? <div className={styles.listTools}><span className={styles.grow} /><div className={styles.search}><ListToolbar search={{ value: search, onChange: setSearch, placeholder: cfg.search, width: 220 }} /></div></div> : null}
           <TodayList style={style} rows={rows} note={today.rowsNote} canWrite={canWrite} busyId={busy} menuFor={menuFor} onVisit={(r) => void markVisit(r)} onNoShow={(r) => void markNoShow(r)} onApprove={(r) => void approve(r)} onResult={(r) => setResultRow(r)} onUndo={(r) => void undoVisit(r)}
             empty={<ListState kind="empty" title={`${range === 'today' ? '今日' : range === 'week' ? '今週' : '今月'}の${style === 'consult' ? '面談' : style === 'lesson' ? 'クラス' : '予約'}はありません`} description={canWrite ? (style === 'consult' ? '予約の URL を案内すると、空いた時間に入ります。' : '空いている時間に予約を入れられます。') : undefined}
               action={canWrite ? (style === 'consult' ? <Button variant="primary" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/booking`).then(() => notifyToast('予約 URL をコピーしました。')) }}><Copy size={16} aria-hidden="true" />予約 URL をコピー</Button> : <Button variant="primary" onClick={addNew}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button>) : undefined} />}
@@ -189,11 +187,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onAbsent={(name) => void attend(shownRoster, name, 'no_show')} onLine={() => router.push('/broadcasts')} onCancelClass={() => router.push('/events')} />
     }
     body = (
-      <div className={styles.columns} data-wide={!aside || undefined}>
-        {aside ? <div className={styles.asideToggle}><Button aria-expanded={asideOpen} onClick={() => setAsideOpen(!asideOpen)}>{asideOpen ? '右の列を畳む' : roster ? '名簿を見る' : '新着・お支払いを見る'}</Button></div> : null}
-        <div className={styles.mainColumn}>{main}</div>
-        {aside ? <aside className={styles.sideColumn} data-roster={shownRoster ? true : undefined} data-expanded={asideOpen || undefined} aria-label="今日の動き">{aside}</aside> : null}
-      </div>
+      <DetailColumns variant={shownRoster ? 'style-roster' : 'style-dashboard'} aside={aside} asideLabel="今日の動き" expanded={asideOpen} onExpandedChange={setAsideOpen}
+        toggleLabel={asideOpen ? '右の列を畳む' : roster ? '名簿を見る' : '新着・お支払いを見る'}>{main}</DetailColumns>
     )
   }
 
