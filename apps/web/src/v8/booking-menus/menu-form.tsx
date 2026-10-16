@@ -14,7 +14,9 @@ import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import CheckCard from '@/components/shared/check-card'
-import { MenuPaymentFields, useMenuPayment } from '../booking-payments/menu-payment'
+import { useMenuPayment } from '../booking-payments/menu-payment'
+import { BookingMenuPaymentCard, useMenuDeposit } from '../booking-payments/menu-deposit'
+import { MeetingModeCard, useMenuMeeting, type MeetingMode } from './meeting-mode'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -443,7 +445,10 @@ export default function MenuFormV8() {
   ])
   /* お支払い（いつもの方法／このメニューだけ変える）。メニューを保存したあとに口へ書く。 */
   const payment = useMenuPayment('booking', selectedAccountId, editTarget?.id ?? null)
-  const dirty = payment.dirty || baselineRef.current !== '' && baselineRef.current !== currentSignature ||
+  /* デポジット（B1・CnV1I）と会い方・会議の URL（B7・ELruS）。どちらもメニューを保存したあとに口へ書く。 */
+  const deposit = useMenuDeposit(selectedAccountId, editTarget?.id ?? null)
+  const meeting = useMenuMeeting(selectedAccountId, editTarget?.id ?? null, ((editTarget as (BookingMenu & { meeting_mode?: MeetingMode | null }) | null)?.meeting_mode) ?? null)
+  const dirty = payment.dirty || deposit.dirty || meeting.dirty || baselineRef.current !== '' && baselineRef.current !== currentSignature ||
     (baselineRef.current === '' && Boolean(
       name || effectiveCategory || description || durationMinutes !== '60' ||
       bufferAfterMinutes !== '0' || basePrice || concurrentCapacity !== '1' ||
@@ -794,9 +799,11 @@ export default function MenuFormV8() {
       }
       try {
         await payment.save(menuId)
+        await deposit.save(menuId)
+        version = await meeting.save(menuId, version)
       } catch (paymentFailure) {
         saveErrors.capture(paymentFailure)
-        throw new Error('メニューは保存されましたが、お支払いの方法を保存できませんでした。もう一度押してください。')
+        throw new Error('メニューは保存されましたが、お支払いの方法・会い方を保存できませんでした。もう一度押してください。')
       }
       setCreatedMenuNeedingFollowUp(null)
       notifySaved(editTarget ? 'メニューを保存しました' : publish ? 'メニューを公開しました' : '下書きを保存しました')
@@ -1112,6 +1119,9 @@ export default function MenuFormV8() {
             )}
           </Card>
 
+          {/* 会い方（B7・ELruS）：担当スタッフと予約のきまりの間。 */}
+          <MeetingModeCard state={meeting} readOnly={Boolean(editTarget && !canEdit)} />
+
           {/* ③ 予約のきまり */}
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="予約のきまり" meta="空ならお店全体のきまり（予約のルール）を使います" />
@@ -1151,6 +1161,9 @@ export default function MenuFormV8() {
               </Button>
             </div>
           </Card>
+
+          {/* お支払い（B1・CnV1I）：予約のきまりのすぐ下に、独立した段で。 */}
+          <BookingMenuPaymentCard payment={payment} deposit={deposit} price={basePrice.trim() === '' ? null : Number(basePrice) || 0} readOnly={Boolean(editTarget && !canEdit)} />
 
           {/* ④ そのほか（受け方・予約を受けたとき・設備）と お支払い。絵 QqER7・v5L19Z は白い段に白い小段を積む。 */}
           <Card variant="form" gap="normal">
@@ -1271,9 +1284,6 @@ export default function MenuFormV8() {
               {resourceMessage && <p role="status" className="text-ink-secondary text-sm">{resourceMessage}</p>}
             </Card>
 
-            {/* 絵 QqER7・mauOC：いつもの方法を使う／このメニューだけ変える（B-305）。決済をつないでいない店は 1 行の案内。 */}
-            <CardHeader size="stacked" title="お支払い" />
-            <MenuPaymentFields state={payment} name="menu" price={basePrice.trim() === '' ? null : Number(basePrice) || 0} readOnly={Boolean(editTarget && !canEdit)} />
           </Card>
 
           {saveError && (

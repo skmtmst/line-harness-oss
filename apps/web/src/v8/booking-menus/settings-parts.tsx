@@ -51,8 +51,10 @@ export const V8_TABS = [
   { key: 'holidays', label: '休業日', node: 'KRgTQ' },
   { key: 'rules', label: '予約のルール', node: 'x1OZS6' },
   { key: 'staff', label: '担当スタッフ', node: 'VLEaj' },
-  { key: 'channels', label: '予約経路', node: 'ZyDd6' },
-  { key: 'payments', label: 'お支払い', node: 'T91bV' },
+  /* 8 つのタブ（B1・FcGmv「予約設定のタブ列を 8 つにそろえる」）。順番は変えない。 */
+  { key: 'payments', label: 'お支払い', node: 'FcGmv' },
+  { key: 'tickets', label: '回数券・月謝', node: 'FcGmv' },
+  { key: 'channels', label: '予約経路の連携', node: 'ZyDd6' },
 ] as const
 export type V8TabKey = (typeof V8_TABS)[number]['key']
 export const V8_TAB_KEYS = new Set<string>(V8_TABS.map((tab) => tab.key))
@@ -63,7 +65,8 @@ export const V8_TAB_NODE: Record<V8TabKey, string> = {
   rules: 'x1OZS6',
   staff: 'VLEaj',
   channels: 'ZyDd6',
-  payments: 'T91bV',
+  payments: 'FcGmv',
+  tickets: 'FcGmv',
 }
 export function previewRange(): { from: string; to: string } {
   const now = new Date()

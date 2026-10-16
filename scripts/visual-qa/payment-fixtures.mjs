@@ -10,7 +10,7 @@
 export const PAYMENT_CONFIG = { mode: 'online', provider: 'stripe', holdMinutes: 10, keyConfigured: true, testMode: true }
 
 export const PAYMENT_CONNECTION = {
-  connected: true, testMode: true, accountIdTail: '3kPq', connectedAt: '2026-10-15T12:40:00.000Z',
+  connected: true, testMode: true, accountIdTail: '3kPq', connectedAt: '2026-10-16T00:12:00.000Z',
   dashboardUrl: 'https://dashboard.stripe.com/test/payments',
 }
 
@@ -75,8 +75,26 @@ export const ENTITLEMENT_HISTORY = [
   ev('ee-1', 'grant', '2026-09-01T01:00:00.000Z', null, 6, '紙の回数券の引き継ぎ', '店長 田中'),
 ]
 
+/* ③-2 第1波（B1・B5・B7）の見本。gap1 の口と、口の案（api-gap-draft）の形。 */
+export const CANCELLATION_POLICY = { enabled: true, tiers: [{ beforeHours: 24, percent: 0 }, { beforeHours: 0, percent: 50 }], noShowPercent: 100, version: 2 }
+export const CANCELLATION_OPTIONS = { cardRequiredFor: 'all', chargeMode: 'manual', version: 1 }
+export const DEPOSIT_RULE = { kind: 'percent', value: 30, conditions: { always: true, minPeople: null, weekdays: null, timeBand: null }, version: 1 }
+export const CALENDAR_SWITCH = { readEnabled: true, writeEnabled: false, version: 3, effectiveReadEnabled: true, effectiveWriteEnabled: false, connected: true, futureEventCount: 12 }
+
 /** GET の口。返す物が無い道は undefined。 */
 export function paymentGet(pathname, query, { restaurantTables = [] } = {}) {
+  if (pathname === '/api/booking/admin/cancellation-policy') return { success: true, data: CANCELLATION_POLICY }
+  if (pathname === '/api/booking/admin/cancellation-options') return { success: true, data: CANCELLATION_OPTIONS }
+  if (pathname === '/api/booking/admin/deposit-rules') return { success: true, data: DEPOSIT_RULE }
+  if (/^\/api\/booking\/admin\/menus\/[^/]+\/deposit$/.test(pathname)) return { success: true, data: { ...DEPOSIT_RULE, inherit: false, conditions: { always: false, minPeople: 4, weekdays: [5, 6], timeBand: 'dinner' } } }
+  if (/^\/api\/booking\/admin\/bookings\/[^/]+\/charges$/.test(pathname)) return { success: true, data: { testMode: true, quote: { freeUntil: '2026-11-19T05:00:00.000Z', feeNow: 4200, feeNoShow: 8400, text: '11/19（木）14:00 まで無料／それ以降 料金の 50%（¥4,200）／連絡なしの欠席 100%（¥8,400）', policyAcceptedRequired: true }, charges: [{ id: 'chg-1', booking_id: 'bk-1', line_account_id: 'visual-qa-account', kind: 'cancellation_fee', amount: 4200, status: 'pending', version: 1, actor_staff_id: null, reason: null, test_mode: 1 }] } }
+  if (/^\/api\/booking\/admin\/bookings\/[^/]+\/payment-method$/.test(pathname)) return { success: true, data: { brand: 'Visa', last4: '4242', registeredAt: '2026-11-02T01:00:00.000Z' } }
+  if (/^\/api\/booking\/admin\/bookings\/[^/]+\/group$/.test(pathname)) return { success: true, data: { ownerName: '山田 花子', members: [
+    { bookingId: 'bk-g1', personName: 'チョコ', menuName: '爪切り', staffName: 'Kenta', startsAt: '2026-10-01T04:30:00.000Z', endsAt: '2026-10-01T04:45:00.000Z', status: 'confirmed' },
+    { bookingId: 'bk-g2', personName: 'マロン', menuName: 'トリミング（中型犬）', staffName: '佐々木', startsAt: '2026-10-01T04:00:00.000Z', endsAt: '2026-10-01T05:30:00.000Z', status: 'confirmed' },
+  ] } }
+  if (pathname === '/api/booking/admin/calendar-sync' || /^\/api\/booking\/admin\/staff\/[^/]+\/calendar-sync$/.test(pathname)) return { success: true, data: CALENDAR_SWITCH }
+  if (/^\/api\/booking\/admin\/(staff|menus)\/[^/]+\/meeting-url$/.test(pathname)) return { success: true, data: { url: pathname.includes('/staff/') ? 'https://meet.google.com/abc-defg-hij' : 'https://zoom.us/j/81234567890', version: 1 } }
   if (pathname === '/api/booking/admin/payment-config') return { success: true, data: PAYMENT_CONFIG }
   if (pathname === '/api/booking/admin/payments/export') return { __csv: '\uFEFF記録ID,予約ID,お客さま,予約日時,メニュー,金額,状態,方法,作成日時\npay-1,bk-1,山田 花子,2026-10-18 18:00,ディナー,8800,paid,online,2026-10-15 21:52\n' }
   if (pathname === '/api/booking/admin/payment-connection') return { success: true, data: PAYMENT_CONNECTION }
@@ -99,6 +117,14 @@ export function paymentGet(pathname, query, { restaurantTables = [] } = {}) {
 
 /** 書き込みの口（保存はしない。送った値を当てて返す）。 */
 export function paymentWrite(method, pathname, body) {
+  if (method === 'PUT' && pathname === '/api/booking/admin/cancellation-policy') return { success: true, data: { ...CANCELLATION_POLICY, ...body, version: (body?.expectedVersion ?? 0) + 1 } }
+  if (method === 'PUT' && pathname === '/api/booking/admin/cancellation-options') return { success: true, data: { ...CANCELLATION_OPTIONS, ...body, version: (body?.expectedVersion ?? 0) + 1 } }
+  if (method === 'PUT' && (pathname === '/api/booking/admin/deposit-rules' || /\/deposit$/.test(pathname))) return { success: true, data: { ...DEPOSIT_RULE, ...body, version: (body?.expectedVersion ?? 0) + 1 } }
+  if (method === 'POST' && /^\/api\/booking\/admin\/bookings\/[^/]+\/charges$/.test(pathname)) return { success: true, data: { id: 'chg-1', booking_id: 'bk-1', line_account_id: 'visual-qa-account', kind: 'cancellation_fee', amount: body?.amount ?? 4200, status: 'succeeded', version: 2, actor_staff_id: 'staff-1', reason: null, test_mode: 1 } }
+  if (method === 'POST' && /^\/api\/booking\/admin\/charges\/[^/]+\/(waive|refund)$/.test(pathname)) return { success: true, data: { id: 'chg-1', status: pathname.endsWith('waive') ? 'waived' : 'refunded', version: 3 } }
+  if (method === 'POST' && /\/group\/cancel$/.test(pathname)) return { success: true, data: { cancelled: 2 } }
+  if (method === 'PUT' && (pathname === '/api/booking/admin/calendar-sync' || /\/calendar-sync$/.test(pathname))) return { success: true, data: { ...CALENDAR_SWITCH, ...body, version: (body?.expectedVersion ?? 0) + 1 } }
+  if (method === 'PUT' && /\/meeting-url$/.test(pathname)) return { success: true, data: { url: body?.url ?? null, version: (body?.expectedVersion ?? 0) + 1 } }
   if (method === 'PUT' && pathname === '/api/booking/admin/payment-config') return { success: true, data: { ...PAYMENT_CONFIG, ...body } }
   if ((method === 'PUT' || method === 'DELETE') && /^\/api\/booking\/admin\/menus\/[^/]+\/payment$/.test(pathname)) return { success: true, data: method === 'DELETE' ? { cleared: true } : { ...PAYMENT_CONFIG, ...body } }
   if (method === 'PUT' && /^\/api\/(restaurant-test\/menus|events\/admin\/events)\/[^/]+\/payment$/.test(pathname)) return { success: true, data: { mode: body?.mode ?? null, version: (body?.expectedVersion ?? 0) + 1 } }

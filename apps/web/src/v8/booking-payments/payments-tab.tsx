@@ -12,10 +12,11 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifySaved } from '@/components/shared/toast'
 import { formatListTimestamp } from '@/lib/format'
 import { ApiError, bookingApi, type BookingPaymentAdminConfig } from '@/lib/api'
-import { bookingPaymentAdminApi, type BookingPaymentMode, type StripeConnection } from '@/lib/api-booking-payment-admin'
+import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode, type StripeConnection } from '@/lib/api-booking-payment-admin'
 import { AccountIcon, SkeletonRows, StateCard, useV8TabEdit } from '../booking-menus/tabs/shared'
 import settings from '../booking-menus/settings.module.css'
 import { providerFor } from './labels'
+import { CancellationSection, ConnectionCard, DepositSection, cancellationSaveError, useCancellationSettings } from './cancellation'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import TestModeNote from '@/components/shared/test-mode-note'
 import PaymentRecords from './records'
@@ -63,6 +64,8 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
   const [saveError, setSaveError] = useState<string | null>(null)
   const generation = useRef(0)
   const preparing = usePreparingDialog()
+  const cancellation = useCancellationSettings(accountId)
+  const [connecting, setConnecting] = useState(false)
 
   const load = useCallback(async () => {
     const mine = ++generation.current
@@ -85,19 +88,37 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
   useEffect(() => { void load() }, [load])
 
   const savedMode = normalMode(config?.mode)
-  const dirty = status === 'ready' && config !== null && (mode !== savedMode || hold !== config.holdMinutes)
+  const dirty = (status === 'ready' && config !== null && (mode !== savedMode || hold !== config.holdMinutes)) || cancellation.dirty
   const link = connectionFrom(config, connection)
   useEffect(() => { if (status === 'ready') onConnectedChange?.(link.connected) }, [status, link.connected, onConnectedChange])
+
+  /* 決済をつなぐ：Stripe の試験の接続の画面へ（本番の鍵は入れない）。口が無ければ共通の準備中。 */
+  async function connect() {
+    setConnecting(true)
+    try {
+      const response = await bookingPaymentAdminApi.authorizeConnection(accountId)
+      window.location.assign(response.data.authorizationUrl)
+    } catch (cause) {
+      if (isNotReadyError(cause)) preparing.open('決済をつなぐ')
+      else setSaveError('決済をつなぐ画面を開けませんでした。もう一度お試しください。')
+    } finally {
+      setConnecting(false)
+    }
+  }
 
   async function save() {
     if (!config) return
     setSaving(true)
     setSaveError(null)
     try {
-      const response = await bookingApi.savePaymentConfig(accountId, { mode, provider: providerFor(mode), holdMinutes: hold })
-      setConfig({ ...config, ...response.data })
+      if (mode !== savedMode || hold !== config.holdMinutes) {
+        const response = await bookingApi.savePaymentConfig(accountId, { mode, provider: providerFor(mode), holdMinutes: hold })
+        setConfig({ ...config, ...response.data })
+      }
+      await cancellation.save()
       notifySaved('お支払いの設定を保存しました')
     } catch (cause) {
+      if (cancellation.dirty && cause instanceof ApiError && (cause.status === 409 || cause.status === 400)) { setSaveError(cancellationSaveError(cause)); return }
       setSaveError(cause instanceof ApiError && cause.status === 403
         ? 'この設定を変える権限がありません。'
         : mode === 'customer_choice' && cause instanceof ApiError && cause.status === 400
@@ -114,7 +135,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
     subject: 'お支払いの設定への変更',
     saveDisabled: !canEdit || view !== 'settings',
     onSave: () => void save(),
-    onReset: () => { if (config) { setMode(savedMode); setHold(config.holdMinutes); setSaveError(null) } },
+    onReset: () => { if (config) { setMode(savedMode); setHold(config.holdMinutes); setSaveError(null) } cancellation.reset() },
   })
 
   if (view === 'records') return <PaymentRecords accountId={accountId} canEdit={canEdit} />
@@ -130,36 +151,10 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
   return (
     <div className={settings.tabStack} data-design={connected ? 'Payments' : 'PaymentsNotConnected'}>
       {saveError ? <Notice tone="danger" role="alert">{saveError}</Notice> : null}
-      <section className={settings.section} aria-labelledby="payments-provider-heading">
-        <div className={styles.headRow}>
-          <h2 id="payments-provider-heading" className={settings.sectionTitle}>決済サービス</h2>
-          <HelpTip label="決済サービスの説明">お客さまのカード番号は Stripe の画面で入れてもらいます。お店にも musubo にも残りません。</HelpTip>
-        </div>
-        <div className={styles.providerRow}>
-          <span className={styles.providerMark} aria-hidden="true">S</span>
-          <div className={styles.providerText}>
-            <span className={styles.providerName}>
-              Stripe
-              {connected ? <StatusBadge tone="success" size="compact">つながっている</StatusBadge> : null}
-              {connected && testMode ? <TestModeNote size="compact">{null}</TestModeNote> : null}
-            </span>
-            <span className={styles.providerMeta}>
-              {connected
-                ? <>{link.accountIdTail ? `アカウント acct_••••${link.accountIdTail}` : 'アカウント：決済サービスの設定から読みます'}{link.connectedAt ? `・${formatListTimestamp(link.connectedAt)} につないだ` : ''}</>
-                : 'まだつないでいません。つなぐと、予約のときにカードで先に払ってもらえます'}
-            </span>
-          </div>
-          <div className={styles.providerActions}>
-            {connected ? <Button href={link.dashboardUrl ?? (testMode ? 'https://dashboard.stripe.com/test/payments' : 'https://dashboard.stripe.com/payments')} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} aria-hidden="true" />Stripe の管理画面を開く</Button> : null}
-            {canEdit ? (connected
-              ? <Button onClick={() => preparing.open('Stripe のつなぎ直し')}>つなぎ直す</Button>
-              : <Button variant="primary" onClick={() => preparing.open('Stripe をつなぐ')}><Plug size={15} aria-hidden="true" />Stripe をつなぐ</Button>) : null}
-          </div>
-        </div>
-        {connected
-          ? (testMode ? <Notice tone="warn" icon={<AlertTriangle size={16} aria-hidden="true" />}>試験モードです。本当の請求は起きません。本番に切り替えるのは、本部の承認のあとです。</Notice> : null)
-          : <Notice tone="warn" icon={<AlertTriangle size={16} aria-hidden="true" />}>つなぐまでは、お客さまはお店で払うだけです。つないだ後も最初は試験モードで、本番は本部の承認のあとです。</Notice>}
-      </section>
+      {/* 絵 FcGmv・i2iv4g（B1）：決済のつなぎ → キャンセル料 → デポジット。つなぐのは Stripe の試験の接続（組3 の口）。 */}
+      <ConnectionCard connected={connected} testMode={testMode} checkedAt={link.connectedAt ? formatListTimestamp(link.connectedAt) : null} canEdit={canEdit} busy={connecting} onConnect={() => void connect()} />
+      <CancellationSection state={cancellation} connected={connected} testMode={testMode} canEdit={canEdit} />
+      <DepositSection state={cancellation} connected={connected} canEdit={canEdit} />
 
       <section className={settings.section} aria-labelledby="payments-method-heading">
         <div className={styles.headRow}>
