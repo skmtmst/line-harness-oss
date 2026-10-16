@@ -1339,7 +1339,7 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner'), inpu
   try { registration=await validateRegistrationOptions(c.env.DB,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,parsed.value,c.get('staff').id); }
   catch(error) { if(error instanceof RegistrationOptionsError) return inputError(c, {success:false,error:'タグ・親・担当者の指定を確認してください',code:error.code}, error.status, []); throw error; }
   const baseUrl = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
-  const prepared = await prepareLineConnection({ ...parsed.value, baseUrl });
+  const prepared = await prepareLineConnection({ ...parsed.value, baseUrl, acceptedWebhookUrls: acceptedWebhookUrls(c.env, `${baseUrl}/webhook`) });
   if (!prepared.success || !prepared.channelAccessToken) {
     return c.json({
       success: true,
@@ -1375,7 +1375,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
   try { registration=await validateRegistrationOptions(c.env.DB,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,parsed.value,c.get('staff').id); }
   catch(error) { if(error instanceof RegistrationOptionsError) return inputError(c, {success:false,error:'タグ・親・担当者の指定を確認してください',code:error.code}, error.status, []); throw error; }
   const baseUrl = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
-  const prepared = await prepareLineConnection({ ...parsed.value, baseUrl });
+  const prepared = await prepareLineConnection({ ...parsed.value, baseUrl, acceptedWebhookUrls: acceptedWebhookUrls(c.env, `${baseUrl}/webhook`) });
   if (!prepared.success || !prepared.channelAccessToken || !prepared.bot || !prepared.liffId) {
     return inputError(c, {
       success: false,
