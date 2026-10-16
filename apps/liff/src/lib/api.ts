@@ -294,7 +294,16 @@ export type CreateEventBookingResponse =
   | { id: string; status: string }
   | { waitlisted: true; slot_id: string };
 
+/**
+ * 欠席の振替（B3）。口（Worker）は Codex の gap2 が作る。形は B3 の「データと API の形の案」。
+ * makeup が無い予約は、今までどおり欠席の入口を出さない。
+ */
+export interface MakeupCredit { id: string; expires_at: string; status: 'open' | 'used' | 'expired' | 'revoked'; source_starts_at?: string | null; source_name?: string | null }
+export interface MakeupOption { slot_id: string; event_id: string; starts_at: string; ends_at: string; name: string; remaining: number | null; full: boolean }
+export interface EventBookingMakeup { enabled: boolean; /** 振替がもらえるときの期限（この欠席なら）。 */ valid_until?: string | null; /** 欠席の連絡の締め（これを過ぎると振替の対象外）。 */ cutoff_at: string | null; plan_label?: string | null }
+
 export interface EventBookingMine {
+  makeup?: EventBookingMakeup;
   /** 従来の予約行は未指定。待ちの行は source: 'waitlist'。 */
   source?: 'booking' | 'waitlist';
   queue_position?: number | null;
@@ -487,6 +496,13 @@ export const api = {
     ),
   myEventBookings: (tab: 'upcoming' | 'past') =>
     get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
+  /** 欠席する。締めの内なら振替が 1 回付く（credit）。付かないときは reason_if_none に理由。 */
+  eventAbsence: (bookingId: string, key: string) =>
+    post<{ credit: MakeupCredit | null; reason_if_none?: string }>(`/api/liff/events/bookings/${encodeURIComponent(bookingId)}/absence`, {}, { 'Idempotency-Key': key }),
+  makeupCredits: () => get<{ credits: MakeupCredit[] }>('/api/liff/events/makeup-credits'),
+  makeupOptions: (id: string, week: string) => get<{ options: MakeupOption[] }>(`/api/liff/events/makeup-credits/${encodeURIComponent(id)}/options?week=${encodeURIComponent(week)}`),
+  useMakeup: (id: string, eventSlotId: string, key: string) =>
+    post<{ id: string; status: string }>(`/api/liff/events/makeup-credits/${encodeURIComponent(id)}/use`, { eventSlotId }, { 'Idempotency-Key': key }),
   myEventWaitlist: () => get<{ items: EventWaitlistMine[] }>('/api/liff/events/me/waitlist'),
   myEventWaitlistEntry: (waitlistId: string) =>
     get<EventWaitlistMine>(`/api/liff/events/me/waitlist/${encodeURIComponent(waitlistId)}`),

@@ -4,6 +4,13 @@ import styles from './Icon.module.css';
 // 見た目は 24x24・線・角丸 (lucide の決まり) でそろえる。絵文字は使わない。
 
 const PATHS = {
+  /** 振替・繰り返し */
+  repeat: [
+    <path key="a" d="m17 2 4 4-4 4" />,
+    <path key="b" d="M3 11v-1a4 4 0 0 1 4-4h14" />,
+    <path key="c" d="m7 22-4-4 4-4" />,
+    <path key="d" d="M21 13v1a4 4 0 0 1-4 4H3" />,
+  ],
   'qr-code': [
     <rect key="a" width="5" height="5" x="3" y="3" rx="1" />,
     <rect key="b" width="5" height="5" x="16" y="3" rx="1" />,

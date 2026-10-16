@@ -690,9 +690,32 @@ const server = createServer(async (req, res) => {
 
   // ---- イベント ----
   if (method === 'GET' && pathname === '/api/liff/events/me') {
+    if (state.features.includes('lesson')) {
+      /* ③-2 第2弾 B3：振替を使う教室（rx3FL・kzE16）。 */
+      const lesson = (id, starts) => ({ ...QA_EVENT_BOOKING, id, event_name: '朝ヨガ（初級）', venue_name: 'スタジオ A', status: 'confirmed', cancel_deadline_hours_before: null, slot_starts_at: starts, slot_ends_at: new Date(Date.parse(starts) + 3_600_000).toISOString(), makeup: { enabled: true, cutoff_at: new Date(Date.parse(starts) - 3 * 3_600_000).toISOString(), plan_label: '月謝', valid_until: '2026-12-14T14:59:59.000Z' } });
+      json(res, 200, { items: [lesson('qa-lesson-1', '2026-11-14T00:00:00.000Z'), lesson('qa-lesson-2', '2026-11-21T00:00:00.000Z')] });
+      return;
+    }
     json(res, 200, { items: [QA_EVENT_BOOKING, QA_EVENT_WAITLIST] });
     return;
   }
+  // ---- 欠席の振替（③-2 第2弾 B3）----
+  if (method === 'GET' && pathname === '/api/liff/events/makeup-credits') {
+    json(res, 200, { credits: state.features.includes('makeup') ? [{ id: 'qa-credit-1', status: 'open', expires_at: '2026-12-14T14:59:59.000Z', source_starts_at: '2026-11-14T00:00:00.000Z', source_name: '朝ヨガ' }] : [] });
+    return;
+  }
+  if (method === 'GET' && /^\/api\/liff\/events\/makeup-credits\/[^/]+\/options$/.test(pathname)) {
+    const at = (day, hm) => `2026-11-${day}T${hm}:00.000Z`;
+    json(res, 200, { options: [
+      { slot_id: 'qa-ms-1', event_id: 'qa-event-1', starts_at: at('18', '01:00'), ends_at: at('18', '02:00'), name: 'ヨガ（初級）', remaining: 3, full: false },
+      { slot_id: 'qa-ms-2', event_id: 'qa-event-1', starts_at: at('18', '10:00'), ends_at: at('18', '11:00'), name: '朝ヨガ（オンライン）', remaining: 5, full: false },
+      { slot_id: 'qa-ms-3', event_id: 'qa-event-1', starts_at: at('18', '11:30'), ends_at: at('18', '12:30'), name: 'ヨガ（中級）', remaining: 0, full: true },
+      { slot_id: 'qa-ms-4', event_id: 'qa-event-1', starts_at: at('19', '01:00'), ends_at: at('19', '02:00'), name: 'ヨガ（初級）', remaining: 2, full: false },
+    ] });
+    return;
+  }
+  if (method === 'POST' && /^\/api\/liff\/events\/makeup-credits\/[^/]+\/use$/.test(pathname)) { json(res, 200, { id: 'qa-event-booking-new', status: 'confirmed' }); return; }
+  if (method === 'POST' && /^\/api\/liff\/events\/bookings\/[^/]+\/absence$/.test(pathname)) { json(res, 200, { credit: { id: 'qa-credit-1', status: 'open', expires_at: '2026-12-14T14:59:59.000Z', source_starts_at: '2026-11-14T00:00:00.000Z', source_name: '朝ヨガ' } }); return; }
   // 自分のキャンセル待ち (qVdiX の「順番 2 番目」「キャンセル待ちをやめる」)。
   if (method === 'GET' && pathname === '/api/liff/events/me/waitlist') {
     json(res, 200, { items: [QA_EVENT_WAITLIST_MINE] });
