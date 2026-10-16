@@ -77,6 +77,7 @@ import {
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useBroadcastAb } from '@/v8/broadcast-ab/use-ab'
+import { broadcastAbApi } from '@/v8/broadcast-ab/api'
 import BroadcastAbTabs from '@/v8/broadcast-ab/tabs'
 import BroadcastAbSettings, { abConfirmLine } from '@/v8/broadcast-ab/settings'
 import Notice from '@/components/shared/notice'
@@ -2030,8 +2031,8 @@ export default function BroadcastForm({
       // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (!saved) return
-      /* G1：B 案と A/B の設定を送る（送る・承認の依頼の前に）。 */
-      await ab.persist(saved.id)
+      /* G1：A・B 案と A/B の設定を送る（送る・承認の依頼の前に）。版は配信の lock_version。 */
+      const abVersion = await ab.persist(saved.id, Number((saved as { version?: number }).version ?? 0), bubbles)
       // 承認が要るときは、保存のあと承認の依頼まで続ける。依頼までが1つの操作。
       if (needsApproval && !needsApprovalSingle) {
         const requested = await api.broadcasts.approval.request(saved.id, {
@@ -2045,6 +2046,15 @@ export default function BroadcastForm({
       }
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (currentStep && sendMode === 'now' && (!needsApproval || needsApprovalSingle)) {
+        /* G1：A/B の配信は組2 の今の段では模擬送信だけ（testMode。本物の LINE には送らない）。 */
+        if (ab.enabled && audienceCount !== null) {
+          const started = await broadcastAbApi.startMock(saved.id, abVersion, audienceCount, typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `ab-${Date.now()}`)
+          if ((selectedAccountIdRef.current || null) !== requestAccountId) return
+          if (!started.success) { setError('A/B の試しを始められませんでした'); return }
+          setConfirmOpen(false)
+          onSuccess(saved)
+          return
+        }
         const sent = await api.broadcasts.send(saved.id, needsApprovalSingle ? { confirmedRecipientCount: Number(approvalCountInput) } : undefined)
         if ((selectedAccountIdRef.current || null) !== requestAccountId) return
         if (!sent.success) { setError(sent.error); return }

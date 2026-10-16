@@ -111,6 +111,7 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend }: { broadc
         <span className={styles.spacer} />
         {result ? <span className={styles.note}>{metricLine}</span> : null}
       </div>
+      {result?.testMode ? <p className={styles.note}>今は試しの送信です（本物の LINE には送っていません）。</p> : null}
       {ab.state === 'error' ? (
         <Notice tone="danger" action={<Button onClick={() => void ab.reload()}>もう一度試す</Button>}>結果を読めませんでした。</Notice>
       ) : !result ? <p className={styles.note} role="status">読み込んでいます…</p> : (

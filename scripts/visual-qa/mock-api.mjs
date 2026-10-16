@@ -2233,15 +2233,15 @@ function broadcastAbRead(method, pathname) {
     { key: 'A', label: '写真 1 枚', sent: 405, failed: 0, clicks: 25, clickRate: 0.062, bookings: 3, purchases: null, purchaseAmount: null },
     { key: 'B', label: 'カルーセル 3 枚', sent: 405, failed: 0, clicks: Math.round(405 * bClick), clickRate: bClick, bookings: bBook, purchases: null, purchaseAmount: null },
   ]
-  if (m[1] === 'broadcast-2') return { success: true, data: { status: 'decided', metric: 'click', decideAfterMinutes: 240, variants: variants(0.098, 7), winner: 'B', confidence: 0.98, decideAt: '2026-11-20T05:00:00.000Z', remainder: { count: 3240, scheduledAt: '2026-11-20T05:00:00.000Z', sentAt: '2026-11-20T05:00:00.000Z' } } }
-  if (m[1] === 'broadcast-3') return { success: true, data: { status: 'undecided', metric: 'click', decideAfterMinutes: 240, variants: variants(0.066, 4), winner: null, confidence: 0.61, decideAt: '2026-11-20T05:00:00.000Z', chooseUntil: '2026-11-21T05:00:00.000Z', remainder: { count: 3240, scheduledAt: null, sentAt: null } } }
+  if (m[1] === 'broadcast-2') return { success: true, data: { status: 'decided', testMode: true, metric: 'click', decideAfterMinutes: 240, variants: variants(0.098, 7), winner: 'B', confidence: 0.98, decideAt: '2026-11-20T05:00:00.000Z', remainder: { count: 3240, scheduledAt: '2026-11-20T05:00:00.000Z', sentAt: '2026-11-20T05:00:00.000Z' } } }
+  if (m[1] === 'broadcast-3') return { success: true, data: { status: 'undecided', testMode: true, metric: 'click', decideAfterMinutes: 240, variants: variants(0.066, 4), winner: null, confidence: 0.61, decideAt: '2026-11-20T05:00:00.000Z', chooseUntil: '2026-11-21T05:00:00.000Z', remainder: { count: 3240, scheduledAt: null, sentAt: null } } }
   return { success: true, data: null }
 }
 function broadcastAbWrite(method, pathname) {
-  if (method === 'PUT' && /^\/api\/broadcasts\/[^/]+\/ab-test$/.test(pathname)) return { version: 1 }
-  if (method === 'DELETE' && /^\/api\/broadcasts\/[^/]+\/ab-test$/.test(pathname)) return { removed: true }
-  if (method === 'PUT' && /^\/api\/broadcasts\/[^/]+\/variants\/[AB]$/.test(pathname)) return { version: 1 }
-  if (method === 'POST' && /^\/api\/broadcasts\/[^/]+\/ab-test\/choose$/.test(pathname)) return { status: 'decided' }
+  if (method === 'PUT' && /^\/api\/broadcasts\/[^/]+\/ab-test$/.test(pathname)) return { version: 4, testMode: true }
+  if (method === 'DELETE' && /^\/api\/broadcasts\/[^/]+\/ab-test$/.test(pathname)) return { deleted: true, version: 4 }
+  if (method === 'PUT' && /^\/api\/broadcasts\/[^/]+\/variants\/[AB]$/.test(pathname)) return { key: pathname.slice(-1), version: 3 }
+  if (method === 'POST' && /^\/api\/broadcasts\/[^/]+\/ab-test\/choose$/.test(pathname)) return { variant: 'A', testMode: true }
   return null
 }
 
@@ -2948,7 +2948,10 @@ const GAPUI_C_MCP_LOGS = [
 ]
 function gapuiCAiSettings() {
   const mode = process.env.GAPUI_AI_MODE || 'draft_only'
-  return { mode, suspendedReason: mode === 'suspended' ? 'provider' : null, publishedQaCount: 18, draftQaCount: 1, version: 4 }
+  return { mode, suspendedReason: mode === 'suspended' ? 'provider' : null, publishedQaCount: 18, draftQaCount: 1, version: 4, autoReplyAvailable: false }
+}
+function gapuiCQaRow(row) {
+  return { id: row.id, account_id: 'visual-qa-account', questions_json: JSON.stringify(row.questions), answer_messages_json: JSON.stringify([{ type: 'text', text: row.answerText }]), status: row.status, version: row.version, updated_at: row.updatedAt }
 }
 function gapuiCRead(method, pathname, query) {
   if (method !== 'GET') return null
@@ -2956,7 +2959,8 @@ function gapuiCRead(method, pathname, query) {
   if (pathname === '/api/qa-entries') {
     const q = query.get('q') ?? '', status = query.get('status') ?? ''
     const items = GAPUI_C_QA.filter((row) => (!status || row.status === status) && (!q || row.questions.some((text) => text.includes(q)) || row.answerText.includes(q)))
-    return { success: true, data: { items, total: items.length } }
+    /* 組2 の形：行は questions_json・answer_messages_json、件数は外側の total（20 件ずつ）。 */
+    return { success: true, data: items.map(gapuiCQaRow), total: items.length, nextOffset: null }
   }
   if (pathname === '/api/ai-answer-logs') {
     const action = query.get('action') ?? ''
@@ -2986,13 +2990,13 @@ function gapuiCWrite(method, pathname, query) {
   }
   if (method === 'PUT' && pathname === '/api/ai-settings') return { ...gapuiCAiSettings(), version: 5 }
   if (method === 'POST' && pathname === '/api/ai-settings/test') return { qaTitle: '駐車場はありますか', handoffReason: null }
-  if (method === 'POST' && pathname === '/api/qa-entries') return { ...GAPUI_C_QA[4], id: 'qa-new', source: 'manual' }
+  if (method === 'POST' && pathname === '/api/qa-entries') return gapuiCQaRow({ ...GAPUI_C_QA[4], id: 'qa-new', status: 'draft' })
   if (method === 'POST' && pathname === '/api/qa-entries/import') return { jobId: 'qa-import-1' }
   const qa = /^\/api\/qa-entries\/([^/]+)(?:\/(publish|stop))?$/.exec(pathname)
   if (qa && (method === 'PUT' || method === 'POST' || method === 'DELETE')) {
     const row = GAPUI_C_QA.find((item) => item.id === qa[1]) ?? GAPUI_C_QA[0]
-    if (method === 'DELETE') return { deleted: true }
-    return { ...row, status: qa[2] === 'publish' ? 'published' : qa[2] === 'stop' ? 'stopped' : row.status, version: row.version + 1 }
+    if (method === 'DELETE') return { version: row.version + 1, status: 'stopped' }
+    return { status: qa[2] === 'publish' ? 'published' : qa[2] === 'stop' ? 'stopped' : 'draft', version: row.version + 1 }
   }
   if (method === 'POST' && pathname === '/api/mcp-connections') {
     return { connection: { ...GAPUI_C_MCP[0], id: 'mcp-new', level: 'read', lastUsedAt: null }, url: 'https://api.musubo.app/mcp/acc_7Q2K', key: 'mcp_live_7c1e4b2a9d0f3f9a' }

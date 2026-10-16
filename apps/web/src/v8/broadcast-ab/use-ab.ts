@@ -24,11 +24,13 @@ export function useBroadcastAb() {
   const removeB = useCallback(() => { setB(null); setTab('A'); setEnabled(false) }, [])
 
   /* 保存のあと：B 案と設定を口へ送る。A/B を外したら設定を消す。 */
-  const persist = useCallback(async (broadcastId: string) => {
-    if (b && enabled) {
-      await broadcastAbApi.saveVariant(broadcastId, 'B', b)
-      await broadcastAbApi.saveTest(broadcastId, settings)
-    }
+  /* 版は配信の lock_version。案・設定を保存するたびに新しい版が返るので、続けて渡す。返り値は最後の版。 */
+  const persist = useCallback(async (broadcastId: string, version: number, aBubbles: BroadcastBubble[]): Promise<number> => {
+    if (!b || !enabled) return version
+    const a = await broadcastAbApi.saveVariant(broadcastId, 'A', aBubbles, version)
+    const bRes = await broadcastAbApi.saveVariant(broadcastId, 'B', b, a.data.version)
+    const test = await broadcastAbApi.saveTest(broadcastId, { ...settings, expectedVersion: bRes.data.version })
+    return test.data.version
   }, [b, enabled, settings])
 
   return { tab, setTab, b, setB, hasB: b !== null, enabled: enabled && b !== null, setEnabled, settings, setSettings, addB, removeB, persist }

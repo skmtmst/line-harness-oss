@@ -39,7 +39,9 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
-  const choices = permissions.modeChoices
+  /* 組2 の今の段では Q&A の自動応答は使えない（autoReplyAvailable:false）。選ぶ欄に出さない。 */
+  const autoUnavailable = settings?.autoReplyAvailable === false
+  const choices = autoUnavailable ? permissions.modeChoices.filter((choice) => choice !== 'auto_qa') : permissions.modeChoices
   const published = settings?.publishedQaCount ?? 0
 
   const close = () => { if (busy) return; setPending(null); setError('') }
@@ -103,7 +105,8 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
         data-design-node={mode === 'off' ? 'UbRQ4' : 'y4nixm'}
       >
         {MODE_NOTE[mode]}
-        {choosing && !choices.includes('auto_qa') && mode !== 'off' ? <span className={styles.ownerOnly}>自動で答えるのオンはオーナーだけが変えられます</span> : null}
+        {choosing && autoUnavailable ? <span className={styles.ownerOnly}>Q&A で自動で答えるは、まだ使えません（使えるようになったらお知らせします）</span> : null}
+        {choosing && !autoUnavailable && !choices.includes('auto_qa') && mode !== 'off' ? <span className={styles.ownerOnly}>自動で答えるのオンはオーナーだけが変えられます</span> : null}
         {choosing && choices.includes('auto_qa') && published === 0 ? <span className={styles.ownerOnly}>自動で答えるは、Q&A を 1 件以上公開すると選べます</span> : null}
       </Notice>
 

@@ -1,11 +1,7 @@
-import { fetchApi } from '@/lib/api'
+import { broadcastAbApi as gap2 } from '@/lib/api-gap2'
 import type { BroadcastBubble } from '@line-crm/shared'
 
-/*
- * G1 A/B テストの口（要件 G1-ab-test §3 の案）。本物は Codex の gap2 が作る途中なので、
- * 同じ道・同じ形の関数を画面側に置く（撮影は scripts/visual-qa/mock-api.mjs の見本）。
- * gap2 が lib に関数を足したら、この file はそれに置き換えて消す。
- */
+/* G1 A/B テストの口：組2（gap2）の lib/api-gap2 に合わせる画面側の形（契約 API-CONTRACT-GAP2 §G1）。 */
 
 export type AbMetric = 'click' | 'booking' | 'purchase'
 export type AbUndecided = 'stop' | 'send_a'
@@ -43,20 +39,50 @@ export type AbResult = {
   /** 決められなかったため A を送った（決まらないとき＝A を送る）。 */
   fallback?: boolean
   remainder: { count: number; scheduledAt: string | null; sentAt: string | null }
+  /** 組2 の今の段は模擬送信だけ（本物の LINE には送らない）。 */
+  testMode?: boolean
 }
 
 type Result<T> = { success: true; data: T }
-const write = (method: string, body: unknown, headers?: Record<string, string>) => ({ method, body: JSON.stringify(body), ...(headers ? { headers } : {}) })
 
+/** B 案の本文（今は文字の案だけ。組2 の口は text を受ける）。 */
+export function variantText(bubbles: BroadcastBubble[]): string {
+  return bubbles.filter((bubble) => bubble.type === 'text').map((bubble) => String(bubble.content.text ?? '')).join('\n\n').trim()
+}
+
+/*
+ * 組2（gap2）の口 `broadcastAbApi`（lib/api-gap2）を画面の形へ合わせる。
+ * 口が返さない値（決めるまでの時間・選ぶ期限・予約の数など）は null のまま出し、0 と言わない。
+ */
 export const broadcastAbApi = {
-  saveTest: (broadcastId: string, body: AbSettings & { expectedVersion?: number }) =>
-    fetchApi<Result<{ version: number }>>(`/api/broadcasts/${encodeURIComponent(broadcastId)}/ab-test`, write('PUT', body)),
-  removeTest: (broadcastId: string) =>
-    fetchApi<Result<{ removed: true }>>(`/api/broadcasts/${encodeURIComponent(broadcastId)}/ab-test`, { method: 'DELETE' }),
-  saveVariant: (broadcastId: string, key: 'A' | 'B', messages: BroadcastBubble[]) =>
-    fetchApi<Result<{ version: number }>>(`/api/broadcasts/${encodeURIComponent(broadcastId)}/variants/${key}`, write('PUT', { messages })),
-  result: (broadcastId: string) =>
-    fetchApi<Result<AbResult | null>>(`/api/broadcasts/${encodeURIComponent(broadcastId)}/ab-result`),
+  saveTest: (broadcastId: string, body: AbSettings & { expectedVersion: number }) =>
+    gap2.save(broadcastId, { ...body, metric: 'click', decideAfterMinutes: body.decideAfterMinutes as 60 | 120 | 240 | 480 | 1440 }),
+  removeTest: (broadcastId: string, expectedVersion: number) => gap2.remove(broadcastId, expectedVersion),
+  saveVariant: (broadcastId: string, key: 'A' | 'B', messages: BroadcastBubble[], expectedVersion: number) =>
+    gap2.saveVariant(broadcastId, key, variantText(messages), expectedVersion),
+  startMock: gap2.startMock,
+  result: async (broadcastId: string): Promise<Result<AbResult | null>> => {
+    const res = await gap2.result(broadcastId) as Result<Record<string, unknown> | null>
+    if (!res.success || !res.data) return { success: true, data: null }
+    const raw = res.data as Record<string, any>
+    const variants = (raw.variants ?? []) as Array<Record<string, any>>
+    return {
+      success: true,
+      data: {
+        status: raw.status as AbStatus,
+        metric: (raw.metric ?? 'click') as AbMetric,
+        decideAfterMinutes: Number(raw.decideAfterMinutes ?? 240),
+        variants: variants.map((variant) => ({ key: variant.key, label: variant.label ?? null, sent: variant.sent ?? 0, failed: variant.failed ?? 0, clicks: variant.clicks ?? null, clickRate: variant.clickRate ?? null, bookings: variant.bookings ?? null, purchases: variant.purchases ?? null, purchaseAmount: variant.purchaseAmount ?? null })),
+        winner: raw.winner ?? null,
+        confidence: raw.confidence ?? null,
+        decideAt: raw.decideAt ?? null,
+        chooseUntil: raw.chooseUntil ?? null,
+        fallback: raw.fallback ?? false,
+        remainder: { count: raw.remainder?.count ?? 0, scheduledAt: raw.remainder?.scheduledAt ?? null, sentAt: raw.remainder?.sentAt ?? (raw.remainder?.sent ? raw.decidedAt ?? null : null) },
+        testMode: raw.testMode === true,
+      },
+    }
+  },
   choose: (broadcastId: string, variant: 'A' | 'B' | 'none', confirmedRecipientCount: number, idempotencyKey: string) =>
-    fetchApi<Result<{ status: AbStatus }>>(`/api/broadcasts/${encodeURIComponent(broadcastId)}/ab-test/choose`, write('POST', { variant, confirmedRecipientCount }, { 'Idempotency-Key': idempotencyKey })),
+    gap2.chooseMock(broadcastId, variant, confirmedRecipientCount, idempotencyKey),
 }
