@@ -1,5 +1,13 @@
 'use client'
 
+import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
+
+import { DataTable, Tr, Th, Td, TableHeadRow } from '@/components/shared/table'
+
+import { RadioGroup } from '@/components/shared/radio'
+
+import Notice from '@/components/shared/notice'
+
 import { useCallback, useEffect, useState } from 'react'
 import { CalendarCheck, CalendarX2, Link2, Unplug, Wand2 } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -30,7 +38,7 @@ type Load = { state: 'loading' } | { state: 'ready'; store: BookingCalendarSwitc
 const onOff = (on: boolean | undefined) => (on ? 'オン' : 'オフ')
 
 function saveError(cause: unknown): string {
-  if (cause instanceof ApiError && cause.status === 409) return 'ほかの人が先に変えました。読み直してから、もう一度お試しください。'
+  if (isConflictResponse(cause)) return CONFLICT_TEXT.retry
   if (cause instanceof ApiError && cause.status === 403) return 'この操作をする権限がありません。'
   if (cause instanceof ApiError && cause.status === 400) return 'https:// で始まる URL を入れてください。'
   return '保存できませんでした。もう一度お試しください。'
@@ -109,25 +117,25 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
       {load.state === 'error' ? <div className={styles.card}><p className={styles.minor}>カレンダーの設定を読み込めませんでした。</p><Button size="compact" onClick={() => void reload()}>もう一度読み込む</Button></div> : null}
       {ready && mine ? (
         <>
-          {error ? <p className={styles.error} role="alert">{error}</p> : null}
+          {error ? <Notice tone="danger">{error}</Notice> : null}
           <section className={styles.card} aria-labelledby="staff-calendar-heading">
             <h3 id="staff-calendar-heading" className={styles.title}>カレンダー</h3>
             {ready.store ? <p className={styles.minor}>{`店全体の同期：読み込み ${onOff(ready.store.readEnabled)} ・ 書き込み ${onOff(ready.store.writeEnabled)}（予約設定 › 担当スタッフの上で変えます）`}</p> : null}
-            <div className={styles.table} role="table" aria-label="つなぐカレンダー">
-              <div className={`${styles.row} ${styles.head}`} role="row"><span role="columnheader">カレンダー</span><span role="columnheader">状態</span><span role="columnheader">読み込み</span><span role="columnheader">書き込み</span></div>
-              <div className={styles.row} role="row">
-                <span role="cell" className={styles.name}><strong>Google カレンダー</strong></span>
-                <span role="cell"><StatusBadge tone={connected ? 'success' : 'danger'} size="compact">{connected ? 'つながっている' : '切れている'}</StatusBadge></span>
-                <span role="cell">{canEdit ? <Toggle label="Google カレンダーの読み込み" checked={mine.readEnabled} disabled={busy} onChange={(on) => void saveSwitch({ readEnabled: on, writeEnabled: mine.writeEnabled })} /> : onOff(mine.readEnabled)}</span>
-                <span role="cell">{canEdit ? <Toggle label="Google カレンダーの書き込み" checked={mine.writeEnabled} disabled={busy}
-                  onChange={(on) => { if (on) void saveSwitch({ readEnabled: mine.readEnabled, writeEnabled: true }); else { setError(null); setWriteOff('keep') } }} /> : onOff(mine.writeEnabled)}</span>
-              </div>
-              <div className={styles.row} role="row">
-                <span role="cell" className={styles.name}><strong>Outlook</strong><span className={styles.minor}>まだつないでいません</span></span>
-                <span role="cell"><StatusBadge tone="neutral" size="compact">つないでいない</StatusBadge></span>
-                <span role="cell" className={styles.span2}>{canEdit ? <Button size="compact" onClick={() => preparing.open('Outlook をつなぐ')}>つなぐ</Button> : null}</span>
-              </div>
-            </div>
+            <DataTable aria-label="つなぐカレンダー">
+              <thead><TableHeadRow><Th>カレンダー</Th><Th>状態</Th><Th>読み込み</Th><Th>書き込み</Th></TableHeadRow></thead><tbody>
+              <Tr>
+                <Td><strong>Google カレンダー</strong></Td>
+                <Td><StatusBadge tone={connected ? 'success' : 'danger'} size="compact">{connected ? 'つながっている' : '切れている'}</StatusBadge></Td>
+                <Td>{canEdit ? <Toggle label="Google カレンダーの読み込み" checked={mine.readEnabled} disabled={busy} onChange={(on) => void saveSwitch({ readEnabled: on, writeEnabled: mine.writeEnabled })} /> : onOff(mine.readEnabled)}</Td>
+                <Td>{canEdit ? <Toggle label="Google カレンダーの書き込み" checked={mine.writeEnabled} disabled={busy}
+                  onChange={(on) => { if (on) void saveSwitch({ readEnabled: mine.readEnabled, writeEnabled: true }); else { setError(null); setWriteOff('keep') } }} /> : onOff(mine.writeEnabled)}</Td>
+              </Tr>
+              <Tr>
+                <Td><strong>Outlook</strong><span className={styles.minor}>まだつないでいません</span></Td>
+                <Td><StatusBadge tone="neutral" size="compact">つないでいない</StatusBadge></Td>
+                <Td>{canEdit ? <Button size="compact" onClick={() => preparing.open('Outlook をつなぐ')}>つなぐ</Button> : null}</Td>
+              </Tr>
+            </tbody></DataTable>
             <p className={styles.minor}>初めはどちらもオフです。オフにしても予約はそのまま残ります。</p>
           </section>
 
@@ -139,7 +147,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
                   <RadioCard name={`staff-meeting-${person?.id}`} value="manual" icon={<Link2 size={18} />} title="手で入れる" note="決まった URL を毎回使う" checked onChange={() => undefined} />
                   <RadioCard name={`staff-meeting-${person?.id}`} value="auto" icon={<Wand2 size={18} />} title="自動で発行" note="予約が決まったら会議を作る" checked={false} onChange={() => preparing.open('会議の自動発行')} />
                 </RadioCardGroup>
-                <div className={styles.table} role="radiogroup" aria-label="自動で発行するときの会議">
+                <RadioGroup label="自動で発行するときの会議">
                   {['Google Meet', 'Zoom', 'Microsoft Teams'].map((provider) => (
                     <div key={provider} className={`${styles.row} ${styles.providerRow}`}>
                       <Radio name={`staff-meeting-provider-${person?.id}`} checked={false} onChange={() => preparing.open('会議の自動発行')}>{provider}</Radio>
@@ -147,7 +155,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
                       <Button size="compact" onClick={() => preparing.open(`${provider} をつなぐ`)}>つなぐ</Button>
                     </div>
                   ))}
-                </div>
+                </RadioGroup>
                 <Field label="固定の会議の URL" optional error={urlInvalid ? 'https:// で始まる URL を入れてください' : undefined}>
                   <div className={styles.urlLine}>
                     <TextField aria-label="固定の会議の URL" value={ready.url?.value ?? ''} placeholder="https://meet.google.com/…" disabled={ready.url === null}

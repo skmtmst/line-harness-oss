@@ -43,6 +43,12 @@ export type AbResult = {
   testMode?: boolean
 }
 
+type AbApiResult = Partial<Omit<AbResult, 'variants' | 'remainder'>> & {
+  variants?: Array<Partial<AbVariantResult> & { key: 'A' | 'B' }>
+  remainder?: Partial<AbResult['remainder']> & { sent?: number }
+  decidedAt?: string | null
+}
+
 type Result<T> = { success: true; data: T }
 
 /** B 案の本文（今は文字の案だけ。組2 の口は text を受ける）。 */
@@ -64,8 +70,8 @@ export const broadcastAbApi = {
   result: async (broadcastId: string): Promise<Result<AbResult | null>> => {
     const res = await gap2.result(broadcastId) as Result<Record<string, unknown> | null>
     if (!res.success || !res.data) return { success: true, data: null }
-    const raw = res.data as Record<string, any>
-    const variants = (raw.variants ?? []) as Array<Record<string, any>>
+    const raw = res.data as AbApiResult
+    const variants = raw.variants ?? []
     return {
       success: true,
       data: {

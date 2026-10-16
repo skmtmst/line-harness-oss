@@ -145,11 +145,6 @@
   gap: var(--tpl-bm-8);
 }
 
-.connectList svg {
-  flex: none;
-  color: var(--color-accent-deep);
-}
-
 /* 右の欄 */
 .side {
   display: flex;
@@ -267,10 +262,6 @@
   line-height: var(--tpl-bm-18);
 }
 
-.footNote svg {
-  flex: none;
-}
-
 /* メニューごとのお支払いの段（mauOC・XFRyO） */
 .choiceRow {
   display: flex;
@@ -288,11 +279,6 @@
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 700;
-}
-
-.amountBox svg {
-  flex: none;
-  color: var(--color-ink-secondary);
 }
 
 .amountNote {
@@ -335,11 +321,6 @@
   gap: var(--tpl-bm-6);
   color: var(--color-ink);
   font-size: var(--tpl-bm-12);
-}
-
-.sideCardLink svg {
-  flex: none;
-  color: var(--color-link);
 }
 
 .readValue {

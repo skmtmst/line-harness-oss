@@ -1,5 +1,7 @@
 'use client'
 
+import { PAGE_SIZES, pageSizeOptions } from '@/components/shared/page-size-options'
+
 /*
  * ★V8 自動応答の「Q&A」タブ（板 y4nixm・使っていない UbRQ4・閲覧のみ yUK7Z、確かめの窓 NmTj4）。
  * 要件 G2 §2-1・§2-2・§2-6・§4（AI-02・07・08・20・21・23・24）。
@@ -39,15 +41,10 @@ import { QA_STATUS_LABEL, QA_STATUS_TONE } from './words'
 import styles from './qa-list.module.css'
 
 const STATUS_OPTIONS = [
-  { value: '', label: '状態：すべて' },
+  { value: '', label: 'すべて' },
   { value: 'published', label: '公開' },
   { value: 'draft', label: '下書き' },
   { value: 'stopped', label: '止めた' },
-]
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
 ]
 
 type Load = { kind: 'loading' } | { kind: 'ready'; items: QaEntry[]; total: number } | { kind: 'error'; error: unknown }
@@ -146,7 +143,7 @@ export default function QaListV8() {
         <ListToolbarSearchSlot search={{ placeholder: '質問・答えで探す', value: url.q, onChange: (q) => setUrl({ q, page: '1' }), width: 280 }} />
         <Select size="content" aria-label="状態" value={url.status} options={STATUS_OPTIONS} onChange={(status) => setUrl({ status, page: '1' })} />
         <ListToolbarEnd>
-          <Select size="page-size" aria-label="表示件数" value={String(size)} options={PAGE_SIZE_OPTIONS} onChange={(next) => setUrl({ size: next, page: '1' })} />
+          <Select size="page-size" aria-label="表示件数" value={String(size)} options={pageSizeOptions(PAGE_SIZES)} onChange={(next) => setUrl({ size: next, page: '1' })} />
         </ListToolbarEnd>
       </ListToolbarRow></ListToolbarFrame>}
       pagination={load.kind === 'ready' && total > size ? <Pagination page={page} pageCount={pageCount} onPageChange={(next) => setUrl({ page: String(next) })} range={{ total, first: (page - 1) * size + 1, last: Math.min(total, page * size) }} /> : undefined}

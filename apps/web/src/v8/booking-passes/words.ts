@@ -9,7 +9,7 @@ export const KIND_LABEL: Record<BookingPassPlan['kind'], string> = { ticket: '�
 export const STATUS_LABEL: Record<BookingPassPlan['status'], string> = { draft: '下書き', on_sale: '販売中', stopped: '止めた' }
 
 /** 期限の選び肢（日）。API は 1〜3650 日。 */
-export const VALID_CHOICES = [30, 90, 180, 365]
+export const VALID_CHOICES = [1, 3, 6].map(months => months * 30).concat(365)
 
 export function validLabel(days: number): string {
   if (days % 365 === 0) return `${days / 365} 年`
@@ -39,3 +39,6 @@ export function failureText(reason: unknown, doing: string): string {
   if (reason instanceof ApiError && reason.status === 403) return `${doing}権限がありません。オーナーか管理者に頼んでください。`
   return `${doing}ことができませんでした。時間をおいてもう一度お試しください。`
 }
+
+/** 作成画面から戻る商品一覧。旧ticketsへの入口はsettingsでpassesへ寄せる。 */
+export const PASS_LIST_HREF = '/booking/menus?tab=passes'

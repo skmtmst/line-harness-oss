@@ -1,5 +1,7 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
 /*
  * 送り手の選び口（板 OmYbb「送り手を選ぶ」・G8）。
  * 「店の名前（送り手なし）」を空の値として先頭に置き、その下に使える送り手を並べる。
@@ -31,7 +33,7 @@ export default function SenderSelect({ accountId, value, onChange, disabled }: {
   // 送り手が 1 人もいない店には出さない（足すのはアカウントの詳細）。
   if (!senders || senders.length === 0) return null
   return (
-    <Select
+    <EntitySelect
       aria-label="送り手を選ぶ"
       value={value}
       disabled={disabled}

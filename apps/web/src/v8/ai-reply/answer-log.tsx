@@ -1,5 +1,7 @@
 'use client'
 
+import { PAGE_SIZES, pageSizeOptions } from '@/components/shared/page-size-options'
+
 /*
  * ★V8 自動応答の「AI が答えた記録」タブ（板 LPkKH、行を押した引き出し V5WpQ）。
  * 要件 G2 §2-1・§4（AI-14・18・19・20）。数の帯 3 つ・したこと／期間・件数・表（日時・お客さま・質問・したこと・元の Q&A）。
@@ -49,11 +51,6 @@ const PERIOD_OPTIONS = [
   { value: '7', label: '期間：過去7日' },
   { value: '30', label: '期間：過去30日' },
   { value: '90', label: '期間：過去90日' },
-]
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
 ]
 
 type Load = { kind: 'loading' } | { kind: 'ready'; items: AiAnswerLog[]; total: number; summary: AiAnswerSummary } | { kind: 'error'; error: unknown }
@@ -150,7 +147,7 @@ export default function AnswerLogV8() {
         <Select size="content" aria-label="したこと" value={url.action} options={ACTION_OPTIONS} onChange={(action) => setUrl({ action, page: '1' })} />
         <Select size="content" aria-label="期間" value={String(days)} options={PERIOD_OPTIONS} onChange={(next) => setUrl({ days: next, page: '1' })} />
         <ListToolbarEnd>
-          <Select size="page-size" aria-label="表示件数" value={String(size)} options={PAGE_SIZE_OPTIONS} onChange={(next) => setUrl({ size: next, page: '1' })} />
+          <Select size="page-size" aria-label="表示件数" value={String(size)} options={pageSizeOptions(PAGE_SIZES)} onChange={(next) => setUrl({ size: next, page: '1' })} />
         </ListToolbarEnd>
       </ListToolbarRow></ListToolbarFrame>}
       pagination={load.kind === 'ready' && total > size ? <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / size))} onPageChange={(next) => setUrl({ page: String(next) })} range={{ total, first: (page - 1) * size + 1, last: Math.min(total, page * size) }} /> : undefined}

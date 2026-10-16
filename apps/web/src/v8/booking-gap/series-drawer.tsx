@@ -1,5 +1,13 @@
 'use client'
 
+import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
+
+import { Field } from '@/components/shared/form-controls'
+
+import Notice from '@/components/shared/notice'
+
+import { DataTable, Tr, Th, Td } from '@/components/shared/table'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarX2 } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -110,7 +118,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
       onCreated({ seriesId: res.data.series.id, created: res.data.bookings.length })
     } catch (e) {
       /* 保存の間に埋まった回があれば口は何も作らず 409 を返す（全部か無し）。表を確かめ直す。 */
-      if (e instanceof ApiError && e.status === 409) { setConflict(true); setRetry((n) => n + 1) }
+      if (isConflictResponse(e)) { setConflict(true); setRetry((n) => n + 1) }
       else setError('予約を入れられませんでした。もう一度お試しください。')
     } finally { setBusy(false) }
   }
@@ -148,40 +156,39 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
           {on ? <>
             <div className={styles.controls}>
               <SegmentedControl aria-label="繰り返しの間隔" size="booking" options={FREQ_OPTIONS} value={freq} onChange={setFreq} />
-              <label className={styles.count}>
-                <span>回数</span>
+              <Field label="回数">
                 <NumberField numericText unit="回" value={countText} onChange={(event) => setCountText(event.target.value)} aria-label="回数" invalid={countText !== '' && !countOk} />
-              </label>
+              </Field>
             </div>
-            {!countOk ? <p className={styles.fieldError} role="alert">回数は {MIN} 回から {MAX} 回までです。</p> : null}
+            {!countOk ? <Notice tone="danger">回数は {MIN} 回から {MAX} 回までです。</Notice> : null}
             {countOk && state !== 'idle' ? <p className={styles.range}>{dayOf(summary.startsAt)} から {state === 'ready' ? dayOf(last) : '…'} まで、{ruleLabel(freq, summary.startsAt)}（{count} 回）</p> : null}
-            {state === 'loading' ? <div className={styles.loading} aria-busy="true"><Skeleton height={48} /></div> : null}
-            {state === 'error' ? <p className={styles.fieldError} role="alert">空きを確かめられませんでした。<Button variant="text" onClick={() => setRetry((n) => n + 1)}>もう一度</Button></p> : null}
+            {state === 'loading' ? <Skeleton height={48} /> : null}
+            {state === 'error' ? <Notice tone="danger">空きを確かめられませんでした。<Button variant="text" onClick={() => setRetry((n) => n + 1)}>もう一度</Button></Notice> : null}
             {state === 'ready' && unreadable ? <p className={styles.range}>空きを確かめられない回があります。その回は作りません。</p> : null}
-            {state === 'ready' && conflict ? <p className={styles.fieldError} role="alert">その間に埋まった回があります。表を確かめ直してください。</p> : null}
+            {state === 'ready' && conflict ? <Notice tone="danger">その間に埋まった回があります。表を確かめ直してください。</Notice> : null}
             {state === 'ready' && blocked.length === 0 && !unreadable ? <p className={styles.allOk}>{list.length} 回すべて取れます</p> : null}
             {state === 'ready' && blocked.length > 0 ? <>
               <span className={styles.badge}><CalendarX2 aria-hidden="true" size={14} />取れない回 {blocked.length} 件</span>
-              <table className={styles.table}>
-                <thead><tr><th>日</th><th>理由</th><th>どうするか</th></tr></thead>
+              <DataTable>
+                <thead><Tr><Th>日</Th><Th>理由</Th><Th>どうするか</Th></Tr></thead>
                 <tbody>
                   {blocked.map((o) => {
                     const alt = o.alternatives[0]
                     const pick = picks[o.index] ?? 'skip'
                     return (
-                      <tr key={o.index}>
-                        <td>{dayWithWeekday(o.startsAt)}</td>
-                        <td><div className={styles.reason}><span>{reasonText(o.reason)}</span><span className={alt ? styles.alt : styles.sub}>{alt ? `→ ${hm(alt)} にする` : 'この回は作りません'}</span></div></td>
-                        <td>
+                      <Tr key={o.index}>
+                        <Td>{dayWithWeekday(o.startsAt)}</Td>
+                        <Td><div className={styles.reason}><span>{reasonText(o.reason)}</span><span className={alt ? styles.alt : styles.sub}>{alt ? `→ ${hm(alt)} にする` : 'この回は作りません'}</span></div></Td>
+                        <Td>
                           <SegmentedControl aria-label={`${dayOf(o.startsAt)} の回`} size="compact" value={pick === 'skip' || !alt ? 'skip' : 'alternative'}
                             options={[{ value: 'alternative', label: '別の時間' }, { value: 'skip', label: '飛ばす' }]}
                             onChange={(next) => { if (next === 'alternative' && !alt) return; setPicks((p) => ({ ...p, [o.index]: next })) }} />
-                        </td>
-                      </tr>
+                        </Td>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
+              </DataTable>
             </> : null}
           </> : null}
         </section>

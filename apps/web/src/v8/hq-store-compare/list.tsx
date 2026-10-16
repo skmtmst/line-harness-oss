@@ -1,5 +1,7 @@
 'use client'
 
+import PeriodPicker from '@/components/shared/period-picker'
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { StoreComparisonResult, StoreComparisonRow } from '@line-crm/shared'
@@ -114,7 +116,7 @@ export default function StoreComparisonList() {
   const toolbar = (
     <ListToolbar
       filters={<>
-        <Select aria-label="期間" value={String(days)} options={[7, 30, 90].map((value) => ({ value: String(value), label: `期間：過去${value}日` }))} onChange={(value) => { setPage(1); setDays(Number(value)) }} />
+        <PeriodPicker days={days} onChange={(value) => { setPage(1); setDays(Number(value)) }} />
         <Select aria-label="比べる相手" value={compare} options={COMPARE_OPTIONS} onChange={(value) => { setPage(1); setCompare(value as 'previous' | 'average') }} />
         <Button variant="secondary" onClick={() => preparing.open('店の組での絞り込み')}>店の組：すべて</Button>
       </>}

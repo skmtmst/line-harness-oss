@@ -1,5 +1,9 @@
 'use client'
 
+import Card from '@/components/shared/card'
+
+import { DataTable, Tr, Th, Td } from '@/components/shared/table'
+
 import Button from '@/components/shared/button'
 import type { BookingParty } from '@/lib/api-gap2-pending'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
@@ -20,26 +24,26 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
   const preparing = usePreparingDialog()
 
   return (
-    <section className={styles.card} aria-label={`この組（${party.members.length} 人）`}>
+    <Card padding="compact" layout="vertical" gap="var(--polish-space-field)" aria-label={`この組（${party.members.length} 人）`}>
       <header className={styles.head}>
         <h3 className={styles.title}>この組（{party.members.length} 人）</h3>
         <span className={styles.owner}>{party.ownerName} さまの予約</span>
       </header>
-      <table className={styles.table}>
-        <thead><tr><th>人</th><th>メニュー</th><th>担当</th><th>時間</th></tr></thead>
+      <DataTable>
+        <thead><Tr><Th>人</Th><Th>メニュー</Th><Th>担当</Th><Th>時間</Th></Tr></thead>
         <tbody>
           {party.members.map((m) => (
-            <tr key={m.bookingId} data-current={m.bookingId === currentBookingId || undefined}>
-              <td>{m.label}</td><td>{m.menuName}</td><td>{m.staffName}</td><td>{hm(m.startsAt)}〜{hm(m.endsAt)}</td>
-            </tr>
+            <Tr key={m.bookingId} data-current={m.bookingId === currentBookingId || undefined}>
+              <Td>{m.label}</Td><Td>{m.menuName}</Td><Td>{m.staffName}</Td><Td>{hm(m.startsAt)}〜{hm(m.endsAt)}</Td>
+            </Tr>
           ))}
         </tbody>
-      </table>
+      </DataTable>
       {canOperate ? <div className={styles.actions}>
         {canRemoveMember && party.members.length > 1 ? <Button variant="secondary" onClick={() => preparing.open('この人だけ取り消す')}>この人だけ取り消す</Button> : null}
         <Button variant="danger" onClick={() => preparing.open('組をまとめて取り消す')}>組をまとめて取り消す</Button>
       </div> : null}
       {preparing.dialog}
-    </section>
+    </Card>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import BroadcastAbResult, { abStatusBadge, useAbResult } from '@/v8/broadcast-ab/result'
+import BroadcastAbResult, { abStatusDefinition, useAbResult } from '@/v8/broadcast-ab/result'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useState, type ReactNode, type RefObject } from 'react'
@@ -163,9 +163,9 @@ export default function BroadcastDetail({
   const { status: displayStatus, label: baseStatusLabel } = displayStatusOf(broadcast)
   /* G1：A/B の配信は状態を分けて札に出す（試し中・選んでください・残りへ送信中・送信済み）。 */
   const abResult = useAbResult(broadcast.status === 'draft' ? null : broadcast.id)
-  const abBadge = abStatusBadge(abResult.result)
-  const statusLabel = abBadge?.label ?? baseStatusLabel
-  const badgeTone = abBadge ? (abBadge.tone === 'neutral' ? 'info' : abBadge.tone) : BADGE_TONE[displayStatus]
+  const abStatus = abStatusDefinition(abResult.result)
+  const statusLabel = abStatus?.label ?? baseStatusLabel
+  const badgeTone = abStatus ? (abStatus.tone === 'neutral' ? 'info' : abStatus.tone) : BADGE_TONE[displayStatus]
   const isDraft = broadcast.status === 'draft'
   const isSent = broadcast.status === 'sent'
   const isScheduled = broadcast.status === 'scheduled'

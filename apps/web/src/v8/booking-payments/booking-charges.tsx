@@ -1,5 +1,7 @@
 'use client'
 
+import ListDateTime from '@/components/shared/list-date-time'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CreditCard, MessageCircle, RotateCcw } from 'lucide-react'
 import type { BookingCancellationCharge, BookingCancellationQuote } from '@line-crm/shared'
@@ -101,7 +103,7 @@ export function BookingChargesSection({ accountId, bookingId, customerName, book
     <section className={styles.section} aria-label="お支払い">
       <div className={styles.headRow}><h3 className={styles.title}>キャンセル料</h3><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></div>
       {load.testMode ? <TestModeNote>本当の請求は起きません</TestModeNote> : null}
-      <p className={styles.line}><CreditCard size={14} aria-hidden="true" />{card ? `${cardLabel}（登録済み${card.registeredAt ? ` ${formatListTimestamp(card.registeredAt).split(' ')[0]}` : ''}）` : 'カード：—'}</p>
+      <p className={styles.line}><CreditCard size={14} aria-hidden="true" />{card ? <>{cardLabel}（登録済み{card.registeredAt ? <ListDateTime value={card.registeredAt} /> : null}）</> : 'カード：—'}</p>
       <p className={styles.amount}>{`${yen(charge.amount)}（料金の ${percent ?? '—'}%）`}</p>
       {charge.reason ? <p className={styles.minor}>{`理由：${charge.reason}`}</p> : null}
       <p className={styles.minor}>{`予約のときの決まりで計算（${load.quote.text}）`}</p>

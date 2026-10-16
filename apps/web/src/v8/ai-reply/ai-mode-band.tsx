@@ -175,7 +175,7 @@ export function AutoAnswerConfirmDialog({ open, accountId, accountName, publishe
     }
   }
   const rows: Array<{ label: string; value: React.ReactNode; note?: string }> = [
-    { label: '送る相手', value: <strong className={styles.lead}>これから届く質問すべて（この店）</strong>, note: 'お金・予約の変更・苦情・個人情報の質問は答えず、人へ回します' },
+    { label: '送る相手', value: <strong className={styles.recipient}>これから届く質問すべて（この店）</strong>, note: 'お金・予約の変更・苦情・個人情報の質問は答えず、人へ回します' },
     { label: '送る目的', value: <StatusBadge tone="warning">取引</StatusBadge>, note: 'お客さまの質問への答えです' },
     { label: '送る日時', value: <strong>オンにした時から</strong>, note: '［返信案だけ］に戻すと、すぐ自動で送るのを止めます' },
     { label: '送り手', value: <strong>送り手なし（アカウントの名前）</strong> },
@@ -224,7 +224,7 @@ export function AutoAnswerConfirmDialog({ open, accountId, accountName, publishe
           {result.qaTitle ? `「${result.qaTitle}」の答えで返します（テストなので送りません）` : `人へ回します：${handoffReasonText(result.handoffReason)}（テストなので送りません）`}
         </p>
       ) : null}
-      {testError ? <p className={styles.testError} role="alert">{testError}</p> : null}
+      {testError ? <Notice tone="danger">{testError}</Notice> : null}
     </Dialog>
   )
 }

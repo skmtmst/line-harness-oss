@@ -1,5 +1,7 @@
 'use client'
 
+import { RadioGroup } from '@/components/shared/radio'
+
 import { useCallback, useEffect, useState } from 'react'
 import { Video } from 'lucide-react'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -79,11 +81,11 @@ export function MeetingModeCard({ state, readOnly }: { state: MenuMeetingState; 
       </RadioCardGroup>
       {online ? (
         <>
-          <div className={styles.urlChoice} role="radiogroup" aria-label="会議の URL">
+          <RadioGroup className={styles.urlChoice} label="会議の URL">
             <span className={styles.label}>会議の URL</span>
             <Radio name="menu-meeting-url" checked onChange={() => undefined}>手で入れる（決まった URL）</Radio>
             <Radio name="menu-meeting-url" checked={false} onChange={() => preparing.open('会議の自動発行')}>自動で発行（予約が決まったら作る）</Radio>
-          </div>
+          </RadioGroup>
           <div className={styles.infoBox}><Video size={16} aria-hidden="true" /><span><strong>担当の固定の URL を先に使います</strong><span className={styles.minor}>担当に URL が無いときは、このメニューの URL を使います。</span></span></div>
           <Field label="メニューの固定の URL（担当に固定の URL が無いとき・作れなかったときに使います）" optional error={state.urlInvalid ? 'https:// で始まる URL を入れてください' : undefined}>
             <TextField aria-label="メニューの固定の URL" value={state.url?.value ?? ''} placeholder="https://zoom.us/j/…" disabled={state.url === null}

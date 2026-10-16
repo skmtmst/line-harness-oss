@@ -111,9 +111,9 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
               disabled={choices.length < 2}
             />
           </Field>
-          <Field label="本文" required>
+          <Field label="本文" required count={{ value: text.length, max: 1000 }}>
             <InsertTextField ref={ref} aria-label="本文" editorSize="message" maxLength={1000} value={text} onValueChange={setText} />
-            <MessageInsertRow count={`${text.length} / 1,000`}>
+            <MessageInsertRow>
               <MessageInsertButton kind="name" label="名前" onClick={insertName} />
             </MessageInsertRow>
             <p className={styles.tokenNote}>下に、見ていた商品の画像・名前・値段・リンクのカードが付きます。</p>

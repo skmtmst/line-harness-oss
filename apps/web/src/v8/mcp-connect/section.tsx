@@ -1,5 +1,7 @@
 'use client'
 
+import { EntityPickerField } from '@/components/shared/entity-picker'
+
 /*
  * ★V8 外部連携 › API 接続の区画「AI とつなぐ（MCP）」（板 Xb0yc の後ろ・作る窓 Xb0yc・作った後の窓 Ge1vp）。
  * 要件 G9 §2-1・§2-2・§2-5・§2-6・§4（MCP-01・02・11・13・15・16・18・19）。
@@ -118,7 +120,7 @@ export default function McpConnectionsSection() {
         help={<HelpTip label="AI とつなぐの説明">MCP（AI のアプリとつなぐ決まり）で、Claude などの AI からこのアカウントの数を読んだり、下書きを作ったりできます。何をしたかは全部「AI の操作の記録」に残ります。</HelpTip>}
         action={create ?? (permissions.stop ? <span className={styles.ownerOnly}>オーナーだけが作れます</span> : undefined)}
       />
-      <p className={styles.lead}>Claude などの AI から、このアカウントの情報を読む・下書きを作ることができます。送るのは人の承認が要ります。</p>
+      <p className={styles.purpose}>Claude などの AI から、このアカウントの情報を読む・下書きを作ることができます。送るのは人の承認が要ります。</p>
       {load.kind === 'loading' ? <ListState kind="loading" /> : null}
       {failure ? <ListState kind="error" title={failure.title} description={failure.description} onRetry={failure.retryable ? () => void fetchList() : undefined} /> : null}
       {load.kind === 'ready' && load.items.length === 0 ? (
@@ -279,7 +281,7 @@ function McpCreateDialog({ open, defaultAccountId, accountOptions, onClose, onCr
           </RadioCardGroup>
           <p className={styles.note}>どの段でも、消す・設定・権限・鍵・お金・個人情報の書き出しはできません。作った後に段は変えられません。</p>
           <div className={styles.selects}>
-            <Select size="full" aria-label="使えるアカウント" value={accountId} options={accountOptions} onChange={setAccountId} />
+            <EntityPickerField label="使えるアカウント" noun="アカウント" title="使えるアカウントを選ぶ" value={accountId} items={accountOptions.map((option) => ({ id: option.value, name: String(option.label) }))} onChange={(id) => setAccountId(id ?? '')} />
             <Select size="full" aria-label="期限" value={days} options={EXPIRY_OPTIONS} onChange={setDays} />
           </div>
         </div>

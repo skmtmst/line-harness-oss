@@ -1,5 +1,9 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
+import Radio, { RadioGroup } from '@/components/shared/radio'
+
 /*
  * 予約メニューの「見せる相手」（板 L6ifay・B9-1／要件 B9）。
  * 全員（初期）／このタグが付いた人だけ／このタグが付いた人には見せない。タグは「どれか1つ」。
@@ -60,20 +64,17 @@ export function AudienceSection({ accountId, mode, tagIds, onMode, onTagIds, can
   return (
     <Card variant="form" gap="normal">
       <CardHeader size="stacked" title={<span className={styles.titleWithMark}>見せる相手<HelpTip label="見せる相手の説明">会員だけ・初めての人だけ・常連だけのメニューを出し分けます。タグは「どれか1つ」が付いていれば当てはまります。</HelpTip><StatusBadge tone="success" dot={false} size="compact">足した物</StatusBadge></span>} />
-      <div role="radiogroup" aria-label="見せる相手" className={styles.fieldStack}>
+      <RadioGroup label="見せる相手" className={styles.fieldStack}>
         {MODES.map((item) => (
-          <label key={item.value} className={styles.audienceRow}>
-            <input type="radio" name="booking-menu-audience" value={item.value} checked={mode === item.value} disabled={!canEdit} onChange={() => onMode(item.value)} />
-            <span>{item.label}</span>
-          </label>
+          <Radio key={item.value} name="booking-menu-audience" value={item.value} checked={mode === item.value} disabled={!canEdit} onChange={() => onMode(item.value)}>{item.label}</Radio>
         ))}
-      </div>
+      </RadioGroup>
       {mode !== 'all' ? (
         <TagPickerField label="見せる相手のタグ" value={tagIds} onChange={onTagIds} accountId={accountId} readOnly={!canEdit} />
       ) : null}
       <div className={styles.audiencePreview}>
         <span className={styles.ruleLabel}>右の予約画面の見本：</span>
-        <Select aria-label="この人で見る" size="full" value={friendId} onChange={onFriendId} options={options} />
+        <EntitySelect aria-label="この人で見る" size="full" value={friendId} onChange={onFriendId} options={options} />
       </div>
       <p className={styles.ruleLabel}>タグが外れたら次の予約から見えなくなります。今ある予約はそのままです。</p>
     </Card>

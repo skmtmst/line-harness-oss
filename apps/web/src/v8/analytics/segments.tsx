@@ -1,5 +1,8 @@
 'use client'
 
+import HeatmapTable from '@/components/shared/heatmap-table'
+import { ListToolbarRow } from '@/components/shared/list-toolbar'
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CustomerSegments } from '@line-crm/shared'
@@ -108,23 +111,19 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
         </span>
         <Button variant="secondary" onClick={() => setPick({ r: 0, f: 0 })} disabled={notComputed}>全員を見る</Button>
       </div>
-      <div className={styles.tools}>
+      <ListToolbarRow>
         <SegmentedControl aria-label="数える物" options={BASIS_OPTIONS} value={basis} onChange={(next) => { setPick(null); setBasis(next) }} />
         <SegmentedControl aria-label="見る数" options={MEASURE_OPTIONS} value={measure} onChange={(next) => { setPick(null); setMeasure(next) }} />
-      </div>
+      </ListToolbarRow>
       <div className={styles.card}>
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>RFM の表</h3>
           <HelpTip label="RFM の表の説明">縦は最後に来店・購入した日、横は{measure === 'count' ? '来店・購入した回数' : '合計金額の順位'}です。直近 1 年を数えます。マスを押すと、その人たちを見て LINE を送れます。</HelpTip>
           <span className={styles.cardNote}>濃いほど人が多い</span>
         </div>
-        <div className={styles.grid} role="grid" aria-label="お客さまの分け方の表">
-          <span className={styles.gridFixed} aria-hidden="true" />
-          {F_LABEL[measure].map((label) => <span key={label} className={styles.colHead} role="columnheader">{label}</span>)}
-          {R_LABEL.map((rowLabel, r0) => (
-            <Row key={rowLabel} r={r0 + 1} label={rowLabel} cellAt={cellAt} max={max} pick={pick} onPick={setPick} />
-          ))}
-        </div>
+        <HeatmapTable label="お客さまの分け方の表" columns={F_LABEL[measure]}
+          rows={R_LABEL.map((label, row) => ({ key: String(row + 1), label, cells: [1, 2, 3, 4, 5].map(f => { const cell = cellAt(row + 1, f); return { key: String(f), name: cell?.name ?? '—', count: cell?.count ?? null } }) }))}
+          selected={pick ? `${pick.r}:${pick.f}` : undefined} onSelect={(r, f) => setPick({ r: Number(r), f: Number(f) })} />
       </div>
       <Drawer
         open={pick !== null && !notComputed}
@@ -139,33 +138,6 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
       </Drawer>
       {preparing.dialog}
     </section></ListPageSection>
-  )
-}
-
-function Row({ r, label, cellAt, max, pick, onPick }: { r: number; label: string; cellAt: (r: number, f: number) => Cell | undefined; max: number; pick: Pick | null; onPick: (pick: Pick) => void }) {
-  return (
-    <>
-      <span className={styles.rowHead} role="rowheader">{label}</span>
-      {[1, 2, 3, 4, 5].map((f) => {
-        const cell = cellAt(r, f)
-        const count = cell?.count ?? null
-        return (
-          <button
-            key={f}
-            type="button"
-            className={styles.cell}
-            data-level={levelOf(count, max)}
-            aria-pressed={pick?.r === r && pick.f === f}
-            aria-label={`${cell?.name ?? ''} ${count === null ? '人数は未取得' : `${formatNumber(count)} 人`}`}
-            disabled={count === null}
-            onClick={() => onPick({ r, f })}
-          >
-            <span className={styles.cellName} title={cell?.name}>{cell?.name ?? '—'}</span>
-            <span className={styles.cellCount}>{count === null ? '—' : `${formatNumber(count)} 人`}</span>
-          </button>
-        )
-      })}
-    </>
   )
 }
 

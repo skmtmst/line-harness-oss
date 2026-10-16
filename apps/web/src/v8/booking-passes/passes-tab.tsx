@@ -1,5 +1,7 @@
 'use client'
 
+import ListToolbar from '@/components/shared/list-toolbar'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Gift } from 'lucide-react'
 import type { BookingPassPlan } from '@line-crm/shared'
@@ -10,7 +12,6 @@ import EmptyList from '@/components/shared/empty-list'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
-import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/shared/page-size-select'
@@ -164,11 +165,9 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
   )
 
   const toolbar = (
-    <div className={styles.toolRow}>
-      <div className={styles.search}><SearchField placeholder="名前で探す" aria-label="名前で探す" value={query} onChange={(value) => { setPage(1); setQuery(value) }} onClear={() => { setPage(1); setQuery('') }} /></div>
-      <Select aria-label="種類で絞り込む" value={kind} options={KIND_OPTIONS} onChange={(value) => { setPage(1); setKind(value as Kind) }} />
-      <span className={styles.toolEnd}><PageSizeSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next as 10 | 20 | 50) }} /></span>
-    </div>
+    <ListToolbar search={{ placeholder: '名前で探す', label: '名前で探す', value: query, onChange: (value) => { setPage(1); setQuery(value) } }}
+      filters={<Select aria-label="種類で絞り込む" value={kind} options={KIND_OPTIONS} onChange={(value) => { setPage(1); setKind(value as Kind) }} />}
+      trailing={<PageSizeSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next as 10 | 20 | 50) }} />} />
   )
 
   const body = status === 'loading' && plans.length === 0 ? (
@@ -214,7 +213,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
               <Td>{periodLabel(plan)}</Td>
               <Td align="right">{yen(plan.price)}</Td>
               <Td collapseAt="narrow"><TruncatedText value={usable} /></Td>
-              <Td align="right">{holders === undefined ? <span className={styles.empty}>—</span> : `${formatNumber(holders)} 人`}</Td>
+              <Td align="right">{holders === undefined ? <span className={styles.unavailableValue}>—</span> : `${formatNumber(holders)} 人`}</Td>
               <Td><StatusBadge tone={plan.status === 'on_sale' ? 'success' : 'neutral'}>{STATUS_LABEL[plan.status]}</StatusBadge></Td>
               <ActionCell>
                 <span className={styles.menuBox}>
@@ -244,7 +243,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
 
   return (
     <SaveErrorScope errors={errors}><section className={styles.panel} aria-label="回数券・月謝">
-      <Notice tone="info" message="回数券・月謝は、お客さまごとに入れます（店頭で売った物・紙の回数券の引き継ぎは、友だちの詳細の「予約」タブから）。" />
+      <Notice tone="info" compact message="回数券・月謝は、お客さまごとに入れます（店頭で売った物・紙の回数券の引き継ぎは、友だちの詳細の「予約」タブから）。" />
       {stats}
       {notice ? <Notice tone="danger" message={notice} /> : null}
       {toolbar}

@@ -1,5 +1,11 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
+import { DataTable, TableHeadRow, Tr, Td, Th, HandleCell, ActionCell } from '@/components/shared/table'
+
+import Notice from '@/components/shared/notice'
+
 import { useMemo, useState } from 'react'
 import { Play, Info, Plus } from 'lucide-react'
 import type { FormBlock } from '@line-crm/shared'
@@ -52,9 +58,9 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
   const staffOptions = (menuId: string) => [{ value: '', label: '全員' }, ...(refs.bookingMenuStaff?.[menuId] ?? []).map((s) => ({ value: s.id, label: s.name }))]
 
   const targetCells = (target: RoutingTarget, update: (next: RoutingTarget) => void, label: string, invalid: boolean) => <>
-    <span className={styles.cell}>{readOnly ? <span>{menus.find((m) => m.id === target.menuId)?.name ?? '—'}</span> : <Select aria-label={`${label}の出すメニュー`} invalid={invalid} value={target.menuId} options={menuOptions} onChange={(v) => update(setTarget(target, { menuId: v }))} />}</span>
-    <span className={styles.cell}>{readOnly ? <span>{target.staffId ? (refs.bookingMenuStaff?.[target.menuId] ?? []).find((s) => s.id === target.staffId)?.name : '全員'}</span> : <Select aria-label={`${label}の担当`} value={target.staffId ?? ''} options={staffOptions(target.menuId)} onChange={(v) => update(setTarget(target, { staffId: v || undefined }))} disabled={!target.menuId} />}</span>
-    <span className={styles.cell}>{readOnly ? <span>{MODES.find((m) => m.value === (target.meetingMode ?? ''))?.label}</span> : <Select aria-label={`${label}の会い方`} value={target.meetingMode ?? ''} options={MODES} onChange={(v) => update(setTarget(target, { meetingMode: (v || undefined) as RoutingTarget['meetingMode'] }))} />}</span>
+    <Td>{readOnly ? <span>{menus.find((m) => m.id === target.menuId)?.name ?? '—'}</span> : <EntitySelect aria-label={`${label}の出すメニュー`} invalid={invalid} value={target.menuId} options={menuOptions} onChange={(v) => update(setTarget(target, { menuId: v }))} />}</Td>
+    <Td>{readOnly ? <span>{target.staffId ? (refs.bookingMenuStaff?.[target.menuId] ?? []).find((s) => s.id === target.staffId)?.name : '全員'}</span> : <EntitySelect aria-label={`${label}の担当`} value={target.staffId ?? ''} options={staffOptions(target.menuId)} onChange={(v) => update(setTarget(target, { staffId: v || undefined }))} disabled={!target.menuId} />}</Td>
+    <Td>{readOnly ? <span>{MODES.find((m) => m.value === (target.meetingMode ?? ''))?.label}</span> : <Select aria-label={`${label}の会い方`} value={target.meetingMode ?? ''} options={MODES} onChange={(v) => update(setTarget(target, { meetingMode: (v || undefined) as RoutingTarget['meetingMode'] }))} />}</Td>
   </>
 
   return (
@@ -65,46 +71,46 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
           <HelpTip label="答えで予約の行き先を分けるの説明">質問への答えに合わせて、予約のメニューと担当を自動で決めます。上の行から順に当てはめ、どれにも当たらないときは最後の行へ進みます。</HelpTip>
         </span>
         <span className={styles.actions}>
-          {value.enabled ? <Button variant="secondary" icon={<Play size={16} aria-hidden="true" />} onClick={() => { setTrying((v) => !v); setTrial('') }} aria-pressed={trying}>試しに答える</Button> : null}
+          {value.enabled ? <Button variant="secondary" icon={<Play size={16} aria-hidden="true" />} onClick={() => { setTrying((v) => !v); setTrial('') }} aria-expanded={trying} aria-controls="routing-trial">試しに答える</Button> : null}
           {readOnly ? null : <Toggle label="答えで予約の行き先を分ける" checked={value.enabled} onChange={(enabled) => set({ enabled })} />}
         </span>
       </div>
       {value.enabled ? <>
         <div className={styles.questionRow}>
           <span className={styles.label}>分ける質問</span>
-          {readOnly ? <span>{question?.label}</span> : <Select aria-label="分ける質問" value={questionId} options={questions.map((q) => ({ value: q.id, label: `${q.label}（${choiceModeLabel(q.type)}）` }))}
+          {readOnly ? <span>{question?.label}</span> : <EntitySelect aria-label="分ける質問" value={questionId} options={questions.map((q) => ({ value: q.id, label: `${q.label}（${choiceModeLabel(q.type)}）` }))}
             onChange={(id) => { setPickedQuestion(id); set({ rules: [] }) }} />}
           <span className={styles.hint}>使える質問：1 つ選ぶ・いくつでも選ぶ・プルダウン</span>
         </div>
         <p className={styles.info}><Info aria-hidden="true" size={16} />行き先はこの表で決まるので、お客さまにはメニューと担当を選ばせず日時から始めます（下の「メニューを選んでもらう」は使いません）。上の行から順に当てはめます。</p>
-        {trying && question ? <div className={styles.trial} role="group" aria-label="試しに答える">
+        {trying && question ? <div id="routing-trial" className={styles.trial} role="group" aria-label="試しに答える">
           <span>もしお客さまが「{question.label}」に</span>
           <Select aria-label="試しの答え" value={trial} options={[{ value: '', label: '答えを選ぶ' }, ...(question.choices ?? []).map((c) => ({ value: c.label, label: c.label }))]} onChange={setTrial} />
           <span>と答えたら</span>
           {trial ? <strong>{hit === -1 || hit === null ? '「どれにも当たらないとき」の行き先になります（保存はされません）' : `${(hit ?? 0) + 1} 行目の行き先になります（保存はされません）`}</strong> : null}
         </div> : null}
-        <div className={styles.table} role="table" aria-label="行き先の表">
-          <div className={styles.headRow} role="row"><span /><span title={`もし「${question?.label ?? '質問'}」が`}>もし「{question?.label ?? '質問'}」が</span><span>出すメニュー</span><span>担当の組</span><span>会い方</span><span /></div>
+        <DataTable aria-label="行き先の表">
+          <thead><TableHeadRow><Th aria-label="並べ替え" /><Th>もし「{question?.label ?? '質問'}」が</Th><Th grow>出すメニュー</Th><Th>担当の組</Th><Th>会い方</Th><Th aria-label="操作" /></TableHeadRow></thead><tbody>
           {(readOnly ? ruled : reorder.shown).map((rule, index) => {
             const invalid = problem?.row === index
             return (
-              <div key={rule.id} className={styles.row} role="row" data-hit={hit === index || undefined} data-invalid={invalid || undefined} {...reorder.rowProps(rule.id)}>
-                <span className={styles.grip}>{readOnly ? null : <ReorderHandle look="icon" label={`${index + 1} 行目`} {...reorder.handle(rule.id)} {...reorder.handleProps(rule.id)} />}</span>
-                <span className={styles.cond}><span title={ruleAnswer(rule)}>〈{ruleAnswer(rule)}〉</span></span>
+              <Tr key={rule.id} selected={hit === index} data-invalid={invalid || undefined} {...reorder.rowProps(rule.id)}>
+                <HandleCell>{readOnly ? null : <ReorderHandle look="icon" label={`${index + 1} 行目`} {...reorder.handle(rule.id)} {...reorder.handleProps(rule.id)} />}</HandleCell>
+                <Td><span className={styles.cond}><span title={ruleAnswer(rule)}>〈{ruleAnswer(rule)}〉</span></span></Td>
                 {targetCells(rule.target, (target) => setRule(rule.id, { target }), `${index + 1} 行目`, invalid)}
-                <span className={styles.more}>{readOnly ? null : <RowMenu appearance="box" size="row" label={`${index + 1} 行目のそのほかの操作`} open={openMenu === rule.id} onOpenChange={(o) => setOpenMenu(o ? rule.id : null)}
-                  items={[...reorder.menuItems(rule.id, () => setOpenMenu(null)), { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { set({ rules: value.rules.filter((_, i) => `r${i}` !== rule.id) }); setOpenMenu(null) } }]} />}</span>
-              </div>
+                <ActionCell>{readOnly ? null : <RowMenu appearance="box" size="row" label={`${index + 1} 行目のそのほかの操作`} open={openMenu === rule.id} onOpenChange={(o) => setOpenMenu(o ? rule.id : null)}
+                  items={[...reorder.menuItems(rule.id, () => setOpenMenu(null)), { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { set({ rules: value.rules.filter((_, i) => `r${i}` !== rule.id) }); setOpenMenu(null) } }]} />}</ActionCell>
+              </Tr>
             )
           })}
-          <div className={styles.row} role="row" data-fallback data-hit={(hit === -1) || undefined} data-invalid={problem?.row === value.rules.length || undefined}>
-            <span />
-            <span className={styles.cond}><span>どれにも当たらない</span><StatusBadge size="compact" dot={false}>消せない</StatusBadge></span>
+          <Tr data-fallback selected={hit === -1} data-invalid={problem?.row === value.rules.length || undefined}>
+            <HandleCell />
+            <Td><span className={styles.cond}><span>どれにも当たらない</span><StatusBadge size="compact" dot={false}>消せない</StatusBadge></span></Td>
             {targetCells(value.fallback, (fallback) => set({ fallback }), 'どれにも当たらないとき', problem?.row === value.rules.length)}
-            <span className={styles.more}>—</span>
-          </div>
-        </div>
-        {problem ? <p className={styles.error} role="alert">{problem.message}</p> : null}
+            <ActionCell>—</ActionCell>
+          </Tr>
+        </tbody></DataTable>
+        {problem ? <Notice tone="danger">{problem.message}</Notice> : null}
         {readOnly ? null : <div className={styles.add}>
           <Button variant="text" icon={<Plus size={16} aria-hidden="true" />} disabled={answersLeft.length === 0 || value.rules.length >= MAX_ROUTING_ROWS} onClick={() => question && set({ rules: [...value.rules, newRule(question.id, answersLeft[0].label)] })}>行き先を追加</Button>
           {value.rules.length >= MAX_ROUTING_ROWS ? <span className={styles.hint}>{MAX_ROUTING_ROWS} 行までです</span> : answersLeft.length === 0 ? <span className={styles.hint}>この質問の答えはすべて表にあります</span> : null}

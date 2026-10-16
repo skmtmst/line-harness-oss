@@ -1,5 +1,13 @@
 'use client'
 
+import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
+
+import { SettingCheckbox } from '@/components/shared/checkbox'
+
+import { DataTable, Tr, Th, Td, TableHeadRow } from '@/components/shared/table'
+
+import { RadioGroup } from '@/components/shared/radio'
+
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, Plug, Plus } from 'lucide-react'
 import type { BookingCancellationPolicy } from '@line-crm/shared'
@@ -120,9 +128,9 @@ export type CancellationSettings = ReturnType<typeof useCancellationSettings>
 /** 保存の失敗を言葉にする（段の穴・重なり・未接続・本番・版）。 */
 export function cancellationSaveError(cause: unknown): string {
   if (!(cause instanceof ApiError)) return '保存できませんでした。もう一度お試しください。'
-  if (cause.status === 409 && cause.code === 'payment_not_connected') return '決済をつないでから、キャンセル料をオンにできます。'
-  if (cause.status === 409 && cause.code === 'live_mode_not_approved') return '本番の決済は本部の承認のあとで使えます。'
-  if (cause.status === 409) return 'ほかの人が先に保存しました。読み直してから、もう一度保存してください。'
+  if (isConflictResponse(cause) && cause.code === 'payment_not_connected') return '決済をつないでから、キャンセル料をオンにできます。'
+  if (isConflictResponse(cause) && cause.code === 'live_mode_not_approved') return '本番の決済は本部の承認のあとで使えます。'
+  if (isConflictResponse(cause)) return CONFLICT_TEXT.save
   if (cause.status === 400) return '段の間に空き・重なりがあるか、100% を超える値があります。段を見直してください。'
   if (cause.status === 403) return 'この設定を変える権限がありません。'
   return '保存できませんでした。もう一度お試しください。'
@@ -165,29 +173,26 @@ export function CancellationSection({ state, connected, testMode, canEdit }: { s
         ) : (
           <>
             {canEdit ? (
-              <label className={styles.switchRow}>
-                <input type="checkbox" checked={draft.enabled} onChange={(event) => state.setDraft({ ...draft, enabled: event.target.checked })} />
-                <span>キャンセル料を使う</span>
-              </label>
+              <SettingCheckbox checked={draft.enabled} onChange={(enabled) => state.setDraft({ ...draft, enabled })} label="キャンセル料を使う" />
             ) : <p className={styles.readValue}>{draft.enabled ? 'キャンセル料を使う' : 'キャンセル料は使わない'}</p>}
-            <div className={styles.tierTable} role="table" aria-label="キャンセル料の段">
-              <div className={`${styles.tierRow} ${styles.tierHead}`} role="row"><span role="columnheader">いつ取り消したか</span><span role="columnheader">キャンセル料</span><span /></div>
+            <DataTable aria-label="キャンセル料の段">
+              <thead><TableHeadRow><Th>いつ取り消したか</Th><Th>キャンセル料</Th><Th aria-label="操作" /></TableHeadRow></thead><tbody>
               {tiers.map((tier, index) => (
-                <div key={`${tier.beforeHours}-${index}`} className={styles.tierRow} role="row">
-                  <span role="cell">{tierLabel(tiers, index)}</span>
-                  <span role="cell">{tier.percent === 0 ? '無料' : `料金の ${tier.percent}%`}</span>
-                  <span role="cell">{canEdit ? <RowMenu appearance="box" size="row" label={`${tierLabel(tiers, index)}の操作`} items={[
+                <Tr key={`${tier.beforeHours}-${index}`}>
+                  <Td>{tierLabel(tiers, index)}</Td>
+                  <Td>{tier.percent === 0 ? '無料' : `料金の ${tier.percent}%`}</Td>
+                  <Td>{canEdit ? <RowMenu appearance="box" size="row" label={`${tierLabel(tiers, index)}の操作`} items={[
                     { id: 'edit', label: '変える', onSelect: () => setEditing(index) },
                     ...(tiers.length > 1 ? [{ id: 'remove', label: '消す', tone: 'danger' as const, onSelect: () => setTiers(tiers.filter((_, i) => i !== index)) }] : []),
-                  ]} /> : null}</span>
-                </div>
+                  ]} /> : null}</Td>
+                </Tr>
               ))}
-              <div className={styles.tierRow} role="row">
-                <span role="cell">連絡なしで来なかった</span>
-                <span role="cell">{`料金の ${draft.noShowPercent}%`}</span>
-                <span role="cell">{canEdit ? <RowMenu appearance="box" size="row" label="無断の操作" items={[{ id: 'edit', label: '変える', onSelect: () => setEditing('noshow') }]} /> : null}</span>
-              </div>
-            </div>
+              <Tr>
+                <Td>連絡なしで来なかった</Td>
+                <Td>{`料金の ${draft.noShowPercent}%`}</Td>
+                <Td>{canEdit ? <RowMenu appearance="box" size="row" label="無断の操作" items={[{ id: 'edit', label: '変える', onSelect: () => setEditing('noshow') }]} /> : null}</Td>
+              </Tr>
+            </tbody></DataTable>
             <p className={styles.minor}>物差しは「予約の開始の何時間前か」1 つだけです。段の間に空き・重なりがあると保存できません。100% を超える値は入れられません。</p>
             {canEdit && tiers.length < 3 ? <Button variant="text" textTone="ink" onClick={() => setEditing('new')}><Plus size={15} aria-hidden="true" />段を足す</Button> : null}
           </>
@@ -207,10 +212,10 @@ export function CancellationSection({ state, connected, testMode, canEdit }: { s
       ) : <p className={styles.minor}>カードを登録してもらう条件と請求の仕方は、データの準備が済むと決められます（今は全員・店が［請求する］を押す）。</p>}
       <h3 className={styles.subTitle}>請求の仕方</h3>
       {!canEdit ? <p className={styles.readValue}>{state.optionsDraft?.chargeMode === 'auto' ? '自動で請求する' : '店が［請求する］を押す'}</p> : (
-      <div className={styles.inline} role="radiogroup" aria-label="請求の仕方">
+      <RadioGroup className={styles.inline} label="請求の仕方">
         <Radio name="charge-mode" checked={(state.optionsDraft?.chargeMode ?? 'manual') === 'manual'} disabled={!state.optionsDraft} onChange={() => state.optionsDraft && state.setOptionsDraft({ ...state.optionsDraft, chargeMode: 'manual' })}>店が［請求する］を押す（おすすめ）</Radio>
         <Radio name="charge-mode" checked={state.optionsDraft?.chargeMode === 'auto'} disabled={!state.optionsDraft} onChange={() => state.optionsDraft && state.setOptionsDraft({ ...state.optionsDraft, chargeMode: 'auto' })}>自動で請求する</Radio>
-      </div>)}
+      </RadioGroup>)}
       {draft ? <p className={styles.minor}>{`お客さまの確認画面・前日のリマインド・取り消しの前に、同じ文で出ます：「${policySampleText(draft)}」`}</p> : null}
       <TierDialog editing={editing} tiers={tiers} noShowPercent={draft?.noShowPercent ?? 100} onClose={() => setEditing(null)}
         onApply={(next) => { if (!draft) return; if (editing === 'noshow') state.setDraft({ ...draft, noShowPercent: next.percent }); else if (editing === 'new') setTiers([...tiers, next]); else if (typeof editing === 'number') setTiers(tiers.map((tier, index) => (index === editing ? next : tier))); setEditing(null) }} />
@@ -262,11 +267,11 @@ export function DepositSection({ state, connected, canEdit }: { state: Cancellat
         <p className={styles.readValue}>{rule.kind === 'none' ? 'デポジット：なし' : rule.kind === 'percent' ? `デポジット：料金の ${rule.value ?? 0}%` : `デポジット：${yen(rule.value ?? 0)}`}</p>
       ) : (
         <>
-          <div className={styles.inline} role="radiogroup" aria-label="デポジット">
+          <RadioGroup className={styles.inline} label="デポジット">
             {([['none', 'なし'], ['amount', '金額（¥）'], ['percent', '料金の %']] as const).map(([kind, label]) => (
               <Radio key={kind} name="deposit-kind" checked={rule.kind === kind} onChange={() => set({ kind, value: kind === 'none' ? null : rule.value })}>{label}</Radio>
             ))}
-          </div>
+          </RadioGroup>
           {rule.kind !== 'none' ? (
             <div className={styles.depositRow}>
               <Field label={rule.kind === 'percent' ? '料金の %' : '金額'}>

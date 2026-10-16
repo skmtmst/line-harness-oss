@@ -26,7 +26,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
   const paymentsWide = tab === 'payments' && (paymentsView === 'records' || paymentsView === 'events')
   /* 担当スタッフは割り当て方（QJMoY）が入って横いっぱいの表になった。スマホの見本は出さない。 */
   /* お支払い（FcGmv）はスマホの見本を右に出す。記録・届いた知らせは横いっぱい。 */
-  const noPhone = tab === 'channels' || tab === 'staff' || tab === 'passes' || paymentsWide
+  const hideCustomerExample = tab === 'channels' || tab === 'staff' || tab === 'passes' || paymentsWide
   const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
@@ -57,8 +57,8 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
 
 
         actions={tab === 'passes' && canEditSettings ? <Button variant="primary" href="/booking/passes/new">回数券・月謝を作る</Button> : undefined}
-        preview={noPhone ? undefined : previewContent}
-        previewToggle={noPhone ? undefined : (
+        preview={hideCustomerExample ? undefined : previewContent}
+        previewToggle={hideCustomerExample ? undefined : (
           /* 絵 VFxWU：畳んだときも「LINEでの見え方を見る」と「お客さまに見える画面を確かめる」の2つを並べる。 */
           <div className={styles.narrowActions}>
             <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>

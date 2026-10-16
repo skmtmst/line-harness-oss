@@ -1,5 +1,9 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
+import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
+
 /*
  * 受信箱の「割り当てと返事の期限」の引き出し（板 L6pGz・要件 G3）。
  * 口：inboxRoutingApi（GET/PUT /api/inbox/routing-settings。契約 API-CONTRACT-GAP1.md）。
@@ -85,8 +89,8 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
       onSaved(res.data)
       onClose()
     } catch (caught) {
-      setError(caught instanceof ApiError && caught.status === 409
-        ? 'ほかの人が先に変えました。開き直して、最新の内容から変えてください。'
+      setError(isConflictResponse(caught)
+        ? CONFLICT_TEXT.routing
         : describeApiFailure(caught, '保存'))
     } finally { setSaving(false) }
   }
@@ -128,7 +132,7 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
                   営業時間の中だけ数える（予約の受付時間から。予約を使っていない店は 9:00〜18:00）
                 </Checkbox>
                 <Field label="過ぎたら知らせる先" htmlFor="routing-team">
-                  <Select id="routing-team" aria-label="過ぎたら知らせる先" size="full" disabled={!draft.enabled} value={draft.escalateTeamId ?? ''}
+                  <EntitySelect id="routing-team" aria-label="過ぎたら知らせる先" size="full" disabled={!draft.enabled} value={draft.escalateTeamId ?? ''}
                     onChange={(value) => setDraft({ ...draft, escalateTeamId: value || null })}
                     options={[{ value: '', label: '担当者だけに知らせる' }, ...teams.map((team) => ({ value: team.id, label: `通知チーム：${team.name}` }))]} />
                 </Field>

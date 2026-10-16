@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { GitCompare, RefreshCw, TriangleAlert } from 'lucide-react'
 import Button from './button'
+import { ApiError } from '@/lib/api'
 import Dialog from './dialog'
 import { formatDateTime } from '@/lib/format'
 import styles from './save-conflict.module.css'
@@ -234,3 +235,15 @@ export function SaveConflictCompareDialog({
     </Dialog>
   )
 }
+
+/** 409は画面ごとに判定しない。版以外の業務上の衝突も、codeは呼び出し側で区別する。 */
+export function isConflictResponse(error: unknown): error is ApiError & { status: 409 } {
+  return error instanceof ApiError && error.status === 409
+}
+/** 短い編集窓で、既存の入力を保ったまま読み直しへ案内する共通の言葉。 */
+export const CONFLICT_TEXT = {
+  retry: 'ほかの人が先に変えました。読み直してから、もう一度お試しください。',
+  reopen: 'ほかの人が先に直しました。閉じて開き直してから、もう一度お試しください。',
+  routing: 'ほかの人が先に変えました。開き直して、最新の内容から変えてください。',
+  save: 'ほかの人が先に保存しました。読み直してから、もう一度保存してください。',
+} as const

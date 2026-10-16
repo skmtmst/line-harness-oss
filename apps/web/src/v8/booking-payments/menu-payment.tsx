@@ -1,5 +1,7 @@
 'use client'
 
+import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRight, Calculator, CreditCard, Pencil, Settings } from 'lucide-react'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -123,7 +125,7 @@ export function useMenuPayment(kind: MenuPaymentKind, accountId: string | null, 
         }
       }
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 409) {
+      if (isConflictResponse(cause)) {
         conflict.mark()
         throw new PaymentConflictError('version_conflict')
       }

@@ -1,5 +1,8 @@
 'use client'
 
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+
 import { useCallback, useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -20,7 +23,7 @@ import styles from './ab.module.css'
  */
 
 /** 詳細の頭の札（状態を分ける：試し中・選んでください・残りへ送信中・送信済み）。 */
-export function abStatusBadge(result: AbResult | null): { label: string; tone: 'info' | 'warning' | 'success' | 'neutral' } | null {
+export function abStatusDefinition(result: AbResult | null): { label: string; tone: 'info' | 'warning' | 'success' | 'neutral' } | null {
   if (!result) return null
   const map: Record<AbStatus, { label: string; tone: 'info' | 'warning' | 'success' | 'neutral' } | null> = {
     draft: null,
@@ -66,11 +69,11 @@ function Variant({ variant, winner, metric }: { variant: AbVariantResult; winner
         <span className={styles.variantTitle} title={variant.label ?? undefined}>{`${variant.key} 案${variant.label ? `：${variant.label}` : ''}`}</span>
         {winner ? <StatusBadge tone="success" dot>勝ち</StatusBadge> : null}
       </div>
-      <dl className={styles.metrics}>
-        <div><dt>送った</dt><dd>{`${formatNumber(variant.sent)} 人`}</dd></div>
-        <div><dt>クリック率</dt><dd>{pct(variant.clickRate)}</dd></div>
-        <div><dt>{metric === 'purchase' ? '購入' : '予約'}</dt><dd>{metric === 'purchase' ? count(variant.purchases, '件') : count(variant.bookings, '件')}</dd></div>
-      </dl>
+      <KpiBand>
+        <KpiCard detail="" presentation="band" title="送った" value={variant.sent} unit="人" />
+        <KpiCard detail="" presentation="band" title="クリック率" valueText={pct(variant.clickRate)} value={null} unit="" />
+        <KpiCard detail="" presentation="band" title={metric === 'purchase' ? '購入' : '予約'} valueText={metric === 'purchase' ? count(variant.purchases, '件') : count(variant.bookings, '件')} value={null} unit="" />
+      </KpiBand>
     </div>
   )
 }

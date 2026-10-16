@@ -176,10 +176,10 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
                   )}
                 </Td>
                 <Td>{waitLabel(rule.waitMinutes)}</Td>
-                <Td align="right">{sentCount === undefined ? <span className={styles.empty}>—</span> : `${formatNumber(sentCount)} 件`}</Td>
-                <Td align="right"><span className={styles.empty} title="クリックの計測はまだつながっていません">—</span></Td>
-                <Td align="right"><span className={styles.empty} title="購入の計測はまだつながっていません">—</span></Td>
-                <Td align="right"><span className={styles.empty} title="金額の計測はまだつながっていません">—</span></Td>
+                <Td align="right">{sentCount === undefined ? <span className={styles.unavailableValue}>—</span> : `${formatNumber(sentCount)} 件`}</Td>
+                <Td align="right"><span className={styles.unavailableValue} title="クリックの計測はまだつながっていません">—</span></Td>
+                <Td align="right"><span className={styles.unavailableValue} title="購入の計測はまだつながっていません">—</span></Td>
+                <Td align="right"><span className={styles.unavailableValue} title="金額の計測はまだつながっていません">—</span></Td>
                 <ActionCell>
                   {canEdit ? (
                     <span className={styles.menuBox}>

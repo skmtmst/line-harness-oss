@@ -8,7 +8,7 @@
 .kindCell { display: flex; flex-direction: column; min-width: 0; }
 .kindName { color: var(--color-ink); font-weight: 600; }
 .kindWho { color: var(--color-ink-secondary); font-size: var(--text-caption); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.empty { color: var(--color-ink-faint); }
+.unavailableValue { color: var(--color-ink-faint); }
 .foot { color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .menuBox { display: inline-flex; }
 

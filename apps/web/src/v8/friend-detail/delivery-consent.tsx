@@ -1,5 +1,9 @@
 'use client'
 
+import { RadioGroup } from '@/components/shared/radio'
+
+import Card from '@/components/shared/card'
+
 import { useCallback, useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -7,7 +11,7 @@ import Drawer from '@/components/shared/drawer'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import StatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import Radio from '@/components/shared/radio'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
@@ -146,7 +150,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
     >
       <div className={styles.body}>
         {error ? <Notice tone="danger" message={error} /> : null}
-        <section className={styles.card} aria-label="目的ごとの受け取り">
+        <Card padding="compact" layout="vertical" gap="var(--polish-space-field)" aria-label="目的ごとの受け取り">
           {PURPOSES.map((purpose) => {
             const row = rowOf(purpose.key)
             const state = row?.state ?? 'unknown'
@@ -156,25 +160,25 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
                   <span className={styles.rowTitle}>{purpose.label}</span>
                   <span className={styles.rowNote}>{purpose.note}</span>
                 </div>
-                <StatusPill tone={STATE_TONE[state]}><span>{STATE_LABEL[state]}</span></StatusPill>
+                <StatusBadge tone={STATE_TONE[state]}><span>{STATE_LABEL[state]}</span></StatusBadge>
                 {canEdit ? <Button variant="secondary" onClick={() => begin(purpose.key)}>変える</Button> : null}
               </div>
             )
           })}
-        </section>
+        </Card>
         {editing && canEdit ? (
           <section className={styles.edit} aria-label={`${label(editing)}を変える`}>
             <h3 className={styles.sectionTitle}>{`変える（${label(editing)}）`}</h3>
-            <div className={styles.card}>
-              <div className={styles.radios} role="radiogroup" aria-label="受け取り">
+            <Card padding="compact" layout="vertical" gap="var(--polish-space-field)">
+              <RadioGroup className={styles.radios} label="受け取り">
                 {STATES.map((state) => (
                   <Radio key={state} name="consent-state" value={state} checked={next === state} onChange={() => setNext(state)}>{state === 'unknown' ? '不明（まだ聞いていない）' : STATE_LABEL[state]}</Radio>
                 ))}
-              </div>
+              </RadioGroup>
               <Field label="理由" required error={reasonError}>
                 <TextField aria-label="理由" value={reason} placeholder="例：お電話で「宣伝はいらない」とご連絡" onChange={(event) => { setReason(event.target.value); setReasonError('') }} />
               </Field>
-            </div>
+            </Card>
           </section>
         ) : null}
         <section aria-label="履歴">

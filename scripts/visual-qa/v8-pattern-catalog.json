@@ -416,11 +416,14 @@
             "apps/web/src/components/shared/filter-chip.tsx",
             "apps/web/src/components/shared/filter-chip.css",
             "apps/web/src/components/shared/filter-link.tsx",
-            "apps/web/src/components/shared/filter-link.module.css"
+            "apps/web/src/components/shared/filter-link.module.css",
+            "apps/web/src/components/shared/heatmap-table.tsx",
+            "apps/web/src/components/shared/heatmap-table.module.css"
           ],
           "components": [
             "FilterChip",
-            "FilterLink"
+            "FilterLink",
+            "HeatmapTable"
           ],
           "vars": [
             "--color-control-border"
@@ -582,7 +585,9 @@
             "apps/web/src/components/shared/grid-table.tsx",
             "apps/web/src/components/shared/grid-table.module.css",
             "apps/web/src/components/shared/data-table.module.css",
-            "apps/web/src/components/shared/table-presentation.module.css"
+            "apps/web/src/components/shared/table-presentation.module.css",
+            "apps/web/src/components/shared/heatmap-table.tsx",
+            "apps/web/src/components/shared/heatmap-table.module.css"
           ],
           "components": [
             "DataTable",
@@ -595,7 +600,8 @@
             "GridHeadRow",
             "GridRow",
             "GridCell",
-            "PersonCell"
+            "PersonCell",
+            "HeatmapTable"
           ],
           "vars": [
             "--color-table-head",
@@ -2365,12 +2371,17 @@
       ],
       "owner": {
         "code": {
-          "files": [],
-          "components": [],
+          "files": [
+            "apps/web/src/components/shared/period-picker.tsx",
+            "apps/web/src/components/shared/period-picker.module.css"
+          ],
+          "components": [
+            "PeriodPicker"
+          ],
           "vars": []
         },
         "pen": [],
-        "status": "未実装（B-158 の 5：部品を作る）"
+        "status": "集計期間は共通PeriodPickerを使う"
       },
       "code": {
         "selectorHint": "range|period|days",
@@ -2414,11 +2425,14 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/bar-chart.tsx",
-            "apps/web/src/components/shared/bar-chart.module.css"
+            "apps/web/src/components/shared/bar-chart.module.css",
+            "apps/web/src/components/shared/heatmap-table.tsx",
+            "apps/web/src/components/shared/heatmap-table.module.css"
           ],
           "components": [
             "BarChart",
-            "BarChartEmpty"
+            "BarChartEmpty",
+            "HeatmapTable"
           ],
           "vars": []
         },
@@ -2747,7 +2761,9 @@
             "apps/web/src/components/shared/check-card.tsx",
             "apps/liff/src/card-surface.css",
             "apps/liff/src/index.css",
-            "apps/liff/src/components/ui/liff-skin.css"
+            "apps/liff/src/components/ui/liff-skin.css",
+            "apps/web/src/components/shared/heatmap-table.tsx",
+            "apps/web/src/components/shared/heatmap-table.module.css"
           ],
           "components": [
             "Toggle",
@@ -2757,7 +2773,10 @@
             "RadioCard",
             "RadioCardGroup",
             "CheckCard",
-            "UnavailableSelection"
+            "UnavailableSelection",
+            "Radio",
+            "RadioGroup",
+            "HeatmapTable"
           ],
           "vars": [
             "--shadow-controls-toggle"
@@ -2888,7 +2907,8 @@
             "apps/liff/src/components/ui/Stepper.tsx"
           ],
           "components": [
-            "Steps"
+            "Steps",
+            "StepSection"
           ],
           "vars": []
         },

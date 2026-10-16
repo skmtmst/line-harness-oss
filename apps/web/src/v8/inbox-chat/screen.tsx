@@ -1,100 +1,80 @@
 'use client'
 
-import { inboxRoutingApi } from '@/lib/api-gap1'
-import { SlaBadge, assigneeLabel, type ChatSlaFields } from './sla'
-import { jstDate, jstCalendar } from '@/lib/jst-datetime'
-
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { PageTitle } from '@/components/templates/page-frame'
-import FilterChip from '@/components/shared/filter-chip'
-import ListState from '@/components/shared/list-state'
-import { InboxMessage, InboxMessageDay, InboxQuotedMessage } from '@/components/shared/inbox-thread'
-import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls, InboxHistoryButton } from '@/components/shared/inbox-list'
-
-import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton'
-import Avatar from '@/components/shared/avatar'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
-import {
-  api,
-  ApiError,
-  fetchApi,
-  type ChatDetail as ApiChatDetail,
-  type ChatDetailMessage,
-  type ChatListItem,
-  type InboxStats,
-  type ScheduledChatSend,
-} from '@/lib/api'
-import { buildSupportEmailInboxQuery } from './support-email-query'
-import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
-import { withRequestTimeout } from '@/lib/request-timeout'
-import { INBOX_INFO_PANEL_MIN_WIDTH } from './inbox-layout'
-import styles from './list-parts.module.css'
-import { InboxPage, InboxListPane, InboxConversationPane, InboxMessages, InboxComposer, InboxSummaryPane } from '@/components/templates/inbox-page'
-import { InboxComposerTools, InboxToolButton, InboxInputBox, InboxDraftArea, InboxDraftCount, InboxComposerBottom, InboxComposerActions } from '@/components/shared/inbox-composer'
-import Select from '@/components/shared/select'
-import SearchField from '@/components/shared/search-field'
-import { buildOperatorRows, type ChatStatus } from '@/components/chats/inbox-dropdown'
-import { unreadLookup } from '@/components/chats/assignee-unread'
-import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
-import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
-import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
-import { startVisiblePoll } from '@/lib/visible-polling'
-import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
-import { runOptimistic } from '@/lib/undoable'
-import SenderSelect from '@/components/shared/sender-select'
-import { useStaffRole } from '@/lib/staff-role'
-import { useAccount } from '@/contexts/account-context'
-import TemplatePicker from '@/components/chats/template-picker'
-import FlexPreviewComponent from '@/components/flex-preview'
-import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
-import ChatThreadWindow from '@/components/chats/chat-thread-window'
-import ChatSearchBar from '@/v8/inbox-search/chat-search-bar'
-import { useChatSearch } from '@/v8/inbox-search/use-chat-search'
-import InboxRulesPopover from '@/v8/inbox-chat/rules-popover'
-import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog'
-import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css'
-import ConversationHead from '@/v8/inbox-chat/conversation-head'
-import { InboxAiDraft, InboxAiHeadMenu, InboxAiSummary, useInboxAi } from '@/v8/ai-reply/inbox-ai'
-import { formatInboxListTime } from '@/v8/inbox-chat/list-time'
-import AttachMenu from '@/v8/inbox-chat/attach-menu'
-import AttachmentChip, { type PendingAttachmentView } from '@/v8/inbox-chat/attachment-chip'
-import AttachmentMessage from '@/v8/inbox-chat/attachment-message'
-import {
-  ATTACH_NOTE,
-  ATTACH_NOTE_TITLE,
-  attachmentPreviewLabel,
-  attachmentSendInput,
-  checkAttachment,
-  describeUploadFailure,
-  scheduledContentLabel,
-  type AttachSlot,
-} from '@/v8/inbox-chat/attachments'
-import type { ChatAttachment } from '@line-crm/shared'
-import SegmentedControl from '@/components/shared/segmented'
-import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window'
-import { type ImageUploaderValue } from '@/components/shared/image-uploader'
-import { Suspense } from 'react'
-import EmailThread from '@/components/support/email-thread'
-import Button from '@/components/shared/button'
-
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-
-
-import Notice from '@/components/shared/notice'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import { RowMenu } from '@/components/shared/row-actions'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { InboxMedia, InboxFlexContent, InboxFloatingPanel, InboxInfoBackdrop, InboxEmailHeading } from '@/components/shared/inbox-content'
-import { Bookmark, CheckCircle2, Clock3, ListFilter, Reply, FileText, Link2, NotebookPen, Send, Settings2, X } from 'lucide-react'
-
+import { inboxRoutingApi } from '@/lib/api-gap1';
+import { SlaBadge, assigneeLabel, type ChatSlaFields } from './sla';
+import { jstDate, jstCalendar } from '@/lib/jst-datetime';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import { PageTitle } from '@/components/templates/page-frame';
+import FilterChip from '@/components/shared/filter-chip';
+import ListState from '@/components/shared/list-state';
+import { InboxMessage, InboxMessageDay, InboxQuotedMessage } from '@/components/shared/inbox-thread';
+import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls, InboxHistoryButton } from '@/components/shared/inbox-list';
+import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton';
+import Avatar from '@/components/shared/avatar';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { api, ApiError, fetchApi, type ChatDetail as ApiChatDetail, type ChatDetailMessage, type ChatListItem, type InboxStats, type ScheduledChatSend } from '@/lib/api';
+import { buildSupportEmailInboxQuery } from './support-email-query';
+import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query';
+import { withRequestTimeout } from '@/lib/request-timeout';
+import { INBOX_INFO_PANEL_MIN_WIDTH } from './inbox-layout';
+import styles from './list-parts.module.css';
+import { InboxPage, InboxListPane, InboxConversationPane, InboxMessages, InboxComposer, InboxSummaryPane } from '@/components/templates/inbox-page';
+import { InboxComposerTools, InboxToolButton, InboxInputBox, InboxDraftArea, InboxDraftCount, InboxComposerBottom, InboxComposerActions } from '@/components/shared/inbox-composer';
+import SearchField from '@/components/shared/search-field';
+import { buildOperatorRows, type ChatStatus } from '@/components/chats/inbox-dropdown';
+import { unreadLookup } from '@/components/chats/assignee-unread';
+import InboxFilterPanel from '@/components/chats/inbox-filter-panel';
+import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog';
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
+import { startVisiblePoll } from '@/lib/visible-polling';
+import { UNANSWERED_REFRESH_EVENT } from '@/lib/events';
+import { runOptimistic } from '@/lib/undoable';
+import SenderSelect from '@/components/shared/sender-select';
+import { useStaffRole } from '@/lib/staff-role';
+import { useAccount } from '@/contexts/account-context';
+import TemplatePicker from '@/components/chats/template-picker';
+import FlexPreviewComponent from '@/components/flex-preview';
+import FriendInfoSidebar from '@/components/chats/friend-info-sidebar';
+import ChatThreadWindow from '@/components/chats/chat-thread-window';
+import ChatSearchBar from '@/v8/inbox-search/chat-search-bar';
+import { useChatSearch } from '@/v8/inbox-search/use-chat-search';
+import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
+import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog';
+import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css';
+import ConversationHead from '@/v8/inbox-chat/conversation-head';
+import { InboxAiDraft, InboxAiHeadMenu, InboxAiSummary, useInboxAi } from '@/v8/ai-reply/inbox-ai';
+import { formatInboxListTime } from '@/v8/inbox-chat/list-time';
+import AttachMenu from '@/v8/inbox-chat/attach-menu';
+import AttachmentChip, { type PendingAttachmentView } from '@/v8/inbox-chat/attachment-chip';
+import AttachmentMessage from '@/v8/inbox-chat/attachment-message';
+import { ATTACH_NOTE, ATTACH_NOTE_TITLE, attachmentPreviewLabel, attachmentSendInput, checkAttachment, describeUploadFailure, scheduledContentLabel, type AttachSlot } from '@/v8/inbox-chat/attachments';
+import type { ChatAttachment } from '@line-crm/shared';
+import SegmentedControl from '@/components/shared/segmented';
+import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
+import { type ImageUploaderValue } from '@/components/shared/image-uploader';
+import { Suspense } from 'react';
+import EmailThread from '@/components/support/email-thread';
+import Button from '@/components/shared/button';
+import ConfirmDialog from '@/components/shared/confirm-dialog';
+import Dialog from '@/components/shared/dialog';
+import Notice from '@/components/shared/notice';
+import { useOverlayFocus } from '@/components/shared/overlay-utils';
+import { RowMenu } from '@/components/shared/row-actions';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { japaneseDetailOf } from '@/components/shared/api-error-message';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { InboxMedia, InboxFlexContent, InboxFloatingPanel, InboxInfoBackdrop, InboxEmailHeading } from '@/components/shared/inbox-content';
+import { Bookmark, Clock3, ListFilter, Reply, FileText, Link2, NotebookPen, Send, Settings2, X } from 'lucide-react';
+import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types';
+import { savedViewFailureMessage } from './saved-view-failure';
+import { savedViewSummary } from './saved-view-summary';
+import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic';
+import { describeSendFailure } from './send-failure';
+import { formatDateTime, formatNumber, formatTime } from '@/lib/format';
+import { StickerMessageImage, ChatImageMessage } from "./screen-gap-parts"
 type Chat = ChatListItem
 
 /**
@@ -142,13 +122,6 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
  */
 const statusFiltersV8 = statusFilters.filter((f) => f.key !== 'all')
 
-import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
-import { savedViewFailureMessage } from './saved-view-failure'
-import { savedViewSummary } from './saved-view-summary'
-import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
-import { describeSendFailure } from './send-failure'
-import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
-
 type InboxSavedView = {
   id: string
   name: string
@@ -186,92 +159,6 @@ function toListCursor(
 ): ListCursor | null {
   if (!last?.lastMessageAt) return null
   return { at: last.lastMessageAt, id: last.id, unread: last.isUnread ? 1 : 0 }
-}
-
-function StickerMessageImage({ content }: { content: string }) {
-  const [failed, setFailed] = useState(false)
-  const [retryKey, setRetryKey] = useState(0)
-  const sticker = parseStickerMessageContent(content)
-  const fallback = stickerFallback(content)
-
-  // 本文由来のURLをそのまま読みに行く。https 以外(意図しない scheme・
-  // 空文字など)は画像にせず、文字の代替表示に倒す。共通側の許可リスト
-  // 検証(#493-C1)が入るまでの間の最低限の guard。
-  if (!sticker || failed || !sticker.stickerUrl.startsWith('https://')) {
-    return (
-      <span className="inline-flex flex-col items-center gap-1">
-        <span>{fallback}</span>
-        {sticker && failed ? (
-          <button
-            type="button"
-            onClick={() => { setFailed(false); setRetryKey((key) => key + 1) }}
-            className="text-action text-micro font-semibold underline underline-offset-2"
-          >
-            画像を読み込み直す
-          </button>
-        ) : null}
-      </span>
-    )
-  }
-
-  return (
-    <InboxMedia kind="sticker"
-      key={retryKey}
-      src={sticker.stickerUrl}
-      alt={fallback}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-    />
-  )
-}
-
-/**
- * 履歴の画像メッセージ(INBOX-30)。
- *
- * 以前は alt 空・onError なしの `<img>` だけで、404・期限切れ・回線断で
- * 何も出ない空白になっていた。スタンプと同じく、失敗は代替表示と
- * 再読み込みに倒す。画像の内容は推測して書かない。
- */
-function ChatImageMessage({ content }: { content: string }) {
-  const [failed, setFailed] = useState(false)
-  const [retryKey, setRetryKey] = useState(0)
-  let url: string | null = null
-  try {
-    const parsed = JSON.parse(content) as { originalContentUrl?: unknown; previewImageUrl?: unknown }
-    const candidate = parsed.originalContentUrl ?? parsed.previewImageUrl
-    if (typeof candidate === 'string' && candidate.startsWith('https://')) url = candidate
-  } catch {
-    url = null
-  }
-
-  if (!url || failed) {
-    return (
-      <span className="flex min-w-40 flex-col items-center justify-center gap-1.5 rounded-mini bg-canvas-sunken px-4 py-6 text-center">
-        <span className="text-ink-faint text-xs">画像を読み込めませんでした</span>
-        {url ? (
-          <button
-            type="button"
-            onClick={() => { setFailed(false); setRetryKey((key) => key + 1) }}
-            className="text-action text-xs font-semibold underline underline-offset-2"
-          >
-            画像を読み込み直す
-          </button>
-        ) : null}
-      </span>
-    )
-  }
-
-  return (
-    <InboxMedia kind="image"
-      key={retryKey}
-      src={url}
-      alt="画像"
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-    />
-  )
 }
 
 function formatInboxDatetime(iso: string | null): string {

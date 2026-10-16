@@ -38,12 +38,12 @@ import styles from './payments.module.css'
 
 const TABLE_LAYOUT = { headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--polish-space-section)', bodyTextSize: 'var(--polish-text-body)', collapseScope: 'page' as const }
 const STATUS_FILTER = [
-  { value: '', label: '状態：すべて' },
-  { value: 'pending', label: `状態：${PAYMENT_STATUS.unpaid.label}` },
-  { value: 'paid', label: `状態：${PAYMENT_STATUS.paid.label}` },
-  { value: 'refunded', label: `状態：${PAYMENT_STATUS.refunded.label}` },
-  { value: 'expired', label: `状態：${PAYMENT_STATUS.expired.label}` },
-  { value: 'onsite', label: '状態：お店で払う' },
+  { value: '', label: 'すべて' },
+  { value: 'pending', label: `${PAYMENT_STATUS.unpaid.label}` },
+  { value: 'paid', label: `${PAYMENT_STATUS.paid.label}` },
+  { value: 'refunded', label: `${PAYMENT_STATUS.refunded.label}` },
+  { value: 'expired', label: `${PAYMENT_STATUS.expired.label}` },
+  { value: 'onsite', label: 'お店で払う' },
 ]
 const METHOD_FILTER = [
   { value: '', label: '方法：すべて' },
@@ -68,6 +68,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [refundTarget, setRefundTarget] = useState<PaymentRecord | null>(null)
   const [testMode, setTestMode] = useState(false)
+  const [refundKey, setRefundKey] = useState(() => crypto.randomUUID())
   const [refunding, setRefunding] = useState(false)
   const [refundError, setRefundError] = useState<string | null>(null)
   const preparing = usePreparingDialog()
@@ -103,7 +104,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
       ...(record.bookingId ? [{ id: 'open', label: '予約を開く', icon: <CalendarDays size={15} aria-hidden="true" />, href: `/booking/bookings?booking=${encodeURIComponent(record.bookingId)}` }] : []),
       ...(canEdit && record.status === 'pending' ? [{ id: 'link', label: '支払いのリンクを送る', icon: <Send size={15} aria-hidden="true" />, onSelect: () => void previewLink(record) }] : []),
       ...(record.receiptUrl ? [{ id: 'receipt', label: '領収書を見る', icon: <FileText size={15} aria-hidden="true" />, href: record.receiptUrl, external: true }] : []),
-      ...(canEdit && record.status === 'paid' ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={15} aria-hidden="true" />, onSelect: () => { setRefundError(null); setRefundTarget(record) } }] : []),
+      ...(canEdit && record.status === 'paid' ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={15} aria-hidden="true" />, onSelect: () => { setRefundError(null); setRefundKey(crypto.randomUUID()); setRefundTarget(record) } }] : []),
     ]
   }
 
@@ -146,7 +147,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
     setRefunding(true)
     setRefundError(null)
     try {
-      await bookingPaymentAdminApi.refund(refundTarget.id)
+      await bookingPaymentAdminApi.refund(refundTarget.id, { amount: input.amount, reason: input.reason, notifyLine: input.notify, idempotencyKey: refundKey })
     } catch (cause) {
       setRefundError(cause instanceof ApiError && cause.status === 409 ? 'この支払いは返金できません（支払い済みのものだけ返金できます）。'
         : cause instanceof ApiError && cause.status === 403 ? '返金する権限がありません。'

@@ -1,5 +1,7 @@
 'use client'
 
+import Card from '@/components/shared/card'
+
 import { useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -37,11 +39,11 @@ export default function SeriesPanelSection({ series, bookings, accountId, custom
   const newStartsAt = `${jstDay}T${time}:00+09:00`
 
   return (
-    <section className={styles.card} aria-label="繰り返し">
+    <Card padding="compact" layout="vertical" gap="var(--polish-space-field)" aria-label="繰り返し">
       <h3 className={styles.title}>繰り返し（{target.ruleText}・全 {sorted.length} 回）</h3>
       <ol className={styles.list}>
         {sorted.map((o, i) => (
-          <li key={o.id} data-current={o.id === bookingId || undefined}>
+          <li className={styles.occurrence} key={o.id} data-current={o.id === bookingId || undefined}>
             <span>{(o.series_index ?? i) + 1} 回目</span><span>{dayWithWeekday(o.starts_at)} {hm(o.starts_at)}</span>
             {o.id === bookingId ? <span className={styles.here}>この予約</span> : null}
           </li>
@@ -56,6 +58,6 @@ export default function SeriesPanelSection({ series, bookings, accountId, custom
       </Dialog>
       {mode ? <SeriesScopeDialog open mode={mode} accountId={accountId} target={target} newStartsAt={mode === 'change' ? newStartsAt : undefined}
         onClose={() => setMode(null)} onDone={() => { setMode(null); onChanged() }} /> : null}
-    </section>
+    </Card>
   )
 }

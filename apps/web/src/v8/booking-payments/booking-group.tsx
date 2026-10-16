@@ -1,5 +1,7 @@
 'use client'
 
+import { DataTable, Tr, Th, Td, TableHeadRow } from '@/components/shared/table'
+
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -43,17 +45,17 @@ export function BookingGroupSection({ accountId, bookingId, canOperate, onChange
   return (
     <section className={`${styles.section} ${styles.groupSection}`} aria-label="この組">
       <div className={styles.headRow}><h3 className={styles.title}>{`この組（${group.members.length} 人）`}</h3>{group.ownerName ? <span className={styles.minor}>{`${group.ownerName} さまの予約`}</span> : null}</div>
-      <div className={styles.groupTable} role="table" aria-label="この組の予約">
-        <div className={`${styles.groupRow} ${styles.groupHead}`} role="row"><span role="columnheader">人</span><span role="columnheader">メニュー</span><span role="columnheader">担当</span><span role="columnheader">時間</span></div>
+      <DataTable aria-label="この組の予約">
+        <thead><TableHeadRow><Th>人</Th><Th>メニュー</Th><Th>担当</Th><Th>時間</Th></TableHeadRow></thead><tbody>
         {group.members.map((member) => (
-          <div key={member.bookingId} className={styles.groupRow} role="row">
-            <span role="cell" title={member.personName}>{member.personName}</span>
-            <span role="cell" className={styles.groupWrap}>{member.menuName}</span>
-            <span role="cell">{member.staffName ?? '—'}</span>
-            <span role="cell">{`${formatTime(member.startsAt)}〜${formatTime(member.endsAt)}`}</span>
-          </div>
+          <Tr key={member.bookingId}>
+            <Td title={member.personName}>{member.personName}</Td>
+            <Td>{member.menuName}</Td>
+            <Td>{member.staffName ?? '—'}</Td>
+            <Td>{`${formatTime(member.startsAt)}〜${formatTime(member.endsAt)}`}</Td>
+          </Tr>
         ))}
-      </div>
+      </tbody></DataTable>
       {canOperate ? <div className={styles.actions}><Button variant="danger" onClick={() => { setReason(''); setError(null); setOpen(true) }}>組をまとめて取り消す</Button></div> : null}
       <Dialog open={open} title="組をまとめて取り消しますか？" titleNote={`${group.members.length} 件の予約をまとめて取り消します`} size="small" contentLayout="form" tone="destructive"
         busy={busy} error={error ?? undefined} cancelLabel="やめる" onCancel={() => { if (!busy) setOpen(false) }}

@@ -449,7 +449,7 @@ export default function MenuFormV8() {
   }
 
   /* 「この人で見る」：選んだ友だちに、作りかけのメニューが見えるか（タグで限定したとき）。 */
-  const hiddenForPreview = (() => {
+  const hiddenMenuFields = (() => {
     const friend = previewFriends.find((item) => item.id === previewFriendId)
     if (!friend) return null
     const verdict = audienceVisibility(audienceMode, audienceTagIds, friend.tags.map((tag) => tag.id), (id) => tags.find((tag) => tag.id === id)?.name ?? '選んだタグ')
@@ -933,11 +933,11 @@ export default function MenuFormV8() {
             {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
           </div>
           <p className={shell.sideTitle}>お客さまの予約画面</p>
-          {hiddenForPreview ? <Notice tone="warn">{`${hiddenForPreview.name}さんには「${draftMenu.name}」は見えません（${hiddenForPreview.reason}）`}</Notice> : null}
+          {hiddenMenuFields ? <Notice tone="warn">{`${hiddenMenuFields.name}さんには「${draftMenu.name}」は見えません（${hiddenMenuFields.reason}）`}</Notice> : null}
           <>
             <LiffPhoneMenuStep categoryTone="customer"
               menus={menus.filter((menu) => menu.id !== editTarget?.id)}
-              draft={hiddenForPreview ? null : draftMenu}
+              draft={hiddenMenuFields ? null : draftMenu}
               status={menusStatus}
             />
           </>

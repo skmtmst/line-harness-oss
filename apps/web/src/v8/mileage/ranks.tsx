@@ -160,13 +160,13 @@ export default function RanksTab() {
             <Tr key={tier.id} data-row-id={tier.id}>
               <Td><StatusBadge tone={index === 0 ? 'neutral' : index === tiers.length - 1 ? 'warning' : 'info'} dot={false}>{tier.name}</StatusBadge></Td>
               <Td grow><TruncatedText value={upText(program, tier, index === 0)} /></Td>
-              <Td>{index === 0 ? <span className={styles.empty}>—</span> : downText(program, tier)}</Td>
+              <Td>{index === 0 ? <span className={styles.unavailableValue}>—</span> : downText(program, tier)}</Td>
               <Td>
                 {tier.mileMultiplier > 1
                   ? <>{`${tier.mileMultiplier} 倍`}{tier.benefitDescriptions?.length ? <span className={styles.sub} title={tier.benefitDescriptions.join(' ・ ')}>{tier.benefitDescriptions.join(' ・ ')}</span> : null}</>
-                  : tier.benefitDescriptions?.length ? <span title={tier.benefitDescriptions.join(' ・ ')}>{tier.benefitDescriptions.join(' ・ ')}</span> : <span className={styles.empty}>—</span>}
+                  : tier.benefitDescriptions?.length ? <span title={tier.benefitDescriptions.join(' ・ ')}>{tier.benefitDescriptions.join(' ・ ')}</span> : <span className={styles.unavailableValue}>—</span>}
               </Td>
-              <Td align="right">{count === undefined ? <span className={styles.empty}>—</span> : `${formatNumber(count)} 人`}</Td>
+              <Td align="right">{count === undefined ? <span className={styles.unavailableValue}>—</span> : `${formatNumber(count)} 人`}</Td>
               <ActionCell>
                 {readonly ? null : (
                   <span className={styles.menuBox}>

@@ -1,5 +1,12 @@
 'use client'
 
+import EntitySelect from '@/components/shared/entity-select'
+
+import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
+
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Ban, CalendarPlus, Info, Pencil, Plus, Ticket } from 'lucide-react'
 import type { BookingEntitlementEvent, BookingEntitlementOperation, BookingEntitlementView } from '@line-crm/shared'
@@ -181,7 +188,7 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
       notifySaved(action === 'revoke' ? '回数券を取り消しました' : '回数券を更新しました')
       onDone()
     } catch (cause) {
-      setError(cause instanceof ApiError && cause.status === 409 ? 'ほかの人が先に直しました。閉じて開き直してから、もう一度お試しください。'
+      setError(isConflictResponse(cause) ? CONFLICT_TEXT.reopen
         : cause instanceof ApiError && cause.status === 403 ? '回数券を変える権限がありません。'
           : isNotReadyError(cause) ? 'データの準備が済むと保存できます。'
             : '保存できませんでした。もう一度お試しください。')
@@ -202,7 +209,7 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
               onChange={(value) => { setAction(value as Action); if (value !== 'give' && targetId === NEW_TICKET && items[0]) setTargetId(items[0].id) }} />
           ))}
         </RadioCardGroup>
-        <div className={styles.fullSelect}><Select aria-label="対象の回数券" value={targetId} onChange={setTargetId} size="full"
+        <div className={styles.fullSelect}><EntitySelect aria-label="対象の回数券" value={targetId} onChange={setTargetId} size="full"
           options={[...items.map((item) => ({ value: item.id, label: optionLabel(item) })), ...(action === 'give' ? [{ value: NEW_TICKET, label: '新しい回数券を付ける' }] : [])]} /></div>
         {isNew ? (
           <Field label="回数券の名前" required error={submitted && !name.trim() ? '名前を入れてください' : undefined}>
@@ -276,11 +283,11 @@ export function EntitlementDrawer({ item, accountId, friendName, canEdit, onClos
     <Drawer open={item !== null} title={item?.name ?? ''} description={`${friendName || 'この友だち'} さん`} onClose={onClose} width="editor" closeAppearance="box" heightMode="viewport">
       {item ? (
         <div className={styles.drawerBody}>
-          <div className={styles.stats}>
-            <div className={styles.stat}><span className={styles.statLabel}>残り</span><span className={styles.statValue}>{item.kind === 'monthly' ? `${item.monthRemaining ?? '—'} 回` : `${item.remaining ?? 0} 回`}</span></div>
-            <div className={styles.stat}><span className={styles.statLabel}>期限</span><span className={styles.statValue}>{shortDay(item.expires_at)}</span></div>
-            <div className={styles.stat}><span className={styles.statLabel}>使った</span><span className={styles.statValue}>{used === null ? '—' : `${used} 回`}</span></div>
-          </div>
+          <KpiBand>
+            <KpiCard detail="" presentation="band" title="残り" value={item.kind === 'monthly' ? item.monthRemaining : item.remaining} unit="回" />
+            <KpiCard detail="" presentation="band" title="期限" value={null} valueText={shortDay(item.expires_at)} unit="" />
+            <KpiCard detail="" presentation="band" title="使った" value={used} unit="回" />
+          </KpiBand>
           <div className={styles.historyHead}>
             <h3 className={styles.historyTitle}>履歴</h3>
             {canEdit ? <Button onClick={() => onAdd(item.id)}><Plus size={15} aria-hidden="true" />手で入れる</Button> : null}

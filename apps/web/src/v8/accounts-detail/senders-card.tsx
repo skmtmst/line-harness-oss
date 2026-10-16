@@ -1,5 +1,9 @@
 'use client'
 
+import { mediaLimitLabel } from '@/components/shared/media-slot'
+
+import { OptionalBadge } from '@/components/shared/form-controls'
+
 /*
  * 送り手（板 Asa6v・G8）：メッセージの送り主として、お客さまの LINE に出る名前と顔。
  * 一覧（アイコン・名前・使える人）と［送り手を追加］。口は lineSenderApi（Codex・GAP1）。
@@ -138,17 +142,16 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
               : <><ImagePlus size={22} aria-hidden="true" /><span>画像を選ぶ</span></>}
           </button>
           <div className={styles.iconText}>
-            <strong>アイコン（任意）</strong>
-            <span>登録メディアから選び、正方形に切ります。1MB まで（PNG・JPEG）。無いときはアカウントのアイコン</span>
+            <strong>アイコン<OptionalBadge /></strong>
+            <span>登録メディアから選び、正方形に切ります。{mediaLimitLabel('image/png,image/jpeg', 1024 * 1024)}。無いときはアカウントのアイコン</span>
             {icon ? <Button size="compact" variant="text" onClick={() => setIcon(null)}>外す</Button> : null}
           </div>
         </div>
-        <div className={styles.nameWrap}><Field label="名前" required htmlFor="sender-name">
+        <div className={styles.nameWrap}><Field label="名前" required htmlFor="sender-name" count={{ value: name.trim().length, max: NAME_MAX }}>
           <TextField id="sender-name" value={name} onChange={(e) => setName(e.target.value)}  placeholder="例：渋谷店 予約係" />
         </Field></div>
         <div className={styles.nameNote}>
           <span>「LINE」「ライン」は名前に使えません</span>
-          <span className={name.trim().length > NAME_MAX ? styles.over : undefined}>{name.trim().length} / {NAME_MAX}</span>
         </div>
         {canManage ? (
           <Select aria-label="使える人" size="full" value={visibility} onChange={(value) => setVisibility(value as 'all' | 'owner_only')}

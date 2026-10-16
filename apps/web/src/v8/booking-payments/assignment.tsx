@@ -1,5 +1,9 @@
 'use client'
 
+import { DataTable, Tr, Th, Td } from '@/components/shared/table'
+
+import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
+
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ListOrdered, Lock, Scale, Shuffle } from 'lucide-react'
 import type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentSettings } from '@line-crm/shared'
@@ -106,7 +110,7 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
       apply(response.data); conflict.clear()
       notifySaved('割り当て方を保存しました')
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 409) {
+      if (isConflictResponse(cause)) {
         /* 共通の帯と比べる窓（違いを比べる／最新を読み込んで続ける）。入力は捨てない。 */
         conflict.mark()
       } else if (isNotReadyError(cause)) {

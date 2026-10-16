@@ -1,5 +1,8 @@
 'use client'
 
+import Card from '@/components/shared/card'
+import Button from '@/components/shared/button'
+
 import { Check } from 'lucide-react'
 import type { StepperStep } from '@/components/shared/stepper'
 import styles from './steps.module.css'
@@ -92,4 +95,19 @@ export function Steps({
       </ol>
     </nav>
   )
+}
+
+/** 段を開いて入力し、閉じた段には要約と変更口を残す作成画面。 */
+export function StepSection({ order, title, summary, open, onChange, children }: {
+  order: number; title: string; summary: string; open: boolean; onChange: () => void; children: import('react').ReactNode
+}) {
+  return <Card padding="default" layout="vertical" gap="var(--polish-space-field)" selected={open} aria-label={`${order} ${title}`}>
+    <div className={styles.sectionHead}>
+      <span className={styles.sectionNumber}>{order}</span>
+      <span className={styles.sectionTitle}>{title}</span>
+      <span className={styles.sectionSummary} title={open ? undefined : summary}>{open ? null : summary}</span>
+      {open ? null : <Button variant="secondary" onClick={onChange}>変える</Button>}
+    </div>
+    {open ? <div className={styles.sectionBody}>{children}</div> : null}
+  </Card>
 }

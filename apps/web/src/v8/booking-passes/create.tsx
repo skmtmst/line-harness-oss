@@ -1,5 +1,9 @@
 'use client'
 
+import { PASS_LIST_HREF } from './words'
+
+import { StepSection } from '@/components/templates/steps'
+
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Pencil, Plus } from 'lucide-react'
@@ -162,7 +166,7 @@ function PassCreateInner() {
       }
       setDirty(false)
       notifySaved(start ? `「${plan.name}」の販売を始めました。` : `「${plan.name}」を下書きで保存しました。`)
-      router.push('/booking/menus?tab=passes')
+      router.push(PASS_LIST_HREF)
     } catch (reason) {
       setConfirmCreate(false)
       if (!errorsScope.capture(reason)) setNotice(failureText(reason, start ? '作る' : '保存する'))
@@ -177,21 +181,12 @@ function PassCreateInner() {
   const summary4 = 'まだ（あとで Stripe とつなぐ）'
 
   const stepCard = (n: StepKey, title: string, summary: string, content: ReactNode, change?: () => void) => (
-    <section key={n} className={styles.step} data-open={open === n} aria-label={`${n} ${title}`}>
-      <div className={styles.stepHead}>
-        <span className={styles.stepNumber}>{n}</span>
-        <span className={styles.stepTitle}>{title}</span>
-        {open === n ? null : <span className={styles.stepSummary} title={summary}>{summary}</span>}
-        {open === n ? <span className={styles.stepSummary} /> : null}
-        {open === n ? null : <Button variant="secondary" icon={<Pencil size={16} aria-hidden="true" />} onClick={change ?? (() => setOpen(n))}>変える</Button>}
-      </div>
-      {open === n ? <div className={styles.stepBody}>{content}</div> : null}
-    </section>
+    <StepSection key={n} order={n} title={title} summary={summary} open={open === n} onChange={change ?? (() => setOpen(n))}>{content}</StepSection>
   )
 
   const footer = canEdit ? (
     <>
-      <Button onClick={() => router.push('/booking/menus?tab=passes')} disabled={busy !== null}>キャンセル</Button>
+      <Button onClick={() => router.push(PASS_LIST_HREF)} disabled={busy !== null}>キャンセル</Button>
       <Button variant="secondary" onClick={() => void submit(false)} busy={busy === 'draft'} disabled={busy !== null}>下書き保存</Button>
       <Button variant="primary" onClick={() => { if (body()) setConfirmCreate(true) }} busy={busy === 'create'} disabled={busy !== null}>作る</Button>
     </>
@@ -206,7 +201,7 @@ function PassCreateInner() {
   ) : loadState === 'missing' ? (
     <ListState kind="empty" emptyPreset="readonly" title="この回数券・月謝は直せません" description="見つからないか、販売を始めたあとです。販売を始めた券は、やめることだけできます。" />
   ) : (
-    <div className={styles.steps}>
+    <div className={styles.formSections}>
       {notice ? <Notice tone="danger" message={notice} /> : null}
       {stepCard(1, '種類と値段', summary1, (
         <>

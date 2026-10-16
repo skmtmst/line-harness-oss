@@ -1,5 +1,9 @@
 'use client'
 
+import Notice from '@/components/shared/notice'
+
+import { DataTable, Tr, Th, Td } from '@/components/shared/table'
+
 import { useEffect, useState } from 'react'
 import Dialog from '@/components/shared/dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -125,23 +129,23 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
             note={changing ? `${dayOf(target.startsAt)} から ${dayOf(last)} まで ${newTime} に変える。埋まっている回は前のまま` : `${dayOf(target.startsAt)} から ${dayOf(last)} まで取り消す。繰り返しはここで終わる`} />
         </RadioCardGroup>
         <h3 className={styles.heading}>{changing ? (items && count !== items.length ? `変わる日（${items.length} 件のうち ${count} 件）` : `変わる日（${items?.length ?? '…'} 件）`) : `取り消す日（${items?.length ?? '…'} 件）`}</h3>
-        {loadError ? <p className={styles.error} role="alert">対象の日を読み込めませんでした。<button type="button" className={styles.retry} onClick={() => setRetry((n) => n + 1)}>もう一度</button></p> : null}
-        {!loadError ? <table className={styles.table} aria-busy={!items}>
-          <thead><tr><th>日</th><th>{changing ? '前' : '時間'}</th><th>{changing ? '後' : 'キャンセル料'}</th></tr></thead>
+        {loadError ? <Notice tone="danger">対象の日を読み込めませんでした。<button type="button" className={styles.retry} onClick={() => setRetry((n) => n + 1)}>もう一度</button></Notice> : null}
+        {!loadError ? <DataTable aria-busy={!items}>
+          <thead><Tr><Th>日</Th><Th>{changing ? '前' : '時間'}</Th><Th>{changing ? '後' : 'キャンセル料'}</Th></Tr></thead>
           <tbody>
             {(items ?? []).map((item) => (
-              <tr key={item.id} data-blocked={(changing && blockedIds.has(item.id)) || undefined}>
-                <td>{dayWithWeekday(item.starts_at)}</td>
-                <td>{hm(item.starts_at)}</td>
-                <td className={(changing ? blockedIds.has(item.id) : impact?.[item.id]?.fee) ? styles.warn : undefined}>
+              <Tr key={item.id} data-blocked={(changing && blockedIds.has(item.id)) || undefined}>
+                <Td>{dayWithWeekday(item.starts_at)}</Td>
+                <Td>{hm(item.starts_at)}</Td>
+                <Td className={(changing ? blockedIds.has(item.id) : impact?.[item.id]?.fee) ? styles.warn : undefined}>
                   {changing ? (blockedIds.has(item.id) ? `埋まっています・${hm(item.starts_at)} のまま` : newTime)
                     : impact ? (impact[item.id]?.fee ? `${yen(impact[item.id].fee!.amount)}（${impact[item.id].fee!.percent}%・${impact[item.id].fee!.reason}）` : 'かかりません')
                     : <button type="button" className={styles.retry} onClick={() => preparing.open('キャンセル料の前もっての見込み')}>見込みを見る</button>}
-                </td>
-              </tr>
+                </Td>
+              </Tr>
             ))}
           </tbody>
-        </table> : null}
+        </DataTable> : null}
         {changing || impact ? null : <p className={styles.note}>取り消すと元に戻せません。キャンセル料は期限を過ぎた回だけに掛かり、取り消しの結果の知らせに見込みの金額が出ます（請求は予約の詳細の「お支払い」から）。</p>}
         <Checkbox checked={false} onCheckedChange={() => preparing.open('LINE でのお知らせ')}>{target.customerName} さんに LINE で知らせる（{changing ? '変わった日と時間' : '取り消した日'}）</Checkbox>
         {preparing.dialog}

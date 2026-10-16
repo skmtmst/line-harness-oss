@@ -1,5 +1,7 @@
 'use client'
 
+import { PAGE_SIZES, pageSizeOptions } from '@/components/shared/page-size-options'
+
 /*
  * ★V8 外部連携 › AI の操作の記録（板 hqhj5）。要件 G9 §2-1・§2-6・§4（MCP-04・06・11・15・16・17・22）。
  * 題の下に接続の名前とできること、右上に［この接続を止める］（オーナー・管理者・代理ログイン）。
@@ -35,11 +37,6 @@ const PERIOD_OPTIONS = [
   { value: '7', label: '期間：過去7日' },
   { value: '30', label: '期間：過去30日' },
   { value: '90', label: '期間：過去90日' },
-]
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
 ]
 
 type Load = { kind: 'loading' } | { kind: 'ready'; items: McpCallLog[]; total: number; connection: McpConnection | null } | { kind: 'error'; error: unknown }
@@ -116,7 +113,7 @@ export default function McpLogV8() {
         <Select size="content" aria-label="したこと" value={url.what} options={CALL_FILTER_OPTIONS} onChange={(what) => setUrl({ what, page: '1' })} />
         <Select size="content" aria-label="期間" value={String(days)} options={PERIOD_OPTIONS} onChange={(next) => setUrl({ days: next, page: '1' })} />
         <ListToolbarEnd>
-          <Select size="page-size" aria-label="表示件数" value={String(size)} options={PAGE_SIZE_OPTIONS} onChange={(next) => setUrl({ size: next, page: '1' })} />
+          <Select size="page-size" aria-label="表示件数" value={String(size)} options={pageSizeOptions(PAGE_SIZES)} onChange={(next) => setUrl({ size: next, page: '1' })} />
         </ListToolbarEnd>
       </ListToolbarRow></ListToolbarFrame>}
       pagination={load.kind === 'ready' && total > size ? <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / size))} onPageChange={(next) => setUrl({ page: String(next) })} range={{ total, first: (page - 1) * size + 1, last: Math.min(total, page * size) }} /> : undefined}
