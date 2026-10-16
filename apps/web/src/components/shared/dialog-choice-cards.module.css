@@ -7,6 +7,10 @@
   width: 100%;
 }
 
+.grid[data-columns='4'] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .card {
   position: relative;
   min-width: 0;

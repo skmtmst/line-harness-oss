@@ -37,7 +37,7 @@ export function DashboardRow({ children, aside, asideRef, variant, asideSize, as
     {aside ? <aside ref={asideRef} className={styles.dashboardAside} data-template-region="aside" data-aside-size={asideSize}>{aside}</aside> : null}
   </div>
 }
-export function DashboardColumns({ children, layout, cardHeight }: { children: ReactNode[]; layout?: 'overview' | 'cards'; cardHeight?: 'natural' }) {
+export function DashboardColumns({ children, layout, cardHeight }: { children: ReactNode[]; layout?: 'overview' | 'cards'; cardHeight?: 'natural' | 'equal' }) {
   return <div className={`${styles.dashboardRow} ${styles.dashboardColumns}`} data-template-region="row" data-layout={layout} data-card-height={cardHeight}>{layout === 'cards' ? Children.toArray(children) : children.map((child, index) => <div className={styles.dashboardCell} key={index}>{child}</div>)}</div>
 }
 

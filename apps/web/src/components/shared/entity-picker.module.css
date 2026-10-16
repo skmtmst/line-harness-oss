@@ -21,12 +21,26 @@
 .embedded { flex: none; height: var(--tpl-picker-embed-h); }
 .multiList { gap: var(--tpl-picker-gap); padding: var(--tpl-picker-list-pad); }
 .multiRows { display: flex; flex-direction: column; gap: var(--tpl-picker-row-gap); min-height: 0; overflow-y: auto; }
-.multiRow { display: flex; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); }
-.multiRow[data-selected] { background: var(--color-accent-soft); }
+/* S2Vgi（正の形）：行は薄い枠の箱、選んだ行は緑の地と緑の枠。 */
+.multiRow { display: flex; flex: none; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-bd-ring); }
+.multiRow[data-selected] { background: var(--color-accent-soft); box-shadow: var(--tpl-bd-ring-accent); }
+/* 窓の中身の高さは「テンプレートを選ぶ」と同じ。候補が多くても下の帯を画面の外へ押し出さない。 */
+/* 1つ選ぶ窓も高さを決め、候補が多いときは一覧の中を送る（f63Jza：候補29件で下の段が画面の外へ出ていた）。 */
+.singleBody { height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); }
+:root .singleBody .tpList > * { flex-shrink: 0; }
+:root .singleBody .tpCard { padding: var(--tpl-picker-single-card-pad); }
+.multiBody { height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); }
+.multiBody .multiList > * { flex: none; }
+.multiBody .multiList > .multiRows { flex: 1 1 auto; }
 .multiRow[data-disabled] { color: var(--color-ink-faint); }
-.multiName { display: flex; align-items: center; gap: var(--tpl-picker-gap); flex: 1; min-width: 0; cursor: pointer; font-size: var(--text-caption); font-weight: 600; }
+.multiName { display: flex; align-items: center; gap: var(--tpl-picker-gap); flex: 1 1 auto; min-width: 0; cursor: pointer; font-size: var(--text-caption); font-weight: 600; }
 .multiNameText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.multiExtra { flex-shrink: 0; display: inline-flex; align-items: center; }
+.multiExtra { flex: 0 1 auto; min-width: 0; overflow: hidden; display: inline-flex; align-items: center; }
+.multiRow[data-stacked] { min-height: var(--tpl-picker-stack-row-h); padding: var(--tpl-picker-stack-row-pad); }
+.multiStack { display: flex; flex-direction: column; justify-content: center; gap: var(--tpl-picker-stack-gap); flex: 1 1 auto; min-width: 0; cursor: pointer; }
+.multiStack > .multiName { flex: none; cursor: inherit; }
+.multiSub { display: flex; align-items: center; min-width: 0; font-size: var(--text-micro, var(--text-caption)); line-height: var(--tpl-picker-stack-sub-lh); color: var(--color-ink-secondary); }
+.multiSubText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .multiMeta { flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro, var(--text-caption)); color: var(--color-ink-secondary); }
 .multiCount { display: inline-flex; align-items: center; }
 .textButton { padding: 0; border: 0; background: none; font: inherit; color: var(--color-action); cursor: pointer; }
@@ -133,8 +147,16 @@
   box-shadow: var(--tpl-inbox-line-top);
 }
 .tpFootLead { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--tpl-inbox-composer-gap); }
-.tpFootText { display: flex; min-width: 0; flex-direction: column; }
+.tpFootText { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; font-size: var(--text-caption); }
 .tpFootTitle { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; white-space: nowrap; }
+.createRow { display: flex; align-items: center; gap: var(--tpl-picker-gap); }
+.createRow > :first-child { flex: 1; min-width: 0; }
+.tpFootNote { color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+/* S2Vgi：一覧の下の「選んだもの」の帯（薄い緑の地・左に名前・右に件数）。 */
+.pickedBand { display: flex; align-items: center; gap: var(--tpl-picker-gap); width: 100%; min-width: 0; padding: var(--tpl-inbox-tp-band-pad); background: var(--color-accent-soft); font-size: var(--text-caption); }
+.pickedLabel { flex: none; color: var(--color-accent-deep); font-weight: 600; }
+.pickedNames { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink); text-overflow: ellipsis; white-space: nowrap; }
+.pickedCount { flex: none; color: var(--color-accent-deep); font-weight: 600; }
 .tpFootSub { color: var(--color-ink-faint); font-size: var(--text-nano); white-space: nowrap; }
 .tpFootActions { display: flex; flex: none; align-items: center; gap: var(--tpl-inbox-composer-gap); }
 
@@ -158,7 +180,7 @@
 .fieldName { max-width: 100%; flex-shrink: 1; }
 /* eovoGの絞り込み：項目名と値を1行の本文として見せる。 */
 .field[data-value-prefix] .fieldName { font-size: var(--polish-text-body); font-weight: 400; line-height: var(--tpl-inbox-row-preview-lh); }
-.fieldAction { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); flex-shrink: 0; font-size: var(--text-caption); color: var(--color-accent-deep); }
+.fieldAction { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); flex-shrink: 0; font-size: var(--text-body); font-weight: 600; color: var(--color-accent-deep); }
 .fieldClear { position: relative; border: 0; background: none; color: var(--color-ink-secondary); font-size: var(--text-caption); cursor: pointer; }
 .fieldClear:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); }
 .fieldChips { display: flex; flex: 1; min-width: 0; flex-wrap: wrap; gap: var(--tpl-picker-tiny-gap); padding-block: var(--tpl-picker-tiny-gap); pointer-events: none; }

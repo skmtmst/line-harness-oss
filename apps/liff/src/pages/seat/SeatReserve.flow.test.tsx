@@ -118,8 +118,11 @@ describe('席の予約の流れ', () => {
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     await screen.findByText('ご予約を受け付けました');
     expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null });
-    expect(screen.getByText('予約済み')).toBeTruthy();
-    expect(screen.getByText('2名・テーブル席')).toBeTruthy();
+    expect(screen.getByText('確定')).toBeTruthy();
+    expect(screen.getByText('2名')).toBeTruthy();
+    expect(screen.getByText('然 - NEN - 本店')).toBeTruthy();
+    expect(screen.queryByText('お席')).toBeNull();
+    expect(screen.queryByText('コース')).toBeNull();
   });
 
   it('ご要望と電話（任意）を入れて確定の口へ送る。お席・遅れたときの決まり・休みの理由を出す', async () => {
@@ -131,7 +134,7 @@ describe('席の予約の流れ', () => {
           lateArrivalPolicy: { cancelAfterMinutes: 15, message: '15分を過ぎてご連絡がない場合は、取り消しになることがあります' } },
     }));
     vi.mocked(seat.hold).mockResolvedValue({ success: true, data: held() });
-    vi.mocked(seat.confirm).mockResolvedValue({ success: true, data: held({ status: 'confirmed', version: 4, holdExpiresAt: null, note: '記念日です' }) });
+    vi.mocked(seat.confirm).mockResolvedValue({ success: true, data: held({ status: 'confirmed', version: 4, holdExpiresAt: null, note: '記念日です', courseName: '記念日のコース' }) });
     open();
     expect(await screen.findByText('10/9（金）は臨時休業のため選べません')).toBeTruthy();
     fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
@@ -148,6 +151,8 @@ describe('席の予約の流れ', () => {
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     await screen.findByText('ご予約を受け付けました');
     expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: '記念日です', customerPhone: '090-1111-2222' });
+    expect(screen.getByText('記念日のコース')).toBeTruthy();
+    expect(screen.queryByText('お席')).toBeNull();
   });
 
   it('電話の形が違うときは送らずに理由を出す', async () => {

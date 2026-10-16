@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import Disclosure from '@/components/shared/disclosure'
 import HelpTip from '@/components/shared/help-tip'
 import { bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
@@ -350,7 +350,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
           <div className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>お店が承認してから確定する</span>
             {canEdit ? (
-              <SaveErrorField names={["approvalMode","draft.approvalMode","approval_mode","draft.approval_mode"]}><SettingCheckbox
+              <SaveErrorField names={["approvalMode","draft.approvalMode","approval_mode","draft.approval_mode"]}><Toggle
                 label="お店が承認してから確定する"
                 checked={draft.approvalMode === 'manual'}
                 onChange={(next) => set('approvalMode', next ? 'manual' : 'automatic')}
@@ -376,7 +376,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
               <HelpTip label="「指名なし」の説明">オンにすると、受付中のスタッフ全員が「指名なし」での予約の対象になります。</HelpTip>
             </span>
             {canEdit ? (
-              <SaveErrorField names={["noAssign","initialNoAssign","no_assign","initial_no_assign"]}><SettingCheckbox
+              <SaveErrorField names={["noAssign","initialNoAssign","no_assign","initial_no_assign"]}><Toggle
                 label="「指名なし」を出す"
                 checked={noAssign ?? initialNoAssign}
                 onChange={(next) => setNoAssign(next)}

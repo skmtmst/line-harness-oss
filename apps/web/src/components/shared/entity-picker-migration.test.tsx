@@ -41,7 +41,7 @@ test('札の×は窓を開かずその項目だけ外す。必須の選択は札
   expect((within(dialog).getByRole('checkbox', { name: '本店' }) as HTMLInputElement).disabled).toBe(true)
   fireEvent.click(within(dialog).getByRole('checkbox', { name: 'すべてをまとめて選ぶ' }))
   fireEvent.click(within(dialog).getByRole('checkbox', { name: 'すべてをまとめて選ぶ' }))
-  fireEvent.click(within(dialog).getByRole('button', { name: 'この 1件にする' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' }))
   expect(screen.getByText('本店')).toBeTruthy()
 })
 

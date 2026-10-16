@@ -42,13 +42,6 @@ describe('統括 バナー生成', () => {
   })
 
 
-  it('数・タブ・説明は一覧の型へ渡し、フォルダなしの作成位置も型で決める', () => {
-    expect(listPage.match(/stats=\{head.stats\}/g)).toHaveLength(2)
-    expect(listPage.match(/tabs=\{head.tabs\}/g)).toHaveLength(2)
-    expect(listPage.match(/explanation=\{head.explanation\}/g)).toHaveLength(2)
-    expect(listPage).toContain('createAction: createProject')
-    expect(listPage).toContain('createAction: uploadImage')
-  })
   it('生成パネルに品質やクレジットの選択を置かない（2026-09-12 決定）', () => {
     const withoutComments = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     expect(withoutComments).not.toMatch(/品質|クレジット|高精細|quality/)

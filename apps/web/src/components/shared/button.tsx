@@ -2,12 +2,7 @@
 import Link from '@/components/shared/list-navigation'
 import type { LinkProps } from 'next/link'
 import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type {
-  AnchorHTMLAttributes,
-  ButtonHTMLAttributes,
-  ReactNode,
-} from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import styles from './button.module.css'
 import { normalizeActionLabel, normalizeActionNode } from './action-words'
 
@@ -43,6 +38,8 @@ type CommonProps = {
    * サービス札の「停止」「再開」）。画面CSSから共通ボタンを上書きしない書き方（設計ルール2節）。
    */
   textTone?: 'action' | 'ink' | 'danger' | 'accent' | 'quiet'
+  /** よく使う絞り込みが適用中の印。開閉状態は aria-expanded で別に伝える。 */
+  filterActive?: boolean
   /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
   presentation?: 'account-inline' | 'registration-inline' | 'restaurant'
   className?: string
@@ -86,7 +83,8 @@ type NativeButtonProps = CommonProps &
      * かつ絵が幅を指定している並び（窓の足など）で使う。`busy` の間も
      * 平常時の幅を下回らないので、こちらでも幅は跳ねない。
      */
-    widthReserve?: 'states' | 'idle'
+    /** `dynamic` は件数などで平常時の文字が変わる操作。状態の予約を保ち、現在の全文で測り直す。 */
+    widthReserve?: 'states' | 'idle' | 'dynamic'
   }
 
 type LinkButtonProps = CommonProps &
@@ -136,10 +134,10 @@ export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
   const size = props.size ?? 'standard'
   const tone = props.textTone && props.textTone !== 'action' ? styles[TEXT_TONE[props.textTone]] : null
-  const classes = [styles.button, styles[variant], styles[size], tone, props.className].filter(Boolean).join(' ')
+  const classes = [styles.button, styles[variant], styles[size], tone, props.filterActive && styles.filterActive, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, icon, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, ...linkProps } = props
+    const { children, icon, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, filterActive: _filterActive, ...linkProps } = props
     const newTab = external || linkProps.target === '_blank'
     return (
       <Link href={href} className={classes} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
@@ -164,6 +162,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     align,
     fullWidth,
     textTone: _textTone,
+    filterActive: _filterActive,
     presentation,
     href: _href,
     type = 'button',
@@ -215,10 +214,10 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       return
     }
     // 親の再描画でラベルが変わらなければ、複製・挿入・幅取得を繰り返さない。
-    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, presentation, buttonProps.style, buttonProps.hidden])
+    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, widthReserve, presentation, buttonProps.style, buttonProps.hidden])
     if (measuredLabelRef.current === measurementKey) return
     measuredLabelRef.current = measurementKey
-    el.style.width = ''
+    if (widthReserve === 'dynamic') el.style.width = ''
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
     if (widthReserve === 'idle') {

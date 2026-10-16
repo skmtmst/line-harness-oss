@@ -296,10 +296,11 @@ describe('NEXT-19: リサーチの質問が保存値へ入る', () => {
     await renderEditor('research')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '質問を足す' })) })
     expect(host.querySelectorAll('section[aria-label^="問 "]')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: '問 2 を消す' }).querySelector('svg.lucide-trash-2')).toBeTruthy()
     await act(async () => {
       fireEvent.change(within(questionSection(2)).getByRole('textbox', { name: /質問文/ }), { target: { value: 'よく使っている商品を教えてください' } })
       setSelectValue(selectByLabel('問 2 の答え方'), 'multiple')
-      fireEvent.click(screen.getByRole('checkbox', { name: '問 2 を必ず答えてもらう' }))
+      fireEvent.click(screen.getByRole('switch', { name: '問 2 を必ず答えてもらう' }))
     })
     await act(async () => {
       fireEvent.change(screen.getByLabelText('問 2 の選択肢 1'), { target: { value: 'フード' } })

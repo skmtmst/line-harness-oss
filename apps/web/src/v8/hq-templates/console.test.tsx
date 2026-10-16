@@ -210,6 +210,9 @@ describe('統括のテンプレートの詳細（pQ4fH）', () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findByRole('link', { name: '予約前日のご案内' })).closest('tr')!)
     expect(await screen.findByRole('heading', { name: '配った先' })).toBeTruthy()
+    const recipients = screen.getByRole('region', { name: '配った先' })
+    const content = recipients.closest('[data-template-region="content"]')
+    expect(content?.querySelector(':scope > section[aria-label="配った先"]')).toBe(recipients)
     expect(screen.getByText('4 アカウントに配りました。新しい版を配ると、4 アカウントのテンプレートが新しい版になります。')).toBeTruthy()
     expect(screen.getByText('ほか 1 アカウント')).toBeTruthy()
     const enter = screen.getAllByRole('button', { name: /このアカウントへ入る/ })
@@ -266,7 +269,7 @@ describe('統括の回答フォームの編集（u5MM7：店の回答フォー�
     calls.update.mockImplementation(async (_id: string, input: { name: string; definition: unknown }) => ({ template: { ...formRow, revision: 4, name: input.name }, definition: input.definition }))
   })
 
-  it('名前を押すと店と同じ3つのタブの編集画面。右は「配った先」、［保存する］で統括のひな形を直してアカウントへ配るへ進む', async () => {
+  it('名前を押すと店と同じ3つのタブの編集画面。右は「配った先」、［保存して配る］で統括のひな形を直してアカウントへ配るへ進む', async () => {
     render(<HqTemplatesV8 type="form" />)
     fireEvent.click((await screen.findByRole('link', { name: '来店アンケート' })).closest('tr')!)
     expect(await screen.findByRole('heading', { name: '配った先' })).toBeTruthy()
@@ -276,13 +279,16 @@ describe('統括の回答フォームの編集（u5MM7：店の回答フォー�
     expect(screen.queryByText('回答用URL')).toBeNull()
     expect(screen.queryByRole('button', { name: /この版を公開/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /公開前に試す/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    fireEvent.click(screen.getByRole('tab', { name: '答え終わったあと' }))
+    fireEvent.change(screen.getByLabelText('お礼の文'), { target: { value: '回答を受け付けました' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存して配る' }))
     await waitFor(() => expect(calls.update).toHaveBeenCalled())
     const [id, input] = calls.update.mock.calls[0]
     expect(id).toBe('f-t-1')
     expect(input).toMatchObject({ type: 'form', name: '来店アンケート', expectedRevision: 3 })
     /* 画面に出ない設定（答えたあとのシナリオ）は落とさない。 */
     expect(input.definition.form).toMatchObject({ on_submit_scenario_id: 'scn-keep', fields: [{ name: 'purpose' }] })
+    expect(input.definition.form.layout.options.thanksText).toBe('回答を受け付けました')
     expect(await screen.findByRole('checkbox', { name: /然 -NEN- 本店/ })).toBeTruthy()
   })
 
@@ -500,7 +506,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /^配る先：(選ぶ|変える)$/ }))
     const picker = await findPickerDialog('配るアカウントを選ぶ')
     for (const name of names) fireEvent.click(within(picker).getByRole('checkbox', { name }))
-    fireEvent.click(within(picker).getByRole('button', { name: `この ${names.length} アカウントにする` }))
+    fireEvent.click(within(picker).getByRole('button', { name: `選ぶ（${names.length}件）` }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '配るアカウントを選ぶ' })).toBeNull())
   }
   async function selectFolder() {
@@ -595,7 +601,7 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     expect(within(folderDialog).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(within(folderDialog).getByRole('button', { name: 'キャンセル' }))
     const listName = await screen.findByRole('link', { name: 'VIP', exact: true })
-    expect(listName.closest('[data-list-name]')?.querySelector('[data-folder-dot]')?.getAttribute('style')).toContain(expectedColor)
+    expect(within(listName).getByRole('img', { name: 'フォルダ：予約' }).getAttribute('style')).toContain(expectedColor)
     fireEvent.click(listName.closest('tr')!)
     const body = await screen.findByRole('region', { name: '本文' })
     const pill = within(body).getByRole('group', { name: 'タグ「VIP」' })

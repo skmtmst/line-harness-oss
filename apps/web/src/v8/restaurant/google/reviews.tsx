@@ -2,16 +2,15 @@
 import { notifySaved } from '@/components/shared/toast'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import HelpTip from '@/components/shared/help-tip'
 import KpiCard from '@/components/shared/kpi-card'
 import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useState } from 'react'
-import { RefreshCw, Sparkles } from 'lucide-react'
+import { Inbox, RefreshCw, Sparkles } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
-import { DataTable, TableHeadRow, Th, Td, Tr } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Td, Tr, ActionCell } from '@/components/shared/table'
 import { TextArea } from '@/components/shared/text-field'
 import Checkbox from '@/components/shared/checkbox'
 import IconButton from '@/components/shared/icon-button'
@@ -20,7 +19,7 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import StatusBadge from '@/components/shared/status-badge'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
@@ -35,9 +34,10 @@ import { StatRow } from '../common-a/parts'
 import { errorMessage, formatShortStamp, reviewReceivedAt } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import { Stars, replyBadge } from './review-presentation'
+export { Stars, replyBadge } from './review-presentation'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TextLink from '@/components/shared/text-link'
-import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
@@ -63,24 +63,6 @@ const RATING_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '', label: '評価：すべて' },
   ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `評価：★${n}` })),
 ]
-
-/** 星（★の文字）。評価2以下は赤、ほかは金。 */
-export function Stars({ rating, small = false }: { rating: number; small?: boolean }) {
-  const safe = Math.max(0, Math.min(5, Math.round(rating)))
-  return (
-    <span className={`${styles.stars} ${safe <= 2 ? styles.starsLow : ''} ${small ? styles.starsSmall : ''}`} aria-label={`評価 ${safe}／5`} role="img">
-      {'★'.repeat(safe) + '☆'.repeat(5 - safe)}
-    </span>
-  )
-}
-
-export function replyBadge(review: GoogleReview): { label: string; tone: StatusBadgeTone } {
-  if (review.replyStatus === 'published') return { label: '返信済み', tone: 'success' }
-  if (review.replyStatus === 'replied' || review.replyStatus === 'pending_confirm') return { label: '反映確認中', tone: 'warning' }
-  if (review.replyStatus === 'draft') return { label: review.replyDraftAiGenerated ? 'AI下書きあり' : '下書きあり', tone: 'info' }
-  if (review.needsAttention) return { label: '要確認', tone: 'danger' }
-  return { label: '未返信', tone: 'warning' }
-}
 
 export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: string; data: GoogleConnectionData; go: GoogleNav; onSynced: () => void }) {
   const [filter, setFilter] = useListUrlValue<GoogleReviewFilter>('filter', 'all')
@@ -145,14 +127,13 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
   return (
     <>
       <StatRow>
-        <KpiCard density="compact" title="未返信" valueText={`${data.summary.unrepliedCount}`} detail="返信を待っている口コミ" valueTone={data.summary.unrepliedCount > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
-        <KpiCard density="compact" title="平均の評価" valueText={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} detail={`総合・${reviewTotal}件`} icon={null} presentation="band" value={null} unit="" />
-        <KpiCard density="compact" title="要確認" valueText={`${data.summary.attentionCount}`} detail="評価2以下" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard density="compact" title="未返信" valueText={`${data.summary.unrepliedCount}`} detail="返信を待っている口コミ" valueTone={data.summary.unrepliedCount > 0 ? 'warning' : 'default'} icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
+        <KpiCard density="compact" title="平均の評価" valueText={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} detail={`総合・${reviewTotal}件`} icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
+        <KpiCard density="compact" title="要確認" valueText={`${data.summary.attentionCount}`} detail="評価2以下" icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
         {/* Google経由の予約：結ぶ口がまだ無いので「—」（数を推測しない）。 */}
-        <KpiCard density="compact" title="Google経由の予約" valueText="—" detail="この30日" help="予約の連携サービスと結ぶと数えます。いまは取れないので「—」です。" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard density="compact" title="Google経由の予約" valueText="—" detail="この30日" help="予約の連携サービスと結ぶと数えます。いまは取れないので「—」です。" icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
       </StatRow>
       <div className={styles.toolbar}>
-        <HelpTip label="一覧の操作の説明">返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</HelpTip>
         <span className={styles.search}>
           <SearchField placeholder="口コミを探す" aria-label="口コミを探す" value={search} onChange={setSearch} onClear={() => setSearch('')} />
         </span>
@@ -163,6 +144,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
           aria-label={syncing ? 'Googleから取得中…' : 'Googleから同期する'}
           onClick={() => void sync()}
           disabled={syncing || connection.status !== 'connected'}
+          title={syncing ? '口コミを取得しています' : connection.status !== 'connected' ? 'Googleとの接続を確認してください' : undefined}
         >
           <RefreshCw aria-hidden className={`${styles.icon16} ${syncing ? styles.spin : ''}`} />
         </IconButton>
@@ -185,39 +167,41 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         </div>
       ) : null}
       {list && list.total > 0 ? (
-        <DataTable density="reviews" data-design="google-reviews"><thead>
-          <TableHeadRow>
-            <Th className={`${styles.colReviewer}`}>投稿者・評価</Th>
-            <Th className={`${styles.colComment}`}>口コミ</Th>
-            <Th className={`${styles.colReceived}`}>受信</Th>
-            <Th className={`${styles.colState}`}>状態</Th>
-            <Th className={styles.colOps}><span className="sr-only">操作</span></Th>
+        /* 絵 j0Wcg：口コミの表は角丸の枠のカードに入る。 */
+        <Card overflow="hidden"><DataTable density="reviews" columnSizing="controls" data-design="google-reviews"><thead>
+          <TableHeadRow data-table-layout="columns">
+            <Th>投稿者・評価</Th>
+            <Th grow>口コミ</Th>
+            <Th>受信</Th>
+            <Th>状態</Th>
+            <Th><span className="sr-only">操作</span></Th>
           </TableHeadRow></thead><tbody>
           {list.reviews.map((review) => {
             const badge = replyBadge(review)
             const actionable = review.replyStatus === 'unreplied' || review.replyStatus === 'draft' || review.replyStatus === 'pending_confirm'
             return (
-              <Tr key={review.id} data-row-id={review.id}>
-                <Td className={`${styles.colReviewer}`}>
+              <Tr key={review.id} data-row-id={review.id} data-table-layout="columns">
+                <Td>
                   <span className={styles.reviewer}>{review.reviewerDisplayName ?? '匿名'}</span>
                   <Stars rating={review.starRating} />
                 </Td>
-                <Td className={`${styles.colComment}`}>
+                <Td grow>
                   <span className={styles.comment} title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</span>
                 </Td>
-                <Td className={`${styles.colReceived}`}>{formatShortStamp(reviewReceivedAt(review))}</Td>
-                <Td className={`${styles.colState}`}><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
-                <Td className={`${styles.colOps}`}>
+                <Td>{formatShortStamp(reviewReceivedAt(review))}</Td>
+                <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
+                <ActionCell>
                   <Button onClick={() => go({ tab: 'reviews', view: 'draft', id: review.id })}>{actionable ? '下書きを作る' : '返信を見る'}</Button>
-                </Td>
+                </ActionCell>
               </Tr>
             )
           })}
-        </tbody></DataTable>
+        </tbody></DataTable></Card>
       ) : null}
       {list && pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${list.total} 件 ・ 新着と未返信は別に管理`} />
       ) : null}
+      <Notice tone="info" appearance="soft" icon={null}>返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</Notice>
     </>
   )
 }

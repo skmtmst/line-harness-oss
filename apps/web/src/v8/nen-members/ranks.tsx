@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Plus, RefreshCw } from 'lucide-react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { GitCompareArrows, TriangleAlert } from 'lucide-react';
+import { DetailColumns } from '@/components/templates/detail-columns'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import { RowActions } from '@/components/shared/row-actions';
@@ -29,13 +30,6 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import Notice from '@/components/shared/notice'
 
-/*
- * ★V8-B 会員 › ランク設定（fb9NJ）・ランクを消す（確認）（dEv6G）・競合（e5yBLx）。
- *
- * 左に「ランクの決まり」と「ランク」（行ごとに 名前・しきい値・還元・ごみ箱）、右に「ECとの同期」。
- * 下の中央に キャンセル・保存して EC へ同期。
- * 競合の帯はタブの下・数の帯の上（型の tabs の段）に出すので、外枠へ渡す（onTopBand）。
- */
 
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagId: string | null; tagName: string | null; memberCount: number }
 
@@ -77,6 +71,7 @@ export default function RankSettingsV8({
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [drafts, setDrafts] = useState<RankDraft[]>([])
+  const [asideExpanded, setAsideExpanded] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -331,7 +326,29 @@ export default function RankSettingsV8({
         </div>
       ) : null}
 
-      <div className={styles.rankSplit}>
+      <DetailColumns presentation="notification" asideLabel="ECとの同期" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-rank-sync">
+          <div className={styles.cardHead}>
+            <h2 id="nen-rank-sync" className={styles.cardTitle}>ECとの同期</h2>
+            <p className={styles.cardDesc}>保存すると、ランクをネットショップへ送り、タグも付け替えます。送れなかったときは、理由がここに出ます</p>
+          </div>
+          <div className={styles.syncRow}>
+            {rules?.syncStatus === 'synced'
+              ? <StatusBadge tone="success" size="compact">同期済み</StatusBadge>
+              : rules?.syncStatus === 'failed'
+                ? <StatusBadge tone="danger" size="compact">失敗</StatusBadge>
+                : <StatusBadge tone="warning" size="compact">未同期</StatusBadge>}
+            <span className={styles.syncText}>
+              {rules?.syncStatus === 'synced' && rules.syncedAt ? `最後に送った日時 ${shortDateTime(rules.syncedAt)}` : rules?.syncStatus === 'failed' ? rules.syncError ?? '理由は記録されていません' : 'まだECへ送っていません'}
+            </span>
+          </div>
+          {readonly ? null : (
+            <div className={styles.syncAction}>
+              <Button variant="secondary" onClick={() => void resync()} disabled={busy || dirty} busy={Boolean(busy)} busyLabel="処理中…">
+                <RefreshCw size={15} aria-hidden="true" />もう一度同期
+              </Button>
+            </div>
+          )}
+        </Card>}>
         <div className={styles.rankMain}>
           <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-rank-rules">
             <div className={styles.cardHead}>
@@ -406,36 +423,12 @@ export default function RankSettingsV8({
             )}
           </Card>
         </div>
-
-        <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" className={styles.sideCard} aria-labelledby="nen-rank-sync">
-          <div className={styles.cardHead}>
-            <h2 id="nen-rank-sync" className={styles.cardTitle}>ECとの同期</h2>
-            <p className={styles.cardDesc}>保存すると、ランクをネットショップへ送り、タグも付け替えます。送れなかったときは、理由がここに出ます</p>
-          </div>
-          <div className={styles.syncRow}>
-            {rules?.syncStatus === 'synced'
-              ? <StatusBadge tone="success" size="compact">同期済み</StatusBadge>
-              : rules?.syncStatus === 'failed'
-                ? <StatusBadge tone="danger" size="compact">失敗</StatusBadge>
-                : <StatusBadge tone="warning" size="compact">未同期</StatusBadge>}
-            <span className={styles.syncText}>
-              {rules?.syncStatus === 'synced' && rules.syncedAt ? `最後に送った日時 ${shortDateTime(rules.syncedAt)}` : rules?.syncStatus === 'failed' ? rules.syncError ?? '理由は記録されていません' : 'まだECへ送っていません'}
-            </span>
-          </div>
-          {readonly ? null : (
-            <div className={styles.syncAction}>
-              <Button variant="secondary" onClick={() => void resync()} disabled={busy || dirty} busy={Boolean(busy)} busyLabel="処理中…">
-                <RefreshCw size={15} aria-hidden="true" />もう一度同期
-              </Button>
-            </div>
-          )}
-        </Card>
-      </div>
+      </DetailColumns>
 
       {readonly ? null : (
         <div className={styles.saveRow}>
-          <Button variant="secondary" onClick={cancel} disabled={busy || !dirty}>キャンセル</Button>
-          <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty} busy={Boolean(busy)} busyLabel="処理中…">
+          <Button variant="secondary" onClick={cancel} disabled={busy || !dirty} title={busy ? '処理しています' : !dirty ? '変更がありません' : undefined}>キャンセル</Button>
+          <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty} title={busy ? '処理しています' : !dirty ? '変更がありません' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
             <Check size={15} aria-hidden="true" />{conflict ? '比べてから保存' : '保存して EC へ同期'}
           </Button>
         </div>

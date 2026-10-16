@@ -9,12 +9,13 @@
  * 読み書き（読み込み・複製・配る・版を比べる・戻す）は呼ぶ側（console.tsx）。ここは見せ方と押した知らせだけ。
  */
 import { useState } from 'react'
-import { ArrowLeft, CircleAlert, Copy, GitCompare, LogIn, Pencil, RotateCcw, Send } from 'lucide-react'
+import { ArrowLeft, ChevronDown, CircleAlert, Copy, GitCompare, LogIn, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
 import type { HqTemplateReceivedVersion, HqTemplateVersionComparison, HqTemplateVersionDisplay, MessageTemplateDefinition } from '@line-crm/shared'
 import { templateKind } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import LinePreview from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import Card, { CardHeader } from '@/components/shared/card'
 import TagPill from '@/components/shared/tag-pill'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -25,6 +26,7 @@ import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
+import { RowMenu } from '@/components/shared/row-actions'
 
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
@@ -74,7 +76,7 @@ export function receivedLabels(row: HqTemplateReceivedVersion): { version: strin
 
 export default function HqTemplateDetail({
   detail, row, accounts, folderName, folderColor, canEdit, busy, notices, versions, versionsError, received, onReloadVersions, onCompare, onRestore,
-  onBack, onEdit, onDistribute, onDuplicate, onEnterAccount,
+  onBack, onEdit, onDistribute, onDuplicate, onEnterAccount, onRemove,
 }: {
   detail: TemplateDetail
   /** 一覧の行（配った先のアカウント名・数・中身の要約・今月送った数）。一覧に無いときは「—」。 */
@@ -99,6 +101,8 @@ export default function HqTemplateDetail({
   onDuplicate: () => void
   /** 配った先のアカウントに入る（店の画面へ切り替える）。 */
   onEnterAccount: (accountId: string) => void
+  /** 右上の「…」の［削除する］（店の詳細と同じ置き場。絵 pQ4fH）。渡さなければ「…」を出さない。 */
+  onRemove?: () => void
 }) {
   const [compare, setCompare] = useState<{ from: number; to: number; result: HqTemplateVersionComparison | null; error: string } | null>(null)
   const [restoreTarget, setRestoreTarget] = useState<number | null>(null)
@@ -157,28 +161,20 @@ export default function HqTemplateDetail({
             <Copy size={14} aria-hidden="true" />
             複製する
           </Button>
+          {onRemove ? <RowMenu appearance="box" label="そのほかの操作" menuLabel={`ひな形「${detail.template.name}」の操作`} items={[{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: onRemove }]} /> : null}
         </div>
       ) : null}
-      <section className={styles.aboutBox} aria-label="このテンプレートについて">
-        <h2 className={styles.aboutTitle}>このテンプレートについて</h2>
+      <Card layout="vertical" contentPadding="var(--tpl-eds-about-pad)" gap="var(--tpl-eds-about-gap)" aria-label="このテンプレートについて">
+        <CardHeader size="content" title="このテンプレートについて" />
         <dl className={styles.aboutList}>
           <div className={styles.aboutRow}><dt>種類</dt><dd>{kindLabel}</dd></div>
           <div className={styles.aboutRow}><dt>フォルダ</dt><dd>{folderName}</dd></div>
           <div className={styles.aboutRow}><dt>今月送った数</dt><dd title={row?.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : '配った先の合計'}>{sentLabel(row?.this_month_sent_count)}</dd></div>
           <div className={styles.aboutRow}><dt>差し込み</dt><dd title={words.join('・')}>{words.length > 0 ? words.join('・') : emptyValue('none')}</dd></div>
         </dl>
-      </section>
+      </Card>
       <LinePreview accountName="公式アカウント" note="受け取る人のLINEでの見え方です。{ } の差し込みは、配った先のアカウントで送るときに、受け取る人ごとの値に変わります。">
-        <div className={styles.talkRow}>
-          <span className={styles.talkIcon} aria-hidden="true">公</span>
-          <div className={styles.talkCol}>
-            <span className={styles.talkName}>公式アカウント</span>
-            <div className={styles.talkBubbleRow}>
-              <p className={styles.talkBubble}>{text}</p>
-              <span className={styles.talkTime}>18:00</span>
-            </div>
-          </div>
-        </div>
+        <LinePreviewMessage accountName="公式アカウント" avatar="公" time="18:00">{text}</LinePreviewMessage>
       </LinePreview>
     </div>
   )
@@ -193,7 +189,7 @@ export default function HqTemplateDetail({
   }
   const shortName = (name: string) => name.replace(/^然\s*-NEN-\s*/, '')
   const enterButton = (accountId: string | null) => accountId
-    ? <button type="button" className={styles.ghostButton} onClick={() => onEnterAccount(accountId)} aria-label="このアカウントへ入る"><LogIn size={14} aria-hidden="true" />入る</button>
+    ? <Button variant="text" onClick={() => onEnterAccount(accountId)} aria-label="このアカウントへ入る"><LogIn size={14} aria-hidden="true" />入る</Button>
     : <span className={styles.ghostSpacer} aria-hidden="true" />
   const creator = (version: HqTemplateVersionDisplay) => `${version.creator_name ?? emptyValue('unknown')}・${stamp(version.created_at)}`
   const sortedVersions = [...(versions ?? [])].sort((a, b) => b.version - a.version)
@@ -215,7 +211,7 @@ export default function HqTemplateDetail({
 
   return (
     <div className={styles.page} data-design-node="pQ4fH">
-      <DetailPage layout="record-detail" contentPadding="0"
+      <DetailPage layout="record-detail" contentPadding="var(--tpl-eds-content-pad)"
         title={detail.template.name}
         identity={backLink}
         help={[kindLabel, folderName, current?.creator_name ? `作った人 ${current.creator_name}` : null, `更新 ${stamp(detail.template.updated_at)}`].filter(Boolean).join('・')}
@@ -223,59 +219,37 @@ export default function HqTemplateDetail({
         summaryLabel="LINE の見え方"
         summaryPreview={{ label: 'LINE の見え方', title: 'LINE の見え方' }}
       >
-        <div className={styles.content}>
         {canEdit ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</ReadOnlyNotice></div>}
         {notices}
         {canEdit ? (
-          <div className={styles.draftBand} role="status">
-            <CircleAlert size={18} aria-hidden="true" className={styles.draftIcon} />
-            <div className={styles.draftText}>
-              <p className={styles.draftTitle}>{unsentChanges ? '配っていない変更があります' : distributedCount > 0 ? '直したら、配ると新しい版になります' : 'まだ配っていません'}</p>
-              <p className={styles.draftNote}>
-                {distributedCount > 0
-                  ? `配ると、配った ${distributedCount} アカウントのテンプレートが新しい版になります（各アカウントで使っている所はそのアカウントの決まりで切り替わります）`
-                  : '「配る」で、選んだアカウントのテンプレートに届きます'}
-              </p>
-            </div>
-            {unsentChanges && inUse && current && inUse.version !== current.version ? (
-              <Button variant="secondary" onClick={() => openCompare(inUse.version, current.version)} aria-pressed={compare?.from === inUse.version && compare.to === current.version}>
-                <GitCompare size={14} aria-hidden="true" />
-                比べる
+          <Notice tone="warn" role="status" icon={<CircleAlert size={18} aria-hidden="true" />}
+            heading={unsentChanges ? '配っていない変更があります' : distributedCount > 0 ? '直したら、配ると新しい版になります' : 'まだ配っていません'}
+            action={<>
+              {unsentChanges && inUse && current && inUse.version !== current.version ? (
+                <Button variant="secondary" onClick={() => openCompare(inUse.version, current.version)} aria-pressed={compare?.from === inUse.version && compare.to === current.version}>
+                  <GitCompare size={14} aria-hidden="true" />比べる
+                </Button>
+              ) : null}
+              <Button variant="primary" onClick={onDistribute} disabled={busy} aria-label={`${detail.template.name}を配る`}>
+                <Upload size={14} aria-hidden="true" />配る
               </Button>
-            ) : null}
-            <Button variant="primary" onClick={onDistribute} disabled={busy} aria-label={`${detail.template.name}を配る`}>
-              <Send size={14} aria-hidden="true" />
-              配る
-            </Button>
-          </div>
+            </>}>
+            {distributedCount > 0
+              ? `配ると、配った ${distributedCount} アカウントのテンプレートが新しい版になります（各アカウントで使っている所はそのアカウントの決まりで切り替わります）`
+              : '「配る」で、選んだアカウントのテンプレートに届きます'}
+          </Notice>
         ) : null}
         {compare && inUse && current && compare.from === inUse.version && compare.to === current.version ? compareBox : null}
 
-        <section className={styles.card} aria-label="本文">
-          <div className={styles.cardHead}>
-            <div className={styles.cardTitles}>
-              <h2 className={styles.cardTitle}>{`${kind === 'message' ? '本文' : '中身'}${current?.is_draft && distributedCount > 0 ? '（下書き）' : ''}`}</h2>
-              <p className={styles.cardNote}>{kind === 'message' ? '{ } は差し込み。受け取る人ごとに変わります。' : summary ?? '中身の要約を読めませんでした'}</p>
-            </div>
-            {canEdit ? (
-              <Button variant="secondary" onClick={onEdit} disabled={busy}>
-                <Pencil size={14} aria-hidden="true" />
-                編集する
-              </Button>
-            ) : null}
-          </div>
+        <Card layout="vertical" contentPadding="var(--tpl-eds-card-pad)" gap="var(--tpl-eds-card-gap)" aria-label="本文">
+          <CardHeader size="content" title={`${kind === 'message' ? '本文' : '中身'}${current?.is_draft && distributedCount > 0 ? '（下書き）' : ''}`} meta={kind === 'message' ? '{ } は差し込み。受け取る人ごとに変わります。' : summary ?? '中身の要約を読めませんでした'} action={canEdit ? <Button variant="secondary" onClick={onEdit} disabled={busy}><Pencil size={14} aria-hidden="true" />編集する</Button> : undefined} />
           <div className={styles.bodyBox}>{tag ? <TagPill name={tag.name} color={tagColor} /> : kind === 'message' ? content : `［${kindLabel}］${summary ?? ''}`}</div>
-        </section>
+        </Card>
 
-        <section className={styles.card} aria-label="配った先">
-          <div className={styles.cardTitles}>
-            <h2 className={styles.cardTitle}>配った先</h2>
-            <p className={styles.cardNote}>
-              {distributedCount > 0
-                ? `${distributedCount} アカウントに配りました。新しい版を配ると、${distributedCount} アカウントのテンプレートが新しい版になります。`
-                : 'まだどのアカウントにも配っていません。配ると、ここに並びます。'}
-            </p>
-          </div>
+        <Card layout="vertical" contentPadding="var(--tpl-eds-card-pad)" gap="var(--tpl-eds-card-gap)" aria-label="配った先">
+          <CardHeader size="content" title="配った先" meta={distributedCount > 0
+            ? `${distributedCount} アカウントに配りました。新しい版を配ると、${distributedCount} アカウントのテンプレートが新しい版になります。`
+            : 'まだどのアカウントにも配っていません。配ると、ここに並びます。'} />
           {receivedRows.length > 0 ? receivedRows.map((item) => {
             const labels = receivedLabels(item)
             return (
@@ -283,7 +257,7 @@ export default function HqTemplateDetail({
                 <span className={styles.usageKind} title={item.accountName}>{shortName(item.accountName)}</span>
                 <span className={styles.usageNameQuiet} title={item.accountName}>{item.accountName}</span>
                 <span className={styles.usageVersion} title={labels.version}>{labels.version}</span>
-                <span className={styles.usageState}>{labels.state}</span>
+                <span className={`${styles.usageState} ${styles.usageStateWide}`} title={labels.state}>{labels.state}</span>
                 {enterButton(accounts.some((account) => account.id === item.accountId) ? item.accountId : null)}
               </div>
             )
@@ -294,7 +268,7 @@ export default function HqTemplateDetail({
                   <span className={styles.usageKind} title={name}>{shortName(name)}</span>
                   <span className={styles.usageNameQuiet} ><TruncatedText value={String(name ?? '')} /></span>
                   <span className={styles.usageVersion}>—</span>
-                  <span className={styles.usageState}>受け取り済み</span>
+                  <span className={`${styles.usageState} ${styles.usageStateWide}`}>受け取り済み</span>
                   {enterButton(accountIdOf(name))}
                 </div>
               ))}
@@ -303,16 +277,13 @@ export default function HqTemplateDetail({
           ) : <ListEmptyMessage>まだ配っていません</ListEmptyMessage>}
           {canEdit ? (
             <div className={styles.moreRow}>
-              <button type="button" className={styles.ghostButton} onClick={onDistribute} disabled={busy}>配る先を変える</button>
+              <Button variant="text" onClick={onDistribute} disabled={busy}><ChevronDown size={14} aria-hidden="true" />配る先を変える</Button>
             </div>
           ) : null}
-        </section>
+        </Card>
 
-        <section className={styles.card} aria-label="版の履歴">
-          <div className={styles.cardTitles}>
-            <h2 className={styles.cardTitle}>版の履歴</h2>
-            <p className={styles.cardNote}>戻すと、その版を下書きとして作り直します。配るまで配った先は変わりません</p>
-          </div>
+        <Card layout="vertical" contentPadding="var(--tpl-eds-card-pad)" gap="var(--tpl-eds-card-gap)" aria-label="版の履歴">
+          <CardHeader size="content" title="版の履歴" meta="戻すと、その版を下書きとして作り直します。配るまで配った先は変わりません" />
           {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>
               <p className={styles.errorText}>版の履歴を読み込めませんでした。もう一度お試しください。</p>
@@ -335,12 +306,12 @@ export default function HqTemplateDetail({
                     {version.is_current ? (
                       inUse && inUse.version !== version.version ? (
                         <div className={styles.versionActions}>
-                          <Button variant="secondary" onClick={() => openCompare(inUse.version, version.version)}>いまの版と比べる</Button>
+                          <Button variant="secondary" onClick={() => openCompare(inUse.version, version.version)}><GitCompare size={14} aria-hidden="true" />いまの版と比べる</Button>
                         </div>
                       ) : null
                     ) : !isInUse ? (
                       <div className={styles.versionActions}>
-                        {current ? <Button variant="secondary" onClick={() => openCompare(version.version, current.version)}>比べる</Button> : null}
+                        {current ? <Button variant="secondary" onClick={() => openCompare(version.version, current.version)}><GitCompare size={14} aria-hidden="true" />比べる</Button> : null}
                         {canEdit ? (
                           <Button variant="secondary" disabled={busy} onClick={() => { setRestoreError(''); setRestoreTarget(version.version) }}><RotateCcw size={14} aria-hidden="true" />この版に戻す</Button>
                         ) : null}
@@ -352,8 +323,7 @@ export default function HqTemplateDetail({
               {compare && !(inUse && current && compare.from === inUse.version && compare.to === current.version) ? compareBox : null}
             </>
           )}
-        </section>
-      </div>
+        </Card>
       </DetailPage>
 
       <ConfirmDialog

@@ -8,6 +8,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { emptyValue } from '@/components/shared/empty-value'
 import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select'
+import { EntityPickerField,type EntityPickerItem } from '@/components/shared/entity-picker'
 import { Field as SharedField } from '@/components/shared/form-controls'
 import { type GridTableDesign } from '@/components/shared/grid-table'
 import Notice from '@/components/shared/notice'
@@ -18,7 +19,7 @@ import { type AccountWithStats } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import { restaurantTestApi,type RestaurantIntakeAddress,type RestaurantMembership,type RestaurantStore } from '@/lib/restaurant-test-api'
 import type { RestaurantLoginMember } from '@line-crm/shared'
-import { MailPlus,Plus } from 'lucide-react'
+import { Check,MailPlus,MessageCircle,Plus,type LucideIcon } from 'lucide-react'
 import { useCallback,useEffect,useState,type FormEvent,type ReactNode } from 'react'
 import { formatStamp,Panel,Status } from '../common-a/parts'
 import styles from './organization.module.css'
@@ -71,23 +72,49 @@ export function DefaultSelect({ name, ariaLabel, defaultValue, options }: {
   return <SaveErrorField names={["value"]}><Select name={name} aria-label={ariaLabel} value={value} onChange={setValue} size="full" options={options} /></SaveErrorField>
 }
 
+/** 作ってある物を選ぶ欄（選ぶ窓・B-163）。フォームへは隠し欄で送る。 */
+function PickerInput({ name, label, noun, items, defaultValue, placeholder, icon, required = false, clearable = false }: {
+  name: string
+  label: string
+  noun: string
+  items: EntityPickerItem[]
+  defaultValue: string
+  placeholder?: string
+  icon?: LucideIcon
+  required?: boolean
+  clearable?: boolean
+}) {
+  const [value, setValue] = useState(defaultValue)
+  return <SharedField label={label} required={required}>
+    <>
+      <SaveErrorField names={[name]}><EntityPickerField label={label} noun={noun} icon={icon} items={items} value={value} onChange={setValue} placeholder={placeholder} clearable={clearable} /></SaveErrorField>
+      <input type="hidden" name={name} value={value} />
+    </>
+  </SharedField>
+}
+
 export function StoreLineAccountSelect({ accounts, stores, currentStore }: {
   accounts: AccountWithStats[]
   stores: RestaurantStore[]
   currentStore?: RestaurantStore
 }) {
   const usedByAccount = new Map(stores.filter((item) => item.line_account_id).map((item) => [item.line_account_id!, item.id]))
+  const items: EntityPickerItem[] = accounts.map((account) => {
+    const usedStoreId = usedByAccount.get(account.id)
+    const usedElsewhere = Boolean(usedStoreId && usedStoreId !== currentStore?.id)
+    const name = account.displayName || account.name
+    return {
+      id: account.id,
+      name: account.basicId ? `${name}（${account.basicId.startsWith("@") ? "" : "@"}${account.basicId}）` : name,
+      keywords: account.basicId ?? undefined,
+      disabled: usedElsewhere,
+      meta: usedElsewhere ? '他店舗で使用中' : undefined,
+    }
+  })
   return (
-    <SharedField label={<><span className={styles.fieldLabel}>LINE公式アカウント<span className={styles.fieldRequired}> *</span></span></>}><DefaultSelect
-        name="lineAccountId"
-        ariaLabel="LINE公式アカウント"
-        defaultValue={currentStore?.line_account_id || ''}
-        options={[{ value: '', label: '選択してください' }, ...accounts.map((account) => {
-          const usedStoreId = usedByAccount.get(account.id)
-          const usedElsewhere = Boolean(usedStoreId && usedStoreId !== currentStore?.id)
-          return { value: account.id, label: `${account.displayName || account.name}${usedElsewhere ? '（他店舗で使用中）' : ''}`, disabled: usedElsewhere }
-        })]}
-      /></SharedField>
+    <div className={styles.fieldWide}>
+      <PickerInput name="lineAccountId" label="LINE公式アカウント" noun="LINE公式アカウント" icon={MessageCircle} items={items} defaultValue={currentStore?.line_account_id || ''} required />
+    </div>
   )
 }
 
@@ -119,7 +146,7 @@ export function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel }:
       </div>
       <div className={styles.formActions}>
         <Button type="button" disabled={busy} onClick={onCancel}>キャンセル</Button>
-        <Button variant="primary" type="submit" disabled={busy}>{store ? '保存する' : '店舗を登録する'}</Button>
+        <Button variant="primary" type="submit" disabled={busy}>{store ? <Check aria-hidden className={styles.buttonIcon} /> : null}{store ? '保存する' : '店舗を登録する'}</Button>
       </div>
     </form>
   )
@@ -262,7 +289,7 @@ export function MemberForm({ member, stores, busy, onSubmit, onCancel, login }: 
         <Field label="氏名" name="staffName" defaultValue={member?.staff_name} required />
         <Field label="メール" name="email" type="email" defaultValue={member?.email ?? ''} />
         <SharedField label={<><span className={styles.fieldLabel}>役割</span></>}><DefaultSelect name="role" ariaLabel="役割" defaultValue={member?.role ?? 'staff'} options={(['staff', 'store_manager', 'super_admin'] as const).map(value => ({ value, label: roleLabel[value] }))} /></SharedField>
-        <SharedField label={<><span className={styles.fieldLabel}>担当店舗</span></>}><DefaultSelect name="storeId" ariaLabel="担当店舗" defaultValue={member?.store_id ?? ''} options={[{ value: '', label: '全店舗' }, ...stores.map((s) => ({ value: s.id, label: s.name }))]} /></SharedField>
+        <PickerInput name="storeId" label="担当店舗" noun="店舗" items={stores.map((s) => ({ id: s.id, name: s.name, meta: [s.code, s.area].filter(Boolean).join('・') || undefined, keywords: s.code }))} defaultValue={member?.store_id ?? ''} placeholder="全店舗" clearable />
         <Field label="LINE通知UID" name="lineUid" defaultValue={member?.line_uid ?? ''} />
         <Field label="Googleメール" name="googleEmail" type="email" defaultValue={member?.google_email ?? ''} />
       </div>

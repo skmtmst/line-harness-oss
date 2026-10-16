@@ -256,6 +256,16 @@ describe('EmergencyControlV8 を現役の画面から操作する', () => {
     expect([...screen.queryAllByRole('dialog'), ...screen.queryAllByRole('alertdialog')]).toHaveLength(0); expect(bench.stopCalls).toHaveLength(0)
   })
 
+  it('停止の補足は1000文字まで入力でき、残り字数を実画面で更新する', async () => {
+    await mountControl(); await answerPreview(0, previewPayload({ mark: 400 }))
+    const dialog = await fillStop()
+    const detail = within(dialog).getByRole('textbox', { name: /補足/ }) as HTMLTextAreaElement
+    expect(detail.maxLength).toBe(1000)
+    expect(dialog.textContent).toContain('あと1000文字')
+    fireEvent.change(detail, { target: { value: '追加の補足' } })
+    expect(dialog.textContent).toContain('あと995文字')
+  })
+
   it('停止の403は、本人確認の窓を閉じて理由を前面に出し、送り直せなくする', async () => {
     await mountControl(); await answerPreview(0, previewPayload({ mark: 400 }))
     const { ApiError } = await import('@/lib/api')

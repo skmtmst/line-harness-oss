@@ -1,5 +1,14 @@
 # V8 型の対応表（パターン台帳）
 
+## people-day-grid 人の当日予約盤（L28）
+
+- 役目：時刻を縦、担当を横に並べる。正の部品は `shared/reservation-board.tsx` の `timeDirection="vertical"` と `reservation-people-grid.tsx`。標準の横時間軸は変更しない。
+- 空き枠はAPIから渡った `slots` のみ。予約の詳細・版付き移動・移動失敗後の復旧は共通盤の契約を保つ。閲覧者へ作成入口・ドラッグを出さない。
+- 当日の型は `templates/booking-page.tsx` の明示的な `stats` / `aside`。白い板が1100未満なら右欄を畳み「次の予約・内訳」で開く。数・次の予約・売上は実データから読み、未取得は0にしない。
+- 右欄の区画は同じ型の `BookingSidebarSection` へ題と内容を渡す。区切り・余白・題の段を画面側に定義しない。
+- 格子の外枠は共通 `GridTable` の `presentation="calendar"`。カードの本文ではなく、時刻・担当の行/列/セルを持つ表として描く。通常の一覧の密度・カードの余白の定義は変えない。
+- 見張り：`reservation-people-grid.test.tsx`・`day-frame.test.tsx` と実ブラウザの3幅。使う板はGcyTr/O2Z8u。細かな最終調整はClaudeへ渡す。
+
 - 作成：2026-10-09（オーナー「見落としていて決まりから外れているところが、次回から外れないように、同じものとして認識されるようにしておいて」・B-143・B-168・B-172）
 - 何の文書か：**同じ役目の物を、画面が違っても同じ物として見つける**ための表。型ごとに「役目・持ち主（正の部品）・見つけ方・決まり・見張り」を1節で書く。
 - 誰が読むか：画面を作る・直す人（Codex・Claude・Pen の作業役）と、点検の道具。機械が読む表は `scripts/visual-qa/v8-pattern-catalog.json`（この文書と同じ中身。正規表現は JSON が正）。
@@ -27,10 +36,14 @@
 - 作成の2列：`templates/create-page.tsx` の `CreateColumns`。見え方は入力の高さに収め、長い見本はその欄で送る。380幅と1100未満の畳み方は型が持つ。保存・プレビューの内容は画面が渡す。
 - 手順ごとの補足列：`templates/create-step-columns.tsx` の `CreateStepColumns`。白い板1100未満では右欄を同じ内容の確認窓へ畳む。入力値・補足の役目名は画面から渡す。
 - 作成の完了見出し：`templates/create-parts.tsx` の `CreateCompletionHeading`。丸い成功印・中央の題・結果本文を表示する。状態の札と区別し、数と次の操作は画面から渡す。
-- 内容で終わる板の本文：`templates/page-frame.tsx` の `PageContent`。左右24・上16、下24は外枠が1回だけ持つ。
+- 内容で終わる板の本文：`templates/page-frame.tsx` の `PageContent`。左右24・上16、下24は外枠が1回だけ持つ。本文の外に置く数の帯は `PageContent layout="stats"`（左右24、上下の追加なし）へ。既に本文の内側にある帯を二重に包まない。
 - 履歴の表：既存の `shared/table.tsx` の `DataTable.grid`。列・端の余白と本文／見出しの文字の大きさを共通の口へ渡す。画面で表の子を上書きしない。
 
 ## 使い方（必ず守る）
+
+- 外側の看板は `layout/sidebar-identity.tsx` の `SidebarBrand`（店は `SidebarIdentity` が取得した値を渡す）。運営も同じ横並びを使う。
+- 左下の本人操作は `shared/sidebar-user-menu.tsx`。既存の本人カードと `ActionMenu` を使い、運営の本人情報・プロフィール・2要素認証・ログアウトを渡す。店・統括の権限取得は既存 `hq/account-menu.tsx` が持つ。
+- 運営の注意帯は `Notice` の `presentation="ops"`。琥珀色・右の環境札なし。環境と版は左下の `SidebarVersion` で確認する。
 
 1. **画面を作る・直す前に**、その画面に出る型をこの表で探し、**持ち主（正の部品）だけを使う**。画面の中で同じ役目の物を書かない（§2・§6.20）。
 2. **画面の CSS で部品の見た目を上書きしない**。部品に見た目の `className`・`style` を渡さない（幅・余白・並びは呼び出し側が渡してよい＝§5）。色・大きさ・角丸・影を直書きしない（変数を読む）。
@@ -107,6 +120,8 @@
 <a id="card"></a>
 ## card カード（中身のまとまりの箱）
 
+- 選んだカードの枠と面は `Card.selected` へ渡す。既定のカードは変更しない。
+
 - 一覧のカード配置は一覧型の `ListPageCards`（`list-page.tsx` と `page-templates.module.css`）が列数と共通16の間隔を持つ。カードの面と内側は `Card`・`CardContent`・`CardHeader`（card.tsx）、操作は `RowNameButton`・`IconButton` が持つ（L7メディア・バナー）。CardContentは端の16を1回だけ持つ。
 - 分析のカード本文は `ListPageSection` が共通16/24の余白、`DetailColumns(presentation="analysis")` が左右の列と狭幅の折り畳みを持つ。カードの面/題はCard/CardHeader。ほかの提示と既定は保つ（L11 ws9wt）。
 
@@ -132,7 +147,7 @@
 ## kpi-band 数の帯
 
 - **役目**：数（KPI）を線で区切った1本の帯で並べる
-- **補足**：L5差し戻しU6/V3では全文を自然に折り返し、行き先を次の行に置く。説明と括弧の補足を分ける形（wjfLe）は KpiCard の `detailLayout="qualifier"` を使う。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。
+- **補足**：Gの最新版に従い、既定は文節で折り返す。`detailLayout="single"` は1行＋省略で全文を `title` に残し、`qualifier` は括弧の前で改行する。行き先は次の行。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。
 - **持ち主（コード）**：`apps/web/src/components/shared/kpi-band.tsx`・`apps/web/src/components/shared/kpi-card.tsx`・`apps/web/src/components/shared/kpi-card.module.css`・`apps/web/src/components/shared/kpi-band-v8.css`・`apps/web/src/components/shared/list-kpis.tsx`（部品 `KpiBand`・`KpiCard`・`ListKpis`）
   - 読む変数：`--color-hairline`
 - **持ち主（Pen）**：`Pp3nS`「数のマス」
@@ -197,6 +212,8 @@
 
 <a id="filter"></a>
 ## filter 絞り込み
+
+- URLで分類を切り替える札は `shared/filter-link`。リンク先・現在地・再読込を保つ。
 
 - **役目**：一覧を状態・種類などで絞る札。数が増える物は選ぶ窓で絞る
 - **持ち主（コード）**：`apps/web/src/components/shared/filter-chip.tsx`・`apps/web/src/components/shared/filter-chip.css`（部品 `FilterChip`）
@@ -338,6 +355,8 @@
 - **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
 - **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
   - 入力行：`shared/dialog-form-row.tsx` の `DialogFormRow` に既存の `Field` を渡す。独立した入力を本文幅へそろえ、保存・エラーは呼び出し側のまま保つ。
+  - チェック・未設定情報の行：同じファイルの `DialogContentRow` に共通 `Checkbox` または名前・操作を渡す。チェック後も行の薄い線を保ち、未設定情報は `tone="muted"` の灰色の面で1行にまとめる。
+  - 公開前の宛先：`shared/dialog-recipient-list.tsx` の `DialogRecipientList` へ実際の名前・役割・共通の通知方法の札を渡す。通常一覧の固定行高を持たず、役割を読めない時は「—」。
   - 作る種類を選ぶ窓：`shared/dialog-choice-cards.tsx` の `DialogChoiceCards` へ名前・説明・行き先を渡す。3列のカードの説明は安全に折り返し、名前は1行、クリック・キーボード・別タブで行き先を開ける。選択を保存するラジオとは分ける。
   - 使用先を示す窓：`shared/dialog-usage-table.tsx` の `DialogUsageTable` へ種類・名前・行き先を渡す。フォルダの丸を出さず、名前の省略と全文確認・外部の行き先の印1つを共通部品で保つ。
   - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
@@ -382,6 +401,8 @@
 <a id="picker-field"></a>
 ## picker-field 選ぶ欄（選ぶ前・選んだ後）
 
+- 電話予約で検索した友だちの行は `shared/friend-match-row.tsx` の `FriendMatchRow`。選択の薄い帯、名前/補足、選ぶ/選び直すを1行で持ち、行の内側へ別の選択枠を重ねない。
+
 - **役目**：選ぶ前は「〇〇を選ぶ」の副ボタン、選んだ後は見本・札＋「変える」
 - 候補自身の印の色は `EntityPickerItem.color` から共通 `TagPill` へ渡す。基本の追加URLの青い印もこの口を使い、画面で札のCSSを上書きしない。
 - **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`（部品 `EntityPickerSummary`・`EntityPickerField`・`HqAccountPickerField`・`HqAccountSelectField`）
@@ -423,6 +444,8 @@
 <a id="tap-action"></a>
 ## tap-action 押したら（TapActionField）
 
+- 窓を開く要約欄は `shared/tap-action-summary` が共通の選択欄へ接続する。
+
 - **役目**：ボタン・面を押したときの動き（URL・テキスト・予約・回答フォーム・予約履歴・来店スタンプ）を選ぶ
 - **持ち主（コード）**：`apps/web/src/components/shared/tap-action-field.tsx`・`apps/web/src/components/shared/tap-action-field.module.css`・`apps/web/src/lib/tap-actions.ts`・`apps/web/src/components/shared/use-tap-action-sources.ts`（部品 `TapActionField`・`TapTargetPicker`）
 - **持ち主（Pen）**：`Vx8Ny`「押したら（TapActionField）/閉じた」・`XVGg5`「押したら/開いた」・`c1qBx`「押したら/選んだ後」
@@ -442,6 +465,8 @@
 
 <a id="tap-extra"></a>
 ## tap-extra 押されたときにあわせて行うこと
+
+- タグとスコアの行は `shared/tap-extras-rows` が共通の ActionList へ接続する。画面の保存値は変えない。
 
 - **役目**：押したらに付けて、タグを付ける・スコアを足す
 - **持ち主（コード）**：`apps/web/src/components/shared/tap-action-field.tsx`（部品 `TapActionField`）
@@ -547,7 +572,7 @@
 <a id="sticky-bar"></a>
 ## sticky-bar 作る・編集の下の帯
 
-- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。 **10-14 C14差し戻しの例外**：役目の印を保持する操作は`Button.icon`へ明示する（シナリオ・共通情報のCheck／競合のGitCompare）。帯は明示iconを置き換えず、指定なしの保存印と待機/完了の状態印は維持。
+- **10-13の追加（F6・Y4）**：通常/分割の帯の主保存・作成・公開の印は `shared/sticky-save-actions.tsx` がSaveへそろえる。文字・markup・押下・無効・refは保持。次へ/リンク/副操作はその役目の印、処理中/完了は共通Buttonの状態を保つ。実ReactとSVG故障対照で確認する。 **10-14 C14差し戻しの例外**：役目の印を保持する操作は`Button.icon`へ明示する（シナリオ・共通情報のCheck／競合のGitCompare）。帯は明示iconを置き換えず、指定なしの保存印と待機/完了の状態印は維持。 件数で保存文が変わる操作は`Button.widthReserve="dynamic"`を指定し現在の全文で測り直す。既定の`states`/`idle`の幅は保つ（合格済みの窓と競合の帯を動かさない）。
 
 - **役目**：画面の下に追従。キャンセル・保存は中央、削除は左端
 - **持ち主（コード）**：`apps/web/src/components/shared/sticky-bar.tsx`・`apps/web/src/components/shared/sticky-bar.module.css`・`apps/web/src/components/templates/create-page.tsx`・`apps/web/src/components/shared/create-page.tsx`（部品 `StickyBar`・`CreatePage`・`PageFooter`）
@@ -1091,3 +1116,10 @@
 - 持ち主は`shared/bar-chart.tsx`・CSS。`distribution="diverging"`で同じ人数の単位を基準線の上（増加）と下（減少）へ。指定のない形は保つ。
 - `BarChartLegend`の`layout="analytics"`とtoneの`broadcast`/`scenario`、`BarChartEventMark`は出来事の青/紫を共有する。`toBarChartItems`へ渡すcampaignsのkindから日付の印を出す。人数の緑/灰と分け、名前は読み上げに残す。
 - 寸法の見張りは`scripts/v8-guard/bar-chart-layout-browser.mjs`、数と日選択の描画は`shared/bar-chart.test.tsx`。画面接続前の部品検査を板の合格へ数えない。
+
+<a id="verification-list"></a>
+## verification-list 接続のチェックの行
+
+- 役目：入力した接続情報の検査結果。一般の表ではなく、検査の印・題・説明・状態を並べる。
+- 持ち主：`shared/verification-list.tsx` の `VerificationList`。箱は共通Card、状態はStatusBadge、行は文字と上下12の自然高。
+- 失敗の説明は全文を折り返して高さを増やす。その他は1行で省略し、titleで全文を残す。使用先：LINEアカウント登録の接続確認（v2KMj）。

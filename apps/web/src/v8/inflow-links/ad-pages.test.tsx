@@ -158,7 +158,7 @@ describe('広告への送信履歴（p0kA3）', () => {
     await choose('Google広告')
     expect(host.querySelector('tbody')?.textContent).toContain('初回購入')
     expect(host.querySelector('tbody')?.textContent).not.toContain('定期便の申し込み')
-    await choose('すべての媒体')
+    await choose('すべて')
     expect(host.querySelector('tbody')?.textContent).toContain('定期便の申し込み')
     expect(calls).toHaveLength(0)
   })

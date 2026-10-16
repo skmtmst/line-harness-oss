@@ -6,6 +6,7 @@ const base = process.env.LIFF_QA_URL ?? 'http://127.0.0.1:3670';
 const api = process.env.LIFF_QA_API ?? 'http://127.0.0.1:8798';
 for (const url of [base, api]) assert.ok(['localhost', '127.0.0.1'].includes(new URL(url).hostname));
 const out = process.env.LIFF_QA_OUT ?? '/tmp/liff-affiliate-state';
+const capture = process.env.LIFF_QA_CAPTURE !== '0';
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 375, height: 724 }, locale: 'ja-JP', timezoneId: 'Asia/Tokyo', acceptDownloads: true });
@@ -52,7 +53,7 @@ try {
   const chunks = [];
   for await (const chunk of stream) chunks.push(chunk);
   assert.ok(Buffer.concat(chunks).subarray(0, 8).toString().startsWith('%PDF-1.4'));
-  await page.screenshot({ path: `${out}/S3uBl-functions.png`, fullPage: true });
+  if (capture) await page.screenshot({ path: `${out}/S3uBl-functions.png`, fullPage: true });
   await apiState({ fail: ['/api/liff/mileage/rewards', '/api/liff/affiliate/bank'] });
   await page.reload();
   await visibleText('使い道を読み込めませんでした');

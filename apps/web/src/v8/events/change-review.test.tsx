@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({ reason: '', endsAt: '2026-10-12T12:30' }))
@@ -33,6 +33,23 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('イベント変更の入力確認', () => {
+  it('影響確認の窓から戻っても、変更理由と日時を保つ', () => {
+    state.reason = '会場の都合'
+    render(<ChangeReview />)
+    const reason = screen.getByLabelText('変える理由') as HTMLTextAreaElement
+    const endsAt = screen.getByLabelText('終了日時')
+    const originalDate = endsAt.getAttribute('title')
+    fireEvent.click(screen.getByRole('button', { name: '影響の確認を見る' }))
+    const dialog = screen.getByRole('dialog', { name: '影響の確認' })
+    expect(within(dialog).getByRole('heading', { name: '日時・会場を変えるときの約束' })).toBeTruthy()
+    expect(within(dialog).getByText(/確定した申込 10 人/)).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(reason.value).toBe('会場の都合')
+    expect(endsAt.getAttribute('title')).toBe(originalDate)
+    expect(apply).not.toHaveBeenCalled()
+  })
+
   it('公開中の理由が空なら、確認窓を開かず理由へ移る', () => {
     render(<ChangeReview />)
     fireEvent.click(screen.getByRole('button', { name: '変えてお知らせする' }))

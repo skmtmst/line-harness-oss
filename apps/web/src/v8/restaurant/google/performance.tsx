@@ -5,7 +5,7 @@ import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/chart
 /*
  * ★V8 Googleビジネス パフォーマンス（`SrmVs`）。
  * 数4（共通の KpiCard）→ 飲食店向け指標 → 注。期間は 7／28／90 日（今の画面と同じ口・既定28日）。
- * 表示数の推移（今の画面の棒グラフ）は、帯の下の「表示数の推移を見る」で開閉する。
+ * 表示数の推移は、飲食店向け指標の題の右の操作から開閉する。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Eye, MapPin, MousePointerClick, Phone } from 'lucide-react'
@@ -126,9 +126,8 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
               />
             ))}
           </KpiBand>
-          <Button onClick={() => setShowTrend((current) => !current)} aria-expanded={showTrend}>表示数の推移を見る</Button>
           <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
-            <SectionHeader size="small" title={<>飲食店向け指標</>} />
+            <SectionHeader size="small" title={<>飲食店向け指標</>} actions={<Button size="compact" onClick={() => setShowTrend((current) => !current)} aria-expanded={showTrend}>表示数の推移を見る</Button>} />
             <dl className={styles.facts}>
               <div className={styles.factRow}><dt className={styles.factKey}>予約ボタンのクリック</dt><dd className={styles.factValue}>{data.food.bookings === null ? '—（連携サービス未対応）' : `${polishFormatNumber(data.food.bookings)} 回`}</dd></div>
               <div className={styles.factRow}><dt className={styles.factKey}>メニューの閲覧</dt><dd className={styles.factValue}>{data.food.menuClicks === null ? '—（対象機能を使っている店舗のみ）' : `${polishFormatNumber(data.food.menuClicks)} 回`}</dd></div>

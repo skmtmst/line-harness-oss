@@ -1,5 +1,7 @@
 'use client'
 
+import { shortUid, historyBadge } from './uid-labels'
+
 import { useState } from 'react'
 import { Inbox, CheckCheck, CircleCheck, Download, Plus, Undo2 } from 'lucide-react'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
@@ -13,6 +15,7 @@ import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
+import StatusBadge from '@/components/shared/status-badge'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
@@ -38,20 +41,6 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  */
 
 const PRE_EXECUTE = ['dry_run', 'review', 'ready']
-
-/** 長い UID は頭4字…末3字で見せる（全文は title）。 */
-function shortUid(uid: string): string {
-  return uid.length > 10 ? `${uid.slice(0, 4)}…${uid.slice(-3)}` : uid
-}
-
-function historyBadge(run: UidMigrationRun): { tone: 'ok' | 'muted' | 'danger' | 'warn'; label: string } {
-  if (run.status === 'completed') return { tone: 'ok', label: '本移行済み' }
-  if (run.status === 'rolled_back') return { tone: 'muted', label: '切り戻し済み' }
-  if (run.status === 'failed') return { tone: 'danger', label: run.counts.applied > 0 ? '一部失敗' : '失敗' }
-  if (run.status === 'executing') return { tone: 'warn', label: '実行中' }
-  if (run.status === 'ready') return { tone: 'ok', label: '確認完了' }
-  return { tone: 'muted', label: 'テスト移行' }
-}
 
 
 export default function UidMigrationV8({ initialRunId }: { initialRunId: string | null }) {
@@ -327,14 +316,14 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                 {m.runs.map((run) => {
                   const badge = historyBadge(run)
                   return (
-                    <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={reviewing && active?.id === run.id || undefined} data-row-id={run.id}>
+                    <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} data-row-id={run.id}>
                       <Td className={styles.td}>{slashDateTime(run.createdAt)}</Td>
                       <Td className={styles.td}>
                         <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`}  onClick={() => m.selectRun(run.id)}>
                           {`${accountName(run.fromAccountId)} → ${accountName(run.toAccountId)}`}
                         </button>
                       </Td>
-                      <Td className={styles.td}><span className={badge.tone === 'ok' ? `${styles.pill} ${styles.pillOk}` : badge.tone === 'danger' ? `${styles.pill} ${styles.pillDanger}` : badge.tone === 'warn' ? `${styles.pill} ${styles.pillWarn}` : `${styles.pill} ${styles.pillMuted}`}>{badge.label}</span></Td>
+                      <Td className={styles.td}><StatusBadge size="compact" tone={badge.tone === 'ok' ? 'success' : badge.tone === 'danger' ? 'danger' : badge.tone === 'warn' ? 'warning' : 'neutral'}>{badge.label}</StatusBadge></Td>
                       <Td className={styles.td}>
                         {run.rollbackable === true && !rollbackBlockedReason ? (
                           <button type="button" className={styles.textButton} disabled={m.busy || m.detailBusy} onClick={() => { m.selectRun(run.id); m.setRollbackError(null); m.setRollbackConflicts([]); m.setConfirmRollback(true) }}>
@@ -384,7 +373,8 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
   }
 
   return (
-    <PageFrame kind="list" boardId={active && !reviewing ? 'L48eY' : 'Z0jHp'}>
+    /* 要確認の判断（Z0jHp）は板を画面の高さまで伸ばし、キャンセルの帯を画面の下に追従させる。 */
+    <PageFrame kind="list" boardId={active && !reviewing ? 'L48eY' : 'Z0jHp'} heightMode={active && reviewing ? 'viewport' : undefined}>
       <FriendsSectionHead
         current="uid-migration"
         description="友だち情報と配信停止の状態を、新しいLINEアカウントへ引き継ぎます"
@@ -395,7 +385,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
           </Button>
         )}
       />
-      <div className={styles.body}>{body}</div>
+      <div className={styles.body} data-fill={active && reviewing ? '' : undefined}>{body}</div>
 
       <MigrationItemDialog detailItem={m.detailItem} active={active} me={m.me} busy={m.busy} detailError={m.detailError} onClose={() => { m.setDetailItem(null); m.setDetailError(null) }} decide={(item, decision) => void m.decide(item, decision)} />
       <ExecuteConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy} open={m.confirmExecute} error={m.executeError} canRun={m.canRunExecute} onConfirm={() => m.execute()} onCancel={() => { if (!m.busy) m.setConfirmExecute(false) }} />

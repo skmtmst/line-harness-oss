@@ -1,0 +1,10 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.table { width: 100%; border-collapse: collapse; font-size: var(--text-caption); line-height: var(--tpl-wa-op-row-lh); }
+.table tr { box-shadow: var(--shadow-row-line); }
+.table td { padding: var(--tpl-wa-op-row-pad); vertical-align: middle; }
+.table td + td { padding-left: var(--tpl-wa-op-col-gap); }
+.name { width: var(--tpl-wa-op-name-w); font-weight: 600; }
+.role { color: var(--color-ink-secondary); }
+.table td.channel { width: 1%; padding-right: var(--polish-space-field); white-space: nowrap; }
+}

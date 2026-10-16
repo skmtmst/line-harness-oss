@@ -14,7 +14,6 @@ import Notice from '@/components/shared/notice'
 import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, CircleX, Send, Users } from 'lucide-react'
-import { usePageTitle } from '@/components/shell/page-chrome'
 import { RowMenu } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
@@ -81,7 +80,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   exportOpen: boolean
   onExportClose: () => void
 }) {
-  usePageTitle('運用者へのお知らせ')
+  // 上の帯の最後はタブ名ではなく画面名「LINE通知」（絵 u8xibp）。題は左メニューの名前に任せる。
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [rules, setRules] = useState<OperatorNotificationRule[]>([])
   const [summary, setSummary] = useState<OperatorNotificationSummary | null>(null)
@@ -212,7 +211,8 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
               <Th className={styles.opSchedule}>送る時間</Th>
               <Th><span className={styles.opNum}>今日</span></Th>
               <Th>状態</Th>
-              <Th>{canManage ? '操作' : ''}</Th>
+              {/* 絵 u8xibp は操作の列にも見出しを出す。閲覧のみは操作が無いので空。 */}
+              <Th showActionLabel>{canManage ? '操作' : ''}</Th>
             </TableHeadRow>
           </thead>
           <tbody>

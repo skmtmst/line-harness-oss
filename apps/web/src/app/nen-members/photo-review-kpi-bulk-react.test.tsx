@@ -136,7 +136,7 @@ async function averageTimeValue(): Promise<string | undefined> {
   if (!button) return undefined
   if (button.getAttribute('aria-expanded') !== 'true') await act(async () => { button.click() })
   const tip = document.getElementById(button.getAttribute('aria-describedby') ?? '')
-  const pending = tip?.querySelector('strong')?.nextElementSibling
+  const pending = [...(tip?.querySelectorAll('span') ?? [])].find(el => !el.childElementCount && el.textContent?.includes('投稿から審査までの日数：'))
   return pending?.textContent?.split('投稿から審査までの日数：')[1]?.trim()
 }
 

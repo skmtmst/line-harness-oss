@@ -17,16 +17,6 @@
 }
 
 /* 数の帯：角12の枠で囲む。マスの余白・数の行の高さは、部品の題の行（13/19.5）の分だけ詰めて絵の位置（題・数・補足）に合わせる。 */
-.kpiBox {
-  --tpl-band-cell-pad-block: var(--tpl-sc2-kpi-pad-block);
-  --tpl-band-cell-pad-side: var(--tpl-sc2-kpi-pad-side);
-  --tpl-band-cell-gap: var(--tpl-sc2-kpi-gap);
-  --tpl-band-number-lh: var(--tpl-sc2-kpi-num-lh);
-  overflow: hidden;
-  border-radius: var(--tpl-sc2-radius);
-  box-shadow: var(--tpl-sc2-ring);
-}
-
 .section {
   display: flex;
   flex-direction: column;

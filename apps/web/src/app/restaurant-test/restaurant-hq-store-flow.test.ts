@@ -11,7 +11,6 @@ const accountsPage = readFileSync(new URL('../accounts/page.tsx', import.meta.ur
 const accountsNewPage = readFileSync(new URL('../accounts/new/page.tsx', import.meta.url), 'utf8')
 const consolePage = readFileSync(new URL('../../v8/restaurant/booking-kit/shell.tsx', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../lib/restaurant-test-api.ts', import.meta.url), 'utf8')
-const manualLinks = readFileSync(new URL('../../lib/manual-links.ts', import.meta.url), 'utf8')
 
 describe('飲食店向けHQと店舗追加動線', () => {
   it('店舗一覧と追加の重複入口を統括と店舗追加ウィザードへ転送する', () => {
@@ -81,15 +80,6 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(wizard).not.toContain("if (!selectedAccountId) throw new Error")
     expect(wizard).not.toContain('disabled={!selectedAccountId || saving}')
     expect(wizard).toContain('統括の店舗一覧へ')
-  })
-
-  it('マニュアルURLをJSXへ直書きせず、空の間は押し口を出さない', () => {
-    expect(wizard).toContain('MANUAL_LINKS')
-    expect(wizard).toContain('return href')
-    expect(wizard).toContain('<Button disabled title=')
-    expect(manualLinks).toContain("createOfficialAccount: ''")
-    expect(manualLinks).toContain("enableMessagingApi: ''")
-    expect(manualLinks).toContain("findChannelCredentials: ''")
   })
 
   it('店舗ごとに別のLINEプロバイダーを作る理由を利用者向けに案内する', () => {

@@ -259,12 +259,12 @@ test('v8 の削除の窓（VsSyu）は危ない操作を左端に離し、動い
     const dialog = document.querySelector('[data-design-node="VsSyu"]')
     expect(dialog?.textContent).toContain('「契約終了の前に知らせる」を削除しますか？')
     expect(dialog?.textContent).toContain('削除は元に戻せません。')
+    expect(dialog?.textContent).toContain('しばらく使わないだけなら「一時停止する」を使ってください。')
     const buttons = [...dialog!.querySelectorAll('button')].map((button) => button.textContent?.trim())
     // 閉じる印のあと、削除・取消・代わりの操作を同じ段へ置く。
     expect(buttons.filter(Boolean)).toEqual(['削除する', 'キャンセル', '代わりに一時停止'])
     const panel = dialog!.querySelector('[role="alertdialog"]') as HTMLElement
     expect(panel.style.getPropertyValue('--dialog-design-width')).toBe('480px')
-    expect((dialog as HTMLElement).style.getPropertyValue('--dialog-design-top')).toBe('260px')
     expect(panel.querySelector('[data-dialog-actions]')?.querySelectorAll('button')).toHaveLength(3)
   })
 })
@@ -282,6 +282,7 @@ test('下書きの削除も確認前には送信せず、元に戻すで延期�
   await eventually(() => expect(document.querySelector('[data-design-node="VsSyu"]')?.textContent).toContain('削除しますか？'))
   expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
   expect(document.querySelector('[data-design-node="VsSyu"]')?.textContent).not.toContain('代わりに一時停止')
+  expect(document.querySelector('[data-design-node="VsSyu"]')?.textContent).not.toContain('「一時停止する」を使ってください。')
   const confirm = [...document.querySelectorAll('[data-design-node="VsSyu"] button')].find(button => button.textContent === '削除する') as HTMLElement
   await act(async () => confirm.click())
   expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(true)

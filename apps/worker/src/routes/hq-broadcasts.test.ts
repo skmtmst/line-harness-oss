@@ -157,3 +157,77 @@ it('別人承認を全店の子配信へ残し、送信後に店側の承認か�
  expect((await call(`/api/hq/broadcasts/${r.id}/send`,'POST',{expectedVersion:3},true)).status).toBe(200);
  expect(f.raw.prepare('SELECT approval_status,approval_requested_by_staff_id,approval_decided_by_staff_id FROM broadcasts').get()).toEqual({approval_status:'approved',approval_requested_by_staff_id:'owner',approval_decided_by_staff_id:'reviewer'});
 });
+
+type HqRunResponse = {data: import('@line-crm/shared').HqBroadcastRun & {sent:0;followupAudienceCount:number}};
+type HqListResponse = {data:Array<{id:string;selectable:boolean}>;pagination:{total:number;nextCursor:string|null};statusCounts:Record<string,number>};
+type ReactionResponse = {data:Awaited<ReturnType<typeof import('../services/hq-broadcast-reactions.js').hqBroadcastReactions>>};
+type QuotaResponse = {data:Awaited<ReturnType<typeof import('../services/hq-broadcast-list.js').hqBroadcastQuota>>};
+describe('統括の配信一覧・複製・追送',()=>{
+ it('配信日・状態・名前でページ分け前に絞り、全件数と承認待ち数を返す',async()=>{
+   const one=await made({title:'秋のお知らせ'}),two=await made({title:'冬のお知らせ'}),three=await made({title:'秋の承認'});
+   f.raw.prepare("UPDATE hq_broadcast_runs SET approval_json=? WHERE id=?").run(JSON.stringify({status:'pending'}),three.id);
+   f.raw.prepare("UPDATE hq_broadcast_runs SET created_at='2026-10-01 01:00:00' WHERE id IN (?,?)").run(one.id,three.id);
+   f.raw.prepare("UPDATE hq_broadcast_runs SET created_at='2026-11-01 01:00:00' WHERE id=?").run(two.id);
+   const page=await call('/api/hq/broadcasts?from=2026-10-01&to=2026-10-31&q=%E7%A7%8B&limit=1');expect(page.status).toBe(200);const b=await page.json() as HqListResponse;
+   expect(b.data).toHaveLength(1);expect(b.data[0].selectable).toBe(true);expect(b.pagination).toMatchObject({total:2,nextCursor:'1'});expect(b.statusCounts).toMatchObject({all:2,draft:1,pending_approval:1});
+   const pending=await (await call('/api/hq/broadcasts?status=pending_approval')).json() as HqListResponse;expect(pending.data.map(r=>r.id)).toEqual([three.id]);
+   expect((await call('/api/hq/broadcasts?from=2026-02-30')).status).toBe(400);expect((await call('/api/hq/broadcasts?limit=0')).status).toBe(400);
+ });
+ it('複製は承認と予約日を引き継がず下書きだけ作り、押し直しでも増えない',async()=>{
+   const source=await made();const body={requestId:'duplicate-draft',expectedVersion:source.version};
+   const first=await call(`/api/hq/broadcasts/${source.id}/duplicate`,'POST',body);expect(first.status).toBe(201);const a=(await first.json() as HqRunResponse).data;
+   expect(a).toMatchObject({status:'prepared',scheduledAt:null,sent:0,input:{saveAsDraft:true}});
+   expect((await (await call(`/api/hq/broadcasts/${source.id}/duplicate`,'POST',body)).json() as HqRunResponse).data.id).toBe(a.id);
+   expect((f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get() as {n:number}).n).toBe(0);
+   expect((await call(`/api/hq/broadcasts/${source.id}/duplicate`,'POST',{...body,expectedVersion:0})).status).toBe(409);
+ });
+ async function sentWithLink() {
+   const run=await made();
+   f.raw.prepare("INSERT INTO broadcasts(id,title,message_type,message_content,status,line_account_id,hq_run_id,sent_at,total_count,success_count,track_links) VALUES ('sent-child','元配信','text','本文','sent','shop',?,'2026-10-01T10:00:00+09:00',2,2,1)").run(run.id);
+   f.raw.prepare("UPDATE hq_broadcast_targets SET broadcast_id='sent-child' WHERE run_id=?").run(run.id);
+   f.raw.prepare("UPDATE hq_broadcast_runs SET status='scheduled' WHERE id=?").run(run.id);
+   f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('clicked','U-clicked','shop');INSERT INTO tracked_links(id,name,original_url,line_account_id) VALUES('tracked','商品','https://example.com','shop');INSERT INTO broadcast_tracked_links(broadcast_id,tracked_link_id,label,created_at) VALUES('sent-child','tracked','商品','2026-10-01');INSERT INTO link_clicks(id,tracked_link_id,friend_id,clicked_at) VALUES('click','tracked','clicked','2026-10-01T11:00:00+09:00');INSERT INTO messages_log(id,friend_id,direction,message_type,content,broadcast_id,line_account_id) VALUES('log1','friend','outgoing','text','本文','sent-child','shop'),('log2','clicked','outgoing','text','本文','sent-child','shop')");
+   return run;
+ }
+ it('追送は届いて押していない人だけの下書きを作り、送信とテスト送信はしない',async()=>{
+   const source=await sentWithLink();
+   const r=await call(`/api/hq/broadcasts/${source.id}/followup`,'POST',{requestId:'followup-draft',expectedVersion:1});expect(r.status,await r.clone().text()).toBe(201);
+   const b=(await r.json() as HqRunResponse).data;expect(globalThis.fetch).not.toHaveBeenCalled();expect(b).toMatchObject({status:'prepared',sent:0,followupAudienceCount:1,input:{followupOfRunId:source.id,targetType:'segment'}});
+   // The normal send flow resolves the per-account source again, even after the draft is saved.
+   const {resolveHqBroadcastAudience,countHqAudience}=await import('../services/hq-broadcast-audience.js');
+   const condition=await resolveHqBroadcastAudience(f.db,tenant,'shop',b.input);expect(await countHqAudience(f.db,'shop',condition)).toBe(1);
+   expect((f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get() as {n:number}).n).toBe(1);
+   actor('owner',true);expect((await call(`/api/hq/broadcasts/${source.id}/followup`,'POST',{requestId:'forbidden',expectedVersion:1})).status).toBe(403);
+ });
+ it('計測のない追送と別組織の追送元は断り、少人数の反応は未取得表示にする',async()=>{
+   const source=await sentWithLink();const reactions=await call(`/api/hq/broadcasts/${source.id}/reactions`);expect(reactions.status).toBe(200);
+   const b=(await reactions.json() as ReactionResponse).data;expect(b.links[0]).toMatchObject({uniqueClickCount:null,clickCount:null,suppressed:true});expect(b.blockCount).toBeNull();
+   f.raw.exec("UPDATE broadcasts SET track_links=0 WHERE id='sent-child'");expect((await call(`/api/hq/broadcasts/${source.id}/followup`,'POST',{requestId:'no-track',expectedVersion:1})).status).toBe(409);
+   f.raw.exec("INSERT INTO tenants(id,name) VALUES('other','Other')");f.raw.prepare("UPDATE hq_broadcast_runs SET tenant_id='other' WHERE id=?").run(source.id);
+   expect((await call(`/api/hq/broadcasts/${source.id}/reactions`)).status).toBe(404);
+ });
+ it('反応は送信成功者だけの14日間を数え、20人以上なら人数・回数・率を返す',async()=>{
+   const source=await sentWithLink();
+   for(let n=0;n<20;n++){
+     f.raw.prepare("INSERT INTO friends(id,line_user_id,line_account_id) VALUES (?,?,'shop')").run(`react${n}`,`U-react${n}`);
+     f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state) VALUES ('sent-child',?,'shop','sent')").run(`react${n}`);
+     f.raw.prepare("INSERT INTO link_clicks(id,tracked_link_id,friend_id,clicked_at) VALUES (?,'tracked',?,'2026-10-02T00:00:00+09:00')").run(`click${n}`,`react${n}`);
+   }
+   f.raw.exec("INSERT INTO link_clicks(id,tracked_link_id,friend_id,clicked_at) VALUES ('again','tracked','react0','2026-10-03T00:00:00+09:00'),('too-late','tracked','react0','2026-10-15T10:00:00+09:00'),('too-early','tracked','react0','2026-09-01T00:00:00+09:00')");
+   const result=await (await call(`/api/hq/broadcasts/${source.id}/reactions`)).json() as ReactionResponse;
+   expect(result.data.links[0]).toMatchObject({uniqueClickCount:20,clickCount:21,clickRate:100,suppressed:false});
+   f.raw.exec("INSERT INTO analytics_event_coverage(line_account_id,event_type,available_from,state,updated_at) VALUES ('shop','friend_unfollow','2026-09-01T00:00:00+09:00','available','2026-10-01');INSERT INTO analytics_events(id,line_account_id,friend_id,event_type,source_kind,source_id,occurred_at,idempotency_key) VALUES ('blocked','shop','react0','friend_unfollow','line_webhook','evt','2026-10-02T00:00:00+09:00','block1'),('blocked-again','shop','react0','friend_unfollow','line_webhook','evt2','2026-10-03T00:00:00+09:00','block2'),('late-block','shop','react1','friend_unfollow','line_webhook','evt3','2026-10-15T10:00:00+09:00','block3')");
+   const blocked=await (await call(`/api/hq/broadcasts/${source.id}/reactions`)).json() as ReactionResponse;
+   expect(blocked.data).toMatchObject({blockCount:1,blockCountState:'available'});
+   f.raw.exec("UPDATE analytics_event_coverage SET state='partial'");
+   expect((await (await call(`/api/hq/broadcasts/${source.id}/reactions`)).json() as ReactionResponse).data.blockCount).toBeNull();
+
+ });
+ it('送信枠は未計測ならnull、15分以内の同じアカウントの計測だけを足す',async()=>{
+   expect((await (await call('/api/hq/broadcasts/quota')).json() as QuotaResponse).data.remaining).toBeNull();
+   const now=new Date().toISOString();f.raw.prepare("INSERT INTO operation_health_runs(id,scope_key,line_account_id,window_started_at,source,status,overall_status,started_at) VALUES('health','shop','shop',?,'scheduled','completed','normal',?)").run(now,now);
+   f.raw.prepare("INSERT INTO operation_health_results(id,run_id,check_key,status,summary,value_json,source,observed_at) VALUES('quota','health','message_quota','normal','計測',?,'line_messaging_api',?)").run(JSON.stringify({line:{remaining:70,used:30,limit:100}}),now);
+   const result=await (await call('/api/hq/broadcasts/quota')).json() as QuotaResponse;expect(result.data).toMatchObject({remaining:70,used:30,limit:100});
+   f.raw.exec("UPDATE operation_health_results SET observed_at='2020-01-01T00:00:00Z'");expect((await (await call('/api/hq/broadcasts/quota')).json() as QuotaResponse).data.remaining).toBeNull();
+ });
+});

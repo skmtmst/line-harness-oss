@@ -1,4 +1,7 @@
 'use client'
+
+import { operationFailureText } from './health-error'
+import TruncatedText from '@/components/shared/truncated-text'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { TriangleAlert, CircleCheck, Info, OctagonAlert } from 'lucide-react'
@@ -42,11 +45,6 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 type ReleaseSummary = { version: string; released: string | null }
 
 const HISTORY_FETCH_LIMIT = 200
-
-function operationFailureText(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.message && !/^API error: \d+$/.test(error.message)) return error.message
-  return fallback
-}
 
 type ControlMessage = { tone: 'success' | 'warning' | 'danger'; text: string }
 
@@ -589,7 +587,7 @@ export function HealthPanelV8({
                   </GridCell>
                   <GridCell role="cell" className={styles.judge}><StatusPill severity={check.severity} stale={check.stale} /></GridCell>
                   <GridCell role="cell" className={styles.time}>{formatCheckedAt(check.observedAt)}</GridCell>
-                  <GridCell role="cell" className={styles.how} title={abnormal ? check.threshold : undefined}>{abnormal ? check.summary : check.threshold}</GridCell>
+                  <GridCell role="cell" className={styles.how} title={abnormal ? check.threshold : undefined}><TruncatedText value={abnormal ? (check.summary ?? '') : check.threshold} /></GridCell>
                 </GridRow>
               )
             })}
