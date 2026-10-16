@@ -1,10 +1,10 @@
 import type { AccountStyle, StyleTemplateSample } from '@line-crm/shared';
 import { fetchApi } from './api';
 
-import { write, Result, StarterSetItem, StyleStarterSet } from './api-styles-common.js';
-export type * from './api-styles-common.js';
-import { methods1 } from './api-style-methods-1.js';
-import { methods2 } from './api-style-methods-2.js';
+import { write, Result, StarterSetItem, StyleStarterSet } from './api-styles-common';
+export type * from './api-styles-common';
+import { methods1 } from './api-style-methods-1';
+import { methods2 } from './api-style-methods-2';
 export const styleApi = { ...methods1, ...methods2 };
 
 export const hqStyleApi = {
