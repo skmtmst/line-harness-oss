@@ -229,11 +229,11 @@ test('行から右の詳細を開き、停止の確認では理由を必須に�
   expect(stopButton).toBeTruthy()
   await act(async () => { stopButton!.click() })
   await eventually(() => {
-    expect([...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('商品を買ったを止めますか？'))).toBeTruthy()
+    expect([...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('「商品を買った」を止めますか？'))).toBeTruthy()
   })
   expect(document.body.textContent).toContain('理由必須')
   // 理由が空のままは止められない（右の詳細の「止める」と区別する）
-  const stopPanel = [...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('商品を買ったを止めますか？'))
+  const stopPanel = [...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('「商品を買った」を止めますか？'))
   expect(stopPanel).toBeTruthy()
   const confirmButton = [...stopPanel!.querySelectorAll('button')].find((button) =>
     button.textContent === '止める')

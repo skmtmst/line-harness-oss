@@ -32,6 +32,22 @@ beforeEach(async () => {
 afterEach(() => fixture.raw.close());
 
 describe('マイルの友だち詳細を友だちIDで取る（V6R-CX-e）', () => {
+  it('最終行動の名前・増減・日時は同じ1件から返し、記録なしはnull',async()=>{
+    friend('me','本人');friend('empty','記録なし');friend('other','別の人');
+    grant('first','me',null,100);grant('latest','me',null,-50);grant('unrelated','other',null,999);
+    fixture.raw.exec("UPDATE mileage_ledger SET entry_type='spend',reason='送料無料クーポン',occurred_at='2026-10-02T10:00:00' WHERE id='latest'");
+    const result=await getMileageFriendsV6(fixture.db,{lineAccountId:'acc',visibleAccountIds:['acc'],search:'',limit:100,offset:0});
+    expect(result.items.find(r=>r.friendId==='me')?.lastAction).toEqual({name:'送料無料クーポン',amount:-50,occurredAt:'2026-10-02T10:00:00',entryType:'spend',status:'available'});
+    expect(result.items.find(r=>r.friendId==='empty')?.lastAction).toBeNull();
+  });
+  it('名寄せした相手の最終行動でも、担当外の店舗の中身は返さない',async()=>{
+    fixture.raw.exec("INSERT INTO users(id,display_name) VALUES('user','本人');INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token) VALUES('hidden','担当外','hidden','s','t')");
+    friend('me','本人','user');friend('elsewhere','本人','user');fixture.raw.exec("UPDATE friends SET line_account_id='hidden' WHERE id='elsewhere'");
+    grant('visible','me','user',10);grant('hidden-action','elsewhere','user',999);
+    fixture.raw.exec("UPDATE mileage_ledger SET reason='担当外の購入',occurred_at='2026-10-03' WHERE id='hidden-action'");
+    const result=await getMileageFriendsV6(fixture.db,{lineAccountId:'acc',visibleAccountIds:['acc'],search:'',limit:1,offset:0});
+    expect(result.items[0].lastAction).toMatchObject({name:'購入',amount:10});
+  });
   it('同じ名前が101人いても、友だちIDで本人の1行を返す', async () => {
     for (let i = 0; i < 101; i += 1) friend(`f-${String(i).padStart(3, '0')}`, '佐藤');
     // 本人は残高が一番少ない（名前で探した100件の枠からこぼれる並び）

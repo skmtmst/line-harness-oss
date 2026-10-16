@@ -8,6 +8,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RegistrantsTab } from '@/v8/reminders/detail'
+// 登録者のタブは画面の説明の帯を持つので、画面と同じく説明の器の中に置く（loVfW）。
+import { PageExplanationProvider } from '@/components/shared/page-explanation'
 
 const apiMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -83,11 +85,17 @@ afterEach(async () => {
 
 async function render() {
   await act(async () => {
-    root.render(<RegistrantsTab canManage reminderId="reminder-1" />)
+    root.render(<PageExplanationProvider pageKey="reminders:registrants"><RegistrantsTab canManage reminderId="reminder-1" /></PageExplanationProvider>)
     await Promise.resolve()
     await Promise.resolve()
   })
 }
+async function clickAria(label: string) {
+  const button = document.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement | null
+  if (!button) throw new Error(`${label} が見つかりません`)
+  await act(async () => { button.click(); await Promise.resolve() })
+}
+
 async function click(label: string) {
   const button = Array.from(document.querySelectorAll('button')).find((item) => item.textContent === label)
   if (!button) throw new Error(`${label} が見つかりません`)
@@ -167,9 +175,12 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
 
   it('取消後は再開だけを表示し、再開には取消後の版番号を渡す', async () => {
     await render()
+    // 行の操作は「…」1つの中（B-253）。
+    await clickAria('田中 花子の操作')
     await click('取り消す')
     expect(apiMock.cancel).toHaveBeenCalledWith('reminder-1', 'registration-1', 4)
     expect(host.textContent).toContain('取消済み')
+    await clickAria('田中 花子の操作')
     await click('再開する')
     expect(apiMock.resume).toHaveBeenCalledWith('reminder-1', 'registration-1', 5)
     expect(host.textContent).toContain('未送信分だけを次の配信処理で組み直します。')
@@ -193,7 +204,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     expect(host.textContent).toContain('田中 花子')
     account.selectedAccountId = 'account-b'
     await act(async () => {
-      root.render(<RegistrantsTab canManage reminderId="reminder-1" />)
+      root.render(<PageExplanationProvider pageKey="reminders:registrants"><RegistrantsTab canManage reminderId="reminder-1" /></PageExplanationProvider>)
       await Promise.resolve()
       await Promise.resolve()
     })
@@ -207,8 +218,8 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     apiMock.list.mockResolvedValueOnce({ success: true, data: [jstRegistrant] })
     await render()
     const trigger = document.querySelector('button[aria-label="田中 花子の基準日"]')
-    // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す（日本語の見せ方）。
-    expect(trigger?.textContent).toContain('2026年9月16日（水）10:00')
+    // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す（表の欄は「9/16（水）10:00」の短い形・loVfW）。
+    expect(trigger?.textContent).toContain('9/16（水）10:00')
     await pickTargetDate('田中 花子の基準日', '2026-09-16T10:30')
     await click('基準日を保存')
     expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', '2026-09-16T01:30:00.000Z', 4)

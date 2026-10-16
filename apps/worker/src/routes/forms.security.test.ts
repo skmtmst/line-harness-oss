@@ -51,6 +51,7 @@ vi.mock('@line-crm/db', () => ({
   getForms: vi.fn(),
   getFormsWithStats: mocks.getFormsWithStats,
   getFormById: mocks.getFormById,
+  getFormLatestEdit:vi.fn(async()=>null),
   getFormAccountIds: mocks.getFormAccountIds,
   listLineAccountsWithTenantStatus: vi.fn(async () => [
     { id: 'account-a', tenant_status: 'active' },
@@ -370,7 +371,7 @@ describe('submission pagination compatibility', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ success: true, data: [] });
     // #722: 切る数は口が渡す。渡した数と名乗る数が同じであることが要点。
-    expect(mocks.getFormSubmissions).toHaveBeenCalledWith(bindings.DB, 'form-1', 200);
+    expect(mocks.getFormSubmissions).toHaveBeenCalledWith(bindings.DB, 'form-1', 200, {lineAccountId:'account-a'});
     expect(mocks.getFormSubmissionsPage).not.toHaveBeenCalled();
   });
 
@@ -522,6 +523,7 @@ describe('submission pagination compatibility', () => {
       'account-a',
       [{ key: 'next_visit', label: '次回来店日' }],
       [],
+      {},
     );
   });
 

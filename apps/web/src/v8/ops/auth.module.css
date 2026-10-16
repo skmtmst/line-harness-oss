@@ -26,8 +26,8 @@
   border-radius: var(--radius-control);
   background: var(--color-accent-deep);
   color: var(--color-on-accent);
-  font-size: var(--text-heading);
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
 }
 
 .brandText {
@@ -37,7 +37,7 @@
 
 .brandName {
   color: var(--color-ink);
-  font-size: var(--text-lead);
+  font-size: var(--text-base);
   font-weight: 700;
 }
 

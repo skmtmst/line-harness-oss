@@ -32,6 +32,8 @@ export type DialogProps = {
   widthPreset?: 'picker'
   /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。v7 では効かない。 */
   designTop?: number
+  /** 指定した上位置を含めて窓を画面内に収め、本文だけをスクロールする。 */
+  fitViewport?: boolean
   /**
    * ★V8：絵の窓の頭（題と×の行）の余白。CSS の padding と同じ書き方（例 `'20px 20px 0'`）。
    * 小窓だけの絵（MyJP7・F1LK4e・CVz5d など）は頭が今の共通の値（上20・左右24・下8）より
@@ -42,6 +44,8 @@ export type DialogProps = {
   designHeaderPadding?: string
   /** ★V8：絵の窓の頭の高さ（px）。渡すと頭の行をこの高さに固定する。渡さなければ中身なり。v7 では効かない。 */
   designHeaderHeight?: number
+  /** 頭の×の左に置く操作（選ぶ窓の「＋タグを作る」など）。 */
+  headerAction?: ReactNode
   /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
   designContentPadding?: string
   /** 指定した窓だけ下の操作段の余白を変える。 */
@@ -134,8 +138,10 @@ export default function Dialog({
   designLayout,
   confirmFirst,
   designTop,
+  fitViewport,
   designHeaderPadding,
   designHeaderHeight,
+  headerAction,
   designContentPadding,
   designFooterPadding,
   footerDivider = true,
@@ -258,7 +264,7 @@ export default function Dialog({
       {/* 絵が無いときは今までどおり h2 を直接置く。囲むと既存の余白が動く。 */}
       {titlePart}
       {titleNote ? <p className={styles.titleNote}>{titleNote}</p> : null}
-      {designLayout === 'stacked' ? null : descriptionNode}
+      {designLayout === 'stacked' || descriptionBand === 'danger' ? null : descriptionNode}
     </>
   )
   const panel = (
@@ -303,19 +309,15 @@ export default function Dialog({
     >
       <div className={styles.headerRow}>
         <div className={styles.headerContent}>
-          {descriptionBand === 'danger' && description ? (
-            <>
-              {titlePart}
-              <div className={`${styles.callout} ${styles.calloutDanger}`} data-qa-dialog-callout>{descriptionNode}</div>
-            </>
-          ) : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
+          {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
         </div>
+        {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
         <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
           <X aria-hidden="true" size={18} />
         </IconButton>
       </div>
-      {designLayout === 'stacked' ? descriptionNode : null}
+      {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><div className={`${styles.callout} ${styles.calloutDanger}`} data-qa-dialog-callout>{descriptionNode}</div></div> : designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <p className={styles.error} role="alert">{error || automaticError}</p> : null}
@@ -361,7 +363,7 @@ export default function Dialog({
   const discardDialog = discard.confirming ? <Dialog open={discard.confirming} title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null
   if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}{discardDialog}</OverlayDepthContext.Provider>
   const overlay = (
-    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-viewport-fit={fitViewport || undefined} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) discard.requestClose()
     }}>
       {panel}
@@ -386,6 +388,6 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
 }
 
 /** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
-export function DialogActions({ children, leadingAction }: { children: ReactNode; leadingAction?: ReactNode }) {
-  return <div className={styles.actions} data-dialog-actions>{leadingAction ? <span className={styles.actionLead}>{leadingAction}</span> : null}{children}</div>
+export function DialogActions({ children, leadingAction, padding }: { children: ReactNode; leadingAction?: ReactNode; padding?: 'none' }) {
+  return <div className={styles.actions} data-dialog-actions data-padding={padding}>{leadingAction ? <span className={styles.actionLead}>{leadingAction}</span> : null}{children}</div>
 }

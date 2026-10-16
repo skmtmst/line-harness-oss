@@ -141,14 +141,17 @@ test('v8 の動かす切替は押した瞬間に札が変わり、失敗した�
   })
   await renderPage()
   const board = host.querySelector('[data-design-node="gW0F2"]')!
-  expect(board.textContent).toContain('動いています')
+  // 状態の札は言葉の表どおり「有効／停止中」（「動いています」は使わない）。
+  const badgeText = () => Array.from(board.querySelectorAll('[data-design-node="xRvDB"]')).map((el) => el.textContent).join('|')
+  expect(badgeText()).toContain('有効')
+  expect(board.textContent).not.toContain('動いています')
   const toggle = board.querySelector('[role="switch"]') as HTMLElement
   await act(async () => { toggle.click() })
   // 口の返事を待たずスイッチが変わる（札は切り替え中になる）。
   expect(toggle.getAttribute('aria-checked')).toBe('false')
   expect(board.textContent).toContain('切り替え中')
   await act(async () => { resolveUpdate!(json({ success: false, error: 'boom' })) })
-  expect(board.textContent).toContain('動いています')
+  expect(badgeText()).toContain('有効')
 })
 
 test('v8 で↑↓を受け取り口の列で押すと次の受け取り口へ移る', async () => {

@@ -149,7 +149,8 @@ export function useFriendMigrations() {
       const response = await api.friendMigrations.previewImport({ accountId, sourceFilename: file.name, sourceChecksum, rows })
       if (!response.success) { setMessage(response.error); return }
       setImportId(response.data.id); setSummary(response.data.result.summary)
-      setMessage(response.data.duplicate ? '同じファイルの確認結果を表示しました。二重には反映しません。' : '確認だけ完了しました。まだ友だち情報は変更していません。')
+      // 初めての確認は、結果の箱の「まだ友だち情報は変えていません」で伝わるので帯を重ねない（絵 T9gblG）。
+      setMessage(response.data.duplicate ? '同じファイルの確認結果を表示しました。二重には反映しません。' : null)
       await load()
     } catch (error) { setMessage(operationFailureMessage(error, '確認')) }
     finally { setBusy(false) }

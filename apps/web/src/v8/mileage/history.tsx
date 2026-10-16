@@ -277,7 +277,7 @@ export default function HistoryTab() {
   const toolbar = (
     <MileageToolbar
       narrow={narrow}
-      notices={<ToolbarNotices info="明細はあとから消せません。間違えて付けたときは「減らす」で取り消しの明細を足します。" error={exportError} />}
+      notices={<ToolbarNotices error={exportError} />}
       search={{
         placeholder: '友だち・できごとで探す',
         value: searchInput,
@@ -316,13 +316,17 @@ export default function HistoryTab() {
   ) : table
 
 
-  const footer = !loading && !error && result !== null && (items.length > 0 || (spentOnly && pageCount > 1)) ? (
-    <HistoryPager {...{ spentOnly, total, page, pageSize, items, pageCount, loading, setPage }} />
+  const footer = !loading && !error && total !== null && (items.length > 0 || (spentOnly && pageCount > 1)) ? (
+    <div className={styles.pagerStack}>
+      <HistoryPager {...{ spentOnly, total, page, pageSize, items, pageCount, loading, setPage }} />
+      {/* 行の操作の案内はページ送りの下の1行（絵 oRbJi の「下の段」）。 */}
+      <p className={styles.footNoteFlush}>行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。</p>
+    </div>
   ) : undefined
 
   return (
     <MileageFrame
-      explanation="行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。"
+      explanation="明細はあとから消せません。間違えて付けたときは「減らす」で取り消しの明細を足します。"
       actions={<div className={styles.headActions}>
         <Button onClick={exportCsv} disabled={!canExport}>
           <Download size={15} aria-hidden="true" /> CSVで書き出す

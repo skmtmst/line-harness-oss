@@ -3,6 +3,7 @@
  * V8 統括のアカウント（src/v8/hq/home.tsx）の動きの試験。
  * LINE ID の @ を二重にしない、要確認のカードに引っかかった確認の言葉を出す（全文は title）、
  * 閲覧のみには「更新する」を置かない。
+ * 「入る」は見た目のまま、押すと友だちの引き継ぎを続きから進める（2026-10-15 の決まり）。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -13,6 +14,7 @@ vi.hoisted(() => {
 })
 
 const accounts = vi.hoisted(() => vi.fn())
+const stepImport = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -21,7 +23,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      lineAccounts: { ...actual.api.lineAccounts, list: accounts },
+      lineAccounts: { ...actual.api.lineAccounts, list: accounts, stepFollowerImport: stepImport },
       lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })) },
       tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '然 -NEN-' } })) },
     },
@@ -67,6 +69,8 @@ beforeEach(() => {
   document.body.appendChild(container)
   root = createRoot(container)
   accounts.mockResolvedValue({ success: true, data: [warnedAccount] })
+  stepImport.mockReset()
+  stepImport.mockResolvedValue({ success: true, data: { state: { phase: 'completed' }, busy: false, profilesFetched: 0 } })
   role.value = 'owner'
 })
 
@@ -113,10 +117,57 @@ describe('統括のアカウント', () => {
     expect(container.querySelector('article [data-design-part="notice"]')).toBeNull()
   })
 
+  it('「入る」を押すと、友だちの引き継ぎを続きから進める口を叩く', async () => {
+    await render()
+    const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
+    await act(async () => { enter.click() })
+    expect(stepImport).toHaveBeenCalledWith('acc-1')
+  })
+
+  it('口が返らなくても、口が転んでも「入る」は止まらない', async () => {
+    // 返らない場合（答えを待たない）と、転んだ場合（遷移を止めない）の両方。
+    stepImport.mockReturnValueOnce(new Promise(() => {}))
+    await render()
+    const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
+    await act(async () => { enter.click() })
+    expect(stepImport).toHaveBeenCalledTimes(1)
+    stepImport.mockRejectedValueOnce(new Error('worker unavailable'))
+    await act(async () => { enter.click() })
+    await act(async () => { await Promise.resolve() })
+    expect(stepImport).toHaveBeenCalledTimes(2)
+  })
+
+  it('閲覧のみは引き継ぎを動かさない', async () => {
+    role.value = 'viewer'
+    await render()
+    const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
+    await act(async () => { enter.click() })
+    expect(stepImport).not.toHaveBeenCalled()
+  })
+
   it('閲覧のみには「更新する」を置かない', async () => {
     role.value = 'viewer'
     await render()
     const card = container.querySelector('article')!
     expect([...card.querySelectorAll('button')].some((button) => button.textContent === '更新する')).toBe(false)
+  })
+  it.each(['owner', 'admin', 'viewer'])('アカウントの用途文から権限を推測せず、現在の人%sで設定の入口を決める', async viewerRole => {
+    role.value = viewerRole
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, role: '本店の配信に使う', connection: { status: 'ok', issues: [] } }] })
+    await render()
+    expect(container.querySelector('button[aria-label$="の設定"]') !== null).toBe(viewerRole !== 'viewer')
+  })
+
+
+
+  it('閲覧のみでも所属とタグを読め、権限者を含む補足の全文へ届く', async () => {
+    role.value = 'viewer'
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, folderId: 'area', folder: { name: '渋谷エリア', color: '#0088ff' }, tags: [{ id: 'main', name: '本店', color: '#0088ff' }], stats: { ...warnedAccount.stats, staffCount: 4 } }] })
+    await render()
+    const card = container.querySelector('article')!
+    expect(card.querySelector('[aria-label="フォルダ：渋谷エリア"]')).not.toBeNull()
+    expect(card.querySelector('[aria-label="タグ「本店」"]')).not.toBeNull()
+    expect(card.textContent).toContain('権限者 4 人')
+    expect([...card.querySelectorAll('button')].some(button => button.textContent === '設定')).toBe(false)
   })
 })

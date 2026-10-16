@@ -264,3 +264,14 @@ describe('rich-menu HQ store atomic adapter', () => {
     await expect(f.plan('a', { snapshotToken })).rejects.toThrow('VERSION_CONFLICT');
   });
 });
+
+it('counts the audience-tag binding in the D1 atomic snapshot limit',()=>{
+  const f=fixture();
+  const area={id:'text-one',bounds:{x:0,y:0,width:100,height:100},actionType:'message' as const,actionData:{text:'案内'},intent:'text' as const,label:'案内'};
+  f.definition.richMenu.pages[0].areas=[{...area,tagIds:Array.from({length:23},(_,i)=>`source-${i}`)},{...area,id:'text-two',bounds:{x:100,y:0,width:100,height:100},tagIds:Array.from({length:23},(_,i)=>`source-${i+23}`)}];
+  const options=()=>({...f.options,input:{...f.input,definitionJson:JSON.stringify(f.definition)}});
+  expect(()=>createRichMenuHqTemplateAdapter(options())).not.toThrow();
+  f.definition.richMenu.displayAudience='tag';f.definition.richMenu.displayTagName='会員';
+  expect(()=>createRichMenuHqTemplateAdapter(options())).toThrow('UNSUPPORTED_REFERENCE_LIMIT');
+  expect(f.bucket.head).not.toHaveBeenCalled();
+});

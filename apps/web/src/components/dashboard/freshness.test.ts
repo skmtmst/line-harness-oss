@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import DashboardFreshness, { dashboardFreshnessText, formatDashboardAsOf } from './freshness'
+import DashboardFreshness, { dashboardFreshnessText, dashboardPeriodLabel, formatDashboardAsOf } from './freshness'
 
 describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
   // 比較の「今日」は JST 2026-09-13（UTC 09-13T15:00 は JST 09-14 0:00）。
@@ -63,4 +63,9 @@ describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
     }))
     expect(html).toContain(`class="${className} shrink-0 text-xs font-medium"`)
   })
+})
+
+it('30日と旧28日の応答を異なる期間として表示する', () => {
+  expect(dashboardPeriodLabel('last30')).toBe('過去30日')
+  expect(dashboardPeriodLabel('last28')).toBe('過去28日')
 })

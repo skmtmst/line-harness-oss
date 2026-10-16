@@ -1,5 +1,9 @@
 'use client'
 
+import { scheduleStamp, changeText } from './edit-text'
+export { scheduleStamp, changeText } from './edit-text'
+
+import { TextField } from '@/components/shared/text-field'
 import { requiredText } from '@/lib/form-requirement'
 const b244Requirements = {
   changeReason: requiredText("変える理由を入力してください"),
@@ -51,34 +55,6 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-
-/*
- * ★V8 共通情報の編集（板 `AYc6O`、編集（1152）`C67dE`、競合 `piWhz`）。
- *
- * 型は作る（CreatePage）：頭（戻る・名前・差し込み名と使っている数）→ 左に「中身を変える」
- * 「変える前に影響を見る」、右の列に名前とフォルダ・使える期間・社内メモ（ひとまとまり）・
- * 決めた日に変える・これまでの変更・差し込んだときの見え方、下の帯に削除・キャンセル・止める・
- * 反映して保存。1152 では右の列の上に「LINEでの見え方を見る」を置き、スマホは窓で開く。
- * 競合は頭の下の琥珀の帯と比べる窓で扱う。
- * データの口・影響確認・保存・予約・削除・状態切替は `app/contents/vars/edit/edit-v8.tsx` から
- * 写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
- */
-
-/** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
-export function scheduleStamp(value: string): string {
-  const match = /^\d{4}-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(value)
-  if (!match) return value
-  const [, m, d, hh, mm] = match
-  return `${Number(m)}/${Number(d)}${hh ? ` ${Number(hh)}:${mm}` : ''}`
-}
-
-/** 履歴の「前 → 後」。先頭の同じ言葉（「平日 」など）は後ろで繰り返さない。 */
-export function changeText(before: string, after: string): string {
-  const from = before || '（空）'
-  const to = after || '（空）'
-  const head = /^(\S+\s)/.exec(from)?.[1]
-  return `${from} → ${head && to.startsWith(head) && to.length > head.length ? to.slice(head.length) : to}`
-}
 
 /** 履歴の日時（ISO）を日本時間の「9/01 10:00」の形にする。 */
 export function historyStamp(value: string): string {
@@ -840,7 +816,8 @@ function EditCommonVarV8Inner() {
               aria-label="フォルダ"
               label="フォルダ"
               id="cv-folder"
-              {...(narrow ? { size: 'full' as const } : { width: 240 })}
+              // 右の列の幅いっぱい（絵 AYc6O）。固定 240 は列（約206）より広く、縮んで字が真ん中に寄っていた。
+              size="full"
               value={folderId}
               onChange={(next) => { setSaved(false); setFolderId(next) }}
               // 絵は「フォルダ：お店の情報」を1つの文で見せる（閉じたボタンの頭は label）。
@@ -926,14 +903,13 @@ function EditCommonVarV8Inner() {
 
       <section className={styles.sideCard} aria-labelledby="cv-edit-memo-heading">
         <h2 id="cv-edit-memo-heading" className={styles.sideTitle}>社内メモ</h2>
-        <div className={styles.field}><Field label="メモ（お客さまには出ません）" htmlFor="cv-memo"><SaveErrorField names={["memo","saved"]}><input
+        <div className={styles.field}><Field label="メモ（お客さまには出ません）" htmlFor="cv-memo"><SaveErrorField names={["memo","saved"]}><TextField
             id="cv-memo"
-            type="text"
             value={memo}
             onChange={(e) => { setSaved(false); setMemo(e.target.value) }}
             maxLength={1000}
             placeholder="店舗ごとに違うときは店舗の共通情報へ"
-            className={styles.fieldInput}
+            title="店舗ごとに違うときは店舗の共通情報へ"
             readOnly={!canWrite}
           /></SaveErrorField></Field></div>
       </section>
@@ -977,6 +953,7 @@ function EditCommonVarV8Inner() {
             <div className={styles.schedActions}>
               <Button
                 variant="text"
+                size="slot"
                 type="button"
                 onClick={() => {
                   const now = jstNowLocalInput()
@@ -990,6 +967,7 @@ function EditCommonVarV8Inner() {
               {schedules.length > 0 ? (
                 <Button
                   variant="text"
+                  size="slot"
                   type="button"
                   onClick={() => {
                     setClearSchedulesError('')
@@ -1028,15 +1006,6 @@ function EditCommonVarV8Inner() {
       ) : (
         <p className={styles.fieldHint}>まだ変更履歴はありません。</p>
       )}
-      {canWrite ? (
-        <div className={styles.statusBox}>
-          <p className={styles.statusLabel}>下の帯の操作（状態で変わる）：</p>
-          {/* 絵どおり3つ並べ、いまの状態で押せるものだけ押せる（押せない理由は title）。 */}
-          <Button type="button" onClick={() => openStatusDialog('stop')} disabled={(item.status ?? 'active') !== 'active'} title={(item.status ?? 'active') === 'active' ? undefined : '使用中のときだけ止められます'}><Pause size={14} aria-hidden="true" />止める</Button>
-          <Button type="button" onClick={() => openStatusDialog('resume')} disabled={item.status !== 'stopped'} title={item.status === 'stopped' ? undefined : '止めているときだけ再開できます'}><Play size={14} aria-hidden="true" />再開する</Button>
-          <Button type="button" onClick={() => openStatusDialog('publish')} disabled={item.status !== 'draft'} title={item.status === 'draft' ? undefined : '下書きのときだけ公開できます'}>公開する</Button>
-        </div>
-      ) : null}
     </section>
   ) : null
 
@@ -1075,7 +1044,7 @@ function EditCommonVarV8Inner() {
           {/* 競合の帯（板 `piWhz`）。頭の下に横いっぱい。入力は残したまま、誰の保存かを見せる。 */}
             {/* 誰が・いつ保存したかの文と、入力を残す動きは同じ。 */}
             <div className={styles.conflictSlot}>
-              <SaveConflictBand
+              <SaveConflictBand reloadVariant="primary"
                 title={`${conflict.actorName ?? '別の担当者'}さんが ${conflict.savedAt && formatHourMinute(conflict.savedAt) ? `${formatHourMinute(conflict.savedAt)} に` : ''}共通情報「${item.name}」を保存しました`}
                 description={`あなたが直した所はまだ保存されていません。このまま保存すると、${conflict.actorName ?? '別の担当者'}さんの変更が消えます。`}
                 designNode="piWhz"
@@ -1099,6 +1068,9 @@ function EditCommonVarV8Inner() {
       noticeSpacing="band"
       identity={<></>}
       preview={preview}
+      /* 1152（C67dE）は右の列を畳まず、スマホだけをボタンにして「決めた日に変える」を右に残す（畳むと予定の欄が見えなくなっていた）。 */
+      hidePreviewWhenNarrow={!narrow}
+      previewCompactWhenNarrow
       destructive={canWrite && item ? (
         <StickyBarAction destructive icon={Trash2} label="削除する" onClick={() => openDelete()} />
       ) : undefined}
@@ -1113,6 +1085,18 @@ function EditCommonVarV8Inner() {
               止める
             </Button>
           ) : null}
+          {/* 状態で変わる操作は下の帯だけに置く（右の列に同じ操作を並べない）。止めている→再開する、下書き→公開する。 */}
+          {canWrite && item && stopped ? (
+            <Button type="button" onClick={() => openStatusDialog('resume')} disabled={saving}>
+              <Play size={14} aria-hidden="true" />
+              再開する
+            </Button>
+          ) : null}
+          {canWrite && item && isDraft ? (
+            <Button type="button" onClick={() => openStatusDialog('publish')} disabled={saving}>
+              公開する
+            </Button>
+          ) : null}
           {canWrite && item ? (
             conflict ? (
               <Button type="button" variant="primary" icon={<GitCompare size={16} aria-hidden="true" />} onClick={() => setCompareOpen(true)} disabled={saving}>
@@ -1121,7 +1105,7 @@ function EditCommonVarV8Inner() {
             ) : (
               <Button
                 type="button"
-                variant="primary" icon={<Check size={16} aria-hidden="true" />}
+                variant="primary" widthReserve="dynamic" icon={<Check size={16} aria-hidden="true" />}
                 disabled={saving || blocked.length > 0}
                 onClick={() => void save()}
                 busy={saving}

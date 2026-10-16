@@ -5,6 +5,9 @@
  * `inbound_only` を型と実行時の両方で固定し、誤って双方向化できないようにする。
  */
 
+import { selectAssignment } from './booking-assignment-selector.js';
+import { defaultAssignmentResource } from './booking-assignment-settings.js';
+
 export const RESTAURANT_RESERVATION_SOURCES = [
   'restaurant_board',
   'reszaiko',
@@ -104,7 +107,8 @@ export function chooseRestaurantTable(candidates: RestaurantTableCandidate[], gu
       if (waste !== 0) return waste;
       return a.maxCapacity - b.maxCapacity || a.id.localeCompare(b.id);
     });
-  return suitable[0]?.id ?? null;
+  return selectAssignment(suitable.map(t => ({ ...t, ...defaultAssignmentResource(t.id), dailyCount: 0, periodCount: 0 })),
+    { method: 'legacy_first', guestCount })?.id ?? null;
 }
 
 export function restaurantRoleFromAdminRole(role: 'owner' | 'admin' | 'staff' | 'viewer'):

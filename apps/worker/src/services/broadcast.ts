@@ -1,3 +1,5 @@
+import { broadcastWideContext } from './broadcast-wide-context.js';
+import { DELIVERY_CONSENT_ALLOWED_SQL, recordSuppressedBroadcastRecipients, suppressedFriendIds, hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
 import { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
 import { buildBroadcastAudienceQuery as buildSegmentQuery } from './broadcast-audience-query.js';
 import { buildMessage } from './line-message.js';
@@ -86,48 +88,6 @@ const PERSONALIZED_PUSH_BATCH_SIZE = 10;
  */
 const PERSONALIZED_PUSH_PER_TICK = 150;
 
-/**
- * 配信全体で1つに決まる差し込みの値。
- *
- * 共通情報（営業時間など）と配信日は、誰に送っても同じ値になる。
- * 1人ずつ引くと人数分クエリが増えるので、送る前に1回だけ用意する。
- *
- * 配信日の起点は**実際に送る時刻**。予約時刻ではない。cron は5分刻みで
- * 動くので、深夜0時前後の配信では予約時刻と実際の日付が割れる。
- * 相手が受け取った日と、本文に書かれた日が食い違うのがいちばん困る。
- */
-async function broadcastWideContext(
-  db: D1Database,
-  accountId: string | null,
-  content: string,
-  fixedVars: Record<string, string> | undefined,
-  broadcastId: string,
-): Promise<BroadcastRenderContext> {
-  const context: BroadcastRenderContext = { deliveredAt: new Date() };
-  if(/\{\{\s*account\.name\s*\}\}/.test(content)) {
-    if(!accountId)throw new Error('店名の差し込みには店舗が必要です');
-    const a=await db.prepare('SELECT name FROM line_accounts WHERE id=?').bind(accountId).first<{name:string}>();
-    if(!a)throw new Error('店名を確認できません');context.accountName=a.name;
-  }
-  if (accountId) {
-    const { getLineAccountById: getLA } = await import('@line-crm/db');
-    const acct = await getLA(db, accountId);
-    context.liffId = (acct as unknown as { liff_id?: string | null } | null)?.liff_id ?? null;
-  }
-  // 共通情報は本文で使っているときだけ引く。使わない配信で毎回1クエリ増やさない。
-  // snapshot の無い到達経路でも、消えた共通情報を空文字へ落とさず fail-closed にする。
-  if (/\{\{\s*var\./.test(content)) {
-    if (fixedVars) context.vars = fixedVars;
-    else {
-      const { resolveSendCommonVars } = await import('./interpolation-context.js');
-      context.vars = await resolveSendCommonVars(
-        db, accountId, content, { kind: 'broadcast', id: broadcastId },
-      );
-    }
-  }
-  return context;
-}
-
 export async function processBroadcastSend(
   db: D1Database,
   lineClient: LineClient,
@@ -162,6 +122,16 @@ export async function processBroadcastSend(
     );
   }
 
+  // LINE broadcast cannot omit specific followers. Keep the saved target 'all'
+  // and switch to the existing resumable recipient ledger when consent requires it.
+  if (broadcast.target_type === 'all' && !hasRecipientVariablesInParts(storedParts)
+    && await hasSuppressedDeliveryRecipients(db, broadcast.line_account_id ?? null)) {
+    const conditions = JSON.stringify({ operator: 'AND', rules: [{ type: 'is_following', value: true }] });
+    await db.prepare(`UPDATE broadcasts SET status='sending',batch_offset=0,segment_conditions=? WHERE id=?`)
+      .bind(conditions, broadcast.id).run();
+    return (await getBroadcastById(db, broadcastId))!;
+  }
+
   // A recipient variable cannot be delivered through LINE broadcast or
   // multicast because those endpoints accept one shared Message object.
   // Convert scheduled/direct sends into the resumable queue path.
@@ -194,10 +164,10 @@ export async function processBroadcastSend(
       const { sql, bindings } = buildSegmentQuery(storedConditions);
       const segmentAudienceSql = accountId
         ? `SELECT COUNT(*) AS total,
-                  SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                  SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
              FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
         : `SELECT COUNT(*) AS total,
-                  SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                  SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
              FROM (${sql}) q`;
       const segmentAudience = await db
         .prepare(segmentAudienceSql)
@@ -214,7 +184,7 @@ export async function processBroadcastSend(
       return (await getBroadcastById(db, broadcastId))!;
     }
 
-    const where: string[] = ['f.is_following = 1'];
+    const where: string[] = ['f.is_following = 1', 'COALESCE(f.is_hidden,0)=0', DELIVERY_CONSENT_ALLOWED_SQL];
     const binds: unknown[] = [];
     if (accountId) {
       where.push('f.line_account_id = ?');
@@ -281,9 +251,9 @@ export async function processBroadcastSend(
     // 名前を差し込む本文は、名前の無い人がいると差し込めない。送る前に止める。
     if (hasRecipientVariablesInParts(storedParts)) {
       const nameSql = accountId
-        ? `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+        ? `SELECT SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
              FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-        : `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+        : `SELECT SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
              FROM (${sql}) q`;
       const missing = await db.prepare(nameSql).bind(...binds).first<{ missing_name: number | null }>();
       if (Number(missing?.missing_name ?? 0) > 0) {
@@ -369,6 +339,11 @@ export async function processBroadcastSend(
         'broadcast',
         JSON.stringify(messages),
       );
+      if (await hasSuppressedDeliveryRecipients(db,broadcastAccountId)) {
+        await db.prepare(`UPDATE broadcasts SET batch_offset=0,segment_conditions=? WHERE id=?`)
+          .bind(JSON.stringify({operator:'AND',rules:[{type:'is_following',value:true}]}),broadcast.id).run();
+        return (await getBroadcastById(db,broadcastId))!;
+      }
       const { requestId } = await lineClient.broadcast(messages, retryKey);
       await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
       if (broadcastAccountId) {
@@ -449,7 +424,9 @@ export async function processBroadcastSend(
             await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) break;
         const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
         const batch = followingFriends.slice(i, i + MULTICAST_BATCH_SIZE);
-        const sendable = batch.filter((f) => !blocked.has(f.id));
+        const suppressed = await suppressedFriendIds(db,batch.map(f=>f.id));
+        await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
+        const sendable = batch.filter((f) => !blocked.has(f.id)&&!suppressed.has(f.id));
         if (sendable.length === 0) continue;
         const sendableIds = sendable.map((f) => f.id);
         const lineUserIds = sendable.map((f) => f.line_user_id);
@@ -610,7 +587,7 @@ async function countScheduledRecipients(
   accountId: string,
 ): Promise<number | null> {
   try {
-    const where: string[] = ['f.is_following = 1', 'f.line_account_id = ?'];
+    const where: string[] = ['f.is_following = 1', 'f.line_account_id = ?', 'COALESCE(f.is_hidden,0)=0', DELIVERY_CONSENT_ALLOWED_SQL];
     const binds: unknown[] = [accountId];
     if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
       where.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');
@@ -1037,9 +1014,12 @@ async function processQueuedBroadcastBatches(
     .bind(broadcast.id).first<{n:number}>();
   if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:Number(raw.total_count ?? 0),
     known:Number(previousAudience?.n ?? 0),started:!!hasAudience || Number(raw.success_count ?? 0)>0 || batchOffset>0 || Number(raw.send_attempt_no ?? 1)>1})) return;
-  if (!hasAudience && (segmentConditionsStr || broadcast.target_tag_id)) {
+  const filterAll = broadcast.target_type === 'all' && await hasSuppressedDeliveryRecipients(db,accountId);
+  if (!hasAudience && (segmentConditionsStr || broadcast.target_tag_id || filterAll)) {
     const conditions = segmentConditionsStr ? JSON.parse(segmentConditionsStr)
-      : { operator: 'AND', rules: [{ type: 'tag_exists', value: broadcast.target_tag_id }] };
+      : { operator: 'AND', rules: broadcast.target_tag_id
+          ? [{ type: 'tag_exists', value: broadcast.target_tag_id }]
+          : [{ type: 'is_following', value: true }] };
     const query = buildSegmentQuery(conditions);
     const sql = accountId ? query.sql.replace('WHERE', 'WHERE f.line_account_id = ? AND') : query.sql;
     const bindings = accountId ? [accountId, ...query.bindings] : query.bindings;
@@ -1060,6 +1040,10 @@ async function processQueuedBroadcastBatches(
       'queued-broadcast',
       JSON.stringify(messages),
     );
+    if (await hasSuppressedDeliveryRecipients(db,accountId)) {
+      await updateBroadcastBatchProgress(db,broadcast.id,0,0);
+      return;
+    }
     const { requestId } = await lineClient.broadcast(messages, retryKey);
     await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
     await createBroadcastInsight(db, broadcast.id);
@@ -1149,6 +1133,8 @@ async function processQueuedBroadcastBatches(
       return;
     }
     const batch = friends.slice(currentOffset, currentOffset + deliveryBatchSize);
+    const suppressed = await suppressedFriendIds(db,batch.map(f=>f.id));
+    await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
     const batchIndex = Math.floor(currentOffset / deliveryBatchSize);
 
     if (personalized) {
@@ -1156,7 +1142,7 @@ async function processQueuedBroadcastBatches(
         // 台帳が「送達済み」「送達不明」と覚えている相手は飛ばす（#662）。
         // 送達不明を飛ばすのは at-most-once のため——外へ出たかもしれない
         // 相手を送り直すと、相手のトークに2通残って取り消せない。
-        if (blocked.has(friend.id)) {
+        if (blocked.has(friend.id)||suppressed.has(friend.id)) {
           currentOffset++;
           continue;
         }
@@ -1284,7 +1270,7 @@ async function processQueuedBroadcastBatches(
      * 失敗分の再送は先頭から歩き直すので、ここで叩いてしまうと送り終えた
      * 相手へ2通目が出る。
      */
-    const sendable = batch.filter((friend) => !blocked.has(friend.id));
+    const sendable = batch.filter((friend) => !blocked.has(friend.id)&&!suppressed.has(friend.id));
     if (sendable.length === 0) {
       currentOffset += batch.length;
       continue;

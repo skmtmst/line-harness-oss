@@ -10,6 +10,29 @@ import type { BookingConflict, BookingReceptionSource } from '@line-crm/shared';
 export type { BookingConflict } from '@line-crm/shared';
 
 const AUTO_ASSIGN_KEY = 'booking_auto_assign';
+export const EXTERNAL_BOOKING_CHANNELS = ['hot_pepper_beauty', 'google_reserve', 'epark'] as const;
+export type ExternalBookingChannel = typeof EXTERNAL_BOOKING_CHANNELS[number];
+const channelSettingKey = (channel: ExternalBookingChannel) => `booking_channel_connection:${channel}`;
+
+export async function getBookingChannelSetting(db: D1Database, accountId: string, channel: ExternalBookingChannel) {
+  const row = await db.prepare('SELECT value FROM account_settings WHERE line_account_id=? AND key=?')
+    .bind(accountId, channelSettingKey(channel)).first<{ value: string }>();
+  const stored = row ? JSON.parse(row.value) as { enabled: boolean; version: number } : { enabled: false, version: 0 };
+  return { key: channel, ...stored, connectionStatus: stored.enabled ? 'requested' as const : 'disabled' as const, operational: false as const };
+}
+
+/** 連携の申請状態だけを保存する。実際のメール取り込みや外部認証は開始しない。 */
+export async function saveBookingChannelSetting(db: D1Database, accountId: string, channel: ExternalBookingChannel, enabled: boolean, expectedVersion: number) {
+  const key = channelSettingKey(channel);
+  const value = JSON.stringify({ enabled, version: expectedVersion + 1 });
+  const saved = await db.prepare(`INSERT INTO account_settings(id,line_account_id,key,value)
+    SELECT ?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM account_settings WHERE line_account_id=? AND key=?)
+    ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value,
+      updated_at=strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')
+    WHERE json_extract(account_settings.value,'$.version')=?`)
+    .bind(crypto.randomUUID(),accountId,key,value,expectedVersion,accountId,key,expectedVersion).run();
+  return saved.meta.changes > 0;
+}
 export async function getBookingAutoAssign(db: D1Database, accountId: string): Promise<boolean> {
   const row = await db.prepare('SELECT value FROM account_settings WHERE line_account_id = ? AND key = ?').bind(accountId, AUTO_ASSIGN_KEY).first<{ value: string }>();
   return row?.value === 'true';
@@ -76,7 +99,9 @@ export async function getBookingChannels(db: D1Database, accountId: string, cred
   return { timeZone, ...bounds, staff, autoAssign: await getBookingAutoAssign(db, accountId), channels: [
     { key: 'line', status: 'active', todayCount: count(['liff']) },
     { key: 'manual', status: 'active', todayCount: count(['phone','counter','operator']) },
-    ...['hot_pepper_beauty','google_reserve','epark'].map((key) => ({ key, status: 'preparing', todayCount: null })),
+    ...await Promise.all(EXTERNAL_BOOKING_CHANNELS.map(async (key) => ({
+      ...await getBookingChannelSetting(db, accountId, key), status: 'preparing', todayCount: null,
+    }))),
   ] };
 }
 

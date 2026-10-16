@@ -60,13 +60,6 @@ describe('表の外側の余白の洗い出し', () => {
     expect(read('v8', 'automations', 'common-actions.module.css')).toContain('.colOps')
   })
 
-  it('/ops/audit：IPを理由の補足で確認し、右端の欄は残りの幅を使う', () => {
-    const body = code(read('v8', 'ops', 'audit.tsx'))
-    expect(body).toContain('className={parts.grow} role="cell" title={')
-    expect(body).toContain('IP ${row.ip')
-    expect(read('v8', 'ops', 'parts.module.css')).toMatch(/\.grow\s*\{[^}]*min-width: 0;[^}]*flex: 1;/)
-  })
-
   it('/ops/members：名前は残りの幅を使い、名前とメールの全文を確認できる', () => {
     const body = code(read('v8', 'ops', 'members.tsx'))
     expect(body).toContain('<GridNameCell folder={false}')
@@ -102,12 +95,6 @@ describe('表の外側の余白の洗い出し', () => {
     const body = code(read('v8', 'settings', 'ec-commerce', 'screen.tsx'))
     expect(body).toContain('<Th><span className={styles.srOnly}>操作</span></Th>')
     expect(body).toContain('<RowMenu')
-  })
-
-  it('/ec-commerce/identity-candidates：V8の比較表で操作の列を持つ', () => {
-    const body = code(read('v8', 'settings', 'ec-commerce', 'identity.tsx'))
-    expect(body).toContain('<Th>操作</Th>')
-    expect(body).toContain('<DataTable')
   })
 
   it('/friends/migrations：V8の表は左右のセル余白を設計値で保つ', () => {

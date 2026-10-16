@@ -282,12 +282,13 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
     const compactNode = (account: AccountItem, depth: number): ReactNode => {
       const parent = accounts.find((item) => item.id === account.parentLineAccountId)
       return <div key={account.id} className={depth > 0 ? compact.child : undefined}>
-        <Card surface="inset" contentPadding="var(--tpl-acct-hierarchy-row-pad)" className={compact.row}
+        {/* 子・孫は幅をそろえ、カードの中だけを字下げする（絵 a7lUk）。 */}
+        <Card surface="inset" contentPadding={`var(--tpl-acct-hierarchy-row-pad-y) var(--tpl-acct-hierarchy-row-pad-x) var(--tpl-acct-hierarchy-row-pad-y) calc(var(--tpl-acct-hierarchy-row-pad-x) + ${depth} * var(--tpl-acct-hierarchy-indent))`} className={compact.row}
           data-account-id={account.id} draggable={!saving}
           onDragStart={(event) => startDrag(event, account.id)} onDragEnd={finishDrag}
           onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }}
           onDrop={(event) => dropOn(event, account.id)}>
-          <GripHorizontal size={12} aria-hidden="true" />
+          <GripHorizontal className={compact.grip} size={12} aria-hidden="true" />
           <span className={compact.name} title={account.displayName || account.name}>{account.displayName || account.name}</span>
           <span className={compact.relationship}>{depth === 0 ? '最上位（親）' : `${parent?.displayName || parent?.name || '上位アカウント'}の${depth === 1 ? '子' : '孫'}`}</span>
           {moveMenu(account)}
@@ -311,11 +312,12 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
               onDrop={(event) => dropOn(event, null)}>
               {hierarchyRoots.map((account) => compactNode(account, 0))}
             </div>
-            {unassigned.length > 0 ? <Card surface="inset" contentPadding="var(--tpl-acd-dlg-band-pad)" className={compact.unassigned}>
-              <p>{`未設定のLINEアカウント：${unassigned.map((account) => account.displayName || account.name).join('・')}`}</p>
-              <div className={compact.unassignedMenus}>{unassigned.map((account) => <span key={account.id} className={compact.unassignedItem}>
-                <span className={compact.name} title={account.name}>{account.name}</span>{moveMenu(account)}
-              </span>)}</div>
+            {/* 未設定は灰色の1本の帯。名前ごとの「…」から行き先を選ぶ（絵 a7lUk）。 */}
+            {unassigned.length > 0 ? <Card surface="muted" contentPadding="var(--tpl-acd-dlg-band-pad-y) var(--tpl-acd-dlg-band-pad-x)" className={compact.unassigned}>
+              <span className={compact.unassignedLabel}>▧ 未設定のLINEアカウント：</span>
+              {unassigned.map((account) => <span key={account.id} className={compact.unassignedItem}>
+                <span className={compact.unassignedName} title={account.displayName || account.name}>{account.displayName || account.name}</span>{moveMenu(account)}
+              </span>)}
             </Card> : null}
             {!hierarchyRoots.length && !unassigned.length ? <ListState kind="empty" title="LINEアカウントがありません" /> : null}
           </>}

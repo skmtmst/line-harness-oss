@@ -18,6 +18,7 @@ import StatusBadge from './status-badge'
 import {formatDate} from '@/lib/format'
 import RestaurantFloorMap from './restaurant-floor-map'
 import ReservationMonth from './reservation-month'
+import ReservationPeopleGrid from './reservation-people-grid'
 import styles from './reservation-board.module.css'
 const hm=(iso:string)=>formatDate(iso,{style:'time'})
 const civil=(iso:string)=>new Date(Date.parse(iso)+9*3600000)
@@ -26,8 +27,11 @@ const minutes=(iso:string)=>civil(iso).getUTCHours()*60+civil(iso).getUTCMinutes
 const source=(s:string)=>({line:'LINE',restaurant_board:'レストランボード',tabelog:'食べログ',hotpepper:'ホットペッパー',ikyu:'一休',phone:'電話',manual:'電話',walk_in:'ウォークイン'}[s]??s)
 const state=(s:string)=>({confirmed:'予約あり',requested:'承認待ち',pending:'承認待ち',visited:'来店済み',seated:'着席中',cancelled:'取消',no_show:'無断取消'}[s]??s)
 const axisName={resource:'時間',floor:'座席表',list:'一覧',month:'月'}
-export function ReservationSource({value,note}:{value:string;note?:string|null}){return <span className={styles.source} data-source={value}>{value==='manual'&&note?.startsWith('ウォークイン')?'ウォークイン':source(value)}</span>}
+/** 経路の札。label を渡すと、その名前で出す（予約経路の連携の表のように、口が媒体の名前を持つとき）。 */
+export function ReservationSource({value,note,label}:{value:string;note?:string|null;label?:string}){return <span className={styles.source} data-source={value} title={label}>{label??(value==='manual'&&note?.startsWith('ウォークイン')?'ウォークイン':source(value))}</span>}
 export function ReservationDetailsActions({children}:{children:ReactNode}){return <div className={styles.detailActions}>{children}</div>}
+/** 盤の色の見本（予約元ごとの箱の色）。道具の段に1行で置く（GcyTr）。 */
+export function ReservationLegend({items,label='予約の色'}:{items:Array<{label:string;tone:'info'|'warning'|'success'|'neutral'|'danger'}>;label?:string}){return <span className={styles.legendInline} role="list" aria-label={label}>{items.map(item=><span key={item.label} role="listitem" data-state={item.tone}>{item.label}</span>)}</span>}
 export function ReservationFacts({items}:{items:Array<{label:string;value:ReactNode}>}){return <dl className={styles.facts}>{items.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>}
 export function ReservationDining({entry,dense=false}:{entry:ReservationBoardEntry;dense?:boolean}) {
  if(dense)return <div className={styles.denseDining}><strong>飲食（顧客情報と同じ段）</strong><ReservationFacts items={[{label:'アレルギー',value:entry.dining?.allergy||entry.currentAllergy?<StatusBadge size="dining" tone="info" surface="white">{entry.dining?.allergy||entry.currentAllergy}</StatusBadge>:'—'},{label:'記念日',value:entry.dining?.anniversary||'—'},...(entry.dining?.seatPreference?[{label:'席の好み',value:entry.dining.seatPreference}]:[]),...(entry.dining?.courseAllergens?.length?[{label:'コースの注意',value:entry.dining.courseAllergens.join('・')}]:[]),...(entry.currentAllergy&&entry.dining?.allergy&&entry.currentAllergy!==entry.dining.allergy?[{label:'今回の注意',value:entry.currentAllergy}]:[])]}/></div>
@@ -41,7 +45,8 @@ export function ReservationDining({entry,dense=false}:{entry:ReservationBoardEnt
 }
 export type ReservationBoardSlot={resourceId:string;startsAt:string;href?:string}
 /** 保存先による違いは表示型と変更契約に閉じ、すべての入口を同じ盤で描く。 */
-export default function ReservationBoard({entries,resources,axis:controlledAxis='resource',onAxis,canWrite=false,busy=false,onOpen,onMove,actions,menus,toolbar,trailingToolbar,notice,floor,loadPrintEntries,printContext,title='予約台帳',compact=false,dates,slots,onSlot,kind:requestedKind,columns='standard',diningContentColumns=false,monthNamePresentation,renderBody,renderList}: {
+export default function ReservationBoard({entries,resources,axis:controlledAxis='resource',onAxis,canWrite=false,busy=false,onOpen,onMove,actions,menus,toolbar,trailingToolbar,notice,floor,loadPrintEntries,printContext,title='予約台帳',compact=false,dates,slots,onSlot,kind:requestedKind,columns='standard',diningContentColumns=false,monthNamePresentation,timeDirection,renderBody,renderList}: {
+ timeDirection?: 'vertical';
  renderBody?:(body:ReactNode)=>ReactNode;
  renderList?:()=>ReactNode;
  columns?:'standard'|'dining'|'today';
@@ -50,7 +55,7 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
  monthNamePresentation?:'readable';
  kind?:'people'|'seats';entries:ReservationBoardEntry[];resources:ReservationBoardResource[];axis?:ReservationAxis;onAxis?:(axis:ReservationAxis)=>void;
  canWrite?:boolean;busy?:boolean;onOpen:(id:string)=>void;onMove?:(id:string,move:ReservationBoardMove)=>Promise<void>;
- menus?:(entry:ReservationBoardEntry)=>ReactNode; actions?:(entry:ReservationBoardEntry)=>ReactNode;toolbar?:ReactNode;trailingToolbar?:ReactNode;notice?:ReactNode;floor?:RestaurantFloor;
+  menus?:(entry:ReservationBoardEntry)=>ReactNode; actions?:(entry:ReservationBoardEntry)=>ReactNode;toolbar?:ReactNode;trailingToolbar?:ReactNode;notice?:ReactNode;floor?:RestaurantFloor;
  loadPrintEntries?:()=>Promise<ReservationBoardEntry[]>;printContext?:string;title?:string;compact?:boolean;dates?:string[];slots?:ReservationBoardSlot[];
  onSlot?:(resourceId:string,startsAt:string)=>void;
 }) {
@@ -92,6 +97,7 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
   </Tr>)}</tbody></DataTable>
  }
  const timeline=(date:string)=>{
+  if(kind==='people'&&timeDirection==='vertical')return <ReservationPeopleGrid key={date} date={date} entries={entries} resources={resources} slots={slots} canWrite={canWrite} busy={busy} onOpen={onOpen} onMove={onMove} onSlot={onSlot} onError={setError}/>
   const rows=entries.filter(e=>dayKey(e.startsAt)===date)
   return <div key={date}>{renderedDays.length>1?<h3 className={styles.day}>{date}</h3>:null}
   <div className={styles.timeHead}>{hours.map(m=><span key={m}>{`${Math.floor(m/60)}:00`}</span>)}</div>
@@ -109,5 +115,5 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
  {printing?createPortal(<div data-reservation-print data-theme="v8" className={styles.print}><h2>{title}（{axisName[axis]}）</h2><p>{printContext??[...new Set((printRows??entries).map(e=>e.scopeId))].join('・')}</p><p>{renderedDays[0]}〜{renderedDays.at(-1)}</p>{axis!=='list'?<ReservationBoard kind={kind} entries={printRows??entries} resources={resources} axis={axis} floor={floor} dates={renderedDays} onOpen={()=>{}} title={title}/>:null}{list(printRows??entries,true)}</div>,document.body):null}
  </>
  const props={className:styles.board,'data-kind':kind,'data-columns':columns,'aria-label':title,'data-reservation-board':true,'data-list-skeleton':axis==='list'||compact?true:undefined,'data-print-active':printing?'true':undefined,'data-axis':axis}
- return renderBody||compact?<section {...props}>{contents}</section>:<Card frame="inset" overflow="hidden" {...props}>{contents}</Card>
+ return renderBody||compact||kind==='people'&&timeDirection==='vertical'?<section {...props}>{contents}</section>:<Card frame="inset" overflow="hidden" {...props}>{contents}</Card>
 }

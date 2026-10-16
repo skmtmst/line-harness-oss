@@ -60,7 +60,7 @@ test('選んだアクションの前へ実際に差し込み、保存順にも�
   ]} saving={false} error="" onCancel={vi.fn()} onSave={save} onDelete={vi.fn()} />)
   fireEvent.click(within(screen.getByRole('region', { name: 'タグ連動' })).getByRole('button', { name: '開く' }))
   fireEvent.click(screen.getByRole('button', { name: '行うことを足す' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'テキスト送信' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'テキストを送る' }))
   fireEvent.change(screen.getByRole('textbox', { name: '送る本文' }), { target: { value: 'ご登録ありがとうございます。' } })
   fireEvent.keyDown(screen.getByRole('button', { name: '3つ目の行うことを並べ替える' }), { key: 'ArrowUp' })
   fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))

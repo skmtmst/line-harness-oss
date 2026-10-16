@@ -114,10 +114,21 @@ test('v8 では Uv9AA の記録（帯・札・表）が出る', async () => {
   expect(details.some(title => title?.includes('この30日で 99.9%成功。平均 0.4 秒'))).toBe(true)
   expect(details.some(title => title?.includes('この30日でいちばん遅くて 1.2秒'))).toBe(true)
   expect(details.some(title => title?.includes('うち2件はここから送り直せます'))).toBe(true)
-  // 表の行：返事の札・かかった時間・操作。
+  // 表の行：返事の札・かかった時間・行の右端の「…」（中身を見るはその中）。
   expect(board?.textContent).toContain('500 エラー')
-  expect(board?.textContent).toContain('中身を見る')
+  expect(board?.querySelector('button[aria-label="「予約台帳」の操作"]')).not.toBeNull()
 })
+
+/** 行の「…」を開いて「中身を見る」を押す（絵 Uv9AA の行の右端は「…」だけ）。 */
+async function openContents(board: Element, name?: string) {
+  const trigger = (name
+    ? board.querySelector(`button[aria-label="「${name}」の操作"]`)
+    : board.querySelector('button[aria-label$="の操作"]')) as HTMLElement
+  await act(async () => { trigger.click() })
+  const item = [...document.querySelectorAll('[role="menuitem"]')].find((node) => node.textContent?.includes('中身を見る')) as HTMLElement
+  expect(item).toBeTruthy()
+  await act(async () => { item.click() })
+}
 
 test('v8 で失敗したものをまとめてやり直すボタンが出る', async () => {
   document.documentElement.dataset.theme = 'v8'
@@ -147,9 +158,7 @@ test('v8 で中身を見ると中身の窓（DA0Ag）が出て、伏せ字の本
   const dialogOf = () => document.querySelector('[data-design-node="DA0Ag"]')
   // まだ閉じているときは窓は無い。
   expect(dialogOf()).toBeNull()
-  const openButton = board.querySelector('button[aria-label="「予約台帳」の中身を見る"]') as HTMLElement
-  expect(openButton.textContent).toBe('中身を見る')
-  await act(async () => { openButton.click() })
+  await openContents(board, '予約台帳')
   await act(async () => {})
   const dialog = dialogOf() as HTMLElement
   expect(dialog).not.toBeNull()
@@ -168,8 +177,7 @@ test('v8 の中身の窓は閉じるで閉じて一覧だけに戻る', async ()
   await renderPage()
   const board = host.querySelector('[data-design-node="Uv9AA"]')!
   const dialogOf = () => document.querySelector('[data-design-node="DA0Ag"]')
-  const openButton = [...board.querySelectorAll('button')].find((button) => button.textContent === '中身を見る') as unknown as HTMLElement
-  await act(async () => { openButton.click() })
+  await openContents(board)
   expect(dialogOf()).not.toBeNull()
   const close = [...(dialogOf() as HTMLElement).querySelectorAll('button')].find((button) => button.textContent === '閉じる') as HTMLElement
   await act(async () => { close.click() })

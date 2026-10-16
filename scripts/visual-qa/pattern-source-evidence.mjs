@@ -110,6 +110,7 @@ export function sourceEvidence(file, source, offset, length = 1) {
     imports: entry.imports,
     calls: parents.filter(ts.isCallExpression).map(node => node.expression.getText(entry.tree)),
     ancestorTags: parents.filter(node => ts.isJsxElement(node)).map(node => node.openingElement.tagName.getText(entry.tree)),
+    enclosingTags: parents.filter(node => ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)).map(node => (ts.isJsxElement(node) ? node.openingElement : node).tagName.getText(entry.tree)),
     visualPropCount: shapeProps.length,
     shapeIdentity: shape && digest(shape),
     dialogIdentity,

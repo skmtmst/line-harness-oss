@@ -12,6 +12,8 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
+import { DEFAULT_PAGE_SIZE as PAGE_SIZE } from '@/components/shared/page-size-options'
 import StatusBadge from '@/components/shared/status-badge'
 import { RowMenu } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -36,6 +38,9 @@ import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/
  */
 
 type Tab = 'open' | 'done'
+
+/* 絵 YMVFD：表の下に件数とページ送り。1ページの行数。 */
+
 
 /* 手を動かす順：未対応 → 残りあり → もう開けてよい → 閉じた（同じ状態の中は時刻順）。 */
 const STATE_ORDER: Record<CloseGroup['state'], number> = { open: 0, partly: 1, reopen: 2, done: 3 }
@@ -62,6 +67,7 @@ export default function CloseTasksPage() {
   const [query, setQuery] = useListUrlValue('q', '')
   const [medium, setMedium] = useState('all')
   const [busyId, setBusyId] = useState('')
+  const [page, setPage] = useState(1)
 
   const latest = useRef(0)
   const load = useCallback(async () => {
@@ -98,6 +104,11 @@ export default function CloseTasksPage() {
     .filter((g) => medium === 'all' || g.items.some((item) => item.channel === medium))
     .filter((g) => !query.trim() || slotTitle(g.startsAt).includes(query.trim()) || g.items.some((item) => item.name.includes(query.trim())))
     .sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state] || a.startsAt.localeCompare(b.startsAt))
+  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const pageRows = shown.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  // 絞り込み・タブを変えたら1ページ目へ（§6.11 の 5）。
+  useEffect(() => { setPage(1) }, [tab, medium, query])
   const mediaOptions = [...new Map(groups.flatMap((g) => g.items).map((item) => [item.channel, item.name])).entries()]
 
   const close = async (taskId: string, name: string) => {
@@ -125,7 +136,6 @@ export default function CloseTasksPage() {
     content = <ListState kind="empty" title={tab === 'open' ? '未対応の知らせはありません' : '閉じた知らせはありません'} description={tab === 'open' ? '他の予約サイトの枠を閉じる必要があると、ここに出ます。' : undefined} />
   } else {
     content = (
-      <div className={styles.tableWrap}>
       <DataTable presentation="columns" data-design="restaurant-close-tasks">
         <thead>
           <TableHeadRow data-table-layout="columns">
@@ -137,10 +147,15 @@ export default function CloseTasksPage() {
           </TableHeadRow>
         </thead>
         <tbody>
-          {shown.map((group) => {
+          {pageRows.map((group) => {
             const remaining = openItems(group)
             const target = remaining[0] ?? null
-            const targetMedium = target ? media.find((m) => m.code === target.channel) ?? null : null
+            /*
+             * 「もう開けてよい」の行は、閉じた媒体の管理画面で枠を開け直す（絵 YMVFD）。
+             * 開け直した印を付ける口（［開けた］）はまだ無い（BEHAVIOR.md の「今の口で出せないもの」）。
+             */
+            const linkItem = target ?? (group.state === 'reopen' ? group.items[0] ?? null : null)
+            const targetMedium = linkItem ? media.find((m) => m.code === linkItem.channel) ?? null : null
             const badge = STATE_BADGE[group.state]
             return (
               <Tr key={group.slotId} data-table-layout="columns">
@@ -187,13 +202,13 @@ export default function CloseTasksPage() {
           })}
         </tbody>
       </DataTable>
-      </div>
     )
   }
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="YMVFD"
+      tableInset
       headingSize="compact"
       title="他のサイトの枠を閉じる知らせ"
       help="LINE や電話で予約が入って席が少なくなった枠を、ほかの予約サイトでも閉じるための知らせです。閉じたら［閉じた］を押します。キャンセルで席が戻った枠は「もう開けてよい」になります。"
@@ -206,6 +221,16 @@ export default function CloseTasksPage() {
           ]}
         /></span>
       )}
+      pagination={tasks !== null && !error && shown.length > 0 ? (
+        <Pagination
+          spacing="restaurant"
+          page={currentPage}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          ariaLabel="枠を閉じる知らせのページ送り"
+          range={{ total: shown.length, first: (currentPage - 1) * PAGE_SIZE + 1, last: (currentPage - 1) * PAGE_SIZE + pageRows.length }}
+        />
+      ) : undefined}
       toolbar={(
         <>
           <span className={styles.search}>

@@ -1,3 +1,4 @@
+import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { buildSegmentWhere } from '@line-crm/db';
 import type { HqBroadcastInput, SegmentCondition, SegmentRule } from '@line-crm/shared';
 import { StampError } from './visit-stamps.js';
@@ -47,9 +48,17 @@ export async function resolveHqBroadcastAudience(db: D1Database, tenantId: strin
     groups.push(await resolve(parsed.condition));
   }
   const rules:SegmentRule[]=[{type:'is_following',value:true}];
+  if(input.followupOfRunId) {
+    const source=await db.prepare(`SELECT b.id FROM hq_broadcast_runs r JOIN hq_broadcast_targets t ON t.run_id=r.id AND t.excluded=0
+      JOIN broadcasts b ON b.id=t.broadcast_id AND b.line_account_id=t.line_account_id
+      WHERE r.id=? AND r.tenant_id=? AND t.line_account_id=? AND b.status='sent' AND b.track_links=1
+      AND EXISTS(SELECT 1 FROM broadcast_tracked_links l WHERE l.broadcast_id=b.id)`).bind(input.followupOfRunId,tenantId,accountId).first<{id:string}>();
+    if(!source)throw new StampError('追送元の送信記録と計測リンクを確認してください',409);
+    rules.push({type:'broadcast_link_clicked',value:{broadcastId:source.id,clicked:false}});
+  }
   if(input.audience.kind==='tag')rules.push({type:'tag_exists',value:await accountReference('tags',input.audience.tagName)});
   else if(input.targetType==='tag')rules.push({type:'tag_exists',value:await accountReference('tags',input.targetTagId)});
-  if(input.targetType==='segment'&&!input.segmentConditions&&!input.savedSearchId) throw new StampError('詳細条件を指定してください');
+  if(input.targetType==='segment'&&!input.segmentConditions&&!input.savedSearchId&&!input.followupOfRunId) throw new StampError('詳細条件を指定してください');
   for(const tag of input.excludedTagIds??[])rules.push({type:'tag_not_exists',value:await accountReference('tags',tag)});
   const condition:SegmentCondition={operator:'AND',rules,...(groups.length?{groups}:{})};
   try{buildSegmentWhere(condition);}catch{throw new StampError('詳細条件を確認してください');}
@@ -57,7 +66,9 @@ export async function resolveHqBroadcastAudience(db: D1Database, tenantId: strin
 }
 export async function countHqAudience(db:D1Database,accountId:string,condition:SegmentCondition) {
   const where=buildSegmentWhere(condition);
-  const result=await db.prepare(`SELECT COUNT(*) AS count FROM friends f WHERE f.line_account_id=? AND COALESCE(f.is_hidden,0)=0
-    AND f.line_user_id IS NOT NULL AND f.line_user_id<>'' AND (${where.sql})`).bind(accountId,...where.bindings).first<{count:number}>();
-  return result!.count;
+  const result=await db.prepare(`SELECT COALESCE(SUM(${DELIVERY_CONSENT_ALLOWED_SQL}),0) AS count,
+    COALESCE(SUM(NOT (${DELIVERY_CONSENT_ALLOWED_SQL})),0) AS consentExcluded FROM friends f WHERE f.line_account_id=? AND COALESCE(f.is_hidden,0)=0
+    AND f.line_user_id IS NOT NULL AND f.line_user_id<>'' AND (${where.sql})`).bind(accountId,...where.bindings).first<{count:number;consentExcluded:number}>();
+  if (!result) throw new Error('audience_count_unavailable');
+  return result;
 }

@@ -154,8 +154,8 @@ describe('R395 確認後の再連携を本移行で上書きしない', () => {
     expect(friendUserId(testDb, 'f-new')).toBe(userId);
     const item = migrationItem(testDb);
     expect(item.result).toBe('applied');
-    expect(JSON.parse(item.before_json!)).toEqual({ oldUserId: null, newUserId: null });
-    expect(JSON.parse(item.after_json!)).toEqual({ userId });
+    expect(JSON.parse(item.before_json!)).toEqual({ oldUserId: null, newUserId: null, deliveryConsents: [] });
+    expect(JSON.parse(item.after_json!)).toEqual({ userId, deliveryConsentsRecorded: 1, deliveryConsents: [] });
   });
 });
 
@@ -458,8 +458,8 @@ describe('F-3 移行先UIDの新規作成と名前引継ぎ', () => {
     const item = createItem(testDb);
     expect(item.result).toBe('applied');
     expect(item.new_friend_id).toBe(made.id);
-    expect(JSON.parse(item.before_json!)).toEqual({ oldUserId: null, newUserId: null });
-    expect(JSON.parse(item.after_json!)).toEqual({ userId: made.user_id });
+    expect(JSON.parse(item.before_json!)).toEqual({ oldUserId: null, newUserId: null, deliveryConsents: [] });
+    expect(JSON.parse(item.after_json!)).toEqual({ userId: made.user_id, deliveryConsentsRecorded: 1, deliveryConsents: [] });
   });
 
   it('同じUIDが対象アカウントにあれば作らず採用する', async () => {

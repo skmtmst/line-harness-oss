@@ -64,14 +64,13 @@
 .attr { display: flex; align-items: center; gap: var(--tpl-fr-stack-gap); min-height: var(--tpl-fr-cmp-attr-h); }
 .attr dt { width: var(--tpl-fr-cmp-attr-label); flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .attr dd { margin: 0; }
-.attr dd.mono { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-family: var(--font-mono); font-size: var(--text-micro); }
+.attr dd.mono { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-family: var(--font-mono); font-size: var(--text-micro); }
 
 .pill { display: inline-flex; padding: var(--tpl-fr-status-pad); border-radius: var(--radius-pill); font-size: var(--text-micro); font-weight: 700; line-height: var(--tpl-fr-sub-lh); white-space: nowrap; }
 .pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .pillMuted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 
 .card { gap: var(--tpl-fr-cmp-card-gap); padding: var(--tpl-fr-panel-pad); }
-.pair > .card { min-height: var(--tpl-fr-cmp-card-min); }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-fr-panel-title-size); font-weight: 700; line-height: var(--tpl-fr-panel-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-fr-sub-lh); }
 
@@ -100,20 +99,6 @@
 .panel { gap: var(--tpl-fr-stack-gap); padding: var(--tpl-fr-cmp-panel-pad); }
 .panelTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-fr-cmp-panel-lh); }
 .radios { display: flex; align-items: center; gap: var(--tpl-fr-cmp-radio-gap); }
-
-.fieldBox {
-  display: flex;
-  align-items: center;
-  min-height: var(--tpl-fr-control-h);
-  margin: 0;
-  padding: 0 var(--tpl-fr-stack-gap);
-  border-radius: var(--radius-control);
-  box-shadow: var(--tpl-fr-shadow-control);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-fr-cmp-panel-lh);
-}
 
 .checks { display: flex; flex-direction: column; gap: var(--tpl-fr-cmp-check-gap); }
 .fieldLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-fr-cmp-panel-lh); margin-bottom: calc(var(--tpl-fr-cmp-check-gap) - var(--tpl-fr-stack-gap)); }
@@ -166,20 +151,6 @@
 .faint { color: var(--color-ink-faint); }
 
 /* 下の帯：左に「別の人だった」、中央に保留・結び付ける（画面の下に追従）。 */
-.footer { position: sticky; bottom: var(--tpl-fr-stack-gap); z-index: 20; }
-.footerBar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--tpl-toolbar-gap);
-  padding: var(--tpl-fr-stack-gap) var(--tpl-fr-area-gap);
-  border-radius: var(--radius-panel);
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
-}
-.footerBar > :first-child { justify-self: start; }
-.footerCenter { display: flex; gap: var(--tpl-toolbar-gap); }
-
 /* 1152 の板（p15At）：確認済みの札は値のすぐ後ろ。 */
 @container v8-page (max-width: 1000px) {
   .attr { gap: var(--tpl-fr-area-gap); }

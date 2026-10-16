@@ -82,6 +82,7 @@ describe('現役の行動スコアへ引き継いだ動作', () => {
     calls.friendScore.mockResolvedValue({ success: true, data: {
       currentScore: 90, history: [
         { id: 'one', occurredAt: '2026-10-02T00:00:00Z', scoreChange: 5, scoreBefore: 85, scoreAfter: 90, reason: '手動の調整', mode: 'manual', executedByStaffName: '担当A' },
+        { id: 'expired', occurredAt: '2026-10-01T12:00:00Z', scoreChange: -5, scoreBefore: 90, scoreAfter: 85, reason: '点の期限が切れた', mode: 'automatic', executedByStaffName: null },
         { id: 'two', occurredAt: '2026-10-01T00:00:00Z', scoreChange: 0, scoreBefore: null, scoreAfter: null, reason: null, mode: 'automatic', executedByStaffName: null },
       ],
     } })
@@ -92,6 +93,10 @@ describe('現役の行動スコアへ引き継いだ動作', () => {
     expect(await screen.findByTitle('手動の調整・85 点 → 90 点・手で変更（担当A）')).toBeTruthy()
     expect(screen.getByTitle('点数が変わった理由は未取得・前後の点数は未取得・自動で加算')).toBeTruthy()
     expect(calls.friendScore).toHaveBeenCalledWith('f1')
+    const detail = screen.getByRole('dialog', { name: '点数の変化の明細' })
+    expect(detail.querySelector('[data-score-delta="positive"]')?.getAttribute('data-tone')).toBe('success')
+    expect(detail.querySelector('[data-score-delta="negative"]')?.getAttribute('data-tone')).toBe('warning')
+    expect(detail.querySelector('[data-score-delta="zero"]')?.getAttribute('data-tone')).toBe('neutral')
   })
 
   it('閲覧のみでは手動調整を隠し、明細は読める', async () => {
@@ -118,6 +123,7 @@ describe('現役の行動スコアへ引き継いだ動作', () => {
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: ' 調整の理由 ' } })
     expect(screen.getByText('変更前')).toBeTruthy()
     expect(screen.getByText('変更後')).toBeTruthy()
+    expect(screen.getByRole('dialog').querySelectorAll('[data-score-delta="negative"][data-tone="warning"]')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: '10 点減らす' }))
     await screen.findByText('通信に失敗しました。接続を確認してもう一度お試しください。')
     expect(onCompleted).not.toHaveBeenCalled()

@@ -1,23 +1,10 @@
-import type {
-  StyleSchedule,
-  StyleSnapshot,
-  RestaurantOpeningDay,
-} from '@line-crm/shared';
-import {
-  addDate,
-  civilDate,
-  instant,
-  styleRows,
-  cancelled,
-} from './style-analytics.js';
+import { seatSchedule } from './style-seat-schedule.js';
+import type { StyleSchedule, StyleSnapshot } from '@line-crm/shared';
+import { addDate, civilDate, instant, styleRows, cancelled } from './style-analytics.js';
 import { StyleError } from './style-setup.js';
 import { getAvailability } from './availability.js';
 import { eventModeRemaining } from './event-mode-capacity.js';
-import {
-  closuresForRange,
-  openSeatTablePeriods,
-  type ClosurePeriod,
-} from './restaurant-closures.js';
+
 import { restaurantCivilTime } from './restaurant-booking.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 
@@ -300,129 +287,7 @@ export async function styleSchedule(
         ),
     );
   }
-  if (style === 'restaurant') {
-    const duration = Number(query.duration_minutes ?? 120),
-      guests = Number(query.guest_count ?? 1);
-    if (
-      !Number.isInteger(duration) ||
-      duration < 1 ||
-      duration > 1440 ||
-      !Number.isInteger(guests) ||
-      guests < 1 ||
-      guests > 100
-    )
-      throw new StyleError('invalid_slot');
-    const stores = (
-      await db
-        .prepare(
-          'SELECT id,timezone FROM rt_stores WHERE line_account_id=? AND (? IS NULL OR id=?) ORDER BY id',
-        )
-        .bind(account, query.store_id ?? null, query.store_id ?? null)
-        .all<{ id: string; timezone: string }>()
-    ).results;
-    if (!stores.length) {
-      availability.status = 'unconfigured';
-      availability.reason = 'store_required';
-    }
-    const closedByStore: string[][] = [];
-    for (const store of stores) {
-      const setting = await db
-        .prepare(
-          'SELECT hours_json FROM rt_opening_hours_settings WHERE store_id=?',
-        )
-        .bind(store.id)
-        .first<{ hours_json: string }>();
-      if (!setting) {
-        availability.status = 'unconfigured';
-        availability.reason = 'business_hours_required';
-      }
-      const hours: RestaurantOpeningDay[] = setting
-        ? JSON.parse(setting.hours_json)
-        : [];
-      const closed = await closuresForRange(db, store.id, from, to);
-      for (const c of closed)
-        closures.push({
-          id: c.id,
-          target: JSON.parse(c.table_ids_json).length ? 'table' : 'store',
-          targetIds: JSON.parse(c.table_ids_json).length
-            ? JSON.parse(c.table_ids_json)
-            : [store.id],
-          dateFrom: c.start_date,
-          dateTo: c.end_date,
-          kind: c.kind,
-          hours: c.all_day ? [] : [{ start: c.start_time!, end: c.end_time! }],
-          reason: c.memo,
-        });
-      const closedDates: string[] = [];
-      const candidates: ClosurePeriod[] = [];
-      for (const day of days) {
-        const weekday = new Date(day.date + 'T00:00:00Z').getUTCDay();
-        const periods = hours.find((h) => h.weekday === weekday)?.periods ?? [];
-        if (
-          setting &&
-          (!periods.length ||
-            closed.some(
-              (c) =>
-                c.all_day &&
-                !JSON.parse(c.table_ids_json).length &&
-                c.start_date <= day.date &&
-                c.end_date >= day.date,
-            ))
-        )
-          closedDates.push(day.date);
-        // Opening hours are not availability: every displayed candidate must pass the existing seat check.
-        const seen = new Set<number>();
-        for (const period of periods) {
-          const minute = (t: string) =>
-            Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
-          for (
-            let start = minute(period.opensAt);
-            start + duration <= minute(period.closesAt);
-            start += 30
-          ) {
-            if (seen.has(start)) continue;
-            seen.add(start);
-            const startsAt = restaurantCivilTime(
-                day.date,
-                start,
-                store.timezone,
-              ),
-              endsAt = restaurantCivilTime(
-                day.date,
-                start + duration,
-                store.timezone,
-              );
-            if (instant(startsAt) < instant(asOf)) continue;
-            candidates.push({ startsAt, endsAt });
-          }
-        }
-      }
-      for (const period of await openSeatTablePeriods(
-        db,
-        store.id,
-        candidates,
-        guests,
-      ))
-        for (const table of period.tables)
-          availability.slots.push({
-            columnId: table.id,
-            resourceIds: table.tableIds ?? [table.id],
-            menuId: null,
-            date: civilDate(instant(period.startsAt), timeZone),
-            startsAt: period.startsAt,
-            endsAt: period.endsAt,
-            remaining: table.maxCapacity,
-          });
-      closedByStore.push(closedDates);
-    }
-    availability.closedDates = days
-      .filter(
-        (day) =>
-          closedByStore.length &&
-          closedByStore.every((dates) => dates.includes(day.date)),
-      )
-      .map((d) => d.date);
-  }
+  await seatSchedule(db,account,query,style,from,to,asOf,timeZone,days,closures,availability);
   if (entries.some((e) => e.columnIds.includes('unassigned')))
     columns.push({ id: 'unassigned', kind: 'unassigned', name: '担当未定' });
   entries.sort((a, b) =>

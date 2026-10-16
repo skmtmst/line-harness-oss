@@ -1,3 +1,4 @@
+import { readOfficialProfileUrl } from './line-account-profile-url.js';
 import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -5,63 +6,21 @@ import { getLineAccountFoldersByAccountIds, getLineAccountTag } from '@line-crm/
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import {
-  getLineAccountsByIds,
-  getLineAccountScopeEntries,
-  getLineAccountListStats,
-  getLineAccountTagsByAccountIds,
-  getLineAccountById,
-  getLineAccountCredentialHealth,
-  createLineAccount,
-  listLineAccountTags,
-  updateLineAccount,
-  updateLineAccountFields,
-  updateLineAccountOrder,
-  deleteUncommittedLineAccount,
-  getLineAccountArchiveBlockers,
-  setDefaultLineAccount,
-  archiveLineAccount,
-  restoreLineAccount,
-  deactivateLineAccount,
-  activateLineAccount,
-  listSkippedDeliveries,
-  getLineAccountConnectionChecksByIdempotencyKey,
-  saveLineAccountConnectionChecks,
-  LineAccountRevisionConflictError,
-  jstNow,
-  LineAccountLifecycleError,
-} from '@line-crm/db';
-import type {
-  LineAccount as DbLineAccount,
-  LineAccountConnectionCheck,
-  LineAccountScopeEntry,
-} from '@line-crm/db';
+import { getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountListStats, getLineAccountTagsByAccountIds, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
+import type { LineAccount as DbLineAccount, LineAccountConnectionCheck, LineAccountScopeEntry } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
 import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
-import {
-  detectFollowerImportCapability,
-  getFollowerImportState,
-  processFollowerImportStep,
-  startFollowerImport,
-} from '../services/follower-import.js';
+import { detectFollowerImportCapability, getFollowerImportState, processFollowerImportStep, startFollowerImport } from '../services/follower-import.js';
 import type { FollowerImportClient } from '../services/follower-import.js';
-import {
-  canAccessAllLineAccounts,
-  getVisibleLineAccountScope,
-  validateAccountHierarchy,
-} from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope, validateAccountHierarchy } from '../services/account-access.js';
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
-import {
-  lineConnectStep,
-  prepareLineConnection,
-  type LineConnectStep,
-} from '../services/line-account-connect.js';
+import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
@@ -975,9 +934,10 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
   }
 });
 
-// Existing-follower migration is an explicit, persisted, one-time job.
-// No cron polls LINE: connection/UI performs a one-item capability probe, then
-// operator-approved step requests advance the D1 cursor until completion.
+// Existing-follower migration is an explicit, persisted, one-time job. The D1
+// cursor is the source of truth: the scheduled lane carries it to completion
+// with no browser open, and step requests resume it under the same lock, each
+// run spending its whole time/subrequest budget instead of one fixed page.
 lineAccounts.get('/api/line-accounts/:id/follower-import', async (c) => {
   const id = c.req.param('id')!;
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
@@ -1043,12 +1003,11 @@ lineAccounts.post(
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
     const client = new LineClient(account.channel_access_token);
-    const result = await processFollowerImportStep(
-      c.env.DB,
-      client as unknown as FollowerImportClient,
-      account.id,
-    );
-    return c.json({ success: true, data: result });
+    /* 画面を閉じられても、この 1 回ぶんは走り切らせる。途中で切られると進んだ分は
+     * D1 に残るがロックだけ取られた状態になり、続きを拾えるまで待たされる。 */
+    const run = processFollowerImportStep(c.env.DB, client as unknown as FollowerImportClient, account.id);
+    try { c.executionCtx.waitUntil(run); } catch { /* 試験では executionCtx が無い */ }
+    return c.json({ success: true, data: await run });
   },
 );
 
@@ -1069,34 +1028,6 @@ function normalizeOptionalString(v: unknown): string | null | undefined {
   if (typeof v !== 'string') return undefined;
   const trimmed = v.trim();
   return trimmed === '' ? null : trimmed;
-}
-
-function readOfficialProfileUrl(
-  value: unknown,
-): { ok: true; value: string | null | undefined } | { ok: false; error: string } {
-  if (value === undefined) return { ok: true, value: undefined };
-  if (value === null) return { ok: true, value: null };
-  if (typeof value !== 'string') {
-    return { ok: false, error: 'officialProfileUrl must be a https://lin.ee/ URL' };
-  }
-  const trimmed = value.trim();
-  if (!trimmed) return { ok: true, value: null };
-  try {
-    const url = new URL(trimmed);
-    if (
-      url.protocol !== 'https:' ||
-      url.hostname !== 'lin.ee' ||
-      url.port !== '' ||
-      url.username ||
-      url.password ||
-      url.pathname === '/'
-    ) {
-      return { ok: false, error: 'officialProfileUrl must be a https://lin.ee/ URL' };
-    }
-    return { ok: true, value: url.toString() };
-  } catch {
-    return { ok: false, error: 'officialProfileUrl must be a https://lin.ee/ URL' };
-  }
 }
 
 // Pair-validate Login Channel ID / Secret. Required because the OAuth flow

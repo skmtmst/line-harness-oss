@@ -1,3 +1,5 @@
+import { identity } from './restaurant-customer-identity.js';
+import { assignRestaurantTable } from '../services/booking-assignment.js';
 import { referralCandidates } from '../services/restaurant-referrals.js';
 import { collectInputs, parseLayout, normalizeBookingValue } from '@line-crm/shared';
 import { respondToRestaurantConfirmation, type RestaurantConfirmationResponse } from '../services/restaurant-confirmations.js';
@@ -43,61 +45,6 @@ restaurantCustomerBooking.use('/api/liff/restaurant/*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
   await next();
 });
-async function identity(
-  c: Context<Env>,
-): Promise<{ accountId: string; uid: string; friendName: string } | Response> {
-  const liffId = c.req.query('liffId'),
-    auth = c.req.header('Authorization');
-  if (!liffId || !auth?.startsWith('Bearer ') || !auth.slice(7).trim())
-    return c.json({ success: false, error: 'unauthorized' }, 401);
-  const a = await dbFor(c.env)
-    .prepare(
-      `SELECT la.id,la.login_channel_id FROM line_accounts la WHERE la.liff_id=? AND la.is_active=1 AND la.archived_at IS NULL AND ${activeTenantLineAccountSql('la.id')}`,
-    )
-    .bind(liffId)
-    .first<{ id: string; login_channel_id: string | null }>();
-  if (!a?.login_channel_id)
-    return c.json({ success: false, error: 'not_found' }, 404);
-  if (!(await isAccountFeatureEnabled(c.env.DB, a.id, 'restaurant_test')))
-    return c.json({ success: false, error: 'not_found' }, 404);
-  let verified: { sub?: string; aud?: string; exp?: number };
-  try {
-    const r = await fetch('https://api.line.me/oauth2/v2.1/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        id_token: auth.slice(7),
-        client_id: a.login_channel_id,
-      }),
-      signal: AbortSignal.timeout(15000),
-      redirect: 'error',
-    });
-    if (!r.ok) return c.json({ success: false, error: 'unauthorized' }, 401);
-    verified = await r.json();
-  } catch {
-    return c.json({ success: false, error: 'unauthorized' }, 401);
-  }
-  if (
-    !verified.sub ||
-    verified.aud !== a.login_channel_id ||
-    !verified.exp ||
-    verified.exp <= Date.now() / 1000
-  )
-    return c.json({ success: false, error: 'unauthorized' }, 401);
-  const friend = await dbFor(c.env)
-    .prepare(
-      'SELECT display_name,is_following FROM friends WHERE line_user_id=? AND line_account_id=?',
-    )
-    .bind(verified.sub, a.id)
-    .first<{ display_name: string; is_following: number }>();
-  if (!friend || !friend.is_following)
-    return c.json({ success: false, error: 'cannot_book' }, 403);
-  return {
-    accountId: a.id,
-    uid: verified.sub,
-    friendName: friend.display_name || 'LINEのお客さま',
-  };
-}
 async function storeFor(
   c: Context<Env>,
   accountId: string,
@@ -223,13 +170,14 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       body.guestCount,
     ),
     id = crypto.randomUUID();
-  if (!tables.length)
+  const assignedTable = await assignRestaurantTable(db, store.id, startsAt, body.guestCount, tables);
+  if (!assignedTable)
     return c.json({ success: false, error: 'slot_conflict' }, 409);
   const expires = new Date(
     Math.min(Date.now() + result.holdMinutes * 60000, Date.parse(startsAt)),
   ).toISOString();
   if(old){
-    const refreshed=await db.prepare(`UPDATE rt_reservations SET starts_at=?,ends_at=?,table_id=?,hold_expires_at=?,customer_version=customer_version+1,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status='pending' AND julianday(hold_expires_at)<=julianday('now') AND EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`).bind(startsAt,slot.endsAt,tables[0]!.id,expires,old.id,old.customer_version,store.id,result.hoursVersion,body.courseId||null,body.courseId||null,store.id,course?.durationMinutes??null).run();
+    const refreshed=await db.prepare(`UPDATE rt_reservations SET starts_at=?,ends_at=?,table_id=?,hold_expires_at=?,customer_version=customer_version+1,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status='pending' AND julianday(hold_expires_at)<=julianday('now') AND EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`).bind(startsAt,slot.endsAt,assignedTable.id,expires,old.id,old.customer_version,store.id,result.hoursVersion,body.courseId||null,body.courseId||null,store.id,course?.durationMinutes??null).run();
     if(!refreshed.meta.changes)return c.json({success:false,error:'version_conflict'},409);
     const row=await db.prepare('SELECT *,NULL seat_type FROM rt_reservations WHERE id=?').bind(old.id).first<CustomerReservationRow>();
     return c.json({success:true,data:customerBooking(row!)});
@@ -248,7 +196,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       body.guestCount,
       startsAt,
       slot.endsAt,
-      tables[0]!.id,
+      assignedTable.id,
       expires,
       body.requestId,
       customerDetailValue(body.note),
@@ -394,7 +342,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         );
         const occupied=(await db.prepare(`SELECT l.table_id FROM rt_reservations r JOIN rt_reservation_table_links l ON l.reservation_id=r.id WHERE r.store_id=? AND r.id<>? AND r.departed_at IS NULL AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(?) AND julianday(r.ends_at)>julianday(?) UNION SELECT l.table_id FROM rt_seat_waitlist w JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=w.id WHERE w.store_id=? AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(?) AND julianday(w.ends_at)>julianday(?)`).bind(store.id,row.id,ends,starts,store.id,ends,starts).all<{table_id:string}>()).results;
         const busy=new Set(occupied.map(r=>r.table_id));
-        const free=candidates.find(t=>!busy.has(t.id));
+        const free=await assignRestaurantTable(db,store.id,starts,count,candidates.filter(t=>(t.tableIds??[t.id]).every(id=>!busy.has(id))),{excludeReservationId:row.id});
         table=free?.id??null;
         seatType=free?.seatType??null;
         if (!table)

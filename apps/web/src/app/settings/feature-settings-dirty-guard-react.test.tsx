@@ -99,7 +99,7 @@ async function settle() {
 }
 
 function button(label: string): HTMLButtonElement {
-  const found = [...document.body.querySelectorAll('button')].find((item) => item.textContent?.trim() === label)
+  const found = [...document.body.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === label || item.textContent?.trim() === label)
   if (!found) throw new Error(`ボタンが見つかりません: ${label}`)
   return found
 }

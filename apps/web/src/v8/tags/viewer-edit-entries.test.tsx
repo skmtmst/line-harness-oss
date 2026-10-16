@@ -2,6 +2,7 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { PageExplanationProvider } from '@/components/shared/page-explanation'
 
 const state = vi.hoisted(() => ({ role: 'owner', query: '', searchEmpty: true }))
 vi.mock('next/navigation', () => ({
@@ -12,7 +13,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: { id: 'acc-1', name: 'テスト店' } }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
-vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => state.role }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => state.role, useStaffIdentity: () => null }))
 vi.mock('./list', () => ({ default: () => <div>タグ一覧</div> }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
@@ -82,7 +83,8 @@ for (const [title, Component, name, menuTitle] of [
   it.each(['staff', 'owner', 'admin'])(`${title}の詳細と行の編集リンクは閲覧のみで隠す（%s）`, async role => {
     state.role = role
     state.searchEmpty = false
-    const { container } = render(<Component accountId="acc-1" canEdit={role !== 'staff'} />)
+    const view = <Component accountId="acc-1" canEdit={role !== 'staff'} />
+    const { container } = render(title === '友だち情報欄' ? <PageExplanationProvider pageKey="tags:fields">{view}</PageExplanationProvider> : view)
     await screen.findAllByText(name)
     if (title === '保存した検索') {
       const open = screen.getByRole('link', { name: `「${name}」で友だち一覧を開く` })

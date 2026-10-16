@@ -34,7 +34,7 @@ it('担当範囲は窓で仮選択し、取消では反映せず確定してか�
   const reopened = await screen.findByRole('dialog', { name: '担当アカウントを選ぶ' })
   expect((within(reopened).getByRole('checkbox', { name: /銀座/ }) as HTMLInputElement).checked).toBe(false)
   fireEvent.click(within(reopened).getByRole('checkbox', { name: /銀座/ }))
-  fireEvent.click(within(reopened).getByRole('button', { name: 'この 1 アカウントにする' }))
+  fireEvent.click(within(reopened).getByRole('button', { name: '選ぶ（1件）' }))
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '担当アカウントを選ぶ' })).toBeNull())
   fireEvent.click(screen.getByRole('button', { name: '招待メールを送る' }))
   expect(submit).toHaveBeenCalledWith(expect.objectContaining({ scopedLineAccountIds: ['b'], assignedLineAccountId: 'a', accountScope: 'accounts' }))

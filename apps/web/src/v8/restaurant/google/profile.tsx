@@ -5,7 +5,6 @@ import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -156,10 +155,8 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
         ) : null}
       </Card>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-store-info-title">
-        <SectionHeader size="small" title={<span id="gb-store-info-title">
-          店舗情報
-          <HelpTip label="店舗情報の説明">Googleに表示されている内容です。変更は1つの編集画面でまとめて行い、確認してから送信します。自動で以前の内容に戻すことはしません。</HelpTip>
-        </span>} />
+        <SectionHeader size="small" title={<span id="gb-store-info-title">店舗情報</span>}
+          helpLabel="店舗情報の説明" help={<>Googleに表示されている内容です。変更は1つの編集画面でまとめて行い、確認してから送信します。自動で以前の内容に戻すことはしません。</>} />
         <dl className={styles.facts}>
           {[...infoRows, ...(showMore ? moreRows : [])].map(([label, value]) => (
             <div key={label} className={styles.factRow}><dt className={styles.factKey}>{label}</dt><dd className={styles.factValue} title={value}>{value}</dd></div>

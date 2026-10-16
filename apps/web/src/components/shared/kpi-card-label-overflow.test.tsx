@@ -40,4 +40,23 @@ describe('KpiCardの見出しのはみ出し（G3）', () => {
     const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'kpi-card.module.css'), 'utf8')
     expect(css).toMatch(/:root \.labelText \{[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s)
   })
+
+  it('題の終わりの「（…）」は別の札に分け、本体の言葉は切らない（ARuZ4・PMLkX）', async () => {
+    await act(async () => {
+      root.render(<KpiCard title="始まる見込み（試算）" value={116} unit="人" />)
+      await Promise.resolve()
+    })
+    const label = host.querySelector('p[title="始まる見込み（試算）"]')
+    expect(label?.textContent).toBe('始まる見込み（試算）')
+    const parts = [...(label?.querySelectorAll('span span') ?? [])].map(span => span.textContent)
+    expect(parts).toEqual(['始まる見込み', '（試算）'])
+  })
+
+  it('添え書きの無い題は分けない', async () => {
+    await act(async () => {
+      root.render(<KpiCard title="購読中" value={1} unit="人" />)
+      await Promise.resolve()
+    })
+    expect(host.querySelector('p[title="購読中"] span span')).toBeNull()
+  })
 })

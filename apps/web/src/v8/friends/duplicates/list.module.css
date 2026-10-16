@@ -1,22 +1,6 @@
 /* ★V8 重複検出（Pencil hn6Y8・1152 は G9C4Uw）。値は globals.css の --tpl-fr-*。 */
 .body { display: flex; flex-direction: column; gap: var(--tpl-fr-area-gap); padding: var(--tpl-fr-area-pad); min-width: 0; }
 
-.band {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-fm-band-gap);
-  margin: 0;
-  padding: var(--tpl-fm-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-fm-band-lh);
-}
-
-.band > svg { flex-shrink: 0; color: var(--color-action); }
-
-
 .notice { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .linkButton { margin-left: var(--tpl-toolbar-gap); color: var(--color-action); font-weight: 600; }
 .linkButton:hover { text-decoration: underline; }
@@ -24,37 +8,8 @@
 .tools { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); min-width: 0; }
 .search { width: var(--tpl-fr-search-sm); flex-shrink: 1; min-width: 0; }
 .chips { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  height: var(--tpl-fr-control-h);
-  padding: 0 var(--tpl-fr-chip-pad);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  box-shadow: var(--tpl-fr-shadow-outline);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  line-height: var(--tpl-fr-delta-lh);
-  white-space: nowrap;
-}
-
-.chip:hover { background: var(--color-canvas-sunken); }
-.chipOn, .chipOn:hover { background: var(--color-ink); box-shadow: var(--tpl-fr-shadow-outline-ink); color: var(--color-canvas); }
-
 .spacer { flex: 1; min-width: 0; }
 .reviewed { color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
-
-.panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-fr-stack-gap);
-  padding: var(--tpl-fr-panel-pad);
-  border-radius: var(--radius-card);
-  border: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-  min-width: 0;
-}
 
 .panelHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
 .panelTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-fr-panel-title-size); font-weight: 700; line-height: var(--tpl-fr-panel-title-lh); }
@@ -141,7 +96,7 @@
 /* 1152 の板（G9C4Uw）：白い板が 1000 未満のときの列と探す欄。 */
 @container v8-page (max-width: 1000px) {
   .search { width: var(--tpl-fr-search-xs); }
-  .colEvidence { width: var(--tpl-fr-dup-col-account); }
+  .colEvidence { width: var(--tpl-fr-dup-n-col-evidence); }
   .colAccount { width: var(--tpl-fr-dup-n-col-account); }
 }
 

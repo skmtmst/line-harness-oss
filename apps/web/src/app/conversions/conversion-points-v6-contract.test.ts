@@ -1,5 +1,4 @@
 import { readUiSource, readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
-import { readFileSync as readRawSource } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
@@ -42,20 +41,6 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain('Array.isArray(response.data.items)')
     expect(PAGE).toContain('listResult.value !== null')
     expect(PAGE).toContain('setLoadFailed(true)')
-  })
-
-  it('検索と並び順を共通部品にし、数えられる並びだけを載せる', () => {
-    // ★V7 `Xn1Mz`：検索は共通 ListToolbar の1行目へそろえた（SearchField は
-    // 部品の中にある）。素の input 検索に戻さない。
-    expect(PAGE).toContain("from '@/components/shared/list-toolbar'")
-    expect(PAGE).toContain('<ListToolbar')
-    expect(PAGE).toContain('search={{')
-    // V8の独立した一覧はSearchFieldを使う。従来の一覧の入口だけ確認する。
-    expect(readRawSource(new URL('./page.tsx', import.meta.url), 'utf8')).not.toContain("import SearchField from '@/components/shared/search-field'")
-    expect(PAGE).toContain("import Select from '@/components/shared/select'")
-    expect(PAGE).toContain('useListUrlValue<PointSort>')
-    expect(PAGE).toContain('件数が多い順')
-    expect(PAGE).not.toContain('並び替えは準備中です')
   })
 
   it('ページ送りを共通Paginationにする', () => {

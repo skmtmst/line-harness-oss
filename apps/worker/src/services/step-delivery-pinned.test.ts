@@ -85,6 +85,14 @@ describe('processStepDeliveries の版固定（実D1）', () => {
     return { scenario, step1, enrollment };
   }
 
+  it('配信停止の人には送らず、購読を一時停止する',async()=>{
+    const {enrollment}=await seedPublished();
+    testDb.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token) VALUES('consent-account','試験','consent-channel','secret','token');UPDATE friends SET line_account_id='consent-account' WHERE id='friend-1';INSERT INTO friend_delivery_consents(line_account_id,friend_id,purpose,state,reason,source) VALUES('consent-account','friend-1','marketing','revoked','停止希望','manual')");
+    const {sent,client}=pushHarness();await processStepDeliveries(testDb.db,client as never);
+    expect(sent).toHaveLength(0);expect(accountSends).toHaveLength(0);
+    expect(testDb.raw.prepare('SELECT status FROM friend_scenarios WHERE id=?').get(enrollment.id)).toEqual({status:'paused'});
+  });
+
   it('下書き編集のあとも固定版の文面を送る', async () => {
     const { scenario, step1 } = await seedPublished();
     await updateScenarioStep(testDb.db, step1.id, { message_content: '書き換えた1通目' });

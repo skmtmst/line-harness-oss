@@ -109,6 +109,22 @@ describe('表記の決まり', () => {
 })
 
 describe('画面', () => {
+  it.each([true, false])('保存済み下書きのAI生成=%sに応じ、実際の根拠だけを確認に出す', async aiGenerated => {
+    draft = {
+      body: aiGenerated ? 'AIで作った返信' : '手で書いた返信', aiGenerated,
+      generatedAt: aiGenerated ? '2026-09-15T09:31:00.000+09:00' : null,
+      updatedAt: '2026-09-15T09:31:00.000+09:00',
+      references: aiGenerated ? [{ id: 'ref-a', title: '返信の根拠', version: 1, articleKind: 'verified' }] : [],
+    }
+    await act(async () => root.render(<OpsSupportPage />)); await flush()
+    await act(async () => Array.from(host.querySelectorAll('button')).find(b => b.textContent === '返信する')!.click())
+    await flush()
+    const confirmation = document.body.querySelector('[data-design-node="GgP2d"]')
+    expect(confirmation?.textContent).toContain(draft.body)
+    expect(confirmation?.textContent?.includes('AI の下書きの根拠：ナレッジ「返信の根拠」')).toBe(aiGenerated)
+    expect(calls.some(c => c.url.endsWith('/reply'))).toBe(false)
+  })
+
   it('生成予約があると対象だけを自動実行し、完了後は再実行しない', async () => {
     vi.useFakeTimers()
     knowledge = { canProcess: true, article: null, job: { status: 'queued', source_current: 1 } }
@@ -228,6 +244,7 @@ describe('画面', () => {
   })
 
   it('AIで下書きを作ると案内と作成時刻が出て、送ると aiAssisted 付きで返信 API を呼ぶ', async () => {
+    availableReferences = [{ id: 'ref-banner', title: 'バナーの日本語', version: 1, articleKind: 'verified' }]
     await act(async () => { root.render(<OpsSupportPage />) })
     await flush()
     const aiButton = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('AIで下書きを作る'))
@@ -248,6 +265,7 @@ describe('画面', () => {
     for (const row of ['この返事を送りますか？', '宛先', '状態', '優先度', '下書きを削除', '戻って直す', '送信する']) {
       expect(confirm?.textContent ?? '', `「${row}」がない`).toContain(row)
     }
+    expect(confirm?.textContent).toContain('AI の下書きの根拠：ナレッジ「バナーの日本語」をもとに作成')
     const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.includes('送信する')) as HTMLButtonElement
     await act(async () => { sendInDialog.click() })
     await flush()

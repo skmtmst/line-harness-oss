@@ -83,11 +83,11 @@
 }
 
 /*
- * ★V8「入力欄・ラジオ」（Ume2U・y4YQSB）：ラベルは墨の 13px/500。
+ * ★V8「入力欄・ラジオ」（Ume2U・y4YQSB）：ラベルの色は補助の墨。
  * 欄そのもの（高さ36・枠 control-border）は text-field.module.css。
  */
 :root .label {
-  color: var(--color-ink);
+  color: var(--color-ink-secondary);
   font-size: var(--text-label);
 }
 
@@ -115,8 +115,8 @@
 
 :root .field[data-density] { display: flex; flex-direction: column; gap: var(--tpl-rt-payload-gap); }
 :root .field[data-density] .labelRow { margin: 0; }
-:root .field[data-density="compact"] .label { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: normal; }
-:root .field[data-density="input"] .label { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-rt-label-lh); }
+:root .field[data-density="compact"] .label { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; line-height: normal; }
+:root .field[data-density="input"] .label { color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-rt-label-lh); }
 :root .field[data-grow] { flex: 1 1 0; }
 .errorFrame { display: contents; }
 .errorFrame[data-invalid] { display: block; outline: 1px solid var(--color-danger); outline-offset: 2px; border-radius: var(--radius-control); }

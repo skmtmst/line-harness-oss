@@ -73,8 +73,9 @@ function readTab(params: URLSearchParams): AnalyticsTabV8 {
 function Navigation({ active, savedCount }: { active: AnalyticsTabV8; savedCount: number | null }) {
   const owner = tabOwner(active)
   const group = GROUPS.find((item) => item.tabs.some((tab) => tab.key === owner)) ?? GROUPS[0]
+  /* 上の段（組）も下の段（その組の見かた）も共通の下線のタブ（司令塔の判断・絵 iK4cQ・AzrZq・PFe9c・N8ZrUl）。 */
   return <div className={styles.navigation}>
-    <Tabs label="分析の組" items={GROUPS.map(item => ({label:item.label,href:hrefOf(item.tabs[0].key),current:item===group}))} />
+    <Tabs label="分析の組" items={GROUPS.map((item) => ({ label: item.label, href: hrefOf(item.tabs[0].key), current: item.label === group.label }))} />
     <Tabs label="分析の見かた" items={group.tabs.map(item => ({label:item.label,href:hrefOf(item.key),current:item.key===owner,count:item.key==='saved' ? savedCount ?? undefined : undefined}))} />
   </div>
 }

@@ -122,7 +122,7 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
     await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: /タグを付ける/ })))
     const dialog = screen.getByRole('dialog', { name: 'タグを選ぶ' })
     await act(async () => fireEvent.click(within(dialog).getByRole('checkbox', { name: '会員' })))
-    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'この 1件にする' })))
+    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' })))
     await settle(50)
     // acc-2（タグ「予約」だけ）へ切り替える
     accountState.id = 'acc-2'

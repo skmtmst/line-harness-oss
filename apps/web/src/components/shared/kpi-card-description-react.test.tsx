@@ -55,6 +55,29 @@ describe('KpiCardの説明ポップオーバー', () => {
     expect(host.textContent).toContain('実際に見た区間の記録をまだ集計できないため')
   })
 
+  it('省略する補足の全文をtitleへ残し、文中の数と要素も失わない', async () => {
+    await render({ detail: <>タグ・<strong>シナリオ</strong>・対応マークなど {12}件</> })
+    const note = host.querySelector('[data-kpi-detail] [role="note"]')!
+    expect(note.textContent).toBe('タグ・シナリオ・対応マークなど 12件')
+    expect(note.getAttribute('title')).toBe(note.textContent)
+    expect(note.querySelector('strong')?.textContent).toBe('シナリオ')
+  })
+
+  it('括弧の前で補足を2行に分け、全文と行き先と再試行を保つ', async () => {
+    const retry = vi.fn(), action = vi.fn()
+    await render({ detail: '購読の数（再参加を含む）', detailLayout: 'qualifier', onRetry: retry, action: { label: '一覧を見る', onClick: action } })
+    const note = host.querySelector('[data-kpi-detail] [role="note"]')!
+    expect(note.textContent).toBe('購読の数\n（再参加を含む）')
+    expect(note.getAttribute('title')).toBe('購読の数（再参加を含む）')
+    const buttons = host.querySelectorAll<HTMLButtonElement>('[data-kpi-detail] button')
+    await act(async () => {
+      buttons[0].click()
+      buttons[1].click()
+    })
+    expect(retry).toHaveBeenCalledOnce()
+    expect(action).toHaveBeenCalledOnce()
+  })
+
   it('絵に？がある題の指定だけ、説明の印を追加する', async () => {
     await render({ helpDisplay: 'question' })
     expect(host.querySelector('[data-kpi-label]')?.textContent).toBe('視聴?')

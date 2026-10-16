@@ -638,6 +638,48 @@
       "column": "tenant_id"
     }
   },
+  "booking_assignment_settings": {
+    "category": "global"
+  },
+  "booking_entitlements": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_entitlement_events": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_entitlement_month_limits": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "entitlement_id",
+      "parent": "booking_entitlements",
+      "parentColumn": "id"
+    }
+  },
+  "booking_entitlement_uses": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "entitlement_id",
+      "parent": "booking_entitlements",
+      "parentColumn": "id"
+    }
+  },
+  "booking_payment_choices": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "booking_audit_logs": {
     "category": "retain",
     "scope": {
@@ -1742,6 +1784,20 @@
     }
   },
   "hq_template_preflights": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_broadcast_saved_views": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_form_test_tokens": {
     "category": "purge",
     "scope": {
       "by": "tenant",
@@ -4471,6 +4527,76 @@
       "parentColumn": "id"
     }
   },
+  "friend_delivery_consents": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "friend_delivery_consent_events": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "uid_migration_delivery_consents": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "item_id",
+      "parent": "uid_migration_items",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inventory_rule_source_events": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "slot_id",
+      "parent": "rt_inventory_slots",
+      "parentColumn": "id"
+    }
+  },
+  "booking_payment_connections": {
+    "category": "global"
+  },
+  "booking_payment_events": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_payment_event_replays": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "event_id",
+      "parent": "booking_payment_events",
+      "parentColumn": "id"
+    }
+  },
+  "restaurant_course_payment_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "event_payment_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_stripe_connect_states": {
+    "category": "global"
+  },
   "account_styles": {
     "category": "purge",
     "scope": {
@@ -4532,6 +4658,13 @@
     "scope": {
       "by": "lineAccount",
       "column": "line_account_id"
+    }
+  },
+  "hq_template_saved_views": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
     }
   }
 }

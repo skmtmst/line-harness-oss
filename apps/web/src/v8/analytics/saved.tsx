@@ -253,7 +253,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       {loading ? <ListState kind="loading" title="保存した分析を読み込んでいます" />
         : error && items.length === 0 ? <ListState kind="error" title="保存した分析を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setSavedReload((n) => n + 1)} />
         : items.length === 0 ? <ListState kind="empty" title="保存した分析はまだありません" description="クロス分析かファネルを集計し、その結果を保存してください。" />
-        : <DetailColumns presentation="analysis" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={
+        : <DetailColumns presentation="analysis" variant="analysis-history" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={
           <Card variant="records" aria-labelledby="saved-history-title">
             <CardHeader size="content" titleId="saved-history-title" meta={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${schedules.filter(schedule => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined} title={<TruncatedText value={selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'} />} />
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
@@ -262,7 +262,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
               : !selected ? <p data-card-footer className={styles.caption}>一覧から分析を選んでください</p>
               : snapshots.length === 0 ? <p data-card-footer className={styles.caption}>保存された結果はありません</p>
               : <DataTable aria-label="結果の履歴" columnSizing="content" columnLayout={{ ...TABLE_LAYOUT, rowHeight: 'var(--polish-table-row)' }}>
-                <thead><TableHeadRow>
+                <thead><TableHeadRow data-table-layout="columns">
                   <Th grow truncate>対象期間</Th>
                   <Th collapseAt="narrow" truncate>データ締切</Th>
                   <Th truncate>状態</Th>
@@ -282,16 +282,16 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <p data-card-footer className={styles.caption}>保存時点の固定結果です。いま集計し直しても変わりません。</p>
           </Card>
         }>
-          <DataTable aria-label="保存した分析" columnSizing="content" grid={{ columns: 'minmax(0, 1fr) var(--tpl-an-col-90) var(--tpl-an-col-80) var(--tpl-an-col-100) var(--tpl-an-col-100)', padding: '0 var(--tpl-list-inset)', headPadding: '0 var(--tpl-list-inset)', gap: 'var(--polish-space-row)', rowHeight: 'var(--tpl-list-row-h)', bodyTextSize: 'var(--polish-text-body)' }}>
+          <Card variant="records" contentPadding="0" aria-label="保存した分析の一覧"><DataTable aria-label="保存した分析" columnSizing="content" grid={{ columns: 'minmax(0, 1fr) var(--tpl-an-col-90) var(--tpl-an-col-80) var(--tpl-an-col-100) var(--tpl-an-col-100)', padding: '0 var(--tpl-list-inset)', headPadding: '0 var(--tpl-list-inset)', gap: 'var(--polish-space-row)', rowHeight: 'var(--tpl-list-row-h)', bodyTextSize: 'var(--polish-text-body)' }}>
             <thead><TableHeadRow><Th grow truncate>分析名</Th><Th truncate>種類</Th><Th truncate>作った人</Th><Th truncate>更新日時</Th><Th truncate>集計状態</Th></TableHeadRow></thead>
             <tbody>
               {visibleItems.length === 0 ? <Tr><Td colSpan={5}>条件に合う保存済み分析はありません。<Button onClick={() => setQuery('')}>キャンセル</Button></Td></Tr> : visibleItems.map(item => <Tr key={item.id} data-table-layout="columns" selected={selectedId === item.id} onOpen={() => setSelectedId(item.id)}>
-                <Td grow><RowNameButton onClick={() => setSelectedId(item.id)} selected={selectedId === item.id} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`}><TruncatedText value={item.name} /></RowNameButton></Td>
+                <Td grow><RowNameButton onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`}><TruncatedText value={item.name} /></RowNameButton></Td>
                 <Td><TruncatedText value={kindLabel(item.kind)} /></Td><Td><TruncatedText value={item.createdByName} /></Td><Td><TruncatedText value={shortDateTime(item.updatedAt)} /></Td>
                 <Td title={item.latestSnapshot ? `${formatAnalyticsDate(item.latestSnapshot.periodFrom)}〜${formatAnalyticsDate(item.latestSnapshot.periodTo)}・${SAVED_STATE_LABELS[item.latestSnapshot.state]}` : undefined}>{latestPill(item)}</Td>
               </Tr>)}
             </tbody>
-          </DataTable>
+          </DataTable></Card>
         </DetailColumns>}
 
       <div className={styles.sectionHead}>
@@ -303,8 +303,8 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       </div>
       {schedulesError ? <Notice tone="danger" ><span>{schedulesError}</span>{/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}<Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></Notice> : null}
       {schedulesLoading ? null : schedules.length === 0 ? (schedulesError ? null : <ListState kind="empty" title="定期レポートはまだありません" description="決まった曜日や日に、集計結果をメールやLINEへ届けられます。" />)
-        : <DataTable aria-label="定期レポート" columnSizing="content" columnLayout={TABLE_LAYOUT}>
-          <thead><TableHeadRow>
+        : <Card variant="records" contentPadding="0" aria-label="定期レポートの一覧">{/* 表を本文の直下に置くと、一覧の型が本文の左右の余白を 0 にする。枠で包んで余白を保つ。 */}<DataTable aria-label="定期レポート" columnSizing="content" columnLayout={TABLE_LAYOUT}>
+          <thead><TableHeadRow data-table-layout="columns">
             <Th grow truncate>レポート名</Th>
             <Th truncate>間隔</Th>
             <Th truncate>次に届く予定</Th>
@@ -323,7 +323,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
               {!schedule.isOneTime ? <ScheduleMenu schedule={schedule} /> : null}
             </span> : null}</ActionCell>
           </Tr>)}</tbody>
-        </DataTable>}
+        </DataTable></Card>}
 
       {/* 1回だけ送った直近の結果。一覧からは消えるため、ここから失敗理由・宛先別結果へ進める。 */}
       {recentOneTime.length > 0 ? <section className={styles.table} aria-label="1回だけ送った結果">

@@ -136,7 +136,7 @@ async function type(input: Element, value: string) {
 /** searchParams を差し替えて再描画し、画面内の工程移動を再現する。 */
 async function gotoStep(_view: ReturnType<typeof render>, step: string | null) {
   const labels: Record<string, string> = { shape: '形と画像', targeting: '誰に出すか', publish: '公開' }
-  fireEvent.click(within(screen.getByRole('navigation', { name: 'リッチメニューを作る手順' })).getByRole('button', { name: `${labels[step ?? 'shape']}に戻る` }))
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'リッチメニューを作る手順' })).getByRole('button', { name: new RegExp(`^${labels[step ?? 'shape']}に(戻る|進む)$`) }))
   await flush()
 }
 
@@ -246,6 +246,20 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
 describe('リッチメニュー編集の未保存ガード (N-162)', () => {
   beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
   afterEach(() => { delete document.documentElement.dataset.theme })
+  test('開き直した下書きでも「公開」はまだ済みの印にせず番号のまま、押せば進める（OxEMM）', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
+    render(<CurrentRichMenuEdit />)
+    await flush()
+    await screen.findByDisplayValue('メインメニュー').catch(() => null)
+    const nav = screen.getByRole('navigation', { name: 'リッチメニューを作る手順' })
+    const items = Array.from(nav.querySelectorAll('li'))
+    const publish = items[items.length - 1]
+    expect(publish.getAttribute('data-step-state')).toBe('todo')
+    expect(publish.querySelector('[data-step-dot]')?.textContent).toBe('4')
+    expect(within(nav).getByRole('button', { name: '公開に進む' })).toBeTruthy()
+    expect(items[0].getAttribute('data-step-state')).toBe('done')
+  })
+
   test('読み込み直後は変更なしなので一覧リンクを押しても確認は出ない', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=shape')
     render(<CurrentRichMenuEdit />)
@@ -441,7 +455,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
     await fillPublishSchedule()
 
     richMenuUpdate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'x' }))
-    fireEvent.click(screen.getByRole('button', { name: '下書きのまま保存' }))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await flush()
 
     expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[1].checked).toBe(true)

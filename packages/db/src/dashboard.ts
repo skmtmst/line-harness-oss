@@ -11,8 +11,8 @@ import type { FriendActiveMonthComparison as importFriendActiveMonthComparison }
 import { FORM_SUBMIT_CLAIM_STALE_MS } from './forms.js';
 import { toJstString } from './utils.js';
 
-/** 期間の指定。設計の「今日 / 過去7日 / 過去28日」に対応する。 */
-export type DashboardPeriod = 'today' | 'last7' | 'last28';
+/** 今日・過去7日・過去30日。旧last28は既存のAPI利用先向けに保持。 */
+export type DashboardPeriod = 'today' | 'last7' | 'last28' | 'last30';
 
 export type DashboardSectionState = 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated' | 'partial';
 
@@ -287,7 +287,7 @@ function nextMonth(month: string): string {
 export function periodStart(period: DashboardPeriod): string {
   if (period === 'today') return jstDate(0);
   if (period === 'last7') return jstDate(-6);
-  return jstDate(-27);
+  return jstDate(period === 'last30' ? -29 : -27);
 }
 
 /** 今月の始まり（JSTの日付）。「今月の配信」は選んだ期間に関わらず今月1日から数える。 */
@@ -299,7 +299,7 @@ export function monthStart(): string {
 export function periodDays(period: DashboardPeriod): number {
   if (period === 'today') return 1;
   if (period === 'last7') return 7;
-  return 28;
+  return period === 'last30' ? 30 : 28;
 }
 
 interface CountRow {
