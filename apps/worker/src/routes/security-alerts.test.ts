@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
@@ -104,5 +104,40 @@ describe('security alert HTTP permissions and operator actions', () => {
     const response = await request('/api/operations/security-alerts?account_id=a1');
     expect(response.status).toBe(503);
     expect(await response.text()).toContain('SECURITY_MONITOR_UNAVAILABLE');
+  });
+});
+
+
+describe('staging-only manual security sweep', () => {
+  const path = '/api/ops/security-alerts/run-once';
+  const operator = { ...member, id: 'platform', role: 'owner' as const };
+  it('denies production/unknown environments, nonoperators, read-only and impersonated sessions before counting', async () => {
+    for (const DEPLOY_ENV of ['production', 'test', '', undefined]) {
+      const response = await app(operator).request(path, { method: 'POST' }, { ...bindings(), DEPLOY_ENV });
+      expect(response.status).toBe(404);
+    }
+    for (const staff of [null, member, { ...member, role: 'owner' as const }, { ...operator, readOnly: true }]) {
+      expect((await app(staff).request(path, { method: 'POST' }, { ...bindings(), DEPLOY_ENV: 'staging' })).status).toBe(403);
+    }
+    expect((await app(operator, true).request(path, { method: 'POST' }, { ...bindings(), DEPLOY_ENV: 'staging' })).status).toBe(403);
+    expect(store.raw.prepare('SELECT count(*) AS n FROM security_monitor_state').get()).toEqual({ n: 0 });
+  });
+  it('counts and notifies once without invoking deliveries, respects the lease, and reports schema failure', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response('{"ok":true}'));
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      store.raw.exec(`INSERT INTO audit_events(id,tenant_id,category,action,result)
+        VALUES ('fixture-key-event','tenant-a','auth','auth.api_key.rotate','success')`);
+      const env = { ...bindings(), DEPLOY_ENV: 'staging', SLACK_BOT_TOKEN: 'fixture', SLACK_ERROR_CHANNEL_ID: 'CERROR' };
+      const response = await app(operator).request(path, { method: 'POST' }, env);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ success: true, data: { monitor: { status: 'running' } } });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(String(fetcher.mock.calls[0]?.[0])).toContain('slack.com/api/chat.postMessage');
+      expect((await app(operator).request(path, { method: 'POST' }, env)).status).toBe(200);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      store.raw.exec('DROP TABLE security_monitor_state');
+      expect((await app(operator).request(path, { method: 'POST' }, env)).status).toBe(503);
+    } finally { vi.unstubAllGlobals(); }
   });
 });

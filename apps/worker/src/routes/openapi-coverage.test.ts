@@ -144,6 +144,7 @@ const ALLOWLIST_MAX = 771;
 const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/operations/security-alerts',
   'GET /api/ops/security-alerts',
+  'POST /api/ops/security-alerts/run-once',
   'POST /api/operations/security-alerts/{id}/acknowledge',
   'POST /api/operations/security-alerts/{id}/resolve',
   'POST /api/ops/security-alerts/{id}/acknowledge',

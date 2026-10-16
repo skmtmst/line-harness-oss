@@ -43,7 +43,7 @@ function review(platform: boolean, status: string) {
       '400': { description: '版の指定が不正' }, '404': { description: '記録なし、または担当外の記録' }, '409': { description: '版の競合。最新の状態を読み直す' } },
   };
 }
-export const securityMonitorPaths = Object.fromEntries([false, true].flatMap(platform => {
+const alertPaths = Object.fromEntries([false, true].flatMap(platform => {
   const base = platform ? '/api/ops/security-alerts' : '/api/operations/security-alerts';
   return [
     [base, { get: list(platform) }],
@@ -51,3 +51,13 @@ export const securityMonitorPaths = Object.fromEntries([false, true].flatMap(pla
     [`${base}/{id}/resolve`, { post: review(platform, 'resolved') }],
   ];
 }));
+
+export const securityMonitorPaths = { ...alertPaths,
+  '/api/ops/security-alerts/run-once': { post: {
+    tags: ['Operations'], summary: '検証環境で運営マスターが安全監視だけを1回実行',
+    description: 'DEPLOY_ENV=staging限定。閲覧のみ・代理ログイン禁止。既存の5分leaseを尊重し、配信定期処理は動かさない。入力なし。',
+    responses: { ...errors, '404': { description: '本番・不明な環境では利用不可' },
+      '200': { description: 'successとdata.monitor。直前に同じ5分窓を処理済みなら再集計しない。完了日時を確認する。' },
+    },
+  } },
+};

@@ -7,6 +7,7 @@ import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/p
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { publicSecurityAlert, securityMonitorStatus, type SecurityAlertRow } from '../services/security-monitor-store.js';
 import { SECURITY_WINDOW_MINUTES, securityThresholds } from '../services/security-monitor-rules.js';
+import { runSecurityMonitor } from '../services/security-monitor.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 export const securityAlerts = new Hono<Env>();
@@ -74,3 +75,16 @@ securityAlerts.post('/api/operations/security-alerts/:id/resolve', requireRole('
 securityAlerts.get('/api/ops/security-alerts', requirePlatformAdmin(), c => list(c, true));
 securityAlerts.post('/api/ops/security-alerts/:id/acknowledge', requirePlatformAdminWrite(), c => review(c, true, 'acknowledged'));
 securityAlerts.post('/api/ops/security-alerts/:id/resolve', requirePlatformAdminWrite(), c => review(c, true, 'resolved'));
+
+
+// Staging has no cron. This runs only monitoring, never the delivery scheduler.
+securityAlerts.post('/api/ops/security-alerts/run-once', requirePlatformAdminWrite(), async c => {
+  if (c.env.DEPLOY_ENV !== 'staging') return c.notFound();
+  if (c.get('impersonation')) return c.json({ success: false, error: '代理ログイン中は実行できません' }, 403);
+  try {
+    await runSecurityMonitor(c.env);
+    return c.json({ success: true, data: { monitor: await securityMonitorStatus(c.env.DB) } });
+  } catch {
+    return c.json({ success: false, error: '安全監視を実行できませんでした', code: 'SECURITY_MONITOR_UNAVAILABLE' }, 503);
+  }
+});

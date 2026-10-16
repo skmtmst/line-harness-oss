@@ -1,4 +1,4 @@
-import type { SecurityAlertsResponse, SecurityAlertReviewResponse } from '@line-crm/shared';
+import type { SecurityAlertsResponse, SecurityAlertReviewResponse, SecurityMonitorStatus } from '@line-crm/shared';
 import { fetchApi } from './api';
 
 function base(accountId?: string) {
@@ -10,6 +10,9 @@ function query(accountId?: string) {
 
 /** Omit accountId only in the platform console; the server enforces platform membership. */
 export const securityMonitorApi = {
+  /** Staging platform operators only; respects the five-minute lease. */
+  runOnce: () => fetchApi<{ success: true; data: { monitor: SecurityMonitorStatus } }>(
+    '/api/ops/security-alerts/run-once', { method: 'POST' }),
   list: (accountId?: string, offset = 0) => fetchApi<SecurityAlertsResponse>(`${base(accountId)}${query(accountId)}${accountId === undefined ? '?' : '&'}offset=${offset}`),
   acknowledge: (id: string, expectedVersion: number, accountId?: string) =>
     fetchApi<SecurityAlertReviewResponse>(`${base(accountId)}/${encodeURIComponent(id)}/acknowledge${query(accountId)}`,

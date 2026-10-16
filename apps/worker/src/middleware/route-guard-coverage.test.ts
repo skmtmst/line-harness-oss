@@ -627,6 +627,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/members/:staffId/resend-invite',
     'POST /api/ops/security-alerts/:id/acknowledge',
     'POST /api/ops/security-alerts/:id/resolve',
+    'POST /api/ops/security-alerts/run-once',
     'POST /api/ops/support/tickets',
     'POST /api/ops/support/tickets/:id/draft/ai',
     'POST /api/ops/support/tickets/:id/reply',
