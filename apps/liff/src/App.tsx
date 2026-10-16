@@ -19,6 +19,7 @@ const VisitStampQr = lazy(() => import('./pages/VisitStampQr.js'));
 const VisitStamps = lazy(() => import('./pages/VisitStamps.js'));
 const SeatReserve = lazy(() => import('./pages/seat/SeatReserve.js'));
 const EntryRouteCoupon = lazy(() => import('./pages/EntryRouteCoupon.js'));
+const FileOpen = lazy(() => import('./pages/FileOpen.js'));
 const NotFound = lazy(() => import('./pages/NotFound.js'));
 
 function Loading() {
@@ -72,6 +73,8 @@ export default function App() {
         <Route path="/visit-stamps" element={<VisitStamps />} />
         <Route path="/webinar/:slug" element={<Webinar />} />
         <Route path="/research/:id" element={<Research />} />
+        <Route path="/files/:id" element={<FileOpen />} />
+        <Route path="/files" element={<FileOpen />} />
         <Route path="/forms/:id" element={<Form />} />
         <Route path="/restaurant/reserve/:token" element={<SeatReserve />} />
         <Route path="/" element={<Navigate to={{ pathname: '/booking', search: location.search }} replace />} />
