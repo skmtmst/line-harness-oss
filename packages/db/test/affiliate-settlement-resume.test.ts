@@ -7,6 +7,7 @@ import {
   createAffiliatePayoutBatch,
   createAffiliateStatement,
   getClosedAccountSettlement,
+  getAffiliateStatementDownload,
   prepareAffiliateStatement,
   previewAffiliateAccountSettlement,
   saveAffiliateBankProfile,
@@ -97,6 +98,23 @@ describe('R287 締め後に開き直しても明細・CSVを再開できる', ()
       }],
       batch: null,
     });
+  });
+
+  it('B-351: 明細は本人・店・統括と有効期限が揃うときだけ取得でき、期限のない旧行は返さない', async () => {
+    const closed = await closeSeptember();
+    const snapshot = await prepareAffiliateStatement(db, { tenantId: TENANT_ID, lineAccountId: 'account-1', settlementId: closed.settlementId, affiliateId: 'affiliate-1' });
+    const statement = await createAffiliateStatement(db, {
+      tenantId: TENANT_ID, lineAccountId: 'account-1', snapshot: snapshot!, objectKey: 'statements/synthetic.pdf',
+      checksum: 'checksum', idempotencyKey: 'expiry-test', requestFingerprint: 'expiry-test', actorId: 'staff-1',
+      expiresAt: '2026-11-01T00:00:00.000Z',
+    });
+    const input = { tenantId: TENANT_ID, lineAccountId: 'account-1', affiliateId: 'affiliate-1', statementId: statement.id, now: '2026-10-31T23:59:59.999Z' };
+    expect(await getAffiliateStatementDownload(db, input)).toMatchObject({ objectKey: 'statements/synthetic.pdf' });
+    for (const changed of [{ tenantId: 'other-tenant' }, { lineAccountId: 'other-account' }, { affiliateId: 'other-person' }, { now: '2026-11-01T00:00:00.000Z' }, { now: '2026-11-02T00:00:00.000Z' }]) {
+      expect(await getAffiliateStatementDownload(db, { ...input, ...changed })).toBeNull();
+    }
+    sqlite.prepare('UPDATE affiliate_statements SET expires_at = NULL WHERE id = ?').run(statement.id);
+    expect(await getAffiliateStatementDownload(db, input)).toBeNull();
   });
 
   it('明細発行後は発行済みが分かり、CSV準備後は作成済みが分かる', async () => {
