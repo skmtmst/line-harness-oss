@@ -92,14 +92,18 @@ test('B1-13 B1-24: 期限ちょうどは無料、開始後の取消と巻戻し�
  seedGapBooking(d);cancel('2026-11-20T06:00:00Z');expect((d.raw.prepare("SELECT amount FROM booking_charges WHERE booking_id='bk'").get() as any).amount).toBe(4200);
  d.raw.exec("UPDATE bookings SET status='confirmed' WHERE id='bk'");cancel('2026-11-20T06:30:00Z');expect(d.raw.prepare("SELECT amount,status FROM booking_charges WHERE booking_id='bk'").get()).toEqual({amount:4200,status:'pending'});
 });
-test('B1-13 B7-24: 本人の予約履歴に取消前の額・会議URL・終了を返し、申込中のURLを隠す',async()=>{
+test('B1-13 B7-24 GAP3-INTEGRATION-02: 本人の予約履歴に取消前の額・支払い・会議URL・終了を返し、申込中のURLを隠す',async()=>{
  vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-20T04:00:00Z'));
  try{
  connect();await save();d.raw.exec("UPDATE menus SET meeting_mode='online',fixed_meeting_url='https://example.test/meeting' WHERE id='menu'");seedGapBooking(d);seedGapBooking(d,'pending','requested');
+ d.raw.exec(`INSERT INTO booking_payments(id,line_account_id,booking_id,amount,status,provider,provider_payment_id,idempotency_key,created_at,updated_at,refunded_amount)
+   VALUES('paid','a','bk',8400,'paid','stripe','pi_test_history','history','2026-11-19T00:00:00Z','2026-11-19T00:00:00Z',300)`);
  const {default:booking}=await import('./booking.js');const r=await gapApp(d,[booking]).request('/api/liff/booking/me?liffId=liff-a',{headers:{Authorization:'Bearer token'}});
  expect(r.status).toBe(200);const data=await r.json() as any,confirmed=data.upcoming.find((r:any)=>r.id==='bk'),pending=data.upcoming.find((r:any)=>r.id==='pending');
  expect(confirmed).toMatchObject({meeting_url:'https://example.test/meeting',ends_at:'2026-11-20T06:00:00.000Z',cancellationQuote:{feeNow:4200},cancel_deadline_at:'2026-11-20T05:00:00Z'});
+ expect(confirmed.payment).toMatchObject({method:'online',status:'partially_refunded',amount:8400,refundedAmount:300});
  expect(pending.meeting_url).toBeNull();expect(confirmed).not.toHaveProperty('policy_snapshot_json');
+ expect(confirmed).not.toHaveProperty('price_at_booking');expect(confirmed).not.toHaveProperty('ticket');
  }finally{vi.useRealTimers();}
 });
 test('B7-14 B7-15: カレンダーが切れた知らせは1回、つなぎ直すと解決にする',async()=>{

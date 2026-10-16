@@ -96,6 +96,13 @@ describe('模擬の部分返金と監査',()=>{
     f.raw.exec('DELETE FROM booking_payment_connections; UPDATE booking_payments SET booking_id=NULL');
     expect(await (await request()).json()).toMatchObject({data:{refund:{notificationStatus:'unavailable',sent:false}}});
   });
+  it('GAP3-INTEGRATION-01: 今日・担当別の入金と部分返金を同じ範囲で集計する',async()=>{
+    expect((await request()).status).toBe(200);
+    expect(await paymentSummary(f.db,'a',now,'today','s1')).toMatchObject({paidAmount:1000,refundedAmount:300,refundedCount:1});
+    expect(await paymentSummary(f.db,'a',now,'today','s2')).toMatchObject({paidAmount:0,refundedAmount:0,refundedCount:0});
+    expect(await paymentSummary(f.db,'a',new Date('2026-10-17T04:00:00Z'),'today','s1')).toMatchObject({paidAmount:0,refundedAmount:0,refundedCount:0});
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('返金額・操作者を一覧/CSV用の値に返し、月次は入金総額と返金増分を分ける',async()=>{
     await request();
     const page=await paymentRecords(f.db,'a',{q:'',status:'partially_refunded',method:'',period:'month',limit:20,offset:0},now);

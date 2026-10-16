@@ -1591,7 +1591,7 @@ booking.get('/api/liff/booking/me', async (c) => {
     .all<BookingHistoryItem>();
 
   const payments = await customerBookingPayments(c.env.DB,accountId,friendId);
-  const historyItem = (row: BookingHistoryItem) => ({...bookingHistoryItem(row),
+  const historyItem = <T extends BookingHistoryItem>(row: T) => ({...bookingHistoryItem(row),
     ...(payments.has(row.id) ? {payment:payments.get(row.id)!} : {})});
   return c.json({ upcoming: upcoming.results.map(row => {
     const {policy_snapshot_json,price_at_booking,ticket,...item}=historyItem(row);
