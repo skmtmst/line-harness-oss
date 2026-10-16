@@ -4795,7 +4795,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
-    const found = broadcastOne[1] === 'visual-compose' ? VISUAL_COMPOSE_DRAFT : BROADCASTS.find((item) => item.id === broadcastOne[1])
+    /* 送る前の確かめの撮影用（板 F94nep・RxxfO）：確認の段まで進める、入力ずみの下書き。 */
+    const confirmFixture = broadcastOne[1] === 'visual-confirm'
+      ? { ...BROADCASTS[1], id: 'visual-confirm', title: '秋の新メニューのお知らせ', messageType: 'text', messageContent: '【秋の新メニュー】10/18 からトリートメント 20%OFF\nご予約はリッチメニューの［予約する］から。期間：10/18〜10/31', targetType: 'tag', targetTagId: 'tag-0', status: 'draft', scheduledAt: '2099-10-18T01:00:00.000Z', totalCount: 1284, version: 2, draftStep: 'confirm' }
+      : null
+    const found = confirmFixture ?? (broadcastOne[1] === 'visual-compose' ? VISUAL_COMPOSE_DRAFT : BROADCASTS.find((item) => item.id === broadcastOne[1]))
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/broadcasts') {
@@ -7477,6 +7481,14 @@ const server = createServer((req, res) => {
       HTTP状態と器を返す。編集・公開・予約・適用・削除の画面検証用。
       409/400 の代表例つき (削除ブロック・冪等キーなし・順序の形違い)。
     */
+    /* 送る前の確かめの撮影用：確認の下書きの保存（版を 1 つ進めて返す）。 */
+    if (method === 'PUT' && url.pathname === '/api/broadcasts/visual-confirm') {
+      const found = BROADCASTS[1]
+      res.writeHead(200).end(JSON.stringify({
+        success: true, data: { ...found, id: 'visual-confirm', title: '秋の新メニューのお知らせ', targetType: 'tag', targetTagId: 'tag-0', status: 'draft', scheduledAt: '2099-10-18T01:00:00.000Z', version: 2 },
+      }))
+      return
+    }
     if (method === 'POST' && url.pathname === '/api/rich-menu-groups') {
       res.writeHead(201).end(JSON.stringify({
         success: true, data: { id: 'rmg-new', pages: [{ id: 'rmg-new-top' }] },

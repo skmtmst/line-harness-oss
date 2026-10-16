@@ -23,6 +23,9 @@ import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from '
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import SendConfirmDialog from '@/components/shared/send-confirm-dialog'
+import { chatSafetyApi } from '@/lib/api-gap1'
+import type { SendConfirmationPreview } from '@line-crm/shared'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import HelpTip from '@/components/shared/help-tip'
@@ -279,6 +282,9 @@ export default function HqBroadcastCreate() {
   const [errorStep, setErrorStep] = useState<BroadcastStepKey | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [sending, setSending] = useState(false)
+  /* 共通の「送る前の確かめ」の中身は、保存した一括配信に対するサーバーの数え直し（GET /api/hq/broadcasts/:id/send-preview）。 */
+  const [sendPreview, setSendPreview] = useState<{ state: 'loading' | 'error' | 'ready'; data: SendConfirmationPreview | null }>({ state: 'loading', data: null })
+  const [previewSeq, setPreviewSeq] = useState(0)
   const [leaving, setLeaving] = useState(false)
   /* 下書きの依頼番号。作ったとき（または読んだ下書き）のものを、直すときもそのまま使う（口の決まり）。 */
   const requestRef = useRef('')
@@ -615,6 +621,16 @@ export default function HqBroadcastCreate() {
     setConfirmCount('')
     setConfirmOpen(true)
   }
+
+  useEffect(() => {
+    if (!confirmOpen || !run) return
+    let alive = true
+    setSendPreview({ state: 'loading', data: null })
+    void chatSafetyApi.hqSendPreview(run.id)
+      .then((res) => { if (alive) setSendPreview(res.success ? { state: 'ready', data: res.data } : { state: 'error', data: null }) })
+      .catch(() => { if (alive) setSendPreview({ state: 'error', data: null }) })
+    return () => { alive = false }
+  }, [confirmOpen, run, previewSeq])
 
   const send = async () => {
     if (!run) return
@@ -1191,8 +1207,33 @@ export default function HqBroadcastCreate() {
         onConfirm={() => { confirmLeave() }}
       />
 
+      {/* 共通の「送る前の確かめ」（U1・板 i7TdtN）。統括担当が 1 人だけで人数を入れて確かめるときは、下の窓を使う。 */}
+      <SendConfirmDialog
+        open={confirmOpen && gate !== 'single'}
+        subtitle={`${title.trim() || '新しい一括配信'} ・ ${formatNumber(totals?.sendStores ?? 0)} アカウントへ`}
+        scheduled={when !== 'now'}
+        state={sendPreview.state}
+        onRetry={() => setPreviewSeq((value) => value + 1)}
+        recipients={sendPreview.data?.recipients ?? null}
+        recipientsNote={sendPreview.data ? `除く：宣伝を止めている ${formatNumber(sendPreview.data.excluded.optedOut)}・ブロック ${formatNumber(sendPreview.data.excluded.blocked)}・重複 ${formatNumber(sendPreview.data.excluded.duplicate)}` : undefined}
+        perAccount={sendPreview.data?.perAccount?.map((row) => ({
+          name: chosen.find((store) => store.id === row.accountId)?.name ?? row.accountId,
+          recipients: row.recipients,
+          note: row.excluded.optedOut > 0 ? `止めている ${formatNumber(row.excluded.optedOut)} 人を除く` : undefined,
+        }))}
+        purpose="marketing"
+        whenLabel={when === 'now' ? '今すぐ送る' : `${sendWhenLabel} に送る（予約）`}
+        whenNote={when === 'now' ? undefined : '予約は送る時刻の 1 分前まで［予約を取り消す］で止められます'}
+        sender={sendPreview.data?.sender ?? null}
+        bodyHead={sendPreview.data?.firstText ?? ''}
+        allRecipients={audience === 'all'}
+        hidePrimary={approval.state === null}
+        primaryLabel={sendPreview.data ? (when === 'now' ? `${formatNumber(sendPreview.data.recipients)} 人に送る` : `${formatNumber(sendPreview.data.recipients)} 人に予約する`) : '送る'}
+        onConfirm={() => send()}
+        onBack={() => { if (!sending) setConfirmOpen(false) }}
+      />
       <ConfirmDialog
-        open={confirmOpen}
+        open={confirmOpen && gate === 'single'}
         title={`${formatNumber(totals?.sendStores ?? 0)}アカウントに送ります`}
         description={`${formatNumber(totals?.sendPeople ?? 0)} 人に${when === 'now' ? 'すぐ' : `${sendWhenLabel} に`}送ります。送った LINE は取り消せません。${totals && totals.skipStores ? `外した${formatNumber(totals.skipStores)}アカウントには送りません。` : ''}`}
         confirmLabel={when === 'now' ? '送る' : '予約する'}

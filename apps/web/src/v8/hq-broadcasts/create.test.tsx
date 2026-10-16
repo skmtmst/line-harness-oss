@@ -28,6 +28,7 @@ const replace = vi.hoisted(() => vi.fn())
 const params = vi.hoisted(() => ({ value: new URLSearchParams() }))
 
 vi.mock('@/lib/hq-broadcasts-api', () => ({ hqBroadcastsApi: hq }))
+vi.mock('@/lib/api-gap1', () => ({ chatSafetyApi: { hqSendPreview: async () => ({ success: true, data: { recipients: 6120, excluded: { blocked: 0, optedOut: 0, duplicate: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '本文', sender: null, expectedVersion: 2, perAccount: [] } }) } }))
 vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeof import('@/lib/hq-templates-api')>(), hqTemplatesApi: tpl }))
 /*
  * その場で作る：店のカルーセル・リッチメッセージの作る部品（host の口）は、ここでは口だけの代わりにする。
@@ -175,7 +176,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(new URLSearchParams(window.location.search).get('step')).toBe('confirm')
     expect(replace).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
-    fireEvent.click(await screen.findByRole('button', { name: '予約する' }))
+    fireEvent.click(await screen.findByRole('button', { name: /人に予約する/ }))
     await waitFor(() => expect(hq.send).toHaveBeenCalledWith('run-1', 2))
     expect(push).toHaveBeenCalledWith('/hq/broadcasts/detail?id=run-1')
   })
