@@ -368,8 +368,10 @@
 
 /* 予約メニューのお支払い 4 つ（CnV1I） */
 .fourChoices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-bm-12); }
-.depositLine { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--tpl-bm-12); }
-.depositResult { padding-bottom: var(--tpl-bm-8); color: var(--color-ink); font-size: var(--tpl-bm-13); white-space: nowrap; }
+.depositLine { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--tpl-bm-12); }
+/* 物差し（%・金額）と結果は、入れる欄の高さにそろえる（題の下・補足の上）。 */
+.depositLine > :first-child { margin-top: var(--tpl-bm-28); }
+.depositResult { padding-top: var(--tpl-bm-36); color: var(--color-ink); font-size: var(--tpl-bm-13); white-space: nowrap; }
 .subLabel { margin: 0; color: var(--color-ink); font-size: var(--tpl-bm-13); font-weight: 700; }
 .checkRow { display: flex; flex-wrap: wrap; gap: var(--tpl-bm-24); }
 @container (max-width: 760px) { .fourChoices { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
