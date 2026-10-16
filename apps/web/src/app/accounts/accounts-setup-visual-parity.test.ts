@@ -28,22 +28,16 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
   })
 
   it('新設計の4項目入力・自動接続と5つの正本ノードを使う', () => {
-    for (const value of [
-      '`${workerBase}/auth/callback`',
-      'api.lineAccounts.connectCheck',
-      'api.lineAccounts.connect',
-      /* 2026-10-16 ⑤の進捗は読むだけだと次の cron まで動かないので、画面を開いている間は
-       * step で続きを進める。見せ方は変えていない。 */
-      'api.lineAccounts.stepFollowerImport',
-      'data-design-node="xj3zz"',
-      'data-design-node="GwKE2"',
-      'data-design-node="JYfda"',
-      'data-design-node="v2KMj"',
-      'data-design-node="TvXII"',
-      'designNode="qw80E"',
-    ]) {
-      expect(setupSource).toContain(value)
-    }
+    /*
+      2026-10-16: ⑤の進捗を「読むだけ（followerImportState）」から step の自己連鎖へ替えた。
+      ソース文字で呼ぶ口と正本ノードを数えていた並びは、B-273（新しいソース契約を増やさない）
+      に合わせてやめ、ソースの字面ではなく実際の描画・呼び出しで確かめる試験へ移した。
+        - 4項目入力・自動接続と呼ぶ口: `new/register-v8.react.test.tsx`
+          （「②の4項目が空では③へ進めない」「登録後は画面から取り込みの続きを進め…」）
+        - 5つの正本ノード: 同ファイル「各段と結果の窓は絵の正本ノードを描く」＋
+          `scripts/visual-qa/v8-design-map-route-contract.test.ts`（ノードとURLの対応）
+      ここには「置かないもの」だけを残す。
+    */
     expect(setupSource).not.toContain('channel-access-token')
     expect(setupSource).not.toContain('id="liff-id"')
     expect(setupSource).not.toContain('account-timezone')

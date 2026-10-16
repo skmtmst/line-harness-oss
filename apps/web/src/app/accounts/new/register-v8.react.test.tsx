@@ -102,6 +102,36 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(screen.queryByText('LINE ID')).toBeNull()
   })
 
+  /*
+    絵の正本ノードは、ソース文字の検索（旧 accounts-setup-visual-parity.test.ts の並び）ではなく
+    実際に描かれた印で確かめる（B-273）。xj3zz=①／JYfda=②／GwKE2=③／v2KMj=④／TvXII=⑤、
+    qw80E=結果の窓。ノードとURLの対応は scripts/visual-qa/v8-design-map-route-contract.test.ts。
+  */
+  const shownNode = () => document.querySelector('[data-design-node]')?.getAttribute('data-design-node')
+
+  it('各段と結果の窓は絵の正本ノードを描く', async () => {
+    render(<RegisterV8 />)
+    expect(shownNode()).toBe('xj3zz')
+    next()
+    expect(shownNode()).toBe('JYfda')
+    fill('v8-channel-id', '123456789')
+    fill('v8-channel-secret', 'synthetic-secret')
+    fill('v8-login-channel-id', '2007123456')
+    fill('v8-login-channel-secret', 'synthetic-login-secret')
+    next()
+    expect(shownNode()).toBe('GwKE2')
+    next()
+    expect(await screen.findByRole('button', { name: '接続して設定する' })).toBeTruthy()
+    expect(shownNode()).toBe('v2KMj')
+    fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
+    expect(await screen.findByText('接続を確かめた結果')).toBeTruthy()
+    expect(document.querySelector('[data-design-node="qw80E"]')).toBeTruthy()
+    fireEvent.click(screen.getByText('LINE Official Account Manager で「応答メッセージ」をオフにしたことを確かめました'))
+    fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
+    expect(await screen.findByText('登録が完了しました')).toBeTruthy()
+    expect(document.querySelector('[data-design-node="TvXII"]')).toBeTruthy()
+  })
+
   it('④は検査前は5行とも「まだ」', async () => {
     await enterCheckStep()
     expect(screen.getAllByText('まだ').length).toBeGreaterThanOrEqual(5)
