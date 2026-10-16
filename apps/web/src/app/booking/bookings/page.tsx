@@ -20,6 +20,8 @@ import { Calendar, CalendarPlus, CalendarX, CircleAlert, Download, Phone, X } fr
 import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import BookingGapSections from '@/v8/booking-gap/booking-gap-sections'
+import SeriesHost from '@/v8/booking-gap/series-host'
 import Button from '@/components/shared/button'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
@@ -1348,6 +1350,7 @@ export default function BookingsPage() {
         >
           {activeBooking ? (
             <div>
+              {selectedAccountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={selectedAccountId} bookingId={activeBooking.id} customerName={activeBooking.friend_name ?? 'お客様'} menuName={activeBooking.menu_name} startsAt={activeBooking.starts_at} canOperate={canOperate} onChanged={() => void load()} /></div> : null}
               <DetailRow label="日時">
                 {formatJpDateTime(activeBooking.starts_at)} 〜 {formatJpTime(activeBooking.ends_at)}
               </DetailRow>
@@ -1375,6 +1378,8 @@ export default function BookingsPage() {
           ) : null}
         </DetailPanel>
       )}
+
+      {selectedAccountId && canOperate ? <SeriesHost params={new URLSearchParams(urlParams.toString())} accountId={selectedAccountId} menus={menus} staffList={staffList} basePath="/booking/bookings" /> : null}
 
       {dialogs}
     </BookingLedgerFrame>

@@ -27,7 +27,11 @@ export type SeriesChoice = { index: number; action: 'keep' | 'skip' | 'alternati
 export type SeriesScope = 'this' | 'following';
 export type SeriesScopeImpact = { bookingId: string; startsAt: string; after?: string | null; blocked?: boolean; fee?: { amount: number; percent: number; reason: string } | null };
 
+export type BookingSeriesOf = { seriesId: string; ruleText: string; total: number; index: number; version: number; occurrences: { bookingId: string; index: number; startsAt: string; status: string }[] };
+
 export const bookingSeriesApi = {
+  /** この予約が繰り返しの 1 回なら、その組と各回。そうでなければ null。 */
+  ofBooking: (id: string, bookingId: string) => fetchApi<Result<BookingSeriesOf | null>>(account(`/api/booking/admin/bookings/${e(bookingId)}/series`, id)),
   preview: (id: string, input: { menuId: string; staffId: string | null; startsAt: string; rule: SeriesRule }) =>
     fetchApi<Result<SeriesPreview>>(account('/api/booking/admin/series/preview', id), json('POST', input)),
   create: (id: string, input: { menuId: string; staffId: string | null; friendId: string; startsAt: string; rule: SeriesRule; choices: SeriesChoice[] }, key: string) =>

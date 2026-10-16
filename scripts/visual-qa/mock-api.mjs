@@ -29,6 +29,7 @@ const QRCode = createRequire(new URL('../../apps/web/package.json', import.meta.
 
 import { QA_CLOCK, storeAt, storeYmd } from './qa-clock.mjs'
 import { mockFingerprint } from './mock-fingerprint.mjs'
+import { gap2Respond } from './mock-gap2.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
@@ -6474,6 +6475,20 @@ const server = createServer((req, res) => {
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()
+    return
+  }
+
+  /* ③-2 第2弾（繰り返し・同伴・行き先を分ける）の見本。送られた回数・間隔から返す。保存はしない。 */
+  if (/^\/api\/booking\/admin\/(series|groups|bookings\/[^/]+\/(series|group))/.test(url.pathname)) {
+    let raw = ''
+    req.on('data', (chunk) => { raw += chunk })
+    req.on('end', () => {
+      let body = {}
+      try { body = JSON.parse(raw || '{}') } catch { body = {} }
+      const hit = gap2Respond(method, url.pathname, body)
+      if (hit) res.writeHead(hit[0]).end(JSON.stringify(hit[1]))
+      else res.writeHead(404).end(JSON.stringify({ success: false, error: 'not_found' }))
+    })
     return
   }
 
