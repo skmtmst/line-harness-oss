@@ -535,7 +535,7 @@ jobs:
       - name: Verify EC import list account-switch behavior on the built admin
         run: >-
           pnpm exec playwright test
-          --config apps/web/src/app/ec-commerce/ec-commerce-issue-685.config.mjs
+          --config scripts/codex/ec-commerce-isolated.config.mjs
       # 間欠的な失敗(#685)の原因切り分け用。失敗時のDOM(error-context.md)を
       # artifactとして残し、CIでしか再現しない症状を後から読めるようにする。
       - name: Upload EC import list failure context
