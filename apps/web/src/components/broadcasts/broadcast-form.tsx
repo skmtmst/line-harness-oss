@@ -76,6 +76,7 @@ import {
   filterSendableTemplates,
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import SendConfirmDialog from '@/components/shared/send-confirm-dialog'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Combobox from '@/components/shared/combobox'
@@ -2657,9 +2658,34 @@ export default function BroadcastForm({
       </ul>
     </ConfirmDialog>
 
+    {/* 共通の「送る前の確かめ」（U1・板 F94nep／RxxfO）。承認が要るときは、承認者を選ぶ下の窓を使う。 */}
+    <SendConfirmDialog
+      open={confirmOpen && !needsApproval}
+      subtitle={`${title.trim() || '新しい一斉配信'} ・ ${confirmAudienceLabel}`}
+      scheduled={sendMode === 'scheduled'}
+      state={audienceCount === null ? 'error' : 'ready'}
+      hidePrimary={Boolean(currentStep) && approvalConfigState !== 'ready'}
+      unavailableNote={currentStep && approvalConfigState === 'loading' ? '承認の設定を確認しています…' : currentStep && approvalConfigState === 'error' ? '承認の設定を確認できません。確認画面を開き直してください' : undefined}
+      onRetry={() => { void runPreflight() }}
+      recipients={audienceCount}
+      recipientsNote={exclusionNote ?? undefined}
+      purpose="marketing"
+      whenLabel={sendMode === 'scheduled' && scheduledLabel ? `${scheduledLabel} に送る（予約）` : '今すぐ送る'}
+      whenNote={concurrentBroadcasts.length > 0
+        ? '同じ時刻の前後 1 時間に別の予約配信があります'
+        : sendMode === 'scheduled' ? '予約は送る時刻の 1 分前まで［予約を取り消す］で止められます' : undefined}
+      bodyHead={String(bubbles.find((b) => b.type === 'text')?.content.text ?? '') || `${TYPE_LABELS[bubbles[0]?.type ?? 'text'] ?? 'メッセージ'}を送ります`}
+      bubbleCount={bubbles.length}
+      allRecipients={targetMode === 'all'}
+      extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}
+      primaryLabel={audienceCount === null ? '送る' : sendMode === 'scheduled' ? `${formatNumber(audienceCount)} 人に予約する` : `${formatNumber(audienceCount)} 人に送る`}
+      onConfirm={() => save()}
+      onBack={() => { if (!saving) setConfirmOpen(false) }}
+      error={error || undefined}
+    />
     <div data-design-node="FpgxH">
       <ConfirmDialog
-        open={confirmOpen}
+        open={confirmOpen && needsApproval}
         title={sendMode === 'scheduled' ? 'この内容で予約しますか？' : 'この内容で送りますか？'}
         description={
           needsApproval && !needsApprovalSingle
