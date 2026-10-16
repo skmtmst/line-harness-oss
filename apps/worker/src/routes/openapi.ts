@@ -1,4 +1,5 @@
 import { gap1Paths } from './gap1-openapi.js';
+import { gap3Paths } from './gap3-openapi.js';
 import { gap2Paths } from './gap2-openapi.js';
 import { stylePaths } from './styles-openapi.js';
 import { hqTemplateListPaths } from './hq-template-list-openapi.js';
@@ -427,6 +428,7 @@ const spec = {
     ...bookingPaymentAdminPaths,
     ...gap1Paths,
     ...gap2Paths,
+    ...gap3Paths,
     ...bookingEntitlementPaths,
     ...behaviorFixPaths,
     '/api/account-settings/customer-look': {
