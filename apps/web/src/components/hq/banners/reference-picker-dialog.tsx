@@ -1,11 +1,11 @@
 'use client'
 
-import styles from './reference-picker-dialog.module.css'
 import { Check, FileUp, Star, Upload } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react'
 import Button from '@/components/shared/button'
 import Dialog, { type DialogProps } from '@/components/shared/dialog'
-import FileDropzone from '@/components/shared/file-drop'
+import ImageMultiUpload from '@/components/shared/image-multi-upload'
+import ImageMultiSelect from '@/components/shared/image-multi-select'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -164,7 +164,6 @@ export default function ReferencePickerDialog({
       .filter((entry): entry is { reference: BannerReference; image: BannerImage } => entry !== null)
   }, [images, picks])
 
-  const full = picks.length >= BANNER_MAX_REFERENCE_IMAGES
 
   /** タイルを押したとき。選んでいれば外し、選んでいなければ 3 枚までで足す。 */
   const toggle = (image: BannerImage) => {
@@ -264,62 +263,22 @@ export default function ReferencePickerDialog({
             )}
           </>
         ) : (
-          <div
-            data-design-node="exeSo"
-            role="listbox"
-            aria-label="参照にする画像"
-            aria-multiselectable="true"
-            className={hqLayout ? "grid max-h-160 grid-cols-4 gap-3 overflow-y-auto" : "grid max-h-160 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4"}
-          >
-            {visible.map((image) => {
-              const index = picks.findIndex((reference) => reference.imageId === image.id)
-              const selectedTile = index >= 0
-              return (
-                <button
-                  key={image.id}
-                  type="button"
-                  role="option"
-                  aria-selected={selectedTile}
-                  // 3 枚そろったら、選んでいないタイルは押しても増えないので触れない形にする。
-                  disabled={!selectedTile && full}
-                  onClick={() => toggle(image)}
-                  className={hqLayout ? styles.tile : "flex flex-col gap-1.5 text-left disabled:opacity-50"}
-                >
-                  <span
-                    className={
-                      selectedTile
-                        ? 'relative block aspect-square w-full overflow-hidden rounded-control border-2 border-accent bg-step-idle'
-                        : 'relative block aspect-square w-full overflow-hidden rounded-control border border-hairline bg-step-idle'
-                    }
-                  >
-                    {/* 統括の画像は Worker から配信されるので next/image の最適化は使わない（image-tile と同じ） */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={image.media.url} alt="" className="h-full w-full object-cover" loading="lazy" />
-                    {selectedTile ? (
-                      <span className="absolute bottom-2 left-2 rounded-pill bg-accent-deep px-2 py-0.5 text-nano font-semibold text-on-accent">
-                        {`${index + 1}枚目`}
-                      </span>
-                    ) : null}
-                  </span>
-                  <>
-                    <span className={hqLayout ? styles.name : "truncate text-caption font-semibold text-ink"}>{referenceName(image)}</span>
-                    <span className={hqLayout ? styles.size : "truncate text-nano text-ink-faint tabular-nums"}>{referenceSize(image, presets)}</span>
-                  </>
-                </button>
-              )
-            })}
-          </div>
+          <ImageMultiSelect
+            designNode="exeSo" compact={hqLayout} max={BANNER_MAX_REFERENCE_IMAGES}
+            items={visible.map(image => ({ id: image.id, url: image.media.url, name: referenceName(image), size: referenceSize(image, presets) }))}
+            selectedIds={picks.map(reference => reference.imageId)}
+            onToggle={id => { const image = visible.find(item => item.id === id); if (image) toggle(image) }}
+          />
         )}
 
         {/* 選んだ画像の使い方（`JOi8G`）。1 枚ずつ決める。選んでいないときは出さない。 */}
         {/* UcBQ5：その場で選ぶ窓は、下に手元の画像を落とす欄。使い方は生成パネルの行で決める。 */}
         {onLivePick ? (
-          <FileDropzone
+          <ImageMultiUpload
             variant="upload"
             icon={<FileUp aria-hidden="true" size={24} style={{ width: 24, height: 24 }} />}
             title="手元の画像を追加"
             hint={<>ドラッグ＆ドロップ<br />またはクリック<br />10MB 以内・PNG・JPEG・WebP</>}
-            accept="image/png,image/jpeg,image/webp"
             aria-label="参照画像のファイルを選ぶ"
             onFiles={(files) => { if (files[0]) onUpload(files[0]) }}
           />

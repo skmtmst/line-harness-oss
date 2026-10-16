@@ -56,3 +56,15 @@ describe('CSSの使い先による所有監査', () => {
     expect(findings('<ui.Button className={styles.state}>実行</ui.Button>')).not.toHaveLength(0)
   })
 })
+
+it('直接のsvg指定は兄弟の動的な本文と分け、共通部品のsvgは数える', () => {
+  expect(findings('<li className={styles.state}><Check /><span>{content}</span></li>', '.state > svg', "import { Check } from 'lucide-react'" )).toHaveLength(0)
+  expect(findings('<li className={styles.state}><Button /></li>', '.state > svg')).not.toHaveLength(0)
+  expect(findings('<li className={styles.state}>{content}</li>', '.state > svg')).not.toHaveLength(0)
+})
+it('文字列だけのmapとテンプレート本文は通し、未知のmapの本文は残す', () => {
+  expect(findings('<ul className={styles.state}>{words.map(text => <li><Check />{text}</li>)}</ul>', '.state svg', "import { Check } from 'lucide-react'; const words = ['ひとつ', 'ふたつ'] as const" )).toHaveLength(0)
+  expect(findings('<div className={styles.state}><Check />{`金額：${amount}`}</div>', '.state svg', "import { Check } from 'lucide-react'" )).toHaveLength(0)
+  expect(findings('<ul className={styles.state}>{words.map(text => <li><Check />{text}</li>)}</ul>', '.state svg', "import { Check } from 'lucide-react'" )).not.toHaveLength(0)
+  expect(findings('<div className={styles.state}><Button /></div>', '.state svg')).not.toHaveLength(0)
+})

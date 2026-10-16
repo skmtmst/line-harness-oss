@@ -154,46 +154,15 @@
 .colLast { width: var(--tpl-fr-col-last); }
 .colMenu { width: var(--tpl-fr-col-menu); }
 
-:global(:root) .table th.th,
-:global(:root) .table th.thFriend,
-:global(:root) .table th.thCheck,
-:global(:root) .table th.thMenu {
-  height: var(--tpl-fr-thead-h);
-  padding: 0 var(--tpl-fr-cell-gap) 0 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  line-height: var(--tpl-fr-delta-lh);
-}
-
-:global(:root) .table th.thCheck { padding-left: var(--tpl-fr-row-side); }
-:global(:root) .table th.thMenu { padding-right: var(--tpl-fr-row-side); }
-
 .thFriendInner { display: inline-flex; align-items: center; gap: var(--tpl-fr-cell-gap); }
 .thStar { color: var(--color-ink-faint); flex-shrink: 0; }
-
-:global(:root) .table td.td,
-:global(:root) .table td.tdCheck,
-:global(:root) .table td.tdStar,
-:global(:root) .table td.tdMenu {
-  padding: var(--tpl-fr-row-block) var(--tpl-fr-cell-gap) var(--tpl-fr-row-block) 0;
-  font-size: var(--text-caption);
-  line-height: var(--tpl-fr-delta-lh);
-  vertical-align: middle;
-}
-
-:global(:root) .table td.tdCheck { padding-left: var(--tpl-fr-row-side); }
-/* 閲覧のみは選ぶ列が無いので、先頭の注目・友だちの列が端の余白を持つ。 */
-:global(:root) .table th.thFriend:first-child,
-:global(:root) .table td.tdStar:first-child { padding-left: var(--tpl-fr-row-side); }
-:global(:root) .table td.tdMenu { padding-right: var(--tpl-fr-row-side); }
 
 /*
  * 大きな一覧は行を限定して描く。セルも content-visibility で省くと、
  * 行高やタグ幅を測るたびに画面外のセルを描き直すため、セルは省かない。
  * 枠の外の影・フォーカス輪郭まで描き、セルの端で切らない。
  */
-:global(:root) .table td:is(.tdCheck, .tdStar, .tdMenu, .fixedContent) {
+:global([data-table-presentation="friend-list"]) td:is([data-column-kind="check"], [data-column-kind="star"], [data-column-kind="menu"], .fixedContent) {
   contain: layout style paint;
   overflow-clip-margin: var(--tpl-fr-cell-inset);
 }

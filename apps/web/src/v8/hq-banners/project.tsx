@@ -13,7 +13,7 @@ import MediaSlot from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
 import { RowMenu } from '@/components/shared/row-actions'
 import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
-import StickyBar from '@/components/shared/sticky-bar'
+import StickyBar, { StickyBarRegion } from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
@@ -673,9 +673,8 @@ function ProjectInner() {
               </div>
             )}
             {/* 下の帯は左の本文の幅だけに置き、右の生成パネルに重ねない（司令塔 2026-10-15・iMnph）。 */}
-            <div className={styles.galleryFooter}>
+            <StickyBarRegion gap="var(--tpl-hb-gallery-gap)" feedback={blockedReason && input.presetKey && !running && (inputTouched || !validation) ? <p className={styles.warnText}>{blockedReason}</p> : null}>
             {/* 入力が足りないだけの理由は、開いたばかりでは出さない（触ってから）。接続・アーカイブ・上限はすぐ出す。 */}
-            {blockedReason && input.presetKey && !running && (inputTouched || !validation) ? <p className={styles.warnText}>{blockedReason}</p> : null}
 
             {/* G-6（sr0Po）：左は選んだ画像の配布、右は生成の操作。0枚なら左の帯は出さない。 */}
             {canManage ? (
@@ -715,7 +714,7 @@ function ProjectInner() {
                 }
               />
             ) : null}
-            </div>
+            </StickyBarRegion>
           </section>
 
           {canManage ? (

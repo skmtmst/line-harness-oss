@@ -1,3 +1,5 @@
+import PageHeading from '../components/ui/PageHeading.js';
+import FieldError from '../components/ui/FieldError.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -230,7 +232,7 @@ export default function MyPage() {
     <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="マイページ" />
       <div data-design-node="L5g75" className="mx-auto w-full max-w-md space-y-3 px-4 pt-3 pb-10">
-        <h1 className="truncate text-xl font-bold text-ink" title={name ?? undefined}>{name ? `${name} さん` : 'マイページ'}</h1>
+        <PageHeading title={name ?? undefined}>{name ? `${name} さん` : 'マイページ'}</PageHeading>
         {failed ? (
           <LoadErrorView note="予約はなくなっていません。" onRetry={() => setReloadKey((k) => k + 1)} />
         ) : !history ? (
@@ -285,7 +287,7 @@ export default function MyPage() {
                   ))}
                 </ul>
               )}
-              {prefError && <p role="alert" className="text-[13px] leading-5 text-danger">{prefError}</p>}
+              {prefError && <FieldError>{prefError}</FieldError>}
             </Card>
           </>
         )}

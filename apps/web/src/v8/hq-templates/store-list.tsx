@@ -400,7 +400,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   }
   /* 列の幅（col）と中身の箱（Td）は列ごとに書く（className を変数で渡すと見張りが読めない）。 */
   type Column = { key: string; head: string; col: ReactNode; cell: (row: HqTemplate) => ReactNode }
-  const plainTd = (key: string, text: ReactNode, title?: string) => <Td key={key} className={storeStyles.cellPlain} title={title}>{text}</Td>
+  const plainTd = (key: string, text: ReactNode, title?: string) => <Td key={key} presentation="template-plain" title={title}>{text}</Td>
   const boxedTd = (key: string, inner: ReactNode) => <Td key={key}>{inner}</Td>
   const columns: Column[] = type === 'template' ? [
     { key: 'kind', head: '種類', col: <col key="kind" className={storeStyles.colKind} />, cell: (row) => {
@@ -468,8 +468,8 @@ export default function HqStoreList(props: HqStoreListProps) {
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
             return (
               <Tr key={row.id} data-row-id={row.id} density="template" onOpen={() => (onOpen ?? onEdit)(row)}>
-                {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
-                {type === 'template' ? <Td className={storeStyles.cellPlain}><Checkbox aria-label={`「${row.name}」を選ぶ`} checked={selectedIds.includes(row.id)} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...current, row.id] : current.filter((id) => id !== row.id))} /></Td> : null}
+                {type === 'rich_menu' ? <Td presentation="template-plain">{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
+                {type === 'template' ? <Td presentation="template-plain"><Checkbox aria-label={`「${row.name}」を選ぶ`} checked={selectedIds.includes(row.id)} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...current, row.id] : current.filter((id) => id !== row.id))} /></Td> : null}
                 {type === 'tag' ? (
                   /* タグ（DzdC3）は名前をタグの札で出す。フォルダの色は札の中の丸（名前の前の丸を二重に置かない）。 */
                   <NameCell name={(

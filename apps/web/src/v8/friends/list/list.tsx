@@ -758,7 +758,7 @@ export default function FriendsListV8() {
   const colCount = (selectable ? 4 : 3) + displayColumns.length
   const table = (
     <div className={refreshing ? `${styles.tableWrap} ${styles.refreshing}` : styles.tableWrap} aria-busy={loadStatus === 'loading' || refreshing || undefined}>
-      <DataTable className={styles.table} data-design="V8FriendTable">
+      <DataTable presentation="friend-list" data-design="V8FriendTable">
         <colgroup>
           {selectable ? <col className={styles.colCheck} /> : null}
           <col className={styles.colStar} />
@@ -770,7 +770,7 @@ export default function FriendsListV8() {
         <thead>
           <TableHeadRow>
             {selectable ? (
-              <Th className={styles.thCheck}>
+              <Th columnKind="check">
                 <SaveErrorField names={["allSelected","selectedIds","all_selected","selected_ids"]}><Checkbox
                   checked={allSelected}
                   indeterminate={selectedCount > 0 && !allSelected}
@@ -779,13 +779,13 @@ export default function FriendsListV8() {
                 /></SaveErrorField>
               </Th>
             ) : null}
-            <Th colSpan={2} className={styles.thFriend}>
+            <Th colSpan={2} columnKind="name">
               <span className={styles.thFriendInner}><Star size={14} aria-label="注目" className={styles.thStar} />友だち</span>
             </Th>
             {displayColumns.map((column) => (
-              <Th key={column.key} className={styles.th}>{column.label}</Th>
+              <Th key={column.key}>{column.label}</Th>
             ))}
-            <Th className={styles.thMenu}><span className="sr-only">操作</span></Th>
+            <Th columnKind="menu"><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
         <TableBody
@@ -801,11 +801,11 @@ export default function FriendsListV8() {
             return (
               <Tr key={friend.id} interactive href={`/friends/detail?id=${friend.id}`} onOpen={() => router.push(`/friends/detail?id=${friend.id}`)} selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
                 {selectable ? (
-                  <Td className={styles.tdCheck}>
+                  <Td columnKind="check">
                     <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
                   </Td>
                 ) : null}
-                <Td className={styles.tdStar}>
+                <Td columnKind="star">
                   {rowCanEdit ? (
                     <button
                       type="button"
@@ -824,7 +824,7 @@ export default function FriendsListV8() {
                     </span>
                   )}
                 </Td>
-                <Td className={styles.td}>
+                <Td presentation="friend-list">
                   {/* 絵 nF4ts・x6QsVz：名前の前に顔の丸（写真が無ければ頭文字）。 */}
                   <div className={styles.friendCell}>
                     {narrow ? null : <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />}
@@ -833,7 +833,7 @@ export default function FriendsListV8() {
                 </Td>
                 {displayColumns.map(column => {
                   if (column.key === 'support') return (
-                  <Td key={column.key} className={styles.td}>
+                  <Td key={column.key} presentation="friend-list">
                     <div className={styles.supportCell}>
                       <span className={styles.statusRow}>
                         <StatusBadge tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']} title={friend.supportMark && friend.supportMark.name !== status.label ? `対応マーク：${friend.supportMark.name}` : undefined}>{status.label}</StatusBadge>
@@ -844,10 +844,10 @@ export default function FriendsListV8() {
                   </Td>
                   )
                   if (column.key === 'scenario') return (
-                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
+                  <Td key={column.key} presentation="friend-list" className={styles.fixedContent}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
                   )
                   if (column.key === 'latest') return (
-                  <Td key={column.key} className={styles.td}>
+                  <Td key={column.key} presentation="friend-list">
                     {latest ? (
                       <div className={styles.twoLine}>
                         <span className={styles.cellText} title={latest.content}>{messageWord(latest)}</span>
@@ -857,7 +857,7 @@ export default function FriendsListV8() {
                   </Td>
                   )
                   if (column.key === 'tags') return (
-                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}>
+                  <Td key={column.key} presentation="friend-list" className={styles.fixedContent}>
                     <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
                       <TagOverflow>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}</TagOverflow>
 
@@ -866,15 +866,15 @@ export default function FriendsListV8() {
                   </Td>
                   )
                   if (column.key === 'source') return (
-                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.firstTrackedLinkName || emptyValue('unknown')}>{friend.firstTrackedLinkName || emptyValue('unknown')}</span></Td>
+                  <Td key={column.key} presentation="friend-list" className={styles.fixedContent}><span className={styles.cellText} title={friend.firstTrackedLinkName || emptyValue('unknown')}>{friend.firstTrackedLinkName || emptyValue('unknown')}</span></Td>
                   )
                   if (column.key === 'last') return (
-                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
+                  <Td key={column.key} presentation="friend-list" className={styles.fixedContent}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
                   )
                   const value = friend.fieldValues?.[column.key]
                   return <Td key={column.key}><span className={styles.cellText} title={value ?? undefined}>{value ?? '未設定'}</span></Td>
                 })}
-                <Td className={styles.tdMenu}>
+                <Td columnKind="menu">
                   <div className={styles.menuBox}>
                     <FriendRowMenu
                       friendId={friend.id}

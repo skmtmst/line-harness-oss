@@ -175,7 +175,7 @@ export function MenuPaymentFields({ state, name, price, people, unit, readOnly =
   if (state.status === 'loading') return <p className={styles.minor}>お支払いの設定を読み込んでいます…</p>
   if (state.status === 'error') return <p className={styles.minor}>お支払いの設定を読み込めませんでした。いつもの方法（予約設定 › お支払い）で受けます。</p>
   if (!state.connected) {
-    return <p className={styles.sideCardLink}><CreditCard size={15} aria-hidden="true" />先払いを受けるには<TextLink href="/booking/menus?tab=payments">お支払いをつなぐ<ArrowRight size={14} aria-hidden="true" /></TextLink></p>
+    return <p className={styles.sideCardLink}><CreditCard size={15} aria-hidden="true" className={styles.connectionIcon} />先払いを受けるには<TextLink iconTone="link" href="/booking/menus?tab=payments">お支払いをつなぐ<ArrowRight size={14} aria-hidden="true" /></TextLink></p>
   }
   const own = state.value !== null
   const effective = state.value ?? state.defaultMode

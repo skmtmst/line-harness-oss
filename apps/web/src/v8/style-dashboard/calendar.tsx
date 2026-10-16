@@ -1,6 +1,8 @@
 'use client'
 import { ChevronLeft, ChevronRight, Info, Plus } from 'lucide-react'
 import type { CSSProperties } from 'react'
+import { CalendarPerson } from '@/components/shared/calendar-parts'
+import MonthCalendarGrid from '@/components/shared/month-calendar'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import StatusBadge from '@/components/shared/status-badge'
@@ -83,19 +85,7 @@ export function MonthCalendar({ month, onMove, onDay }: { month: StyleMonth; onM
         <span className={styles.grow} />
         <span className={styles.calLegend}><i data-k="few" />満席に近い<i data-k="full" />満席<i data-k="off" />休み</span>
       </div>
-      <div className={styles.monthFrame} role="grid" aria-label={month.title}>
-        <div className={styles.monthWeekdays} role="row">
-          {['月', '火', '水', '木', '金', '土', '日'].map((w, i) => <span key={w} role="columnheader" data-day={i === 5 ? 'sat' : i === 6 ? 'sun' : undefined}>{w}</span>)}
-        </div>
-        <div className={styles.monthCells}>
-          {month.days.map((d) => (
-            <button key={d.date} type="button" role="gridcell" className={styles.monthCell} data-out={!d.inMonth || undefined} data-closed={d.closed || undefined} data-today={d.today || undefined} onClick={() => onDay(d.date)}>
-              <span className={styles.monthTop}><strong>{d.day}</strong><span className={styles.grow} />{d.mark ? <StatusBadge tone={d.mark.tone} dot={false} size="micro">{d.mark.label}</StatusBadge> : null}</span>
-              {d.closed ? <span className={styles.monthNote}>定休日</span> : d.empty ? <span className={styles.monthNote}>予約なし</span> : d.groups !== undefined ? <><strong className={styles.monthGroups}>{d.groups}組</strong><span className={styles.monthNote}>{d.people}人</span></> : null}
-            </button>
-          ))}
-        </div>
-      </div>
+      <MonthCalendarGrid title={month.title} days={month.days} onDay={onDay} />
     </section>
   )
 }
@@ -109,7 +99,7 @@ export function DayList({ month, href }: { month: StyleMonth; href: string }) {
         {s.rows.map((r) => (
           <div key={`${r.time}-${r.name}`} className={styles.dayRow}>
             <strong className={styles.dayTime}>{r.time}</strong>
-            <span className={styles.dayName}><a href={href}>{r.name}</a><span className={styles.cellSub}>{r.sub}</span></span>
+            <CalendarPerson href={href} name={r.name} secondary={<span className={styles.cellSub}>{r.sub}</span>} />
             <span className={styles.grow} />
             <StatusBadge tone={r.state.tone}>{r.state.label}</StatusBadge>
           </div>

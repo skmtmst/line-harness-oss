@@ -95,18 +95,9 @@
 .entry[data-state='pending'] .entryState { color: var(--polish-status-warning-ink); }
 .entryTime { color: var(--color-ink-faint); font-size: var(--text-micro); }
 .star { color: var(--color-star-on); flex: 0 0 auto; }
-.freeSlot { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: var(--polish-space-row); block-size: 100%; inline-size: 100%; border: 1px dashed var(--color-accent-border); border-radius: var(--radius-control); background: var(--tpl-sd-free); color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 600; cursor: pointer; white-space: nowrap; }
-.freeSlot:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); }
 .nowLine { position: absolute; inset-inline: 0; border-block-start: 1px solid var(--tpl-sd-now); }
 .nowLine span { position: absolute; inset-inline-start: 0; transform: translateY(-50%); padding-inline: var(--polish-space-row); border-radius: var(--radius-pill); background: var(--tpl-sd-now); color: var(--color-on-accent); font-size: var(--text-micro); font-weight: 700; }
 .boardLegend { display: flex; align-items: center; gap: var(--polish-space-field); padding: var(--polish-space-field) var(--polish-space-card); color: var(--color-ink-secondary); font-size: var(--text-label); white-space: nowrap; }
-.legendItem { display: inline-flex; align-items: center; gap: var(--polish-space-row); }
-.legendItem::before { content: ''; inline-size: var(--tpl-sd-accent-w); block-size: var(--polish-icon-control); border-radius: var(--radius-mini); background: var(--color-info); }
-.legendItem[data-state='active']::before { background: var(--color-success); }
-.legendItem[data-state='done']::before, .legendItem[data-state='off']::before { background: var(--color-ink-disabled); }
-.legendItem[data-state='pending']::before { background: var(--color-warning); }
-.legendItem[data-state='star']::before { display: none; }
-.legendItem[data-state='star'] svg { color: var(--color-star-on); }
 
 /* カレンダー */
 .calendar { display: flex; flex-direction: column; gap: var(--polish-space-field); min-inline-size: 0; }
@@ -121,7 +112,7 @@
 .calLegend i[data-k='full'] { background: var(--polish-status-danger-bg); }
 .calLegend i[data-k='now'] { background: var(--color-success); }
 .calLegend i[data-k='prev'] { background: var(--color-ink-disabled); }
-.weekFrame, .monthFrame { border: 1px solid var(--card-edge); box-shadow: var(--card-shadow); border-radius: var(--radius-card); overflow: hidden; }
+.weekFrame { border: 1px solid var(--card-edge); box-shadow: var(--card-shadow); border-radius: var(--radius-card); overflow: hidden; }
 .weekHead { border-block-end: 1px solid var(--color-hairline); background: var(--polish-table-head-bg); }
 .weekDay { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; justify-content: center; min-inline-size: 0; color: var(--color-ink-secondary); font-size: var(--text-micro); }
 .weekDay strong { color: var(--color-ink); font-size: var(--text-body); }
@@ -133,27 +124,11 @@
 .weekFree { flex-direction: row; align-items: flex-start; gap: var(--polish-space-row); background: var(--tpl-sd-free); color: var(--color-accent-deep); font-weight: 600; }
 .weekEntry, .weekFree { inline-size: auto; }
 .weekEntry:focus-visible, .weekFree:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); }
-.monthWeekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); min-block-size: var(--polish-table-head); align-items: center; background: var(--polish-table-head-bg); color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600; text-align: center; }
-.monthWeekdays [data-day='sat'] { color: var(--color-info); }
-.monthWeekdays [data-day='sun'] { color: var(--color-danger); }
-.monthCells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.monthCell { all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--polish-space-row); min-block-size: var(--tpl-sd-month-cell); padding: var(--polish-space-row) var(--polish-space-field); border-block-start: 1px solid var(--color-hairline); border-inline-start: 1px solid var(--color-hairline); cursor: pointer; min-inline-size: 0; }
-.monthCell:nth-child(7n + 1) { border-inline-start: 0; }
-.monthCell[data-closed] { background: var(--color-canvas-sunken); }
-.monthCell[data-today] { outline: var(--tpl-sd-ring) solid var(--color-accent-deep); outline-offset: -2px; background: var(--color-accent-soft); }
-.monthCell[data-today] strong { color: var(--color-accent-deep); }
-.monthCell[data-out] { color: var(--color-ink-faint); }
-.monthCell:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); }
-.monthTop { display: flex; align-items: center; gap: var(--polish-space-row); font-size: var(--text-body); min-inline-size: 0; }
-.monthGroups { color: var(--color-ink); font-size: var(--text-body); }
-.monthNote { color: var(--color-ink-secondary); font-size: var(--text-micro); white-space: nowrap; }
 .dayList { display: flex; flex-direction: column; gap: var(--polish-space-field); }
 .dayListHead { display: flex; align-items: center; gap: var(--polish-space-row); }
 .dayListCard { display: flex; flex-direction: column; padding: var(--polish-space-row) var(--polish-space-card); border-radius: var(--radius-card); background: var(--color-canvas); box-shadow: var(--card-shadow), var(--card-edge); }
 .dayRow { display: flex; align-items: center; gap: var(--polish-space-field); min-block-size: var(--tpl-sd-row-h); min-inline-size: 0; }
 .dayTime { color: var(--color-ink); font-size: var(--text-body); }
-.dayName { display: flex; flex-direction: column; min-inline-size: 0; }
-.dayName a { color: var(--color-accent-deep); font-size: var(--text-body); font-weight: 600; text-decoration: none; white-space: nowrap; }
 .dayHint { display: flex; gap: var(--polish-space-row); margin: var(--tpl-sd-text-margin); color: var(--color-ink-secondary); font-size: var(--text-label); }
 
 /* 教室の名簿 */

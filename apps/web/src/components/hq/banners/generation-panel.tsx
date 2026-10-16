@@ -2,7 +2,7 @@
 
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
-import FileDropzone from '@/components/shared/file-drop'
+import ImageMultiUpload from '@/components/shared/image-multi-upload'
 import HelpTip from '@/components/shared/help-tip'
 import Radio from '@/components/shared/radio'
 import RadioCard,{ RadioCardGroup } from '@/components/shared/radio-card'
@@ -199,13 +199,12 @@ export default function GenerationPanel({
               <>
                 {v8Layout ? (
                   /* 絵 iMnph：参照画像は落とす欄（題・ドラッグ＆ドロップ・制限）と、その中の「ライブラリから選ぶ」。 */
-                  <FileDropzone
+                  <ImageMultiUpload
                     variant="upload"
                     /* 押せる欄の中の印は共通で16に縮むので、絵の24を直に指定する。 */
                     icon={<FileUp aria-hidden="true" size={24} style={{ width: 24, height: 24 }} className="text-ink-secondary" />}
                     title="参照画像を追加"
                     hint={<>ドラッグ＆ドロップ<br />またはクリックしてファイルをアップロード<br />（1ファイル10メガバイト以内・PNG・JPEG・WebP）</>}
-                    accept="image/png,image/jpeg,image/webp"
                     disabled={disabled}
                     busy={referenceBusy}
                     aria-label="参照画像のファイルを選ぶ"

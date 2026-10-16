@@ -313,7 +313,7 @@
   font-size: var(--tpl-bm-12);
 }
 
-.sideCardLink svg {
+.connectionIcon {
   flex: none;
   color: var(--color-link);
 }

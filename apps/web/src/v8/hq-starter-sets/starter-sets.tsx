@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Info, Pencil, Plus, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
-import FolderPanel from '@/components/shared/folder-panel'
+import CategoryPanel from '@/components/shared/category-panel'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -154,7 +154,7 @@ export default function HqStarterSetsV8() {
         <Button onClick={() => preparing.open('標準に戻す')}>標準に戻す</Button>
         <Button variant="primary" onClick={() => preparing.open('初期セットを作る')}><Plus aria-hidden="true" className={styles.buttonIcon} />初期セットを作る</Button>
       </> : null}
-      folders={<FolderPanel heading="スタイル" showHeading rows={rows} activeId={active} onSelect={(id) => setActive(id as AccountStyle)} />}
+      folders={<CategoryPanel heading="スタイル" showHeading rows={rows} activeId={active} onSelect={(id) => setActive(id as AccountStyle)} />}
       folderNav={{ label: 'スタイル', rows, activeId: active, onSelect: (id) => setActive(id as AccountStyle) }}
     >
       <div className={styles.body}>

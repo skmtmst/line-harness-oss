@@ -1,4 +1,5 @@
 'use client'
+import { CalendarSlotButton, CalendarLegendItem } from '@/components/shared/calendar-parts'
 import { CalendarX2, CircleHelp, Plus, Star } from 'lucide-react'
 import { useRef, useState, type CSSProperties } from 'react'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -85,7 +86,7 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
           if (i < 0) return null
           return (
             <div key={`${f.columnId}-${f.start}`} className={styles.entryWrap} style={{ ...col(i, count), ...at(f.start, board.from), blockSize: 'var(--tpl-sd-free-h)' }}>
-              <button type="button" className={styles.freeSlot} onClick={() => onSlot(f.columnId, f.start)}><Plus size={14} aria-hidden="true" />入れる<span>{f.start}〜</span></button>
+              <CalendarSlotButton onClick={() => onSlot(f.columnId, f.start)}><Plus size={14} aria-hidden="true" />入れる<span>{f.start}〜</span></CalendarSlotButton>
             </div>
           )
         }) : null}
@@ -93,8 +94,8 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
       </div>
       {opened ? <ActionMenu open items={entryItems(opened)} anchorRef={anchor} ariaLabel={`${opened.name}の操作`} onClose={() => setOpenId(null)} /> : null}
       <div className={styles.boardLegend}>
-        {[['booked', '予約中'], ['active', '施術中'], ['done', '来店済み'], ['pending', '承認待ち'], ['off', '休み']].map(([k, l]) => <span key={k} className={styles.legendItem} data-state={k}>{l}</span>)}
-        <span className={styles.legendItem} data-state="star"><Star size={12} aria-hidden="true" />指名</span>
+        {[['booked', '予約中'], ['active', '施術中'], ['done', '来店済み'], ['pending', '承認待ち'], ['off', '休み']].map(([k, l]) => <CalendarLegendItem key={k} state={k}>{l}</CalendarLegendItem>)}
+        <CalendarLegendItem state="star"><Star size={12} aria-hidden="true" />指名</CalendarLegendItem>
         <span className={styles.grow} />
         {canWrite ? <span className={styles.cellMuted}>空いている所を押すと予約を入れられます</span> : null}
       </div>

@@ -127,6 +127,12 @@ export function sourceEvidence(file, source, offset, length = 1) {
     dialogIdentity,
     jsxStart: jsx?.getStart(entry.tree),
     descendantTags,
+    readOnlyText: Boolean(jsx && !attribute && ['p', 'span', 'HelpTip', 'GridCell'].includes(opening?.tagName.getText(entry.tree))
+      && descendantTags.every(tag => ['span', 'strong', 'em', 'br', 'Info'].includes(tag))
+      && (['p', 'span'].includes(opening.tagName.getText(entry.tree))
+        || entry.imports[opening.tagName.getText(entry.tree)]?.path === '@/components/shared/help-tip'
+        || entry.imports[opening.tagName.getText(entry.tree)]?.path === '@/components/shared/grid-table')),
+
     returnsJsx,
     declarationReturnsJsx,
     returnTags,
