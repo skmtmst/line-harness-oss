@@ -61,6 +61,94 @@ Sandbox のテスト店舗は自分で作れず、Integration Tech Support へ�
 テスト用アプリの作成と権限付与は自分でできます。
 出典：https://developer.uber.com/docs/eats/guides/sandbox
 
+## 4-2. 弊社の本番 Uber アカウント（店舗）をテストに使えるか（2026-10-16 判定）
+
+利用者からの問い：**「本番アカウントに繋げられるのか。店舗IDがあれば問題ないのか」**
+
+**答え：店舗IDだけでは繋がりません。足りないのは店舗側の情報ではなく、弊社アプリ側の資格です。**
+壁は2つあり、どちらも店舗IDでは越えられません。
+
+### 壁1：弊社アプリがまだ本番側の登録簿にいない
+
+| 根拠 | 出典 |
+| --- | --- |
+| 弊社アプリ `musubo POS Integration` は開発者画面の表示が **TEST APP**。`Create Prod App` は押せない | §5-2 |
+| 本番の権限（`eats.pos_provisioning`）は「Uber の個別審査が先」 | §5-2・§3 |
+| 開発者画面の **Integration Verification Result が未完了** | §7 |
+| 実機で本番側 `auth.uber.com` へ繋いだ結果は `invalid_client`（＝本番の登録簿から弊社の `client_id` を引けない） | §7-2 |
+
+**つまり本番の店舗IDを持っていても、いまのアプリでは認可画面すら出ません。**
+これは設定の不足ではなく、審査前という状態そのものによる仕様どおりの結果です（§5-2 の訂正）。
+
+### 壁2：Sandbox と本番は別の世界で、店舗IDは行き来しない
+
+接続先が認証・API ともホスト単位で分かれており（§5-2）、
+**本番に登録された店舗は Sandbox の `test-api.uber.com` 側には存在しません。**
+Sandbox で `GET /v1/eats/stores` に出るのは Uber が払い出すテスト店舗だけです（§4）。
+本番の店舗IDを Sandbox 設定（`RT_DELIVERY_UBEREATS_ENVIRONMENT=sandbox`）のまま渡しても、
+相手側に該当する店舗が無いため照合できません。
+
+### 仮に本番側へ向けた場合に起きること（だから今はやりません）
+
+- 本番で繋ぐには §3 の手続きが順に必要です。Integration Verification（Uber 立ち会いの通し試験）
+  → 本番アプリ作成 → Scope Whitelisting → パイロット店舗で最低3日・注文投入成功率 98% 以上。
+- `POST /pos_data` で有効化した本番店舗には、**実際のお客様の注文が musubo へ流れ始めます**（§5）。
+  試験のために本番店舗を繋ぐのは、実注文を試験に巻き込むことになります。
+- したがって `RT_DELIVERY_UBEREATS_ENVIRONMENT` を本番へ切り替える作業は、
+  審査が通るまで行いません。
+
+### 本番アカウントが要るのはこの後の工程
+
+無駄にはなりません。**Integration Verification の通し試験とパイロット店舗の3日稼働**で、
+弊社の本番 Uber アカウントと実店舗が必要になります。
+いまの段階で使う先が無いだけで、順番が後ろにあるという関係です。
+
+### 結論と待ち物
+
+テスト接続の待ち物は **Sandbox のテスト店舗の払い出し（Uber からの返信）1つ**で、
+本番アカウントで代替することはできません（§8 項目6）。利用者の操作は不要です。
+
+## 4-3. Uber の連絡先（2026-10-16 調査・出典の有無で分けた）
+
+利用者からの問い：**「問い合わせ先がフォームしかない。開発のメール窓口はないか」**
+
+**Uber は開発者向けのメールアドレスを公開していません。** 公式ページが示す人への経路は
+**フォーム**と**パートナー担当者**の2つだけです。
+
+### Uber 自身のページで確認できたもの
+
+| 窓口 | 値 | 出典 |
+| --- | --- | --- |
+| Integration Tech Support フォーム | `http://t.uber.com/integration-support` | https://developer.uber.com/docs/eats/guides/getting-started（「Technical questions and issues」） |
+| Uber Eats パートナー担当者 | 個別（弊社の担当者） | 同上。`Partner Approval` の前提として「Speak with your Uber Eats partner manager」 |
+| Uber Eats Japan 代表メール | `uber.japan@uber.com` | 特定商取引法に基づく表示（help.uber.com）。会員・一般窓口で開発用ではない |
+| Uber Eats Japan 代表電話 | `03-4588-5452`（10:00–19:00） | 同上。総務／Eats JP 共通と記載 |
+
+developer.uber.com の該当ページには**メールアドレス・電話番号・Slack 等は一切載っていません**。
+加盟店向けの POS 連携のヘルプ記事（help.uber.com）も、連絡手段はフォームだけでした。
+
+### 検索では出るが Uber の公式ページで裏が取れなかったもの（使用前に要確認）
+
+`eats-partner-tech-support@uber.com` ／ `r.jp@uber.com` ／ `restaurants@uber.com`。
+いずれも第三者サイトや検索結果の要約にのみ現れ、Uber 自身のページでは確認できませんでした。
+**実在・現役である保証がないため、重要な依頼の唯一の宛先にはしません。**
+
+### フォームより確実な経路（弊社の状況に固有）
+
+§3 の事前手続きには「**Uber Eats のパートナー担当者の承認**」が含まれ、これは
+フォームではなく**担当者を通す工程**です。弊社はすでに本番の Uber Eats 加盟店アカウントを
+持っているため（§4-2）、**その加盟店に付いているアカウント担当者が、そのまま開発側の
+取次ぎ役になり得ます。**
+
+依頼する内容は次の2点で、フォームへ送った内容（§7-2 の控え）と同じです。
+
+1. Sandbox のテスト店舗の払い出し
+2. Integration Verification と本番アプリの権限開放（Scope Whitelisting）の進め方
+
+担当者が分からない場合の確認先は、Uber Eats Manager（加盟店管理画面）のヘルプ、
+または上記の代表窓口です。**フォームの返信を待ちながら並行して当たれます**（二重依頼には
+ならない。フォームは技術窓口、担当者は営業・契約窓口）。
+
 ## 5. 公式仕様の要点（実装の根拠）
 
 出典：https://developer.uber.com/docs/eats/guides/authentication ／
