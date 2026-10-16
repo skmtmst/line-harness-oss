@@ -18,6 +18,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
+import type { MediaItem } from '@line-crm/shared'
 import ListState from '@/components/shared/list-state'
 import { RowMenu } from '@/components/shared/row-actions'
 import styles from './senders-card.module.css'
@@ -36,6 +38,9 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [stopping, setStopping] = useState<LineSender | null>(null)
+  /* アイコン（任意）：登録メディアの共通の選ぶ窓から。正方形の PNG/JPEG・1MB 以内はサーバーが確かめる。 */
+  const [icon, setIcon] = useState<MediaItem | null>(null)
+  const [iconPickerOpen, setIconPickerOpen] = useState(false)
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
 
   const load = useCallback(async () => {
@@ -55,9 +60,10 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
     setBusy(true)
     setError('')
     try {
-      await lineSenderApi.create(accountId, { name: trimmed, visibility: canManage ? visibility : 'owner_only' }, idempotencyKey)
+      await lineSenderApi.create(accountId, { name: trimmed, visibility: canManage ? visibility : 'owner_only', ...(icon ? { iconMediaId: icon.id } : {}) }, idempotencyKey)
       setAdding(false)
       setName('')
+      setIcon(null)
       setIdempotencyKey(crypto.randomUUID())
       await load()
     } catch (caught) {
@@ -126,6 +132,16 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
         <Field label="名前" htmlFor="sender-name" note={`${name.trim().length} / ${NAME_MAX} 文字`}>
           <TextField id="sender-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={NAME_MAX + 10} placeholder="例：店長 Kenta" />
         </Field>
+        <Field label="アイコン（任意）" note="登録メディアから選び、正方形の画像にします">
+          <span className={styles.iconPick}>
+            {icon?.url
+              // eslint-disable-next-line @next/next/no-img-element -- 登録メディアの画像
+              ? <img src={icon.url} alt="" className={styles.icon} />
+              : <span className={styles.icon} aria-hidden="true">{name.trim().slice(0, 1) || '＋'}</span>}
+            <Button size="compact" onClick={() => setIconPickerOpen(true)}>{icon ? '画像を変える' : '画像を選ぶ'}</Button>
+            {icon ? <Button size="compact" variant="text" onClick={() => setIcon(null)}>外す</Button> : null}
+          </span>
+        </Field>
         {canManage ? (
           <Field label="使える人">
             <Select aria-label="使える人" size="full" value={visibility} onChange={(value) => setVisibility(value as 'all' | 'owner_only')}
@@ -133,6 +149,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
           </Field>
         ) : null}
       </ConfirmDialog>
+      <MediaPickerDialog open={iconPickerOpen} accountId={accountId} kind="image" title="アイコンを選ぶ" onClose={() => setIconPickerOpen(false)} onSelect={(item) => { setIcon(item); setIconPickerOpen(false) }} />
       <ConfirmDialog
         open={stopping !== null}
         title={`「${stopping?.name ?? ''}」を使わなくしますか？`}

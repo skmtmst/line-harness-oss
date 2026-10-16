@@ -43,6 +43,7 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { startVisiblePoll } from '@/lib/visible-polling'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { runOptimistic } from '@/lib/undoable'
+import SenderSelect from '@/components/shared/sender-select'
 import { useStaffRole } from '@/lib/staff-role'
 import { useAccount } from '@/contexts/account-context'
 import TemplatePicker from '@/components/chats/template-picker'
@@ -762,6 +763,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   /* 訂正：送ったあとは取り消せない。間違えた吹き出しの［訂正を送る］から、見本の文と引用を入れて人が送る。 */
   const [correctingId, setCorrectingId] = useState<string | null>(null)
   const staffRole = useStaffRole()
+  /* 送り手（G8）：選ぶと、お客さまの LINE でメッセージの上に出る名前と顔が変わる。空は店の名前。 */
+  const [senderId, setSenderId] = useState('')
   // N-025: 送信予約。JSTの datetime-local 値をそのまま口へ渡し、
   // 保存はサーバー側でUTCへ正規化される。
   const [scheduledSends, setScheduledSends] = useState<ScheduledChatSend[]>([])
@@ -2097,7 +2100,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         const content = messageContent.trim()
         const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content, quotedMessageId: quotedMessage?.id ?? null })
         const sendResult = await api.chats.send(sendingChatId,
-          { content, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(correctingId ? { correctionOfMessageId: correctingId } : {}) } as Parameters<typeof api.chats.send>[1],
+          { content, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(correctingId ? { correctionOfMessageId: correctingId } : {}), ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -3876,6 +3879,7 @@ aria-invalid={messageOverLimit} />
                   )}
                   <InboxComposerActions
 >
+                    {staffRole !== 'viewer' ? <SenderSelect accountId={selectedAccountId} value={senderId} onChange={setSenderId} disabled={sending} /> : null}
                     <InboxToolButton
 size={'compact'}
 data-inbox-v6="schedule-toggle"
