@@ -266,8 +266,8 @@ export default function Dialog({
   const panel = (
     <div
       ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
-      onChangeCapture={formInput.onChangeCapture}
-      onInputCapture={formInput.onChangeCapture}
+      onChange={formInput.onInputChange}
+      onInput={formInput.onInputChange}
       onClickCapture={(event) => { formInput.onClickCapture(event); captureOverlayClose(event, isDirty || busy, discard.requestClose) }}
       className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmationSizeClass}`}
       role={suppliedRole ?? (tone === 'destructive' ? 'alertdialog' : 'dialog')}

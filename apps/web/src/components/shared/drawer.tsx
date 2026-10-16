@@ -111,8 +111,8 @@ export default function Drawer({
   const panel = (
     <aside
       ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
-      onChangeCapture={formInput.onChangeCapture}
-      onInputCapture={formInput.onChangeCapture}
+      onChange={formInput.onInputChange}
+      onInput={formInput.onInputChange}
       onClickCapture={(event) => { formInput.onClickCapture(event); captureOverlayClose(event, isDirty || busy, discard.requestClose) }}
       className={`${styles.panel} ${modal ? '' : styles.inline}`}
       role="dialog"
