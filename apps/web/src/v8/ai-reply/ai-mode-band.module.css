@@ -108,3 +108,13 @@
 :root .band {
   border-radius: var(--radius-control);
 }
+
+/* 使っていない時の帯は白い地に灰色の枠（板 UbRQ4）。使っている時の青い地と色で分かれる。 */
+:root .band.bandOff {
+  border: 1px solid var(--color-control-border);
+  background: var(--color-canvas);
+}
+
+:root .bandOff svg {
+  color: var(--color-ink-faint);
+}

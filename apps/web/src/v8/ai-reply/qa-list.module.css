@@ -3,7 +3,7 @@
  * 枠・見出し・タブ・道具・表は型（ListPage）と共通部品。ここは帯を縦に並べる間と窓の中身だけ。
  */
 .bands {
-  padding-inline: var(--space-16);
+  padding-inline: var(--space-24);
   display: flex;
   flex-direction: column;
   gap: var(--space-12);

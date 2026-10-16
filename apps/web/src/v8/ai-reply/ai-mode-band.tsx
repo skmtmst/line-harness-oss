@@ -102,7 +102,7 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
         help={mode === 'off' ? 'AI は会話の要約と返信案を作ります。送るのはいつも担当者です。お客さまの電話番号・住所などは伏せてから渡します。' : '自動で答えるのは、店が公開した Q&A の答えの文そのままです。お金・予約の変更・苦情・個人情報の質問や、当たっている見込みが低いものは人へ回します。'}
         helpLabel="AI の使い方の説明"
         action={choiceRow ?? action ?? undefined}
-        className={styles.band}
+        className={mode === 'off' ? `${styles.band} ${styles.bandOff}` : styles.band}
         data-design-node={mode === 'off' ? 'UbRQ4' : 'y4nixm'}
       >
         {MODE_NOTE[mode]}

@@ -6,9 +6,9 @@
 .draft {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-4);
   margin: var(--space-8) var(--space-16) 0;
-  padding: var(--space-12) var(--space-16);
+  padding: var(--space-8) var(--space-16);
   border-radius: var(--radius-card);
   font-size: var(--text-caption);
   color: var(--color-ink);

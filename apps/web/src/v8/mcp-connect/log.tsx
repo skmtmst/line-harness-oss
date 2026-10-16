@@ -107,7 +107,7 @@ export default function McpLogV8() {
       heightMode="content"
       title="AI の操作の記録"
       help="AI との接続が読んだ・下書きを作った・送る依頼を出した・断ったことを、全部ここに残します。送る依頼は、人が承認するまで送りません。"
-      crumbs={connection ? <span className={styles.lead}>{`${connection.name} ・ ${LEVEL_LABEL[connection.level]}`}</span> : undefined}
+      subtitle={connection ? `${connection.name} ・ ${LEVEL_LABEL[connection.level]}` : undefined}
       actions={connection && connection.status === 'active' && permissions.stop
         ? <Button variant="danger" onClick={() => { setError(''); setStopOpen(true) }}>この接続を止める</Button>
         : undefined}
@@ -152,8 +152,10 @@ export default function McpLogV8() {
             {load.items.map((log) => {
               const state = callLabel(log.kind, log.result)
               const broadcast = log.targetType === 'broadcast' && log.targetId && log.result === 'ok'
+              /* 承認へ進む：送る依頼の行は詳細へ。下書きの行は、承認待ちかを口が返すまで押せない形で残す（B-314）。 */
               const items = broadcast ? [
                 ...(log.kind === 'send_request' && !permissions.viewer ? [{ id: 'approve', label: '承認へ進む', href: `/broadcasts/detail?id=${encodeURIComponent(log.targetId!)}`, onSelect: () => setMenuId(null) }] : []),
+                ...(log.kind === 'draft' && !permissions.viewer ? [{ id: 'approve', label: '承認へ進む', disabled: true, disabledReason: '現在準備中です' }] : []),
                 { id: 'draft', label: '下書きを開く', href: `/broadcasts/detail?id=${encodeURIComponent(log.targetId!)}`, onSelect: () => setMenuId(null) },
               ] : []
               return (
