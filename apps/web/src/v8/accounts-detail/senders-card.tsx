@@ -7,7 +7,7 @@
  * 閲覧のみには追加・使わないを出さない。スタッフは自分用だけ、オーナー・管理者は全員用も作れる。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { ImagePlus, Plus } from 'lucide-react'
 import type { LineSender } from '@line-crm/shared'
 import { lineSenderApi } from '@/lib/api-gap1'
 import { ApiError } from '@/lib/api'
@@ -34,7 +34,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
   const [failed, setFailed] = useState(false)
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
-  const [visibility, setVisibility] = useState<'all' | 'owner_only'>('owner_only')
+  const [visibility, setVisibility] = useState<'all' | 'owner_only'>('all')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [stopping, setStopping] = useState<LineSender | null>(null)
@@ -121,32 +121,38 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
       <ConfirmDialog
         open={adding}
         title="送り手を追加"
+        titleIcon={false}
         description="お客さまの LINE で、メッセージの上に出る名前と顔です"
-        confirmLabel="追加する"
+        confirmLabel="追加"
         busy={busy}
         error={error || undefined}
         confirmDisabled={!name.trim() || name.trim().length > NAME_MAX}
         onConfirm={() => create()}
         onCancel={() => { if (!busy) setAdding(false) }}
       >
-        <Field label="名前" htmlFor="sender-name" note={`${name.trim().length} / ${NAME_MAX} 文字`}>
-          <TextField id="sender-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={NAME_MAX + 10} placeholder="例：店長 Kenta" />
-        </Field>
-        <Field label="アイコン（任意）" note="登録メディアから選び、正方形の画像にします">
-          <span className={styles.iconPick}>
+        <div className={styles.iconRow}>
+          <button type="button" className={styles.iconTile} onClick={() => setIconPickerOpen(true)} aria-label={icon ? '画像を変える' : '画像を選ぶ'}>
             {icon?.url
               // eslint-disable-next-line @next/next/no-img-element -- 登録メディアの画像
-              ? <img src={icon.url} alt="" className={styles.icon} />
-              : <span className={styles.icon} aria-hidden="true">{name.trim().slice(0, 1) || '＋'}</span>}
-            <Button size="compact" onClick={() => setIconPickerOpen(true)}>{icon ? '画像を変える' : '画像を選ぶ'}</Button>
+              ? <img src={icon.url} alt="" className={styles.iconTileImage} />
+              : <><ImagePlus size={22} aria-hidden="true" /><span>画像を選ぶ</span></>}
+          </button>
+          <div className={styles.iconText}>
+            <strong>アイコン（任意）</strong>
+            <span>登録メディアから選び、正方形に切ります。1MB まで（PNG・JPEG）。無いときはアカウントのアイコン</span>
             {icon ? <Button size="compact" variant="text" onClick={() => setIcon(null)}>外す</Button> : null}
-          </span>
-        </Field>
+          </div>
+        </div>
+        <div className={styles.nameWrap}><Field label="名前" required htmlFor="sender-name">
+          <TextField id="sender-name" value={name} onChange={(e) => setName(e.target.value)}  placeholder="例：渋谷店 予約係" />
+        </Field></div>
+        <div className={styles.nameNote}>
+          <span>「LINE」「ライン」は名前に使えません</span>
+          <span className={name.trim().length > NAME_MAX ? styles.over : undefined}>{name.trim().length} / {NAME_MAX}</span>
+        </div>
         {canManage ? (
-          <Field label="使える人">
-            <Select aria-label="使える人" size="full" value={visibility} onChange={(value) => setVisibility(value as 'all' | 'owner_only')}
-              options={[{ value: 'all', label: '全員' }, { value: 'owner_only', label: '自分だけ' }]} />
-          </Field>
+          <Select aria-label="使える人" size="full" value={visibility} onChange={(value) => setVisibility(value as 'all' | 'owner_only')}
+            options={[{ value: 'all', label: '使える人：全員' }, { value: 'owner_only', label: '使える人：自分だけ' }]} />
         ) : null}
       </ConfirmDialog>
       <MediaPickerDialog open={iconPickerOpen} accountId={accountId} kind="image" title="アイコンを選ぶ" onClose={() => setIconPickerOpen(false)} onSelect={(item) => { setIcon(item); setIconPickerOpen(false) }} />

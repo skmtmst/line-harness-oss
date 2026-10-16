@@ -110,7 +110,7 @@ export function ApprovalRequestFields({
             <label htmlFor="approval-approver" className="text-ink text-xs font-semibold">
               承認をお願いする人
             </label>
-            <HelpTip label="承認をお願いする人の説明">送る人とは別の人。</HelpTip>
+            {bare ? null : <HelpTip label="承認をお願いする人の説明">送る人とは別の人。</HelpTip>}
           </div>
           {candidatesState === 'loading' ? (
             <p className="text-ink-faint text-xs">読み込んでいます…</p>
@@ -140,14 +140,20 @@ export function ApprovalRequestFields({
           <label htmlFor="approval-note" className="text-ink mb-1 block text-xs font-semibold">
             ひとこと（任意）
           </label>
-          <SaveErrorField names={["note"]}><TextArea
+          <SaveErrorField names={["note"]}>{bare ? <TextField
             id="approval-note"
-            rows={bare ? 2 : 3}
             maxLength={500}
             value={note}
             onChange={(event) => onNoteChange(event.target.value)}
             placeholder="秋の案内です。10時までに見てください"
-          /></SaveErrorField>
+          /> : <TextArea
+            id="approval-note"
+            rows={3}
+            maxLength={500}
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+            placeholder="秋の案内です。10時までに見てください"
+          />}</SaveErrorField>
         </div>
       </div>
     </div>

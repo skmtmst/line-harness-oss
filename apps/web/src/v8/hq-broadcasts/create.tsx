@@ -1217,7 +1217,8 @@ export default function HqBroadcastCreate() {
         recipients={sendPreview.data?.recipients ?? null}
         recipientsNote={sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : undefined}
         perAccount={sendPreview.data?.perAccount?.map((row) => ({
-          name: chosen.find((store) => store.id === row.accountId)?.name ?? row.accountId,
+          /* 口は店の ID だけを返す。名前は店の一覧から引く。 */
+          name: (stores ?? []).find((store) => store.id === row.accountId)?.name ?? row.accountId,
           recipients: row.recipients,
           note: row.excluded.optedOut > 0 ? `止めている ${formatNumber(row.excluded.optedOut)} 人を除く` : undefined,
         }))}
