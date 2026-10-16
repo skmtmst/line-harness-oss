@@ -1,3 +1,4 @@
+import {defaultWindow} from './automation-execution-window.js';
 import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { automationTabCounts } from '../services/tab-counts.js';
@@ -252,11 +253,6 @@ function safeFailureReason(code: string | null, failedAction: string | null): st
   return `${failedAction ?? '登録した処理'}を完了できませんでした`;
 }
 
-function defaultWindow() {
-  const to = new Date();
-  const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1_000);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
 
 /**
  * まだ終わっていない実行が「運用停止」「機能無効」で claim できないとき、

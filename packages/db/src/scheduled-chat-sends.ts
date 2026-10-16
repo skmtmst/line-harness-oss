@@ -1,3 +1,5 @@
+import {normalizeScheduledAt} from './scheduled-chat-time.js';
+export {normalizeScheduledAt} from './scheduled-chat-time.js';
 // N-025 (#927): 1対1トークの送信予約の状態機械を DB で持つ。
 // 時系列: scheduled -> sending(lease付きclaim) -> sent / failed / cancelled。
 // retryableな失敗はscheduledへ戻し、scheduled_atをずらして再送する。
@@ -40,18 +42,6 @@ export type ScheduledChatSendRow = {
   updated_at: string;
 };
 
-/**
- * 予約時刻の入力をUTCのISO8601('Z')へ正規化する。
- * '+09:00'などオフセット付きのまま保存すると、due判定の文字列比較で
- * 順序が崩れるため、書き込み境界で必ずここを通す。
- */
-export function normalizeScheduledAt(value: string): string {
-  const time = Date.parse(value);
-  if (!Number.isFinite(time)) {
-    throw new Error('scheduled_at must be an ISO 8601 datetime');
-  }
-  return new Date(time).toISOString();
-}
 
 /**
  * 予約の新規作成。idempotency_keyの一意制約で、同じ作成要求の再送は

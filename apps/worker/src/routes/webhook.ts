@@ -1,3 +1,4 @@
+import {logWebhookStepFailure,recordWebhookAnalyticsEvent} from './webhook-analytics.js';
 import {assignInbox} from '../services/inbox-assignment.js';
 import { webhookDemoTargets } from '../services/webhook-demo-targets.js';
 import { parseRestaurantConfirmationPostback, respondToRestaurantConfirmation } from '../services/restaurant-confirmations.js';
@@ -70,42 +71,9 @@ const webhook = new Hono<Env>();
 // large-payload DoS before signature verification (#104). 1 MiB leaves room for
 // bursty batched deliveries (~100 events × ~5 KB) while still well below the
 // 128 MB Cloudflare Workers memory ceiling.
-const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024; // 1 MiB
+const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024;
 
-function logWebhookStepFailure(
-  stage: string,
-  error: unknown,
-  lineAccountId: string | null,
-  event?: WebhookEvent,
-): void {
-  console.error(JSON.stringify({"code":"line_webhook_step_failed"}));
-}
 
-async function recordWebhookAnalyticsEvent(
-  db: D1Database,
-  lineAccountId: string | null,
-  event: WebhookEvent,
-  input: {
-    friendId?: string | null;
-    eventType: string;
-    dimensions?: Record<string, unknown>;
-  },
-): Promise<void> {
-  if (!lineAccountId) return;
-  try {
-    await recordAnalyticsEvent(db, {
-      lineAccountId,
-      friendId: input.friendId,
-      eventType: input.eventType,
-      sourceKind: 'line_webhook',
-      sourceId: event.webhookEventId,
-      occurredAt: new Date(event.timestamp).toISOString(),
-      dimensions: input.dimensions,
-    });
-  } catch (error) {
-    logWebhookStepFailure('analytics_event_record', error, lineAccountId, event);
-  }
-}
 
 /**
  * friends.line_user_id はグローバル UNIQUE のため (C-2b までは1ユーザー1行)、

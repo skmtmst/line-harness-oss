@@ -1,3 +1,4 @@
+import {styleTemplateSamples} from './style-template-samples-api.js';
 import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import {
   paymentBadges,
@@ -103,26 +104,9 @@ styles.get(base + '/starter-set', async (c) => {
     data: await starter(c.env.DB, c.get('staff').tenantId ?? null, style),
   });
 });
+styles.route('/',styleTemplateSamples);
 
-styles.get(base + '/template-samples', async (c) => {
-  await account(c);
-  if (!hasStaffPermission(c, '/templates'))
-    throw new StyleError('forbidden', 403);
-  const style = checkStyle(c.req.query('style'));
-  return c.json({
-    success: true,
-    data: { style, items: templateSamples(style) },
-  });
-});
 
-styles.get('/api/hq/style-template-samples', async (c) => {
-  await hq(c);
-  const style = checkStyle(c.req.query('style'));
-  return c.json({
-    success: true,
-    data: { style, items: templateSamples(style) },
-  });
-});
 
 styles.get(base + '/resources', requireRole('owner', 'admin'), async (c) => {
   const id = await account(c);
