@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { api, type EventBookingMine, type EventSlot, type MakeupCredit } from '../lib/api.js';
-import AbsenceSheet from '../components/AbsenceSheet.js';
-import MakeupPicker from '../components/MakeupPicker.js';
+import { api, type EventBookingMine, type EventSlot } from '../lib/api.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
@@ -23,11 +21,6 @@ function canCancel(b: EventBookingMine): boolean {
   if (b.cancel_deadline_hours_before == null) return false;
   const deadlineMs = new Date(b.slot_starts_at).getTime() - b.cancel_deadline_hours_before * 3600_000;
   return deadlineMs > Date.now();
-}
-
-/** 振替を使うクラスの、これからの予約。欠席の入口を出す。 */
-function canAbsent(b: EventBookingMine): boolean {
-  return b.makeup?.enabled === true && (b.status === 'requested' || b.status === 'confirmed') && new Date(b.slot_starts_at).getTime() > Date.now();
 }
 
 /**
@@ -62,12 +55,6 @@ export default function EventBookings() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const requestGeneration = useRef(0);
-  /* 欠席の振替（B3）：欠席の確かめ・残っている振替・欠席した直後の回。 */
-  const [absenceTarget, setAbsenceTarget] = useState<EventBookingMine | null>(null);
-  const [credits, setCredits] = useState<MakeupCredit[]>([]);
-  const [justAbsent, setJustAbsent] = useState<string | null>(null);
-  const loadCredits = useCallback(() => { Promise.resolve().then(() => api.makeupCredits()).then((r) => setCredits(r.credits.filter((c) => c.status === 'open'))).catch(() => setCredits([])); }, []);
-  useEffect(() => { loadCredits(); }, [loadCredits]);
 
   const refresh = useCallback(async () => {
     const generation = ++requestGeneration.current;
@@ -259,7 +246,6 @@ export default function EventBookings() {
                 {actionError}
               </p>
             )}
-            {tab === 'upcoming' && credits[0] ? <MakeupPicker key={credits[0].id} credit={credits[0]} justAbsent={justAbsent} onUsed={() => { setJustAbsent(null); loadCredits(); void refresh(); }} onLater={() => setJustAbsent(null)} /> : null}
             {items.length === 0 ? (
               tab === 'upcoming' ? (
                 <StatusView icon="calendar" title="これからのイベントはありません" />
@@ -297,11 +283,6 @@ export default function EventBookings() {
                                 {b.venue_name}
                               </div>
                             )}
-                            {b.makeup?.enabled && (
-                              <div className="mt-[3px] truncate text-[11.5px] text-liff-sub">
-                                {[b.makeup.plan_label, b.makeup.cutoff_at ? `欠席の連絡は ${utcToJstHm(b.makeup.cutoff_at)} まで` : null].filter(Boolean).join(' ・ ')}
-                              </div>
-                            )}
                             <div className="mt-[3px] flex">
                               <Badge tone={meta.tone}>{canLeaveWaitlist(b) && b.queue_position != null ? `キャンセル待ち ${b.queue_position}番目` : meta.text}</Badge>
                             </div>
@@ -326,18 +307,6 @@ export default function EventBookings() {
                                   disabled={busy}
                                 >
                                   キャンセルする
-                                </Button>
-                                {canAbsent(b) && (
-                                  <Button variant="inline-action" type="button" disabled={busy} onClick={() => { setActionError(null); setAbsenceTarget(b); }}>
-                                    欠席する
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-                            {!canCancel(b) && canAbsent(b) && (
-                              <div className="flex flex-wrap items-center gap-2 pt-1.5">
-                                <Button variant="inline-action" type="button" disabled={busy} onClick={() => { setActionError(null); setAbsenceTarget(b); }}>
-                                  欠席する
                                 </Button>
                               </div>
                             )}
@@ -368,11 +337,6 @@ export default function EventBookings() {
           </>
         )}
       </div>
-      {absenceTarget ? <AbsenceSheet booking={absenceTarget} onClose={() => setAbsenceTarget(null)} onDone={({ credit, reason }) => {
-        const target = absenceTarget; setAbsenceTarget(null);
-        if (credit) setJustAbsent(target.slot_starts_at); else if (reason) setActionError(reason);
-        loadCredits(); void refresh();
-      }} /> : null}
       <ConfirmDialog
         open={pendingCancel !== null}
         designNode="nUYyb"

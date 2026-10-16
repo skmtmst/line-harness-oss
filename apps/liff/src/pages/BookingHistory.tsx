@@ -8,6 +8,7 @@ import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import HistoryCard from '../components/HistoryCard.js';
 import WaitlistSection from '../components/WaitlistSection.js';
+import LessonHistorySection from '../components/LessonHistorySection.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
@@ -81,6 +82,8 @@ export default function BookingHistory() {
     selected: ChangeSlot | null;
     error: string | null;
   } | null>(null);
+  /* 振替先を選ぶ間は、その帯が下の操作を担う（下の帯を重ねない）。 */
+  const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -226,6 +229,7 @@ export default function BookingHistory() {
             {actionError && (
               <p role="alert" className="text-[13px] leading-5 text-danger">{actionError}</p>
             )}
+            {tab === 'upcoming' ? <LessonHistorySection onPicking={setPicking} /> : null}
             {tab === 'upcoming' ? <WaitlistSection onChanged={() => setReloadKey((k) => k + 1)} /> : null}
             {list.length === 0 ? (
               tab === 'upcoming' ? (
@@ -261,7 +265,7 @@ export default function BookingHistory() {
           </>
         )}
       </div>
-      {data && !failed && (
+      {data && !failed && !picking && (
         <BottomBar>
           <Button
             variant="primary"
