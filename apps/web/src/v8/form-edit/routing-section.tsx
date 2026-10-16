@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { FlaskConical, Info, Plus } from 'lucide-react'
+import { Play, Info, Plus } from 'lucide-react'
 import type { FormBlock } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -64,7 +64,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
           <HelpTip label="答えで予約の行き先を分けるの説明">質問への答えに合わせて、予約のメニューと担当を自動で決めます。上の行から順に当てはめ、どれにも当たらないときは最後の行へ進みます。</HelpTip>
         </span>
         <span className={styles.actions}>
-          {value.enabled ? <Button variant="secondary" icon={<FlaskConical size={16} aria-hidden="true" />} onClick={() => { setTrying((v) => !v); setTrial('') }} aria-pressed={trying}>試しに答える</Button> : null}
+          {value.enabled ? <Button variant="secondary" icon={<Play size={16} aria-hidden="true" />} onClick={() => { setTrying((v) => !v); setTrial('') }} aria-pressed={trying}>試しに答える</Button> : null}
           {readOnly ? null : <Toggle label="答えで予約の行き先を分ける" checked={value.enabled} onChange={(enabled) => set({ enabled })} />}
         </span>
       </div>
@@ -83,13 +83,13 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
           {trial ? <strong>{hit === -1 || hit === null ? '「どれにも当たらないとき」の行き先になります（保存はされません）' : `${(hit ?? 0) + 1} 行目の行き先になります（保存はされません）`}</strong> : null}
         </div> : null}
         <div className={styles.table} role="table" aria-label="行き先の表">
-          <div className={styles.headRow} role="row"><span /><span>もし「{question?.label ?? '質問'}」が</span><span>出すメニュー</span><span>担当の組</span><span>会い方</span><span /></div>
+          <div className={styles.headRow} role="row"><span /><span title={`もし「${question?.label ?? '質問'}」が`}>もし「{question?.label ?? '質問'}」が</span><span>出すメニュー</span><span>担当の組</span><span>会い方</span><span /></div>
           {(readOnly ? value.rules : reorder.shown).map((rule, index) => {
             const invalid = problem?.row === index
             return (
               <div key={rule.id} className={styles.row} role="row" data-hit={hit === index || undefined} data-invalid={invalid || undefined} {...reorder.rowProps(rule.id)}>
                 <span className={styles.grip}>{readOnly ? null : <ReorderHandle look="icon" label={`${index + 1} 行目`} {...reorder.handle(rule.id)} {...reorder.handleProps(rule.id)} />}</span>
-                <span className={styles.cond}>〈{ruleAnswer(rule)}〉</span>
+                <span className={styles.cond}><span title={ruleAnswer(rule)}>〈{ruleAnswer(rule)}〉</span></span>
                 {targetCells(rule.target, (target) => setRule(rule.id, { target }), `${index + 1} 行目`, invalid)}
                 <span className={styles.more}>{readOnly ? null : <RowMenu appearance="box" size="row" label={`${index + 1} 行目のそのほかの操作`} open={openMenu === rule.id} onOpenChange={(o) => setOpenMenu(o ? rule.id : null)}
                   items={[...reorder.menuItems(rule.id, () => setOpenMenu(null)), { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { set({ rules: value.rules.filter((r) => r.id !== rule.id) }); setOpenMenu(null) } }]} />}</span>
@@ -98,7 +98,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
           })}
           <div className={styles.row} role="row" data-fallback data-hit={(hit === -1) || undefined} data-invalid={problem?.row === value.rules.length || undefined}>
             <span />
-            <span className={styles.cond}>どれにも当たらない<StatusBadge size="compact" dot={false}>消せない</StatusBadge></span>
+            <span className={styles.cond}><span>どれにも当たらない</span><StatusBadge size="compact" dot={false}>消せない</StatusBadge></span>
             {targetCells(value.fallback, (fallback) => set({ fallback }), 'どれにも当たらないとき', problem?.row === value.rules.length)}
             <span className={styles.more}>—</span>
           </div>

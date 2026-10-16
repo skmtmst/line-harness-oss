@@ -11,15 +11,18 @@
 .trial { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border: 1px dashed var(--color-accent-border); border-radius: var(--radius-control); font-size: var(--text-label); }
 .trial > :nth-child(2) { width: 200px; }
 .trial strong { color: var(--color-success); }
-.table { --cols: 40px minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.9fr) 56px; display: flex; flex-direction: column; }
-.headRow, .row { display: grid; grid-template-columns: var(--cols); align-items: center; column-gap: 12px; padding: 0 16px; }
+.table { --cols: 24px 140px minmax(0, 1fr) 96px 112px 40px; display: flex; flex-direction: column; }
+.headRow, .row { display: grid; grid-template-columns: var(--cols); align-items: center; column-gap: 8px; padding: 0 16px; }
+.headRow > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .headRow { min-height: 40px; background: var(--color-table-head); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; }
 .row { min-height: 52px; border-bottom: 1px solid var(--color-hairline); font-size: var(--text-body); }
 .row[data-fallback] { background: var(--color-canvas-sunken); }
 .row[data-hit] { background: var(--color-accent-soft); box-shadow: inset 0 0 0 1px var(--color-accent); }
 .row[data-invalid] { box-shadow: inset 0 0 0 1px var(--color-danger); }
-.cond { display: inline-flex; align-items: center; gap: 8px; color: var(--color-ink); font-weight: 500; }
+.cond { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 8px 0; color: var(--color-ink); font-weight: 500; white-space: nowrap; }
+.cond > :first-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .cell { min-width: 0; padding: 6px 0; }
+.cell > * { width: 100%; min-width: 0; }
 .grip, .more { display: inline-flex; align-items: center; justify-content: center; color: var(--color-ink-faint); }
 .error { margin: 0; color: var(--color-danger); font-size: var(--text-label); }
 .add { display: flex; align-items: center; gap: 12px; }
