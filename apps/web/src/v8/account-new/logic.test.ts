@@ -29,7 +29,8 @@ describe('LINEアカウントを登録（★V8）の小さな計算', () => {
     expect(allV8RowsPassed(stopped)).toBe(false)
     const passed = toV8CheckRows(connection('passed'))
     expect(allV8RowsPassed(passed)).toBe(true)
-    expect(passed[4].detail).toBe('https://lin.ee/nen')
+    // lin.ee は LINE が発行する短縮URLで basicId から作れない。開ける標準形を出す。
+    expect(passed[4].detail).toBe('https://line.me/R/ti/p/@nen')
   })
 
   it('④の止まった行は理由を1つだけ出す（Webhook のオフの説明に段の文を重ねない）', () => {

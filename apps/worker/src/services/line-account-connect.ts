@@ -94,6 +94,26 @@ async function readJson<T>(response: Response): Promise<T | null> {
   }
 }
 
+function trimTrailingSlash(value: string): string {
+  return value.trim().replace(/\/+$/, '');
+}
+
+/**
+ * LINE に登録されている Webhook URL が musubo の受け口かどうか。
+ * 既存アカウントの確認（routes/line-accounts.ts の acceptedWebhookUrls）と
+ * 同じく、別名URL（WORKER_ALIAS_URLS。stagingのworkers.devなど）も同じ
+ * Worker なので一致とみなす。末尾スラッシュの違いは無視する。
+ */
+function webhookUrlMatches(
+  registeredUrl: string | null | undefined,
+  canonicalUrl: string,
+  accepted?: readonly string[],
+): boolean {
+  if (!registeredUrl) return false;
+  const list = (accepted && accepted.length > 0 ? accepted : [canonicalUrl]).map(trimTrailingSlash);
+  return list.includes(trimTrailingSlash(registeredUrl));
+}
+
 /**
  * LINE側の自動設定を順番に行う。DBは一切触らず、秘密値は成功時も呼び出し元にだけ返す。
  * 呼び出し元はこの値をHTTPレスポンスへ含めてはならない。
@@ -105,6 +125,8 @@ export async function prepareLineConnection(input: {
   loginChannelSecret: string;
   baseUrl: string;
   liffId?: string;
+  /** 同じ Worker を指す別名URLの受け口。既存アカウントの確認と同じ一覧を渡す。 */
+  acceptedWebhookUrls?: readonly string[];
 }): Promise<PreparedLineConnection> {
   const completed: LineConnectStep[] = [];
   const webhookUrl = `${input.baseUrl.replace(/\/$/, '')}/webhook`;
@@ -152,10 +174,10 @@ export async function prepareLineConnection(input: {
     : null;
   webhook.registeredUrl = endpoint?.endpoint ?? null;
   webhook.active = typeof endpoint?.active === 'boolean' ? endpoint.active : null;
-  if (!getWebhook?.ok || endpoint?.endpoint !== webhookUrl) {
+  if (!getWebhook?.ok || !webhookUrlMatches(endpoint?.endpoint, webhookUrl, input.acceptedWebhookUrls)) {
     return stopped(completed, 3, 'Webhook URLを確認できませんでした。もう一度お試しください。', webhookUrl, webhook, { bot: profile });
   }
-  if (endpoint.active !== true) {
+  if (endpoint?.active !== true) {
     return stopped(completed, 3, 'LINE Developersで「Webhookの利用」をオンにしてください（設定方法を見る）。', webhookUrl, webhook, { bot: profile });
   }
   const testWebhook = await lineFetch('https://api.line.me/v2/bot/channel/webhook/test', {
