@@ -30,7 +30,7 @@ export interface MenuPaymentOverride {
   mode: BookingPaymentMode;
 }
 
-export type PaymentRecordStatus = 'paid' | 'pending' | 'refunded' | 'expired' | 'onsite';
+export type PaymentRecordStatus = 'paid' | 'partially_refunded' | 'pending' | 'refunded' | 'expired' | 'onsite';
 
 export interface PaymentRecord {
   id: string;
@@ -45,6 +45,9 @@ export interface PaymentRecord {
   method: string | null;
   createdAt: string;
   receiptUrl: string | null;
+  refundedAmount: number;
+  actorLabel: string | null;
+  reason: string | null;
 }
 
 export interface PaymentSummary {
@@ -77,6 +80,12 @@ export interface PaymentEvent {
   result: PaymentEventResult;
 }
 
+export interface RefundPaymentInput { amount?: number; reason: string; notifyLine?: boolean; idempotencyKey: string }
+export interface PaymentRefund {
+  id: string; amount: number; reason: string; actorLabel: string; createdAt: string;
+  notifyLine: boolean; notificationStatus: 'not_requested' | 'simulated' | 'unavailable'; simulation: true; sent: false;
+}
+
 export const bookingPaymentAdminApi = {
   /** 接続/つなぎ直し。同じ管理ログインを保って返されたURLを開く（10分間有効）。 */
   authorizeConnection: (accountId: string) =>
@@ -103,9 +112,13 @@ export const bookingPaymentAdminApi = {
     fetchApi<Result<{ items: PaymentEvent[]; total: number }>>(`/api/booking/admin/payment-events?${q(accountId, filter)}`),
   replayEvent: (accountId: string, id: string) =>
     fetchApi<Result<PaymentEvent>>(`/api/booking/admin/payment-events/${encodeURIComponent(id)}/replay?${q(accountId)}`, { method: 'POST', body: '{}' }),
-  /** 今ある口：支払い済みの返金。 */
-  refund: (paymentId: string) =>
-    fetchApi<Result<{ payment: unknown }>>(`/api/booking/payments/${encodeURIComponent(paymentId)}/refund`, { method: 'POST', body: '{}' }),
+  /** 同じ操作の再送には同じidempotencyKey。amount省略は残額全部。実送金・実送信なし。 */
+  refund: (paymentId: string, input: RefundPaymentInput) =>
+    fetchApi<Result<{ payment: unknown; refund: PaymentRefund; duplicate: boolean; simulation: true; sent: false }>>(`/api/booking/payments/${encodeURIComponent(paymentId)}/refund`, { method: 'POST', body: JSON.stringify(input) }),
+  refunds: (paymentId: string) =>
+    fetchApi<Result<{ items: PaymentRefund[] }>>(`/api/booking/payments/${encodeURIComponent(paymentId)}/refunds`),
+  linkBooking: (paymentId: string, bookingId: string, reason: string) =>
+    fetchApi<Result<{ payment: unknown }>>(`/api/booking/payments/${encodeURIComponent(paymentId)}/booking`, { method: 'POST', body: JSON.stringify({ bookingId, reason }) }),
   /** 飲食のコース（restaurant-test のメニュー）とイベントのクラスの支払い。予約メニューは bookingApi.saveMenuPayment。 */
   courseMode: (accountId: string, menuId: string) =>
     fetchApi<Result<{ mode: BookingPaymentMode | null; version: number }>>(`/api/restaurant-test/menus/${encodeURIComponent(menuId)}/payment?${q(accountId)}`),

@@ -7560,7 +7560,11 @@ const spec = {
     '/api/booking/payments/{id}/refund': {
       post: {
         tags: ['Booking'],
-        summary: '支払い済みを返金する',
+        summary: '試験用の支払いを一部または全額返金する',
+        description: 'owner/admin、閲覧のみ不可。697が必要。試験用Stripe IDとJPYだけ。amount省略は残額全部。同じidempotencyKeyは1回だけ、本文違い409。data:{payment,refund,duplicate,simulation:true,sent:false}。LINE希望は保存するが送信しない。',
+        requestBody: {required:true,content:{'application/json':{schema:{type:'object',required:['reason','idempotencyKey'],properties:{
+          amount:{type:'integer',minimum:1},reason:{type:'string',minLength:1,maxLength:500},notifyLine:{type:'boolean',default:false},idempotencyKey:{type:'string',minLength:1,maxLength:200}
+        }}}}},
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],

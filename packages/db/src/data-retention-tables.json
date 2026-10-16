@@ -4870,5 +4870,19 @@
       "by": "lineAccount",
       "column": "account_id"
     }
+  },
+  "booking_payment_refunds": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_payment_booking_links": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
   }
 }

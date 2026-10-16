@@ -1713,6 +1713,17 @@ CREATE TABLE booking_operation_runs (
 
 CREATE TABLE booking_page_views(id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id), menu_id TEXT REFERENCES menus(id), friend_id TEXT REFERENCES friends(id), entry_point TEXT, viewed_at TEXT NOT NULL);
 
+CREATE TABLE booking_payment_booking_links (
+  id TEXT PRIMARY KEY,
+  payment_id TEXT NOT NULL REFERENCES booking_payments(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  booking_id TEXT REFERENCES bookings(id) ON DELETE SET NULL,
+  reason TEXT NOT NULL CHECK(length(trim(reason)) BETWEEN 1 AND 500),
+  actor_id TEXT NOT NULL,
+  actor_label TEXT NOT NULL,
+  created_at TEXT NOT NULL CHECK(julianday(created_at) IS NOT NULL)
+);
+
 CREATE TABLE booking_payment_choices (
   booking_id TEXT PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1770,7 +1781,8 @@ CREATE TABLE booking_payment_events (
   lease_token TEXT,
   lease_until TEXT,
   applied_at TEXT,
-  error_code TEXT,
+  error_code TEXT, refunded_amount INTEGER
+  CHECK(refunded_amount IS NULL OR (typeof(refunded_amount)='integer' AND refunded_amount>0 AND refunded_amount<=amount)),
   UNIQUE(provider,line_account_id,provider_event_id)
 );
 
@@ -1788,6 +1800,22 @@ CREATE TABLE booking_payment_methods (
  idempotency_key TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(line_account_id,friend_id,idempotency_key)
 );
 
+CREATE TABLE booking_payment_refunds (
+  id TEXT PRIMARY KEY,
+  payment_id TEXT NOT NULL REFERENCES booking_payments(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 200),
+  amount INTEGER NOT NULL CHECK(typeof(amount)='integer' AND amount>0),
+  requested_amount INTEGER CHECK(requested_amount IS NULL OR (typeof(requested_amount)='integer' AND requested_amount>0)),
+  reason TEXT NOT NULL CHECK(length(trim(reason)) BETWEEN 1 AND 500),
+  actor_id TEXT NOT NULL,
+  actor_label TEXT NOT NULL,
+  notify_line INTEGER NOT NULL DEFAULT 0 CHECK(notify_line IN (0,1)),
+  notification_status TEXT NOT NULL CHECK(notification_status IN ('not_requested','simulated','unavailable')),
+  created_at TEXT NOT NULL CHECK(julianday(created_at) IS NOT NULL),
+  UNIQUE(payment_id,idempotency_key)
+);
+
 CREATE TABLE "booking_payments" (
   booking_id_history TEXT,
   id TEXT PRIMARY KEY,
@@ -1803,7 +1831,8 @@ CREATE TABLE "booking_payments" (
   hold_until TEXT,
   paid_at TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL, refunded_at TEXT, receipt_url TEXT,
+  updated_at TEXT NOT NULL, refunded_at TEXT, receipt_url TEXT, refunded_amount INTEGER NOT NULL DEFAULT 0
+  CHECK(typeof(refunded_amount)='integer' AND refunded_amount>=0 AND refunded_amount<=amount), actor_label TEXT, action_reason TEXT,
   UNIQUE (line_account_id, idempotency_key)
 );
 
@@ -9323,7 +9352,11 @@ CREATE INDEX idx_booking_operation_runs_booking
 CREATE INDEX idx_booking_operation_runs_status
   ON booking_operation_runs(status, scheduled_at);
 
+CREATE INDEX idx_booking_payment_booking_links_payment ON booking_payment_booking_links(payment_id,created_at);
+
 CREATE INDEX idx_booking_payment_events_account_received ON booking_payment_events(line_account_id,received_at DESC,id);
+
+CREATE INDEX idx_booking_payment_refunds_account_date ON booking_payment_refunds(line_account_id,created_at);
 
 CREATE INDEX idx_booking_payments_booking
   ON booking_payments(booking_id, created_at DESC);

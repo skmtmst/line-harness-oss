@@ -604,6 +604,7 @@
     "669_restaurant_anniversary_followup.sql",
     "681_style_setup_selection_and_auto_insert.sql",
     "682_booking_stripe_connect_states.sql",
+    "697_booking_payment_refunds.sql",
     "698_chat_corrections.sql",
     "699_line_senders.sql",
     "700_inbox_first_response.sql",
@@ -621,5 +622,5 @@
     "712_operator_push.sql",
     "713_booking_hq_origin.sql"
   ],
-  "migrationCount": 620
+  "migrationCount": 621
 }

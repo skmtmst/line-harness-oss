@@ -331,7 +331,7 @@ describe('予約の支払いの共通口', () => {
       `SELECT id FROM booking_payments WHERE booking_id = 'booking-a'`,
     ).get() as { id: string }).id;
     const refunded = await instance.request(`/api/booking/payments/${paymentId}/refund`, {
-      method: 'POST',
+      method: 'POST', headers: {'Content-Type':'application/json'}, body:JSON.stringify({reason:'取消',idempotencyKey:'refund-all'}),
     }, env());
     await expect(refunded.json()).resolves.toMatchObject({ success: true });
     expect(sqlite.prepare(`SELECT status FROM booking_payments WHERE id = ?`)
