@@ -2,6 +2,7 @@
 
 import { Steps } from '@/components/templates/steps'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog,{ DialogActions } from '@/components/shared/dialog'
 import Link from '@/components/shared/list-navigation'
@@ -133,11 +134,11 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
                 options={[{ value: '', label: resources === null ? '読み込んでいます…' : resources.length ? '使うリッチメニュー・画像を選ぶ' : '使える物がありません' }, ...(resources ?? []).map((item) => ({ value: item.id, label: `${item.kind === 'image' ? '画像' : 'リッチメニュー'}：${item.name}` }))]} />
             ) : null}
           </RadioCardGroup>
-          <aside className={styles.samplePanel} aria-label="入る見本">
+          <Card surface="muted" layout="vertical" contentPadding="var(--polish-space-card)" gap="var(--ob-panel-gap)" role="complementary" aria-label="入る見本">
             <div className={styles.panelHead}><span className={styles.panelTitle}>入る見本</span><StatusBadge tone="neutral" dot>見本</StatusBadge></div>
             <SampleMenuTiles style={style} />
             <p className={styles.panelNote}>{`中身が決まっていないボタンは、お客さまには「${PREPARING_WORD}」と出します。`}</p>
-          </aside>
+          </Card>
         </div>
         {where('あとから変えられます（リッチメニュー・テンプレートの画面）。')}
       </>

@@ -126,30 +126,6 @@
   line-height: var(--tpl-bm-22);
 }
 
-.connectList {
-  display: flex;
-  align-self: stretch;
-  flex-direction: column;
-  gap: var(--tpl-bm-12);
-  margin: var(--polish-space-none);
-  padding: var(--polish-space-none);
-  list-style: none;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bm-13);
-  line-height: var(--tpl-bm-20);
-}
-
-.connectList li {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-bm-8);
-}
-
-.connectList svg {
-  flex: none;
-  color: var(--color-accent-deep);
-}
-
 /* 右の欄 */
 .side {
   display: flex;

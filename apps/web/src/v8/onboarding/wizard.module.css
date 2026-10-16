@@ -91,15 +91,6 @@
   gap: var(--polish-space-section);
 }
 
-.samplePanel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ob-panel-gap);
-  padding: var(--polish-space-card);
-  border-radius: var(--polish-radius-card);
-  background: var(--color-surface-pearl);
-}
-
 .panelHead {
   display: flex;
   align-items: center;
