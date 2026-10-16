@@ -1,4 +1,7 @@
-import type { WorkerBindings } from './worker-bindings.js';
+import type { Env } from './worker-env.js';
+export type { Env } from './worker-env.js';
+import { liffNotificationPreferences } from './routes/liff-notification-preferences.js';
+import { styles } from './routes/styles.js';
 import { processScenarioSourceJobs } from './services/scenario-source-jobs.js';
 import { formDocuments } from './routes/form-documents.js';
 import { purgeExpiredFormDocuments } from './services/form-documents.js';
@@ -65,7 +68,6 @@ import {
 import { sendBookingNotification } from './services/booking-notifier.js';
 import { DEFAULT_ACCOUNT_SETTINGS } from './services/booking-types.js';
 import { authMiddleware } from './middleware/auth.js';
-import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
 import { rateLimitMiddleware, authenticatedRateLimitMiddleware } from './middleware/rate-limit.js';
@@ -91,6 +93,7 @@ import { lineAccounts } from './routes/line-accounts.js';
 import { gettingStarted } from './routes/getting-started.js';
 import { recipes } from './routes/recipes.js';
 import { hqTemplates } from './routes/hq-templates.js';
+import { hqFormTests } from './routes/hq-form-tests.js';
 import { manualLinks } from './routes/manual-links.js';
 import { errorMessages } from './routes/error-messages.js';
 import { accountHandovers } from './routes/account-handovers.js';
@@ -143,9 +146,11 @@ import { autoReplies } from './routes/auto-replies.js';
 import { autoReplyRuns } from './routes/auto-reply-runs.js';
 import { adminAuth } from './routes/admin-auth.js';
 import { resolveCorsOrigin } from './middleware/admin-auth-config.js';
-import { timingMark, timingStart, type ServerTiming } from './lib/server-timing.js';
+import { timingMark, timingStart } from './lib/server-timing.js';
 import booking from './routes/booking.js';
+import { bookingEntitlements } from './routes/booking-entitlements.js';
 import { bookingPayments } from './routes/booking-payments.js';
+import { bookingPaymentAdmin } from './routes/booking-payment-admin.js';
 import { bookingPlus } from './routes/booking-plus.js';
 import events from './routes/events.js';
 import { trafficPools } from './routes/traffic-pools.js';
@@ -194,7 +199,7 @@ import { restaurantGooglePerformance } from './routes/restaurant-google-performa
 import { restaurantDelivery } from './routes/restaurant-delivery.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
-import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
+import { piiMaskMiddleware } from './middleware/impersonation.js';
 import { outputAuditMiddleware } from './middleware/output-audit.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
@@ -255,23 +260,6 @@ import {
   resolveOgForForm,
   resolveOgForAccount,
 } from './lib/og-resolver.js';
-
-export type Env = {
-  Bindings: WorkerBindings;
-  Variables: {
-    // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
-    staff: AuthenticatedStaff;
-    /** route固有の監査を残した場合、共通middlewareとの二重記録を防ぐ。 */
-    auditRecorded?: boolean;
-    mfaAuditRecorded?: boolean;
-    outputAuditRecorded?: boolean;
-    outputAudit?: { count: number | null; accountId?: string; accountIds?: string[]; accountCounts?: Record<string, number>; targetId?: string; phase?: 'requested' | 'download' };
-    /** 代理ログイン中（★V6 37-5）。middleware/impersonation.ts が入れる。 */
-    impersonation?: ImpersonationContext;
-    /** 段ごとの経過時間（V6R-CX-a）。lib/server-timing.ts が入れる。 */
-    serverTiming?: ServerTiming;
-  };
-};
 
 export const app = new Hono<Env>();
 
@@ -358,6 +346,7 @@ app.route('/', webhook);
 app.route('/', gettingStarted);
 app.route('/', recipes);
 app.route('/', hqTemplates);
+app.route('/', hqFormTests);
 app.route('/', hqBroadcasts);
 app.route('/', ops);
 app.route('/', manualLinks);
@@ -393,6 +382,7 @@ app.route('/', usersGrouped);
 app.route('/', inbox);
 app.route('/', openapi);
 app.route('/', liffRoutes);
+app.route('/', liffNotificationPreferences);
 app.route('/', affiliateSelfRoutes);
 app.route('/', affiliatePayouts);
 
@@ -439,6 +429,8 @@ app.route('/', adminAuth);
 app.route('/', trafficPools);
 app.route('/', booking);
 app.route('/', bookingPayments);
+app.route('/', bookingPaymentAdmin);
+app.route('/', bookingEntitlements);
 app.route('/', bookingPlus);
 app.route('/', events);
 app.route('/', accountSettings);
@@ -478,6 +470,7 @@ app.route('/', fileScan);
 app.route('/', analytics);
 app.route('/', analyticsExports);
 app.route('/', dashboard);
+app.route('/', styles);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', visitStamps);

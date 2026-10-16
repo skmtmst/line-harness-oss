@@ -1,4 +1,5 @@
 import { isPublicApiBoundary } from './public-api-boundary.js';
+import { parseCookieHeader, bearerToken } from './auth-http.js';
 import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
 import { DELIVERY_API_PERMISSIONS, effectiveStaffEditKeys } from '@line-crm/shared';
 import type { Context, Next } from 'hono';
@@ -28,36 +29,6 @@ export const SESSION_REMEMBER_MAX_AGE = 7 * 24 * 60 * 60;
 export const SESSION_MAX_AGE = SESSION_REMEMBER_MAX_AGE;
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-
-/**
- * decodeURIComponent throws on malformed percent escapes (e.g. `%`). Cookie
- * headers are client-controlled, so fall back to the raw value rather than
- * letting the exception turn a request into a 500.
- */
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-function parseCookieHeader(cookieHeader: string | undefined): Record<string, string> {
-  if (!cookieHeader) return {};
-  const cookies: Record<string, string> = {};
-  for (const part of cookieHeader.split(';')) {
-    const [rawName, ...rawValue] = part.trim().split('=');
-    if (!rawName) continue;
-    cookies[rawName] = safeDecode(rawValue.join('=') || '');
-  }
-  return cookies;
-}
-
-function bearerToken(c: Context<Env>): string | null {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  return authHeader.slice('Bearer '.length);
-}
 
 /**
  * Return the hash key of the existing opaque admin session for server-side
@@ -272,6 +243,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/restaurant-test/close-notification-settings', '/restaurant-test/inventory'],
   ['/api/restaurant-test/inventory-rules', '/restaurant-test/inventory'],
   ['/api/restaurant-test/channel-close-tasks', '/restaurant-test/inventory'],
+  ['/api/restaurant-test/assignment-settings', 'booking.settings'],
 ];
 
 /**
@@ -280,6 +252,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
  * cannot inherit chat or friend-attribute access from the friends permission.
  */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  [/^\/api\/dashboard\/style\/template-samples$/, '/templates'],
   // 予約の細かい権限（N-411）。広い '/api/booking' → '/booking/bookings' より先に評価する。
   // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
   [/^\/api\/booking\/admin\/staff\/me(?:\/|$)/, 'booking.staff.own'],
@@ -347,6 +320,7 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['GET', '/api/tenants/me'],
   // 自社の表示設定だけ読む。PUTは会社全体のowner/adminに限定する。
   ['GET', '/api/settings/company'],
+  ['GET', '/api/hq/support/summary'],
   ['POST', '/api/client-errors'],
   ['GET', '/api/capabilities'],
   ['GET', '/api/line-accounts'],
@@ -506,7 +480,7 @@ const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = 
   ['DELETE', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
   ['PATCH', /^\/api\/restaurant-test\/closures\/[^/]+$/],
   ['DELETE', /^\/api\/restaurant-test\/closures\/[^/]+$/],
-  ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/done$/],
+  ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/(?:done|opened)$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],

@@ -38,6 +38,7 @@ vi.mock('@line-crm/db', async () => {
 
 const { authMiddleware, sha256Hex } = await import('../middleware/auth.js');
 const { restaurantTest } = await import('./restaurant-test.js');
+const { scenarios } = await import('./scenarios.js');
 type Env = import('../index.js').Env;
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -1759,11 +1760,47 @@ describe('飲食3・共通フォローのHTTP境界',()=>{
  const path='/api/restaurant-test/followups/store-ginza';
  const scope='?account_id=account-1';
  const version=()=> (testDb.raw.prepare("SELECT template_version FROM rt_store_followup_templates WHERE store_id='store-ginza'").get() as {template_version:number}).template_version;
+ it('1つの共通フォローへテキストとカルーセルを保存し、読込・版競合・停止を守る',async()=>{
+  seedRestaurantFixture();
+  const step='restaurant-followup:store-ginza:reservation_created',url=path+'/steps/'+step+'/messages'+scope;
+  const bubbles=[{id:'text',type:'text',content:{text:'{{name}}さん、ご予約ありがとうございます。'}},{id:'cards',type:'carousel',content:{columnsJson:JSON.stringify([{text:'ご案内',actions:[{type:'uri',label:'詳しく',uri:'https://example.test/guide'}]}])}}];
+  const before=version(),body={expectedVersion:before,messageBubbles:bubbles};
+  const response=await requestWithMethod(url,'PUT',body);expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({data:{stepId:step,messageBubbles:bubbles,version:before+1,sendingStatus:'stopped'}});
+  expect(testDb.raw.prepare('SELECT message_bubbles_json FROM scenario_steps WHERE id=?').get(step)).toEqual({message_bubbles_json:JSON.stringify(bubbles)});
+  expect((await requestWithMethod(url,'PUT',body)).status).toBe(409);
+  const common=new Hono<Env>();common.use('*',authMiddleware);common.route('/',scenarios);
+  const commonUrl='/api/scenarios/restaurant-followup:store-ginza';
+  const read=await common.request(commonUrl,{headers:{Authorization:'Bearer owner-key'}},env);
+  expect(read.status).toBe(200);expect((await read.json() as any).data.steps.find((s:any)=>s.id===step).messageBubbles).toEqual(bubbles);
+  const oldEditor=await common.request(commonUrl+'/steps/'+step,{method:'PUT',headers:{Authorization:'Bearer owner-key','Content-Type':'application/json'},body:JSON.stringify({messageType:'text',messageContent:'旧画面の文'})},env);
+  expect(oldEditor.status).toBe(409);expect(await oldEditor.json()).toMatchObject({code:'MULTIPLE_MESSAGES_REQUIRE_EDITOR'});
+
+  expect((await requestWithMethod(path+'/steps/restaurant-followup:store-yokohama:reservation_created/messages'+scope,'PUT',{...body,expectedVersion:version()})).status).toBe(404);
+  for(const invalid of [null,[],Array(6).fill(bubbles[0]),[{type:'text',content:{text:''}}],[{type:'image',content:{originalContentUrl:'http://invalid'}}]]) {
+   const result=await requestWithMethod(url,'PUT',{expectedVersion:version(),messageBubbles:invalid});expect([400,422]).toContain(result.status);
+  }
+  expect(version()).toBe(before+1);
+  expect((await requestWithMethod(url,'PUT',{messageBubbles:bubbles})).status).toBe(400);
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'viewer',role:'admin',name:'閲覧',access_level:'read_only',permission_keys:'[]'} as never);
+  expect((await requestWithMethod(url,'PUT',{expectedVersion:version(),messageBubbles:bubbles},'reader-key')).status).toBe(403);
+ });
+ it('同時保存は片方だけ成功し、他店のテンプレート参照を保存しない',async()=>{
+  seedRestaurantFixture();const step='restaurant-followup:store-ginza:reservation_created',url=path+'/steps/'+step+'/messages'+scope;
+  const first={expectedVersion:version(),messageBubbles:[{id:'one',type:'text',content:{text:'先の保存'}}]};
+  const second={...first,messageBubbles:[{id:'two',type:'text',content:{text:'後の保存'}}]};
+  const responses=await Promise.all([requestWithMethod(url,'PUT',first),requestWithMethod(url,'PUT',second)]);
+  expect(responses.map(r=>r.status).sort()).toEqual([200,409]);
+  const saved=(testDb.raw.prepare('SELECT message_bubbles_json FROM scenario_steps WHERE id=?').get(step) as {message_bubbles_json:string}).message_bubbles_json;
+  testDb.raw.exec("INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES('foreign-card','他店','text','他店の文','account-3')");
+  expect((await requestWithMethod(url,'PUT',{expectedVersion:version(),messageBubbles:[{id:'foreign',type:'text',content:{text:'文',templateId:'foreign-card'}}]})).status).toBe(422);
+  expect((testDb.raw.prepare('SELECT message_bubbles_json FROM scenario_steps WHERE id=?').get(step) as {message_bubbles_json:string}).message_bubbles_json).toBe(saved);
+ });
  it('公開前の開始と古い版を拒否し、共通の行の追加・解除は停止にする',async()=>{
   seedRestaurantFixture();
   expect((await request(path+'/request-start'+scope,{expectedVersion:version()})).status).toBe(409);
   const step='custom-review';
-  testDb.raw.prepare("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES(?,'restaurant-followup:store-ginza',6,'text','同じ口コミの案内')").run(step);
+  testDb.raw.prepare("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) SELECT ?,'restaurant-followup:store-ginza',COALESCE(MAX(step_order)+1,0),'text','同じ口コミの案内' FROM scenario_steps WHERE scenario_id='restaurant-followup:store-ginza'").run(step);
   const before=version();
   const binding={expectedVersion:before,trigger:'review_request',offsetMinutes:181,enabled:true};
   expect((await requestWithMethod(path+'/bindings/'+step+scope,'POST',binding)).status).toBe(200);

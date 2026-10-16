@@ -140,6 +140,7 @@ function app() {
   a.post('/api/broadcasts/:id/send', (c) => c.json({ success: true }));
   a.post('/api/hq/support/requests', (c) => c.json({ success: true }));
   a.get('/api/hq/support/requests', (c) => c.json({ success: true }));
+  a.get('/api/hq/support/summary', (c) => c.json({ success: true }));
   a.get('/api/hq/notices', (c) => c.json({ success: true }));
   a.post('/api/hq/notices/:id/read', (c) => c.json({ success: true }));
   a.get('/api/tenants/me', (c) => c.json({ success: true }));
@@ -905,6 +906,14 @@ describe('CORS allowed / blocked origins', () => {
 describe('N-423 staff deny-by-default (#670)', () => {
   const staffBearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
 
+  test('所属統括の問い合わせ集計はスタッフと閲覧のみも読め、認証なしと更新は通さない',async()=>{
+    for(const token of ['no-permissions-key','viewer-key']) {
+      expect((await app().request('/api/hq/support/summary',staffBearer(token),crossSiteEnv())).status).toBe(200);
+      expect((await app().request('/api/hq/support/summary',{...staffBearer(token),method:'POST'},crossSiteEnv())).status).toBe(403);
+    }
+    expect((await app().request('/api/hq/support/summary',{},crossSiteEnv())).status).toBe(401);
+  });
+
   test.each(['GET', 'POST'] as const)('%s 未登録の管理APIは staff に 403', async (method) => {
     for (const token of ['friends-key', 'no-permissions-key']) {
       const res = await app().request('/api/coverage-unmapped-demo', { ...staffBearer(token), method }, crossSiteEnv());
@@ -1059,6 +1068,7 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['POST', '/api/restaurant-test/stores/abc/select'],
       ['GET', '/api/restaurant-test/snapshot'],
       ['POST', '/api/restaurant-test/reservations/manual'],
+      ['POST', '/api/restaurant-test/channel-close-tasks/task/opened'],
     ] as const) {
       expect(isStaffExplicitAllow(method, path)).toBe(true);
     }

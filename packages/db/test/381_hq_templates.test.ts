@@ -31,6 +31,7 @@ function setup() {
   sqlite.exec(readFileSync(join(root, 'migrations/571_hq_scenario_templates.sql'), 'utf8'));
   sqlite.exec(readFileSync(join(root, 'migrations/612_hq_friend_attribute_templates.sql'), 'utf8'));
   sqlite.exec(readFileSync(join(root, 'migrations/622_hq_delivery_templates.sql'), 'utf8'));
+  sqlite.exec(readFileSync(join(root, 'migrations/661_hq_catalog_templates.sql'), 'utf8'));
   const db = asD1(sqlite);
   return { sqlite, db };
 }

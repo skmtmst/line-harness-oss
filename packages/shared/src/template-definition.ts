@@ -20,6 +20,8 @@ export type MessageTemplateMediaDefinition = Readonly<{
 
 export type MessageTemplateDefinition = Readonly<{
   card?: HqMessageCard;
+  /** Ordered LINE messages; the single template fields remain a compatibility summary. */
+  messageBubbles?: import('./broadcast-definition').BroadcastBubble[];
   /** 店の素材と同じkind/payload。メッセージ・質問はtemplateを使う。 */
   asset?: Readonly<{ kind: BroadcastAssetKind; payload: AssetPayloadInput }>;
   schemaVersion: 1;
@@ -42,6 +44,7 @@ export type MessageTemplateDefinition = Readonly<{
 export const TEMPLATE_KINDS = ['message','carousel','rich_message','rich_video','question','coupon','research'] as const;
 export type TemplateKind = typeof TEMPLATE_KINDS[number];
 export function templateKind(definition: MessageTemplateDefinition): TemplateKind {
+  if (definition.messageBubbles) return 'message';
   if (definition.asset) return definition.asset.kind==='card_message' ? 'carousel' : definition.asset.kind;
   if (definition.template.messageType === 'imagemap') return 'rich_video';
   if (definition.template.questionJson) return 'question';

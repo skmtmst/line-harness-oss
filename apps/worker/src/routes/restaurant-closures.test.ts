@@ -80,6 +80,35 @@ function seedReservation(id: string, status = 'confirmed', tableId: string | nul
   ).run(id, SLOT, SLOT_END, tableId, status);
 }
 
+test('媒体作業は予約経路で絞り、開けた印はその世代だけに保存する',async()=>{
+ seedReservation('line-r');seedReservation('phone-r','confirmed','table-2');
+ testDb.raw.exec(`UPDATE rt_reservations SET source='line' WHERE id='line-r';UPDATE rt_reservations SET source='phone' WHERE id='phone-r';
+ INSERT INTO rt_reservation_close_tasks(id,store_id,reservation_id,channel,starts_at,status) VALUES
+ ('line-task','store-s','line-r','hotpepper','${SLOT}','reopen'),('phone-task','store-s','phone-r','tabelog','${SLOT}','close');
+ INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity) VALUES('notice-slot','store-s','${SLOT}',8);
+ INSERT INTO rt_channel_close_tasks(id,store_id,slot_id,channel,status,reason,remaining_seats) VALUES('slot-task','store-s','notice-slot','tabelog','reopen','limited',1);`);
+ const line=await get('/api/restaurant-test/channel-close-tasks?storeId=store-s&source=line');
+ expect(await line.json()).toMatchObject({data:[{id:'line-task',source:'line',generation:1,opened:false}]});
+ expect(await (await get('/api/restaurant-test/channel-close-tasks?storeId=store-s&source=phone&channel=hotpepper')).json()).toMatchObject({data:[]});
+ expect((await post('/api/restaurant-test/channel-close-tasks/phone-task/opened',{expectedGeneration:1})).status).toBe(409);
+ expect((await post('/api/restaurant-test/channel-close-tasks/line-task/opened',{})).status).toBe(400);
+ for(const id of ['line-task','slot-task']) {
+  expect((await post(`/api/restaurant-test/channel-close-tasks/${id}/opened`,{expectedGeneration:1})).status).toBe(200);
+  expect((await post(`/api/restaurant-test/channel-close-tasks/${id}/opened`,{expectedGeneration:1})).status).toBe(200);
+ }
+ expect(await (await get('/api/restaurant-test/channel-close-tasks?storeId=store-s&source=line')).json()).toMatchObject({data:[{id:'line-task',opened:true}]});
+ testDb.raw.exec("UPDATE rt_reservation_close_tasks SET generation=2 WHERE id='line-task'");
+ expect((await post('/api/restaurant-test/channel-close-tasks/line-task/opened',{expectedGeneration:1})).status).toBe(409);
+ expect(await (await get('/api/restaurant-test/channel-close-tasks?storeId=store-s&source=line')).json()).toMatchObject({data:[{opened:false,generation:2}]});
+ expect((await post('/api/restaurant-test/channel-close-tasks/missing/opened',{expectedGeneration:1})).status).toBe(404);
+ authMocks.getStaffByApiKey.mockResolvedValue({id:'staff',role:'staff',name:'担当',permission_keys:'[]',tenant_id:TENANT} as never);
+ const headers={Authorization:'Bearer staff-key','Content-Type':'application/json'};
+ const acknowledge=()=>app().request('/api/restaurant-test/channel-close-tasks/line-task/opened?account_id=account-1',{method:'POST',headers,body:JSON.stringify({expectedGeneration:2})},env);
+ expect((await acknowledge()).status).toBe(200);
+ authMocks.getStaffByApiKey.mockResolvedValue({id:'staff',role:'staff',name:'担当',access_level:'read_only',permission_keys:'[]',tenant_id:TENANT} as never);
+ expect((await acknowledge()).status).toBe(403);
+});
+
 function app() {
   const instance = new Hono<Env>();
   instance.use('*', authMiddleware);
@@ -226,6 +255,9 @@ describe('日付で席予約を閉じる',()=>{
   expect((await post('/api/restaurant-test/channel-close-tasks/'+rows[0].id+'/done',{})).status).toBe(200);
   expect((await request('DELETE',closurePath+'/'+id,{expectedVersion:1})).status).toBe(200);
   expect(testDb.raw.prepare('SELECT channel,status FROM rt_closure_close_tasks ORDER BY channel').all()).toEqual([{channel:'media1',status:'reopen'},{channel:'media2',status:'reopen'}]);
+  const reopened=(await (await get('/api/restaurant-test/channel-close-tasks?storeId=store-s')).json() as {data:Array<{id:string;generation:number}>}).data;
+  expect((await post('/api/restaurant-test/channel-close-tasks/'+reopened[0].id+'/opened',{expectedGeneration:reopened[0].generation})).status).toBe(200);
+  expect((await (await get('/api/restaurant-test/channel-close-tasks?storeId=store-s')).json() as {data:Array<{opened:boolean}>}).data.filter(row=>row.opened)).toHaveLength(1);
   expect(testDb.raw.prepare('SELECT archived_at FROM rt_closures WHERE id=?').get(id)).toMatchObject({archived_at:expect.any(String)});
   expect((await (await get(closurePath+'?storeId=store-s')).json() as any).data).toEqual([]);
  });

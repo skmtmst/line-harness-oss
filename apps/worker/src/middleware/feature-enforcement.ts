@@ -1,15 +1,11 @@
-import { bodyAccountIds, ACCOUNT_KEYS } from './feature-account-body.js';
+import { ACCOUNT_KEYS, bodyAccountIds } from './feature-body-accounts.js';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { FeatureId } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from './auth.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
-import {
-  accountFeatureAvailability,
-  createFeatureAvailabilityRequestContext,
-  type FeatureAvailability,
-} from '../services/feature-enforcement.js';
+import { accountFeatureAvailability, createFeatureAvailabilityRequestContext, type FeatureAvailability } from '../services/feature-enforcement.js';
 
 export type RouteClassification =
   | { kind: 'feature'; featureId: FeatureId }
@@ -243,6 +239,12 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 
 /** 同じ prefix 内で公開経路と管理経路が分かれる例外。 */
 export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadata[] = [
+  {
+    pattern: /^\/api\/hq\/style(?:\*|-template-samples|-starter-sets(?:\/[^/]+)?|-attention)$/,
+    methods: ['ALL', 'GET', 'PUT'],
+    accountResolver: 'none',
+    classification: { kind: 'core', reason: '統括の業種設定。ルート内で統括所属とowner/adminを確認し、店舗の機能停止は各予約口で検証する' },
+  },
   {pattern:/^\/api\/instagram\/webhook$/,methods:['GET','POST'],accountResolver:'none',classification:{kind:'public',reason:'Metaの確認用トークン・HMAC署名で個別認証する受信口'}},
   {pattern:/^\/internal\/ubereats\/sandbox-token-probe$/,methods:['POST'],accountResolver:'none',classification:{kind:'system',reason:'合言葉の署名で個別認証するUber Sandbox接続確認の一回実行口'}},
   {
@@ -348,7 +350,6 @@ export function routeClassification(path: string, method = 'GET'): RouteClassifi
   if (pattern) return pattern.classification;
   return FEATURE_ROUTE_MANIFEST.find((item) => prefixMatches(path, item.prefix))?.classification ?? null;
 }
-
 
 /**
  * WRITE-01: URL の対象IDから所属LINEアカウントを引く対応表。

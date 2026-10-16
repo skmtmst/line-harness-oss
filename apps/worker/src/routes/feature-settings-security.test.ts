@@ -40,6 +40,40 @@ beforeEach(() => {
 });
 
 describe('feature settings scope and versioning', () => {
+  it.each([
+    { label: '利用中', environment: 'true', packs: ['restaurant'], enabled: true, plan: 'active', expected: true },
+    { label: '環境停止', environment: 'false', packs: ['restaurant'], enabled: true, plan: 'active', expected: false },
+    { label: '飲食パックなし', environment: 'true', packs: [], enabled: true, plan: 'active', expected: false },
+    { label: '店が停止', environment: 'true', packs: ['restaurant'], enabled: false, plan: 'active', expected: false },
+    { label: '課金状態によらず利用判定を返す同梱機能', environment: 'true', packs: ['restaurant'], enabled: true, plan: 'canceled', expected: true },
+  ])('飲食の情報の表示判定：$label', async ({ environment, packs, enabled, plan, expected }) => {
+    const testDb = createTestD1();
+    try {
+      testDb.raw.prepare('INSERT INTO tenants(id,name,plan_key,plan_status,feature_packs) VALUES(?,?,?,?,?)')
+        .run('tenant-a', '統括', 'standard', plan, JSON.stringify(packs));
+      testDb.raw.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id)
+        VALUES('account-1','店舗','channel-1','s','t','tenant-a'),('account-2','別店舗','channel-2','s','t','tenant-a')`);
+      testDb.raw.prepare(`INSERT INTO account_settings(id,line_account_id,key,value)
+        VALUES('bundle','account-1','feature.settings_bundle_v1',?)`)
+        .run(JSON.stringify({ version: 1, data: { features: { restaurant_test: enabled } } }));
+      // 同じ統括でも店の設定を混ぜない。旧保存も読む。
+      testDb.raw.exec(`INSERT INTO account_settings(id,line_account_id,key,value)
+        VALUES('legacy','account-2','feature.restaurant_test','{"enabled":false}')`);
+      for (const [accountId, visible] of [['account-1', expected], ['account-2', false]] as const) {
+        const response = await app('staff').request(
+          `/api/settings/features/visibility?account_id=${accountId}`, {},
+          { DB: testDb.db, RESTAURANT_TEST_ENABLED: environment },
+        );
+        expect(response.status).toBe(200);
+        const body = await response.json() as { data: { features: Record<string, boolean> } };
+        expect(body.data.features.restaurant_test).toBe(visible);
+        expect(Object.keys(body.data)).toEqual(['features']);
+      }
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
   it('管理GETはstaffを拒否し、owner/adminだけに返す', async () => {
     const testDb = createTestD1();
     try {

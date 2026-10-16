@@ -1,3 +1,4 @@
+import { readCappedBodyText } from './webhook-request-body.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError } from '@line-crm/db';
@@ -266,38 +267,6 @@ const RECEIVE_RATE_WINDOW_MS = 60_000;
  */
 const RECEIVE_TIMESTAMP_PAST_MS = 15 * 60_000;
 const RECEIVE_TIMESTAMP_FUTURE_MS = 5 * 60_000;
-
-/*
- * R428: 申告なし・申告不足の本文も上限を超えて読み続けない。
- * 上限を超えたら null を返し、呼び出し側は413にする。
- */
-async function readCappedBodyText(raw: Request, maxBytes: number): Promise<string | null> {
-  const reader = raw.body?.getReader();
-  if (!reader) return '';
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      try {
-        await reader.cancel();
-      } catch {
-        // 読み捨ての中断に失敗しても、413 にはできる。
-      }
-      return null;
-    }
-    chunks.push(value);
-  }
-  const merged = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(merged);
-}
 
 /** R430: X-Webhook-Timestamp の検査状態。送らない受信は checked:false。 */
 function receiveTimestampState(raw: string | null | undefined):
@@ -1495,6 +1464,20 @@ async function requireInteractionAccount(c: Context<Env>) {
 }
 
 // ========== 送った・受け取ったやり取りの記録 ==========
+
+webhooks.get('/api/webhooks/interactions/export.csv',requireRole('owner','admin','staff'),async c=>{
+  const access=await requireInteractionAccount(c);if('error' in access)return access.error;
+  const direction=c.req.query('direction'),status=c.req.query('status');
+  const result=await listWebhookInteractions(c.env.DB,{lineAccountId:access.lineAccountId,periodDays:Number(c.req.query('periodDays')??30),
+    direction:direction==='incoming'||direction==='outgoing'?direction:undefined,status:status==='succeeded'||status==='failed'?status:undefined,search:c.req.query('search'),exportAll:true});
+  if(result.total>5000||result.items.length>5000)return c.json({success:false,error:'5,000件以内になるよう期間や検索条件を絞ってください'},422);
+  const cell=(value:unknown)=>{let s=value==null?'':String(value);if(/^[\s]*[=+@\-]|^[\t\r\n]/u.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};
+  // Do not export payloads, headers, matching values, or URLs with credentials/queries.
+  const lines=[['日時','向き','つなぎ先','出来事','状態','返事','試行回数','かかった時間（ms）'],...result.items.map(row=>[row.started_at,row.direction,row.webhook_name,row.event_type,row.status,webhookResponseLabel(row),row.attempt_count,row.duration_ms])];
+  c.set('outputAudit',{count:result.items.length,accountIds:[access.lineAccountId],accountCounts:{[access.lineAccountId]:result.items.length}});
+  const date=new Date(Date.now()+9*3600_000).toISOString().slice(0,10);
+  return new Response('\uFEFF'+lines.map(row=>row.map(cell).join(',')).join('\r\n'),{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="webhook-interactions-${date}.csv"`,'Cache-Control':'no-store'}});
+});
 
 webhooks.get('/api/webhooks/interactions', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
