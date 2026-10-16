@@ -88,8 +88,11 @@ def check_pending(row):
         require(row[field].startswith("未実施"), f"invented result: {row['case_key']}:{field}")
 
 
-cases = read("CASES.tsv")
+all_cases = read("CASES.tsv")
+all_case_by_key = unique(all_cases, "case_key")
+cases = [r for r in all_cases if r["計画行の種類"] == "元の受け入れ"]
 case_by_key = unique(cases, "case_key")
+added_cases = [r for r in all_cases if r["計画行の種類"] != "元の受け入れ"]
 raw = unique(read("SOURCE-ROWS.tsv"), "case_key")
 manifest = read("SOURCE-MANIFEST.tsv")
 extra_sources = read("USABILITY-SOURCES.tsv")
@@ -137,10 +140,10 @@ require(actual_classes == counts["主分類"] == {"自動": 1337, "単体": 257,
 
 tasks = unique(read("USABILITY-TASKS.tsv"), "作業ID")
 expected = {f"COM-{i:02}" for i in range(1, 6)}
-for group, count in (("STD", 5), ("FOOD", 7), ("SALON", 6), ("MEET", 6), ("CLASS", 7)):
+for group, count in (("STD", 5), ("FOOD", 7), ("SALON", 6), ("MEET", 6), ("CLASS", 7), ("EC", 5)):
     expected.update(f"{group}-{i:02}" for i in range(1, count + 1))
 gap_ids = {f"GAP-{group}{i}" for group in ("B", "G") for i in range(1, 10)} | {"GAP-U1", "GAP-H1"}
-require(set(tasks) == expected | gap_ids, "task coverage: five industries or twenty added features")
+require(set(tasks) == expected | gap_ids, "task coverage: six styles or twenty added features")
 plan = (HERE / "PLAN.md").read_text()
 owner_section = plan.split("## 12. 使いやすさとライバル比較", 1)[1].split("### 12-1.", 1)[0].rstrip() + "\n"
 require(hashlib.sha256(owner_section.encode()).hexdigest() == counts["B352の司令塔追記本文sha256"], "B-352 commander text changed")
@@ -156,21 +159,21 @@ for line in plan.split("## 11. IDごとの分類", 1)[1].split("## 付録A.", 1)
         require(key not in plan_cases, f"duplicate PLAN ID: {key}")
         plan_cases[key] = (cells[1], cells[2])
 require(plan_cases == {key: (r["行"], r["主分類"]) for key, r in case_by_key.items()}, "PLAN §11 classification differs from CASES")
-require(len(tasks) == counts["作業数"] == 56, "task count")
-require(counts["共通作業"] == 5 and counts["業種固有作業"] == 31 and counts["追加機能"] == 20, "task subtotals")
+require(len(tasks) == counts["作業数"] == 61, "task count")
+require(counts["共通作業"] == 5 and counts["業種固有作業"] == 36 and counts["追加機能"] == 20, "task subtotals")
 all_refs = set()
 for key, task in tasks.items():
     all_refs |= check_refs(task["比較根拠_固定版_箇所"])
     all_refs |= check_refs(task["言葉の確認根拠"])
     require(task["比較相手"] and task["根拠の範囲と未確認"] and task["初見へ渡す目的"], f"missing purpose/evidence: {key}")
     require(task["評価状態"].startswith("未実施"), f"invented task result: {key}")
-    require(set(split(task["関連case_key"])) <= set(case_by_key), f"missing case: {key}")
+    require(set(split(task["関連case_key"])) <= set(all_case_by_key), f"missing case: {key}")
     require(task["計画の通し区間"] == f"PLAN.md §6 {key}" or key in gap_ids, f"missing task in PLAN: {key}")
     if key not in gap_ids:
         all_refs |= check_refs(task["作業の出典"])
     for case_key in split(task["関連case_key"]):
-        require(key in split(case_by_key[case_key]["使いやすさ作業ID"]), f"missing reverse task link: {key}/{case_key}")
-for row in cases:
+        require(key in split(all_case_by_key[case_key]["使いやすさ作業ID"]), f"missing reverse task link: {key}/{case_key}")
+for row in all_cases:
     ids = split(row["使いやすさ作業ID"])
     if ids:
         for key in ids:
@@ -178,7 +181,7 @@ for row in cases:
             require(tasks[key]["比較根拠_固定版_箇所"] in row["比較根拠_固定版_箇所"], f"stale case reference: {key}")
         require(row["使いやすさ対象"].startswith("対象（" if row["主分類"] == "自動" else "補助（"), f"wrong scope: {row['case_key']}")
         check_pending(row)
-    else:
+    elif row["計画行の種類"] == "元の受け入れ":
         require(row["使いやすさ対象"].startswith("対象外（"), f"unmapped target: {row['case_key']}")
     candidates = row["既存試験の候補_存在のみ照合"]
     if not candidates.startswith("候補未特定"):
@@ -186,9 +189,9 @@ for row in cases:
             require((ROOT / candidate).is_file(), f"missing existing test candidate: {candidate}")
 auto_count = sum(r["使いやすさ対象"].startswith("対象（") for r in cases)
 support_count = sum(r["使いやすさ対象"].startswith("補助（") for r in cases)
-require(auto_count == counts["評価対象のA行"] == 151, "A target count")
-require(support_count == counts["通しに関連する補助行"] == 35, "support count")
-require(len(cases) - auto_count - support_count == counts["使いやすさ対象外の既存行"] == 1468, "non-target count")
+require(auto_count == counts["評価対象のA行"], "A target count")
+require(support_count == counts["通しに関連する補助行"], "support count")
+require(len(cases) - auto_count - support_count == counts["使いやすさ対象外の既存行"], "non-target count")
 
 gap = unique(read("GAP-USABILITY-CASES.tsv"), "case_key")
 gap_source_rows = {}
@@ -222,9 +225,100 @@ for key in ("MEET-01", "MEET-02", "MEET-03", "MEET-04", "MEET-06"):
     require("gap-features/B7-online-meeting-calendar.md:L8-L13" in tasks[key]["比較根拠_固定版_箇所"], f"B7 evidence: {key}")
 require(counts["固定した要件SHA"] == SHA, "counts source SHA")
 require(len(source_paths) == counts["照合した固定資料"] == 118, "source count")
-require(len(all_refs) == counts["作業別の根拠箇所"] == 61, "evidence location count")
+require(len(all_refs) == counts["作業別の根拠箇所"], "evidence location count")
 require(git("merge-base", "--is-ancestor", counts["取り込んだ本線SHA"], "HEAD") == b"", "recorded base not included")
+styles = {"standard": "標準", "restaurant": "飲食", "salon": "サロン", "consult": "面談", "lesson": "教室", "ec": "EC"}
+prefixes = {"STD": "standard", "FOOD": "restaurant", "SALON": "salon", "MEET": "consult", "CLASS": "lesson", "EC": "ec"}
+required_rivals = {
+    "standard": set(), "restaurant": {"トレタ", "TableCheck", "Airリザーブ", "ebica"},
+    "salon": {"SALON BOARD", "リザービア"}, "consult": {"TimeRex", "Calendly", "jicoo"},
+    "lesson": {"hacomono", "STORES 予約"}, "ec": {"カスタマーリングス", "Klaviyo"},
+}
+require(len(all_cases) == counts["CASES全行"] == 1809, "total plan rows")
+require(len(added_cases) == counts["追加した計画行"] == 155, "added plan rows")
+for row in added_cases:
+    require(row["原文ID"] == row["出典"] == row["行"] == "", f"invented requirement: {row['case_key']}")
+    require(row["主分類"] == "自動" and row["case_key"].startswith("plan::"), "plan namespace/classification")
+    require(row["要件SHA"] == SHA and row["計画の根拠"], "plan provenance")
+    require(row["実施方法"] and row["前提と安全条件"], "plan procedure/safety")
+    require(set(split(row["関連する受け入れcase_key"])) <= set(case_by_key), "unknown requirement link")
+    check_pending(row)
+ec_cases = [r for r in added_cases if r["計画行の種類"] == "EC通し"]
+require({r["case_key"] for r in ec_cases} == {f"plan::EC-{i:02}" for i in range(1, 6)}, "EC case coverage")
+require(len(ec_cases) == counts["EC通し追加行"] == 5, "EC row count")
+for row in ec_cases:
+    require(row["対象スタイル"] == "ec", "EC style")
+    require(row["case_key"] in split(tasks[row["使いやすさ作業ID"]]["関連case_key"]), "EC reverse link")
+require(tasks["EC-03"]["関連追加機能作業ID"] == all_case_by_key["plan::EC-03"]["関連追加機能作業ID"] == "GAP-G6", "EC cart/restock feature link")
+switches = [r for r in added_cases if r["計画行の種類"] == "スタイル切替"]
+expected_switches = {(a, b, str(n)) for a in styles for b in styles if a != b for n in range(1, 6)}
+actual_switches = {(r["切替元"], r["切替先"], r["切替観点"].split()[0]) for r in switches}
+require(actual_switches == expected_switches and len(switches) == 150, "30 ordered round trips x five checks")
+require(counts["スタイル切替追加行"] == 150 and counts["切替の有向経路"] == 30 and counts["切替の観点数"] == 5, "switch counts")
+for row in switches:
+    a, b = row["切替元"], row["切替先"]
+    require(row["case_key"] == f"plan::SW-{a}-{b}-{row['切替観点'].split()[0]}", "switch key")
+    require(f"{styles[a]}→{styles[b]}→{styles[a]}" in row["実施方法"], "missing return leg")
+    if row["切替観点"].startswith("1 "):
+        require(all(w in row["前提と安全条件"] for w in ("予約", "友だち", "配信", "タグ")), "four count types")
+    if row["切替観点"].startswith("3 "):
+        require(all(w in row["前提と安全条件"] for w in ("予約管理", "ダッシュボード", "受信箱", "一斉配信", "LIFF")), "five vocabulary surfaces")
+    if row["切替観点"].startswith("5 "):
+        require(all(w in row["前提と安全条件"] for w in ("卓", "クラス", "担当")), "industry readiness")
+style_sources = read("STYLE-SOURCES.tsv")
+require(len(style_sources) == counts["追加の調査記録"] == 5, "research snapshot count")
+snapshots = {}
+for row in style_sources:
+    path = row["snapshot"]
+    require(path.startswith("sources/") and ".." not in Path(path).parts, "snapshot path")
+    data = (HERE / path).read_bytes()
+    require(hashlib.sha256(data).hexdigest() == row["sha256"], f"research snapshot hash: {path}")
+    require(len(data.splitlines()) == int(row["行数"]), f"research snapshot lines: {path}")
+    snapshots[path] = data.decode().splitlines()
+evidence = unique(read("RIVAL-EVIDENCE.tsv"), "根拠ID")
+require(len(evidence) == counts["スタイル別ライバル参照行"], "rival evidence count")
+expected_evidence = set()
+for tid, task in tasks.items():
+    ss = split(task["対象スタイル"])
+    require(len(set(ss)) == len(ss) and set(ss) <= set(styles), f"task styles: {tid}")
+    if tid.startswith("COM-"):
+        require(set(ss) == set(styles), f"common work missing style: {tid}")
+    elif tid.split("-")[0] in prefixes:
+        require(ss == [prefixes[tid.split("-")[0]]], f"daily work style: {tid}")
+    wanted = {f"{tid}:{s}:{rival}" for s in ss for rival in required_rivals[s]}
+    require(set(split(task["スタイル別ライバル根拠ID"])) == wanted, f"rival coverage: {tid}")
+    expected_evidence |= wanted
+    for eid in wanted:
+        row = evidence[eid]
+        require(row["作業ID"] == tid and row["スタイル"] in ss, f"rival task/style: {eid}")
+        require(row["同じ目的"] == task["初見へ渡す目的"], f"rival purpose: {eid}")
+        require(row["比較相手"] in task["比較相手"], f"rival not propagated: {eid}")
+        require(row["比較結果"].startswith("未確認") and row["ライバル手数"].startswith("未確認"), "invented comparison/steps")
+        require("資料不足" in row["足りない資料"], f"missing evidence limit: {eid}")
+        locations = re.findall(r"local:(sources/[^:;]+):L(\d+)-L(\d+)", row["根拠箇所"])
+        require(locations or row["根拠箇所"].startswith("資料不足"), f"missing rival reference: {eid}")
+        for path, start, end in locations:
+            require(path in snapshots and 1 <= int(start) <= int(end) <= len(snapshots[path]), f"rival reference range: {eid}")
+require(set(evidence) == expected_evidence, "orphan rival evidence")
+for row in all_cases + list(gap.values()):
+    tids = split(row["使いやすさ作業ID"])
+    want = {eid for tid in tids for eid in split(tasks[tid]["スタイル別ライバル根拠ID"])}
+    require(set(split(row["スタイル別ライバル根拠ID"])) == want, f"rival column coverage: {row['case_key']}")
+    if tids:
+        require(set(split(row["対象スタイル"])) == {s for tid in tids for s in split(tasks[tid]["対象スタイル"])}, "case styles differ from tasks")
+    if row["case_key"] in gap:
+        require(row["比較相手_計画"] == tasks[tids[0]]["比較相手"], "gap rivals stale")
+actual_style_counts = {name: sum(t["作業ID"].split("-")[0] in prefixes and prefixes[t["作業ID"].split("-")[0]] == style for t in tasks.values()) for style, name in styles.items()}
+require(actual_style_counts == counts["スタイルごとの固有作業数"], "style task counts")
+for style, name in styles.items():
+    purposes = [t["初見へ渡す目的"] for t in tasks.values() if t["作業ID"].split("-")[0] in prefixes and prefixes[t["作業ID"].split("-")[0]] == style]
+    require(len(set(purposes)) == len(purposes) >= 3, f"fewer than three unique first-use goals: {style}")
+require({k: v + 5 for k, v in actual_style_counts.items()} == counts["スタイルごとの日常作業数_共通5を含む"], "common-inclusive task counts")
+owner_style = plan.split("### 12-2. スタイルごとに見る", 1)[1].split("## 13.", 1)[0].rstrip() + "\n"
+require(hashlib.sha256(owner_style.encode()).hexdigest() == counts["B352スタイル司令塔追記sha256"], "commander style text changed")
+require("### E2E-EC：EC" in plan and all(f"**EC-{i:02}**" in plan for i in range(1, 6)), "PLAN missing EC flow")
 require(not any((HERE / name).exists() for name in ("RESULTS.tsv", "FINDINGS.md", "USABILITY-RIVAL.md")), "stage 2 output present during planning")
 print(f"PASS: 固定資料 {len(source_paths)}本、受け入れ {len(cases)}件、元18列・自動1337/単体257/手60を保持")
 print(f"PASS: 作業 {len(tasks)}本、A対象 {auto_count}件・補助 {support_count}件、追加機能 {len(gap)}行、根拠 {len(all_refs)}箇所")
+print(f"PASS: 追加155行（EC5・切替150）、全{len(all_cases)}行、6スタイル固有目的 {actual_style_counts}、比較参照 {len(evidence)}行")
 print("PASS: 全セル・行番号・blob/sha256・双方向の作業対応・未実施の状態を照合。段2・外部接続なし")
