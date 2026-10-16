@@ -22,9 +22,10 @@ on:
     branches:
       - codex/development
   schedule:
-    # Avoid the busy start of each quarter-hour, when scheduled workflows are
+    # Hourly patrol (owner 2026-10-16: save Actions minutes; PR events still sync immediately).
+    # Avoid the busy start of the hour, when scheduled workflows are
     # delayed more often. GitHub schedules run from the default branch.
-    - cron: '7,22,37,52 * * * *'
+    - cron: '7 * * * *'
   workflow_dispatch:
     inputs:
       pr_number:
