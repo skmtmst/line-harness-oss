@@ -19,7 +19,7 @@ beforeEach(() => { vi.mocked(api.createRequest).mockClear(); vi.mocked(api.cance
 afterEach(cleanup);
 
 function renderConfirm() {
-  render(<Confirm menu={menu} staff={staff} slot={{ date: '2099-01-02', start: '10:00' }} autoConfirm onBack={() => {}} onSubmitted={() => {}} />);
+  render(<Confirm menu={menu} staff={staff} slot={{ date: '2099-01-02', start: '10:00' }} autoConfirm onSubmitted={() => {}} />);
 }
 
 it('決まりがオンの店は、チェックを入れるまで押せず、入れるとカードを登録して決まりの版と一緒に送る', async () => {

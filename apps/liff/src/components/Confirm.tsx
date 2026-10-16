@@ -24,7 +24,7 @@ export default function Confirm({
   slot,
   autoConfirm,
   cancelDeadlineMinutesBefore = null,
-  onBack,
+  onPolicyChange,
   onSubmitted,
 }: {
   menu: MenuItem;
@@ -33,8 +33,8 @@ export default function Confirm({
   /** 予約のルールが承認なし確定のとき真。未承認の案内を出さない。 */
   autoConfirm: boolean;
   cancelDeadlineMinutesBefore?: number | null;
-  /** 「← 日時を選び直す」。日時の段へ戻る。 */
-  onBack: () => void;
+  /** キャンセル料の決まりがオンか（手順の帯に「お支払い」を足す）。 */
+  onPolicyChange?: (enabled: boolean) => void;
   /** 予約ができたら予約ID・状態・支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
   onSubmitted: (result: {
     bookingId: string;
@@ -58,17 +58,13 @@ export default function Confirm({
   useEffect(() => {
     let alive = true;
     void Promise.resolve().then(() => api.cancellationPreview({ menuId: menu.id, staffId: staff.id, startsAt })).catch(() => null).then((data) => {
-      if (alive) { setPolicy(data && data.enabled ? data : null); setAccepted(false); }
+      if (alive) { setPolicy(data && data.enabled ? data : null); setAccepted(false); onPolicyChange?.(Boolean(data && data.enabled)); }
     });
     return () => { alive = false; };
-  }, [menu.id, staff.id, startsAt]);
+  }, [menu.id, staff.id, startsAt, onPolicyChange]);
 
   const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start]));
-  function back() {
-    request.invalidate();
-    setSubmitting(false);
-    onBack();
-  }
+  /* 戻るは頭の「‹」（Booking）。この段が外れると useRequestGeneration が世代を進め、送信中の古い応答は捨てる。 */
 
   async function handleSubmit() {
     if (submitting) return;
@@ -179,12 +175,6 @@ export default function Confirm({
             : policy?.deposit ? `${yen(policy.deposit.amount)} を払って予約する`
               : policy ? 'カードを登録して予約する'
                 : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
-        </Button>
-        <Button variant="text"
-          type="button"
-          onClick={back}
-        >
-          ← 日時を選び直す
         </Button>
       </BottomBar>
     </div>

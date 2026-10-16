@@ -19,6 +19,6 @@ test.each([['inquiry',0,'お問い合わせ'],['inquiry',5000,'お問い合わ�
   expect(await screen.findByText(expected)).toBeTruthy(); cleanup();
   render(<StaffList menu={menu} selectedId={null} onSelect={() => {}} />);
   expect(await screen.findByText(new RegExp(expected))).toBeTruthy(); cleanup();
-  render(<Confirm menu={menu} staff={staff} slot={{ date:'2026-10-10',start:'10:00' }} autoConfirm={false} onBack={() => {}} onSubmitted={() => {}} />);
+  render(<Confirm menu={menu} staff={staff} slot={{ date:'2026-10-10',start:'10:00' }} autoConfirm={false} onSubmitted={() => {}} />);
   expect(screen.getByText(new RegExp(expected))).toBeTruthy();
 });
