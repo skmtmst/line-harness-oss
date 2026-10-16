@@ -309,12 +309,12 @@ export function McpIssuedDialog({ issued, onClose }: { issued: McpIssued | null;
             <div className={styles.issuedRow}>
               <span className={styles.issuedLabel}>URL</span>
               <code className={styles.code}>{issued.url}</code>
-              <CopyTextButton value={issued.url} aria-label="接続の URL をコピー" />
+              <CopyTextButton value={issued.url} variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="接続の URL をコピー" />
             </div>
             <div className={styles.issuedRow}>
               <span className={styles.issuedLabel}>鍵</span>
               <code className={styles.code} title="鍵は伏せて出しています。コピーで全部を写せます">{masked}</code>
-              <CopyTextButton value={issued.key} aria-label="鍵をコピー" />
+              <CopyTextButton value={issued.key} variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="鍵をコピー" />
             </div>
             <p className={styles.howto}><Copy size={13} aria-hidden="true" />貼り方：Claude の［設定］→［コネクタ］→［URL を追加］に貼り、鍵を入れます。</p>
           </div>

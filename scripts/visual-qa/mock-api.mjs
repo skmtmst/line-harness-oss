@@ -2946,9 +2946,16 @@ const GAPUI_C_MCP_LOGS = [
   { id: 'mcl-3', at: '2026-10-15T13:45:00.000Z', connectionId: 'mcp-1', connectionName: 'Claude（Kenta）', kind: 'send_request', result: 'refused', summary: '送る依頼（この接続は下書きまで）', targetType: 'broadcast', targetId: 'bc-ai-1' },
   { id: 'mcl-4', at: '2026-10-14T01:02:00.000Z', connectionId: 'mcp-1', connectionName: 'Claude（Kenta）', kind: 'read', result: 'ok', summary: '予約の件数（10/14）', targetType: 'bookings', targetId: null },
 ]
+/* 撮るときの状態は環境変数か、GAPUI_STATE_FILE の JSON（{role,mode,auto,busy}）。ファイルなら動かしたまま切り替えられる。 */
+function gapuiState() {
+  const base = { role: process.env.GAPUI_ROLE, mode: process.env.GAPUI_AI_MODE, auto: process.env.GAPUI_AUTO, busy: process.env.GAPUI_AI_BUSY }
+  const file = process.env.GAPUI_STATE_FILE
+  if (!file) return base
+  try { return { ...base, ...JSON.parse(readFileSync(file, 'utf8')) } } catch { return base }
+}
 function gapuiCAiSettings() {
-  const mode = process.env.GAPUI_AI_MODE || 'draft_only'
-  return { mode, suspendedReason: mode === 'suspended' ? 'provider' : null, publishedQaCount: 18, draftQaCount: 1, version: 4, autoReplyAvailable: false }
+  const mode = gapuiState().mode || 'draft_only'
+  return { mode, suspendedReason: mode === 'suspended' ? 'provider' : null, publishedQaCount: 18, draftQaCount: 1, version: 4, autoReplyAvailable: gapuiState().auto === '1' }
 }
 function gapuiCQaRow(row) {
   return { id: row.id, account_id: 'visual-qa-account', questions_json: JSON.stringify(row.questions), answer_messages_json: JSON.stringify([{ type: 'text', text: row.answerText }]), status: row.status, version: row.version, updated_at: row.updatedAt }
@@ -5121,7 +5128,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   */
   if (pathname === '/api/staff/me') {
     // tenantId は統括のテンプレート（LRc93）の所属先の確認に要る（無いと「所属先を確認できません」で止まる）。
-    return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null, tenantId: 'visual-tenant-1' } }
+    return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null, tenantId: 'visual-tenant-1', ...(gapuiState().role === 'viewer' ? { role: 'staff', readOnly: true, roleBundle: 'view_only' } : {}) } }
   }
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
   if (method === 'GET' && pathname === '/api/webhooks/outgoing/owh-slack-order') {
@@ -7715,6 +7722,11 @@ const server = createServer((req, res) => {
     /* 変更の確認（hmr2P・qUdNh）の口は実APIが器で包まずに返す。包むと人数が読めず「確定 0 人」になる。 */
     if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/change-review(\/apply)?$/.test(url.pathname)) {
       res.writeHead(200).end(JSON.stringify(url.pathname.endsWith('/apply') ? EVENT_CHANGE_APPLY_RESULT : EVENT_CHANGE_PREVIEW))
+      return
+    }
+    /* 口が「今は使えない」を返す撮影用の状態（受信箱の OmV7B）。 */
+    if (gapuiState().busy === '1' && method === 'POST' && /^\/api\/chats\/[^/]+\/ai\/(summary|draft)$/.test(url.pathname)) {
+      res.writeHead(503).end(JSON.stringify({ success: false, error: 'ai_rate_limit' }))
       return
     }
     const fixedResult = visualQaWriteBody(method, url.pathname, url.searchParams)
