@@ -1,3 +1,4 @@
+import { serializeInboxSavedView } from '../services/inbox-saved-view-response.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -23,7 +24,6 @@ import {
   deleteSavedSearch,
   validateInboxSavedViewConditions,
   type InboxSavedViewConditions,
-  type SavedSearch,
   type SavedSearchAccess,
   createScheduledChatSend,
   getScheduledChatSend,
@@ -151,25 +151,6 @@ type ChatLike = {
   revision: number;
 };
 
-function serializeInboxSavedView(
-  row: SavedSearch,
-  count?: { matchCount: number; matchCountCapped: boolean },
-) {
-  return {
-    id: row.id,
-    name: row.name,
-    scope: row.scope,
-    conditions: JSON.parse(row.conditions_json) as unknown,
-    createdBy: row.created_by,
-    lineAccountId: row.line_account_id,
-    isShared: Boolean(row.is_shared),
-    displayOrder: row.display_order,
-    isFavorite: row.display_order < 0,
-    createdAt: row.created_at,
-    matchCount: count?.matchCount ?? null,
-    matchCountCapped: count?.matchCountCapped ?? false,
-  };
-}
 
 async function countInboxSavedViewMatches(
   db: D1Database,
