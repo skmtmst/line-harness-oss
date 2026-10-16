@@ -33,3 +33,21 @@ test('RFM-11/B349-FILTER-01: 既存の検索形式で4条件をANDし、配信�
  const bad={all:[{kind:'visit_count',op:'between',value:{min:4,max:2}}]};expect((await gapCall(app,'/api/friends?lineAccountId=a&conditions='+encodeURIComponent(JSON.stringify(bad)))).status).toBe(422);
  expect((await gapCall(app,'/api/friends?lineAccountId=b&conditions='+encodeURIComponent(JSON.stringify(conditions)))).status).toBe(404);
 });
+
+test.each([
+ ['visit_count',{min:3},{min:2,max:2}],
+ ['purchase_amount',{min:6000},{min:5000,max:5000}],
+ ['last_activity_at',{from:'2026-10-16'},{from:'2026-10-15',to:'2026-10-15'}],
+ ['member_tier','gold','base'],
+] as const)('B349-fmToi-%s: 1条件だけでも一致と不一致を分け、anyでも同じ値を使う',async(kind,miss,hit)=>{
+ await setup();await refreshCustomerSegments(d.db,'a',new Date());
+ d.raw.exec("UPDATE customer_activity_daily SET amount=5000 WHERE friend_id='f' AND basis='purchase'");
+ const app=gapApp(d,[friends]);
+ for(const mode of ['all','any']as const)for(const [value,expected]of [[miss,[]],[hit,['f']]]as const){
+  const conditions={[mode]:[{kind,op:kind==='member_tier'?'eq':'between',value}]};
+  const r=await gapCall(app,'/api/friends?lineAccountId=a&conditions='+encodeURIComponent(JSON.stringify(conditions)));
+  expect(r.status,await r.clone().text()).toBe(200);
+  const ids=(await r.json() as any).data.items.map((x:any)=>x.id);
+  if(kind==='member_tier'&&value==='base')expect(ids.sort()).toEqual(['f','f2']);else expect(ids).toEqual(expected);
+ }
+});
