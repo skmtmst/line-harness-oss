@@ -6,6 +6,7 @@ import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import HelpTip from '../components/HelpTip.js';
 import MileageRewards from '../components/MileageRewards.js';
+import MemberCard from '../components/MemberCard.js';
 import AffiliatePayments from '../components/AffiliatePayments.js';
 import Button from '../components/ui/Button.js';
 import Card from '../components/ui/Card.js';
@@ -944,6 +945,7 @@ export default function Affiliate() {
       <div className="min-h-screen bg-canvas" data-design-node="S3uBl">
         <LiffHeader title="マイル・紹介" />
         <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
+          <MemberCard />
           {wallet && <MileageSummaryCard wallet={wallet} />}
           {wallet && <MileageOpportunities items={wallet.opportunities} />}
           <Card className="space-y-3 p-4" data-design-node="vqu9B">
@@ -1018,6 +1020,7 @@ export default function Affiliate() {
       <LiffHeader title="マイル・紹介" />
       <div className="mx-auto flex w-full max-w-md flex-col gap-3.5 p-4 pb-12">
 
+        <MemberCard />
         {wallet && <MileageSummaryCard wallet={wallet} />}
 
         <ReferralCard

@@ -972,6 +972,10 @@ const server = createServer(async (req, res) => {
       return;
     }
   }
+  if (method === 'GET' && pathname === '/api/liff/member-card') {
+    json(res, 200, { success: true, data: { name: 'シルバー', since: '2026-09-01T00:00:00.000Z', downgradeDueAt: '2026-12-31T00:00:00.000Z', next: { name: 'ゴールド', remaining: 2, metric: 'visits' } } });
+    return;
+  }
   if (method === 'GET' && pathname === '/api/liff/mileage/me') {
     json(res, 200, {
       mileage: {
