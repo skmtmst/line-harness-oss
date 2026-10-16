@@ -13,3 +13,5 @@
 .faint { color: var(--color-ink-faint); font-size: var(--text-caption); }
 .summary { color: var(--color-ink); font-size: var(--text-body); }
 .footer { display: flex; justify-content: center; gap: var(--space-8); width: 100%; }
+
+.radios { display: flex; flex-direction: column; gap: var(--space-8); }

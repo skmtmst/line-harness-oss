@@ -105,6 +105,7 @@ export function TagEditForm({
   const [linked, setLinked] = useState(host?.initialValues.linked ?? tag.linkedEnabled ?? (hasStoredLink || initialActions.length > 0))
   const [reward, setReward] = useState(String(tag.mileageReward ?? 0))
   const [referralReward, setReferralReward] = useState(String(tag.referralMileageReward ?? 0))
+  const [grantOn, setGrantOn] = useState((tag.mileageReward ?? 0) > 0 || (tag.referralMileageReward ?? 0) > 0)
   const [multiplier, setMultiplier] = useState(tag.mileageMultiplierBps == null ? '' : String(tag.mileageMultiplierBps))
   const [priority, setPriority] = useState(String(tag.mileageMultiplierPriority ?? 0))
   const [applyToExisting, setApplyToExisting] = useState(retroactiveReference)
@@ -192,6 +193,8 @@ export function TagEditForm({
 
   /* 使っている所：削除の影響確認と同じ数え方（dependencies）。取れないときはタグの一覧の数。 */
   const usageRows = buildUsageRows(dependencies, tag.usedIn)
+  /* このタグを付ける物（絵 zOc7f）：自動応答・回答フォーム・オートメーションなど、付ける側。 */
+  const grantAttachers = usageRows.filter((row) => ['自動応答', '回答フォーム', 'オートメーション', '友だち追加時の配信', '流入リンク', '友だち追加の経路'].includes(row.label) && row.count > 0)
   /* 競合の帯は共通部品（save-conflict）。絵は `xn95q`（頭の説明の下・横いっぱい）。 */
   const conflictBand = conflict ? (
     <div className={styles.conflictSlot}>
@@ -361,26 +364,32 @@ export function TagEditForm({
                   {retroPreview && (retroPreview.selfExcluded > 0 || retroPreview.referralExcluded > 0) ? (
                     <p className={styles.hint}>{`すでに付与済みの人（本人${retroPreview.selfExcluded} 人・紹介者${retroPreview.referralExcluded} 人）は対象から外れています。`}</p>
                   ) : null}
-                  <div className={styles.subHead}>
-                    <h3 className={styles.subTitle}>タグが付いたときに積むマイル</h3>
-                  </div>
+                </>
+              ) : null}
+            </Card>
+          ) : null}
+          {linked || host ? (
+            <Card variant="form" gap="normal" aria-label="このタグが付いたらマイル">
+              <CardHeader size="stacked" title="このタグが付いたらマイル" meta="付いた本人（と紹介者）に、一度だけマイルを足します"
+                action={readOnly ? <span className={styles.linkedState}>{grantOn ? 'オン' : 'オフ'}</span> : <SettingCheckbox checked={grantOn} onChange={(next) => { setGrantOn(next); if (!next) { setReward('0'); setReferralReward('0') } else if (!(Number(reward) > 0)) setReward('100') }} label="このタグが付いたらマイル" />} />
+              {grantOn ? (
+                <>
                   <SettingsFormRow layout="columns">
                     <Field note={<>このタグが付いた本人へ、一度だけ積みます。</>} label="本人へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <SaveErrorField names={["reward", "rewardMiles", "mileageReward", "mileage.self", "tag.mileage.self", "definition.tag.mileage.self"]}><NumberInput unit="mile" type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} /></SaveErrorField>}{readOnly ? <span className={styles.unit}>mile</span> : null}</span>
 </Field>
                     <Field note={<>紹介経由の友だちなら、その紹介者にも積みます。</>} label="紹介者へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <SaveErrorField names={["referralReward", "referral_reward", "referralRewardMiles", "referralMileageReward", "mileage.referrer", "tag.mileage.referrer", "definition.tag.mileage.referrer"]}><NumberInput unit="mile" type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} /></SaveErrorField>}{readOnly ? <span className={styles.unit}>mile</span> : null}</span>
 </Field>
                   </SettingsFormRow>
-                  {readOnly ? (
-                    <div className={styles.field}>
-                      <span className={styles.label}>タグを外して付け直したときの扱い</span>
-                      <span className={styles.roValue}>{reapplyMode === 'every' ? '付け直すたびに積む' : '最初の1回だけ積む'}</span>
+                  <div className={styles.switchRow}>
+                    <div className={styles.switchText}><span className={styles.label}>1 人 1 回だけ</span><span className={styles.hint}>タグを外して付け直したときの扱い：外して付け直しても足しません（外すと、付け直すたびに足します）。</span></div>
+                    {readOnly ? <span className={styles.linkedState}>{reapplyMode === 'once' ? 'オン' : 'オフ'}</span> : <SaveErrorField names={["reapplyMode"]}><SettingCheckbox checked={reapplyMode === 'once'} onChange={(next) => setReapplyMode(next ? 'once' : 'every')} label="1 人 1 回だけ" /></SaveErrorField>}
+                  </div>
+                  {grantAttachers.length > 0 ? (
+                    <div className={styles.attachBox}>
+                      <p className={styles.subTitle}>{`このタグを付ける物（${grantAttachers.reduce((sum, row) => sum + row.count, 0)}）`}</p>
+                      {grantAttachers.map((row) => <p key={row.label} className={styles.hint}>{`${row.label} ${row.count} 件`}</p>)}
                     </div>
-                  ) : (
-                  <SaveErrorField names={["reapplyMode"]}><RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
-                    <RadioCard name="reapplyMode" value="once" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} title="最初の1回だけ積む" note="誤操作や付け直しで、同じマイルが重複しません。" />
-                    <RadioCard name="reapplyMode" value="every" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} title="付け直すたびに積む" note="購入回数など、同じタグを繰り返し使う運用向けです。" />
-                  </RadioCardGroup></SaveErrorField>
-                  )}
+                  ) : null}
                 </>
               ) : null}
             </Card>

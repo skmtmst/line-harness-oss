@@ -10,14 +10,14 @@ import EmptyList from '@/components/shared/empty-list'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
-import ListToolbar from '@/components/shared/list-toolbar'
+import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { RowMenu } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
 import { notifySaved } from '@/components/shared/toast'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -161,11 +161,11 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
   )
 
   const toolbar = (
-    <ListToolbar
-      search={{ placeholder: '名前で探す', label: '名前で探す', value: query, onChange: (value) => { setPage(1); setQuery(value) } }}
-      filters={<Select aria-label="種類で絞り込む" value={kind} options={KIND_OPTIONS} onChange={(value) => { setPage(1); setKind(value as Kind) }} />}
-      trailing={<PageSizeSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next as 10 | 20 | 50) }} />}
-    />
+    <div className={styles.toolRow}>
+      <div className={styles.search}><SearchField placeholder="名前で探す" aria-label="名前で探す" value={query} onChange={(value) => { setPage(1); setQuery(value) }} onClear={() => { setPage(1); setQuery('') }} /></div>
+      <Select aria-label="種類で絞り込む" value={kind} options={KIND_OPTIONS} onChange={(value) => { setPage(1); setKind(value as Kind) }} />
+      <span className={styles.toolEnd}><PageSizeSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next as 10 | 20 | 50) }} /></span>
+    </div>
   )
 
   const body = status === 'loading' && plans.length === 0 ? (
@@ -213,7 +213,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
               <Td collapseAt="narrow"><TruncatedText value={usable} /></Td>
               <Td align="right">{holders === undefined ? <span className={styles.empty}>—</span> : `${formatNumber(holders)} 人`}</Td>
               <Td><StatusBadge tone={plan.status === 'on_sale' ? 'success' : 'neutral'}>{STATUS_LABEL[plan.status]}</StatusBadge></Td>
-              <Td>
+              <ActionCell>
                 <span className={styles.menuBox}>
                   <RowMenu
                     label={`${plan.name}の操作`}
@@ -230,7 +230,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
                     ]}
                   />
                 </span>
-              </Td>
+              </ActionCell>
             </Tr>
           )
         })}

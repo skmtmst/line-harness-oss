@@ -1,5 +1,6 @@
 'use client'
 
+import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import TagOverflow from '@/components/shared/tag-overflow'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
@@ -175,6 +176,8 @@ export default function AdvancedSearchDialog({
   const marksFeatureEnabled = features?.marks !== false
   const fieldsFeatureEnabled = features?.fields !== false
   const [blocks, setBlocks] = useState<Block[]>(() => defaultBlocks(fieldsFeatureEnabled))
+  /* ★V8 fmToi：来店・購入・会員ランクの絞り込みは、一覧の受け口ができるまで形だけ残す。 */
+  const preparing = usePreparingDialog()
   const [visibility, setVisibility] = useState<FriendVisibilityChoice>('visible')
   const [any, setAny] = useState<SavedSearchCondition[]>([])
   const [extraAll, setExtraAll] = useState<SavedSearchCondition[]>([])
@@ -679,6 +682,10 @@ export default function AdvancedSearchDialog({
                   ＋ {BLOCK_LABEL[k]}
                 </button>
               ))}
+              {['来店の回数', '購入の合計金額', '最後の来店・購入の日', '会員ランク'].map((label) => (
+                <button key={label} type="button" onClick={() => preparing.open(`${label}での絞り込み`)} className="text-action rounded-control px-1 py-1 text-xs font-semibold hover:bg-action-soft">＋ {label}</button>
+              ))}
+              {preparing.dialog}
           </div>
 
           {/* 編集画面で組み直せない保存済み条件。黙って落とさず外せる形で残す（FRIEND-32）。 */}

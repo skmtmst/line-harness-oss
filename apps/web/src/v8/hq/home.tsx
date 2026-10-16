@@ -8,6 +8,7 @@ import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd } from '@/components/s
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
+import { RowMenu } from '@/components/shared/row-actions'
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import { brandInitial } from '@/components/layout/brand-initial'
 import EmptyList from '@/components/shared/empty-list'
@@ -435,6 +436,21 @@ export default function HqHomeV8() {
     )
   }
 
+  /* ★V8 oFq4S：表の行末は「…」1つ（行の操作は中に）。 */
+  const tableMenu = (account: AccountWithStats) => {
+    const name = account.displayName || account.name
+    const items = isArchived(account)
+      ? [
+          { id: 'detail', label: '詳細', onSelect: () => setEditingAccount(account) },
+          ...(isOwner ? [{ id: 'restore', label: '戻す', onSelect: () => setArchiveTarget({ account, mode: 'restore' as const }) }] : []),
+        ]
+      : [
+          { id: 'login', label: 'このアカウントに切り替える', onSelect: () => login(account.id) },
+          ...(canManage ? [{ id: 'settings', label: '設定', onSelect: () => setSettingsAccount(account) }] : []),
+        ]
+    return <RowMenu label={`${name}の操作`} items={items} />
+  }
+
   const folderDotOf = (account: AccountWithStats) => {
     const id = folderOf(account)
     const found = id ? folders.find((item) => item.id === id) ?? (account as { folder?: Folder | null }).folder ?? null : null
@@ -587,7 +603,7 @@ export default function HqHomeV8() {
             <span role="columnheader">対応が要る</span>
             <span role="columnheader" className={styles.num}>友だち</span>
             <span role="columnheader" className={styles.num}>今月の配信</span>
-            <span role="columnheader">操作</span>
+            <span role="columnheader" className="sr-only">操作</span>
           </div>
           {shown.map((account) => {
             const state = statusOf(account)
@@ -610,7 +626,7 @@ export default function HqHomeV8() {
                 <span role="cell">{state.tone === 'warn' ? `${Math.max(1, account.connection?.issues?.length ?? 0)} 件` : <span>—</span>}</span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.friendCount ?? 0)}</span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.messagesThisMonth ?? 0)}</span>
-                <span role="cell">{cardActions(account)}</span>
+                <span role="cell" className={styles.rowEnd}>{tableMenu(account)}</span>
               </div>
             )
           })}

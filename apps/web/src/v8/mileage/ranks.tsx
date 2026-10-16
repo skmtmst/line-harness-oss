@@ -16,7 +16,8 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
 import { TextField } from '@/components/shared/text-field'
 import { notifySaved } from '@/components/shared/toast'
 import { ApiError } from '@/lib/api'
@@ -144,8 +145,8 @@ export default function RanksTab() {
     <DataTable>
       <thead>
         <TableHeadRow>
-          <Th grow>ランク</Th>
-          <Th>上がる条件</Th>
+          <Th>ランク</Th>
+          <Th grow>上がる条件</Th>
           <Th>下がる条件</Th>
           <Th>特典</Th>
           <Th align="right">今の人数</Th>
@@ -157,8 +158,8 @@ export default function RanksTab() {
           const count = countOf(tier.id)
           return (
             <Tr key={tier.id} data-row-id={tier.id}>
-              <Td grow><StatusBadge tone={index === 0 ? 'neutral' : index === tiers.length - 1 ? 'warning' : 'info'} dot={false}>{tier.name}</StatusBadge></Td>
-              <Td>{upText(program, tier, index === 0)}</Td>
+              <Td><StatusBadge tone={index === 0 ? 'neutral' : index === tiers.length - 1 ? 'warning' : 'info'} dot={false}>{tier.name}</StatusBadge></Td>
+              <Td grow><TruncatedText value={upText(program, tier, index === 0)} /></Td>
               <Td>{index === 0 ? <span className={styles.empty}>—</span> : downText(program, tier)}</Td>
               <Td>
                 {tier.mileMultiplier > 1
@@ -166,7 +167,7 @@ export default function RanksTab() {
                   : <span className={styles.empty}>—</span>}
               </Td>
               <Td align="right">{count === undefined ? <span className={styles.empty}>—</span> : `${formatNumber(count)} 人`}</Td>
-              <Td>
+              <ActionCell>
                 {readonly ? null : (
                   <span className={styles.menuBox}>
                     <RowMenu
@@ -180,7 +181,7 @@ export default function RanksTab() {
                     />
                   </span>
                 )}
-              </Td>
+              </ActionCell>
             </Tr>
           )
         })}

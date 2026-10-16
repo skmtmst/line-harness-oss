@@ -77,8 +77,10 @@ test('閲覧のみでも連動とマイルの明細を開閉でき、変更の�
   expect(linked.getByRole('button', { name: '閉じる' })).toBeTruthy()
   const mileage = within(screen.getByRole('region', { name: 'マイル' }))
   fireEvent.click(mileage.getByRole('button', { name: '開く' }))
-  expect(mileage.getByText('本人へのマイル付与')).toBeTruthy()
-  expect(mileage.getByText('500')).toBeTruthy()
+  /* ★V8 zOc7f：付いたときに積むマイルは、別の箱「このタグが付いたらマイル」。 */
+  const grant = within(screen.getByRole('region', { name: 'このタグが付いたらマイル' }))
+  expect(grant.getByText('本人へのマイル付与')).toBeTruthy()
+  expect(grant.getByText('500')).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'タグを保存する' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'タグを削除する' })).toBeNull()
   expect(screen.queryByRole('button', { name: '複製して作る' })).toBeNull()

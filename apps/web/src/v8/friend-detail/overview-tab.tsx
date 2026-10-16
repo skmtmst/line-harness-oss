@@ -110,7 +110,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
     return () => { alive = false }
   }, [selectedAccountId, friendId])
   return (
-  <CustomerInfoRail><aside className={styles.summary} data-design="Left" data-friend-profile-panel>
+  <><CustomerInfoRail><aside className={styles.summary} data-design="Left" data-friend-profile-panel>
     <CustomerInfoPanel
       friendId={friendId}
       profile={{ name: realName || friend.displayName, pictureUrl: friend.pictureUrl, addedAt: friend.createdAt ? formatDay(friend.createdAt) : '追加日不明' }}
@@ -192,7 +192,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         </section>
       </div>}
     />
-  </aside><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} rows={consents.rows} canEdit={perms.manage} onClose={() => setConsentOpen(false)} onSaved={consents.reload} /></CustomerInfoRail>
+  </aside></CustomerInfoRail><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} rows={consents.rows} canEdit={perms.manage} onClose={() => setConsentOpen(false)} onSaved={consents.reload} /></>
   )
 }
 

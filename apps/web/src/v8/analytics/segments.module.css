@@ -42,8 +42,7 @@
 .cell[data-level='2'] { background: color-mix(in srgb, var(--color-accent-deep) 28%, var(--color-canvas)); }
 .cell[data-level='3'] { background: color-mix(in srgb, var(--color-accent-deep) 55%, var(--color-canvas)); }
 .cell[data-level='4'] { background: var(--color-accent-deep); color: var(--color-on-accent); }
-.cell:focus-visible { outline: var(--focus-ring); outline-offset: var(--polish-focus-offset); }
-.cell[aria-pressed='true'] { outline: var(--focus-ring); outline-offset: calc(var(--polish-focus-offset) * -1); }
+.cell[aria-pressed='true'] { outline: var(--polish-focus-width) solid var(--color-ink); outline-offset: calc(var(--polish-focus-offset) * -1); }
 .cellName { overflow: hidden; font-size: var(--text-micro); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .cellCount { font-size: var(--text-body); font-weight: 700; }
 
@@ -53,3 +52,5 @@
 .optOut { display: flex; align-items: center; gap: var(--space-8); }
 .nameCell { color: var(--color-ink); font-weight: 600; }
 .footer { display: flex; justify-content: center; gap: var(--space-8); width: 100%; }
+
+.cell:focus-visible { outline: var(--focus-ring); outline-offset: var(--polish-focus-offset); }

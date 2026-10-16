@@ -11,7 +11,7 @@ import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Pagination from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/shared/page-size-select'
-import PeriodPicker, { pastPeriod } from '@/components/shared/period-picker'
+import { pastPeriod } from '@/components/shared/period-picker'
 import Select from '@/components/shared/select'
 import { DataTable, SortTh, TableHeadRow, Td, Th, Tr, type SortDirection } from '@/components/shared/table'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
@@ -89,7 +89,7 @@ export default function StoreComparisonList() {
   const toolbar = (
     <ListToolbar
       filters={<>
-        <PeriodPicker days={days} onChange={(next) => { setPage(1); setDays(next) }} />
+        <Select aria-label="期間" value={String(days)} options={[7, 30, 90].map((value) => ({ value: String(value), label: `期間：過去${value}日` }))} onChange={(value) => { setPage(1); setDays(Number(value)) }} />
         <Select aria-label="比べる相手" value={compare} options={COMPARE_OPTIONS} onChange={(value) => { setPage(1); setCompare(value as 'previous' | 'average') }} />
         <Button variant="secondary" onClick={() => preparing.open('店の組での絞り込み')}>店の組：すべて</Button>
       </>}
@@ -133,7 +133,7 @@ export default function StoreComparisonList() {
         <span className={styles.averageText}>
           {METRICS.map((def) => `${def.label} ${formatMetric(def.key, data.average[def.key] ?? null)}`).join('・')}
         </span>
-        <span className={styles.averageNote}>平均より悪い数は赤の札</span>
+        <span className={styles.averageNote}>{`札は${compare === 'average' ? '全店の平均' : '前の期間'}との差（赤＝悪い・緑＝良い）`}</span>
       </div>
     </>
   )
@@ -144,7 +144,7 @@ export default function StoreComparisonList() {
         skeleton
         boardId="W4fI7A"
         title="店の比較"
-        help={<>店ごとに、友だち・予約・来店・返事の速さを並べて見ます。平均より悪い数は赤の札で知らせます。数は毎朝、前の日の分まで更新します。{METRICS.map((def) => <span key={def.key}><br />{`${def.label}：${def.help}`}</span>)}</>}
+        help={<>店ごとに、友だち・予約・来店・返事の速さを並べて見ます。平均より悪い数は赤の札で知らせます。数は毎朝、前の日の分まで更新します。数の横の札は、「比べる相手」（前の期間か全店の平均）との差で、赤は悪い方・緑は良い方です。{METRICS.map((def) => <span key={def.key}><br />{`${def.label}：${def.help}`}</span>)}</>}
         toolbar={toolbar}
         pagination={status === 'ready' && total > 0 ? (
           <ListPagePagination>
@@ -155,7 +155,7 @@ export default function StoreComparisonList() {
       >
         {body}
       </ListPage>
-      <StoreDrawer row={openRow} period={period} onClose={() => setOpenId(null)} />
+      <StoreDrawer row={openRow} period={period} compare={compare} onClose={() => setOpenId(null)} />
       {preparing.dialog}
     </>
   )
@@ -170,7 +170,7 @@ function MetricCell({ def, metric, compare }: { def: MetricDef; metric: StoreCom
   return (
     <span className={styles.cell} title={diffTitle(def.key, metric.diff, compare)}>
       {formatMetric(def.key, metric.value)}
-      {diff && tone ? <DeltaChip tone={tone}>{diff}</DeltaChip> : null}
+      <span className={styles.chipSlot}>{diff && tone ? <DeltaChip tone={tone}>{diff}</DeltaChip> : null}</span>
     </span>
   )
 }
@@ -180,7 +180,7 @@ type Detail = {
   attention: unknown
 }
 
-function StoreDrawer({ row, period, onClose }: { row: StoreComparisonRow | null; period: { from: string; to: string }; onClose: () => void }) {
+function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRow | null; period: { from: string; to: string }; compare: 'previous' | 'average'; onClose: () => void }) {
   const router = useRouter()
   const { setSelectedAccountId } = useAccount()
   const [detail, setDetail] = useState<{ id: string; status: Status; data: Detail | null }>({ id: '', status: 'loading', data: null })
@@ -211,7 +211,7 @@ function StoreDrawer({ row, period, onClose }: { row: StoreComparisonRow | null;
     <Drawer
       open={row !== null}
       title={row?.name ?? ''}
-      description={row ? `${worse > 0 ? `平均より下の数 ${worse} つ` : '平均より下の数はありません'}` : undefined}
+      description={row ? `${worse > 0 ? `${compare === 'average' ? '全店の平均' : '前の期間'}より悪い数 ${worse} つ` : `${compare === 'average' ? '全店の平均' : '前の期間'}より悪い数はありません`}` : undefined}
       closeAppearance="box"
       heightMode="viewport"
       onClose={onClose}

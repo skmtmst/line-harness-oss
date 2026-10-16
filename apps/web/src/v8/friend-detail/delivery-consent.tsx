@@ -7,8 +7,9 @@ import Drawer from '@/components/shared/drawer'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import StatusBadge from '@/components/shared/status-badge'
+import StatusPill from '@/components/shared/status-pill'
+import Radio from '@/components/shared/radio'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { notifySaved } from '@/components/shared/toast'
 import { friendDeliveryConsentsApi, type FriendDeliveryConsent } from '@/lib/api-friend-delivery-consents'
@@ -140,7 +141,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
                   <span className={styles.rowTitle}>{purpose.label}</span>
                   <span className={styles.rowNote}>{purpose.note}</span>
                 </div>
-                <StatusBadge tone={STATE_TONE[state]}>{STATE_LABEL[state]}</StatusBadge>
+                <StatusPill tone={STATE_TONE[state]}>{STATE_LABEL[state]}</StatusPill>
                 {canEdit ? <Button variant="secondary" onClick={() => begin(purpose.key)}>変える</Button> : null}
               </div>
             )
@@ -150,11 +151,11 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
           <section className={styles.edit} aria-label={`${label(editing)}を変える`}>
             <h3 className={styles.sectionTitle}>{`変える（${label(editing)}）`}</h3>
             <div className={styles.card}>
-              <RadioCardGroup legend="受け取り" legendVisible={false}>
+              <div className={styles.radios} role="radiogroup" aria-label="受け取り">
                 {STATES.map((state) => (
-                  <RadioCard key={state} name="consent-state" value={state} checked={next === state} onChange={() => setNext(state)} title={state === 'unknown' ? '不明（まだ聞いていない）' : STATE_LABEL[state]} />
+                  <Radio key={state} name="consent-state" value={state} checked={next === state} onChange={() => setNext(state)}>{state === 'unknown' ? '不明（まだ聞いていない）' : STATE_LABEL[state]}</Radio>
                 ))}
-              </RadioCardGroup>
+              </div>
               <Field label="理由" required error={reasonError}>
                 <TextField aria-label="理由" value={reason} placeholder="例：お電話で「宣伝はいらない」とご連絡" onChange={(event) => { setReason(event.target.value); setReasonError('') }} />
               </Field>
@@ -164,16 +165,19 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
         <section aria-label="履歴">
           <h3 className={styles.sectionTitle}>履歴</h3>
           {history.length === 0 ? <p className={styles.faint}>まだ記録はありません。</p> : (
-            <div className={styles.history}>
-              {history.map((row) => (
-                <div key={`${row.purpose}-${row.version}`} className={styles.historyRow}>
-                  <span>{md(row.updatedAt)}</span>
-                  <span>{label(row.purpose)}</span>
-                  <span>{STATE_LABEL[row.state]}</span>
-                  <span title={row.reason}>{row.source === 'manual' ? (row.updatedBy ?? 'スタッフ') : '本人'}</span>
-                </div>
-              ))}
-            </div>
+            <DataTable>
+              <thead><TableHeadRow><Th>いつ</Th><Th>目的</Th><Th>状態</Th><Th>だれ</Th></TableHeadRow></thead>
+              <tbody>
+                {history.map((row) => (
+                  <Tr key={`${row.purpose}-${row.version}`}>
+                    <Td>{md(row.updatedAt)}</Td>
+                    <Td>{label(row.purpose)}</Td>
+                    <Td>{STATE_LABEL[row.state]}</Td>
+                    <Td><span title={row.reason}>{row.source === 'manual' ? (row.updatedBy ?? 'スタッフ') : '本人'}</span></Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </DataTable>
           )}
         </section>
       </div>

@@ -51,3 +51,5 @@
 .recentDate { color: var(--color-ink-secondary); white-space: nowrap; }
 .mute { color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .footer { display: flex; justify-content: center; width: 100%; }
+
+.chipSlot { display: inline-flex; min-inline-size: calc(var(--space-32) + var(--space-16)); }

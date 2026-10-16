@@ -63,6 +63,7 @@ describe('店の比較の表', () => {
     expect(screen.getByText('−25')).toBeTruthy()
     expect(screen.getAllByTitle('この数はまだ取れていません').length).toBe(2)
     expect(screen.getByText('2 店の平均')).toBeTruthy()
+    expect(screen.getByText(/札は前の期間との差（赤＝悪い・緑＝良い）/)).toBeTruthy()
   })
 
   it('列の見出しを押すとその数の順で頼み直す（同じ列をもう一度押すと向きが逆）', async () => {

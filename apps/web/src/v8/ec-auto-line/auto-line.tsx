@@ -9,7 +9,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { RowMenu } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Toggle from '@/components/shared/toggle'
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
@@ -180,7 +180,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
                 <Td align="right"><span className={styles.empty} title="クリックの計測はまだつながっていません">—</span></Td>
                 <Td align="right"><span className={styles.empty} title="購入の計測はまだつながっていません">—</span></Td>
                 <Td align="right"><span className={styles.empty} title="金額の計測はまだつながっていません">—</span></Td>
-                <Td>
+                <ActionCell>
                   {canEdit ? (
                     <span className={styles.menuBox}>
                       <RowMenu
@@ -194,7 +194,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
                       />
                     </span>
                   ) : null}
-                </Td>
+                </ActionCell>
               </Tr>
             )
           })}
