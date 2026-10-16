@@ -160,9 +160,10 @@ export default function AnswerLogV8() {
           title="AI が答えた記録"
           description={opened ? `${at(opened.createdAt)} ・ ${opened.friendName} さん` : undefined}
           closeAppearance="box"
+          heightMode="viewport"
           onClose={() => setUrl({ log: '' })}
           footer={opened && permissions.publishQa && opened.qa && opened.qa.status === 'published' && opened.action === 'answered'
-            ? <Button onClick={() => { setStopError(''); setStopTarget({ qaEntryId: opened.qa!.id, title: opened.qa!.title, version: opened.qa!.version }) }}>この答えを止める</Button>
+            ? <div className={styles.footerEnd}><Button onClick={() => { setStopError(''); setStopTarget({ qaEntryId: opened.qa!.id, title: opened.qa!.title, version: opened.qa!.version }) }}>この答えを止める</Button></div>
             : undefined}
         >
           {detail?.kind === 'loading' ? <ListState kind="loading" /> : null}

@@ -3,6 +3,7 @@
  * 枠・見出し・タブ・道具・表は型（ListPage）と共通部品。ここは帯を縦に並べる間と窓の中身だけ。
  */
 .bands {
+  padding-inline: var(--space-16);
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
@@ -99,8 +100,18 @@
 }
 
 .link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  white-space: nowrap;
   color: var(--color-action);
   font-size: var(--text-micro);
   font-weight: 700;
   text-decoration: none;
+}
+
+/* 引き出しの下の帯：操作は右寄せ（板 V5WpQ）。 */
+.footerEnd {
+  display: flex;
+  justify-content: flex-end;
 }
