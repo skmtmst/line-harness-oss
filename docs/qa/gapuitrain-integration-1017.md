@@ -3,7 +3,7 @@
 ## 取り込み
 
 開始HEAD e7cbcf22c6はA/B/C取り込み済み、Dのmerge途中。MERGE_HEAD b22c695089から今回の司令塔回答を適用して再開した。
-F土台を保持し、D e17fea9be2、E 0d88aa3ab2、gap3 112de8816b、最新本線 ab3d2eda63をすべて--no-ffで包含。
+F土台を保持し、D e17fea9be2、E 0d88aa3ab2、gap3 112de8816b、最新本線 ab3d2eda63、gap3の最終確認の履歴 c76f6f5ebdをすべて--no-ffで包含。
 API列車origin/codex/kenta-apitrain-1016 3bc9359966はgap3に包含済みで追加mergeは不要だった。
 検査のbaseはorigin/codex/development b2f05ca80e68eed14e947cb9ab000242d29a1526。
 
@@ -29,9 +29,19 @@ API列車origin/codex/kenta-apitrain-1016 3bc9359966はgap3に包含済みで追
 - pnpm全typecheck終了0。分割後のWeb/LIFF型も終了0。
 - 共通部品の新規指摘0・許可0、ソース断定の追加0、code-size違反0、entity-picker違反0。
 - 回数券の旧/新URLと一覧/案内を含む関連7件、変更した8ファイル26件、LIFF読み込み失敗の見張り7件/回復2件は成功。
-- 初回DB全試験、更新処理、セットアップ、共有、LIFF全試験と型、scripts型、Worker型は成功。Worker全試験と初回CI後半は進行中。
-- 全体lintのエラーはany2件のみ。修正ファイルのlint終了0。既存の警告は別に保持。
+- 初回DB全試験、更新処理、セットアップ、共有、LIFF全試験と型、scripts型、Worker型は成功。Worker全試験は1081ファイル/12811件成功。初回CI後半は進行中。
+- CIの画面lintで見つかったany2件を修正。修正後のsrc全体lintはエラー0（既存警告は保持）。任意のeslint .は生成宣言とCI対象外の点検スクリプトの既存2件を検出するため、CIのnext lintと区別する。
 - 反映履歴はpending-kenta-gapui-integration.md。#PR番号は司令塔の採番後に置換する。
 - docs/v8-pattern-catalog.mdは保護対象のため変更しない。追記案はgapuitrain-pattern-catalog-proposal-1017.mdへ保存し、司令塔の正規経路に渡す。
 
 push/PR作成・DB適用・配備・実送信・実決済は行わない。
+
+## Web全試験で見つかった不足の修正（a561556e3b）
+
+- 保存の失敗を9か所で共通の欄へ返し、入力を保持。会議URLの422応答について、欄下の理由・赤枠・値の保持を動作試験に追加。
+- 未保存の13か所を実際の持ち主へ接続。タブの編集状態は親、作成画面は型、繰り返す予約・会議URL・会話の割り当て・卓の設定は共通の番兵がリンク/履歴/再読込を守る。対象外の追加0。再読込の停止とunmount後の解除も動作試験で確認。
+- APIの英語エラーを共通の日本語案内へ。壊れた保存済みの選択値を空の選択に置き換えず読み込み失敗へ返し、空の内容での上書きを防止。配信本文の復元は元の動きを保持し、既存の解析例外の登録1件を移動先へ追従（追加の例外0）。
+- 新しい画面の直書き値を共通変数へ。共通部品の利用先一覧は実ファイルから導出し、22件追加/1件削除。閾値は変更しない。
+- Webの見張り14ファイル74件、関連動作試験、型検査、src lint、code-size（0件）・共通部品の新規指摘（0件）・ソース断定（0件）は成功。
+- 最終CIはa561556e3bを新品の作業場所へ出し、Node22.23.3で再検査中。ログは `/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261016-233827-a561556e3b-39007/`。
+- LIFF最新全試験は88ファイル/500件成功。Worker/DBのコードは初回全試験成功時と同一。LIFFを含むWorkerの最終ビルドとブラウザ入口/安全ヘッダーの確認もc76f6f5ebdで成功。
