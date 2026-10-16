@@ -576,6 +576,7 @@ export interface SavedSearchConditions {
 /** 共通の配信対象条件1本。画面・人数確認・実送信で同じ形を使う。 */
 export interface SavedSegmentRule {
   type:
+    | "customer_segment" | "visit_count" | "purchase_amount" | "last_activity_at" | "member_tier"
     | "tag_exists"
     | "tag_not_exists"
     | "tag_all"

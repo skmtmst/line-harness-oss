@@ -4919,5 +4919,172 @@
       "by": "lineAccount",
       "column": "line_account_id"
     }
+  },
+  "ai_answer_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "booking_cancellation_options": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "booking_deposit_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "booking_groups": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_pass_plans": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "customer_activity_daily": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "customer_activity_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ec_auto_line_rule_events": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ec_auto_line_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ec_auto_line_sends": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ec_behavior_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "hq_store_daily_metrics": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "inbox_assignment_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "inbox_assignment_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "mcp_call_logs": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "connection_id",
+      "parent": "mcp_connections",
+      "parentColumn": "id"
+    }
+  },
+  "mcp_connections": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "organization_id"
+    }
+  },
+  "member_rank_history": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "member_rank_mutations": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "member_rank_programs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "member_rank_tiers": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "member_ranks": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "rfm_segment_names": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "staff_presence": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
   }
+,
+  "hq_store_response_samples": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}}
 }

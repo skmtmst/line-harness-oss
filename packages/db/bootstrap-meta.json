@@ -627,7 +627,14 @@
     "710_broadcast_ab_tests.sql",
     "711_ai_drafts_qa.sql",
     "712_operator_push.sql",
-    "713_booking_hq_origin.sql"
+    "713_booking_hq_origin.sql",
+    "714_inbox_assignment.sql",
+    "715_ai_mcp_management.sql",
+    "716_booking_rules_groups.sql",
+    "717_customer_segments_ranks.sql",
+    "718_hq_store_metrics.sql",
+    "719_ec_auto_line.sql",
+    "720_booking_pass_plans.sql"
   ],
-  "migrationCount": 628
+  "migrationCount": 635
 }

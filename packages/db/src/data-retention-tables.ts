@@ -60,7 +60,10 @@ export function purgeTablesChildFirst(): string[] {
   /** その表の行を選ぶために、まだ残っていないといけない表。 */
   const dependsOn = (name: string): string[] => {
     // 第2弾の参照を残したまま親の組・申込を先に消さない。
-    if (name === 'bookings') return ['booking_series'];
+    if (name === 'bookings') return ['booking_series','booking_groups'];
+    if (name === 'member_ranks') return ['member_rank_tiers'];
+    if (name === 'hq_store_response_samples') return ['chats'];
+    if (name === 'ec_auto_line_sends') return ['ec_behavior_events'];
     if (name === 'booking_makeup_credits') return ['event_bookings'];
     // Files also reference answers and friends; remove them before either parent.
     if (name === 'form_submission_files') return ['form_submissions'];

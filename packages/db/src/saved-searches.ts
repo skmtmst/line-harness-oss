@@ -240,6 +240,7 @@ export function validateSearchConditions(
 }
 
 const SEGMENT_RULE_TYPES = new Set([
+  'customer_segment','visit_count','purchase_amount','last_activity_at','member_tier',
   'tag_exists',
   'tag_not_exists',
   'tag_all',

@@ -143,6 +143,23 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
   const bindings: unknown[] = []
 
   switch (rule.type) {
+    case 'customer_segment': {
+      const v=asRecord(rule.value,rule.type),r=Number(v.r),f=Number(v.f),basis=v.basis??'both',measure=v.measure??'count';
+      if(![r,f].every(n=>Number.isInteger(n)&&n>=1&&n<=5)||!['visit','purchase','both'].includes(String(basis))||!['count','amount'].includes(String(measure)))throw new Error('invalid customer segment');
+      return {sql:`EXISTS(SELECT 1 FROM customer_activity_daily c WHERE c.account_id=f.line_account_id AND c.friend_id=f.id AND c.basis=? AND c.r_bucket=? AND c.${measure==='amount'?'m_bucket':'f_bucket'}=?)`,bindings:[basis,r,f]};
+    }
+    case 'visit_count': case 'purchase_amount': {
+      const v=asRecord(rule.value,rule.type),min=Number(v.min??0),max=v.max===undefined?Number.MAX_SAFE_INTEGER:Number(v.max);
+      if(!Number.isFinite(min)||!Number.isFinite(max)||min<0||max<min)throw new Error('invalid customer activity range');
+      const column=rule.type==='visit_count'?'activity_count':'amount',basis=rule.type==='visit_count'?'visit':'purchase';
+      return {sql:`EXISTS(SELECT 1 FROM customer_activity_daily c WHERE c.account_id=f.line_account_id AND c.friend_id=f.id AND c.basis=? AND c.${column} BETWEEN ? AND ?)`,bindings:[basis,min,max]};
+    }
+    case 'last_activity_at': {
+      const range=buildDateRange('c.last_activity_at',rule.value,rule.type);
+      return {sql:`EXISTS(SELECT 1 FROM customer_activity_daily c WHERE c.account_id=f.line_account_id AND c.friend_id=f.id AND c.basis='both' AND ${range.sql})`,bindings:range.bindings};
+    }
+    case 'member_tier': return {sql:'EXISTS(SELECT 1 FROM member_ranks r WHERE r.account_id=f.line_account_id AND r.friend_id=f.id AND r.tier_id=?)',bindings:[asString(rule.value,rule.type)]};
+
     case 'friend_id_in': {
       const ids = [...new Set(asStringArray(rule.value, 'friend_id_in'))];
       // IDごとの ? を並べるとD1のbind上限へ当たる。JSONは1 bindで展開する。

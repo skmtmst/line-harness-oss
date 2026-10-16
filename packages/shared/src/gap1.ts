@@ -9,7 +9,7 @@ export interface SendConfirmationPreview {
  purpose:'marketing';scheduledAt:string|null;quietHoursShiftTo:string|null;needsApproval:boolean;firstText:string;sender:LineSenderSnapshot|null;
  expectedVersion:string|number;stoppable?:boolean;perAccount?:Array<{accountId:string;recipients:number;excluded:SendConfirmationPreview['excluded']}>;
 }
-export interface InboxFirstResponseSettings {strategy:'none';enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;version:number;escalateTeamId:string|null}
+export interface InboxFirstResponseSettings {strategy:'none'|'even'|'priority'|'random_weighted';targets?:Array<{staffId:string;priority:number;cap:number}>;enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;version:number;escalateTeamId:string|null}
 export type InboxFirstResponseWrite=Omit<InboxFirstResponseSettings,'version'|'escalateTeamId'> & {expectedVersion:number;escalateTeamId?:string|null};
 export type InboxSlaState='none'|'ok'|'soon'|'overdue'|'outside_hours';
 export interface BookingCancellationPolicy {enabled:boolean;tiers:Array<{beforeHours:number;percent:number}>;noShowPercent:number;version:number}
