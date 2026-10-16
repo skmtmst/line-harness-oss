@@ -1,0 +1,279 @@
+'use client'
+
+/*
+ * ★V8 自動応答の「AI が答えた記録」タブ（板 LPkKH、行を押した引き出し V5WpQ）。
+ * 要件 G2 §2-1・§4（AI-14・18・19・20）。数の帯 3 つ・したこと／期間・件数・表（日時・お客さま・質問・したこと・元の Q&A）。
+ * 行を押すと引き出しに 質問・送った答えの全文・元の Q&A・そのあとの会話。行末「…」に［受信箱で開く］［Q&A に足す］。
+ */
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Drawer from '@/components/shared/drawer'
+import EmptyList from '@/components/shared/empty-list'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import { ListToolbarEnd, ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
+import { useListUrlState } from '@/components/shared/list-url-state'
+import Pagination from '@/components/shared/pagination'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { RowMenu } from '@/components/shared/row-actions'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
+import { describeApiFailure, loadFailureCopy } from '@/components/shared/api-error-message'
+import { notifyToast } from '@/components/shared/toast'
+import { ListPage } from '@/components/templates'
+import { useAccount } from '@/contexts/account-context'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { formatDate, formatNumber } from '@/lib/format'
+import { History } from 'lucide-react'
+import { aiReplyApi, type AiAnswerLog, type AiAnswerLogDetail, type AiAnswerSummary, type AnswerAction } from './api'
+import { AutoReplyTabs } from './auto-reply-tabs'
+import QaEditDialog, { type QaDraftSeed } from './qa-edit-dialog'
+import { QA_HELP } from './qa-list'
+import { useAiSettings } from './use-ai-settings'
+import { ACTION_LABEL, ACTION_TONE, QA_STATUS_LABEL, handoffReasonText } from './words'
+import styles from './qa-list.module.css'
+
+const ACTION_OPTIONS = [
+  { value: '', label: 'したこと：すべて' },
+  { value: 'answered', label: '答えた' },
+  { value: 'handed_off', label: '人へ回した' },
+  { value: 'customer_asked_human', label: 'お客さまが「人と話したい」' },
+]
+const PERIOD_OPTIONS = [
+  { value: '7', label: '期間：過去7日' },
+  { value: '30', label: '期間：過去30日' },
+  { value: '90', label: '期間：過去90日' },
+]
+const PAGE_SIZE_OPTIONS = [
+  { value: '10', label: '10件表示' },
+  { value: '20', label: '20件表示' },
+  { value: '50', label: '50件表示' },
+]
+
+type Load = { kind: 'loading' } | { kind: 'ready'; items: AiAnswerLog[]; total: number; summary: AiAnswerSummary } | { kind: 'error'; error: unknown }
+type Detail = { kind: 'loading' } | { kind: 'ready'; data: AiAnswerLogDetail } | { kind: 'error'; message: string }
+
+const at = (value: string) => formatDate(value, { style: 'list', fallback: '—' })
+
+export default function AnswerLogV8() {
+  const { selectedAccountId } = useAccount()
+  const accountId = selectedAccountId ?? ''
+  const { permissions } = useAiSettings(selectedAccountId)
+  usePageTitle('AI が答えた記録')
+  usePageCrumbs([{ label: '自動応答', href: '/auto-replies' }])
+  const [url, setUrl] = useListUrlState({ action: '', days: '30', page: '1', size: '20', log: '' })
+  const page = Math.max(1, Number(url.page) || 1)
+  const size = Number(url.size) || 20
+  const days = Number(url.days) || 30
+  const [load, setLoad] = useState<Load>({ kind: 'loading' })
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<Detail | null>(null)
+  const [seed, setSeed] = useState<QaDraftSeed | null>(null)
+  const [stopTarget, setStopTarget] = useState<{ qaEntryId: string; title: string; version: number } | null>(null)
+  const [stopBusy, setStopBusy] = useState(false)
+  const [stopError, setStopError] = useState('')
+  const generation = useRef(0)
+
+  const fetchList = useCallback(async () => {
+    const mine = ++generation.current
+    if (!accountId) { setLoad({ kind: 'ready', items: [], total: 0, summary: { answered: 0, handedOff: 0, askedAgainRate: null } }); return }
+    setLoad({ kind: 'loading' })
+    try {
+      const res = await aiReplyApi.logs(accountId, { action: url.action as AnswerAction | '', days, page, limit: size })
+      if (mine !== generation.current) return
+      setLoad({ kind: 'ready', ...res.data })
+    } catch (error) {
+      if (mine !== generation.current) return
+      setLoad({ kind: 'error', error })
+    }
+  }, [accountId, url.action, days, page, size])
+  useEffect(() => { void fetchList() }, [fetchList])
+
+  const openLog = useCallback(async (id: string) => {
+    setDetail({ kind: 'loading' })
+    try {
+      const res = await aiReplyApi.log(accountId, id)
+      setDetail({ kind: 'ready', data: res.data })
+    } catch (caught) {
+      setDetail({ kind: 'error', message: describeApiFailure(caught, '記録の読み込み') })
+    }
+  }, [accountId])
+  useEffect(() => {
+    if (url.log && accountId) void openLog(url.log)
+    else setDetail(null)
+  }, [url.log, accountId, openLog])
+
+  const stopAnswer = async () => {
+    if (!stopTarget) return
+    setStopBusy(true)
+    setStopError('')
+    try {
+      await aiReplyApi.stopQa(accountId, stopTarget.qaEntryId, stopTarget.version)
+      notifyToast('この答えを止めました。返信案にも自動の答えにも使いません')
+      setStopTarget(null)
+      if (url.log) void openLog(url.log)
+    } catch (caught) {
+      setStopError(describeApiFailure(caught, '止める操作'))
+    } finally {
+      setStopBusy(false)
+    }
+  }
+
+  const total = load.kind === 'ready' ? load.total : 0
+  const summary = load.kind === 'ready' ? load.summary : null
+  const failure = load.kind === 'error' ? loadFailureCopy(load.error, 'AI が答えた記録') : null
+  const opened = detail?.kind === 'ready' ? detail.data : null
+
+  return (
+    <ListPage
+      boardId="LPkKH"
+      headingSize="regular"
+      heightMode="content"
+      title="自動応答"
+      help={QA_HELP}
+      tabs={<AutoReplyTabs active="ai-log" />}
+      stats={<>
+        {permissions.viewer ? <ReadOnlyNotice role="status" /> : null}
+        <KpiBand aria-label="AI が答えた数">
+          <KpiCard title="答えた" value={summary ? summary.answered : null} unit={summary ? '件' : ''} detail={`過去${days}日`} />
+          <KpiCard title="人へ回した" value={summary ? summary.handedOff : null} unit={summary ? '件' : ''} detail="答えが見つからない など" />
+          <KpiCard title="答えのあとに聞き直し" value={summary?.askedAgainRate ?? null} unit={summary?.askedAgainRate != null ? '%' : ''} detail="同じ人が 30 分以内にもう一度聞いた割合" />
+        </KpiBand>
+      </>}
+      toolbar={<ListToolbarFrame><ListToolbarRow>
+        <Select size="content" aria-label="したこと" value={url.action} options={ACTION_OPTIONS} onChange={(action) => setUrl({ action, page: '1' })} />
+        <Select size="content" aria-label="期間" value={String(days)} options={PERIOD_OPTIONS} onChange={(next) => setUrl({ days: next, page: '1' })} />
+        <ListToolbarEnd>
+          <Select size="page-size" aria-label="表示件数" value={String(size)} options={PAGE_SIZE_OPTIONS} onChange={(next) => setUrl({ size: next, page: '1' })} />
+        </ListToolbarEnd>
+      </ListToolbarRow></ListToolbarFrame>}
+      pagination={load.kind === 'ready' && total > size ? <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / size))} onPageChange={(next) => setUrl({ page: String(next) })} range={{ total, first: (page - 1) * size + 1, last: Math.min(total, page * size) }} /> : undefined}
+      overlays={<>
+        <Drawer
+          open={detail !== null}
+          title="AI が答えた記録"
+          description={opened ? `${at(opened.createdAt)} ・ ${opened.friendName} さん` : undefined}
+          closeAppearance="box"
+          onClose={() => setUrl({ log: '' })}
+          footer={opened && permissions.publishQa && opened.qa && opened.qa.status === 'published' && opened.action === 'answered'
+            ? <Button onClick={() => { setStopError(''); setStopTarget({ qaEntryId: opened.qa!.id, title: opened.qa!.title, version: opened.qa!.version }) }}>この答えを止める</Button>
+            : undefined}
+        >
+          {detail?.kind === 'loading' ? <ListState kind="loading" /> : null}
+          {detail?.kind === 'error' ? <ListState kind="error" title="記録を読み込めませんでした" description={detail.message} onRetry={() => void openLog(url.log)} /> : null}
+          {opened ? <LogDetailBody log={opened} /> : null}
+        </Drawer>
+        <QaEditDialog
+          open={seed !== null}
+          accountId={accountId}
+          seed={seed}
+          canPublish={permissions.publishQa}
+          onSaved={() => setSeed(null)}
+          onClose={() => setSeed(null)}
+        />
+        <ConfirmDialog
+          open={stopTarget !== null}
+          title={`「${stopTarget?.title ?? ''}」の答えを止めますか？`}
+          description="止めると、この Q&A を返信案にも自動の答えにも使いません。すでに送った答えは取り消せません。あとから公開し直せます。"
+          confirmLabel="止める"
+          busy={stopBusy}
+          error={stopError || undefined}
+          onConfirm={() => void stopAnswer()}
+          onCancel={() => { if (!stopBusy) setStopTarget(null) }}
+        />
+      </>}
+    >
+      {load.kind === 'loading' ? <ListState kind="loading" /> : null}
+      {failure ? <ListState kind="error" title={failure.title} description={failure.description} onRetry={failure.retryable ? () => void fetchList() : undefined} /> : null}
+      {load.kind === 'ready' && load.items.length === 0 ? (
+        <EmptyList
+          icon={<History aria-hidden="true" />}
+          title="まだ記録がありません"
+          description="自動で答えるをオンにすると、AI が答えた・人へ回した記録がここに残ります。"
+          filtered={Boolean(url.action)}
+          onClearFilters={() => setUrl({ action: '', page: '1' })}
+        />
+      ) : null}
+      {load.kind === 'ready' && load.items.length > 0 ? (
+        <DataTable aria-label="AI が答えた記録" columnSizing="content">
+          <thead>
+            <TableHeadRow>
+              <Th>日時</Th>
+              <Th>お客さま</Th>
+              <Th grow>質問</Th>
+              <Th>したこと</Th>
+              <Th>元の Q&A</Th>
+              <Th><span className="sr-only">操作</span></Th>
+            </TableHeadRow>
+          </thead>
+          <tbody>
+            {load.items.map((log) => (
+              <Tr key={log.id} data-row-id={log.id} onClick={() => setUrl({ log: log.id })}>
+                <Td>{at(log.createdAt)}</Td>
+                <Td title={log.friendName}><TruncatedText value={log.friendName} /></Td>
+                <Td grow title={log.questionText}><TruncatedText value={log.questionText} /></Td>
+                <Td><StatusBadge tone={ACTION_TONE[log.action]}>{ACTION_LABEL[log.action]}</StatusBadge></Td>
+                <Td title={log.qaTitle ?? handoffReasonText(log.handoffReason)}><TruncatedText value={log.qaTitle ?? '—'} /></Td>
+                <ActionCell>
+                  <RowMenu
+                    appearance="plain"
+                    label={`${at(log.createdAt)} の記録の操作`}
+                    open={menuId === log.id}
+                    onOpenChange={(next) => setMenuId(next ? log.id : null)}
+                    items={[
+                      { id: 'inbox', label: '受信箱で開く', href: `/chats?friend=${encodeURIComponent(log.friendId)}`, onSelect: () => setMenuId(null) },
+                      ...(permissions.editQa && log.action !== 'answered' ? [{ id: 'add-qa', label: 'Q&A に足す', onSelect: () => { setMenuId(null); setSeed({ question: log.questionText }) } }] : []),
+                    ]}
+                  />
+                </ActionCell>
+              </Tr>
+            ))}
+          </tbody>
+        </DataTable>
+      ) : null}
+    </ListPage>
+  )
+}
+
+/** 引き出しの中身（V5WpQ）。送った答えは控え（その時の版）を出し、今の Q&A と違えば知らせる（AI-19）。 */
+function LogDetailBody({ log }: { log: AiAnswerLogDetail }) {
+  const differs = Boolean(log.qa && log.answerText && log.qa.currentAnswerText !== log.answerText)
+  return (
+    <div className={styles.drawerBody}>
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>お客さまの質問</h3>
+        <p className={styles.question}>{log.questionText}</p>
+      </section>
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>送った答え（全文）</h3>
+        {log.answerText ? <p className={styles.answer}>{log.answerText}</p> : <p className={styles.after}>答えを送っていません（{handoffReasonText(log.handoffReason)}）</p>}
+        <div className={styles.answerMeta}>
+          <StatusBadge tone={ACTION_TONE[log.action]}>{ACTION_LABEL[log.action]}</StatusBadge>
+          {log.answerText ? <span>自動で送ったため取り消せません</span> : null}
+        </div>
+      </section>
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>元の Q&A</h3>
+        {log.qa ? (
+          <div className={styles.qaBox}>
+            <p className={styles.qaTitle}>{log.qa.title}</p>
+            <p className={styles.qaMeta}>{`${QA_STATUS_LABEL[log.qa.status]} ・ 使われた ${formatNumber(log.qa.useCount)} 回 ・ 最後に直した ${formatDate(log.qa.updatedAt, { style: 'list-day', fallback: '—' })}`}</p>
+            {differs ? <p className={styles.differs}>今の答えと違います（送った時の答えを出しています）</p> : null}
+            <Link className={styles.link} href="/auto-replies?tab=qa">Q&A を開く <ArrowRight size={13} aria-hidden="true" /></Link>
+          </div>
+        ) : <p className={styles.after}>—</p>}
+      </section>
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>そのあとの会話</h3>
+        {log.afterNote ? <p className={styles.after}>{log.afterNote}</p> : null}
+        <Link className={styles.link} href={`/chats?friend=${encodeURIComponent(log.friendId)}`}>受信箱で会話を開く <ArrowRight size={13} aria-hidden="true" /></Link>
+      </section>
+    </div>
+  )
+}
