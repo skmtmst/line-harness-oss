@@ -7,6 +7,7 @@
  * 予約は「未承認」で入り、店が承認する（すぐ確定は作らない）。
  */
 export interface FormBookingConfig {
+  routing?:import('./gap2.js').BookingRouting;
   kind?: 'people' | 'seats';
   storeId?: string;
   courseId?: string | null;

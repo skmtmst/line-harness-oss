@@ -2,6 +2,7 @@ export const HQ_CATALOG_TEMPLATE_TYPES=['booking_menu','mileage_reward'] as cons
 export type HqCatalogTemplateType=typeof HQ_CATALOG_TEMPLATE_TYPES[number];
 /** 予約メニューは店の保存項目と同じ。参照は配り先の同名タグへ解決する。 */
 export interface HqBookingMenuSettings {
+ paymentMode?:'default'|'online'|'onsite';image_url?:string|null;
  name:string;category_label?:string|null;description?:string|null;duration_minutes:number;
  buffer_after_minutes?:number;base_price:number;price_mode?:'fixed'|'free'|'inquiry';sort_order?:number;
  concurrent_capacity?:number;booking_window_days?:number|null;cutoff_hours_before?:number|null;

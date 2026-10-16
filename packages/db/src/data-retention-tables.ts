@@ -57,6 +57,9 @@ export function purgeTablesChildFirst(): string[] {
   const depth = new Map<string, number>();
   /** その表の行を選ぶために、まだ残っていないといけない表。 */
   const dependsOn = (name: string): string | undefined => {
+    // 第2弾の参照を残したまま親の組・申込を先に消さない。
+    if (name === 'bookings') return 'booking_series';
+    if (name === 'booking_makeup_credits') return 'event_bookings';
     // Files also reference answers and friends; remove them before either parent.
     if (name === 'form_submission_files') return 'form_submissions';
     if (name === 'scenario_source_jobs') return 'scenario_versions';

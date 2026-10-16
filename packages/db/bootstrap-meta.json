@@ -610,7 +610,16 @@
     "701_booking_cancellation_policy.sql",
     "702_booking_cancellation_charges.sql",
     "703_booking_calendar_switches.sql",
-    "704_booking_fixed_meeting_urls.sql"
+    "704_booking_fixed_meeting_urls.sql",
+    "705_booking_audience_nomination.sql",
+    "706_booking_series.sql",
+    "707_booking_addons.sql",
+    "708_booking_form_routing.sql",
+    "709_booking_makeup_credits.sql",
+    "710_broadcast_ab_tests.sql",
+    "711_ai_drafts_qa.sql",
+    "712_operator_push.sql",
+    "713_booking_hq_origin.sql"
   ],
-  "migrationCount": 611
+  "migrationCount": 620
 }
