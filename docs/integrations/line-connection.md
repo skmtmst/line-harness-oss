@@ -650,7 +650,18 @@ Codexから「書き換え可能なstaging専用LINEチャネルを特定して�
   - **方針違反は無い**：`-- migration-policy: table-rebuild` の印と一時表 `rt_delivery_orders_new` の命名規則を満たしており、`AGENTS.md:72`（印のない `DROP TABLE`／`RENAME TO` は通さない）に適合。中身は `rt_store_feature_flags` の新設と `rt_delivery_orders` の作り直し（`service` に `'line'` 追加、`order_source`／`delivery_provider`／`delivery_tracking_id`／`delivery_fee_amount`／`coupon_id`／`friend_id` 追加、既存行は列指定で全件コピー、索引5本を再作成）。**行データは保持されるが作り直しなので取り消せない**。
   - **よって残っているのは「別工程で当てる」という手順だけ**。`.github/workflows/migrate-d1.yml` は既定が dry-run で、ヘッダに「当てる前に必ず Time Travel のブックマークを取る。追加のみのポリシーで down マイグレーションを書けないので、戻る手段はこれだけになる」と明記。`docs/NEN-LINE-STAGING.md:146-152` も「必ずデプロイロックを取得してから」「D1マイグレーションは `Migrate D1` を先にdry-runし、別工程で適用します」としている（`scripts/deploy/staging-deploy.sh` はマイグレーションを当てないため、配備workflowが未適用を検出して止めるのは**設計どおり**）。
   - **Claudeの判断**：staging への683の適用は保存済み共通承認 `user-deployment-20260929-v1` の「配備に必要な…DBマイグレーション」の範囲内。利用者への追加確認は不要で、**正規手順（デプロイロック → Time Travel ブックマーク → `Migrate D1` staging dry-run → 同 apply → 統合SHAのstaging配備 → 確認Aを1回だけ）**をCodexへ引き継ぐ。**本番は対象外**（本番はmainへのpushで自動適用される別経路）。
-- 次の1手（Codex・予約済み）：**683をstagingへ正規手順で当ててから、統合SHA `9089d1a712e468b920ba93fbe89e96a28e168169` のstaging配備と確認Aの1回だけの実行**
+- 2026-10-16 20:31〜20:36（Codex）：**683のstaging適用は完了。配備はデプロイロックの二重取得で公開前に失敗し、確認Aは未実施**。
+  - **Time Travel ブックマーク2件**（戻る手段。適用前に取得）：20:31:26 JST `00003d21-00000000-00005106-667243b4841a57558200556d9aca51a3`（Codexが手動取得）／20:34:22 JST `00003d22-00000000-00005106-e1e7ccbe7903fedb68f3c1250b2b7ee9`（apply workflowが自動取得）。
+  - **dry-run 成功**：run `38894458639`。未適用は **`683_restaurant_delivery_phase2_slots.sql` の1件だけ**（依頼の停止条件「2件以上なら適用せず返す」に該当せず）。
+  - **apply 成功**：run `38894591157`。**適用後の未適用件数は0件**。→ 配備workflowが止まる原因は解消済み。**683の再適用は不要**。
+  - **配備は失敗（コードの公開処理に入る前）**：run [38894823582](https://github.com/skmtmst/line-harness-oss/actions/runs/38894823582) が 20:36:24 JST にロック取得の段で停止。公開SHAの一致・新しい Worker Version ID は**確認できていない**。公開Workerは `8325dad6-a4ff-41cd-89c3-0cb6989561d7` のまま。ロックは失敗run終了後に解放済みで、現在は空いている。
+  - **確認A＝未実施**（配備成功後に1回だけという条件のため）。**確認B＝未確認**（owner資格情報を保有していないため。作らない）。本番は変更なし。
+- 2026-10-16（Claude）：**ロック競合の原因はコードで特定した。前回のClaudeの依頼文の誤りで、Codexの作業手順は正しい**。
+  - **ロックを取る経路が2つあり、混ぜると必ず失敗する**。`.github/workflows/deploy-cloudflare-staging.yml:251-260` に `Acquire the shared staging lock`（`DELIVERY_MODE=apply` のときだけ実行）があり、**workflow自身がロックを取って** `:472-474` の `always() && steps.staging_lock.outcome == 'success'` で解放する。一方 `scripts/deploy/staging-deploy.sh:26-29` は「ロックの取得・解放はここでは**意図的にやらない**（取得は他の開発者への使用宣言であり、解放は確認完了の宣言なので、途中で中断しうるスクリプトの副作用にしてはいけない）」とコメントし、手元経路は**人が取る**前提。
+  - **取得は「空いているrefへのpush」なので、自分が先に取っていてもworkflow側の取得は失敗する**（`scripts/deploy/deploy-lock.ts:10,286`「already-occupied ref への push はサーバが弾く。その拒否が排他そのもの」）。自分のロックだから通るという作りではない。
+  - **よってClaudeの前回依頼が誤り**。`docs/NEN-LINE-STAGING.md:146-152`「必ずデプロイロックを取得してから」は**手元 `pnpm deploy:staging` の手順**であり、これをActions経路に当てて「先にロックを取る」と指示した。Codexは指示どおり実行しており、停止条件を守って再実行しなかったのも正しい。
+  - **ドキュメントを直した**：`docs/DEPLOY-GATE.md` の「検証デプロイの手順」冒頭に手元経路限定であることを明記し、「GitHub Actions のロック」節に**どちらが取る／解放するかの対応表**と、今回のrunで落ちた事実を追記した。同じ取り違えが再発しないようにする。
+- 次の1手（Codex・予約済み）：**統合SHA `9089d1a712e468b920ba93fbe89e96a28e168169` のstaging配備（ロックは取らずworkflowに任せる）と、確認Aの1回だけの実行**。683の適用は完了済みなので繰り返さない
 - その次（Claude）：**画面②〜⑤の v06 実装**（利用者承認済みの `LINE新規追加_v06.pen`）。Claudeが実装 → Codexが独立検証・CI・マージ・staging配備という通常の担当で進める。本番配備は今回の対象外。6b（大量件数での途中再開）は件数の多い認証済みアカウント待ちで実施不可
 - 以前の1手（済み・記録用）：上の**テスト2ファイルの差分**を独立レビュー → コミット・PR #1751 の更新 → **必須CI → マージ → staging配備** → 実API検証（6a）
 - **前回の停止条件の衝突を解消した（Claudeの設計）**：前回の依頼文は「実stepを通す」と「実利用者のプロフィールを保存しない」を同時に求めていて両立しなかった（stepは取得したプロフィールを `friends` に書く。`maxProfiles: 0` も `Math.max(1, …)` で1に丸められ、`importIdPage` は友だち行を書く）。今回は条件をこう分ける。

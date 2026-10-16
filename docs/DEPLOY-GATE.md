@@ -66,6 +66,11 @@ export LINE_HARNESS_DEPLOY_REMOTE=origin
 
 ## 検証デプロイの手順
 
+**この節は手元から `pnpm deploy:staging` で配るときの手順です。**
+GitHub Actions の `deploy-cloudflare-staging.yml` を使うときは
+ロックを自分で取らないでください（workflow が自分で取ります）。
+→「[GitHub Actions のロック](#github-actions-のロック2026-10-13-修正)」
+
 ### 1. ロックを取得する（＝使用宣言）
 
 ```bash
@@ -136,6 +141,22 @@ run が終わる段で解放します。この解放の段は
   途中まで反映された事実は run の失敗と `Summarize` の出力が示します。
 - 取得していない run（`outcome != success`）は解放しません。
   他担当のロックに触れないためです。
+
+**workflow を使うなら、手元で先にロックを取らないでください。**
+ロックは「空いているrefへのpush」で取るので、自分が先に取っていても
+workflow 側の取得は `lock-held-by-other` 相当で失敗します。
+自分のロックだから通るということはありません。
+**手元の `pnpm deploy:staging` と、workflow の `DELIVERY_MODE=apply` は、
+ロックの取り方が違う別経路です。混ぜて使えません。**
+
+| 配り方 | ロックを取るのは | 解放するのは |
+| --- | --- | --- |
+| 手元 `pnpm deploy:staging -- --apply` | **自分**（上の手順1） | **自分**（手順3） |
+| Actions `deploy-cloudflare-staging.yml` | **workflow**（`Acquire the shared staging lock`） | **workflow**（run終了時） |
+
+run [38894823582](https://github.com/skmtmst/line-harness-oss/actions/runs/38894823582) が
+これで落ちました。手元のロックを取った状態で workflow を起動したため、
+**コードの公開処理に入る前**に取得の段で停止しています（配備は未実施）。
 
 以前はここが `success()` だったため、**取得後に1段でも失敗すると解放が飛ばされ、
 誰も配備していないのにロックが残り続けました**。
