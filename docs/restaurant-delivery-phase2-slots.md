@@ -12,7 +12,7 @@
 
 ## 先に足した受け皿は3つ
 
-### 1. 店舗ごとの機能の入り切り — `rt_store_feature_flags`（移行 637）
+### 1. 店舗ごとの機能の入り切り — `rt_store_feature_flags`（移行 683）
 
 **なぜ必要か。** これまでの入り切りは LINE アカウント単位の `restaurant_test`（`packages/shared/src/feature-catalog.ts`）
 1本しか無く、`account_settings` に保存される。つまり「飲食店機能をまるごと使うか使わないか」しか選べず、
@@ -38,7 +38,7 @@
 4 は 1〜3 を細かくするだけで、緩める向きには働かせない。経路の入口の作り（`feature()` ミドルウェア、
 `feature-route-manifest.test.ts` が凍結している対応表）は触っていない。
 
-### 2. 注文表の項目追加 — `rt_delivery_orders`（移行 637 で作り直し）
+### 2. 注文表の項目追加 — `rt_delivery_orders`（移行 683 で作り直し）
 
 **なぜ作り直したか。** `service` の CHECK が3サービスしか許しておらず、LINE から直接受けた注文は
 **そもそも1行も入れられなかった**。SQLite は `ALTER TABLE` で CHECK を変えられないため、
@@ -130,7 +130,7 @@ TypeScript 側は `apps/worker/src/services/delivery-order-source.ts`（新規�
 ## 後片付けが要る周辺
 
 - `docs/patent-briefing-delivery-aggregation.md` の表の案（`restaurant_id` / `platform_order_id` /
-  `platform_source` / `platform_store_id`）は、実際の 635・637 の作りと**一致していない**。
+  `platform_source` / `platform_store_id`）は、実際の 635・683 の作りと**一致していない**。
   実装の正本はこの文書と移行ファイル。あの文書は由来の確認が済んでいないため今回は触っていない。
 - `packages/db/schema.sql` は移行と同期していない（`rt_delivery_orders` が無い）。
   最終形の正本は `packages/db/bootstrap.sql` で、**生成物なので手で書き換えない**。

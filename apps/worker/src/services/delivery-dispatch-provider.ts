@@ -27,7 +27,7 @@ export type DeliveryDispatchProviderId = (typeof DELIVERY_DISPATCH_PROVIDERS)[nu
 /**
  * 注文表 `rt_delivery_orders.delivery_provider` に入る値の全部。
  * 'service' はそのサービスの配達員（既存の3サービス）、'store' は店舗が自分で運ぶ。
- * 移行 637 の CHECK と同じ並びを保つ。
+ * 移行 683 の CHECK と同じ並びを保つ。
  */
 export const DELIVERY_PROVIDERS = [
   'service',
