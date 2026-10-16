@@ -561,11 +561,18 @@ PR #1751 は必須CIをすべて通過して**マージ済み**（マージSHA `
 
 **6b（大量件数での途中再開）は未確認のまま。** 実データで使える対象アカウントの友だちが13人しかなく、途中再開が起きる件数に届かないため実測できていない。
 
-## 4. 気づいた不具合（未修正・実装時に扱う）
+## 4. 気づいた不具合
 
-1. **友だち追加URLの形が他と違う**：`logic.ts:92` と `register-v8.tsx:148,933` は `https://lin.ee/{basicId}` を組み立てているが、他の箇所は `https://line.me/R/ti/p/@{basicId}`（`services/platform-announcements.ts:48`、`routes/liff.ts:1202`、`components/dashboard/qr-dialog.tsx:56`）。`lin.ee` は個別に発行されるもので basicId から導けない（`packages/db/src/line-accounts.ts:64` のコメント、`official_profile_url` 列がその用途）。→ 画面に出すURLが開けない可能性が高い
-2. **別名URLが登録時に通らない（推測）**：既存アカウントの再確認は別名を許容する（`acceptedWebhookUrls`、`line-accounts.ts:327-340`）が、新規登録の `prepareLineConnection:155` は完全一致で比較しているため `WORKER_ALIAS_URLS` 等の別名だと不一致になる
-3. **`token_expires_at` が登録直後NULL（推測）**：`createLineAccount` のINSERT列（`packages/db/src/line-accounts.ts:228-245`）に含まれていないため、初回の更新判定に影響する可能性
+### 4-1・4-2 は修正済み（2026-10-16・Claude）
+
+1. **友だち追加URLの形が他と違う → 修正した**：`logic.ts:92` が組み立てていた `https://lin.ee/{basicId}` を、他の箇所と同じ `https://line.me/R/ti/p/@{basicId}` へ替えた。`lin.ee` はLINEが個別に発行する短縮URLで basicId から導けないため（`packages/db/src/line-accounts.ts:64` のコメント、保存用の列は `official_profile_url`）、画面に出していたURLは開けない可能性が高かった。既存の作り方と一致していることも読み取りで確認した（`services/platform-announcements.ts:48`、`components/dashboard/qr-dialog.tsx:47`、`dashboard-v4.test.ts:89` が `https://line.me/R/ti/p/@nen` を期待）。`routes/line-accounts.ts:1079-1097` が保存済みURLをホスト `lin.ee` のときだけ採用していることも、`lin.ee` が導出物ではない裏付け。試験は `logic.test.ts:33` の期待値を標準形へ直した
+2. **別名URLが登録時に通らない → 再現条件を特定して修正した**：既存アカウントの再確認は別名を許容する（`acceptedWebhookUrls`、`routes/line-accounts.ts:327-340`）のに、新規追加の `prepareLineConnection` だけ完全一致で比較していたため、`WORKER_ALIAS_URLS`（stagingの `workers.dev` など）に登録されたチャネルは3段目で止まっていた。`line-account-connect.ts` に `trimTrailingSlash` と `webhookUrlMatches` を足し、入力へ任意の `acceptedWebhookUrls` を追加。`routes/line-accounts.ts` の2つの呼び出し（`/connect/check`・`/connect`）から既存アカウントと**同じ受け口一覧**を渡す形にした。末尾スラッシュの違いも無視する。受け口一覧に無いURL（`https://example.com/webhook`）は3段目で止まることを否定側の試験で確かめているので、判定は緩めていない
+   - 検証：`line-account-connect.test.ts` に別名通過・一覧外拒否の2件を追加。worker 全件 **11,809件**合格、web のアカウント・ダッシュボード範囲 **108件**（17ファイル）合格、worker・web の型検査とも合格。**実LINE APIでの別名確認は未実施**（stagingに別名を登録した対象アカウントが無い）
+   - 見た目・文言・操作フローは1行のURL表示（4-1）だけで、承認済みデザインの「友だち追加 URL」行の表示内容をそのまま正す修正なので**新規Pencil承認は不要**
+
+### 未修正（優先度が低いので据え置き）
+
+3. **`token_expires_at` が登録直後NULL**：`createLineAccount` のINSERT列（`packages/db/src/line-accounts.ts:228-245`）に含まれていない（`updateLineAccount:986-988` では入れられる）。発行トークンは30日有効なので新規登録直後の実害は無く、期限切れ更新の実装と合わせて直すのが妥当
 
 ## 5. 残件と次の1手
 
@@ -590,7 +597,8 @@ PR #1751 は必須CIをすべて通過して**マージ済み**（マージSHA `
 - 2026-10-16 14:42（Codex）：**PR #1752 はマージ済み・staging配備済み**（マージSHA `525eb5aaf2`、公開versionとhealthのSHAが一致）。必須CIは全件合格。**本番は未変更**
 - 2026-10-16（Codex）：**stagingの後片付けを診断し、「物理削除は未完了」で確定した**。対象1行は友だち行0件・進捗設定0件・直接の子116経路すべて0件で、無効・アーカイブ済み・秘密値の列も空。`DELETE FROM line_accounts` を**1回だけ**試すと `triggers nested too deep: SQLITE_ERROR [code: 7500]` で失敗したため、指示どおり停止し**再試行・`DROP TRIGGER`・外部キー切りはしていない**（今回のWrangler応答にHTTP状態の表示は無し）。有効なアカウントとしては**0件**。原因は行数に依存しない組み立て時の上限超過なので同じ `DELETE` を繰り返しても変わらず、物理行の除去にはCASCADE経路（116本）を減らす設計変更かD1側の上限緩和が必要で**今回の依頼範囲外**（§3 の「stagingの後片付けの診断結果」）
 - 2026-10-16：**6b（大量件数での途中再開）は未確認**。実データで使える対象アカウントの友だちが13人しかなく、途中再開が起きる件数に届かないため実測できていない。確認するには件数の多い認証済みアカウントの用意が必要で、未確認を合格と扱わない
-- 次の1手：**D1 7500 の一連の作業（6a・巻き戻し・ゲート・S14）はここで完了**。残るのは (a) 6b の実測（対象アカウント待ち＝実施不可）と (b) §4 の未修正3件、そして (c) 画面②〜⑤の v06 実装。(c) は利用者承認済みの新規デザイン版に沿ってClaudeが実装 → Codexが独立検証・CI・マージ・staging配備、という通常の担当で進める。本番配備は今回の対象外
+- 2026-10-16（Claude）：**§4 の不具合1・2を修正した**。友だち追加URLを開ける標準形（`https://line.me/R/ti/p/@{basicId}`）へ替え、新規追加のWebhook判定を既存アカウントと同じ受け口一覧（別名URL許容・末尾スラッシュ無視）に揃えた。worker 11,809件／web 108件／worker・web 型検査が合格し、別名通過と一覧外拒否の回帰試験2件を追加（§4）。**実LINE APIでの別名確認は未実施**。残るのは不具合3（`token_expires_at`）で、期限切れ更新の実装時に扱う
+- 次の1手：**画面②〜⑤の v06 実装**（利用者承認済みの `LINE新規追加_v06.pen`）。Claudeが実装 → Codexが独立検証・CI・マージ・staging配備という通常の担当で進める。本番配備は今回の対象外。6b（大量件数での途中再開）は件数の多い認証済みアカウント待ちで実施不可
 - 以前の1手（済み・記録用）：上の**テスト2ファイルの差分**を独立レビュー → コミット・PR #1751 の更新 → **必須CI → マージ → staging配備** → 実API検証（6a）
 - **前回の停止条件の衝突を解消した（Claudeの設計）**：前回の依頼文は「実stepを通す」と「実利用者のプロフィールを保存しない」を同時に求めていて両立しなかった（stepは取得したプロフィールを `friends` に書く。`maxProfiles: 0` も `Math.max(1, …)` で1に丸められ、`importIdPage` は友だち行を書く）。今回は条件をこう分ける。
   - **6a 実APIの通し確認（実施する・2026-10-16 経路を差し替えた）**：対象は本番の認証済みアカウント1件（友だち**13人**）。前回ここに書いた「staging の登録ウィザードから新規登録する」は**取り消す**。Codexが「本番LINEチャネルのWebhook宛先とLIFF接続先を書き換えるので停止条件に反する」として実行を断ったのは**正しい判断**で、台帳側の手順が誤っていた。
