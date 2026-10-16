@@ -460,6 +460,107 @@ Codexの再検証で401の原因は2つとも判明したが、stagingの設定�
 - stagingでの一時アカウントの作成とstep実行は**未実施**。「実利用者のプロフィール（表示名・画像）を保存しない」という今回の停止条件に対し、stepは取得したプロフィールをstagingの `friends` に書き込む。よって両方を同時には満たせない。作った一時アカウント・友だち行は**0件**で、削除対象もない。画面「入る」と離脱後の継続は**未検証**。
 - staging既存3件の保存済みトークンは**更新していない**。3件すべて暗号化トークン列が埋まっており、stagingの暗号鍵はWorker secretでローカルから値を取得できない。D1の平文列だけ更新してもWorkerは古い暗号化列を優先して読んでしまう。既存の管理APIの資格情報更新は本人再確認のstep-up必須で、APIキーだけでは実行できない。暗号化を外す／値を不一致にする更新は避けた。安全に更新する経路はClaudeの設計・実装側で整理する。
 
+### 「3分で終わる計算なのに10分待たされる」原因と修正（2026-10-16 09:50 JST／Claude実装・ローカル検証まで）
+
+上の実測で**LINEとの通信そのものは10,000人で約3.0分**（参考換算）と分かったのに、画面の体感は**約10〜12分**になる。差は通信ではなく**待ち時間**だった。
+
+- 1回の実行は `DEFAULT_RUN_BUDGET_MS = 20_000`（`apps/worker/src/services/follower-import.ts:26`）で区切る。1人あたり約17.9msなら**1回で約1,100人**進む。
+- 画面側（登録ウィザードの⑤）は `api.lineAccounts.followerImportState` を**読むだけ**で、3秒ごとに進捗を見ていた。自分では進めないので、次に進むのは自動処理（cron）の順番が来たとき。
+- その自動処理は `frequentHeavy = '1-56/5 * * * *'`（`apps/worker/src/services/scheduled-job-isolation.ts:11-23`、呼び出しは `index.ts:1476,1503-1509,2089`）で**5分ごと**。1アカウントに `PER_ACCOUNT_BUDGET_MS = 150_000`（2.5分）を割り当てるので1回で約8,380人進むが、**登録直後の人は最大5分待たされる**。
+- つまり利用者指示「5分に1回・25人ずつとかしなくて良いです、最速で引き継げる設計でお願いします。」に対し、worker側は最速になっていたが**画面側が5分刻みを呼び戻していた**。
+
+修正は画面側だけ。⑤の進捗の効果を `api.lineAccounts.stepFollowerImport` に替え、**1回ぶんが終わったらすぐ次を呼ぶ**自己連鎖にした（`apps/web/src/v8/account-new/register.tsx:200-228`）。
+
+- 間隔は `busy ? 3000 : 500`。`busy`（他の経路が同じアカウントを握っている）ときだけ3秒待ち、進んだ直後は0.5秒。**0msにしない**のは、何も進まない応答が続いたときに空回りで熱を出さないため（0.5秒はWorker側の約20秒に対して無視できる）。失敗時は5秒後に再試行。
+- 同時に呼ばれても壊れない。ロック期間中は `follower-import.ts:74`、CAS要求が0行なら `:95` が、どちらも**エラーではなく** `{ state, busy: true, profilesFetched: 0 }` を返す。
+- 画面を閉じたあとは**今までどおり**自動処理（5分ごと）とアカウント一覧の「入る」が続きを拾う。カーソルはD1に残るので、間違って戻っても続きから始まる（利用者指示「現在のアカウント一覧と同じデザインで入るというボタンを押すと続きから始まる仕組み」）。
+- これで10,000人は**約10回 × 20秒 ≒ 3.5分**、待ち時間ゼロになる。
+- `DEFAULT_RUN_BUDGET_MS` は**上げない**。20秒・1人17.9msで約1,111人は1 invocationのサブリクエスト上限に近い。台帳として記録しておくが、リポジトリ内に**矛盾**がある（`follower-import.ts:28` は「有料プランは10,000回まで」、`index.ts:2816` は「1kの予算では1k超の積み残しを流しきれない」）。**どちらが正しいか未確定なので、1回の実行量を増やす前提の設計はしない**。
+- Worker側は**1行も変えていない**。`/api/line-accounts/:id/follower-import/step` は `await run` のまま `{ state, busy, profilesFetched }` を返す（`apps/worker/src/routes/line-accounts.ts:1036-1053`）。
+
+変えたのは5ファイル（ブランチ `skmtmst/LINE追加画面のアップデート`、基点 `ed421c0b4d9424c052397401da53eccbca1ef8c1`）。
+
+| ファイル | 変更 |
+| --- | --- |
+| `apps/web/src/v8/account-new/register.tsx` | ⑤の効果を step の自己連鎖へ（本体の修正） |
+| `apps/web/src/v8/account-new/BEHAVIOR.md` | 動きの一覧22行目を実装に合わせた |
+| `apps/web/src/app/accounts/accounts-setup-visual-parity.test.ts` | 設計ゲートが**ソース文字列**を見ているため、期待値を `stepFollowerImport` へ |
+| `apps/web/src/app/accounts/new/register-v8.react.test.tsx` | モック追加と、`step` を呼ぶ／`followerImportState` を呼ばないの検証へ書き替え |
+| `apps/web/src/app/accounts/new/wizard.test.tsx` | モック追加と、入れ子の応答形（`{state,busy,profilesFetched}`）へ |
+
+**見た目・文言・配置・操作フローは変えていない**（進捗の表示に使う口だけを替えた）。よって**新規Pencil承認は不要**。
+
+ローカル検証（Claudeの担当範囲）：
+
+- web（登録ウィザード関連25ファイル）**159件 合格**。最初の実行は2件落ちた（`register-v8.react.test.tsx:139`／`wizard.test.tsx:174`、どちらも旧 `followerImportState` をモックしていたため）。モックと検証を直して全件合格。
+- worker `follower-import` 10件・`follower-import-background` 1件・`routes/line-accounts` 76件の**87件 合格**（worker無変更の裏取り。背景継続と「入る」が壊れていないこと）。
+- `pnpm --filter web --filter worker typecheck` 両方 `Done`（tscエラーなし）。
+- worker全件の広い実行では31件落ちるが、落ちているのは `hq_templates` など**この差分と無関係の既存失敗**（差分にworkerファイルは0件）。
+
+**実APIでの確認はまだ**。画面を開いたまま10,000人規模を進める実測と、途中で閉じて「入る」から再開する確認はstagingが必要で、Codexの担当範囲。
+
+### 6a 実APIの通し確認は合格・後片付けだけが残った（2026-10-16 12:28 JST／Codex報告）
+
+PR #1751 は必須CIをすべて通過して**マージ済み**（マージSHA `b34e4f5b`）。staging配備も成功し、公開ヘルスのSHAはマージSHAと一致した（[PR #1751](https://github.com/skmtmst/line-harness-oss/pull/1751)／[配備結果](https://github.com/skmtmst/line-harness-oss/actions/runs/38845200375)）。
+
+- 実APIで**13人の取り込みが約2.1秒・stepの呼び出し1回・`busy` は0回**で完了。上の「画面が自分で次を呼ぶ」修正が実環境で効いていることの実測。発行したLINEトークンは無効化済み。本番D1・Webhook・LIFFへの書き込みは無い。
+- 後片付けは**友だち行0件・進捗設定0件**まで済んだ。残ったのは**stagingの一時 `line_accounts` 1行**だけで、`DELETE` が **HTTP 400／code 7500 `triggers nested too deep`** で失敗した。その行は無効・アーカイブ状態で、トークンとチャネル秘密値は空（再照合済み）。
+- **6b（大量件数での途中再開）は実データでは未確認**。対象の友だちが13人のため1回のstepで完走する。合格扱いにしない（理由は §5 の 6b）。
+
+### D1の `triggers nested too deep`（code 7500）の原因と巻き戻しの修正（2026-10-16／Claude実装・ローカル検証まで）
+
+**原因は「連鎖が深い」ことではなく、文を組み立てる時点（prepare）でプログラムが大きすぎること**。実測で確定した。SQLiteの実行時の深さ超過は `too many levels of trigger recursion`（上限 `SQLITE_MAX_TRIGGER_DEPTH` は既定1000）という別の文言で、`line_accounts` の実行時の最長連鎖は**深さ5**しかない。D1は式の深さの上限（`SQLITE_LIMIT_EXPR_DEPTH`）を本家の1000より小さく設定しているように振る舞う（[Cloudflare Community の7500報告](https://community.cloudflare.com/t/d1-returns-7500-triggers-nested-too-deep-sqlite-error-for-all-insert-update/954528)、[eliot-research#294](https://github.com/UnknownAlienHuman/eliot-research/issues/294)）。
+
+実スキーマ（`packages/db/schema.sql` ＋ migrations 全適用、ローカル `:memory:`）に `EXPLAIN` を当てて、組み立てられた命令列そのものを数えた（`EXPLAIN` は prepare の結果を返すだけで行を1件も触らない）。
+
+| 測ったもの | 命令数 | 下位プログラム |
+| --- | --- | --- |
+| `DELETE FROM line_accounts WHERE id = ?`（`foreign_keys=ON`） | **18,719** | **384** |
+| 同じ文（`foreign_keys=OFF`） | 57 | 0 |
+| 対象行が**0件**のとき | 18,719 | 384 |
+| 対象行が**1件**あるとき | 18,719 | 384 |
+
+- **0件でも1件でも同じ＝データに依存しない。** だから「子行を先に消す」では親行の `DELETE` は通らない。生成した27本の深い方からの子 `DELETE` は子表を空にするには正しいが、親行の文の大きさは変わらない。
+- **外部キーを切る回避もD1では使えない。** D1はすべてのクエリを暗黙のトランザクション内で走らせるため利用者のクエリから `PRAGMA foreign_keys = OFF` にできず、`PRAGMA defer_foreign_keys = ON` は `ON DELETE CASCADE` を止めない（[Define foreign keys · D1](https://developers.cloudflare.com/d1/sql-api/foreign-keys/)、[SQL statements · D1](https://developers.cloudflare.com/d1/sql-api/sql-statements/)、[workerd#2471](https://github.com/cloudflare/workerd/issues/2471)）。
+- **トリガを落とす回避も効かない。** 現状 18,719／384 に対し、フォルダ系の DELETE トリガ9本を落として 17,461／302、**トリガ289本すべてを落としても 15,148／270**。重さの約8割はトリガではなくCASCADEの連鎖なので、stagingで `DROP TRIGGER` を試す価値はない（**やらない**）。
+- 実スキーマは表613・トリガ298本。`line_accounts` を CASCADE で参照するのは**FK経路116・子表115**（`account_handovers` が `to_account_id`／`from_account_id` の2経路）。重い子は `folders(account_id)` 5,487／149、`friend_add_rule_folders(line_account_id)` 5,303／120、`rich_menu_groups` 1,019／17、`media` 785／10 など。**116経路のうち75は下位プログラムを1本も作らない**（単独の `DELETE` なら軽い）。`line_accounts` 自身のトリガは INSERT／UPDATE 専用（`line_accounts_folder_scope_insert`／`_update`）で、`DELETE` の組み立てには関わらない。
+
+**これは後片付けの問題ではなく出荷済みの機能不具合だった。** `deleteUncommittedLineAccount`（修正後は `packages/db/src/line-account-rollback.ts`）は登録の途中で失敗したときの巻き戻しで、呼び出し元は登録API（`apps/worker/src/routes/line-accounts.ts:1460`）と設定コピー失敗時（同 `:1646`）。親行の `DELETE` がD1で必ず落ちるため、行が残る。`channel_id` は `NOT NULL UNIQUE`（`schema.sql`）で、`login_channel_id`／`liff_id` にも一意索引がある（`migrations/542_line_account_login_liff_unique.sql`）ので、**追加に失敗した利用者は同じチャネルをもう一度登録できなくなっていた**。
+
+修正（`packages/db/src/line-account-rollback.ts`）：子行の `DELETE` を batch で先に流し、親行の `DELETE` を try/catch で包む。落ちたら行を消すのをやめ、**無効化して一意列を解放する**。
+
+- `channel_id` は NOT NULL なので衝突しない値（`abandoned:<id>`）へ退避。`login_channel_id`／`liff_id` は NULL に戻す（migration 542 のコメントどおり、SQLiteの一意索引はNULLを重複とみなさない）。
+- トークンとチャネル秘密値（平文列）は空に、暗号化列は NULL に。`is_active = 0`、`is_default = 0`（`idx_line_accounts_one_default_per_tenant` は `WHERE is_default = 1` の部分索引なので0なら衝突しない）、`archived_at`/`archived_by='system'`/`archived_reason` を立てる。
+- アーカイブ済みの行は有効なアカウントの照会から外れる（`archived_at IS NULL` が `packages/db/src/line-accounts.ts:238,373,385,1156,1188`）。よって**一覧や接続先には出てこない**。
+- 親行の削除失敗はS14のログ安全性を守るため出力せず、無効化へ進む。UPDATE は `line_accounts_folder_scope_update`（`UPDATE OF folder_id, tenant_id`）を踏まず、FKの親キー（`id`）も変えないので軽く組み立てられる。Codexがstagingの同じ行をUPDATEできている実績もある。
+
+ローカル検証（Claudeの担当範囲）：
+
+- `apps/worker/src/services/line-account-rollback.test.ts` **4件 合格**。追加した1件は、親行の `DELETE` だけをD1と同じ文言で失敗させ、行が無効化されること・子行が消えていること・**同じ `channel_id`／`login_channel_id`／`liff_id` をもう一度登録できること**を確かめる。
+- `routes/line-accounts` 76件・`line-account-capacity` 12件・`follower-import` 10件の**98件 合格**。
+- `packages/db` と `apps/worker` の型検査（`tsc --noEmit`）がどちらもエラー0。
+- 新しいmigrationは追加していない（`PRAGMA` を含むmigrationを禁じる `packages/db/test/409_outbound_send_failure_ledger.test.ts:81` の制約にも触れない）。
+- **行数ゲート対応（2026-10-16 13:34）**：`packages/db/src/line-accounts.ts` は上限 `1547` にちょうど張り付いていたため（`apps/web/scripts/v8-guard/code-size-baseline.json:405`）、Codexの独立検証で「1593行・46行超過」として必須CI相当のゲートに拒否された。新規ファイルの上限は400行で、台帳への**新規登録や上限引き上げは `inspectSize` が禁止**している（`apps/web/scripts/v8-guard/code-size.mjs:41-42`）。そこで巻き戻しの2関数を新ファイル `packages/db/src/line-account-rollback.ts`（64行）へ移し、`packages/db/src/index.ts` から再公開した。`line-accounts.ts` は 1530行へ戻り、`@line-crm/db` の公開面（`deleteUncommittedLineAccount`）は呼ぶ口6箇所とも無変更。`node apps/web/scripts/v8-guard/code-size.mjs --base b34e4f5bab` が**違反0件**（本体2,675ファイル／凍結437件）、ゲート自己テストも合格。関連テスト102件と両方の型検査も再実行して合格。
+
+- **S14ログ安全性の対応（2026-10-16 14:10）**：上の新ファイルで、親行 `DELETE` が落ちたときに `console.error` へ例外の文面（`error.message`）を混ぜていたため、`apps/worker/src/security-console-contract.test.ts` の「本番コードは固定コードと安全な経路だけをログに出す」規則に違反した（検出箇所 `packages/db/src/line-account-rollback.ts:31`）。7500は**データに依存しない組み立て時の失敗**で、文面を残しても新しい情報は増えないため、ログ出力自体をやめて黙って無効化へ回る形（silent fallback）にした。試験側も「ログが0回であること」を確かめる形へ直した（`line-account-rollback.test.ts:135`）。S14の契約テスト2件・関連テスト102件・型検査が合格。
+
+**6a の受入条件4「一時行が削除され0件」は、D1では素の `DELETE` で満たせない。** 残った1行は無効・アーカイブ・秘密値なしの状態で、有効なアカウントとしては0件。これを実状として記録する（合格と偽らない）。
+
+### stagingの後片付けの診断結果＝物理削除は未完了（2026-10-16／Codex実測）
+
+上の修正を含む [PR #1752](https://github.com/skmtmst/line-harness-oss/pull/1752) は必須CI全件合格後に**マージ済み**で、**stagingのWorkerへ配備済み**（公開versionとhealthのSHAがマージSHA `525eb5aaf2` と一致）。**本番は未変更**。
+
+そのうえで §5 の手順どおりに後片付けを診断した結果は次のとおり。
+
+- (i) 棚卸し（読み取り専用）：対象1行について**友だち行0件・進捗設定0件・直接の子116経路すべて0件**。対象行は無効・アーカイブ済みで、トークンとチャネル秘密値の列も空。
+- (ii) 子行の `DELETE` は不要（残件0件のため実行していない）。
+- (iii) `DELETE FROM line_accounts WHERE id = :acct` を**1回だけ**診断目的で試し、`triggers nested too deep: SQLITE_ERROR [code: 7500]` で失敗。**指示どおりそこで停止**し、再試行・`DROP TRIGGER`・外部キー切りはしていない。無効・アーカイブ済みの行はそのまま残した。今回のWrangler応答にはHTTP状態の表示が無かった（以前の同種の失敗は HTTP 400）。
+- (iv) 有効なアカウントとして**0件**。
+
+**結論：一時行の物理削除は未完了。** 原因は §3 の「D1の `triggers nested too deep`」で実測済みのとおり、行数・子件数に依存しない組み立て時の上限超過なので、同じ `DELETE` を繰り返しても結果は変わらない。現状は「有効なアカウント0件／行は無効・アーカイブ・秘密値なし」で確定とし、以後は 6a の受入条件4をこの読み替えで扱う。物理行の除去には、`line_accounts` を参照するCASCADE経路（116本）を減らす設計変更か、D1側の上限緩和が必要で、どちらも今回の依頼範囲外。
+
+**6b（大量件数での途中再開）は未確認のまま。** 実データで使える対象アカウントの友だちが13人しかなく、途中再開が起きる件数に届かないため実測できていない。
+
 ## 4. 気づいた不具合（未修正・実装時に扱う）
 
 1. **友だち追加URLの形が他と違う**：`logic.ts:92` と `register-v8.tsx:148,933` は `https://lin.ee/{basicId}` を組み立てているが、他の箇所は `https://line.me/R/ti/p/@{basicId}`（`services/platform-announcements.ts:48`、`routes/liff.ts:1202`、`components/dashboard/qr-dialog.tsx:56`）。`lin.ee` は個別に発行されるもので basicId から導けない（`packages/db/src/line-accounts.ts:64` のコメント、`official_profile_url` 列がその用途）。→ 画面に出すURLが開けない可能性が高い
@@ -480,7 +581,35 @@ Codexの再検証で401の原因は2つとも判明したが、stagingの設定�
 - 2026-10-16：PR #1738 は**マージ済み**（`5ace6976dc`）、**staging配備も完了**（公開SHA一致）。**本番は未配備**。受入条件1〜5はマージ済みHEADで合格。受入条件6（実APIでの実測）だけHTTP 401で未達（§3 の「マージとstaging配備は完了・実測はHTTP 401で止まった」）
 - 2026-10-16：401は2つとも原因が判明（staging側の設定と保存済みトークンは未変更）。新トークンを用いた `/v2/bot/followers/ids` が**3件そろってHTTP 403**。LINE側のアカウント種別制限（認証済み／プレミアム限定）に合致し、アプリは403を `capability='unavailable'` として扱う。管理APIの401は「TOTP鍵設定済み＋`auth.mfa.required` 未設定」の組み合わせだった（§3 の「403の原因確定と、401その2の確認結果」）
 - 2026-10-16 09:26：stagingのMFA設定を `'false'` に変更し、管理APIが既存キーでHTTP 200を確認。本番D1読取だけで実LINE APIの対象1件（友だち13人）を実測し、ID一覧93ms＋最大12並列プロフィール233ms＝合計326ms。10,000人は単純比例で約3.0分だが標本13人の参考値。個人情報は保存せず、本番の設定・DB・Webhook・配備は無変更（§3 の「本番LINE APIの読み取り実測」）。
-- 次の1手：stagingの実stepは実利用者の表示名・画像を保存するため「保存しない」という今回の停止条件と両立せず、未実施。Claude側でこの衝突を解消する検証方法を整理する。staging既存3件は暗号化列があるため、平文だけを書き換えず、暗号化を保って安全に更新する正式経路を用意する。どちらも本番の変更を含めない。
+- 2026-10-16 09:50：**体感10〜12分の原因を特定して直した**。LINEとの通信は約3.0分でも、画面⑤が進捗を**読むだけ**だったため次の自動処理（5分ごと）を待っていた。画面を開いている間は `stepFollowerImport` で続きを自分で進める形に替え、待ち時間をゼロにした（10,000人なら約10回×20秒≒3.5分）。web 159件／worker 87件／型検査が合格。**worker・見た目は無変更＝新規Pencil承認は不要**（§3 の「3分で終わる計算なのに10分待たされる原因と修正」）
+- 2026-10-16 11:27：**PR #1751 の必須CIの失敗を直した**。落ちていたのは実行時のテストではなく静的ゲート `Guard newly added source visual contracts (B-273)`（`.github/workflows/required-pr-gate.yml:280`）。原因は、⑤の呼ぶ口の変更に合わせて `accounts-setup-visual-parity.test.ts` の「ソース文字で中身を確かめる並び」を1語だけ差し替えたこと。`scripts/verify-no-source-visual-contracts.mjs:77` の `hit.key` は期待文字の**集合ごと**を含むため、追加でも削除でも「新しいソース契約」と判定される（削除だけにして再実行しても1件のまま残った）。台帳 `docs/qa/match-l2x-counts-1014.md:34` の前例どおり、該当の positive な並びを丸ごと外し、契約を描画の試験へ移した。呼ぶ口は `register-v8.react.test.tsx`（`stepFollowerImport` が呼ばれ `followerImportState` は呼ばれない）、5つの正本ノードは同ファイルに新設した「各段と結果の窓は絵の正本ノードを描く」（DOM の `data-design-node` を①→②→③→④→結果の窓→⑤の順に実測）＋ `scripts/visual-qa/v8-design-map-route-contract.test.ts`（ノードとURLの対応）で担保する。該当3ファイル25件が合格し、同CIステップの4コマンド（自己テスト49件／B-273 **0件**／行数ゲート自己テスト11件／行数ゲート違反0件）もローカルで合格。**本体 `register.tsx` は無変更＝見た目・文言・操作フローも無変更なので新規Pencil承認は不要**
+- 2026-10-16 12:28（Codex）：**PR #1751 はマージ済み・staging配備済み**（マージSHA `b34e4f5b`、公開SHA一致）。実APIの6aは**13人・約2.1秒・step 1回・busy 0回で合格**。発行トークンは無効化済み。本番D1・Webhook・LIFFへの書き込みは無い。残ったのは後片付けだけ（§3 の「6a 実APIの通し確認は合格」）
+- 2026-10-16（Claude）：**上の削除失敗の原因を実測で確定し、巻き戻しの機能不具合を直した**。7500は実行時の連鎖ではなく**文を組み立てる時点**の失敗で、親行 `DELETE` は0件でも1件でも 18,719命令／下位384本と**同一＝データに依存しない**。外部キー切りはD1で不可、トリガ全削除でも15,148命令で通らない。よって素の `DELETE` は諦め、`deleteUncommittedLineAccount` を「子行を消す → 親行 `DELETE` を試す → 落ちたら行を無効化して一意列（`channel_id`／`login_channel_id`／`liff_id`）を解放」に変えた。これが無いと**追加に失敗した人が同じチャネルを再登録できない**。巻き戻し4件＋関連98件＋型検査が合格（§3 の「D1の `triggers nested too deep`」）。**見た目・文言・操作フローは無変更＝新規Pencil承認は不要**
+- 2026-10-16 13:34（Claude）：**行数ゲートの超過を直した**。Codexの独立検証で `packages/db/src/line-accounts.ts` が「1593行・上限1547行」として拒否されたため、巻き戻しの2関数を新ファイル `packages/db/src/line-account-rollback.ts`（64行）へ移し `index.ts` から再公開。本体は1530行、公開面と挙動は無変更。ゲート**違反0件**・テスト102件・型検査が合格（§3 の「行数ゲート対応」）
+- 2026-10-16 14:10（Claude）：**S14ログ安全性の違反を直した**。巻き戻しの新ファイルで `console.error` に例外の文面を混ぜていたため契約テストに拒否された。7500はデータに依存しない組み立て時の失敗で文面に情報が無いので、ログ出力をやめて黙って無効化へ回る形にし、試験も「ログ0回」の確認へ直した。S14契約2件・関連102件・型検査が合格（§3 の「S14ログ安全性の対応」）
+- 2026-10-16 14:42（Codex）：**PR #1752 はマージ済み・staging配備済み**（マージSHA `525eb5aaf2`、公開versionとhealthのSHAが一致）。必須CIは全件合格。**本番は未変更**
+- 2026-10-16（Codex）：**stagingの後片付けを診断し、「物理削除は未完了」で確定した**。対象1行は友だち行0件・進捗設定0件・直接の子116経路すべて0件で、無効・アーカイブ済み・秘密値の列も空。`DELETE FROM line_accounts` を**1回だけ**試すと `triggers nested too deep: SQLITE_ERROR [code: 7500]` で失敗したため、指示どおり停止し**再試行・`DROP TRIGGER`・外部キー切りはしていない**（今回のWrangler応答にHTTP状態の表示は無し）。有効なアカウントとしては**0件**。原因は行数に依存しない組み立て時の上限超過なので同じ `DELETE` を繰り返しても変わらず、物理行の除去にはCASCADE経路（116本）を減らす設計変更かD1側の上限緩和が必要で**今回の依頼範囲外**（§3 の「stagingの後片付けの診断結果」）
+- 2026-10-16：**6b（大量件数での途中再開）は未確認**。実データで使える対象アカウントの友だちが13人しかなく、途中再開が起きる件数に届かないため実測できていない。確認するには件数の多い認証済みアカウントの用意が必要で、未確認を合格と扱わない
+- 次の1手：**D1 7500 の一連の作業（6a・巻き戻し・ゲート・S14）はここで完了**。残るのは (a) 6b の実測（対象アカウント待ち＝実施不可）と (b) §4 の未修正3件、そして (c) 画面②〜⑤の v06 実装。(c) は利用者承認済みの新規デザイン版に沿ってClaudeが実装 → Codexが独立検証・CI・マージ・staging配備、という通常の担当で進める。本番配備は今回の対象外
+- 以前の1手（済み・記録用）：上の**テスト2ファイルの差分**を独立レビュー → コミット・PR #1751 の更新 → **必須CI → マージ → staging配備** → 実API検証（6a）
+- **前回の停止条件の衝突を解消した（Claudeの設計）**：前回の依頼文は「実stepを通す」と「実利用者のプロフィールを保存しない」を同時に求めていて両立しなかった（stepは取得したプロフィールを `friends` に書く。`maxProfiles: 0` も `Math.max(1, …)` で1に丸められ、`importIdPage` は友だち行を書く）。今回は条件をこう分ける。
+  - **6a 実APIの通し確認（実施する・2026-10-16 経路を差し替えた）**：対象は本番の認証済みアカウント1件（友だち**13人**）。前回ここに書いた「staging の登録ウィザードから新規登録する」は**取り消す**。Codexが「本番LINEチャネルのWebhook宛先とLIFF接続先を書き換えるので停止条件に反する」として実行を断ったのは**正しい判断**で、台帳側の手順が誤っていた。
+    - **使わない経路とその理由**
+      - staging の**登録ウィザード**は使えない。`apps/worker/src/services/line-account-connect.ts` は**本番チャネルそのものを書き換える**（`:141` Webhook宛先の PUT、`:149` その読み出し、`:180` LIFF一覧、`:191` LIFFアプリの作成、`:208` LIFFアプリの更新）。前回の「新規登録なら正規経路なので暗号化列が正しく作られて回避できる」という理由付けは**誤りだった**（暗号化列の問題は解けるが、本番書き込みが発生する）。
+      - `POST /api/line-accounts`（新規作成・`apps/worker/src/routes/line-accounts.ts:1483`）も使えない。`verifyConnection`（`:1607`／定義 `:481`）が、チャネルに登録済みのWebhook宛先が**stagingの** `acceptedWebhookUrls`（`:327`）に含まれることを求めるので400になり、さらに LINE の Webhook テスト（`/v2/bot/channel/webhook/test`）を本番チャネルへ投げる。
+      - `PUT /api/line-accounts/:id` も使えない。`line_account.credentials` の更新は本人再確認（step-up）が必須で、`apps/worker/src/lib/step-up.ts` は新しい管理セッションか、`X-Step-Up-Token` ＋同じセッションのハッシュを要求する。CodexはAPIキー認証で管理セッションを持たないため、**原理的に満たせない**。
+      - staging既存3件のトークン更新も使えない（3件とも暗号化列が埋まっていて、`decryptLineAccountCredentials` は暗号化列を優先する。stagingの暗号鍵は書き込み専用のWorker secretで値を取り出せない）。
+    - **使う経路（本番への書き込みが1つも無い）**
+      1. トークン：本番D1を**読取専用**で照会し、`channel_id`＋`channel_secret` をメモリ内だけで使って LINE の `client_credentials` で30日トークンを発行する。**2026-10-16 09:26 に実施済みでHTTP 200**（LINE request ID `42b4e551-db03-4bb8-ac6f-79751b860cf2`）。本番D1・チャネルWebhook設定・既存トークンへの書き込みは無い。残る副作用は、発行がLINE側のチャネル単位トークン集合（上限30本）を1本動かすこと。**ここは提案（確定ではない）**：発行は1本までにし、確認後に `POST https://api.line.me/v2/oauth/revoke` で無効化する。チャネル設定は触らない。
+      2. アカウント行：**stagingのD1へ一時行を1件だけ直接insertする**。`channel_access_token` は平文列にだけ入れ、`channel_access_token_encrypted` は**NULL**にする（`packages/db/src/line-accounts.ts:425` の `if (!encrypted) continue;` により平文列がそのまま読まれる。既存3件で詰まったのは暗号化列が埋まっていたからで、新しい行には当てはまらない）。`tenant_id` はstagingのAPIキーのスタッフと同じテナント、`archived_at` は NULL、`is_active` は **0**。見え方の関門は `tenant_id` と `archived_at` だけで（`apps/worker/src/services/account-access.ts:16-26`、`packages/db/src/line-accounts.ts:628-643`、`routes/line-accounts.ts:202-240` のいずれにも `is_active` の条件が無い）、`is_active=0` でも detect・start・step・一覧には出る一方、配信系の経路からは外れる。他の列は既存のstaging行から写してプラン列などの取りこぼしを防ぐ。stagingのD1書き込みは保存済み共通承認の範囲内（同じやり方で `auth.mfa.required` の1行を登録済み）。
+      3. 実行：`POST …/follower-import/detect`（`:990`、読み取りのLINE呼び出し1回）→ `POST …/follower-import/start`（`:1015`、LINE呼び出し無し。detect を先に通さないと `FOLLOWER_IMPORT_NOT_AVAILABLE` で409になる）→ `POST …/follower-import/step`（`:1036`）を自己連鎖で呼ぶ。これは上で決めた「『入る』が叩いている口」そのもので、取得の並列・書き戻し・カーソル・ロック・時間予算の切れ方はここで観測できる。間隔は通常500ms／`busy` が返ったら3000ms／失敗は5000ms、終端フェーズで止める。一時行は一覧（`:202`）にも出るので、画面の「入る」からの確認も取れる。
+    - **測る数値**：完了までの実時間、step の呼び出し回数、`busy` が返った回数。
+    - **保存の許可範囲**：**staging の13行だけ**。確認後に友だち行と一時アカウント行を削除し、**0件になったことを実測**する。**表示名・画像・ユーザーID・トークンは会話・ログ・リポジトリへ出さない**（出力の禁止は維持し、一時的な保存だけを許す）。
+      - **2026-10-16 訂正**：友だち行と進捗設定は0件になったが、**一時アカウント行の `DELETE` はD1では通らない**（code 7500。原因は §3 の「D1の `triggers nested too deep`」で実測済み。行数に依存しないので何度試しても同じ）。この条件は「**有効なアカウントとして0件＝一時行は無効・アーカイブ・秘密値なし**」に読み替える。素の `DELETE` を繰り返したり `DROP TRIGGER`・外部キー切りを試したりしない。
+    - stagingには**cronが無い**（`wrangler.staging.toml` 5行目「Intentionally has no [triggers] section」。`processPendingFollowerImports` の呼び出し元は cron の scheduled ハンドラ `apps/worker/src/index.ts:1490-1496` だけで、HTTPの入口は無い）。よってstagingでは**画面の連鎖だけが取り込みを進める**ので、受入条件2の確認にちょうど合う。**`[triggers]` は足さない。配備workflowの拒否も外さない。**
+    - もし 403（`FOLLOWER_IMPORT_NOT_AVAILABLE`）になったら、LINEのアカウント種別制限で**不具合ではない**。記録して止める。
+  - **6b 大量データでの途中再開（実APIでは確認できない）**：使える認証済みアカウントの友だちが13人しかなく、1回のstepで完走するため「途中で閉じて『入る』で再開」を実データでは再現できない。再開そのものは単体テスト（`follower-import.test.ts:354` の予算打ち切りからの再開、および旧実行の巻き戻り・上書き防止の回帰テスト）で担保済み。**実データでの大量件数の再開は未確認のまま残す**と記録し、合格と言わない
+- 残件（Claude）：staging既存3件の暗号化トークン列を安全に更新する正式経路。入口の候補は `packages/db/src/line-accounts.ts:926 updateLineAccount`（`:946` `channel_access_token`、`:986-988` `token_expires_at`）と `apps/worker/src/services/line-account-connect.ts:120,175`。**6a は新規登録で回避できるので、この残件は検証の前提ではない**
 - 以前の1手（済み・記録用）：Codexへ再検証・コミット・PR・CI・マージ・**staging配備**を引き継ぐ。再現スクリプト（`staleFriendWrites === 0`）での再確認を含む。最新本線 `origin/codex/development`（`e346a93acac35f1882f121f68b622b7bcdf67e69`）を取り込む。**本番は今回の対象外**。cronの自然発火は受入条件から外し、step の口で確かめる（理由は §3 の同節）
 - その次：`apps/web/src/v8/account-new/` の**v06実装**（下の実装範囲）
 - v06の実装範囲：`apps/web/src/v8/account-new/register.tsx`／`logic.ts`／`register.module.css`／`BEHAVIOR.md` へ反映（①は「事前確認」、②は「アカウント接続」）。実装に含めるもの＝Step 2 のチェック3つ・Step 3 のチェック2つが全部入るまで次へを無効／Step 4 の5項目を上から順に確認する進行と行ごとの待機中・確認中（回るリング）・OK・エラー表示／確認の行は上下中央そろえ／エラー時のカード上部の赤い案内箱／5項目すべてOKのときだけフッターの次へを活性／**Step 5 の友だち追加テスト（QR表示＋追加の検知で自動的に次へ）**／ウィザードを4段にして基本情報の段を経路から外す／**友だち引き継ぎを選んだ人だけ通る引き継ぎ中の画面（進捗・残り時間・速さの更新と、終了後の自動遷移）**／**完了画面の「早速使ってみる」で接続したアカウントのダッシュボードへ遷移**。上記の不具合1は同じPRで直すか別PRにするかを判断する

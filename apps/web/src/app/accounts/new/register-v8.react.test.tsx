@@ -7,7 +7,7 @@ import type { LineAccountConnectData } from '@/lib/api'
 
 const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(),
-  followerImportState: vi.fn(), followerInsight: vi.fn(),
+  followerImportState: vi.fn(), stepFollowerImport: vi.fn(), followerInsight: vi.fn(),
   staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(),
 }))
 vi.mock('@/lib/api', () => ({
@@ -17,6 +17,7 @@ vi.mock('@/lib/api', () => ({
       connect: calls.connect,
       list: calls.list,
       followerImportState: calls.followerImportState,
+      stepFollowerImport: calls.stepFollowerImport,
       followerInsight: calls.followerInsight,
     },
     staff: { list: calls.staffList },
@@ -101,6 +102,36 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(screen.queryByText('LINE ID')).toBeNull()
   })
 
+  /*
+    絵の正本ノードは、ソース文字の検索（旧 accounts-setup-visual-parity.test.ts の並び）ではなく
+    実際に描かれた印で確かめる（B-273）。xj3zz=①／JYfda=②／GwKE2=③／v2KMj=④／TvXII=⑤、
+    qw80E=結果の窓。ノードとURLの対応は scripts/visual-qa/v8-design-map-route-contract.test.ts。
+  */
+  const shownNode = () => document.querySelector('[data-design-node]')?.getAttribute('data-design-node')
+
+  it('各段と結果の窓は絵の正本ノードを描く', async () => {
+    render(<RegisterV8 />)
+    expect(shownNode()).toBe('xj3zz')
+    next()
+    expect(shownNode()).toBe('JYfda')
+    fill('v8-channel-id', '123456789')
+    fill('v8-channel-secret', 'synthetic-secret')
+    fill('v8-login-channel-id', '2007123456')
+    fill('v8-login-channel-secret', 'synthetic-login-secret')
+    next()
+    expect(shownNode()).toBe('GwKE2')
+    next()
+    expect(await screen.findByRole('button', { name: '接続して設定する' })).toBeTruthy()
+    expect(shownNode()).toBe('v2KMj')
+    fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
+    expect(await screen.findByText('接続を確かめた結果')).toBeTruthy()
+    expect(document.querySelector('[data-design-node="qw80E"]')).toBeTruthy()
+    fireEvent.click(screen.getByText('LINE Official Account Manager で「応答メッセージ」をオフにしたことを確かめました'))
+    fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
+    expect(await screen.findByText('登録が完了しました')).toBeTruthy()
+    expect(document.querySelector('[data-design-node="TvXII"]')).toBeTruthy()
+  })
+
   it('④は検査前は5行とも「まだ」', async () => {
     await enterCheckStep()
     expect(screen.getAllByText('まだ').length).toBeGreaterThanOrEqual(5)
@@ -128,15 +159,17 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(await screen.findByText('登録が完了しました')).toBeTruthy()
   })
 
-  it('登録後はWorkerで進む取り込みを読み取り、完了を画面へ反映する', async () => {
+  it('登録後は画面から取り込みの続きを進め、完了を画面へ反映する', async () => {
     calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account', followerImport: { capability: 'available', phase: 'importing_ids' } } })
-    calls.followerImportState.mockResolvedValue({ success: true, data: { capability: 'available', phase: 'hydrating_profiles', received: 10, imported: 10 } })
+    /* 読むだけ（followerImportState）では次の自動処理まで進まないので、画面は step を呼ぶ。 */
+    calls.stepFollowerImport.mockResolvedValue({ success: true, data: { state: { capability: 'available', phase: 'completed', received: 10, imported: 10 }, busy: false, profilesFetched: 10 } })
     await enterCheckStep()
     fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
     const registerButton = await screen.findByRole('button', { name: '確認コードを入れて登録する' })
     fireEvent.click(screen.getByText('LINE Official Account Manager で「応答メッセージ」をオフにしたことを確かめました'))
     fireEvent.click(registerButton)
-    await waitFor(() => expect(calls.followerImportState).toHaveBeenCalledWith('new-account'))
+    await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledWith('new-account'))
+    expect(calls.followerImportState).not.toHaveBeenCalled()
     expect(await screen.findByText('登録が完了しました')).toBeTruthy()
   })
 
