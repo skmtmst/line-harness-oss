@@ -1837,6 +1837,31 @@
       "parentColumn": "id"
     }
   },
+  "incoming_webhook_queue": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "webhook_id",
+      "parent": "incoming_webhooks",
+      "parentColumn": "id"
+    }
+  },
+  "operator_notification_occurrences": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "instance_id",
+      "parent": "notification_instances",
+      "parentColumn": "id"
+    }
+  },
+  "public_ingress_receipts": {
+    "category": "purge",
+    "scope": {
+      "by": "publicIngress",
+      "column": "scope_id"
+    }
+  },
   "incoming_webhook_steps": {
     "category": "purge",
     "scope": {

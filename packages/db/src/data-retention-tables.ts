@@ -20,8 +20,10 @@ export type RetentionCategory = 'purge' | 'retain' | 'global';
  * tenant      … 列に統括IDがそのまま入っている。
  * lineAccount … 列にLINEアカウントIDが入っている。アカウントは統括に属する。
  * parent      … 親表の行に属する。親をたどると最後は tenant か lineAccount に着く。
+ * publicIngress … 受信の種類ごとに成果地点または計測サイトから統括をたどる。
  */
 export type RetentionScope =
+  | { by: 'publicIngress'; column: string }
   | { by: 'workflow'; column: string }
   | { by: 'tenant'; column: string }
   | { by: 'lineAccount'; column: string }
@@ -56,28 +58,29 @@ export function retentionTableNames(): string[] {
 export function purgeTablesChildFirst(): string[] {
   const depth = new Map<string, number>();
   /** その表の行を選ぶために、まだ残っていないといけない表。 */
-  const dependsOn = (name: string): string | undefined => {
+  const dependsOn = (name: string): string[] => {
     // Files also reference answers and friends; remove them before either parent.
-    if (name === 'form_submission_files') return 'form_submissions';
-    if (name === 'scenario_source_jobs') return 'scenario_versions';
+    if (name === 'form_submission_files') return ['form_submissions'];
+    if (name === 'scenario_source_jobs') return ['scenario_versions'];
     const scope = RETENTION_TABLES[name]?.scope;
-    if (!scope) return undefined;
-    if (scope.by === 'parent') return scope.parent;
-    if (scope.by === 'workflow' || (scope.by === 'lineAccount' && name !== 'line_accounts')) return 'line_accounts';
-    return undefined;
+    if (!scope) return [];
+    if (scope.by === 'publicIngress') return ['conversion_points', 'measurement_sites'];
+    if (scope.by === 'parent') return [scope.parent];
+    if (scope.by === 'workflow' || (scope.by === 'lineAccount' && name !== 'line_accounts')) return ['line_accounts'];
+    return [];
   };
   const measure = (name: string, seen: Set<string>): number => {
     const cached = depth.get(name);
     if (cached !== undefined) return cached;
     // 親子の輪があっても止まるようにする。実際の schema には無いが、将来の追加で壊さない。
     if (seen.has(name)) return 0;
-    const parent = dependsOn(name);
-    if (!parent) {
+    const parents = dependsOn(name);
+    if (!parents.length) {
       depth.set(name, 0);
       return 0;
     }
     seen.add(name);
-    const value = measure(parent, seen) + 1;
+    const value = Math.max(...parents.map(parent => measure(parent, new Set(seen)))) + 1;
     seen.delete(name);
     depth.set(name, value);
     return value;
@@ -100,6 +103,11 @@ export function tenantScopeCondition(table: string): string {
 }
 
 function buildCondition(table: string, scope: RetentionScope, seen: Set<string>): string {
+  if (scope.by === 'publicIngress') return `(${table}.kind, ${table}.${scope.column}) IN (
+    WITH target(tenant_id) AS (SELECT ?)
+    SELECT 'conversion_nonce', id FROM conversion_points WHERE tenant_id=(SELECT tenant_id FROM target)
+    UNION ALL SELECT 'site_event', id FROM measurement_sites WHERE line_account_id IN
+      (SELECT id FROM line_accounts WHERE tenant_id=(SELECT tenant_id FROM target)))`;
   if (scope.by === 'workflow') return `${table}.${scope.column} IN (WITH target(id) AS (SELECT ?)
     SELECT 'tenant:' || id FROM target UNION ALL SELECT 'line:' || id FROM line_accounts WHERE tenant_id=(SELECT id FROM target))`;
   if (scope.by === 'tenant') return `${table}.${scope.column} = ?`;
