@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import { utcToJstHm, utcToJstMd, formatWeekday } from '../lib/datetime.js';
 import Button from './ui/Button.js';
+import LoadErrorView from './LoadErrorView.js';
 import WaitlistOfferSheet from './WaitlistOfferSheet.js';
 
 /** 自分のキャンセル待ち。順番（先着・何番目か）は口が返す。口が無い間は番号を出さない。 */
@@ -17,6 +18,7 @@ const jstDay = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3_600_000
  * 時間内に決めなかった人には「時間切れ」と［もう一度キャンセル待ちをする］。1人3件まで・開始の1時間前で締める。
  */
 export default function WaitlistSection({ onChanged, upcomingHeading }: { onChanged?: () => void; /** 待ちの下に予約が続くときだけ true。「これからの予約」の見出しで区切る。 */ upcomingHeading?: boolean }) {
+  const [loadFailed, setLoadFailed] = useState(false);
   const [rows, setRows] = useState<WaitlistRow[] | null>(null);
   const [now, setNow] = useState(Date.now());
   const [working, setWorking] = useState<string | null>(null);
@@ -26,7 +28,8 @@ export default function WaitlistSection({ onChanged, upcomingHeading }: { onChan
 
   useEffect(() => {
     let alive = true;
-    Promise.resolve().then(() => api.bookingWaitlists()).then((r) => { if (alive) setRows(r.waitlist as WaitlistRow[]); }).catch((e) => { logFailure('waitlist-section', e); if (alive) setRows([]); });
+    setLoadFailed(false);
+    Promise.resolve().then(() => api.bookingWaitlists()).then((r) => { if (alive) setRows(r.waitlist as WaitlistRow[]); }).catch((e) => { logFailure('waitlist-section', e); if (alive) setLoadFailed(true); });
     return () => { alive = false; };
   }, [reload]);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
@@ -35,6 +38,7 @@ export default function WaitlistSection({ onChanged, upcomingHeading }: { onChan
 
   /* 見せるのは待っている・案内が来ている・時間切れの 3 つ。予約になった・取り消した待ちは出さない。 */
   const shown = (rows ?? []).filter((w) => w.status === 'waiting' || w.status === 'invited' || (w.status === 'finished' && !!w.hold_expires_at));
+  if (loadFailed) return <LoadErrorView compact note="キャンセル待ちはなくなっていません。" onRetry={() => setReload(n => n + 1)} />;
   if (shown.length === 0 && !offerId) return null;
 
   async function cancel(id: string) {

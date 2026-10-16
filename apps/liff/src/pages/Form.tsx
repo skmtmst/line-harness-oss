@@ -6,54 +6,25 @@ import { TextInput, ChoiceInput, FieldLabel, FieldCount } from '../components/fo
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import liff from '../lib/liff-runtime.js';
-import {
-  PREFECTURES,
-  collectInputs,
-  isOtherFreeText,
-  formChoiceIsSelected,
-  nextSectionIndex,
-  normalizeBookingValue,
-  normalizeFormTheme,
-  normalizeRatingValue,
-  validateAnswer,
-  type FormAvailability,
-  type FormBlock,
-  type FormBookingValue,
-  type FormInputBlock,
-  type FormLayout,
-} from '@line-crm/shared';
+import { PREFECTURES, collectInputs, isOtherFreeText, formChoiceIsSelected, nextSectionIndex, normalizeBookingValue, normalizeFormTheme, normalizeRatingValue, validateAnswer, type FormAvailability, type FormBlock, type FormBookingValue, type FormInputBlock, type FormLayout } from '@line-crm/shared';
 import { submitButtonText } from '../lib/form-button-text.js';
-import { api, type MenuItem, type PostalCodeCandidate, type PublicForm, type RoutedTarget, type StaffItem } from '../lib/api.js';
+import { api, type MenuItem, type PublicForm, type RoutedTarget, type StaffItem } from '../lib/api.js';
 import Stepper from '../components/ui/Stepper.js';
 import { NoRoutedSlots, RoutedBanner, RoutedConfirm } from '../components/RoutedBooking.js';
-import {
-  addDays,
-  formatWeekday,
-  slotStartsAtIso,
-  formatJstEventAt,
-  jstToday,
-  utcToJstHm,
-  utcToJstMd,
-} from '../lib/datetime.js';
-import {
-  conflictMessage,
-  decideFormSubmitStep,
-  FORM_SUBMIT_INCOMPLETE_MESSAGE,
-} from '../lib/form-submit-flow.js';
+import { addDays, formatWeekday, slotStartsAtIso, formatJstEventAt, jstToday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
+import { conflictMessage, decideFormSubmitStep, FORM_SUBMIT_INCOMPLETE_MESSAGE } from '../lib/form-submit-flow.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import Button from '../components/ui/Button.js';
-import { LiffFieldLabel } from '../components/forms/controls.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import PrivacyNote from '../components/ui/PrivacyNote.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
-import { DateYmdField, AddressControls, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../components/forms/controls';
-import { LiffInput } from '../components/forms/controls.js'
-
+import { DateYmdField, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../components/forms/controls';
+import { type AddressDraft, AddressFields } from "./Form-gap-parts.js"
 /**
  * 回答フォーム（友だちが実際に入力する画面）。
  *
@@ -774,15 +745,6 @@ export default function Form() {
   );
 }
 
-/** 回答の住所の形。空欄は空文字に寄せる（未入力判定と一致させるため）。 */
-type AddressDraft = {
-  postalCode: string;
-  prefecture: string;
-  city: string;
-  addressLine1: string;
-  addressLine2: string;
-};
-
 function toAddressDraft(value: unknown): AddressDraft {
   const empty: AddressDraft = { postalCode: '', prefecture: '', city: '', addressLine1: '', addressLine2: '' };
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return empty;
@@ -795,118 +757,6 @@ function toAddressDraft(value: unknown): AddressDraft {
     addressLine1: text('addressLine1'),
     addressLine2: text('addressLine2'),
   };
-}
-
-/**
- * F-11：住所は郵便番号→自動補完＋手入力。候補が複数の番号は選んでもらう。
- * 選ばなければ手入力の住所はそのまま残す（上書きは選んだときだけ）。
- */
-function AddressFields({
-  name,
-  draft,
-  onChange,
-  placeholder,
-}: {
-  name: string;
-  draft: AddressDraft;
-  onChange: (name: string, value: unknown) => void;
-  placeholder?: string;
-}) {
-  const [candidates, setCandidates] = useState<PostalCodeCandidate[]>([]);
-  const [looking, setLooking] = useState(false);
-  const [lookupMessage, setLookupMessage] = useState<string | null>(null);
-  // 調べている間に書いた欄を、届いた応答で古い中身に戻さないため、
-  // いちばん新しい住所を持っておく（応答のときはこれに足す）。
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-  // 調べた郵便番号の回。郵便番号を書き換えたら古い応答・候補は使わない。
-  const lookupGenRef = useRef(0);
-  useEffect(
-    () => () => {
-      lookupGenRef.current += 1;
-    },
-    [],
-  );
-
-  const patch = (next: AddressDraft) => onChange(name, next);
-
-  const applyCandidate = (c: PostalCodeCandidate) => {
-    const latest = draftRef.current;
-    patch({
-      ...latest,
-      prefecture: c.prefecture,
-      city: c.city,
-      // 町名は番地欄が空のときだけ入れる。書いた番地は消さない。
-      addressLine1: latest.addressLine1 || c.town,
-    });
-    setCandidates([]);
-    setLookupMessage(null);
-  };
-
-  const lookup = async () => {
-    const searched = draft.postalCode;
-    const gen = ++lookupGenRef.current;
-    setLooking(true);
-    setLookupMessage(null);
-    // 応答を使ってよいか（この回が最新で、郵便番号も調べた時のまま）。
-    const stillCurrent = () =>
-      gen === lookupGenRef.current && draftRef.current.postalCode === searched;
-    try {
-      const res = await api.postalCodeSearch(searched);
-      if (!stillCurrent()) return;
-      if (!res.success) throw new Error('postal_code_search_failed');
-      const data = res.data;
-      if (data.status === 'matched' && data.candidates.length === 1) {
-        applyCandidate(data.candidates[0]);
-        return;
-      }
-      if (data.status === 'multiple') {
-        setCandidates(data.candidates);
-        return;
-      }
-      setCandidates([]);
-      setLookupMessage(
-        data.status === 'invalid'
-          ? '郵便番号は 123-4567 のように入力してください'
-          : 'その郵便番号の住所が見つかりません。下の欄へ直接入力してください',
-      );
-    } catch {
-      if (!stillCurrent()) return;
-      setCandidates([]);
-      setLookupMessage('住所を調べられませんでした。下の欄へ直接入力してください');
-    } finally {
-      if (gen === lookupGenRef.current) setLooking(false);
-    }
-  };
-
-  return (
-    <AddressControls draft={draft} placeholder={placeholder} looking={looking} onLookup={() => void lookup()} onChange={(next) => {
-      if (next.postalCode !== draft.postalCode) {
-        lookupGenRef.current += 1;
-        setLooking(false);
-        setCandidates([]);
-      }
-      patch(next);
-    }}>
-      {candidates.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-xs text-ink-faint">候補が複数あります。選んでください</p>
-          {candidates.map((c) => (
-            <Button variant="option"
-              key={`${c.postalCode}-${c.town}`}
-              type="button"
-              onClick={() => applyCandidate(c)}
-            >
-              {c.prefecture}
-              {c.city}
-              {c.town}
-            </Button>
-          ))}
-        </div>
-      )}
-      {lookupMessage && <p className="text-xs text-ink-faint">{lookupMessage}</p>}
-    </AddressControls>
-  );
 }
 
 /**
@@ -1037,10 +887,7 @@ function PeopleBookingSlotPicker({
   if (routed?.status === 'loading') return <p className="text-sm text-ink-faint">ご案内を準備しています...</p>;
   if (routed?.status === 'error') {
     return (
-      <div className="space-y-2">
-        <p role="alert" className="text-sm text-ink-secondary">ご案内を準備できませんでした。回答は保存されています。</p>
-        <Button variant="secondary" onClick={routed.retry}>もう一度</Button>
-      </div>
+      <LoadErrorView compact message="ご案内を準備できませんでした。回答は保存されています。" onRetry={routed.retry} />
     );
   }
   if (!menuId) {

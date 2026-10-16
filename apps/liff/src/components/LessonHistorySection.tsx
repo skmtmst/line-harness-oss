@@ -5,6 +5,7 @@ import AbsenceSheet, { mdHm } from './AbsenceSheet.js';
 import MakeupPicker from './MakeupPicker.js';
 import Button from './ui/Button.js';
 import Card from './ui/Card.js';
+import LoadErrorView from './LoadErrorView.js';
 
 /**
  * 予約の履歴に並ぶ教室の予約（B3・rx3FL・kzE16）。振替を使うクラスの行に［欠席する］、
@@ -18,14 +19,17 @@ export default function LessonHistorySection({ onPicking }: { onPicking?: (picki
   /** 欠席した回を探すための、今・これまでの予約（振替が返す欠席元の予約 ID から日時と教室名を引く）。 */
   const [known, setKnown] = useState<EventBookingMine[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const load = useCallback(() => {
-    Promise.resolve().then(() => api.myEventBookings('upcoming')).then((r) => { const rows = r.items; setKnown((prev) => (Array.isArray(rows) ? [...rows, ...prev.filter((p) => !rows.some((i) => i.id === p.id))] : prev)); setItems(r.items.filter((b) => b.makeup?.enabled && (b.status === 'requested' || b.status === 'confirmed') && Date.parse(b.slot_starts_at) > Date.now())); }).catch(() => setItems([]));
-    Promise.resolve().then(() => api.myEventBookings('past')).then((r) => setKnown((prev) => (Array.isArray(r.items) ? [...prev, ...r.items.filter((i) => !prev.some((p) => p.id === i.id))] : prev))).catch(() => undefined);
-    Promise.resolve().then(() => api.makeupCredits()).then((r) => setCredits(r.credits.filter((c) => c.status === 'open'))).catch(() => setCredits([]));
+    setLoadFailed(false);
+    Promise.resolve().then(() => api.myEventBookings('upcoming')).then((r) => { const rows = r.items; setKnown((prev) => (Array.isArray(rows) ? [...rows, ...prev.filter((p) => !rows.some((i) => i.id === p.id))] : prev)); setItems(r.items.filter((b) => b.makeup?.enabled && (b.status === 'requested' || b.status === 'confirmed') && Date.parse(b.slot_starts_at) > Date.now())); }).catch(() => setLoadFailed(true));
+    Promise.resolve().then(() => api.myEventBookings('past')).then((r) => setKnown((prev) => (Array.isArray(r.items) ? [...prev, ...r.items.filter((i) => !prev.some((p) => p.id === i.id))] : prev))).catch(() => setLoadFailed(true));
+    Promise.resolve().then(() => api.makeupCredits()).then((r) => setCredits(r.credits.filter((c) => c.status === 'open'))).catch(() => setLoadFailed(true));
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { onPicking?.(credits.length > 0); return () => onPicking?.(false); }, [credits.length, onPicking]);
   const sourceOf = (c: MakeupCredit) => { if (justAbsent) return justAbsent; const b = known.find((k) => k.id === c.source_event_booking_id); return b ? { startsAt: b.slot_starts_at, name: b.event_name } : null; };
+  if (loadFailed) return <LoadErrorView compact note="教室の予約・振替の履歴はなくなっていません。" onRetry={load} />;
   if (items.length === 0 && credits.length === 0 && !target) return null;
   return (
     <section className="space-y-3.5" aria-label="教室の予約">
