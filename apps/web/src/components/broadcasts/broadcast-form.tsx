@@ -77,7 +77,7 @@ import {
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import SendConfirmDialog, { describeExclusion } from '@/components/shared/send-confirm-dialog'
+import SendConfirmDialog, { describeExclusion, shiftedWhen } from '@/components/shared/send-confirm-dialog'
 import { chatSafetyApi } from '@/lib/api-gap1'
 import type { SendConfirmationPreview } from '@line-crm/shared'
 import Notice from '@/components/shared/notice'
@@ -2723,7 +2723,7 @@ export default function BroadcastForm({
       recipientsNote={currentStep && sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : exclusionNote ?? undefined}
       purpose="marketing"
       whenLabel={currentStep && sendPreview.data?.quietHoursShiftTo
-        ? `${formatScheduleTime(sendPreview.data.quietHoursShiftTo)} に送る`
+        ? `${shiftedWhen(sendPreview.data.quietHoursShiftTo)} に送る`
         : sendMode === 'scheduled' && scheduledLabel ? `${scheduledLabel} に送る（予約）` : '今すぐ送る'}
       whenNote={currentStep && sendPreview.data?.quietHoursShiftTo
         ? '夜の静かな時間（21〜8 時）のため、次の 8:00 に送ります'

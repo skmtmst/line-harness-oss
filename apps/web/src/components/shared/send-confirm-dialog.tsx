@@ -35,7 +35,15 @@ export function describeExclusion(recipients: number, excluded: { blocked: numbe
   const other = (excluded.hidden ?? 0) + (excluded.missingDestination ?? 0)
   const total = excluded.blocked + excluded.optedOut + excluded.duplicate + other
   const parts = [`宣伝を止めている ${formatNumber(excluded.optedOut)}`, `ブロック ${formatNumber(excluded.blocked)}`, `重複 ${formatNumber(excluded.duplicate)}`, ...(other > 0 ? [`ほか ${formatNumber(other)}`] : [])]
+  if (recipients === 0 && total > 0 && excluded.optedOut === total) return `対象 ${formatNumber(total)} 人はすべて宣伝を止めています`
   return `対象 ${formatNumber(recipients + total)} 人から除く ${formatNumber(total)} 人：${parts.join('・')}`
+}
+
+/** 夜の静かな時間でずらした送信時刻「10/19（日）8:00」。日本時間。 */
+export function shiftedWhen(iso: string): string {
+  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: false }).formatToParts(new Date(iso))
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
+  return `${get('month')}/${get('day')}（${get('weekday')}）${get('hour')}:${get('minute')}`
 }
 
 export type SendConfirmBlock = 'no-permission' | 'impersonation' | null
@@ -133,7 +141,8 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
       cancelLabel="戻る"
       busy={busy}
       error={error}
-      size="medium"
+      size="large"
+      actionWidthReserve="idle"
       onConfirm={blockText || hidePrimary ? undefined : confirm}
       confirmDisabled={!canPress}
       onCancel={() => { if (!busy) onBack() }}
