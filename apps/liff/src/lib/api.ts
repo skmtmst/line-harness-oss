@@ -298,6 +298,9 @@ export type CreateEventBookingResponse =
  * 欠席の振替（B3）。口（Worker）は Codex の gap2 が作る。形は B3 の「データと API の形の案」。
  * makeup が無い予約は、今までどおり欠席の入口を出さない。
  */
+/** 答えで決まった予約の行き先（B6）。 */
+export interface RoutedTarget { menuId: string; menuName: string; durationMinutes: number; price: number; staffId: string | null; staffName: string | null; meetingMode: 'in_person' | 'online' | null }
+
 export interface MakeupCredit { id: string; expires_at: string; status: 'open' | 'used' | 'expired' | 'revoked'; source_starts_at?: string | null; source_name?: string | null }
 export interface MakeupOption { slot_id: string; event_id: string; starts_at: string; ends_at: string; name: string; remaining: number | null; full: boolean }
 export interface EventBookingMakeup { enabled: boolean; /** 振替がもらえるときの期限（この欠席なら）。 */ valid_until?: string | null; /** 欠席の連絡の締め（これを過ぎると振替の対象外）。 */ cutoff_at: string | null; plan_label?: string | null }
@@ -543,6 +546,12 @@ export const api = {
    * 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る。
    * Worker は `{ success: true, data: { answers, createdAt } | null }` で返す。
    */
+  /**
+   * 答えで予約の行き先を決める（B6）。口（Worker）は Codex の gap2 が作る。
+   * 行き先はこの口の返事で決まり、お客さまは書き換えられない（予約には routingToken を添える）。
+   */
+  resolveFormRouting: (id: string, answers: Record<string, unknown>) =>
+    post<{ data: { target: RoutedTarget; matchedIndex: number; routingToken: string } }>(`/api/liff/forms/${encodeURIComponent(id)}/routing/resolve`, { answers }).then((r) => r.data),
   getMyLatestFormAnswer: (id: string) =>
     getLatestFormAnswer(`/api/forms/${id}/my-latest`),
   /**

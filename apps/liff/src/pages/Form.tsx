@@ -23,7 +23,8 @@ import {
   type FormLayout,
 } from '@line-crm/shared';
 import { submitButtonText } from '../lib/form-button-text.js';
-import { api, type MenuItem, type PostalCodeCandidate, type PublicForm, type StaffItem } from '../lib/api.js';
+import { api, type MenuItem, type PostalCodeCandidate, type PublicForm, type RoutedTarget, type StaffItem } from '../lib/api.js';
+import { NoRoutedSlots, RoutedBanner } from '../components/RoutedBooking.js';
 import {
   addDays,
   formatWeekday,
@@ -210,6 +211,25 @@ export default function Form() {
 
   const layout = form?.layout;
   const section = layout?.sections[sectionIndex];
+
+  /**
+   * 答えで予約の行き先を分けるフォーム（B6）：予約の欄があるページに来たら、答えから行き先を決めてもらう。
+   * 行き先はサーバーが決める（お客さまは書き換えられない）。決められなければ「どれにも当たらない」行き先へ。
+   */
+  const routingOn = Boolean((layout as { routing?: { enabled?: boolean } } | undefined)?.routing?.enabled);
+  const pageHasBooking = Boolean(section?.blocks.some((b) => b.kind === 'input' && b.type === 'booking'));
+  const [routed, setRouted] = useState<RoutedState | undefined>(undefined);
+  const [routedRetry, setRoutedRetry] = useState(0);
+  const answersKey = JSON.stringify(answers);
+  useEffect(() => {
+    if (!routingOn || !pageHasBooking || !id) { setRouted(undefined); return; }
+    let alive = true;
+    setRouted({ status: 'loading' });
+    api.resolveFormRouting(id, JSON.parse(answersKey) as Record<string, unknown>)
+      .then((r) => { if (alive) setRouted({ status: 'ready', target: r.target }); })
+      .catch((e) => { logFailure('form-routing-resolve', e); if (alive) setRouted({ status: 'error', retry: () => setRoutedRetry((n) => n + 1) }); });
+    return () => { alive = false; };
+  }, [routingOn, pageHasBooking, id, answersKey, routedRetry]);
 
   /** いま出ているページの入力欄。検証はここだけを見る。 */
   const visibleInputs = useMemo(() => {
@@ -613,6 +633,7 @@ export default function Form() {
       error={block.kind === 'input' ? (fieldErrors[block.name] ?? null) : null}
       errorColor={theme.error}
       choiceAvailability={block.kind === 'input' ? form.availability?.choices[block.name] : undefined}
+      routed={routed}
     />
   );
 
@@ -872,7 +893,8 @@ function AddressFields({
  * 日にち→時刻の順に空き枠から選ぶ。選んだ枠は回答に入れ、送信後に
  * 予約の受け口で確保する（枠の再確認と重なり防止はそちらが担う）。
  */
-export function BookingSlotPicker(props: {block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void}) {
+export type RoutedState = { status: 'loading' } | { status: 'error'; retry: () => void } | { status: 'ready'; target: RoutedTarget };
+export function BookingSlotPicker(props: {block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void;/** 答えで行き先が決まるフォーム（B6）。 */ routed?:RoutedState}) {
   return props.block.booking?.kind==='seats' ? <SeatBookingBlock {...props} /> : <PeopleBookingSlotPicker {...props} />;
 }
 
@@ -880,13 +902,17 @@ function PeopleBookingSlotPicker({
   block,
   value,
   onChange,
+  routed,
 }: {
   block: FormInputBlock;
   value: unknown;
   onChange: (next: FormBookingValue | '') => void;
+  routed?: RoutedState;
 }) {
-  const menuId = block.booking?.menuId ?? '';
-  const fixedStaffId = block.booking?.staffId ?? null;
+  /* 答えで行き先が決まったら、フォームで決めたメニュー・担当より答えの行き先が先（担当は選ばせない）。 */
+  const target = routed?.status === 'ready' ? routed.target : null;
+  const menuId = target?.menuId ?? block.booking?.menuId ?? '';
+  const fixedStaffId = target ? target.staffId : block.booking?.staffId ?? null;
   const daysAhead = Math.min(60, Math.max(1, block.booking?.daysAhead ?? 14));
   const picked = normalizeBookingValue(value);
   const today = jstToday();
@@ -983,6 +1009,15 @@ function PeopleBookingSlotPicker({
     };
   }, [menuId, fixedStaffId, staffId, today, lastDay]);
 
+  if (routed?.status === 'loading') return <p className="text-sm text-ink-faint">ご案内を準備しています...</p>;
+  if (routed?.status === 'error') {
+    return (
+      <div className="space-y-2">
+        <p role="alert" className="text-sm text-ink-secondary">ご案内を準備できませんでした。回答は保存されています。</p>
+        <Button variant="secondary" onClick={routed.retry}>もう一度</Button>
+      </div>
+    );
+  }
   if (!menuId) {
     return <p className="text-sm text-ink-secondary">予約のメニューが決まっていません。お店に確認してください。</p>;
   }
@@ -1005,7 +1040,8 @@ function PeopleBookingSlotPicker({
           {menu.name}・{menu.duration_minutes}分
         </p>
       )}
-      {!fixedStaffId && staffList.length > 1 && (
+      {target ? <RoutedBanner target={target} /> : null}
+      {!target && !fixedStaffId && staffList.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {staffList.map((s) => (
             <Button variant="chip" selected={staffId === s.id}
@@ -1035,7 +1071,9 @@ function PeopleBookingSlotPicker({
           onChange(picked?.startsAt === startsAt ? '' : { menuId, staffId: fixedStaffId ?? staffId, startsAt });
         }}
       />
-      {!dates.some(hasOpen) && <p className="text-sm text-ink-secondary">選べる期間に空きがありません。期間を変えてください。</p>}
+      {!dates.some(hasOpen) && (target
+        ? <NoRoutedSlots target={target} days={daysAhead} onContact={() => liff.closeWindow()} />
+        : <p className="text-sm text-ink-secondary">選べる期間に空きがありません。期間を変えてください。</p>)}
       {picked && (
         <p className="text-xs font-bold text-liff-primary">
           {formatJstEventAt(picked.startsAt)}〜 を選んでいます
@@ -1060,7 +1098,9 @@ function BlockView({
   error,
   errorColor,
   choiceAvailability,
+  routed,
 }: {
+  routed?: RoutedState;
   block: FormBlock;
   /** ページの先頭の画像 (題の上の表紙)。★V8 B8rCt は高さ 96・角丸 12 の帯。 */
   cover?: boolean;
@@ -1349,6 +1389,7 @@ function BlockView({
           <BookingSlotPicker
             block={block}
             value={value}
+            routed={routed}
             onChange={(next) => onChange(block.name, next)}
           />
         )}

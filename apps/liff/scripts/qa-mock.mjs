@@ -266,6 +266,7 @@ const QA_FORM_COVER = `data:image/svg+xml,${encodeURIComponent(
 
 /** 来店アンケート (★V8 の B8rCt・g9osGN・aNZKe)。2ページ目に予約の欄。 */
 function qaForm() {
+  const routed = state.features.includes('routed') || state.features.includes('routed-empty');
   return {
     id: 'qa-form-1',
     name: '来店アンケート',
@@ -337,6 +338,8 @@ function qaForm() {
           ],
         },
       ],
+      /* ③-2 第2弾 B6：答えで予約の行き先を分ける（撮影が features に routed を足したときだけ）。 */
+      ...(routed ? { routing: { enabled: true, questionId: 'qa-b1', rules: [], fallback: { menuId: 'qa-menu-4' } } } : {}),
       options: {
         thanksUrl: null,
         thanksText: 'ご回答ありがとうございました',
@@ -475,6 +478,11 @@ const server = createServer(async (req, res) => {
     }
   }
 
+  // ---- 答えで予約の行き先を分ける（③-2 第2弾 B6：Z76uuv・R02q7）。features に routed があるときだけフォームを書き換える ----
+  if (method === 'POST' && /^\/api\/liff\/forms\/[^/]+\/routing\/resolve$/.test(pathname)) {
+    json(res, 200, { success: true, data: { matchedIndex: 1, routingToken: 'qa-routing-token', target: { menuId: 'qa-menu-online', menuName: 'オンライン相談 60 分', durationMinutes: 60, price: 3300, staffId: state.features.includes('routed-empty') ? 'qa-staff-empty' : 'qa-staff-1', staffName: '佐々木', meetingMode: 'online' } } });
+    return;
+  }
   // ---- キャンセル待ち（③-2 第2弾：Zm2Vh・xANkO）。features に waitlist / waitlist-expired があるときだけ行を返す ----
   if (method === 'GET' && pathname === '/api/liff/booking/waitlist') {
     const base = { staff_id: 'qa-staff-1', menu_id: 'qa-menu-1', hold_minutes: 30, created_at: '2026-10-15T01:00:00.000Z', menu_name: 'トリミング（小型犬）', staff_name: '佐々木' };
@@ -594,6 +602,7 @@ const server = createServer(async (req, res) => {
   }
   if (method === 'GET' && pathname === '/api/liff/booking/availability') {
     const staffId = url.searchParams.get('staff_id') ?? 'qa-staff-1';
+    if (staffId === 'qa-staff-empty') { json(res, 200, { by_staff: [{ staff_id: staffId, display_name: 'QA スタッフ', slots: [] }], closed_dates: [] }); return; }
     // ★V8 の絵 (M2p63S・k3aJKU) に合わせた日付で決める。月曜はお休み、
     // 4・10・15・20・25・30 日は満席 (枠はあって残り0)。時刻は 9:00〜16:00 の6つで、
     // 10:00 と 16:00 は埋まっている。
