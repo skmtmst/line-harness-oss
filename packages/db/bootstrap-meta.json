@@ -604,6 +604,7 @@
     "669_restaurant_anniversary_followup.sql",
     "681_style_setup_selection_and_auto_insert.sql",
     "682_booking_stripe_connect_states.sql",
+    "683_restaurant_delivery_phase2_slots.sql",
     "686_public_ingress_receipts.sql",
     "687_template_soft_delete.sql",
     "688_media_metadata_revision.sql",
@@ -636,5 +637,5 @@
     "719_ec_auto_line.sql",
     "720_booking_pass_plans.sql"
   ],
-  "migrationCount": 635
+  "migrationCount": 636
 }
