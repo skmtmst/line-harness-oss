@@ -1541,6 +1541,10 @@ async function handleEvent(
         await dispatchOperatorEvent(db,operatorMailEnv!,{lineAccountId:lineAccountId!,eventType:chat.operator_id?'inbox_assigned_reply':'inbox_new_inquiry',sourceEventId:logId,executionMode:'automatic'});
       });
     }
+    if(!nonTextMatched&&lineAccountId)await replay('ai_qa_simulation',async()=>{
+      const {simulateIncomingQa}=await import('../services/ai-auto-qa.js');
+      await simulateIncomingQa(db,{account:lineAccountId,friendId:friend.id,eventId:event.webhookEventId??logId,question:content,kind:msg.type});
+    });
     await replay('recordWebhookAnalyticsEvent:0',()=>recordWebhookAnalyticsEvent(execution?.mutationDb('recordWebhookAnalyticsEvent:0') ?? db, lineAccountId, event, {
       friendId: friend.id,
       eventType: 'message_received',
@@ -1674,6 +1678,13 @@ async function handleEvent(
         await dispatchOperatorEvent(db,operatorMailEnv!,{lineAccountId:lineAccountId!,eventType:chat.operator_id?'inbox_assigned_reply':'inbox_new_inquiry',sourceEventId:logId,executionMode:'automatic'});
       });
     }
+
+    // G2 is simulation-only in this tranche. It cannot consume a reply token or
+    // suppress unread/operator notifications. Keyword rules always take priority.
+    if (!matched && lineAccountId) await replay('ai_qa_simulation', async()=>{
+      const {simulateIncomingQa}=await import('../services/ai-auto-qa.js');
+      await simulateIncomingQa(db,{account:lineAccountId,friendId:friend.id,eventId:event.webhookEventId??logId,question:incomingText,kind:event.message?.type??'text'});
+    });
 
     // イベントバス発火: message_received
     // Pass replyToken only when auto_reply didn't actually consume it

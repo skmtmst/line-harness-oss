@@ -3,7 +3,7 @@ import {requirePermission} from '../middleware/role-guard.js';
 import {Hono} from 'hono';
 import type {Env} from '../index.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite,gapKey} from '../services/gap-common.js';
-import {autoKinds,autoLineRules,ingestBehavior} from '../services/ec-auto-line.js';
+import {autoKinds,autoLineRules,ingestBehavior,processAutoLineMock} from '../services/ec-auto-line.js';
 import {getConnectorSecret} from './ec-connector-secret.js';
 export const ecAutoLine=new Hono<Env>();
 ecAutoLine.use('/api/ec/auto-line/*',requirePermission('/ec-commerce'));
@@ -51,3 +51,9 @@ ecAutoLine.get('/api/ec/auto-line/stats',async c=>{
  const a=await gapAccount(c),r=await c.env.DB.prepare("SELECT count(*) total,count(CASE WHEN status='simulated' THEN 1 END) simulated,count(CASE WHEN status LIKE 'skipped_%' THEN 1 END) skipped FROM ec_auto_line_sends WHERE account_id=?").bind(a).first();return c.json({success:true,data:{...r,sent:0,clicks:null,purchases:null,testMode:true}});
 });
 ecAutoLine.post('/api/ec/auto-line/rules/:kind/test',async c=>{gapWrite(c,{admin:true});const a=await gapAccount(c),kind=c.req.param('kind');if(!autoKinds.includes(kind as typeof autoKinds[number]))throw new GapError('invalid_kind');return c.json({success:true,data:{preview:(await autoLineRules(c.env.DB,a)).find(r=>r.kind===kind),sent:false,testMode:true}});});
+
+ecAutoLine.post('/api/ec/auto-line/simulate',async c=>{
+ gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c);
+ if(b.testMode!==true)throw new GapError('test_mode_required');
+ return c.json({success:true,data:{...await processAutoLineMock(c.env.DB,new Date(),a),sent:false,testMode:true}});
+});

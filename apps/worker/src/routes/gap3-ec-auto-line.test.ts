@@ -68,3 +68,26 @@ test('EC-03/12/13/23: 本人の結び付けから予定を一度だけ作り、�
  expect(d.raw.prepare('SELECT messages_snapshot_json FROM ec_auto_line_sends').get()).toEqual({messages_snapshot_json:JSON.stringify(rule.messages)});
  await processAutoLineMock(d.db,at);expect(states()).toEqual([{status:'simulated'}]);expect(fetch).not.toHaveBeenCalled();
 });
+
+test('EC-03/06/20/28: 店内の予定だけを模擬実行・実績0・再実行と閲覧と代理を守る',async()=>{
+ vi.useFakeTimers();vi.setSystemTime(at);await enable();scheduled();
+ d.raw.exec("INSERT INTO ec_behavior_events(id,account_id,friend_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) VALUES('other','b','other-f','cart_add','p','{}','2026-10-16T01:00:00Z','now','other'); INSERT INTO ec_auto_line_sends(id,account_id,rule_kind,friend_id,product_id,trigger_event_id,scheduled_at,original_due_at,messages_snapshot_json) VALUES('other-send','b','cart','other-f','p','other','2026-10-16T02:00:00Z','2026-10-16T02:00:00Z','[]')");
+ const url='/api/ec/auto-line/simulate?account_id=a';
+ for(const [staff,im]of [[{...gapOwner,readOnly:true},false],[gapOwner,true]]as const)expect((await gapCall(app(staff,im),url,'POST',{testMode:true})).status).toBe(403);
+ expect((await gapCall(app(),url,'POST',{testMode:false})).status).toBe(400);
+ const result=(await (await gapCall(app(),url,'POST',{testMode:true})).json() as any).data;expect(result).toEqual({processed:1,sent:false,testMode:true});
+ expect((await (await gapCall(app(),url,'POST',{testMode:true})).json() as any).data.processed).toBe(0);
+ expect(d.raw.prepare("SELECT status FROM ec_auto_line_sends WHERE account_id='b'").get()).toEqual({status:'scheduled'});
+ expect((await (await gapCall(app(),'/api/ec/auto-line/stats?account_id=a')).json() as any).data).toMatchObject({sent:0,simulated:1,clicks:null,purchases:null});
+});
+
+test('EC-03: 購入が事前確認の直後に増えても、最後のUPDATEで模擬配信を止める',async()=>{
+ await enable();scheduled();let injected=false;const original=d.db.prepare.bind(d.db);
+ const racing={...d.db,prepare(sql:string){
+  if(!injected&&sql.startsWith('UPDATE ec_auto_line_sends SET status=?')){
+   injected=true;d.raw.exec("INSERT INTO ec_behavior_events(id,account_id,friend_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) VALUES('last-buy','a','f','purchase','p','{}','2026-10-16T02:59:59Z','now','last-buy')");
+  }
+  return original(sql);
+ }} as D1Database;
+ await processAutoLineMock(racing,at);expect(injected).toBe(true);expect(states()).toEqual([{status:'skipped_purchased'}]);
+});

@@ -41,7 +41,7 @@ export const gap2Paths:Record<string,Record<string,ReturnType<typeof operation>>
 (gap2Paths["/api/broadcasts/{id}/ab-result"]??={}).get=operation("GET","/api/broadcasts/{id}/ab-result","G1: 模擬A/Bの結果","data:{status,variants,winner,remainder,version,testMode:true,...}。クリック以外の未提供の指標はnull。配信閲覧権限。");
 (gap2Paths["/api/broadcasts/{id}/ab-test/choose"]??={}).post=operation("POST","/api/broadcasts/{id}/ab-test/choose","G1: 模擬A/Bの勝者を選ぶ","body:{variant:A/B/none,confirmedRecipientCount,testMode:true}。Idempotency-KeyとX-Confirm-Irreversible:broadcast-send必須。配信送信権限、閲覧のみ・代理不可。本物の送信なし。");
 (gap2Paths["/api/ai-settings"]??={}).get=operation("GET","/api/ai-settings","G2: AI設定を読む","data:{mode,version,...,autoReplyAvailable:false}。初期off。自動応答の閲覧権限。");
-(gap2Paths["/api/ai-settings"]??={}).put=operation("PUT","/api/ai-settings","G2: 要約と返信案を有効化・停止","body:{mode:off/draft_only/suspended,expectedVersion,confirmed?,reason?}。owner/admin、draft_onlyは確認必須。代理は理由つきoff/suspendedだけ。auto_qaはオーナーでも409、他の管理者403。");
+(gap2Paths["/api/ai-settings"]??={}).put=operation("PUT","/api/ai-settings","G2: 要約と返信案を有効化・停止","body:{mode:off/draft_only/suspended,expectedVersion,confirmed?,reason?}。owner/admin、draft_onlyは確認必須。代理は理由つきoff/suspendedだけ。auto_qaはtestMode:true/confirmed:true/公開QA/オーナー本人確認がある模擬だけ。実送信なし。指定なしは409、他の管理者403。");
 (gap2Paths["/api/chats/{id}/ai/summary"]??={}).post=operation("POST","/api/chats/{id}/ai/summary","G2: 会話の3行要約","data:{lines,generatedAt,basedOnMessageId}。閲覧できる会話だけ。閲覧のみ・代理可。個人情報を伏せ、月3000回、外部への保存なし。LINEへ送らない。");
 (gap2Paths["/api/chats/{id}/ai/draft"]??={}).post=operation("POST","/api/chats/{id}/ai/draft","G2: 返信案を作る","data:{text,sources,generatedAt,basedOnMessageId}。会話の返信権限、閲覧のみ・代理不可。公開Q&Aと過去返信を参照。個人情報は伏せ、LINEへ送らない。");
 (gap2Paths["/api/qa-entries"]??={}).get=operation("GET","/api/qa-entries","G2: Q&Aの一覧","任意のqとoffset。dataは最大20件、total/nextOffsetを返す。自動応答の閲覧権限。");
@@ -55,3 +55,6 @@ export const gap2Paths:Record<string,Record<string,ReturnType<typeof operation>>
 (gap2Paths["/api/me/push/subscriptions/{id}"]??={}).delete=operation("DELETE","/api/me/push/subscriptions/{id}","G4: 端末を外す","本人または同じ統括のowner/admin。代理不可。");
 (gap2Paths["/api/me/push/preferences"]??={}).put=operation("PUT","/api/me/push/preferences","G4: 自分の通知の好みを保存","body:{kinds:[new_inquiry,assigned_reply],quietStart,quietEnd,quietAllowCritical,expectedVersion}。新規版0。閲覧のみ可、代理不可。");
 (gap2Paths["/api/me/push/test"]??={}).post=operation("POST","/api/me/push/test","G4: 自分の端末へ試験通知","1分に1回。VAPID未設定503。本人だけ、閲覧のみ可、代理不可。顧客本文・連絡先は送らない。");
+
+(gap2Paths['/api/ai-settings/simulate']??={}).post=operation('POST','/api/ai-settings/simulate','G2: Q&A自動応答を模擬','body:{chatId,question,kind?,testMode:true}。Idempotency-Key必須。管理者以上。代理・閲覧のみ不可。dataにaction/handoffReason/messages/sent:false/testMode:true/replayed。実送信なし。');
+(gap2Paths['/api/chats/{id}/ai/typing']??={}).post=operation('POST','/api/chats/{id}/ai/typing','G2: 入力中の1分間の借用','body:{typing:boolean}。会話の返信権限。代理・閲覧のみ不可。falseは自分の借用だけを解放。競合409。');

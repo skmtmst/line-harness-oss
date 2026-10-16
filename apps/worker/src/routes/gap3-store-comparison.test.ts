@@ -49,3 +49,13 @@ test('CMP-20: 運営の本人と店の統括が違っても検証済みの代理
  expect((await gapCall(gapApp(d,[storeComparison],{...gapOwner}),url)).status).toBe(403);
  expect((await gapCall(gapApp(d,[storeComparison],{...gapOwner},true),url)).status).toBe(200);
 });
+
+test('CMP-05/09/10: プールと現在の可視店の交差だけで比較し、指標ごとに3店未満の平均はnull',async()=>{
+ snapshot('a',3);snapshot('a2',9);snapshot('a3',6);snapshot('b',999);
+ d.raw.exec("INSERT INTO traffic_pools(id,slug,name,active_account_id,is_active,created_at,updated_at) VALUES('pool','p','比較用','a',1,'now','now'),('foreign','f','他統括','b',1,'now','now'); INSERT INTO pool_accounts(id,pool_id,line_account_id) VALUES('pa','pool','a'),('pb','pool','a2'),('pc','pool','b')");
+ let data=await read(url+'&poolId=pool&compare=average');expect(data.rows.map((r:any)=>r.accountId)).toEqual(['a','a2']);expect(data.average.bookings).toBeNull();expect(data.rows.every((r:any)=>r.metrics.bookings.diff===null)).toBe(true);
+ d.raw.exec("INSERT INTO pool_accounts(id,pool_id,line_account_id) VALUES('pd','pool','a3')");data=await read(url+'&poolId=pool&compare=average&order=desc');expect(data.average.bookings).toBe(6);expect(data.rows[0].accountId).toBe('a2');
+ d.raw.exec("UPDATE hq_store_daily_metrics SET bookings=NULL WHERE account_id='a3'");expect((await read(url+'&poolId=pool&compare=average')).average.bookings).toBeNull();
+ expect((await gapCall(gapApp(d,[storeComparison]),url+'&poolId=foreign')).status).toBe(404);expect((await gapCall(gapApp(d,[storeComparison]),url+'&poolId=missing')).status).toBe(404);
+ d.raw.exec("UPDATE staff_members SET account_scope='accounts' WHERE id='o'; INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('o','a','now')");data=await read(url+'&poolId=pool',{...gapOwner});expect(data.rows.map((r:any)=>r.accountId)).toEqual(['a']);
+});
