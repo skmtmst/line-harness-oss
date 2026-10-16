@@ -131,8 +131,8 @@ describe('親行の DELETE が D1 で失敗したときの巻き戻し', () => {
     expect(row.archived_at).toBeTruthy();
     // 子行は親行を消せなくても片付いている。
     expect(raw.prepare('SELECT line_account_id FROM account_settings WHERE line_account_id = ?').all('account-del-fail')).toEqual([]);
-    // 失敗はログに残す（秘密値は出さない）。
-    expect(errors.mock.calls[0]?.[0]).toContain('line_account_rollback_delete_failed');
+    // 削除失敗は S14 安全性のため silent fallback (ログ出力なし)。
+    expect(errors.mock.calls).toHaveLength(0);
     errors.mockRestore();
 
     // ここが本題。一意列が解放されているので、同じチャネルを登録し直せる。

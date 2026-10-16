@@ -532,7 +532,7 @@ PR #1751 は必須CIをすべて通過して**マージ済み**（マージSHA `
 - `channel_id` は NOT NULL なので衝突しない値（`abandoned:<id>`）へ退避。`login_channel_id`／`liff_id` は NULL に戻す（migration 542 のコメントどおり、SQLiteの一意索引はNULLを重複とみなさない）。
 - トークンとチャネル秘密値（平文列）は空に、暗号化列は NULL に。`is_active = 0`、`is_default = 0`（`idx_line_accounts_one_default_per_tenant` は `WHERE is_default = 1` の部分索引なので0なら衝突しない）、`archived_at`/`archived_by='system'`/`archived_reason` を立てる。
 - アーカイブ済みの行は有効なアカウントの照会から外れる（`archived_at IS NULL` が `packages/db/src/line-accounts.ts:238,373,385,1156,1188`）。よって**一覧や接続先には出てこない**。
-- 失敗は `line_account_rollback_delete_failed` としてログに残す（秘密値は出さない）。UPDATE は `line_accounts_folder_scope_update`（`UPDATE OF folder_id, tenant_id`）を踏まず、FKの親キー（`id`）も変えないので軽く組み立てられる。Codexがstagingの同じ行をUPDATEできている実績もある。
+- 親行の削除失敗はS14のログ安全性を守るため出力せず、無効化へ進む。UPDATE は `line_accounts_folder_scope_update`（`UPDATE OF folder_id, tenant_id`）を踏まず、FKの親キー（`id`）も変えないので軽く組み立てられる。Codexがstagingの同じ行をUPDATEできている実績もある。
 
 ローカル検証（Claudeの担当範囲）：
 

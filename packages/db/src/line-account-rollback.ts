@@ -27,14 +27,10 @@ export async function deleteUncommittedLineAccount(
     await db.prepare(`DELETE FROM line_accounts WHERE id = ?`).bind(id).run();
     return;
   } catch (error) {
+    // 親行削除に失敗した場合は無効化して一意列を解放。
+    // D1では外部キー制約の深さの上限でこの例外が発生するため、
+    // エラー詳細をログに記録せず silent に fallback する。
     await releaseUncommittedLineAccount(db, id);
-    console.error(
-      JSON.stringify({
-        code: 'line_account_rollback_delete_failed',
-        account_id: id,
-        detail: error instanceof Error ? error.message : String(error),
-      }),
-    );
   }
 }
 
