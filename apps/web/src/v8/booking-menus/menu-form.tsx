@@ -46,6 +46,9 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { EntityPickerField } from '@/components/shared/entity-picker'
 import Notice from '@/components/shared/notice'
+import { AudienceSection, audienceVisibility, type AudienceMode } from './audience-section'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import type { FriendListItem } from '@/lib/api'
 import HelpTip from '@/components/shared/help-tip'
 import { isSaveConflict } from '@/components/shared/api-error-message'
 
@@ -188,6 +191,12 @@ export default function MenuFormV8() {
   const [askQuestion, setAskQuestion] = useState(false)
   const [intakeQuestion, setIntakeQuestion] = useState('')
   const [autoTagId, setAutoTagId] = useState<string | null>(null)
+  /* 見せる相手（B9）。保存の口はメニューの audienceMode・audienceTagIds（Codex の次の段）。 */
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>('all')
+  const [audienceTagIds, setAudienceTagIds] = useState<string[]>([])
+  const [previewFriendId, setPreviewFriendId] = useState('')
+  const [previewFriends, setPreviewFriends] = useState<FriendListItem[]>([])
+  const canEditAudience = canManageRole(useStaffRole())
   const [resourceIds, setResourceIds] = useState<Set<string>>(new Set())
   const [resourceQuantities, setResourceQuantities] = useState<Record<string, string>>({})
   const [resourceSaving, setResourceSaving] = useState(false)
@@ -242,6 +251,11 @@ export default function MenuFormV8() {
     setAskQuestion(Boolean(menu.intake_question))
     setIntakeQuestion(menu.intake_question ?? '')
     setAutoTagId(menu.auto_tag_id)
+    {
+      const wide = menu as BookingMenu & { audience_mode?: AudienceMode; audience_tag_ids_json?: string | null }
+      setAudienceMode(wide.audience_mode ?? 'all')
+      try { setAudienceTagIds(wide.audience_tag_ids_json ? (JSON.parse(wide.audience_tag_ids_json) as string[]) : []) } catch { setAudienceTagIds([]) }
+    }
     setResourceIds(new Set((menu.assigned_resources ?? []).map((item) => item.resourceId)))
     setResourceQuantities(Object.fromEntries((menu.assigned_resources ?? []).map((item) => [item.resourceId, String(item.quantity)])))
     const ids = new Set<string>()
@@ -391,6 +405,7 @@ export default function MenuFormV8() {
     setResourceSaving(false)
     setResourceMessage(null)
     setAutoTagId(null)
+    setAudienceMode('all'); setAudienceTagIds([]); setPreviewFriendId('')
     setNoAssign(false)
   }, [selectedAccountId])
 
@@ -431,6 +446,14 @@ export default function MenuFormV8() {
     is_active: 1,
     auto_tag_id: autoTagId,
   }
+
+  /* 「この人で見る」：選んだ友だちに、作りかけのメニューが見えるか（タグで限定したとき）。 */
+  const hiddenForPreview = (() => {
+    const friend = previewFriends.find((item) => item.id === previewFriendId)
+    if (!friend) return null
+    const verdict = audienceVisibility(audienceMode, audienceTagIds, friend.tags.map((tag) => tag.id), (id) => tags.find((tag) => tag.id === id)?.name ?? '選んだタグ')
+    return verdict.visible ? null : { name: friend.displayName, reason: verdict.reason }
+  })()
 
   /*
    * 直しかけ判定：読み込んだ時点（作成なら初期値）と違ったら確認を挟む。
@@ -660,6 +683,7 @@ export default function MenuFormV8() {
       intake_question: askQuestion ? intakeQuestion.trim() || null : null,
       auto_tag_id: autoTagId,
       is_active: publish ? 1 : 0,
+      ...({ audience_mode: audienceMode, audience_tag_ids: audienceMode === 'all' ? [] : audienceTagIds } as Partial<BookingMenu>),
     }
   }
 
@@ -895,10 +919,11 @@ export default function MenuFormV8() {
             {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
           </div>
           <p className={shell.sideTitle}>お客さまの予約画面</p>
+          {hiddenForPreview ? <Notice tone="warn">{`${hiddenForPreview.name}さんには「${draftMenu.name}」は見えません（${hiddenForPreview.reason}）`}</Notice> : null}
           <>
             <LiffPhoneMenuStep categoryTone="customer"
               menus={menus.filter((menu) => menu.id !== editTarget?.id)}
-              draft={draftMenu}
+              draft={hiddenForPreview ? null : draftMenu}
               status={menusStatus}
             />
           </>
@@ -1144,6 +1169,10 @@ export default function MenuFormV8() {
               </Button>
             </div>
           </Card>
+
+          {/* 見せる相手（B9・絵 L6ifay）。 */}
+          <AudienceSection accountId={selectedAccountId ?? null} mode={audienceMode} tagIds={audienceTagIds} onMode={setAudienceMode} onTagIds={setAudienceTagIds} canEdit={canEditAudience}
+            friendId={previewFriendId} onFriendId={setPreviewFriendId} onFriends={setPreviewFriends} />
 
           {/* ④ そのほか（受け方・予約を受けたとき・設備）と お支払い。絵 QqER7・v5L19Z は白い段に白い小段を積む。 */}
           <Card variant="form" gap="normal">

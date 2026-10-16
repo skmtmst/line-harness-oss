@@ -4827,7 +4827,20 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
     return { success: true, data: FRIEND_SAVED_VIEWS }
   }
-  if (pathname === '/api/chats') return { success: true, data: CHATS }
+  /* 返事の期限（G3。契約 API-CONTRACT-GAP1.md）。口が足す slaDueAt・slaState・assignedBy を最初の4件に付け、sort=sla_due と slaState=overdue も受ける。 */
+  if (pathname === '/api/inbox/routing-settings') return { success: true, data: { strategy: 'none', enabled: true, firstResponseMinutes: 30, businessHoursOnly: true, version: 3, escalateTeamId: null } }
+  if (pathname === '/api/chats') {
+    const minutes = [-60, -20, -8, 12]
+    const withSla = CHATS.map((chat, index) => {
+      if (index >= minutes.length) return { ...chat, slaDueAt: null, slaState: 'none', assignedBy: null }
+      return { ...chat, slaDueAt: new Date(Date.now() + minutes[index] * 60000).toISOString(), slaState: minutes[index] < 0 ? 'overdue' : 'soon', assignedBy: index < 2 ? 'auto' : index === 2 ? 'manual' : null }
+    })
+    let rows = withSla
+    if (query.get('slaState') === 'overdue') rows = rows.filter((chat) => chat.slaState === 'overdue')
+    if (query.get('sort') === 'sla_due') rows = [...rows].sort((a, b) => (a.slaDueAt ? Date.parse(a.slaDueAt) : Infinity) - (b.slaDueAt ? Date.parse(b.slaDueAt) : Infinity))
+    const limit = Number(query.get('limit') ?? 0)
+    return { success: true, data: limit > 0 && query.get('sort') === 'sla_due' && query.get('slaState') === 'overdue' && limit === 1 ? rows.slice(0, 1) : rows, total: rows.length }
+  }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
   /* 受信箱の件数（実口 /api/chats/quick-counts と同じ形）。状態で絞ると、その状態の会話だけ数える。 */
   if (pathname === '/api/chats/quick-counts') {
