@@ -39,7 +39,7 @@ interface ConfirmDialogProps {
    */
   children?: ReactNode
   /** 見出しの左に置く絵。危険な操作は警告、と一目で分かるようにする。 */
-  titleIcon?: ReactNode
+  titleIcon?: ReactNode | false
   /** 実行ボタンの中、文字の左に置く絵。 */
   confirmIcon?: ReactNode
   /** この確認画面に対応するPencilの実Node。 */
@@ -51,6 +51,8 @@ interface ConfirmDialogProps {
   /** ★V8：絵の窓の幅 px（Dialog の designWidth と同じ）。 */
   designLayout?: 'stacked'
   footerAlign?: 'center' | 'start'
+  /** 下の帯の左に置く一言（例「閉じても送りません」）。 */
+  footerLead?: ReactNode
   /** 絵で操作の間隔が指定されている窓だけに使う。 */
   designFooterGap?: number
   confirmFirst?: boolean
@@ -104,6 +106,7 @@ export default function ConfirmDialog({
   size,
   designLayout,
   footerAlign,
+  footerLead,
   designFooterGap,
   confirmFirst,
   designTop,
@@ -141,7 +144,7 @@ export default function ConfirmDialog({
    * 「完了・成功」の意味なので、まだ何も済んでいない窓には出さない。
    * 危険な操作の警告印は従来どおり残す。
    */
-  const shownTitleIcon = titleIcon ?? (primaryAction === 'cancel'
+  const shownTitleIcon = titleIcon === false ? undefined : titleIcon ?? (primaryAction === 'cancel'
     ? undefined
     : destructive
       ? <TriangleAlert size={22} />
@@ -175,6 +178,7 @@ export default function ConfirmDialog({
       designWidth={designWidth ?? (size ? undefined : CONFIRM_WIDTH)}
       designLayout={designLayout}
       footerAlign={footerAlign}
+      footerLead={footerLead}
       designFooterGap={designFooterGap}
       confirmFirst={confirmFirst}
       designTop={designTop}

@@ -76,6 +76,10 @@ import {
   filterSendableTemplates,
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import SendConfirmDialog, { describeExclusion, shiftedShort, shiftedWhen } from '@/components/shared/send-confirm-dialog'
+import { chatSafetyApi } from '@/lib/api-gap1'
+import type { SendConfirmationPreview } from '@line-crm/shared'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Combobox from '@/components/shared/combobox'
@@ -2001,6 +2005,54 @@ export default function BroadcastForm({
     && approvalCountInput.trim() !== ''
     && Number(approvalCountInput) === audienceCount
 
+  /*
+   * 共通の「送る前の確かめ」の中身は、保存した配信に対するサーバーの数え直し（GET send-preview）。
+   * 窓を開くたびに下書きを保存して数え直し、確定は「見た人数・版」を添えて送る（人数・版が変わっていたら 409）。
+   */
+  const canSendBroadcast = useFeatureAccess('broadcasts')
+  const broadcastRole = useStaffRole()
+  const [sendPreview, setSendPreview] = useState<{ state: 'loading' | 'error' | 'ready'; data: SendConfirmationPreview | null; broadcast: ApiBroadcast | null }>({ state: 'loading', data: null, broadcast: null })
+  const [previewSeq, setPreviewSeq] = useState(0)
+  useEffect(() => {
+    if (!confirmOpen || needsApprovalSingle || !currentStep) return
+    let alive = true
+    setSendPreview({ state: 'loading', data: null, broadcast: null })
+    void (async () => {
+      try {
+        const saved = await persistDraft(scheduledAtIso(), true, undefined, 'confirm')
+        if (!alive) return
+        if (!saved) { setSendPreview({ state: 'error', data: null, broadcast: null }); return }
+        const preview = await chatSafetyApi.sendPreview(saved.id)
+        if (!alive) return
+        setSendPreview(preview.success ? { state: 'ready', data: preview.data, broadcast: saved } : { state: 'error', data: null, broadcast: saved })
+      } catch {
+        if (alive) setSendPreview({ state: 'error', data: null, broadcast: null })
+      }
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmOpen, previewSeq])
+  const confirmFromPreview = async () => {
+    const { data, broadcast } = sendPreview
+    if (!data || !broadcast) return
+    setError('')
+    try {
+      const at = scheduledAtIso()
+      await chatSafetyApi.confirmBroadcast(broadcast.id, { expectedVersion: Number(data.expectedVersion), confirmedRecipientCount: data.recipients, ...(at ? { scheduledAt: at } : {}) })
+      setConfirmOpen(false)
+      /* 送ったあとの状態を読み直す。読めなくても、確定は済んでいるので先へ進む。 */
+      const latest = await api.broadcasts.get(broadcast.id).catch(() => null)
+      onSuccess(latest?.success ? latest.data : broadcast)
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 409) {
+        setError('送る相手や内容が変わりました。数え直しました。もう一度確かめてください。')
+        setPreviewSeq((value) => value + 1)
+        return
+      }
+      setError(describeSaveFailure(caught))
+    }
+  }
+
   const save = async () => {
     if (saving || submittingRef.current) return
     if (currentStep && approvalConfigState !== 'ready') { setError('承認の設定を確認できません。確認画面を開き直してください'); return }
@@ -2657,9 +2709,61 @@ export default function BroadcastForm({
       </ul>
     </ConfirmDialog>
 
+    {/* 共通の「送る前の確かめ」（U1・板 F94nep／RxxfO）。承認が要るときは、承認者を選ぶ下の窓を使う。 */}
+    <SendConfirmDialog
+      open={confirmOpen && !needsApprovalSingle}
+      subtitle={`${title.trim() || '新しい一斉配信'} ・ ${confirmAudienceLabel}`}
+      scheduled={sendMode === 'scheduled'}
+      state={currentStep ? sendPreview.state : audienceCount === null ? 'error' : 'ready'}
+      block={(broadcastRole === 'viewer' || broadcastRole === 'staff') && !canSendBroadcast ? 'no-permission' : null}
+      hidePrimary={Boolean(currentStep) && approvalConfigState !== 'ready'}
+      unavailableNote={currentStep && approvalConfigState === 'loading' ? '承認の設定を確認しています…' : currentStep && approvalConfigState === 'error' ? '承認の設定を確認できません。確認画面を開き直してください' : undefined}
+      onRetry={() => (currentStep ? setPreviewSeq((value) => value + 1) : void runPreflight())}
+      recipients={currentStep ? (sendPreview.data?.recipients ?? null) : audienceCount}
+      recipientsNote={currentStep && sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : exclusionNote ?? undefined}
+      purpose="marketing"
+      whenLabel={currentStep && sendPreview.data?.quietHoursShiftTo
+        ? `${shiftedWhen(sendPreview.data.quietHoursShiftTo)} に送る`
+        : sendMode === 'scheduled' && scheduledLabel ? `${scheduledLabel} に送る（予約）` : '今すぐ送る'}
+      whenNote={currentStep && sendPreview.data?.quietHoursShiftTo
+        ? '夜の静かな時間（21〜8 時）のため、次の 8:00 に送ります'
+        : concurrentBroadcasts.length > 0
+          ? '同じ時刻の前後 1 時間に別の予約配信があります'
+          : sendMode === 'scheduled' ? '予約は送る時刻の 1 分前まで［予約を取り消す］で止められます' : undefined}
+      sender={currentStep ? sendPreview.data?.sender ?? null : null}
+      bodyHead={(currentStep && sendPreview.data?.firstText) || String(bubbles.find((b) => b.type === 'text')?.content.text ?? '') || `${TYPE_LABELS[bubbles[0]?.type ?? 'text'] ?? 'メッセージ'}を送ります`}
+      bubbleCount={bubbles.length}
+      allRecipients={targetMode === 'all'}
+      extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}
+      approval={needsApproval && approvalConfig ? { note: `${formatNumber(approvalConfig.threshold)} 人以上は承認が要る店です。承認されたら${sendMode === 'scheduled' && scheduledDate ? ` ${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime} に` : ''}送ります` } : null}
+      approvalFields={needsApproval && approvalConfig && audienceCount !== null ? (
+        <ApprovalRequestFields
+          bare
+          recipientCount={audienceCount}
+          threshold={approvalConfig.threshold}
+          candidates={approvalCandidates}
+          candidatesState={approvalCandidatesState}
+          approverId={approverId}
+          onApproverChange={setApproverId}
+          note={approvalNote}
+          onNoteChange={setApprovalNote}
+        />
+      ) : undefined}
+      primaryDisabled={needsApproval && approverId === ''}
+      primaryLabel={needsApproval ? '承認を依頼する' : (() => {
+        const n = currentStep ? sendPreview.data?.recipients ?? null : audienceCount
+        const shifted = currentStep ? sendPreview.data?.quietHoursShiftTo : null
+        if (n !== null && shifted) return `${shiftedShort(shifted)} に ${formatNumber(n)} 人へ送る`
+        const shortAt = sendMode === 'scheduled' && scheduledDate ? `${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime}` : null
+        return n === null ? '送る' : sendMode === 'scheduled' ? `${formatNumber(n)} 人に${shortAt ? ` ${shortAt} で` : ''}予約する` : `${formatNumber(n)} 人に送る`
+      })()}
+      onConfirm={() => (currentStep && !needsApproval ? confirmFromPreview() : save())}
+      onBack={() => { if (!saving) setConfirmOpen(false) }}
+      error={error || undefined}
+    />
     <div data-design-node="FpgxH">
       <ConfirmDialog
-        open={confirmOpen}
+        open={confirmOpen && needsApprovalSingle}
         title={sendMode === 'scheduled' ? 'この内容で予約しますか？' : 'この内容で送りますか？'}
         description={
           needsApproval && !needsApprovalSingle
@@ -2770,18 +2874,6 @@ export default function BroadcastForm({
           二者承認（設計 A-1・A-4）。承認が要る人数のときだけ出す。
           境目が読めているときだけ判定し、取得失敗中は確定させない。
         */}
-        {needsApproval && !needsApprovalSingle && audienceCount !== null && approvalConfig !== null ? (
-          <ApprovalRequestFields
-            recipientCount={audienceCount}
-            threshold={approvalConfig.threshold}
-            candidates={approvalCandidates}
-            candidatesState={approvalCandidatesState}
-            approverId={approverId}
-            onApproverChange={setApproverId}
-            note={approvalNote}
-            onNoteChange={setApprovalNote}
-          />
-        ) : null}
         {needsApprovalSingle && audienceCount !== null ? (
           <SingleOperatorFields
             recipientCount={audienceCount}

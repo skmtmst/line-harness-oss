@@ -4783,9 +4783,33 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       pagination: { limit: 50, cursor: 0, nextCursor: null },
     }
   }
+  /* 統括の一括配信の確かめ（板 i7TdtN）：店ごとの内訳つき。数は絵のとおり。 */
+  if (/^\/api\/hq\/broadcasts\/[^/]+\/send-preview$/.test(pathname)) {
+    const ex = (optedOut) => ({ blocked: 0, optedOut, duplicate: 0, hidden: 0, missingDestination: 0 })
+    return { success: true, data: { recipients: 15131, excluded: ex(20), purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '【秋の新メニュー】10/18 からトリートメント 20%OFF', sender: { name: '渋谷店 予約係' }, expectedVersion: 2,
+      perAccount: [
+        { accountId: 'visual-qa-account-store', recipients: 1272, excluded: ex(12) }, { accountId: 'visual-qa-account-prod', recipients: 864, excluded: ex(5) },
+        { accountId: 'visual-qa-account', recipients: 2010, excluded: ex(0) }, { accountId: 'visual-qa-account-event-2025', recipients: 1105, excluded: ex(3) },
+      ] } }
+  }
+  /* U1 送る前の確かめ（板 F94nep・RxxfO）：契約 API-CONTRACT-GAP1 の send-preview。 */
+  if (/^\/api\/(hq\/)?broadcasts\/[^/]+\/send-preview$/.test(pathname)) {
+    return { success: true, data: { recipients: 1272, excluded: { blocked: 0, optedOut: 12, duplicate: 0, hidden: 0, missingDestination: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '【秋の新メニュー】10/18 からトリートメント 20%OFF', sender: { name: '渋谷店 予約係' }, expectedVersion: 2 } }
+  }
+  /* G8 送り手（板 Asa6v）：契約 API-CONTRACT-GAP1 の LineSender。 */
+  if (/^\/api\/line-accounts\/[^/]+\/senders$/.test(pathname)) {
+    return { success: true, data: [
+      { id: 'snd-1', name: '佐藤（然）', iconMediaId: null, iconUrl: null, visibility: 'all', ownerStaffId: null, status: 'active', version: 1 },
+      { id: 'snd-2', name: '店長 Kenta', iconMediaId: null, iconUrl: null, visibility: 'owner_only', ownerStaffId: 'visual-qa-owner', status: 'active', version: 1 },
+    ] }
+  }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
-    const found = broadcastOne[1] === 'visual-compose' ? VISUAL_COMPOSE_DRAFT : BROADCASTS.find((item) => item.id === broadcastOne[1])
+    /* 送る前の確かめの撮影用（板 F94nep・RxxfO）：確認の段まで進める、入力ずみの下書き。 */
+    const confirmFixture = broadcastOne[1].startsWith('visual-confirm')
+      ? { ...BROADCASTS[1], id: broadcastOne[1], title: '秋の新メニューのお知らせ', messageType: 'text', messageContent: '【秋の新メニュー】10/18 からトリートメント 20%OFF\nご予約はリッチメニューの［予約する］から。期間：10/18〜10/31', targetType: broadcastOne[1] === 'visual-confirm-all' ? 'all' : 'tag', targetTagId: broadcastOne[1] === 'visual-confirm-all' ? null : 'tag-0', status: 'draft', scheduledAt: '2099-10-18T01:00:00.000Z', totalCount: 1284, version: 2, draftStep: 'confirm' }
+      : null
+    const found = confirmFixture ?? (broadcastOne[1] === 'visual-compose' ? VISUAL_COMPOSE_DRAFT : BROADCASTS.find((item) => item.id === broadcastOne[1]))
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/broadcasts') {
@@ -7481,6 +7505,14 @@ const server = createServer((req, res) => {
       HTTP状態と器を返す。編集・公開・予約・適用・削除の画面検証用。
       409/400 の代表例つき (削除ブロック・冪等キーなし・順序の形違い)。
     */
+    /* 送る前の確かめの撮影用：確認の下書きの保存（版を 1 つ進めて返す）。 */
+    if (method === 'PUT' && url.pathname.startsWith('/api/broadcasts/visual-confirm')) {
+      const found = BROADCASTS[1]
+      res.writeHead(200).end(JSON.stringify({
+        success: true, data: { ...found, id: url.pathname.split('/').pop(), title: '秋の新メニューのお知らせ', targetType: url.pathname.endsWith('-all') ? 'all' : 'tag', targetTagId: url.pathname.endsWith('-all') ? null : 'tag-0', status: 'draft', scheduledAt: '2099-10-18T01:00:00.000Z', version: 2 },
+      }))
+      return
+    }
     if (method === 'POST' && url.pathname === '/api/rich-menu-groups') {
       res.writeHead(201).end(JSON.stringify({
         success: true, data: { id: 'rmg-new', pages: [{ id: 'rmg-new-top' }] },

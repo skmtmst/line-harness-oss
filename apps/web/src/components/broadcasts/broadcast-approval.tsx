@@ -83,7 +83,10 @@ export function ApprovalRequestFields({
   onApproverChange,
   note,
   onNoteChange,
+  bare = false,
 }: {
+  /** 共通の「送る前の確かめ」の窓の中に置くとき：警告の箱と文を出さず、欄だけにする。 */
+  bare?: boolean
   recipientCount: number
   threshold: number
   candidates: BroadcastApprovalCandidate[]
@@ -94,18 +97,20 @@ export function ApprovalRequestFields({
   onNoteChange: (note: string) => void
 }) {
   return (
-    <div className="bg-warning-bg rounded-control mt-3 p-3 text-xs leading-5">
-      <p className="text-warning font-semibold">
-        {formatThreshold(threshold)}以上なので、もう1人の承認が要ります。承認されるまで送られません。
-      </p>
-      <div className="mt-3 space-y-3">
+    <div className={bare ? 'text-xs leading-5' : 'bg-warning-bg rounded-control mt-3 p-3 text-xs leading-5'}>
+      {bare ? null : (
+        <p className="text-warning font-semibold">
+          {formatThreshold(threshold)}以上なので、もう1人の承認が要ります。承認されるまで送られません。
+        </p>
+      )}
+      <div className={bare ? 'space-y-3' : 'mt-3 space-y-3'}>
         <div>
           {/* ？は label の外に置く。中に入れるとラベルがボタンを指して入力欄との結びつきが壊れる。 */}
           <div className="mb-1 flex items-center gap-1">
             <label htmlFor="approval-approver" className="text-ink text-xs font-semibold">
               承認をお願いする人
             </label>
-            <HelpTip label="承認をお願いする人の説明">送る人とは別の人。</HelpTip>
+            {bare ? null : <HelpTip label="承認をお願いする人の説明">送る人とは別の人。</HelpTip>}
           </div>
           {candidatesState === 'loading' ? (
             <p className="text-ink-faint text-xs">読み込んでいます…</p>
@@ -125,22 +130,30 @@ export function ApprovalRequestFields({
               ]}
             /></SaveErrorField>
           )}
-          <p className="text-ink-faint mt-1 text-xs">
-            送る相手 {formatCount(recipientCount)}。
-          </p>
+          {bare ? null : (
+            <p className="text-ink-faint mt-1 text-xs">
+              送る相手 {formatCount(recipientCount)}。
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="approval-note" className="text-ink mb-1 block text-xs font-semibold">
             ひとこと（任意）
           </label>
-          <SaveErrorField names={["note"]}><TextArea
+          <SaveErrorField names={["note"]}>{bare ? <TextField
+            id="approval-note"
+            maxLength={500}
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+            placeholder="秋の案内です。10時までに見てください"
+          /> : <TextArea
             id="approval-note"
             rows={3}
             maxLength={500}
             value={note}
             onChange={(event) => onNoteChange(event.target.value)}
             placeholder="秋の案内です。10時までに見てください"
-          /></SaveErrorField>
+          />}</SaveErrorField>
         </div>
       </div>
     </div>
