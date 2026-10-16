@@ -1,3 +1,4 @@
+import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { automationTabCounts } from '../services/tab-counts.js';
 import { Hono } from 'hono';
@@ -626,7 +627,7 @@ automations.get(
     );
     return c.json({
       success: true,
-      data: result.items,
+      data: await withStyleSampleMetadata(c.env.DB,result.items,'automation'),
       summary: result.summary,
       freshness: result.freshness,
       pagination: {

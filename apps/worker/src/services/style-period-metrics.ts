@@ -161,5 +161,5 @@ export function stylePeriodMetrics(rows: StyleBooking[], style: IndustryStyle, f
     JSON.parse(config?.answers_json ?? '{}').outcome?.mode !== 'configured'
   )
     metrics.conversionRate = missing('面談の結果が未設定');
-  return {period, metricsFor, metrics, previous, past, weekFrom, weekTo};
+  return {period, metricsFor, metrics, previous, previousFrom, previousTo, past, weekFrom, weekTo};
 }

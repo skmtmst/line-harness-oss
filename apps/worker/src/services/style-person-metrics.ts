@@ -88,7 +88,7 @@ export function personMetrics(
         rows.some(
           (r) =>
             r.personKey === key &&
-            r.id !== visit.id &&
+            (r.kind !== visit.kind || r.id !== visit.id) &&
             eligible(r) &&
             instant(r.startsAt) > instant(visit.endsAt) &&
             instant(r.requestedAt) >= instant(visit.endsAt) &&

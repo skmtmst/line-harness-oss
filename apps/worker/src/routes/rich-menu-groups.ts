@@ -1,3 +1,4 @@
+import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { serializeGroup } from './rich-menu-group-display.js';
 import { type ExternalLineArea } from './rich-menu-external-types.js'
 import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
@@ -1270,13 +1271,13 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
         // 数えられない行があっても一覧は出す。その行だけ人数を出さない。
       }
     }));
-    const items = pageItems.map((g) => ({
+    const items = await withStyleSampleMetadata(c.env.DB,pageItems.map((g) => ({
         ...g,
         thumbnailR2Key: imageByGroupId.get(g.id)?.key ?? null,
         pageCount: shapeByGroupId.get(g.id)?.pageCount ?? 0,
         defaultPageAreaCount: shapeByGroupId.get(g.id)?.areaCount ?? 0,
         audienceCount: audienceByGroupId.get(g.id) ?? null,
-      }));
+      })), 'rich_menu');
     if (paging) {
       const sort = sortKey === 'taps'
         ? [{ field: 'monthlyStats.taps', direction: 'desc' as const }, { field: 'id', direction: 'asc' as const }]
@@ -1619,7 +1620,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId', async (c) => {
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return c.json({ success: false, error: 'not found' }, 404);
   }
-  return c.json({ success: true, data: serializeGroupWithPages(group) });
+  return c.json({ success: true, data: (await withStyleSampleMetadata(c.env.DB,[serializeGroupWithPages(group)],'rich_menu'))[0] });
 });
 
 richMenuGroups.post('/api/rich-menu-groups', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {

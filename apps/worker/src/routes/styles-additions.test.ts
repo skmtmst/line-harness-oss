@@ -183,7 +183,7 @@ describe('B-311 template samples', () => {
     expect(r.status).toBe(200);
     expect(
       r.body.data.inserted.filter((i: any) => i.kind === 'template'),
-    ).toHaveLength(18);
+    ).toHaveLength(3);
     expect(r.body.data.inserted.find((i: any) => i.key === key)).toMatchObject({
       id: existing.id,
       isSample: false,

@@ -72,6 +72,12 @@ export type StyleBooking = {
   cancelledAt: string | null;
   confirmedResponse: string | null;
   participationMode: string | null;
+  payment?: {
+    bookingId: string;
+    status: 'paid' | 'pending' | 'refunded' | 'expired' | 'onsite';
+    method: string | null;
+    amount: number;
+  } | null;
 };
 export type StyleSnapshot = {
   style: IndustryStyle;
@@ -86,6 +92,8 @@ export type StyleSnapshot = {
   items: StyleBooking[];
   newBookings: StyleBooking[];
   resultId: string;
+  sidebar?: StyleDashboardSidebar;
+  payments?: StyleDashboardPayments;
 };
 
 export type StyleScheduleEntry = {
@@ -147,4 +155,128 @@ export type StyleSchedule = {
     }>;
     closedDates: string[];
   };
+};
+
+export const STYLE_METRIC_IDS = [
+  'bookings',
+  'guests',
+  'visits',
+  'noShowRate',
+  'cancelRate',
+  'estimatedRevenue',
+  'nextBookingRate',
+  'secondVisitRate',
+  'thirdVisitRate',
+  'returnRate',
+  'recall',
+  'attention',
+  'weekBookings',
+  'resultPending',
+  'conversionRate',
+  'capacity',
+  'freeTables',
+  'classes',
+  'inactiveMembers',
+  'trialConversion',
+  'attendancePending',
+  'unseated',
+  'firstTime',
+  'regular',
+  'paidAmount',
+  'pendingCount',
+  'newBookings',
+  'classroomOccupancy',
+  'onlineOccupancy',
+  'unlimitedClasses',
+  'mediaCloseTasks',
+  'tableUtilization',
+] as const;
+export type StyleMetricId = (typeof STYLE_METRIC_IDS)[number];
+export type StyleDashboardSidebar = {
+  today: string;
+  attention: Array<{
+    id: string;
+    name: string;
+    friendId: string | null;
+    startsAt: string;
+    allergy: string | null;
+    anniversary: boolean;
+    noShowHistory: boolean;
+  }>;
+  waitlist: Array<{
+    id: string;
+    name: string;
+    startsAt: string;
+    partySize: number;
+    status: string;
+    storeId: string;
+  }>;
+  noNextBooking: Array<{
+    personKey: string;
+    friendId: string | null;
+    name: string;
+    visits: number;
+    lastVisit: string;
+    intervalDays: number | null;
+    nextBooking: string | null;
+    recall: boolean;
+  }>;
+};
+export type StyleDashboardPayments =
+  | {
+      status: 'available';
+      paidAmount: number;
+      paidCount: number;
+      refundedAmount: number;
+      refundedCount: number;
+      pendingCount: number;
+      expiredCount: number;
+      holdMinutes: number;
+      source: string;
+    }
+  | { status: 'forbidden' | 'unavailable'; reason?: string };
+
+export type StyleSampleMetadata = {
+  isSample: boolean;
+  sampleKey: string | null;
+  starterSetId: string | null;
+  starterSetVersion: number | null;
+};
+
+/** Initial KPI choices shared by the dashboard and its reset action. Free-table count and utilization are the day/period forms of the same restaurant card. */
+export const STYLE_DEFAULT_METRIC_IDS: Record<
+  AccountStyle,
+  readonly StyleMetricId[]
+> = {
+  standard: [],
+  ec: [],
+  restaurant: [
+    'bookings',
+    'attention',
+    'freeTables',
+    'tableUtilization',
+    'noShowRate',
+    'newBookings',
+  ],
+  salon: [
+    'bookings',
+    'attention',
+    'nextBookingRate',
+    'paidAmount',
+    'newBookings',
+  ],
+  consult: [
+    'bookings',
+    'resultPending',
+    'weekBookings',
+    'noShowRate',
+    'newBookings',
+  ],
+  lesson: [
+    'classes',
+    'attendancePending',
+    'classroomOccupancy',
+    'paidAmount',
+    'newBookings',
+  ],
 };

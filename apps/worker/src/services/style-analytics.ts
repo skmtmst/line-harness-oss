@@ -1,13 +1,20 @@
+import { restaurantCivilTime } from './restaurant-booking.js';
+import { styleDashboardSidebar } from './style-dashboard-sidebar.js';
 import { StyleError } from './style-setup.js';
 import type { IndustryStyle, StyleSnapshot } from '@line-crm/shared';
 
-
-
-
 export * from './style-analytics-core.js';
-export {styleRows} from './style-booking-rows.js';
-export {personMetrics} from './style-person-metrics.js';
-import { DAY, instant, civilDate, eligible, readWindow } from './style-analytics-core.js';
+export { styleRows } from './style-booking-rows.js';
+export { personMetrics } from './style-person-metrics.js';
+import {
+  DAY,
+  countMetric,
+  instant,
+  civilDate,
+  addDate,
+  eligible,
+  readWindow,
+} from './style-analytics-core.js';
 import { styleRows } from './style-booking-rows.js';
 import { personMetrics } from './style-person-metrics.js';
 import { lessonMetrics } from './style-lesson-metrics.js';
@@ -44,6 +51,10 @@ export async function styleSnapshot(
   query: Record<string, string | undefined>,
   staffId?: string,
   now = Date.now(),
+  access: {
+    kinds?: import('@line-crm/shared').StyleBooking['kind'][];
+    ownMeetStaffId?: string;
+  } = {},
 ): Promise<
   StyleSnapshot & {
     people: ReturnType<typeof personMetrics>['people'];
@@ -59,7 +70,7 @@ export async function styleSnapshot(
     timeZone = window.timeZone,
     from = instant(window.from),
     to = instant(window.to);
-  const raw = await styleRows(db, account, style);
+  const raw = await styleRows(db, account, style, access.kinds);
   if (query.holidays && !['all', 'exclude', 'only'].includes(query.holidays))
     throw new StyleError('invalid_holiday_filter');
   const holidays = (
@@ -71,6 +82,9 @@ export async function styleSnapshot(
   const rows = raw.filter(
     (r) =>
       (!staffId || r.staffId === staffId) &&
+      (r.kind !== 'meet' ||
+        !access.ownMeetStaffId ||
+        r.staffId === access.ownMeetStaffId) &&
       (!query.store_id || r.storeId === query.store_id) &&
       (!query.menu_id || r.menuId === query.menu_id) &&
       (!query.holidays ||
@@ -89,11 +103,74 @@ export async function styleSnapshot(
   const settings: Record<string, number> = JSON.parse(
     config?.settings_json ?? '{}',
   );
-  const {period, metricsFor, metrics, previous, past, weekFrom, weekTo} = stylePeriodMetrics(rows, style, from, to, query, now, settings, timeZone, config);
+  const {
+    period,
+    metricsFor,
+    metrics,
+    previous,
+    previousFrom,
+    previousTo,
+    past,
+    weekFrom,
+    weekTo,
+  } = stylePeriodMetrics(
+    rows,
+    style,
+    from,
+    to,
+    query,
+    now,
+    settings,
+    timeZone,
+    config,
+  );
+  const daily = (start: number, end: number) => {
+    const result = [];
+    for (
+      let date = civilDate(start, timeZone);
+      date <= civilDate(end - 1, timeZone);
+      date = addDate(date, 1)
+    ) {
+      const fromDay = instant(restaurantCivilTime(date, 0, timeZone)),
+        toDay = instant(restaurantCivilTime(addDate(date, 1), 0, timeZone));
+      result.push({
+        date,
+        metrics: metricsFor(Math.max(start, fromDay), Math.min(end, toDay)),
+      });
+    }
+    return result;
+  };
+  metrics.newBookings = countMetric(
+    rows.filter(
+      (r) => instant(r.requestedAt) >= from && instant(r.requestedAt) < to,
+    ).length,
+    '予約が入った日が期間内の予約',
+  );
   const analytics: Record<string, unknown> = {
+    dailyComparison: {
+      current: daily(from, to),
+      previous: daily(previousFrom, previousTo),
+    },
     periodMetrics: metricsFor(from, to),
   };
-  const context = {db, account, query, now, window, from, to, timeZone, rows, raw, style, staffId, settings, metrics, analytics, period};
+  const context = {
+    db,
+    account,
+    query,
+    now,
+    window,
+    from,
+    to,
+    timeZone,
+    rows,
+    raw,
+    style,
+    staffId,
+    settings,
+    metrics,
+    analytics,
+    period,
+  };
   await restaurantMetrics(context);
   await staffMetrics(context);
   const selected = await activityMetrics(context);
@@ -112,6 +189,17 @@ export async function styleSnapshot(
       staffId,
       settings,
     );
+  analytics.sidebar = await styleDashboardSidebar(
+    db,
+    account,
+    style,
+    rows,
+    timeZone,
+    now,
+    settings,
+    staffId,
+    query.store_id,
+  );
   analytics.resultPending = past.filter(
     (r) => r.status !== 'no_show' && (!r.visited || !r.outcome),
   );
@@ -232,6 +320,8 @@ export async function styleSnapshot(
     timeZone,
     from: window.from,
     to: window.to,
+    sidebar:
+      analytics.sidebar as import('@line-crm/shared').StyleDashboardSidebar,
     dateBasis: 'visit',
     range: window.range,
     metrics,
