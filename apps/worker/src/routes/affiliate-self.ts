@@ -1,3 +1,4 @@
+import { signDownload, validDownload } from '../services/download-capability.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -568,7 +569,9 @@ affiliateSelfRoutes.put('/api/liff/affiliate/bank', inputJsonBoundary(), async (
 /** 本人の支払明細一覧。 */
 affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    c.header('Cache-Control', 'private, no-store');
+    c.header('Referrer-Policy', 'no-referrer');
+    const token = /^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1];
     if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
@@ -590,7 +593,9 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
 /** 本人の有効な明細だけをR2から返す。 */
 affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    c.header('Cache-Control', 'private, no-store');
+    c.header('Referrer-Policy', 'no-referrer');
+    const token = /^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1];
     if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
@@ -604,6 +609,16 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
       affiliateId: affiliate.id, statementId: c.req.param('id'),
     });
     if (!file) return c.json({ success: false, error: '支払明細が見つからないか期限切れです' }, 404);
+    if (!c.env.API_KEY) return c.json({ success: false, error: '取得用の鍵が未設定です' }, 503);
+    const binding = JSON.stringify([resolved.tenantId, resolved.lineAccountId, affiliate.id, resolved.friend.id]);
+    if (c.req.query('issue') === '1') {
+      const url = await signDownload(new URL(c.req.url), c.env.API_KEY, 'affiliate-statement', file.statement.id, binding,
+        file.statement.expiresAt ? Date.parse(file.statement.expiresAt) : undefined);
+      return c.json({ success: true, data: { url, expiresAt: new Date(Number(new URL(url).searchParams.get('expires')) * 1000).toISOString() } });
+    }
+    if (!await validDownload(new URL(c.req.url), c.env.API_KEY, 'affiliate-statement', file.statement.id, binding)) {
+      return c.json({ success: false, error: '取得用URLが無効か期限切れです' }, 403);
+    }
     const object = await c.env.IMAGES.get(file.objectKey);
     if (!object) return c.json({ success: false, error: '支払明細が見つかりません' }, 404);
     console.log(JSON.stringify({"code":"routes_affiliate_self_log","route":"GET /api/liff/affiliate/statements/:id/download"}));
@@ -612,6 +627,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="affiliate-statement-${file.statement.id}.pdf"`,
         'Cache-Control': 'private, no-store',
+        'Referrer-Policy': 'no-referrer',
       },
     });
   } catch (error) {

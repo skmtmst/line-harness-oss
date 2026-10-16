@@ -1828,7 +1828,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     let message: Message;
     try {
       const built = await buildChatMessage({
-        messageType, content: rendered.content, bucket: c.env.IMAGES,
+        messageType, content: rendered.content, bucket: c.env.IMAGES, signingSecret: c.env.API_KEY,
         owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
         origin: c.env.WORKER_URL || new URL(c.req.url).origin,
       });
@@ -2552,7 +2552,7 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
     try {
       // text/Flexの差し込みは送信時に展開する。添付は予約時と送信時の両方で検証する。
       if (messageType !== 'text') {
-        validatedContent = (await buildChatMessage({ messageType, content, bucket: c.env.IMAGES,
+        validatedContent = (await buildChatMessage({ messageType, content, bucket: c.env.IMAGES, signingSecret: c.env.API_KEY,
           owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
           origin: c.env.WORKER_URL || new URL(c.req.url).origin, neededAt: Date.parse(time.scheduledAt),
         })).content;
@@ -2663,7 +2663,7 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
         const friend = await getFriendById(c.env.DB, chat.friend_id);
         if (!friend) return c.notFound();
         const built = await buildChatMessage({ messageType: existing.message_type,
-          content: updates.content ?? existing.content, bucket: c.env.IMAGES,
+          content: updates.content ?? existing.content, bucket: c.env.IMAGES, signingSecret: c.env.API_KEY,
           owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
           origin: c.env.WORKER_URL || new URL(c.req.url).origin,
           neededAt: Date.parse(updates.scheduledAt ?? existing.scheduled_at),
