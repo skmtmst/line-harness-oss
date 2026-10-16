@@ -18,7 +18,10 @@ test('D-05 仲間: シナリオのタグ解除もtag_changeを知らせる',asyn
   const action:ScenarioActionRow={id:'remove',scenario_id:'scenario',hook:'choice_selected',step_id:null,choice_index:null,sort_order:0,action_type:'tag',config_json:'{"op":"remove","tagIds":["t"]}',condition_json:null,repeat_on_refire:1};
   expect((await runActionRows(f.db,[action],'f',{accountId:'a',sourceEventId:'choice'})).failed).toBe(0);
   expect(fireEvent).toHaveBeenCalledTimes(1);
-  expect(vi.mocked(fireEvent).mock.calls[0][2]).toEqual({friendId:'f',eventData:{tagId:'t',action:'remove'}});
+  expect(vi.mocked(fireEvent).mock.calls[0].slice(1)).toEqual(['tag_change',{
+    friendId:'f',eventData:{tagId:'t',action:'remove'},sourceKind:'friend_tag',
+    sourceEventId:expect.stringMatching(/^tag:f:t:remove:.+$/),occurredAt:expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+  },undefined,'a']);
 });
 test('D-05 仲間: 質問の選択肢からのタグ解除もtag_changeを知らせる',async()=>{
   f.raw.prepare(`INSERT INTO scenario_steps(id,scenario_id,step_order,delay_minutes,message_type,message_content,question_json)
@@ -26,6 +29,9 @@ test('D-05 仲間: 質問の選択肢からのタグ解除もtag_changeを知ら
   const send=vi.fn(async()=>undefined),client={replyMessage:send,pushMessage:send} as unknown as LineClient;
   await handleQuestionAnswer(f.db,client,{id:'f',line_user_id:'Uf'},{stepId:'step',choiceIndex:0,lineAccountId:'a'},'fake-reply');
   expect(fireEvent).toHaveBeenCalledTimes(1);
-  expect(vi.mocked(fireEvent).mock.calls[0][2]).toEqual({friendId:'f',eventData:{tagId:'t',action:'remove'}});
+  expect(vi.mocked(fireEvent).mock.calls[0].slice(1)).toEqual(['tag_change',{
+    friendId:'f',eventData:{tagId:'t',action:'remove'},sourceKind:'friend_tag',
+    sourceEventId:expect.stringMatching(/^tag:f:t:remove:.+$/),occurredAt:expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+  },undefined,'a']);
   expect(send).not.toHaveBeenCalled();
 });

@@ -19,7 +19,11 @@ for (const kind of ['tag','research_action'] as const) {
     layout.options.afterActions = [kind === 'tag' ? {kind:'tag',op:'remove',tagIds:['t']} : {kind:'research_action',actionType:'tag',config:{op:'remove',tagIds:['t']},onFailure:'stop'}] as FormAction[];
     const input = {db:f.db,friendId:'f',formId:'form',layout,answers:{},idempotencyPrefix:'answer'};
     expect((await applyFormLayoutEffects(input)).failedEffects).toEqual([]);
-    expect(fireEvent).toHaveBeenCalledWith(f.db,'tag_change',{friendId:'f',eventData:{tagId:'t',action:'remove'}});
+    expect(fireEvent).toHaveBeenCalledWith(f.db,'tag_change',{
+      friendId:'f',eventData:{tagId:'t',action:'remove'},
+      sourceEventId:expect.stringMatching(/^tag:f:t:remove:.+$/),sourceKind:'friend_tag',
+      occurredAt:expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    },undefined,'a');
     expect(f.raw.prepare('SELECT COUNT(*) n FROM friend_tags').get()).toEqual({n:0});
     await applyFormLayoutEffects(input);
     expect(fireEvent).toHaveBeenCalledTimes(1);
