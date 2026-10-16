@@ -27,7 +27,15 @@ export interface MenuItem {
   /** キャンセル期限 (開始の何時間前まで)。null は店の既定を使う。 */
   cancel_deadline_hours_before?: number | null;
   intake_question?: string | null;
+  /** 同時に予約できる人数（B5。口は今 1 だけ。2 以上になったら「何人で予約しますか」を出す）。 */
+  max_party_size?: number;
+  /** 追加メニュー（オプション）。メニューを選んだあと addons の口で読み足す。 */
+  addons?: MenuAddon[];
+  /** お客さまの繰り返し予約（B4。初期オフ）。オンのメニューだけ確認に「毎週この時間で続ける」を出す。口が出来るまでの形（B-314）。 */
+  recurring?: { enabled: boolean; max_count: number };
 }
+
+export interface MenuAddon { id: string; name: string; duration_minutes: number; price: number }
 
 export interface StaffItem {
   id: string;
@@ -294,7 +302,19 @@ export type CreateEventBookingResponse =
   | { id: string; status: string }
   | { waitlisted: true; slot_id: string };
 
+/**
+ * 欠席の振替（B3）。口（Worker）は Codex の gap2 が作る。形は B3 の「データと API の形の案」。
+ * makeup が無い予約は、今までどおり欠席の入口を出さない。
+ */
+/** 答えで決まった予約の行き先（B6）。 */
+export interface RoutedTarget { menuId: string; menuName: string; durationMinutes: number; price: number; staffId: string | null; staffName: string | null; meetingMode: 'in_person' | 'online' | null }
+
+export interface MakeupCredit { id: string; expires_at: string; status: 'open' | 'used' | 'expired' | 'revoked'; source_event_booking_id?: string | null; source_event_id?: string; /** 口はまだ返さない（欠席した回の日時・名前）。返すようになったら帯の 1 行目に出す。 */ source_starts_at?: string | null; source_name?: string | null }
+export interface MakeupOption { slot_id: string; event_id: string; starts_at: string; ends_at: string; name: string; remaining: number | null; full: boolean }
+export interface EventBookingMakeup { enabled: boolean; /** 振替がもらえるときの期限（この欠席なら）。 */ valid_until?: string | null; /** 欠席の連絡の締め（これを過ぎると振替の対象外）。 */ cutoff_at: string | null; plan_label?: string | null }
+
 export interface EventBookingMine {
+  makeup?: EventBookingMakeup;
   /** 従来の予約行は未指定。待ちの行は source: 'waitlist'。 */
   source?: 'booking' | 'waitlist';
   queue_position?: number | null;
@@ -424,7 +444,14 @@ export const api = {
   bookingSettings: () => get<LiffBookingSettings>('/api/liff/booking/settings'),
   // Worker 側で id_token を verify するので lineUserId は body に入れない。
   createRequest: (
-    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string;waitlist_id?:string; policyAccepted?: boolean; policyVersion?: number; setupIntentId?: string },
+    body: {
+      menu_id: string; staff_id: string; starts_at: string; customer_note?: string; waitlist_id?: string; policyAccepted?: boolean; policyVersion?: number; setupIntentId?: string;
+      /** B5：追加メニュー（1 人分・0〜3 個）。2 人以上の組は口がまだ受けない。 */
+      addonIds?: string[];
+      /** B6：答えで決まった行き先の署名（resolve の返事）。 */
+      routingToken?: string;
+      meeting_mode?: 'online' | 'in_person';
+    },
     idempotencyKey: string,
   ) =>
     post<CreateBookingResponse>(
@@ -511,6 +538,17 @@ export const api = {
     ),
   myEventBookings: (tab: 'upcoming' | 'past') =>
     get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
+  /** 欠席する。締めの内なら振替が 1 回付く（credit）。付かないときは reason_if_none に理由（B3・契約どおり）。 */
+  eventAbsence: (bookingId: string, key: string) =>
+    post<{ success: true; data: { makeupCredit: MakeupCredit | null; reasonIfNone: string | null } }>(`/api/liff/events/bookings/${encodeURIComponent(bookingId)}/absence`, {}, { 'Idempotency-Key': key })
+      .then((r) => ({ credit: r.data.makeupCredit, reason_if_none: r.data.reasonIfNone ?? undefined })),
+  makeupCredits: () => get<{ success: true; data: MakeupCredit[] }>('/api/liff/events/makeup-credits').then((r) => ({ credits: r.data })),
+  /** 振替先の回。from はその週の最初の日（YYYY-MM-DD）。空きは定員−埋まりで数える。 */
+  makeupOptions: (id: string, from: string) =>
+    get<{ success: true; data: Array<{ id: string; event_id: string; starts_at: string; ends_at: string; capacity: number | null; occupied: number; name?: string | null }> }>(`/api/liff/events/makeup-credits/${encodeURIComponent(id)}/options?from=${encodeURIComponent(from)}`)
+      .then((r) => ({ options: r.data.map((o): MakeupOption => ({ slot_id: o.id, event_id: o.event_id, starts_at: o.starts_at, ends_at: o.ends_at, name: o.name ?? '', remaining: o.capacity == null ? null : Math.max(0, o.capacity - o.occupied), full: o.capacity != null && o.occupied >= o.capacity })) })),
+  useMakeup: (id: string, eventSlotId: string, key: string) =>
+    post<{ success: true; data: { bookingId: string; replayed: boolean } }>(`/api/liff/events/makeup-credits/${encodeURIComponent(id)}/use`, { eventSlotId }, { 'Idempotency-Key': key }).then((r) => ({ id: r.data.bookingId, status: 'confirmed' })),
   myEventWaitlist: () => get<{ items: EventWaitlistMine[] }>('/api/liff/events/me/waitlist'),
   myEventWaitlistEntry: (waitlistId: string) =>
     get<EventWaitlistMine>(`/api/liff/events/me/waitlist/${encodeURIComponent(waitlistId)}`),
@@ -551,6 +589,19 @@ export const api = {
    * 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る。
    * Worker は `{ success: true, data: { answers, createdAt } | null }` で返す。
    */
+  /**
+   * 答えで予約の行き先を決める（B6）。口（Worker）は Codex の gap2 が作る。
+   * 行き先はこの口の返事で決まり、お客さまは書き換えられない（予約には routingToken を添える）。
+   */
+  resolveFormRouting: (id: string, answers: Record<string, unknown>, blockId?: string) =>
+    post<{ success: true; data: { matchedIndex: number; target: { menuId: string; staffId?: string; staffGroupId?: string; meetingMode?: 'online' | 'in_person' }; routingToken: string; expiresAt: string } }>(`/api/liff/forms/${encodeURIComponent(id)}/routing/resolve`, { answers, blockId }).then((r) => r.data),
+  /** 繰り返しの確かめ（B4・口はまだ無い。無い間は確認の窓で「空きを確かめられませんでした」）。 */
+  seriesPreview: (body: { menu_id: string; staff_id: string; starts_at: string; freq: 'weekly'; count: number }) =>
+    post<{ occurrences: Array<{ index: number; starts_at: string; available: boolean; reason?: string; alternatives: string[] }> }>('/api/liff/booking/series/preview', body),
+  /** 追加メニュー（B5）。メニューを選んだあと読む。 */
+  addons: (menuId: string) =>
+    get<{ success: true; data: Array<{ id: string; name: string; duration_minutes: number; base_price: number }> }>(`/api/liff/booking/menus/${encodeURIComponent(menuId)}/addons`)
+      .then((r) => r.data.map((a): MenuAddon => ({ id: a.id, name: a.name, duration_minutes: a.duration_minutes, price: a.base_price }))),
   getMyLatestFormAnswer: (id: string) =>
     getLatestFormAnswer(`/api/forms/${id}/my-latest`),
   /**

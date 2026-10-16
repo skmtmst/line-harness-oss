@@ -4,6 +4,13 @@ import styles from './Icon.module.css';
 // 見た目は 24x24・線・角丸 (lucide の決まり) でそろえる。絵文字は使わない。
 
 const PATHS = {
+  /** 振替・繰り返し */
+  repeat: [
+    <path key="a" d="m17 2 4 4-4 4" />,
+    <path key="b" d="M3 11v-1a4 4 0 0 1 4-4h14" />,
+    <path key="c" d="m7 22-4-4 4-4" />,
+    <path key="d" d="M21 13v1a4 4 0 0 1-4 4H3" />,
+  ],
   'qr-code': [
     <rect key="a" width="5" height="5" x="3" y="3" rx="1" />,
     <rect key="b" width="5" height="5" x="16" y="3" rx="1" />,
@@ -16,6 +23,12 @@ const PATHS = {
     <path key="b" d="M15 7h2a5 5 0 0 1 4 8" />,
     <path key="c" d="M8 12h4" />,
     <path key="d" d="m2 2 20 20" />,
+  ],
+  /** 準備中（B-314 の準備中の画面 K9HMJp） */
+  hammer: [
+    <path key="a" d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9" />,
+    <path key="b" d="m18 15 4-4" />,
+    <path key="c" d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5" />,
   ],
   /** 済み・選択中 */
   check: [<path key="c" d="M20 6 9 17l-5-5" />],

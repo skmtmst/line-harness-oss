@@ -675,12 +675,6 @@ export default function DateTimePicker({
       {view === 'list' && settings?.calendarMode === 'month-only' ? (
         <Button variant="text" type="button" onClick={() => switchView('calendar')}>日を選び直す</Button>
       ) : null}
-      <Button variant="text"
-        type="button"
-        onClick={onBackToStaff}
-      >
-        ← 担当を選び直す
-      </Button>
     </BottomBar>
   );
 

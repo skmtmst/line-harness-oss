@@ -1,9 +1,9 @@
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import BookingIntake from './BookingIntake.js';
 import { bookingPriceText } from '../lib/booking-price.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type BookingCancellationPreview, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
-import CancellationPolicy, { yen } from './CancellationPolicy.js';
+import CancellationPolicy from './CancellationPolicy.js';
 import { addMinutesHm, formatJpLong, slotStartsAtIso } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
@@ -12,6 +12,9 @@ import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import PrivacyNote from './ui/PrivacyNote.js';
 import type { SlotPick } from './DateTimePicker.js';
+import PreparingOverlay from './PreparingOverlay.js';
+import RecurringCard, { type RecurrenceValue } from './RecurringCard.js';
+import { menuLine, personShort, totals, yen, type PartyState } from '../lib/party.js';
 
 /**
  * 1-d 内容の確認 (★V8・gLReL)。送った中身のカード＋ご要望＋案内の帯。
@@ -23,8 +26,11 @@ export default function Confirm({
   staff,
   slot,
   autoConfirm,
+  party,
   cancelDeadlineMinutesBefore = null,
   onPolicyChange,
+  onBack,
+  onRegisterBack,
   onSubmitted,
 }: {
   menu: MenuItem;
@@ -32,9 +38,15 @@ export default function Confirm({
   slot: SlotPick;
   /** 予約のルールが承認なし確定のとき真。未承認の案内を出さない。 */
   autoConfirm: boolean;
+  /** 2 人以上・追加メニューのとき（B5）。人ごとの行と合計を出し、組で送る。 */
+  party?: PartyState;
   cancelDeadlineMinutesBefore?: number | null;
   /** キャンセル料の決まりがオンか（手順の帯に「お支払い」を足す）。 */
   onPolicyChange?: (enabled: boolean) => void;
+  /** 日時の段へ戻る。戻るボタンは頭の「‹」にだけある（この画面には置かない）。 */
+  onBack?: () => void;
+  /** 頭の「‹」から呼べるよう、戻る処理を親へ渡す。 */
+  onRegisterBack?: (back: (() => void) | null) => void;
   /** 予約ができたら予約ID・状態・支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
   onSubmitted: (result: {
     bookingId: string;
@@ -63,11 +75,25 @@ export default function Confirm({
     return () => { alive = false; };
   }, [menu.id, staff.id, startsAt, onPolicyChange]);
 
+  /* 続けて予約（B4）・2 人以上の組（B5）：口がまだ無い間は、送らずに「現在準備中です」を出す（B-314）。 */
+  const [recurrence, setRecurrence] = useState<RecurrenceValue>(null);
+  const [preparing, setPreparing] = useState<string | null>(null);
+
   const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start]));
-  /* 戻るは頭の「‹」（Booking）。この段が外れると useRequestGeneration が世代を進め、送信中の古い応答は捨てる。 */
+  /* 戻る（頭の「‹」から呼ぶ）：送りかけの返事は受け取らず、日時の段へ戻る。 */
+  function back() {
+    request.invalidate();
+    setSubmitting(false);
+    onBack?.();
+  }
+  const backRef = useRef(back);
+  backRef.current = back;
+  useEffect(() => { onRegisterBack?.(() => backRef.current()); return () => onRegisterBack?.(null); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
     if (submitting) return;
+    if (party && party.size > 1) { setPreparing('2 人以上でのご予約'); return; }
+    if (recurrence) { setPreparing('毎週の続けての予約'); return; }
     const generation = request.begin();
     setSubmitting(true);
     setError(null);
@@ -91,6 +117,7 @@ export default function Confirm({
           starts_at: startsAt,
           customer_note: note || undefined,
           ...(consent ?? {}),
+          ...(party && party.members[0].addonIds.length ? { addonIds: party.members[0].addonIds } : {}),
         },
         idemKey,
       );
@@ -132,17 +159,17 @@ export default function Confirm({
     <div className="space-y-3.5" data-design-node={wide ? 'uZqMA' : 'gLReL'}>
       <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
       <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
-        <Row alignEnd={policy !== null} label="メニュー" value={menu.name} />
+        {party ? totals(party, menu).rows.map((r) => <Row alignEnd={policy !== null} key={r.index} label={personShort(r.index)} value={`${menuLine(r.menu, r.member)}・${(r.index === 0 ? (r.member.staff ?? staff) : r.member.staff)?.display_name ?? '指名なし'}`} />) : <Row alignEnd={policy !== null} label="メニュー" value={menu.name} />}
         <Row
           alignEnd={policy !== null}
           label="日時"
-          value={`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, staff.duration_minutes)}`}
+          value={`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, party ? totals(party, menu).minutes : staff.duration_minutes)}`}
         />
-        <Row alignEnd={policy !== null} label="担当" value={staff.display_name} />
+        {party ? null : <Row alignEnd={policy !== null} label="担当" value={staff.display_name} />}
         <Row
           alignEnd={policy !== null}
           label="料金"
-          value={policy ? bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode) : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
+          value={party ? `${yen(totals(party, menu).price)}（目安・お店で払う）` : policy ? bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode) : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
         />
         {policy?.deposit ? (
           <>
@@ -151,6 +178,8 @@ export default function Confirm({
           </>
         ) : null}
       </dl>
+      {menu.recurring?.enabled && !party ? <RecurringCard menu={menu} staff={staff} startsAt={slotStartsAtIso(slot)} onChange={setRecurrence} /> : null}
+      {preparing ? <PreparingOverlay title="ご予約" feature={preparing} /> : null}
       <BookingIntake question={menu.intake_question} value={note} onChange={setNote} />
       {error && (
         <p role="alert" className="text-[13px] leading-6 text-danger">
@@ -176,7 +205,7 @@ export default function Confirm({
           {submitting ? '送信中...'
             : policy?.deposit ? `${yen(policy.deposit.amount)} を払って予約する`
               : policy ? 'カードを登録して予約する'
-                : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
+                : recurrence ? `${recurrence.made} 回分を予約する` : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
         </Button>
       </BottomBar>
     </div>

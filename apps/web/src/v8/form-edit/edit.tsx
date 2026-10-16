@@ -40,6 +40,7 @@ import { focusFieldById } from '@/lib/use-form-errors';
 import { useCustomerLook } from '@/components/shared/use-customer-look';
 import { FormPhone } from './phone';
 import styles from './edit.module.css'
+import { routingError, routingOf, withRouting, type FormRouting } from './routing-model'
 import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TextLink from '@/components/shared/text-link'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -472,6 +473,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   const inputCount = layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input').length, layout.header.filter((b) => b.kind === 'input').length)
 
+  const patchRouting = (next: FormRouting) => setLayout((prev) => withRouting(prev, next))
   const patchOptions = (next: Partial<FormOptions>) => setLayout((prev) => ({ ...prev, options: { ...prev.options, ...next } }))
 
   /* ---------------- 未保存の確認 ---------------- */
@@ -542,6 +544,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     if (dup) return { message: '回答キーが重なっています。複製した入力欄を確認してください' }
     const layoutError = validateFormLayoutForSave(layout)
     if (layoutError) return { message: layoutError }
+    const routingProblem = routingError(routingOf(layout))
+    if (routingProblem) return { message: routingProblem.message }
     const ogImageError = ogImageUrlError(ogImageUrl)
     if (ogImageError) return { message: ogImageError, tab: 'appearance', target: 'fe-og-image', inline: true }
     // 文字と背景の差が 4.5:1 未満の組み合わせは保存できない（保存APIも同じ検査をする）。
@@ -945,6 +949,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onMoveBlock={moveBlock}
             onDuplicateBlock={duplicateBlock}
             onRemoveBlock={removeBlock}
+            routing={routingOf(layout)}
+            onChangeRouting={host ? undefined : patchRouting}
           />
         ) : editTab === 'after' ? (
           <AfterTab readOnly={!canEdit} options={layout.options} refs={refs} onSubmitTagId={onSubmitTagId} onChangeOptions={patchOptions} onChangeSubmitTag={setOnSubmitTagId} />

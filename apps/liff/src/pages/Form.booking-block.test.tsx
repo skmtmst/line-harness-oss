@@ -217,7 +217,7 @@ it('XL-01 仲間: 予約付き回答の送信中に前のページへ戻った�
   createRequest.mockReturnValue(pending)
   fireEvent.click(screen.getByRole('button',{name:'送信する'}))
   await waitFor(()=>expect(createRequest).toHaveBeenCalledOnce())
-  fireEvent.click(screen.getByRole('button',{name:/前のページへ/}))
+  fireEvent.click(screen.getByRole('button',{name:'戻る'}))
   await act(async()=>{resolve({booking_id:'old',status:'requested'});await pending})
   expect(screen.queryByText('ご回答ありがとうございました')).toBeNull()
   expect(screen.getByRole('button',{name:'次へ'})).toBeTruthy()

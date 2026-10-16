@@ -183,7 +183,7 @@ export function BookingControls({ menuLabel, days, selectedDate, times, onDate, 
   return <div className={styles.stack}>
     {menuLabel ? <p className={styles.note}>{menuLabel}</p> : null}
     {children}
-    <div className={styles.days} role="group" aria-label="日付">
+    <div className={styles.days} role="group" aria-label="日付" style={days.length === 7 ? { ['--day-cols' as string]: 7 } : undefined}>
       {days.map((d) => <button key={d.date} type="button" className={styles.day} aria-pressed={selectedDate === d.date} aria-label={`${Number(d.date.slice(5, 7))}月${d.day}日${d.open ? '' : ' 空きなし'}`} data-off={!d.open || undefined} disabled={!d.open && !preview} aria-disabled={!d.open || undefined} onClick={() => { if (d.open) onDate(d.date) }}><span className={styles.weekday}>{d.weekday}</span><span>{d.day}</span></button>)}
     </div>
     <div className={styles.times}>
