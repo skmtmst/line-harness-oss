@@ -140,12 +140,14 @@ async function dispatchOne(
   }
 
   let message: Message;
+  let renewalMessage: Message | undefined;
   try {
     const built = await buildChatMessage({ messageType: row.message_type, content: rendered.content,
       bucket: env.IMAGES, signingSecret: env.API_KEY, origin: env.WORKER_URL ?? '',
       owner: { friendId: target.friend.id, lineAccountId: target.friend.line_account_id ?? null },
     });
     message = built.message;
+    renewalMessage = built.renewalMessage;
     rendered.content = built.content;
   } catch (error) {
     if (!(error instanceof ChatAttachmentError)) throw error;
@@ -175,7 +177,7 @@ async function dispatchOne(
     return;
   }
   try {
-    if (reservation.kind !== 'replay') await lineClient.pushMessage(target.friend.line_user_id, [message], row.idempotency_key);
+    if (reservation.kind !== 'replay') await lineClient.pushMessage(target.friend.line_user_id, [message, ...(renewalMessage ? [renewalMessage] : [])], row.idempotency_key);
   } catch (error) {
     const failure = classifyLineOutboundFailure(error, nowIso);
     // unknown(送達可否が分からない)は自動再送すると二重送信になり得るため

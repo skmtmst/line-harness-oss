@@ -1,3 +1,5 @@
+import { customerDownloadEntry, privateDownloadHeaders } from '../services/download-entrypoints.js';
+import { isCustomerFileOwner } from '../services/customer-file-access.js';
 import { validDownload } from '../services/download-capability.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -168,10 +170,18 @@ chatAttachments.get('/images/chat-attachments/video-preview.png', c => {
 chatAttachments.get('/images/chat-attachments/:attachmentId', async c => {
   const id = c.req.param('attachmentId');
   if (!CHAT_ATTACHMENT_ID.test(id)) return c.notFound();
+  for (const [key, value] of Object.entries(privateDownloadHeaders)) c.header(key, value);
+  const requestUrl = new URL(c.req.url);
+  if (!requestUrl.searchParams.has('expires') && !requestUrl.searchParams.has('signature')) {
+    return c.redirect(customerDownloadEntry(originOf(c), 'files', id), 303);
+  }
   const head = await c.env.IMAGES.head(`${CHAT_ATTACHMENT_PREFIX}${id}`);
   if (!head) return c.notFound();
-  if (!await validDownload(new URL(c.req.url), c.env.API_KEY, 'chat-attachment', id,
-    JSON.stringify([head.customMetadata?.lineAccountId ?? '', head.customMetadata?.friendId ?? '']))) {
+  const binding = JSON.stringify([head.customMetadata?.lineAccountId ?? '', head.customMetadata?.friendId ?? '']);
+  const staffOrLineDelivery = await validDownload(requestUrl, c.env.API_KEY, 'chat-attachment', id, binding);
+  const customer = !staffOrLineDelivery && await validDownload(requestUrl, c.env.API_KEY, 'chat-attachment-self', id, binding)
+    && await isCustomerFileOwner(c, head);
+  if (!staffOrLineDelivery && !customer) {
     return c.json({ success: false, error: '取得用URLが無効か期限切れです' }, 403, { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' });
   }
   const attachment = attachmentFromObject(id, head, originOf(c));

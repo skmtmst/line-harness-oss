@@ -77,6 +77,8 @@ const UNAUTHENTICATED_PATTERNS: Array<string | RegExp> = [
   // Public referral URLs do database work too. Share one IP budget across
   // changing refs/help/query values and ignore unverified credentials.
   /^\/r\//,
+  /^\/liff\/(?:files|statements)\//,
+  /^\/api\/liff\/files\//,
   // 会員登録・メールログイン・パスワード再設定。認証前に叩かれる入口なので低い上限にする。
   /^\/api\/auth\/(register|password)\//,
 ];

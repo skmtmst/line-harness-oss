@@ -1,3 +1,4 @@
+import { customerDownloadEntry } from '../services/download-entrypoints.js';
 import { signDownload, validDownload } from '../services/download-capability.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -583,7 +584,9 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
     const data = await listAffiliateStatementsForSelf(c.env.DB, {
       tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId, affiliateId: affiliate.id,
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: data.map(statement => ({ ...statement,
+      renewalUrl: customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', statement.id),
+    })) });
   } catch (error) {
     console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"GET /api/liff/affiliate/statements"}));
     return c.json({ success: false, error: '支払明細を確認できませんでした' }, 500);
@@ -595,6 +598,10 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
   try {
     c.header('Cache-Control', 'private, no-store');
     c.header('Referrer-Policy', 'no-referrer');
+    // Old emailed/LINE links guide to LIFF, without copying token/query values.
+    if (!c.req.header('Authorization') && !c.req.query('signature') && !c.req.query('expires') && c.req.query('issue') !== '1') {
+      return c.redirect(customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', c.req.param('id')), 303);
+    }
     const token = /^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1];
     if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     const resolved = await resolveFriendFromLineToken(c.env, token);
@@ -612,6 +619,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
     if (!c.env.API_KEY) return c.json({ success: false, error: '取得用の鍵が未設定です' }, 503);
     const binding = JSON.stringify([resolved.tenantId, resolved.lineAccountId, affiliate.id, resolved.friend.id]);
     if (c.req.query('issue') === '1') {
+      if (!await c.env.IMAGES.head(file.objectKey)) return c.json({ success: false, error: '支払明細が見つかりません' }, 404);
       const url = await signDownload(new URL(c.req.url), c.env.API_KEY, 'affiliate-statement', file.statement.id, binding,
         file.statement.expiresAt ? Date.parse(file.statement.expiresAt) : undefined);
       return c.json({ success: true, data: { url, expiresAt: new Date(Number(new URL(url).searchParams.get('expires')) * 1000).toISOString() } });

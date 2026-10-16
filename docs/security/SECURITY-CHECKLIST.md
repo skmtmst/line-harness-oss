@@ -108,7 +108,7 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 
 | ID | 点検・危なさ | 確かめ方（命令・画面） | 今の状態 | 根拠のファイル |
 | --- | --- | --- | --- | --- |
-| S41 | B-351/4 ログイン不要の入口・高 | [公開入口](PUBLIC-ENTRYPOINTS.md)を実登録と照合。別人・別店・期限切れ・連続取得を架空データで拒否する | 未：全入口を一覧化。短縮リンクの無制限取得を修正。添付画像/動画を含め署名は最長15分へ、明細は認証ヘッダー＋署名へ修正。署名URLを期限内に転送された場合の添付の本人限定・全入口の個別組合せ・公開素材の誤配置は残る（[契約と試験](SIGNED-DOWNLOADS.md)） | `apps/worker/src/middleware/public-referral-rate-limit.security.test.ts`、`routes/public-entrypoints.security.test.ts`、`services/image-access.ts` |
+| S41 | B-351/4 ログイン不要の入口・高 | [公開入口](PUBLIC-ENTRYPOINTS.md)を実登録と照合。別人・別店・期限切れ・連続取得を架空データで拒否する | 未：全入口を一覧化。短縮リンクの無制限取得を修正。添付画像/動画を含め署名は最長15分へ、明細は認証ヘッダー＋署名へ修正。本人用の取り直しAPI・古いリンクのLIFF案内・送信本文の入口を追加し、別人/別店/削除を拒否する試験を追加。取り直し画面の接続、LINE内表示用URLの期限内の転送、全入口の個別組合せ・公開素材の誤配置は残る（[契約と試験](SIGNED-DOWNLOADS.md)） | `apps/worker/src/middleware/public-referral-rate-limit.security.test.ts`、`routes/public-entrypoints.security.test.ts`、`services/image-access.ts` |
 | S42 | B-351/5 ログイン失敗・新しい端末・ロボット避け・高 | 同一メールへの失敗を別IPから繰り返す。架空の新端末で監査・通知を確認。全ログイン方法でロボット避けの適用を照合 | 未：メール/アカウント単位の15分制限、新端末の監査とメールはある。Turnstileは登録と再設定にあり、パスワードログイン自体では検証していない。全方法の適用は後続 | `apps/worker/src/routes/auth-email.ts`、`middleware/sensitive-rate-limit.ts`、`services/admin-session.ts`、`services/turnstile.ts` |
 | S43 | B-351/6 WAF・ボット対策・請求急増の知らせ・高 | オーナーがCloudflareのSecurityとNotifications/Billingで対象ホスト・通知先・条件・適用範囲を照合。架空の連続アクセスと通知の試験 | 分からない：配備先の設定・プラン・通知の到達は未確認。オーナー作業欄へ手順を追加 | `apps/worker/src/middleware/rate-limit.ts`、`docs/security/DETECTION.md`、この文書のオーナー手順 |
 | S44 | B-351/8 危ない操作の直前の本人確認・高 | 削除・権限・鍵再発行・停止・書き出しごとに確認票の欠落/期限切れ/別セッション/再使用を拒否。全危険操作の一覧を照合 | 未：一回限りで目的とセッションに結び付く確認票がある。全危険操作へ適用した証拠はまだない | `apps/worker/src/lib/step-up.ts`、`routes/admin-auth-step-up-grant-binding.test.ts`、`routes/account-handovers.ts`、`routes/staff-step-up.test.ts` |
@@ -163,7 +163,7 @@ S07・S15・S22・S24・S28の「試験が本当の故障を見付けるか」�
 
 | ID | 手順 | 完了の条件・故障の確かめ方 |
 | --- | --- | --- |
-| S17・S41 | 配備前に取得URL署名の既存binding `API_KEY` をsecretとして登録済みか、名前・型・存在だけで確認する。実値の取得や今回の登録変更はしない。署名なしの過去のLINE添付URLも止まるため、再案内と15分後の再取得の運用を決める | 検証で鍵なしは保存前503、署名なし/改ざん/15分後は取得403。元の会話の読み直しだけでURLを更新でき、他の会話では更新できない。実配備の存在確認は未。期限内のURL転送を本人限定にする画面は別の残件 |
+| S17・S41 | 配備前に取得URL署名の既存binding `API_KEY` をsecretとして登録済みか、名前・型・存在だけで確認する。実値の取得や今回の登録変更はしない。過去の署名なしリンクは本文を返さずLIFFへ案内する。本人用の取り直しAPIと送信本文の入口は用意済み。LIFFの取り直し画面を接続し、本人・別人・別店で確認する（SIGNED-DOWNLOADS.md） | 検証で鍵なしは保存前503、署名なし/改ざん/15分後は取得403。元の会話の読み直しだけでURLを更新でき、他の会話では更新できない。実配備の存在確認は未。本人用の取得URLはBearerも必須。LINE内の写真/動画表示用URLの15分内の転送は制約として残る。LIFFの取り直し画面はClaude担当の残件 |
 | S19 | 今回のGitleaks 8.30.1による全参照検査と故障対照は済。公開直前に承認済みの端末で同じ版と検出設定を固定して再検査。全対象remoteの枝・tagを取得して対象ref数を記録し、`gitleaks git --redact=100 --log-opts="--all" .` を実行。レポートと標準出力はGit/Slack外の権限を絞った保管先へ。GitHub SecurityのSecret scanning・push protectionの利用可否と有効範囲も確認 | 別の使い捨てrepoで架空の検出対象を過去commit→削除し、全履歴検査が終了1になることを先に確認。問題発見時は種類・場所だけ記録し旧鍵を失効。検査の終了値と全対象refの網羅を確認してから済。画像内の秘密はS38で目視。[公式の使い方](https://github.com/gitleaks/gitleaks#usage) |
 | S21 | 環境ごとに別の32バイト鍵を安全な端末で生成し、Worker secret `GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY` へ標準入力またはCloudflareの秘密設定画面で登録（通常変数・引数・履歴・ログへ置かない）。承認・控えを整え、既存平文はGoogleで失効後に暗号化対応した接続口から再登録し、旧接続と控えの扱いを確認。既存予約のconnection_id参照の付替えは別途承認済み移行手順を用意し、先に削除しない | 新規3種の暗号化と旧平文件数0を値なしの件数で確認。検証用接続で鍵欠落・改ざん時に保存/Google呼出しが止まることを確認。既存接続はこの修正後500で停止するため、secret設定と移行準備なしで配備しない。手順の詳細は修正記録 |
 | S26 | 開発依存の大きい更新は司令塔が承認し、Vitest 4.1.11への更新でCriticalは0。bracesの上流修正版を確認し、公開後に更新。現行のlintではnext.rootDirを未指定のまま保ち、外部入力からパターンを作らない | 現在Critical 0 / High 1。旧Vitest・危険なtinypoolを混ぜる試験と、globの解析経路を再開すると落ちる試験で再発を防ぐ。Highは未解消として公開判断に残す |

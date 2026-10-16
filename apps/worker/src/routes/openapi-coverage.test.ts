@@ -142,6 +142,7 @@ const ALLOWLIST_MAX = 771;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/liff/files/{id}/download',
   'GET /api/operations/security-alerts',
   'GET /api/ops/security-alerts',
   'POST /api/ops/security-alerts/run-once',
@@ -1961,7 +1962,7 @@ describe('OpenAPIと公開APIの同期', () => {
       const classification = routeClassification(entry.honoPath, method);
       const operation = spec.paths[path]?.[method.toLowerCase() as 'get'];
       // These LIFF handlers verify the account's LINE ID token themselves.
-      const verifiedLiff = ['/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking'].includes(entry.honoPath);
+      const verifiedLiff = ['/api/liff/files/:id/download', '/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking'].includes(entry.honoPath);
       if (verifiedLiff) {
         if (JSON.stringify(operation?.security) !== '[{"liffIdToken":[]}]') problems.push(`${key}: LINE IDトークンの表示が無い`);
       } else if (classification?.kind === 'public') {

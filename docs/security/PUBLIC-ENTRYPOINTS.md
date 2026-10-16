@@ -4,7 +4,7 @@
 
 ## 数え方と限界
 
-WorkerのHono実登録にある管理認証の外の入口は **173経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。
+WorkerのHono実登録にある管理認証の外の入口は **175経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。既存の全入口の再生成は③-2第3波の本線統合後に司令塔が起動する。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。
 
 「全経路を列挙」と「すべての入力で安全を確認」は別。表の本人確認・期限はコードの方式で、実配備の設定や全資源ID×本人の組合せはS07/S15の未完を維持する。URLの実値・query・顧客情報は記録しない。
 
@@ -13,7 +13,7 @@ WorkerのHono実登録にある管理認証の外の入口は **173経路**（�
 | 記号 | 対象・状態 | 次の直しと確かめ方 |
 | --- | --- | --- |
 | R00 | `/r/:ref` とhelpは回数制限を完全に除外していた。今回、同一IPで1分100回に制限した。URL/偽Cookie/Bearerを変えても同じ枠を消費し、101回目は処理前に429 | `middleware/public-referral-rate-limit.security.test.ts`。単一実行環境の一時的な制限であり、分散したアクセスや再起動をまたぐ保証はしない。永続の制限とWAFは後続/S43 |
-| R01・高 | 会話の添付はUUIDの能力URL。汎用ファイルには期限があるが、画像・動画を含め、取得は最長15分の署名を必須へ変更。署名なしの既存URLも拒否 | [短命URLの設計と契約](SIGNED-DOWNLOADS.md)。会話を読み直して更新できる。署名URLは期限内なら転送先も読めるため本人限定とは数えない。過去のLINE本文・後からの画像取得への影響と、本人確認付きの取得画面は残件。DB変更なし |
+| R01・高 | 会話の添付はUUIDの能力URL。汎用ファイルには期限があるが、画像・動画を含め、取得は最長15分の署名を必須へ変更。署名なしの既存URLは本文を返さずLIFFへ案内 | [短命URLの設計と契約](SIGNED-DOWNLOADS.md)。会話を読み直して更新できる。本人用の取り直しURLはLINE本人のBearerも必須、送信本文はLIFF入口へ変更。LINE内表示用URLは15分内の転送で取得可能な制約が残る。取り直し画面はClaudeの接続待ち。DB変更なし |
 | R02・高 | `/images/*` の明示公開名前空間と `/media/:id/content` は期限なし。private写真は5分HMAC、審査原本とprivate書類は公開しない。公開素材へ誤って個人情報を入れる危険は残る | 公開用素材と顧客添付の分離・公開取り消し後のCDNの扱いを後続で確認。既存の `images-public-delivery.test.ts`・`media-download-chain.test.ts`・`form-documents.test.ts` を保持 |
 | R03・高 | 本人用の支払明細PDFは店/友だち/期限を検査する。今回、期限がNULLの旧明細も拒否するよう修正した。追加対応で認証ヘッダー＋最長15分の署名へ変更。queryだけの認証は拒否 | `routes/affiliate-self.ts`、`apps/liff/src/lib/affiliate-self-api.ts`。[契約と試験](SIGNED-DOWNLOADS.md)。同じUIのAPI関数が発行→本人認証付き取得を行う。別人・改ざん・期限切れは拒否。本番反映は司令塔 |
 | R04 | 領収書そのものの無認証ダウンロード経路は実登録に見当たらない。支払明細とクーポンreceiptは別物 | 新設時は短命URL・本人と店・公開状態・期限切れの試験を必須にする。「領収書が安全に実装済み」とは数えない |
@@ -21,10 +21,12 @@ WorkerのHono実登録にある管理認証の外の入口は **173経路**（�
 
 共通の回数制限：`middleware/rate-limit.ts`。認証・upload等には `sensitive-rate-limit.ts` の共有D1枠もある。下のIPの上限は単一実行環境の1分窓（特記を除く）。IPを分散した取得を止めるものではなく、本番WAFの確認はS43。
 
-## 全173経路
+## 全175経路
 
 | メソッド・経路 | IDの形・推測への耐性 | 回数の制限 | 返す個人情報/確認する人 | 期限 | 根拠のファイル |
 | --- | --- | --- | --- | --- | --- |
+| `GET /api/liff/files/:id/download` | ランダムUUID。UUIDだけで取得権限にしない | IP 100/分（単一実行環境） | LINE ID tokenで本人・店/統括・R2持ち主・保存期限を照合して、名前/種類/大きさと本人専用の署名URLだけを返す | 署名は最長15分、保存期限が先ならその期限まで。別人/別店/削除/保存期限切れは404 | `apps/worker/src/routes/customer-downloads.ts`、`services/customer-file-access.ts` |
+| `GET /liff/:kind/:id` | kindはfiles/statementsのみ。添付UUID/明細ID自体は認証ではない | IP 100/分（単一実行環境） | 本文/個人情報は返さず、保存物の店の登録済みLIFFへ303。外部の遷移先/元queryは使わない | 入口自体は期限なし。削除/停止/LIFF未設定は410で問い合わせ案内 | `apps/worker/src/routes/customer-downloads.ts` |
 | `GET /admin/manifest` | 固定パス、IDは秘密にしない | IP 3,000/分（単一実行環境） | 公開の版/稼働/ブランド/静的手引き・スクリプト/転送 | 期限なし。公開メタデータ | `apps/worker/src/routes/admin-version.ts` |
 | `ALL /admin/update/*` | 固定パス、IDは秘密にしない | IP 3,000/分（単一実行環境） | updateは404で廃止。internalは検証専用＋専用確認 | 本番では実行不可（既存試験で確認） | `apps/worker/src/routes/admin-update.ts` |
 | `GET /admin/version` | 固定パス、IDは秘密にしない | IP 3,000/分（単一実行環境） | 公開の版/稼働/ブランド/静的手引き・スクリプト/転送 | 期限なし。公開メタデータ | `apps/worker/src/routes/admin-version.ts` |
@@ -74,7 +76,7 @@ WorkerのHono実登録にある管理認証の外の入口は **173経路**（�
 | `POST /api/liff/affiliate/offers/:id/enroll` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/affiliate-self.ts` |
 | `POST /api/liff/affiliate/register` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/affiliate-self.ts` |
 | `GET /api/liff/affiliate/statements` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/affiliate-self.ts` |
-| `GET /api/liff/affiliate/statements/:id/download` | 明細ID＋LINE本人の所属照合 | IP 3,000/分（単一実行環境） | 本人の支払明細PDF。発行/取得とも認証ヘッダー必須。R03のquery認証を廃止 | 署名は最長15分。本人/店/統括と明細の公開状態/取得期限も照合。期限なしの旧行は拒否 | `apps/worker/src/routes/affiliate-self.ts` |
+| `GET /api/liff/affiliate/statements/:id/download` | 明細ID＋LINE本人の所属照合 | IP 3,000/分（単一実行環境） | 本人の支払明細PDF。発行/取得とも認証ヘッダー必須。旧署名なしリンクはqueryの認証情報を捨てLIFF入口へ303案内。R03のquery認証を廃止 | 署名は最長15分。本人/店/統括と明細の公開状態/取得期限も照合。期限なしの旧行は拒否 | `apps/worker/src/routes/affiliate-self.ts` |
 | `POST /api/liff/booking/:id/cancel` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
 | `POST /api/liff/booking/:id/reschedule` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
 | `GET /api/liff/booking/availability` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 公開の空き枠/メニュー/表示設定。利用者一覧や秘密を含めないことを個別確認 | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
@@ -180,7 +182,7 @@ WorkerのHono実登録にある管理認証の外の入口は **173経路**（�
 | `GET /health` | 固定パス、IDは秘密にしない | IP 3,000/分（単一実行環境） | 公開の版/稼働/ブランド/静的手引き・スクリプト/転送 | 期限なし。公開メタデータ | `apps/worker/src/routes/health.ts` |
 | `GET /images/*` | 公開画像のUUID/公開名前空間。private画像はHMAC付きURL（R01/R02参照） | IP 3,000/分。配備先のWAFは未確認 | 公開素材は公開前提。友だち写真/添付は個人情報を含み得る | private画像5分。公開画像/ライブ素材は原則期限なし | `apps/worker/src/routes/images.ts` |
 | `GET /images/broadcast-media/:filename` | 公開画像のUUID/公開名前空間。private画像はHMAC付きURL（R01/R02参照） | IP 3,000/分。配備先のWAFは未確認 | 公開素材は公開前提。友だち写真/添付は個人情報を含み得る | private画像5分。公開画像/ライブ素材は原則期限なし | `apps/worker/src/routes/broadcast-message-assets.ts` |
-| `GET /images/chat-attachments/:attachmentId` | ランダムUUID＋15分の署名。署名込みのURL自体が取得権限になる | IP 3,000/分。配備先のWAFは未確認 | 会話の添付。第三者へ渡すと取得可能（R01） | 全種別で署名は最長15分。汎用ファイルの保存期限が先なら短縮（R01） | `apps/worker/src/routes/chat-attachments.ts` |
+| `GET /images/chat-attachments/:attachmentId` | ランダムUUID＋15分の署名。署名込みのURL自体が取得権限になる | IP 3,000/分。配備先のWAFは未確認 | 会話の添付。本人用の署名には同じ本人のBearerも必須。LINE内表示/管理用の署名は15分内なら転送先も取得可能。署名なしは本文を返さずLIFFへ303（R01） | 全種別で署名は最長15分。汎用ファイルの保存期限が先なら短縮（R01） | `apps/worker/src/routes/chat-attachments.ts` |
 | `GET /images/chat-attachments/video-preview.png` | 固定パス | IP 3,000/分。配備先のWAFは未確認 | 固定の見本PNGだけ | 期限なし | `apps/worker/src/routes/chat-attachments.ts` |
 | `GET /images/imagemaps/:id/:width` | 公開画像のUUID/公開名前空間。private画像はHMAC付きURL（R01/R02参照） | IP 3,000/分。配備先のWAFは未確認 | 公開素材は公開前提。友だち写真/添付は個人情報を含み得る | private画像5分。公開画像/ライブ素材は原則期限なし | `apps/worker/src/routes/broadcast-message-assets.ts` |
 | `POST /internal/ubereats/sandbox-token-probe` | 固定パス、IDは秘密にしない | IP 3,000/分（単一実行環境） | updateは404で廃止。internalは検証専用＋専用確認 | 本番では実行不可（既存試験で確認） | `apps/worker/src/routes/restaurant-delivery.ts` |

@@ -178,6 +178,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/health', 'system', '稼働確認'),
   exempt('/api/qr', 'public', '公開QR生成'),
   exempt('/api/liff', 'public', 'LIFF内で個別認証する公開経路'),
+  exempt('/liff', 'public', '本人確認するLIFFへ案内する入口。ファイル本文は返さない'),
   exempt('/api/public', 'public', '公開表示専用経路'),
   exempt('/api/integrations', 'system', '署名検証する外部受信経路'),
   exempt('/api/internal', 'system', '内部サービス間経路'),

@@ -1826,6 +1826,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     const lineClient = new LineClient(accessToken);
     const messageType = body.messageType ?? 'text';
     let message: Message;
+    let renewalMessage: Message | undefined;
     try {
       const built = await buildChatMessage({
         messageType, content: rendered.content, bucket: c.env.IMAGES, signingSecret: c.env.API_KEY,
@@ -1833,6 +1834,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         origin: c.env.WORKER_URL || new URL(c.req.url).origin,
       });
       message = built.message;
+      renewalMessage = built.renewalMessage;
       rendered.content = built.content;
     } catch (error) {
       if (error instanceof ChatAttachmentError) return inputError(c, { success: false, code: error.code, error: error.message }, 400, ["attachmentIds"]);
@@ -1914,7 +1916,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     // LINE API が同一リクエストを二重配信しない。
     const outboundLeaseToken = reservation.leaseToken;
     try {
-      await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+      await lineClient.pushMessage(friend.line_user_id, [message, ...(renewalMessage ? [renewalMessage] : [])], idempotencyKey);
     } catch (error) {
       const failedAt = new Date().toISOString();
       const failure = classifyLineOutboundFailure(error, failedAt);

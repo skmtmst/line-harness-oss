@@ -36,6 +36,7 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path.startsWith('/r/') ||
     path.startsWith('/pool/') ||
     path.startsWith('/images/') ||
+    (normalizedMethod === 'GET' && /^\/liff\/(?:files|statements)\/[\w-]+$/.test(path)) ||
     path.startsWith('/api/liff/') ||
     path === '/api/auth/login' ||
     path === '/api/auth/logout' ||

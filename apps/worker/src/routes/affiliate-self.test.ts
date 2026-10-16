@@ -59,6 +59,7 @@ const DB = {} as D1Database;
 const LOGIN_CHANNEL_ID = '2000000000';
 
 const imagesGet = vi.fn();
+const imagesHead = vi.fn().mockResolvedValue({ size: 100 });
 const env = {
   DB,
   API_KEY: 'fixture-download-signing-key',
@@ -67,7 +68,7 @@ const env = {
   LINE_LOGIN_CHANNEL_ID: LOGIN_CHANNEL_ID,
   LINE_CHANNEL_SECRET: 'wallet-link-secret',
   LINE_CREDENTIAL_ENCRYPTION_KEY: 'test-encryption-key',
-  IMAGES: { get: imagesGet },
+  IMAGES: { get: imagesGet, head: imagesHead },
 } as unknown as import('../index.js').Env['Bindings'];
 
 function call(path: string, init?: RequestInit) {
@@ -735,6 +736,18 @@ describe('LIFF affiliate bank and statements', () => {
       affiliateId: expect.stringContaining('friend-alice'), statementId: 'statement-1',
     }));
   });
+  it('消した明細には署名を発行せず、他の本人の発行条件も自分の所属に固定する', async () => {
+    await registerAlice();
+    dbMocks.getAffiliateStatementDownload.mockResolvedValue({ statement: { id: 'statement-1' }, objectKey: 'missing.pdf' });
+    imagesHead.mockResolvedValueOnce(null);
+    const response = await call('/api/liff/affiliate/statements/statement-1/download?issue=1', { headers: { Authorization: 'Bearer tok-alice' } });
+    expect(response.status).toBe(404); expect(imagesGet).not.toHaveBeenCalled();
+    dbMocks.getAffiliateStatementDownload.mockResolvedValueOnce(null);
+    expect((await call('/api/liff/affiliate/statements/foreign/download?issue=1&affiliateId=bob&lineAccountId=other', { headers: { Authorization: 'Bearer tok-alice' } })).status).toBe(404);
+    expect(dbMocks.getAffiliateStatementDownload).toHaveBeenLastCalledWith(DB, expect.objectContaining({
+      affiliateId: expect.stringContaining('friend-alice'), lineAccountId: 'account-main', statementId: 'foreign',
+    }));
+  });
   it('認証情報をqueryへ戻せず、別人・別明細・期限切れの署名はR2を読まない', async () => {
     await registerAlice();
     dbMocks.getAffiliateStatementDownload.mockImplementation(async (_db, input) => ({
@@ -742,7 +755,10 @@ describe('LIFF affiliate bank and statements', () => {
     }));
     const path = '/api/liff/affiliate/statements/statement-1/download';
     const headers = { Authorization: 'Bearer tok-alice' };
-    expect((await call(`${path}?lineAccessToken=tok-alice`)).status).toBe(400);
+    const legacy = await call(`${path}?lineAccessToken=tok-alice`);
+    expect(legacy.status).toBe(303);
+    expect(legacy.headers.get('location')).toBe('https://worker.example.com/liff/statements/statement-1');
+    expect(await legacy.text()).not.toContain('pdf-body');
     expect((await call(path, { headers })).status).toBe(403);
     const issued = await call(`${path}?issue=1`, { headers });
     const { data } = await issued.json() as { data: { url: string } };

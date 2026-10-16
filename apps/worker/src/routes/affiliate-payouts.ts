@@ -1,3 +1,4 @@
+import { customerDownloadEntry } from '../services/download-entrypoints.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
@@ -405,7 +406,7 @@ affiliatePayouts.post(
         c.env.DB,
         c.env,
         body.affiliateId,
-        `支払明細を発行しました。確定額: ¥${snapshot.totalAmount.toLocaleString('ja-JP')}。紹介者マイページから確認できます。`,
+        `支払明細を発行しました。確定額: ¥${snapshot.totalAmount.toLocaleString('ja-JP')}。LINEで本人確認して確認できます。\n${customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', statement.id)}`,
       );
       return c.json({ success: true, data: statement, notificationAttempted: true }, 201);
     } catch (error) {

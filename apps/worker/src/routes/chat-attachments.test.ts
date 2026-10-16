@@ -158,6 +158,7 @@ describe('受信箱の送信・期限付きリンク', () => {
   it('動画をvideoで送り、決まったPNGのプレビューを使う', async () => {
     const { attachment } = await video();
     expect((await send('video', { originalContentUrl: attachment.url })).status).toBe(200);
+    expect(payload().messages[1]).toEqual({ type: 'text', text: `後から開く場合はこちら（LINEで本人確認）\nhttps://worker.example/liff/files/${attachment.id}` });
     expect(payload().messages[0]).toEqual({ type: 'video', originalContentUrl: attachment.url, previewImageUrl: 'https://worker.example/images/chat-attachments/video-preview.png' });
     const preview = await app().request('/images/chat-attachments/video-preview.png', {}, bindings);
     expect(preview.headers.get('Content-Type')).toBe('image/png');
@@ -178,12 +179,20 @@ describe('受信箱の送信・期限付きリンク', () => {
     const file = await uploadedFile(); const k = key();
     expect((await send('file', { attachmentId: file.id, url: 'https://evil.example' }, k)).status).toBe(200);
     expect(payload().messages[0].type).toBe('text');
-    expect(payload().messages[0].text).toContain('案内.pdf'); expect(payload().messages[0].text).toContain(file.url);
+    expect(payload().messages[0].text).toContain('案内.pdf'); expect(payload().messages[0].text).toContain(`https://worker.example/liff/files/${file.id}`); expect(payload().messages[0].text).not.toContain('signature=');
     expect(payload().messages[0].text).not.toContain('evil.example');
     expect((await send('file', { attachmentId: file.id, url: 'https://evil.example' }, k)).status).toBe(200);
     expect(pushes()).toHaveLength(1);
     expect(db.raw.prepare("SELECT source,message_type FROM messages_log WHERE direction='outgoing'").get()).toEqual({ source: 'manual', message_type: 'file' });
     expect((await send('file', { attachmentId: file.id }, k)).status).toBe(409);
+  });
+  it('画像を表示するURLはLINE用のまま、本文の再取得先は署名なしのLIFF入口にする', async () => {
+    const image = (await (await upload(PNG_BYTES, 'p.png', 'image/png')).json<TestReply>()).data;
+    expect((await send('image', { originalContentUrl: image.url, previewImageUrl: image.url })).status).toBe(200);
+    expect(payload().messages).toHaveLength(2);
+    expect(payload().messages[0].originalContentUrl).toBe(image.url);
+    expect(payload().messages[1].text).toContain(`/liff/files/${image.id}`);
+    expect(payload().messages[1].text).not.toContain('signature=');
   });
   it('別の会話のファイル・外部動画・壊れたJSONはLINEを呼ばず履歴も作らない', async () => {
     const file = (await (await upload(PDF_BYTES, 'a.pdf', 'application/pdf', 'f2')).json<TestReply>()).data;
@@ -222,7 +231,8 @@ describe('B-351 短命の添付URL', () => {
       : kind === 'image' ? (await (await upload(PNG_BYTES, 'a.png', 'image/png')).json<TestReply>()).data : await uploadedFile();
     const unsigned = new URL(file.url); unsigned.search = '';
     const forged = new URL(file.url); forged.searchParams.set('signature', '0'.repeat(64));
-    for (const url of [unsigned, forged]) expect((await app().request(url.toString(), {}, bindings)).status).toBe(403);
+    expect((await app().request(unsigned.toString(), {}, bindings)).status).toBe(303);
+    expect((await app().request(forged.toString(), {}, bindings)).status).toBe(403);
     const now = vi.spyOn(Date, 'now').mockReturnValue(Number(new URL(file.url).searchParams.get('expires')) * 1000);
     try { expect((await app().request(file.url, {}, bindings)).status).toBe(403); }
     finally { now.mockRestore(); }
@@ -272,7 +282,7 @@ describe('B-351 短命の添付URL', () => {
 });
 
 describe('画像・動画・ファイルの送信予約', () => {
-  it('一時的な送信失敗の後、短命URLを更新しても同じ予約を再試行できる', async () => {
+  it('一時的な送信失敗の後、LIFF入口が変わらず同じ予約を再試行できる', async () => {
     const file = await uploadedFile();
     const { data } = await (await schedule('file', { attachmentId: file.id })).json<TestReply>();
     db.raw.prepare('UPDATE scheduled_chat_sends SET scheduled_at=? WHERE id=?').run('2000-01-01T00:00:00Z', data.id);
@@ -283,7 +293,8 @@ describe('画像・動画・ファイルの送信予約', () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 5 * 60_000);
     try {
       expect((await processDueScheduledChatSends(bindings)).sent).toBe(1);
-      expect(payload().messages[0].text).not.toBe(first);
+      expect(payload().messages[0].text).toBe(first);
+      expect(first).toContain(`/liff/files/${file.id}`); expect(first).not.toContain('signature=');
     } finally { now.mockRestore(); }
     expect(new Headers(pushes().at(-1)![1]?.headers).has('X-Line-Harness-Source')).toBe(false);
   });
@@ -299,6 +310,7 @@ describe('画像・動画・ファイルの送信予約', () => {
     const result = await processDueScheduledChatSends(bindings);
     expect(result.sent).toBe(1);
     expect(payload().messages[0].type).toBe(type === 'file' ? 'text' : type);
+    if (type === 'video') expect(payload().messages[1].text).toContain('/liff/files/');
     expect(new Headers(pushes()[0][1]?.headers).has('X-Line-Harness-Source')).toBe(false);
     expect(db.raw.prepare("SELECT source,message_type FROM messages_log WHERE direction='outgoing'").get()).toEqual({ source: 'scheduled', message_type: type });
   });
