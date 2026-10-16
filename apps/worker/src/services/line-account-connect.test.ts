@@ -11,7 +11,7 @@ const input = {
 
 type Failure = 'messaging-token' | 'bot' | 'webhook-inactive' | 'login-token' | 'liff-create' | null;
 
-function installFetch(failure: Failure = null, existingLiffId?: string) {
+function installFetch(failure: Failure = null, existingLiffId?: string, registeredEndpoint?: string) {
   const calls: Array<{ url: string; method: string; body: string }> = [];
   vi.stubGlobal('fetch', vi.fn(async (request: string | URL | Request, init: RequestInit = {}) => {
     const url = String(request);
@@ -33,7 +33,7 @@ function installFetch(failure: Failure = null, existingLiffId?: string) {
     }
     if (url.endsWith('/v2/bot/channel/webhook/endpoint') && method === 'PUT') return Response.json({});
     if (url.endsWith('/v2/bot/channel/webhook/endpoint')) {
-      return Response.json({ endpoint: `${input.baseUrl}/webhook`, active: failure !== 'webhook-inactive' });
+      return Response.json({ endpoint: registeredEndpoint ?? `${input.baseUrl}/webhook`, active: failure !== 'webhook-inactive' });
     }
     if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
     if (url.endsWith('/liff/v1/apps') && method === 'GET') {
@@ -86,6 +86,31 @@ describe('LINEアカウント自動接続', () => {
     const missing=await prepareLineConnection({...input,liffId:'2007123456-missing'})
     expect(missing.success).toBe(false);expect(missing.steps.find(s=>s.state==='failed')?.order).toBe(4)
   })
+
+  /*
+   * 既存アカウントの確認は別名URL（WORKER_ALIAS_URLS）も同じWorkerとして通すのに、
+   * 新規追加だけ完全一致で止まっていた。同じ受け口一覧で判定する。
+   */
+  it('別名URLで登録されたWebhookも同じ受け口として通し、末尾スラッシュの違いも無視する', async () => {
+    const alias = 'https://nen-line-stg-alias.skmtmst.workers.dev/webhook/';
+    installFetch(null, undefined, alias);
+    const accepted = await prepareLineConnection({
+      ...input,
+      acceptedWebhookUrls: [`${input.baseUrl}/webhook`, 'https://nen-line-stg-alias.skmtmst.workers.dev/webhook'],
+    });
+    expect(accepted.success).toBe(true);
+    expect(accepted.webhook.registeredUrl).toBe(alias);
+  });
+
+  it('受け口一覧に無いWebhook URLは3段目で止める', async () => {
+    installFetch(null, undefined, 'https://example.com/webhook');
+    const result = await prepareLineConnection({
+      ...input,
+      acceptedWebhookUrls: [`${input.baseUrl}/webhook`],
+    });
+    expect(result.success).toBe(false);
+    expect(result.steps.find((item) => item.state === 'failed')?.order).toBe(3);
+  });
 
   it('descriptionがmusuboの既存LIFFを流用する', async () => {
     const calls = installFetch(null, '2007123456-existing');
