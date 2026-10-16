@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MenuList from '../components/MenuList.js';
 import RepeatCard from '../components/RepeatCard.js';
-import StaffList from '../components/StaffList.js';
+import StaffList, { nominationFee } from '../components/StaffList.js';
 import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
 import BookingPayment from '../components/BookingPayment.js';
@@ -200,6 +200,15 @@ export default function Booking() {
       )}
       {step === 'staff' && stepReady && (
         <BottomBar>
+          {menu && staff && menu.price_mode !== 'inquiry' && menu.base_price > 0 ? (
+            <p className="mb-2.5 flex items-baseline gap-2 text-[13px] text-liff-sub" data-booking-total="">
+              <span>合計</span>
+              <span className="text-[17px] font-bold text-ink">{`¥${(menu.base_price + nominationFee(menu, staff)).toLocaleString()}`}</span>
+              <span className="text-xs">{nominationFee(menu, staff) > 0
+                ? `（料金 ¥${menu.base_price.toLocaleString()}・指名料 ¥${nominationFee(menu, staff).toLocaleString()}）`
+                : `（料金 ¥${menu.base_price.toLocaleString()}・指名料なし）`}</span>
+            </p>
+          ) : null}
           <Button variant="primary" disabled={!staff} onClick={() => setStep('datetime')}>
             日時を選ぶ
           </Button>

@@ -7,6 +7,12 @@ import LoadErrorView from './LoadErrorView.js';
 import LoadingView from './LoadingView.js';
 import Icon from './ui/Icon.js';
 
+/** 指名料。指名なし（おまかせ）は 0。指名した担当は、担当の料金が基本の料金より高い分。 */
+export function nominationFee(menu: Pick<MenuItem, 'base_price'>, staff: Pick<StaffItem, 'price' | 'is_designation_optional'>): number {
+  if (staff.is_designation_optional === 1) return 0;
+  return Math.max(0, staff.price - menu.base_price);
+}
+
 /**
  * 1-b 担当を選ぶ (★V8・biNP5)。札を押すと選ばれるだけで、進むのは下の操作の帯。
  * 「指名なし」(is_designation_optional) は先頭に来る。脇の文は
@@ -65,12 +71,10 @@ export default function StaffList({
         {list.map((s) => {
           const selected = s.id === selectedId;
           const optional = s.is_designation_optional === 1;
-          const diff = s.price - menu.base_price;
-          const sub = optional
-            ? 'いちばん早く空いている人'
-            : [s.role, diff > 0 ? `+¥${diff.toLocaleString()}` : '指名料なし']
-                .filter(Boolean)
-                .join('・');
+          /* 指名料：お客さまが指名したときだけ。指名なし（おまかせ）は掛からない。担当の料金が基本より高い分が指名料。 */
+          const fee = nominationFee(menu, s);
+          const name = optional ? '指名なし（指名料なし）' : s.display_name;
+          const sub = optional ? 'いちばん早く空いている人' : s.role ?? '';
           return (
             <li key={s.id}>
               <Button variant="option" selected={selected}
@@ -100,8 +104,8 @@ export default function StaffList({
                   </span>
                 )}
                 <span className="min-w-0 flex-1 text-left">
-                  <span className="block truncate text-[15px] font-bold text-ink" title={s.display_name}>
-                    {s.display_name}
+                  <span className="block truncate text-[15px] font-bold text-ink" title={name}>
+                    {name}
                   </span>
                   <span className="mt-0.5 block truncate text-[11.5px] text-liff-sub" title={sub}>
                     {sub}
@@ -109,6 +113,8 @@ export default function StaffList({
                 </span>
                 {selected ? (
                   <Icon name="circle-check" className="h-[22px] w-[22px] shrink-0 text-liff-primary" />
+                ) : fee > 0 ? (
+                  <span className="shrink-0 rounded-[5px] border border-liff-primary px-2 py-0.5 text-[11.5px] font-bold text-liff-primary">{`指名料 +¥${fee.toLocaleString()}`}</span>
                 ) : (
                   <Icon name="chevron-right" className="h-[18px] w-[18px] shrink-0 text-liff-idle" />
                 )}

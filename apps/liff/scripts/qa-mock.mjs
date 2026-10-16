@@ -548,7 +548,7 @@ const server = createServer(async (req, res) => {
             profile_image_url: null,
             bio: null,
             is_designation_optional: 0,
-            price: basePrice,
+            price: basePrice + 500, // 指名料 +¥500（B9・C6NcOH）
             duration_minutes: duration,
           },
           {
