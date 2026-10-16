@@ -80,7 +80,7 @@ export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: Dashboard
     kpi({ id: 'today', key: 'bookings', title: `${r}の予約`, unit: `組・${num(s, 'guests') ?? '—'}人`, detail: () => `初めて ${num(s, 'firstTime') ?? '—'}・常連 ${num(s, 'regular') ?? '—'}`, link: { label: '一覧', href: '/restaurant-test/reservations' }, help: '取消・無断・押さえを除く予約です。来店日で数えます。' }, s),
     kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => `未配席 ${num(s, 'unseated') ?? '—'}・枠を閉じる ${num(s, 'mediaCloseTasks') ?? '—'}`, link: { label: '内訳', href: '/restaurant-test/reservations' }, help: '承認待ち・卓が決まっていない予約・他の予約サイトの枠を閉じる知らせの数です。' }, s),
     kpi({ id: 'free', key: 'freeTables', title: '空席（いま）', unit: '卓', detail: () => '動いている卓のうち', link: { label: '座席表', href: '/restaurant-test/tables' }, help: '動いている卓のうち、いま予約が重なっていない卓の数です。' }, s),
-    kpi({ id: 'noshow', key: 'noShowRate', title: '無断キャンセル率', lower: true, detail: () => '期間内の予約で', link: { label: '人を見る', href: '/friends' }, help: '無断キャンセルの割合です。' }, s),
+    kpi({ id: 'noshow', key: 'noShowRate', title: '無断キャンセル率', lower: true, detail: () => '期間内', link: { label: '人を見る', href: '/friends' }, help: '無断キャンセルの割合です。' }, s),
     newKpi(s, '/restaurant-test/reservations', range),
   ]
   if (style === 'salon') return [
