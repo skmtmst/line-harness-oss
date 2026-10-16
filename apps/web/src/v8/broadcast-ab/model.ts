@@ -8,7 +8,7 @@ export const AB_DECIDE_HOURS = [1, 2, 4, 8, 24]
 export const AB_DEFAULT: AbSettings = { testRatioPct: 20, metric: 'click', decideAfterMinutes: 240, undecidedPolicy: 'stop' }
 
 export const METRIC_WORD: Record<AbMetric, string> = { click: 'クリック', booking: '予約', purchase: '購入' }
-export const UNDECIDED_WORD: Record<AbUndecided, string> = { stop: '止めて知らせる（選ぶまで送らない）', send_a: 'A 案を送る' }
+export const UNDECIDED_WORD: Record<AbUndecided, string> = { stop: '止めて知らせる', send_a: 'A 案を送る' }
 
 /** 試す人数と残り（1 案 = 割合の半分。50% は全員を半分ずつで残り無し）。 */
 export function splitAudience(total: number, ratioPct: number): { a: number; b: number; rest: number } {

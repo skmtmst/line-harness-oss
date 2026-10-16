@@ -56,10 +56,10 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
               <div className={styles.ratioBar} aria-hidden="true">
                 <span className={styles.ratioA} style={{ flexBasis: `${half}%` }}>{`A ${half}%`}</span>
                 <span className={styles.ratioB} style={{ flexBasis: `${half}%` }}>{`B ${half}%`}</span>
-                {split.rest > 0 ? <span className={styles.ratioRest}>{`残り ${100 - ab.settings.testRatioPct}%（${formatNumber(split.rest)} 人）に勝った方`}</span> : null}
+                {ab.settings.testRatioPct < 50 ? <span className={styles.ratioRest}>{`残り ${100 - ab.settings.testRatioPct}%${total === null ? '' : `（${formatNumber(split.rest)} 人）`}に勝った方`}</span> : null}
               </div>
               <Select aria-label="試す割合" size="full" value={String(ab.settings.testRatioPct)} onChange={(value) => set('testRatioPct', Number(value) as typeof ab.settings.testRatioPct)}
-                options={AB_RATIOS.map((pct) => { const s = splitAudience(total ?? 0, pct); return { value: String(pct), label: pct >= 50 ? `試す割合：50%（全員を半分ずつ・A ${formatNumber(s.a)} 人・B ${formatNumber(s.b)} 人）` : `試す割合：${pct}%（A ${formatNumber(s.a)} 人・B ${formatNumber(s.b)} 人）` } })} />
+                options={AB_RATIOS.map((pct) => { const s = splitAudience(total ?? 0, pct); const people = total === null ? '人数は最終確認で数えます' : `A ${formatNumber(s.a)} 人・B ${formatNumber(s.b)} 人`; return { value: String(pct), label: pct >= 50 ? `試す割合：50%（全員を半分ずつ・${people}）` : `試す割合：${pct}%（${people}）` } })} />
             </div>
             <div className={styles.column}>
               <RadioCardGroup legend="勝ちの決め方" legendVisible className={styles.metricRow}>
@@ -77,7 +77,7 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
           {approvalThreshold !== null && total !== null && total >= approvalThreshold ? (
             <p className={styles.info}><Info aria-hidden="true" className={styles.infoIcon} />{`${formatNumber(approvalThreshold)} 人以上の配信なので、送る前に承認が要ります。承認は 1 回で、試しと残りの両方を送れます。`}{ab.settings.undecidedPolicy === 'stop' ? '決まらないときは 24 時間お待ちし、選ばなければ送らずに終えます。' : ''}</p>
           ) : (
-            <p className={styles.info}><Info aria-hidden="true" className={styles.infoIcon} />{`${hm(decideAt)} に勝ちを決め、残りの人へ送ります。夜の静かな時間（21〜8 時）にかかるときは 8:00 に送ります。`}</p>
+            <p className={styles.info}><Info aria-hidden="true" className={styles.infoIcon} />{`${hm(decideAt)} に勝ちを決め、残りの人へ送ります。決まらないときは${ab.settings.undecidedPolicy === 'stop' ? '止めて知らせ、24 時間選ばなければ送らずに終えます' : ' A 案を送ります'}。夜の静かな時間（21〜8 時）にかかるときは 8:00 に送ります。`}</p>
           )}
         </>
       ) : null}

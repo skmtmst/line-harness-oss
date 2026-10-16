@@ -2406,7 +2406,6 @@ export default function BroadcastForm({
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
-          <BroadcastAbSettings ab={ab} total={audienceCount} targetAll={targetMode === 'all'} start={new Date(scheduledAtIso() ?? Date.now())} approvalThreshold={approvalConfig?.threshold ?? null} ecConnected canEdit onNarrow={() => goToStep('audience')} />
           <h3>配信日</h3>
           <SaveErrorField names={["broadcast-send-mode","sendMode","spreadMinutes"]}><RadioCardGroup legend="配信日" className={styles.methodCards}>
             <RadioCard name="broadcast-send-mode" value="now" checked={sendMode === 'now' && Number(spreadMinutes) === 0} onChange={() => { setSendMode('now'); setSpreadMinutes('0') }} title="今すぐ配信" note="最終確認で送ると、すぐに届きます" />
@@ -2502,6 +2501,7 @@ export default function BroadcastForm({
               {concurrentBroadcasts.length > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
             </section>
           )}
+          <BroadcastAbSettings ab={ab} total={audienceCount} targetAll={targetMode === 'all'} start={new Date(scheduledAtIso() ?? Date.now())} approvalThreshold={approvalConfig?.threshold ?? null} ecConnected canEdit onNarrow={() => goToStep('audience')} />
         </section>
 
     <div id="broadcast-step-confirm" className={shows('confirm') ? styles.section : 'hidden'}>
