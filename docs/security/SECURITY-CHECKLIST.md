@@ -19,7 +19,7 @@ B-343の追加では開発基点`b4adb688bd42c359d1539dbf802b5ad888a9e647`を通
 
 番号691への付け直し、競合3件の解消、本線取り込み後の結果は[再検証記録](SECURITY-MERGE-1016.md)。API一覧と共通境界の表は検証専用の手動実行1経路を含む最新の登録に更新した。追加の[負荷・費用・検証手順](DETECTION.md#5分ごとの処理の重さと費用b-34310月16日追加)はローカルD1の実測。配備先の検証D1の実測は未実施。
 
-B-351の追加は[公開入口](PUBLIC-ENTRYPOINTS.md)・[CSPの記録](CSP-REVIEW-1016.md)・[作業と検査](SECURITY-B351-1016.md)。本線 `af8e504d75` の取り込み済みを再確認し、公開リンクの回数制限と期限なし明細の拒否を追加。CSPを強制すると止まる候補と大きい変更を残し、S41〜S49を推測で済にしていない。
+B-351の追加は[公開入口](PUBLIC-ENTRYPOINTS.md)・[CSPの記録](CSP-REVIEW-1016.md)・[作業と検査](SECURITY-B351-1016.md)。本線 `af8e504d75` の取り込み済みを再確認し、公開リンクの回数制限と期限なし明細の拒否を追加。追加対応で静的配信のCSPを強制用へ変更し、添付・明細を最長15分の署名へ変更した。[追加対応](SECURITY-B351-CONTINUATION.md)と[URLの契約](SIGNED-DOWNLOADS.md)。LINE内の未検証操作・Worker HTML・本番実効値などを残し、S41〜S49を推測で済にしていない。
 
 表のパスはリポジトリのルートから。命令は原則として読むだけ。「検証で確認」は、別途用意した架空データの環境で担当者が行う次の作業。実際のお客さまへ試し送信しない。
 
@@ -55,7 +55,7 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 | ID | 点検・危なさ | 確かめ方（命令・画面） | 今の状態 | 根拠のファイル |
 | --- | --- | --- | --- | --- |
 | S16 | 秘密の正規の置き場・高 | secretの案内と環境別設定を読む。Cloudflare Worker secret、GitHub Environment secrets、手元の未追跡設定の使い分けを確認する | 済：LINE暗号化鍵等はWorker secretへ置く手順。通常変数へ置かない規定がある。実値や本番の設定状況は取得していない | `docs/line-credential-encryption.md`、`apps/worker/wrangler.toml`、`apps/worker/wrangler.staging.toml`、`.github/workflows/deploy-cloudflare-staging.yml` |
-| S17 | 本番・検証のsecretの存在と分離・高 | 各Workerの Settings → Variables and Secrets とGitHubのEnvironment secretsで名前・型・権限だけ確認。担当者がLINE・Stripe・Google・Slack・管理ログイン・暗号化の鍵を照合する | 分からない：doctorは検証用の配備資格情報の名前を確認しただけ。サービス用secretや別々の値であることは未確認 | `scripts/codex/doctor.sh`、`apps/worker/src/index.ts`、`.github/workflows/deploy-cloudflare-staging.yml` |
+| S17 | 本番・検証のsecretの存在と分離・高 | 各Workerの Settings → Variables and Secrets とGitHubのEnvironment secretsで名前・型・権限だけ確認。担当者がLINE・Stripe・Google・Slack・管理ログイン・暗号化・取得URL署名（API_KEY）の鍵を照合する | 分からない：doctorは検証用の配備資格情報の名前を確認しただけ。サービス用secretや別々の値であることは未確認 | `scripts/codex/doctor.sh`、`apps/worker/src/index.ts`、`.github/workflows/deploy-cloudflare-staging.yml` |
 | S18 | 実際の.envや.dev.varsをGitへ入れない・高 | `git ls-files` のファイル名を確認し、`.env`・`.env.*`・`.dev.vars*` からexample/sample/templateを除く。内容を表示しない | 済：現在の追跡対象に実設定ファイル0、例示ファイル2。.gitignoreに除外あり。履歴全体の証明ではない | `.gitignore`、`.env.example`、`docs/.env.example` |
 | S19 | 全履歴・全枝の秘密検査・高 | 担当者が承認済みのsecret検査を全履歴・対象の全枝へ行う。GitHubのSecurity → Secret scanningも確認。結果は場所と種類のみ記録 | 済：2026-10-16 kenta。公式Gitleaks 8.30.1をchecksum照合して使用。全ローカルref＋originの現行全枝/tagを隔離mirrorへ取得し、5,704参照・25,793コミットで検出0（終了0）。削除済み履歴の架空secretは終了1で検出し、出力の伏せ字も確認。未到達の履歴・画像内の文字・任意の秘密の不存在まで保証しない。GitHub側の監視設定はオーナー | `.gitignore`、`.github/workflows/`、`docs/line-credential-encryption.md` |
 | S20 | DBのLINE認証情報が暗号化済みか・高 | 担当者が鍵設定・移行結果を値なしの件数で確認。暗号文の欠落・復号失敗・平文への切替の有無を確認する | 分からない：AES-GCMの実装はあるが、従来の平文を読む経路も残る。本番DBの完了状態は未照会 | `packages/db/src/credential-crypto.ts`、`packages/db/src/line-accounts.ts`、`docs/line-credential-encryption.md` |
@@ -104,15 +104,15 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 
 ## B-351：漏えい対策の強化（2026-10-16）
 
-1・2・3・7は **保留（B-351）**。この9行には数えず、実装・設定変更・催促はしない。残りのコードは司令塔の「公開できる形」の段でまとめる。今回の範囲は点検表・CSPの試しの確認・公開入口の棚卸し。
+1・2・3・7は **保留（B-351）**。この9行には数えず、実装・設定変更・催促はしない。残りのコードは司令塔の「公開できる形」の段でまとめる。初回は点検表・CSPの試しの確認・公開入口の棚卸し。17:43の追加依頼でCSPの強制用コードと添付/明細の短命URLへ進めた。
 
 | ID | 点検・危なさ | 確かめ方（命令・画面） | 今の状態 | 根拠のファイル |
 | --- | --- | --- | --- | --- |
-| S41 | B-351/4 ログイン不要の入口・高 | [公開入口](PUBLIC-ENTRYPOINTS.md)を実登録と照合。別人・別店・期限切れ・連続取得を架空データで拒否する | 未：全入口を一覧化。短縮リンクの無制限取得を修正。添付画像/動画の無期限URL、支払明細の認証情報付きURL、全入口の個別組合せの確認は残る | `apps/worker/src/middleware/public-referral-rate-limit.security.test.ts`、`routes/public-entrypoints.security.test.ts`、`services/image-access.ts` |
+| S41 | B-351/4 ログイン不要の入口・高 | [公開入口](PUBLIC-ENTRYPOINTS.md)を実登録と照合。別人・別店・期限切れ・連続取得を架空データで拒否する | 未：全入口を一覧化。短縮リンクの無制限取得を修正。添付画像/動画を含め署名は最長15分へ、明細は認証ヘッダー＋署名へ修正。署名URLを期限内に転送された場合の添付の本人限定・全入口の個別組合せ・公開素材の誤配置は残る（[契約と試験](SIGNED-DOWNLOADS.md)） | `apps/worker/src/middleware/public-referral-rate-limit.security.test.ts`、`routes/public-entrypoints.security.test.ts`、`services/image-access.ts` |
 | S42 | B-351/5 ログイン失敗・新しい端末・ロボット避け・高 | 同一メールへの失敗を別IPから繰り返す。架空の新端末で監査・通知を確認。全ログイン方法でロボット避けの適用を照合 | 未：メール/アカウント単位の15分制限、新端末の監査とメールはある。Turnstileは登録と再設定にあり、パスワードログイン自体では検証していない。全方法の適用は後続 | `apps/worker/src/routes/auth-email.ts`、`middleware/sensitive-rate-limit.ts`、`services/admin-session.ts`、`services/turnstile.ts` |
 | S43 | B-351/6 WAF・ボット対策・請求急増の知らせ・高 | オーナーがCloudflareのSecurityとNotifications/Billingで対象ホスト・通知先・条件・適用範囲を照合。架空の連続アクセスと通知の試験 | 分からない：配備先の設定・プラン・通知の到達は未確認。オーナー作業欄へ手順を追加 | `apps/worker/src/middleware/rate-limit.ts`、`docs/security/DETECTION.md`、この文書のオーナー手順 |
 | S44 | B-351/8 危ない操作の直前の本人確認・高 | 削除・権限・鍵再発行・停止・書き出しごとに確認票の欠落/期限切れ/別セッション/再使用を拒否。全危険操作の一覧を照合 | 未：一回限りで目的とセッションに結び付く確認票がある。全危険操作へ適用した証拠はまだない | `apps/worker/src/lib/step-up.ts`、`routes/admin-auth-step-up-grant-binding.test.ts`、`routes/account-handovers.ts`、`routes/staff-step-up.test.ts` |
-| S45 | B-351/10 本番のCSP・高 | web/LIFFを通常ビルドし、出力の_headersをHTTP応答へ付けてPlaywrightで実行。Report-Onlyの違反と実際の強制時の停止を分ける | 未：Report-Onlyを本番と同じ全パスへ配置。詳細・停止候補・未確認条件は[CSP記録](CSP-REVIEW-1016.md)。ブラウザの記録だけで本番適用や強制可能とはしない | `apps/web/public/_headers`、`apps/liff/public/_headers`、`scripts/security/csp-policy.test.ts`、`scripts/security/csp-browser.mjs` |
+| S45 | B-351/10 本番のCSP・高 | web/LIFFを通常ビルドし、出力の_headersをHTTP応答へ付けてPlaywrightで実行。強制用ヘッダーで通常表示の違反0と、故意のinline/未知スクリプトの拒否を分けて確認する | 未：静的配信用の強制コードを実装。起動の外部化・動画Worker・実PDFの紙面と文字を実ブラウザで確認。[CSP記録](CSP-REVIEW-1016.md)のLINE内の追加窓・Worker HTML・既存のスタイル許可・本番実効値は残る。本番へは未配備 | `apps/web/public/_headers`、`apps/liff/public/_headers`、`scripts/security/csp-policy.test.ts`、`scripts/security/csp-browser.mjs` |
 | S46 | B-351/9 不要アカウント・権限の毎月の見直し・高 | オーナー2人が毎月、実際のサービスのメンバーと担当表を照合。退職/不要/過大権限を止め、既存セッションと鍵も失効したことを確認 | 分からない：アプリの削除/失効の口はあるが、実際の全アカウント・毎月の実施記録は未確認。オーナー作業欄へ手順を追加 | `apps/worker/src/routes/staff.ts`、`docs/security/TWO-FACTOR-SETUP.md`、この文書のオーナー手順 |
 | S47 | B-351/11 配備のたびの本番設定の機械点検・高 | 配備前の設定と配備後の実効値を照合。試験用フラグ・公開接続先・secretの型/存在・CSP・署名検証を確認。故意の設定違いで配備判定が失敗すること | 未：preflightと公開SHA照合、本番の試験機能停止はある。全安全設定の配備ごとの照合は未完成 | `scripts/deploy/preflight.ts`、`scripts/deploy/verify-public-build.mjs`、`apps/worker/src/lib/environment-features.ts` |
 | S48 | B-351/12 個人情報の期限・自動削除・書き出しの印・高 | 情報の種類ごとに期限と例外を決め、期限前/後と失敗時の再実行を確認。書き出しの操作者・日時の印がファイルから分かるか確認 | 未：本人確認書類・統括削除等の自動処理と書き出し監査はある。全個人情報の保存期限と出力ファイルへの印の網羅は未完 | `apps/worker/src/services/form-documents.ts`、`services/customer-data-deletion.ts`、`services/tenant-data-purge.ts`、`middleware/output-audit.ts` |
@@ -163,6 +163,7 @@ S07・S15・S22・S24・S28の「試験が本当の故障を見付けるか」�
 
 | ID | 手順 | 完了の条件・故障の確かめ方 |
 | --- | --- | --- |
+| S17・S41 | 配備前に取得URL署名の既存binding `API_KEY` をsecretとして登録済みか、名前・型・存在だけで確認する。実値の取得や今回の登録変更はしない。署名なしの過去のLINE添付URLも止まるため、再案内と15分後の再取得の運用を決める | 検証で鍵なしは保存前503、署名なし/改ざん/15分後は取得403。元の会話の読み直しだけでURLを更新でき、他の会話では更新できない。実配備の存在確認は未。期限内のURL転送を本人限定にする画面は別の残件 |
 | S19 | 今回のGitleaks 8.30.1による全参照検査と故障対照は済。公開直前に承認済みの端末で同じ版と検出設定を固定して再検査。全対象remoteの枝・tagを取得して対象ref数を記録し、`gitleaks git --redact=100 --log-opts="--all" .` を実行。レポートと標準出力はGit/Slack外の権限を絞った保管先へ。GitHub SecurityのSecret scanning・push protectionの利用可否と有効範囲も確認 | 別の使い捨てrepoで架空の検出対象を過去commit→削除し、全履歴検査が終了1になることを先に確認。問題発見時は種類・場所だけ記録し旧鍵を失効。検査の終了値と全対象refの網羅を確認してから済。画像内の秘密はS38で目視。[公式の使い方](https://github.com/gitleaks/gitleaks#usage) |
 | S21 | 環境ごとに別の32バイト鍵を安全な端末で生成し、Worker secret `GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY` へ標準入力またはCloudflareの秘密設定画面で登録（通常変数・引数・履歴・ログへ置かない）。承認・控えを整え、既存平文はGoogleで失効後に暗号化対応した接続口から再登録し、旧接続と控えの扱いを確認。既存予約のconnection_id参照の付替えは別途承認済み移行手順を用意し、先に削除しない | 新規3種の暗号化と旧平文件数0を値なしの件数で確認。検証用接続で鍵欠落・改ざん時に保存/Google呼出しが止まることを確認。既存接続はこの修正後500で停止するため、secret設定と移行準備なしで配備しない。手順の詳細は修正記録 |
 | S26 | 開発依存の大きい更新は司令塔が承認し、Vitest 4.1.11への更新でCriticalは0。bracesの上流修正版を確認し、公開後に更新。現行のlintではnext.rootDirを未指定のまま保ち、外部入力からパターンを作らない | 現在Critical 0 / High 1。旧Vitest・危険なtinypoolを混ぜる試験と、globの解析経路を再開すると落ちる試験で再発を防ぐ。Highは未解消として公開判断に残す |
