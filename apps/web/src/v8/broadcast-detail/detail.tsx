@@ -276,7 +276,7 @@ export default function BroadcastDetail({
         crumbs={<><p className={styles.meta}>{metaLine(broadcast, audienceLabel)}</p></>}
         steps={<>{isDraft
             ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
-            : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} />}</>}
+            : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} abWaiting={abResult.result?.status === 'undecided' || abResult.result?.status === 'testing'} />}</>}
         titleAccessory={<><span className={styles.badge} data-tone={badgeTone}>
               <span className={styles.dot} aria-hidden="true" />
               {statusLabel}
@@ -540,8 +540,10 @@ function DraftStepRail({ broadcastId, draftStep, canEdit }: { broadcastId: strin
  * 送るまでの6段階（絵 `F3X1Mo`・`pNiUk`）。承認が絡まない・予約しない
  * 配信はその段を省く。分かれ道（失敗・停止・期限切れ）は札で添える。
  */
-function DeliveryRail({ broadcast, approvalInvolved: withApproval }: { broadcast: ApiBroadcast; approvalInvolved: boolean }) {
-  const { status: displayStatus } = displayStatusOf(broadcast)
+/* abWaiting：A/B で残りの人への送信がまだ（選んでください・試し中）。段は「送信中」にとどめ、送信済みへ進めない。 */
+function DeliveryRail({ broadcast, approvalInvolved: withApproval, abWaiting = false }: { broadcast: ApiBroadcast; approvalInvolved: boolean; abWaiting?: boolean }) {
+  const { status: baseStatus } = displayStatusOf(broadcast)
+  const displayStatus = abWaiting && baseStatus === 'sent' ? 'sending' : baseStatus
   const scheduled = broadcast.status === 'scheduled' || broadcast.scheduledAt != null
   const steps = DELIVERY_STEPS.filter((step) => {
     if (step.key === 'pending_approval') return withApproval

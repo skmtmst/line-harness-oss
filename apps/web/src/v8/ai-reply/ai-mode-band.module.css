@@ -106,5 +106,5 @@
 
 /* 帯は板の中に収まる角丸の箱（板 y4nixm・UbRQ4：半径 10）。 */
 :root .band {
-  border-radius: 10px;
+  border-radius: var(--radius-control);
 }
