@@ -1202,7 +1202,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         </DistributionToolbar>}
       /* 絵 J7HNK：アカウントのフォルダは左の列（数とまとめて選ぶ印）。狭い板では選ぶ欄に畳む。 */
       folders={accountFolderRows.length > 1 ? <DistributionFolderPanel rows={accountFolderRows} activeId={accountFolder} onSelect={setAccountFolder} failed={Boolean(accountFolders.failed)} /> : undefined}
-      collapsedFolders={accountFolderRows.length > 1 ? <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: `フォルダ：${row.label}` }))}/> : undefined}
+      collapsedFolders={accountFolderRows.length > 1 ? <Select aria-label="アカウントのフォルダ" label="フォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))}/> : undefined}
       actions={<>
 {stage === 'accounts' ? <>
             <Button disabled={busy} onClick={toList}>キャンセル</Button>

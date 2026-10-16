@@ -8,6 +8,7 @@ import Notice from '@/components/shared/notice'
 import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
 import RadioCard,{ RadioCardGroup } from '@/components/shared/radio-card'
 import EntitySelect from '@/components/shared/entity-select'
+import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
 import { type StarterSetItem } from '@/lib/api-styles'
@@ -214,7 +215,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
           </section>
         ) : null}
       </>
-    ) : <p className={styles.loading}>入った物を読み込んでいます…</p>
+    ) : <ListState kind="loading" title="入った物を読み込んでいます…" />
   }
 
   return (

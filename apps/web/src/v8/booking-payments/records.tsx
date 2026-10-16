@@ -38,23 +38,23 @@ import styles from './payments.module.css'
 
 const TABLE_LAYOUT = { headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--polish-space-section)', bodyTextSize: 'var(--polish-text-body)', collapseScope: 'page' as const }
 const STATUS_FILTER = [
-  { value: '', label: '状態：すべて' },
-  { value: 'pending', label: `状態：${PAYMENT_STATUS.unpaid.label}` },
-  { value: 'paid', label: `状態：${PAYMENT_STATUS.paid.label}` },
-  { value: 'refunded', label: `状態：${PAYMENT_STATUS.refunded.label}` },
-  { value: 'expired', label: `状態：${PAYMENT_STATUS.expired.label}` },
-  { value: 'onsite', label: '状態：お店で払う' },
+  { value: '', label: 'すべて' },
+  { value: 'pending', label: `${PAYMENT_STATUS.unpaid.label}` },
+  { value: 'paid', label: `${PAYMENT_STATUS.paid.label}` },
+  { value: 'refunded', label: `${PAYMENT_STATUS.refunded.label}` },
+  { value: 'expired', label: `${PAYMENT_STATUS.expired.label}` },
+  { value: 'onsite', label: 'お店で払う' },
 ]
 const METHOD_FILTER = [
-  { value: '', label: '方法：すべて' },
-  { value: 'online', label: '方法：オンライン' },
-  { value: 'onsite', label: '方法：店頭' },
+  { value: '', label: 'すべて' },
+  { value: 'online', label: 'オンライン' },
+  { value: 'onsite', label: '店頭' },
 ]
 const PERIOD_FILTER = [
-  { value: 'month', label: '期間：今月' },
-  { value: '7d', label: '期間：過去7日' },
-  { value: '30d', label: '期間：過去30日' },
-  { value: '90d', label: '期間：過去90日' },
+  { value: 'month', label: '今月' },
+  { value: '7d', label: '過去7日' },
+  { value: '30d', label: '過去30日' },
+  { value: '90d', label: '過去90日' },
 ]
 
 type Load = { state: 'loading' } | { state: 'ready'; page: PaymentRecordsPage } | { state: 'not-ready' } | { state: 'error' }
@@ -180,9 +180,9 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
           <div data-template-region="toolbar"><ListToolbar
             search={{ placeholder: '名前・タグ・メモで探す', value: query, onChange: setQuery, width: 260 }}
             filters={<>
-              <Select aria-label="状態" value={status} onChange={setStatus} options={STATUS_FILTER} />
-              <Select aria-label="方法" value={method} onChange={setMethod} options={METHOD_FILTER} />
-              <Select aria-label="期間" value={period} onChange={setPeriod} options={PERIOD_FILTER} />
+              <Select aria-label="状態" label="状態" value={status} onChange={setStatus} options={STATUS_FILTER} />
+              <Select aria-label="方法" label="方法" value={method} onChange={setMethod} options={METHOD_FILTER} />
+              <Select aria-label="期間" label="期間" value={period} onChange={setPeriod} options={PERIOD_FILTER} />
             </>}
             trailing={<span className={styles.count}>{load.state === 'ready' ? `${load.page.total}件表示` : ''}</span>}
           /></div>

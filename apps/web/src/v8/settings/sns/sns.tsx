@@ -169,8 +169,8 @@ export default function SnsSettingsPage() {
     }
   }
 
-  const googleBadge = googleError || !google ? null : GOOGLE_BADGE[google.connection.status] ?? GOOGLE_BADGE.disconnected
-  const igBadge = igState ? IG_BADGE[igState] : null
+  const googleBadgeInfo = googleError || !google ? null : GOOGLE_BADGE[google.connection.status] ?? GOOGLE_BADGE.disconnected
+  const igStatus = igState ? IG_BADGE[igState] : null
   const googleLocation = google?.connection.locationTitle ?? google?.store.name ?? null
 
   return (
@@ -193,7 +193,7 @@ export default function SnsSettingsPage() {
             <span className={styles.mark} aria-hidden>G</span>
             <h2 id="sns-google-title" className={styles.cardTitle}>Google ビジネス</h2>
             <span className={styles.rowSpacer} />
-            {googleBadge ? <StatusBadge tone={googleBadge.tone} size="compact">{googleBadge.label}</StatusBadge> : null}
+            {googleBadgeInfo ? <StatusBadge tone={googleBadgeInfo.tone} size="compact">{googleBadgeInfo.label}</StatusBadge> : null}
             {googleConnected && canManage ? (
               <RowActions menuAppearance="box" menuSize="row" subjectName="Google ビジネスの連携"
                 destructiveItem={{ id: 'disconnect', label: '接続を解除する', onSelect: () => { setActionError(''); setConfirm('google') } }} />
@@ -223,7 +223,7 @@ export default function SnsSettingsPage() {
             <span className={styles.mark} aria-hidden>IG</span>
             <h2 id="sns-instagram-title" className={styles.cardTitle}>Instagram</h2>
             <span className={styles.rowSpacer} />
-            {igBadge ? <StatusBadge tone={igBadge.tone} size="compact">{igBadge.label}</StatusBadge> : null}
+            {igStatus ? <StatusBadge tone={igStatus.tone} size="compact">{igStatus.label}</StatusBadge> : null}
             {(igState === 'connected' || igState === 'expired') && canManage ? (
               <RowActions menuAppearance="box" menuSize="row" subjectName="Instagram の連携"
                 destructiveItem={{ id: 'disconnect', label: '接続を解除する', onSelect: () => { setActionError(''); setConfirm('instagram') } }} />

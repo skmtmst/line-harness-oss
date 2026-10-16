@@ -80,7 +80,7 @@ export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: Dashboard
     kpi({ id: 'today', key: 'bookings', title: `${r}の予約`, unit: `組・${num(s, 'guests') ?? '—'}人`, detail: () => `初めて ${num(s, 'firstTime') ?? '—'}・常連 ${num(s, 'regular') ?? '—'}`, link: { label: '一覧', href: '/restaurant-test/reservations' }, help: '取消・無断・押さえを除く予約です。来店日で数えます。' }, s),
     kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => `未配席 ${num(s, 'unseated') ?? '—'}・枠を閉じる ${num(s, 'mediaCloseTasks') ?? '—'}`, link: { label: '内訳', href: '/restaurant-test/reservations' }, help: '承認待ち・卓が決まっていない予約・他の予約サイトの枠を閉じる知らせの数です。' }, s),
     kpi({ id: 'free', key: 'freeTables', title: '空席（いま）', unit: '卓', detail: () => '動いている卓のうち', link: { label: '座席表', href: '/restaurant-test/tables' }, help: '動いている卓のうち、いま予約が重なっていない卓の数です。' }, s),
-    kpi({ id: 'noshow', key: 'noShowRate', title: '無断キャンセル率', lower: true, detail: () => '期間の予約で数えます', link: { label: '人を見る', href: '/friends' }, help: '無断キャンセルの割合です。' }, s),
+    kpi({ id: 'noshow', key: 'noShowRate', title: '無断キャンセル率', lower: true, detail: () => '期間の予約で数える', link: { label: '人を見る', href: '/friends' }, help: '無断キャンセルの割合です。' }, s),
     newKpi(s, '/restaurant-test/reservations', range),
   ]
   if (style === 'salon') return [
@@ -112,7 +112,7 @@ const STATE: Record<string, StyleBadge> = {
   cancelled: { label: '取消', tone: 'neutral' }, rejected: { label: '取消', tone: 'neutral' }, expired: { label: '期限切れ', tone: 'warning' }, no_show: { label: '無断', tone: 'danger' }, held: { label: '押さえ', tone: 'neutral' },
 }
 const ACTIVE: Record<IndustryStyle, string> = { restaurant: '着席中', salon: '施術中', consult: '実施中', lesson: '受講中' }
-export const stateBadge = (b: StyleBooking, style: IndustryStyle = 'restaurant'): StyleBadge => b.status === 'seated' || (b.attendance === 'visited' && !b.visited) ? { label: ACTIVE[style], tone: 'success' } : b.visited && b.status !== 'completed' ? STATE.visited : style === 'consult' && b.status === 'confirmed' ? { label: '確定', tone: 'info' } : STATE[b.status] ?? { label: b.status, tone: 'neutral' }
+export const bookingStatus = (b: StyleBooking, style: IndustryStyle = 'restaurant'): StyleBadge => b.status === 'seated' || (b.attendance === 'visited' && !b.visited) ? { label: ACTIVE[style], tone: 'success' } : b.visited && b.status !== 'completed' ? STATE.visited : style === 'consult' && b.status === 'confirmed' ? { label: '確定', tone: 'info' } : STATE[b.status] ?? { label: b.status, tone: 'neutral' }
 const MEET: Record<string, StyleBadge> = { online: { label: 'オンライン', tone: 'info' }, in_person: { label: '対面', tone: 'neutral' }, customer_choice: { label: 'お客さまが選ぶ', tone: 'neutral' } }
 const SOURCE: Record<string, string> = { line: 'LINE', liff: 'LINE', phone: '電話', manual: '電話', walk_in: 'ウォークイン', web: 'Web', hotpepper: 'ホットペッパー', tabelog: '食べログ', restaurant_board: 'レストランボード' }
 
@@ -126,7 +126,7 @@ function rowOf(style: IndustryStyle, e: StyleScheduleEntry, sch: StyleSchedule, 
     const remaining = slot ? slot.remaining : undefined
     return { ...base, reservationId: e.classId, remaining: remaining ?? undefined, name: e.title, sub: columnNames || base.sub, vacancy: remaining === undefined ? undefined : remaining === null ? '○' : remaining <= 0 ? '×' : remaining <= 2 ? '△' : '○', waiting: undefined }
   }
-  const state = stateBadge(b, style)
+  const state = bookingStatus(b, style)
   const live = !['cancelled', 'rejected', 'expired', 'no_show'].includes(b.status)
   const past = Date.parse(b.startsAt) <= now.getTime()
   const extra = { past, live, booking: { id: b.id, kind: b.kind, version: b.version, updatedAt: b.updatedAt, price: b.price, partySize: b.partySize, startsAt: b.startsAt, meetingUrl: b.meetingUrl } }
@@ -158,7 +158,7 @@ function boardOf(style: IndustryStyle, sch: StyleSchedule, now: Date): StyleBoar
   const firstNext = columns.map((c) => ({ c, s: nextOf(c.id) })).filter((x) => x.s).sort((a, b) => a.s!.startsAt.localeCompare(b.s!.startsAt))[0]
   const entries: StyleBoard['entries'] = sch.entries.filter((e) => e.columnIds[0]).map((e) => {
     const b = e.booking
-    const st = b ? stateBadge(b, style) : { label: '', tone: 'info' as const }
+    const st = b ? bookingStatus(b, style) : { label: '', tone: 'info' as const }
     const state: StyleBoard['entries'][number]['state'] = !b ? 'booked' : b.visited ? 'done' : b.status === 'seated' || b.attendance === 'visited' ? 'active' : ['requested', 'pending'].includes(b.status) ? 'pending' : 'booked'
     return { id: e.id, columnId: e.columnIds[0], start: hm(e.startsAt, tz), end: hm(e.endsAt, tz), name: b?.name ?? e.title, menu: b ? e.title : '', state, stateLabel: st.label, nominated: b?.designation === 'designated' }
   })

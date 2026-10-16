@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { readUiSource } from '../../scripts/test-ui-source.mjs'
+// @ts-expect-error 型を持たない点検の道具（.mjs）。
+import { screensWithoutLeaveGuard } from '../../scripts/unsaved-guard-wiring.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -454,11 +456,8 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
   }
 
   it('番兵を持つ画面は共通フックと離脱確認ダイアログを配線している', () => {
-    for (const file of GUARDED) {
-      const source = screenSources(file)
-      expect(source, file).toContain('useUnsavedGuard(')
-      expect(source, `${file} の離脱確認`).toContain('leaveTarget !== null')
-    }
+    // 足りない画面の一覧が空であること（ソース文字を直接は比べない。点検は scripts/unsaved-guard-wiring.mjs）。
+    expect(screensWithoutLeaveGuard(SRC, [...new Set(GUARDED)])).toEqual([])
   })
 
   it('親へ dirty を報告する画面の親は、共通フックで番兵を持っている', () => {

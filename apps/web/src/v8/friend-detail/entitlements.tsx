@@ -8,11 +8,14 @@ import Card, { CardHeader } from '@/components/shared/card'
 import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
 import Drawer from '@/components/shared/drawer'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { isSaveConflict } from '@/components/shared/save-conflict'
 import Select from '@/components/shared/select'
 import EntitySelect from '@/components/shared/entity-select'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -185,7 +188,7 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
       onDone()
     } catch (cause) {
       if (saveErrors.capture(cause)) return
-      setError(cause instanceof ApiError && cause.status === 409 ? 'ほかの人が先に直しました。閉じて開き直してから、もう一度お試しください。'
+      setError(isSaveConflict(cause) ? 'ほかの人が先に直しました。閉じて開き直してから、もう一度お試しください。'
         : cause instanceof ApiError && cause.status === 403 ? '回数券を変える権限がありません。'
           : isNotReadyError(cause) ? 'データの準備が済むと保存できます。'
             : '保存できませんでした。もう一度お試しください。')
@@ -280,11 +283,11 @@ export function EntitlementDrawer({ item, accountId, friendName, canEdit, onClos
     <Drawer open={item !== null} title={item?.name ?? ''} description={`${friendName || 'この友だち'} さん`} onClose={onClose} width="editor" closeAppearance="box" heightMode="viewport">
       {item ? (
         <div className={styles.drawerBody}>
-          <div className={styles.stats}>
-            <div className={styles.stat}><span className={styles.statLabel}>残り</span><span className={styles.statValue}>{item.kind === 'monthly' ? `${item.monthRemaining ?? '—'} 回` : `${item.remaining ?? 0} 回`}</span></div>
-            <div className={styles.stat}><span className={styles.statLabel}>期限</span><span className={styles.statValue}>{shortDay(item.expires_at)}</span></div>
-            <div className={styles.stat}><span className={styles.statLabel}>使った</span><span className={styles.statValue}>{used === null ? '—' : `${used} 回`}</span></div>
-          </div>
+          <KpiBand presentation="band" density="compact" gridClassName="grid grid-cols-3" aria-label={`${item.name}の残り・期限・使った回数`}>
+            <KpiCard presentation="band" density="compact" icon={null} title="残り" value={item.kind === 'monthly' ? item.monthRemaining : item.remaining ?? 0} unit="回" detail="" />
+            <KpiCard presentation="band" density="compact" icon={null} title="期限" value={null} valueText={shortDay(item.expires_at)} unit="" detail="" />
+            <KpiCard presentation="band" density="compact" icon={null} title="使った" value={used} unit="回" detail="" />
+          </KpiBand>
           <div className={styles.historyHead}>
             <h3 className={styles.historyTitle}>履歴</h3>
             {canEdit ? <Button onClick={() => onAdd(item.id)}><Plus size={15} aria-hidden="true" />手で入れる</Button> : null}

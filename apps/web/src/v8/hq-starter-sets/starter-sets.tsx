@@ -5,6 +5,7 @@ import { Info, Pencil, Plus, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import FolderPanel from '@/components/shared/folder-panel'
 import HelpTip from '@/components/shared/help-tip'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
@@ -181,8 +182,8 @@ export default function HqStarterSetsV8() {
           <h3 className={styles.sectionTitle}>入る物</h3>
           <HelpTip label="入る物の説明">新しいアカウントでこのスタイルを選んだときに入る物です。自動で送る物は止めた状態で入ります。</HelpTip>
         </div>
-        {sets === null ? (error ? null : <p className={styles.empty} role="status">読み込んでいます…</p>) : groups.length === 0 ? (
-          <p className={styles.empty}>{`${label}の初期セットはまだありません。［初期セットを作る］から作れます。`}</p>
+        {sets === null ? (error ? null : <ListState kind="loading" title="読み込んでいます…" />) : groups.length === 0 ? (
+          <ListState kind="empty" title={`${label}の初期セットはまだありません`} description="［初期セットを作る］から作れます。" emptyPreset="readonly" />
         ) : (
           <div className={styles.table}>
             <GridTable label="入る物" design={{ columns: 'var(--hss-col-kind) minmax(0, 1fr) var(--hss-col-how) var(--hss-col-date) var(--hss-col-menu)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--polish-space-section)', rowHeight: 'var(--hss-row-h)', fontSize: 'var(--text-body)' }}>
@@ -223,7 +224,7 @@ export default function HqStarterSetsV8() {
             <span className={styles.spacer} />
             {samples ? <span className={styles.sampleCount}>{`${samples.length}件`}</span> : null}
           </div>
-          {samplesError ? <Notice tone="danger" action={<Button onClick={() => setSamplesTick((value) => value + 1)}>もう一度試す</Button>}>見本を読み込めませんでした。</Notice> : samples === null ? <p className={styles.empty} role="status">読み込んでいます…</p> : (
+          {samplesError ? <ListState kind="error" title="見本を読み込めませんでした" onRetry={() => setSamplesTick((value) => value + 1)} /> : samples === null ? <ListState kind="loading" title="読み込んでいます…" /> : (
             <div className={styles.table}>
               <GridTable label="テンプレートの見本" design={{ columns: 'minmax(0, 1fr) var(--hss-col-kind) var(--hss-col-kind) var(--hss-col-open)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--polish-space-section)', fontSize: 'var(--text-body)' }}>
                 <GridHeadRow>

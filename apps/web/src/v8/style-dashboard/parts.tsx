@@ -11,7 +11,7 @@ import type { IndustryStyle, StyleBadge, StyleRow, StyleSideCard } from './model
 import styles from './style-dashboard.module.css'
 
 /** 支払い・状態などの丸い札。 */
-export function Badge({ badge }: { badge?: StyleBadge | null }) {
+export function StatusOrDash({ badge }: { badge?: StyleBadge | null }) {
   if (!badge) return <span className={styles.muted}>—</span>
   return <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
 }

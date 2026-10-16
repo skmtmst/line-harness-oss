@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ListOrdered, Lock, Scale, Shuffle } from 'lucide-react'
 import type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentSettings } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
-import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict, type SaveConflictDiffLine, type SaveConflictState } from '@/components/shared/save-conflict'
+import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict, type SaveConflictDiffLine, type SaveConflictState } from '@/components/shared/save-conflict'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
@@ -109,7 +109,7 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
       apply(response.data); conflict.clear()
       notifySaved('割り当て方を保存しました')
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 409) {
+      if (isSaveConflict(cause)) {
         /* 共通の帯と比べる窓（違いを比べる／最新を読み込んで続ける）。入力は捨てない。 */
         conflict.mark()
       } else if (isNotReadyError(cause)) {

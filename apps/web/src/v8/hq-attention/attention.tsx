@@ -6,7 +6,9 @@ import Link, { useListNavigationRouter as useRouter } from '@/components/shared/
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import EntitySelect from '@/components/shared/entity-select'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -120,7 +122,7 @@ export default function HqAttentionV8() {
     <ListToolbarFrame>
       <ListToolbarRow>
         <Select aria-label="種類" value={kind} onChange={(value) => setKind(value as typeof kind)} options={[{ value: 'all', label: '種類：すべて' }, ...KINDS.map((item) => ({ value: item.key, label: `種類：${item.label}` }))]} />
-        <Select aria-label="アカウントのフォルダ" value={folder} onChange={setFolder} options={[{ value: 'all', label: 'アカウントのフォルダ：すべて' }, ...folders.map((item) => ({ value: item.id, label: `アカウントのフォルダ：${item.name}` }))]} />
+        <EntitySelect compact aria-label="アカウントのフォルダ" noun="フォルダ" valuePrefix="アカウントのフォルダ：" value={folder} onChange={setFolder} options={[{ value: 'all', label: 'すべて' }, ...folders.map((item) => ({ value: item.id, label: item.name }))]} />
         <ListToolbarEnd><span className={styles.sort}>件数の多い順</span></ListToolbarEnd>
       </ListToolbarRow>
     </ListToolbarFrame>
@@ -138,8 +140,8 @@ export default function HqAttentionV8() {
     >
       {error ? <Notice tone="danger" action={<Button onClick={() => void load()}>もう一度試す</Button>}>{error}</Notice> : null}
       <div className={styles.stack}>
-      {items === null ? (error ? null : <p className={styles.empty} role="status">読み込んでいます…</p>) : shown.length === 0 && !error ? (
-        <p className={styles.empty}>今、対応が要るものはありません。</p>
+      {items === null ? (error ? null : <ListState kind="loading" title="読み込んでいます…" />) : shown.length === 0 && !error ? (
+        <ListState kind="empty" title="今、対応が要るものはありません" emptyPreset="readonly" />
       ) : (
         <div className={styles.table}><GridTable label="対応が要るもの" design={{ columns: 'minmax(0, 1fr) var(--hqa-col-wide) var(--hqa-col-wide) var(--hqa-col-narrow) var(--hqa-col-mid) var(--hqa-col-mid) var(--hqa-col-menu)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--polish-space-section)', rowHeight: 'var(--hqa-row-h)', fontSize: 'var(--text-body)' }}>
           <GridHeadRow>

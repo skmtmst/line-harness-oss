@@ -9,10 +9,10 @@ import { Field } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import TextLink from '@/components/shared/text-link'
-import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict, type SaveConflictDiffLine, type SaveConflictState } from '@/components/shared/save-conflict'
+import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict, type SaveConflictDiffLine, type SaveConflictState } from '@/components/shared/save-conflict'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { formatYen } from '@/lib/format'
-import { ApiError, bookingApi } from '@/lib/api'
+import { bookingApi } from '@/lib/api'
 import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode } from '@/lib/api-booking-payment-admin'
 import { MODE_LABEL, providerFor } from './labels'
 import styles from './payments.module.css'
@@ -126,7 +126,7 @@ export function useMenuPayment(kind: MenuPaymentKind, accountId: string | null, 
         }
       }
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 409) {
+      if (isSaveConflict(cause)) {
         conflict.mark()
         throw new PaymentConflictError('version_conflict')
       }

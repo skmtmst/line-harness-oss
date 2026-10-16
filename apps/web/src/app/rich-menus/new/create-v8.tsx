@@ -2880,12 +2880,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             rows={[
               ...(audience === 'all'
                 ? [
-                    {
-                      key: 'default',
-                      label: '既定のメニュー',
-                      value: `${currentDefaultMenu?.name ?? '（なし）'} → このメニュー`,
-                      wrap: true,
-                    },
+                    // 長い名前でも1行のまま（省略は title で全文）。「→」でつなぐと行が増えるので、今と公開後を別の行にする。
+                    { key: 'default-now', label: '今の既定', value: currentDefaultMenu?.name ?? '（なし）' },
+                    { key: 'default-next', label: '公開後の既定', value: 'このメニュー' },
                   ]
                 : []),
               {

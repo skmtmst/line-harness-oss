@@ -69,26 +69,6 @@
   gap: var(--tpl-bm-16);
 }
 
-.compare {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--tpl-bm-12);
-}
-
-.compare th,
-.compare td {
-  padding: var(--tpl-bm-12) var(--tpl-bm-16);
-  box-shadow: var(--shadow-row-line);
-  color: var(--color-ink);
-  text-align: left;
-  font-weight: 400;
-}
-
-.compare thead th {
-  background: var(--color-table-head);
-  font-weight: 700;
-}
-
 .priorityCell,
 .limitCell {
   flex-shrink: 0;

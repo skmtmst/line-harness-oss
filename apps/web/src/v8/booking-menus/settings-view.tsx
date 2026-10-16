@@ -24,7 +24,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
   /* つなぐ前（UteeA）も右の欄を出さない。 */
   const paymentsWide = tab === 'payments' && (paymentsView === 'records' || paymentsView === 'events')
   /* 担当スタッフは割り当て方（QJMoY）が入って横いっぱいの表になった。スマホの見本は出さない。 */
-  const noPhone = tab === 'channels' || tab === 'payments' || tab === 'staff'
+  const withoutPreview = tab === 'channels' || tab === 'payments' || tab === 'staff'
   const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
@@ -54,11 +54,11 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
             /></>}
 
 
-        preview={tab === 'payments' && accountId && !paymentsWide ? <PaymentsSideV8 accountId={accountId} menus={menus} connected={paymentsConnected} /> : noPhone ? undefined : previewContent}
+        preview={tab === 'payments' && accountId && !paymentsWide ? <PaymentsSideV8 accountId={accountId} menus={menus} connected={paymentsConnected} /> : withoutPreview ? undefined : previewContent}
         previewToggle={tab === 'payments' && accountId && !paymentsWide ? (
           /* 狭い幅（1152）：右の欄を畳み、「メニューごとの支払い方法」を窓で開く。 */
           <PreviewLauncher title="メニューごとの支払い方法" label="メニューごとの支払い方法を見る"><PaymentsSideV8 accountId={accountId} menus={menus} connected={paymentsConnected} /></PreviewLauncher>
-        ) : noPhone ? undefined : (
+        ) : withoutPreview ? undefined : (
           /* 絵 VFxWU：畳んだときも「LINEでの見え方を見る」と「お客さまに見える画面を確かめる」の2つを並べる。 */
           <div className={styles.narrowActions}>
             <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>

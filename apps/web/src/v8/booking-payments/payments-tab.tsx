@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertTriangle, CreditCard, ExternalLink, Plug, Split, Store } from 'lucide-react'
+import { AlertTriangle, CreditCard, Plug, Split, Store } from 'lucide-react'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -153,7 +153,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
             </span>
           </div>
           <div className={styles.providerActions}>
-            {connected ? <Button href={link.dashboardUrl ?? (testMode ? 'https://dashboard.stripe.com/test/payments' : 'https://dashboard.stripe.com/payments')} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} aria-hidden="true" />Stripe の管理画面を開く</Button> : null}
+            {connected ? <Button href={link.dashboardUrl ?? (testMode ? 'https://dashboard.stripe.com/test/payments' : 'https://dashboard.stripe.com/payments')} external>Stripe の管理画面を開く</Button> : null}
             {canEdit ? (connected
               ? <Button onClick={() => preparing.open('Stripe のつなぎ直し')}>つなぎ直す</Button>
               : <Button variant="primary" onClick={() => preparing.open('Stripe をつなぐ')}><Plug size={15} aria-hidden="true" />Stripe をつなぐ</Button>) : null}
