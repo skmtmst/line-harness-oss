@@ -8,10 +8,13 @@ const fixture = vi.hoisted(() => ({ update: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { updateLineFlow: fixture.update } }))
-vi.mock('@/v8/restaurant/common-a/frame', () => ({ default: ({ children }: { children: (ctx: RestaurantContext) => React.ReactNode }) => children({
-  data: { lineFlows: [{ id: 'flow-1', flow_type: 'post_visit', title: '来店のお礼', body: 'ありがとうございました', timing_minutes: 180, delivery_mode: 'preview_only' }] },
-  store: null, busy: false, mutate: (operation: () => Promise<unknown>) => operation(),
-} as unknown as RestaurantContext) }))
+vi.mock('@/v8/restaurant/common-a/frame', () => ({ default: ({ children, actions }: { children: (ctx: RestaurantContext) => React.ReactNode; actions?: (ctx: RestaurantContext) => React.ReactNode }) => {
+  const ctx = {
+    data: { lineFlows: [{ id: 'flow-1', flow_type: 'post_visit', title: '来店のお礼', body: 'ありがとうございました', timing_minutes: 180, delivery_mode: 'preview_only' }] },
+    store: null, busy: false, mutate: (operation: () => Promise<unknown>) => operation(),
+  } as unknown as RestaurantContext
+  return React.createElement(React.Fragment, null, children(ctx), actions?.(ctx))
+} }))
 import LineFollowupV8 from '@/v8/restaurant/line-followup/line-followup'
 
 afterEach(() => { cleanup(); vi.clearAllMocks() })
@@ -19,24 +22,25 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 describe('LINE来店フォロー V8', () => {
   it('現行の通知一覧と選択した通知の入力欄を描く', () => {
     render(React.createElement(LineFollowupV8))
-    expect(screen.getByRole('table').textContent).toContain('配信：3時間後')
-    expect(screen.getByRole('button', { name: 'ご来店のお礼' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('退店から 3時間後')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '来店後（退店のきっかけ）' }).getAttribute('aria-expanded')).toBe('true')
     expect((screen.getByRole('textbox', { name: 'タイトル' }) as HTMLInputElement).value).toBe('来店のお礼')
   })
 
   it('データの口は今のまま（lineFlows の読み・updateLineFlow の保存）', async () => {
     fixture.update.mockResolvedValue({ success: true })
     render(React.createElement(LineFollowupV8))
-    fireEvent.change(screen.getByRole('textbox', { name: '本文' }), { target: { value: 'またお待ちしています' } })
+    const body = screen.getByRole('textbox', { name: '本文' })
+    body.textContent = 'またお待ちしています'
+    fireEvent.input(body)
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(fixture.update).toHaveBeenCalledWith('account-1', 'flow-1', { title: '来店のお礼', body: 'またお待ちしています' }))
   })
 
   it('本送信は押せないまま置く（プレビューのみ）', () => {
     render(React.createElement(LineFollowupV8))
-    const sending = screen.getByText('本送信').closest('[data-kpi-presentation]')!
-    expect(sending.textContent).toContain('停止中')
-    expect(sending.textContent).toContain('プレビューのみ')
+    expect(screen.getAllByText('確認用')).toHaveLength(1)
+    expect(screen.getByText('来店後（退店のきっかけ） の中身')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /本送信|送信する/ })).toBeNull()
   })
 })

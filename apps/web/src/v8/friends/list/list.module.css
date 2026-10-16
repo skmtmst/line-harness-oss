@@ -146,6 +146,8 @@
 
 .colCheck { width: var(--tpl-fr-col-check); }
 .colStar { width: var(--tpl-fr-col-star); }
+/* 名前の列は顔の丸＋名前（「Kyohei Yamamoto」が切れない幅）を最低限とる（nF4ts）。 */
+.colName { width: calc(var(--tpl-fr-avatar) + var(--tpl-fr-avatar-gap) + var(--tpl-fr-name-content-min)); }
 .colSupport { width: var(--tpl-fr-col-support); }
 .colScenario { width: var(--tpl-fr-col-scenario); }
 .colLatest { width: var(--tpl-fr-col-latest); }

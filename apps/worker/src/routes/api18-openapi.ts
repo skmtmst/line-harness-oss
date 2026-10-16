@@ -1,3 +1,4 @@
+import { hqAuthoringPaths } from './hq-authoring-openapi.js';
 /** 統括の画面を店と同じ欄にするAPI。権限と未取得の意味も契約に残す。 */
 type Schema=Record<string,unknown>;
 const string:Schema={type:'string'},number:Schema={type:'integer',minimum:0},nullableNumber:Schema={type:['integer','null']};
@@ -14,6 +15,7 @@ function op(summary:string,params:string[]=[],data:Schema={},body?:Schema,query:
    '400':{description:'入力を確認'},'403':{description:'統括の権限が不足'},'404':{description:'対象がない・別統括'},'409':{description:'編集・承認・宛先条件の競合'}}};
 }
 export const api18Paths={
+ ...hqAuthoringPaths,
  '/api/hq/templates/attribute-kind-counts':{get:op('友だち属性の種類別件数。情報欄・対応マークは所属未対応のためnull',[],{type:'object',properties:{tag:number,friend_field:{type:'null'},support_mark:{type:'null'}}})},
  '/api/hq/templates/{id}/versions':{get:op('ひな形の版履歴・作った人・日時・下書きか',['id'],{type:'array',items:version})},
  '/api/hq/templates/{id}/versions/compare':{get:op('2つの版の内容を比べる',['id'],{type:'object',properties:{from:{type:'object'},to:{type:'object'},changed:{type:'boolean'}}},undefined,{from:{type:'integer',minimum:1},to:{type:'integer',minimum:1}})},

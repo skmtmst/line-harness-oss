@@ -115,13 +115,13 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
   return (
     <Card variant="form">
       <div className={styles.cardHead}>
-        <StatusBadge dot={false} tone="neutral">{kindLabel[item.kind]}</StatusBadge>
+        <StatusBadge dot={false} tone="success">{kindLabel[item.kind]}</StatusBadge>
         <Status value={item.status} />
         <span className={styles.store}>{store?.name || '全店舗'}</span>
         <span className={styles.spacer} aria-hidden="true" />
         {pending && !readOnly ? (
           <>
-            <Button disabled={busy} onClick={() => onReturn(item)}><Undo2 aria-hidden className={styles.buttonIcon} />差戻し</Button>
+            <Button disabled={busy} textTone="danger" onClick={() => onReturn(item)}><Undo2 aria-hidden className={styles.buttonIcon} />差戻し</Button>
             <Button disabled={busy} onClick={() => onApprove(item)}><Check aria-hidden className={styles.buttonIcon} />承認する</Button>
           </>
         ) : pending ? (
@@ -159,7 +159,7 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
       footer={(
         <DialogActions>
           <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" disabled={busy || !reason.trim()} title={busy ? '処理しています' : !reason.trim() ? '差し戻す理由を入力してください' : undefined} busy={busy} busyLabel="処理中…" onClick={() => onSubmit(reason.trim())}>差し戻す</Button>
+          <Button variant="primary" disabled={busy || !reason.trim()} title={busy ? '処理しています' : !reason.trim() ? '差し戻す理由を入力してください' : undefined} busy={busy} busyLabel="処理中…" onClick={() => onSubmit(reason.trim())}><Undo2 size={15} aria-hidden="true" />差し戻す</Button>
         </DialogActions>
       )}
     >
@@ -171,14 +171,14 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
             </p>
             <p className={styles.dialogSummaryMain}>{approvalSummary(item)}</p>
           </div>
-          <DialogFormRow><Field note={<>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</>} label="差し戻す理由（・申請者に届きます）" required><SaveErrorField names={["reason"]}><TextArea
+          <Field label="差し戻す理由（・申請者に届きます）" required><SaveErrorField names={["reason"]}><TextArea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：原価の根拠（仕入れ値の表）を添えてください"
               rows={3}
               disabled={busy}
-            /></SaveErrorField></Field></DialogFormRow>
-
+            /></SaveErrorField></Field>
+          <p className={styles.dialogNote}>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</p>
         </div>
       ) : null}
     </Dialog>
@@ -213,10 +213,10 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
         <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
-        <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} presentation="band" value={null} unit="" />
-        <KpiCard title="Google投稿" valueText={`${rows.filter((a) => a.kind === 'gbp_post').length}`} detail="投稿下書き" presentation="band" value={null} unit="" />
-        <KpiCard title="LINE配信" valueText={`${rows.filter((a) => a.kind === 'line_message').length}`} detail="配信下書き" presentation="band" value={null} unit="" />
-        <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" presentation="band" value={null} unit="" />
+        <KpiCard title="承認待ち" value={pending.length} unit="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} detail={null} presentation="band" />
+        <KpiCard title="Google投稿" value={rows.filter((a) => a.kind === 'gbp_post').length} unit="投稿下書き" detail={null} presentation="band" />
+        <KpiCard title="LINE配信" value={rows.filter((a) => a.kind === 'line_message').length} unit="配信下書き" detail={null} presentation="band" />
+        <KpiCard title="メニュー改定" value={rows.filter((a) => a.kind === 'menu_change').length} unit="価格・内容変更" detail={null} presentation="band" />
       </StatRow>
       {rows.length === 0 ? (
         <ListState kind="empty" title="承認待ちはありません" />

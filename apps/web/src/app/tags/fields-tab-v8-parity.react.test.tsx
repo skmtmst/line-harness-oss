@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import React from 'react'
+import { PageExplanationProvider } from '@/components/shared/page-explanation'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
@@ -28,6 +29,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {} }),
 }))
 
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffIdentity: () => null }))
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status = 500
@@ -53,7 +55,7 @@ describe('友だち情報欄V8一覧', () => {
   test('共通項目は並び替えと削除を許さず、独自の項目と区別する', async () => {
     fixture.fields = [fieldItem('f1', '会員番号', true), fieldItem('f2', '好きな色', false)]
     const { default: FieldsTabV8 } = await import('@/v8/tags/fields-tab')
-    const rendered = render(<FieldsTabV8 accountId="account-a" canEdit />)
+    const rendered = render(<PageExplanationProvider pageKey="tags:fields"><FieldsTabV8 accountId="account-a" canEdit /></PageExplanationProvider>)
     await rendered.findByText('会員番号')
     expect(rendered.getAllByTitle('共通項目は移行後に並び替えできます').length).toBeGreaterThan(0)
     fireEvent.click(rendered.getByRole('button', { name: '項目「会員番号」の操作' }))
@@ -67,7 +69,7 @@ describe('友だち情報欄V8一覧', () => {
   test('表示件数に30件・40件を選べる', async () => {
     fixture.fields = [fieldItem('f1', '会員番号', false)]
     const { default: FieldsTabV8 } = await import('@/v8/tags/fields-tab')
-    const rendered = render(<FieldsTabV8 accountId="account-a" canEdit />)
+    const rendered = render(<PageExplanationProvider pageKey="tags:fields"><FieldsTabV8 accountId="account-a" canEdit /></PageExplanationProvider>)
     await rendered.findByText('会員番号')
     const box = rendered.container.querySelector('[aria-label="表示件数"]')
     if (!box) throw new Error('page size select is missing')

@@ -55,12 +55,14 @@ test('Y3 作る題と編集のパンくずの不一致を落とし、同じ状�
  }finally{await browser.close()}
 });
 
-test('Y4 主保存の実SVGを数え、チェック・印なし・二重印の故障を落とす',async()=>{
+test('Y4 主保存の共通Checkと明示の役目印を守り、旧Save・印なし・二重印を落とす',async()=>{
  const browser=await connectGuardBrowser();try{const page=await browser.newPage();
  const button=icons=>`<main><div data-sticky-actions><button class="button_primary_x">${icons}保存する</button></div></main>`;
- const svg=kind=>`<svg class="lucide lucide-${kind}" width="16" height="16"><path d="M0 0L16 16" /></svg>`;
- for(const icons of [svg('check'),'',svg('save')+svg('check')]){await page.setContent(button(icons));assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y4,1);}
- await page.setContent(button(svg('save')));assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y4,0);
+ const svg=kind=>`<svg class="lucide lucide-${kind}" data-sticky-save-icon width="16" height="16"><path d="M0 0L16 16" /></svg>`;
+ for(const icons of [svg('save'),'',svg('save')+svg('check')]){await page.setContent(button(icons));assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y4,1);}
+ await page.setContent(button(svg('check')));assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y4,0);
+ for(const kind of ['upload','git-compare-arrows']){await page.setContent(button(svg(kind).replace(' data-sticky-save-icon','')));assert.equal((await page.evaluate(scanCreateConsistency)).counts.Y4,0);}
+ await page.setContent(button(svg('check')));
  await page.locator('button').evaluate(e=>{e.textContent='保存中…';e.setAttribute('aria-busy','true')});assert.equal((await page.evaluate(scanCreateConsistency)).saves.length,0);
  await page.setContent(button(svg('arrow-right')).replace('保存する','次へ'));assert.equal((await page.evaluate(scanCreateConsistency)).saves.length,0);
  }finally{await browser.close()}
@@ -94,7 +96,7 @@ test('Y1〜Y4の説明値を保ち、数値の実測で本線比較・新規・�
   ['form-action-value','<main><div data-action-row style="--tpl-action-row-gap:12px"><span data-action-name style="font-size:14px">名前</span><span data-action-value style="font-size:16px">値</span></div></main>','nameSize'],
   ['form-preview-surface','<main><section data-page-template="create" style="background:white"><aside data-template-region="preview" style="background:#f7f8fa">見本</aside></section></main>','bg'],
   ['form-create-title','<nav aria-label="パンくず"><h1>ルールを編集</h1></nav><main><h2>ルールを作る</h2></main>','breadcrumb'],
-  ['form-save-icon','<main><div data-sticky-actions><button class="button_primary_x">保存する<svg class="lucide lucide-check" width="16" height="16"></svg></button></div></main>','icons'],
+  ['form-save-icon','<main><div data-sticky-actions><button class="button_primary_x">保存する<svg class="lucide lucide-save" data-sticky-save-icon width="16" height="16"></svg></button></div></main>','icons'],
  ];
  for(const [kind,markup,detailKey] of fixtures){
   await page.setContent(markup);

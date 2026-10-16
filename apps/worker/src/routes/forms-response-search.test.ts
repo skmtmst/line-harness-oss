@@ -173,3 +173,45 @@ describe('N-171/N-179 回答のサーバー側検索', () => {
     expect(found).toHaveLength(24);
   });
 });
+
+describe('回答一覧と集計の同じ期間',()=>{
+  test('期間をページ分け前に適用し、集計・未完了数・開始数も同じ期間にする',async()=>{
+    const db=createTestD1();seed(db);
+    db.raw.exec("INSERT INTO form_opens(id,form_id,friend_id,opened_at) VALUES ('old','form-1','friend-1','2026-08-01 00:00:00'),('current','form-1','friend-2','2026-09-01 10:00:00');UPDATE form_submissions SET destination_write_status='failed' WHERE id='sub-spec'");
+    const response=await list(setupApp(db),'page=1&limit=10&from=2026-09-01&to=2026-09-01');
+    expect(response.status).toBe(200);const body=await response.json() as {data: import('@line-crm/shared').FormSubmissionPage};
+    expect(body.data.items.map(r=>r.id)).toEqual(['sub-spec']);expect(body.data.total).toBe(1);
+    expect(body.data.summary).toMatchObject({submitted:1,startedUnique:1,completionRate:100,destinationWrites:{failed:1}});
+    db.raw.close();
+  });
+  test('終了日を含み、次の日は含まない。ISO日時と日本時間の旧日時を両方扱う',async()=>{
+    const db=createTestD1();seed(db);
+    for(const [id,at] of [['before','2026-08-31T14:59:59Z'],['start','2026-08-31T15:00:00Z'],['end','2026-09-01 23:59:59'],['after','2026-09-01T15:00:00Z']])db.raw.prepare("INSERT INTO form_submissions(id,form_id,friend_id,data,created_at) VALUES (?,'form-1','friend-1','{}',?)").run(id,at);
+    const body=await (await list(setupApp(db),'page=1&limit=20&from=2026-09-01&to=2026-09-01')).json() as {data: import('@line-crm/shared').FormSubmissionPage};
+    expect(body.data.items.map(r=>r.id).sort()).toEqual(['end','start','sub-spec']);expect(body.data.summary.submitted).toBe(3);
+    const legacy=await (await list(setupApp(db),'from=2026-09-01&to=2026-09-01')).json() as {data: Array<{id:string}>};expect(legacy.data).toHaveLength(3);db.raw.close();
+  });
+  test.each(['from=2026-02-30','to=bad','from=2026-09-02&to=2026-09-01','period=invalid','period=this_month&from=2026-10-01'])('不正な期間は400: %s',async range=>{
+    const db=createTestD1();seed(db);expect((await list(setupApp(db),`page=1&${range}`)).status).toBe(400);db.raw.close();
+  });
+  test('今月・先月・すべては日本時間の暦月を使う',async()=>{
+    vi.useFakeTimers();vi.setSystemTime(new Date('2026-08-31T15:00:00Z'));
+    try {
+      const db=createTestD1();seed(db);const app=setupApp(db);
+      for(const [period,total] of [['this_month',1],['last_month',25],['all',26]]){
+        const body=await (await list(app,`page=1&period=${period}`)).json() as {data: import('@line-crm/shared').FormSubmissionPage};expect(body.data.total).toBe(total);expect(body.data.summary.submitted).toBe(total);
+      }
+      db.raw.close();
+    } finally {vi.useRealTimers()}
+  });
+});
+
+
+test('期間を日付の回答人数と評価の平均にも適用する',async()=>{
+  const db=createTestD1();seed(db);
+  db.raw.prepare("UPDATE forms SET fields=? WHERE id='form-1'").run(JSON.stringify([{name:'visit',label:'来店日',type:'date'},{name:'rating',label:'評価',type:'rating'}]));
+  db.raw.prepare("UPDATE form_submissions SET data=? WHERE id='sub-spec'").run(JSON.stringify({visit:'2026-09-01',rating:5}));
+  db.raw.prepare("UPDATE form_submissions SET data=? WHERE id='sub-01'").run(JSON.stringify({visit:'2026-08-01',rating:1}));
+  const body=await (await list(setupApp(db),'page=1&from=2026-09-01&to=2026-09-01')).json() as {data: import('@line-crm/shared').FormSubmissionPage};
+  expect(body.data.summary).toMatchObject({dateAnsweredUniqueFriends:1,dateFields:[{key:'visit',answered:1,minDate:'2026-09-01',maxDate:'2026-09-01'}],ratingFields:[{key:'rating',answered:1,average:5}]});db.raw.close();
+});

@@ -208,6 +208,10 @@ describe('V8 予約の通し：受付枠を作る', () => {
     renderNode(<BookingSettingsV8 accountId="account-a" />)
     await flush()
 
+    const capacityHelp = (await screen.findByText('「同時」は1時間に受けられる数ではなく、同じ時間に重ねられる予約の数です。')).closest('[role="note"]')
+    expect(capacityHelp).not.toBeNull()
+    expect(capacityHelp?.querySelector('svg.lucide-info')).not.toBeNull()
+
     // 月曜を開ける（09:00–18:00が入る）と書きかけになり保存帯が出る。
     fireEvent.click(await screen.findByRole('checkbox', { name: '月曜日を開ける' }))
     const saveButton = await screen.findByRole('button', { name: '受付枠を作る' })

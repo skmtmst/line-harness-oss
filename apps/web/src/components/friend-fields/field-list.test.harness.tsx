@@ -1,10 +1,12 @@
 import React from 'react'
+import { PageExplanationProvider } from '@/components/shared/page-explanation'
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import FieldsTab from '@/v8/tags/fields-tab'
 
 const fixture = vi.hoisted(() => ({ load: vi.fn() }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffIdentity: () => null }))
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error { constructor(message: string, readonly status: number) { super(message) } },
   api: { friendFields: { stats: () => fixture.load(), list: async () => ({ success: true, data: [] }) }, folders: { list: async () => ({ success: true, data: [] }) } },
@@ -19,7 +21,7 @@ beforeEach(() => { fixture.load.mockReset() })
 afterEach(cleanup)
 
 export function drawFields() {
-  const { container } = render(<FieldsTab accountId="account-test" canEdit={false} />)
+  const { container } = render(<PageExplanationProvider pageKey="tags:fields"><FieldsTab accountId="account-test" canEdit={false} /></PageExplanationProvider>)
   const details = () => [...container.querySelectorAll('[data-kpi-detail]')].map(el => el.textContent)
   const numbers = () => [...container.querySelectorAll('[data-kpi-number]')].map(el => el.textContent)
   return { container, details, numbers, waitFor }

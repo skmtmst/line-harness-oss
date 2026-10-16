@@ -48,7 +48,7 @@ export default function NoPermissionBoard({
       </div>
       <div className={styles.center}>
         <section className={styles.card} role="alert">
-          <span className={styles.lock} aria-hidden="true"><Lock size={24} /></span>
+          <span className={styles.lock} aria-hidden="true"><Lock size={16} /></span>
           <h2 className={styles.cardTitle}>{featureName}を開く権限がありません</h2>
           <p className={styles.cardText}>
             {roleLabel ? `いまの役割は「${roleLabel}」です。` : 'この画面を開く権限がありません。'}

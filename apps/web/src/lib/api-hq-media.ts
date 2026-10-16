@@ -8,6 +8,11 @@ const data = async <T>(path: string, init: RequestInit) => {
   return result.data
 }
 export const hqMediaApi = {
+  list: (params: {kind?:'video'|'audio'|'image';cursor?:string;limit?:number}={}) => {
+    const query=new URLSearchParams()
+    for(const [key,value] of Object.entries(params))if(value!==undefined)query.set(key,String(value))
+    return data<{items:Array<MessageTemplateMediaDefinition & {selectable:boolean;sizeKb:number}>;nextCursor:string|null}>(`${base}?${query}`,{method:'GET'})
+  },
   createSession: (file: File, kind: 'video' | 'audio') => {
     const mimeType = kind === 'audio' ? 'audio/mp4' : 'video/mp4'
     if (file.size < 1 || file.size > 200 * 1024 * 1024 || !file.name.toLowerCase().endsWith(kind === 'audio' ? '.m4a' : '.mp4')) throw new Error('動画はMP4・音声はM4Aを200MB以内で選んでください。')

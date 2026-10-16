@@ -162,3 +162,21 @@
 :root .warn[data-presentation='account-note'] { background: var(--tpl-acd-warn-bg); color: var(--tpl-acd-warn-ink); }
 
 :root .notice { padding: var(--tpl-notice-pad); font-size: var(--text-body); }
+
+/* 運営の共通注意帯。橙の状態札とは役目を分ける。 */
+:root .notice[data-presentation='ops'] {
+  gap: var(--tpl-op-caution-gap);
+  padding: var(--tpl-op-caution-pad);
+  border: 0;
+  border-radius: var(--tpl-op-caution-radius);
+  background: var(--tpl-op-caution-bg);
+  color: var(--tpl-op-caution-ink);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-op-caution-lh);
+}
+:root .notice[data-presentation='ops'] .icon {
+  width: var(--tpl-op-caution-icon);
+  height: var(--tpl-op-caution-icon);
+}
+:root .notice[data-presentation='ops'] .icon > svg { width: 100%; height: 100%; }

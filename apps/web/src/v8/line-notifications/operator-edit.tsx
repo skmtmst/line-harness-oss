@@ -28,13 +28,13 @@ import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
 import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { ROLE_LABELS } from '@/lib/hq-members'
+import DialogRecipientList from '@/components/shared/dialog-recipient-list'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import type { OperatorNotificationTeam } from '@line-crm/shared'
 import { DEDUPE_OPTIONS, DEFAULT_EVENT_TYPE, EVENT_OPTIONS, IMPORTANCE_OPTIONS, RECIPIENTS_SAVE_GUARD_MESSAGE, SCHEDULE_OPTIONS, THRESHOLD_OPTIONS, eventLabel, eventPlaceLabel, importanceLabel, readConditions } from './operator-words'
 import styles from './operator-edit.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
-import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect from '@/components/shared/entity-select'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -693,17 +693,10 @@ function OperatorEditInner() {
               </span>
             </p>
           </div>
-          <ul className={styles.confirmList} aria-label="受け取る人">
-            {selectedRecipients.map((recipient) => (
-              <li key={recipient.id} className={styles.confirmRow}>
-                <span className={styles.confirmName} ><TruncatedText value={String(recipient.name ?? '')} /></span>
-                <span className={styles.confirmRole}>{recipientRole(recipient, staffRoles)}</span>
-                <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
-                  {recipient.channels.line ? 'LINE' : '画面だけ'}
-                </StatusBadge>
-              </li>
-            ))}
-          </ul>
+          <DialogRecipientList rows={selectedRecipients.map(recipient => ({
+            id: recipient.id, name: String(recipient.name ?? ''), role: recipientRole(recipient, staffRoles),
+            channel: <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>{recipient.channels.line ? 'LINE' : '画面だけ'}</StatusBadge>,
+          }))} />
           <p className={styles.confirmNote}>LINE 未登録の人には、管理画面のお知らせだけで届きます。</p>
           <div className={styles.confirmActions}>
             <Button type="button" onClick={() => setConfirmOpen(false)} disabled={publishing}>戻って直す</Button>
@@ -729,7 +722,7 @@ function OperatorEditInner() {
 /** 宛先の役割。口が役割を返せばそれを、無ければログインユーザーの一覧から引いた名前を出す。 */
 function recipientRole(recipient: OperatorRecipientPreview['items'][number], staffRoles: Record<string, string>): string {
   const own = (recipient as { roleLabel?: unknown }).roleLabel
-  return typeof own === 'string' && own ? own : staffRoles[recipient.id] ?? ''
+  return typeof own === 'string' && own ? own : staffRoles[recipient.id] || '—'
 }
 
 /** 題（12px・太字）＋選ぶ欄。2つ並べるときは .pair に入れる。 */

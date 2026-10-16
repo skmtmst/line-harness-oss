@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { Bookmark } from 'lucide-react'
 
 
 export default function AnalyticsPage() {
@@ -124,7 +125,7 @@ function SaveAnalysisAction({
         </div>
       ) : (
         <Button onClick={() => setOpen(true)} variant="secondary">
-          この分析を保存
+          <Bookmark size={15} aria-hidden="true" />この分析を保存
         </Button>
       )}
       {error && <p className="text-danger text-xs">{error}</p>}

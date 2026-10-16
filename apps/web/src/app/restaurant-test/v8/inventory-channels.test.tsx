@@ -8,6 +8,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import InventoryChannels from '@/v8/restaurant/inventory/channels'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 const jsonResponse = (body: unknown) => ({ ok: true, status: 200, json: async () => body })
 
@@ -33,10 +34,14 @@ const connectors = [
 describe('hQQlt 予約経路の連携', () => {
   it('アドレス・媒体・読めなかったものを出す', async () => {
     render(<InventoryChannels accountId="account-1" storeId="store-1" date="2026-10-02" canEdit />)
-    expect(await screen.findByText('r-abc@in.musubo.jp')).toBeTruthy()
+    const address = await screen.findByRole('textbox', { name: '取り込みアドレス' }) as HTMLInputElement
+    expect(address.value).toBe('r-abc@in.musubo.jp')
+    expect(address.readOnly).toBe(true)
     expect(document.querySelector('[data-design-node="hQQlt"]')).toBeTruthy()
     expect(screen.getByText('restaurant_board')).toBeTruthy()
-    expect(screen.getByText('読めなかったもの 1 件')).toBeTruthy()
-    expect(screen.getByText('食べログの予約メール')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '読めなかったもの' })).toBeTruthy()
+    const unreadLabel = document.querySelector('[data-kpi-label][title="読めなかった"]')!
+    expect(unreadLabel.closest('[data-kpi-presentation]')?.querySelector('[data-kpi-number]')?.textContent).toBe('1')
+    expect(screen.getByText(/食べログ ・ 人数の欄が読めませんでした/)).toBeTruthy()
   })
 })

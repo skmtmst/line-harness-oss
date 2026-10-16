@@ -1,7 +1,6 @@
 'use client'
 import { requiredText } from '@/lib/form-requirement'
 const notificationTitleRequirement = requiredText('通知の見出しを入力してください。')
-import { FolderDotName } from '@/components/shared/folder-dot'
 import { RowActions } from '@/components/shared/row-actions'
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -11,6 +10,7 @@ import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import KpiBand from '@/components/shared/kpi-band'
+import { ListFolderContext } from '@/components/shared/list-folder-context'
 import Toggle from '@/components/shared/toggle'
 import { CircleDot, Download, Inbox, Plus, Star } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
@@ -42,7 +42,6 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { readSaveFieldErrors } from '@/lib/api-field-errors'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-
 /*
  * ★V8 LINE通知（Pencil `g3iDs`。運用者へのお知らせ `u8xibp`・送れなかったもの `DrwMm`・記録 `PZBVb`）。
  *
@@ -1009,8 +1008,7 @@ function LineNotificationsPage() {
       valueText={kpi.valueText ?? (typeof kpi.value === 'string' ? kpi.value : undefined)}
       unit={kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
       valueTextWithUnit
-      detail={kpi.note === '取得失敗' ? '取得失敗' : null}
-      help={kpi.note || undefined}
+      detail={kpi.note || null}
       valueTone={kpi.label === '送れなかった' && typeof kpi.value === 'number' && kpi.value > 0 ? 'warning' : 'default'}
       loading={loadState === 'loading'}
       action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '見る', href: kpi.href } : undefined}
@@ -1208,13 +1206,14 @@ function LineNotificationsPage() {
   return <SaveErrorScope errors={saveErrors}><SbSettingsScreen
     boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}
     layout="narrow-nav"
+    contentLayout={tab === 'customer' ? 'wide' : undefined}
     actions={tab === 'operator' && expandedSetting === null && canManage ? <>
       <Button onClick={() => setOperatorExportOpen(true)} disabled={!selectedAccountId}><Download aria-hidden="true" size={15} />CSVで書き出す</Button>
       <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
     </> : undefined}
-    title="LINE通知" help={tab === 'failures' ? '送れなかった理由や再試行の予定を確かめます。ブロックなどの対象外と、再試行が必要な失敗を分けて確認してください。' : undefined}
+    title="LINE通知" help={tab === 'customer' ? '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。' : tab === 'failures' ? '送れなかった理由や再試行の予定を確かめます。ブロックなどの対象外と、再試行が必要な失敗を分けて確認してください。' : undefined}
     explanationKey={`line-notifications:${tab}`}
-    explanation={tab === 'operator' ? 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。' : '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。'}
+    explanation={tab === 'customer' ? undefined : tab === 'operator' ? 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。' : '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。'}
   >
     {expandedSetting === null ? <Tabs label="LINE通知の中の切り替え" size="notification" items={tabsWithCounts.map(item => ({ label: item.label, href: tabHref[item.key], current: tab === item.key }))} /> : null}
     {/*
@@ -1322,7 +1321,7 @@ function LineNotificationsPage() {
 
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
-    <Card padding="rows" overflow="hidden" data-design-node="festr" data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}>
+    <ListFolderContext.Provider value={false}><Card padding="rows" overflow="hidden" data-design-node="festr" data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}>
       {loadState === 'loading' ? (
         <div aria-busy="true" aria-label="顧客へのお知らせを読み込んでいます">
           <DelayedSkeleton
@@ -1345,10 +1344,10 @@ function LineNotificationsPage() {
         : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
         : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うものはありません" description="札や検索を外すと、すべて出ます" action={<Button variant="secondary" onClick={() => setFilter('all')}>条件を外す</Button>} />
-        : <DataTable label="顧客へのお知らせ" grid={{ columns: 'minmax(0, 1fr) var(--tpl-sb-ln-col-when) var(--tpl-sb-ln-col-who) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) var(--tpl-sb-ln-col-edit)', compactColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) var(--tpl-sb-ln-col-edit)', padding: 'var(--tpl-sb-ec-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)' }}>
+        : <DataTable label="顧客へのお知らせ" grid={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) max-content', padding: 'var(--tpl-sb-ec-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)' }}>
           <thead>
             <TableHeadRow>
-              <Th>お知らせの種類（きっかけ）</Th>
+              <Th title="お知らせの種類（きっかけ）">種類</Th>
               <Th>いつ送るか</Th>
               <Th>だれに</Th>
               <Th>この30日</Th>
@@ -1363,9 +1362,9 @@ function LineNotificationsPage() {
               const sent = sendCountsFailed ? null : sent30dOf(setting.eventType)
               const name = setting.title?.trim() || setting.label
               return <Tr key={setting.eventType}>
-                <Td><FolderDotName>{canManage ? <RowNameButton title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</RowNameButton> : <TruncatedText value={deliveryWords(setting).trigger || name} />}</FolderDotName></Td>
-                <Td className={styles.cell} title={timingLabel(setting)}>{timingLabel(setting)}</Td>
-                <Td className={styles.cell} title={audienceLabel(setting)}>{audienceLabel(setting)}</Td>
+                <Td>{canManage ? <RowNameButton title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</RowNameButton> : <TruncatedText value={deliveryWords(setting).trigger || name} />}</Td>
+                <Td><TruncatedText value={timingLabel(setting)} /></Td>
+                <Td><TruncatedText value={audienceLabel(setting)} /></Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'warn' ? 'warning' : 'neutral'}>{status.label}</StatusBadge></Td>
                 <Td>{canManage ? <NotificationToggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /> : <span className={styles.minor}>{setting.isEnabled ? 'オン' : 'オフ'}</span>}</Td>
@@ -1374,7 +1373,7 @@ function LineNotificationsPage() {
             })}
           </tbody>
         </DataTable>}
-    </Card>
+    </Card></ListFolderContext.Provider>
     </> : null}
   </SbSettingsScreen></SaveErrorScope>
 }

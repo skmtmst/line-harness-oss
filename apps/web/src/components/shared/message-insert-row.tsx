@@ -15,7 +15,8 @@ export const MessageInsertButton = forwardRef<HTMLButtonElement, {
   const Icon = ICONS[kind]
   return <button ref={ref} type="button" data-message-insert-button={kind} className={styles.button} onClick={onClick} disabled={disabled} title={title} aria-expanded={expanded} aria-haspopup={expanded === undefined ? undefined : 'menu'}><Icon aria-hidden="true" />{label}</button>
 })
-export default function MessageInsertRow({ children, count, more, readOnly = false }: { children: ReactNode; count?: ReactNode; more?: ReactNode; readOnly?: boolean }) {
+/** moreFirst：広いときは「その他」に畳む項目を先に並べる（統括の店の差し込み・絵 pIHp3）。狭いときは今までどおり末尾の「その他」。 */
+export default function MessageInsertRow({ children, count, more, readOnly = false, moreFirst = false }: { children: ReactNode; count?: ReactNode; more?: ReactNode; readOnly?: boolean; moreFirst?: boolean }) {
   const rowRef = useRef<HTMLDivElement>(null)
   const moreRef = useRef<HTMLButtonElement>(null)
   const [narrow, setNarrow] = useState(false)
@@ -28,8 +29,10 @@ export default function MessageInsertRow({ children, count, more, readOnly = fal
     return () => observer.disconnect()
   }, [])
   return <div ref={rowRef} data-message-insert-row className={styles.row} role="group" aria-label={readOnly ? '文字数' : '利用できる差し込み項目'}>
-    {readOnly ? null : <div className={styles.controls}><span className={styles.label}>差し込む</span>{children}
-      {more ? narrow ? <MessageInsertButton ref={moreRef} kind="other" label="その他" expanded={open} onClick={() => setOpen(value => !value)} /> : <div className={styles.controls}>{more}</div> : null}
+    {readOnly ? null : <div className={styles.controls}><span className={styles.label}>差し込む</span>
+      {more && moreFirst && !narrow ? <div className={styles.controls}>{more}</div> : null}
+      {children}
+      {more ? narrow ? <MessageInsertButton ref={moreRef} kind="other" label="その他" expanded={open} onClick={() => setOpen(value => !value)} /> : moreFirst ? null : <div className={styles.controls}>{more}</div> : null}
     </div>}
     {count === undefined ? null : <span data-message-character-count className={styles.count}>{count}</span>}
     {!readOnly && more && narrow ? <MenuPortal open={open} getAnchor={() => moreRef.current} onClose={() => setOpen(false)}><div className={styles.more} role="group" aria-label="その他の差し込み">{more}</div></MenuPortal> : null}

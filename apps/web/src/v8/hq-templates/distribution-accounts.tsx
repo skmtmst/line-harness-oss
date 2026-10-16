@@ -37,6 +37,7 @@ export function distributionFolderRows({ accounts, folders, membership, selected
       id, label, count: ids.length,
       icon: id === ALL_ACCOUNTS ? undefined : <FolderDot folder={folder} />,
       leading: <SaveErrorField names={["length","ids.length","count"]}><Checkbox aria-label={`${label}をまとめて選ぶ`} checked={ids.length > 0 && count === ids.length}
+        title={ids.length === 0 ? 'このフォルダには配れるアカウントがありません。' : disabled ? '配布の確認中は選択を変更できません。' : undefined}
         indeterminate={count > 0 && count < ids.length} disabled={disabled || ids.length === 0}
         onCheckedChange={(checked) => onChange(checked ? [...new Set([...selected, ...ids])] : selected.filter((accountId) => !ids.includes(accountId)))} /></SaveErrorField>,
     }

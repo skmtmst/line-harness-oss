@@ -15,6 +15,12 @@ import {
   X,
 } from 'lucide-react'
 import TopBar from '@/components/shared/top-bar'
+import { PageChromeProvider, usePageChrome } from '@/components/shell/page-chrome'
+import SidebarUserMenu from '@/components/shared/sidebar-user-menu'
+import SidebarVersion from '@/components/layout/sidebar-version'
+import { SidebarBrand } from '@/components/layout/sidebar-identity'
+import Notice from '@/components/shared/notice'
+import { humanizeErrorText } from '@/components/shared/human-error-text'
 import { PageHeading } from '@/components/templates/page-frame'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
@@ -41,29 +47,21 @@ export const OPS_MENU: Array<{ href: string; label: string; icon: typeof LayoutD
   { href: '/ops/audit', label: '監査ログ', icon: ScrollText },
 ]
 
-/** 下端の入口。メンバー管理と自分の2要素認証（v7 は左下のアカウントメニューから開いていた）。 */
+/** 下端の入口。2要素認証とログアウトは左下の本人カードから開く。 */
 const OPS_FOOT: Array<{ href: string; label: string; icon: typeof LayoutDashboard }> = [
   { href: '/ops/members', label: 'メンバー管理', icon: Users },
-  { href: '/ops/two-factor', label: '2要素認証', icon: ShieldCheck },
 ]
 
 /** 道から画面名を引く（パンくずの最後の段）。 */
 export function opsTitleForPath(pathname: string): string {
-  const all = [...OPS_MENU, ...OPS_FOOT, { href: '/ops/invite', label: 'メンバーの招待' }]
+  const all = [...OPS_MENU, ...OPS_FOOT, { href: '/ops/invite', label: 'メンバーの招待' }, { href: '/ops/two-factor', label: '2要素認証' }]
   const hit = all.filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0]
   if (pathname.startsWith('/ops/tenants/detail')) return '契約先の詳細'
   return hit?.label ?? ''
 }
 
-export default function OpsShellV8({
-  me,
-  meError,
-  onRetryMe,
-  pathname,
-  banner,
-  children,
-}: {
+type OpsShellProps = {
   me: OpsMe | null
   meError: string
   onRetryMe: () => void
@@ -71,7 +69,22 @@ export default function OpsShellV8({
   /** 代理ログイン中の帯など、板の上に出すもの。 */
   banner?: ReactNode
   children: ReactNode
-}) {
+}
+
+/** 中の画面が usePageTitle で渡した名前（記事の題名など）を上の帯のパンくずの最後に出す。 */
+export default function OpsShellV8(props: OpsShellProps) {
+  return <PageChromeProvider><OpsShellFrame {...props} /></PageChromeProvider>
+}
+
+function OpsShellFrame({
+  me,
+  meError,
+  onRetryMe,
+  pathname,
+  banner,
+  children,
+}: OpsShellProps) {
+  const pageChrome = usePageChrome()
   const [collapsed, setCollapsed] = useState(false)
   const [drawer, setDrawer] = useState(false)
   const drawerRef = useOverlayFocus<HTMLElement>(drawer, () => setDrawer(false))
@@ -89,13 +102,7 @@ export default function OpsShellV8({
 
   const menu = (
     <>
-      <div className={`${styles.brand} ${nav.collapseHide}`}>
-        <span aria-hidden="true" className={styles.brandMark}>m</span>
-        <span className={styles.brandText}>
-          <span className={styles.brandName}>musubo 運営</span>
-          <span className={styles.brandSub}>musubo</span>
-        </span>
-      </div>
+      <SidebarBrand name="musubo 運営" mark="m" />
       <nav className={nav.nav} aria-label="運営メニュー">
         <div className={nav.section}>
           <p className={nav.sectionToggle}>
@@ -140,11 +147,18 @@ export default function OpsShellV8({
         })}
         {!me ? (
           <p className={styles.meNote} role="status">
-            {meError || '担当者を読み込んでいます'}
+            {humanizeErrorText(meError || '担当者を読み込んでいます')}
             {meError ? <button type="button" onClick={onRetryMe} className={styles.meRetry}>もう一度</button> : null}
           </p>
         ) : null}
       </div>
+      <div className={nav.collapseHide}><SidebarVersion /></div>
+      <SidebarUserMenu name={me?.name || '—'} role="運営" collapsed={collapsed && !drawer} pathname={pathname} items={[
+        { id: 'profile', label: 'プロフィールを編集', href: '/staff' },
+        { id: 'members', label: 'メンバー管理', href: '/ops/members' },
+        { id: 'two-factor', label: me?.totpEnabled ? '2要素認証（設定済み）' : '2要素認証の設定', href: '/ops/two-factor' },
+        { id: 'logout', label: 'ログアウト', tone: 'danger', dividerBefore: true, onSelect: () => void logoutAndGoToLogin('/ops/login') },
+      ]} />
     </>
   )
 
@@ -176,21 +190,18 @@ export default function OpsShellV8({
         <div className={`${shellStyles.side} ${styles.side}`}>
           <div className="hidden xl:block v8-topbar-wrap">
             <TopBar
-              title={title ? `運営 › ${title}` : '運営'}
+              title={title ? `運営 › ${title}${pageChrome.title ? ` › ${pageChrome.title}` : ''}` : '運営'}
               manualHref={null}
               accounts={[{ id: 'ops', label: '運営コンソール', mark: 'm' }]}
               selectedAccountId="ops"
               onAccountChange={() => undefined}
               roleLabel="運営"
+              accountScopeLabel="運営"
               userName={me?.name ?? ''}
               onLogout={() => logoutAndGoToLogin('/ops/login')}
-              identityActions={[
-                { id: 'profile', label: 'プロフィールを編集', href: '/staff' },
-                { id: 'members', label: 'メンバー管理', href: '/ops/members' },
-                { id: 'two-factor', label: me?.totpEnabled ? '2要素認証（設定済み）' : '2要素認証の設定', href: '/ops/two-factor' },
-                { id: 'logout', label: 'ログアウト', tone: 'danger', dividerBefore: true, onSelect: () => void logoutAndGoToLogin('/ops/login') },
-              ]}
+              showIdentity={false}
               v8Chrome
+              chromeVariant="shell"
               menuCollapsed={collapsed}
             />
           </div>
@@ -213,20 +224,24 @@ export function OpsHead({
   description,
   actions,
   environment,
+  stats,
+  band,
 }: {
   title: string
   description?: ReactNode
   actions?: ReactNode
   environment?: 'production' | 'staging'
+  stats?: ReactNode
+  /** 見出しと注意帯の間に置く数の帯（絵 P0jhqO：見出し→数の帯→注意帯の順）。 */
+  band?: ReactNode
 }) {
   return (
     <div className={styles.head}>
       <PageHeading title={title} help={description} actions={actions} inset="none" />
-      <p className={styles.caution} data-ops-env={environment}>
-        <ShieldCheck aria-hidden="true" />
-        <span>運営コンソール：契約先のデータを扱います。操作はすべて記録されます</span>
-        {environment === 'staging' ? <span className={styles.envTag}>検証環境</span> : null}
-      </p>
+      {band}
+      <Notice tone="warn" presentation="ops" className={styles.caution} data-ops-env={environment} icon={<ShieldCheck aria-hidden="true" />}>
+        運営コンソール：契約先のデータを扱います。操作はすべて記録されます
+      </Notice>
     </div>
   )
 }

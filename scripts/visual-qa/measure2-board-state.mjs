@@ -233,9 +233,11 @@ export function applyBoardStateProfiles(map) {
     const entry = result.boards[id]
     if (!entry) continue
     // 閲覧のみ・失敗・手動の再現条件がある板を、作成画面の見本で上書きしない。
-    if (entry.state?.manual || entry.state?.role === 'viewer' || entry.kind === '閲覧のみ' || entry.state?.click) {
+    if (entry.state?.manual || entry.state?.role === 'viewer' || entry.kind === '閲覧のみ') {
       throw new Error(`${id}: 既存の状態指定と撮影の指定が重なっています`)
     }
+    // 地図に具体的な開き方がある板は、その操作・API見本を正とし、補助の既定で上書きしない。
+    if (entry.state?.click) continue
     entry.url = profile.url
     if (profile.joinControlText) entry.state = { ...entry.state, joinControlText: profile.joinControlText }
     if (profile.transformApi) {

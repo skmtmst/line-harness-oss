@@ -8,7 +8,7 @@ const b244Requirements = {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSearchParams } from 'next/navigation'
-import { LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
+import { LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox, Copy } from 'lucide-react'
 import type { IncomingWebhook } from '@line-crm/shared'
 import { api, ApiError, type IncomingWebhookDetail as DetailType, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -662,7 +662,7 @@ export default function WebhooksIncomingV8() {
               ? <InlineEdit value={selected.name} label="受け取り口の名前" onSave={renameInlet} />
               : selected.name}
           </h2>
-          <StatusBadge tone={toggling ? 'neutral' : selected.isActive ? 'success' : 'neutral'}>{toggling ? '切り替え中' : selected.isActive ? '動いています' : '止めています'}</StatusBadge>
+          <StatusBadge tone={toggling ? 'neutral' : selected.isActive ? 'success' : 'neutral'}>{toggling ? '切り替え中' : selected.isActive ? '有効' : '停止中'}</StatusBadge>
           <span className={styles.spacer} aria-hidden="true" />
           {canManage ? (
             <>
@@ -682,7 +682,7 @@ export default function WebhooksIncomingV8() {
               <span className={styles.fieldLabel}>受け取る URL（相手のサービスに貼る）</span>
               <span className={styles.valueBox} ><TruncatedText value={String(endpointUrl(selected.id) ?? '')} url /></span>
             </div>
-            <CopyTextButton value={endpointUrl(selected!.id)} aria-label="受け取るURLをコピー"  />
+            <CopyTextButton value={endpointUrl(selected!.id)} label="コピーする" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="受け取るURLをコピー" />
           </div>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
@@ -759,20 +759,20 @@ export default function WebhooksIncomingV8() {
               <p className={styles.cardNote}>いま確認が必要な届物はありません。</p>
             ) : (
               <>
-                <DataTable aria-label="人が見つからなかった届物" columnSizing="content">
+                <DataTable aria-label="人が見つからなかった届物">
                   <thead>
                     <TableHeadRow>
                   <Th className={styles.miniWhen}>届いた日時</Th>
-                  <Th grow className={styles.miniValue}>届いた値</Th>
+                  <Th className={styles.miniValue}>届いた値</Th>
                   <Th className={styles.miniCandidate}>候補</Th>
-                  <Th className={styles.miniOps}><span className={styles.srOnly}>操作</span></Th>
+                  <Th grow className={styles.miniOps}><span className={styles.srOnly}>操作</span></Th>
                 </TableHeadRow>
                 </thead>
                 <tbody>
                 {unmatched.map((item) => (
                   <Tr key={item.id} data-row-id={item.id}>
                     <Td className={styles.miniWhen}>{shortDateTime(item.receivedAt)}</Td>
-                    <Td grow className={styles.miniValue} title={item.identityAttempts.map((attempt: { kind: string; value: string }) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')}>
+                    <Td className={styles.miniValue} title={item.identityAttempts.map((attempt: { kind: string; value: string }) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')}>
                       {item.identityAttempts.length > 0
                         ? item.identityAttempts.map((attempt: { kind: string; value: string }) => attempt.value).join('、')
                         : '照合に使える値が届いていません'}
@@ -790,7 +790,7 @@ export default function WebhooksIncomingV8() {
                         </div>
                       )) : null}
                     </Td>
-                    <Td className={styles.miniOps}>
+                    <Td grow className={styles.miniOps}>
                       {canResolveUnmatched ? (
                         item.kind === 'candidate' && item.candidates[0] ? (
                           <Button disabled={dismissingId !== null} busy={dismissingId === item.id} onClick={() => void resolveUnmatched(item, { action: 'link', friendId: item.candidates[0].friendId })}>結び付ける</Button>

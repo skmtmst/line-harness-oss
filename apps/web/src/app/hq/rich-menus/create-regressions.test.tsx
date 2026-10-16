@@ -25,7 +25,7 @@ beforeEach(() => {
     references: { tags: [], templates: [], forms: [{ id: 'f-1', name: '申込フォーム' }] },
     uploadImage: vi.fn(async (file: File) => ({ r2Key: `hq-templates/tenant/${file.name}` })),
     imageUrl: (key) => `http://images.test/${key}`,
-    distribute: <div>配るアカウント</div>, distributeSummary: [], selectedCount: 1, busy: false, onSave: vi.fn(),
+    distribute: <div>配るアカウント</div>, selectedCount: 1, friendTotal: 120, busy: false, onSave: vi.fn(),
   }
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('統括から店舗のAPIを呼んではいけません') }))
 })
@@ -42,8 +42,7 @@ const saved = (): HqRichMenuSeed => vi.mocked(host.onSave).mock.calls.at(-1)![0]
 const save = async () => { click('下書きを保存'); await waitFor(() => expect(host.onSave).toHaveBeenCalled()) }
 const selectArea = (letter: string) => fireEvent.focus(screen.getByRole('button', { name: new RegExp(`^面 ${letter}、`) }))
 const pickIntent = (name: string) => {
-  fireEvent.click(screen.getByRole('button', { name: '押したときの動き' }))
-  fireEvent.click(within(screen.getByRole('option', { name, exact: true })).getByRole('button'))
+  fireEvent.click(within(screen.getByRole('group', { name: '押したときの動き' })).getByRole('radio', { name, exact: true }))
 }
 
 describe('統括リッチメニューのオーナー指摘の回帰', () => {
@@ -205,12 +204,22 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     await save()
     expect(saved().pages).toHaveLength(3)
   })
-  it('面がない編集状態では、右上に空の回数の箱を置かない', async () => {
+  it('統括の右欄は面の有無に関わらず使う参照を出し、店の回数を出さない', async () => {
     host.initial = { id: 'm-1', name: '未設定', chatBarText: 'メニュー', folderId: null, size: 'large', displayAudience: 'all', displayOrder: 0, defaultPageId: 'p-1', pages: [{ id: 'p-1', name: 'トップ', imageR2Key: null, areas: [] }] }
     window.history.replaceState(null, '', '/hq/rich-menus?step=buttons')
     render(<RichMenuCreateV8 host={host} />)
     await screen.findByText('画像の上で面を選ぶ')
     expect(screen.queryByRole('heading', { name: '押された回数（今月）' })).toBeNull()
+    expect(screen.getByRole('heading', { name: '各アカウントで使うもの' })).toBeTruthy()
+  })
+  it('面を選んだ状態でも統括の右欄に店の集計を混ぜない', async () => {
+    await start()
+    selectArea('A')
+    expect(screen.getByRole('heading', { name: '各アカウントで使うもの' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: '押された回数（今月）' })).toBeNull()
+    await save()
+    expect(saved().pages[0].areas).toHaveLength(6)
+    expect(fetch).not.toHaveBeenCalled()
   })
   it('2つ目のタブにも選んだ面を出し、店のid指定が残っていても店の下書きを読まない', async () => {
     window.history.replaceState(null, '', '/hq/rich-menus?id=store-draft')
@@ -243,6 +252,29 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     expect(screen.getByRole('heading', { name: /面 A「/ })).toBeTruthy()
     expect(screen.getByRole('img', { name: /直す欄が1か所/ })).toBeTruthy()
     expect(host.onSave).not.toHaveBeenCalled()
+  })
+
+  /* UgZPJ・BVSbe：③は配る先（全員／決めない）、④は確かめて配る（足りないもの・配ったときの扱い）。 */
+  it('③で「決めない」を選ぶと各アカウントで決める形で保存し、④の「配ったときの扱い」を配る前の確認へ渡す', async () => {
+    await start()
+    selectArea('A'); pickIntent('テキストを送る')
+    fireEvent.change(screen.getByLabelText('このボタンの送る文'), { target: { value: '予約' } })
+    click('次へ：配る先')
+    expect(await screen.findByRole('heading', { name: '各アカウントで誰に出すか' })).toBeTruthy()
+    expect(screen.queryByText('タグが付いた人')).toBeNull()
+    expect(screen.queryByText('トークを開いたとき')).toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: /決めない/ }))
+    expect(screen.getByText('各アカウントで決める')).toBeTruthy()
+    click('次へ：確かめて配る')
+    expect(await screen.findByRole('heading', { name: '確かめる' })).toBeTruthy()
+    expect(screen.getByText('面 B・C・D・E・F の動きが未設定')).toBeTruthy()
+    fireEvent.click(screen.getByRole('radio', { name: /新しく作る/ }))
+    click('1 アカウントへ配る')
+    await waitFor(() => expect(host.onSave).toHaveBeenCalled())
+    const [seed, distribute, mode] = vi.mocked(host.onSave).mock.calls.at(-1)!
+    expect(seed.displayAudience).toBe('store')
+    expect(distribute).toBe(true)
+    expect(mode).toBe('alias')
   })
 
 })

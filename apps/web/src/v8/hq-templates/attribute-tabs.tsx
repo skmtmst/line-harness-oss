@@ -118,6 +118,13 @@ export function cleanupTagCount(rows: Pick<HqTemplate, 'friend_count' | 'name'>[
   return rows.filter((row) => row.friend_count === 0 || (seen.get(nameKey(row.name)) ?? 0) > 1).length
 }
 
+/** 整理の候補のタグの id（未使用か、ほかのタグと名前が重なっている）。人数を数えていない行は入れない。 */
+export function cleanupTagIds(rows: Pick<HqTemplate, 'id' | 'friend_count' | 'name'>[]): Set<string> {
+  const seen = new Map<string, number>()
+  for (const row of rows) seen.set(nameKey(row.name), (seen.get(nameKey(row.name)) ?? 0) + 1)
+  return new Set(rows.filter((row) => row.friend_count === 0 || (seen.get(nameKey(row.name)) ?? 0) > 1).map((row) => row.id))
+}
+
 /** 付け方の絞り込みの選択肢（一覧にある付け方だけ）。 */
 export function assignmentMethods(rows: Pick<HqTemplate, 'assignment_method'>[]): string[] {
   return [...new Set(rows.map((row) => row.assignment_method).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b, 'ja'))

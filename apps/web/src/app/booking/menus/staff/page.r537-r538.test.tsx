@@ -152,7 +152,7 @@ describe('R538 閲覧のみでは変更・保存の入口に進めない', () =>
     const duration = screen.getByLabelText('稼働さん の カット の所要時間') as HTMLInputElement
     expect(duration.disabled).toBe(true)
     // 保存の押し口は出ず、理由が読める。
-    expect(screen.queryByRole('button', { name: '保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存する', exact: true })).toBeNull()
     // スタッフ追加の行き先も押せない姿になる。
     expect(screen.queryByRole('link', { name: 'スタッフを追加する' })).toBeNull()
   })
@@ -168,6 +168,6 @@ describe('R538 閲覧のみでは変更・保存の入口に進めない', () =>
 
     // 変えると保存の押し口が出る。
     fireEvent.click(boxes[0])
-    expect(screen.getByRole('button', { name: '保存' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '保存する', exact: true })).toBeTruthy()
   })
 })

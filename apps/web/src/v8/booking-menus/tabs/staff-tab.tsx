@@ -3,7 +3,8 @@
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useState } from 'react'
-import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table'
+import HelpTip from '@/components/shared/help-tip'
 import { ListChecks, Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -136,7 +137,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Table">
       <div className={styles.staffHeadRow}>
-        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length} 人`}</h2>
+        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length} 人`} <HelpTip label="担当スタッフの操作の説明">行の「…」から 勤務とシフト・編集・止める。名前を押すと勤務とシフトが開きます。カレンダーにつないでいないスタッフは、ほかの予約サービスの予約で枠が埋まらないので、つなぐのをおすすめします。</HelpTip></h2>
         <div className={styles.staffHeadActions}>
           <Button href="/booking/menus/staff"><ListChecks size={15} aria-hidden="true" />担当メニューをまとめて決める</Button>
           {canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}><Plus size={15} aria-hidden="true" />スタッフを登録</Button> : null}
@@ -191,17 +192,17 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         return (
           <div key={person.id} className={styles.staffRow}>
             <span className={styles.staffName}>
-              <Link href={`/booking/staff/shifts?staff_id=${person.id}`} className={styles.staffNameLink}>
+              <RowNameLink href={`/booking/staff/shifts?staff_id=${person.id}`} title={person.name}>
                 {person.name}
-              </Link>
-              {person.role ? <span className={styles.staffRole}>{person.role}</span> : null}
+              </RowNameLink>
+              {person.role ? <span className={styles.staffRole} title={person.role}>{person.role}</span> : null}
             </span>
             <span className={styles.staffColMenus}>
               {offered > 0 ? (
                 <span className={styles.staffCellMain}>{offered}つ</span>
               ) : (
                 <span className={styles.cellWarn}>
-                  0<span className={styles.staffCellSub}>予約画面に出ません</span>
+                  0<span className={styles.staffCellSub} title="予約画面に出ません">予約画面に出ません</span>
                 </span>
               )}
             </span>
@@ -231,8 +232,8 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
             </span>
             <span className={styles.staffColMenu}>
               <RowMenu
-                appearance="plain"
-                className={styles.rowMenuButton}
+                appearance="box"
+                size="row"
                 label={`${person.display_name}のそのほかの操作`}
                 menuLabel={`${person.display_name}の操作`}
                 open={openMenuId === person.id}
@@ -257,10 +258,6 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       ) : null}
       </section>
       )}
-
-      <p className={styles.staffNote}>
-        行の「…」から 勤務とシフト・編集・止める。名前を押すと勤務とシフトが開きます。カレンダーにつないでいないスタッフは、ほかの予約サービスの予約で枠が埋まらないので、つなぐのをおすすめします。
-      </p>
 
       {editing ? (
         <StaffEditModal staff={editing} onSave={saveStaff} onClose={() => setEditing(null)} />

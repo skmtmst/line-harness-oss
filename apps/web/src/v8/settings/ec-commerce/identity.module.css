@@ -29,12 +29,6 @@
   white-space: nowrap;
 }
 
-.ops {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-st2-id-ops-gap);
-}
-
 .more {
   display: flex;
   justify-content: center;

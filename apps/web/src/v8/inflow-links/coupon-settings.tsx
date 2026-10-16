@@ -1,4 +1,5 @@
 'use client'
+import { RadioCardGroup } from '@/components/shared/radio-card'
 
 import { useEffect, useState } from 'react'
 import { couponDate, couponPayloadError } from '@line-crm/shared'
@@ -6,13 +7,13 @@ import { api, type BroadcastMessageAsset } from '@/lib/api'
 import { CardHeader } from '@/components/shared/card'
 import { Field } from '@/components/shared/form-controls'
 import Toggle from '@/components/shared/toggle'
-import Select from '@/components/shared/select'
-import Button from '@/components/shared/button'
+import Radio from '@/components/shared/radio'
+import { Ticket } from 'lucide-react'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
 import styles from './new/create.module.css'
-import { EntityPickerDialog } from '@/components/shared/entity-picker'
+import { EntityPickerDialog, EntityPickerSummary } from '@/components/shared/entity-picker'
 
 export type CouponSettingsValue = { couponEnabled: boolean; couponAssetId: string | null; couponAudience: 'new_friends' | 'all_friends' }
 
@@ -46,22 +47,27 @@ export default function CouponSettings({ accountId, value, onChange, onOptionsLo
   const selected = items.find((item) => item.id === value.couponAssetId)
   const payload = selected?.publishedPayload ?? selected?.payload
   return <>
-    <div className={styles.fieldRow}>
-      <div className={styles.field}>
-        <CardHeader size="stacked" title="読み取った人にクーポンを渡す" meta="オンにすると、友だち追加のあとトークにクーポンが届きます（1人1回）" />
-      </div>
+    <CardHeader size="stacked" title="読み取った人にクーポンを渡す" meta="LINE公式の「クーポンQRコード」と同じ。友だち追加のあと、トークにクーポンが届きます" />
+    {/* 絵 QUF2R：スイッチは左、名前を横に。オンのときだけ右に「クーポン付き QR」。 */}
+    <div className={styles.couponSwitchRow}>
       <Toggle checked={value.couponEnabled} disabled={disabled} label="クーポンを渡す"
         onChange={(couponEnabled) => onChange({ ...value, couponEnabled })} />
+      <span className={styles.couponSwitchLabel} aria-hidden="true">クーポンを渡す</span>
+      {value.couponEnabled ? <StatusBadge tone="warning" dot={false} size="compact"><Ticket size={12} aria-hidden="true" />クーポン付き QR</StatusBadge> : null}
     </div>
     {value.couponEnabled ? <>
-      <Field label="渡すクーポン" required note={selected ? `${String(payload?.description ?? '')}・期限 ${String(payload?.endsAt ?? '')}` : '公開中で、利用期間内のクーポンを選んでください。'}>
-        {selected ? <StatusBadge tone="warning" dot={false}>{selected.name}</StatusBadge> : null}
-        <Button disabled={disabled || !accountId} onClick={() => setOpen(true)}>{value.couponAssetId ? 'クーポンを変える' : 'クーポンを選ぶ'}</Button>
+      <Field label="渡すクーポン" required note={selected ? undefined : '公開中で、利用期間内のクーポンを選んでください。'}>
+        <EntityPickerSummary label="渡すクーポン" noun="クーポン" icon={Ticket} valuePrefix="クーポン"
+          name={selected?.name} meta={selected ? `${String(payload?.description ?? '')}・期限 ${String(payload?.endsAt ?? '')}` : undefined}
+          ariaLabel={selected ? 'クーポンを変える' : 'クーポンを選ぶ'} disabled={disabled || !accountId} onOpen={() => setOpen(true)} />
       </Field>
       <Field label="渡す相手">
-        <Select aria-label="渡す相手" value={value.couponAudience} disabled={disabled} size="full"
-          options={[{ value: 'new_friends', label: '新しく友だちになった人だけ' }, { value: 'all_friends', label: 'すでに友だちの人にも' }]}
-          onChange={(couponAudience) => onChange({ ...value, couponAudience: couponAudience as CouponSettingsValue['couponAudience'] })} />
+        <RadioCardGroup className={styles.couponAudience} legend="渡す相手">
+          {([['new_friends', '新しく友だちになった人だけ'], ['all_friends', 'すでに友だちの人にも']] as const).map(([key, text]) => (
+            <Radio key={key} name="coupon-audience" value={key} checked={value.couponAudience === key} disabled={disabled}
+              onChange={() => onChange({ ...value, couponAudience: key })}>{text}</Radio>
+          ))}
+        </RadioCardGroup>
       </Field>
       <Notice tone="info" message="1人1回だけ渡します。同じ人が何度読み取っても、2枚目は渡しません。すでに友だちの人にも渡す設定では、読み取るとクーポンの画面が開きます。" />
       {open ? <EntityPickerDialog title="クーポンを選ぶ" initialId={value.couponAssetId ?? undefined}

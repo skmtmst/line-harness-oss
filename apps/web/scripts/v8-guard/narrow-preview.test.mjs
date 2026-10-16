@@ -60,6 +60,7 @@ test('狭い作成画面の見え方は1回で開き、二重の入口を出さ�
     for (const { board, url, label = 'LINEの見え方を確認', title = 'LINEの見え方', phone = true } of cases) for (const width of [1152, 1440]) {
       const page = await browser.newPage({ viewport: { width, height: 1128 } })
       console.log(`preview ${board} ${width}`)
+      const phoneSelector = board === 'research' ? '[data-liff-phone-frame]' : '[data-line-preview-part="phone"]'
       const errors = []
       page.on('pageerror', error => errors.push(error.message))
       try {
@@ -77,7 +78,7 @@ test('狭い作成画面の見え方は1回で開き、二重の入口を出さ�
         if (width === 1440) {
           assert.equal(await trigger.count(), 0, `${board}: 広い板は右欄をそのまま出す`)
           assert.ok(await page.locator('main [data-template-region="preview"]:visible').count(), `${board}: 右欄を消さない`)
-          if (phone) assert.ok(await page.locator('main [data-line-preview-part="phone"]:visible').count(), `${board}: 広い板でも見え方を出す`)
+          if (phone) assert.ok(await page.locator(`main ${phoneSelector}:visible`).count(), `${board}: 広い板でも見え方を出す`)
           assert.deepEqual(errors, [], board)
           continue
         }
@@ -93,7 +94,7 @@ test('狭い作成画面の見え方は1回で開き、二重の入口を出さ�
         assert.equal(await page.getByRole('dialog', { name: title, exact: true }).count(), 1, `${board}: 窓の題も右欄の役目を伝える`)
         assert.equal(await dialogs.locator('button:visible').filter({ hasText: /LINEで(?:の)?見え方(?:を)?見る/ }).count(), 0, `${board}: 見え方の窓をさらに開かせない`)
         if (board === 'K7HWG') assert.ok(await dialogs.getByText('設定内容', { exact: true }).count())
-        else if (phone) assert.ok(await dialogs.locator('[data-line-preview-part="phone"]:visible').count(), `${board}: 見え方そのものを出す`)
+        else if (phone) assert.ok(await dialogs.locator(`${phoneSelector}:visible`).count(), `${board}: 見え方そのものを出す`)
         await dialogs.getByRole('button', { name: '閉じる', exact: true }).first().click()
         await page.locator('[role="dialog"],[role="alertdialog"]').waitFor({ state: 'hidden', timeout: 5000 })
         assert.equal(await dialogs.count(), 0, board)

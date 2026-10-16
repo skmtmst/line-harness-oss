@@ -15,7 +15,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import TapActionField from '@/components/shared/tap-action-field'
@@ -46,7 +46,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 口・保存前の確かめ・同時編集（409）の扱いは BEHAVIOR.md。
  */
 
-type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'; items: Array<{ id: string; name: string; isActive: boolean }> }
+type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'; items: Array<{ id: string; name: string; isActive: boolean; folderId?: string | null }> }
 
 /** CTA の押したら：URL を開く・回答フォーム。 */
 const WEBINAR_CTA_KINDS: readonly TapActionKind[] = ['uri', 'form']
@@ -112,11 +112,11 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     const id = ++formRequestId.current
     if (!accountId) { setForms({ state: 'idle', items: [] }); return }
     setForms({ state: 'loading', items: [] })
-    fetchApi<{ success: boolean; data: Array<{ id: string; name: string; isActive?: boolean }> }>(`/api/forms?account_id=${encodeURIComponent(accountId)}`)
+    fetchApi<{ success: boolean; data: Array<{ id: string; name: string; isActive?: boolean; folderId?: string | null }> }>(`/api/forms?account_id=${encodeURIComponent(accountId)}`)
       .then((response) => {
         if (id !== formRequestId.current) return
         if (!response.success || !Array.isArray(response.data)) throw new Error('forms_not_loaded')
-        setForms({ state: 'ready', items: response.data.map((item) => ({ id: item.id, name: item.name, isActive: item.isActive === true })) })
+        setForms({ state: 'ready', items: response.data.map((item) => ({ ...item, isActive: item.isActive === true })) })
       })
       .catch((cause: unknown) => {
         if (id !== formRequestId.current) return
@@ -354,13 +354,13 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
                     kinds={WEBINAR_CTA_KINDS}
                     hasLiff
                     readOnly={readOnly}
-                    sources={forms.state === 'ready' ? { form: forms.items.map((item) => ({ id: item.id, name: item.name, note: item.isActive ? '公開中' : '公開していません', disabled: !item.isActive })) } : undefined}
+                    sources={forms.state === 'ready' ? { form: forms.items.map((item) => ({ ...item, note: item.isActive ? '公開中' : '公開していません', disabled: !item.isActive })) } : undefined}
                   /></SaveErrorField>
                 </div>
                 </Field>
               </div>
               <div className={styles.toggleRow}>
-                {readOnly ? null : <SaveErrorField names={["autoOpen","current.autoOpen","auto_open","current.auto_open"]}><SettingCheckbox checked={current.autoOpen} label="ボタンを押したら、フォームを自動で開く" onChange={(next) => update(currentIndex, { autoOpen: next })} /></SaveErrorField>}
+                {readOnly ? null : <SaveErrorField names={["autoOpen","current.autoOpen","auto_open","current.auto_open"]}><Toggle checked={current.autoOpen} label="ボタンを押したら、フォームを自動で開く" onChange={(next) => update(currentIndex, { autoOpen: next })} /></SaveErrorField>}
                 <span className={styles.toggleText}>{readOnly ? `ボタンを押したら、フォームを自動で${current.autoOpen ? '開く' : '開かない'}` : 'ボタンを押したら、フォームを自動で開く'}</span>
               </div>
             </fieldset>

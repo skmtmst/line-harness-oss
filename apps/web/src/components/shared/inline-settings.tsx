@@ -6,8 +6,9 @@ import Button from './button'
 import styles from './inline-settings.module.css'
 
 /** B-177: 項目の設定はその項目の中で開く。窓や別のフォーカス面を増やさない。 */
-export default function InlineSettings({ open, title, children, onClose, footer }: {
+export default function InlineSettings({ open, title, children, onClose, footer, flow = 'row' }: {
   open: boolean; title: string; children: ReactNode; onClose: () => void; footer?: ReactNode
+  flow?: 'row' | 'column'
 }) {
   const id = useId()
   const ref = useRef<HTMLDivElement>(null)
@@ -15,7 +16,7 @@ export default function InlineSettings({ open, title, children, onClose, footer 
     if (open) ref.current?.focus({ preventScroll: true })
   }, [open])
   if (!open) return null
-  return <Card padding="roomy" layout="vertical" className={styles.card}>
+  return <Card padding="roomy" layout="vertical" className={styles.card} data-settings-flow={flow}>
     <div className={styles.body} ref={ref} tabIndex={-1} role="region" aria-labelledby={id} data-inline-settings>
       <h3 className={styles.title} id={id}>{title}</h3>
       {children}

@@ -93,7 +93,7 @@ describe('P0jhqO お問い合わせの絵合わせ', () => {
     expect(help.getAttribute('aria-expanded')).toBe('false')
     await act(async () => { help.click() })
     expect(help.getAttribute('aria-expanded')).toBe('true')
-    expect(host.querySelector('[role="note"]')?.textContent).toContain('統括の管理画面「お問い合わせ」から送られたものが新規として並びます')
+    expect(document.getElementById(help.getAttribute('aria-describedby')!)?.textContent).toContain('統括の管理画面「お問い合わせ」から送られたものが新規として並びます')
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
     expect(help.getAttribute('aria-expanded')).toBe('false')
     expect(body).toContain('代わりに起票する')
@@ -108,8 +108,16 @@ describe('P0jhqO お問い合わせの絵合わせ', () => {
     await act(async () => { waiting.click() })
     await settle()
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('stage=waiting'))).toBe(true)
-    expect(body).toContain('優先度：すべて')
-    expect(body).toContain('並び替え：優先度')
+    expect(body).toContain('優先度')
+    const sort = host.querySelector<HTMLButtonElement>('button[aria-label="並び替え"]')!
+    expect(sort).toBeTruthy()
+    await act(async () => { sort.click() })
+    await settle()
+    const newest = [...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find(button => button.textContent?.includes('新しい順'))!
+    expect(newest).toBeTruthy()
+    await act(async () => { newest.click() })
+    await settle()
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('sort=newest'))).toBe(true)
     // 行
     expect(body).toContain('#1042')
     expect(body).toContain('然-NEN-本部・優先度 高')

@@ -79,15 +79,7 @@ describe('機能設定の画面契約', () => {
       .not.toContain('ほかの管理者')
   })
 
-  it('撮影用の機能設定は同じ版と全キーを持ち、ウェビナーだけ見本のため有効にする', () => {
-    const mock = readFileSync(resolve(process.cwd(), '../../scripts/visual-qa/mock-api.mjs'), 'utf8')
-    const featureSection = mock.slice(mock.indexOf('const FEATURES = {'), mock.indexOf('/** 設計 `bfB50`'))
-    for (const { featureId } of FEATURE_CATALOG) expect(featureSection).toContain(`${featureId}:`)
-    for (const { featureId } of FEATURE_CATALOG.filter((item) => !item.defaultEnabled)) {
-      expect(featureSection).toContain(`${featureId}: ${featureId === 'webinars' ? 'true' : 'false'}`)
-    }
-    expect(mock.slice(mock.indexOf("'/api/settings/features':"))).toContain('version: 1')
-  })
+  // 撮影用の全機能・版の確認は mock-api-method-contract.test.ts のHTTP試験へ移した。
 
   it('マニュアル一覧の固定件数は固定行数と一致する', () => {
     const fixtures = readFileSync(resolve(process.cwd(), '../../scripts/visual-qa/fixtures.mjs'), 'utf8')

@@ -151,7 +151,7 @@
   padding: var(--tpl-sb-ext-pad);
   border-radius: var(--tpl-sb-card-radius);
   outline: 1px solid var(--card-edge);
-  background: var(--color-status-warn-soft);
+  background: var(--color-canvas);
   box-shadow: var(--card-shadow);
 }
 
@@ -270,6 +270,7 @@
 .judge { display: flex; align-items: center; }
 
 .how {
+  min-width: 0;
   font-size: var(--tpl-sb-row-sub);
   line-height: var(--tpl-sb-row-sub-lh);
   word-break: normal;

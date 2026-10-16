@@ -83,24 +83,10 @@
 
 /* 「重なり」の札。押すと重なりありの絞り込みへ。 */
 .miniBadgeWarn {
-  min-height: 0;
-  height: var(--tpl-badge-h);
   padding: 0;
   border: 0;
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-  font-size: var(--text-micro);
-  font-weight: 500;
+  background: transparent;
   cursor: pointer;
-}
-
-.miniBadgeWarn > span {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-chip-row-gap);
-  font-size: var(--text-caption);
-  padding: 1px var(--tpl-cell-gap-half);
-  border-radius: var(--radius-pill);
 }
 
 .miniBadgeWarn:hover {
@@ -355,7 +341,6 @@
 /* 絵 uE9gf 道具の段の右：並び 124・よく使う絞り込み 151（左に印）。 */
 .sortBox { width: var(--tpl-ar-sort-w); }
 .sortBox :global(*) { max-width: 100%; }
-.miniBadgeWarn > span::before { content: ''; width: var(--tpl-badge-dot); height: var(--tpl-badge-dot); border-radius: var(--radius-pill); background: currentColor; }
 .middleCell { vertical-align: middle; }
 .rowClick > td { height: var(--tpl-ar-row-h); } /* 絵 uE9gf の行は 63〜66。札の無い行も同じ高さに */
 

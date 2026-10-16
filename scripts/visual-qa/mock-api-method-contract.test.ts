@@ -1,3 +1,4 @@
+import { FEATURE_CATALOG } from '../../packages/shared/src/feature-catalog'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
 import { dirname, join } from 'node:path'
@@ -50,6 +51,18 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
 
   afterAll(() => {
     child?.kill('SIGTERM')
+  })
+
+  it('撮影用の機能設定は全キーと版を返し、見本用の機能だけ有効にする', async () => {
+    const response = await fetch(`${baseUrl}/api/settings/features`)
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.success).toBe(true)
+    expect(body.data.version).toBe(1)
+    expect(Object.keys(body.data.features).sort()).toEqual(FEATURE_CATALOG.map(entry => entry.featureId).sort())
+    for (const entry of FEATURE_CATALOG) {
+      expect(body.data.features[entry.featureId]).toBe(entry.defaultEnabled || entry.featureId === 'webinars' || entry.featureId === 'affiliates')
+    }
   })
 
   it('計測鍵を待たせず返し、同じアカウントは同じ鍵・別アカウントは別の鍵', async () => {

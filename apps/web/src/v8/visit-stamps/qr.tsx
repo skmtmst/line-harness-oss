@@ -1,7 +1,7 @@
 'use client'
 
 import {useCallback,useEffect,useRef,useState} from 'react'
-import {ArrowRight,Check,Download,Minus,Plus,Printer,QrCode,RefreshCw} from 'lucide-react'
+import {ArrowRight,Check,Minus,Plus,QrCode,RefreshCw} from 'lucide-react'
 import type {VisitStampCard,VisitStampQr,VisitStampQrInput,VisitStampQrStatus} from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -38,20 +38,19 @@ export function StorefrontQr({card,accountId,shop,canManage}: {card:VisitStampCa
     catch(e){if(live.current){setError(reason(e));if((e as {status?:number}).status===409){pending.current=null;const latest=await visitStampsApi.storefrontQr(card.id,accountId).catch(()=>null);if(latest)setQr(latest.data)}}}
     finally{if(live.current)setBusy(false)}
   }
-  const download=()=>{if(!image.src)return;const a=document.createElement('a');a.href=image.src;a.download='来店スタンプ-店頭QR.png';a.click()}
   const note=card.settings.stampInterval?.mode==='hours'?`1日1回まで・前の押印から${card.settings.stampInterval.hours}時間`:'1日1回まで'
   return <section className={styles.storefront} aria-label="店頭の QR（印刷用）">
     <div className={styles.titleLine}><h3>店頭の QR（印刷用）</h3><HelpTip label="店頭のQRの説明">店頭に貼るQRです。読んだ人に押します。同じ日は1回までです。作り直すと古いQRは使えません。</HelpTip></div>
     <div className={styles.storeRow}>{image.src?<img className={styles.thumb} src={image.src} alt="店頭のQR" />:null}
       <div className={styles.storeDetails}><span className={styles.sub}>{`${card.name} ・ この店で1つ`}</span>
-        {qr?.status==='active'?<><div className={styles.actions}><Button variant="secondary" disabled={!image.src} onClick={download}><Download size={14} aria-hidden="true" />ダウンロード</Button><Button variant="secondary" disabled={!image.src} onClick={()=>setPrint(true)}><Printer size={14} aria-hidden="true" />印刷する</Button></div>
+        {qr?.status==='active'?<><div className={styles.actions}><Button variant="secondary" disabled={!image.src} onClick={()=>setPrint(true)}><QrCode size={14} aria-hidden="true" />保存・印刷</Button></div>
           <div className={styles.actions}>{canManage?<Button variant="text" onClick={()=>{pending.current=null;setConfirm(true)}}><RefreshCw size={14} aria-hidden="true" />作り直す</Button>:null}<span className={styles.sub}>{`最後に作り直した日 ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric'}).format(new Date(qr.issuedAt))}`}</span></div></>
           :loaded?canManage?<Button variant="secondary" busy={busy} busyLabel="発行しています…" onClick={()=>void issue()}>{qr?'店頭のQRを作り直す':'店頭のQRを作る'}</Button>:<span className={styles.sub}>店頭のQRは管理者が発行します。</span>:<span className={styles.sub}>QRを読み込んでいます…</span>}
       </div>
     </div>
     {error||image.error?<Notice tone="danger" message={error||image.error}/>:null}
     <Dialog open={confirm} designNode="PYDUP" designWidth={560} tone="destructive" confirmation confirmIcon={<RefreshCw size={14} aria-hidden="true"/>} title="店頭の QR を作り直しますか？" confirmLabel="作り直す" busy={busy} error={error||undefined} onCancel={()=>setConfirm(false)} onConfirm={()=>void issue()}>
-      <div className={styles.dialogBody}><p>今の店頭の QR は使えなくなります。印刷した紙を貼り替えてください。</p><p className={styles.sub}>新しい QR は、作り直したあとに［ダウンロード］［印刷する］から出せます。</p></div>
+      <div className={styles.dialogBody}><p>今の店頭の QR は使えなくなります。印刷した紙を貼り替えてください。</p><p className={styles.sub}>新しい QR は、作り直したあとに［保存・印刷］から出せます。</p></div>
     </Dialog>
     {print&&qr?<QrDialog open onClose={()=>setPrint(false)} accountName={`${shop}・${card.name}`} baseLink={qr.url} routes={[]} direct={{title:"来店スタンプの店頭QR",description:note,downloads:true}}/>:null}
   </section>

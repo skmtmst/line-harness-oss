@@ -7,6 +7,21 @@ import { emptyTapAction, type TapActionValue } from '@/lib/tap-actions'
 
 afterEach(cleanup)
 
+test('格子指定は印付きの全種類を直接選べ、既存の値変更と閲覧表示を保つ', () => {
+  const change = vi.fn()
+  const props = { name: '面 A', value: emptyTapAction('uri'), onChange: change, hasLiff: true, kindPresentation: 'grid' as const }
+  const { rerender } = render(<TapActionField {...props} extraKinds={[{ value: 'action', label: '動きを実行する', icon: Zap }]} />)
+  const group = screen.getByRole('group', { name: '面 Aを押したら' })
+  expect(within(group).getAllByRole('radio')).toHaveLength(7)
+  expect((within(group).getByRole('radio', { name: 'URLを開く' }) as HTMLInputElement).checked).toBe(true)
+  expect(within(group).getByRole('radio', { name: '予約' }).closest('label')?.querySelector('svg')).toBeTruthy()
+  fireEvent.click(within(group).getByRole('radio', { name: '予約' }))
+  expect(change).toHaveBeenLastCalledWith({ kind: 'booking', refId: '' })
+  rerender(<TapActionField {...props} readOnly />)
+  expect(screen.queryByRole('radio')).toBeNull()
+  expect(screen.getByLabelText('面 Aを押したら：URLを開く')).toBeTruthy()
+})
+
 function openKinds() {
   fireEvent.click(screen.getByRole('button', { name: 'ボタン1を押したら' }))
   return screen.getByRole('listbox')

@@ -144,7 +144,7 @@ a.railStep:hover .railLabel {
 }
 
 /* 送るまでの段の字は絵の幅（12px の字＋1）に合わせ、段の間を 108・96 にそろえる。 */
-.railItem[data-kind='delivery'] .railLabel {
+.railItem.railDelivery .railLabel {
   padding-inline-end: 1px;
 }
 
@@ -160,24 +160,25 @@ a.railStep:hover .railLabel {
   color: var(--color-canvas);
 }
 
-.railItem[data-state='done'] .railMark {
+.railItem[data-delivery-stage='done'] .railMark {
   background: var(--tpl-bd-green);
 }
 
-.railItem[data-state='done'] .railStep {
+.railItem[data-delivery-stage='done'] .railStep {
   color: var(--color-action);
 }
 
-.railItem[data-kind='delivery'][data-state='done'] .railStep {
+.railItem.railDelivery[data-delivery-stage='done'] .railStep {
   color: var(--color-ink-secondary);
 }
 
-.railItem[data-state='current'] .railMark {
+.railItem[data-delivery-stage='current'] .railMark {
   background: var(--color-canvas);
-  box-shadow: var(--tpl-bd-mark-ring);
+  outline: var(--tpl-bd-mark-stroke) solid var(--tpl-bd-green);
+  outline-offset: calc(-1 * var(--tpl-bd-mark-stroke));
 }
 
-.railItem[data-state='current'] .railStep {
+.railItem[data-delivery-stage='current'] .railStep {
   color: var(--color-ink);
   font-weight: 700;
 }
@@ -279,7 +280,6 @@ a.railStep:hover .railLabel {
   flex-direction: column;
   gap: var(--tpl-bd-main-gap);
   min-width: 0;
-  padding: var(--tpl-bd-main-pad);
 }
 
 .side {
@@ -637,14 +637,9 @@ a.railStep:hover .railLabel {
   gap: var(--tpl-bd-ap-btn-gap);
 }
 
+/* 期限の注意は共通の帯（Notice 注意・枠なし）。ここでは置き場だけ。 */
 .deadline {
   margin: 0;
-  padding: var(--tpl-bd-deadline-pad);
-  border-radius: var(--radius-card);
-  background: var(--color-status-warn-soft);
-  color: var(--color-warning);
-  font-size: var(--tpl-bd-desc-size);
-  line-height: var(--tpl-bd-row-lh);
 }
 
 /* 予約を取り消す窓（BeNtj）：ボタンは左から 取り消す・やめる・残す。 */
@@ -721,6 +716,12 @@ a.railStep:hover .railLabel {
 
 .head:has(.rail) ~ .split .side { padding-top: var(--tpl-section-pad); }
 
-.railItem[data-finished] .railMark { background: var(--color-ink); }
+/* 丸・線の色は型の共通部品 Steps（Fa8ED・B-211）とそろえる：済み＝緑の丸＋レ、今＝緑の面、まだ＝白に枠、済んだ線＝緑 1.5。 */
+.railLine { height: var(--tpl-steps-line-h); background: var(--color-divider); }
+.railLine[data-done] { background: var(--color-accent-deep); }
+.railItem[data-finished] .railMark { background: var(--color-selection-border); }
 .railItem[data-finished] .railStep { color: var(--color-ink); font-weight: 700; }
-.railItem[data-state='current'] .railMark { background: var(--color-ink); box-shadow: none; }
+.railItem[data-delivery-stage='current'] .railMark { background: var(--color-selection-border); box-shadow: none; }
+.railItem[data-delivery-stage='todo'] .railMark { background: var(--color-canvas); box-shadow: none; outline: 1px solid var(--color-control-border); outline-offset: -1px; }
+.railItem.railDelivery[data-delivery-stage='done'] .railStep { color: var(--color-ink); }
+.railItem[data-delivery-stage='todo'] .railStep { color: var(--color-ink-secondary); }
