@@ -35,6 +35,6 @@ export default function DownloadFailure({
     case 'wait':
       return <StatusView tone="muted" icon="rotate-cw" title="混み合っています" body={`${waitSeconds ?? 30}秒ほど待ってから、もう一度お試しください。`} action={{ label: 'もう一度試す', onClick: onRetry }} />;
     default:
-      return <StatusView tone="muted" icon="wifi-off" title="取得できませんでした" body={copy.retryBody} action={{ label: 'もう一度試す', onClick: onRetry }} />;
+      return <StatusView tone="muted" icon="wifi-off" title="開けませんでした" body={copy.retryBody} action={{ label: 'もう一度試す', onClick: onRetry }} />;
   }
 }

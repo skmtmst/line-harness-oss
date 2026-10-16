@@ -51,7 +51,7 @@ test('期限切れ：取得で403なら［もう一度取得］で取り直す',
   routes.push(() => issued());
   mount();
   fireEvent.click(await screen.findByRole('button', { name: '明細を取得する' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'もう一度取得' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度開く' }));
   expect(await screen.findByRole('button', { name: '明細を取得する' })).toBeTruthy();
   expect(calls).toHaveLength(3);
 });

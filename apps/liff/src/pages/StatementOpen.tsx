@@ -84,7 +84,7 @@ export default function StatementOpen() {
               <p className="text-[15px] font-bold text-ink">支払明細</p>
               <p className="text-[13px] text-liff-sub">PDF</p>
             </Card>
-            <p className="text-[13px] text-pretty text-liff-sub">ボタンを押すと、明細を取得します。</p>
+            <p className="text-[13px] text-pretty text-liff-sub">ボタンを押すと、明細を開きます。</p>
           </div>
         )}
         {state.name === 'opened' && (
@@ -101,8 +101,8 @@ export default function StatementOpen() {
               copy={{
                 unavailableTitle: '明細を利用できません',
                 unavailableBody: 'お店へお問い合わせください',
-                expiredRetry: 'もう一度取得',
-                expiredBody: 'もう一度取得すると、新しいリンクを作ります。',
+                expiredRetry: 'もう一度開く',
+                expiredBody: 'もう一度開くと、新しいリンクを作ります。',
                 unconfiguredBody: 'ただいま取得できません。お店へお問い合わせください',
                 loginBody: 'LINEでログインして、もう一度お試しください',
                 retryBody: '時間をおいて、もう一度お試しください。',
