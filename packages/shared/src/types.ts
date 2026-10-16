@@ -526,6 +526,7 @@ export interface CommonVarChangeImpact extends Omit<CommonVarDeleteImpact, "item
 }
 
 export type SavedSearchConditionKind =
+  | "visit_count" | "purchase_amount" | "last_activity_at" | "member_tier"
   | "name"
   | "tag"
   | "field"

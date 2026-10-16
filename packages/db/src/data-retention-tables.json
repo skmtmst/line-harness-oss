@@ -4500,6 +4500,15 @@
       "parentColumn": "id"
     }
   },
+  "rt_store_feature_flags": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
   "rt_store_followup_templates": {
     "category": "purge",
     "scope": {
@@ -5086,5 +5095,14 @@
     }
   }
 ,
-  "hq_store_response_samples": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}}
+  "hq_store_response_samples": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "member_rank_notices": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "ec_auto_line_attribution_events": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "booking_entitlement_notices": {"category":"purge","scope":{"by":"lineAccount","column":"line_account_id"}},
+  "booking_pass_purchases": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "broadcast_execution_contexts": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "hq_store_comparison_export_jobs": {"category":"purge","scope":{"by":"tenant","column":"tenant_id"}},
+  "booking_pass_billing_events": {"category":"purge","scope":{"by":"parent","column":"purchase_id","parent":"booking_pass_purchases","parentColumn":"id"}}
+,
+  "account_ai_features":{"category":"purge","scope":{"by":"lineAccount","column":"account_id"}}
 }

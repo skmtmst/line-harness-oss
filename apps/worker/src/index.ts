@@ -1,3 +1,7 @@
+import {accountAiFeatures} from './routes/account-ai-features.js';
+import {broadcastSimulation} from './routes/broadcast-simulation.js';
+import {bookingPassNotices} from './routes/booking-pass-notices.js';
+import {bookingPassBilling} from './routes/booking-pass-billing.js';
 import {deliveryPurposePreview} from './routes/delivery-purpose-preview.js';
 import {mcpRpc} from './routes/mcp-rpc.js';
 import {customerSegments} from './routes/customer-segments.js';
@@ -392,6 +396,7 @@ app.route('/', scenarioDrafts);
 // broadcasts の PUT /:id が先だと approval-threshold を id と読んで404になる。
 app.route('/', broadcastApprovals);
 app.route('/', broadcastAb);
+app.route('/', broadcastSimulation);
 app.route('/', broadcasts);
 app.route('/', chatAttachments);
 app.route('/', broadcastMessageAssets);
@@ -424,11 +429,14 @@ app.route('/', templates);
 app.route('/', inboxSla);
 app.route('/', lineSenders);
 app.route('/', aiDrafts);
+app.route('/', accountAiFeatures);
 app.route('/', customerSegments);
 app.route('/', memberRanks);
+app.route('/', bookingPassBilling);
 app.route('/', storeComparison);
 app.route('/', ecAutoLine);
 app.route('/', bookingPassPlans);
+app.route('/', bookingPassNotices);
 app.route('/', aiAnswerLogs);
 app.route('/', deliveryPurposePreview);
 app.route('/', mcpConnections);
@@ -1839,6 +1847,10 @@ async function scheduled(
         const {processStoreComparison}=await import('./services/store-comparison.js');
         await processStoreComparison(env.DB,now);
       }},
+      {name:'pass notice simulations',run:async()=>{const {processPassNotices}=await import('./services/booking-pass-notices.js');await processPassNotices(env.DB,new Date(event.scheduledTime));}},
+      {name:'pass billing grace',run:async()=>{const {expirePassGrace}=await import('./services/booking-pass-billing.js');await expirePassGrace(env.DB,new Date(event.scheduledTime));}},
+      {name:'comparison CSV jobs',run:async()=>{const {processComparisonExports}=await import('./services/store-comparison-export.js');await processComparisonExports(env.DB,new Date(event.scheduledTime));}},
+      {name:'rank notice simulations',run:async()=>{const {processRankNotices}=await import('./services/member-ranks.js');await processRankNotices(env.DB,new Date(event.scheduledTime));}},
       {name:'EC automatic LINE simulation',run:async()=>{
         const {processAutoLineMock}=await import('./services/ec-auto-line.js');
         await processAutoLineMock(env.DB,new Date(event.scheduledTime));

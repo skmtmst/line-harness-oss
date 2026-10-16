@@ -1,3 +1,4 @@
+import {processBroadcastSimulation} from './broadcast-simulation.js';
 import { broadcastWideContext } from './broadcast-wide-context.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL, recordSuppressedBroadcastRecipients, suppressedFriendIds, hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
 import { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
@@ -94,6 +95,7 @@ export async function processBroadcastSend(
   broadcastId: string,
   workerUrl?: string,
 ): Promise<Broadcast> {
+  if(await processBroadcastSimulation(db,broadcastId))return (await getBroadcastById(db,broadcastId))!;
   // Mark as sending
   await updateBroadcastStatus(db, broadcastId, 'sending');
 
@@ -637,6 +639,7 @@ export async function processScheduledBroadcasts(
   }
 
   for (const broadcast of scheduled) {
+    if(await processBroadcastSimulation(db,broadcast.id))continue;
     try {
       const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
       if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
@@ -827,6 +830,7 @@ export async function processQueuedBroadcasts(
     (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
   );
   for (const broadcast of queued) {
+    if(await processBroadcastSimulation(db,broadcast.id))continue;
     // 機能オフ中は送信中の続きも止める。行は残るため再オンで再開する。
     const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
     if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {

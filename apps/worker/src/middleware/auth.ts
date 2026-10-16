@@ -289,7 +289,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
 ];
 
-export function gap2ReadOperation(method:string,path:string){return method==='POST'&&(/^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)||/^\/api\/chats\/[^/]+\/ai\/summary$/.test(path)||path==='/api/booking/admin/series/preview'||path==='/api/member-ranks/preview'||path==='/api/delivery-purposes/preview'||/^\/api\/booking\/admin\/series\/[^/]+\/impact$/.test(path));}
+export function gap2ReadOperation(method:string,path:string){return method==='POST'&&(/^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)||/^\/api\/chats\/[^/]+\/ai\/summary$/.test(path)||path==='/api/booking/admin/series/preview'||path==='/api/member-ranks/preview'||path==='/api/hq/store-comparison/export'||path==='/api/delivery-purposes/preview'||/^\/api\/booking\/admin\/series\/[^/]+\/impact$/.test(path));}
 function gap2SelfPreference(method:string,path:string){return (method==='POST'&&/^\/api\/me\/push\/(subscriptions|test)$/.test(path))||(method==='PUT'&&path==='/api/me/push/preferences')||(method==='DELETE'&&/^\/api\/me\/push\/subscriptions\/[^/]+$/.test(path));}
 export function permissionForApiPath(path: string): string | null {
   if(/^\/api\/friends\/[^/]+\/member-rank$/.test(path))return '/mileage';
@@ -299,6 +299,7 @@ export function permissionForApiPath(path: string): string | null {
   if(path.startsWith('/api/member-ranks'))return '/mileage';
   if(path.startsWith('/api/ec/auto-line'))return '/ec-commerce';
   if(path.startsWith('/api/ai-answer-logs'))return '/auto-replies';
+  if(path.startsWith('/api/ai-features'))return '/settings';
   if(path.startsWith('/api/qa-entries')||path.startsWith('/api/ai-settings'))return '/auto-replies';
   if (/^\/api\/line-accounts\/[^/]+\/(?:senders|sender-icons)(?:\/|$)/.test(path)) return '/chats';
   const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
@@ -686,7 +687,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   }
 
   const outputRequest = isOutputRequest(path, c.req.query('format'), method);
-  if (staff.readOnly && outputRequest) {
+  if (staff.readOnly && outputRequest && !(path==='/api/hq/store-comparison/export'||/^\/api\/hq\/store-comparison\/exports\/[^/]+\/download$/.test(path))) {
     return c.json({ success: false, error: '閲覧のみの権限では書き出しを実行できません' }, 403);
   }
 

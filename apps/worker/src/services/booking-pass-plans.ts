@@ -15,8 +15,8 @@ export async function expandPlanGrant(db:D1Database,a:string,b:Record<string,unk
  return {...b,kind:r.kind,name:r.name,remaining:r.kind==='ticket'?r.count:undefined,monthlyLimit:r.kind==='monthly'?r.monthly_limit:undefined,menuId:null,validFrom,expiresAt:new Date(Date.parse(validFrom)+Number(r.valid_days)*86400000).toISOString()};
 }
 export async function passUnusable(db:D1Database,e:{id:string;menu_id:string|null;kind:string;remaining:number|null;monthRemaining:number|null;valid_from:string;expires_at:string},a:string,menu:string|undefined,at:string){
- const extra=await db.prepare('SELECT e.billing_status,p.target_scope_json FROM booking_entitlements e LEFT JOIN booking_pass_plans p ON p.id=e.plan_id AND p.line_account_id=e.line_account_id WHERE e.id=? AND e.line_account_id=?').bind(e.id,a).first<{billing_status:string;target_scope_json:string|null}>();
- if(extra?.billing_status==='stopped')return 'billing_stopped';
+ const extra=await db.prepare('SELECT e.billing_status,e.grace_until,p.target_scope_json FROM booking_entitlements e LEFT JOIN booking_pass_plans p ON p.id=e.plan_id AND p.line_account_id=e.line_account_id WHERE e.id=? AND e.line_account_id=?').bind(e.id,a).first<{billing_status:string;grace_until:string|null;target_scope_json:string|null}>();
+ if(extra?.billing_status==='stopped'||extra?.billing_status==='grace'&&extra.grace_until&&Date.parse(extra.grace_until)<=Date.now())return 'billing_stopped';
  if(Date.parse(at)<Date.parse(e.valid_from)||Date.parse(at)>=Date.parse(e.expires_at))return 'expired';
  if(menu&&(e.menu_id&&e.menu_id!==menu||extra?.target_scope_json&&JSON.parse(extra.target_scope_json).length&&!JSON.parse(extra.target_scope_json).includes(menu)))return 'menu_out_of_scope';
  if(e.kind==='ticket'?Number(e.remaining)<=0:Number(e.monthRemaining)<=0)return 'month_used_up';return null;

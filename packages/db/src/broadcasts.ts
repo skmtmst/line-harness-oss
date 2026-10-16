@@ -1,3 +1,5 @@
+import {markInsightFailed} from './broadcast-insight-retry.js';
+export {markInsightFailed} from './broadcast-insight-retry.js';
 import { sqlIdSet } from './id-queries.js';
 import { refreshBroadcastReferences, removeConsumerReferences } from './template-versions.js';
 import { jstNow } from './utils.js';
@@ -106,6 +108,9 @@ function broadcastListQuery(
   // 一覧に集計の最新行を同梱する。送信済みごとに insight 口を叩く N+1 を
   // 一覧1クエリで吸収するため。LINEへの再取得は手動ボタン(fetch-insight)に寄せる。
   let sql = `SELECT b.*,
+       (SELECT purpose FROM broadcast_execution_contexts x WHERE x.broadcast_id=b.id) AS purpose,
+       (SELECT execution_mode FROM broadcast_execution_contexts x WHERE x.broadcast_id=b.id) AS execution_mode,
+       (SELECT created_via FROM broadcast_execution_contexts x WHERE x.broadcast_id=b.id) AS created_via,
        bi.id as insight_id,
        bi.status as insight_status,
        bi.delivered as insight_delivered,
@@ -190,6 +195,7 @@ export async function getBroadcastListPage(db:D1Database, accountId:string|undef
   const folderBinds=opts.folderId && opts.folderId!=='unfiled' ? [opts.folderId]:[];
   // deriveBroadcastDisplayStatus と同じ優先順位。件数・絞り込みのための存在確認はDB内だけで行う。
   const classified=`SELECT b.*, CASE
+    WHEN execution_mode='simulation' AND status='sent' THEN 'sent'
     WHEN approval_status='pending' THEN CASE WHEN scheduled_at IS NOT NULL AND julianday(scheduled_at)<=julianday(?) THEN 'expired' ELSE 'pending_approval' END
     WHEN approval_status='expired' THEN 'expired'
     WHEN stopped_at IS NOT NULL AND stopped_at<>'' THEN 'stopped'
@@ -220,6 +226,9 @@ export async function getBroadcastById(
   return db
     .prepare(
       `SELECT b.*,
+       (SELECT purpose FROM broadcast_execution_contexts x WHERE x.broadcast_id=b.id) AS purpose,
+       (SELECT execution_mode FROM broadcast_execution_contexts x WHERE x.broadcast_id=b.id) AS execution_mode,
+       (SELECT created_via FROM broadcast_execution_contexts x WHERE x.broadcast_id=b.id) AS created_via,
        bi.id as insight_id, bi.delivered, bi.unique_impression,
        bi.unique_click, bi.unique_media_played,
        bi.open_rate, bi.click_rate, bi.status as insight_status,
@@ -612,19 +621,6 @@ export async function updateInsightResult(
     .run();
 }
 
-export async function markInsightFailed(
-  db: D1Database,
-  insightId: string,
-  retryCount: number,
-): Promise<void> {
-  const newStatus = retryCount >= 2 ? 'failed' : 'pending';
-  await db
-    .prepare(
-      `UPDATE broadcast_insights SET retry_count = ?, status = ? WHERE id = ?`,
-    )
-    .bind(retryCount + 1, newStatus, insightId)
-    .run();
-}
 
 export async function getQueuedBroadcasts(db: D1Database): Promise<Broadcast[]> {
   // Pick up broadcasts explicitly queued for batch processing:

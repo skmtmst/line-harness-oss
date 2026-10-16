@@ -62,7 +62,12 @@ beforeEach(() => {
   app = new Hono<Env>();
   app.use('*', async (c,next) => { c.set('staff', staff); await next(); }); app.route('/', hqTemplates);
 });
-afterEach(() => sql.close());
+afterEach(() => {
+ // B-354: distribution must never silently enable account AI.
+ expect(sql.prepare("SELECT count(*) n FROM ai_settings WHERE mode NOT IN('off','suspended')").get()).toEqual({n:0});
+ expect(sql.prepare('SELECT count(*) n FROM account_ai_features WHERE enabled=1').get()).toEqual({n:0});
+ sql.close();
+});
 
 describe('HQ tag HTTP and real SQLite boundaries', () => {
   test.each([

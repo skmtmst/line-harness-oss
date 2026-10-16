@@ -1,3 +1,4 @@
+import {outgoingEventTypes} from './webhook-event-types.js';
 import { readCappedBodyText, receiveTimestampState } from './webhook-receive-envelope.js';
 import { encryptCredential, decryptCredential } from '@line-crm/db';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -142,23 +143,6 @@ function safeJson<T>(raw: string | null | undefined, fallback: T): T {
   }
 }
 
-/**
- * 送り先の `event_types` を読む(#506 中)。
- *
- * 1行でも壊れていると一覧全体が例外→500になっていた。壊れた行は空に
- * 落とし、IDを構造化ログに残して一覧は返す。配列でないJSON(文字列など)
- * も同じ扱いにする。
- */
-function outgoingEventTypes(raw: string | null | undefined, webhookId: string): string[] {
-  try {
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) throw new Error('event_types is not an array');
-    return parsed.map((entry) => String(entry));
-  } catch {
-    console.error(JSON.stringify({"code":"outgoing_webhook_event_types_broken"}));
-    return [];
-  }
-}
 
 async function incomingActionDisplayName(db: D1Database, action: IncomingWebhookActionRef): Promise<string> {
   const table = ({

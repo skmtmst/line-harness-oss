@@ -12,7 +12,8 @@ export function maskAiText(text:string,names:string[]=[]){
 export interface AiSource {type:'qa'|'past_reply';id:string;title:string}
 const cache=new Map<string,{until:number;data:unknown}>();
 export async function aiSettings(db:D1Database,account:string){return await db.prepare('SELECT mode,version,monthly_limit_drafts FROM ai_settings WHERE account_id=?').bind(account).first<{mode:string;version:number;monthly_limit_drafts:number}>()??{mode:'off',version:0,monthly_limit_drafts:3000};}
-export async function makeAiDraft(db:D1Database,input:{account:string;friend:string;chat:string;kind:'summary'|'draft';apiKey:string;masked:boolean}){
+export async function makeAiDraft(db:D1Database,input:{account:string;friend:string;chat:string;kind:'summary'|'draft';apiKey:string;masked:boolean;providerEnabled?:boolean}){
+ if(input.providerEnabled!==true)throw new GapError('g2_ai_unavailable',409);
  const settings=await aiSettings(db,input.account);if(settings.mode==='off')throw new GapError('ai_disabled',409);if(settings.mode==='suspended')throw new GapError('ai_suspended',503);
  const friend=await db.prepare('SELECT display_name FROM friends WHERE id=? AND line_account_id=?').bind(input.friend,input.account).first<{display_name:string}>();
  const names=friend?.display_name?[friend.display_name]:[];

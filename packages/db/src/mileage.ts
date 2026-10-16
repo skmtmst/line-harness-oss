@@ -1,3 +1,4 @@
+import {resolveRankMileageMultiplier,resolveMileageMultiplier} from './mileage-multiplier.js';
 import { sqlIdSet } from './id-queries.js';
 import type { MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary } from '@line-crm/shared';
 import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
@@ -1804,7 +1805,7 @@ export interface ApplyMileageRulesInput {
   publishedSnapshot?: Record<string, number> | null;
 }
 
-interface MileageMultiplier {
+export interface MileageMultiplier {
   bps: number;
   tagId: string | null;
   tagName: string | null;
@@ -1872,31 +1873,7 @@ async function resolveReferralMileageBeneficiary(
     : null;
 }
 
-async function resolveMileageMultiplier(
-  db: D1Database,
-  friendId: string,
-  occurredAt: string,
-): Promise<MileageMultiplier> {
-  const row = await db
-    .prepare(
-      `WITH identity AS (SELECT user_id FROM friends WHERE id = ?)
-       SELECT t.mileage_multiplier_bps AS bps, t.id AS tag_id, t.name AS tag_name
-         FROM friend_tags ft
-         JOIN friends f ON f.id = ft.friend_id
-         JOIN tags t ON t.id = ft.tag_id
-         LEFT JOIN identity i ON 1 = 1
-        WHERE t.mileage_multiplier_bps IS NOT NULL
-          AND ft.assigned_at <= ?
-          AND (f.id = ? OR (i.user_id IS NOT NULL AND f.user_id = i.user_id))
-        ORDER BY t.mileage_multiplier_priority DESC, ft.assigned_at DESC, t.id ASC
-        LIMIT 1`,
-    )
-    .bind(friendId, occurredAt, friendId)
-    .first<{ bps: number; tag_id: string; tag_name: string }>();
-  return row
-    ? { bps: Number(row.bps), tagId: row.tag_id, tagName: row.tag_name }
-    : { bps: 10000, tagId: null, tagName: null };
-}
+
 
 /**
  * m22o: 公開版の有効期限(日数)から、台帳へ残す有効期限の日時を作る。
@@ -2170,18 +2147,19 @@ async function applyMileageRulesImmediately(
         referral_mileage_reward: number;
       }>();
     if (tag && Number(tag.mileage_reward) > 0) {
+      const rank=await resolveRankMileageMultiplier(db,friend.id,occurredAt),rankBps=Math.round((rank?.mile_multiplier??1)*10000);
       const tagEntry = await postMileageEntry(db, {
         beneficiaryUserId: friend.user_id,
         beneficiaryFriendId: friend.id,
         engagementEventId: event.id,
         entryType: 'grant',
         status: 'available',
-        amount: Number(tag.mileage_reward),
+        amount: Math.max(1,Math.round(Number(tag.mileage_reward)*rankBps/10000)),
         reason: `タグ「${tag.name}」獲得`,
         source: 'tag',
         sourceEventId: input.sourceEventId,
         idempotencyKey: `tag-reward:identity:${identityKey}:tag:${tag.id}`,
-        metadata: { tagId: tag.id, eventType: input.eventType },
+        metadata: { tagId: tag.id, eventType: input.eventType,baseAmount:Number(tag.mileage_reward),multiplierBps:rankBps,multiplierTagId:rank?.tag_id??null },
         occurredAt,
       });
       granted.push(tagEntry);

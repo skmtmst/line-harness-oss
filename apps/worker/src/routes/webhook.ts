@@ -1,3 +1,4 @@
+import {logWebhookStepFailure,recordWebhookAnalyticsEvent} from './webhook-analytics.js';
 import {assignInbox} from '../services/inbox-assignment.js';
 import { webhookDemoTargets } from '../services/webhook-demo-targets.js';
 import { parseRestaurantConfirmationPostback, respondToRestaurantConfirmation } from '../services/restaurant-confirmations.js';
@@ -70,42 +71,9 @@ const webhook = new Hono<Env>();
 // large-payload DoS before signature verification (#104). 1 MiB leaves room for
 // bursty batched deliveries (~100 events × ~5 KB) while still well below the
 // 128 MB Cloudflare Workers memory ceiling.
-const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024; // 1 MiB
+const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024;
 
-function logWebhookStepFailure(
-  stage: string,
-  error: unknown,
-  lineAccountId: string | null,
-  event?: WebhookEvent,
-): void {
-  console.error(JSON.stringify({"code":"line_webhook_step_failed"}));
-}
 
-async function recordWebhookAnalyticsEvent(
-  db: D1Database,
-  lineAccountId: string | null,
-  event: WebhookEvent,
-  input: {
-    friendId?: string | null;
-    eventType: string;
-    dimensions?: Record<string, unknown>;
-  },
-): Promise<void> {
-  if (!lineAccountId) return;
-  try {
-    await recordAnalyticsEvent(db, {
-      lineAccountId,
-      friendId: input.friendId,
-      eventType: input.eventType,
-      sourceKind: 'line_webhook',
-      sourceId: event.webhookEventId,
-      occurredAt: new Date(event.timestamp).toISOString(),
-      dimensions: input.dimensions,
-    });
-  } catch (error) {
-    logWebhookStepFailure('analytics_event_record', error, lineAccountId, event);
-  }
-}
 
 /**
  * friends.line_user_id はグローバル UNIQUE のため (C-2b までは1ユーザー1行)、
@@ -1541,6 +1509,10 @@ async function handleEvent(
         await dispatchOperatorEvent(db,operatorMailEnv!,{lineAccountId:lineAccountId!,eventType:chat.operator_id?'inbox_assigned_reply':'inbox_new_inquiry',sourceEventId:logId,executionMode:'automatic'});
       });
     }
+    if(!nonTextMatched&&lineAccountId)await replay('ai_qa_simulation',async()=>{
+      const {simulateIncomingQa}=await import('../services/ai-auto-qa.js');
+      await simulateIncomingQa(db,{account:lineAccountId,friendId:friend.id,eventId:event.webhookEventId??logId,question:content,kind:msg.type});
+    });
     await replay('recordWebhookAnalyticsEvent:0',()=>recordWebhookAnalyticsEvent(execution?.mutationDb('recordWebhookAnalyticsEvent:0') ?? db, lineAccountId, event, {
       friendId: friend.id,
       eventType: 'message_received',
@@ -1674,6 +1646,13 @@ async function handleEvent(
         await dispatchOperatorEvent(db,operatorMailEnv!,{lineAccountId:lineAccountId!,eventType:chat.operator_id?'inbox_assigned_reply':'inbox_new_inquiry',sourceEventId:logId,executionMode:'automatic'});
       });
     }
+
+    // G2 is simulation-only in this tranche. It cannot consume a reply token or
+    // suppress unread/operator notifications. Keyword rules always take priority.
+    if (!matched && lineAccountId) await replay('ai_qa_simulation', async()=>{
+      const {simulateIncomingQa}=await import('../services/ai-auto-qa.js');
+      await simulateIncomingQa(db,{account:lineAccountId,friendId:friend.id,eventId:event.webhookEventId??logId,question:incomingText,kind:event.message?.type??'text'});
+    });
 
     // イベントバス発火: message_received
     // Pass replyToken only when auto_reply didn't actually consume it

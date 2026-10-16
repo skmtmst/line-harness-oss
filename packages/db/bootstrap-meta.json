@@ -604,6 +604,7 @@
     "669_restaurant_anniversary_followup.sql",
     "681_style_setup_selection_and_auto_insert.sql",
     "682_booking_stripe_connect_states.sql",
+    "683_restaurant_delivery_phase2_slots.sql",
     "686_public_ingress_receipts.sql",
     "687_template_soft_delete.sql",
     "688_media_metadata_revision.sql",
@@ -634,7 +635,12 @@
     "717_customer_segments_ranks.sql",
     "718_hq_store_metrics.sql",
     "719_ec_auto_line.sql",
-    "720_booking_pass_plans.sql"
+    "720_booking_pass_plans.sql",
+    "721_member_rank_benefits.sql",
+    "722_hq_comparison_exports.sql",
+    "723_ec_auto_line_attribution.sql",
+    "724_booking_pass_purchases.sql",
+    "725_broadcast_execution_contexts.sql"
   ],
-  "migrationCount": 635
+  "migrationCount": 641
 }

@@ -25,8 +25,9 @@ export async function ingestBehavior(db:D1Database,a:string,b:Record<string,unkn
  if(b.type==='restock'&&Number(b.stock)>0){const r=rules.find(x=>x.kind==='restock')!;if(r.enabled){await db.prepare(`INSERT OR IGNORE INTO ec_auto_line_sends(id,account_id,rule_kind,friend_id,product_id,trigger_event_id,scheduled_at,original_due_at,messages_snapshot_json) SELECT lower(hex(randomblob(16))),?,'restock',friend_id,?,id,?,?,? FROM ec_behavior_events WHERE account_id=? AND product_id=? AND type='restock_subscribe' AND friend_id IS NOT NULL`).bind(a,b.productId,now.toISOString(),now.toISOString(),JSON.stringify(r.messages),a,b.productId).run();}}
  return {accepted:true,matched:true,duplicate:false};
 }
-export async function processAutoLineMock(db:D1Database,now=new Date()){
- const rows=(await db.prepare("SELECT s.*,e.occurred_at FROM ec_auto_line_sends s JOIN ec_behavior_events e ON e.id=s.trigger_event_id WHERE s.status='scheduled' AND julianday(s.scheduled_at)<=julianday(?) ORDER BY s.scheduled_at,s.id LIMIT 100").bind(now.toISOString()).all<Record<string,unknown>>()).results;
+export async function processAutoLineMock(db:D1Database,now=new Date(),account?:string){
+ const rows=(await db.prepare("SELECT s.*,e.occurred_at FROM ec_auto_line_sends s JOIN ec_behavior_events e ON e.id=s.trigger_event_id WHERE s.status='scheduled' AND (? IS NULL OR s.account_id=?) AND julianday(s.scheduled_at)<=julianday(?) ORDER BY s.scheduled_at,s.id LIMIT 100").bind(account??null,account??null,now.toISOString()).all<Record<string,unknown>>()).results;
+ let processed=0;
  for(const s of rows){
  const a=String(s.account_id),f=String(s.friend_id),at=now.toISOString(),tz=await getAccountTimeZone(db,a),hour=tzHHMM(tz,now),day=tzDateStr(tz,now),rules=await autoLineRules(db,a);let status='simulated';
  const friend=await db.prepare('SELECT is_following FROM friends WHERE id=? AND line_account_id=?').bind(f,a).first<{is_following:number}>();
@@ -50,7 +51,29 @@ export async function processAutoLineMock(db:D1Database,now=new Date()){
  if(status==='simulated'&&((s.rule_kind==='cart'&&now.getTime()-Date.parse(String(s.original_due_at))>12*3600000)||now.getTime()-Date.parse(String(s.scheduled_at))>3*3600000))status='skipped_late';
  const midnight=restaurantCivilTime(day,0,tz);
  // Single conditional UPDATE both claims the message and checks all three caps. Concurrent runs cannot exceed the caps.
- const result=await db.prepare(`UPDATE ec_auto_line_sends SET status=?,sent_at=CASE WHEN ?='simulated' THEN ? ELSE NULL END,claim_token=? WHERE id=? AND status='scheduled' AND (?!='simulated' OR NOT EXISTS(SELECT 1 FROM ec_auto_line_sends x WHERE x.account_id=? AND x.friend_id=? AND x.status='simulated' AND (julianday(x.sent_at)>=julianday(?) OR x.product_id=? AND julianday(x.sent_at)>=julianday(?,'-30 days')))) AND (?!='simulated' OR (SELECT count(*) FROM ec_auto_line_sends x WHERE x.account_id=? AND x.friend_id=? AND x.status='simulated' AND julianday(x.sent_at)>=julianday(?,'-7 days'))<3)`).bind(status,status,at,crypto.randomUUID(),s.id,status,a,f,midnight,s.product_id,at,status,a,f,at).run();
- if(!result.meta.changes)await db.prepare("UPDATE ec_auto_line_sends SET status='skipped_cap' WHERE id=? AND status='scheduled'").bind(s.id).run();
+ const result=await db.prepare(`UPDATE ec_auto_line_sends SET status=?,sent_at=CASE WHEN ?='simulated' THEN ? ELSE NULL END,claim_token=? WHERE id=? AND status='scheduled'
+ AND (?!='simulated' OR (
+ EXISTS(SELECT 1 FROM friends WHERE id=? AND line_account_id=? AND is_following=1)
+ AND EXISTS(SELECT 1 FROM ec_auto_line_rules WHERE account_id=? AND kind=? AND enabled=1)
+ AND NOT EXISTS(SELECT 1 FROM ec_behavior_events WHERE account_id=? AND friend_id=? AND type='purchase' AND julianday(occurred_at)>=julianday(?))
+ AND NOT EXISTS(SELECT 1 FROM ec_orders WHERE line_account_id=? AND friend_id=? AND normalized_status='current' AND julianday(ordered_at)>=julianday(?))
+ AND NOT EXISTS(SELECT 1 FROM friend_delivery_consents WHERE line_account_id=? AND friend_id=? AND purpose IN('promotion','marketing','advertising','宣伝') AND state='revoked')))
+ AND (?!='simulated' OR (
+ (rule_kind!='restock' OR COALESCE((SELECT json_extract(e.product_snapshot_json,'$.stock') FROM ec_behavior_events e WHERE e.account_id=ec_auto_line_sends.account_id AND e.product_id=ec_auto_line_sends.product_id AND e.type='restock' ORDER BY julianday(e.occurred_at) DESC,e.id DESC LIMIT 1),0)>0)
+ AND (rule_kind!='cart' OR trigger_event_id=(SELECT e.id FROM ec_behavior_events e WHERE e.account_id=ec_auto_line_sends.account_id AND e.friend_id=ec_auto_line_sends.friend_id AND e.product_id=ec_auto_line_sends.product_id AND e.type IN('cart_add','cart_remove') ORDER BY julianday(e.occurred_at) DESC,e.received_at DESC,e.id DESC LIMIT 1))))
+ AND (?!='simulated' OR NOT EXISTS(SELECT 1 FROM ec_auto_line_sends x WHERE x.account_id=? AND x.friend_id=? AND x.status='simulated' AND (julianday(x.sent_at)>=julianday(?) OR x.product_id=? AND julianday(x.sent_at)>=julianday(?,'-30 days')))) AND (?!='simulated' OR (SELECT count(*) FROM ec_auto_line_sends x WHERE x.account_id=? AND x.friend_id=? AND x.status='simulated' AND julianday(x.sent_at)>=julianday(?,'-7 days'))<3)`).bind(status,status,at,crypto.randomUUID(),s.id,status,f,a,a,s.rule_kind,a,f,s.occurred_at,a,f,s.occurred_at,a,f,status,status,a,f,midnight,s.product_id,at,status,a,f,at).run();
+ if(result.meta.changes)processed++;
+ else {
+  const fallback=await db.prepare(`UPDATE ec_auto_line_sends SET status=CASE
+   WHEN EXISTS(SELECT 1 FROM ec_behavior_events WHERE account_id=? AND friend_id=? AND type='purchase' AND julianday(occurred_at)>=julianday(?)) OR EXISTS(SELECT 1 FROM ec_orders WHERE line_account_id=? AND friend_id=? AND normalized_status='current' AND julianday(ordered_at)>=julianday(?)) THEN 'skipped_purchased'
+   WHEN EXISTS(SELECT 1 FROM friend_delivery_consents WHERE line_account_id=? AND friend_id=? AND purpose IN('promotion','marketing','advertising','宣伝') AND state='revoked') THEN 'skipped_opted_out'
+   WHEN NOT EXISTS(SELECT 1 FROM ec_auto_line_rules WHERE account_id=? AND kind=? AND enabled=1) THEN 'skipped_disabled'
+   WHEN NOT EXISTS(SELECT 1 FROM friends WHERE id=? AND line_account_id=? AND is_following=1) THEN 'skipped_blocked'
+   WHEN rule_kind='restock' AND COALESCE((SELECT json_extract(e.product_snapshot_json,'$.stock') FROM ec_behavior_events e WHERE e.account_id=ec_auto_line_sends.account_id AND e.product_id=ec_auto_line_sends.product_id AND e.type='restock' ORDER BY julianday(e.occurred_at) DESC,e.id DESC LIMIT 1),0)<=0 THEN 'skipped_stock'
+   WHEN rule_kind='cart' AND trigger_event_id IS NOT (SELECT e.id FROM ec_behavior_events e WHERE e.account_id=ec_auto_line_sends.account_id AND e.friend_id=ec_auto_line_sends.friend_id AND e.product_id=ec_auto_line_sends.product_id AND e.type IN('cart_add','cart_remove') ORDER BY julianday(e.occurred_at) DESC,e.received_at DESC,e.id DESC LIMIT 1) THEN 'skipped_removed'
+   ELSE 'skipped_cap' END WHERE id=? AND status='scheduled'`).bind(a,f,s.occurred_at,a,f,s.occurred_at,a,f,a,s.rule_kind,f,a,s.id).run();
+  processed+=fallback.meta.changes;
  }
+ }
+ return {processed};
 }

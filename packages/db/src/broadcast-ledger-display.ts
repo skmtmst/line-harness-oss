@@ -50,6 +50,8 @@ export function isTemporaryLedgerErrorCode(code: string | null | undefined): boo
 }
 
 export type BroadcastRecipientGroup =
+  | 'simulated'
+  | 'simulation_suppressed'
   | 'delivered'
   | 'failed_temporary'
   | 'failed_permanent'
@@ -66,6 +68,8 @@ export interface BroadcastRecipientView {
 }
 
 const RECIPIENT_VIEWS: Record<BroadcastRecipientGroup, BroadcastRecipientView> = {
+  simulated:{group:'simulated',label:'模擬で確認済み',detail:'実際の送信はしていません',retryable:false},
+  simulation_suppressed:{group:'simulation_suppressed',label:'模擬で対象から除外',detail:'送る直前の同意・対象を確認し、実際の送信はしていません',retryable:false},
   delivered: { group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false },
   failed_temporary: {
     group: 'failed_temporary',
@@ -99,6 +103,8 @@ export function classifyBroadcastRecipient(
   state: string,
   errorCode: string | null | undefined,
 ): BroadcastRecipientView {
+  if(errorCode==='simulation_only')return RECIPIENT_VIEWS.simulated;
+  if(errorCode==='simulation_suppressed')return RECIPIENT_VIEWS.simulation_suppressed;
   if (state === 'sent') return RECIPIENT_VIEWS.delivered;
   if (state === 'unknown') return RECIPIENT_VIEWS.unknown;
   if (state === 'failed') {

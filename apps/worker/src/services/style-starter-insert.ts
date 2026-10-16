@@ -1,3 +1,4 @@
+import {prepareStarterInsert} from './style-starter-insert-context.js';
 import { styleMenuButtons } from './style-menu-buttons.js';
 import {
   recordSnapshot,
@@ -30,66 +31,8 @@ export async function insertStyleStarterItems(
     skipExisting?: boolean;
   } = {},
 ) {
-  const set = options.set ?? (await starter(db, tenant, style)),
-    inserted: unknown[] = [];
-  const existing = (
-    await db
-      .prepare('SELECT * FROM style_starter_items WHERE line_account_id=?')
-      .bind(account)
-      .all<{
-        item_key: string;
-        target_id: string;
-        kind: string;
-        style: string;
-        is_sample: number;
-        source_snapshot: string | null;
-      }>()
-  ).results;
-  const oldProfile = await profile(db, account);
-  const choice = input.choices as
-    | Record<
-        string,
-        { mode: 'sample' | 'existing' | 'configured'; resourceId?: string }
-      >
-    | undefined;
-  if (
-    choice !== undefined &&
-    (!choice || typeof choice !== 'object' || Array.isArray(choice))
-  )
-    throw new StyleError('invalid_choices');
-  for (const [key, chosen] of Object.entries(choice ?? {})) {
-    const item = set.definition.items.find((i) => i.key === key);
-    if (
-      !item ||
-      !chosen ||
-      !['sample', 'existing', 'configured'].includes(chosen.mode)
-    )
-      throw new StyleError('invalid_choices');
-    if (chosen.mode !== 'sample') {
-      const table =
-        item.kind === 'template'
-          ? 'templates'
-          : item.kind === 'rich_menu'
-            ? 'rich_menu_groups'
-            : item.kind === 'automation'
-              ? 'automation_definitions'
-              : item.kind === 'reminder'
-                ? 'reminders'
-                : item.kind === 'booking_menu'
-                  ? 'menus'
-                  : null;
-      if (!table || !chosen.resourceId)
-        throw new StyleError('invalid_resource');
-      const col = item.kind === 'rich_menu' ? 'account_id' : 'line_account_id';
-      if (
-        !(await db
-          .prepare(`SELECT 1 FROM ${table} WHERE id=? AND ${col}=?`)
-          .bind(chosen.resourceId, account)
-          .first())
-      )
-        throw new StyleError('resource_not_found', 404);
-    }
-  }
+  const {set,existing,oldProfile,choice}=await prepareStarterInsert(db,account,tenant,style,input,options);
+  const inserted:unknown[]=[];
   for (const item of selected ? set.definition.items : []) {
     if (item.kind === 'booking_menu' && !['salon', 'consult'].includes(style))
       continue;
