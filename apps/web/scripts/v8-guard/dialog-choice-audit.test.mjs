@@ -25,6 +25,15 @@ for (const width of [1152, 1440, 1920]) {
       assert.equal((await scan()).findings.length, 0)
       await page.locator('.link').focus()
       assert.equal((await scan()).findings.length, 0)
+      const originalBackground = await page.locator('.link').evaluate(el => {
+        const style = getComputedStyle(el)
+        return { color: style.backgroundColor, image: style.backgroundImage }
+      })
+      // CSSの色の遷移が終わり、故障を入れる前の描画状態へ戻ってから次を測る。
+      const restoredBackground = () => page.waitForFunction(({ color, image }) => {
+        const style = getComputedStyle(document.querySelector('.link'))
+        return style.backgroundColor === color && style.backgroundImage === image
+      }, originalBackground)
       await page.locator('.link').evaluate(el => { el.style.background = 'var(--color-canvas-sunken)' })
       await page.waitForFunction(() => {
         const link = document.querySelector('.link')
@@ -37,9 +46,11 @@ for (const width of [1152, 1440, 1920]) {
       })
       assert.equal((await scan()).findings.filter(f => f.kind === 'dialog-choice-label-background').length, 1)
       await page.locator('.link').evaluate(el => { el.style.background = '' })
+      await restoredBackground()
       await page.locator('.link').evaluate(el => { el.style.backgroundImage = 'linear-gradient(var(--color-canvas-sunken), var(--color-canvas-sunken))' })
       assert.equal((await scan()).findings.filter(f => f.kind === 'dialog-choice-label-background').length, 1)
       await page.locator('.link').evaluate(el => { el.style.backgroundImage = '' })
+      await restoredBackground()
       await page.locator('table td').first().evaluate(el => {
         const dot = document.createElement('span')
         dot.dataset.folderDot = ''
