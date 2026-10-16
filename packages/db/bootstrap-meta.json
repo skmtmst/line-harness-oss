@@ -635,7 +635,12 @@
     "717_customer_segments_ranks.sql",
     "718_hq_store_metrics.sql",
     "719_ec_auto_line.sql",
-    "720_booking_pass_plans.sql"
+    "720_booking_pass_plans.sql",
+    "721_member_rank_benefits.sql",
+    "722_hq_comparison_exports.sql",
+    "723_ec_auto_line_attribution.sql",
+    "724_booking_pass_purchases.sql",
+    "725_broadcast_execution_contexts.sql"
   ],
-  "migrationCount": 636
+  "migrationCount": 641
 }

@@ -95,6 +95,14 @@ CREATE TABLE _617_backup_templates (id TEXT PRIMARY KEY, folder_id TEXT);
 
 CREATE TABLE _617_backup_webinars (id TEXT PRIMARY KEY, folder_id TEXT);
 
+CREATE TABLE account_ai_features (
+ account_id TEXT NOT NULL REFERENCES line_accounts(id),feature TEXT NOT NULL CHECK(feature IN('banner','google_review')),
+ enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN(0,1)),version INTEGER NOT NULL DEFAULT 1,
+ consent_by TEXT,consent_at TEXT,disclosure_version TEXT,
+ CHECK(enabled=0 OR (consent_by IS NOT NULL AND consent_at IS NOT NULL AND disclosure_version IS NOT NULL)),
+ PRIMARY KEY(account_id,feature)
+);
+
 CREATE TABLE account_handover_decisions (
   id              TEXT PRIMARY KEY,
   handover_id     TEXT NOT NULL REFERENCES account_handovers(id) ON DELETE CASCADE,
@@ -1384,7 +1392,7 @@ CREATE TABLE banner_generations (
   finished_at      TEXT
 , reference_image_id TEXT REFERENCES banner_images(id), reference_mode TEXT
   CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')), base_color TEXT, accent_color TEXT, reference_images TEXT, emphasis_lines TEXT, crop_gravity TEXT NOT NULL DEFAULT 'center'
-  CHECK (crop_gravity IN ('center','top','bottom')), stop_requested_at TEXT);
+  CHECK (crop_gravity IN ('center','top','bottom')), stop_requested_at TEXT, ai_account_id TEXT REFERENCES line_accounts(id));
 
 CREATE TABLE banner_image_deliveries (
   id               TEXT PRIMARY KEY,
@@ -1646,7 +1654,7 @@ CREATE TABLE booking_entitlements (
   expires_at TEXT NOT NULL CHECK(julianday(expires_at)>julianday(valid_from)),
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','revoked')),
   version INTEGER NOT NULL DEFAULT 1 CHECK(version>0),
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, plan_id TEXT REFERENCES booking_pass_plans(id), source TEXT NOT NULL DEFAULT 'manual' CHECK(source IN('manual','online')), billing_status TEXT NOT NULL DEFAULT 'ok' CHECK(billing_status IN('ok','grace','stopped')),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, plan_id TEXT REFERENCES booking_pass_plans(id), source TEXT NOT NULL DEFAULT 'manual' CHECK(source IN('manual','online')), billing_status TEXT NOT NULL DEFAULT 'ok' CHECK(billing_status IN('ok','grace','stopped')), stripe_subscription_id TEXT, grace_until TEXT,
   CHECK((kind='ticket' AND remaining IS NOT NULL AND monthly_limit IS NULL)
     OR (kind='monthly' AND remaining IS NULL AND monthly_limit IS NOT NULL))
 );
@@ -1735,12 +1743,26 @@ CREATE TABLE booking_operation_runs (
 
 CREATE TABLE booking_page_views(id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id), menu_id TEXT REFERENCES menus(id), friend_id TEXT REFERENCES friends(id), entry_point TEXT, viewed_at TEXT NOT NULL);
 
+CREATE TABLE booking_pass_billing_events (
+ event_id TEXT PRIMARY KEY,purchase_id TEXT NOT NULL REFERENCES booking_pass_purchases(id),subscription_id TEXT,invoice_id TEXT,
+ kind TEXT NOT NULL CHECK(kind IN('checkout.session.completed','invoice.paid','invoice.payment_failed','customer.subscription.deleted')),
+ period_start TEXT NOT NULL,period_end TEXT NOT NULL,occurred_at TEXT NOT NULL,request_json TEXT NOT NULL CHECK(json_valid(request_json)),
+ result TEXT NOT NULL CHECK(result IN('recorded','applied','ignored')),test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1)
+);
+
 CREATE TABLE booking_pass_plans (
  id TEXT PRIMARY KEY,line_account_id TEXT NOT NULL REFERENCES line_accounts(id),kind TEXT NOT NULL CHECK(kind IN('ticket','monthly')),name TEXT NOT NULL,
  price INTEGER NOT NULL CHECK(price>=0),count INTEGER,monthly_limit INTEGER,valid_days INTEGER NOT NULL CHECK(valid_days BETWEEN 1 AND 3650),
  target_scope_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(target_scope_json)),allow_without_pass INTEGER NOT NULL DEFAULT 1 CHECK(allow_without_pass IN(0,1)),
  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN('draft','on_sale','stopped')),version INTEGER NOT NULL DEFAULT 1,created_by TEXT NOT NULL,created_at TEXT NOT NULL,idempotency_key TEXT NOT NULL,request_json TEXT NOT NULL,
  UNIQUE(line_account_id,created_by,idempotency_key),CHECK(kind='ticket' AND count>0 AND monthly_limit IS NULL OR kind='monthly' AND count IS NULL AND monthly_limit>0)
+);
+
+CREATE TABLE booking_pass_purchases (
+ id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES line_accounts(id),friend_id TEXT NOT NULL REFERENCES friends(id),plan_id TEXT NOT NULL REFERENCES booking_pass_plans(id),
+ amount INTEGER NOT NULL CHECK(amount>=0),snapshot_json TEXT NOT NULL CHECK(json_valid(snapshot_json)),request_key TEXT NOT NULL,checkout_id TEXT NOT NULL UNIQUE,
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','paid')),entitlement_id TEXT REFERENCES booking_entitlements(id),subscription_id TEXT UNIQUE,
+ test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),created_at TEXT NOT NULL,paid_at TEXT,UNIQUE(account_id,friend_id,request_key)
 );
 
 CREATE TABLE booking_payment_booking_links (
@@ -2119,6 +2141,15 @@ CREATE TABLE broadcast_asset_versions (
   created_by_staff_id TEXT,
   created_at TEXT NOT NULL,
   UNIQUE (asset_id, version_number)
+);
+
+CREATE TABLE broadcast_execution_contexts (
+ broadcast_id TEXT PRIMARY KEY REFERENCES broadcasts(id) ON DELETE CASCADE,account_id TEXT NOT NULL REFERENCES line_accounts(id),
+ purpose TEXT NOT NULL CHECK(purpose IN('transaction','notice','marketing')),execution_mode TEXT NOT NULL DEFAULT 'simulation' CHECK(execution_mode='simulation'),
+ created_via TEXT NOT NULL CHECK(created_via IN('manual','mcp')),created_by TEXT NOT NULL,mcp_connection_id TEXT REFERENCES mcp_connections(id),
+ request_key TEXT NOT NULL,request_fingerprint TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'draft' CHECK(state IN('draft','scheduled','completed')),
+ execution_key TEXT,execution_request_json TEXT,confirmed_count INTEGER,completed_at TEXT,
+ UNIQUE(account_id,created_by,request_key)
 );
 
 CREATE TABLE broadcast_insights (
@@ -2680,6 +2711,13 @@ CREATE TABLE ec_action_executions (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE (event_id, action_type, rule_version)
+);
+
+CREATE TABLE ec_auto_line_attribution_events (
+ id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES line_accounts(id),send_id TEXT NOT NULL REFERENCES ec_auto_line_sends(id),friend_id TEXT NOT NULL REFERENCES friends(id),
+ kind TEXT NOT NULL CHECK(kind IN('click','purchase')),external_event_id TEXT NOT NULL,order_id TEXT,amount INTEGER CHECK(amount>=0),occurred_at TEXT NOT NULL,
+ test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),request_json TEXT NOT NULL,
+ UNIQUE(account_id,external_event_id)
 );
 
 CREATE TABLE ec_auto_line_rule_events (
@@ -3811,7 +3849,7 @@ CREATE TABLE friends (
   unfollow_count   INTEGER NOT NULL DEFAULT 0,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL, support_mark_id TEXT REFERENCES support_marks(id) ON DELETE SET NULL, is_hidden INTEGER NOT NULL DEFAULT 0, real_name TEXT, system_display_name TEXT, private_memo TEXT, photo_watch_required INTEGER NOT NULL DEFAULT 0);
+, ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL, support_mark_id TEXT REFERENCES support_marks(id) ON DELETE SET NULL, is_hidden INTEGER NOT NULL DEFAULT 0, real_name TEXT, system_display_name TEXT, private_memo TEXT, photo_watch_required INTEGER NOT NULL DEFAULT 0, member_number TEXT);
 
 CREATE TABLE funnel_steps (
   id         TEXT PRIMARY KEY,
@@ -3957,6 +3995,13 @@ CREATE TABLE hq_form_test_tokens (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY(template_id,tenant_id) REFERENCES hq_templates(id,tenant_id),
   FOREIGN KEY(template_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id)
+);
+
+CREATE TABLE hq_store_comparison_export_jobs (
+ id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL REFERENCES tenants(id),requested_by TEXT NOT NULL REFERENCES staff_members(id),
+ request_key TEXT NOT NULL,filters_json TEXT NOT NULL CHECK(json_valid(filters_json)),account_ids_json TEXT NOT NULL CHECK(json_valid(account_ids_json)),
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','completed','failed')),csv_text TEXT,row_count INTEGER,error_code TEXT,
+ created_at TEXT NOT NULL,expires_at TEXT NOT NULL,completed_at TEXT,UNIQUE(tenant_id,requested_by,request_key)
 );
 
 CREATE TABLE hq_store_daily_metrics (
@@ -4833,14 +4878,22 @@ CREATE TABLE member_rank_history(id TEXT PRIMARY KEY,account_id TEXT NOT NULL RE
 
 CREATE TABLE member_rank_mutations(account_id TEXT NOT NULL REFERENCES line_accounts(id),request_key TEXT NOT NULL,request_json TEXT NOT NULL,response_json TEXT NOT NULL,PRIMARY KEY(account_id,request_key));
 
+CREATE TABLE member_rank_notices (
+ id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES line_accounts(id),friend_id TEXT NOT NULL REFERENCES friends(id),
+ change_key TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN('upgrade','downgrade_warning')),tier_id TEXT NOT NULL REFERENCES member_rank_tiers(id),
+ purpose TEXT NOT NULL CHECK(purpose IN('notice','marketing')),messages_json TEXT NOT NULL CHECK(json_valid(messages_json)),base_messages_json TEXT NOT NULL CHECK(json_valid(base_messages_json)),
+ scheduled_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'scheduled' CHECK(status IN('scheduled','simulated','cancelled','skipped_late','skipped_opted_out','skipped_blocked','skipped_disabled')),
+ processed_at TEXT,test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),UNIQUE(account_id,friend_id,change_key,kind)
+);
+
 CREATE TABLE member_rank_programs (
  account_id TEXT PRIMARY KEY REFERENCES line_accounts(id),metric TEXT NOT NULL DEFAULT 'visits' CHECK(metric IN('visits','amount','miles')),window_months INTEGER NOT NULL DEFAULT 6 CHECK(window_months BETWEEN 1 AND 36),
  status TEXT NOT NULL DEFAULT 'stopped' CHECK(status IN('stopped','active')),version INTEGER NOT NULL DEFAULT 1,activated_at TEXT,updated_at TEXT NOT NULL,initial_version INTEGER NOT NULL DEFAULT 0,evaluation_token TEXT
-);
+, notify_upgrade INTEGER NOT NULL DEFAULT 1 CHECK(notify_upgrade IN(0,1)), notify_downgrade INTEGER NOT NULL DEFAULT 1 CHECK(notify_downgrade IN(0,1)));
 
 CREATE TABLE member_rank_tiers (
  id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES line_accounts(id),sort INTEGER NOT NULL,name TEXT NOT NULL,threshold INTEGER NOT NULL CHECK(threshold>=0),mile_multiplier REAL NOT NULL DEFAULT 1 CHECK(mile_multiplier BETWEEN 1 AND 3),tag_id TEXT NOT NULL REFERENCES tags(id)
-);
+, coupon_code TEXT, upgrade_message_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(upgrade_message_json)), downgrade_message_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(downgrade_message_json)), benefit_descriptions_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(benefit_descriptions_json)));
 
 CREATE TABLE member_ranks(account_id TEXT NOT NULL REFERENCES line_accounts(id),friend_id TEXT NOT NULL REFERENCES friends(id),tier_id TEXT NOT NULL REFERENCES member_rank_tiers(id),since TEXT NOT NULL,downgrade_due_at TEXT,PRIMARY KEY(account_id,friend_id));
 
@@ -9178,6 +9231,10 @@ CREATE TABLE workflow_steps (
 
 CREATE INDEX ai_answer_logs_account ON ai_answer_logs(account_id,created_at,id);
 
+CREATE INDEX booking_pass_billing_cycle ON booking_pass_billing_events(subscription_id,period_start,occurred_at);
+
+CREATE UNIQUE INDEX booking_pass_subscription ON booking_entitlements(line_account_id,stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
+
 CREATE INDEX booking_sync_notices_account ON booking_sync_notices(line_account_id,status,target_date);
 
 CREATE INDEX bookings_group ON bookings(group_id);
@@ -9188,6 +9245,10 @@ CREATE INDEX broadcasts_hq_run ON broadcasts(hq_run_id);
 
 CREATE INDEX customer_activity_cells ON customer_activity_daily(account_id,basis,r_bucket,f_bucket,friend_id);
 
+CREATE UNIQUE INDEX ec_auto_line_attribution_order ON ec_auto_line_attribution_events(account_id,order_id) WHERE kind='purchase';
+
+CREATE INDEX ec_auto_line_attribution_send ON ec_auto_line_attribution_events(send_id,kind,occurred_at);
+
 CREATE INDEX ec_auto_line_sends_caps ON ec_auto_line_sends(account_id,friend_id,sent_at,product_id);
 
 CREATE INDEX ec_auto_line_sends_due ON ec_auto_line_sends(status,scheduled_at);
@@ -9195,6 +9256,10 @@ CREATE INDEX ec_auto_line_sends_due ON ec_auto_line_sends(status,scheduled_at);
 CREATE INDEX ec_behavior_friend ON ec_behavior_events(account_id,friend_id,occurred_at,type);
 
 CREATE INDEX friend_delivery_consents_dispatch ON friend_delivery_consents(line_account_id,state,friend_id);
+
+CREATE UNIQUE INDEX friends_account_member_number ON friends(line_account_id,member_number);
+
+CREATE INDEX hq_store_comparison_exports_due ON hq_store_comparison_export_jobs(status,created_at);
 
 CREATE INDEX hq_store_response_period ON hq_store_response_samples(account_id,responded_at);
 
@@ -11370,6 +11435,8 @@ CREATE UNIQUE INDEX member_rank_active_sort ON member_rank_tiers(account_id,sort
 
 CREATE INDEX member_rank_history_friend ON member_rank_history(account_id,friend_id,at);
 
+CREATE INDEX member_rank_notices_due ON member_rank_notices(status,scheduled_at);
+
 CREATE INDEX rt_closures_store_dates ON rt_closures(store_id,start_date,end_date) WHERE archived_at IS NULL;
 
 CREATE INDEX rt_confirmation_reservation ON rt_reservation_confirmations(reservation_id,reservation_version);
@@ -11620,6 +11687,14 @@ WHEN OLD.staff_id IS NOT NEW.staff_id AND OLD.nominated=1
 BEGIN UPDATE bookings SET nominated=0,nomination_fee_at_booking=0,
  price_at_booking=MAX(0,NEW.price_at_booking-OLD.nomination_fee_at_booking) WHERE id=NEW.id; END;
 
+CREATE TRIGGER booking_pass_grace_consumption BEFORE UPDATE OF consumed_at ON booking_entitlement_uses
+WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL AND EXISTS(SELECT 1 FROM booking_entitlements e WHERE e.id=NEW.entitlement_id AND e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))
+BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+
+CREATE TRIGGER booking_pass_grace_selection BEFORE INSERT ON booking_entitlement_uses
+WHEN EXISTS(SELECT 1 FROM booking_entitlements e WHERE e.id=NEW.entitlement_id AND e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))
+BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+
 CREATE TRIGGER booking_payments_history_detach AFTER UPDATE OF booking_id ON booking_payments BEGIN UPDATE booking_payments SET booking_id_history = COALESCE(NEW.booking_id, OLD.booking_id, OLD.booking_id_history) WHERE id = NEW.id; END;
 
 CREATE TRIGGER booking_payments_history_insert AFTER INSERT ON booking_payments BEGIN UPDATE booking_payments SET booking_id_history = COALESCE(NEW.booking_id, NEW.booking_id_history) WHERE id = NEW.id; END;
@@ -11665,6 +11740,14 @@ CREATE TRIGGER booking_waitlist_conversion AFTER INSERT ON bookings WHEN NEW.wai
 CREATE TRIGGER booking_waitlist_registration BEFORE INSERT ON booking_waitlist BEGIN SELECT CASE WHEN julianday(NEW.starts_at)<=julianday('now','+1 hour') THEN RAISE(ABORT,'waitlist_registration_closed') WHEN ((SELECT COUNT(*) FROM booking_waitlist w WHERE w.line_account_id=NEW.line_account_id AND w.status IN ('waiting','invited') AND (w.friend_id=NEW.friend_id OR (w.booking_customer_id IS NOT NULL AND w.booking_customer_id=NEW.booking_customer_id))) + (SELECT COUNT(*) FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=NEW.line_account_id AND w.status IN ('waiting','invited') AND w.line_uid=(SELECT line_user_id FROM friends WHERE id=NEW.friend_id AND line_account_id=NEW.line_account_id)))>=3 THEN RAISE(ABORT,'waitlist_limit') END; END;
 
 CREATE TRIGGER booking_waitlist_resource_snapshot AFTER UPDATE OF status ON booking_waitlist WHEN NEW.status='invited' AND OLD.status='waiting' BEGIN INSERT OR REPLACE INTO booking_waitlist_resources SELECT NEW.id,resource_id,quantity FROM booking_menu_resources WHERE menu_id=NEW.menu_id; END;
+
+CREATE TRIGGER broadcast_simulation_dispatch_insert BEFORE INSERT ON broadcast_send_claims
+WHEN (NEW.dispatched_at IS NOT NULL OR NEW.state='sent') AND EXISTS(SELECT 1 FROM broadcast_execution_contexts WHERE broadcast_id=NEW.broadcast_id)
+BEGIN SELECT RAISE(ABORT,'simulation_transport_forbidden'); END;
+
+CREATE TRIGGER broadcast_simulation_dispatch_update BEFORE UPDATE ON broadcast_send_claims
+WHEN (NEW.dispatched_at IS NOT NULL OR NEW.state='sent') AND EXISTS(SELECT 1 FROM broadcast_execution_contexts WHERE broadcast_id=NEW.broadcast_id)
+BEGIN SELECT RAISE(ABORT,'simulation_transport_forbidden'); END;
 
 CREATE TRIGGER capture_ad_conversion_account AFTER INSERT ON conversion_events BEGIN INSERT INTO ad_conversion_event_accounts(conversion_event_id,line_account_id,platform_ids_json) SELECT NEW.id,f.line_account_id,(SELECT json_group_array(p.id) FROM ad_platforms p WHERE p.line_account_id = f.line_account_id AND p.is_active = 1 AND p.verified_at IS NOT NULL AND p.name IN ('meta','google')) FROM friends f WHERE f.id = NEW.friend_id AND f.line_account_id IS NOT NULL; END;
 
@@ -11800,6 +11883,9 @@ CREATE TRIGGER friend_field_value_source_clear AFTER UPDATE OF value, updated_by
 WHEN NEW.updated_by IS NOT 'form' AND NEW.source_type = 'form'
 BEGIN   UPDATE friend_field_values SET source_type = NULL, source_id = NULL
   WHERE friend_id = NEW.friend_id AND field_id = NEW.field_id; END;
+
+CREATE TRIGGER friends_issue_member_number AFTER INSERT ON friends WHEN NEW.member_number IS NULL BEGIN
+ UPDATE friends SET member_number=upper(hex(randomblob(8))) WHERE id=NEW.id; END;
 
 CREATE TRIGGER hq_attribute_skip_insert BEFORE INSERT ON hq_template_preflight_resolutions
 WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
