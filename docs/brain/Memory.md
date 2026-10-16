@@ -54,7 +54,7 @@ tags: [memory, core]
 
 ## 進行中（2026-10-16）
 
-- 列車41（lh-train-41 / codex/kenta-train-41-1016）：10-16 11:00依頼の続き。A〜F指定6コミットを保持し、#1744の47f4a43153を03b59c385fへ--no-ff包含。Worker・DB全体をAPI列車と同一にし、支払い表示の公開も保持。最新本線b34e4f5babを包含済み。DB2285・Worker12193全件成功、型/lint・Workerビルド/LIFF入口成功。Web全試験はheavy枠待ち、V8・依存ビルドを抜かしたscripts/LIFFの正規再実行も残る。所有102/文字契約7/選択欄3は許可を足さず記録。見た目・上限・許可・鍵は変更なし。コミットまで、push/PR/DB適用/配備なし。続きはdocs/qa/train41-api-1016.md、前回の鍵と画面指摘はdocs/qa/train41-1016.md。
+- 列車41（lh-train-41 / codex/kenta-train-41-1016）：A〜F指定6コミットを保持し、#1744の47f4a43153を03b59c385fへ--no-ff包含。本線b34e4f5babも包含済み。Worker・DB全体はAPI列車と同一。Web APIの分割3ファイルの.js参照でNextが起動できず、拡張子なしへ直したe0d84691b0を保存（関連5/型/本番形式build成功）。DB2285・Worker12193・scripts1037/skip1・共有385・LIFF485成功、LIFFビルド/行数違反0。修正版のWeb全試験中、V8/同版の鍵checkは未完。所有102/文字契約7/選択欄3は許可を足さず記録。見た目・上限・許可・鍵は変更なし。コミットまで、push/PR/DB適用/配備なし。docs/qa/train41-api-1016.md（途中）と前回docs/qa/train41-1016.md。
 
 
 
