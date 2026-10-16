@@ -6,7 +6,7 @@ const account=(path:string,id:string)=>`${path}?account_id=${e(id)}`;
 const json=(method:string,body:unknown,key?:string)=>({method,body:JSON.stringify(body),...(key?{headers:{'Idempotency-Key':key}}:{})});
 const liff=(path:string,id:string)=>`${path}?liffId=${e(id)}`;
 const bearer=(token:string,key?:string)=>({Authorization:`Bearer ${token}`,...(key?{'Idempotency-Key':key}:{})});
-export interface Gap2MenuWrite {name:string;duration_minutes:number;base_price:number;expectedVersion?:number;description?:string|null;is_active?:boolean;audienceMode?:BookingAudienceWrite['audienceMode'];audienceTagIds?:string[];addonMenuIds?:string[];addonOnly?:boolean;maxPartySize?:1}
+export interface Gap2MenuWrite {name:string;duration_minutes:number;base_price:number;expectedVersion?:number;description?:string|null;is_active?:boolean;audienceMode?:BookingAudienceWrite['audienceMode'];audienceTagIds?:string[];addonMenuIds?:string[];addonOnly?:boolean;maxPartySize?:1|2|3|4|5|6;recurring?:{enabled:boolean;freqs:Array<'weekly'|'biweekly'|'monthly_nth'>;maxCount:number}}
 export const bookingAudienceApi={
  previewAs:(accountId:string,friendId:string)=>fetchApi<Result<Array<{id:string;name:string;visible:boolean;reason:string|null}>>>(account('/api/booking/admin/menus/preview-as',accountId)+`&friend_id=${e(friendId)}`),
  createMenu:(accountId:string,input:Gap2MenuWrite,key:string)=>fetchApi<{id:string;version:number}>(account('/api/booking/admin/menus',accountId),json('POST',input,key)),
@@ -51,7 +51,7 @@ export const aiDraftApi={
  saveSettings:(a:string,input:{mode:'off'|'draft_only'|'suspended';expectedVersion:number;confirmed?:true;reason?:string})=>fetchApi<Result<{mode:string;version:number;autoReplyAvailable:false}>>(account('/api/ai-settings',a),json('PUT',input)),
  summary:(chatId:string)=>fetchApi<Result<AiSummary>>(`/api/chats/${e(chatId)}/ai/summary`,json('POST',{})),
  draft:(chatId:string)=>fetchApi<Result<AiReplyDraft>>(`/api/chats/${e(chatId)}/ai/draft`,json('POST',{})),
- qa:(a:string,q='',offset=0)=>fetchApi<Result<QaEntry[]>&{total:number;nextOffset:number|null}>(account('/api/qa-entries',a)+`&q=${e(q)}&offset=${offset}`),
+ qa:async(a:string,q='',offset=0)=>{const r=await fetchApi<Result<{items:QaEntry[];total:number;nextOffset:number|null}>>(account('/api/qa-entries',a)+`&q=${e(q)}&offset=${offset}`);return {success:true as const,data:r.data.items,total:r.data.total,nextOffset:r.data.nextOffset};},
  createQa:(a:string,input:QaEntryWrite,key:string)=>fetchApi<Result<QaEntry>>(account('/api/qa-entries',a),json('POST',input,key)),
  saveQa:(a:string,id:string,input:QaEntryWrite&{expectedVersion:number})=>fetchApi<Result<{version:number;status:'draft'}>>(account(`/api/qa-entries/${e(id)}`,a),json('PUT',input)),
  publishQa:(a:string,id:string,expectedVersion:number)=>fetchApi<Result<{version:number;status:'published'}>>(account(`/api/qa-entries/${e(id)}/publish`,a),json('POST',{expectedVersion})),

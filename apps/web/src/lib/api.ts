@@ -6199,6 +6199,8 @@ export type StepUpPurpose =
   | 'broadcast.approval'
   | 'webhook.api_token'
   | 'webhook.secret'
+  | 'ai.settings'
+  | 'mcp.connection'
 
 /** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。 */
 export type LineAccountTag = { id: string; name: string; color: string | null; displayOrder: number }
@@ -14254,6 +14256,7 @@ export interface BookingTodayResponse {
 
 /** キャンセル待ちの1件（booking-plus 2）。 */
 export interface BookingWaitlistEntry {
+  position?: number | null
   id: string;
   staff_id: string;
   menu_id: string;
