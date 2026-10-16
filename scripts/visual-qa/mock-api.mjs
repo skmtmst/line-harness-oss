@@ -2225,7 +2225,28 @@ const UID_MIGRATION_DONE = {
   rolledBackAt: null, failureReason: null, rollbackable: true,
 }
 
+/* G1 A/B テスト（要件 G1 §3 の口の案。gap2 が作るまでの見本）。broadcast-2＝勝ちが決まった（n4kwM）・broadcast-3＝決められない（Eoi7q）。 */
+function broadcastAbRead(method, pathname) {
+  const m = method === 'GET' && pathname.match(/^\/api\/broadcasts\/([^/]+)\/ab-result$/)
+  if (!m) return null
+  const variants = (bClick, bBook) => [
+    { key: 'A', label: '写真 1 枚', sent: 405, failed: 0, clicks: 25, clickRate: 0.062, bookings: 3, purchases: null, purchaseAmount: null },
+    { key: 'B', label: 'カルーセル 3 枚', sent: 405, failed: 0, clicks: Math.round(405 * bClick), clickRate: bClick, bookings: bBook, purchases: null, purchaseAmount: null },
+  ]
+  if (m[1] === 'broadcast-2') return { success: true, data: { status: 'decided', metric: 'click', decideAfterMinutes: 240, variants: variants(0.098, 7), winner: 'B', confidence: 0.98, decideAt: '2026-11-20T05:00:00.000Z', remainder: { count: 3240, scheduledAt: '2026-11-20T05:00:00.000Z', sentAt: '2026-11-20T05:00:00.000Z' } } }
+  if (m[1] === 'broadcast-3') return { success: true, data: { status: 'undecided', metric: 'click', decideAfterMinutes: 240, variants: variants(0.066, 4), winner: null, confidence: 0.61, decideAt: '2026-11-20T05:00:00.000Z', chooseUntil: '2026-11-21T05:00:00.000Z', remainder: { count: 3240, scheduledAt: null, sentAt: null } } }
+  return { success: true, data: null }
+}
+function broadcastAbWrite(method, pathname) {
+  if (method === 'PUT' && /^\/api\/broadcasts\/[^/]+\/ab-test$/.test(pathname)) return { version: 1 }
+  if (method === 'DELETE' && /^\/api\/broadcasts\/[^/]+\/ab-test$/.test(pathname)) return { removed: true }
+  if (method === 'PUT' && /^\/api\/broadcasts\/[^/]+\/variants\/[AB]$/.test(pathname)) return { version: 1 }
+  if (method === 'POST' && /^\/api\/broadcasts\/[^/]+\/ab-test\/choose$/.test(pathname)) return { status: 'decided' }
+  return null
+}
+
 function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
+  { const ab = broadcastAbWrite(method, pathname); if (ab) return ab }
   /*
    * B-6 受信箱の添付（API-15・M0393「7. 添付」）：画像以外の準備（アップロード）は保存しないで同じ形を返す。
    * B-26 右の欄でその場で直す：対応状況・担当・メモの更新は、送った値を当てた会話を返す（保存はしない）。
@@ -2898,6 +2919,7 @@ function visitStampRead(pathname, query) {
 }
 
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  { const ab = broadcastAbRead(method, pathname); if (ab) return ab }
   { const stamps = method === 'GET' ? visitStampRead(pathname, query) : null; if (stamps) return stamps }
   if (method === 'GET' && pathname === '/api/restaurant-test/media-links') return { success: true, data: RESTAURANT_MEDIA_LINKS }
   if (method === 'GET' && pathname === '/api/restaurant-test/media') return { success: true, data: RESTAURANT_MEDIA_LINKS.map(({ code, name, acceptsReservations }) => ({ code, name, acceptsReservations })) }

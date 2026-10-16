@@ -76,6 +76,9 @@ import {
   filterSendableTemplates,
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useBroadcastAb } from '@/v8/broadcast-ab/use-ab'
+import BroadcastAbTabs from '@/v8/broadcast-ab/tabs'
+import BroadcastAbSettings, { abConfirmLine } from '@/v8/broadcast-ab/settings'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Combobox from '@/components/shared/combobox'
@@ -589,6 +592,8 @@ export default function BroadcastForm({
   const [templateSaveCreatedId, setTemplateSaveCreatedId] = useState<string | null>(null)
   const [templateApplyError, setTemplateApplyError] = useState('')
   const templateApplyLock = useRef(false)
+  /* G1 A/B テスト（QOdsh・cM35y・a5r5Wg）。A 案はこの bubbles、B 案は ab が持つ。 */
+  const ab = useBroadcastAb()
   const [bubbles, setBubbles] = useState<BroadcastBubble[]>(visualQaAugustCampaign ? [{
     id: 'visual-qa-august-campaign',
     type: 'text',
@@ -2025,6 +2030,8 @@ export default function BroadcastForm({
       // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (!saved) return
+      /* G1：B 案と A/B の設定を送る（送る・承認の依頼の前に）。 */
+      await ab.persist(saved.id)
       // 承認が要るときは、保存のあと承認の依頼まで続ける。依頼までが1つの操作。
       if (needsApproval && !needsApprovalSingle) {
         const requested = await api.broadcasts.approval.request(saved.id, {
@@ -2339,6 +2346,18 @@ export default function BroadcastForm({
         </section>
         <div className={shows('message') ? 'contents' : 'hidden'}>
         <section id="broadcast-step-message" className={ styles.section}>
+          {targetMode !== 'all' ? <BroadcastAbTabs ab={ab} aBubbles={bubbles} canEdit /> : null}
+          {ab.tab === 'B' && ab.b ? (
+            <MessageComposer bubbles={ab.b} accountId={selectedAccountId} busy={composerBusy}
+              unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
+              onChange={(index, bubble) => ab.setB((items) => (items ?? []).map((item, i) => (i === index ? bubble : item)))}
+              onMove={(index, direction) => ab.setB((items) => { const next = [...(items ?? [])]; const to = index + direction; if (to < 0 || to >= next.length) return next; [next[index], next[to]] = [next[to], next[index]]; return next })}
+              onDelete={(index) => ab.setB((items) => (items ?? []).filter((_, i) => i !== index))}
+              onAdd={() => ab.setB((items) => [...(items ?? []), emptyBubble()])}
+              onPickTemplate={() => undefined} onSaveTemplate={() => undefined} onCompose={() => undefined}
+            />
+          ) : null}
+          <div className={ab.tab === 'B' && ab.b !== null ? 'hidden' : 'contents'}>
           <MessageComposer bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))} bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)} bubbles={bubbles} accountId={selectedAccountId} busy={composerBusy} onBusyChange={(value) => { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(value) }}
             unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
             onChange={updateBubble} onMove={moveBubble} onDelete={(index) => setBubbles((items) => items.filter((_, i) => i !== index))}
@@ -2348,6 +2367,7 @@ export default function BroadcastForm({
             onCompose={(index, kind) => { setTemplateSaveError(''); setInlineComposer({ index, kind }) }}
             extraFields={(index, bubble) => bubble.type === 'text' ? null : isContentTemplateType(bubble.type) ? <SaveErrorField names={["assetId","bubble.content.assetId","content.assetId","asset_id","bubble.content.asset_id","content.asset_id"]}><EntitySelect clearable size="full" aria-label="コンテンツで作成したテンプレートから選択" placeholder="テンプレートを選択してください" value={String(bubble.content.assetId ?? '')} onChange={(id) => { const asset = assets.find((item) => item.id === id); updateBubble(index, { ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : {} }) }} options={assets.filter((item) => item.kind === bubble.type).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name }))} /></SaveErrorField> : null}
           />
+          </div>
         </section>
         {showTemplatePicker && (
           <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ" searchPlaceholder="テンプレート名・本文で探す"
@@ -2386,6 +2406,7 @@ export default function BroadcastForm({
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
+          <BroadcastAbSettings ab={ab} total={audienceCount} targetAll={targetMode === 'all'} start={new Date(scheduledAtIso() ?? Date.now())} approvalThreshold={approvalConfig?.threshold ?? null} ecConnected canEdit onNarrow={() => goToStep('audience')} />
           <h3>配信日</h3>
           <SaveErrorField names={["broadcast-send-mode","sendMode","spreadMinutes"]}><RadioCardGroup legend="配信日" className={styles.methodCards}>
             <RadioCard name="broadcast-send-mode" value="now" checked={sendMode === 'now' && Number(spreadMinutes) === 0} onChange={() => { setSendMode('now'); setSpreadMinutes('0') }} title="今すぐ配信" note="最終確認で送ると、すぐに届きます" />
@@ -2534,7 +2555,7 @@ export default function BroadcastForm({
         <div className={styles.previewHead}><h3>LINE の見え方</h3><div className={styles.deviceSwitch} role="group" aria-label="プレビューの端末"><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button></div><Button ref={previewCloseRef} className={styles.previewClose} size="compact" onClick={() => { setPreviewOpen(false); previewToggleRef.current?.focus() }}>閉じる</Button></div>
         <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
           <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={ Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
-            <div className="flex flex-col gap-3 text-ink">{ bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
+            <div className="flex flex-col gap-3 text-ink">{ (ab.tab === 'B' && ab.b ? ab.b : bubbles).map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
           </LinePreview>
         </div>
         <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>
@@ -2673,6 +2694,7 @@ export default function BroadcastForm({
         onCancel={() => { if (!saving) setConfirmOpen(false) }}
         onConfirm={canConfirm && (!currentStep || approvalConfigState === 'ready') ? () => void save() : undefined}
       >
+        {abConfirmLine(ab, audienceCount, new Date(scheduledAtIso() ?? Date.now())) ? <Notice tone="info" data-design-node="a5r5Wg">{abConfirmLine(ab, audienceCount, new Date(scheduledAtIso() ?? Date.now()))}</Notice> : null}
         {currentStep && approvalConfigState === 'loading' ? <p role="status" className="text-xs text-ink-faint">承認の設定を確認しています…</p> : currentStep && approvalConfigState === 'error' ? <Notice tone="danger">承認の設定を確認できません。戻ってから確認画面を開き直してください</Notice> : null}
         <dl className="border-hairline divide-hairline divide-y rounded-control border text-sm">
           <div className="flex justify-between gap-4 px-4 py-3">

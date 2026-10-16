@@ -324,6 +324,9 @@ shared-button-importer v8/ops/knowledge-article.tsx
 shared-button-importer v8/ops/tenants.tsx
 shared-button-importer v8/ops/tenant-detail.tsx
 shared-button-importer v8/ops/support.tsx
+shared-button-importer v8/broadcast-ab/result.tsx
+shared-button-importer v8/broadcast-ab/settings.tsx
+shared-button-importer v8/broadcast-ab/tabs.tsx
 shared-button-importer v8/broadcast-detail/detail.tsx
 shared-button-importer v8/broadcast-detail/reserved.tsx
 shared-button-importer v8/hq-banners/dialogs.tsx
