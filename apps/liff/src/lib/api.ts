@@ -27,7 +27,13 @@ export interface MenuItem {
   /** キャンセル期限 (開始の何時間前まで)。null は店の既定を使う。 */
   cancel_deadline_hours_before?: number | null;
   intake_question?: string | null;
+  /** 同時に予約できる人数（B5。1 以外のときだけ「何人で予約しますか」を出す）。口の返事の形は B5 の案。 */
+  max_party_size?: number;
+  /** 追加メニュー（オプション）。人ごとに 0〜3 個選べる。 */
+  addons?: MenuAddon[];
 }
+
+export interface MenuAddon { id: string; name: string; duration_minutes: number; price: number }
 
 export interface StaffItem {
   id: string;
@@ -421,9 +427,21 @@ export const api = {
   },
   /** 予約の設定を読む。読めないときは呼び側が既定（リスト・60日）に倒す。 */
   bookingSettings: () => get<LiffBookingSettings>('/api/liff/booking/settings'),
+  /** 繰り返しの確かめ（B4）。取れない回と近い時間の候補（最大 3）を返す。保存はしない。 */
+  seriesPreview: (body: { menu_id: string; staff_id: string; starts_at: string; freq: 'weekly'; count: number }) =>
+    post<{ occurrences: Array<{ index: number; starts_at: string; available: boolean; reason?: string; alternatives: string[] }> }>('/api/liff/booking/series/preview', body),
   // Worker 側で id_token を verify するので lineUserId は body に入れない。
   createRequest: (
-    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string;waitlist_id?:string },
+    body: {
+      menu_id: string; staff_id: string; starts_at: string; customer_note?: string; waitlist_id?: string;
+      /** B5：2 人以上・追加メニューのとき。1 人でも取れなければ何も作らない（全部か無し）。 */
+      members?: Array<{ menu_id: string; addon_ids: string[]; staff_id: string | null; guest_label?: string | null }>;
+      start_mode?: 'parallel' | 'sequential';
+      /** B4：「毎週この時間で続ける」。取れない回の扱いは回ごとに（飛ばす／近い時間）。 */
+      recurrence?: { freq: 'weekly'; count: number; choices: Array<{ index: number; action: 'keep' | 'skip' | 'alternative'; alternative_starts_at?: string }> };
+      /** B6：答えで決まった行き先の署名。 */
+      routing_token?: string;
+    },
     idempotencyKey: string,
   ) =>
     post<CreateBookingResponse>(

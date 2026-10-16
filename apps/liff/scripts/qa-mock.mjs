@@ -504,7 +504,7 @@ const server = createServer(async (req, res) => {
 
   // ---- 予約 ----
   if (method === 'GET' && pathname === '/api/liff/booking/menus') {
-    json(res, 200, {
+    const menusBody = {
       menus: [
         {
           id: 'qa-menu-1',
@@ -548,7 +548,16 @@ const server = createServer(async (req, res) => {
           sort_order: 4,
         },
       ],
-    });
+    };
+    /* ③-2 第2弾 B5：同伴・追加メニュー（hhUtj・zYErQ）。features に party があるときだけ上限と追加メニューを返す。 */
+    if (state.features.includes('party')) {
+      for (const m of menusBody.menus) {
+        if (m.id === 'qa-menu-4') continue;
+        m.max_party_size = 3;
+        if (m.id === 'qa-menu-1') m.addons = [{ id: 'qa-addon-1', name: '歯みがき', duration_minutes: 15, price: 800 }, { id: 'qa-addon-2', name: '爪切り', duration_minutes: 10, price: 500 }];
+      }
+    }
+    json(res, 200, menusBody);
     return;
   }
   {
@@ -578,7 +587,7 @@ const server = createServer(async (req, res) => {
             profile_image_url: null,
             bio: null,
             is_designation_optional: 0,
-            price: basePrice,
+            price: state.features.includes('party') ? basePrice + 500 : basePrice,
             duration_minutes: duration,
           },
           {

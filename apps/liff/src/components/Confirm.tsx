@@ -11,6 +11,7 @@ import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import PrivacyNote from './ui/PrivacyNote.js';
 import type { SlotPick } from './DateTimePicker.js';
+import { menuLine, personShort, totals, yen, type PartyState } from '../lib/party.js';
 
 /**
  * 1-d 内容の確認 (★V8・gLReL)。送った中身のカード＋ご要望＋案内の帯。
@@ -22,6 +23,7 @@ export default function Confirm({
   staff,
   slot,
   autoConfirm,
+  party,
   cancelDeadlineMinutesBefore = null,
   onBack,
   onSubmitted,
@@ -31,6 +33,8 @@ export default function Confirm({
   slot: SlotPick;
   /** 予約のルールが承認なし確定のとき真。未承認の案内を出さない。 */
   autoConfirm: boolean;
+  /** 2 人以上・追加メニューのとき（B5）。人ごとの行と合計を出し、組で送る。 */
+  party?: PartyState;
   cancelDeadlineMinutesBefore?: number | null;
   /** 「← 日時を選び直す」。日時の段へ戻る。 */
   onBack: () => void;
@@ -70,6 +74,10 @@ export default function Confirm({
           // 空き枠が返した開始の瞬間を送る（店が日本時間以外でもずれない）。
           starts_at: slotStartsAtIso(slot),
           customer_note: note || undefined,
+          ...(party ? {
+            members: party.members.map((m, i) => ({ menu_id: (m.menu ?? menu).id, addon_ids: m.addonIds, staff_id: i === 0 ? (m.staff ?? staff).id : (m.staff?.id ?? null) })),
+            start_mode: totals(party, menu).sequential ? 'sequential' as const : 'parallel' as const,
+          } : {}),
         },
         idemKey,
       );
@@ -102,15 +110,15 @@ export default function Confirm({
     <div className="space-y-3.5" data-design-node={wide ? 'uZqMA' : 'gLReL'}>
       <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
       <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
-        <Row label="メニュー" value={menu.name} />
+        {party ? totals(party, menu).rows.map((r) => <Row key={r.index} label={personShort(r.index)} value={`${menuLine(r.menu, r.member)}・${(r.index === 0 ? (r.member.staff ?? staff) : r.member.staff)?.display_name ?? '指名なし'}`} />) : <Row label="メニュー" value={menu.name} />}
         <Row
           label="日時"
-          value={`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, staff.duration_minutes)}`}
+          value={`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, party ? totals(party, menu).minutes : staff.duration_minutes)}`}
         />
-        <Row label="担当" value={staff.display_name} />
+        {party ? null : <Row label="担当" value={staff.display_name} />}
         <Row
           label="料金"
-          value={`${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
+          value={party ? `${yen(totals(party, menu).price)}（目安・お店で払う）` : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
         />
       </dl>
       <BookingIntake question={menu.intake_question} value={note} onChange={setNote} />

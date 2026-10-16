@@ -15,6 +15,8 @@ import Stepper from '../components/ui/Stepper.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
+import PartyMenuStep, { PartyStaffStep, PartySummary } from '../components/PartyStep.js';
+import { initialParty, partyCapable, type PartyState } from '../lib/party.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
 
@@ -35,6 +37,9 @@ export default function Booking() {
   const [step, setStep] = useUrlStep<Step>('menu', { search: params.toString(), write: (query, replace) => setParams(query, { replace }) });
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
+  /* 同伴・追加メニュー（B5）。メニューが許したときだけ使う。1 人で追加なしなら今までどおり。 */
+  const [party, setParty] = useState<PartyState>(initialParty);
+  const [changingMenu, setChangingMenu] = useState(false);
   const [slot, setSlot] = useState<SlotPick | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [paymentDue, setPaymentDue] = useState(false);
@@ -89,7 +94,9 @@ export default function Booking() {
     if (m.id !== menu?.id) {
       setStaff(null);
       setSlot(null);
+      setParty(initialParty());
     }
+    setChangingMenu(false);
     setMenu(m);
   }
 
@@ -98,6 +105,9 @@ export default function Booking() {
     setStaff(s);
   }
 
+  /* 2 人以上・追加メニューあり。確認と送信を組の形にする。 */
+  const partyActive = party.size > 1 || party.members[0]?.addonIds.length > 0;
+  const partyMode = step === 'menu' && !changingMenu && partyCapable(menu);
   const steps = paymentDue ? [...STEPS, 'お支払い'] : STEPS;
   const stepIndex =
     step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : step === 'payment' ? 4 : 3;
@@ -115,7 +125,10 @@ export default function Booking() {
       <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>
         {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
         <div key={step} className="liff-step">
-        {step === 'menu' && (
+        {step === 'menu' && partyMode && (
+          <PartyMenuStep menu={menu!} party={party} onParty={setParty} onChangeMenu={() => setChangingMenu(true)} />
+        )}
+        {step === 'menu' && !partyMode && (
           <div data-design-node="IruGD" className="space-y-3.5">
             <RepeatCard
               onRepeat={(m, s) => {
@@ -127,7 +140,10 @@ export default function Booking() {
             <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
           </div>
         )}
-        {step === 'staff' && menu && (
+        {step === 'staff' && menu && party.size > 1 && (
+          <PartyStaffStep menu={menu} party={party} onParty={setParty} onLoadState={setStepReady} />
+        )}
+        {step === 'staff' && menu && party.size === 1 && (
           <div data-design-node="biNP5">
             <StaffList
               key={menu.id}
@@ -158,6 +174,7 @@ export default function Booking() {
             staff={staff}
             slot={slot}
             autoConfirm={autoConfirm}
+            party={partyActive ? party : undefined}
             cancelDeadlineMinutesBefore={cancelDeadline}
             onBack={() => setStep('datetime')}
             onSubmitted={(result) => {
@@ -191,16 +208,18 @@ export default function Booking() {
         )}
         </div>
       </div>
-      {step === 'menu' && stepReady && (
+      {step === 'menu' && (stepReady || partyMode) && (
         <BottomBar>
-          <Button variant="primary" disabled={!menu} onClick={() => setStep('staff')}>
+          {partyMode && menu ? <PartySummary party={party} first={menu} /> : null}
+          <Button variant="primary" disabled={!menu} onClick={() => { if (partyMode && party.size === 1) setStaff(null); setStep('staff'); }}>
             担当を選ぶ
           </Button>
         </BottomBar>
       )}
       {step === 'staff' && stepReady && (
         <BottomBar>
-          <Button variant="primary" disabled={!staff} onClick={() => setStep('datetime')}>
+          {party.size > 1 && menu ? <PartySummary party={party} first={menu} withFee /> : null}
+          <Button variant="primary" disabled={party.size > 1 ? !party.members[0].staff : !staff} onClick={() => { if (party.size > 1) { const lead = party.members[0].staff; if (lead && lead.id !== staff?.id) { setSlot(null); setStaff(lead); } } setStep('datetime'); }}>
             日時を選ぶ
           </Button>
           <Button variant="text"
