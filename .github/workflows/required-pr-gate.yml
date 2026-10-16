@@ -556,7 +556,9 @@ jobs:
           pnpm exec playwright test
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
       - name: MFA auth input and button behavior at three widths
-        run: pnpm exec playwright test --config apps/web/src/v8/login/train30-auth.config.mjs
+        run: |
+          mfa_mock_port="$(node --input-type=module -e 'import { createServer } from "node:net"; const server = createServer(); server.listen(0, "127.0.0.1", () => { console.log(server.address().port); server.close(); });')"
+          TRAIN30_MOCK_PORT="$mfa_mock_port" pnpm exec playwright test --config apps/web/src/v8/login/train30-auth.config.mjs
       - name: Verify admin security headers and auth interactions
         run: node scripts/codex/train32-security-browser.mjs web
       - name: Upload MFA browser failure context
