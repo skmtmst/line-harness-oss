@@ -41,9 +41,9 @@ function AddSlotDialog({
     try {
       const s = jstHHMMToUtcIso(date, startTime)
       const e = jstHHMMToUtcIso(date, endTime)
-      if (s >= e) throw new Error('開始時刻 < 終了時刻')
+      if (s >= e) { setErr('開始時刻 < 終了時刻'); return }
       const cap = capacity === '' ? null : Number(capacity)
-      if (cap != null && (!Number.isInteger(cap) || cap < 1)) throw new Error('定員は1以上の整数')
+      if (cap != null && (!Number.isInteger(cap) || cap < 1)) { setErr('定員は1以上の整数'); return }
       await onSubmit({ starts_at: s, ends_at: e, capacity: cap })
     } catch (e) {
       saveErrors.capture(e)
@@ -106,11 +106,12 @@ function EditSlotDialog({
     try {
       const s = jstHHMMToUtcIso(date, startTime)
       const e = jstHHMMToUtcIso(date, endTime)
-      if (s >= e) throw new Error('開始時刻 < 終了時刻')
+      if (s >= e) { setErr('開始時刻 < 終了時刻'); return }
       const cap = capacity === '' ? null : Number(capacity)
-      if (cap != null && (!Number.isInteger(cap) || cap < 1)) throw new Error('定員は1以上の整数')
+      if (cap != null && (!Number.isInteger(cap) || cap < 1)) { setErr('定員は1以上の整数'); return }
       if (cap != null && cap < booked) {
-        throw new Error(`この枠には${booked}件の予約が入っています。定員は${booked}以上にしてください`)
+        setErr(`この枠には${booked}件の予約が入っています。定員は${booked}以上にしてください`)
+        return
       }
       await onSubmit({ starts_at: s, ends_at: e, capacity: cap })
     } catch (e) {

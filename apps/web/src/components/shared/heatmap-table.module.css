@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .grid { display: grid; grid-template-columns: calc(var(--space-32) * 3 + var(--space-14)) repeat(5, minmax(0, 1fr)); column-gap: var(--space-4); row-gap: var(--space-4); }
 .gridFixed { grid-column: 1; }
 .colHead { display: flex; justify-content: center; color: var(--color-ink-secondary); font-size: var(--text-caption); }
@@ -27,3 +29,4 @@
 
 
 .cell:focus-visible { outline: var(--focus-ring); outline-offset: var(--polish-focus-offset); }
+}

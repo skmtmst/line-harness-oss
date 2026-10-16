@@ -148,7 +148,6 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'v8/inbox-chat/routing-drawer.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/restaurant/menu/edit.tsx': 'components/templates/create-page.tsx',
   'v8/restaurant/tables/assign.tsx': 'components/shared/form-leave-guard.tsx',
-  'v8/tag-edit/edit-form-gap-parts.tsx': 'components/templates/create-page.tsx',
 
   // ③-2 第3波：作る画面は CreatePage の dirty、編集の引き出しは Drawer の離脱の確認、ランクの段の窓は Dialog が守る。
   'v8/booking-passes/create.tsx': 'components/templates/create-page.tsx',

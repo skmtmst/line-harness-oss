@@ -592,4 +592,4 @@ shared-button-importer v8/friend-detail/entitlements.tsx
 shared-button-importer v8/inbox-chat/routing-drawer.tsx
 shared-button-importer v8/restaurant/menu/edit.tsx
 shared-button-importer v8/restaurant/tables/assign.tsx
-shared-button-importer v8/tag-edit/edit-form-gap-parts.tsx
+shared-button-importer v8/tag-edit/edit-form.tsx

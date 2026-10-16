@@ -687,7 +687,7 @@ function SlotsTab({
       saveErrors.capture(e)
       if (e instanceof ApiError && e.status === 409 && e.code === 'version_conflict') {
         await refresh()
-        throw new Error(slotConflictMessage(e))
+        throw new ApiError(409, slotConflictMessage(e), e.code, e.data)
       }
       throw e
     }

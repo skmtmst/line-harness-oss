@@ -15,28 +15,10 @@ import { memberRanksApi } from '@/lib/api-gap3';
  * 追加できる絞り込みの種類。並びは Lステップの並びに合わせてある。
  * `group` は候補の右端に出すまとまり名（友だちの情報・タグ・行動など）。
  */
-const RULE_KINDS: { type: string; label: string; group: string; feature?: 'support_marks' | 'friend_fields'; make: () => SegmentRule }[] = [
-  { type: 'name', label: '名前', group: '友だちの情報', make: () => ({ type: 'name', value: { text: '', targets: ['display', 'real', 'system'] } }) },
-  { type: 'private_memo', label: 'メモ', group: '友だちの情報', make: () => ({ type: 'private_memo', value: '' }) },
-  { type: 'status_message', label: 'ステータスメッセージ', group: '友だちの情報', make: () => ({ type: 'status_message', value: '' }) },
-  { type: 'registered_at', label: '友だち登録日', group: '友だちの情報', make: () => ({ type: 'registered_at', value: { from: '', to: '' } }) },
-  { type: 'support_mark', label: '対応マーク', group: 'タグ・記入欄', feature: 'support_marks' as const, make: () => ({ type: 'support_mark', value: { markIds: [], exclude: false } }) },
-  { type: 'tag_exists', label: 'タグ', group: 'タグ・記入欄', make: () => ({ type: 'tag_exists', value: '' }) },
-  { type: 'friend_field', label: '友だち情報', group: 'タグ・記入欄', feature: 'friend_fields' as const, make: () => ({ type: 'friend_field', value: { fieldId: '', op: 'contains', text: '' } }) },
-  { type: 'scenario_subscribed', label: 'シナリオ購読', group: '参加', make: () => ({ type: 'scenario_subscribed', value: '' }) },
-  { type: 'scenario_state', label: 'シナリオ', group: '参加', make: () => ({ type: 'scenario_state', value: { scenarioId: '', state: 'subscribed' } }) },
-  { type: 'form_answered', label: '回答フォーム', group: '行動', make: () => ({ type: 'form_answered', value: '' }) },
-  { type: 'last_reaction_at', label: '最終反応日', group: '行動', make: () => ({ type: 'last_reaction_at', value: { from: '', to: '' } }) },
-  { type: 'reaction_state', label: '反応状態', group: '行動', make: () => ({ type: 'reaction_state', value: 'reply_or_postback' }) },
-  { type: 'score_range', label: '行動スコア', group: '行動', make: () => ({ type: 'score_range', value: { min: 30, max: 69 } }) },
-  { type: 'visit_count', label: '来店の回数', group: '来店・購入', make: () => ({ type: 'visit_count', value: { min: 1 } }) },
-  { type: 'purchase_amount', label: '購入の合計金額', group: '来店・購入', make: () => ({ type: 'purchase_amount', value: { min: 1 } }) },
-  { type: 'last_activity_at', label: '最後の来店・購入の日', group: '来店・購入', make: () => ({ type: 'last_activity_at', value: { from: '', to: '' } }) },
-  { type: 'member_tier', label: '会員ランク', group: '来店・購入', make: () => ({ type: 'member_tier', value: '' }) },
-  { type: 'is_following', label: 'ブロック状態', group: '友だちの情報', make: () => ({ type: 'is_following', value: true }) },
-  { type: 'is_hidden', label: '表示状態', group: '友だちの情報', make: () => ({ type: 'is_hidden', value: false }) },
-]
 
+
+
+type RuleKind = { type: string; label: string; group: string; feature?: 'support_marks' | 'friend_fields'; make: () => SegmentRule }
 
 interface Option {
   id: string
@@ -56,8 +38,8 @@ function KindPicker({
   kinds,
   onPick,
 }: {
-  kinds: typeof RULE_KINDS
-  onPick: (kind: (typeof RULE_KINDS)[number]) => void
+  kinds: RuleKind[]
+  onPick: (kind: RuleKind) => void
 }) {
   const [open, setOpen] = useState(false)
   return <>
@@ -116,4 +98,4 @@ function MemberTierRule({ value, onChange }: { value: string; onChange: (next: s
     </div>
   )
 }
-export { RULE_KINDS, type Option, KindPicker, TagPicker, MemberTierRule }
+export { type RuleKind, type Option, KindPicker, TagPicker, MemberTierRule }
