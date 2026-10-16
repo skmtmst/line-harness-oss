@@ -9,4 +9,3 @@
 - 行内の選択群：`shared/radio.tsx` の `RadioGroup` とRadio。群の名前と選択肢を渡し、入力・ラベル・読み上げを共通化する。
 - 集計期間：既存の `shared/period-picker.tsx` のPeriodPickerを対応表へ登録。券の有効期限とは別の役目。
 - 比較の表と保存の衝突判定は既存table/save-conflictへ接続する。許可・閾値の追加なし。
-
