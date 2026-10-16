@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, FileUp, Star, Upload } from 'lucide-react'
+import { Check, Star, Upload } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react'
 import Button from '@/components/shared/button'
 import Dialog, { type DialogProps } from '@/components/shared/dialog'
@@ -274,14 +274,7 @@ export default function ReferencePickerDialog({
         {/* 選んだ画像の使い方（`JOi8G`）。1 枚ずつ決める。選んでいないときは出さない。 */}
         {/* UcBQ5：その場で選ぶ窓は、下に手元の画像を落とす欄。使い方は生成パネルの行で決める。 */}
         {onLivePick ? (
-          <ImageMultiUpload
-            variant="upload"
-            icon={<FileUp aria-hidden="true" size={24} style={{ width: 24, height: 24 }} />}
-            title="手元の画像を追加"
-            hint={<>ドラッグ＆ドロップ<br />またはクリック<br />10MB 以内・PNG・JPEG・WebP</>}
-            aria-label="参照画像のファイルを選ぶ"
-            onFiles={(files) => { if (files[0]) onUpload(files[0]) }}
-          />
+          <ImageMultiUpload presentation="library" onUpload={onUpload} />
         ) : null}
 
         {!onLivePick && pickedImages.length > 0 ? (

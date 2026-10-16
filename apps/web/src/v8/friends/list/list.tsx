@@ -758,7 +758,7 @@ export default function FriendsListV8() {
   const colCount = (selectable ? 4 : 3) + displayColumns.length
   const table = (
     <div className={refreshing ? `${styles.tableWrap} ${styles.refreshing}` : styles.tableWrap} aria-busy={loadStatus === 'loading' || refreshing || undefined}>
-      <DataTable presentation="friend-list" data-design="V8FriendTable">
+      <DataTable cellPresentation="friends" data-design="V8FriendTable">
         <colgroup>
           {selectable ? <col className={styles.colCheck} /> : null}
           <col className={styles.colStar} />

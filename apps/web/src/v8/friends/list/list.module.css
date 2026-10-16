@@ -162,7 +162,7 @@
  * 行高やタグ幅を測るたびに画面外のセルを描き直すため、セルは省かない。
  * 枠の外の影・フォーカス輪郭まで描き、セルの端で切らない。
  */
-:global([data-table-presentation="friend-list"]) td:is([data-column-kind="check"], [data-column-kind="star"], [data-column-kind="menu"], .fixedContent) {
+:global([data-cell-presentation="friends"]) td:is([data-column-kind="check"], [data-column-kind="star"], [data-column-kind="menu"], .fixedContent) {
   contain: layout style paint;
   overflow-clip-margin: var(--tpl-fr-cell-inset);
 }

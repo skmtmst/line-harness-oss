@@ -31,7 +31,7 @@ type BannerPreset,
 type BannerReferenceMode,
 type BannerUsage,
 } from '@/lib/hq-banners'
-import { ChevronDown,FileUp,Images,Layers,Plus,Scissors,Sparkles,Upload,X } from 'lucide-react'
+import { ChevronDown,Images,Layers,Plus,Scissors,Sparkles,Upload,X } from 'lucide-react'
 import { useId,useRef,useState,type ReactNode } from 'react'
 import styles from './generation-panel.module.css'
 import { UsageBars } from './generation-usage'
@@ -199,18 +199,7 @@ export default function GenerationPanel({
               <>
                 {v8Layout ? (
                   /* 絵 iMnph：参照画像は落とす欄（題・ドラッグ＆ドロップ・制限）と、その中の「ライブラリから選ぶ」。 */
-                  <ImageMultiUpload
-                    variant="upload"
-                    /* 押せる欄の中の印は共通で16に縮むので、絵の24を直に指定する。 */
-                    icon={<FileUp aria-hidden="true" size={24} style={{ width: 24, height: 24 }} className="text-ink-secondary" />}
-                    title="参照画像を追加"
-                    hint={<>ドラッグ＆ドロップ<br />またはクリックしてファイルをアップロード<br />（1ファイル10メガバイト以内・PNG・JPEG・WebP）</>}
-                    disabled={disabled}
-                    busy={referenceBusy}
-                    aria-label="参照画像のファイルを選ぶ"
-                    secondary={<Button variant="text" textTone="accent" disabled={disabled || referenceBusy} onClick={onPickReference}>ライブラリから選ぶ</Button>}
-                    onFiles={(files) => { if (files[0]) onUploadReference(files[0]) }}
-                  />
+                  <ImageMultiUpload presentation="reference" disabled={disabled} busy={referenceBusy} onPickLibrary={onPickReference} onUpload={onUploadReference} />
                 ) : <div className="grid grid-cols-2 gap-2">
                   <Button disabled={disabled || referenceBusy} onClick={onPickReference} className="w-full">
                     <Images aria-hidden="true" className="h-4 w-4" />

@@ -16,7 +16,7 @@ export default function MonthCalendarGrid({ title, days, onDay }: { title: strin
         <div className={styles.monthCells}>
           {days.map((d) => (
             <button key={d.date} type="button" role="gridcell" className={styles.monthCell} data-out={!d.inMonth || undefined} data-closed={d.closed || undefined} data-today={d.today || undefined} onClick={() => onDay(d.date)}>
-              <span className={styles.monthTop}><strong>{d.day}</strong><span style={{ flex: 1 }} />{d.mark ? <StatusBadge tone={d.mark.tone} dot={false} size="micro">{d.mark.label}</StatusBadge> : null}</span>
+              <span className={styles.monthTop}><strong>{d.day}</strong><span className={styles.grow} />{d.mark ? <StatusBadge tone={d.mark.tone} dot={false} size="micro">{d.mark.label}</StatusBadge> : null}</span>
               {d.closed ? <span className={styles.monthNote}>定休日</span> : d.empty ? <span className={styles.monthNote}>予約なし</span> : d.groups !== undefined ? <><strong className={styles.monthGroups}>{d.groups}組</strong><span className={styles.monthNote}>{d.people}人</span></> : null}
             </button>
           ))}
