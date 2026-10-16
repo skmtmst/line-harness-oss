@@ -1107,13 +1107,10 @@ export default function MenuFormV8() {
                   })}
                 </SettingsFormRow>
                 {fieldErrors.staff && assigned.size === 0 ? <p className={styles.fieldError} role="alert">{fieldErrors.staff}</p> : null}
+                {/* 保存する設定はチェック（決まり14・絵どおり：言葉は左、チェックは右）。 */}
                 <div className={styles.toggleLine}>
                   <span className={styles.toggleLineLabel}>「指名なし」でも受ける</span>
-                  <SaveErrorField names={["noAssign","no_assign"]}><Toggle
-                    label="「指名なし」でも受ける"
-                    checked={noAssign}
-                    onChange={toggleNoAssign}
-                  /></SaveErrorField>
+                  <SaveErrorField names={["noAssign","no_assign"]}><SettingCheckbox label="「指名なし」でも受ける" checked={noAssign} onChange={toggleNoAssign} /></SaveErrorField>
                 </div>
               </>
             )}
