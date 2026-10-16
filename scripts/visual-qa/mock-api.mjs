@@ -4782,6 +4782,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       pagination: { limit: 50, cursor: 0, nextCursor: null },
     }
   }
+  /* 統括の一括配信の確かめ（板 i7TdtN）：店ごとの内訳つき。数は絵のとおり。 */
+  if (/^\/api\/hq\/broadcasts\/[^/]+\/send-preview$/.test(pathname)) {
+    const ex = (optedOut) => ({ blocked: 0, optedOut, duplicate: 0, hidden: 0, missingDestination: 0 })
+    return { success: true, data: { recipients: 15131, excluded: ex(20), purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '【秋の新メニュー】10/18 からトリートメント 20%OFF', sender: { name: '渋谷店 予約係' }, expectedVersion: 2,
+      perAccount: [
+        { accountId: 'hq-shibuya', recipients: 1272, excluded: ex(12) }, { accountId: 'hq-ikebukuro', recipients: 864, excluded: ex(5) },
+        { accountId: 'hq-shinjuku', recipients: 2010, excluded: ex(0) }, { accountId: 'hq-yokohama', recipients: 1105, excluded: ex(3) },
+        { accountId: 'hq-ginza', recipients: 9880, excluded: ex(0) },
+      ] } }
+  }
   /* U1 送る前の確かめ（板 F94nep・RxxfO）：契約 API-CONTRACT-GAP1 の send-preview。 */
   if (/^\/api\/(hq\/)?broadcasts\/[^/]+\/send-preview$/.test(pathname)) {
     return { success: true, data: { recipients: 1272, excluded: { blocked: 0, optedOut: 12, duplicate: 0, hidden: 0, missingDestination: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '【秋の新メニュー】10/18 からトリートメント 20%OFF', sender: { name: '渋谷店 予約係' }, expectedVersion: 2 } }

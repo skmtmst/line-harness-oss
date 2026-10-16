@@ -130,9 +130,11 @@ export function ApprovalRequestFields({
               ]}
             /></SaveErrorField>
           )}
-          <p className="text-ink-faint mt-1 text-xs">
-            送る相手 {formatCount(recipientCount)}。
-          </p>
+          {bare ? null : (
+            <p className="text-ink-faint mt-1 text-xs">
+              送る相手 {formatCount(recipientCount)}。
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="approval-note" className="text-ink mb-1 block text-xs font-semibold">
@@ -140,7 +142,7 @@ export function ApprovalRequestFields({
           </label>
           <SaveErrorField names={["note"]}><TextArea
             id="approval-note"
-            rows={3}
+            rows={bare ? 2 : 3}
             maxLength={500}
             value={note}
             onChange={(event) => onNoteChange(event.target.value)}
