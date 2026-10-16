@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* 準備中の窓（fuQxi）：印の丸 48・印 22・本文 13/20・補足 12/18、間 12、中央そろえ。 */
 .body {

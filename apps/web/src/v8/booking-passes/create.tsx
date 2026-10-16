@@ -26,6 +26,7 @@ import { useAccount } from '@/contexts/account-context'
 import { bookingPassPlansApi } from '@/lib/api-gap3'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { KIND_LABEL, VALID_CHOICES, failureText, periodLabel, countLabel, validLabel, yen } from './words'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './passes.module.css'
 
 /*
@@ -85,6 +86,7 @@ function PassCreateInner() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [confirmCreate, setConfirmCreate] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const errorsScope = useSaveFormErrors()
 
   const patch = (next: Partial<Form>) => { setDirty(true); setForm((current) => ({ ...current, ...next })) }
 
@@ -163,7 +165,7 @@ function PassCreateInner() {
       router.push('/booking/menus?tab=passes')
     } catch (reason) {
       setConfirmCreate(false)
-      setNotice(failureText(reason, start ? '作る' : '保存する'))
+      if (!errorsScope.capture(reason)) setNotice(failureText(reason, start ? '作る' : '保存する'))
     } finally {
       setBusy(null)
     }
@@ -278,7 +280,7 @@ function PassCreateInner() {
   )
 
   return (
-    <>
+    <SaveErrorScope errors={errorsScope}>
       <CreatePage
         boardId="nrtRJ"
         title="回数券・月謝を作る"
@@ -311,7 +313,7 @@ function PassCreateInner() {
         onCancel={() => setConfirmCreate(false)}
       />
       {preparing.dialog}
-    </>
+    </SaveErrorScope>
   )
 }
 

@@ -46,8 +46,18 @@ export function isRuleComplete(rule: SegmentRule): boolean {
     case 'status_message':
     case 'ref_code':
       return typeof rule.value === 'string' && rule.value.trim() !== ''
+    case 'visit_count':
+    case 'purchase_amount': {
+      const has = (x: unknown) => x !== null && x !== undefined && x !== ''
+      if (!has(v?.min) && !has(v?.max)) return false
+      if ((has(v?.min) && !Number.isFinite(Number(v.min))) || (has(v?.max) && !Number.isFinite(Number(v.max)))) return false
+      return !(has(v?.min) && has(v?.max) && Number(v.min) > Number(v.max))
+    }
+    case 'member_tier':
+      return typeof rule.value === 'string' && rule.value !== ''
     case 'registered_at':
     case 'last_reaction_at':
+    case 'last_activity_at':
       return (
         (typeof v?.from === 'string' && v.from !== '') ||
         (typeof v?.to === 'string' && v.to !== '')

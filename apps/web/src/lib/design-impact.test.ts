@@ -179,6 +179,9 @@ describe('共通部品の影響範囲', () => {
       // ★V8 予約設定のメニュー・担当スタッフのタブ（owaS3）。src/v8/booking-menus に書き直した。
       'v8/booking-menus/tabs/menus-tab.tsx',
       'v8/booking-menus/tabs/staff-tab.tsx',
+      // ③-2 第3波：予約設定の回数券・月謝の表、統括の店の比較の表。
+      'v8/booking-passes/passes-tab.tsx',
+      'v8/hq-store-compare/list.tsx',
       // ★V8 統括のアカウント（JKjsE）。新しい置き場（src/v8）に一から書いた。
       'v8/hq/home.tsx',
       // ★V8 統括のひな形の一覧・一括配信の一覧（i0Ao0R・U4Eep0）。店の一覧と同じ形で表の下にページ送り（2026-10-08）。

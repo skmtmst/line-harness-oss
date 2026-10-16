@@ -25,7 +25,7 @@ import { classifyApiFailure, loadFailureNotice } from '@/components/shared/api-e
 import { usePageTitle } from '@/components/shell/page-chrome'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import PlatformNotices from '@/components/hq/platform-notices'
-import { api, fetchApi } from '@/lib/api'
+import { api, bookingApi, fetchApi } from '@/lib/api'
 import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared'
 import { resolveStoreReturnPath } from '@/lib/hq-navigation'
 import { formatNumber } from '@/lib/format'
@@ -268,6 +268,23 @@ export default function HqHomeV8() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / size))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * size, current * size)
+  /* ★V8 oFq4S：表の「接続」（お支払いのつなぎ：つながっている／試験モード／つなぐ前）。表の行だけ、店ごとに読む。 */
+  const [payState, setPayState] = useState<Record<string, 'live' | 'test' | 'none' | 'unknown'>>({})
+  const shownIds = shown.map((account) => account.id).join(',')
+  useEffect(() => {
+    if (view !== 'table' || !shownIds) return
+    let alive = true
+    void Promise.allSettled(shownIds.split(',').map((id) => bookingApi.getPaymentConfig(id).then((response) => [id, response.data] as const))).then((results) => {
+      if (!alive) return
+      const next: Record<string, 'live' | 'test' | 'none' | 'unknown'> = {}
+      results.forEach((result, index) => {
+        const id = shownIds.split(',')[index]
+        next[id] = result.status === 'fulfilled' ? (result.value[1].keyConfigured ? (result.value[1].testMode ? 'test' : 'live') : 'none') : 'unknown'
+      })
+      setPayState((current) => ({ ...current, ...next }))
+    })
+    return () => { alive = false }
+  }, [view, shownIds])
   const resetPage = () => setPage(1)
   const statusCount = (filter: StatusFilter) => accounts.filter((account) => matchesStatus(account, filter)).length
   const nameOf = (id: string | null | undefined) => {
@@ -566,7 +583,8 @@ export default function HqHomeV8() {
         <div className={styles.table} role="table" aria-label="アカウントの一覧">
           <div className={styles.head} role="row">
             <span role="columnheader">アカウント</span>
-            <span role="columnheader">状態</span>
+            <span role="columnheader">接続</span>
+            <span role="columnheader">対応が要る</span>
             <span role="columnheader" className={styles.num}>友だち</span>
             <span role="columnheader" className={styles.num}>今月の配信</span>
             <span role="columnheader">操作</span>
@@ -582,8 +600,14 @@ export default function HqHomeV8() {
                     <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
                     <span className={styles.meta}><TruncatedText value={metaOf(account)} /></span>
                   </span>
+                  <StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill>
                 </span>
-                <span role="cell"><StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill></span>
+                <span role="cell">{(() => {
+                  const pay = payState[account.id]
+                  if (!pay || pay === 'unknown') return emptyValue('unknown')
+                  return <StatusPill tone={pay === 'live' ? 'success' : pay === 'test' ? 'warning' : 'neutral'}>{pay === 'live' ? 'つながっている' : pay === 'test' ? '試験モード' : 'つなぐ前'}</StatusPill>
+                })()}</span>
+                <span role="cell">{state.tone === 'warn' ? `${Math.max(1, account.connection?.issues?.length ?? 0)} 件` : <span>—</span>}</span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.friendCount ?? 0)}</span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.messagesThisMonth ?? 0)}</span>
                 <span role="cell">{cardActions(account)}</span>

@@ -15,6 +15,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { customerSegmentsApi } from '@/lib/api-gap3'
 import { formatNumber } from '@/lib/format'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './segments.module.css'
 
 /*
@@ -258,6 +259,7 @@ function PickFooterHost({ accountId, pick, basis, measure, data, cellAt, canMana
 }) {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const errors = useSaveFormErrors()
   const total = pick.r === 0 ? data.total : cellAt(pick.r, pick.f)?.count ?? null
   const whole = pick.r === 0
   const cell = whole ? null : cellAt(pick.r, pick.f)
@@ -275,15 +277,15 @@ function PickFooterHost({ accountId, pick, basis, measure, data, cellAt, canMana
       const response = await customerSegmentsApi.saveSearch(accountId, pick.r, pick.f, { name: `${name}（${BASIS_WORD[basis]}）`, basis, measure })
       if (!response.success) throw new Error('save_failed')
       notifySaved('保存した検索にしました。友だち一覧の「保存した検索」から開けます。')
-    } catch {
-      setMessage('保存した検索にできませんでした。時間をおいてもう一度お試しください。')
+    } catch (reason) {
+      if (!errors.capture(reason)) setMessage('保存した検索にできませんでした。時間をおいてもう一度お試しください。')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className={styles.drawerBody}>
+    <SaveErrorScope errors={errors}><div className={styles.drawerBody}>
       {message ? <Notice tone="danger" message={message} /> : null}
       <div className={styles.footer}>
         <Button variant="secondary" onClick={() => onPrepare('CSVの書き出し')}>CSVで書き出す</Button>
@@ -294,6 +296,6 @@ function PickFooterHost({ accountId, pick, basis, measure, data, cellAt, canMana
           </Button>
         ) : null}
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }

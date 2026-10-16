@@ -24,6 +24,7 @@ import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import EntityRemoteField from './entity-remote-field'
+import { memberRanksApi } from '@/lib/api-gap3'
 
 
 /*
@@ -71,6 +72,10 @@ const RULE_KINDS: { type: string; label: string; group: string; feature?: 'suppo
   { type: 'last_reaction_at', label: '最終反応日', group: '行動', make: () => ({ type: 'last_reaction_at', value: { from: '', to: '' } }) },
   { type: 'reaction_state', label: '反応状態', group: '行動', make: () => ({ type: 'reaction_state', value: 'reply_or_postback' }) },
   { type: 'score_range', label: '行動スコア', group: '行動', make: () => ({ type: 'score_range', value: { min: 30, max: 69 } }) },
+  { type: 'visit_count', label: '来店の回数', group: '来店・購入', make: () => ({ type: 'visit_count', value: { min: 1 } }) },
+  { type: 'purchase_amount', label: '購入の合計金額', group: '来店・購入', make: () => ({ type: 'purchase_amount', value: { min: 1 } }) },
+  { type: 'last_activity_at', label: '最後の来店・購入の日', group: '来店・購入', make: () => ({ type: 'last_activity_at', value: { from: '', to: '' } }) },
+  { type: 'member_tier', label: '会員ランク', group: '来店・購入', make: () => ({ type: 'member_tier', value: '' }) },
   { type: 'is_following', label: 'ブロック状態', group: '友だちの情報', make: () => ({ type: 'is_following', value: true }) },
   { type: 'is_hidden', label: '表示状態', group: '友だちの情報', make: () => ({ type: 'is_hidden', value: false }) },
 ]
@@ -576,6 +581,38 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
         </div>
       )
 
+    case 'visit_count':
+    case 'purchase_amount': {
+      const visit = rule.type === 'visit_count'
+      const name = visit ? '来店の回数' : '購入の合計金額'
+      const num = (x: unknown) => (typeof x === 'number' ? x : '')
+      const put = (key: 'min' | 'max', text: string) => {
+        const next: Record<string, unknown> = { ...v }
+        if (text === '') delete next[key]
+        else next[key] = Number(text)
+        onChange({ type: rule.type, value: next })
+      }
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink text-sm font-semibold">{name}</span>
+          <TextField type="number" min={0} step={1} value={num(v.min)} onChange={(e) => put('min', e.target.value)} placeholder="下限なし" aria-label={`${name}の下限`} />
+          <span className="text-ink-faint text-sm">{visit ? '回以上〜' : '円以上〜'}</span>
+          <TextField type="number" min={0} step={1} value={num(v.max)} onChange={(e) => put('max', e.target.value)} placeholder="上限なし" aria-label={`${name}の上限`} />
+          <span className="text-ink-faint text-sm">{visit ? '回以下' : '円以下'}</span>
+        </div>
+      )
+    }
+    case 'member_tier':
+      return <MemberTierRule value={typeof rule.value === 'string' ? rule.value : ''} onChange={(next) => onChange({ type: 'member_tier', value: next })} />
+    case 'last_activity_at':
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink text-sm font-semibold">最後の来店・購入の日</span>
+          <DateField value={String(v.from ?? '')} onChange={(next) => onChange({ type: rule.type, value: { ...v, from: next } })} aria-label="最後の来店・購入の日の開始" className="w-48" />
+          <span className="text-ink-faint text-sm">〜</span>
+          <DateField value={String(v.to ?? '')} onChange={(next) => onChange({ type: rule.type, value: { ...v, to: next } })} aria-label="最後の来店・購入の日の終了" className="w-48" />
+        </div>
+      )
     case 'registered_at':
     case 'last_reaction_at':
       return (
@@ -802,4 +839,25 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     default:
       return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません（{rule.type}）</span>
   }
+}
+
+
+/** 会員ランクで絞る行。段の名前は、いまのアカウントのランクの段から読む（動かしていなくても選べる）。 */
+function MemberTierRule({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const { selectedAccountId } = useAccount()
+  const [tiers, setTiers] = useState<Array<{ id: string; name: string }>>([])
+  useEffect(() => {
+    if (!selectedAccountId) return
+    let alive = true
+    memberRanksApi.program(selectedAccountId)
+      .then((response) => { if (alive && response.success) setTiers(response.data.tiers.map((tier) => ({ id: tier.id, name: tier.name }))) })
+      .catch(() => undefined)
+    return () => { alive = false }
+  }, [selectedAccountId])
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-ink text-sm font-semibold">会員ランク</span>
+      <Select aria-label="会員ランク" value={value} onChange={onChange} options={[{ value: '', label: 'ランクを選ぶ' }, ...tiers.map((tier) => ({ value: tier.id, label: `${tier.name}の人` }))]} />
+    </div>
+  )
 }

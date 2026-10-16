@@ -25,6 +25,7 @@ import { bookingApi } from '@/lib/api'
 import { bookingPassPlansApi } from '@/lib/api-gap3'
 import { formatNumber } from '@/lib/format'
 import { KIND_LABEL, STATUS_LABEL, countLabel, failureText, periodLabel, yen } from './words'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './passes.module.css'
 
 /*
@@ -64,6 +65,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
   const [menuId, setMenuId] = useState<string | null>(null)
   const [holdersOf, setHoldersOf] = useState<BookingPassPlan | null>(null)
   const current = useRef(accountId)
+  const errors = useSaveFormErrors()
   current.current = accountId
 
   const load = useCallback(async () => {
@@ -120,7 +122,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
       await load()
     } catch (reason) {
       setPending(null)
-      setNotice(failureText(reason, action === 'start' ? '販売を始める' : '販売をやめる'))
+      if (!errors.capture(reason)) setNotice(failureText(reason, action === 'start' ? '販売を始める' : '販売をやめる'))
       await load()
     } finally {
       setBusyId(null)
@@ -139,7 +141,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
       notifySaved('複製しました。下書きとして入っています。')
       await load()
     } catch (reason) {
-      setNotice(failureText(reason, '複製する'))
+      if (!errors.capture(reason)) setNotice(failureText(reason, '複製する'))
     } finally {
       setBusyId(null)
     }
@@ -237,7 +239,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
   )
 
   return (
-    <section className={styles.panel} aria-label="回数券・月謝">
+    <SaveErrorScope errors={errors}><section className={styles.panel} aria-label="回数券・月謝">
       {stats}
       {notice ? <Notice tone="danger" message={notice} /> : null}
       {toolbar}
@@ -260,7 +262,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
         onCancel={() => setPending(null)}
       />
       {holdersOf ? <HoldersDialog accountId={accountId} plan={holdersOf} onClose={() => setHoldersOf(null)} /> : null}
-    </section>
+    </section></SaveErrorScope>
   )
 }
 

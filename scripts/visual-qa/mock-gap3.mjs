@@ -112,6 +112,16 @@ export function gap3Respond(method, pathname, body = {}, query = new URLSearchPa
     ], attention: null })
   }
 
+  if (method === 'GET' && /^\/api\/friends\/[^/]+\/member-rank$/.test(pathname)) {
+    return ok({ current: { tier_id: 't-2', name: 'シルバー', threshold: 3 }, history: [
+      { id: 'h1', from_tier_id: 't-1', to_tier_id: 't-2', reason: 'upgrade', at: '2026-10-12T05:05:00.000Z' },
+      { id: 'h2', from_tier_id: null, to_tier_id: 't-1', reason: 'activated', at: '2026-10-01T01:00:00.000Z' },
+    ] })
+  }
+  if (/^\/api\/friends\/[^/]+\/delivery-consents/.test(pathname)) {
+    const row = (purpose, state, source, version) => ({ purpose, state, reason: source === 'manual' ? '電話で了承' : '本人の操作', source, updatedBy: source === 'manual' ? 'Kenta' : null, updatedAt: '2026-10-12T05:05:00.000Z', version })
+    return ok([row('transaction', 'granted', 'manual', 1), row('notice', 'granted', 'manual', 1), row('marketing', 'revoked', 'liff', 3)])
+  }
   if (method === 'GET' && pathname === '/api/ec/auto-line/rules') return ok(RULES)
   if (method === 'GET' && pathname === '/api/ec/auto-line/sends') {
     const kind = query.get('kind') ?? ''

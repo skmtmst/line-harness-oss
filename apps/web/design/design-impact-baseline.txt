@@ -553,3 +553,13 @@ shared-button-importer components/shared/reservation-people-grid.tsx
 shared-button-importer v8/automations/common-action-sequence.tsx
 shared-button-importer v8/booking-bookings/day-frame.tsx
 shared-button-importer v8/booking-bookings/month-bar.tsx
+# ③-2 第3波の画面（共通Button）。
+shared-button-importer components/shared/preparing-dialog.tsx
+shared-button-importer v8/analytics/segments.tsx
+shared-button-importer v8/booking-passes/create.tsx
+shared-button-importer v8/booking-passes/passes-tab.tsx
+shared-button-importer v8/ec-auto-line/auto-line.tsx
+shared-button-importer v8/ec-auto-line/edit-drawer.tsx
+shared-button-importer v8/friend-detail/delivery-consent.tsx
+shared-button-importer v8/hq-store-compare/list.tsx
+shared-button-importer v8/mileage/ranks.tsx

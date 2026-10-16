@@ -17,8 +17,8 @@
   border: 1px solid var(--card-edge, var(--color-hairline));
 }
 .cardHead { display: flex; align-items: center; gap: var(--space-8); }
-.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--text-lead); font-weight: 700; }
-.cardNote { margin-left: auto; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.cardTitle { color: var(--color-ink); font-size: var(--text-lead); font-weight: 700; }
+.cardNote { flex: 1; text-align: right; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .grid { display: grid; grid-template-columns: calc(var(--space-32) * 3 + var(--space-14)) repeat(5, minmax(0, 1fr)); column-gap: var(--space-4); row-gap: var(--space-4); }
 .gridFixed { grid-column: 1; }
 .colHead { display: flex; justify-content: center; color: var(--color-ink-secondary); font-size: var(--text-caption); }
@@ -28,7 +28,7 @@
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
-  min-height: calc(var(--space-32) * 2);
+  min-block-size: calc(var(--space-32) * 2);
   padding: var(--space-8);
   border: 0;
   border-radius: var(--radius-control);
@@ -43,13 +43,13 @@
 .cell[data-level='3'] { background: color-mix(in srgb, var(--color-accent-deep) 55%, var(--color-canvas)); }
 .cell[data-level='4'] { background: var(--color-accent-deep); color: var(--color-on-accent); }
 .cell:focus-visible { outline: var(--focus-ring); outline-offset: var(--polish-focus-offset); }
-.cell[aria-pressed='true'] { box-shadow: inset 0 0 0 var(--polish-focus-width) var(--color-ink); }
+.cell[aria-pressed='true'] { outline: var(--focus-ring); outline-offset: calc(var(--polish-focus-offset) * -1); }
 .cellName { overflow: hidden; font-size: var(--text-micro); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .cellCount { font-size: var(--text-body); font-weight: 700; }
 
 /* 引き出し */
 .drawerBody { display: flex; flex-direction: column; gap: var(--space-12); }
-.mute { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.mute { color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .optOut { display: flex; align-items: center; gap: var(--space-8); }
 .nameCell { color: var(--color-ink); font-weight: 600; }
 .footer { display: flex; justify-content: center; gap: var(--space-8); width: 100%; }

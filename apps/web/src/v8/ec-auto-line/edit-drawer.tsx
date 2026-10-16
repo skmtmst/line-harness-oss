@@ -8,6 +8,7 @@ import { Field } from '@/components/shared/form-controls'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import LinePreview, { LinePreviewCard, LinePreviewMessage } from '@/components/shared/line-preview'
 import MessageInsertRow, { MessageInsertButton } from '@/components/shared/message-insert-row'
+import PreviewLauncher from '@/components/templates/preview-launcher'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { SettingCheckbox } from '@/components/shared/checkbox'
@@ -15,6 +16,7 @@ import HelpTip from '@/components/shared/help-tip'
 import { notifySaved } from '@/components/shared/toast'
 import { ecAutoLineApi } from '@/lib/api-gap3'
 import { KIND_LABEL, KIND_WHO, WAIT_CHOICES, failureText, ruleText, waitLabel } from './words'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './auto-line.module.css'
 
 /*
@@ -41,6 +43,7 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const ref = useRef<InsertTextFieldHandle | null>(null)
+  const errors = useSaveFormErrors()
   const kind = rule?.kind
   const ruleKey = rule ? `${rule.kind}:${rule.version}` : ''
 
@@ -74,17 +77,17 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
       notifySaved(`${KIND_LABEL[kind]}の自動の LINE を保存しました。`)
       await onSaved()
     } catch (reason) {
-      setError(failureText(reason, '保存する'))
+      if (!errors.capture(reason)) setError(failureText(reason, '保存する'))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Drawer
+    <SaveErrorScope errors={errors}><Drawer
       open
-      width="composer"
-      viewportInset
+      width="editor"
+      heightMode="viewport"
       title={`${KIND_LABEL[kind]}の LINE を編集する`}
       description={KIND_WHO[kind]}
       closeAppearance="box"
@@ -125,15 +128,17 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
           <FixedBlock label="1 人の上限"><p className={styles.subtle}>1 日に 1 通・1 週間に 3 通まで（変えられません）</p></FixedBlock>
           <FixedBlock label="送らない時間帯"><p className={styles.subtle}>夜の静かな時間（21 時〜翌 8 時）は、朝 8 時に送ります。</p></FixedBlock>
           <FixedBlock label="送る目的"><p className={styles.subtle}>宣伝（固定）</p></FixedBlock>
-        </div>
-        <div className={styles.previewCol}>
-          <LinePreview title="LINE の見本" fit note="本文と商品カードの見え方です。" caption="自動で送る">
-            <LinePreviewMessage accountName="お店" avatar="店" time="10:00">{text.replace(/\{\{name\}\}/g, '山田')}</LinePreviewMessage>
-            <LinePreviewCard imageUrl="" title="商品の名前" description="見ていた商品の説明が入ります" price="¥3,280" time="10:00" actions={[{ label: 'カートを見る', onClick: () => {} }]} />
-          </LinePreview>
+          <div>
+            <PreviewLauncher title="LINE の見本" label="LINE での見え方を見る">
+              <LinePreview title={null} fit note="本文と商品カードの見え方です。" caption="自動で送る">
+                <LinePreviewMessage accountName="お店" avatar="店" time="10:00">{text.replace(/\{\{name\}\}/g, '山田')}</LinePreviewMessage>
+                <LinePreviewCard imageUrl="" title="商品の名前" description="見ていた商品の説明が入ります" price="¥3,280" time="10:00" actions={[{ label: 'カートを見る', onClick: () => {} }]} />
+              </LinePreview>
+            </PreviewLauncher>
+          </div>
         </div>
       </div>
-    </Drawer>
+    </Drawer></SaveErrorScope>
   )
 }
 

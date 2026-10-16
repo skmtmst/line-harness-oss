@@ -200,7 +200,7 @@
 .head,
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-amount) var(--tpl-hq-col-actions);
+  grid-template-columns: minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-amount) var(--tpl-hq-col-actions);
   align-items: center;
   column-gap: var(--tpl-hq-col-gap);
 }

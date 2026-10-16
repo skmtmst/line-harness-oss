@@ -296,6 +296,7 @@ export function ConditionDialog({
           ['名前','メモ','ステータスメッセージ','友だち登録日'],
           ['対応マーク','タグ','友だち情報','シナリオ購読','シナリオ'],
           ['回答フォーム','最終反応日','反応状態','行動スコア'],
+          ['来店の回数','購入の合計金額','最後の来店・購入の日','会員ランク'],
           ['ブロック状態','表示状態'],
         ].map((line) => <div key={line[0]} className="flex gap-2">{line.map((label) => <span key={label} className="border-hairline rounded-pill border px-2.5 py-1.5 text-xs text-ink-secondary">{label}</span>)}</div>)}</div>
         <p className="text-ink-faint mt-2 text-xs">対応マーク・友だち情報は、任意機能をオンにしているアカウントだけで出ます。</p>

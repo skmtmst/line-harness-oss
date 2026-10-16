@@ -17,6 +17,7 @@ import { ecAutoLineApi } from '@/lib/api-gap3'
 import { formatNumber } from '@/lib/format'
 import EditDrawer from './edit-drawer'
 import { KIND_LABEL, KIND_ORDER, KIND_WHEN, KIND_WHO, failureText, waitLabel } from './words'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './auto-line.module.css'
 
 /*
@@ -41,6 +42,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
   const [editKind, setEditKind] = useState<AutoLineKind | null>(null)
   const [menuKind, setMenuKind] = useState<AutoLineKind | null>(null)
   const current = useRef<string | null>(null)
+  const errors = useSaveFormErrors()
 
   const load = useCallback(async () => {
     if (!accountId) return
@@ -81,7 +83,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
       notifySaved(`${KIND_LABEL[rule.kind]}の自動の LINE をオフにしました。`)
       await load()
     } catch (reason) {
-      setNotice(failureText(reason, 'オフにする'))
+      if (!errors.capture(reason)) setNotice(failureText(reason, 'オフにする'))
       await load()
     } finally {
       setBusyKind(null)
@@ -101,7 +103,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
       await load()
     } catch (reason) {
       setConfirmKind(null)
-      setNotice(failureText(reason, 'オンにする'))
+      if (!errors.capture(reason)) setNotice(failureText(reason, 'オンにする'))
       await load()
     } finally {
       setBusyKind(null)
@@ -115,7 +117,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
       if (!response.success) throw new Error('test_failed')
       notifyToast(`${KIND_LABEL[kind]}の見本を作りました。LINE へは送っていません。`)
     } catch (reason) {
-      setNotice(failureText(reason, '見本を作る'))
+      if (!errors.capture(reason)) setNotice(failureText(reason, '見本を作る'))
     }
   }
 
@@ -124,7 +126,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
   if (status === 'error') return <ListState kind="error" error={error} onRetry={() => void load()} />
 
   return (
-    <section className={styles.panel} aria-label="自動の LINE">
+    <SaveErrorScope errors={errors}><section className={styles.panel} aria-label="自動の LINE">
       <Notice
         tone="warn"
         message="閲覧落ち・カゴ落ちには、お店のサイトに musubo の計測の読み込みが要ります。今は試験運転で、LINE へは送りません。"
@@ -216,6 +218,6 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
         onSaved={async () => { setEditKind(null); await load() }}
       />
       {preparing.dialog}
-    </section>
+    </section></SaveErrorScope>
   )
 }

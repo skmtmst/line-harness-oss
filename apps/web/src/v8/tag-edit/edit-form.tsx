@@ -12,6 +12,7 @@ import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api
 import { formatDay } from '@/lib/format';
 import { StickyBarAction } from '@/components/shared/sticky-bar'
 import { CreatePage } from '@/components/templates';
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import { SaveConflictBand } from '@/components/shared/save-conflict';
@@ -164,11 +165,24 @@ export function TagEditForm({
     return () => clearTimeout(timer)
   }, [tag.id, accountId, values.rewardMiles, values.referralRewardMiles, retroactiveReference, host])
 
+  /* ★V8 zOc7f：マイルを付ける動きの重なりと、大量付与の確かめ。 */
+  const grantAmounts = (linked ? actions : []).flatMap((action) => {
+    const amount = Number((action.definition?.params as { amount?: unknown } | undefined)?.amount)
+    return action.definition?.type === 'grant_mileage' && amount > 0 ? [amount] : []
+  })
+  const overlapAmounts = [...(reward.trim() && Number(reward) > 0 ? [Number(reward)] : []), ...grantAmounts]
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const bulkOk = useRef(false)
+  const bulkPeople = tag.friendCount ?? 0
   const requestSave = () => {
     if (readOnly) return
     const problem = tagNameProblem(name)
     if (problem) { setNameError(problem); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
+    if (grantAmounts.length > 0 && bulkPeople >= 1000 && !bulkOk.current) {
+      setBulkOpen(true)
+      return
+    }
     if (applyToExisting && (tag.friendCount ?? 0) > 0 && (values.rewardMiles > 0 || values.referralRewardMiles > 0)) {
       setRetroactiveOpen(true)
       return
@@ -295,6 +309,7 @@ export function TagEditForm({
                 {linked || host ? (
                   <>
                     <LinkedActionList value={actions} onChange={next => { if (host && next.length > actions.length) setLinked(true); setActions(next) }} accountId={host ? null : accountId} allowedTypes={host?.allowedActionTypes} readOnly={readOnly} />
+                    {overlapAmounts.length >= 2 && grantAmounts.length >= 1 ? <Notice tone="warn" message={`同じタグで マイル ${overlapAmounts.join('＋')} が付きます（合わせて ${overlapAmounts.reduce((a, b) => a + b, 0)} マイル）。重ねたくないときは、動きを 1 つにしてください。`} /> : null}
                   </>
                 ) : <p className={styles.emptyBox}>連動はオフです。右上のスイッチをオンにすると、付いたときの動きとマイルを決められます。</p>}
               </>
@@ -373,6 +388,14 @@ export function TagEditForm({
         </fieldset>
       </CreatePage>
 
+      <ConfirmDialog
+        open={bulkOpen}
+        title={`${bulkPeople.toLocaleString('ja-JP')} 人に付きます。保存しますか？`}
+        description={`マイルを付ける動きがあります。このタグが付いている ${bulkPeople.toLocaleString('ja-JP')} 人に関わります。付けたマイルは自動では戻せません。`}
+        confirmLabel="保存する"
+        onConfirm={() => { bulkOk.current = true; setBulkOpen(false); requestSave(); bulkOk.current = false }}
+        onCancel={() => setBulkOpen(false)}
+      />
       {retroactiveOpen ? (
         <RetroactiveDialog
           referenceState={retroactiveReference}
