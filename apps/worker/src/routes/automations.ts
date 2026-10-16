@@ -573,7 +573,7 @@ automations.put(
 automations.post(
   '/api/automation-drafts/:id/publish',
   requireAutomationPermission,
-  requireRole('owner', 'admin', 'staff'),
+  requireRole('owner', 'admin'),
   inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
@@ -949,7 +949,7 @@ automations.post(
 automations.post(
   '/api/automations/:id/status',
   requireAutomationPermission,
-  requireRole('owner', 'admin', 'staff'),
+  requireRole('owner', 'admin'),
   inputJsonBoundary(), async (c) => {
     const accountId = await definitionAccountId(c);
     if (typeof accountId !== 'string') return accountId;

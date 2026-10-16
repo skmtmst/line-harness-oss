@@ -1,5 +1,7 @@
 import { asD1 } from '../test-utils/d1-atomic.js';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-04-30T00:05:00+09:00')); });
+afterEach(() => vi.useRealTimers());
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 import { getPendingReminderDeliveries, setFriendFieldValue, setFriendFieldValuesBulk, setFriendFieldValuesForFriend, claimReminderDeliveryRun } from '@line-crm/db';
 import { processFriendFieldReminders } from './friend-field-reminders.js';

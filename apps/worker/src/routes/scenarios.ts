@@ -1,5 +1,6 @@
 import { validateConditionForStorage } from './scenario-condition-validation.js';
 import type { ActionBody } from './scenario-action-input-types.js';
+import { hasDeliveryAccess } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -606,6 +607,7 @@ scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBo
       allowConcurrent?: boolean;
       folderId?: string | null;
     }>();
+    if (body.isActive === true && !hasDeliveryAccess(c.get('staff'), 'scenarios', 'publish')) return c.json({ success: false, error: '公開には管理者権限が必要です' }, 403);
 
     if (!body.name || !body.triggerType) {
       return inputError(c, { success: false, error: 'name and triggerType are required' }, 400, ["name","triggerType"]);
@@ -623,6 +625,7 @@ scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBo
 
     let scenario = await createScenario(c.env.DB, {
       name: body.name,
+      isActive: body.isActive !== false && hasDeliveryAccess(c.get('staff'), 'scenarios', 'publish'),
       description: body.description ?? null,
       triggerType: body.triggerType,
       triggerTagId: body.triggerTagId ?? null,
@@ -636,12 +639,6 @@ scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBo
     if (body.lineAccountId) {
       await c.env.DB.prepare(`UPDATE scenarios SET line_account_id = ? WHERE id = ?`)
         .bind(body.lineAccountId, scenario.id).run();
-    }
-
-    // createScenario() always sets is_active=1; override if the caller requested inactive
-    if (body.isActive === false) {
-      const updated = await updateScenario(c.env.DB, scenario.id, { is_active: 0 });
-      if (updated) scenario = updated;
     }
 
     // フォルダは create の中身に入っていないので、指定があればここで付ける
@@ -686,6 +683,9 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, inputJsonBounda
       || Array.from(body.reason).length > 200
     )) {
       return inputError(c, { success: false, error: '止める理由は停止時だけ指定でき、200字以内の文字列が必要です' }, 400, ["reason","isActive"]);
+    }
+    if (body.isActive !== undefined && !hasDeliveryAccess(c.get('staff'), 'scenarios', 'publish')) {
+      return c.json({ success: false, error: '公開・停止には管理者権限が必要です' }, 403);
     }
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
       return inputError(c, { success: false, error: 'isActive は真偽値で指定してください' }, 400, ["isActive"]);
@@ -1564,7 +1564,7 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireDeliveryAccess('sce
 // 下書きの編集は公開するまで配信へ混入しない。購読は開始時の版へ固定され、
 // 開始後の編集は次に公開した版の購読から使う（N-050 / #644）。
 // アカウント境界は /api/scenarios/:id 系の共通ミドルウェアで 404 にする。
-scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, inputJsonBoundary(), async (c) => {
+scenarios.post('/api/scenarios/:id/publish', requireDeliveryAccess('scenarios', 'publish'), requireScenarioEditBoundary, inputJsonBoundary(), async (c) => {
   try {
     const requestKey = c.req.header('Idempotency-Key');
     if (!validScenarioPublishKey(requestKey)) {

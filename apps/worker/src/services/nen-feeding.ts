@@ -376,7 +376,7 @@ export async function refreshAccountFeeding(db: D1Database, lineAccountId: strin
   const pets = await db.prepare(
     `SELECT p.id, p.animal_type, p.weight_kg, p.birthday, p.neutered, p.activity_level, p.feeding_product_id
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
-      WHERE f.line_account_id = ? ORDER BY p.updated_at DESC LIMIT ?`,
+      WHERE p.archived_at IS NULL AND f.line_account_id = ? ORDER BY p.updated_at DESC LIMIT ?`,
   ).bind(lineAccountId, limit).all<PetFeedingRow>();
   let refreshed = 0;
   const today = new Date();

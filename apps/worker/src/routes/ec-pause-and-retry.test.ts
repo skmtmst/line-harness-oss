@@ -66,6 +66,7 @@ beforeEach(() => {
     INSERT INTO ec_connectors (id, line_account_id, provider, shop_domain, status, version, created_at, updated_at)
     VALUES ('connector-1', 'account-a', 'ec_cube', 'shop.example.com', 'connected', 1, '${NOW_JST}', '${NOW_JST}');
   `);
+  db.raw.prepare("UPDATE ec_connectors SET event_types_json='[\"ec.order.confirmed\"]'").run();
 });
 afterEach(() => { db.raw.close(); });
 

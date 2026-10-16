@@ -314,3 +314,13 @@ test('受理後に処理が消え、鍵の有効時間を越えた予約は自�
   expect(pushMessage).not.toHaveBeenCalled();
   expect(row('expired')).toMatchObject({status:'failed',last_error_code:'LINE_RETRY_KEY_EXPIRED'});
 });
+
+
+test('B-333 予約後にブロックされた相手は送らず理由を残し、再送しない', async () => {
+  await schedule({ id: 'blocked', key: '11111111-2222-4333-8444-555555555555', at: NOW });
+  sqlite.raw.prepare("UPDATE friends SET is_following = 0 WHERE id = 'fr-1'").run();
+  await processDueScheduledChatSends(env(), { now: NOW });
+  expect(row('blocked')).toMatchObject({ status: 'failed', last_error_code: 'friend_not_following' });
+  await processDueScheduledChatSends(env(), { now: '2026-01-11T00:00:00.000Z' });
+  expect(pushMessage).not.toHaveBeenCalled();
+});

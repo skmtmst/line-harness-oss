@@ -99,7 +99,7 @@ describe('processNenDeliveries account and snapshot safety', () => {
     expect(pushViaHarnessProxy).not.toHaveBeenCalled();
     expect(updates).toContainEqual(expect.objectContaining({
       sql: expect.stringContaining("status = 'skipped'"),
-      values: ['line_account_mismatch', '2026-08-28 01:00:00', 'job-1'],
+      values: ['line_account_mismatch', '2026-08-28 01:00:00', 'job-1', expect.any(String)],
     }));
   });
 
@@ -167,7 +167,7 @@ describe('processNenDeliveries account and snapshot safety', () => {
     expect(pushViaHarnessProxy).not.toHaveBeenCalled();
     expect(updates).toContainEqual(expect.objectContaining({
       sql: expect.stringContaining("status = 'skipped'"),
-      values: ['campaign_form_already_submitted', '2026-08-28 01:00:00', 'job-1'],
+      values: ['campaign_form_already_submitted', '2026-08-28 01:00:00', 'job-1', expect.any(String)],
     }));
   });
 });

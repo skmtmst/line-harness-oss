@@ -2,6 +2,7 @@ import { slaChatList, enrichSlaChats } from '../services/inbox-sla-list.js';
 import { refreshInboxSla } from '../services/inbox-sla.js';
 import { resolveLineSender } from '../services/line-senders.js';
 import { GapError } from '../services/gap-common.js';
+import { validateScheduledAt } from './chat-schedule-validation.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -1783,6 +1784,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       'chats.manual-send',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
 
     if (!await canAccessAllLineAccounts(
       c.env.DB,
@@ -2197,6 +2199,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       'chats.manual-send',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
 
     if (!await canAccessAllLineAccounts(
       c.env.DB,
@@ -2514,22 +2517,6 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
   }
 });
 
-// ========== 送信予約(N-025) ==========
-
-// 予約時刻は「いまより先」だけを受け付ける。画面のdatetime-localはJSTで
-// 入力されるが、保存はUTCへ正規化するため境界ずれは起きない。
-function validateScheduledAt(raw: unknown): { ok: true; scheduledAt: string } | { ok: false } {
-  if (typeof raw !== 'string' || !raw) return { ok: false };
-  let scheduledAt: string;
-  try {
-    scheduledAt = normalizeScheduledAt(raw);
-  } catch {
-    return { ok: false };
-  }
-  if (Date.parse(scheduledAt) <= Date.now()) return { ok: false };
-  return { ok: true, scheduledAt };
-}
-
 /**
  * POST /api/chats/:id/schedule — 返信の予約作成。
  * Idempotency-Keyは必須で、同じキーの再送は新しい予約を作らず既存を返す。
@@ -2579,6 +2566,7 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
       'chats.schedule-send',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
     if (!await canAccessAllLineAccounts(
       c.env.DB,
       c.get('staff'),

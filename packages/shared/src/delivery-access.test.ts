@@ -3,8 +3,9 @@ import { BUNDLE_PRESETS, DELIVERY_FEATURE_POLICIES, effectiveStaffEditKeys, hasD
 
 describe('束とAPIの操作判定', () => {
   const keys = scopeLevelsToKeys(BUNDLE_PRESETS.operations.levels).edit
-  it.each(Object.keys(DELIVERY_FEATURE_POLICIES) as DeliveryFeature[])('%s は配信を変えられる束で変更できる', feature => {
-    expect(hasDeliveryAccess({ role: 'staff', permissionKeys: keys }, feature, 'edit')).toBe(true)
+  it.each(Object.keys(DELIVERY_FEATURE_POLICIES) as DeliveryFeature[])('%s の編集は役割と機能の権限を両方確認する', feature => {
+    expect(hasDeliveryAccess({ role: 'staff', permissionKeys: keys }, feature, 'edit')).toBe(feature !== 'richMenus')
+    expect(hasDeliveryAccess({ role: 'admin' }, feature, 'edit')).toBe(true)
     expect(hasDeliveryAccess({ role: 'staff', permissionKeys: [], viewPermissionKeys: keys }, feature, 'edit')).toBe(false)
     expect(hasDeliveryAccess({ role: 'admin', readOnly: true }, feature, 'edit')).toBe(false)
   })

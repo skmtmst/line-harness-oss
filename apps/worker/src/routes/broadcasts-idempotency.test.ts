@@ -43,7 +43,7 @@ const requestBody = {
   messageType: 'text',
   messageContent: '{{name}}さん、おはようございます',
   targetType: 'all',
-  scheduledAt: '2026-08-12T09:00:00.000+09:00',
+  scheduledAt: '2099-08-12T09:00:00.000+09:00',
   lineAccountId: 'account-1',
   trackLinks: true,
 };

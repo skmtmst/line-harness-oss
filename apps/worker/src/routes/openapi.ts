@@ -4,6 +4,7 @@ import { stylePaths } from './styles-openapi.js';
 import { hqTemplateListPaths } from './hq-template-list-openapi.js';
 import { hqTemplateMediaPaths } from './hq-template-media-openapi.js';
 import { api5Paths } from './api5-openapi.js';
+import { behaviorFixPaths } from './behavior-fix-openapi.js';
 import { restaurantRest4Paths } from './restaurant-rest4-openapi.js';
 import { api1AuthoringPaths } from './api1-authoring-openapi.js';
 import { api2FollowupPaths } from './api2-followups-openapi.js';
@@ -427,6 +428,7 @@ const spec = {
     ...gap1Paths,
     ...gap2Paths,
     ...bookingEntitlementPaths,
+    ...behaviorFixPaths,
     '/api/account-settings/customer-look': {
       get: { tags:['Account Settings'], summary:'店のお客さまのデザインを読む', parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'保存した版とデザイン'},'403':{description:'担当外'}} },
       put: { tags:['Account Settings'], summary:'店のお客さまのデザインを保存（オーナー・管理者）', requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['accountId','expectedVersion','look'],properties:{accountId:{type:'string'},expectedVersion:{type:'integer',minimum:0},look:{type:'object'}}}}}}, responses:{'200':{description:'保存した版とデザイン'},'403':{description:'変更権限なし・担当外'},'409':{description:'保存の版が競合'},'422':{description:'色・型・書体が不正'}} },
@@ -5864,7 +5866,7 @@ const spec = {
       post: {
         tags: ['Conversions'],
         summary: '外部システムからの成果受信(公開口・HMAC署名)',
-        description: '管理認証を通さない公開口。X-Conversion-Signature ヘッダに'
+        description: '本文のtimestamp（UNIX秒、前後300秒以内）とnonce（英数字・_・-の16〜128字）も署名の対象。nonceは地点ごとに1回だけ。正規再試行は新nonceと同じsourceEventId。管理認証を通さない公開口。X-Conversion-Signature ヘッダに'
           + '本文のHMAC-SHA256(hex)を、X-Conversion-Event-Id または本文の sourceEventId に'
           + '再送を捌くイベントIDを入れる。成否は受信履歴に残る。',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
@@ -5874,7 +5876,10 @@ const spec = {
             'application/json': {
               schema: {
                 type: 'object',
+                required: ['timestamp','nonce'],
                 properties: {
+                  timestamp: { type: 'integer', description: '署名した送信時刻（UNIX秒）' },
+                  nonce: { type: 'string', minLength: 16, maxLength: 128 },
                   sourceEventId: { type: 'string', description: 'ヘッダの代わりに本文で渡せる' },
                   friendId: { type: 'string' },
                   lineUserId: { type: 'string' },

@@ -1,3 +1,4 @@
+import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
 /*
  * R425: 合言葉を更新して同じ通知を再署名しても、受信処理と後続通知は重ねない。
  *
@@ -20,16 +21,7 @@ const { app } = await import('../index.js');
 const OLD_SECRET = 'rotation-old-secret-0123456789abcdef';
 const NEW_SECRET = 'rotation-new-secret-0123456789abcdef';
 
-async function sign(secret: string, body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  return Array.from(new Uint8Array(signature))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
+const sign = signIncomingTest;
 
 function seed(db: SqliteD1): void {
   db.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
@@ -66,7 +58,7 @@ describe('R425 合言葉の入れ替え後の同一通知は重ねない', () =>
   });
 
   async function receive(body: string, secret: string) {
-    return app.request(
+    return receiveAndDrain(app,
       '/api/webhooks/incoming/iwh-1/receive?accountId=account-1',
       {
         method: 'POST',
@@ -79,12 +71,12 @@ describe('R425 合言葉の入れ替え後の同一通知は重ねない', () =>
 
   it('OLD→NEWの再署名でも受領・未照合・後続通知は1件', async () => {
     const body = JSON.stringify({ eventId: 'evt-1', note: '同じ業務通知' });
-    expect((await receive(body, OLD_SECRET)).status).toBe(200);
+    expect((await receive(body, OLD_SECRET)).status).toBeOneOf([200, 202]);
     expect(counts(db)).toMatchObject({ receipts: 1, unmatched: 1, fired: 1 });
 
     // OLD同署名の再送は従来どおり重複。
     const replayOld = await receive(body, OLD_SECRET);
-    expect(replayOld.status).toBe(200);
+    expect(replayOld.status).toBeOneOf([200, 202]);
     expect(await replayOld.json()).toMatchObject({ success: true, data: { duplicate: true } });
     expect(counts(db)).toMatchObject({ receipts: 1, unmatched: 1, fired: 1 });
 
@@ -93,18 +85,18 @@ describe('R425 合言葉の入れ替え後の同一通知は重ねない', () =>
 
     // 本文を一文字も変えずNEW署名で送る。別件にしてはならない。
     const resend = await receive(body, NEW_SECRET);
-    expect(resend.status).toBe(200);
+    expect(resend.status).toBeOneOf([200, 202]);
     expect(await resend.json()).toMatchObject({ success: true, data: { duplicate: true } });
     expect(counts(db)).toMatchObject({ receipts: 1, unmatched: 1, fired: 1 });
   });
 
   it('本文が違う正当な通知は別件、改ざん・誤署名は拒否のまま', async () => {
     const first = JSON.stringify({ eventId: 'evt-1' });
-    expect((await receive(first, OLD_SECRET)).status).toBe(200);
+    expect((await receive(first, OLD_SECRET)).status).toBeOneOf([200, 202]);
     db.raw.prepare(`UPDATE incoming_webhooks SET secret=? WHERE id='iwh-1'`).run(NEW_SECRET);
 
     const second = JSON.stringify({ eventId: 'evt-2' });
-    expect((await receive(second, NEW_SECRET)).status).toBe(200);
+    expect((await receive(second, NEW_SECRET)).status).toBeOneOf([200, 202]);
     expect(counts(db)).toMatchObject({ receipts: 2, unmatched: 2, fired: 2 });
 
     // 本文改ざん（OLD署名のまま本文だけ変える）は401。

@@ -1,4 +1,5 @@
-import { readCappedBodyText } from './webhook-request-body.js';
+import { readCappedBodyText, receiveTimestampState } from './webhook-receive-envelope.js';
+import { encryptCredential, decryptCredential } from '@line-crm/db';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError } from '@line-crm/db';
@@ -268,20 +269,6 @@ const RECEIVE_RATE_WINDOW_MS = 60_000;
 const RECEIVE_TIMESTAMP_PAST_MS = 15 * 60_000;
 const RECEIVE_TIMESTAMP_FUTURE_MS = 5 * 60_000;
 
-/** R430: X-Webhook-Timestamp の検査状態。送らない受信は checked:false。 */
-function receiveTimestampState(raw: string | null | undefined):
-  | { checked: false }
-  | { checked: true; timeMs: number | null } {
-  if (raw === null || raw === undefined || raw.trim() === '') return { checked: false };
-  const text = raw.trim();
-  const numeric = Number(text);
-  if (Number.isFinite(numeric) && numeric > 0) {
-    return { checked: true, timeMs: numeric >= 1e11 ? numeric : numeric * 1000 };
-  }
-  const parsed = Date.parse(text);
-  return { checked: true, timeMs: Number.isFinite(parsed) ? parsed : null };
-}
-
 /**
  * 名前と種別の上限。極端な値で一覧表示が崩れる・DBが膨らむのを防ぐ(#506 軽)。
  */
@@ -311,8 +298,12 @@ function validateEventTypes(eventTypes: unknown): string | null {
   return null;
 }
 
+export function generateWebhookSecret(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(32)), value=>value.toString(16).padStart(2,'0')).join('');
+}
+
 function validateSecret(secret: unknown): string | null {
-  if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH) {
+  if (typeof secret !== 'string' || secret.length < 32) {
     return `secret must be at least ${MIN_SECRET_LENGTH} characters`;
   }
   return null;
@@ -525,6 +516,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), inputJsonBoundary(
     if (nameError) {
       return inputError(c, { success: false, error: nameError }, 400, ["name"]);
     }
+    body.secret = generateWebhookSecret();
     const secretError = validateSecret(body.secret);
     if (secretError) {
       return inputError(c, { success: false, error: secretError }, 400, ["secret"]);
@@ -595,6 +587,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), inputJsonBounda
       return inputError(c, { success: false, error: 'isActive must be a boolean' }, 400, ["isActive"]);
     }
     if (body.secret !== undefined) {
+      body.secret = generateWebhookSecret();
       const secretError = validateSecret(body.secret);
       if (secretError) {
         return inputError(c, { success: false, error: secretError }, 400, ["secret"]);
@@ -643,6 +636,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), inputJsonBounda
         folderId: updated.folder_id ?? null,
         sourceType: updated.source_type,
         hasSecret: hasWebhookSecret(updated),
+        ...(body.secret !== undefined ? { secret: body.secret } : {}),
         previousSecretUsableUntil: previousSecretUsableUntil(updated),
         isActive: Boolean(updated.is_active),
       },
@@ -1067,6 +1061,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), inputJsonBoundary(
     if (urlError) {
       return inputError(c, { success: false, error: urlError }, 400, ["url"]);
     }
+    body.secret = generateWebhookSecret();
     const secretError = validateSecret(body.secret);
     if (secretError) {
       return inputError(c, { success: false, error: secretError }, 400, ["secret"]);
@@ -1189,6 +1184,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), inputJsonBounda
       }
     }
     if (body.secret !== undefined) {
+      body.secret = generateWebhookSecret();
       const secretError = validateSecret(body.secret);
       if (secretError) {
         return inputError(c, { success: false, error: secretError }, 400, ["secret"]);
@@ -1250,6 +1246,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), inputJsonBounda
         url: updated.url,
         eventTypes: outgoingEventTypes(updated.event_types, updated.id),
         hasSecret: hasWebhookSecret(updated),
+        ...(body.secret !== undefined ? { secret: body.secret } : {}),
         isActive: Boolean(updated.is_active),
         maxRetries: updated.max_retries ?? 0,
         consecutiveFailures: updated.consecutive_failures ?? 0,
@@ -1710,6 +1707,11 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
       return c.json({ success: false, error: 'Webhook is not configured for secure delivery' }, 503);
     }
 
+    const signedTimestamp = c.req.header('X-Webhook-Timestamp') ?? '';
+    const signedEventId = c.req.header('X-Webhook-Event-Id') ?? '';
+    if (!/^\d{10}$/.test(signedTimestamp) || !/^[A-Za-z0-9_.:-]{8,128}$/.test(signedEventId) || Math.abs(Date.now() - Number(signedTimestamp)*1000) > 300_000) {
+      return c.json({success:false, code:'INVALID_FRESHNESS',error:'署名時刻と出来事IDを確認してください'},401);
+    }
     const signatureHeader = c.req.header('X-Webhook-Signature') ?? '';
     if (!signatureHeader) {
       return c.json({ success: false, error: 'X-Webhook-Signature header is required' }, 401);
@@ -1725,13 +1727,13 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
      * 署名が通る。相手のサービス側の切り替えに猶予を持たせるため。
      * 前の合言葉で通した届物はログに残して追えるようにする。
      */
-    let expected = await computeHmacSha256Hex(verifySecret, rawBody);
+    let expected = await computeHmacSha256Hex(verifySecret, `${signedTimestamp}.${signedEventId}.${rawBody}`);
     if (!safeEqualHex(signatureHeader.toLowerCase(), expected)) {
       const previousSecret = await resolvePreviousWebhookSecret(wh, webhookKeysOf(c));
       if (!previousSecret || previousSecret.length < MIN_SECRET_LENGTH) {
         return c.json({ success: false, error: 'Invalid signature' }, 401);
       }
-      const previousExpected = await computeHmacSha256Hex(previousSecret, rawBody);
+      const previousExpected = await computeHmacSha256Hex(previousSecret, `${signedTimestamp}.${signedEventId}.${rawBody}`);
       if (!safeEqualHex(signatureHeader.toLowerCase(), previousExpected)) {
         return c.json({ success: false, error: 'Invalid signature' }, 401);
       }
@@ -1759,23 +1761,6 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
       }
     }
 
-    /*
-     * R430 (v6-26 §7-1): 署名時刻の窓検査。受付期間外の初回受信と
-     * 許容幅を超える未来時刻は受領・後続処理なしで拒否する。
-     * 時刻を送らない古い送信元は受理する（署名対象への時刻組込みは
-     * 将来の送信側契約更新で行う）。
-     */
-    const timestampState = receiveTimestampState(c.req.header('X-Webhook-Timestamp'));
-    if (timestampState.checked) {
-      if (timestampState.timeMs === null) {
-        return inputError(c, { success: false, error: 'X-Webhook-Timestamp の形式が正しくありません' }, 400, []);
-      }
-      const skew = Date.now() - timestampState.timeMs;
-      if (skew > RECEIVE_TIMESTAMP_PAST_MS || skew < -RECEIVE_TIMESTAMP_FUTURE_MS) {
-        return c.json({ success: false, error: 'X-Webhook-Timestamp が受付期間外です' }, 401);
-      }
-    }
-
     let payload: unknown;
     try {
       payload = JSON.parse(rawBody);
@@ -1786,8 +1771,8 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
     /*
      * N-365 (#746): 同じ署名の使い回しを弾く。
      *
-     * 署名は本文だけで作られているので、盗った署名をそのまま送り直すと
-     * 何度でも通っていた。期限付き所有権を得た1件だけが下流へ進む。
+     * 時刻・出来事ID・本文を署名し、同じ出来事は受領台帳で1件にまとめる。
+     * 期限付き所有権を得た1件だけが下流へ進む。
      * 完了済みなら200、処理中なら再送可能な503、失敗・期限切れなら再開する。
      * 再開時は成功済みの処理を飛ばし、同じイベントIDで下流の重複を防ぐ。
      *
@@ -1797,9 +1782,9 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
      * 入れるのは署名そのものではなく SHA-256(台帳に使い回せる値を残さない)。
      */
     const signatureHash = await sha256Hex(expected);
-    // R425: 本文のハッシュも残す。合言葉の入れ替え後に同じ通知を再署名しても
-    // 同じ受領へ結び付け、受領・未照合・後続通知を重ねない。
-    const bodyHash = await sha256Hex(rawBody);
+    // 合言葉の入れ替え後や時刻を更新した再署名も、同じ出来事IDの受領へ結び付ける。
+    // 既存列body_hashには出来事IDのハッシュを保存する（顧客情報は保存しない）。
+    const bodyHash = await sha256Hex(signedEventId);
     // N-384: 受領の予約に窓内件数の上限を載せて1文で判定する。
     // 上限超えの新規受信は受領記録を消費せず 429 で返し、
     // 窓が明けたあとの正規再送を残す。
@@ -1824,135 +1809,20 @@ webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (
     }
     execution = reserved.execution;
 
-    if (wh.line_account_id) {
-      try {
-        await updateIncomingWebhookMaskedSample(
-          execution.db,
-          wh.id,
-          wh.line_account_id,
-          maskedPayloadShape(payload),
-        );
-      } catch {
-        console.error(JSON.stringify({"code":"incoming_webhook_masked_sample_update_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
-      }
-    }
-
-    const { fireEvent } = await import('../services/event-bus.js');
-    const eventType = `incoming_webhook.${wh.source_type}`;
-    const started = Date.now();
-    let interaction: Pick<WebhookInteractionRow, 'id'> | null = null;
-    if (wh.line_account_id) {
-      try {
-        interaction = await execution.step('interaction', async () => ({ id: (await createWebhookInteraction(execution!.db, {
-          lineAccountId: wh.line_account_id!,
-          direction: 'incoming',
-          webhookId: wh.id,
-          webhookName: wh.name,
-          eventType,
-          triggerSummary: `${wh.name}から受け取った`,
-          // 受信は送り直さないため本文を保管しない。顧客情報を台帳へ複製しない。
-          requestBodyJson: null,
-        })).id }));
-      } catch (logError) {
-        // 台帳の一時障害で、署名確認済みの受信処理まで止めない。
-        console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
-      }
-    }
-    let actionResult: { matchedFriendId: string | null; executed: number; failed: number;
-      matchStatus: 'matched' | 'not_found' | 'ambiguous' | 'skipped' } =
-      { matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'skipped' };
-    try {
-      /*
-       * R402: 受領時に照合方法・未一致時の扱い・処理配列全体・参照版を
-       * 一つの実行計画として保存する。再試行はその計画を最後まで使い、
-       * 後日の設定変更は新規受信へだけ適用する。既存受信を別計画へ変える
-       * 場合は差分と未処理分を明示する（現状は計画の固定のみ行う）。
-       */
-      let receiptPlan = await readIncomingWebhookReceiptPlan(c.env.DB, execution.sourceEventId);
-      if (!receiptPlan) {
-        const fresh: IncomingWebhookReceiptPlan = {
-          configVersion: typeof wh.version === 'number' ? wh.version : null,
-          identityMatching: safeJson<IncomingWebhookIdentityMatch>(wh.identity_match_json, {
-            methods: [], onNotFound: 'do_nothing',
-          }),
-          actions: safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []),
-        };
-        /*
-         * 計画の確定は賃借柵の外で行う。内容は受領行の1行に先勝ちで書き、
-         * 同じ受領の並行・再試行が上書きしない。柵内の行動実行はこの後。
-         */
-        await saveIncomingWebhookReceiptPlan(c.env.DB, execution.sourceEventId, fresh);
-        receiptPlan = await readIncomingWebhookReceiptPlan(c.env.DB, execution.sourceEventId) ?? fresh;
-      }
-      if (wh.line_account_id) {
-        actionResult = await execution.step('actions', async () => {
-          const result = await executeIncomingWebhookActions(execution!.db, {
-          lineAccountId: wh.line_account_id!,
-          webhookId: wh.id,
-          sourceEventId: execution!.sourceEventId,
-          payload,
-          identityMatching: receiptPlan!.identityMatching,
-          actions: receiptPlan!.actions,
-          dependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY },
-          execution,
-          });
-          if (result.failed > 0) throw new Error('incoming_actions_failed');
-          return result;
-        });
-      }
-      await execution.step('event', () => fireEvent(execution!.db, eventType, {
-        sourceEventId: execution!.sourceEventId,
-        sourceKind: 'incoming_webhook_receipt',
-        occurredAt: execution!.occurredAt,
-        friendId: actionResult.matchedFriendId ?? undefined,
-        eventData: { webhookId: wh.id, source: wh.source_type, payload, actionResult },
-      }, undefined, wh.line_account_id ?? null, execution));
-      if (actionResult.failed > 0) throw new Error('受信Webhookの処理に失敗しました');
-    } catch (eventError) {
-      if (interaction && wh.line_account_id) {
-        try {
-          await finishWebhookInteraction(execution.db, interaction.id, wh.line_account_id, {
-            status: 'failed',
-            responseStatus: 500,
-            attemptCount: 1,
-            durationMs: Date.now() - started,
-            failureReason: 'processing_failed',
-          });
-        } catch (logError) {
-          console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
-        }
-      }
-      throw eventError;
-    }
-    if (interaction && wh.line_account_id) {
-      try {
-        await finishWebhookInteraction(execution.db, interaction.id, wh.line_account_id, {
-          status: 'succeeded',
-          responseStatus: 200,
-          attemptCount: 1,
-          durationMs: Date.now() - started,
-        });
-      } catch (logError) {
-        // 受信処理は完了している。台帳の一時障害だけで送信元へ500を返さない。
-        console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
-      }
-    }
-
-    await execution.complete();
-    return c.json({
-      success: true,
-      data: {
-        received: true,
-        source: wh.source_type,
-        // N-378: 「受理したが処理対象がいない」を送り主が判別できるよう、
-        // 照合結果と実行件数を添える。received:true の契約はそのまま。
-        matched: actionResult.matchedFriendId !== null,
-        // S: 複数一致で保留になった届物を送り主が判別できるよう照合結果も返す。
-        matchStatus: actionResult.matchStatus,
-        executed: actionResult.executed,
-        failed: actionResult.failed,
-      },
+    if (!c.env.LINE_CREDENTIAL_ENCRYPTION_KEY) throw new Error('incoming_queue_encryption_key_missing');
+    await saveIncomingWebhookReceiptPlan(c.env.DB, execution.sourceEventId, {
+      configVersion: Number(wh.version ?? 1),
+      identityMatching: safeJson<IncomingWebhookIdentityMatch>(wh.identity_match_json, {methods:[],onNotFound:'do_nothing'}),
+      actions: safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []),
     });
+    const encrypted = await encryptCredential(JSON.stringify(payload), c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    const queuedAt = new Date().toISOString();
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO incoming_webhook_queue
+      (source_event_id,webhook_id,signature_hash,body_hash,payload_encrypted,next_attempt_at,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?)`).bind(execution.sourceEventId,wh.id,signatureHash,bodyHash,encrypted,queuedAt,queuedAt,queuedAt).run();
+    if(execution.defer) await execution.defer(); else await execution.fail(); // consumer owns the first attempt
+    return c.json({success:true,data:{received:true,queued:true,source:wh.source_type}},202);
+
   } catch (err) {
     if (execution) {
       try { await execution.fail(); } catch { /* The lease lets a later retry recover even during a DB outage. */ }
@@ -2140,3 +2010,155 @@ webhooks.post('/api/webhooks/api-tokens/:id/rotate', requireRole('owner'), input
 });
 
 export { webhooks };
+
+/** Delivery cron consumer: reception has already authenticated and fixed its plan. */
+export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 50): Promise<number> {
+  const rows = await env.DB.prepare(`SELECT * FROM incoming_webhook_queue WHERE status='pending'
+    AND datetime(next_attempt_at)<=datetime('now') ORDER BY created_at LIMIT ?`).bind(limit).all<{
+      source_event_id:string;webhook_id:string;signature_hash:string;body_hash:string;payload_encrypted:string;attempts:number;
+    }>();
+  let completed = 0;
+  for (const row of rows.results) {
+    const wh = await getIncomingWebhookById(env.DB, row.webhook_id);
+    if (!wh?.is_active || !env.LINE_CREDENTIAL_ENCRYPTION_KEY) continue;
+    if(wh.line_account_id && await env.DB.prepare(`SELECT 1 FROM line_accounts WHERE id=? AND ${stoppedTenantLineAccountSql('line_accounts.id')}`).bind(wh.line_account_id).first()) continue;
+    const reserved = await reserveIncomingWebhook(env.DB,wh.id,row.signature_hash,{limit:RECEIVE_RATE_LIMIT,windowMs:RECEIVE_RATE_WINDOW_MS},row.body_hash);
+    if (reserved.kind === 'busy' || reserved.kind === 'rate_limited') continue;
+    if (reserved.kind === 'completed') {
+      await env.DB.prepare("UPDATE incoming_webhook_queue SET status='completed',payload_encrypted=NULL WHERE source_event_id=?").bind(row.source_event_id).run();
+      continue;
+    }
+    const execution = reserved.execution;
+    if(row.attempts>=4) {
+      await execution.fail();
+      await env.DB.prepare("UPDATE incoming_webhook_queue SET status='failed',updated_at=? WHERE source_event_id=?").bind(new Date().toISOString(),row.source_event_id).run();
+      continue;
+    }
+    await env.DB.prepare('UPDATE incoming_webhook_queue SET attempts=attempts+1 WHERE source_event_id=?').bind(row.source_event_id).run();
+    try {
+      const payload: unknown = JSON.parse(await decryptCredential(row.payload_encrypted,env.LINE_CREDENTIAL_ENCRYPTION_KEY));
+      if (wh.line_account_id) {
+        try {
+          await updateIncomingWebhookMaskedSample(
+            execution.db,
+            wh.id,
+            wh.line_account_id,
+            maskedPayloadShape(payload),
+          );
+        } catch {
+          console.error(JSON.stringify({"code":"incoming_webhook_masked_sample_update_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
+        }
+      }
+
+      const { fireEvent } = await import('../services/event-bus.js');
+      const eventType = `incoming_webhook.${wh.source_type}`;
+      const started = Date.now();
+      let interaction: Pick<WebhookInteractionRow, 'id'> | null = null;
+      if (wh.line_account_id) {
+        try {
+          interaction = await execution.step('interaction', async () => ({ id: (await createWebhookInteraction(execution!.db, {
+            lineAccountId: wh.line_account_id!,
+            direction: 'incoming',
+            webhookId: wh.id,
+            webhookName: wh.name,
+            eventType,
+            triggerSummary: `${wh.name}から受け取った`,
+            // 受信は送り直さないため本文を保管しない。顧客情報を台帳へ複製しない。
+            requestBodyJson: null,
+          })).id }));
+        } catch (logError) {
+          // 台帳の一時障害で、署名確認済みの受信処理まで止めない。
+          console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
+        }
+      }
+      let actionResult: { matchedFriendId: string | null; executed: number; failed: number;
+        matchStatus: 'matched' | 'not_found' | 'ambiguous' | 'skipped' } =
+        { matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'skipped' };
+      try {
+        /*
+         * R402: 受領時に照合方法・未一致時の扱い・処理配列全体・参照版を
+         * 一つの実行計画として保存する。再試行はその計画を最後まで使い、
+         * 後日の設定変更は新規受信へだけ適用する。既存受信を別計画へ変える
+         * 場合は差分と未処理分を明示する（現状は計画の固定のみ行う）。
+         */
+        let receiptPlan = await readIncomingWebhookReceiptPlan(env.DB, execution.sourceEventId);
+        if (!receiptPlan) {
+          const fresh: IncomingWebhookReceiptPlan = {
+            configVersion: typeof wh.version === 'number' ? wh.version : null,
+            identityMatching: safeJson<IncomingWebhookIdentityMatch>(wh.identity_match_json, {
+              methods: [], onNotFound: 'do_nothing',
+            }),
+            actions: safeJson<IncomingWebhookActionRef[]>(wh.action_refs_json, []),
+          };
+          /*
+           * 計画の確定は賃借柵の外で行う。内容は受領行の1行に先勝ちで書き、
+           * 同じ受領の並行・再試行が上書きしない。柵内の行動実行はこの後。
+           */
+          await saveIncomingWebhookReceiptPlan(env.DB, execution.sourceEventId, fresh);
+          receiptPlan = await readIncomingWebhookReceiptPlan(env.DB, execution.sourceEventId) ?? fresh;
+        }
+        if (wh.line_account_id) {
+          actionResult = await execution.step('actions', async () => {
+            const result = await executeIncomingWebhookActions(execution!.db, {
+            lineAccountId: wh.line_account_id!,
+            webhookId: wh.id,
+            sourceEventId: execution!.sourceEventId,
+            payload,
+            identityMatching: receiptPlan!.identityMatching,
+            actions: receiptPlan!.actions,
+            dependencies: { credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY },
+            execution,
+            });
+            if (result.failed > 0) throw new Error('incoming_actions_failed');
+            return result;
+          });
+        }
+        await execution.step('event', () => fireEvent(execution!.db, eventType, {
+          sourceEventId: execution!.sourceEventId,
+          sourceKind: 'incoming_webhook_receipt',
+          occurredAt: execution!.occurredAt,
+          friendId: actionResult.matchedFriendId ?? undefined,
+          eventData: { webhookId: wh.id, source: wh.source_type, payload, actionResult },
+        }, undefined, wh.line_account_id ?? null, execution));
+        if (actionResult.failed > 0) throw new Error('受信Webhookの処理に失敗しました');
+      } catch (eventError) {
+        if (interaction && wh.line_account_id) {
+          try {
+            await finishWebhookInteraction(execution.db, interaction.id, wh.line_account_id, {
+              status: 'failed',
+              responseStatus: 500,
+              attemptCount: 1,
+              durationMs: Date.now() - started,
+              failureReason: 'processing_failed',
+            });
+          } catch (logError) {
+            console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
+          }
+        }
+        throw eventError;
+      }
+      if (interaction && wh.line_account_id) {
+        try {
+          await finishWebhookInteraction(execution.db, interaction.id, wh.line_account_id, {
+            status: 'succeeded',
+            responseStatus: 200,
+            attemptCount: 1,
+            durationMs: Date.now() - started,
+          });
+        } catch (logError) {
+          // 受信処理は完了している。台帳の一時障害だけで送信元へ500を返さない。
+          console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
+        }
+      }
+
+      await execution.complete();
+
+      await env.DB.prepare("UPDATE incoming_webhook_queue SET status='completed',payload_encrypted=NULL,updated_at=? WHERE source_event_id=?").bind(new Date().toISOString(),row.source_event_id).run();
+      completed++;
+    } catch {
+      await execution.fail();
+      await env.DB.prepare(`UPDATE incoming_webhook_queue SET next_attempt_at=?,updated_at=? WHERE source_event_id=?`).bind(new Date(Date.now()+300_000).toISOString(),new Date().toISOString(),row.source_event_id).run();
+    }
+  }
+  return completed;
+}

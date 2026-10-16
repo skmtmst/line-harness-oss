@@ -156,6 +156,13 @@ images.get('/images/*', async (c) => {
   if (isPrivate ? !await privateImageSignatureValid(new URL(c.req.url), c.env.API_KEY) : !publicImageKey(key)) {
     return c.json({ success: false, error: 'Image not found' }, 404);
   }
+  if (key.startsWith('nen-photo-review/') || key.startsWith('nen-photo-public/')) {
+    const photo = await c.env.DB.prepare(`SELECT ps.id FROM nen_photo_submissions ps
+      JOIN media_file_scans scan ON scan.subject_kind='photo' AND scan.subject_id=ps.id
+        AND scan.line_account_id=ps.line_account_id AND scan.status='clean'
+      WHERE substr(ps.review_image_url,-length(?))=? OR substr(ps.public_image_url,-length(?))=?`).bind(`/images/${key}`, `/images/${key}`, `/images/${key}`, `/images/${key}`).first();
+    if (!photo) return c.json({ success: false, error: 'ファイルの安全性を確かめています' }, 409);
+  }
   // Webinar originals use the existing enrollment-gated playback API.
   // A webinar may refer to a media key, so namespace checks alone are insufficient.
   if (!isPrivate && await isWebinarSource(c.env.DB, key)) return c.json({ success: false, error: 'Image not found' }, 404);

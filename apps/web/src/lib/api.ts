@@ -1,7 +1,7 @@
-import type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
-export type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
-import type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
-export type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
+import type { BroadcastPreflight } from './api-broadcast-preflight-types';
+export type { BroadcastPreflight } from './api-broadcast-preflight-types';
+import type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types';
+export type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types';
 import { type RichMenuPublishRun } from './api-rich-menu-publish-types'
 export { type RichMenuPublishRun } from './api-rich-menu-publish-types'
 import { SESSION_LOST_EVENT } from './session-events'
@@ -7361,6 +7361,7 @@ export const api = {
   },
   /** 回答フォーム。 */
   forms: {
+    exportResponses: (formId: string, accountId: string) => fetchApiBlob(`/api/forms/${encodeURIComponent(formId)}/exports?account_id=${encodeURIComponent(accountId)}`, { method: 'POST', accountId }),
     submission: (formId: string, submissionId: string, accountId: string) =>
       fetchApi<ApiResponse<FormSubmissionDetail>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}?account_id=${encodeURIComponent(accountId)}`,
@@ -7715,6 +7716,7 @@ export const api = {
       { method: 'POST', body: JSON.stringify(data) },
     ),
     update: (id: string, accountId: string, data: {
+      expectedRevision?: number
       filename?: string
       folderId?: string | null
       /** 既知の利用期限（YYYY-MM-DD）。null で記録を消して「不明」へ戻す。 */
@@ -7724,6 +7726,7 @@ export const api = {
     }) =>
       fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
+        headers: data.expectedRevision === undefined ? undefined : { 'If-Match': String(data.expectedRevision) },
         body: JSON.stringify(data),
       }),
     /** 削除確認を開くたびに、現在の使用先と削除可否を読み直す。 */
@@ -9785,8 +9788,8 @@ export const api = {
       ),
   },
   affiliates: {
-    list: () =>
-      fetchApi<ApiResponse<Affiliate[]>>('/api/affiliates'),
+    list: (accountId?: string) =>
+      fetchApi<ApiResponse<Affiliate[]>>('/api/affiliates' + (accountId ? `?accountId=${encodeURIComponent(accountId)}` : '')),
     get: (id: string) =>
       fetchApi<ApiResponse<Affiliate>>(`/api/affiliates/${id}`),
     // Admin-side create. Codes are auto-generated (random) — no manual `code`
@@ -12090,6 +12093,7 @@ export const api = {
       fetchApi<ApiResponse<FriendScoreDetail>>(`/api/friends/${friendId}/score`),
   },
   mileage: {
+    exportCsv: (accountId: string, kind: 'balances' | 'history' | 'rewards' | 'scores', reason: string) => fetchApiBlob('/api/mileage/exports', { method: 'POST', accountId, body: JSON.stringify({ accountId, kind, reason }) }),
     rewardFolders: (accountId: string) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>(`/api/mileage/reward-folders?accountId=${encodeURIComponent(accountId)}`),
     createRewardFolder: (accountId: string, name: string) => fetchApi<ApiResponse<{ id: string; name: string; displayOrder: number; count: number }>>('/api/mileage/reward-folders', { method: 'POST', body: JSON.stringify({ accountId, name }) }),
     reorderRewardFolders: (accountId: string, ids: string[]) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>('/api/mileage/reward-folders/order', { method: 'PUT', body: JSON.stringify({ accountId, ids }) }),
@@ -12471,14 +12475,14 @@ export const api = {
         fetchApi<ApiResponse<IncomingWebhookDetail>>(
           `/api/webhooks/incoming/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret: string } & WebhookCreateState, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret?: string } & WebhookCreateState, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhookCreated>>('/api/webhooks/incoming', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
       update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string; folderId?: string | null }, stepUpToken?: string) =>
-        fetchApi<ApiResponse<IncomingWebhook>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
+        fetchApi<ApiResponse<IncomingWebhook & { secret?: string }>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
@@ -12529,7 +12533,7 @@ export const api = {
         fetchApi<ApiResponse<OutgoingWebhook>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number } & WebhookCreateState, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number } & WebhookCreateState, stepUpToken?: string) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12541,7 +12545,7 @@ export const api = {
         data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string; expectedVersion?: number; folderId?: string | null },
         stepUpToken?: string,
       ) =>
-        fetchApi<ApiResponse<OutgoingWebhook>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
+        fetchApi<ApiResponse<OutgoingWebhook & { secret?: string }>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),

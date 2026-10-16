@@ -1,3 +1,4 @@
+import { webinarActionReferenceValid } from './webinar-action-references.js';
 import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 
@@ -540,16 +541,17 @@ export async function updateWebinar(
   db: D1Database,
   id: string,
   patch: Partial<WebinarCreateInput>,
+  expectedVersion?: number,
 ): Promise<Webinar | null> {
   const existing = await getWebinarById(db, id);
   if (!existing) return null;
-  await db
+  const update = db
     .prepare(
       `UPDATE webinars SET account_id = ?, title = ?, slug = ?, status = ?,
          video_prefix = ?, duration_seconds = ?, schedule_json = ?, cta_json = ?,
          tag_on_attend = ?, tag_on_cta_click = ?, folder_id = ?,
          publication_starts_at = ?, publication_ends_at = ?, updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ?${expectedVersion === undefined ? '' : ' AND EXISTS (SELECT 1 FROM webinar_editor_settings s WHERE s.webinar_id = webinars.id AND s.version = ?)'}`,
     )
     .bind(
       patch.accountId !== undefined ? patch.accountId : existing.account_id,
@@ -566,9 +568,28 @@ export async function updateWebinar(
       patch.publicationStartsAt !== undefined
         ? patch.publicationStartsAt : existing.publication_starts_at,
       patch.publicationEndsAt !== undefined ? patch.publicationEndsAt : existing.publication_ends_at,
-      jstNow(), id,
-    )
-    .run();
+      jstNow(), id, ...(expectedVersion === undefined ? [] : [expectedVersion]),
+    );
+  if (expectedVersion === undefined) await update.run();
+  else {
+    const result = await db.batch([
+      db.prepare(`INSERT OR IGNORE INTO webinar_editor_settings (webinar_id,version,created_at,updated_at) VALUES (?,0,?,?)`).bind(id,jstNow(),jstNow()),
+      update,
+      db.prepare(`UPDATE webinar_editor_settings SET version = version + 1, updated_at = ? WHERE webinar_id = ? AND version = ? AND changes() = 1`).bind(jstNow(), id, expectedVersion),
+      db.prepare(`INSERT INTO webinar_versions (id,webinar_id,version,state,snapshot_json,created_at)
+        SELECT ?,webinar_id,version,'draft',json_object(
+          'deliveryKind',delivery_kind,'viewingCondition',json(viewing_condition_json),
+          'publicDescription',public_description,'registrationFormId',registration_form_id,
+          'notificationMessages',json(notification_messages_json),
+          'notificationTest',CASE WHEN notification_test_json IS NULL THEN NULL ELSE json(notification_test_json) END,
+          'actionTemplateBody',action_template_body,'missingResultPolicy',missing_result_policy,
+          'publicPageTest',CASE WHEN public_page_test_json IS NULL THEN NULL ELSE json(public_page_test_json) END),?
+        FROM webinar_editor_settings WHERE webinar_id=? AND version=? AND changes()=1`)
+        .bind(crypto.randomUUID(),jstNow(),id,expectedVersion+1),
+
+    ]);
+    if (Number(result[1].meta?.changes ?? 0) !== 1) return null;
+  }
   return getWebinarById(db, id);
 }
 
@@ -949,6 +970,13 @@ export async function recordWebinarViewSegment(
  * 重なる区間を束ね、重複時間を足さない合計秒数を返す（J #821）。
  * 同じ区間の再送は呼び出し前に冪等キーで1行になっている前提。
  */
+export async function getWebinarWatchedSeconds(db: D1Database, webinarId: string, friendId: string, sessionStartAt: number): Promise<number> {
+  const { results } = await db.prepare(`SELECT start_seconds, end_seconds FROM webinar_view_segments
+    WHERE webinar_id = ? AND friend_id = ? AND session_start_at = ?`)
+    .bind(webinarId, friendId, sessionStartAt).all<{ start_seconds: number; end_seconds: number }>();
+  return mergeWebinarWatchedSeconds(results);
+}
+
 export function mergeWebinarWatchedSeconds(
   intervals: Array<{ start_seconds: number; end_seconds: number }>,
 ): number {
@@ -1282,65 +1310,6 @@ export async function countInvalidWebinarActionReferences(
     if (!await webinarActionReferenceValid(db, accountId, action)) invalid += 1;
   }
   return invalid;
-}
-
-async function webinarActionReferenceValid(
-  db: D1Database,
-  accountId: string | null,
-  action: Pick<WebinarActionInput, 'actionType' | 'config'>,
-): Promise<boolean> {
-  const ref = (key: string): string | null => {
-    const value = action.config[key];
-    return typeof value === 'string' && value.trim() ? value.trim() : null;
-  };
-  const exists = async (sql: string, id: string): Promise<boolean> =>
-    Boolean(await db.prepare(sql).bind(id, accountId).first());
-  switch (action.actionType) {
-    case 'add_tag':
-    case 'remove_tag': {
-      const tagId = ref('tagId');
-      return tagId !== null && await exists(
-        `SELECT id FROM tags WHERE id = ? AND line_account_id = ? AND status = 'active'`,
-        tagId,
-      );
-    }
-    case 'start_scenario':
-    case 'stop_scenario':
-    case 'resume_scenario': {
-      const scenarioId = ref('scenarioId');
-      return scenarioId !== null && await exists(
-        'SELECT id FROM scenarios WHERE id = ? AND line_account_id = ?',
-        scenarioId,
-      );
-    }
-    case 'send_message': {
-      const templateId = ref('templateId');
-      return templateId !== null && await exists(
-        'SELECT id FROM templates WHERE id = ? AND line_account_id = ?',
-        templateId,
-      );
-    }
-    case 'send_webhook': {
-      const webhookId = ref('webhookId');
-      return webhookId !== null && await exists(
-        'SELECT id FROM outgoing_webhooks WHERE id = ? AND line_account_id = ? AND is_active = 1 AND deleted_at IS NULL',
-        webhookId,
-      );
-    }
-    case 'switch_rich_menu': {
-      const pageId = ref('richMenuPageId');
-      return pageId !== null && await exists(
-        `SELECT p.id FROM rich_menu_pages p
-          JOIN rich_menu_groups g ON g.id = p.group_id
-         WHERE p.id = ? AND g.account_id = ? AND g.status = 'published'`,
-        pageId,
-      );
-    }
-    case 'remove_rich_menu':
-      return true;
-    default:
-      return false;
-  }
 }
 
 export type WebinarActionExecutionStatus =

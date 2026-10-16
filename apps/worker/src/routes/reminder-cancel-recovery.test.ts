@@ -68,6 +68,7 @@ vi.mock('../services/liff-auth.js', () => liffAuthMocks);
 const { default: booking } = await import('./booking.js');
 const { default: events } = await import('./events.js');
 
+// 登録は配信予定より前に済んだ固定時刻で作る。取消・送信の交差を検査する。
 const BOOTSTRAP = readFileSync(
   join(process.cwd(), '../../packages/db/bootstrap.sql'),
   'utf8',
@@ -201,9 +202,7 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     try {
       seedAccountsAndFriends(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       const pushMessageWithRequestId = vi.fn(async (..._args: unknown[]) => ({ requestId: 'REQ-1' }));
       let finalVerifyPassed = false;
@@ -263,10 +262,8 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     try {
       seedAccountsAndFriends(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','EV-a'),
-               ('FR-2','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','EV-b');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','EV-a','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'),
+               ('FR-2','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','EV-b','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // 1件だけに割込みclaimが入る。旧実装は行単位の除外で割込み行だけ残し、
       // 1件止まった成功で残るactive+claimedを抱えたまま成功した。
@@ -303,9 +300,7 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     try {
       seedAccountsAndFriends(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // 実時間で10分live (Z)。nowは+09:00書き。TEXT比較だと 'T04'<'T13' で
       // 見逃して取消成功する欠陥だった。epoch比較では投げる。
@@ -340,9 +335,7 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     try {
       seedAccountsAndFriends(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // nowを渡さない (本番と同じ既定: +09:00書きの現在時刻)。
       seedDeliveryRun(dual.raw1, {
@@ -365,9 +358,7 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     try {
       seedAccountsAndFriends(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // 再試行待ちと、切れた貸出の残り。liveは無い。
       seedDeliveryRun(dual.raw1, {
@@ -557,9 +548,7 @@ describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
     try {
       seedBookingCancelTarget(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-9','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-9','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // 実時間でliveなZ lease。routeは既定now (+09:00書き) で比べる。
       seedDeliveryRun(dual.raw1, {
@@ -597,9 +586,7 @@ describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
     try {
       seedBookingCancelTarget(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-9','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-9','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       seedDeliveryRun(dual.raw1, {
         id: 'RUN-9', friend_reminder_id: 'FR-9', reminder_step_id: 'rb-step',
@@ -785,9 +772,7 @@ function seedLiffCancelTarget(raw: Database.Database) {
     INSERT INTO reminder_steps
       (id, reminder_id, offset_minutes, message_type, message_content)
     VALUES ('step-rule-event-9','rule-event-9',-60,'text','お待ちしています');
-    INSERT INTO friend_reminders
-      (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-    VALUES ('FR-l1','friend-9','rule-event-9','2099-06-01T10:00:00.000Z','active','event','eb-l1','eb-l1');
+    INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-l1','friend-9','rule-event-9','2099-06-01T10:00:00.000Z','active','event','eb-l1','eb-l1','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
     INSERT INTO event_booking_reminders
       (id, booking_id, kind, scheduled_at, status, retry_count)
     VALUES ('LEG-l1','eb-l1','day_before','2099-05-31T10:00:00.000Z','pending',0);
@@ -976,9 +961,7 @@ const noPause = async () => undefined;
 /** V6 登録 + 旧表の未送信を1件ずつ足す (予約 RB9 きっかけ)。 */
 function seedBookingReminderPair(raw: Database.Database) {
   raw.exec(`
-    INSERT INTO friend_reminders
-      (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-    VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9');
+    INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
     INSERT INTO booking_reminders (id, booking_id, kind, scheduled_at, status, retry_count)
     VALUES ('LEG-d1','RB9','day_before','2026-09-19T01:00:00.000Z','pending',0);
   `);
@@ -1349,10 +1332,8 @@ describe('取消チェックの各層を個別に見張る (自主検証)', () =
         INSERT INTO reminder_steps (id, reminder_id, offset_minutes, message_type, message_content)
         VALUES ('rb2-step1','rb-rule2',-120,'text','1通目'),
                ('rb2-step2','rb-rule2',-60,'text','2通目');
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9'),
-               ('FR-d2','f2','rb-rule2','2026-09-20T01:00:00.000Z','active','booking','RB10','RB10');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'),
+               ('FR-d2','f2','rb-rule2','2026-09-20T01:00:00.000Z','active','booking','RB10','RB10','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // 1件目の送信が済んだら武装し、2件目の claim が成立した直後に
       // 別接続の取消を割り込ませる (claim と登録確認の間の窓)。

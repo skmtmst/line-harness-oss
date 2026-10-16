@@ -374,3 +374,20 @@ describe('送信予約(N-025)', () => {
     expect(missing.status).toBe(404);
   });
 });
+
+
+describe('B-333 ブロック・解除済み相手の送信禁止', () => {
+  test('手動送信も予約作成も拒否し、送信と予約が残らない', async () => {
+    sqlite.raw.prepare("UPDATE friends SET is_following = 0 WHERE id = 'fr-1'").run();
+    for (const response of [
+      await postSend({ content: '送らない' }, KEY1),
+      await postSchedule({ content: '送らない', scheduledAt: '2099-01-01T00:00:00Z' }, KEY2),
+    ]) {
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ code: 'FRIEND_NOT_FOLLOWING' });
+    }
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(outbox()).toHaveLength(0);
+    expect(scheduledRows()).toHaveLength(0);
+  });
+});

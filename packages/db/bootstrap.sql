@@ -2679,7 +2679,7 @@ CREATE TABLE ec_events (
   error_message     TEXT,
   received_at       TEXT NOT NULL,
   processed_at      TEXT,
-  updated_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL, identity_recovery_mode TEXT CHECK(identity_recovery_mode IN ('analytics_snapshot','non_delivery_actions')),
   UNIQUE (source, external_event_id),
   FOREIGN KEY (friend_id) REFERENCES friends(id) ON DELETE SET NULL
 );
@@ -4272,6 +4272,19 @@ CREATE TABLE inbox_staff_reads (
   PRIMARY KEY (staff_id, channel, conversation_id)
 );
 
+CREATE TABLE incoming_webhook_queue (
+  source_event_id TEXT PRIMARY KEY,
+  webhook_id TEXT NOT NULL REFERENCES incoming_webhooks(id),
+  signature_hash TEXT NOT NULL,
+  body_hash TEXT NOT NULL,
+  payload_encrypted TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed','failed')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE incoming_webhook_receipts (
   webhook_id     TEXT NOT NULL REFERENCES incoming_webhooks(id) ON DELETE CASCADE,
   signature_hash TEXT NOT NULL,
@@ -4575,7 +4588,7 @@ CREATE TABLE media (
   public_url  TEXT,
   uploaded_by TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, archived_at TEXT, archived_by TEXT, archive_reason TEXT, usage_expires_at TEXT, usage_consent_note TEXT);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, archived_at TEXT, archived_by TEXT, archive_reason TEXT, usage_expires_at TEXT, usage_consent_note TEXT, revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1));
 
 CREATE TABLE media_file_scans (
   id               TEXT PRIMARY KEY,
@@ -5220,7 +5233,7 @@ CREATE TABLE nen_delivery_jobs (
   campaign_snapshot IS NULL OR json_valid(campaign_snapshot)
 ), version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), retry_generation INTEGER NOT NULL DEFAULT 0 CHECK (retry_generation >= 0), last_retry_reason TEXT CHECK (
     last_retry_reason IS NULL OR length(last_retry_reason) BETWEEN 1 AND 500
-  ), last_retry_requested_by TEXT, last_retry_requested_at TEXT,
+  ), last_retry_requested_by TEXT, last_retry_requested_at TEXT, next_attempt_at TEXT, claim_token TEXT,
   UNIQUE (campaign_key, friend_id, source_key)
 );
 
@@ -5346,7 +5359,7 @@ CREATE TABLE nen_pet_profiles (
   birthday TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT, weight_updated_at TEXT);
+, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT, weight_updated_at TEXT, archived_at TEXT);
 
 CREATE TABLE "nen_photo_assessment_runs" (
   photo_id_history TEXT,
@@ -5945,6 +5958,12 @@ CREATE TABLE operation_request_receipts (
   PRIMARY KEY (action, actor_id, idempotency_key)
 );
 
+CREATE TABLE operator_notification_occurrences (
+ rule_id TEXT NOT NULL, line_account_id TEXT NOT NULL, source_event_id TEXT NOT NULL,
+ instance_id TEXT NOT NULL REFERENCES notification_instances(id) ON DELETE CASCADE,
+ PRIMARY KEY(rule_id,line_account_id,source_event_id)
+);
+
 CREATE TABLE operator_notification_teams (
   id TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -6242,6 +6261,14 @@ CREATE TABLE postal_import_manifest (
   input_bytes INTEGER NOT NULL,
   row_count INTEGER NOT NULL,
   imported_at TEXT NOT NULL
+);
+
+CREATE TABLE public_ingress_receipts (
+  kind TEXT NOT NULL CHECK (kind IN ('conversion_nonce', 'site_event')),
+  scope_id TEXT NOT NULL,
+  receipt_key TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  PRIMARY KEY (kind, scope_id, receipt_key)
 );
 
 CREATE TABLE qa_entries(id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES line_accounts(id),questions_json TEXT NOT NULL CHECK(json_valid(questions_json)),answer_messages_json TEXT NOT NULL CHECK(json_valid(answer_messages_json)),tags_json TEXT NOT NULL DEFAULT '[]',status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN('draft','published','stopped')),source TEXT NOT NULL DEFAULT 'manual',version INTEGER NOT NULL DEFAULT 1,use_count INTEGER NOT NULL DEFAULT 0,created_by TEXT NOT NULL,updated_at TEXT NOT NULL,idempotency_key TEXT NOT NULL,UNIQUE(account_id,created_by,idempotency_key));
@@ -8271,7 +8298,7 @@ CREATE TABLE "templates" (
   CHECK (draft_question_json IS NULL OR json_valid(draft_question_json)), draft_question_status TEXT
   CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT, draft_revision INTEGER NOT NULL DEFAULT 0, message_bubbles_json TEXT
   CHECK(message_bubbles_json IS NULL OR (json_valid(message_bubbles_json) AND json_type(message_bubbles_json)='array' AND json_array_length(message_bubbles_json) BETWEEN 1 AND 5)), draft_message_bubbles_json TEXT
-  CHECK(draft_message_bubbles_json IS NULL OR (json_valid(draft_message_bubbles_json) AND json_type(draft_message_bubbles_json)='array' AND json_array_length(draft_message_bubbles_json) BETWEEN 1 AND 5)));
+  CHECK(draft_message_bubbles_json IS NULL OR (json_valid(draft_message_bubbles_json) AND json_type(draft_message_bubbles_json)='array' AND json_array_length(draft_message_bubbles_json) BETWEEN 1 AND 5)), deleted_at TEXT);
 
 CREATE TABLE tenant_data_purge_audit (
   id TEXT PRIMARY KEY,
@@ -10043,6 +10070,8 @@ CREATE INDEX idx_inbox_reply_leases_expiry ON inbox_reply_leases (expires_at);
 CREATE INDEX idx_inbox_staff_reads_conversation
   ON inbox_staff_reads (channel, conversation_id, staff_id);
 
+CREATE INDEX idx_incoming_webhook_queue_due ON incoming_webhook_queue(status,next_attempt_at);
+
 CREATE UNIQUE INDEX idx_incoming_webhook_receipts_body
   ON incoming_webhook_receipts (webhook_id, body_hash);
 
@@ -10307,6 +10336,8 @@ CREATE INDEX idx_nen_delivery_jobs_due
 CREATE INDEX idx_nen_delivery_jobs_friend
   ON nen_delivery_jobs(friend_id, created_at DESC);
 
+CREATE INDEX idx_nen_delivery_retry_due ON nen_delivery_jobs(status, next_attempt_at);
+
 CREATE INDEX idx_nen_feeding_products_account
   ON nen_feeding_products(line_account_id, sort_order);
 
@@ -10531,6 +10562,8 @@ CREATE INDEX idx_platform_knowledge_jobs_pending ON platform_knowledge_jobs(stat
 
 CREATE INDEX idx_postal_codes_code
   ON postal_codes(postal_code);
+
+CREATE INDEX idx_public_ingress_receipts_received ON public_ingress_receipts(received_at);
 
 CREATE INDEX idx_recipe_clone_items_v316_run
   ON recipe_clone_items(run_id, created_at, id);
@@ -10954,6 +10987,8 @@ CREATE INDEX idx_template_versions_template
   ON template_versions (template_id, version_number DESC);
 
 CREATE INDEX idx_templates_category ON templates (category);
+
+CREATE INDEX idx_templates_deleted ON templates(deleted_at);
 
 CREATE INDEX idx_templates_line_account
   ON templates(line_account_id, display_order, id);

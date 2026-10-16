@@ -260,6 +260,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/liff/notification-preferences/{purpose}',
   'DELETE /api/hq/broadcasts/saved-views/{viewId}',
   'DELETE /api/hq/templates/{id}/test-tokens/{tokenId}',
+  'POST /api/forms/{id}/exports',
+  'POST /api/mileage/exports',
   'GET /api/hq/billing/metrics',
   'GET /api/hq/broadcasts/quota',
   'GET /api/hq/broadcasts/saved-views',

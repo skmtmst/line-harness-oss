@@ -1,3 +1,4 @@
+import { seedCleanPhotoScans } from '../test-utils/photo-scans.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type Database from 'better-sqlite3';
@@ -56,6 +57,7 @@ function insertPhoto(
        ON CONFLICT(friend_id) DO UPDATE SET customer_id = excluded.customer_id`,
     ).run(input.friendId ?? 'friend-a', input.customerId, NOW);
   }
+  seedCleanPhotoScans(raw);
 }
 
 function insertReward(

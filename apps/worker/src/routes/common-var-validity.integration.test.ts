@@ -102,7 +102,7 @@ describe('共通情報の有効期間 API（実route + SQLite）', () => {
     const id = (await created.json() as { data: { id: string } }).data.id;
 
     for (const body of [{ value: '11-20' }, { value: '11-20', changeReason: '  ' }]) {
-      const response = await app(store.db).request(`/api/common-vars/${id}?accountId=account-a`, json('PATCH', body),
+      const response = await app(store.db).request(`/api/common-vars/${id}?accountId=account-a`, json('PATCH', { ...body, expectedVersion: 1 }),
         { DB: store.db } as Env['Bindings']);
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ code: 'change_reason_required' });
@@ -143,7 +143,7 @@ describe('共通情報の有効期間 API（実route + SQLite）', () => {
     }), { DB: store.db } as Env['Bindings']);
     const proof = (await preview.json() as { data: { impactProof: string } }).data.impactProof;
     const patched = await app(store.db).request(`/api/common-vars/${id}?accountId=account-a`, json('PATCH', {
-      value: slackLike, impactProof: proof, changeReason: '更新',
+      expectedVersion: 1, value: slackLike, impactProof: proof, changeReason: '更新',
     }), { DB: store.db } as Env['Bindings']);
     expect(patched.status).toBe(422);
   });

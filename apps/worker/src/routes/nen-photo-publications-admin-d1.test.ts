@@ -1,3 +1,4 @@
+import { seedCleanPhotoScans } from '../test-utils/photo-scans.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -65,6 +66,7 @@ function insertPhoto(
     input.consentWithdrawnAt ?? null,
     input.reviewedByName ?? '審査した担当',
   );
+  seedCleanPhotoScans(testDb.raw);
 }
 
 function insertPublication(

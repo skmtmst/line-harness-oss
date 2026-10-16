@@ -323,7 +323,7 @@ export async function executeIncomingWebhookActions(
     return { matchedFriendId: friendId, executed: 0, failed: 0, matchStatus: 'matched' };
   }
 
-  const executors = createAutomationActionExecutors(input.dependencies);
+  const executors = createAutomationActionExecutors({ ...input.dependencies, webhookDeliveryMode: 'immediate' });
   let executed = 0;
   let failed = 0;
   let sequence = 0;

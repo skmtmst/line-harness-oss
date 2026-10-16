@@ -350,7 +350,7 @@ describe('photo review operations API', () => {
     expect(mocks.push).toHaveBeenCalledTimes(2);
     expect(mocks.push).toHaveBeenNthCalledWith(
       1, 'https://worker.example', 'resolved-token', 'U1',
-      [{ type: 'text', text: expect.stringContaining('5ポイント') }],
+      [{ type: 'text', text: expect.stringContaining('ポイントを付ける手続き') }],
       // X-Line-Retry-Key はUUID形式が必須のため、UUIDの審査イベントIDをそのまま使う。
       'decision-1', expect.any(Function),
     );

@@ -604,6 +604,11 @@
     "669_restaurant_anniversary_followup.sql",
     "681_style_setup_selection_and_auto_insert.sql",
     "682_booking_stripe_connect_states.sql",
+    "686_public_ingress_receipts.sql",
+    "687_template_soft_delete.sql",
+    "688_media_metadata_revision.sql",
+    "689_behavior_delivery_recovery.sql",
+    "690_incoming_webhook_queue.sql",
     "696_style_starter_updates_and_dashboard_metrics.sql",
     "697_booking_payment_refunds.sql",
     "698_chat_corrections.sql",
@@ -623,5 +628,5 @@
     "712_operator_push.sql",
     "713_booking_hq_origin.sql"
   ],
-  "migrationCount": 622
+  "migrationCount": 627
 }
