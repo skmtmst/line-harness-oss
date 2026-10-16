@@ -365,14 +365,14 @@ function TierDialog({ tier, program, prev, next, isFirst, busy, onCancel, onSave
   }
 
   return (
-    <Dialog open title={tier ? 'ランクを編集する' : 'ランクを足す'} confirmLabel="保存する" busy={busy} onConfirm={submit} onCancel={onCancel}>
+    <Dialog open contentLayout="form" title={tier ? 'ランクを編集する' : 'ランクを足す'} confirmLabel="保存する" busy={busy} onConfirm={submit} onCancel={onCancel}>
       <div className={styles.dialogBody}>
         <Field label="名前" required error={errors.name}><TextField aria-label="名前" value={name} maxLength={30} onChange={(event) => setName(event.target.value)} /></Field>
         <Field label="上がる条件" required error={errors.threshold} note={isFirst ? '最初の段は、友だちになったら入ります。' : `${windowLabel(program.windowMonths)}の ${METRIC_OPTIONS.find((item) => item.value === program.metric)?.label ?? ''}`}>
-          <NumberField aria-label="上がる条件" value={threshold} unit={METRIC_UNIT[program.metric]} min={0} disabled={isFirst} onChange={(event) => setThreshold(event.target.value)} />
+          <NumberField short aria-label="上がる条件" value={threshold} unit={METRIC_UNIT[program.metric]} min={0} disabled={isFirst} onChange={(event) => setThreshold(event.target.value)} />
         </Field>
         <Field label="特典（マイルの倍率）" error={errors.multiplier} note="1 は特典なし。上の段ほど大きくします（1〜3）。">
-          <NumberField aria-label="特典（マイルの倍率）" value={multiplier} unit="倍" min={1} max={3} step={0.1} onChange={(event) => setMultiplier(event.target.value)} />
+          <NumberField short aria-label="特典（マイルの倍率）" value={multiplier} unit="倍" min={1} max={3} step={0.1} onChange={(event) => setMultiplier(event.target.value)} />
         </Field>
         <Field label="特典の説明" note="1 行に 1 つ。お客さまの会員証に出ます（10 個まで）。"><TextArea aria-label="特典の説明" value={benefits} rows={3} onChange={(event) => setBenefits(event.target.value)} /></Field>
         <Field label="クーポンコード" note="上がったときのお知らせに添えます。"><TextField aria-label="クーポンコード" value={coupon} maxLength={100} onChange={(event) => setCoupon(event.target.value)} /></Field>
