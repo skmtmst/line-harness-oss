@@ -8,6 +8,7 @@ import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
+import { AffixedTextField } from '@/components/shared/text-field'
 import Radio from '@/components/shared/radio'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
@@ -269,11 +270,12 @@ export function DepositSection({ state, connected, canEdit }: { state: Cancellat
           {rule.kind !== 'none' ? (
             <div className={styles.depositRow}>
               <Field label={rule.kind === 'percent' ? '料金の %' : '金額'}>
-                <NumberInput aria-label={rule.kind === 'percent' ? 'デポジットの率' : 'デポジットの金額'} unit={rule.kind === 'percent' ? '%' : '円'} type="number" min={1} max={rule.kind === 'percent' ? 100 : undefined}
+                {/* 単位は欄の中（絵 FcGmv：「30 %」）。 */}
+                <AffixedTextField aria-label={rule.kind === 'percent' ? 'デポジットの率' : 'デポジットの金額'} layout="field" endAdornment={rule.kind === 'percent' ? '%' : '円'} type="number" inputMode="numeric" min={1} max={rule.kind === 'percent' ? 100 : undefined}
                   value={rule.value ?? ''} onChange={(event) => set({ value: event.target.value === '' ? null : Number(event.target.value) })} />
               </Field>
               <span className={styles.depositCondition}>
-                <Select aria-label="掛ける条件" value={rule.conditions.always ? 'always' : rule.conditions.minPeople ? 'people' : 'always'}
+                <Select className={styles.fill} aria-label="掛ける条件" value={rule.conditions.always ? 'always' : rule.conditions.minPeople ? 'people' : 'always'}
                   onChange={(value) => set({ conditions: { ...rule.conditions, always: value === 'always', minPeople: value === 'people' ? rule.conditions.minPeople ?? 4 : null } })}
                   options={[{ value: 'always', label: '掛ける条件：常に' }, { value: 'people', label: '掛ける条件：人数が多いとき' }]} />
               </span>

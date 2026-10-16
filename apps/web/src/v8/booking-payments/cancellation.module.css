@@ -13,6 +13,8 @@
 .dialogBody { display: flex; flex-direction: column; gap: var(--tpl-bm-16); width: 100%; }
 .depositRow { display: grid; grid-template-columns: var(--tpl-bm-160) minmax(0, 1fr); align-items: end; gap: var(--tpl-bm-16); }
 .depositCondition { min-width: 0; }
+/* 掛ける条件は残りの幅を埋め、入れる欄と同じ行の高さにする（絵 FcGmv）。 */
+.fill { width: 100%; }
 .connectRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-bm-12); }
 .connectText { display: flex; flex-direction: column; gap: var(--tpl-bm-2); min-width: 0; color: var(--color-ink); font-size: var(--tpl-bm-13); }
 .links { display: flex; flex-wrap: wrap; gap: var(--tpl-bm-16); margin: 0; font-size: var(--tpl-bm-12); }

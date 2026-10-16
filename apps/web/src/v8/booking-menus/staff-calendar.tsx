@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { CalendarCheck, CalendarX2, Link2, Unplug, Wand2 } from 'lucide-react'
 import Button from '@/components/shared/button'
-import DetailPanel from '@/components/shared/detail-panel'
+import Drawer from '@/components/shared/drawer'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import Radio from '@/components/shared/radio'
@@ -102,8 +102,9 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
   const urlDirty = Boolean(ready?.url && ready.url.value.trim() !== ready.url.saved)
 
   return (
-    <DetailPanel open={person !== null} title={person?.name ?? ''} description={person ? `${person.role ? `${person.role} ・ ` : ''}担当メニュー ${menuCount} つ` : undefined}
-      contentSpacing="sections" onClose={onClose} busy={busy} footer={<div className={styles.footer}><Button onClick={onClose}>閉じる</Button></div>}>
+    /* 共通の引き出し（幅は決まりの 540・後ろに暗い幕）。幅は画面で上書きしない。 */
+    <Drawer open={person !== null} title={person?.name ?? ''} description={person ? `${person.role ? `${person.role} ・ ` : ''}担当メニュー ${menuCount} つ` : undefined}
+      width="editor" heightMode="viewport" contentSpacing="sections" onClose={onClose} busy={busy} footer={<div className={styles.footer}><Button onClick={onClose}>閉じる</Button></div>}>
       {load.state === 'loading' ? <p className={styles.minor}>読み込んでいます…</p> : null}
       {load.state === 'error' ? <div className={styles.card}><p className={styles.minor}>カレンダーの設定を読み込めませんでした。</p><Button size="compact" onClick={() => void reload()}>もう一度読み込む</Button></div> : null}
       {ready && mine ? (
@@ -113,15 +114,17 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
             <h3 id="staff-calendar-heading" className={styles.title}>カレンダー</h3>
             {ready.store ? <p className={styles.minor}>{`店全体の同期：読み込み ${onOff(ready.store.readEnabled)} ・ 書き込み ${onOff(ready.store.writeEnabled)}（予約設定 › 担当スタッフの上で変えます）`}</p> : null}
             <div className={styles.table} role="table" aria-label="つなぐカレンダー">
-              <div className={`${styles.row} ${styles.head}`} role="row"><span role="columnheader">カレンダー・状態</span><span role="columnheader">読み込み</span><span role="columnheader">書き込み</span></div>
+              <div className={`${styles.row} ${styles.head}`} role="row"><span role="columnheader">カレンダー</span><span role="columnheader">状態</span><span role="columnheader">読み込み</span><span role="columnheader">書き込み</span></div>
               <div className={styles.row} role="row">
-                <span role="cell" className={styles.name}><strong>Google カレンダー</strong><StatusBadge tone={connected ? 'success' : 'danger'} size="compact">{connected ? 'つながっている' : '切れている'}</StatusBadge></span>
+                <span role="cell" className={styles.name}><strong>Google カレンダー</strong></span>
+                <span role="cell"><StatusBadge tone={connected ? 'success' : 'danger'} size="compact">{connected ? 'つながっている' : '切れている'}</StatusBadge></span>
                 <span role="cell">{canEdit ? <Toggle label="Google カレンダーの読み込み" checked={mine.readEnabled} disabled={busy} onChange={(on) => void saveSwitch({ readEnabled: on, writeEnabled: mine.writeEnabled })} /> : onOff(mine.readEnabled)}</span>
                 <span role="cell">{canEdit ? <Toggle label="Google カレンダーの書き込み" checked={mine.writeEnabled} disabled={busy}
                   onChange={(on) => { if (on) void saveSwitch({ readEnabled: mine.readEnabled, writeEnabled: true }); else { setError(null); setWriteOff('keep') } }} /> : onOff(mine.writeEnabled)}</span>
               </div>
               <div className={styles.row} role="row">
-                <span role="cell" className={styles.name}><strong>Outlook</strong><StatusBadge tone="neutral" size="compact">つないでいない</StatusBadge></span>
+                <span role="cell" className={styles.name}><strong>Outlook</strong><span className={styles.minor}>まだつないでいません</span></span>
+                <span role="cell"><StatusBadge tone="neutral" size="compact">つないでいない</StatusBadge></span>
                 <span role="cell" className={styles.span2}>{canEdit ? <Button size="compact" onClick={() => preparing.open('Outlook をつなぐ')}>つなぐ</Button> : null}</span>
               </div>
             </div>
@@ -140,6 +143,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
                   {['Google Meet', 'Zoom', 'Microsoft Teams'].map((provider) => (
                     <div key={provider} className={`${styles.row} ${styles.providerRow}`}>
                       <Radio name={`staff-meeting-provider-${person?.id}`} checked={false} onChange={() => preparing.open('会議の自動発行')}>{provider}</Radio>
+                      <StatusBadge tone="neutral" size="compact">つないでいない</StatusBadge>
                       <Button size="compact" onClick={() => preparing.open(`${provider} をつなぐ`)}>つなぐ</Button>
                     </div>
                   ))}
@@ -169,7 +173,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
             busy={busy} error={error ?? undefined} cancelLabel="やめる" onCancel={() => { if (!busy) setWriteOff(null) }}
             confirmLabel="書き込みをオフにする" onConfirm={() => void saveSwitch({ readEnabled: mine.readEnabled, writeEnabled: false }, { removeFutureEvents: writeOff === 'remove' })}>
             <p className={styles.body}>{`これからの予約は、${person?.name ?? ''}さんのカレンダーに書きません。予約はそのまま残ります。`}</p>
-            <RadioCardGroup legend="これまでに書いた予定をどうしますか">
+            <RadioCardGroup legend="これまでに書いた予定をどうしますか" legendVisible>
               <RadioCard name="calendar-write-off" value="keep" icon={<CalendarCheck size={16} />} title="カレンダーの予定は残す" note="いま書いてある予定はそのまま" checked={writeOff === 'keep'} onChange={() => setWriteOff('keep')} />
               <RadioCard name="calendar-write-off" value="remove" icon={<CalendarX2 size={16} />} title={`これから先の予約の予定を消す${mine.futureEventCount !== undefined ? `（${mine.futureEventCount} 件）` : ''}`} note="今日より後の予定だけ。過去の予定は消しません" checked={writeOff === 'remove'} onChange={() => setWriteOff('remove')} />
             </RadioCardGroup>
@@ -177,6 +181,6 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
         </>
       ) : null}
       {preparing.dialog}
-    </DetailPanel>
+    </Drawer>
   )
 }

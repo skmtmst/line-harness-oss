@@ -16,6 +16,10 @@
 .warn { background: var(--color-warning-bg, var(--color-table-head)); }
 .info svg, .warn svg { flex: none; margin-top: var(--tpl-bm-2); }
 .groupTable { display: flex; flex-direction: column; border-radius: var(--tpl-bm-8); overflow: hidden; }
-.groupRow { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 0.8fr) var(--tpl-bm-84); align-items: center; gap: var(--tpl-bm-8); min-height: var(--tpl-bm-48); padding: 0 var(--tpl-bm-12); box-shadow: var(--shadow-row-line); font-size: var(--tpl-bm-13); color: var(--color-ink); }
+.groupRow { display: grid; grid-template-columns: var(--tpl-bm-40) minmax(0, 1fr) var(--tpl-bm-48) var(--tpl-bm-84); align-items: center; gap: var(--tpl-bm-6); min-height: var(--tpl-bm-48); padding: var(--tpl-bm-6) var(--tpl-bm-8); box-shadow: var(--shadow-row-line); font-size: var(--tpl-bm-13); color: var(--color-ink); }
 .groupRow > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* メニューは切らない：詳細パネルの幅（決まりの 360）でも、言葉の切れ目（「（」の前など）で 2 行にする（絵 Nx1kq）。 */
+.groupRow > span.groupWrap { white-space: normal; word-break: keep-all; text-overflow: clip; }
+/* 組の囲みは緑の枠（絵 Nx1kq）。 */
+.groupSection { outline: var(--tpl-bm-2) solid var(--color-accent); outline-offset: calc(var(--tpl-bm-2) * -1); }
 .groupHead { min-height: var(--tpl-bm-40); background: var(--color-table-head); color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); }

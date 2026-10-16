@@ -41,14 +41,14 @@ export function BookingGroupSection({ accountId, bookingId, canOperate, onChange
     }
   }
   return (
-    <section className={styles.section} aria-label="この組">
+    <section className={`${styles.section} ${styles.groupSection}`} aria-label="この組">
       <div className={styles.headRow}><h3 className={styles.title}>{`この組（${group.members.length} 人）`}</h3>{group.ownerName ? <span className={styles.minor}>{`${group.ownerName} さまの予約`}</span> : null}</div>
       <div className={styles.groupTable} role="table" aria-label="この組の予約">
         <div className={`${styles.groupRow} ${styles.groupHead}`} role="row"><span role="columnheader">人</span><span role="columnheader">メニュー</span><span role="columnheader">担当</span><span role="columnheader">時間</span></div>
         {group.members.map((member) => (
           <div key={member.bookingId} className={styles.groupRow} role="row">
             <span role="cell" title={member.personName}>{member.personName}</span>
-            <span role="cell" title={member.menuName}>{member.menuName}</span>
+            <span role="cell" className={styles.groupWrap}>{member.menuName}</span>
             <span role="cell">{member.staffName ?? '—'}</span>
             <span role="cell">{`${formatTime(member.startsAt)}〜${formatTime(member.endsAt)}`}</span>
           </div>

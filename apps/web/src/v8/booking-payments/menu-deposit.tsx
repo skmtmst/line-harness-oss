@@ -22,13 +22,16 @@ import styles from './payments.module.css'
  */
 
 type Choice = 'default' | 'online' | 'onsite' | 'deposit'
+const NEW_MENU_DEPOSIT: DepositRule & { inherit: boolean } = { kind: 'none', value: null, conditions: { always: true, minPeople: null, weekdays: null, timeBand: null }, version: 0, inherit: true }
 
 export function useMenuDeposit(accountId: string | null, menuId: string | null) {
   const [saved, setSaved] = useState<(DepositRule & { inherit: boolean }) | null>(null)
   const [draft, setDraft] = useState<(DepositRule & { inherit: boolean }) | null>(null)
   const [ready, setReady] = useState(false)
   useEffect(() => {
-    if (!accountId || !menuId) { setReady(false); return }
+    if (!accountId) { setReady(false); return }
+    /* 作る画面（まだメニューが無い）：いつもの方法から始め、保存でメニューができてから同じ口へ送る（版 0）。 */
+    if (!menuId) { setSaved(NEW_MENU_DEPOSIT); setDraft(NEW_MENU_DEPOSIT); setReady(true); return }
     let alive = true
     void Promise.resolve().then(() => gapDraftApi.menuDeposit(accountId, menuId))
       .then((response) => { if (alive) { setSaved(response.data); setDraft(response.data); setReady(true) } })

@@ -27,7 +27,9 @@ export function useMenuMeeting(accountId: string | null, menuId: string | null, 
   const [url, setUrl] = useState<{ value: string; saved: string; version: number } | null>(null)
   useEffect(() => { setSavedMode(initialMode ?? 'in_person'); setMode(initialMode ?? 'in_person') }, [initialMode, menuId])
   useEffect(() => {
-    if (!accountId || !menuId) { setUrl(null); return }
+    if (!accountId) { setUrl(null); return }
+    /* 作る画面：空の URL から始め、メニューができてから同じ口へ送る（版 0）。 */
+    if (!menuId) { setUrl({ value: '', saved: '', version: 0 }); return }
     let alive = true
     void Promise.resolve().then(() => bookingCalendarApi.getMenuUrl(accountId, menuId))
       .then((response) => { if (alive) setUrl({ value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version }) })
