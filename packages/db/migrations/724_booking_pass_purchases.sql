@@ -21,3 +21,19 @@ BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
 CREATE TRIGGER booking_pass_grace_consumption BEFORE UPDATE OF consumed_at ON booking_entitlement_uses
 WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL AND EXISTS(SELECT 1 FROM booking_entitlements e WHERE e.id=NEW.entitlement_id AND e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))
 BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+
+-- B2-18/19: owner-approved follow-up within 724; all notices are simulations.
+ALTER TABLE booking_pass_plans ADD COLUMN notify_remaining_one INTEGER NOT NULL DEFAULT 0 CHECK(notify_remaining_one IN(0,1));
+ALTER TABLE booking_pass_plans ADD COLUMN notify_expiry_14_days INTEGER NOT NULL DEFAULT 0 CHECK(notify_expiry_14_days IN(0,1));
+CREATE TABLE booking_entitlement_notices (
+ id TEXT PRIMARY KEY,line_account_id TEXT NOT NULL REFERENCES line_accounts(id),friend_id TEXT NOT NULL REFERENCES friends(id),
+ entitlement_id TEXT NOT NULL REFERENCES booking_entitlements(id),plan_id TEXT NOT NULL REFERENCES booking_pass_plans(id),
+ kind TEXT NOT NULL CHECK(kind IN('remaining_one','expiry_14_days')),dedupe_key TEXT NOT NULL,
+ purpose TEXT NOT NULL DEFAULT 'transaction' CHECK(purpose='transaction'),messages_json TEXT NOT NULL CHECK(json_valid(messages_json)),
+ scheduled_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'scheduled' CHECK(status IN('scheduled','simulated','skipped_disabled','skipped_unavailable','skipped_opted_out','skipped_late')),
+ processed_at TEXT,test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),UNIQUE(entitlement_id,kind,dedupe_key)
+);
+CREATE INDEX booking_entitlement_notices_due ON booking_entitlement_notices(status,scheduled_at);
+CREATE TRIGGER booking_pass_remaining_notice AFTER INSERT ON booking_entitlement_events
+WHEN NEW.action='consume'
+BEGIN  INSERT INTO booking_entitlement_notices(id,line_account_id,friend_id,entitlement_id,plan_id,kind,dedupe_key,messages_json,scheduled_at) SELECT lower(hex(randomblob(16))),e.line_account_id,e.friend_id,e.id,e.plan_id,'remaining_one','once',json_array(json_object('type','text','text',e.name||'の残りは1回です（期限 '||e.expires_at||'）')),NEW.created_at FROM booking_entitlements e JOIN booking_pass_plans p ON p.id=e.plan_id AND p.line_account_id=e.line_account_id WHERE e.id=NEW.entitlement_id AND e.kind='ticket' AND e.remaining=1 AND e.status='active' AND e.friend_id IS NOT NULL AND p.notify_remaining_one=1 ON CONFLICT(entitlement_id,kind,dedupe_key) DO NOTHING; END;

@@ -175,6 +175,7 @@
   "broadcast_ab_recipients": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "member_rank_notices": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "ec_auto_line_attribution_events": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]},{"parent":"ec_auto_line_sends","columns":[{"column":"send_id","parentColumn":"id"}]}]},
+  "booking_entitlement_notices": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "booking_pass_purchases": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "booking_pass_billing_events": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"booking_pass_purchases","columns":[{"column":"purchase_id","parentColumn":"id"}]}]}
 }

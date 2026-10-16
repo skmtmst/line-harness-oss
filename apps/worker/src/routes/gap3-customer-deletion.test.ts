@@ -13,6 +13,7 @@ test('GAP3-DELETE-01: 本人の通知・購入・成果だけ削除し、匿名�
  }
  d.raw.exec("INSERT INTO tags(id,name,line_account_id,manual_assignment_allowed) VALUES('rank-tag','会員','a',0);INSERT INTO member_rank_programs(account_id,updated_at) VALUES('a','now');INSERT INTO member_rank_tiers(id,account_id,sort,name,threshold,tag_id) VALUES('tier','a',0,'一般',0,'rank-tag')");
  for(const f of ['f','f2']){
+ d.raw.prepare("INSERT INTO booking_entitlement_notices(id,line_account_id,friend_id,entitlement_id,plan_id,kind,dedupe_key,messages_json,scheduled_at) SELECT ?,'a',?,id,'plan','expiry_14_days','key','[]',? FROM booking_entitlements WHERE friend_id=?").run('pass-notice-'+f,f,at,f);
  d.raw.prepare("INSERT INTO member_ranks(account_id,friend_id,tier_id,since) VALUES('a',?,'tier',?)").run(f,at);
  d.raw.prepare("INSERT INTO member_rank_notices(id,account_id,friend_id,change_key,kind,tier_id,purpose,messages_json,base_messages_json,scheduled_at) VALUES(?,'a',?,?,'upgrade','tier','notice','[]','[]',?)").run('notice-'+f,f,'key-'+f,at);
  d.raw.prepare("INSERT INTO ec_behavior_events(id,account_id,friend_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) VALUES(?,'a',?,'cart_add','p','{}',?,?,?)").run('event-'+f,f,at,at,'event-'+f);
@@ -20,7 +21,7 @@ test('GAP3-DELETE-01: 本人の通知・購入・成果だけ削除し、匿名�
  d.raw.prepare("INSERT INTO ec_auto_line_attribution_events(id,account_id,send_id,friend_id,kind,external_event_id,occurred_at,request_json) VALUES(?,'a',?,?,'click',?,?,'{}')").run('click-'+f,'send-'+f,f,'click-'+f,at);
  }
  expect(await deleteCustomerData({DB:d.db},{kind:'friend_data',id:'f',friendId:'f',accountId:'a',lineUserId:'Uf'},'o')).toMatchObject({deleted:true});
- for(const table of ['member_rank_notices','member_ranks','ec_behavior_events','ec_auto_line_sends','ec_auto_line_attribution_events','booking_pass_purchases'])expect(d.raw.prepare(`SELECT friend_id FROM ${table}`).all(),table).toEqual([{friend_id:'f2'}]);
+ for(const table of ['booking_entitlement_notices','member_rank_notices','member_ranks','ec_behavior_events','ec_auto_line_sends','ec_auto_line_attribution_events','booking_pass_purchases'])expect(d.raw.prepare(`SELECT friend_id FROM ${table}`).all(),table).toEqual([{friend_id:'f2'}]);
  expect(d.raw.prepare('SELECT count(*) n FROM booking_pass_billing_events').get()).toEqual({n:1});expect(d.raw.prepare('SELECT friend_id FROM booking_entitlements ORDER BY friend_id').all()).toEqual([{friend_id:null},{friend_id:'f2'}]);
  expect(d.raw.prepare('SELECT count(*) n FROM member_rank_tiers').get()).toEqual({n:1});expect(d.raw.prepare('SELECT count(*) n FROM booking_pass_plans').get()).toEqual({n:1});
 });
