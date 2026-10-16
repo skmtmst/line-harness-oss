@@ -1022,7 +1022,7 @@ CREATE TABLE audit_events (
                      CHECK (risk_level IN ('normal', 'suspicious', 'high')),
   retention_class    TEXT NOT NULL DEFAULT 'general'
                      CHECK (retention_class IN ('general', 'security', 'personal_data')),
-  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), security_created_at_jd REAL,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id) ON DELETE SET NULL,
   UNIQUE (source_kind, source_id)
 );
@@ -5801,7 +5801,7 @@ CREATE TABLE platform_audit_logs (
   ip                 TEXT,
   visible_to_tenant  INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, security_created_at_jd REAL);
 
 CREATE TABLE platform_counters (
   name   TEXT PRIMARY KEY,
@@ -8812,7 +8812,7 @@ CREATE INDEX idx_audit_events_action_created
 CREATE INDEX idx_audit_events_actor_created
   ON audit_events (actor_principal_id, created_at DESC);
 
-CREATE INDEX idx_audit_events_security_created ON audit_events (created_at);
+CREATE INDEX idx_audit_events_security_utc ON audit_events (security_created_at_jd);
 
 CREATE INDEX idx_audit_events_tenant_created
   ON audit_events (tenant_id, created_at DESC);
@@ -10124,6 +10124,8 @@ CREATE INDEX idx_platform_audit_logs_action
 CREATE INDEX idx_platform_audit_logs_created
   ON platform_audit_logs(created_at DESC);
 
+CREATE INDEX idx_platform_audit_logs_security_utc ON platform_audit_logs (security_created_at_jd);
+
 CREATE INDEX idx_platform_audit_logs_tenant
   ON platform_audit_logs(tenant_id, created_at DESC);
 
@@ -10825,6 +10827,12 @@ CREATE TRIGGER analytics_projection_friend_stage_count
 AFTER INSERT ON analytics_projection_friend_stage
 BEGIN UPDATE analytics_projection_metric_stage SET unique_friend_count = unique_friend_count + 1 WHERE line_account_id = NEW.line_account_id AND cycle_id = NEW.cycle_id AND metric_date = NEW.metric_date AND event_type = NEW.event_type; END;
 
+CREATE TRIGGER audit_events_security_time_insert AFTER INSERT ON audit_events
+BEGIN UPDATE audit_events SET security_created_at_jd = julianday(CASE WHEN substr(NEW.created_at, 20) NOT GLOB '*[Z+-]*' THEN NEW.created_at || '+09:00' ELSE NEW.created_at END) WHERE rowid = NEW.rowid; END;
+
+CREATE TRIGGER audit_events_security_time_update AFTER UPDATE OF created_at ON audit_events
+BEGIN UPDATE audit_events SET security_created_at_jd = julianday(CASE WHEN substr(NEW.created_at, 20) NOT GLOB '*[Z+-]*' THEN NEW.created_at || '+09:00' ELSE NEW.created_at END) WHERE rowid = NEW.rowid; END;
+
 CREATE TRIGGER automation_definitions_folder_delete AFTER DELETE ON folders
 BEGIN UPDATE automation_definitions SET folder_id = NULL WHERE folder_id = OLD.id; END;
 
@@ -11250,6 +11258,12 @@ CREATE TRIGGER outgoing_webhooks_folder_update BEFORE UPDATE OF folder_id, line_
 WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
 ) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER platform_audit_logs_security_time_insert AFTER INSERT ON platform_audit_logs
+BEGIN UPDATE platform_audit_logs SET security_created_at_jd = julianday(CASE WHEN substr(NEW.created_at, 20) NOT GLOB '*[Z+-]*' THEN NEW.created_at || '+09:00' ELSE NEW.created_at END) WHERE rowid = NEW.rowid; END;
+
+CREATE TRIGGER platform_audit_logs_security_time_update AFTER UPDATE OF created_at ON platform_audit_logs
+BEGIN UPDATE platform_audit_logs SET security_created_at_jd = julianday(CASE WHEN substr(NEW.created_at, 20) NOT GLOB '*[Z+-]*' THEN NEW.created_at || '+09:00' ELSE NEW.created_at END) WHERE rowid = NEW.rowid; END;
 
 CREATE TRIGGER rt_closure_reservation_insert BEFORE INSERT ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND NEW.departed_at IS NULL AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) p WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND julianday(json_extract(p.value,'$.startsAt'))<julianday(NEW.ends_at) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at) AND (json_array_length(c.table_ids_json)=0 OR NEW.table_id IS NULL OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) t WHERE t.value=NEW.table_id))) BEGIN SELECT RAISE(ABORT,'closure_conflict'); END;
 
