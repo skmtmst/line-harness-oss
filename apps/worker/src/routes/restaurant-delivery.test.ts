@@ -75,6 +75,7 @@ const { authMiddleware, ADMIN_SESSION_BEARER_PREFIX } = await import('../middlew
 const { restaurantDelivery } = await import('./restaurant-delivery.js');
 const { signSupportRelay } = await import('../services/support-relay.js');
 const { UBER_PROBE_LAST_RUN_KEY } = await import('../services/ubereats-token-probe.js');
+const { MAX_WEBHOOK_BODY_BYTES } = await import('../services/delivery-webhook-payload.js');
 type Env = import('../index.js').Env;
 
 const TENANT = '00000000-0000-4000-8000-000000000001';
@@ -779,6 +780,53 @@ describe('受信口の送信元IPの制限（出前館QA#7）', () => {
     });
     expect(response.status).toBe(200);
     expect(eventRows()).toHaveLength(1);
+  });
+});
+
+/* ====================== 受信口の本文の大きさの上限（413） ====================== */
+
+describe('受信口の本文の大きさの上限（413）', () => {
+  it('申告された大きさが上限を超えていれば、本文を読まずに413で断る', async () => {
+    const response = await postWebhook(orderCreatedPayload(), {
+      headers: { 'content-length': String(MAX_WEBHOOK_BODY_BYTES + 1) },
+    });
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toMatchObject({ success: false, error: 'Payload too large' });
+    expect(eventRows()).toHaveLength(0);
+  });
+
+  it('申告が無くても実測が上限を超えた本文は413で断り、受信台帳に残さない', async () => {
+    const response = await postWebhook(null, {
+      rawBody: JSON.stringify({ event_id: 'evt-big', pad: 'x'.repeat(MAX_WEBHOOK_BODY_BYTES) }),
+    });
+    expect(response.status).toBe(413);
+    expect(eventRows()).toHaveLength(0);
+  });
+
+  it('上限ちょうどまでの本文は大きさでは断らない', async () => {
+    const response = await postWebhook(orderCreatedPayload(), {
+      headers: { 'content-length': String(MAX_WEBHOOK_BODY_BYTES) },
+    });
+    expect(response.status).toBe(200);
+    expect(eventRows()).toHaveLength(1);
+  });
+
+  it('大きさの確認は署名より先。署名が違っても大きすぎれば413', async () => {
+    const response = await postWebhook(orderCreatedPayload(), {
+      signature: 'broken',
+      headers: { 'content-length': String(MAX_WEBHOOK_BODY_BYTES + 1) },
+    });
+    expect(response.status).toBe(413);
+    expect(eventRows()).toHaveLength(0);
+  });
+
+  it('鍵が無いときは大きさより先に503。設定不足の方を先に伝える', async () => {
+    env = { ...env, RT_DELIVERY_UBEREATS_CLIENT_SECRET: undefined } as Env['Bindings'];
+    const response = await postWebhook(orderCreatedPayload(), {
+      headers: { 'content-length': String(MAX_WEBHOOK_BODY_BYTES + 1) },
+    });
+    expect(response.status).toBe(503);
+    expect(eventRows()).toHaveLength(0);
   });
 });
 
