@@ -425,7 +425,7 @@ interface TemplatePublishKeyRecord {
  *   途中障害・並行要求で版だけ進むことはない(独立審査P1)。
  */
 /** 公開本体のUPDATE直後に、不変の版履歴を同じ原子操作へ入れる。 */
-function publishedVersionStatement(
+export function publishedVersionStatement(
   db: D1Database,
   id: string,
   versionNumber: number,
