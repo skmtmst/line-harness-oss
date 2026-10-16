@@ -12,6 +12,10 @@ function legacyDb(): { d1: D1Database; sqlite: Database.Database } {
   const sqlite = new Database(':memory:');
   databases.push(sqlite);
   sqlite.exec(`
+    -- Keep the friend columns at the pre-065 shape; account ownership is still
+    -- required to authorize a legacy unassigned friend lookup.
+    CREATE TABLE line_accounts(id TEXT PRIMARY KEY, tenant_id TEXT);
+    INSERT INTO line_accounts(id,tenant_id) VALUES ('account-legacy',NULL);
     CREATE TABLE friends (
       id TEXT PRIMARY KEY,
       line_user_id TEXT NOT NULL UNIQUE,

@@ -83,6 +83,8 @@ export interface UsersGroupedResult {
 }
 
 export interface UsersGroupedOptions {
+  /** Server-computed authorization, applied before identity merging or caching. */
+  allowedAccountIds?: readonly string[];
   q?: string;
   onlyDups?: boolean;
   account?: string;
@@ -118,15 +120,22 @@ interface FormRow {
   created_at: string;
 }
 
-let cached: { rows: UnifiedUserRow[]; at: number } | null = null;
+let cachedByDb = new WeakMap<D1Database, { rows: UnifiedUserRow[]; at: number; scopeKey: string }>();
 
 export function _resetCacheForTest(): void {
-  cached = null;
+  cachedByDb = new WeakMap();
 }
 
-async function computeAllRows(db: D1Database): Promise<UnifiedUserRow[]> {
-  const identResult = await db.prepare(IDENT_SQL).all<IdentRow>();
-  const formsResult = await db.prepare(FORMS_SQL).all<FormRow>();
+async function computeAllRows(db: D1Database, allowedAccountIds?: readonly string[]): Promise<UnifiedUserRow[]> {
+  if (allowedAccountIds?.length === 0) return [];
+  const scoped = allowedAccountIds !== undefined;
+  const identQuery = db.prepare(IDENT_SQL + (scoped
+    ? ' AND friends.line_account_id IN (SELECT value FROM json_each(?))' : ''));
+  const formsQuery = db.prepare(FORMS_SQL.replace('ORDER BY fs.created_at DESC', (scoped
+    ? 'AND f.line_account_id IN (SELECT value FROM json_each(?)) ' : '') + 'ORDER BY fs.created_at DESC'));
+  const bindings = JSON.stringify(allowedAccountIds);
+  const identResult = await (scoped ? identQuery.bind(bindings) : identQuery).all<IdentRow>();
+  const formsResult = await (scoped ? formsQuery.bind(bindings) : formsQuery).all<FormRow>();
 
   const formByFriend = new Map<string, FormRow[]>();
   for (const row of formsResult.results ?? []) {
@@ -265,14 +274,17 @@ export async function computeUsersGrouped(
   opts: UsersGroupedOptions = {},
 ): Promise<UsersGroupedResult> {
   let allRows: UnifiedUserRow[];
-  if (!opts.forceRefresh && cached && Date.now() - cached.at < CACHE_TTL_MS) {
+  const scopeKey = opts.allowedAccountIds === undefined ? 'internal-unscoped'
+    : JSON.stringify([...new Set(opts.allowedAccountIds)].sort());
+  const cached = cachedByDb.get(db);
+  if (!opts.forceRefresh && cached?.scopeKey === scopeKey && Date.now() - cached.at < CACHE_TTL_MS) {
     allRows = cached.rows;
   } else {
-    allRows = await computeAllRows(db);
+    allRows = await computeAllRows(db, opts.allowedAccountIds);
     if (allRows.length > 0) {
-      cached = { rows: allRows, at: Date.now() };
+      cachedByDb.set(db, { rows: allRows, at: Date.now(), scopeKey });
     } else {
-      cached = null;
+      cachedByDb.delete(db);
     }
   }
 

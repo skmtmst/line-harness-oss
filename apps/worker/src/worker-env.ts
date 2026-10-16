@@ -1,10 +1,11 @@
+import type { WorkerBindings } from './worker-bindings.js';
 import type { AuthenticatedStaff } from './middleware/auth.js';
 import { type ServerTiming } from './lib/server-timing.js';
 import { type ImpersonationContext } from './middleware/impersonation.js';
 import { type CodexMentionQueueMessage } from './services/codex-cloud-monitor.js';
 
 export type Env = {
-  Bindings: {
+  Bindings: WorkerBindings & {
     DB: D1Database;
     BUILD_GIT_COMMIT?: string;
     BUILD_VERSION?: string;

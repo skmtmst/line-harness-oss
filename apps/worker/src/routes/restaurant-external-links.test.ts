@@ -65,7 +65,7 @@ beforeEach(() => {
   app.route('/', restaurantExternalLinks);
   // 本体と同じ登録順。既存の予約更新後のキュー・送信へ流れないことも確かめる。
   app.route('/', restaurantTest);
-  env = { DB: testDb.db, API_KEY: 'owner-key', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
+  env = { DB: testDb.db, API_KEY: 'owner-key', DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('外部通信は禁止'); }));
 });
 afterEach(() => { testDb.raw.close(); vi.unstubAllGlobals(); });

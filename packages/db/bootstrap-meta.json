@@ -609,6 +609,7 @@
     "688_media_metadata_revision.sql",
     "689_behavior_delivery_recovery.sql",
     "690_incoming_webhook_queue.sql",
+    "691_security_monitor.sql",
     "696_style_starter_updates_and_dashboard_metrics.sql",
     "697_booking_payment_refunds.sql",
     "698_chat_corrections.sql",
@@ -628,5 +629,5 @@
     "712_operator_push.sql",
     "713_booking_hq_origin.sql"
   ],
-  "migrationCount": 627
+  "migrationCount": 628
 }

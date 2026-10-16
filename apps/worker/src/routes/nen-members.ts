@@ -10,7 +10,6 @@ import {
   completePhotoNotificationDelivery,
   findRewardedAdoptedDuplicate,
   getEffectivePhotoRewardPolicy,
-  getFriendByLineUserIdForAccount,
   getPhotoNotificationState,
   jstNow,
   publishPhoto,
@@ -23,7 +22,7 @@ import * as dbPackage from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requirePhotoPermission } from './nen-photo-operations.js';
-import { verifyCallerLineIdentity } from '../services/liff-auth.js';
+import { currentFriend, type FriendRow } from '../services/nen-member-identity.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { classifyExternalDeliveryError } from '../services/external-delivery-retry.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
@@ -118,29 +117,6 @@ function detectedImageMime(bytes: Uint8Array): keyof typeof IMAGE_TYPES | null {
   if (bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF'
       && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') return 'image/webp';
   return null;
-}
-
-type FriendRow = {
-  id: string; line_user_id: string; display_name: string | null; user_id: string | null;
-  line_account_id: string | null; channel_access_token: string | null;
-  channel_access_token_encrypted: string | null;
-};
-
-async function currentFriend(c: Context<Env>): Promise<FriendRow | null> {
-  const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
-  if (!identity) return null;
-  const friend = await getFriendByLineUserIdForAccount(
-    c.env.DB,
-    identity.lineUserId,
-    identity.lineAccountId,
-  );
-  if (!friend?.is_following) return null;
-  return c.env.DB.prepare(
-    `SELECT f.id, f.line_user_id, f.display_name, f.user_id, f.line_account_id,
-            a.channel_access_token, a.channel_access_token_encrypted
-       FROM friends f LEFT JOIN line_accounts a ON a.id = f.line_account_id
-      WHERE f.id = ? AND f.is_following = 1 LIMIT 1`,
-  ).bind(friend.id).first<FriendRow>();
 }
 
 function dateOnly(value: unknown): string | null {

@@ -23,7 +23,7 @@ vi.mock('@line-crm/line-sdk', () => {
   const pushMessageWithRequestId = vi.fn().mockResolvedValue({ ok: true, requestId: 'req-1' });
   const replyMessageWithRequestId = vi.fn().mockResolvedValue({ ok: true });
   return {
-    LineClient: vi.fn().mockImplementation(() => ({ pushMessage, pushMessageWithRequestId, replyMessageWithRequestId })),
+    LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage, pushMessageWithRequestId, replyMessageWithRequestId }); }),
     __pushMessage: pushMessageWithRequestId,
   };
 });

@@ -69,7 +69,6 @@ import {
   replaceWebinarActions,
   countInvalidWebinarActionReferences,
   getFriendByLineUserId,
-  getFriendByLineUserIdForAccount,
   getFormById,
   formBelongsToLineAccount,
   type Webinar,
@@ -87,7 +86,7 @@ import {
   getMediaById,
   getMediaIdByR2Key,
 } from '@line-crm/db';
-import { verifyCallerLineUserId } from '../services/liff-auth.js';
+import { resolveWebinarCaller, loadActiveWebinar } from '../services/webinar-caller.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { runWebinarTriggerActions } from '../services/webinar-action-runner.js';
 import { recordConversionSourceEvent } from '@line-crm/db';
@@ -179,36 +178,6 @@ function onDemandSessionStartAt(row: Webinar, now: number): number {
 }
 
 // LIFF caller を認証し、webinar とそのアカウント配下の friend を解決する。
-// 認証 (401) を webinar 存在確認より先に行う (existence oracle 対策)。
-// friend はウェビナーのアカウント配下の行を優先する (同一プロバイダーの複数
-// アカウントは line_user_id が同一のため、無指定の先頭一致だと別アカウントの
-// friend 行に吸われて予約・確認プッシュ・リマインドのアカウントがズレる)。
-async function resolveWebinarCaller(
-  c: Context<Env>,
-  slug: string,
-): Promise<{ webinar: Webinar; friendId: string } | Response> {
-  const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
-  if (!lineUserId) return c.json({ error: 'unauthorized' }, 401);
-  const loaded = await loadActiveWebinar(c, slug);
-  if (loaded instanceof Response) return loaded;
-  const friend = await getFriendByLineUserIdForAccount(
-    c.env.DB, lineUserId, loaded.webinar.account_id,
-  );
-  if (!friend) return c.json({ error: 'friend_not_found' }, 403);
-  return { webinar: loaded.webinar, friendId: friend.id };
-}
-
-async function loadActiveWebinar(
-  c: Context<Env>,
-  slug: string,
-): Promise<{ webinar: Webinar } | Response> {
-  const webinar = await getWebinarBySlug(c.env.DB, slug);
-  if (!webinar || webinar.status !== 'active') {
-    return c.json({ error: 'not_found' }, 404);
-  }
-  return { webinar };
-}
-
 // ----------------------------------------------------------------
 // LIFF: 視聴状態
 // ----------------------------------------------------------------
@@ -895,7 +864,7 @@ webinarRoutes.get('/webinar-assets/:token/:slug/*', async (c) => {
   const valid = await verifyWebinarToken(c.env.LINE_CHANNEL_SECRET, slug, token, nowEpoch());
   if (!valid) return c.json({ error: 'forbidden' }, 403);
 
-  const webinar = await getWebinarBySlug(c.env.DB, slug);
+  const webinar = await getWebinarBySlug(c.env.DB, slug, { activeAccountOnly: true });
   if (!webinar || !webinar.video_prefix) return c.json({ error: 'not_found' }, 404);
 
   const prefix = `/webinar-assets/${token}/${slug}/`;

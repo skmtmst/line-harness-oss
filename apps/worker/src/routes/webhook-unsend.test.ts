@@ -23,7 +23,7 @@ vi.mock('@line-crm/line-sdk', async () => {
   return {
     ...actual,
     verifySignature: vi.fn().mockResolvedValue(true),
-    LineClient: vi.fn().mockImplementation(() => lineClient),
+    LineClient: vi.fn().mockImplementation(function () { return lineClient; }),
   };
 });
 vi.mock('../services/auto-reply.js', () => ({ matchAndReply: autoReply }));

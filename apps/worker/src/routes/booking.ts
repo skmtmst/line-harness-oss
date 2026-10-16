@@ -355,58 +355,31 @@ export async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string 
   return acc?.id ?? null;
 }
 
-// LIFF が送る id_token を LINE Login API で verify し、認証済み LINE userId を返す。
-// 失敗時は null（呼び出し側で 401）。
-//
-// 候補チャンネル ID:
-//   1. LINE_LOGIN_CHANNEL_ID env (デフォルトアカウント)
-//   2. DB 内 line_accounts.login_channel_id (LINE Login channel)
-//   3. DB 内 line_accounts.channel_id (Messaging channel) — LIFF を Login channel
-//      ではなく Messaging channel に紐付けてる構成への保険
-//   4. id_token の aud claim を base64 デコードして直接抽出 — どの DB 値とも
-//      一致しない場合の最後の手段（LIFF が独自に発行する場合）
-export async function verifyCallerLineUserId(c: Context<Env>): Promise<string | null> {
+// The token must be verified against the account selected by the stored LIFF ID.
+// A JWT's unverified aud is never a source of trusted login-channel configuration.
+export async function verifyCallerLineUserId(c: Context<Env>, expectedAccountId?: string): Promise<string | null> {
   const auth = c.req.header('Authorization');
   if (!auth || !auth.startsWith('Bearer ')) return null;
   const idToken = auth.slice('Bearer '.length).trim();
   if (!idToken) return null;
-
+  const accountId = expectedAccountId ?? await resolveAccountIdFromLiff(c);
+  if (!accountId) return null;
+  const accounts = await getLineAccounts(c.env.DB);
+  const account = accounts.find(row => row.id === accountId);
+  if (!account) return null;
   const candidates: string[] = [];
-  const push = (v: string | null | undefined) => {
-    if (v && !candidates.includes(v)) candidates.push(v);
+  const push = (value: string | null | undefined) => {
+    if (value && !candidates.includes(value)) candidates.push(value);
   };
-
-  push(c.env.LINE_LOGIN_CHANNEL_ID);
-  const dbAccounts = await getLineAccounts(c.env.DB);
-  for (const a of dbAccounts) {
-    const acc = a as unknown as {
-      login_channel_id?: string | null;
-      channel_id?: string | null;
-      liff_id?: string | null;
-    };
-    push(acc.login_channel_id);
-    push(acc.channel_id);
-    // liff_id は "<channel_id>-<random>" 形式
-    const liffPrefix = acc.liff_id?.split('-')[0];
-    push(liffPrefix);
+  if (account.login_channel_id) {
+    push(account.login_channel_id);
+  } else {
+    // Legacy configured channels remain scoped to this account. The environment
+    // fallback is only meaningful when the installation has a single account.
+    if (accounts.length === 1) push(c.env.LINE_LOGIN_CHANNEL_ID);
+    push(account.liff_id?.split('-')[0]);
+    push(account.channel_id);
   }
-
-  // id_token (JWT) の payload を base64url decode して aud を抽出
-  // Cloudflare Workers の atob は base64 を扱う。base64url の文字置換が必要。
-  try {
-    const parts = idToken.split('.');
-    if (parts.length === 3) {
-      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
-      const json = JSON.parse(atob(padded));
-      if (typeof json.aud === 'string') push(json.aud);
-      else if (Array.isArray(json.aud)) for (const a of json.aud) push(String(a));
-    }
-  } catch {
-    /* decode 失敗は無視: 候補 URL のみで verify を試す */
-  }
-
-  console.log(JSON.stringify({"code":"routes_booking_log"}));
 
   for (const channelId of candidates) {
     const res = await fetch('https://api.line.me/oauth2/v2.1/verify', {
@@ -418,8 +391,7 @@ export async function verifyCallerLineUserId(c: Context<Env>): Promise<string | 
       const verified = await res.json<{ sub?: string }>();
       if (verified.sub) return verified.sub;
     } else {
-      const errBody = await res.text().catch(() => '');
-      console.log(JSON.stringify({"code":"routes_booking_log"}));
+      // Provider failure is an authentication failure; do not read/log its body.
     }
   }
   return null;
@@ -479,7 +451,7 @@ async function resolveSelfBookingCaller(
 > {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return { ok: false, error: 'unknown_liff', status: 404 };
-  const lineUserId = await verifyCallerLineUserId(c);
+  const lineUserId = await verifyCallerLineUserId(c, accountId);
   if (!lineUserId) return { ok: false, error: 'unauthorized', status: 401 };
   const friendId = await resolveFriendId(c, lineUserId, accountId);
   if (!friendId) return { ok: false, error: 'friend_not_found', status: 404 };
@@ -715,7 +687,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   if (!idemKey) return inputError(c, { error: 'missing_idempotency_key' }, 400, []);
 
   // 認証済み caller の LINE userId を Authorization: Bearer <id_token> から取得。
-  const callerLineUserId = await verifyCallerLineUserId(c);
+  const callerLineUserId = await verifyCallerLineUserId(c, accountId);
   if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
 
   const body = await c.req.json<{
@@ -1550,7 +1522,7 @@ booking.get('/api/liff/booking/me', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
   // 履歴も idToken 検証必須。query の lineUserId に頼ると他人の履歴を覗けてしまう。
-  const callerLineUserId = await verifyCallerLineUserId(c);
+  const callerLineUserId = await verifyCallerLineUserId(c, accountId);
   if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
   if (!friendId) return c.json({ upcoming: [], past: [] });

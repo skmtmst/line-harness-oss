@@ -231,6 +231,7 @@ import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
+import { securityAlerts } from './routes/security-alerts.js';
 import { runScheduledOperationHealthChecks } from './services/operations-health.js';
 import { observeOperationDispatcher } from './services/operation-dispatch-health.js';
 import { processOperationNotificationOutbox } from './services/operation-notifications.js';
@@ -330,6 +331,7 @@ app.use('*', timingMark('rate'));
 // LIFF/public routes skip staff auth. Apply their tenant wall before auth and
 // before any route handler can persist a form/booking/member write.
 app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
+app.use('/api/events/liff/*', tenantPublicBoundaryMiddleware);
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
@@ -524,6 +526,7 @@ app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);
 app.route('/', operations);
+app.route('/', securityAlerts);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -1820,7 +1823,7 @@ async function scheduled(
   try {
     await runScheduledOperationHealthChecks(env.DB, {
       r2: env.IMAGES,
-      queue: env.CODEX_MENTION_QUEUE,
+      queue: env.CODEX_MENTION_QUEUE, security: env,
     });
   } catch (error) {
     console.error(JSON.stringify({"code":"src_index_failed"}));

@@ -67,7 +67,7 @@ function addAutomation(
 
 describe('V6オートメーションのきっかけ接続', () => {
   let testDb: SqliteD1;
-  let record: ReturnType<typeof vi.fn>;
+  let record: ReturnType<typeof vi.fn<AutomationActionExecutor>>;
   let executors: Record<string, AutomationActionExecutor>;
 
   beforeEach(() => {

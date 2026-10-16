@@ -14,6 +14,7 @@ import {
   getFriendById,
   type CalendarAccountScope,
   toJstString,
+  decryptCredential,
 } from '@line-crm/db';
 import { GoogleCalendarClient } from '../services/google-calendar.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -77,7 +78,7 @@ calendar.post('/api/integrations/google-calendar/connect', requireRole('owner', 
       accessToken: body.accessToken,
       refreshToken: body.refreshToken,
       apiKey: body.apiKey,
-    }, scope);
+    }, scope, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY);
     if (!conn) return c.json({ success: false, error: 'Forbidden account' }, 403);
     return c.json({
       success: true,
@@ -130,10 +131,11 @@ calendar.get('/api/integrations/google-calendar/slots', requireRole('owner', 'ad
     // Google FreeBusy API から busy 区間を取得（access_token がある場合のみ）
     let googleBusyIntervals: { start: string; end: string }[] = [];
     if (conn.access_token) {
+      const accessToken = await decryptCredential(conn.access_token, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY);
       try {
         const gcal = new GoogleCalendarClient({
           calendarId: conn.calendar_id,
-          accessToken: conn.access_token,
+          accessToken,
         });
         // タイムゾーンオフセットを付けて ISO 形式で渡す（Asia/Tokyo = +09:00）
         const timeMin = `${date}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
@@ -234,6 +236,9 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
     const scope = await resolveCalendarScope(c);
     const conn = await getCalendarConnectionById(c.env.DB, body.connectionId, scope);
     if (!conn) return c.json({ success: false, error: 'Calendar connection not found' }, 404);
+    // Resolve before writing a booking; bad keys/legacy plaintext must not create partial work.
+    const accessToken = conn.access_token
+      ? await decryptCredential(conn.access_token, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY) : null;
 
     if (body.friendId) {
       const friend = await getFriendById(c.env.DB, body.friendId);
@@ -250,11 +255,11 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
     if (!booking) return c.json({ success: false, error: 'Calendar connection not found' }, 404);
 
     // Google Calendar にイベントを作成（access_token がある場合のみ、ベストエフォート）
-    if (conn.access_token) {
+    if (accessToken) {
       try {
         const gcal = new GoogleCalendarClient({
           calendarId: conn.calendar_id,
-          accessToken: conn.access_token,
+          accessToken,
         });
         const { eventId } = await gcal.createEvent({
           summary: body.title,
@@ -307,18 +312,22 @@ calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRol
     const booking = await getCalendarBookingById(c.env.DB, id, scope);
     if (!booking) return c.json({ success: false, error: 'Calendar booking not found' }, 404);
 
+    const conn = status === 'cancelled' && booking.event_id && booking.connection_id
+      ? await getCalendarConnectionById(c.env.DB, booking.connection_id, scope) : null;
+    const accessToken = conn?.access_token
+      ? await decryptCredential(conn.access_token, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY) : null;
+
     const updated = await updateCalendarBookingStatus(c.env.DB, id, status, scope);
     if (!updated) return c.json({ success: false, error: 'Calendar booking not found' }, 404);
 
     // DB更新後に、Google Calendar のイベントも削除する（ベストエフォート）
     if (status === 'cancelled') {
       if (booking.event_id && booking.connection_id) {
-        const conn = await getCalendarConnectionById(c.env.DB, booking.connection_id, scope);
-        if (conn?.access_token) {
+        if (conn && accessToken) {
           try {
             const gcal = new GoogleCalendarClient({
               calendarId: conn.calendar_id,
-              accessToken: conn.access_token,
+              accessToken,
             });
             await gcal.deleteEvent(booking.event_id);
           } catch (err) {

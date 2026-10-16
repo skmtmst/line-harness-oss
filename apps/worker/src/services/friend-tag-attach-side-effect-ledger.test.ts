@@ -5,7 +5,7 @@
  * enqueueMileageEvent / enrollFriendInScenario / fireEvent を走らせる。
  * 障害は module のモックではなく、DB 側の TRIGGER か D1 の殻の層で起こす。
  */
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi, type MockInstance } from 'vitest';
 import type Database from 'better-sqlite3';
 import {
   FRIEND_TAG_SIDE_EFFECT_MAX_ATTEMPTS,
@@ -172,7 +172,7 @@ function withOneFailingStatement(db: D1Database, pattern: RegExp): D1Database {
   return { prepare, batch: (s: D1PreparedStatement[]) => db.batch(s) } as unknown as D1Database;
 }
 
-let errorSpy: ReturnType<typeof vi.spyOn>;
+let errorSpy: MockInstance<typeof console.error>;
 
 beforeEach(() => {
   errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

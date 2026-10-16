@@ -5,7 +5,7 @@ import type { Env } from '../index.js';
 import { hqTemplates } from './hq-templates.js';
 import { liffActionFromUrl } from '@line-crm/shared';
 // The real pure Web authoring functions feed the real HTTP + SQLite executor.
-const webAuthoringPath = '../../../web/src/lib/hq-template-authoring.ts';
+const webAuthoringPath = new URL('../../../web/src/lib/hq-template-authoring.ts', import.meta.url).href;
 const { freshDefinition, withUploadedImage, withMessageCard } = await import(/* @vite-ignore */ webAuthoringPath);
 type MessageTemplateDefinition = import('../services/hq-templates/template.js').MessageTemplateDefinition;
 type RichMenuDefinition = { richMenu: { name: string; pages: { imageR2Key: string }[] } };

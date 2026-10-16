@@ -74,7 +74,7 @@ const lineClientMock = vi.hoisted(() => ({
   replyMessage: vi.fn(),
 }));
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => lineClientMock),
+  LineClient: vi.fn().mockImplementation(function () { return lineClientMock; }),
 }));
 
 vi.mock('./step-delivery.js', () => ({

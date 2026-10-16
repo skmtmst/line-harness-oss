@@ -498,6 +498,16 @@ async function resourceOwnerAccountId(c: Context<Env>): Promise<string | null> {
 }
 
 async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; accountMismatch: boolean }> {
+  // Customer booking changes use a compatibility URL outside /api/liff. Keep
+  // the normal event feature gate, but resolve its owner from the stored LIFF
+  // mapping rather than an untrusted account parameter or an admin session.
+  if (c.req.method === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(c.req.path)) {
+    const liffId = c.req.query('liffId');
+    const account = liffId ? await dbFor(c.env).prepare(
+      'SELECT id FROM line_accounts WHERE liff_id = ? AND is_active = 1',
+    ).bind(liffId).first<{ id: string }>() : null;
+    return { ids: account ? [account.id] : [], accountMismatch: false };
+  }
   /*
    * R423/R426/R428: 公開受信口は受信口IDから所属を確定する。
    * 画面のコピーURL（queryなし）でも通り、外部指定の account は使わない。

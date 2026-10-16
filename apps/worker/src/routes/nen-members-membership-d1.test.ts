@@ -55,6 +55,25 @@ async function member(lineUserId: string) {
 }
 
 describe('GET /api/liff/nen/member membership', () => {
+  it.each(['suspended', 'archived', 'inactive', 'missing-tenant'])('S15 %s membership owner is rejected even without an account or LIFF query', async state => {
+    sql.exec("INSERT INTO tenants(id,name,status) VALUES ('fixture-tenant','Fixture','active'); UPDATE line_accounts SET tenant_id='fixture-tenant' WHERE id='account-nen'");
+    if (state === 'inactive') sql.exec("UPDATE line_accounts SET is_active=0 WHERE id='account-nen'");
+    else if (state === 'missing-tenant') sql.exec("UPDATE line_accounts SET tenant_id='missing' WHERE id='account-nen'");
+    else sql.prepare("UPDATE tenants SET status=? WHERE id='fixture-tenant'").run(state);
+    const target = app('U-a');
+    for (const [method, path] of [
+      ['GET','/api/liff/nen/member'], ['POST','/api/liff/nen/pets'], ['PUT','/api/liff/nen/pets/fixture'],
+      ['POST','/api/liff/nen/pets/fixture/photo'], ['POST','/api/liff/nen/health-logs'],
+      ['GET','/api/liff/nen/health-logs'], ['GET','/api/liff/nen/health-logs/summary'],
+      ['POST','/api/liff/nen/photos'], ['PUT','/api/liff/nen/photos/fixture/publication-consent'],
+    ]) {
+      const response = await target.request(path, { method, headers: { Authorization: 'Bearer fixture', 'Content-Type': 'application/json' },
+        ...(method === 'GET' ? {} : { body: JSON.stringify({ petId: 'fixture', data: 'fixture', mimeType: 'image/jpeg', caption: 'fixture', consent: false, consentVersion: 'fixture', showPetName: false }) }) });
+      expect(response.status, `${method} ${path}`).toBe(401);
+      expect(JSON.stringify(await response.json())).not.toContain('membership');
+    }
+  });
+
   it('ECからランクが届いている友だちはその値を返す', async () => {
     const body = await member('U-a');
     expect(body.data.membership).toMatchObject({
