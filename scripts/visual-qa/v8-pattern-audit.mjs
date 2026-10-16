@@ -29,6 +29,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { checkTemporaryAllowances, patternFindingKey } from './temporary-allowances.mjs'
+import { cssConsumerIndex, selectorTargetsNative } from './pattern-css-evidence.mjs'
 import { clearSourceEvidence, sourceEvidence } from './pattern-source-evidence.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -461,11 +462,12 @@ function declarations(body) {
 }
 
 /** (b) CSS：画面の .module.css が部品の中身を塗り直している所。型は overrideSelectors で割り当てる。 */
-export function scanCssOverrides(patterns, rel, content) {
+export function scanCssOverrides(patterns, rel, content, consumers) {
   if (!rel.endsWith('.module.css') || isOwnerSide(scopeOf(rel))) return []
   const hits = []
   for (const rule of cssRules(content)) {
     const selector = stripThemeScope(rule.selector)
+    if (selectorTargetsNative(selector, consumers)) continue
     if (!selector.split(',').some((part) => OVERRIDE_SELECTOR.test(` ${part.trim()}`))) continue
     const visual = declarations(rule.body).filter((d) => LOOK_PROP.test(d.prop))
     if (!visual.length) continue
@@ -537,6 +539,7 @@ export function scanCode(catalog, codeRoot, patterns = catalog.patterns) {
   const b = Object.fromEntries([...patterns.map((p) => [p.id, []]), [NO_TYPE, []]])
   const c = Object.fromEntries([...patterns.map((p) => [p.id, []]), [NO_TYPE, []]])
   const usage = Object.fromEntries(patterns.map((p) => [p.id, { files: new Set(), features: new Set() }]))
+  const cssConsumers = cssConsumerIndex(files, path => readFileSync(path, 'utf8'), codeRoot)
   let scanned = 0
   for (const path of files) {
     clearSourceEvidence()
@@ -553,7 +556,7 @@ export function scanCode(catalog, codeRoot, patterns = catalog.patterns) {
         usage[pattern.id].features.add(featureOf(rel))
       }
     }
-    for (const hit of scanCssOverrides(patterns, rel, content)) b[hit.pattern].push(hit)
+    for (const hit of scanCssOverrides(patterns, rel, content, cssConsumers.get(path))) b[hit.pattern].push(hit)
     for (const hit of scanHardcoded(patterns, rel, content, glob)) c[hit.pattern].push(hit)
   }
   const reach = Object.fromEntries(Object.entries(usage).map(([id, u]) => [id, { files: u.files.size, features: u.features.size }]))
