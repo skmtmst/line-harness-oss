@@ -126,7 +126,7 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
     setChecking(true)
     // 重なる予約を読むだけ。読めなかったときは、重なりなしとして保存へ進む（保存の失敗は呼び出し側が欄へ返す）。
     let rows: OverlapRow[] = []
-    try { rows = await preview(input) } catch { rows = [] } finally { setChecking(false) }
+    try { rows = await preview(input) } catch { /* 読めなければ重なりなしとして保存へ進む */ } finally { setChecking(false) }
     if (rows.length) { setOverlap(rows); setMessage(overlapMessage?.(input) ?? ''); setStep(2) } else onSave(input)
   }
   useEffect(() => { if (open) setIds(choices[0] ? [choices[0].id] : []) }, [open, target]) // eslint-disable-line react-hooks/exhaustive-deps
