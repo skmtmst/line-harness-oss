@@ -1,3 +1,4 @@
+import { serializeConversionPoint } from './conversion-point-serialization.js';
 import { consumePublicIngressReceipt } from '@line-crm/db';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { hasStaffAccess } from '@line-crm/shared';
@@ -116,24 +117,6 @@ const requireVisibleConversionEvent: MiddlewareHandler<Env> = async (c, next) =>
 };
 
 const MEASURE_METHODS: ConversionMeasureMethod[] = ['url_reach', 'webhook', 'manual'];
-
-function serializeConversionPoint(p: ConversionPoint) {
-  return {
-    id: p.id,
-    name: p.name,
-    eventType: p.event_type,
-    value: p.value,
-    measureMethod: p.measure_method,
-    targetUrl: p.target_url,
-    countRepeat: p.count_repeat !== 0,
-    attributionDays: p.attribution_days,
-    lineAccountId: p.line_account_id,
-    version: p.version,
-    status: p.status,
-    stoppedAt: p.stopped_at,
-    createdAt: p.created_at,
-  };
-}
 
 type ConversionPermission = 'view' | 'edit' | 'export';
 

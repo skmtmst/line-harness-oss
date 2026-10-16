@@ -1,3 +1,4 @@
+import { daysUntil } from './nen-date-window.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import * as dbPackage from '@line-crm/db';
 import type { NenRankSetting } from '@line-crm/db';
@@ -174,15 +175,6 @@ function daysSince(value: string | null | undefined, now: Date): number | null {
   if (!value) return null;
   const time = Date.parse(value);
   return Number.isFinite(time) ? Math.floor((now.getTime() - time) / 86_400_000) : null;
-}
-
-function daysUntil(value: unknown, now: Date): number | null {
-  if (typeof value !== 'string') return null;
-  const time = Date.parse(`${value.slice(0, 10)}T00:00:00+09:00`);
-  if (!Number.isFinite(time)) return null;
-  const todayJst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-  todayJst.setHours(0, 0, 0, 0);
-  return Math.ceil((time - todayJst.getTime()) / 86_400_000);
 }
 
 function productTags(nameValue: unknown): string[] {

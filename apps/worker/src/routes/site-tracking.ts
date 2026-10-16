@@ -1,3 +1,4 @@
+import { visibleAccountId } from './site-tracking-scope.js';
 import { consumePublicIngressReceipt, getMeasurementSite, siteAllowsHost, normalizeSiteHost } from '@line-crm/db';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -35,25 +36,6 @@ const siteTracking = new Hono<Env>();
 /** cookie に入れる訪問者ID。形だけ確かめる（中身は当てにしない）。 */
 const VISITOR_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 const TRACKING_KEY_PATTERN = /^hk_(?:[a-f0-9]{32}|9f3a2c81b4)$/;
-
-async function visibleAccountId(c: Context<Env>): Promise<string | Response> {
-  /*
-   * 管理画面は `account_id` で送る（rangeQuery の約束）。
-   * 旧い呼び出し（`accountId`）も当面は受ける。どちらも無ければ
-   * 可視アカウントが1つだけのときだけ補う。
-   */
-  const accountId = (c.req.query('account_id') ?? c.req.query('accountId'))?.trim();
-  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  if (!accountId) {
-    return scope.allowedAccountIds.length === 1
-      ? scope.allowedAccountIds[0]
-      : inputError(c, { success: false, error: 'accountId required' }, 400, ["account_id","accountId"]);
-  }
-  if (!scope.allowedAccountIds.includes(accountId)) {
-    return c.json({ success: false, error: '対象が見つかりません' }, 404);
-  }
-  return accountId;
-}
 
 /**
  * CORS。

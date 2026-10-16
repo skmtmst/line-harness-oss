@@ -1,3 +1,4 @@
+import { validateScheduledAt } from './chat-schedule-validation.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -2463,22 +2464,6 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
-
-// ========== 送信予約(N-025) ==========
-
-// 予約時刻は「いまより先」だけを受け付ける。画面のdatetime-localはJSTで
-// 入力されるが、保存はUTCへ正規化するため境界ずれは起きない。
-function validateScheduledAt(raw: unknown): { ok: true; scheduledAt: string } | { ok: false } {
-  if (typeof raw !== 'string' || !raw) return { ok: false };
-  let scheduledAt: string;
-  try {
-    scheduledAt = normalizeScheduledAt(raw);
-  } catch {
-    return { ok: false };
-  }
-  if (Date.parse(scheduledAt) <= Date.now()) return { ok: false };
-  return { ok: true, scheduledAt };
-}
 
 /**
  * POST /api/chats/:id/schedule — 返信の予約作成。

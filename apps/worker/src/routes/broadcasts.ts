@@ -1,3 +1,4 @@
+import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange } from '@line-crm/shared';
@@ -147,25 +148,6 @@ function unsupportedVariablesError(content: string): string | null {
     : null;
 }
 
-/**
- * Parse a D1 JSON-array column. Returns:
- *   - null if the column is null/undefined/empty string or parse fails
- *   - the value as-is if already an array (some D1 drivers auto-parse JSON columns)
- *   - the parsed array if the JSON is a valid string-array
- *   - null if parsed JSON is not an array (e.g., object, scalar)
- */
-function parseJsonArray(s: unknown): string[] | null {
-  if (!s) return null;
-  if (Array.isArray(s)) return s as string[];
-  if (typeof s !== 'string') return null;
-  try {
-    const parsed = JSON.parse(s);
-    return Array.isArray(parsed) ? (parsed as string[]) : null;
-  } catch {
-    return null;
-  }
-}
-
 function canonicalJsonValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalJsonValue);
   if (value && typeof value === 'object') {
@@ -231,20 +213,6 @@ const BROADCAST_ONLY_CONDITION_AXES = [
   ['assigned_operator', '担当者'], ['inflow_route', '流入経路'], ['broadcast_status', '配信状況'],
   ['booking_status', '予約状況'], ['purchase_history', '購入履歴'], ['block_state', 'ブロック状態'],
 ] as const;
-
-function parseJsonObject(value: unknown): Record<string, unknown> | null {
-  if (!value) return null;
-  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
-  if (typeof value !== 'string') return null;
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
-}
 
 function validateMessageOptions(value: unknown): string | null {
   if (value === undefined || value === null) return null;
