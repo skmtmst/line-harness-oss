@@ -187,6 +187,10 @@ describe('共通部品の影響範囲', () => {
       // ★V8 成果とアフィリエイト（nJlxX・h7dmB・OylSV・aINnz）。src/v8 に一から書いた。
       'v8/affiliates/affiliators.tsx',
       'v8/affiliates/report.tsx',
+      // G2 自動応答の Q&A・AI が答えた記録（y4nixm・LPkKH）と G9 AI の操作の記録（hqhj5）。src/v8 に一から書いた表の下のページ送り。
+      'v8/ai-reply/qa-list.tsx',
+      'v8/ai-reply/answer-log.tsx',
+      'v8/mcp-connect/log.tsx',
       // ★V8-B NEN配信の一覧（MuhWR・Jxmqh・Tj7n4）。新しい置き場（src/v8）に一から書いた。表の下にページ送りを置く。
       'v8/nen-campaigns/list.tsx',
       // ★V8 外部連携の送る一覧（ZSbFY）。新しい置き場（src/v8）に一から書いた。

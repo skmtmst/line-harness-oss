@@ -268,6 +268,10 @@ shared-button-importer v8/affiliates/approvals.tsx
 shared-button-importer v8/affiliates/payment.tsx
 shared-button-importer v8/affiliates/payment-dialogs.tsx
 shared-button-importer v8/affiliates/report.tsx
+shared-button-importer v8/ai-reply/ai-mode-band.tsx
+shared-button-importer v8/ai-reply/answer-log.tsx
+shared-button-importer v8/ai-reply/inbox-ai.tsx
+shared-button-importer v8/ai-reply/qa-list.tsx
 shared-button-importer v8/affiliates/create.tsx
 shared-button-importer v8/automations/list.tsx
 shared-button-importer v8/automations/runs.tsx
@@ -538,6 +542,8 @@ shared-button-importer v8/settings/customer-look/screen.tsx
 shared-button-importer components/shared/selection-button.tsx
 shared-button-importer v8/login/recovery-codes.tsx
 shared-button-importer v8/login/two-factor-setup.tsx
+shared-button-importer v8/mcp-connect/log.tsx
+shared-button-importer v8/mcp-connect/section.tsx
 
 shared-button-importer components/shared/inbox-composer.tsx
 # B-244〜B-247: 新しい共通の知らせの持ち主
