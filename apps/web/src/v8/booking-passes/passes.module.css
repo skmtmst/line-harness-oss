@@ -1,0 +1,49 @@
+/*
+ * ★V8 予約設定「回数券・月謝」（B2-1 `uGfHo`）と作る画面（B2-2 `nrtRJ`）。表・札・窓は共通部品。
+ * 値は var(--space-*)・var(--text-*)・var(--color-*) だけ。
+ */
+.panel { display: flex; flex-direction: column; gap: var(--space-16); }
+.nameCell { display: flex; flex-direction: column; min-width: 0; }
+.name { color: var(--color-ink); font-weight: 600; }
+.sub { color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.empty { color: var(--color-ink-faint); }
+.menuBox { display: inline-flex; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: var(--space-16); }
+.pagerCount { color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+.dialogBody { display: flex; flex-direction: column; gap: var(--space-12); }
+.holderRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-8) 0; border-top: 1px solid var(--color-divider); font-size: var(--text-body); }
+.holderRow:first-of-type { border-top: 0; }
+
+/* 作る画面：手順のカード（今の手順は開く・済みは1行に畳む） */
+.steps { display: flex; flex-direction: column; gap: var(--space-12); }
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16) var(--space-20);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border-soft);
+}
+.step[data-open='true'] { padding: var(--space-20); border: var(--polish-focus-width) solid var(--color-accent); }
+.stepHead { display: flex; align-items: center; gap: var(--space-12); min-width: 0; }
+.stepNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-24);
+  height: var(--space-24);
+  border-radius: var(--radius-large);
+  background: var(--color-shell);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.step[data-open='true'] .stepNumber { background: var(--color-accent); color: var(--color-on-accent); }
+.stepTitle { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; white-space: nowrap; }
+.stepSummary { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-body); text-overflow: ellipsis; white-space: nowrap; }
+.stepBody { display: flex; flex-direction: column; gap: var(--space-16); }
+.row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-16); }
+.picked { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+.note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-body); }

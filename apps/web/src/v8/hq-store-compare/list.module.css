@@ -1,0 +1,53 @@
+/*
+ * ★V8 統括「店の比較」（G7-1 `W4fI7A`・G7-2 `z0fSYt`）。頭・道具の段は型（ListPage）・共通部品。
+ * 値は var(--space-*)・var(--text-*)・var(--color-*) だけ。
+ */
+.cell { display: inline-flex; align-items: center; gap: var(--space-8); white-space: nowrap; }
+.cellEmpty { color: var(--color-ink-faint); }
+.storeName { font-weight: 600; color: var(--color-ink); }
+.rowButton { all: unset; cursor: pointer; display: block; max-width: 100%; }
+.rowButton:focus-visible { outline: var(--focus-ring); outline-offset: var(--polish-focus-offset); border-radius: var(--radius-icon); }
+
+.averageBand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-top: var(--space-16);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-control);
+  background: var(--color-shell);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+.averageTitle { color: var(--color-ink); font-weight: 600; font-size: var(--text-body); }
+.averageText { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.averageNote { white-space: nowrap; }
+
+.pager { display: flex; align-items: center; justify-content: space-between; gap: var(--space-16); }
+.pagerCount { color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+
+/* 引き出し（z0fSYt）：中のカードは影のカード */
+.drawerBody { display: flex; flex-direction: column; gap: var(--space-16); }
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--card-edge, var(--color-hairline));
+}
+.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--text-callout); font-weight: 700; }
+.metricRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-8) 0; border-top: 1px solid var(--color-divider); }
+.metricRow:first-of-type { border-top: 0; }
+.metricName { color: var(--color-ink-secondary); font-size: var(--text-body); }
+.metricValue { display: inline-flex; align-items: center; gap: var(--space-8); color: var(--color-ink); font-weight: 600; font-size: var(--text-body); }
+.recent { display: flex; flex-direction: column; }
+.recentRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-8) 0; border-top: 1px solid var(--color-divider); font-size: var(--text-body); }
+.recentRow:first-of-type { border-top: 0; }
+.recentTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); }
+.recentDate { color: var(--color-ink-secondary); white-space: nowrap; }
+.mute { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.footer { display: flex; justify-content: center; width: 100%; }

@@ -32,17 +32,18 @@ import UsageV8 from './usage'
 import SavedV8 from './saved'
 import FunnelV8, { type FunnelFormSlot, type FunnelSaveSlot } from './funnel'
 import CrossV8 from './cross'
+import SegmentsV8 from './segments'
 import styles from './analytics.module.css'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
-export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved'] as const
+export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved', 'segments'] as const
 export type AnalyticsTabV8 = (typeof ANALYTICS_TABS)[number] | 'conversion-report'
 
 /** 絵の二段：上は組（ふだん見る・深く見る・見直す）、下はその組の見かた。 */
 const GROUPS: Array<{ label: string; tabs: Array<{ key: string; label: string }> }> = [
   { label: 'ふだん見る', tabs: [{ key: 'friends', label: '友だちの増減' }, { key: 'reactions', label: '配信の反応' }, { key: 'routes', label: '経路と成果' }, { key: 'url-clicks', label: 'URLクリック' }] },
-  { label: '深く見る', tabs: [{ key: 'funnel', label: 'ファネル' }, { key: 'cross', label: 'クロス分析' }] },
+  { label: '深く見る', tabs: [{ key: 'funnel', label: 'ファネル' }, { key: 'cross', label: 'クロス分析' }, { key: 'segments', label: 'お客さまの分け方' }] },
   { label: '見直す', tabs: [{ key: 'usage', label: '使われ方' }, { key: 'saved', label: '保存した分析' }] },
 ]
 /** 成果地点ごとのレポートは「経路と成果」の中の1つの見かた（AzrZq はタブが経路と成果）。 */
@@ -51,7 +52,7 @@ const hrefOf = (key: string) => `/analytics?tab=${key}`
 
 const BOARD: Record<string, string> = {
   reactions: 'yvOtn', routes: 'PFe9c', usage: 'N8ZrUl', cross: 'u5CuB8', funnel: 'DkRDE',
-  'url-clicks': 'iK4cQ', saved: 'bglah', 'conversion-report': 'AzrZq',
+  'url-clicks': 'iK4cQ', saved: 'bglah', 'conversion-report': 'AzrZq', segments: 'RMajm',
 }
 
 /** 作る・編集のフォームと結果の保存欄は、入口が今の部品を渡す（src/v8 から @/app を読めないため）。 */
@@ -123,6 +124,7 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
       renderSave={slots?.renderSave ? (props) => slots.renderSave?.({ ...props, accountId: selectedAccountId, sourceKind: 'funnel' }) : undefined}
       stepKindsLabel={slots?.funnelStepKindsLabel} />
     : tab === 'saved' ? <SavedV8 key={selectedAccountId} accountId={selectedAccountId} onCountChange={setSavedCount} canManage={canManage} />
+    : tab === 'segments' ? <SegmentsV8 key={selectedAccountId} accountId={selectedAccountId} canManage={canManage} />
     : tab === 'usage' ? <UsageV8 key={selectedAccountId} accountId={selectedAccountId} />
     : <UrlClicksV8 key={selectedAccountId} accountId={selectedAccountId} />
 

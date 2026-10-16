@@ -29,6 +29,7 @@ const QRCode = createRequire(new URL('../../apps/web/package.json', import.meta.
 
 import { QA_CLOCK, storeAt, storeYmd } from './qa-clock.mjs'
 import { mockFingerprint } from './mock-fingerprint.mjs'
+import { gap3Respond } from './mock-gap3.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
@@ -6539,6 +6540,20 @@ const server = createServer((req, res) => {
       }
       scenarioDraftRows.set(key, next)
       res.writeHead(row ? 200 : 201).end(JSON.stringify({ success: true, data: next }))
+    })
+    return
+  }
+
+  /* ③-2 第3波（お客さまの分け方・会員ランク・店の比較・自動の LINE・回数券・月謝）の見本。保存はしない。 */
+  if (/^\/api\/(analytics\/customer-segments|member-ranks|hq\/store-comparison|ec\/auto-line|booking\/admin\/pass-plans)/.test(url.pathname)) {
+    let raw = ''
+    req.on('data', (chunk) => { raw += chunk })
+    req.on('end', () => {
+      let body = {}
+      try { body = JSON.parse(raw || '{}') } catch { body = {} }
+      const hit = gap3Respond(method, url.pathname, body, url.searchParams)
+      if (hit) res.writeHead(hit[0]).end(JSON.stringify(hit[1]))
+      else res.writeHead(404).end(JSON.stringify({ success: false, error: 'not_found' }))
     })
     return
   }

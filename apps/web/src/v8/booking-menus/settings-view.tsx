@@ -12,6 +12,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { V8TabEditContext, AccountIcon, StateCard } from './tabs/shared'
 import styles from './settings.module.css'
 import ChannelsTabV8 from './channels-tab'
+import PassesTabV8 from '../booking-passes/passes-tab'
 import type { useBookingSettings } from './settings'
 import { MenusTabV8, HoursTabV8, HolidaysTabV8, RulesTabV8, StaffTabV8, V8_TABS } from './settings-parts'
 
@@ -46,8 +47,9 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
             /></>}
 
 
-        preview={tab === 'channels' ? undefined : previewContent}
-        previewToggle={tab === 'channels' ? undefined : (
+        actions={tab === 'passes' && canEditSettings ? <Button variant="primary" href="/booking/passes/new">回数券・月謝を作る</Button> : undefined}
+        preview={tab === 'channels' || tab === 'passes' ? undefined : previewContent}
+        previewToggle={tab === 'channels' || tab === 'passes' ? undefined : (
           /* 絵 VFxWU：畳んだときも「LINEでの見え方を見る」と「お客さまに見える画面を確かめる」の2つを並べる。 */
           <div className={styles.narrowActions}>
             <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>
@@ -148,6 +150,8 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                 canEdit={canEditSettings}
                 onReload={reloadCore}
               />
+            ) : tab === 'passes' ? (
+              <PassesTabV8 accountId={accountId} canEdit={canEditSettings} />
             ) : (
               <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} staff={staff} onSummaryChange={setChannelsSummary} />
             )}

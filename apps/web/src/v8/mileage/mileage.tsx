@@ -19,6 +19,7 @@ import RewardsTab from './rewards'
 import BalancesTab from './balances'
 import HistoryTab from './history'
 import ScoreTab from './score'
+import RanksTab from './ranks'
 
 function MileageInner() {
   usePageTitle('マイル')
@@ -81,6 +82,7 @@ function MileageInner() {
       {tab === 'balances' ? <BalancesTab key={tab} /> : null}
       {tab === 'history' ? <HistoryTab key={tab} /> : null}
       {tab === 'score' ? <ScoreTab key={tab} /> : null}
+      {tab === 'ranks' ? <RanksTab key={tab} /> : null}
     </MileageShell.Provider>
   )
 }
