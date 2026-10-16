@@ -203,6 +203,9 @@ export const piiMaskMiddleware: MiddlewareHandler<Env> = async (c, next) => {
 // ---------------------------------------------------------------------------
 
 const FORBIDDEN_WHILE_IMPERSONATING: Array<[string, RegExp]> = [
+  ['POST', /^\/api\/chats\/[^/]+\/(?:send|send-combined|messages|schedule)$/],
+  ['POST', /^\/api\/(?:hq\/)?broadcasts\/[^/]+\/(?:send|correction)$/],
+  ['POST', /^\/v2\/bot\/message\//],
   ['DELETE', /^\/api\/staff(?:\/|$)/],
   ['DELETE', /^\/api\/line-accounts(?:\/|$)/],
   ['DELETE', /^\/api\/accounts(?:\/|$)/],

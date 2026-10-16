@@ -1511,6 +1511,55 @@ CREATE TABLE booking_business_hours (
   UNIQUE (booking_settings_id, weekday, start_time, end_time)
 );
 
+CREATE TABLE booking_calendar_busy_cache (
+ line_account_id TEXT NOT NULL,staff_id TEXT NOT NULL,connection_id TEXT NOT NULL,calendar_id TEXT NOT NULL,
+ time_min TEXT NOT NULL,time_max TEXT NOT NULL,busy_json TEXT NOT NULL CHECK(json_valid(busy_json)),last_read_at TEXT NOT NULL,
+ PRIMARY KEY(line_account_id,staff_id)
+);
+
+CREATE TABLE booking_calendar_read_health (
+ line_account_id TEXT NOT NULL,staff_id TEXT NOT NULL,last_success_at TEXT,failed_since TEXT,error_code TEXT,
+ PRIMARY KEY(line_account_id,staff_id)
+);
+
+CREATE TABLE booking_calendar_switch_audit (
+ id TEXT PRIMARY KEY,line_account_id TEXT NOT NULL,scope_id TEXT NOT NULL,actor_id TEXT NOT NULL,before_json TEXT NOT NULL,after_json TEXT NOT NULL,created_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_calendar_switch_jobs (
+ id TEXT PRIMARY KEY,line_account_id TEXT NOT NULL,staff_id TEXT NOT NULL,booking_id TEXT NOT NULL REFERENCES bookings(id),
+ action TEXT NOT NULL CHECK(action IN('delete','write')),external_event_id TEXT,calendar_id TEXT,
+ switch_scope TEXT NOT NULL,switch_version INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','failed','done','cancelled')),
+ attempts INTEGER NOT NULL DEFAULT 0,error_code TEXT,created_at TEXT NOT NULL,UNIQUE(booking_id,action,switch_scope,switch_version)
+);
+
+CREATE TABLE booking_calendar_switches (
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id),scope_id TEXT NOT NULL DEFAULT '',
+ read_enabled INTEGER NOT NULL DEFAULT 0 CHECK(read_enabled IN(0,1)),write_enabled INTEGER NOT NULL DEFAULT 0 CHECK(write_enabled IN(0,1)),
+ version INTEGER NOT NULL DEFAULT 1,updated_by TEXT NOT NULL,updated_at TEXT NOT NULL,mutation_token TEXT,PRIMARY KEY(line_account_id,scope_id)
+);
+
+CREATE TABLE booking_cancellation_events (
+ id TEXT PRIMARY KEY,charge_id TEXT NOT NULL REFERENCES booking_charges(id),actor_id TEXT,action TEXT NOT NULL,reason TEXT,created_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_cancellation_policies (
+ line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), enabled INTEGER NOT NULL DEFAULT 0,
+ tiers_json TEXT NOT NULL CHECK(json_valid(tiers_json)), no_show_percent INTEGER NOT NULL CHECK(no_show_percent BETWEEN 0 AND 100),
+ charge_mode TEXT NOT NULL DEFAULT 'manual' CHECK(charge_mode='manual'), version INTEGER NOT NULL DEFAULT 1,
+ updated_by TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_charges (
+ -- 支払の証跡のIDは削除後も残す。顧客・予約・店へのFKで削除を妨げない。
+ id TEXT PRIMARY KEY,booking_id TEXT NOT NULL,line_account_id TEXT NOT NULL,
+ kind TEXT NOT NULL CHECK(kind IN('cancellation_fee','no_show_fee')),amount INTEGER NOT NULL CHECK(amount>=0),
+ policy_snapshot_json TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN('pending','processing','succeeded','failed','unknown','waived','refunded')),
+ reason TEXT,actor_staff_id TEXT,stripe_payment_intent_id TEXT,idempotency_key TEXT,version INTEGER NOT NULL DEFAULT 1,
+ test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+ UNIQUE(booking_id,kind),UNIQUE(line_account_id,idempotency_key)
+);
+
 CREATE TABLE booking_customers (
   id                    TEXT PRIMARY KEY,
   line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1714,6 +1763,13 @@ CREATE TABLE "booking_payment_menu_settings" (
   provider TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 
+CREATE TABLE booking_payment_methods (
+ id TEXT PRIMARY KEY, friend_id TEXT NOT NULL REFERENCES friends(id),line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+ setup_id TEXT NOT NULL UNIQUE, stripe_customer_id TEXT, stripe_payment_method_id TEXT,card_brand TEXT,card_last4 TEXT,
+ test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','ready','detached')),
+ idempotency_key TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(line_account_id,friend_id,idempotency_key)
+);
+
 CREATE TABLE "booking_payments" (
   booking_id_history TEXT,
   id TEXT PRIMARY KEY,
@@ -1910,7 +1966,7 @@ CREATE TABLE "bookings" (
   cancelled_at                 TEXT,
   completed_at                 TEXT,
   created_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)), cancel_claim_id TEXT, waitlist_entry_id TEXT, meeting_mode TEXT CHECK(meeting_mode IN('online','in_person')), meeting_url TEXT, meeting_location TEXT, consultation_outcome TEXT CHECK(consultation_outcome IN('considering','won','lost')), outcome_recorded_at TEXT, outcome_recorded_by TEXT, cancellation_reason TEXT, designation TEXT NOT NULL DEFAULT 'unspecified' CHECK(designation IN('designated','any','unspecified')), entry_point TEXT,
+  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)), cancel_claim_id TEXT, waitlist_entry_id TEXT, meeting_mode TEXT CHECK(meeting_mode IN('online','in_person')), meeting_url TEXT, meeting_location TEXT, consultation_outcome TEXT CHECK(consultation_outcome IN('considering','won','lost')), outcome_recorded_at TEXT, outcome_recorded_by TEXT, cancellation_reason TEXT, designation TEXT NOT NULL DEFAULT 'unspecified' CHECK(designation IN('designated','any','unspecified')), entry_point TEXT, policy_snapshot_json TEXT CHECK(policy_snapshot_json IS NULL OR json_valid(policy_snapshot_json)), meeting_url_source TEXT CHECK(meeting_url_source IN('staff','menu','manual')),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
@@ -2144,7 +2200,7 @@ CREATE TABLE "chats" (
   last_customer_message_at TEXT,
   last_operator_message_at TEXT,
   next_response_due_at     TEXT
-);
+, assigned_by TEXT CHECK(assigned_by IN ('auto','manual')), pending_since TEXT, sla_due_at TEXT, first_response_at TEXT, sla_notified_stage INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE codex_cloud_tasks (
   slack_event_id               TEXT PRIMARY KEY,
@@ -4136,6 +4192,15 @@ CREATE TABLE inbox_reply_leases (
   PRIMARY KEY (channel, conversation_id)
 );
 
+CREATE TABLE inbox_routing_settings (
+ account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), strategy TEXT NOT NULL DEFAULT 'none' CHECK(strategy='none'),
+ sla_enabled INTEGER NOT NULL DEFAULT 0 CHECK(sla_enabled IN (0,1)),
+ sla_first_response_minutes INTEGER NOT NULL DEFAULT 30 CHECK(sla_first_response_minutes BETWEEN 5 AND 1440),
+ sla_business_hours_only INTEGER NOT NULL DEFAULT 1 CHECK(sla_business_hours_only IN (0,1)),
+ notify_before_minutes INTEGER NOT NULL DEFAULT 15, escalate_after_minutes INTEGER NOT NULL DEFAULT 30,
+ escalate_team_id TEXT, version INTEGER NOT NULL DEFAULT 1, updated_by TEXT, updated_at TEXT NOT NULL, mutation_token TEXT
+);
+
 CREATE TABLE inbox_staff_reads (
   staff_id        TEXT NOT NULL,
   channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
@@ -4327,6 +4392,16 @@ CREATE TABLE line_message_unsends (
   unsent_at                TEXT NOT NULL,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   PRIMARY KEY (line_message_account_key, line_message_id)
+);
+
+CREATE TABLE line_senders (
+ id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES line_accounts(id), name TEXT NOT NULL,
+ icon_media_id TEXT REFERENCES media(id) ON DELETE SET NULL, icon_url TEXT,
+ visibility TEXT NOT NULL CHECK(visibility IN ('all','owner_only')),
+ owner_staff_id TEXT REFERENCES staff_members(id), status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','inactive')),
+ version INTEGER NOT NULL DEFAULT 1, created_by TEXT NOT NULL, updated_at TEXT NOT NULL,
+ idempotency_key TEXT NOT NULL, request_json TEXT NOT NULL, UNIQUE(account_id,idempotency_key),
+ CHECK(visibility!='owner_only' OR owner_staff_id IS NOT NULL)
 );
 
 CREATE TABLE line_webhook_events (
@@ -4617,7 +4692,7 @@ CREATE TABLE menus (
   auto_tag_id           TEXT,                  -- 予約申込時に friend に自動付与するタグ
   created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), concurrent_capacity INTEGER NOT NULL DEFAULT 1, booking_window_days INTEGER, cutoff_hours_before INTEGER, cancel_deadline_hours_before INTEGER, intake_question TEXT, price_mode TEXT NOT NULL DEFAULT 'fixed'
-  CHECK (price_mode IN ('fixed', 'free', 'inquiry') AND (price_mode = 'fixed' OR base_price = 0)), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), meeting_mode TEXT NOT NULL DEFAULT 'in_person' CHECK(meeting_mode IN('online','in_person','customer_choice')), meeting_location TEXT,
+  CHECK (price_mode IN ('fixed', 'free', 'inquiry') AND (price_mode = 'fixed' OR base_price = 0)), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), meeting_mode TEXT NOT NULL DEFAULT 'in_person' CHECK(meeting_mode IN('online','in_person','customer_choice')), meeting_location TEXT, fixed_meeting_url TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (auto_tag_id) REFERENCES tags(id) ON DELETE SET NULL
 );
@@ -4646,7 +4721,7 @@ CREATE TABLE messages_log (
   sent_by_staff_id TEXT,
   line_event_at    TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT, search_content TEXT);
+, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT, search_content TEXT, correction_of_message_id TEXT REFERENCES messages_log(id), sender_id TEXT REFERENCES line_senders(id), sender_snapshot_json TEXT);
 
 CREATE TABLE "mileage_adjustment_approval_events" (
   request_id_history TEXT,
@@ -7696,7 +7771,7 @@ CREATE TABLE scheduled_chat_sends (
   cancelled_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-);
+, cancellation_reason TEXT, sender_id TEXT REFERENCES line_senders(id), sender_snapshot_json TEXT);
 
 CREATE TABLE scoring_rules (
   id          TEXT PRIMARY KEY,
@@ -7759,7 +7834,7 @@ CREATE TABLE staff (
   is_active                INTEGER NOT NULL DEFAULT 1,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), staff_member_id TEXT,
+  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), staff_member_id TEXT, fixed_meeting_url TEXT, meeting_url_version INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
@@ -9306,6 +9381,8 @@ CREATE UNIQUE INDEX idx_chats_friend_unique ON chats (friend_id);
 
 CREATE INDEX idx_chats_operator ON chats (operator_id);
 
+CREATE INDEX idx_chats_sla_due ON chats(sla_due_at) WHERE first_response_at IS NULL;
+
 CREATE INDEX idx_chats_status ON chats (status);
 
 CREATE INDEX idx_chats_unanswered_page
@@ -9942,6 +10019,8 @@ CREATE INDEX idx_line_accounts_parent
 CREATE INDEX idx_line_accounts_tenant
   ON line_accounts(tenant_id);
 
+CREATE INDEX idx_line_senders_account ON line_senders(account_id,status);
+
 CREATE INDEX idx_line_webhook_events_account
   ON line_webhook_events(line_account_id, received_at DESC);
 
@@ -10007,6 +10086,8 @@ CREATE INDEX idx_menu_versions_menu
   ON menu_versions (menu_id, version_number DESC);
 
 CREATE INDEX idx_menus_account_sort ON menus (line_account_id, sort_order);
+
+CREATE INDEX idx_message_correction_of ON messages_log(correction_of_message_id) WHERE correction_of_message_id IS NOT NULL;
 
 CREATE INDEX idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
 
@@ -11096,6 +11177,28 @@ CREATE TRIGGER booking_auto_assign_sync_rules_insert AFTER INSERT ON account_set
 
 CREATE TRIGGER booking_auto_assign_sync_rules_update AFTER UPDATE ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
 
+CREATE TRIGGER booking_cancellation_fee AFTER UPDATE OF status ON bookings
+WHEN NEW.status IN('cancelled','no_show') AND OLD.status!=NEW.status AND NEW.policy_snapshot_json IS NOT NULL
+ AND json_extract(NEW.policy_snapshot_json,'$.enabled')=1 AND NOT EXISTS(SELECT 1 FROM booking_entitlement_uses WHERE booking_id=NEW.id)
+BEGIN INSERT OR IGNORE INTO booking_charges(id,booking_id,line_account_id,kind,amount,policy_snapshot_json,status,created_at,updated_at)
+ SELECT lower(hex(randomblob(16))),NEW.id,NEW.line_account_id,CASE WHEN NEW.status='no_show' THEN 'no_show_fee' ELSE 'cancellation_fee' END,
+ CAST(NEW.price_at_booking * (CASE WHEN NEW.status='no_show' THEN json_extract(NEW.policy_snapshot_json,'$.noShowPercent')
+ ELSE COALESCE((SELECT json_extract(value,'$.percent') FROM json_each(NEW.policy_snapshot_json,'$.tiers')
+ WHERE (json_extract(value,'$.beforeHours')=0 OR julianday(NEW.starts_at)>=julianday(COALESCE(NEW.decided_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')))+json_extract(value,'$.beforeHours')/24.0)
+ ORDER BY json_extract(value,'$.beforeHours') DESC LIMIT 1),0) END)/100 AS INTEGER),
+ NEW.policy_snapshot_json,'pending',strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')
+ WHERE NEW.price_at_booking>0 AND (NEW.cancellation_reason IS NULL OR NEW.cancellation_reason NOT IN('store','store_cancelled'))
+ AND NEW.price_at_booking*(CASE WHEN NEW.status='no_show' THEN json_extract(NEW.policy_snapshot_json,'$.noShowPercent') ELSE COALESCE((SELECT json_extract(value,'$.percent') FROM json_each(NEW.policy_snapshot_json,'$.tiers') WHERE (json_extract(value,'$.beforeHours')=0 OR julianday(NEW.starts_at)>=julianday(COALESCE(NEW.decided_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')))+json_extract(value,'$.beforeHours')/24.0) ORDER BY json_extract(value,'$.beforeHours') DESC LIMIT 1),0) END)>=100
+ ON CONFLICT(booking_id,kind) DO UPDATE SET amount=excluded.amount,policy_snapshot_json=excluded.policy_snapshot_json,status='pending',reason=NULL,actor_staff_id=NULL,version=booking_charges.version+1,updated_at=excluded.updated_at
+ WHERE booking_charges.status='waived' AND booking_charges.reason='cancellation_reverted'; END;
+
+CREATE TRIGGER booking_cancellation_fee_revert AFTER UPDATE OF status ON bookings WHEN OLD.status IN('cancelled','no_show') AND NEW.status NOT IN('cancelled','no_show')
+BEGIN UPDATE booking_charges SET status='waived',reason='cancellation_reverted',version=version+1 WHERE booking_id=NEW.id AND status='pending'; END;
+
+CREATE TRIGGER booking_cancellation_policy_snapshot AFTER INSERT ON bookings
+BEGIN UPDATE bookings SET policy_snapshot_json=(SELECT json_object('enabled',json(CASE WHEN enabled=1 THEN 'true' ELSE 'false' END),'tiers',json(tiers_json),'noShowPercent',no_show_percent,'version',version)
+ FROM booking_cancellation_policies WHERE line_account_id=NEW.line_account_id) WHERE id=NEW.id AND policy_snapshot_json IS NULL; END;
+
 CREATE TRIGGER booking_entitlement_confirm AFTER UPDATE OF status ON bookings
 WHEN NEW.status='confirmed' AND OLD.status<>'confirmed'
 BEGIN  UPDATE booking_entitlement_uses SET consumed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE booking_id=NEW.id AND consumed_at IS NULL; END;
@@ -11122,6 +11225,20 @@ BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
 
 CREATE TRIGGER booking_entitlement_use_validate BEFORE INSERT ON booking_entitlement_uses
 BEGIN  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM bookings b JOIN booking_entitlements e ON e.id=NEW.entitlement_id WHERE b.id=NEW.booking_id AND b.line_account_id=e.line_account_id AND b.friend_id=e.friend_id AND e.status='active' AND (e.menu_id IS NULL OR e.menu_id=b.menu_id) AND julianday(b.starts_at)>=julianday(e.valid_from) AND julianday(b.starts_at)<julianday(e.expires_at) AND b.status IN ('requested','confirmed') AND NEW.consumed_at IS NULL) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_fixed_meeting_cancel AFTER UPDATE OF status ON bookings WHEN NEW.status IN('cancelled','rejected','expired')
+BEGIN UPDATE bookings SET meeting_url=NULL,meeting_url_source=NULL WHERE id=NEW.id; END;
+
+CREATE TRIGGER booking_fixed_meeting_confirm AFTER UPDATE OF status,staff_id ON bookings
+WHEN NEW.status='confirmed' AND (OLD.status!='confirmed' OR OLD.staff_id!=NEW.staff_id)
+BEGIN UPDATE bookings SET meeting_url=COALESCE((SELECT fixed_meeting_url FROM staff WHERE id=NEW.staff_id AND line_account_id=NEW.line_account_id),(SELECT fixed_meeting_url FROM menus WHERE id=NEW.menu_id AND line_account_id=NEW.line_account_id)),
+ meeting_url_source=CASE WHEN (SELECT fixed_meeting_url FROM staff WHERE id=NEW.staff_id) IS NOT NULL THEN 'staff' ELSE 'menu' END
+ WHERE id=NEW.id AND NEW.meeting_mode='online'; END;
+
+CREATE TRIGGER booking_fixed_meeting_insert AFTER INSERT ON bookings WHEN NEW.status='confirmed'
+BEGIN UPDATE bookings SET meeting_url=COALESCE((SELECT fixed_meeting_url FROM staff WHERE id=NEW.staff_id AND line_account_id=NEW.line_account_id),(SELECT fixed_meeting_url FROM menus WHERE id=NEW.menu_id AND line_account_id=NEW.line_account_id)),
+ meeting_url_source=CASE WHEN (SELECT fixed_meeting_url FROM staff WHERE id=NEW.staff_id) IS NOT NULL THEN 'staff' ELSE 'menu' END
+ WHERE id=NEW.id AND COALESCE(NEW.meeting_mode,(SELECT meeting_mode FROM menus WHERE id=NEW.menu_id))='online' AND NEW.meeting_url IS NULL; END;
 
 CREATE TRIGGER booking_payments_history_detach AFTER UPDATE OF booking_id ON booking_payments BEGIN UPDATE booking_payments SET booking_id_history = COALESCE(NEW.booking_id, OLD.booking_id, OLD.booking_id_history) WHERE id = NEW.id; END;
 
@@ -11170,6 +11287,18 @@ CREATE TRIGGER booking_waitlist_registration BEFORE INSERT ON booking_waitlist B
 CREATE TRIGGER booking_waitlist_resource_snapshot AFTER UPDATE OF status ON booking_waitlist WHEN NEW.status='invited' AND OLD.status='waiting' BEGIN INSERT OR REPLACE INTO booking_waitlist_resources SELECT NEW.id,resource_id,quantity FROM booking_menu_resources WHERE menu_id=NEW.menu_id; END;
 
 CREATE TRIGGER capture_ad_conversion_account AFTER INSERT ON conversion_events BEGIN INSERT INTO ad_conversion_event_accounts(conversion_event_id,line_account_id,platform_ids_json) SELECT NEW.id,f.line_account_id,(SELECT json_group_array(p.id) FROM ad_platforms p WHERE p.line_account_id = f.line_account_id AND p.is_active = 1 AND p.verified_at IS NOT NULL AND p.name IN ('meta','google')) FROM friends f WHERE f.id = NEW.friend_id AND f.line_account_id IS NOT NULL; END;
+
+CREATE TRIGGER chats_sla_manual_response AFTER UPDATE OF last_operator_message_at ON chats
+WHEN NEW.pending_since IS NOT NULL AND NEW.first_response_at IS NULL AND julianday(NEW.last_operator_message_at)>=julianday(NEW.pending_since)
+BEGIN UPDATE chats SET first_response_at=NEW.last_operator_message_at,sla_due_at=NULL WHERE id=NEW.id; END;
+
+CREATE TRIGGER chats_sla_pending_insert AFTER INSERT ON chats WHEN NEW.last_customer_message_at IS NOT NULL
+BEGIN UPDATE chats SET pending_since=NEW.last_customer_message_at WHERE id=NEW.id; END;
+
+CREATE TRIGGER chats_sla_pending_update AFTER UPDATE OF last_customer_message_at ON chats
+WHEN NEW.last_customer_message_at IS NOT NULL AND (OLD.pending_since IS NULL OR OLD.first_response_at IS NOT NULL)
+ AND (NEW.last_operator_message_at IS NULL OR julianday(NEW.last_customer_message_at)>julianday(NEW.last_operator_message_at))
+BEGIN UPDATE chats SET pending_since=NEW.last_customer_message_at,sla_due_at=NULL,first_response_at=NULL,sla_notified_stage=0 WHERE id=NEW.id; END;
 
 CREATE TRIGGER common_actions_folder_delete AFTER DELETE ON folders
 BEGIN UPDATE common_actions SET folder_id = NULL WHERE folder_id = OLD.id; END;
@@ -11481,6 +11610,14 @@ WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM line_account_tags WHERE id=NEW.folder_id
     AND tenant_id=COALESCE(NEW.tenant_id,'00000000-0000-4000-8000-000000000001')
 ) BEGIN SELECT RAISE(ABORT,'ACCOUNT_FOLDER_SCOPE_INVALID'); END;
+
+CREATE TRIGGER line_sender_limit BEFORE INSERT ON line_senders
+WHEN NEW.status='active' AND (SELECT COUNT(*) FROM line_senders WHERE account_id=NEW.account_id AND status='active')>=20
+ AND NOT EXISTS(SELECT 1 FROM line_senders WHERE account_id=NEW.account_id AND idempotency_key=NEW.idempotency_key)
+BEGIN SELECT RAISE(ABORT,'sender_limit'); END;
+
+CREATE TRIGGER line_sender_owner_disabled AFTER UPDATE OF is_active ON staff_members WHEN NEW.is_active=0
+BEGIN UPDATE line_senders SET status='inactive',version=version+1 WHERE owner_staff_id=NEW.id AND visibility='owner_only' AND status='active'; END;
 
 CREATE TRIGGER messages_search_invalidate AFTER UPDATE OF content,unsent_at,delivery_type ON messages_log
 WHEN OLD.content IS NOT NEW.content OR OLD.unsent_at IS NOT NEW.unsent_at OR OLD.delivery_type IS NOT NEW.delivery_type

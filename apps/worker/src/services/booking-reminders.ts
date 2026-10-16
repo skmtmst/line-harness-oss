@@ -1,3 +1,4 @@
+import {bookingCancellationQuote} from './booking-cancellation.js';
 // Cron handler: send due booking reminders.
 // Joined with bookings/menus/staff/line_accounts/friends for everything
 // the notification text renderer needs in one query.
@@ -23,6 +24,7 @@ interface DueRow {
   retry_key: string | null;
   recipient_line_user_id: string | null;
   messages_json: string | null;
+  meeting_mode:string|null;meeting_url:string|null;policy_snapshot_json:string|null;
   starts_at: string;
   menu_name: string;
   staff_name: string;
@@ -80,7 +82,7 @@ export async function processDueReminders(
     .prepare(
       `SELECT r.id, r.booking_id, r.kind, r.retry_count,
               r.retry_key, r.recipient_line_user_id, r.messages_json,
-              b.line_account_id, b.starts_at,
+              b.line_account_id, b.starts_at, b.meeting_mode, b.meeting_url,b.policy_snapshot_json,
               m.name AS menu_name,
               s.display_name AS staff_name,
               la.channel_access_token,
@@ -141,6 +143,8 @@ export async function processDueReminders(
       // 再送では本文を再描画しない。ctx は既存の sender の契約として残す。
       const timeZone = row.timezone ?? 'Asia/Tokyo';
       const ctx = {
+        meetingMode:row.meeting_mode,meetingUrl:row.meeting_url,
+        ...(row.policy_snapshot_json?{cancellationText:(await bookingCancellationQuote(db,row.booking_id,row.line_account_id)).text}:{}),
         menuName: row.menu_name,
         staffName: row.staff_name,
         startsAt: formatStartsAtForStore(row.starts_at, timeZone),

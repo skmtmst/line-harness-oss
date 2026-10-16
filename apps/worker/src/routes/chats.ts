@@ -1,3 +1,7 @@
+import { slaChatList, enrichSlaChats } from '../services/inbox-sla-list.js';
+import { refreshInboxSla } from '../services/inbox-sla.js';
+import { resolveLineSender } from '../services/line-senders.js';
+import { GapError } from '../services/gap-common.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -598,7 +602,7 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
     if (channel !== 'email') {
       // ── LINE 側。一覧クエリと同じ候補集合（messages_log ∪ chats）を
       // 同じ条件で数える。preview 用の集約は不要なので CTE 2本だけ。 ──
-      const accountFilterBindings: string[] = [];
+    const accountFilterBindings: string[] = [];
       let accountFilterSql: string;
       if (lineAccountId) {
         accountFilterSql = `friend_id IN (SELECT id FROM friends WHERE line_account_id = ?)`;
@@ -803,6 +807,7 @@ chats.get('/api/chats/outbound-failures', requireRole('owner', 'admin', 'staff')
 });
 
 chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if(c.req.query('sort')==='sla_due'||c.req.query('slaState')==='overdue') return slaChatList(c);
   try {
     const staff = c.get('staff');
     const status = c.req.query('status') ?? undefined;
@@ -905,6 +910,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     //   - content は text のみ先頭 200 文字まで切り詰めて返す (flex/image など raw JSON を
     //     返すと broadcast 後の rows で multi-MB レスポンスになる)。
     //   - lineAccountId 指定時は messages_log スキャンを対象アカの friend に絞る。
+    for(const account of visibleScope.allowedAccountIds) await refreshInboxSla(c.env.DB,account);
     const accountFilterBindings: string[] = [];
     let accountFilterSql: string;
     if (lineAccountId) {
@@ -1168,7 +1174,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       updatedAt: ch.updated_at,
     }));
 
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: await enrichSlaChats(c.env.DB,data) });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1253,6 +1259,9 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
                   JOIN scenarios s ON s.id = ss.scenario_id
                   WHERE ss.id = messages_log.scenario_step_id) AS scenario_name,
                 messages_log.quoted_message_id,
+                messages_log.correction_of_message_id, messages_log.sender_id, messages_log.sender_snapshot_json,
+                (SELECT json_group_array(json_object('id', corr.id, 'createdAt', corr.created_at, 'staffId', corr.sent_by_staff_id))
+                 FROM messages_log corr WHERE corr.correction_of_message_id=messages_log.id) AS corrections_json,
                 q.direction AS quoted_direction,
                 q.message_type AS quoted_message_type,
                 CASE WHEN q.unsent_at IS NOT NULL THEN '' ELSE q.content END AS quoted_content,
@@ -1304,6 +1313,10 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
           sentByStaffId: m.sent_by_staff_id || null,
           sentByStaffName: m.sent_by_staff_name || null,
           scenarioName: m.scenario_name || null,
+          senderId: m.sender_id ?? null,
+          sender: m.sender_snapshot_json ? JSON.parse(String(m.sender_snapshot_json)) : null,
+          correctionOfMessageId: m.correction_of_message_id ?? null,
+          corrections: JSON.parse(String(m.corrections_json ?? '[]')),
           quoted: m.quoted_message_id
             ? {
                 id: m.quoted_message_id,
@@ -1734,6 +1747,8 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), req
 
 // オペレーターからメッセージ送信
 chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary({"messageType":["string"],"content":["string"],"revision":["number"],"quotedMessageId":["string"]}), async (c) => {
+  if (c.get('impersonation')) return c.json({ success: false, code: 'IMPERSONATION_SEND_BLOCKED', error: '代理ログイン中は送れません' }, 403);
+  if (c.get('staff').readOnly) return c.json({ success: false, error: 'forbidden' }, 403);
   let leasedConversationId: string | null = null;
   try {
     const chatId = c.req.param('id');
@@ -1745,9 +1760,9 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
     // 壊れたJSONは外側catchの500に落とさない。運用者が原因を判別できるよう400で返す。
-    let body: { messageType?: string; content: string; revision?: number; quotedMessageId?: string };
+    let body: { messageType?: string; content: string; revision?: number; quotedMessageId?: string; correctionOfMessageId?: string; senderId?: string };
     try {
-      body = await c.req.json<{ messageType?: string; content: string; revision?: number; quotedMessageId?: string }>();
+      body = await c.req.json<{ messageType?: string; content: string; revision?: number; quotedMessageId?: string; correctionOfMessageId?: string; senderId?: string }>();
     } catch {
       return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     }
@@ -1775,6 +1790,22 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       [friend.line_account_id ?? null],
     )) {
       return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
+
+    if (body.correctionOfMessageId !== undefined) {
+      if (typeof body.correctionOfMessageId !== 'string' || !await c.env.DB.prepare(
+        `SELECT id FROM messages_log WHERE id=? AND friend_id=? AND line_account_id IS ? AND direction='outgoing'
+         AND unsent_at IS NULL AND (delivery_type IS NULL OR delivery_type!='test')`,
+      ).bind(body.correctionOfMessageId, friend.id, friend.line_account_id ?? null).first()) {
+        return c.json({ success: false, error: 'correction_source_not_found' }, 404);
+      }
+    }
+
+    let sender: Awaited<ReturnType<typeof resolveLineSender>> | null = null;
+    if (body.senderId !== undefined) {
+      if (typeof body.senderId !== 'string' || !friend.line_account_id) return c.json({success:false,error:'invalid_sender'},400);
+      try { sender = await resolveLineSender(c.env.DB,friend.line_account_id,c.get('staff'),body.senderId); }
+      catch(e) { if(e instanceof GapError) return c.json({success:false,error:e.code},e.status); throw e; }
     }
 
     // N-026: 差し込みは一斉配信と同じ解決器で置き換える。解決しきれない
@@ -1841,6 +1872,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
 
     // 引用元にLINEのquoteTokenが残っていれば、顧客側にも引用表示として届く。
     if (quoted?.quote_token) message.quoteToken = quoted.quote_token;
+    if (sender) Object.assign(message, {sender});
 
     const payloadHash = await hashOutboundPayload(
       JSON.stringify({
@@ -1849,6 +1881,9 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         messageType,
         content: body.content,
         quotedMessageId: quoted?.id ?? null,
+        correctionOfMessageId: body.correctionOfMessageId ?? null,
+        senderId: body.senderId ?? null,
+        sender,
       }),
     );
     const reservation = await reserveOutboundSend(c.env.DB, {
@@ -1933,7 +1968,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       leasedConversationId = null;
       return inputError(c, {
         success: false,
-        error: failure.status === 'unknown'
+        error: sender && (error as {status?:number})?.status===400 ? '送り手の名前かアイコンを確認してください。送り手なしで送ることもできます' : failure.status === 'unknown'
           ? 'LINEへの送達結果を確認できないため、自動再送を停止しました'
           : 'LINEへ送信できませんでした',
         code: failure.code,
@@ -1949,8 +1984,8 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         c.env.DB
           .prepare(`INSERT OR IGNORE INTO messages_log
             (id, friend_id, direction, message_type, content, source, line_account_id,
-             sent_by_staff_id, created_at, quoted_message_id)
-            VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?)`)
+             sent_by_staff_id, created_at, quoted_message_id, correction_of_message_id, sender_id, sender_snapshot_json)
+            VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?)`)
           .bind(
             logId,
             friend.id,
@@ -1960,6 +1995,9 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
             c.get('staff').id,
             sentAt,
             quoted?.id ?? null,
+            body.correctionOfMessageId ?? null,
+            body.senderId ?? null,
+            sender ? JSON.stringify(sender) : null,
           ),
         completeOutboundSendStatement(c.env.DB, {
           key: idempotencyKey,
@@ -2114,6 +2152,7 @@ chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff
  * LINE呼び出し0回・保存0件。冪等予約は単体口と共用する。
  */
 chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), async (c) => {
+  if(c.get('impersonation')) return c.json({success:false,code:'IMPERSONATION_SEND_BLOCKED',error:'代理ログイン中は送れません'},403);
   let leasedConversationId: string | null = null;
   try {
     const chatId = c.req.param('id');
@@ -2124,7 +2163,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
-    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; texts?: unknown; revision?: number; quotedMessageId?: string };
+    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; texts?: unknown; revision?: number; quotedMessageId?: string; correctionOfMessageId?: string; senderId?: string };
     try {
       body = await c.req.json();
     } catch {
@@ -2218,6 +2257,16 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       messages[0].quoteToken = quoted.quote_token;
     }
 
+    if (body.correctionOfMessageId !== undefined && (typeof body.correctionOfMessageId!=='string' || !await c.env.DB.prepare(
+      "SELECT id FROM messages_log WHERE id=? AND friend_id=? AND line_account_id IS ? AND direction='outgoing' AND unsent_at IS NULL AND (delivery_type IS NULL OR delivery_type!='test')"
+    ).bind(body.correctionOfMessageId,friend.id,friend.line_account_id??null).first())) return c.json({success:false,error:'correction_source_not_found'},404);
+    let sender: Awaited<ReturnType<typeof resolveLineSender>> | null=null;
+    if(body.senderId!==undefined){
+      if(typeof body.senderId!=='string'||!friend.line_account_id)return c.json({success:false,error:'invalid_sender'},400);
+      try{sender=await resolveLineSender(c.env.DB,friend.line_account_id,c.get('staff'),body.senderId);}
+      catch(e){if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e;}
+      for(const m of messages)Object.assign(m,{sender});
+    }
     const leaseNow = new Date();
     const lease = await acquireInboxReplyLease(c.env.DB, {
       channel: 'line',
@@ -2245,6 +2294,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         image: imagePart,
         texts: textParts,
         quotedMessageId: quoted?.id ?? null,
+        correctionOfMessageId:body.correctionOfMessageId??null,senderId:body.senderId??null,sender,
       }),
     );
     const reservation = await reserveOutboundSend(c.env.DB, {
@@ -2357,8 +2407,8 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
           c.env.DB
             .prepare(`INSERT OR IGNORE INTO messages_log
               (id, friend_id, direction, message_type, content, source, line_account_id,
-               sent_by_staff_id, created_at, quoted_message_id)
-              VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?)`)
+               sent_by_staff_id, created_at, quoted_message_id,correction_of_message_id,sender_id,sender_snapshot_json)
+              VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?,?,?,?)`)
             .bind(
               row.id,
               friend.id,
@@ -2369,6 +2419,8 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
               sentAt,
               // 引用は先頭メッセージに付けたので、記録も先頭行にだけ持たせる。
               index === 0 ? quoted?.id ?? null : null,
+              index === 0 ? body.correctionOfMessageId??null : null,
+              body.senderId??null,sender?JSON.stringify(sender):null,
             ),
         ),
         completeOutboundSendStatement(c.env.DB, {
@@ -2486,6 +2538,7 @@ function validateScheduledAt(raw: unknown): { ok: true; scheduledAt: string } | 
  * 区別せず、画面は返された予約1件だけを表示すればよい。
  */
 chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), async (c) => {
+  if(c.get('impersonation')) return c.json({success:false,code:'IMPERSONATION_SEND_BLOCKED',error:'代理ログイン中は送れません'},403);
   try {
     const chatId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
@@ -2708,12 +2761,19 @@ chats.delete('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin
       ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
+    if (c.get('staff').readOnly || c.get('impersonation')?.mode === 'read') return c.json({success:false,error:'forbidden'},403);
+    let reason = c.get('impersonation') ? c.req.header('X-Impersonation-Reason')?.trim() : undefined;
+    if(reason) {try{reason=decodeURIComponent(reason);}catch{return c.json({success:false,error:'invalid_reason'},400);}}
+    if(reason && reason.length>500)return c.json({success:false,error:'invalid_reason'},400);
+    if (c.get('impersonation') && !reason) return c.json({success:false,error:'reason_required'},400);
     const result = await cancelScheduledChatSend(c.env.DB, {
       id: scheduleId,
       friendId: chat.friend_id,
       staffId: c.get('staff').id,
+      reason,
       now: new Date().toISOString(),
     });
+    if (result === 'too_late') return c.json({success:false, code:'SCHEDULE_TOO_LATE',error:'まもなく送ります。取り消せません'},409);
     if (result === 'not_found') {
       return c.json({ success: false, error: '予約が見つかりません' }, 404);
     }
