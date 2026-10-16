@@ -230,3 +230,4 @@
 
 .audienceRow { display: flex; align-items: center; gap: var(--space-8); font-size: var(--text-caption); cursor: pointer; }
 .audiencePreview { display: flex; align-items: center; gap: var(--space-8); }
+.audiencePreview > span { flex: none; white-space: nowrap; }
