@@ -53,7 +53,7 @@ export default function AbsenceSheet({ booking, onClose, onDone }: {
         <p className="text-[13px] leading-5 text-liff-sub">振替先はこのあと選べます。あとで選んでも大丈夫です。</p>
         {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
         <Button variant="primary" disabled={busy} onClick={() => void run()}>欠席する</Button>
-        <Button variant="text" disabled={busy} onClick={onClose}>やめる</Button>
+        <div className="flex justify-center"><Button variant="text" disabled={busy} onClick={onClose}>やめる</Button></div>
       </div>
     </div>
   );

@@ -40,6 +40,7 @@ export default function Booking() {
   /* 同伴・追加メニュー（B5）。メニューが許したときだけ使う。1 人で追加なしなら今までどおり。 */
   const [party, setParty] = useState<PartyState>(initialParty);
   const [changingMenu, setChangingMenu] = useState(false);
+  const confirmBack = useRef<(() => void) | null>(null);
   const [slot, setSlot] = useState<SlotPick | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [paymentDue, setPaymentDue] = useState(false);
@@ -119,7 +120,7 @@ export default function Booking() {
 
   return (
     <LiffLookScope className="min-h-screen bg-canvas">
-      <LiffHeader title="ご予約" />
+      <LiffHeader title="ご予約" onBack={step === 'staff' ? () => setStep('menu') : step === 'datetime' ? () => setStep('staff') : step === 'confirm' ? () => (confirmBack.current ? confirmBack.current() : setStep('datetime')) : undefined} />
       {(params.get('waitlist')||params.get('seat_waitlist'))&&<WaitlistOfferSheet id={params.get('waitlist')||params.get('seat_waitlist')!} seat={!!params.get('seat_waitlist')} decline={params.get('action')==='decline'} onClose={()=>{const next=new URLSearchParams(params);next.delete('waitlist');next.delete('seat_waitlist');next.delete('action');navigate({pathname:'/booking',search:next.toString()},{replace:true});}} />}
       {step !== 'done' && !waiting && !(step === 'datetime' && emptyDatetime) && <Stepper steps={steps} current={stepIndex} />}
       <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>
@@ -174,9 +175,10 @@ export default function Booking() {
             staff={staff}
             slot={slot}
             autoConfirm={autoConfirm}
+            onBack={() => setStep('datetime')}
+            onRegisterBack={(fn) => { confirmBack.current = fn; }}
             party={partyActive ? party : undefined}
             cancelDeadlineMinutesBefore={cancelDeadline}
-            onBack={() => setStep('datetime')}
             onSubmitted={(result) => {
               setBookingId(result.bookingId);
               setDoneStatus(result.status);
@@ -228,12 +230,6 @@ export default function Booking() {
           {party.size > 1 && menu ? <PartySummary party={party} first={menu} withFee /> : null}
           <Button variant="primary" disabled={party.size > 1 ? !party.members[0].staff : !staff} onClick={() => { if (party.size > 1) { const lead = party.members[0].staff; if (lead && lead.id !== staff?.id) { setSlot(null); setStaff(lead); } } setStep('datetime'); }}>
             日時を選ぶ
-          </Button>
-          <Button variant="text"
-            type="button"
-            onClick={() => setStep('menu')}
-          >
-            ← メニューを選び直す
           </Button>
         </BottomBar>
       )}

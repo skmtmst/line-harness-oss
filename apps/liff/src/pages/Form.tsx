@@ -24,6 +24,7 @@ import {
 } from '@line-crm/shared';
 import { submitButtonText } from '../lib/form-button-text.js';
 import { api, type MenuItem, type PostalCodeCandidate, type PublicForm, type RoutedTarget, type StaffItem } from '../lib/api.js';
+import Stepper from '../components/ui/Stepper.js';
 import { NoRoutedSlots, RoutedBanner } from '../components/RoutedBooking.js';
 import {
   addDays,
@@ -218,8 +219,12 @@ export default function Form() {
    */
   const routingOn = Boolean((layout as { routing?: { enabled?: boolean } } | undefined)?.routing?.enabled);
   const pageHasBooking = Boolean(section?.blocks.some((b) => b.kind === 'input' && b.type === 'booking'));
+  const routedPage = routingOn && pageHasBooking;
+  const bookingName = section?.blocks.find((b) => b.kind === 'input' && b.type === 'booking');
+  const routedPicked = bookingName && bookingName.kind === 'input' ? normalizeBookingValue(answers[bookingName.name])?.startsAt ?? null : null;
   const [routed, setRouted] = useState<RoutedState | undefined>(undefined);
   const [routedRetry, setRoutedRetry] = useState(0);
+  const [routedEmpty, setRoutedEmpty] = useState(false);
   const answersKey = JSON.stringify(answers);
   useEffect(() => {
     if (!routingOn || !pageHasBooking || !id) { setRouted(undefined); return; }
@@ -634,12 +639,13 @@ export default function Form() {
       errorColor={theme.error}
       choiceAvailability={block.kind === 'input' ? form.availability?.choices[block.name] : undefined}
       routed={routed}
+      onRoutedEmpty={setRoutedEmpty}
     />
   );
 
   return (
     <div className="min-h-screen bg-canvas" data-design-node={wide ? 'wPfqW' : 'B8rCt'}>
-      <LiffHeader title={pageTitle} />
+      <LiffHeader title={pageTitle} onBack={trail.length > 0 ? goBack : undefined} />
       <div
         className="mx-auto min-h-screen w-full max-w-md pb-28"
         style={{
@@ -652,7 +658,8 @@ export default function Form() {
           fontFamily: theme.fontFamily === 'serif' ? 'serif' : undefined,
         }}
       >
-        {multi && options.sectionHeader !== 'none' && (
+        {routedPage ? <Stepper steps={['質問', '日時', '確認']} current={1} /> : null}
+        {!routedPage && multi && options.sectionHeader !== 'none' && (
           <div className="px-4 pt-3">
             <div className="flex gap-1" aria-hidden="true">
               {layout.sections.map((s, i) => (
@@ -676,7 +683,7 @@ export default function Form() {
             </p>
           ) : null}
           {covers.map((block) => blockView(block, true))}
-          <h1 className="text-xl font-bold text-ink">{heading}</h1>
+          {routedPage ? null : <h1 className="text-xl font-bold text-ink">{heading}</h1>}
           {firstPage && form.description && (
             <p className="text-xs leading-[18px] whitespace-pre-wrap text-liff-sub">
               {form.description}
@@ -700,14 +707,6 @@ export default function Form() {
             </div>
           )}
 
-        {trail.length > 0 && (
-          <Button variant="text"
-            type="button"
-            onClick={goBack}
-          >
-            ← {options.prevLabel || '前のページへ'}
-          </Button>
-        )}
           {/* 送る最後のページだけ、個人情報の取り扱いの一行。 */}
           {isLast && <PrivacyNote />}
         </div>
@@ -716,11 +715,11 @@ export default function Form() {
       <BottomBar appearance="form">
         <Button variant="primary"
           type="button"
-          onClick={() => (isLast ? submit() : goNext())}
+          onClick={() => (routedPage && routedEmpty ? liff.closeWindow() : isLast ? submit() : goNext())}
           disabled={sending || Object.values(uploading).some(Boolean)}
           style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
         >
-          {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+          {sending ? '送信中...' : routedPage && routedEmpty ? 'お店に問い合わせる' : routedPage && routedPicked ? `${utcToJstMd(routedPicked)}（${formatWeekday(new Date(new Date(routedPicked).getTime() + 9 * 3_600_000).toISOString().slice(0, 10))}）${utcToJstHm(routedPicked)} で進む` : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
         </Button>
 
       </BottomBar>
@@ -894,7 +893,7 @@ function AddressFields({
  * 予約の受け口で確保する（枠の再確認と重なり防止はそちらが担う）。
  */
 export type RoutedState = { status: 'loading' } | { status: 'error'; retry: () => void } | { status: 'ready'; target: RoutedTarget };
-export function BookingSlotPicker(props: {block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void;/** 答えで行き先が決まるフォーム（B6）。 */ routed?:RoutedState}) {
+export function BookingSlotPicker(props: {block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void;/** 答えで行き先が決まるフォーム（B6）。 */ routed?:RoutedState;onRoutedEmpty?:(empty:boolean)=>void}) {
   return props.block.booking?.kind==='seats' ? <SeatBookingBlock {...props} /> : <PeopleBookingSlotPicker {...props} />;
 }
 
@@ -903,11 +902,13 @@ function PeopleBookingSlotPicker({
   value,
   onChange,
   routed,
+  onRoutedEmpty,
 }: {
   block: FormInputBlock;
   value: unknown;
   onChange: (next: FormBookingValue | '') => void;
   routed?: RoutedState;
+  onRoutedEmpty?: (empty: boolean) => void;
 }) {
   /* 答えで行き先が決まったら、フォームで決めたメニュー・担当より答えの行き先が先（担当は選ばせない）。 */
   const target = routed?.status === 'ready' ? routed.target : null;
@@ -1009,6 +1010,8 @@ function PeopleBookingSlotPicker({
     };
   }, [menuId, fixedStaffId, staffId, today, lastDay]);
 
+  const emptyRouted = Boolean(target) && !loading && !failed && !Object.values(byDate).some((l) => l.some((t) => t.open));
+  useEffect(() => { onRoutedEmpty?.(emptyRouted); }, [emptyRouted]); // eslint-disable-line react-hooks/exhaustive-deps
   if (routed?.status === 'loading') return <p className="text-sm text-ink-faint">ご案内を準備しています...</p>;
   if (routed?.status === 'error') {
     return (
@@ -1029,8 +1032,8 @@ function PeopleBookingSlotPicker({
   }
 
   // ★V8 (g9osGN)：枠のある日はすべて並べ、空きの無い日は灰色で押せなくする。
-  const dates = Object.keys(byDate).sort();
-  const hasOpen = (d: string) => byDate[d].some((t) => t.open);
+  const dates = routed ? Array.from({ length: 7 }, (_, i) => addDays(today, i)) : Object.keys(byDate).sort();
+  const hasOpen = (d: string) => Boolean(byDate[d]?.some((t) => t.open));
   const daySlots = (selectedDate && byDate[selectedDate]) || [];
 
   return (
@@ -1041,6 +1044,7 @@ function PeopleBookingSlotPicker({
         </p>
       )}
       {target ? <RoutedBanner target={target} /> : null}
+      {target && !emptyRouted ? <h2 className="pt-1 text-xl font-bold text-ink">日時を選んでください</h2> : null}
       {!target && !fixedStaffId && staffList.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {staffList.map((s) => (
@@ -1059,7 +1063,7 @@ function PeopleBookingSlotPicker({
           ))}
         </div>
       )}
-      <BookingControls
+      {emptyRouted ? null : <div className={target ? 'rounded-(--liff-radius-lg) border border-liff-line p-3.5' : undefined}><BookingControls
         days={dates.map((d) => ({ date: d, weekday: formatWeekday(d), day: Number(d.slice(8, 10)), open: hasOpen(d) }))}
         selectedDate={selectedDate ?? ''}
         onDate={setSelectedDate}
@@ -1070,9 +1074,9 @@ function PeopleBookingSlotPicker({
           const startsAt = slotStartsAtIso({ date: selectedDate, start: t.start, startUtc: t.startUtc });
           onChange(picked?.startsAt === startsAt ? '' : { menuId, staffId: fixedStaffId ?? staffId, startsAt });
         }}
-      />
+      />{target ? <p className="mt-2 text-xs text-liff-sub">灰色の日は空きがありません</p> : null}</div>}
       {!dates.some(hasOpen) && (target
-        ? <NoRoutedSlots target={target} days={daysAhead} onContact={() => liff.closeWindow()} />
+        ? <NoRoutedSlots target={target} days={daysAhead} />
         : <p className="text-sm text-ink-secondary">選べる期間に空きがありません。期間を変えてください。</p>)}
       {picked && (
         <p className="text-xs font-bold text-liff-primary">
@@ -1099,8 +1103,10 @@ function BlockView({
   errorColor,
   choiceAvailability,
   routed,
+  onRoutedEmpty,
 }: {
   routed?: RoutedState;
+  onRoutedEmpty?: (empty: boolean) => void;
   block: FormBlock;
   /** ページの先頭の画像 (題の上の表紙)。★V8 B8rCt は高さ 96・角丸 12 の帯。 */
   cover?: boolean;
@@ -1180,9 +1186,9 @@ function BlockView({
   return (
     <div className="flex flex-col gap-2">
       {/* ★V8 (B8rCt)：欄名と必須の札を1行に並べ、選択肢まで 8 空ける。 */}
-      <FieldLabel size="form" id={labelId} htmlFor={singleControl ? fieldId : undefined} required={block.required}>
+      {routed && block.type === 'booking' ? null : <FieldLabel size="form" id={labelId} htmlFor={singleControl ? fieldId : undefined} required={block.required}>
         {block.label}
-      </FieldLabel>
+      </FieldLabel>}
       {block.description && (
         <p id={descId} className="-mt-1 text-xs text-ink-faint">{block.description}</p>
       )}
@@ -1390,6 +1396,7 @@ function BlockView({
             block={block}
             value={value}
             routed={routed}
+            onRoutedEmpty={onRoutedEmpty}
             onChange={(next) => onChange(block.name, next)}
           />
         )}

@@ -18,7 +18,7 @@ export function liffDocumentTitle(title: string): string {
   return name ? `${name} | musubo` : 'musubo';
 }
 
-export default function LiffHeader({ title }: { title: string }) {
+export default function LiffHeader({ title, onBack }: { title: string; /** 前の段へ戻る。渡したときだけ頭の左に「‹」を出す（戻るはページの中に置かない）。 */ onBack?: () => void }) {
   const [shopName, setShopName] = useState(cachedShopName);
 
   // ブラウザ・LINE の上に出る題も、帯の題と同じ画面名にする（「<画面名> | musubo」）。
@@ -50,6 +50,11 @@ export default function LiffHeader({ title }: { title: string }) {
         >
           <Icon name="x" className="h-5 w-5" />
         </Button>
+        {onBack ? (
+          <Button variant="icon" type="button" aria-label="戻る" onClick={onBack}>
+            <Icon name="chevron-left" className="h-5 w-5" />
+          </Button>
+        ) : null}
         <div className="flex min-w-0 flex-1 flex-col items-center">
           <p className="max-w-full truncate text-[13px] font-bold text-ink">
             {title}

@@ -63,7 +63,7 @@ export default function MakeupPicker({ credit, justAbsent, onUsed, onLater }: {
     <section className="space-y-3.5" aria-label="振替">
       <div data-makeup-band className="flex flex-col gap-1.5 rounded-(--liff-radius-lg) bg-liff-soft p-3.5 outline-1 -outline-offset-1 outline-liff-primary">
         <p className="flex items-center gap-2 text-sm font-bold text-ink"><Icon name="repeat" className="h-4 w-4 text-liff-primary" />{`振替 1 回・${formatMd(jstDate(credit.expires_at))} まで`}</p>
-        <p className="text-[13px] leading-5 text-ink">{justAbsent ? `${mdHm(justAbsent)} ${credit.source_name ?? ''} を欠席にしました。振替先はあとで選んでも大丈夫です。` : '振替先はあとで選んでも大丈夫です。'}</p>
+        <p className="text-[13px] leading-5 text-ink">{(() => { const src = justAbsent ?? credit.source_starts_at; return src ? `${mdHm(src)} ${credit.source_name ?? ''} を欠席にしました。振替先はあとで選んでも大丈夫です。` : '振替先はあとで選んでも大丈夫です。'; })()}</p>
       </div>
       <div className="space-y-3 rounded-(--liff-radius-lg) bg-canvas p-3.5 outline-1 -outline-offset-1 outline-liff-line">
         <div className="flex items-center justify-between">

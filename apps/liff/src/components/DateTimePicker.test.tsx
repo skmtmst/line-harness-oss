@@ -818,7 +818,7 @@ describe('監査 L4：満席の日から時刻の「空いたら知らせる」�
     expect(screen.queryByText('この週は空きがありません')).toBeNull();
     fireEvent.click(full);
     expect(await screen.findByRole('button', { name: '10:00に空いたら知らせる' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: '← 担当を選び直す' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '← 担当を選び直す' })).toBeNull();
   });
 
   it('枠の無い週は今までどおり「空きがありません」(ADutg)', async () => {

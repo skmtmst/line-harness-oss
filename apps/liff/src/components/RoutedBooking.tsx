@@ -1,6 +1,5 @@
 import type { RoutedTarget } from '../lib/api.js';
 import { bookingPriceText } from '../lib/booking-price.js';
-import Button from './ui/Button.js';
 import Card from './ui/Card.js';
 import Icon from './ui/Icon.js';
 
@@ -23,13 +22,12 @@ export function RoutedBanner({ target }: { target: RoutedTarget }) {
 }
 
 /** 行き先に空きが無いとき（R02q7）。白い画面にせず、お店へ問い合わせる道を出す。 */
-export function NoRoutedSlots({ target, days, onContact }: { target: RoutedTarget; days: number; onContact: () => void }) {
+export function NoRoutedSlots({ target, days }: { target: RoutedTarget; days: number }) {
   return (
     <Card className="flex flex-col items-center gap-2 px-5 py-8 text-center">
       <Icon name="calendar-x" className="h-8 w-8 text-liff-sub" />
       <p className="text-[15px] font-bold text-ink">ご案内できる日時がありません</p>
       <p className="text-xs leading-[18px] text-liff-sub">{`${Math.ceil(days / 7)} 週間先まで、${target.menuName}の空きがありません。お店にご相談ください。`}</p>
-      <Button variant="secondary" onClick={onContact}>お店に問い合わせる</Button>
     </Card>
   );
 }

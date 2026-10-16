@@ -165,7 +165,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
                     return (
                       <tr key={o.index}>
                         <td>{dayWithWeekday(o.startsAt)}</td>
-                        <td><span>{o.reason}</span><span className={alt ? styles.alt : styles.sub}>{alt ? `→ ${hm(alt)} にする` : 'この回は作りません'}</span></td>
+                        <td><div className={styles.reason}><span>{o.reason}</span><span className={alt ? styles.alt : styles.sub}>{alt ? `→ ${hm(alt)} にする` : 'この回は作りません'}</span></div></td>
                         <td>
                           <SegmentedControl aria-label={`${dayOf(o.startsAt)} の回`} size="compact" value={pick === 'skip' || !alt ? 'skip' : 'alternative'}
                             options={[{ value: 'alternative', label: '別の時間' }, { value: 'skip', label: '飛ばす' }]}

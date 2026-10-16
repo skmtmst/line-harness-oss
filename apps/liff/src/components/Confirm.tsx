@@ -1,7 +1,7 @@
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import BookingIntake from './BookingIntake.js';
 import { bookingPriceText } from '../lib/booking-price.js';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
 import { addMinutesHm, formatJpLong, slotStartsAtIso } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
@@ -27,6 +27,7 @@ export default function Confirm({
   party,
   cancelDeadlineMinutesBefore = null,
   onBack,
+  onRegisterBack,
   onSubmitted,
 }: {
   menu: MenuItem;
@@ -37,8 +38,10 @@ export default function Confirm({
   /** 2 人以上・追加メニューのとき（B5）。人ごとの行と合計を出し、組で送る。 */
   party?: PartyState;
   cancelDeadlineMinutesBefore?: number | null;
-  /** 「← 日時を選び直す」。日時の段へ戻る。 */
+  /** 日時の段へ戻る。戻るボタンは頭の「‹」にだけある（この画面には置かない）。 */
   onBack: () => void;
+  /** 頭の「‹」から呼べるよう、戻る処理を親へ渡す。 */
+  onRegisterBack?: (back: (() => void) | null) => void;
   /** 予約ができたら予約ID・状態・支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
   onSubmitted: (result: {
     bookingId: string;
@@ -58,11 +61,15 @@ export default function Confirm({
   const [recurrence, setRecurrence] = useState<RecurrenceValue>(null);
 
   const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start]));
+  /* 戻る（頭の「‹」から呼ぶ）：送りかけの返事は受け取らず、日時の段へ戻る。 */
   function back() {
     request.invalidate();
     setSubmitting(false);
     onBack();
   }
+  const backRef = useRef(back);
+  backRef.current = back;
+  useEffect(() => { onRegisterBack?.(() => backRef.current()); return () => onRegisterBack?.(null); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
     if (submitting) return;
@@ -146,12 +153,6 @@ export default function Confirm({
       <BottomBar>
         <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
           {submitting ? '送信中...' : recurrence ? `${recurrence.made} 回分を予約する` : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
-        </Button>
-        <Button variant="text"
-          type="button"
-          onClick={back}
-        >
-          ← 日時を選び直す
         </Button>
       </BottomBar>
     </div>

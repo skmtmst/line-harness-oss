@@ -43,13 +43,14 @@ it('REV-I2: 表示後に店払いへ変わっても古いonlineの表示で成�
 });
 
 it('XL-01: 共通予約の送信中に戻ったあと古い成功では完了しない', async () => {
+  let goBack = () => {};
   let resolve!: (value: {booking_id:string;status:string}) => void;
   const promise = new Promise<{booking_id:string;status:string}>(r => {resolve=r;});
   vi.mocked(api.createRequest).mockReturnValue(promise);
   const onSubmitted=vi.fn(),onBack=vi.fn();
-  render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={false} onBack={onBack} onSubmitted={onSubmitted}/>);
+  render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={false} onBack={onBack} onRegisterBack={f=>{if(f)goBack=f;}} onSubmitted={onSubmitted}/>);
   fireEvent.click(screen.getByRole('button',{name:/予約をリクエスト/}));
-  fireEvent.click(screen.getByRole('button',{name:/日時を選び直す|戻る/}));
+  act(()=>goBack());
   expect(onBack).toHaveBeenCalledTimes(1);
   await act(async () => {resolve({booking_id:'old',status:'confirmed'}); await promise;});
   expect(onSubmitted).not.toHaveBeenCalled();
@@ -71,15 +72,16 @@ it('XL-01: Workerイベントの送信中に戻ると古い成功では完了し
 });
 
 it('XL-01: 共通予約で前の失敗は新しい送信を解除せず、新しい成功だけ採用する', async () => {
+  let goBack = () => {};
   let rejectOld!: (reason: Error) => void;
   let resolveNew!: (value: {booking_id:string;status:string}) => void;
   const old = new Promise<{booking_id:string;status:string}>((_,r)=>{rejectOld=r;});
   const next = new Promise<{booking_id:string;status:string}>(r=>{resolveNew=r;});
   vi.mocked(api.createRequest).mockReturnValueOnce(old).mockReturnValueOnce(next);
   const onSubmitted=vi.fn();
-  render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={false} onBack={()=>{}} onSubmitted={onSubmitted}/>);
+  render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={false} onBack={()=>{}} onRegisterBack={f=>{if(f)goBack=f;}} onSubmitted={onSubmitted}/>);
   fireEvent.click(screen.getByRole('button',{name:/予約をリクエスト/}));
-  fireEvent.click(screen.getByRole('button',{name:/日時を選び直す|戻る/}));
+  act(()=>goBack());
   fireEvent.click(screen.getByRole('button',{name:/予約をリクエスト/}));
   await act(async()=>{rejectOld(new Error('古い失敗'));await old.catch(()=>{});});
   expect(screen.getByRole('button',{name:/送信中/}).hasAttribute('disabled')).toBe(true);
