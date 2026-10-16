@@ -1,6 +1,7 @@
 'use client'
 
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
+import { useOverlayLayer } from '@/components/shared/overlay-utils'
 import TagOverflow from '@/components/shared/tag-overflow'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
@@ -178,6 +179,8 @@ export default function AdvancedSearchDialog({
   const [blocks, setBlocks] = useState<Block[]>(() => defaultBlocks(fieldsFeatureEnabled))
   /* ★V8 fmToi：来店・購入・会員ランクの絞り込みは、一覧の受け口ができるまで形だけ残す。 */
   const preparing = usePreparingDialog()
+  /* 共通の重なり番号：この窓の上に開く窓（準備中など）が後ろに回らない。 */
+  const layer = useOverlayLayer(open)
   const [visibility, setVisibility] = useState<FriendVisibilityChoice>('visible')
   const [any, setAny] = useState<SavedSearchCondition[]>([])
   const [extraAll, setExtraAll] = useState<SavedSearchCondition[]>([])
@@ -456,7 +459,8 @@ export default function AdvancedSearchDialog({
 
   return (
     <SaveErrorScope errors={saveErrors}><div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-scrim p-4"
+      className="fixed inset-0 flex items-center justify-center bg-scrim p-4"
+      style={{ zIndex: layer }}
       data-design-node="CYJ0L"
       onClick={onClose}
     >
