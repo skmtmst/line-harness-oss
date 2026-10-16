@@ -22,6 +22,8 @@ export interface OperatorEventTypeEntry {
 }
 
 export const OPERATOR_NOTIFICATION_EVENT_TYPES: OperatorEventTypeEntry[] = [
+  {eventType:'inbox_new_inquiry',label:'新しい問い合わせ',producer:{file:'apps/worker/src/routes/webhook.ts',route:'LINE message received'},connected:true},
+  {eventType:'inbox_assigned_reply',label:'担当の会話への返事',producer:{file:'apps/worker/src/routes/webhook.ts',route:'LINE message received'},connected:true},
   {
     eventType: 'booking_created',
     label: '予約の受付',

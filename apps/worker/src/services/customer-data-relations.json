@@ -37,7 +37,7 @@
   "booking_visit_marks": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"bookings","columns":[{"column":"booking_id","parentColumn":"id"}]}]},
   "booking_waitlist": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"booking_customers","columns":[{"column":"booking_customer_id","parentColumn":"id"}]},{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "booking_waitlist_resources": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"booking_waitlist","columns":[{"column":"waitlist_id","parentColumn":"id"}]}]},
-  "bookings": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]},{"parent":"booking_customers","columns":[{"column":"booking_customer_id","parentColumn":"id"}]}]},
+  "bookings": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]},{"parent":"booking_series","columns":[{"column":"series_id","parentColumn":"id"}]},{"parent":"booking_customers","columns":[{"column":"booking_customer_id","parentColumn":"id"}]}]},
   "broadcast_after_action_runs": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "broadcast_send_claims": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "calendar_bookings": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
@@ -91,7 +91,7 @@
   "link_clicks": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "meet_consultation_reminders": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"meet_consultations","columns":[{"column":"consultation_id","parentColumn":"id"}]}]},
   "meet_consultations": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
-  "messages_log": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
+  "messages_log": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"messages_log","columns":[{"column":"correction_of_message_id","parentColumn":"id"}]},{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "mileage_adjustment_approval_requests": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
   "mileage_adjustment_notifications": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"mileage_ledger","columns":[{"column":"ledger_entry_id","parentColumn":"id"}]},{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "mileage_event_queue": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"engagement_events","columns":[{"column":"engagement_event_id","parentColumn":"id"}]}]},
@@ -157,5 +157,10 @@
   "rt_reservation_confirmations": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "scenario_source_jobs": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "booking_payment_methods": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
-  "booking_calendar_switch_jobs": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"bookings","columns":[{"column":"booking_id","parentColumn":"id"}]}]}
+  "booking_calendar_switch_jobs": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"bookings","columns":[{"column":"booking_id","parentColumn":"id"}]}]},
+  "ai_request_claims": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"chats","columns":[{"column":"chat_id","parentColumn":"id"}]}]},
+  "booking_addons": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"bookings","columns":[{"column":"booking_id","parentColumn":"id"}]}]},
+  "booking_makeup_credits": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"event_bookings","columns":[{"column":"used_event_booking_id","parentColumn":"id"}]},{"parent":"event_bookings","columns":[{"column":"source_event_booking_id","parentColumn":"id"}]},{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
+  "booking_series": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
+  "broadcast_ab_recipients": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]}
 }

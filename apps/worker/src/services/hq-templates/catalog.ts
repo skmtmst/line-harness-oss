@@ -10,15 +10,17 @@ function integer(v:unknown,min:number,max:number,defaultValue?:number):number {
  const n=v===undefined?defaultValue:v;if(typeof n!=='number'||!Number.isSafeInteger(n)||n<min||n>max)return invalid();return n;
 }
 function optionalText(v:unknown,max:number):string|null {return v==null||v===''?null:boundedText(v,max);}
-const bookingKeys=['name','category_label','description','duration_minutes','buffer_after_minutes','base_price','price_mode','sort_order','concurrent_capacity','booking_window_days','cutoff_hours_before','cancel_deadline_hours_before','intake_question','autoTagName'];
+const bookingKeys=['image_url','paymentMode','name','category_label','description','duration_minutes','buffer_after_minutes','base_price','price_mode','sort_order','concurrent_capacity','booking_window_days','cutoff_hours_before','cancel_deadline_hours_before','intake_question','autoTagName'];
 const rewardKeys=['name','description','imageUrl','rewardKind','requiredMiles','stockLimit','perFriendLimit','startsAt','endsAt','benefitExpiresDays','commonActionName','failurePolicy','customerMessage','targetConditions'];
 export function parseCatalogDefinition(type:HqCatalogTemplateType,value:unknown):HqCatalogTemplateDefinition {
  if(!own(value)||value.schemaVersion!==1||!own(value.settings)||Object.keys(value).some(k=>!['schemaVersion','settings'].includes(k)))return invalid();
  const raw=value.settings,allowed=type==='booking_menu'?bookingKeys:rewardKeys;
  if(Object.keys(raw).some(k=>!allowed.includes(k)))return invalid();
  if(type==='booking_menu') {
+  if(raw.paymentMode!==undefined&&!['default','online','onsite'].includes(String(raw.paymentMode)))return invalid();
+  if(raw.image_url!==undefined&&raw.image_url!==null&&(typeof raw.image_url!=='string'||!/^https:\/\//.test(raw.image_url)||raw.image_url.length>2048))return invalid();
   const mode=raw.price_mode??'fixed';if(!['fixed','free','inquiry'].includes(String(mode)))return invalid();
-  const s:Record<string,unknown>={name:boundedText(raw.name,200),category_label:optionalText(raw.category_label,200),description:optionalText(raw.description,10000),duration_minutes:integer(raw.duration_minutes,1,1440),buffer_after_minutes:integer(raw.buffer_after_minutes,0,1440,0),base_price:mode==='fixed'?integer(raw.base_price,0,100000000):0,price_mode:mode,sort_order:integer(raw.sort_order,0,1000000,0),concurrent_capacity:integer(raw.concurrent_capacity,1,100,1),intake_question:optionalText(raw.intake_question,200),autoTagName:optionalText(raw.autoTagName,100)};
+  const s:Record<string,unknown>={paymentMode:raw.paymentMode??'default',image_url:raw.image_url??null,name:boundedText(raw.name,200),category_label:optionalText(raw.category_label,200),description:optionalText(raw.description,10000),duration_minutes:integer(raw.duration_minutes,1,1440),buffer_after_minutes:integer(raw.buffer_after_minutes,0,1440,0),base_price:mode==='fixed'?integer(raw.base_price,0,100000000):0,price_mode:mode,sort_order:integer(raw.sort_order,0,1000000,0),concurrent_capacity:integer(raw.concurrent_capacity,1,100,1),intake_question:optionalText(raw.intake_question,200),autoTagName:optionalText(raw.autoTagName,100)};
   for(const [key,max] of [['booking_window_days',365],['cutoff_hours_before',720],['cancel_deadline_hours_before',720]] as const)s[key]=raw[key]==null?null:integer(raw[key],1,max);
   return {schemaVersion:1,settings:s as unknown as HqCatalogTemplateDefinition['settings']};
  }
@@ -31,7 +33,7 @@ export function parseCatalogDefinition(type:HqCatalogTemplateType,value:unknown)
  }catch(e){if(e instanceof HqTemplateError)throw e;return invalid();}
 }
 const columns:Record<string,string[]>={
- menus:['id','line_account_id',...bookingKeys.filter(k=>k!=='autoTagName'),'is_active','deleted_at','auto_tag_id','version','created_at','updated_at'],
+ menus:['id','line_account_id',...bookingKeys.filter(k=>!['autoTagName','paymentMode'].includes(k)),'is_active','deleted_at','auto_tag_id','version','created_at','updated_at','hq_template_id','hq_template_version_id','hq_customized'],
  menu_versions:['id','menu_id','version_number','name','category_label','description','duration_minutes','buffer_after_minutes','base_price','price_mode','sort_order','is_active','rules_json','created_at'],
  mileage_rewards:['id','line_account_id','program_id','name','description','image_url','reward_kind','status','sort_order','current_draft_version_id','current_published_version_id','created_at','updated_at','archived_at','folder_id'],
  mileage_reward_versions:['id','reward_id','version_number','status','required_miles','stock_limit','per_friend_limit','starts_at','ends_at','benefit_expires_days','common_action_version_id','failure_policy','customer_message','created_at','published_at','target_conditions','revision'],
@@ -43,7 +45,7 @@ const rows=(table:string,where:string)=>`(SELECT COALESCE(json_group_array(json(
 function snapshotSql(type:HqCatalogTemplateType) {
  const account='(SELECT accountId FROM scope)',table=type==='booking_menu'?'menus':'mileage_rewards',versionTable=type==='booking_menu'?'menu_versions':'mileage_reward_versions',owner=type==='booking_menu'?'menu_id':'reward_id';
  const usage=type==='booking_menu'?`SELECT menu_id id,COUNT(*) n FROM (SELECT menu_id FROM bookings UNION ALL SELECT menu_id FROM staff_menus UNION ALL SELECT menu_id FROM booking_menu_resources) GROUP BY menu_id`:`SELECT reward_id id,COUNT(*) n FROM (SELECT reward_id FROM mileage_redemptions UNION ALL SELECT v.reward_id FROM mileage_reward_codes c JOIN mileage_reward_versions v ON v.id=c.reward_version_id) GROUP BY reward_id`;
- return `WITH scope AS (SELECT ? accountId) SELECT json_object('targets',json(${rows(table,`line_account_id=${account}`)}),'versions',json(${rows(versionTable,`${owner} IN (SELECT id FROM ${table} WHERE line_account_id=${account})`)}),'usage',json((SELECT COALESCE(json_group_array(json_object('id',id,'n',n)),'[]') FROM (${usage} ORDER BY id))),'tags',json(${rows('tags',`line_account_id=${account}`)}),'scenarios',json(${rows('scenarios',`line_account_id=${account}`)}),'actions',json(${rows('common_actions',`line_account_id=${account}`)}),'actionVersions',json(${rows('common_action_versions',`common_action_id IN (SELECT id FROM common_actions WHERE line_account_id=${account})`)}),'programs',json(${rows('mileage_programs','1=1')}))`;
+ return `WITH scope AS (SELECT ? accountId) SELECT json_object('targets',json(${rows(table,`line_account_id=${account}`)}),'versions',json(${rows(versionTable,`${owner} IN (SELECT id FROM ${table} WHERE line_account_id=${account})`)}),'usage',json((SELECT COALESCE(json_group_array(json_object('id',id,'n',n)),'[]') FROM (${usage} ORDER BY id))),'tags',json(${rows('tags',`line_account_id=${account}`)}),'scenarios',json(${rows('scenarios',`line_account_id=${account}`)}),'actions',json(${rows('common_actions',`line_account_id=${account}`)}),'actionVersions',json(${rows('common_action_versions',`common_action_id IN (SELECT id FROM common_actions WHERE line_account_id=${account})`)}),'programs',json(${rows('mileage_programs','1=1')}),'paymentConnected',EXISTS(SELECT 1 FROM booking_payment_connections WHERE line_account_id=${account} AND disconnected_at IS NULL),'style',COALESCE((SELECT style FROM account_styles WHERE line_account_id=${account}),'standard'))`;
 }
 export async function catalogSnapshot(db:D1Database,accountId:string,type:HqCatalogTemplateType):Promise<string> {
  return (await db.prepare(`SELECT (${snapshotSql(type)}) snapshot`).bind(accountId).first<{snapshot:string}>())!.snapshot;
@@ -72,12 +74,13 @@ export function catalogReferences(def:HqCatalogTemplateDefinition,snapshot:strin
 export interface CatalogItem {sourceId:string;itemKind:string;name:string;targetId:string|null;expectedRevision:string|null;duplicate:boolean;allowedModes:Array<'create'|'overwrite'|'alias'>;operation?:'reuse'}
 export function inspectCatalog(def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType):CatalogItem[] {
  const snap=JSON.parse(snapshot) as Snapshot,name=def.settings.name,same=snap.targets.filter(r=>normalizeScopedTagName(String(r.name))===normalizeScopedTagName(name));
+ if(type==='booking_menu'){return [{sourceId:type,itemKind:type,name,targetId:null,expectedRevision:null,duplicate:!!same.length,allowedModes:['create']},...catalogReferences(def,snapshot,type)];}
  if(same.length>1)throw new HqTemplateError('VERSION_CONFLICT',409);
- const row=same[0],versions=snap.versions.filter(v=>v[type==='booking_menu'?'menu_id':'reward_id']===row?.id),used=snap.usage.some(u=>u.id===row?.id&&u.n>0);
- const safe=!!row&&!used&&(type==='booking_menu'?!row.is_active&&!row.deleted_at:row.status==='draft'&&!row.archived_at&&!row.current_published_version_id&&versions.every(v=>v.status==='draft'));
+ const row=same[0],versions=snap.versions.filter(v=>v.reward_id===row?.id),used=snap.usage.some(u=>u.id===row?.id&&u.n>0);
+ const safe=!!row&&!used&&(row.status==='draft'&&!row.archived_at&&!row.current_published_version_id&&versions.every(v=>v.status==='draft'));
  return [{sourceId:type,itemKind:type,name,targetId:row?String(row.id):null,expectedRevision:row?JSON.stringify(row):null,duplicate:!!row,allowedModes:(row?safe?['overwrite','alias']:['alias']:['create']) as Array<'create'|'overwrite'|'alias'>},...catalogReferences(def,snapshot,type)];
 }
-export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType,resolutions:readonly HqTemplateResolution[]) {
+export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType,resolutions:readonly HqTemplateResolution[],origin?:{templateId:string;versionId:string}) {
  const snap=JSON.parse(snapshot) as Snapshot,items=inspectCatalog(def,snapshot,type),root=items[0],selected=resolutions.find(r=>r.sourceId===type);
  if(!selected||resolutions.length!==items.length||!root.allowedModes.includes(selected.mode)||items.slice(1).some(i=>!resolutions.some(r=>r.sourceId===i.sourceId&&r.mode==='overwrite')))throw new HqTemplateError('SELECTION_REQUIRED',409);
  const id=selected.mode==='overwrite'?root.targetId!:crypto.randomUUID(),name=selected.mode==='alias'?nextAlias(def.settings.name,snap.targets.map(r=>String(r.name))):def.settings.name;
@@ -86,9 +89,12 @@ export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,sna
  const add=(sql:string,bindings:HqTemplateStatement['bindings'])=>statements.push({sql,bindings});
  const refs=items.slice(1),tagId=s.autoTagName?refs.find(r=>r.sourceId===`tag:${s.autoTagName}`)!.targetId:null;
  if(type==='booking_menu') {
-  const data:Record<string,string|number|null>={...Object.fromEntries(bookingKeys.filter(k=>k!=='autoTagName').map(k=>[k,s[k] as string|number|null])),auto_tag_id:tagId};
+  if((JSON.parse(snapshot) as {style?:string}).style==='ec')throw new HqTemplateError('BOOKING_NOT_USED',422);
+  const data:Record<string,string|number|null>={...Object.fromEntries(bookingKeys.filter(k=>!['autoTagName','paymentMode'].includes(k)).map(k=>[k,s[k] as string|number|null])),auto_tag_id:tagId};
   if(existing){const keys=Object.keys(data);add(`UPDATE menus SET ${keys.map(k=>`${k}=?`).join(',')},version=version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`,[...keys.map(k=>data[k]),id,accountId]);}
   else {const keys=Object.keys(data);add(`INSERT INTO menus(id,line_account_id,${keys.join(',')},is_active) VALUES (?,?,${keys.map(()=>'?').join(',')},0)`,[id,accountId,...keys.map(k=>data[k])]);}
+  if(origin)add('UPDATE menus SET hq_template_id=?,hq_template_version_id=?,hq_customized=0 WHERE id=? AND line_account_id=?',[origin.templateId,origin.versionId,id,accountId]);
+  if(s.paymentMode!=='default')add(`INSERT INTO booking_payment_menu_settings(menu_id,line_account_id,mode,provider,created_at,updated_at) VALUES(?,?,?, ?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')) ON CONFLICT(menu_id) DO UPDATE SET mode=excluded.mode,provider=excluded.provider`,[id,accountId,s.paymentMode==='online'&&(JSON.parse(snapshot) as {paymentConnected?:number}).paymentConnected?'online':'onsite',s.paymentMode==='online'&&(JSON.parse(snapshot) as {paymentConnected?:number}).paymentConnected?'stripe':'onsite']);
   add(`INSERT INTO menu_versions(id,menu_id,version_number,name,category_label,description,duration_minutes,buffer_after_minutes,base_price,price_mode,sort_order,is_active,rules_json) SELECT ?,id,version,name,category_label,description,duration_minutes,buffer_after_minutes,base_price,price_mode,sort_order,is_active,json_object('concurrent_capacity',concurrent_capacity,'booking_window_days',booking_window_days,'cutoff_hours_before',cutoff_hours_before,'cancel_deadline_hours_before',cancel_deadline_hours_before,'intake_question',intake_question) FROM menus WHERE id=? AND line_account_id=?`,[crypto.randomUUID(),id,accountId]);
  } else {
   const actionId=refs.find(r=>r.sourceId==='commonActionName')?.targetId??null;
@@ -103,4 +109,26 @@ export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,sna
   else add(`INSERT INTO mileage_reward_versions(id,reward_id,version_number,status,${cols.join(',')}) VALUES (?,?,(SELECT COALESCE(MAX(version_number),0)+1 FROM mileage_reward_versions WHERE reward_id=?),'draft',${cols.map(()=>'?').join(',')})`,[versionId,id,id,...vals]);
  }
  return {statements,resolutions:[{...selected,targetId:id,aliasName:selected.mode==='alias'?name:undefined},...refs.map(r=>({sourceId:r.sourceId,itemKind:r.itemKind,mode:'overwrite' as const,targetId:r.targetId??undefined,expectedRevision:r.expectedRevision??undefined}))],counts:{created:selected.mode==='create'?1:0,overwritten:selected.mode==='overwrite'?1:0,aliased:selected.mode==='alias'?1:0}};
+}
+
+export function catalogWarnings(def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType){
+ const s=JSON.parse(snapshot) as {style:string;paymentConnected:number;targets:Row[]},settings=def.settings as unknown as Record<string,unknown>;
+ if(type!=='booking_menu')return [];
+ return [...(s.targets.some(t=>normalizeScopedTagName(String(t.name))===normalizeScopedTagName(settings.name as string))?['same_name_exists']:[]),...(settings.paymentMode==='online'&&!s.paymentConnected?['payment_downgraded_to_store']:[]),...(s.style==='ec'?['booking_not_used']:[]),'booking_reception_stopped','staff_selection_required'];
+}
+
+/** Tenant-bound booking_menu adapter used by the shared distribution transaction. */
+export function createBookingMenuHqAdapter(db:D1Database,authority:import('./contract.js').HqTemplateAuthority):import('./contract.js').HqTemplateAdapter {
+ const ok=<T>(value:T)=>({kind:'OK' as const,value});
+ return {type:'booking_menu',
+  async extractReferences(input){parseCatalogDefinition('booking_menu',JSON.parse(input.definitionJson));return ok([{kind:'booking_menu',sourceId:'booking_menu'}]);},
+  async verifyReferences(context,references){if(context.tenantId!==authority.tenantId||!await db.prepare('SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL').bind(context.targetAccountId,authority.tenantId).first())throw new HqTemplateError('FORBIDDEN',403);return ok(references.map(r=>({...r,targetId:r.sourceId})));},
+  async detectDuplicates(){return ok([]);},async buildIdMap(){return ok({});},
+  async buildCommitPlan(context,input){
+   const version=await db.prepare('SELECT template_id FROM hq_template_versions WHERE id=? AND tenant_id=? AND definition_json=?').bind(input.templateVersionId,authority.tenantId,input.definitionJson).first<{template_id:string}>();if(!version)throw new HqTemplateError('VERSION_CONFLICT',409);
+   const snapshot=await catalogSnapshot(db,context.targetAccountId,'booking_menu'),digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(snapshot))),n=>n.toString(16).padStart(2,'0')).join('');if(`hqts1.${digest}`!==context.snapshotToken)throw new HqTemplateError('VERSION_CONFLICT',409);
+   const plan=planCatalog(context.targetAccountId,parseCatalogDefinition('booking_menu',JSON.parse(input.definitionJson)),snapshot,'booking_menu',context.resolutions,{templateId:version.template_id,versionId:input.templateVersionId});
+   return ok({tenantId:authority.tenantId,targetAccountId:context.targetAccountId,preflightId:context.preflightId,idempotencyFingerprint:context.idempotencyFingerprint,snapshotToken:context.snapshotToken,mode:context.mode,resolutions:plan.resolutions,stage:[],dbCommit:plan.statements,compensateOnDbFailure:[],reconcile:[]});
+  },
+ };
 }

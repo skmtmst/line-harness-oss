@@ -74,6 +74,8 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/friend-reminders', 'reminders'),
   feature('/api/reminder-runs', 'reminders'),
   feature('/api/auto-replies', 'auto_replies'),
+  feature('/api/qa-entries', 'auto_replies'),
+  feature('/api/ai-settings', 'auto_replies'),
   feature('/api/auto-reply-runs', 'auto_replies'),
   feature('/api/rich-menus', 'rich_menus'),
   feature('/api/rich-menu', 'rich_menus'),
@@ -155,6 +157,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 
   exempt('/api/settings', 'core', '機能を再度オンにするため停止対象外'),
   exempt('/api/auth', 'core', 'ログインとセッション管理'),
+  exempt('/api/me/push', 'core', '認証済み本人の端末通知。各操作で本人と代理禁止を検証'),
   exempt('/api/staff', 'core', 'ログインユーザーと権限管理'),
   exempt('/api/access', 'core', '権限と監査の共通基盤'),
   exempt('/api/capabilities', 'core', '権限判定の共通基盤'),

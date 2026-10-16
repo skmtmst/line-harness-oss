@@ -1,0 +1,30 @@
+import {Hono} from 'hono';
+import type {Env} from '../index.js';
+import {GapError,gapAccount,gapBody,gapWrite,gapVersion} from '../services/gap-common.js';
+import {loadRoutingLayout,resolveRouting,issueRoutingToken} from '../services/form-routing.js';
+import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
+import {requireDeliveryAccess,requirePermission} from '../middleware/role-guard.js';
+export const formRouting=new Hono<Env>();
+formRouting.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'routing_unavailable'},e instanceof GapError?e.status:503));
+formRouting.post('/api/forms/:id/routing/preview',requireDeliveryAccess('forms','view'),async(c)=>{
+ const a=await gapAccount(c),b=await gapBody(c),layout=await loadRoutingLayout(c.env.DB,c.req.param('id'),a,false);
+ if(!b.answers||typeof b.answers!=='object'||Array.isArray(b.answers))throw new GapError('invalid_answers');
+ return c.json({success:true,data:await resolveRouting(c.env.DB,a,layout.layout,b.answers as Record<string,unknown>,b.blockId as string|undefined)});
+});
+formRouting.post('/api/liff/forms/:id/routing/resolve',async(c)=>{
+ const a=await resolveAccountIdFromLiff(c),user=await verifyCallerLineUserId(c);if(!a||!user)throw new GapError('unauthorized',401);
+ const f=await resolveFriendId(c,user,a);if(!f)throw new GapError('not_found',404);
+ const b=await gapBody(c),layout=await loadRoutingLayout(c.env.DB,c.req.param('id'),a,true);
+ if(!b.answers||typeof b.answers!=='object'||Array.isArray(b.answers))throw new GapError('invalid_answers');
+ const result=await resolveRouting(c.env.DB,a,layout.layout,b.answers as Record<string,unknown>,b.blockId as string|undefined);
+ const token=await issueRoutingToken(c.env.DB,{account:a,friend:f,formId:c.req.param('id'),versionId:layout.current_published_version_id,blockId:result.blockId,target:result.target,matchedIndex:result.matchedIndex,exp:Date.now()+1800000});
+ return c.json({success:true,data:{...result,routingToken:token,expiresAt:new Date(Date.now()+1800000).toISOString()}});
+});
+formRouting.get('/api/booking/admin/routing-staff-groups',requirePermission('/booking/menus'),async(c)=>{const a=await gapAccount(c);return c.json({success:true,data:(await c.env.DB.prepare('SELECT * FROM booking_routing_staff_groups WHERE line_account_id=? ORDER BY name,id').bind(a).all()).results});});
+formRouting.put('/api/booking/admin/routing-staff-groups/:id',requirePermission('/booking/menus'),async(c)=>{
+ gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c),v=gapVersion(b.expectedVersion);
+ if(typeof b.name!=='string'||!b.name.trim()||b.name.length>100||!Array.isArray(b.staffIds)||!b.staffIds.length||b.staffIds.length>100||b.staffIds.some(x=>typeof x!=='string'))throw new GapError('invalid_group');
+ const ids=[...new Set(b.staffIds)];const rows=(await c.env.DB.prepare('SELECT id FROM staff WHERE line_account_id=? AND is_active=1 AND deleted_at IS NULL AND id IN(SELECT value FROM json_each(?))').bind(a,JSON.stringify(ids)).all()).results;if(rows.length!==ids.length)throw new GapError('invalid_staff');
+ const r=await c.env.DB.prepare(`INSERT INTO booking_routing_staff_groups(id,line_account_id,name,staff_ids_json) SELECT ?,?,?,? WHERE ?=0 ON CONFLICT(id) DO UPDATE SET name=excluded.name,staff_ids_json=excluded.staff_ids_json,version=version+1 WHERE line_account_id=? AND version=?`).bind(c.req.param('id'),a,b.name.trim(),JSON.stringify(ids),v,a,v).run();
+ if(!r.meta.changes)throw new GapError('version_conflict',409);return c.json({success:true,data:{version:v+1}});
+});

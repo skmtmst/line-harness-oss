@@ -134,7 +134,7 @@ export type AuthenticatedStaff = {
   credential?: 'session' | 'api-key';
 };
 
-function toAuthenticatedStaff(staff: {
+export function toAuthenticatedStaff(staff: {
   id: string;
   name: string;
   role: StaffRole;
@@ -287,7 +287,10 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
 ];
 
+export function gap2ReadOperation(method:string,path:string){return method==='POST'&&(/^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)||/^\/api\/chats\/[^/]+\/ai\/summary$/.test(path)||path==='/api/booking/admin/series/preview');}
+function gap2SelfPreference(method:string,path:string){return (method==='POST'&&/^\/api\/me\/push\/(subscriptions|test)$/.test(path))||(method==='PUT'&&path==='/api/me/push/preferences')||(method==='DELETE'&&/^\/api\/me\/push\/subscriptions\/[^/]+$/.test(path));}
 export function permissionForApiPath(path: string): string | null {
+  if(path.startsWith('/api/qa-entries')||path.startsWith('/api/ai-settings'))return '/auto-replies';
   if (/^\/api\/line-accounts\/[^/]+\/senders(?:\/|$)/.test(path)) return '/chats';
   const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
   if (override) return override[1];
@@ -350,6 +353,7 @@ const STAFF_SELF_ROUTE_TEMPLATES: Array<[method: string, path: string]> = [
 
 export function isStaffSelfRouteTemplate(method: string, path: string): boolean {
   const normalizedMethod = method.toUpperCase();
+  if((normalizedMethod==='GET'&&path==='/api/me/push')||gap2SelfPreference(normalizedMethod,path))return true;
   if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
   return STAFF_SELF_ROUTE_TEMPLATES.some(([m, p]) => m === normalizedMethod && p === path);
 }
@@ -747,7 +751,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     return c.json({ success: false, code: TENANT_SUSPENDED_CODE, error: TENANT_SUSPENDED_ERROR }, 403);
   }
 
-  if (staff.readOnly && !SAFE_METHODS.has(method)) {
+  if (staff.readOnly && !SAFE_METHODS.has(method) && !gap2ReadOperation(method,path) && !gap2SelfPreference(method,path)) {
     return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
   }
 
@@ -766,7 +770,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     // N-424: 「見えるだけ」の key は GET系だけを許可する。変更系は edit の key が要る。
     const granted = requiredPermission
       && (staff.permissionKeys?.includes(requiredPermission)
-        || (SAFE_METHODS.has(method) && staff.viewPermissionKeys?.includes(requiredPermission)));
+        || ((SAFE_METHODS.has(method)||gap2ReadOperation(method,path)) && staff.viewPermissionKeys?.includes(requiredPermission)));
     if (!requiredPermission || !granted) {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }

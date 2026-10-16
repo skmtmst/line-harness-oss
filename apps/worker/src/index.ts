@@ -1,3 +1,12 @@
+import {sweepOperatorPush,retryOperatorPush} from './services/operator-push.js';
+import {operatorPush} from './routes/operator-push.js';
+import {aiDrafts} from './routes/ai-drafts.js';
+import {broadcastAb} from './routes/broadcast-ab.js';
+import {decideAbTests} from './services/broadcast-ab.js';
+import {bookingMakeup} from './routes/booking-makeup.js';
+import {expireMakeup} from './services/booking-makeup.js';
+import {formRouting} from './routes/form-routing.js';
+import {bookingSeries} from './routes/booking-series.js';
 import { bookingCalendarSettings } from './routes/booking-calendar-settings.js';
 import { bookingCancellation } from './routes/booking-cancellation.js';
 import { inboxSla } from './routes/inbox-sla.js';
@@ -288,6 +297,8 @@ export const ADMIN_REQUEST_HEADERS = [
   'X-Filename',
   'Idempotency-Key',
   'X-Confirm-Irreversible',
+  'X-Line-Harness-Source',
+  'X-Impersonation-Reason',
   'x-step-up-token',
 ] as const;
 
@@ -367,6 +378,7 @@ app.route('/', scenarioDrafts);
 // NOTE: 承認の口（approval-threshold 等の固定名）は :id より先に載せる。
 // broadcasts の PUT /:id が先だと approval-threshold を id と読んで404になる。
 app.route('/', broadcastApprovals);
+app.route('/', broadcastAb);
 app.route('/', broadcasts);
 app.route('/', chatAttachments);
 app.route('/', broadcastMessageAssets);
@@ -398,6 +410,8 @@ app.route('/', actionScoreRules);
 app.route('/', templates);
 app.route('/', inboxSla);
 app.route('/', lineSenders);
+app.route('/', aiDrafts);
+app.route('/', operatorPush);
 app.route('/', chats);
 app.route('/', chatMessages);
 app.route('/', conversations);
@@ -414,6 +428,7 @@ app.route('/', richMenus);
 app.route('/', trackedLinks);
 app.route('/', entryRoutes);
 app.route('/', formDocuments);
+app.route('/', formRouting);
 app.route('/', forms);
 app.route('/', postalCode);
 app.route('/', adPlatforms);
@@ -430,6 +445,7 @@ app.route('/', autoReplies);
 app.route('/', autoReplyRuns);
 app.route('/', adminAuth);
 app.route('/', trafficPools);
+app.route('/', bookingSeries);
 app.route('/', booking);
 app.route('/', bookingCalendarSettings);
 app.route('/', bookingCancellation);
@@ -437,6 +453,7 @@ app.route('/', bookingPayments);
 app.route('/', bookingPaymentAdmin);
 app.route('/', bookingEntitlements);
 app.route('/', bookingPlus);
+app.route('/', bookingMakeup);
 app.route('/', events);
 app.route('/', accountSettings);
 app.route('/', companySettings);
@@ -1285,6 +1302,9 @@ async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'operator push digest',run:async()=>{await sweepOperatorPush(env.DB,env,new Date(event.scheduledTime));await retryOperatorPush(env.DB,env,new Date(event.scheduledTime));}},
+    {name:'makeup credit expiry',run:()=>expireMakeup(env.DB,new Date(event.scheduledTime))},
+    {name:'AB test decisions (test transport)',run:()=>decideAbTests(env.DB,new Date(event.scheduledTime))},
     {name:'line webhook recovery',run:async()=>{const {processDueLineWebhookRetries}=await import('./services/line-webhook-recovery.js');await processDueLineWebhookRetries(env);}},
     {name:'durable tracked click continuation',run:async()=>{const {processDueTrackedClicks}=await import('./services/tracked-click-steps.js');await processDueTrackedClicks(env);}},
     {name:'durable banner generation',run:async()=>{const {processDueBannerGenerations}=await import('./services/banner-jobs.js');await processDueBannerGenerations(env);}},

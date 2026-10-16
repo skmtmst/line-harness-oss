@@ -1,3 +1,5 @@
+import { gap1Paths } from './gap1-openapi.js';
+import { gap2Paths } from './gap2-openapi.js';
 import { stylePaths } from './styles-openapi.js';
 import { hqTemplateListPaths } from './hq-template-list-openapi.js';
 import { hqTemplateMediaPaths } from './hq-template-media-openapi.js';
@@ -422,6 +424,8 @@ const spec = {
     ...api1AuthoringPaths,
     ...bookingAssignmentPaths,
     ...bookingPaymentAdminPaths,
+    ...gap1Paths,
+    ...gap2Paths,
     ...bookingEntitlementPaths,
     '/api/account-settings/customer-look': {
       get: { tags:['Account Settings'], summary:'店のお客さまのデザインを読む', parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'保存した版とデザイン'},'403':{description:'担当外'}} },

@@ -1,3 +1,5 @@
+import {maybeStartAb,maybeReplayAbStart} from './broadcast-ab.js';
+import {GapError} from '../services/gap-common.js';
 import { broadcastSendPreview,broadcastQuietHoursShift } from '../services/gap-send-preview.js';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
@@ -2322,7 +2324,8 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
      */
     try {
       const { enforceBroadcastSendApproval } = await import('../services/broadcast-approval.js');
-      const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown; expectedVersion?:unknown; scheduledAt?:unknown }>().catch(() => null);
+      const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown; expectedVersion?:unknown; scheduledAt?:unknown;testMode?:unknown }>().catch(() => null);
+      const abReplay=await maybeReplayAbStart(c,id,sendBody);if(abReplay)return abReplay;
       if(sendBody?.expectedVersion!==undefined) {
         const current=await broadcastSendPreview(c.env.DB,existing);
         if(sendBody.expectedVersion!==current.expectedVersion||sendBody.confirmedRecipientCount!==current.recipients||current.recipients===0)
@@ -2341,6 +2344,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
             threshold: approvalGate.threshold,
           }, approvalGate.status as 409, []);
       }
+      const abResponse=await maybeStartAb(c,id,sendBody);if(abResponse)return abResponse;
       if(sendBody?.expectedVersion!==undefined && existing.line_account_id) {
         if(sendBody.scheduledAt!==undefined && (typeof sendBody.scheduledAt!=='string'||!Number.isFinite(Date.parse(sendBody.scheduledAt))||Date.parse(sendBody.scheduledAt)<=Date.now()))return c.json({success:false,error:'invalid_scheduled_at'},400);
         const at=typeof sendBody.scheduledAt==='string'?sendBody.scheduledAt:new Date().toISOString();
@@ -2353,6 +2357,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
       }
 
     } catch (gateError) {
+      if(gateError instanceof GapError)return c.json({success:false,error:gateError.code},gateError.status);
       // 数えられない（DB到達不能など）ときは送らない。誤送信より停止を選ぶ。
       console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
       return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
