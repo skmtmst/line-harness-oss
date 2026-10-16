@@ -13,6 +13,8 @@ import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { jstDate } from '@/lib/jst-datetime'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import type { RestaurantTable } from '@/lib/restaurant-test-api'
 import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '../../booking-payments/assignment'
 import type { RestaurantV8Context } from '../booking-kit/shell'
@@ -31,6 +33,7 @@ export default function TablesAssignBoard({ ctx, canEdit }: { ctx: RestaurantV8C
   const { data, store } = ctx
   const { selectedAccountId } = useAccount()
   const assignment = useAssignment(selectedAccountId && store ? { kind: 'tables', accountId: selectedAccountId, storeId: store.id } : null)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: assignment.dirty, busy: assignment.saving, onDiscard: assignment.reset })
   const rows: RestaurantTable[] = (store ? data.tables.filter((table) => table.store_id === store.id) : data.tables).filter((table) => table.is_active)
   const order = rows.map((table) => table.id)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
@@ -70,6 +73,7 @@ export default function TablesAssignBoard({ ctx, canEdit }: { ctx: RestaurantV8C
         </>} />
       ) : null}
       {preparing.dialog}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="卓の割り当て方への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <AssignmentRowDialog open={target !== null} name={target ? `卓 ${target.code}` : ''} unit="組" value={target ? assignment.resources[target.id] : undefined}
         onClose={() => setTarget(null)} onApply={(patch) => { if (target) assignment.setResource(target.id, patch) }} />
       <AssignmentConflict state={assignment} unit="組" order={order} subject="卓の割り当て方" names={Object.fromEntries(rows.map((table) => [table.id, `卓 ${table.code}`]))} />

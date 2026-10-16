@@ -18,6 +18,7 @@ import settings from '../booking-menus/settings.module.css'
 import { providerFor } from './labels'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import TestModeNote from '@/components/shared/test-mode-note'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import PaymentRecords from './records'
 import PaymentEvents from './events'
 import styles from './payments.module.css'
@@ -63,6 +64,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
   const [saveError, setSaveError] = useState<string | null>(null)
   const generation = useRef(0)
   const preparing = usePreparingDialog()
+  const saveErrors = useSaveFormErrors()
 
   const load = useCallback(async () => {
     const mine = ++generation.current
@@ -98,6 +100,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
       setConfig({ ...config, ...response.data })
       notifySaved('お支払いの設定を保存しました')
     } catch (cause) {
+      if (saveErrors.capture(cause)) return
       setSaveError(cause instanceof ApiError && cause.status === 403
         ? 'この設定を変える権限がありません。'
         : mode === 'customer_choice' && cause instanceof ApiError && cause.status === 400
@@ -128,7 +131,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
   const connected = link.connected
   const choices = connected ? [...METHOD_CHOICES, ...(savedMode === 'customer_choice' ? [CHOICE_CUSTOMER] : [])] : METHOD_CHOICES.slice(0, 1)
   return (
-    <div className={settings.tabStack} data-design={connected ? 'Payments' : 'PaymentsNotConnected'}>
+    <SaveErrorScope errors={saveErrors}><div className={settings.tabStack} data-design={connected ? 'Payments' : 'PaymentsNotConnected'}>
       {saveError ? <Notice tone="danger" role="alert">{saveError}</Notice> : null}
       <section className={settings.section} aria-labelledby="payments-provider-heading">
         <div className={styles.headRow}>
@@ -167,12 +170,12 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
           <HelpTip label="いつもの支払い方法の説明">メニュー・コース・クラスで「このメニューだけ変える」を選んでいないときに使う方法です。</HelpTip>
         </div>
         {canEdit ? (
-          <RadioCardGroup legend="いつもの支払い方法" columns={choices.length > 2 ? 3 : choices.length === 2 ? 2 : undefined}>
+          <SaveErrorField names={['mode', 'provider']}><RadioCardGroup legend="いつもの支払い方法" columns={choices.length > 2 ? 3 : choices.length === 2 ? 2 : undefined}>
             {choices.map((choice) => (
               <RadioCard key={choice.value} name="payments-default-method" value={choice.value} title={choice.title} note={choice.note}
                 icon={choice.icon} checked={mode === choice.value} onChange={(value) => setMode(value as BookingPaymentMode)} />
             ))}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
         ) : <p className={styles.readValue}>{[...METHOD_CHOICES, CHOICE_CUSTOMER].find((choice) => choice.value === mode)?.title}</p>}
         <p className={styles.minor}>{METHOD_NOTE}</p>
       </section>
@@ -185,9 +188,9 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
         </div>
         <div className={styles.holdRow}>
           <span className={styles.holdSelect}>
-            {canEdit ? <Select aria-label="お支払いを待つ時間" value={String(hold)}
+            {canEdit ? <SaveErrorField names={['holdMinutes', 'hold_minutes']}><Select aria-label="お支払いを待つ時間" value={String(hold)}
               onChange={(value) => setHold(Number(value))}
-              options={HOLD_CHOICES.map((minutes) => ({ value: String(minutes), label: `${minutes} 分` }))} /> : <span className={styles.readValue}>{`${hold} 分`}</span>}
+              options={HOLD_CHOICES.map((minutes) => ({ value: String(minutes), label: `${minutes} 分` }))} /></SaveErrorField> : <span className={styles.readValue}>{`${hold} 分`}</span>}
           </span>
           <span className={styles.minor}>この時間を過ぎても払われないときは、仮の予約を取り消して枠を空けます。</span>
         </div>
@@ -198,6 +201,6 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
       </section>
       ) : null}
       {preparing.dialog}
-    </div>
+    </div></SaveErrorScope>
   )
 }

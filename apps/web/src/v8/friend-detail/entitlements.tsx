@@ -14,6 +14,8 @@ import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import StatusBadge from '@/components/shared/status-badge'
 import TruncatedText from '@/components/shared/truncated-text'
 import { TextField } from '@/components/shared/text-field'
@@ -137,6 +139,7 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
+  const saveErrors = useSaveFormErrors()
   const key = useRef(uuid())
 
   useEffect(() => {
@@ -181,6 +184,7 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
       notifySaved(action === 'revoke' ? '回数券を取り消しました' : '回数券を更新しました')
       onDone()
     } catch (cause) {
+      if (saveErrors.capture(cause)) return
       setError(cause instanceof ApiError && cause.status === 409 ? 'ほかの人が先に直しました。閉じて開き直してから、もう一度お試しください。'
         : cause instanceof ApiError && cause.status === 403 ? '回数券を変える権限がありません。'
           : isNotReadyError(cause) ? 'データの準備が済むと保存できます。'
@@ -193,7 +197,7 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
   return (
     <Dialog open={open} title="回数券を手で入れる" titleNote={`${friendName || 'この友だち'} さん・店頭で売った・紙の回数券の引き継ぎなど`} onCancel={onClose} size="medium" busy={busy}
       cancelLabel="キャンセル" confirmLabel={submitLabel} onConfirm={() => void submit()}>
-      <div className={styles.dialogBody}>
+      <SaveErrorScope errors={saveErrors}><div className={styles.dialogBody}>
         <RadioCardGroup legend="すること" legendVisible columns={2}>
           {ACTIONS.map((choice) => (
             <RadioCard key={choice.value} name="entitlement-action" value={choice.value} title={choice.title} note={choice.note} icon={choice.icon}
@@ -202,29 +206,29 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
               onChange={(value) => { setAction(value as Action); if (value !== 'give' && targetId === NEW_TICKET && items[0]) setTargetId(items[0].id) }} />
           ))}
         </RadioCardGroup>
-        <div className={styles.fullSelect}><Select aria-label="対象の回数券" value={targetId} onChange={setTargetId} size="full"
-          options={[...items.map((item) => ({ value: item.id, label: optionLabel(item) })), ...(action === 'give' ? [{ value: NEW_TICKET, label: '新しい回数券を付ける' }] : [])]} /></div>
+        <div className={styles.fullSelect}><SaveErrorField names={['entitlementId', 'entitlement_id', 'targetId']}><EntitySelect aria-label="対象の回数券" noun="回数券" value={targetId} onChange={setTargetId} size="full"
+          options={[...items.map((item) => ({ value: item.id, label: optionLabel(item) })), ...(action === 'give' ? [{ value: NEW_TICKET, label: '新しい回数券を付ける' }] : [])]} /></SaveErrorField></div>
         {isNew ? (
           <Field label="回数券の名前" required error={submitted && !name.trim() ? '名前を入れてください' : undefined}>
-            <TextField aria-label="回数券の名前" value={name} maxLength={100} placeholder="例：カット 10回券" onChange={(event) => setName(event.target.value)} />
+            <SaveErrorField names={['name']}><TextField aria-label="回数券の名前" value={name} maxLength={100} placeholder="例：カット 10回券" onChange={(event) => setName(event.target.value)} /></SaveErrorField>
           </Field>
         ) : null}
         {action !== 'revoke' ? (
           <div className={styles.twoCols}>
             {needsCount ? (
               <Field label={action === 'adjust' ? '直したあとの残り' : isNew ? '回数' : '足す回数'} required error={submitted && !countValid ? '回数を入れてください' : undefined}>
-                <NumberInput aria-label="回数" unit="回" type="number" min={action === 'adjust' ? 0 : 1} value={count} onChange={(event) => setCount(event.target.value)} />
+                <SaveErrorField names={['remaining', 'count']}><NumberInput aria-label="回数" unit="回" type="number" min={action === 'adjust' ? 0 : 1} value={count} onChange={(event) => setCount(event.target.value)} /></SaveErrorField>
               </Field>
             ) : null}
             <Field label="期限" required={action === 'extend' || isNew} error={submitted && !expiryValid ? '今の期限より後の日を選んでください' : undefined}>
               {expiry === '' && !isNew && action !== 'extend'
                 ? <Select aria-label="期限" value="" onChange={() => setExpiry(target ? jstDate(new Date(target.expires_at)) : '')} options={[...expiryChoices, { value: 'change', label: '日付を選ぶ' }]} />
-                : <DateField aria-label="期限" value={expiry} onChange={setExpiry} min={jstDate(new Date())} />}
+                : <SaveErrorField names={['expiresAt', 'expires_at']}><DateField aria-label="期限" value={expiry} onChange={setExpiry} min={jstDate(new Date())} /></SaveErrorField>}
             </Field>
           </div>
         ) : null}
         <Field label="理由" required error={submitted && !reason.trim() ? '理由を入れてください（履歴に残ります）' : undefined}>
-          <TextField aria-label="理由" value={reason} maxLength={1000} placeholder="例：店頭で現金で買った（10/15 ¥22,000）" onChange={(event) => setReason(event.target.value)} />
+          <SaveErrorField names={['reason']}><TextField aria-label="理由" value={reason} maxLength={1000} placeholder="例：店頭で現金で買った（10/15 ¥22,000）" onChange={(event) => setReason(event.target.value)} /></SaveErrorField>
         </Field>
         {target || isNew ? (
           <div className={styles.preview}>
@@ -233,7 +237,7 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
           </div>
         ) : null}
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
-      </div>
+      </div></SaveErrorScope>
     </Dialog>
   )
 }

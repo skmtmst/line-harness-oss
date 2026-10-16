@@ -20,7 +20,9 @@ import type { AccountStyle, StyleTemplateSample } from '@line-crm/shared'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Toggle from '@/components/shared/toggle'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import MultiSelect from '@/components/shared/multi-select'
+import EntitySelect from '@/components/shared/entity-select'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { readSaveFieldErrors } from '@/lib/api-field-errors'
 import { useAccount } from '@/contexts/account-context'
 import { hqStyleApi, type StarterSetItem, type StyleStarterSet } from '@/lib/api-styles'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -105,6 +107,7 @@ export default function HqStarterSetsV8() {
   const label = styleLabel(active)
 
   /* 新しいアカウントで自動で入れるの切り替え（今の中身・名前・版と一緒に保存する）。 */
+  const saveErrors = useSaveFormErrors()
   const saveAutoInsert = async (next: boolean) => {
     if (!set) return
     setSaving(true)
@@ -114,7 +117,7 @@ export default function HqStarterSetsV8() {
       notifySaved(next ? '新しいアカウントに自動で入れます' : '新しいアカウントには自動で入れません')
       await load()
     } catch (caught) {
-      setError(describeApiFailure(caught, '保存', { scope: 'hq' }))
+      if (!saveErrors.capture(caught)) setError(describeApiFailure(caught, '保存', { scope: 'hq' }))
     } finally {
       setSaving(false)
     }
@@ -132,14 +135,16 @@ export default function HqStarterSetsV8() {
       setRemoving(null)
       await load()
     } catch (caught) {
-      setSaveError(describeApiFailure(caught, '保存', { scope: 'hq' }))
+      // 入力検査の理由（400/422）は、窓の中にそのまま出す。ほかは共通の失敗文。
+      saveErrors.capture(caught)
+      setSaveError(Object.values(readSaveFieldErrors(caught))[0] ?? describeApiFailure(caught, '保存', { scope: 'hq' }))
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="J6647"
       title="スタイルの初期セット"
       tabs={<Tabs size="compact" label="テンプレートの種類" items={hqTemplateTabsForStarterSets()} />}
@@ -169,7 +174,7 @@ export default function HqStarterSetsV8() {
           </span>
           {/* 新しいアカウントへは必ず入る（口に切り替えが無い）。押せないスイッチは置かず、状態の札で出す。 */}
           {set && canEdit
-            ? <Toggle label="新しいアカウントで自動で入れる" checked={set.autoInsert} disabled={saving} onChange={(next) => void saveAutoInsert(next)} />
+            ? <SaveErrorField names={['autoInsert', 'auto_insert']}><Toggle label="新しいアカウントで自動で入れる" checked={set.autoInsert} disabled={saving} onChange={(next) => void saveAutoInsert(next)} /></SaveErrorField>
             : <StatusBadge tone={set?.autoInsert === false ? 'neutral' : 'success'} dot>{set?.autoInsert === false ? '入れない' : '自動で入れる'}</StatusBadge>}
         </div>
         <div className={styles.sectionHead}>
@@ -276,7 +281,7 @@ export default function HqStarterSetsV8() {
               <RadioCard variant="row" name="hss-target" value="pick" checked={distribute.target === 'pick'} onChange={() => setDistribute({ ...distribute, target: 'pick' })} title="アカウントを選ぶ" />
             </RadioCardGroup>
             {distribute.target === 'pick' ? (
-              <MultiSelect aria-label="配るアカウント" placeholder="アカウントを選ぶ" values={distribute.accounts} onChange={(values) => setDistribute({ ...distribute, accounts: values })} options={accounts.map((account) => ({ value: account.id, label: account.name }))} />
+              <EntitySelect aria-label="配るアカウント" noun="アカウント" placeholder="アカウントを選ぶ" values={distribute.accounts} onChange={(values) => setDistribute({ ...distribute, accounts: values })} options={accounts.map((account) => ({ value: account.id, label: account.name }))} />
             ) : null}
             <RadioCardGroup legend="店が直した物があるとき" legendVisible>
               <RadioCard variant="row" name="hss-mode" value="alias" checked={distribute.mode === 'alias'} onChange={() => setDistribute({ ...distribute, mode: 'alias' })} title="上書きせず、新しく作る（おすすめ）" />
@@ -303,6 +308,6 @@ export default function HqStarterSetsV8() {
         onCancel={() => setRemoving(null)}
         onConfirm={() => void removeKind()}
       />
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

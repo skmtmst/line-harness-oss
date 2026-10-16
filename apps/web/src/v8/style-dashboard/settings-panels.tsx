@@ -9,6 +9,7 @@ import { Field } from '@/components/shared/form-controls'
 import HelpTip from '@/components/shared/help-tip'
 import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Select from '@/components/shared/select'
 import TimeFieldV8 from '@/components/shared/time-field-v8'
 import Toggle from '@/components/shared/toggle'
@@ -54,7 +55,7 @@ export function ViewDrawer({ open, layout, busy, onClose, onSave, onReset, onCha
           </div>
           {picking ? (
             <div className={styles.drawerPick}>
-              <Select aria-label="型" value={nextStyle} onChange={(v: string) => setNextStyle(v as typeof nextStyle)} options={[{ value: 'restaurant', label: '飲食店' }, { value: 'salon', label: 'サロン' }, { value: 'consult', label: '面談・相談' }, { value: 'lesson', label: '教室・レッスン' }, { value: 'standard', label: '標準' }]} />
+              <SaveErrorField names={['style']}><Select aria-label="型" value={nextStyle} onChange={(v: string) => setNextStyle(v as typeof nextStyle)} options={[{ value: 'restaurant', label: '飲食店' }, { value: 'salon', label: 'サロン' }, { value: 'consult', label: '面談・相談' }, { value: 'lesson', label: '教室・レッスン' }, { value: 'standard', label: '標準' }]} /></SaveErrorField>
               <Button size="compact" variant="primary" disabled={busy} onClick={() => onChangeStyle(nextStyle)}>この型にする</Button>
               <span className={styles.cellMuted}>予約や友だちのデータはそのまま使えます</span>
             </div>
@@ -65,7 +66,7 @@ export function ViewDrawer({ open, layout, busy, onClose, onSave, onReset, onCha
               const i = cards.indexOf(item)
               return (
                 <div key={item.id} className={styles.drawerRow}>
-                  <Toggle checked={item.on} label={item.label} onChange={(on) => setCards((list) => list.map((x) => (x.id === item.id ? { ...x, on } : x)))} />
+                  <SaveErrorField names={[`cards.${item.id}`, `cards[${i}]`, `cards.${i}.visible`]}><Toggle checked={item.on} label={item.label} onChange={(on) => setCards((list) => list.map((x) => (x.id === item.id ? { ...x, on } : x)))} /></SaveErrorField>
                   <span className={styles.drawerLabel}>{item.label}</span>
                   <span className={styles.grow} />
                   <IconButton size="row" aria-label={`${item.label}を上へ`} disabled={i <= 0 || cards[i - 1]?.locked} onClick={() => move(i, -1)}><ArrowUp size={16} /></IconButton>
@@ -123,10 +124,10 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
     if (step === 2) { onSave(input, { mode, message }); return }
     if (!preview) { onSave(input); return }
     setChecking(true)
-    try {
-      const rows = await preview(input)
-      if (rows.length) { setOverlap(rows); setMessage(overlapMessage?.(input) ?? ''); setStep(2) } else onSave(input)
-    } catch { onSave(input) } finally { setChecking(false) }
+    // 重なる予約を読むだけ。読めなかったときは、重なりなしとして保存へ進む（保存の失敗は呼び出し側が欄へ返す）。
+    let rows: OverlapRow[] = []
+    try { rows = await preview(input) } catch { rows = [] } finally { setChecking(false) }
+    if (rows.length) { setOverlap(rows); setMessage(overlapMessage?.(input) ?? ''); setStep(2) } else onSave(input)
   }
   useEffect(() => { if (open) setIds(choices[0] ? [choices[0].id] : []) }, [open, target]) // eslint-disable-line react-hooks/exhaustive-deps
   return (

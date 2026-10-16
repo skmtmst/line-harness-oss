@@ -7,7 +7,7 @@ import Link from '@/components/shared/list-navigation'
 import Notice from '@/components/shared/notice'
 import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
 import RadioCard,{ RadioCardGroup } from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
 import { type StarterSetItem } from '@/lib/api-styles'
@@ -127,7 +127,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
               <RadioCard name="setup-look" value="manual" checked={choice === 'manual'} onChange={setChoice} title="手動で設定する" note="リッチメニューの画面で 1 から作ります" icon={<SetupIcon name="sliders" />} />
             </div>
             {choice === 'existing' ? (
-              <Select aria-label="使うリッチメニュー・画像" size="full" value={resource} onChange={setResource} disabled={resources === null}
+              <EntitySelect aria-label="使うリッチメニュー・画像" noun="リッチメニュー・画像" size="full" value={resource} onChange={setResource} disabled={resources === null}
                 options={[{ value: '', label: resources === null ? '読み込んでいます…' : resources.length ? '使うリッチメニュー・画像を選ぶ' : '使える物がありません' }, ...(resources ?? []).map((item) => ({ value: item.id, label: `${item.kind === 'image' ? '画像' : 'リッチメニュー'}：${item.name}` }))]} />
             ) : null}
           </RadioCardGroup>
