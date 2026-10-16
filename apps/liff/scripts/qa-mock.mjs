@@ -21,7 +21,8 @@ import { createServer } from 'node:http';
 
 const PORT = Number(process.env.QA_MOCK_PORT ?? 8790);
 
-const state = { delayMs: 0, fail: null };
+/* features：③-2 第2弾の画面（waitlist・waitlist-expired・party・recurring・lesson・routed など）を出すときだけ撮影が足す。既定は空＝今までの見本のまま。 */
+const state = { delayMs: 0, fail: null, features: [] };
 let qaAvailableMiles = 1250;
 let qaBankProfile = null;
 const qaRedemptions = new Map();
@@ -393,12 +394,14 @@ const server = createServer(async (req, res) => {
     if (body.fail === undefined || body.fail === null || body.fail === 'all' || Array.isArray(body.fail)) {
       state.fail = body.fail ?? null;
     }
+    if (Array.isArray(body.features)) state.features = body.features.filter((f) => typeof f === 'string');
     json(res, 200, state);
     return;
   }
   if (pathname === '/__qa/reset' && req.method === 'POST') {
     state.delayMs = 0;
     state.fail = null;
+    state.features = [];
     qaAvailableMiles = 1250;
     qaBankProfile = null;
     qaRedemptions.clear();
@@ -471,6 +474,25 @@ const server = createServer(async (req, res) => {
       return;
     }
   }
+
+  // ---- キャンセル待ち（③-2 第2弾：Zm2Vh・xANkO）。features に waitlist / waitlist-expired があるときだけ行を返す ----
+  if (method === 'GET' && pathname === '/api/liff/booking/waitlist') {
+    const base = { staff_id: 'qa-staff-1', menu_id: 'qa-menu-1', hold_minutes: 30, created_at: '2026-10-15T01:00:00.000Z', menu_name: 'トリミング（小型犬）', staff_name: '佐々木' };
+    const rows = [];
+    if (state.features.includes('waitlist')) {
+      rows.push({ ...base, id: 'qa-wl-1', starts_at: '2026-11-20T05:00:00.000Z', status: 'invited', hold_expires_at: new Date(Date.now() + 18 * 60_000 - 1000).toISOString(), position: 1 });
+    }
+    if (state.features.includes('waitlist-expired')) {
+      rows.push({ ...base, id: 'qa-wl-3', starts_at: '2026-11-20T05:00:00.000Z', status: 'finished', hold_expires_at: '2026-10-16T02:00:00.000Z', position: 1, hold_minutes: 18 });
+    }
+    if (state.features.includes('waitlist') || state.features.includes('waitlist-expired')) {
+      rows.push({ ...base, id: 'qa-wl-2', menu_id: 'qa-menu-3', menu_name: 'シャンプーのみ', starts_at: '2026-11-22T01:00:00.000Z', status: 'waiting', hold_expires_at: null, position: 3 });
+    }
+    json(res, 200, { waitlist: rows });
+    return;
+  }
+  if (method === 'DELETE' && /^\/api\/liff\/booking\/waitlist\/[^/]+$/.test(pathname)) { json(res, 200, { status: 'cancelled' }); return; }
+  if (method === 'POST' && pathname === '/api/liff/booking/waitlist') { json(res, 200, { id: 'qa-wl-new' }); return; }
 
   // ---- 予約 ----
   if (method === 'GET' && pathname === '/api/liff/booking/menus') {

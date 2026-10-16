@@ -7,6 +7,7 @@ import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import HistoryCard from '../components/HistoryCard.js';
+import WaitlistSection from '../components/WaitlistSection.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
@@ -225,6 +226,7 @@ export default function BookingHistory() {
             {actionError && (
               <p role="alert" className="text-[13px] leading-5 text-danger">{actionError}</p>
             )}
+            {tab === 'upcoming' ? <WaitlistSection onChanged={() => setReloadKey((k) => k + 1)} /> : null}
             {list.length === 0 ? (
               tab === 'upcoming' ? (
                 <StatusView
