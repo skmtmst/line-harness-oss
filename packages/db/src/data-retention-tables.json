@@ -4666,5 +4666,92 @@
       "by": "tenant",
       "column": "tenant_id"
     }
+  },
+  "line_senders": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "inbox_routing_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "booking_calendar_switches": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_calendar_busy_cache": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_calendar_read_health": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_calendar_switch_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "booking_id",
+      "parent": "bookings",
+      "parentColumn": "id"
+    }
+  },
+  "booking_calendar_switch_audit": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_cancellation_policies": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_payment_methods": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "booking_charges": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_cancellation_events": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "charge_id",
+      "parent": "booking_charges",
+      "parentColumn": "id"
+    }
   }
 }
