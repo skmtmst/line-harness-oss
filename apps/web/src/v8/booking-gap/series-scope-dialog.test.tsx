@@ -58,6 +58,8 @@ test('前もっての見込みの口があるとき：埋まっている回は�
   render(<SeriesScopeDialog open mode="change" accountId="a1" target={target} newStartsAt="2026-12-11T16:00:00+09:00" onClose={() => {}} onDone={() => {}} />)
   expect(await screen.findByText(/埋まっています・14:00 のまま/)).toBeTruthy()
   expect(screen.getByRole('button', { name: '2 件を変える' })).toBeTruthy()
+  /* 見出しとボタンの数が食い違って見えないよう「3 件のうち 2 件」と書く。 */
+  expect(screen.getByText('変わる日（3 件のうち 2 件）')).toBeTruthy()
   cleanup()
   impact.mockRejectedValue(new Error('404'))
   render(<SeriesScopeDialog open mode="cancel" accountId="a1" target={target} onClose={() => {}} onDone={() => {}} />)

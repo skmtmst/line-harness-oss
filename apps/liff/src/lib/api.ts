@@ -521,8 +521,8 @@ export const api = {
   makeupCredits: () => get<{ success: true; data: MakeupCredit[] }>('/api/liff/events/makeup-credits').then((r) => ({ credits: r.data })),
   /** 振替先の回。from はその週の最初の日（YYYY-MM-DD）。空きは定員−埋まりで数える。 */
   makeupOptions: (id: string, from: string) =>
-    get<{ success: true; data: Array<{ id: string; event_id: string; starts_at: string; ends_at: string; capacity: number | null; occupied: number }> }>(`/api/liff/events/makeup-credits/${encodeURIComponent(id)}/options?from=${encodeURIComponent(from)}`)
-      .then((r) => ({ options: r.data.map((o): MakeupOption => ({ slot_id: o.id, event_id: o.event_id, starts_at: o.starts_at, ends_at: o.ends_at, name: '', remaining: o.capacity == null ? null : Math.max(0, o.capacity - o.occupied), full: o.capacity != null && o.occupied >= o.capacity })) })),
+    get<{ success: true; data: Array<{ id: string; event_id: string; starts_at: string; ends_at: string; capacity: number | null; occupied: number; name?: string | null }> }>(`/api/liff/events/makeup-credits/${encodeURIComponent(id)}/options?from=${encodeURIComponent(from)}`)
+      .then((r) => ({ options: r.data.map((o): MakeupOption => ({ slot_id: o.id, event_id: o.event_id, starts_at: o.starts_at, ends_at: o.ends_at, name: o.name ?? '', remaining: o.capacity == null ? null : Math.max(0, o.capacity - o.occupied), full: o.capacity != null && o.occupied >= o.capacity })) })),
   useMakeup: (id: string, eventSlotId: string, key: string) =>
     post<{ success: true; data: { bookingId: string; replayed: boolean } }>(`/api/liff/events/makeup-credits/${encodeURIComponent(id)}/use`, { eventSlotId }, { 'Idempotency-Key': key }).then((r) => ({ id: r.data.bookingId, status: 'confirmed' })),
   myEventWaitlist: () => get<{ items: EventWaitlistMine[] }>('/api/liff/events/me/waitlist'),

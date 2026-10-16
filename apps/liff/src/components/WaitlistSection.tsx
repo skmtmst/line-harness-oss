@@ -16,7 +16,7 @@ const jstDay = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3_600_000
  * 空きが出た人には「あと N 分 お取りしています」と［予約する］（先着・30分、開始2時間前を切ったら10分の仮押さえ）。
  * 時間内に決めなかった人には「時間切れ」と［もう一度キャンセル待ちをする］。1人3件まで・開始の1時間前で締める。
  */
-export default function WaitlistSection({ onChanged }: { onChanged?: () => void }) {
+export default function WaitlistSection({ onChanged, upcomingHeading }: { onChanged?: () => void; /** 待ちの下に予約が続くときだけ true。「これからの予約」の見出しで区切る。 */ upcomingHeading?: boolean }) {
   const [rows, setRows] = useState<WaitlistRow[] | null>(null);
   const [now, setNow] = useState(Date.now());
   const [working, setWorking] = useState<string | null>(null);
@@ -57,6 +57,7 @@ export default function WaitlistSection({ onChanged }: { onChanged?: () => void 
 
   const waitingCount = shown.filter((w) => w.status !== 'finished').length;
   return (
+    <>
     <section aria-labelledby="liff-waitlist-title" className="space-y-3">
       <h2 id="liff-waitlist-title" className="text-base font-bold text-ink">{`キャンセル待ち中（${waitingCount}）`}</h2>
       {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
@@ -89,5 +90,7 @@ export default function WaitlistSection({ onChanged }: { onChanged?: () => void 
       </ul>
       {offerId ? <WaitlistOfferSheet id={offerId} onClose={() => { setOfferId(null); refresh(); }} /> : null}
     </section>
+    {upcomingHeading ? <h2 className="pt-1 text-base font-bold text-ink">これからの予約</h2> : null}
+    </>
   );
 }

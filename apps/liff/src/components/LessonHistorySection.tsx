@@ -14,18 +14,22 @@ export default function LessonHistorySection({ onPicking }: { onPicking?: (picki
   const [items, setItems] = useState<EventBookingMine[]>([]);
   const [credits, setCredits] = useState<MakeupCredit[]>([]);
   const [target, setTarget] = useState<EventBookingMine | null>(null);
-  const [justAbsent, setJustAbsent] = useState<string | null>(null);
+  const [justAbsent, setJustAbsent] = useState<{ startsAt: string; name: string | null } | null>(null);
+  /** 欠席した回を探すための、今・これまでの予約（振替が返す欠席元の予約 ID から日時と教室名を引く）。 */
+  const [known, setKnown] = useState<EventBookingMine[]>([]);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
-    Promise.resolve().then(() => api.myEventBookings('upcoming')).then((r) => setItems(r.items.filter((b) => b.makeup?.enabled && (b.status === 'requested' || b.status === 'confirmed') && Date.parse(b.slot_starts_at) > Date.now()))).catch(() => setItems([]));
+    Promise.resolve().then(() => api.myEventBookings('upcoming')).then((r) => { const rows = r.items; setKnown((prev) => (Array.isArray(rows) ? [...rows, ...prev.filter((p) => !rows.some((i) => i.id === p.id))] : prev)); setItems(r.items.filter((b) => b.makeup?.enabled && (b.status === 'requested' || b.status === 'confirmed') && Date.parse(b.slot_starts_at) > Date.now())); }).catch(() => setItems([]));
+    Promise.resolve().then(() => api.myEventBookings('past')).then((r) => setKnown((prev) => (Array.isArray(r.items) ? [...prev, ...r.items.filter((i) => !prev.some((p) => p.id === i.id))] : prev))).catch(() => undefined);
     Promise.resolve().then(() => api.makeupCredits()).then((r) => setCredits(r.credits.filter((c) => c.status === 'open'))).catch(() => setCredits([]));
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { onPicking?.(credits.length > 0); return () => onPicking?.(false); }, [credits.length, onPicking]);
+  const sourceOf = (c: MakeupCredit) => { if (justAbsent) return justAbsent; const b = known.find((k) => k.id === c.source_event_booking_id); return b ? { startsAt: b.slot_starts_at, name: b.event_name } : null; };
   if (items.length === 0 && credits.length === 0 && !target) return null;
   return (
     <section className="space-y-3.5" aria-label="教室の予約">
-      {credits[0] ? <MakeupPicker key={credits[0].id} credit={credits[0]} justAbsent={justAbsent} onUsed={() => { setJustAbsent(null); load(); }} onLater={() => setJustAbsent(null)} /> : null}
+      {credits[0] ? <MakeupPicker key={credits[0].id} credit={credits[0]} source={sourceOf(credits[0])} onUsed={() => { setJustAbsent(null); load(); }} onLater={() => setJustAbsent(null)} /> : null}
       {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
       <ul className="space-y-3.5">
         {items.map((b) => (
@@ -41,7 +45,7 @@ export default function LessonHistorySection({ onPicking }: { onPicking?: (picki
       </ul>
       {target ? <AbsenceSheet booking={target} onClose={() => setTarget(null)} onDone={({ credit, reason }) => {
         const t = target; setTarget(null);
-        if (credit) setJustAbsent(t.slot_starts_at); else if (reason) setError(reason);
+        if (credit) setJustAbsent({ startsAt: t.slot_starts_at, name: t.event_name }); else if (reason) setError(reason);
         load();
       }} /> : null}
     </section>

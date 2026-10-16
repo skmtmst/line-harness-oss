@@ -737,10 +737,10 @@ const server = createServer(async (req, res) => {
   if (method === 'GET' && /^\/api\/liff\/events\/makeup-credits\/[^/]+\/options$/.test(pathname)) {
     const at = (day, hm) => `2026-11-${day}T${hm}:00.000Z`;
     json(res, 200, { success: true, data: [
-      { id: 'qa-ms-1', event_id: 'qa-event-1', starts_at: at('18', '01:00'), ends_at: at('18', '02:00'), capacity: 5, occupied: 2 },
-      { id: 'qa-ms-2', event_id: 'qa-event-1', starts_at: at('18', '10:00'), ends_at: at('18', '11:00'), capacity: 6, occupied: 1 },
-      { id: 'qa-ms-3', event_id: 'qa-event-1', starts_at: at('18', '11:30'), ends_at: at('18', '12:30'), capacity: 4, occupied: 4 },
-      { id: 'qa-ms-4', event_id: 'qa-event-1', starts_at: at('19', '01:00'), ends_at: at('19', '02:00'), capacity: 4, occupied: 2 },
+      { id: 'qa-ms-1', event_id: 'qa-event-1', starts_at: at('18', '01:00'), ends_at: at('18', '02:00'), capacity: 5, name: 'ヨガ（初級）', occupied: 2 },
+      { id: 'qa-ms-2', event_id: 'qa-event-1', starts_at: at('18', '10:00'), ends_at: at('18', '11:00'), capacity: 6, name: '朝ヨガ（オンライン）', occupied: 1 },
+      { id: 'qa-ms-3', event_id: 'qa-event-1', starts_at: at('18', '11:30'), ends_at: at('18', '12:30'), capacity: 4, name: 'ヨガ（中級）', occupied: 4 },
+      { id: 'qa-ms-4', event_id: 'qa-event-1', starts_at: at('19', '01:00'), ends_at: at('19', '02:00'), capacity: 4, name: 'ヨガ（初級）', occupied: 2 },
     ] });
     return;
   }

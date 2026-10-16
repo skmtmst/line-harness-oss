@@ -230,7 +230,7 @@ export default function BookingHistory() {
               <p role="alert" className="text-[13px] leading-5 text-danger">{actionError}</p>
             )}
             {tab === 'upcoming' ? <LessonHistorySection onPicking={setPicking} /> : null}
-            {tab === 'upcoming' ? <WaitlistSection onChanged={() => setReloadKey((k) => k + 1)} /> : null}
+            {tab === 'upcoming' ? <WaitlistSection upcomingHeading={list.length > 0} onChanged={() => setReloadKey((k) => k + 1)} /> : null}
             {list.length === 0 ? (
               tab === 'upcoming' ? (
                 <StatusView

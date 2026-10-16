@@ -25,7 +25,7 @@ import {
 import { submitButtonText } from '../lib/form-button-text.js';
 import { api, type MenuItem, type PostalCodeCandidate, type PublicForm, type RoutedTarget, type StaffItem } from '../lib/api.js';
 import Stepper from '../components/ui/Stepper.js';
-import { NoRoutedSlots, RoutedBanner } from '../components/RoutedBooking.js';
+import { NoRoutedSlots, RoutedBanner, RoutedConfirm } from '../components/RoutedBooking.js';
 import {
   addDays,
   formatWeekday,
@@ -228,6 +228,10 @@ export default function Form() {
   const [routed, setRouted] = useState<RoutedState | undefined>(undefined);
   const [routedRetry, setRoutedRetry] = useState(0);
   const [routedEmpty, setRoutedEmpty] = useState(false);
+  /** 日時を選んだあとの「確認」の段（手順の帯の 3 つ目）。ここで初めて送る。 */
+  const [routedConfirm, setRoutedConfirm] = useState(false);
+  /** 予約の欄が必須で日時がまだのあいだは進めない（空きが無いときは問い合わせへ）。 */
+  const routedNeedsPick = Boolean(bookingName && bookingName.kind === 'input' && bookingName.required) && !routedPicked && !routedEmpty;
   const answersKey = JSON.stringify(answers);
   useEffect(() => {
     if (!routingOn || !pageHasBooking || !id) { setRouted(undefined); return; }
@@ -657,7 +661,7 @@ export default function Form() {
 
   return (
     <div className="min-h-screen bg-canvas" data-design-node={wide ? 'wPfqW' : 'B8rCt'}>
-      <LiffHeader title={pageTitle} onBack={trail.length > 0 ? goBack : undefined} />
+      <LiffHeader title={pageTitle} onBack={routedPage && routedConfirm ? () => setRoutedConfirm(false) : trail.length > 0 ? goBack : undefined} />
       <div
         className="mx-auto min-h-screen w-full max-w-md pb-28"
         style={{
@@ -670,7 +674,7 @@ export default function Form() {
           fontFamily: theme.fontFamily === 'serif' ? 'serif' : undefined,
         }}
       >
-        {routedPage ? <Stepper steps={['質問', '日時', '確認']} current={1} /> : null}
+        {routedPage ? <Stepper steps={['質問', '日時', '確認']} current={routedConfirm ? 2 : 1} /> : null}
         {!routedPage && multi && options.sectionHeader !== 'none' && (
           <div className="px-4 pt-3">
             <div className="flex gap-1" aria-hidden="true">
@@ -703,7 +707,8 @@ export default function Form() {
           )}
 
           {firstPage && <FormReception availability={form.availability} />}
-          {bodyBlocks.map((block) => blockView(block))}
+          {routedPage && routedConfirm && routed?.status === 'ready' && routedPicked ? <RoutedConfirm target={routed.target} whenText={`${utcToJstMd(routedPicked)}（${formatWeekday(new Date(new Date(routedPicked).getTime() + 9 * 3_600_000).toISOString().slice(0, 10))}）${utcToJstHm(routedPicked)}`} /> : null}
+          <div className={routedPage && routedConfirm ? 'hidden' : 'contents'}>{bodyBlocks.map((block) => blockView(block))}</div>
 
           {error && (
             <p className="rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-bold text-danger">
@@ -727,11 +732,16 @@ export default function Form() {
       <BottomBar appearance="form">
         <Button variant="primary"
           type="button"
-          onClick={() => (routedPage && routedEmpty ? liff.closeWindow() : isLast ? submit() : goNext())}
-          disabled={sending || Object.values(uploading).some(Boolean)}
+          onClick={() => {
+            if (routedPage && routedEmpty) { liff.closeWindow(); return; }
+            if (routedPage && routedNeedsPick) return;
+            if (routedPage && routedPicked && !routedConfirm) { const { errors, first } = validateVisible(); setFieldErrors(errors); if (first) return; setRoutedConfirm(true); window.scrollTo({ top: 0 }); return; }
+            if (isLast) void submit(); else goNext();
+          }}
+          disabled={sending || Object.values(uploading).some(Boolean) || (routedPage && routedNeedsPick)}
           style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
         >
-          {sending ? '送信中...' : routedPage && routedEmpty ? 'お店に問い合わせる' : routedPage && routedPicked ? `${utcToJstMd(routedPicked)}（${formatWeekday(new Date(new Date(routedPicked).getTime() + 9 * 3_600_000).toISOString().slice(0, 10))}）${utcToJstHm(routedPicked)} で進む` : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+          {sending ? '送信中...' : routedPage && routedEmpty ? 'お店に問い合わせる' : routedPage && routedNeedsPick ? '日時を選んでください' : routedPage && routedPicked && routedConfirm ? 'この内容で送る' : routedPage && routedPicked ? `${utcToJstMd(routedPicked)}（${formatWeekday(new Date(new Date(routedPicked).getTime() + 9 * 3_600_000).toISOString().slice(0, 10))}）${utcToJstHm(routedPicked)} で進む` : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
         </Button>
 
       </BottomBar>
@@ -1049,8 +1059,8 @@ function PeopleBookingSlotPicker({
   const daySlots = (selectedDate && byDate[selectedDate]) || [];
 
   return (
-    <div className="flex flex-col gap-2" data-design-node="g9osGN">
-      {menu && (
+    <div className={`flex flex-col ${target ? 'gap-4' : 'gap-2'}`} data-design-node="g9osGN">
+      {menu && !target && (
         <p className="text-xs leading-[18px] text-liff-sub">
           {menu.name}・{menu.duration_minutes}分
         </p>

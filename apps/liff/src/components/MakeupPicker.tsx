@@ -15,14 +15,15 @@ const mondayOf = (date: string) => { const d = new Date(`${date}T00:00:00Z`); re
  * 週のカレンダーで日を選び、同じ種類・期限内・空きのある回だけを並べる。満席の回は選べない。
  * 選ぶ前に空きを確かめ直し、埋まっていたらその旨を出す（振替は残る）。［振替先はあとで選ぶ］で閉じても振替は残る。
  */
-export default function MakeupPicker({ credit, justAbsent, onUsed, onLater }: {
+export default function MakeupPicker({ credit, source, onUsed, onLater }: {
   credit: MakeupCredit;
-  /** 欠席した直後は、その回を欠席にしたことを帯に書く。 */
-  justAbsent?: string | null;
+  /** 欠席した回（日時と教室名）。帯の 1 行目に書く。口が返さない間は、予約の一覧から探して渡す。 */
+  source?: { startsAt: string; name: string | null } | null;
   onUsed: () => void;
   onLater?: () => void;
 }) {
   /* 欠席した回の次の週（今日より前は選べない）から始める。 */
+  const firstLoad = useRef(true);
   const [week, setWeek] = useState(() => { const next = credit.source_starts_at ? addDays(mondayOf(jstDate(credit.source_starts_at)), 7) : jstToday(); const today = jstToday(); return mondayOf(next > today ? next : today); });
   const [options, setOptions] = useState<MakeupOption[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -35,10 +36,17 @@ export default function MakeupPicker({ credit, justAbsent, onUsed, onLater }: {
   const load = useCallback(() => {
     setOptions(null); setFailed(false);
     api.makeupOptions(credit.id, week).then((r) => {
+      const inWeek = (o: MakeupOption) => { const d = jstDate(o.starts_at); return d >= week && d <= addDays(week, 6); };
+      const earliest = r.options.find((o) => !o.full);
+      /* 初めて開いたときだけ、振替できる一番早い日の週へ移る（見えている週と選んだ日を食い違わせない）。 */
+      if (firstLoad.current) {
+        firstLoad.current = false;
+        if (earliest && !inWeek(earliest)) { setWeek(mondayOf(jstDate(earliest.starts_at))); return; }
+      }
       setOptions(r.options);
-      const first = r.options.find((o) => !o.full);
-      setDay((cur) => (cur && r.options.some((o) => jstDate(o.starts_at) === cur) ? cur : first ? jstDate(first.starts_at) : null));
-      setPicked((cur) => (cur && r.options.some((o) => o.slot_id === cur && !o.full) ? cur : first?.slot_id ?? null));
+      const first = r.options.find((o) => !o.full && inWeek(o));
+      setDay((cur) => (cur && r.options.some((o) => jstDate(o.starts_at) === cur && inWeek(o)) ? cur : first ? jstDate(first.starts_at) : null));
+      setPicked((cur) => (cur && r.options.some((o) => o.slot_id === cur && !o.full && inWeek(o)) ? cur : first?.slot_id ?? null));
     }).catch((e) => { logFailure('makeup-options', e); setFailed(true); });
   }, [credit.id, week]);
   useEffect(() => { load(); }, [load]);
@@ -63,7 +71,7 @@ export default function MakeupPicker({ credit, justAbsent, onUsed, onLater }: {
     <section className="space-y-3.5" aria-label="振替">
       <div data-makeup-band className="flex flex-col gap-1.5 rounded-(--liff-radius-lg) bg-liff-soft p-3.5 outline-1 -outline-offset-1 outline-liff-primary">
         <p className="flex items-center gap-2 text-sm font-bold text-ink"><Icon name="repeat" className="h-4 w-4 text-liff-primary" />{`振替 1 回・${formatMd(jstDate(credit.expires_at))} まで`}</p>
-        <p className="text-[13px] leading-5 text-ink">{(() => { const src = justAbsent ?? credit.source_starts_at; return src ? `${mdHm(src)} ${credit.source_name ?? ''} を欠席にしました。振替先はあとで選んでも大丈夫です。` : '振替先はあとで選んでも大丈夫です。'; })()}</p>
+        <p className="text-[13px] leading-5 text-ink">{(() => { const at = source?.startsAt ?? credit.source_starts_at; const name = source?.name ?? credit.source_name ?? ''; return at ? `${mdHm(at)} ${name} を欠席にしました。振替先はあとで選んでも大丈夫です。` : '振替先はあとで選んでも大丈夫です。'; })()}</p>
       </div>
       <div className="space-y-3 rounded-(--liff-radius-lg) bg-canvas p-3.5 outline-1 -outline-offset-1 outline-liff-line">
         <div className="flex items-center justify-between">

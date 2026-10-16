@@ -124,7 +124,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
           <RadioCard name="series-scope" value="following" checked={scope === 'following'} onChange={() => setScope('following')} title={`この回から後ぜんぶ（${all ? all.length : '…'} 件）`}
             note={changing ? `${dayOf(target.startsAt)} から ${dayOf(last)} まで ${newTime} に変える。埋まっている回は前のまま` : `${dayOf(target.startsAt)} から ${dayOf(last)} まで取り消す。繰り返しはここで終わる`} />
         </RadioCardGroup>
-        <h3 className={styles.heading}>{changing ? `変わる日（${items?.length ?? '…'} 件）` : `取り消す日（${items?.length ?? '…'} 件）`}</h3>
+        <h3 className={styles.heading}>{changing ? (items && count !== items.length ? `変わる日（${items.length} 件のうち ${count} 件）` : `変わる日（${items?.length ?? '…'} 件）`) : `取り消す日（${items?.length ?? '…'} 件）`}</h3>
         {loadError ? <p className={styles.error} role="alert">対象の日を読み込めませんでした。<button type="button" className={styles.retry} onClick={() => setRetry((n) => n + 1)}>もう一度</button></p> : null}
         {!loadError ? <table className={styles.table} aria-busy={!items}>
           <thead><tr><th>日</th><th>{changing ? '前' : '時間'}</th><th>{changing ? '後' : 'キャンセル料'}</th></tr></thead>

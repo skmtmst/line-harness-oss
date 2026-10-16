@@ -31,3 +31,28 @@ export function NoRoutedSlots({ target, days }: { target: RoutedTarget; days: nu
     </Card>
   );
 }
+
+/** 確認の段（手順の帯の 3 つ目）。ここで内容を見てもらってから、ボタンで送る。 */
+export function RoutedConfirm({ target, whenText }: { target: RoutedTarget; whenText: string }) {
+  const rows: Array<[string, string]> = [
+    ['メニュー', target.menuName],
+    ['日時', whenText],
+    ...(target.staffName ? [['担当', target.staffName] as [string, string]] : []),
+    ...(target.meetingMode ? [['形式', target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : 'お店で'] as [string, string]] : []),
+    ['料金', bookingPriceText(target.price, target.price > 0 ? 'fixed' : 'free')],
+  ];
+  return (
+    <section data-routed-confirm aria-label="ご予約の内容" className="space-y-3.5">
+      <h2 className="text-xl font-bold text-ink">内容をご確認ください</h2>
+      <Card className="divide-y divide-liff-line p-0">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex items-baseline justify-between gap-3 px-3.5 py-3">
+            <span className="shrink-0 text-xs text-liff-sub">{k}</span>
+            <span className="min-w-0 text-right text-[13px] font-bold text-ink">{v}</span>
+          </div>
+        ))}
+      </Card>
+      {target.meetingMode === 'online' ? <p className="text-xs leading-[18px] text-liff-sub">会議の URL は予約が確定したあと LINE で届きます</p> : null}
+    </section>
+  );
+}
