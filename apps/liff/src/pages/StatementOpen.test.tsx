@@ -41,7 +41,7 @@ function mount() {
 test('開ける：発行は ?issue=1 と access token、認証情報は query に載せない', async () => {
   routes.push(() => issued());
   mount();
-  expect(await screen.findByRole('button', { name: '明細を取得する' })).toBeTruthy();
+  expect(await screen.findByRole('button', { name: '明細を開く' })).toBeTruthy();
   expect(calls).toEqual([{ path: DL, search: '?issue=1', auth: 'Bearer access-of-A' }]);
 });
 
@@ -50,9 +50,9 @@ test('期限切れ：取得で403なら［もう一度取得］で取り直す',
   routes.push(() => json({}, 403));
   routes.push(() => issued());
   mount();
-  fireEvent.click(await screen.findByRole('button', { name: '明細を取得する' }));
+  fireEvent.click(await screen.findByRole('button', { name: '明細を開く' }));
   fireEvent.click(await screen.findByRole('button', { name: 'もう一度開く' }));
-  expect(await screen.findByRole('button', { name: '明細を取得する' })).toBeTruthy();
+  expect(await screen.findByRole('button', { name: '明細を開く' })).toBeTruthy();
   expect(calls).toHaveLength(3);
 });
 
@@ -60,7 +60,7 @@ test('別人・別店・停止（404）は「明細を利用できません」',
   routes.push(() => json({}, 404));
   mount();
   expect(await screen.findByText('明細を利用できません')).toBeTruthy();
-  expect(screen.queryByRole('button', { name: '明細を取得する' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '明細を開く' })).toBeNull();
 });
 
 test('401 は LINEでログインの案内、再試行できる', async () => {
@@ -79,7 +79,7 @@ test('混雑（429）は Retry-After の秒数を出す', async () => {
 test('署名リンクに認証情報の query があれば取得しない', async () => {
   routes.push(() => issued({ url: `${DL}?signature=s&lineAccessToken=x` }));
   mount();
-  fireEvent.click(await screen.findByRole('button', { name: '明細を取得する' }));
+  fireEvent.click(await screen.findByRole('button', { name: '明細を開く' }));
   expect(await screen.findByRole('button', { name: 'もう一度試す' })).toBeTruthy();
   expect(calls).toHaveLength(1);
 });

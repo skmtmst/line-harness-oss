@@ -89,7 +89,7 @@ export default function StatementOpen() {
         )}
         {state.name === 'opened' && (
           <div data-statement-state="opened">
-            <StatusView tone="success" icon="check" title="明細を取得しました" body={'開けないときは、もう一度開いてください。'} />
+            <StatusView tone="success" icon="check" title="明細を開きました" body={'開けないときは、もう一度開いてください。'} />
           </div>
         )}
         {state.name === 'failed' && (
@@ -103,7 +103,7 @@ export default function StatementOpen() {
                 unavailableBody: 'お店へお問い合わせください',
                 expiredRetry: 'もう一度開く',
                 expiredBody: 'もう一度開くと、新しいリンクを作ります。',
-                unconfiguredBody: 'ただいま取得できません。お店へお問い合わせください',
+                unconfiguredBody: 'ただいま開けません。お店へお問い合わせください',
                 loginBody: 'LINEでログインして、もう一度お試しください',
                 retryBody: '時間をおいて、もう一度お試しください。',
               }}
@@ -114,7 +114,7 @@ export default function StatementOpen() {
       {(state.name === 'ready' || state.name === 'fetching') && (
         <BottomBar>
           <Button variant="primary" disabled={state.name === 'fetching'} onClick={() => void open(state.issued)}>
-            {state.name === 'fetching' ? '取得しています...' : '明細を取得する'}
+            {state.name === 'fetching' ? '開いています...' : '明細を開く'}
           </Button>
         </BottomBar>
       )}

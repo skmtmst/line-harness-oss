@@ -22,9 +22,9 @@ export const FILE_TEXT = {
   unavailable: 'このファイルは利用できません。お店へお問い合わせください',
   deleted: 'このファイルは削除されました',
   expired: 'リンクの期限が切れました',
-  unconfigured: 'ただいま取得できません。お店へお問い合わせください',
+  unconfigured: 'ただいま開けません。お店へお問い合わせください',
   login: 'LINEでログインして、もう一度お試しください',
-  retry: '取得できませんでした。時間をおいて、もう一度お試しください',
+  retry: '開けませんでした。時間をおいて、もう一度お試しください',
 } as const;
 
 const KIND_LABEL: Record<IssuedFile['kind'], string> = { image: '画像', video: '動画', file: '書類' };
