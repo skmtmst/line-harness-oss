@@ -50,7 +50,7 @@ export function AudienceSection({ accountId, mode, tagIds, onMode, onTagIds, can
   useEffect(() => {
     if (!accountId) return
     let live = true
-    void api.friends.list({ accountId, limit: 30 }).then((res) => {
+    void Promise.resolve().then(() => api.friends.list({ accountId, limit: 30 })).then((res) => {
       if (live && res.success) { setFriends(res.data.items); onFriends(res.data.items) }
     }, () => {})
     return () => { live = false }
