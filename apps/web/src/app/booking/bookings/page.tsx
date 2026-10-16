@@ -45,6 +45,9 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import BookingDetailV8 from './booking-detail-v8'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { BookingChargesSection } from '@/v8/booking-payments/booking-charges'
+import { BookingGroupSection } from '@/v8/booking-payments/booking-group'
 import { canOperateBookings } from '../lib/booking-permissions'
 import { fetchAllPages } from './fetch-all-pages'
 import BookingCalendar, {
@@ -366,6 +369,8 @@ export default function BookingsPage() {
    * v7 は今のまま（引き出し・小窓）で、1画素も変えない。
    */
   const [activeBookingId, setActiveBookingId] = useDetailPanelUrl('booking')
+  /* 返金はオーナー・管理者だけ（B1：スタッフは請求・請求しないまで）。 */
+  const canRefundCharges = canManageRole(useStaffRole())
   const openBookingDetail = (id: string) => withViewTransition(() => setActiveBookingId(id))
   const closeBookingDetail = () => setActiveBookingId(null)
 
@@ -1363,6 +1368,13 @@ export default function BookingsPage() {
               <DetailRow label="お客様からのご希望">
                 {activeBooking.customer_note ?? <span className="text-ink-faint">記入なし</span>}
               </DetailRow>
+              {/* この組（B5・Nx1kq）と お支払い（B1・Ae1W1・fom2A）。口が無い・対象でない予約は出さない。 */}
+              {selectedAccountId ? <div className="mt-3 flex flex-col gap-3">
+                <BookingGroupSection accountId={selectedAccountId} bookingId={activeBooking.id} canOperate={canOperate} />
+                <BookingChargesSection accountId={selectedAccountId} bookingId={activeBooking.id} customerName={activeBooking.friend_name ?? 'お客'}
+                  bookingLabel={`${formatJpDateTime(activeBooking.starts_at)} ${activeBooking.menu_name}`} price={activeBooking.price_at_booking ?? null}
+                  canCharge={canOperate} canRefund={canOperate && canRefundCharges} />
+              </div> : null}
               <p className="mt-3 text-xs">
                 <Link
                   href={`/booking/bookings/detail?id=${encodeURIComponent(activeBooking.id)}`}

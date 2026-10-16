@@ -87,9 +87,15 @@ export function paymentGet(pathname, query, { restaurantTables = [] } = {}) {
   if (pathname === '/api/booking/admin/cancellation-options') return { success: true, data: CANCELLATION_OPTIONS }
   if (pathname === '/api/booking/admin/deposit-rules') return { success: true, data: DEPOSIT_RULE }
   if (/^\/api\/booking\/admin\/menus\/[^/]+\/deposit$/.test(pathname)) return { success: true, data: { ...DEPOSIT_RULE, inherit: false, conditions: { always: false, minPeople: 4, weekdays: [5, 6], timeBand: 'dinner' } } }
-  if (/^\/api\/booking\/admin\/bookings\/[^/]+\/charges$/.test(pathname)) return { success: true, data: { testMode: true, quote: { freeUntil: '2026-11-19T05:00:00.000Z', feeNow: 4200, feeNoShow: 8400, text: '11/19（木）14:00 まで無料／それ以降 料金の 50%（¥4,200）／連絡なしの欠席 100%（¥8,400）', policyAcceptedRequired: true }, charges: [{ id: 'chg-1', booking_id: 'bk-1', line_account_id: 'visual-qa-account', kind: 'cancellation_fee', amount: 4200, status: 'pending', version: 1, actor_staff_id: null, reason: null, test_mode: 1 }] } }
+  if (/^\/api\/booking\/admin\/bookings\/[^/]+\/charges$/.test(pathname)) {
+    const id = pathname.split('/')[5]
+    const quote = { freeUntil: '2026-11-19T05:00:00.000Z', feeNow: 4200, feeNoShow: 8400, text: '24 時間前まで無料・以降 50%・無断 100%', policyAcceptedRequired: true }
+    const charge = (status, extra = {}) => ({ id: `chg-${id}`, booking_id: id, line_account_id: 'visual-qa-account', kind: 'cancellation_fee', amount: 4200, status, version: 1, actor_staff_id: null, reason: null, test_mode: 1, ...extra })
+    const charges = id === 'bk-1' ? [charge('pending')] : id === 'bk-2' ? [charge('succeeded', { actor_staff_id: 'staff-1' })] : []
+    return { success: true, data: { testMode: true, quote, charges } }
+  }
   if (/^\/api\/booking\/admin\/bookings\/[^/]+\/payment-method$/.test(pathname)) return { success: true, data: { brand: 'Visa', last4: '4242', registeredAt: '2026-11-02T01:00:00.000Z' } }
-  if (/^\/api\/booking\/admin\/bookings\/[^/]+\/group$/.test(pathname)) return { success: true, data: { ownerName: '山田 花子', members: [
+  if (/^\/api\/booking\/admin\/bookings\/[^/]+\/group$/.test(pathname)) return pathname.split('/')[5] !== 'bk-3' ? { success: true, data: null } : { success: true, data: { ownerName: '山田 花子', members: [
     { bookingId: 'bk-g1', personName: 'チョコ', menuName: '爪切り', staffName: 'Kenta', startsAt: '2026-10-01T04:30:00.000Z', endsAt: '2026-10-01T04:45:00.000Z', status: 'confirmed' },
     { bookingId: 'bk-g2', personName: 'マロン', menuName: 'トリミング（中型犬）', staffName: '佐々木', startsAt: '2026-10-01T04:00:00.000Z', endsAt: '2026-10-01T05:30:00.000Z', status: 'confirmed' },
   ] } }
