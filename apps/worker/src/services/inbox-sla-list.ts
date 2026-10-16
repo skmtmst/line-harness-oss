@@ -10,7 +10,7 @@ export async function slaChatList(c:Context<Env>) {
  for(const id of ids)await refreshInboxSla(c.env.DB,id);
  const clauses=['f.line_account_id IN(SELECT value FROM json_each(?))',"c.status!='resolved'",'s.sla_enabled=1','c.first_response_at IS NULL','c.sla_due_at IS NOT NULL'];
  const binds:unknown[]=[JSON.stringify(ids)];
- if(c.req.query('slaState')==='overdue'){clauses.push('julianday(c.sla_due_at)<=julianday(?)');binds.push(new Date().toISOString());}
+ if(['overdue','soon'].includes(c.req.query('slaState')??'')){clauses.push(c.req.query('slaState')==='soon'?"julianday(c.sla_due_at)>julianday(?) AND julianday(c.sla_due_at)<=julianday(?,'+15 minutes')":'julianday(c.sla_due_at)<=julianday(?)');binds.push(new Date().toISOString());if(c.req.query('slaState')==='soon')binds.push(new Date().toISOString());}
  if(c.req.query('operatorId')){clauses.push('c.operator_id IS ?');binds.push(c.req.query('operatorId')==='unassigned'?null:c.req.query('operatorId'));}
  if(c.req.query('status')){clauses.push('c.status=?');binds.push(c.req.query('status'));}
  if(c.req.query('q')){clauses.push('instr(lower(f.display_name),lower(?))>0');binds.push(c.req.query('q'));}
@@ -19,8 +19,8 @@ export async function slaChatList(c:Context<Env>) {
  const due=c.req.query('beforeDueAt'),id=c.req.query('beforeId');
  if(due&&id){clauses.push('(julianday(c.sla_due_at)>julianday(?) OR (c.sla_due_at=? AND f.id>?))');binds.push(due,due,id);}
  const limit=Math.min(200,Math.max(1,Number(c.req.query('limit'))||50));
- const rows=(await c.env.DB.prepare(`SELECT c.*,f.display_name,f.picture_url,f.line_account_id ${join} WHERE ${clauses.join(' AND ')} ORDER BY julianday(c.sla_due_at),f.id LIMIT ?`).bind(...binds,limit).all<Record<string,unknown>>()).results;
- const data=await enrichSlaChats(c.env.DB,rows.map(r=>({id:String(r.friend_id),friendId:r.friend_id,friendName:r.display_name,friendPictureUrl:r.picture_url,operatorId:r.operator_id,status:r.status,revision:r.revision,lastMessageAt:r.last_message_at})));
+ const rows=(await c.env.DB.prepare(`SELECT c.*,(SELECT content FROM messages_log WHERE friend_id=c.friend_id ORDER BY created_at DESC LIMIT 1) last_message,f.display_name,f.picture_url,f.line_account_id ${join} WHERE ${clauses.join(' AND ')} ORDER BY julianday(c.sla_due_at),f.id LIMIT ?`).bind(...binds,limit).all<Record<string,unknown>>()).results;
+ const data=await enrichSlaChats(c.env.DB,rows.map(r=>({id:String(r.friend_id),friendId:r.friend_id,friendName:r.display_name,friendPictureUrl:r.picture_url,operatorId:r.operator_id,status:r.status,revision:r.revision,lastMessageAt:r.last_message_at,lastMessage:r.last_message,unread:r.status==='unread',conversationId:r.id})));
  return c.json({success:true,data,total:total?.n??0});
 }
 export async function enrichSlaChats<T extends {id:string;friendId?:unknown}>(db:D1Database,items:T[]) {

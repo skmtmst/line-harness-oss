@@ -7,7 +7,7 @@ import {lineSenders} from './line-senders.js';
 import {broadcastSendPreview} from '../services/gap-send-preview.js';
 import {getBroadcastById} from '@line-crm/db';
 const push=vi.hoisted(()=>vi.fn().mockResolvedValue({}));
-vi.mock('@line-crm/line-sdk',()=>({LineClient:vi.fn().mockImplementation(()=>({pushMessage:push}))}));
+vi.mock('@line-crm/line-sdk',()=>({LineClient:vi.fn().mockImplementation(function(){return {pushMessage:push};})}));
 const {chats}=await import('./chats.js');
 let d:SqliteD1;
 const owner:AuthenticatedStaff={id:'o',name:'管理者',role:'owner',readOnly:false,tenantId:'t'};

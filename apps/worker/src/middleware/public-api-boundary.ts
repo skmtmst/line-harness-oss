@@ -4,6 +4,7 @@
  */
 export function isPublicApiBoundary(method: string, path: string): boolean {
   const normalizedMethod = method.toUpperCase();
+  if(normalizedMethod==='POST' && (path==='/api/ec/events'||path==='/mcp'))return true;
   // フォーム定義の GET は LIFF が認証なしで読む。PUT/DELETE は管理 API。
   if (normalizedMethod === 'GET' && /^\/api\/forms\/[^/]+$/.test(path)) return true;
   // This compatibility URL is a LIFF operation and verifies the customer in

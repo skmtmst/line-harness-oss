@@ -1,3 +1,5 @@
+import {depositEstimate,cancellationCardRequired} from '../services/booking-deposit.js';
+import {assertPassRequirement} from '../services/booking-pass-plans.js';
 import {verifyRoutingToken} from '../services/form-routing.js';
 import {bookingAddons,readAddonSettings} from '../services/booking-addons.js';
 import {menuAudience,readAudienceWrite} from '../services/booking-audience.js';
@@ -114,7 +116,7 @@ const booking = new Hono<Env>();
 booking.use('/api/booking/admin/bookings.csv', outputAuditMiddleware);
 booking.use('/api/booking/*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.ok)await processVisitStampQueue(c.env);});
 
-booking.onError((error,c)=>{if(error instanceof GapError)return c.json({error:error.code},error.status);if(/entitlement_month_change|entitlement_unavailable/.test(String(error)))return c.json({error:String(error).includes('entitlement_month_change')?'entitlement_month_change':'entitlement_unavailable'},409);if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
+booking.onError((error,c)=>{if(error instanceof GapError||error instanceof EntitlementError)return c.json({error:error.code},error.status);if(/entitlement_month_change|entitlement_unavailable/.test(String(error)))return c.json({error:String(error).includes('entitlement_month_change')?'entitlement_month_change':'entitlement_unavailable'},409);if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
 booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{console.error(JSON.stringify({"code":"waitlist_reconcile_failed"}));}}});
 
 // 予約の作成・変更・承認の成功後に、同じ店舗内の重なりを確認する。
@@ -708,8 +710,12 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     waitlist_id?: string;
     formAnswer?: {formId:string;blockId:string;submissionKey:string};
   }>();
-  if(body.recurrence!==undefined)return c.json({error:'recurring_not_allowed'},400);
-  if(body.members!==undefined)return c.json({error:'multi_person_not_available'},400);
+  if((body as Record<string,unknown>).routing_token!==undefined){if(body.routingToken!==undefined&&body.routingToken!==(body as Record<string,unknown>).routing_token)return c.json({error:'routing_token_invalid'},400);body.routingToken=String((body as Record<string,unknown>).routing_token);}
+  if(body.recurrence!==undefined||body.members!==undefined){
+    const friend=await resolveFriendId(c,callerLineUserId,accountId);if(!friend)return c.json({error:'friend_not_found'},404);
+    const {createBulkBooking}=await import('../services/booking-bulk.js');return createBulkBooking(c,accountId,friend,body as Record<string,unknown>);
+  }
+  try { await assertPassRequirement(c.env.DB,accountId,body.menu_id,body.entitlement_id); } catch(e) { if(e instanceof EntitlementError)return c.json({error:e.code},e.status);throw e; }
   if (body.entitlement_id !== undefined && (typeof body.entitlement_id !== 'string' || !body.entitlement_id)) return inputError(c,{error:'invalid_entitlement_id'},400,['entitlement_id']);
   if (body.payment_method !== undefined && !['onsite','online'].includes(body.payment_method)) return inputError(c,{error:'invalid_payment_method'},400,['payment_method']);
   if (body.party_size !== undefined && body.party_size !== 1) return inputError(c, { error: 'unsupported_party_size' }, 422, ["party_size"]);
@@ -838,9 +844,11 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   if(cancellation.enabled && !body.entitlement_id) {
     if(body.policyAccepted!==true) return c.json({error:'policy_acceptance_required'},400);
     if(body.policyVersion!==cancellation.version)return c.json({error:'policy_changed'},409);
+    if(await cancellationCardRequired(c.env.DB,accountId,friendId)){
     try {await requireCancellationTestConnection(c.env.DB,accountId);} catch {return c.json({error:'payment_not_connected'},409);}
     if(typeof body.setupIntentId!=='string' || !await c.env.DB.prepare("SELECT id FROM booking_payment_methods WHERE setup_id=? AND friend_id=? AND line_account_id=? AND status='ready' AND test_mode=1")
       .bind(body.setupIntentId,friendId,accountId).first()) return c.json({error:'card_not_registered'},409);
+    }
   }
 
   if(routing?.target.meetingMode&&body.meeting_mode&&routing.target.meetingMode!==body.meeting_mode)return c.json({error:'routing_token_invalid'},400);
@@ -895,6 +903,8 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   } else if(body.payment_method && body.payment_method!==paymentConfig.mode) {
     return inputError(c,{error:'payment_method_not_allowed'},400,['payment_method']);
   }
+  const deposit=await depositEstimate(c.env.DB,accountId,body.menu_id,menuRow.price,startsAt.toISOString(),1,await getAccountTimeZone(c.env.DB,accountId));
+  if(deposit.amount>0&&!body.entitlement_id)return c.json({error:'deposit_collection_not_available'},409);
   const requiresOnlinePayment = paymentConfig.mode === 'online' && menuRow.price > 0;
   const autoConfirm = adminSettings?.approvalMode === 'automatic' && !requiresOnlinePayment && !formRequiresApproval;
   const initialStatus = (autoConfirm ? 'confirmed' : 'requested') satisfies BookingStatus;
@@ -1005,6 +1015,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
       bookingInsert, bookingId, lineAccountId: accountId, menuId: body.menu_id,
       additionalStatements: [
+        c.env.DB.prepare("UPDATE bookings SET booking_payment_method_id=(SELECT id FROM booking_payment_methods WHERE setup_id=? AND friend_id=? AND line_account_id=? AND status='ready' AND test_mode=1) WHERE id=?").bind(body.setupIntentId??null,friendId,accountId,bookingId),
         ...addons.map(addon=>c.env.DB.prepare('INSERT INTO booking_addons(booking_id,addon_menu_id,duration_min,price_at_booking) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM bookings WHERE id=?)').bind(bookingId,addon.id,addon.duration_minutes,addon.base_price,bookingId)),
         ...(body.entitlement_id ? [entitlementUseStatement(c.env.DB,bookingId,body.entitlement_id,startsAt.toISOString(),await getAccountTimeZone(c.env.DB,accountId))] : []),
         ...(!body.entitlement_id && paymentConfig.mode !== 'none' ? [c.env.DB.prepare(`INSERT INTO booking_payment_choices(booking_id,line_account_id,mode,provider,hold_minutes)
@@ -3550,7 +3561,7 @@ booking.get('/api/booking/admin/waitlist', async (c) => {
   }
   const rows = await c.env.DB
     .prepare(
-      `SELECT w.*, m.name AS menu_name, s.display_name AS staff_name,
+      `SELECT w.*, CASE WHEN w.status='waiting' THEN (SELECT count(*) FROM booking_waitlist older WHERE older.line_account_id=w.line_account_id AND older.staff_id=w.staff_id AND julianday(older.starts_at)=julianday(w.starts_at) AND older.status='waiting' AND (older.created_at<w.created_at OR older.created_at=w.created_at AND older.id<=w.id)) ELSE NULL END AS position, m.name AS menu_name, s.display_name AS staff_name,
               COALESCE(f.display_name, bc.display_name) AS customer_name
          FROM booking_waitlist w
          INNER JOIN menus m ON m.id = w.menu_id
@@ -3729,7 +3740,7 @@ booking.get('/api/liff/booking/waitlist', async (c) => {
   await finishExpiredWaitlists(c.env.DB,caller.accountId);
   const rows = await c.env.DB
     .prepare(
-      `SELECT w.id, w.staff_id, w.menu_id, w.starts_at, w.status,
+      `SELECT w.id, w.staff_id, w.menu_id, w.starts_at, w.status,CASE WHEN w.status='waiting' THEN (SELECT count(*) FROM booking_waitlist older WHERE older.line_account_id=w.line_account_id AND older.staff_id=w.staff_id AND julianday(older.starts_at)=julianday(w.starts_at) AND older.status='waiting' AND (older.created_at<w.created_at OR older.created_at=w.created_at AND older.id<=w.id)) ELSE NULL END AS position,
               w.hold_minutes, w.invited_at, w.hold_expires_at, w.created_at,w.ends_at,
               m.name AS menu_name, s.display_name AS staff_name
          FROM booking_waitlist w

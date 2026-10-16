@@ -10,7 +10,7 @@ import {bookingCancellationQuote} from '../services/booking-cancellation.js';
 export const bookingSeries=new Hono<Env>();
 bookingSeries.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'series_unavailable'},e instanceof GapError?e.status:503));
 async function seriesPermission(c:Context<Env>,next:()=>Promise<void>){
- const staff=c.get('staff'),view=['GET','HEAD'].includes(c.req.method)||c.req.method==='POST'&&c.req.path.endsWith('/preview');
+ const staff=c.get('staff'),view=['GET','HEAD'].includes(c.req.method)||c.req.method==='POST'&&(c.req.path.endsWith('/preview')||c.req.path.endsWith('/impact'));
  if(!staff||!(['owner','admin'].includes(staff.role)||staff.permissionKeys?.includes('/booking/bookings')||view&&staff.viewPermissionKeys?.includes('/booking/bookings')))throw new GapError('forbidden',403);
  await next();
 }
@@ -53,7 +53,7 @@ async function selection(c:Context<Env>,a:string,b:Record<string,unknown>){
  if(!['this','following'].includes(String(b.scope))||typeof b.fromBookingId!=='string')throw new GapError('invalid_scope');
  const series=await c.env.DB.prepare('SELECT version FROM booking_series WHERE id=? AND line_account_id=?').bind(id,a).first<{version:number}>();if(!series)throw new GapError('not_found',404);if(series.version!==version)throw new GapError('version_conflict',409);
  const from=await c.env.DB.prepare('SELECT series_index FROM bookings WHERE id=? AND series_id=? AND line_account_id=?').bind(b.fromBookingId,id,a).first<{series_index:number}>();if(!from)throw new GapError('not_found',404);
- const rows=(await c.env.DB.prepare(`SELECT * FROM bookings WHERE series_id=? AND line_account_id=? AND series_index ${b.scope==='this'?'=':'>='} ? AND status IN('confirmed','requested') ORDER BY series_index`).bind(id,a,from.series_index).all<{id:string;staff_id:string;menu_id:string;friend_id:string;starts_at:string;ends_at:string;block_ends_at:string;lock_version:number}>()).results;
+ const rows=(await c.env.DB.prepare(`SELECT * FROM bookings WHERE series_id=? AND line_account_id=? AND series_index ${b.scope==='this'?'=':'>='} ? AND status IN('confirmed','requested') ORDER BY series_index`).bind(id,a,from.series_index).all<{id:string;staff_id:string;menu_id:string;friend_id:string;starts_at:string;ends_at:string;block_ends_at:string;price_at_booking:number;lock_version:number}>()).results;
  return {id,version,rows};
 }
 bookingSeries.post('/api/booking/admin/series/:id/cancel',async(c)=>{
@@ -83,4 +83,20 @@ bookingSeries.patch('/api/booking/admin/series/:id',async(c)=>{
   planned.forEach((p,index)=>{if(results[index+2].meta.changes)changed.push(p.id);else conflicts.push(p.id);});
  }catch(e){if(/CHECK constraint/.test(String(e)))throw new GapError('version_conflict',409);throw e;}
  return c.json({success:true,data:{changed,conflicts,version:s.version+1}});
+});
+
+bookingSeries.post('/api/booking/admin/series/:id/impact',async c=>{
+ const a=await gapAccount(c),b=await gapBody(c);
+ if(b.expectedVersion===undefined){const row=await c.env.DB.prepare('SELECT version FROM booking_series WHERE id=? AND line_account_id=?').bind(c.req.param('id'),a).first<{version:number}>();if(!row)throw new GapError('not_found',404);b.expectedVersion=row.version;}
+ const s=await selection(c,a,b),change=b.change as {startsAt?:string}|undefined;
+ if(change&&(!change.startsAt||!Number.isFinite(Date.parse(change.startsAt))))throw new GapError('invalid_change');
+ const delta=change?.startsAt&&s.rows.length?Date.parse(change.startsAt)-Date.parse(s.rows[0].starts_at):null;
+ const items=[];
+ for(const row of s.rows){
+  const after=delta===null?null:new Date(Date.parse(row.starts_at)+delta).toISOString();
+  const preview=after?await previewSeries(c.env.DB,a,{friendId:row.friend_id,menuId:row.menu_id,staffId:row.staff_id,startsAt:after,rule:{freq:'weekly',count:2}},c.env,row.id):null;
+  const fee=after?null:await bookingCancellationQuote(c.env.DB,row.id,a);
+  items.push({bookingId:row.id,startsAt:row.starts_at,after,blocked:preview?!preview[0].available:false,fee:fee?{amount:fee.feeNow,percent:row.price_at_booking?Math.round(100*fee.feeNow/row.price_at_booking):0,reason:fee.text}:null});
+ }
+ return c.json({success:true,data:{items}});
 });

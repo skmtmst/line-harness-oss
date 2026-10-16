@@ -808,7 +808,7 @@ chats.get('/api/chats/outbound-failures', requireRole('owner', 'admin', 'staff')
 });
 
 chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
-  if(c.req.query('sort')==='sla_due'||c.req.query('slaState')==='overdue') return slaChatList(c);
+  if(c.req.query('sort')==='sla_due'||['overdue','soon'].includes(c.req.query('slaState')??'')) return slaChatList(c);
   try {
     const staff = c.get('staff');
     const status = c.req.query('status') ?? undefined;

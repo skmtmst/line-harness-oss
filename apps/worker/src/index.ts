@@ -1,3 +1,13 @@
+import {deliveryPurposePreview} from './routes/delivery-purpose-preview.js';
+import {mcpRpc} from './routes/mcp-rpc.js';
+import {customerSegments} from './routes/customer-segments.js';
+import {memberRanks} from './routes/member-ranks.js';
+import {storeComparison} from './routes/store-comparison.js';
+import {ecAutoLine} from './routes/ec-auto-line.js';
+import {bookingPassPlans} from './routes/booking-pass-plans.js';
+import {bookingGap3} from './routes/booking-gap3.js';
+import {aiAnswerLogs} from './routes/ai-answer-logs.js';
+import {mcpConnections} from './routes/mcp-connections.js';
 import {sweepOperatorPush,retryOperatorPush} from './services/operator-push.js';
 import {operatorPush} from './routes/operator-push.js';
 import {aiDrafts} from './routes/ai-drafts.js';
@@ -414,6 +424,15 @@ app.route('/', templates);
 app.route('/', inboxSla);
 app.route('/', lineSenders);
 app.route('/', aiDrafts);
+app.route('/', customerSegments);
+app.route('/', memberRanks);
+app.route('/', storeComparison);
+app.route('/', ecAutoLine);
+app.route('/', bookingPassPlans);
+app.route('/', aiAnswerLogs);
+app.route('/', deliveryPurposePreview);
+app.route('/', mcpConnections);
+app.route('/', mcpRpc);
 app.route('/', operatorPush);
 app.route('/', chats);
 app.route('/', chatMessages);
@@ -451,6 +470,7 @@ app.route('/', trafficPools);
 app.route('/', bookingSeries);
 app.route('/', booking);
 app.route('/', bookingCalendarSettings);
+app.route('/', bookingGap3);
 app.route('/', bookingCancellation);
 app.route('/', bookingPayments);
 app.route('/', bookingPaymentAdmin);
@@ -1805,7 +1825,29 @@ async function scheduled(
   // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
   const lane = scheduledLane(event.cron);
   if (lane === 'restaurantMinute') {
-    await runIsolatedScheduledJobs([{ name: 'restaurant events', run: () => processRestaurantEvents(env) },{name:'inbox first response deadlines',run:async()=>{const {processInboxSla}=await import('./services/inbox-sla.js');await processInboxSla(env.DB,new Date(event.scheduledTime));}}]);
+    await runIsolatedScheduledJobs([
+      {name:'restaurant events',run:()=>processRestaurantEvents(env)},
+      {name:'customer segments and ranks',run:async()=>{
+        const now=new Date(event.scheduledTime);
+        if(new Date(now.getTime()+9*3600000).getUTCHours()<4)return;
+        const {processCustomerSegments}=await import('./services/customer-segments.js');
+        await processCustomerSegments(env.DB,now);
+      }},
+      {name:'store comparison snapshots',run:async()=>{
+        const now=new Date(event.scheduledTime),jst=new Date(now.getTime()+9*3600000);
+        if(jst.getUTCHours()*60+jst.getUTCMinutes()<270)return;
+        const {processStoreComparison}=await import('./services/store-comparison.js');
+        await processStoreComparison(env.DB,now);
+      }},
+      {name:'EC automatic LINE simulation',run:async()=>{
+        const {processAutoLineMock}=await import('./services/ec-auto-line.js');
+        await processAutoLineMock(env.DB,new Date(event.scheduledTime));
+      }},
+      {name:'inbox first response deadlines',run:async()=>{
+        const {processInboxSla}=await import('./services/inbox-sla.js');
+        await processInboxSla(env.DB,new Date(event.scheduledTime));
+      }},
+    ]);
     return;
   }
   if (lane === 'frequentHeavy') {

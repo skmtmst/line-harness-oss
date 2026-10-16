@@ -1,3 +1,4 @@
+import {assignInbox} from '../services/inbox-assignment.js';
 import { webhookDemoTargets } from '../services/webhook-demo-targets.js';
 import { parseRestaurantConfirmationPostback, respondToRestaurantConfirmation } from '../services/restaurant-confirmations.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
@@ -425,6 +426,7 @@ async function handleStoppedTenantEvent(
   });
   if (!recorded.inserted || recorded.isUnsent) return;
   await upsertChatOnMessage(db, friend.id, toJstString(new Date(event.timestamp)));
+  if(friend.line_account_id) await assignInbox(db,friend.line_account_id,friend.id);
   await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
     friendId: friend.id,
     eventType: 'message_received',
@@ -1532,6 +1534,7 @@ async function handleEvent(
     // 友だち」をバッジ・未対応一覧から永久に落としてしまう。
     if (!nonTextMatched) {
       await replay('incoming_chat',()=>upsertChatOnMessage(execution?.mutationDb('incoming_chat') ?? db, friend.id, toJstString(new Date(event.timestamp))));
+      if(friend.line_account_id) await assignInbox(db,friend.line_account_id,friend.id);
       if(operatorMailEnv&&lineAccountId)await replay('operator_push',async()=>{
         const chat=await db.prepare('SELECT id,operator_id FROM chats WHERE friend_id=?').bind(friend.id).first<{id:string;operator_id:string|null}>();if(!chat)return;
         const {dispatchOperatorEvent}=await import('../services/operator-notification-dispatch.js');
@@ -1664,6 +1667,7 @@ async function handleEvent(
     // auto_replies にマッチしなかった = 自発メッセージ → unread にする
     if (!matched) {
       await replay('incoming_chat',()=>upsertChatOnMessage(execution?.mutationDb('incoming_chat') ?? db, friend.id, toJstString(new Date(event.timestamp))));
+      if(friend.line_account_id) await assignInbox(db,friend.line_account_id,friend.id);
       if(operatorMailEnv&&lineAccountId)await replay('operator_push',async()=>{
         const chat=await db.prepare('SELECT id,operator_id FROM chats WHERE friend_id=?').bind(friend.id).first<{id:string;operator_id:string|null}>();if(!chat)return;
         const {dispatchOperatorEvent}=await import('../services/operator-notification-dispatch.js');

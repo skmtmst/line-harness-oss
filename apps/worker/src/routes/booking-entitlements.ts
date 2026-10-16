@@ -1,3 +1,4 @@
+import {passUnusable} from '../services/booking-pass-plans.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -14,7 +15,7 @@ bookingEntitlements.onError((error,c)=>{
 });
 bookingEntitlements.use('/api/booking/admin/entitlements/*', requireRole('owner','admin','staff'),requirePermission('/booking/bookings'),async(c,next)=>{
   c.header('Cache-Control','no-store');
-  if(c.req.method!=='GET'&&c.get('staff')?.readOnly)return c.json({error:'forbidden'},403);
+  if(c.req.method!=='GET'&&(c.get('staff')?.readOnly||c.get('impersonation')))return c.json({error:'forbidden'},403);
   const account=c.req.query('account_id');
   if(!account)return inputError(c,{error:'missing_account_id'},400,['account_id']);
   if(!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[account]))return c.json({error:'not_found'},404);
@@ -57,10 +58,10 @@ bookingEntitlements.get('/api/liff/booking/entitlements',async c=>{
   const menu=c.req.query('menu_id');
   const rows=await entitlementViews(c.env.DB,account,friend,at);
   // 管理側の理由や操作担当者はお客さまへ出さない。
-  return c.json({success:true,data:rows.filter(e=>e.status==='active'&&(!menu||!e.menu_id||e.menu_id===menu)).map(e=>({
+  const data=await Promise.all(rows.filter(e=>e.status==='active').map(async e=>{const unusableReason=await passUnusable(c.env.DB,e,account,menu,at);return ({
     id:e.id,name:e.name,kind:e.kind,menuId:e.menu_id,remaining:e.remaining,monthlyLimit:e.monthly_limit,
     monthAllowance:e.monthAllowance,monthUsed:e.monthUsed,monthRemaining:e.monthRemaining,validFrom:e.valid_from,expiresAt:e.expires_at,
     periodStart:e.periodStart,periodEnd:e.periodEnd,
-    usable:Date.parse(at)>=Date.parse(e.valid_from)&&Date.parse(at)<Date.parse(e.expires_at)&&(e.kind==='ticket'?e.remaining!>0:e.monthRemaining!>0),
-  }))});
+    usable:!unusableReason,unusableReason,
+  });}));return c.json({success:true,data});
 });

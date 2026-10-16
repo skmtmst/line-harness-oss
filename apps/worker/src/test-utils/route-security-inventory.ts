@@ -15,6 +15,15 @@ export function inspectRouteSource(file: string, source: string, importedConstan
   const routers = new Set<string>();
   const registrations: ts.CallExpression[] = [];
   function visit(node: ts.Node): void {
+    // Imported registrars accept the mounted Hono as a parameter instead of
+    // constructing a second router. Only collect them when mounted() proves
+    // that the registrar was called with a router in the live mount tree.
+    if (ts.isFunctionDeclaration(node)) {
+      for (const parameter of node.parameters) {
+        if (ts.isIdentifier(parameter.name) && parameter.type
+          && /^Hono(?:<|$)/.test(parameter.type.getText(ast))) routers.add(parameter.name.text);
+      }
+    }
     if (ts.isFunctionDeclaration(node) && node.name && ts.isSourceFile(node.parent)) locals.set(node.name.text, node);
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const topLevel = ts.isVariableDeclarationList(node.parent) && ts.isVariableStatement(node.parent.parent)
@@ -151,6 +160,23 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
         ? exportedRouters(sources.get(childFile) ?? '').get(importedRouter.exported) : mount.mountedRouter;
       if (!childRouter) throw new Error(`Unresolved mounted router: ${file}:${mount.mountedRouter}`);
       own.push(...mounted(childFile, childRouter, prefix + (mount.path === '/' ? '' : mount.path.replace(/\/$/, '')), nextAncestors));
+    }
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    for (const statement of ast.statements) {
+      if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression)) continue;
+      const call = statement.expression;
+      if (!ts.isIdentifier(call.expression) || call.arguments[0]?.getText(ast) !== router) continue;
+      const registrar = imported.get(call.expression.text);
+      if (!registrar) continue;
+      const childFile = resolve(dirname(file), registrar.module.replace(/\.js$/, '.ts'));
+      const childSource = sources.get(childFile);
+      if (!childSource) continue;
+      const childAst = ts.createSourceFile(childFile, childSource, ts.ScriptTarget.Latest, true);
+      const fn = childAst.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === registrar.exported);
+      if (!fn || !ts.isFunctionDeclaration(fn)) continue;
+      const parameter = fn.parameters[0];
+      if (!parameter?.type || !/^Hono(?:<|$)/.test(parameter.type.getText(childAst))) continue;
+      own.push(...mounted(childFile, parameter.name.getText(childAst), prefix, nextAncestors));
     }
     return own;
   }

@@ -15,7 +15,9 @@ export async function bookingAddons(db:D1Database,a:string,menuId:string,ids:unk
 }
 export async function readAddonSettings(db:D1Database,a:string,b:Record<string,unknown>){
  const sets:string[]=[],values:unknown[]=[];
- if(b.maxPartySize!==undefined){if(!Number.isInteger(b.maxPartySize)||Number(b.maxPartySize)!==1)throw new GapError('multi_person_not_available');sets.push('max_party_size = ?');values.push(b.maxPartySize);}
+ if(b.recurring!==undefined){const r=b.recurring as {enabled:boolean;freqs:string[];maxCount:number};if(!r||typeof r.enabled!=='boolean'||!Array.isArray(r.freqs)||!r.freqs.length||r.freqs.some(x=>!['weekly','biweekly','monthly_nth'].includes(x))||!Number.isInteger(r.maxCount)||r.maxCount<2||r.maxCount>12)throw new GapError('invalid_recurring');sets.push('customer_recurring_enabled = ?','recurring_freqs_json = ?','recurring_max_count = ?');values.push(r.enabled?1:0,JSON.stringify(r.freqs),r.maxCount);}
+
+ if(b.maxPartySize!==undefined){if(!Number.isInteger(b.maxPartySize)||(Number(b.maxPartySize)<1||Number(b.maxPartySize)>6))throw new GapError('invalid_max_party_size');sets.push('max_party_size = ?');values.push(b.maxPartySize);}
  if(b.addonOnly!==undefined){if(typeof b.addonOnly!=='boolean')throw new GapError('invalid_addon_only');sets.push('addon_only = ?');values.push(b.addonOnly?1:0);}
  if(b.addonMenuIds!==undefined){if(!Array.isArray(b.addonMenuIds)||b.addonMenuIds.length>100||b.addonMenuIds.some(x=>typeof x!=='string')||new Set(b.addonMenuIds).size!==b.addonMenuIds.length)throw new GapError('invalid_addon_menus');
  const ids=b.addonMenuIds as string[];const rows=(await db.prepare("SELECT id FROM menus WHERE line_account_id=? AND deleted_at IS NULL AND price_mode='fixed' AND id IN(SELECT value FROM json_each(?))").bind(a,JSON.stringify(ids)).all()).results;if(rows.length!==ids.length)throw new GapError('invalid_addon_menus');sets.push('addon_menu_ids_json = ?');values.push(JSON.stringify(ids));}

@@ -28,10 +28,10 @@ export function recurrenceDates(startsAt:string,rule:BookingRecurrence,tz:string
  if(out.length<2||(!rule.count&&out.length===52&&rule.until!<tzDateStr(tz,new Date(out[51]))))throw new GapError('invalid_recurrence_end');
  return out;
 }
-export async function previewSeries(db:D1Database,account:string,input:SeriesInput,env:Record<string,unknown>,excludeBookingId?:string):Promise<SeriesOccurrence[]>{
+export async function previewSeries(db:D1Database,account:string,input:SeriesInput,env:Record<string,unknown>,excludeBookingId?:string,customerFacing=false):Promise<SeriesOccurrence[]>{
  const tz=await getAccountTimeZone(db,account),dates=recurrenceDates(input.startsAt,input.rule,tz);
  if(dates.some(d=>Date.parse(d)<Date.now()))throw new GapError('past_datetime');
- const availability=await getAvailability(db,{lineAccountId:account,menuId:input.menuId,staffId:input.staffId??undefined,from:tzDateStr(tz,new Date(dates[0])),to:tzDateStr(tz,new Date(dates.at(-1)!)),now:new Date(),minLeadTimeMinutes:0,excludeBookingId,forceCalendarRefresh:true,googleCredentials:{email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL as string,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY as string}});
+ const availability=await getAvailability(db,{lineAccountId:account,menuId:input.menuId,staffId:input.staffId??undefined,from:tzDateStr(tz,new Date(dates[0])),to:tzDateStr(tz,new Date(dates.at(-1)!)),now:new Date(),minLeadTimeMinutes:customerFacing?60:0,applyStoreRules:customerFacing,excludeBookingId,forceCalendarRefresh:true,googleCredentials:{email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL as string,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY as string}});
  const actual=new Set((await db.prepare('SELECT id FROM staff WHERE line_account_id=? AND is_active=1 AND deleted_at IS NULL AND is_designation_optional=0').bind(account).all<{id:string}>()).results.map(r=>r.id));
  const out:SeriesOccurrence[]=[];
  for(let index=0;index<dates.length;index++){
@@ -44,16 +44,17 @@ export async function previewSeries(db:D1Database,account:string,input:SeriesInp
 }
 export function assertChanged(db:D1Database){return db.prepare('INSERT INTO booking_batch_assertions(id,ok) VALUES(?,changes())').bind(crypto.randomUUID());}
 export function clearAssertions(db:D1Database){return db.prepare('DELETE FROM booking_batch_assertions');}
-export async function seriesInsert(db:D1Database,a:string,friend:string,menu:string,staff:string,start:string,id:string,series:string,index:number,actor:string){
+export async function seriesInsert(db:D1Database,a:string,friend:string,menu:string,staff:string,start:string,id:string,series:string|null,index:number,actor:string,options:{status?:'confirmed'|'requested';groupId?:string;label?:string;addonDuration?:number;extraPrice?:number;policy?:unknown;meetingMode?:string}={}){
  const m=await db.prepare(`SELECT m.*,COALESCE(sm.override_duration_minutes,m.duration_minutes) dur,COALESCE(sm.override_price,m.base_price) price FROM menus m JOIN staff_menus sm ON sm.menu_id=m.id AND sm.staff_id=? AND sm.is_offered=1 JOIN staff s ON s.id=sm.staff_id AND s.line_account_id=m.line_account_id AND s.is_active=1 AND s.deleted_at IS NULL WHERE m.id=? AND m.line_account_id=? AND m.is_active=1 AND m.deleted_at IS NULL`).bind(staff,menu,a).first<{dur:number;buffer_after_minutes:number;price:number;version:number}>();
  if(!m)throw new GapError('menu_not_offered');
+ m.dur+=options.addonDuration??0;m.price+=options.extraPrice??0;
  const end=new Date(Date.parse(start)+m.dur*60000).toISOString(),block=new Date(Date.parse(end)+m.buffer_after_minutes*60000).toISOString(),cap=await getStoreCapacitySnapshot(db,a,new Date(start),new Date(block));
  // 各回は既存の資源/店の定員/本人の上限と同じSQLを通る。0件ならbatch全体を戻す。
- const insert=db.prepare(`INSERT INTO bookings(id,line_account_id,friend_id,menu_id,staff_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at,decided_at,decided_by_staff_id,series_id,series_index,menu_version_number,menu_snapshot_json)
- SELECT ?,?,?,?,?,?,?,?,'confirmed',?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM menus WHERE id=? AND version=? AND is_active=1)
+ const insert=db.prepare(`INSERT INTO bookings(id,line_account_id,friend_id,menu_id,staff_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at,decided_at,decided_by_staff_id,series_id,series_index,menu_version_number,menu_snapshot_json,group_id,group_index,person_label,policy_snapshot_json,meeting_mode)
+ SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM menus WHERE id=? AND version=? AND is_active=1)
  AND NOT EXISTS(SELECT 1 FROM bookings WHERE staff_id=? AND status IN('confirmed','requested') AND julianday(starts_at)<julianday(?) AND julianday(block_ends_at)>julianday(?))
  ${STORE_CAPACITY_GUARD_SQL} ${STORE_SETTINGS_VERSION_GUARD_SQL} ${BOOKING_RESOURCE_CAPACITY_GUARD_SQL} ${BOOKING_PERSON_LIMIT_GUARD_SQL}`)
- .bind(id,a,friend,menu,staff,start,end,block,m.price,new Date().toISOString(),new Date().toISOString(),actor,series,index,m.version,JSON.stringify(m),menu,m.version,staff,block,start,JSON.stringify(cap.windows),a,a,a,cap.settingsVersion,...bookingResourceGuardBindings({menuId:menu,lineAccountId:a,startsAt:start,blockEndsAt:block}),...bookingPersonLimitBindings(a,friend,null));
+ .bind(id,a,friend,menu,staff,start,end,block,options.status??'confirmed',m.price,new Date().toISOString(),options.status==='requested'?null:new Date().toISOString(),actor,series,index,m.version,JSON.stringify(m),options.groupId??null,options.groupId?index:null,options.label??null,options.policy?JSON.stringify(options.policy):null,options.meetingMode??'in_person',menu,m.version,staff,block,start,JSON.stringify(cap.windows),a,a,a,cap.settingsVersion,...bookingResourceGuardBindings({menuId:menu,lineAccountId:a,startsAt:start,blockEndsAt:block}),...bookingPersonLimitBindings(a,friend,null));
  const snapshot=db.prepare(`INSERT INTO booking_resource_consumptions(booking_id,line_account_id,resource_id,quantity,snapshot_source) SELECT ?,?,resource_id,quantity,'booking' FROM booking_menu_resources WHERE menu_id=?`).bind(id,a,menu);
  return [insert,assertChanged(db),snapshot];
 }

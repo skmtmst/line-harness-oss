@@ -40,6 +40,7 @@ async function request(path: string, method = 'GET', body?: unknown) {
     {
       DB: sql.db,
       RESTAURANT_TEST_ENABLED: 'true',
+      DEPLOY_ENV: 'test',
       IMAGES: { head: vi.fn(), get: vi.fn(), put: vi.fn(), delete: vi.fn() },
     } as unknown as Env['Bindings'],
   );

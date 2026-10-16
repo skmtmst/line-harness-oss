@@ -48,3 +48,11 @@ describe('security route inventory', () => {
     ]);
   });
 });
+
+it('S07 inventories typed Hono registrar parameters and their guards',()=>{
+ const source=`export function register(app: Hono<Env>, visible: MiddlewareHandler<Env>) {
+  app.get('/api/derived/:id', visible, c=>c.json({}));
+  app.put('/api/derived/:id', requireRole('owner'), visible, c=>c.json({}));
+ }`;
+ expect(inspectRouteSource('registrar.ts',source).map(r=>[r.router,r.method,r.path])).toEqual([['app','GET','/api/derived/:id'],['app','PUT','/api/derived/:id']]);
+});

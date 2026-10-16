@@ -18,8 +18,8 @@ export function seedGapBooking(d:SqliteD1,id='bk',status='confirmed',start='2026
  d.raw.prepare(`INSERT INTO bookings(id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at,decided_at)
  VALUES(?,'a','f','bs','menu',?,?,?,?,8400,'2026-10-16T00:00:00Z','2026-10-16T00:00:00Z')`).run(id,start,new Date(Date.parse(start)+3600000).toISOString(),new Date(Date.parse(start)+3600000).toISOString(),status);
 }
-export function gapApp(d:SqliteD1,routes:Hono<Env>[],staff=gapOwner,im=false){
- const a=new Hono<Env>();a.use('*',async(c,next)=>{c.env={DB:d.db,STRIPE_TEST_WEBHOOK_SECRET:'test-webhook-secret'} as Env['Bindings'];c.set('staff',staff);if(im)c.set('impersonation',{id:'im',tenantId:'t',mode:'write',piiRevealed:true,startedAt:'2026-10-16'});await next();});for(const r of routes)a.route('/',r);return a;
+export function gapApp(d:SqliteD1,routes:Hono<Env>[],staff=gapOwner,im=false,bindings:Partial<Env['Bindings']>={}){
+ const a=new Hono<Env>();a.use('*',async(c,next)=>{c.env={DB:d.db,STRIPE_TEST_WEBHOOK_SECRET:'test-webhook-secret',...bindings} as Env['Bindings'];c.set('staff',staff);if(im)c.set('impersonation',{id:'im',tenantId:'t',mode:'write',piiRevealed:true,startedAt:'2026-10-16'});await next();});for(const r of routes)a.route('/',r);return a;
 }
 export async function gapCall(a:Hono<Env>,path:string,method='GET',body?:unknown,key=crypto.randomUUID()):Promise<Response> {
  return a.request(path,{method,headers:{'Content-Type':'application/json','Idempotency-Key':key},...(body!==undefined?{body:JSON.stringify(body)}:{})});

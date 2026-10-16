@@ -37,6 +37,8 @@ export const STEP_UP_PURPOSES = [
   'broadcast.approval',
   'webhook.api_token',
   'webhook.secret',
+  'ai.settings',
+  'mcp.connection',
 ] as const;
 export type StepUpPurpose = (typeof STEP_UP_PURPOSES)[number];
 

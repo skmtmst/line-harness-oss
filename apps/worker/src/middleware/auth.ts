@@ -289,11 +289,18 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
 ];
 
-export function gap2ReadOperation(method:string,path:string){return method==='POST'&&(/^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)||/^\/api\/chats\/[^/]+\/ai\/summary$/.test(path)||path==='/api/booking/admin/series/preview');}
+export function gap2ReadOperation(method:string,path:string){return method==='POST'&&(/^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)||/^\/api\/chats\/[^/]+\/ai\/summary$/.test(path)||path==='/api/booking/admin/series/preview'||path==='/api/member-ranks/preview'||path==='/api/delivery-purposes/preview'||/^\/api\/booking\/admin\/series\/[^/]+\/impact$/.test(path));}
 function gap2SelfPreference(method:string,path:string){return (method==='POST'&&/^\/api\/me\/push\/(subscriptions|test)$/.test(path))||(method==='PUT'&&path==='/api/me/push/preferences')||(method==='DELETE'&&/^\/api\/me\/push\/subscriptions\/[^/]+$/.test(path));}
 export function permissionForApiPath(path: string): string | null {
+  if(/^\/api\/friends\/[^/]+\/member-rank$/.test(path))return '/mileage';
+  if(path.startsWith('/api/analytics/customer-segments'))return '/analytics';
+  if(path.startsWith('/api/inbox/routing'))return '/chats';
+  if(path.startsWith('/api/delivery-purposes'))return '/broadcasts';
+  if(path.startsWith('/api/member-ranks'))return '/mileage';
+  if(path.startsWith('/api/ec/auto-line'))return '/ec-commerce';
+  if(path.startsWith('/api/ai-answer-logs'))return '/auto-replies';
   if(path.startsWith('/api/qa-entries')||path.startsWith('/api/ai-settings'))return '/auto-replies';
-  if (/^\/api\/line-accounts\/[^/]+\/senders(?:\/|$)/.test(path)) return '/chats';
+  if (/^\/api\/line-accounts\/[^/]+\/(?:senders|sender-icons)(?:\/|$)/.test(path)) return '/chats';
   const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
   if (override) return override[1];
   return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
@@ -313,6 +320,7 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['POST', '/api/auth/api-key'],
   ['DELETE', '/api/auth/api-key'],
   ['GET', '/api/auth/session'],
+  ['PUT', '/api/me/presence'],
   // These routes derive the target exclusively from the authenticated principal.
   ['GET', '/api/auth/two-factor/self'],
   ['POST', '/api/auth/two-factor/recovery'],
