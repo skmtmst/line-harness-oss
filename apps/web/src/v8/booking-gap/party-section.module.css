@@ -1,4 +1,4 @@
 .head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--polish-space-field); }
-.title { margin: 0; font-size: var(--text-body); font-weight: 700; color: var(--color-ink); }
+.title { margin: var(--tpl-layout-zero); font-size: var(--text-body); font-weight: 700; color: var(--color-ink); }
 .owner { font-size: var(--text-caption); color: var(--color-ink-secondary); }
 .actions { display: flex; justify-content: flex-end; gap: var(--polish-space-field); }

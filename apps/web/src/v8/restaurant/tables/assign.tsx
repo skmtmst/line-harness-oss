@@ -1,5 +1,7 @@
 'use client'
 
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
+
 import { useState } from 'react'
 import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -41,6 +43,7 @@ export default function TablesAssignBoard({ ctx, canEdit }: { ctx: RestaurantV8C
 
   return (
     <div className={styles.assignStack}>
+      <FormLeaveGuard dirty={assignment.dirty} busy={assignment.saving} />
       <AssignmentSection state={assignment} kind="tables" canEdit={canEdit} />
       <Card overflow="hidden">
         <DataTable aria-label="卓の優先度と上限" columnSizing="content" columnLayout={TABLE_LAYOUT}>

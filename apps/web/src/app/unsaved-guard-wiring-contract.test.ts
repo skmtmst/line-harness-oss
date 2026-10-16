@@ -135,6 +135,21 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string> = {
+  // 統合後の入力の持ち主。各画面が dirty を型／番兵へ渡す。
+  'v8/booking-gap/series-drawer.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/booking-menus/meeting-mode.tsx': 'v8/booking-menus/menu-form.tsx',
+  'v8/booking-menus/staff-calendar.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/booking-menus/tabs/staff-tab.tsx': 'v8/booking-menus/settings.tsx',
+  'v8/booking-payments/assignment.tsx': 'v8/booking-menus/settings.tsx',
+  'v8/booking-payments/cancellation.tsx': 'v8/booking-menus/settings.tsx',
+  'v8/booking-payments/menu-deposit.tsx': 'v8/booking-menus/menu-form.tsx',
+  'v8/booking-payments/menu-payment.tsx': 'v8/booking-menus/menu-form.tsx',
+  'v8/booking-payments/payments-tab.tsx': 'v8/booking-menus/settings.tsx',
+  'v8/inbox-chat/routing-drawer.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/restaurant/menu/edit.tsx': 'components/templates/create-page.tsx',
+  'v8/restaurant/tables/assign.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/tag-edit/edit-form-gap-parts.tsx': 'components/templates/create-page.tsx',
+
   // ③-2 第3波：作る画面は CreatePage の dirty、編集の引き出しは Drawer の離脱の確認、ランクの段の窓は Dialog が守る。
   'v8/booking-passes/create.tsx': 'components/templates/create-page.tsx',
   'v8/form-edit/content-tab.tsx': 'v8/form-edit/edit.tsx',

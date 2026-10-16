@@ -1,4 +1,6 @@
 'use client'
+
+import { storedStringList } from '@/lib/stored-json'
 import Toggle from '@/components/shared/toggle'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved, notifyToast } from '@/components/shared/toast'
@@ -255,7 +257,7 @@ export default function MenuFormV8() {
     {
       const wide = menu as BookingMenu & { audience_mode?: AudienceMode; audience_tag_ids_json?: string | null }
       setAudienceMode(wide.audience_mode ?? 'all')
-      try { setAudienceTagIds(wide.audience_tag_ids_json ? (JSON.parse(wide.audience_tag_ids_json) as string[]) : []) } catch { setAudienceTagIds([]) }
+      setAudienceTagIds(storedStringList(wide.audience_tag_ids_json))
     }
     setResourceIds(new Set((menu.assigned_resources ?? []).map((item) => item.resourceId)))
     setResourceQuantities(Object.fromEntries((menu.assigned_resources ?? []).map((item) => [item.resourceId, String(item.quantity)])))

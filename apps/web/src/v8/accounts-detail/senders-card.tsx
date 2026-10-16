@@ -1,5 +1,9 @@
 'use client'
 
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+
 import { mediaLimitLabel } from '@/components/shared/media-slot'
 
 import { OptionalBadge } from '@/components/shared/form-controls'
@@ -31,6 +35,7 @@ import styles from './senders-card.module.css'
 const NAME_MAX = 20
 
 export default function SendersCard({ accountId, accountName }: { accountId: string; accountName: string }) {
+  const saveErrors = useSaveFormErrors()
   const role = useStaffRole()
   const canManage = canManageRole(role)
   const canAdd = role !== 'viewer' && role !== null
@@ -51,7 +56,8 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
     setFailed(false)
     try {
       const res = await lineSenderApi.list(accountId)
-      setSenders(res.success ? res.data.filter((row) => row.status === 'active') : [])
+      if (!res.success) throw new Error('senders_failed')
+      setSenders(res.data.filter((row) => row.status === 'active'))
     } catch {
       setFailed(true)
     }
@@ -71,7 +77,8 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
       setIdempotencyKey(crypto.randomUUID())
       await load()
     } catch (caught) {
-      setError(caught instanceof ApiError && caught.message ? caught.message : '追加できませんでした。もう一度お試しください。')
+      saveErrors.capture(caught)
+      setError(japaneseDetailOf(caught) || '追加できませんでした。もう一度お試しください。')
     } finally {
       setBusy(false)
     }
@@ -91,7 +98,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
     }
   }
 
-  return (
+  return (<SaveErrorScope errors={saveErrors}>{(
     <Card variant="form" aria-labelledby="acd-senders">
       <CardHeader size="stacked" headingLevel={3} titleId="acd-senders" title="送り手"
         meta="メッセージの送り主として、名前とアイコンを切り替えられます（LINE の決まり：名前は 20 文字まで・公式アカウントの名前と並んで出ます）"
@@ -148,14 +155,14 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
           </div>
         </div>
         <div className={styles.nameWrap}><Field label="名前" required htmlFor="sender-name" count={{ value: name.trim().length, max: NAME_MAX }}>
-          <TextField id="sender-name" value={name} onChange={(e) => setName(e.target.value)}  placeholder="例：渋谷店 予約係" />
+          <SaveErrorField names={["name"]}><TextField id="sender-name" value={name} onChange={(e) => setName(e.target.value)}  placeholder="例：渋谷店 予約係" /></SaveErrorField>
         </Field></div>
         <div className={styles.nameNote}>
           <span>「LINE」「ライン」は名前に使えません</span>
         </div>
         {canManage ? (
-          <Select aria-label="使える人" size="full" value={visibility} onChange={(value) => setVisibility(value as 'all' | 'owner_only')}
-            options={[{ value: 'all', label: '使える人：全員' }, { value: 'owner_only', label: '使える人：自分だけ' }]} />
+          <SaveErrorField names={["visibility"]}><Select aria-label="使える人" size="full" value={visibility} onChange={(value) => setVisibility(value as 'all' | 'owner_only')}
+            options={[{ value: 'all', label: '使える人：全員' }, { value: 'owner_only', label: '使える人：自分だけ' }]} /></SaveErrorField>
         ) : null}
       </ConfirmDialog>
       <MediaPickerDialog open={iconPickerOpen} accountId={accountId} kind="image" title="アイコンを選ぶ" onClose={() => setIconPickerOpen(false)} onSelect={(item) => { setIcon(item); setIconPickerOpen(false) }} />
@@ -170,5 +177,5 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
         onCancel={() => { if (!busy) setStopping(null) }}
       />
     </Card>
-  )
+  )}</SaveErrorScope>)
 }

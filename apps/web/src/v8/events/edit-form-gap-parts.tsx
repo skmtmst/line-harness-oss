@@ -1,5 +1,7 @@
 'use client'
 
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+
 import { jstDate } from '@/lib/jst-datetime';
 import { useRef, useState } from 'react';
 import { type EventSlot } from '@/lib/api';
@@ -45,7 +47,7 @@ function AddSlotDialog({
       await onSubmit({ starts_at: s, ends_at: e, capacity: cap })
     } catch (e) {
       saveErrors.capture(e)
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(japaneseDetailOf(e) || '保存できませんでした。もう一度お試しください。')
     } finally {
       submitLock.current = false
       setBusy(false)
@@ -113,7 +115,7 @@ function EditSlotDialog({
       await onSubmit({ starts_at: s, ends_at: e, capacity: cap })
     } catch (e) {
       saveErrors.capture(e)
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(japaneseDetailOf(e) || '保存できませんでした。もう一度お試しください。')
     } finally {
       submitLock.current = false
       setBusy(false)

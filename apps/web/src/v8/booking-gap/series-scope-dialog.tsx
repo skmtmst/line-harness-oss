@@ -137,11 +137,11 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
               <Tr key={item.id} data-blocked={(changing && blockedIds.has(item.id)) || undefined}>
                 <Td>{dayWithWeekday(item.starts_at)}</Td>
                 <Td>{hm(item.starts_at)}</Td>
-                <Td className={(changing ? blockedIds.has(item.id) : impact?.[item.id]?.fee) ? styles.warn : undefined}>
+                <Td><span className={(changing ? blockedIds.has(item.id) : impact?.[item.id]?.fee) ? styles.feeNotice : undefined}>
                   {changing ? (blockedIds.has(item.id) ? `埋まっています・${hm(item.starts_at)} のまま` : newTime)
                     : impact ? (impact[item.id]?.fee ? `${yen(impact[item.id].fee!.amount)}（${impact[item.id].fee!.percent}%・${impact[item.id].fee!.reason}）` : 'かかりません')
                     : <button type="button" className={styles.retry} onClick={() => preparing.open('キャンセル料の前もっての見込み')}>見込みを見る</button>}
-                </Td>
+                </span></Td>
               </Tr>
             ))}
           </tbody>

@@ -1,5 +1,9 @@
 'use client'
 
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
+
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 import EntitySelect from '@/components/shared/entity-select'
 
 import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
@@ -48,6 +52,7 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
   /** 保存したあと、一覧の札を取り直す。 */
   onSaved: (settings: InboxFirstResponseSettings) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [settings, setSettings] = useState<InboxFirstResponseSettings | null>(null)
   const [draft, setDraft] = useState<InboxFirstResponseSettings | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
@@ -89,13 +94,16 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
       onSaved(res.data)
       onClose()
     } catch (caught) {
+      saveErrors.capture(caught)
       setError(isConflictResponse(caught)
         ? CONFLICT_TEXT.routing
         : describeApiFailure(caught, '保存'))
     } finally { setSaving(false) }
   }
 
-  return (
+  return (<SaveErrorScope errors={saveErrors}>{(
+    <>
+    <FormLeaveGuard dirty={open && dirty} busy={saving} />
     <Drawer open={open} title="割り当てと返事の期限" description="新しい会話を、だれが・いつまでに返すかを決めます" width="editor" heightMode="viewport" dirty={dirty} busy={saving} error={error} onClose={onClose}
       footer={<div className={styles.footerRow}>
         <Button onClick={onClose} disabled={saving}>キャンセル</Button>
@@ -108,9 +116,7 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
               <section className={styles.card} aria-labelledby="routing-strategy-heading">
                 <h3 id="routing-strategy-heading" className={styles.cardTitle}>割り当て方</h3>
                 {/* 1行の切り替え。今の口で選べるのは「しない」だけなので、全体を選べない形にして並べる（準備中）。 */}
-                <SegmentedControl aria-label="割り当て方" disabled value="none" onChange={() => {}}
-                  options={STRATEGIES.map((item) => ({ value: item.value, label: item.label }))} />
-                <p className={styles.note}>均等・優先順・ランダム＋優先度は準備中です。いまは「しない」だけ選べます。</p>
+                <p className={styles.fixed}>担当を自動で割り当てない</p>
               </section>
 
               <section className={styles.card} aria-labelledby="routing-sla-heading">
@@ -121,8 +127,8 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
                 </div>
                 <div className={styles.pair}>
                   <Field label="最初の返事まで" required htmlFor="routing-minutes">
-                    <NumberInput id="routing-minutes" numericText inputMode="numeric" unit="分" value={minutesText} disabled={!draft.enabled}
-                      invalid={!minutesValid} onChange={(event) => setMinutesText(event.target.value)} />
+                    <SaveErrorField names={["firstResponseMinutes"]}><NumberInput id="routing-minutes" numericText inputMode="numeric" unit="分" value={minutesText} disabled={!draft.enabled}
+                      invalid={!minutesValid} onChange={(event) => setMinutesText(event.target.value)} /></SaveErrorField>
                   </Field>
                   <Field label="金の札を出す" htmlFor="routing-soon">
                     <Select id="routing-soon" aria-label="金の札を出す" size="full" disabled value="soon" onChange={() => {}} options={[{ value: 'soon', label: `残り ${SOON_MINUTES} 分から` }]} />
@@ -142,5 +148,6 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
             </div>
           )}
     </Drawer>
-  )
+    </>
+  )}</SaveErrorScope>)
 }

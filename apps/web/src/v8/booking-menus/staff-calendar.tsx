@@ -1,5 +1,9 @@
 'use client'
 
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
+
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
 
 import { DataTable, Tr, Th, Td, TableHeadRow } from '@/components/shared/table'
@@ -51,6 +55,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
   canEdit: boolean
   onClose: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const preparing = usePreparingDialog()
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [busy, setBusy] = useState(false)
@@ -83,6 +88,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
       setWriteOff(null)
       notifySaved(extra ? '書き込みをオフにしました' : 'カレンダーの設定を保存しました')
     } catch (cause) {
+      saveErrors.capture(cause)
       setError(saveError(cause))
     } finally {
       setBusy(false)
@@ -97,6 +103,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
       setLoad({ ...load, url: { value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version } })
       notifySaved('会議の URL を保存しました')
     } catch (cause) {
+      saveErrors.capture(cause)
       setError(saveError(cause))
     } finally {
       setBusy(false)
@@ -110,9 +117,11 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
   const urlDirty = Boolean(ready?.url && ready.url.value.trim() !== ready.url.saved)
 
   return (
-    /* 共通の引き出し（幅は決まりの 540・後ろに暗い幕）。幅は画面で上書きしない。 */
+    <SaveErrorScope errors={saveErrors}>
+    <FormLeaveGuard dirty={person !== null && urlDirty} busy={busy} />
+    {/* 共通の引き出し（幅は決まりの 540・後ろに暗い幕）。幅は画面で上書きしない。 */}
     <Drawer open={person !== null} title={person?.name ?? ''} description={person ? `${person.role ? `${person.role} ・ ` : ''}担当メニュー ${menuCount} つ` : undefined}
-      width="editor" heightMode="viewport" contentSpacing="sections" onClose={onClose} busy={busy} footer={<div className={styles.footer}><Button onClick={onClose}>閉じる</Button></div>}>
+      width="editor" heightMode="viewport" contentSpacing="sections" onClose={onClose} busy={busy} dirty={urlDirty} footer={<div className={styles.footer}><Button onClick={onClose}>閉じる</Button></div>}>
       {load.state === 'loading' ? <p className={styles.minor}>読み込んでいます…</p> : null}
       {load.state === 'error' ? <div className={styles.card}><p className={styles.minor}>カレンダーの設定を読み込めませんでした。</p><Button size="compact" onClick={() => void reload()}>もう一度読み込む</Button></div> : null}
       {ready && mine ? (
@@ -158,8 +167,8 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
                 </RadioGroup>
                 <Field label="固定の会議の URL" optional error={urlInvalid ? 'https:// で始まる URL を入れてください' : undefined}>
                   <div className={styles.urlLine}>
-                    <TextField aria-label="固定の会議の URL" value={ready.url?.value ?? ''} placeholder="https://meet.google.com/…" disabled={ready.url === null}
-                      onChange={(event) => ready.url && setLoad({ ...ready, url: { ...ready.url, value: event.target.value } })} />
+                    <SaveErrorField names={["url","fixedMeetingUrl"]}><TextField aria-label="固定の会議の URL" value={ready.url?.value ?? ''} placeholder="https://meet.google.com/…" disabled={ready.url === null}
+                      onChange={(event) => ready.url && setLoad({ ...ready, url: { ...ready.url, value: event.target.value } })} /></SaveErrorField>
                     {urlDirty ? <Button variant="primary" busy={busy} disabled={urlInvalid} disabledReason="https:// で始まる URL を入れてください" onClick={() => void saveUrl()}>保存する</Button> : null}
                   </div>
                 </Field>
@@ -190,5 +199,6 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
       ) : null}
       {preparing.dialog}
     </Drawer>
+    </SaveErrorScope>
   )
 }

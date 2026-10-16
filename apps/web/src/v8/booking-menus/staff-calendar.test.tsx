@@ -46,3 +46,14 @@ it('閲覧のみは切り替え・つなぐ・URL の入力を置かず、文字
   expect(screen.queryByRole('button', { name: 'つなぐ' })).toBeNull()
   expect(screen.queryByRole('textbox')).toBeNull()
 })
+
+it('固定の会議URLの保存が欄の理由を返したら、入力を残してその欄に表示する', async () => {
+  net.saveStaffUrl.mockRejectedValue({ status: 422, fields: { url: 'この会議のURLは使えません' } })
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  const field = await screen.findByRole('textbox', { name: '固定の会議の URL' })
+  fireEvent.change(field, { target: { value: 'https://meet.google.com/changed' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  expect(await screen.findByText('この会議のURLは使えません')).toBeTruthy()
+  expect(field.getAttribute('aria-invalid')).toBe('true')
+  expect((field as HTMLInputElement).value).toBe('https://meet.google.com/changed')
+})

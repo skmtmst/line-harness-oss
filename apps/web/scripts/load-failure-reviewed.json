@@ -238,13 +238,6 @@
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
-    "filename": "src/v8/hq-broadcasts/create.tsx",
-    "fingerprint": "987114d142fa1bfc",
-    "disposition": "local-parser",
-    "count": 1,
-    "reason": "ローカル保存の解析。取得APIの失敗ではない。"
-  },
-  {
     "filename": "src/v8/hq-deliveries/console.tsx",
     "fingerprint": "043cc8fc12a0ffbf",
     "disposition": "error-visible",

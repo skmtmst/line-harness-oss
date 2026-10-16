@@ -1,5 +1,7 @@
 'use client'
 
+import { storedStringList } from '@/lib/stored-json'
+
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
@@ -44,24 +46,17 @@ type Period = 'lunch' | 'dinner' | 'both'
 type Draft = { kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string }
 const LIST_HREF = '/restaurant-test/menu'
 
-function safeArray(value: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
-  } catch {
-    return []
-  }
-}
+
 function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
 }
 function draftOf(item: RestaurantMenuItem | null): Draft {
   if (!item) return { kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '' }
-  const periods = safeArray(item.service_periods_json)
+  const periods = storedStringList(item.service_periods_json)
   return {
     kind: item.kind, name: item.name, price: String(item.price),
     period: periods.length > 1 ? 'both' : periods[0] === 'lunch' ? 'lunch' : 'dinner',
-    effectiveAt: '', allergens: safeArray(item.allergens_json).join(', '),
+    effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '),
   }
 }
 
@@ -227,7 +222,7 @@ function MenuEditBody() {
             { label: 'メニュー名', value: draft.name || emptyValue('unconfigured') },
             { label: '価格（税込）', value: editing ? formatYen(editing.price) : emptyValue('unconfigured') },
             ...(editing?.pendingPrice != null ? [{ label: '変更予定の価格', value: formatYen(editing.pendingPrice) }] : []),
-            { label: '提供時間', value: editing ? periodLabel(safeArray(editing.service_periods_json)) : emptyValue('unknown') },
+            { label: '提供時間', value: editing ? periodLabel(storedStringList(editing.service_periods_json)) : emptyValue('unknown') },
             { label: '所要時間', value: editing?.duration_minutes ? `${editing.duration_minutes}分` : emptyValue('unknown') },
             { label: 'アレルギー', value: draft.allergens || emptyValue('none') },
             { label: '変更後の価格の開始日時', value: editing?.pendingEffectiveAt ? polishFormatDateTime(new Date(editing.pendingEffectiveAt)) : emptyValue('unconfigured') },

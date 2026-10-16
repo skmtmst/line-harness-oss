@@ -64,11 +64,13 @@ export function AudienceSection({ accountId, mode, tagIds, onMode, onTagIds, can
   return (
     <Card variant="form" gap="normal">
       <CardHeader size="stacked" title={<span className={styles.titleWithMark}>見せる相手<HelpTip label="見せる相手の説明">会員だけ・初めての人だけ・常連だけのメニューを出し分けます。タグは「どれか1つ」が付いていれば当てはまります。</HelpTip><StatusBadge tone="success" dot={false} size="compact">足した物</StatusBadge></span>} />
+      {canEdit ? (
       <RadioGroup label="見せる相手" className={styles.fieldStack}>
         {MODES.map((item) => (
-          <Radio key={item.value} name="booking-menu-audience" value={item.value} checked={mode === item.value} disabled={!canEdit} onChange={() => onMode(item.value)}>{item.label}</Radio>
+          <Radio key={item.value} name="booking-menu-audience" value={item.value} checked={mode === item.value} onChange={() => onMode(item.value)}>{item.label}</Radio>
         ))}
       </RadioGroup>
+      ) : <p className={styles.ruleLabel}>{MODES.find(item => item.value === mode)?.label}</p>}
       {mode !== 'all' ? (
         <TagPickerField label="見せる相手のタグ" value={tagIds} onChange={onTagIds} accountId={accountId} readOnly={!canEdit} />
       ) : null}

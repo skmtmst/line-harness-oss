@@ -1,5 +1,9 @@
 'use client'
 
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
+
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
 
 import { Field } from '@/components/shared/form-controls'
@@ -51,6 +55,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
   onClose: () => void
   onCreated: (result: { seriesId: string; created: number }) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [on, setOn] = useState(true)
   const [freq, setFreq] = useState<SeriesFreq>('weekly')
   const [countText, setCountText] = useState('8')
@@ -117,6 +122,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
       notifySaved(`${res.data.bookings.length} 件の予約を入れました`)
       onCreated({ seriesId: res.data.series.id, created: res.data.bookings.length })
     } catch (e) {
+      saveErrors.capture(e)
       /* 保存の間に埋まった回があれば口は何も作らず 409 を返す（全部か無し）。表を確かめ直す。 */
       if (isConflictResponse(e)) { setConflict(true); setRetry((n) => n + 1) }
       else setError('予約を入れられませんでした。もう一度お試しください。')
@@ -125,7 +131,9 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
 
   const last = list.length ? list[list.length - 1].startsAt : summary.startsAt
 
-  return (
+  return (<SaveErrorScope errors={saveErrors}>{(
+    <>
+    <FormLeaveGuard dirty={open && on && state !== 'idle'} busy={busy} />
     <Drawer
       open={open}
       title="予約を入れる"
@@ -157,7 +165,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
             <div className={styles.controls}>
               <SegmentedControl aria-label="繰り返しの間隔" size="booking" options={FREQ_OPTIONS} value={freq} onChange={setFreq} />
               <Field label="回数">
-                <NumberField numericText unit="回" value={countText} onChange={(event) => setCountText(event.target.value)} aria-label="回数" invalid={countText !== '' && !countOk} />
+                <SaveErrorField names={["count","rule.count"]}><NumberField numericText unit="回" value={countText} onChange={(event) => setCountText(event.target.value)} aria-label="回数" invalid={countText !== '' && !countOk} /></SaveErrorField>
               </Field>
             </div>
             {!countOk ? <Notice tone="danger">回数は {MIN} 回から {MAX} 回までです。</Notice> : null}
@@ -195,5 +203,6 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
         {on && state === 'ready' ? <p className={styles.note}>{list.length} 回のうち {made} 件を入れます{skipped.length ? `（${skipped.map((o) => dayOf(o.startsAt)).join('・')} は飛ばす）` : ''}。保存の直前に空きを確かめ直します。</p> : null}
       </div>
     </Drawer>
-  )
+    </>
+  )}</SaveErrorScope>)
 }

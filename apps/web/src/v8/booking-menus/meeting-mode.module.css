@@ -1,9 +1,9 @@
 /* 予約メニューの会い方（★V8 ELruS）。値は変数だけ。 */
-.readValue { margin: 0; color: var(--color-ink); font-size: var(--tpl-bm-13); font-weight: 700; }
-.minor { display: block; margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); line-height: var(--tpl-bm-18); font-weight: 400; }
+.readValue { margin: var(--tpl-layout-zero); color: var(--color-ink); font-size: var(--tpl-bm-13); font-weight: 700; }
+.minor { display: block; margin: var(--tpl-layout-zero); color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); line-height: var(--tpl-bm-18); font-weight: 400; }
 .label { color: var(--color-ink); font-size: var(--tpl-bm-13); font-weight: 700; }
 .urlChoice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-bm-24); }
 .infoBox { display: flex; align-items: flex-start; gap: var(--tpl-bm-12); padding: var(--tpl-bm-12) var(--tpl-bm-16); border-radius: var(--tpl-bm-8); background: var(--color-table-head); color: var(--color-ink); font-size: var(--tpl-bm-13); }
 .infoBox > span { display: flex; flex-direction: column; gap: var(--tpl-bm-2); }
-.sample { margin: 0; padding: var(--tpl-bm-10) var(--tpl-bm-12); border-radius: var(--tpl-bm-8); outline: 1px solid var(--card-edge); outline-offset: calc(var(--tpl-bm-1) * -1); color: var(--color-ink); font-size: var(--tpl-bm-12); }
+.sample { margin: var(--tpl-layout-zero); padding: var(--tpl-bm-10) var(--tpl-bm-12); border-radius: var(--tpl-bm-8); outline: 1px solid var(--card-edge); outline-offset: calc(var(--tpl-bm-1) * -1); color: var(--color-ink); font-size: var(--tpl-bm-12); }
 .token { padding: var(--tpl-bm-2) var(--tpl-bm-6); border-radius: var(--tpl-bm-6); background: var(--color-info-bg); font-weight: 700; }

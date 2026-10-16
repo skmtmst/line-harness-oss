@@ -7,7 +7,7 @@
 }
 
 .minor {
-  margin: 0;
+  margin: var(--tpl-layout-zero);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-18);
@@ -17,7 +17,7 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-bm-8);
-  margin: 0;
+  margin: var(--tpl-layout-zero);
   padding: var(--tpl-bm-10) var(--tpl-bm-16);
   border-radius: var(--tpl-bm-8);
   background: var(--color-table-head);
@@ -26,7 +26,7 @@
 }
 
 .subTitle {
-  margin: 0;
+  margin: var(--tpl-layout-zero);
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 700;
@@ -84,7 +84,7 @@
 }
 
 .readValue {
-  margin: 0;
+  margin: var(--tpl-layout-zero);
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 700;

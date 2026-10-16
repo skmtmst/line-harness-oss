@@ -1,5 +1,7 @@
 'use client'
 
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CreditCard, Split, Store } from 'lucide-react'
@@ -50,6 +52,7 @@ function connectionFrom(config: BookingPaymentAdminConfig | null, connection: St
 }
 
 export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accountId: string; canEdit: boolean; onConnectedChange?: (connected: boolean) => void }) {
+  const saveErrors = useSaveFormErrors()
   const searchParams = useSearchParams()
   const rawView = searchParams.get('view')
   const view: View = rawView === 'records' || rawView === 'events' ? rawView : 'settings'
@@ -116,6 +119,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
       await cancellation.save()
       notifySaved('お支払いの設定を保存しました')
     } catch (cause) {
+      saveErrors.capture(cause)
       if (cancellation.dirty && cause instanceof ApiError && (cause.status === 409 || cause.status === 400)) { setSaveError(cancellationSaveError(cause)); return }
       setSaveError(cause instanceof ApiError && cause.status === 403
         ? 'この設定を変える権限がありません。'
@@ -136,17 +140,17 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
     onReset: () => { if (config) { setMode(savedMode); setHold(config.holdMinutes); setSaveError(null) } cancellation.reset() },
   })
 
-  if (view === 'records') return <PaymentRecords accountId={accountId} canEdit={canEdit} />
-  if (view === 'events') return <PaymentEvents accountId={accountId} canEdit={canEdit} />
-  if (status === 'loading') return <SkeletonRows rows={6} />
+  if (view === 'records') return (<SaveErrorScope errors={saveErrors}>{<PaymentRecords accountId={accountId} canEdit={canEdit} />}</SaveErrorScope>)
+  if (view === 'events') return (<SaveErrorScope errors={saveErrors}>{<PaymentEvents accountId={accountId} canEdit={canEdit} />}</SaveErrorScope>)
+  if (status === 'loading') return (<SaveErrorScope errors={saveErrors}>{<SkeletonRows rows={6} />}</SaveErrorScope>)
   if (status === 'error') {
-    return <StateCard icon={<AccountIcon />} title="お支払いの設定を読み込めませんでした" description="通信状態を確認して、もう一度お試しください。" action={<Button onClick={() => void load()}>もう一度読み込む</Button>} />
+    return (<SaveErrorScope errors={saveErrors}>{<StateCard icon={<AccountIcon />} title="お支払いの設定を読み込めませんでした" description="通信状態を確認して、もう一度お試しください。" action={<Button onClick={() => void load()}>もう一度読み込む</Button>} />}</SaveErrorScope>)
   }
 
   const testMode = link.testMode
   const connected = link.connected
   const choices = connected ? [...METHOD_CHOICES, ...(savedMode === 'customer_choice' ? [CHOICE_CUSTOMER] : [])] : METHOD_CHOICES.slice(0, 1)
-  return (
+  return (<SaveErrorScope errors={saveErrors}>{(
     <div className={settings.tabStack} data-design={connected ? 'Payments' : 'PaymentsNotConnected'}>
       {saveError ? <Notice tone="danger" role="alert">{saveError}</Notice> : null}
       {/* 絵 FcGmv・i2iv4g（B1）：決済のつなぎ → キャンセル料 → デポジット。つなぐのは Stripe の試験の接続（組3 の口）。 */}
@@ -164,8 +168,8 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
         {canEdit ? (
           <RadioCardGroup legend="いつもの支払い方法" columns={choices.length > 2 ? 3 : choices.length === 2 ? 2 : undefined}>
             {choices.map((choice) => (
-              <RadioCard key={choice.value} name="payments-default-method" value={choice.value} title={choice.title} note={choice.note}
-                icon={choice.icon} checked={mode === choice.value} onChange={(value) => setMode(value as BookingPaymentMode)} />
+              <SaveErrorField key={choice.value} names={["mode"]}><RadioCard key={choice.value} name="payments-default-method" value={choice.value} title={choice.title} note={choice.note}
+                icon={choice.icon} checked={mode === choice.value} onChange={(value) => setMode(value as BookingPaymentMode)} /></SaveErrorField>
             ))}
           </RadioCardGroup>
         ) : <p className={styles.readValue}>{[...METHOD_CHOICES, CHOICE_CUSTOMER].find((choice) => choice.value === mode)?.title}</p>}
@@ -181,9 +185,9 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
         </div>
         <div className={styles.holdRow}>
           <span className={styles.holdSelect}>
-            {canEdit ? <Select aria-label="お支払いを待つ時間" value={String(hold)}
+            {canEdit ? <SaveErrorField names={["holdMinutes"]}><Select aria-label="お支払いを待つ時間" value={String(hold)}
               onChange={(value) => setHold(Number(value))}
-              options={HOLD_CHOICES.map((minutes) => ({ value: String(minutes), label: `${minutes} 分` }))} /> : <span className={styles.readValue}>{`${hold} 分`}</span>}
+              options={HOLD_CHOICES.map((minutes) => ({ value: String(minutes), label: `${minutes} 分` }))} /></SaveErrorField> : <span className={styles.readValue}>{`${hold} 分`}</span>}
           </span>
           <span className={styles.minor}>この時間を過ぎても払われないときは、仮の予約を取り消して枠を空けます。</span>
         </div>
@@ -195,5 +199,5 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
       ) : null}
       {preparing.dialog}
     </div>
-  )
+  )}</SaveErrorScope>)
 }

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import type { SeriesOccurrence } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
 
+const push = vi.fn()
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 const preview = vi.fn()
 const create = vi.fn()
 vi.mock('@/lib/api-gap2', () => ({ bookingSeriesApi: { preview: (...a: unknown[]) => preview(...a), create: (...a: unknown[]) => create(...a) } }))
@@ -60,4 +62,17 @@ test('確かめられないときは保存を押せない（確かめないで�
   open()
   expect(await screen.findByText(/空きを確かめられませんでした/)).toBeTruthy()
   expect((screen.getByRole('button', { name: /件を入れる/ }) as HTMLButtonElement).disabled).toBe(true)
+})
+
+// 閉じる確認とは別に、入力中の再読込も共通の番兵が止める。
+test('繰り返す予約の確認中はページを閉じる前に確かめ、閉じた後は番兵を外す', async () => {
+  const view = open()
+  await screen.findByText('取れない回 2 件')
+  const event = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(event)
+  expect(event.defaultPrevented).toBe(true)
+  view.unmount()
+  const after = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(after)
+  expect(after.defaultPrevented).toBe(false)
 })
