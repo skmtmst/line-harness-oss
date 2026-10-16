@@ -2,6 +2,7 @@
 """Check the QA plan against pinned Git documents without connecting to staging."""
 
 import csv
+from collections import Counter
 import hashlib
 import json
 from pathlib import Path
@@ -211,13 +212,46 @@ for row in extra_sources:
     require(split(tasks[task_id]["追加機能の受け入れID"]) == actual_ids, f"gap task acceptance coverage: {task_id}")
 require(set(gap) == set(gap_source_rows), "missing or extra gap ID")
 require(len(gap) == counts["追加機能の受け入れ参照行"] == 503, "gap denominator")
+require(not set(gap) & set(all_case_by_key), "duplicate key across CASES and GAP")
 for key, (path, number, cells, task_id) in gap_source_rows.items():
     row = gap[key]
     require(row["出典"] == path and row["要件SHA"] == SHA and int(row["行"]) == number, f"gap source: {key}")
     require(row["原文ID"] == cells["ID"] and json.loads(row["受け入れ全セル_JSON"]) == cells, f"gap cells: {key}")
     require(row["使いやすさ作業ID"] == task_id, f"gap task link: {key}")
     require(row["比較根拠_固定版_箇所"] == tasks[task_id]["比較根拠_固定版_箇所"], f"gap reference: {key}")
+    require(row["主分類"] in ("自動", "単体", "手"), f"gap classification: {key}")
+    require(row["分類理由"] and row["前提と安全条件"], f"gap reason/safety: {key}")
+    method_prefix = {"自動": "A：", "単体": "U：", "手": "M："}[row["主分類"]]
+    require(row["実施方法"].startswith(method_prefix), f"gap method/classification: {key}")
+    require(cells["操作手順"] in row["実施方法"] and cells["こうなれば良い"] in row["実施方法"], f"gap procedure/outcome: {key}")
+    require("対象" in row["合否の対象"] and "2157" in row["合否の対象"], f"gap excluded from denominator: {key}")
+    require("加えない" not in row["扱い"] and row["合否の状態"].startswith("未実施"), f"gap stale scope/result: {key}")
+    require(row["候補照合SHA"] == counts["追加機能の候補照合SHA"], f"gap candidate SHA: {key}")
+    candidates = row["既存試験の候補_存在のみ照合"]
+    require(candidates, f"empty gap candidate: {key}")
+    if not candidates.startswith("候補未特定"):
+        for candidate in candidates.split(" ; "):
+            require(git("cat-file", "-t", f"{row['候補照合SHA']}:{candidate}").strip() == b"blob", f"missing pinned gap candidate: {key}/{candidate}")
     check_pending(row)
+
+gap_classes = dict(Counter(row["主分類"] for row in gap.values()))
+require(gap_classes == counts["追加機能の主分類"] == {"自動": 335, "単体": 128, "手": 40}, "gap class totals")
+require(len(cases) + len(gap) == counts["受け入れ合否の分母"] == 2157, "acceptance denominator")
+require(len(all_cases) + len(gap) == counts["全計画の合否行数"] == 2312, "all verdict rows")
+require(dict(Counter(r["主分類"] for r in cases + list(gap.values()))) == counts["全受け入れの主分類"], "all acceptance classes")
+require(dict(Counter(r["主分類"] for r in all_cases + list(gap.values()))) == counts["全計画の主分類"], "all plan classes")
+require(git("merge-base", "--is-ancestor", counts["今回検査前に取り込んだ本線SHA"], "HEAD") == b"", "latest verification base not included")
+require(git("merge-base", "--is-ancestor", counts["追加機能の候補照合SHA"], "HEAD") == b"", "candidate inspection SHA not included")
+section9 = plan.split("## 9. ", 1)[1].split("## 10. ", 1)[0]
+for item in ("(a)", "(b)", "(c)", "(d)", "637〜725", "dry-run", "Version ID", "Q-75", "検証環境だけ", "9-1.", "TEST-CANDIDATE-RECONCILIATION.tsv", "--find-renames", "削除", "改名", "B-342"):
+    require(item in section9, f"missing execution gate/reconciliation step: {item}")
+section2 = plan.split("## 2. ", 1)[1].split("## 3. ", 1)[0]
+require("③-2も今回の動作総点検の対象" in section2, "stale scope")
+require("| ③-2合計 | 335 | 128 | 40 | 503 |" in plan, "PLAN gap total differs")
+for path in {row[0] for row in gap_source_rows.values()}:
+    group = [row for row in gap.values() if row["出典"] == path]
+    c = Counter(row["主分類"] for row in group)
+    require(f"| {Path(path).name} | {c['自動']} | {c['単体']} | {c['手']} | {len(group)} |" in plan, f"PLAN gap document total: {path}")
 
 for key in ("SALON-06", "CLASS-06"):
     require("gap-features/B2-tickets-monthly.md:L8-L13" in tasks[key]["比較根拠_固定版_箇所"], f"B2 evidence: {key}")
@@ -321,4 +355,5 @@ require(not any((HERE / name).exists() for name in ("RESULTS.tsv", "FINDINGS.md"
 print(f"PASS: 固定資料 {len(source_paths)}本、受け入れ {len(cases)}件、元18列・自動1337/単体257/手60を保持")
 print(f"PASS: 作業 {len(tasks)}本、A対象 {auto_count}件・補助 {support_count}件、追加機能 {len(gap)}行、根拠 {len(all_refs)}箇所")
 print(f"PASS: 追加155行（EC5・切替150）、全{len(all_cases)}行、6スタイル固有目的 {actual_style_counts}、比較参照 {len(evidence)}行")
+print(f"PASS: ③-2 {len(gap)}行を分類 {gap_classes}、受け入れ2157件・全計画2312行。開始条件(a)〜(d)と段1.5の再照合手順あり")
 print("PASS: 全セル・行番号・blob/sha256・双方向の作業対応・未実施の状態を照合。段2・外部接続なし")
