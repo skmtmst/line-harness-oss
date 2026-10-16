@@ -15,7 +15,7 @@
 | 飲食店の予約・休業・来店 | [予約API](api/restaurant-booking.md)・[来店とスタンプ](api/visits-and-stamps.md)・[分離境界](restaurant-test-architecture.md) |
 | 下書き・会話検索・Instagram | [接続API](api/drafts-and-instagram.md)・[Metaの設定](instagram-meta-app-setup.md) |
 | 集計・広告・通知のAPI | [設定と計測](api/operations-and-measurement.md) |
-| Google・デリバリーの外部設定 | [Google設定](manuals/google-business-oauth-setup.md)・[Sheets設定](manuals/google-sheets-oauth-setup.md)・[デリバリー接続](integrations/delivery-api-inquiry.md) |
+| Google・デリバリーの外部設定 | [Google設定](manuals/google-business-oauth-setup.md)・[Sheets設定](manuals/google-sheets-oauth-setup.md)・[デリバリー接続](integrations/delivery-api-inquiry.md)・[フェーズ2の受け皿](restaurant-delivery-phase2-slots.md) |
 | 運営のお問い合わせ・AI | [運営コンソール](ops-console.md)・[受信設定](support-inbox-setup.md) |
 | 保存が失敗した時の表示 | [欄ごとのエラー](form-save-errors.md) |
 | Slackでの共同開発・報告 | [共同開発とPR同期](codex-slack-sync.md)・[完了報告](slack-report-to-claude.md) |
