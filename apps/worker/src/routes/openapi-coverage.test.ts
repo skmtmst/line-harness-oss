@@ -738,6 +738,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/booking/payments/start',
   'POST /api/booking/payments/webhook/{provider}',
   'POST /api/booking/payments/{id}/refund',
+  'GET /api/booking/payments/{id}/refunds',
+  'POST /api/booking/payments/{id}/booking',
   'POST /api/broadcasts',
   'POST /api/broadcasts/{id}/approval-approve',
   'POST /api/broadcasts/{id}/approval-cancel',

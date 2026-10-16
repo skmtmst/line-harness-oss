@@ -5,7 +5,7 @@ import { paymentPeriod } from './booking-payment-admin.js';
 interface EventRow {
   id: string; line_account_id: string; provider: string; payment_id: string | null;
   provider_payment_id: string; outcome: string; kind: string; amount: number | null; currency: string | null;
-  receipt_url: string | null; result: string; version: number; attempts: number;
+  receipt_url: string | null; refunded_amount: number | null; result: string; version: number; attempts: number;
 }
 const eventGate = 'EXISTS (SELECT 1 FROM booking_payment_events e WHERE e.id=? AND e.lease_token=? AND e.result<>\'failed\')';
 
@@ -54,15 +54,15 @@ export async function receivePaymentEvent(db: D1Database, provider: string, outc
   const eventId = outcome.providerEventId ?? 'sha256:' + Array.from(new Uint8Array(digest), x => x.toString(16).padStart(2, '0')).join('');
   const kind = outcome.status === 'failed' ? 'other' : outcome.status;
   await db.prepare(`INSERT INTO booking_payment_events
-    (id,line_account_id,provider,provider_event_id,payment_id,provider_payment_id,kind,outcome,amount,currency,receipt_url,received_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(provider,line_account_id,provider_event_id) DO NOTHING`)
+    (id,line_account_id,provider,provider_event_id,payment_id,provider_payment_id,kind,outcome,amount,currency,receipt_url,received_at,refunded_amount)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(provider,line_account_id,provider_event_id) DO NOTHING`)
     .bind(crypto.randomUUID(), payment.line_account_id, provider, eventId, payment.id, outcome.providerPaymentId,
       kind, outcome.status, outcome.amount ?? payment.amount, (outcome.currency ?? payment.currency).toUpperCase(),
-      outcome.receiptUrl ?? null, new Date().toISOString()).run();
+      outcome.receiptUrl ?? null, new Date().toISOString(), outcome.status==='refunded' ? outcome.refundedAmount ?? outcome.amount ?? payment.amount : null).run();
   const event = await db.prepare(`SELECT * FROM booking_payment_events WHERE provider=? AND line_account_id=? AND provider_event_id=?`)
     .bind(provider, payment.line_account_id, eventId).first<EventRow>();
   if (!event) throw new Error('payment_event_missing');
-  if (event.payment_id !== payment.id || event.outcome !== outcome.status
+  if (event.refunded_amount !== (outcome.status==='refunded' ? outcome.refundedAmount ?? outcome.amount ?? payment.amount : null) || event.payment_id !== payment.id || event.outcome !== outcome.status
     || event.amount !== (outcome.amount ?? payment.amount) || event.currency !== (outcome.currency ?? payment.currency).toUpperCase()) {
     return { status: 'event_conflict' };
   }
@@ -95,10 +95,27 @@ export async function processPaymentEvent(db: D1Database, account: string, id: s
         AND p.provider=e.provider AND p.provider_payment_id=e.provider_payment_id
         AND p.amount=e.amount AND upper(p.currency)=e.currency) THEN 'failed'
       WHEN EXISTS(SELECT 1 FROM booking_payments p WHERE p.id=e.payment_id AND
-        ((e.outcome='refunded' AND p.status='paid') OR (e.outcome IN ('paid','failed','expired') AND p.status IN ('unpaid','pending')))) THEN 'applied'
-      WHEN e.outcome='refunded' AND EXISTS(SELECT 1 FROM booking_payments p WHERE p.id=e.payment_id AND p.status<>'refunded') THEN 'failed'
+        ((e.outcome='refunded' AND p.status='paid' AND COALESCE(e.refunded_amount,e.amount)>p.refunded_amount) OR (e.outcome IN ('paid','failed','expired') AND p.status IN ('unpaid','pending')))) THEN 'applied'
+      WHEN e.outcome='refunded' AND EXISTS(SELECT 1 FROM booking_payments p WHERE p.id=e.payment_id AND p.status NOT IN ('paid','refunded')) THEN 'failed'
       ELSE 'duplicate' END,error_code=NULL WHERE id=? AND lease_token=?`).bind(id, token)];
     if (payment && event.outcome === 'paid') writes.push(...paidBookingPaymentStatements(db, payment, at, true, fence));
+    else if (payment && event.outcome==='refunded') {
+      writes.push(db.prepare(`INSERT INTO booking_payment_refunds
+        (id,payment_id,line_account_id,idempotency_key,amount,requested_amount,reason,actor_id,actor_label,notify_line,notification_status,created_at)
+        SELECT ?,p.id,p.line_account_id,?,COALESCE(e.refunded_amount,e.amount)-p.refunded_amount,NULL,
+          'provider_refund','system','Stripe',0,'not_requested',?
+        FROM booking_payments p JOIN booking_payment_events e ON e.payment_id=p.id
+        WHERE e.id=? AND e.lease_token=? AND e.result='applied' AND e.outcome='refunded'
+          AND COALESCE(e.refunded_amount,e.amount)>p.refunded_amount AND p.status='paid'
+          AND NOT EXISTS(SELECT 1 FROM booking_payment_refunds r WHERE r.id=?)`)
+        .bind('event:'+id,'event:'+id,at,id,token,'event:'+id));
+      writes.push(db.prepare(`UPDATE booking_payments SET
+        status=CASE WHEN ?=amount THEN 'refunded' ELSE 'paid' END,refunded_amount=?,refunded_at=?,updated_at=?,
+        receipt_url=COALESCE(?,receipt_url),actor_label='Stripe',action_reason='provider_refund'
+        WHERE id=? AND status='paid' AND refunded_amount<? AND (${eventGate})`)
+        .bind(event.refunded_amount ?? event.amount,event.refunded_amount ?? event.amount,at,at,event.receipt_url,payment.id,
+          event.refunded_amount ?? event.amount,id,token));
+    }
     else if (payment) {
       writes.push(db.prepare(`UPDATE booking_payments SET status=?,updated_at=?,
         refunded_at=CASE WHEN ?='refunded' THEN COALESCE(refunded_at,?) ELSE refunded_at END,
@@ -115,6 +132,8 @@ export async function processPaymentEvent(db: D1Database, account: string, id: s
           .bind(crypto.randomUUID(), payment.booking_id, account, at));
       }
     }
+    if (payment && event.receipt_url) writes.push(db.prepare(`UPDATE booking_payments SET receipt_url=?
+      WHERE id=? AND (${eventGate})`).bind(event.receipt_url,payment.id,id,token));
     writes.push(db.prepare(`UPDATE booking_payment_events SET applied_at=CASE WHEN result='applied' THEN COALESCE(applied_at,?) ELSE applied_at END,
       error_code=CASE WHEN result='failed' THEN 'payment_state_mismatch' WHEN outcome='failed' THEN 'payment_failed' ELSE NULL END
       WHERE id=? AND lease_token=?`).bind(at, id, token));

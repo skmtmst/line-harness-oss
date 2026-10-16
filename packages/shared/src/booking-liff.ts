@@ -1,3 +1,13 @@
+/** 本人に開示する支払い情報。操作した人や店内の理由は含めない。 */
+export interface BookingHistoryPayment {
+  method: 'onsite' | 'online';
+  status: string;
+  amount: number;
+  currency: string;
+  refundedAmount: number;
+  receiptUrl: string | null;
+}
+
 /** 本人確認済みの LIFF 予約履歴。変更・取消には取得した版をそのまま送る。 */
 export interface BookingHistoryItem {
   id: string;
@@ -10,6 +20,7 @@ export interface BookingHistoryItem {
   menu_id: string;
   staff_id: string;
   customer_note?: string | null;
+  payment?: BookingHistoryPayment;
   menu_name: string;
   staff_name: string;
   profile_image_url: string | null;

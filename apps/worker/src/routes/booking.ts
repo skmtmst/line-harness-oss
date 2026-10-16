@@ -1,3 +1,4 @@
+import { customerBookingPayments } from '../services/booking-payment-history.js';
 import { syncSelfBookingMeet } from './booking-self-meet-sync.js';
 import type { SelfBookingChange } from './booking-self-meet-sync.js';
 import { EntitlementError, entitlementUseStatement, validateEntitlementSelection } from '../services/booking-entitlements.js';
@@ -851,7 +852,6 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   // 未承認を通さずその場で確定にする。設定が読めないときは承認ありに倒す。
   const adminSettings = await getBookingAdminSettings(c.env.DB, accountId);
   let paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
-  const wasCustomerChoice = paymentConfig.mode === 'customer_choice';
   if (body.entitlement_id) {
     try { await validateEntitlementSelection(c.env.DB,accountId,friendId,body.menu_id,body.entitlement_id,startsAt.toISOString()); }
     catch(error) { if(error instanceof EntitlementError)return c.json({error:error.code},error.status); throw error; }
@@ -970,7 +970,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       bookingInsert, bookingId, lineAccountId: accountId, menuId: body.menu_id,
       additionalStatements: [
         ...(body.entitlement_id ? [entitlementUseStatement(c.env.DB,bookingId,body.entitlement_id,startsAt.toISOString(),await getAccountTimeZone(c.env.DB,accountId))] : []),
-        ...(!body.entitlement_id && (body.payment_method || wasCustomerChoice) && paymentConfig.mode !== 'none' ? [c.env.DB.prepare(`INSERT INTO booking_payment_choices(booking_id,line_account_id,mode,provider,hold_minutes)
+        ...(!body.entitlement_id && paymentConfig.mode !== 'none' ? [c.env.DB.prepare(`INSERT INTO booking_payment_choices(booking_id,line_account_id,mode,provider,hold_minutes)
           SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM bookings WHERE id=?)`).bind(bookingId,accountId,paymentConfig.mode,paymentConfig.provider,paymentConfig.holdMinutes,bookingId)] : []),
         ...(bookingPayment ? [bookingPaymentInsertStatement(c.env.DB, {
           id: bookingPayment.id, bookingId, lineAccountId: accountId, amount: menuRow.price,
@@ -1521,7 +1521,10 @@ booking.get('/api/liff/booking/me', async (c) => {
     .bind(friendId, accountId, new Date().toISOString())
     .all<BookingHistoryItem>();
 
-  return c.json({ upcoming: upcoming.results.map(row => ({ ...bookingHistoryItem(row), cancel_deadline_at: new Date(new Date(row.starts_at).getTime() - Number(row.cancel_deadline_minutes_before) * 60_000).toISOString() })), past: past.results.map(bookingHistoryItem) } satisfies BookingHistoryResponse);
+  const payments = await customerBookingPayments(c.env.DB,accountId,friendId);
+  const historyItem = (row: BookingHistoryItem) => ({...bookingHistoryItem(row),
+    ...(payments.has(row.id) ? {payment:payments.get(row.id)!} : {})});
+  return c.json({ upcoming: upcoming.results.map(row => ({ ...historyItem(row), cancel_deadline_at: new Date(new Date(row.starts_at).getTime() - Number(row.cancel_deadline_minutes_before) * 60_000).toISOString() })), past: past.results.map(historyItem) } satisfies BookingHistoryResponse);
 });
 
 // ================================================================
