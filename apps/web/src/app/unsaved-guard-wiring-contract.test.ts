@@ -194,6 +194,9 @@ const EXEMPTIONS: Record<string, string> = {
     '編集を持たない上部の帯。アカウント切替と移動を共通の未保存確認へ委ねる',
   'components/shared/command-palette.tsx':
     '編集を持たない探す窓（⌘K）。選んだ行き先への移動を共通の未保存確認へ委ねる',
+  'v8/ai-reply/qa-edit-dialog.tsx': 'G2 の Q&A を作る・直す窓（y4nixm）。保存の口は窓の中だけで、開くたびに元の Q&A か記録の質問から作り直し、入力のある窓は Dialog の dirty で閉じる前に確かめる。',
+  'v8/ai-reply/qa-list.tsx': 'G2 の Q&A タブ（y4nixm）。一覧上の操作（公開・止める・削除・AI の使い方）は確認窓で確定し、画面に残る下書きを持たない。取り込む窓の URL は閉じると戻る窓の中の入力',
+  'v8/mcp-connect/section.tsx': 'G9 AI とつなぐの区画（Xb0yc）。作る窓の入力は閉じると何も作らない窓の中だけで、止める・作り直すは確認窓で確定する。画面に残る下書きを持たない',
   'v8/restaurant/closures/closure-dialog.tsx': '臨時休業・貸切を足す・変える窓（提案 E-10 nVvXy）。保存の口は窓の中だけで、開くたびに押した日か記録から作り直し、閉じると入力を破棄する。',
   'v8/restaurant/front-desk/phone-drawer.tsx': '電話予約の引き出し（提案 E-2）。保存の口は引き出しの中だけで、開くたびに空から始まり、閉じると入力を破棄する（入力中は題に * が付く）。',
   'v8/reminders/basics-form.tsx':

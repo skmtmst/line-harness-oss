@@ -89,6 +89,12 @@ export default function Notice({
   const Icon = ICON_BY_TONE[canonical]
   const node = NODE_BY_TONE[canonical]
   const hasHelp = help !== undefined && help !== null
+  const helpTip = hasHelp ? (
+    <HelpTip label={`${helpLabel ?? 'この案内'}の説明`}>
+      {help}
+      {helpHref ? <a href={helpHref}>くわしく</a> : null}
+    </HelpTip>
+  ) : null
   return (
     <div
       {...props}
@@ -109,14 +115,9 @@ export default function Notice({
         <span className={styles.icon} aria-hidden="true">{icon}</span>
       )}
       <span className={styles.message}>
-        {heading ? <><span className={styles.heading}>{heading}</span><span className={styles.description}>{typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}</span></>
+        {heading ? <><span className={styles.headingRow}><span className={styles.heading}>{heading}</span>{hasHelp ? helpTip : null}</span><span className={styles.description}>{typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}</span></>
           : typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}
-        {hasHelp ? (
-          <HelpTip label={`${helpLabel ?? 'この案内'}の説明`}>
-            {help}
-            {helpHref ? <a href={helpHref}>くわしく</a> : null}
-          </HelpTip>
-        ) : null}
+        {hasHelp && !heading ? helpTip : null}
       </span>
       {action ? <span className={styles.action}>{action}</span> : null}
       {onClose ? <button type="button" className={styles.close} onClick={onClose} aria-label="通知を閉じる"><X aria-hidden="true" size={16} /></button> : null}

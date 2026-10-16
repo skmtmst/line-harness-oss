@@ -63,6 +63,8 @@ import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { compareEvaluationOrder, movePriorityUpdates } from './order';
 import QuickCreateV8 from './quick-create'
+import { AutoReplyTabs } from '@/v8/ai-reply/auto-reply-tabs'
+import { conversationAiUiEnabled } from '@/lib/environment-features'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value';
@@ -1489,7 +1491,7 @@ export default function AutoRepliesListV8() {
 
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" tabs={conversationAiUiEnabled() ? <AutoReplyTabs active="keyword" /> : undefined} title={<>
         自動応答
       </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。

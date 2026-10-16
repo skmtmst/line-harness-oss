@@ -58,6 +58,7 @@ import InboxRulesPopover from '@/v8/inbox-chat/rules-popover'
 import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog'
 import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css'
 import ConversationHead from '@/v8/inbox-chat/conversation-head'
+import { InboxAiDraft, InboxAiHeadMenu, InboxAiSummary, useInboxAi } from '@/v8/ai-reply/inbox-ai'
 import { formatInboxListTime } from '@/v8/inbox-chat/list-time'
 import AttachMenu from '@/v8/inbox-chat/attach-menu'
 import AttachmentChip, { type PendingAttachmentView } from '@/v8/inbox-chat/attachment-chip'
@@ -470,6 +471,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null)
+  /* G2：会話の要約と返信案（l1i3v）。AI を使っていない店では何も出さない。 */
+  const inboxAi = useInboxAi(chatDetail?.id ?? null, selectedAccountId, chatDetail?.messages)
   /*
    * URLの `?status=` で絞り込み済みの受信箱を開けるようにする（IDEA-01）。
    * ダッシュボードの「対応が必要な受信」は `?status=unread` でここへ来る。
@@ -3428,8 +3431,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   status={{ value: chatDetail.status as ChatStatus, onChange: (next) => void handleStatusUpdate(next as Chat['status']) }}
                   search={{ open: chatSearch.open, onToggle: () => (chatSearch.open ? chatSearch.close() : openChatSearch()) }}
                   panel={{ open: showFriendInfo, onToggle: () => setShowFriendInfo((current) => !current) }}
+                  extra={<InboxAiHeadMenu inboxAi={inboxAi} accountId={selectedAccountId} />}
                 />
               )}
+              <InboxAiSummary inboxAi={inboxAi} />
 
               {chatSearch.open && (
                 <ChatSearchBar search={chatSearch} focusSeq={chatSearchFocusSeq} busy={chatSearchFilling} />
@@ -3588,6 +3593,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
                 よく使うものだけ出し、設定は畳む。
               */}
+              <InboxAiDraft inboxAi={inboxAi} onInsert={(text) => { setMessageContent(text); textareaRef.current?.focus() }} />
               <InboxComposer
 data-inbox-v4="composer"
 data-drop-over={dropOver ? '' : undefined}

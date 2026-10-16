@@ -7,3 +7,14 @@ export function restaurantTestUiEnabled(
 ): boolean {
   return value?.trim().toLowerCase() === 'true'
 }
+
+/**
+ * 会話の AI（G2：受信箱の要約・返信案、自動応答の Q&A・AI が答えた記録）の入口。
+ * 2026-10-16 オーナー決定 B-355 でこちらの AI は出さない。コードは残し、明示的な true の時だけ入口を出す（既定オフ）。
+ * AI とつなぐ接続（MCP）は別物でこの旗の対象外。
+ */
+export function conversationAiUiEnabled(
+  value = process.env.NEXT_PUBLIC_CONVERSATION_AI_ENABLED,
+): boolean {
+  return value?.trim().toLowerCase() === 'true'
+}

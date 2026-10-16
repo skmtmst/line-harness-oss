@@ -32,6 +32,7 @@ WebhookTabs,
 overviewBandCells
 } from './shell'
 import { useApiTokens } from './use-api-tokens'
+import McpConnectionsSection from '@/v8/mcp-connect/section'
 
 
 function SkeletonCells({ height, width }: { height: number; width: string }) {
@@ -331,6 +332,8 @@ export default function WebhooksApiTokensV8() {
             </ContextMenu>
           </>
         ) : null}
+        {/* G9：AI とつなぐ（MCP）の区画（板 Xb0yc）。スタッフには出さない。 */}
+        <McpConnectionsSection />
       </div>
     </ListPage></SaveErrorScope>
   )
