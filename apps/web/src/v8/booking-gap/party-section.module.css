@@ -1,8 +1,0 @@
-.card { --pad: 16px; --gap-m: 12px; --cell-x: 16px; --cell-y: 16px; display: flex; flex-direction: column; gap: var(--gap-m); padding: var(--pad); border: 1px solid var(--color-hairline); border-radius: var(--radius-card); background: var(--color-canvas); }
-.head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-m); }
-.title { margin: 0; font-size: var(--text-body); font-weight: 700; color: var(--color-ink); }
-.owner { font-size: var(--text-caption); color: var(--color-ink-secondary); }
-.table { width: 100%; border-collapse: collapse; font-size: var(--text-label); }
-.table th { padding: var(--gap-m) var(--cell-x); background: var(--color-table-head); color: var(--color-ink-secondary); font-weight: 600; text-align: left; }
-.table td { padding: var(--cell-y) var(--cell-x); border-bottom: 1px solid var(--color-hairline); color: var(--color-ink); }
-.actions { display: flex; justify-content: flex-end; gap: var(--gap-m); }

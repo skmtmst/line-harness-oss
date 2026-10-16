@@ -325,7 +325,7 @@ function qaForm() {
               label: '次回のご希望の日時を選んでください',
               required: true,
               // g9osGN は 10/14(水)〜18(日) の5日。16日は満席。
-              booking: { menuId: 'qa-menu-1', staffId: 'qa-staff-form', daysAhead: 5 },
+              booking: { menuId: 'qa-menu-1', staffId: 'qa-staff-form', daysAhead: 5, ...(routed ? { routing: { enabled: true, rules: [], fallback: { menuId: 'qa-menu-4' } } } : {}) },
             },
             {
               id: 'qa-b4',
@@ -338,8 +338,6 @@ function qaForm() {
           ],
         },
       ],
-      /* ③-2 第2弾 B6：答えで予約の行き先を分ける（撮影が features に routed を足したときだけ）。 */
-      ...(routed ? { routing: { enabled: true, questionId: 'qa-b1', rules: [], fallback: { menuId: 'qa-menu-4' } } } : {}),
       options: {
         thanksUrl: null,
         thanksText: 'ご回答ありがとうございました',
@@ -480,19 +478,12 @@ const server = createServer(async (req, res) => {
 
   // ---- 答えで予約の行き先を分ける（③-2 第2弾 B6：Z76uuv・R02q7）。features に routed があるときだけフォームを書き換える ----
   if (method === 'POST' && /^\/api\/liff\/forms\/[^/]+\/routing\/resolve$/.test(pathname)) {
-    json(res, 200, { success: true, data: { matchedIndex: 1, routingToken: 'qa-routing-token', target: { menuId: 'qa-menu-online', menuName: 'オンライン相談 60 分', durationMinutes: 60, price: 3300, staffId: state.features.includes('routed-empty') ? 'qa-staff-empty' : 'qa-staff-1', staffName: '佐々木', meetingMode: 'online' } } });
+    json(res, 200, { success: true, data: { matchedIndex: 1, routingToken: 'qa-routing-token', expiresAt: '2026-10-16T05:00:00.000Z', target: { menuId: 'qa-menu-online', staffId: state.features.includes('routed-empty') ? 'qa-staff-empty' : 'qa-staff-1', meetingMode: 'online' } } });
     return;
   }
-  // ---- 繰り返しの確かめ（③-2 第2弾 B4：qOUmy）。3 回目だけ取れない（お休み）。 ----
-  if (method === 'POST' && pathname === '/api/liff/booking/series/preview') {
-    const body = await readBody(req);
-    const start = Date.parse(body.starts_at);
-    const count = Math.min(Math.max(Number(body.count) || 4, 2), 12);
-    json(res, 200, { occurrences: Array.from({ length: count }, (_, i) => {
-      const at = start + i * 7 * 86_400_000;
-      const blocked = i === 2;
-      return { index: i, starts_at: new Date(at).toISOString(), available: !blocked, ...(blocked ? { reason: 'お休み' } : {}), alternatives: blocked ? [1, 2, 3].map((h) => new Date(at + h * 3_600_000).toISOString()) : [] };
-    }) });
+  // ---- 追加メニュー（③-2 第2弾 B5：hhUtj）。features に party があるときだけ。形は API-CONTRACT-GAP2 のとおり ----
+  if (method === 'GET' && /^\/api\/liff\/booking\/menus\/[^/]+\/addons$/.test(pathname)) {
+    json(res, 200, { success: true, data: state.features.includes('party') && pathname.includes('qa-menu-1') ? [{ id: 'qa-addon-1', name: '歯みがき', duration_minutes: 15, base_price: 800, version: 1 }, { id: 'qa-addon-2', name: '爪切り', duration_minutes: 10, base_price: 500, version: 1 }] : [] });
     return;
   }
   // ---- キャンセル待ち（③-2 第2弾：Zm2Vh・xANkO）。features に waitlist / waitlist-expired があるときだけ行を返す ----
@@ -561,16 +552,8 @@ const server = createServer(async (req, res) => {
         },
       ],
     };
-    /* ③-2 第2弾 B5：同伴・追加メニュー（hhUtj・zYErQ）。features に party があるときだけ上限と追加メニューを返す。 */
-    if (state.features.includes('party')) {
-      for (const m of menusBody.menus) {
-        if (m.id === 'qa-menu-4') continue;
-        m.max_party_size = 3;
-        if (m.id === 'qa-menu-1') m.addons = [{ id: 'qa-addon-1', name: '歯みがき', duration_minutes: 15, price: 800 }, { id: 'qa-addon-2', name: '爪切り', duration_minutes: 10, price: 500 }];
-      }
-    }
-    /* ③-2 第2弾 B4：お客さまの繰り返し予約（qOUmy）。features に recurring があるときだけ。 */
-    if (state.features.includes('recurring')) { const m = menusBody.menus.find((x) => x.id === 'qa-menu-1'); if (m) m.recurring = { enabled: true, max_count: 12 }; }
+    /* ③-2 第2弾 B6：答えの行き先のメニュー（Z76uuv）。features に routed があるときだけ足す。 */
+    if (state.features.includes('routed') || state.features.includes('routed-empty')) menusBody.menus.push({ id: 'qa-menu-online', name: 'オンライン相談 60 分', category_label: '相談', description: null, duration_minutes: 60, buffer_after_minutes: 0, base_price: 3300, sort_order: 9 });
     json(res, 200, menusBody);
     return;
   }
@@ -733,21 +716,21 @@ const server = createServer(async (req, res) => {
   }
   // ---- 欠席の振替（③-2 第2弾 B3）----
   if (method === 'GET' && pathname === '/api/liff/events/makeup-credits') {
-    json(res, 200, { credits: state.features.includes('makeup') ? [{ id: 'qa-credit-1', status: 'open', expires_at: '2026-12-14T14:59:59.000Z', source_starts_at: '2026-11-14T00:00:00.000Z', source_name: '朝ヨガ' }] : [] });
+    json(res, 200, { success: true, data: state.features.includes('makeup') ? [{ id: 'qa-credit-1', status: 'open', expires_at: '2026-12-14T14:59:59.000Z', source_event_booking_id: 'qa-lesson-1', source_event_id: 'qa-event-1', used_event_booking_id: null, version: 1 }] : [] });
     return;
   }
   if (method === 'GET' && /^\/api\/liff\/events\/makeup-credits\/[^/]+\/options$/.test(pathname)) {
     const at = (day, hm) => `2026-11-${day}T${hm}:00.000Z`;
-    json(res, 200, { options: [
-      { slot_id: 'qa-ms-1', event_id: 'qa-event-1', starts_at: at('18', '01:00'), ends_at: at('18', '02:00'), name: 'ヨガ（初級）', remaining: 3, full: false },
-      { slot_id: 'qa-ms-2', event_id: 'qa-event-1', starts_at: at('18', '10:00'), ends_at: at('18', '11:00'), name: '朝ヨガ（オンライン）', remaining: 5, full: false },
-      { slot_id: 'qa-ms-3', event_id: 'qa-event-1', starts_at: at('18', '11:30'), ends_at: at('18', '12:30'), name: 'ヨガ（中級）', remaining: 0, full: true },
-      { slot_id: 'qa-ms-4', event_id: 'qa-event-1', starts_at: at('19', '01:00'), ends_at: at('19', '02:00'), name: 'ヨガ（初級）', remaining: 2, full: false },
+    json(res, 200, { success: true, data: [
+      { id: 'qa-ms-1', event_id: 'qa-event-1', starts_at: at('18', '01:00'), ends_at: at('18', '02:00'), capacity: 5, occupied: 2 },
+      { id: 'qa-ms-2', event_id: 'qa-event-1', starts_at: at('18', '10:00'), ends_at: at('18', '11:00'), capacity: 6, occupied: 1 },
+      { id: 'qa-ms-3', event_id: 'qa-event-1', starts_at: at('18', '11:30'), ends_at: at('18', '12:30'), capacity: 4, occupied: 4 },
+      { id: 'qa-ms-4', event_id: 'qa-event-1', starts_at: at('19', '01:00'), ends_at: at('19', '02:00'), capacity: 4, occupied: 2 },
     ] });
     return;
   }
-  if (method === 'POST' && /^\/api\/liff\/events\/makeup-credits\/[^/]+\/use$/.test(pathname)) { json(res, 200, { id: 'qa-event-booking-new', status: 'confirmed' }); return; }
-  if (method === 'POST' && /^\/api\/liff\/events\/bookings\/[^/]+\/absence$/.test(pathname)) { json(res, 200, { credit: { id: 'qa-credit-1', status: 'open', expires_at: '2026-12-14T14:59:59.000Z', source_starts_at: '2026-11-14T00:00:00.000Z', source_name: '朝ヨガ' } }); return; }
+  if (method === 'POST' && /^\/api\/liff\/events\/makeup-credits\/[^/]+\/use$/.test(pathname)) { json(res, 200, { success: true, data: { bookingId: 'qa-event-booking-new', replayed: false } }); return; }
+  if (method === 'POST' && /^\/api\/liff\/events\/bookings\/[^/]+\/absence$/.test(pathname)) { json(res, 200, { success: true, data: { eventBooking: { id: 'qa-lesson-1', status: 'absent' }, makeupCredit: { id: 'qa-credit-1', status: 'open', expires_at: '2026-12-14T14:59:59.000Z', source_event_booking_id: 'qa-lesson-1', source_event_id: 'qa-event-1', used_event_booking_id: null, version: 1 }, reasonIfNone: null } }); return; }
   // 自分のキャンセル待ち (qVdiX の「順番 2 番目」「キャンセル待ちをやめる」)。
   if (method === 'GET' && pathname === '/api/liff/events/me/waitlist') {
     json(res, 200, { items: [QA_EVENT_WAITLIST_MINE] });

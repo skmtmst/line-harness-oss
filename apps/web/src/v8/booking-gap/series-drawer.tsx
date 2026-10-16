@@ -10,8 +10,10 @@ import Toggle from '@/components/shared/toggle'
 import NumberField from '@/components/shared/number-field'
 import { Skeleton } from '@/components/shared/skeleton'
 import { notifySaved } from '@/components/shared/toast'
-import { bookingSeriesApi, type SeriesFreq, type SeriesOccurrence } from '@/lib/api-gap2'
-import { createdCount, dayOf, dayWithWeekday, FREQ_OPTIONS, hm, initialPick, ruleLabel, weekdayOf, type Pick } from './series-model'
+import { ApiError } from '@/lib/api'
+import { bookingSeriesApi } from '@/lib/api-gap2'
+import type { RecurrenceFrequency as SeriesFreq, SeriesOccurrence } from '@line-crm/shared'
+import { reasonText, createdCount, dayOf, dayWithWeekday, FREQ_OPTIONS, hm, initialPick, ruleLabel, weekdayOf, type Pick } from './series-model'
 import styles from './series-drawer.module.css'
 
 export type SeriesDrawerSummary = {
@@ -70,13 +72,14 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
     const timer = setTimeout(() => {
       void bookingSeriesApi.preview(accountId, {
         menuId: summary.menuId,
+        friendId: summary.friendId,
         staffId: summary.staffId,
         startsAt: summary.startsAt,
-        rule: { freq, weekday: weekdayOf(summary.startsAt), time: hm(summary.startsAt), count },
+        rule: { freq, weekday: weekdayOf(summary.startsAt), count },
       }).then((res) => {
         if (!current) return
         setList(res.data.occurrences)
-        setUnreadable(Boolean(res.data.unreadable))
+        setUnreadable(res.data.occurrences.some((o) => !o.available && o.reason === 'calendar_unreadable'))
         setPicks(Object.fromEntries(res.data.occurrences.map((o) => [o.index, initialPick(o)])))
         setState('ready')
       }).catch(() => { if (current) setState('error') })
@@ -95,17 +98,20 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
     try {
       const res = await bookingSeriesApi.create(accountId, {
         menuId: summary.menuId, staffId: summary.staffId, friendId: summary.friendId, startsAt: summary.startsAt,
-        rule: { freq, weekday: weekdayOf(summary.startsAt), time: hm(summary.startsAt), count },
+        rule: { freq, weekday: weekdayOf(summary.startsAt), count },
+        /* 口の選択は「そのまま」と「飛ばす」。別の時間は、その回の keep に新しい開始を添える。 */
         choices: list.map((o) => {
           const pick = picks[o.index] ?? 'skip'
-          return pick === 'alternative' && o.alternatives[0] ? { index: o.index, action: 'alternative' as const, alternativeStartsAt: o.alternatives[0] } : { index: o.index, action: pick === 'skip' ? 'skip' as const : 'keep' as const }
+          if (pick === 'alternative' && o.alternatives[0]) return { index: o.index, action: 'keep' as const, alternativeStartsAt: o.alternatives[0] }
+          return { index: o.index, action: pick === 'skip' ? 'skip' as const : 'keep' as const }
         }),
       }, key.current)
-      if ('conflicts' in res) { setConflict(true); setRetry((n) => n + 1); return }
-      notifySaved(`${res.data.created} 件の予約を入れました`)
-      onCreated({ seriesId: res.data.seriesId, created: res.data.created })
-    } catch {
-      setError('予約を入れられませんでした。もう一度お試しください。')
+      notifySaved(`${res.data.bookings.length} 件の予約を入れました`)
+      onCreated({ seriesId: res.data.series.id, created: res.data.bookings.length })
+    } catch (e) {
+      /* 保存の間に埋まった回があれば口は何も作らず 409 を返す（全部か無し）。表を確かめ直す。 */
+      if (e instanceof ApiError && e.status === 409) { setConflict(true); setRetry((n) => n + 1) }
+      else setError('予約を入れられませんでした。もう一度お試しください。')
     } finally { setBusy(false) }
   }
 
@@ -165,7 +171,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
                     return (
                       <tr key={o.index}>
                         <td>{dayWithWeekday(o.startsAt)}</td>
-                        <td><div className={styles.reason}><span>{o.reason}</span><span className={alt ? styles.alt : styles.sub}>{alt ? `→ ${hm(alt)} にする` : 'この回は作りません'}</span></div></td>
+                        <td><div className={styles.reason}><span>{reasonText(o.reason)}</span><span className={alt ? styles.alt : styles.sub}>{alt ? `→ ${hm(alt)} にする` : 'この回は作りません'}</span></div></td>
                         <td>
                           <SegmentedControl aria-label={`${dayOf(o.startsAt)} の回`} size="compact" value={pick === 'skip' || !alt ? 'skip' : 'alternative'}
                             options={[{ value: 'alternative', label: '別の時間' }, { value: 'skip', label: '飛ばす' }]}

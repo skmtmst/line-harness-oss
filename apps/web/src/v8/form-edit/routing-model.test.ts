@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest'
 import type { FormBlock } from '@line-crm/shared'
-import type { FormRouting } from '@/lib/api-gap2'
-import { emptyRouting, hasBookingBlock, matchRule, newRule, routingError, routingQuestions } from './routing-model'
+import { type FormRouting, emptyRouting, hasBookingBlock, matchRule, newRule, routingError, routingQuestions } from './routing-model'
 
 const radio = { id: 'q1', kind: 'input', type: 'radio', name: 'k', label: 'ご相談の内容', choices: [{ id: 'a', label: 'トリミング' }, { id: 'b', label: 'しつけ' }] } as unknown as FormBlock
 const text = { id: 'q2', kind: 'input', type: 'textarea', name: 't', label: '自由記述' } as unknown as FormBlock
@@ -26,7 +25,7 @@ test('保存の前の確かめ：行き先のメニューと「どれにも当�
   expect(routingError(undefined)).toBeNull()
   expect(routingError({ ...emptyRouting(), enabled: false })).toBeNull()
   expect(routingError({ ...emptyRouting(), enabled: true, rules: [rule] })?.message).toContain('1 行目')
-  const ok = { ...rule, target: { ...rule.target, menuId: 'bm-1' } }
+  const ok = { ...rule, target: { menuId: 'bm-1' } }
   expect(routingError({ enabled: true, rules: [ok], fallback: { menuId: '' } })?.message).toContain('どれにも当たらないとき')
   expect(routingError({ enabled: true, rules: [ok], fallback: { menuId: 'bm-5' } })).toBeNull()
 })

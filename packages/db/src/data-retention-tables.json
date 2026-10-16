@@ -4753,5 +4753,122 @@
       "parent": "booking_charges",
       "parentColumn": "id"
     }
+  },
+  "ai_request_claims": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "chat_id",
+      "parent": "chats",
+      "parentColumn": "id"
+    }
+  },
+  "ai_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ai_usage_counters": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "booking_addons": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "booking_id",
+      "parent": "bookings",
+      "parentColumn": "id"
+    }
+  },
+  "booking_batch_assertions": {
+    "category": "global"
+  },
+  "booking_makeup_credits": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_routing_staff_groups": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_series": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "broadcast_ab_recipients": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_ab_tests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_variants": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "operator_push_deliveries": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "subscription_id",
+      "parent": "operator_push_subscriptions",
+      "parentColumn": "id"
+    }
+  },
+  "operator_push_preferences": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
+  },
+  "operator_push_subscriptions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
+  },
+  "qa_entries": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
   }
 }

@@ -1,6 +1,7 @@
 import type {GoogleServiceAccountCredentials} from './google-service-account.js';
 import {clientForConnection,getStaffCalendarConnection,runBookingGoogleSync} from './booking-calendar-sync.js';
 import {GoogleCalendarReadError,type BusyInterval} from './google-calendar.js';
+import {createFeatureJobGate} from './feature-enforcement.js';
 export interface CalendarSwitch {readEnabled:boolean;writeEnabled:boolean;version:number}
 export async function calendarSwitch(db:D1Database,account:string,staff=''):Promise<CalendarSwitch> {
  const r=await db.prepare('SELECT read_enabled,write_enabled,version FROM booking_calendar_switches WHERE line_account_id=? AND scope_id=?').bind(account,staff).first<{read_enabled:number;write_enabled:number;version:number}>();
@@ -37,10 +38,12 @@ export async function readCalendarBusy(db:D1Database,credentials:GoogleServiceAc
  }
 }
 export async function processCalendarSwitchJobs(db:D1Database,credentials:GoogleServiceAccountCredentials,now=new Date()) {
+ const gate=createFeatureJobGate();
  const jobs=(await db.prepare(`SELECT * FROM booking_calendar_switch_jobs WHERE status IN('pending','failed') AND attempts<3 ORDER BY created_at,id LIMIT 50`).all<{
   id:string;line_account_id:string;staff_id:string;booking_id:string;action:'write'|'delete';external_event_id:string|null;calendar_id:string|null;switch_scope:string;switch_version:number;
  }>()).results;
  for(const j of jobs){
+  if(!await gate.canRun(db,j.line_account_id,'booking','calendar busy cache and switch jobs'))continue;
   const s=await calendarSwitch(db,j.line_account_id,j.switch_scope);
   if(s.version!==j.switch_version||(j.action==='delete'?s.writeEnabled:!s.writeEnabled)) {await db.prepare("UPDATE booking_calendar_switch_jobs SET status='cancelled' WHERE id=?").bind(j.id).run();continue;}
   try{
@@ -58,10 +61,11 @@ export async function processCalendarSwitchJobs(db:D1Database,credentials:Google
  }
 }
 export async function refreshCalendarBusyCaches(db:D1Database,credentials:GoogleServiceAccountCredentials,now=new Date()) {
+ const gate=createFeatureJobGate();
  const rows=(await db.prepare(`SELECT g.line_account_id,g.staff_id,COALESCE(bs.booking_window_days,60) window_days FROM google_calendar_connections g LEFT JOIN booking_settings bs ON bs.line_account_id=g.line_account_id JOIN line_accounts a ON a.id=g.line_account_id AND a.is_active=1
   JOIN booking_calendar_switches s ON s.line_account_id=g.line_account_id AND s.scope_id=g.staff_id AND s.read_enabled=1
   JOIN booking_calendar_switches a_s ON a_s.line_account_id=g.line_account_id AND a_s.scope_id='' AND a_s.read_enabled=1 WHERE g.is_active=1 LIMIT 100`).all<{line_account_id:string;staff_id:string;window_days:number}>()).results;
- for(let i=0;i<rows.length;i+=5) await Promise.all(rows.slice(i,i+5).map(async r=>{try{await readCalendarBusy(db,credentials,{lineAccountId:r.line_account_id,staffId:r.staff_id,timeMin:new Date(now.getTime()-86400000).toISOString(),timeMax:new Date(now.getTime()+(Math.min(365,Math.max(1,r.window_days))+1)*86400000).toISOString(),fresh:true});}catch{/* 期限切れの控えは空きの入口で閉じる。既存の同期通知が運用者に知らせる。 */}}));
+ for(let i=0;i<rows.length;i+=5) await Promise.all(rows.slice(i,i+5).map(async r=>{if(!await gate.canRun(db,r.line_account_id,'booking','calendar busy cache and switch jobs'))return;try{await readCalendarBusy(db,credentials,{lineAccountId:r.line_account_id,staffId:r.staff_id,timeMin:new Date(now.getTime()-86400000).toISOString(),timeMax:new Date(now.getTime()+(Math.min(365,Math.max(1,r.window_days))+1)*86400000).toISOString(),fresh:true});}catch{/* 期限切れの控えは空きの入口で閉じる。既存の同期通知が運用者に知らせる。 */}}));
 }
 export function validMeetingUrl(value:unknown):value is string|null {
  if(value===null)return true;if(typeof value!=='string'||value.length>2048)return false;

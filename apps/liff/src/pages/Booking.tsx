@@ -55,7 +55,7 @@ export default function Booking() {
     api.menus().then(({ menus }) => {
       if (!alive || menuTouched.current) return;
       const selected = menus.find(item => item.id === initialMenuId);
-      if (selected) { setMenu(selected); setStep('staff'); }
+      if (selected) { setMenu(selected); loadAddons(selected); setStep('staff'); }
     }).catch(() => { /* 非公開・削除済み・取得失敗は通常の選択へ戻す。 */ });
     return () => { alive = false; };
   }, [initialMenuId]);
@@ -89,6 +89,11 @@ export default function Booking() {
     navigate({ pathname: '/booking', search: next.toString() }, { replace: true });
   }
 
+  /** 追加メニュー（B5）：メニューを選んだあとに読み足す。読めなければ追加なしのまま進める。 */
+  function loadAddons(m: MenuItem) {
+    Promise.resolve().then(() => api.addons(m.id)).then((addons) => setMenu((cur) => (cur && cur.id === m.id ? { ...cur, addons } : cur))).catch(() => undefined);
+  }
+
   function pickMenu(m: MenuItem) {
     menuTouched.current = true;
     // 選び直したら後の選択は捨てる (古い担当・日時のまま送らない)。
@@ -99,6 +104,7 @@ export default function Booking() {
     }
     setChangingMenu(false);
     setMenu(m);
+    loadAddons(m);
   }
 
   function pickStaff(s: StaffItem) {

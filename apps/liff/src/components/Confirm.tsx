@@ -12,7 +12,6 @@ import BottomBar from './ui/BottomBar.js';
 import PrivacyNote from './ui/PrivacyNote.js';
 import type { SlotPick } from './DateTimePicker.js';
 import { menuLine, personShort, totals, yen, type PartyState } from '../lib/party.js';
-import RecurringCard, { type RecurrenceValue } from './RecurringCard.js';
 
 /**
  * 1-d 内容の確認 (★V8・gLReL)。送った中身のカード＋ご要望＋案内の帯。
@@ -57,8 +56,6 @@ export default function Confirm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(() => crypto.randomUUID());
-  /* 続けて予約（B4）：メニューが許したときだけ。 */
-  const [recurrence, setRecurrence] = useState<RecurrenceValue>(null);
 
   const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start]));
   /* 戻る（頭の「‹」から呼ぶ）：送りかけの返事は受け取らず、日時の段へ戻る。 */
@@ -84,11 +81,7 @@ export default function Confirm({
           // 空き枠が返した開始の瞬間を送る（店が日本時間以外でもずれない）。
           starts_at: slotStartsAtIso(slot),
           customer_note: note || undefined,
-          ...(party ? {
-            members: party.members.map((m, i) => ({ menu_id: (m.menu ?? menu).id, addon_ids: m.addonIds, staff_id: i === 0 ? (m.staff ?? staff).id : (m.staff?.id ?? null) })),
-            start_mode: totals(party, menu).sequential ? 'sequential' as const : 'parallel' as const,
-          } : {}),
-          ...(recurrence ? { recurrence: { freq: 'weekly' as const, count: recurrence.count, choices: recurrence.choices } } : {}),
+          ...(party && party.members[0].addonIds.length ? { addonIds: party.members[0].addonIds } : {}),
         },
         idemKey,
       );
@@ -132,7 +125,6 @@ export default function Confirm({
           value={party ? `${yen(totals(party, menu).price)}（目安・お店で払う）` : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
         />
       </dl>
-      {menu.recurring?.enabled && !party ? <RecurringCard menu={menu} staff={staff} startsAt={slotStartsAtIso(slot)} onChange={setRecurrence} /> : null}
       <BookingIntake question={menu.intake_question} value={note} onChange={setNote} />
       {error && (
         <p role="alert" className="text-[13px] leading-6 text-danger">
@@ -152,7 +144,7 @@ export default function Confirm({
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
         <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-          {submitting ? '送信中...' : recurrence ? `${recurrence.made} 回分を予約する` : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
+          {submitting ? '送信中...' : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
         </Button>
       </BottomBar>
     </div>

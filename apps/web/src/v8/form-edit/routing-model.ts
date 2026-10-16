@@ -1,5 +1,5 @@
-import type { FormBlock, FormInputBlock } from '@line-crm/shared'
-import type { FormRouting, RoutingRule, RoutingTarget } from '@/lib/api-gap2'
+import type { FormBlock, FormInputBlock, FormLayout } from '@line-crm/shared'
+import type { BookingRouting, RoutingTarget } from '@line-crm/shared'
 import { isChoiceType } from './model'
 
 /*
@@ -7,8 +7,11 @@ import { isChoiceType } from './model'
  * 条件に使えるのは 1 つ選ぶ・いくつでも選ぶ・プルダウンの質問（自由記述は当て方がぶれるので使えない）。
  * 上から順に最初に当たった行。最後の「どれにも当たらないとき」は消せず、メニューを選ぶまで保存できない。行は 50 まで。
  */
+export type FormRouting = BookingRouting
+export type RoutingRule = BookingRouting['rules'][number]
+export { type RoutingTarget }
 export const MAX_ROUTING_ROWS = 50
-export const emptyTarget = (): RoutingTarget => ({ menuId: '', staffGroupId: null, staffId: null, meetingMode: null })
+export const emptyTarget = (): RoutingTarget => ({ menuId: '' })
 export const emptyRouting = (): FormRouting => ({ enabled: false, rules: [], fallback: emptyTarget() })
 
 /** 条件に使える質問（予約ブロックより前・同じフォームの選ぶ質問）。 */
@@ -19,9 +22,9 @@ export const hasBookingBlock = (blocks: FormBlock[]) => blocks.some((b) => b.kin
 export const choiceModeLabel = (type: string) => (type === 'radio' ? '1 つ選ぶ' : type === 'checkbox' ? 'いくつでも選ぶ' : 'プルダウン')
 
 export function newRule(questionId: string, answer: string): RoutingRule {
-  return { id: `rr-${Math.random().toString(36).slice(2, 10)}`, conditions: [{ questionId, op: 'is', value: answer }], target: emptyTarget() }
+  return { conditions: [{ questionId, op: 'is', value: answer }], target: emptyTarget() }
 }
-const answerOf = (rule: RoutingRule) => (rule.conditions[0]?.value as string | undefined) ?? ''
+const answerOf = (rule: RoutingRule) => String(rule.conditions[0]?.value ?? '')
 export const ruleAnswer = answerOf
 
 /** 上から順に最初に当たった行の番号。当たらなければ -1（＝どれにも当たらない）。 */
@@ -39,5 +42,12 @@ export function routingError(routing: FormRouting | undefined): { row: number; m
   return null
 }
 
-/** 回答フォームの版の JSON に載せる決まり。型（shared）が来るまで layout の routing として持つ。 */
-export const routingOf = (layout: unknown): FormRouting | undefined => (layout as { routing?: FormRouting }).routing
+/** 予約ブロック（最初の 1 つ）の booking.routing が決まり。保存は回答フォームの版（layout）に含まれる。 */
+const bookingBlocks = (layout: FormLayout): FormInputBlock[] => [...layout.header, ...layout.sections.flatMap((s) => s.blocks)].filter((b): b is FormInputBlock => b.kind === 'input' && b.type === 'booking')
+export const routingOf = (layout: FormLayout): FormRouting | undefined => bookingBlocks(layout)[0]?.booking?.routing
+export function withRouting(layout: FormLayout, routing: FormRouting): FormLayout {
+  const target = bookingBlocks(layout)[0]
+  if (!target) return layout
+  const patch = (b: FormBlock): FormBlock => (b === target ? { ...target, booking: { menuId: '', staffId: null, daysAhead: 14, ...target.booking, routing } } : b)
+  return { ...layout, header: layout.header.map(patch), sections: layout.sections.map((sec) => ({ ...sec, blocks: sec.blocks.map(patch) })) }
+}

@@ -278,6 +278,7 @@ function eachDate(from: string, to: string): string[] {
 }
 
 export interface GetAvailabilityParams {
+  additionalDurationMinutes?:number;
   lineAccountId: string;
   menuId: string;
   staffId?: string;
@@ -796,7 +797,7 @@ async function loadAvailabilityData(
     ).bind(params.menuId,params.lineAccountId,rangeEnd.toISOString(),rangeStart.toISOString(),params.excludeBookingId??null,params.excludeBookingId??null,params.excludeWaitlistId??null,params.excludeWaitlistId??null).all<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }>();
 
   const menuForCalc = {
-    duration_minutes: menu.override_duration ?? menu.duration_minutes,
+    duration_minutes: (menu.override_duration ?? menu.duration_minutes)+(params.additionalDurationMinutes??0),
     buffer_after_minutes: menu.buffer_after_minutes,
   };
   // 受付の締め切り。全体の最短リード時間とメニューごとの締め切りの、

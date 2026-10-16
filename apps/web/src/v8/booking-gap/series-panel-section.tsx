@@ -4,9 +4,9 @@ import { useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
-import type { BookingSeriesOf } from '@/lib/api-gap2'
+import type { Gap2Booking, Gap2Series } from '@line-crm/shared'
 import SeriesScopeDialog from './series-scope-dialog'
-import { dayWithWeekday, hm } from './series-model'
+import { dayWithWeekday, hm, ruleLabel } from './series-model'
 import styles from './series-panel-section.module.css'
 
 const TIMES = Array.from({ length: 19 }, (_, i) => `${String(9 + Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`)
@@ -15,8 +15,9 @@ const TIMES = Array.from({ length: 19 }, (_, i) => `${String(9 + Math.floor(i / 
  * 予約の詳細パネルの段「繰り返し（毎週金曜 14:00・全 8 回）」と回の一覧（B4）。
  * 変える・取り消すは確かめの窓（この回だけ／この回から後ぜんぶ）を通す。閲覧のみの人には操作を出さない。
  */
-export default function SeriesPanelSection({ series, accountId, customerName, menuName, bookingId, startsAt, canOperate, onChanged }: {
-  series: BookingSeriesOf
+export default function SeriesPanelSection({ series, bookings, accountId, customerName, menuName, bookingId, startsAt, canOperate, onChanged }: {
+  series: Gap2Series
+  bookings: Gap2Booking[]
   accountId: string
   customerName: string
   menuName: string
@@ -28,18 +29,21 @@ export default function SeriesPanelSection({ series, accountId, customerName, me
   const [picking, setPicking] = useState(false)
   const [time, setTime] = useState(hm(startsAt))
   const [mode, setMode] = useState<'change' | 'cancel' | null>(null)
-  const target = { seriesId: series.seriesId, customerName, ruleText: series.ruleText, menuName, index: series.index, bookingId, startsAt, version: series.version }
+  const sorted = [...bookings].sort((a, b) => (a.series_index ?? 0) - (b.series_index ?? 0))
+  const rule = (() => { try { return JSON.parse(series.rule_json) as { freq: 'weekly' | 'biweekly' | 'monthly_nth' } } catch { return { freq: 'weekly' as const } } })()
+  const here = sorted.find((b) => b.id === bookingId)
+  const target = { seriesId: series.id, customerName, ruleText: ruleLabel(rule.freq, startsAt), menuName, index: (here?.series_index ?? 0) + 1, bookingId, startsAt }
   const jstDay = new Date(new Date(startsAt).getTime() + 9 * 3_600_000).toISOString().slice(0, 10)
   const newStartsAt = `${jstDay}T${time}:00+09:00`
 
   return (
     <section className={styles.card} aria-label="繰り返し">
-      <h3 className={styles.title}>繰り返し（{series.ruleText}・全 {series.total} 回）</h3>
+      <h3 className={styles.title}>繰り返し（{target.ruleText}・全 {sorted.length} 回）</h3>
       <ol className={styles.list}>
-        {series.occurrences.map((o) => (
-          <li key={o.bookingId} data-current={o.bookingId === bookingId || undefined}>
-            <span>{o.index} 回目</span><span>{dayWithWeekday(o.startsAt)} {hm(o.startsAt)}</span>
-            {o.bookingId === bookingId ? <span className={styles.here}>この予約</span> : null}
+        {sorted.map((o, i) => (
+          <li key={o.id} data-current={o.id === bookingId || undefined}>
+            <span>{(o.series_index ?? i) + 1} 回目</span><span>{dayWithWeekday(o.starts_at)} {hm(o.starts_at)}</span>
+            {o.id === bookingId ? <span className={styles.here}>この予約</span> : null}
           </li>
         ))}
       </ol>

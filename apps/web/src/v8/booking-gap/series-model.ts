@@ -1,4 +1,4 @@
-import type { SeriesFreq, SeriesOccurrence } from '@/lib/api-gap2'
+import type { RecurrenceFrequency as SeriesFreq, SeriesOccurrence } from '@line-crm/shared'
 
 /** 繰り返しの予約の言葉と並べ方（言葉の表：繰り返す・毎週・隔週・毎月第 N 曜・飛ばす。「シリーズ」「定期」は使わない）。 */
 export const FREQ_OPTIONS: { value: SeriesFreq; label: string }[] = [
@@ -27,4 +27,10 @@ export const initialPick = (o: SeriesOccurrence): Pick => (o.available ? 'keep' 
 /** 作る件数＝取れた回＋「別の時間」を選んだ回（飛ばす回は数えない）。 */
 export function createdCount(list: SeriesOccurrence[], picks: Record<number, Pick>): number {
   return list.filter((o) => (o.available ? true : (picks[o.index] ?? 'skip') === 'alternative' && o.alternatives.length > 0)).length
+}
+
+/** 口が返す取れない理由の言葉。知らない理由は「空きがありません」。 */
+export function reasonText(reason: string | null): string {
+  if (reason === 'calendar_unreadable') return '空きを確かめられません'
+  return '空きがありません'
 }

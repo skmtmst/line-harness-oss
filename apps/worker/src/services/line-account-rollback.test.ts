@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { deleteUncommittedLineAccount } from '@line-crm/db';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { detectFollowerImportCapability } from './follower-import.js';
@@ -67,5 +67,82 @@ describe('R564: 接続中断時の巻き戻しは設定行を残さない', () =
     expect(
       raw.prepare('SELECT id FROM line_account_connection_checks WHERE line_account_id = ?').all('account-r564-checks'),
     ).toEqual([]);
+  });
+});
+
+/**
+ * D1 では親行の DELETE 自体が通らないことがある（HTTP 400 / code 7500
+ * `triggers nested too deep`）。line_accounts を ON DELETE CASCADE で参照する表が
+ * 116 経路あり、文を組み立てる時点で上限を超えるため、行数には依存しない。
+ * 子行を先に消しても通らないので、巻き戻しは行を無効化して一意列を解放する。
+ * 合格条件: 親行 DELETE が失敗しても、同じチャネルをもう一度登録できる。
+ */
+describe('親行の DELETE が D1 で失敗したときの巻き戻し', () => {
+  /** 親行の DELETE だけを D1 と同じように失敗させる。 */
+  function withParentDeleteFailure(db: D1Database): D1Database {
+    const parentDelete = /DELETE\s+FROM\s+line_accounts\b/i;
+    const fail = () => {
+      throw new Error('D1_ERROR: triggers nested too deep: SQLITE_ERROR');
+    };
+    return {
+      ...db,
+      prepare: (sql: string) => {
+        const statement = db.prepare(sql);
+        if (!parentDelete.test(sql)) return statement;
+        return {
+          ...statement,
+          bind: (...args: unknown[]) => ({ ...statement.bind(...args), run: fail }),
+        } as unknown as D1PreparedStatement;
+      },
+    } as unknown as D1Database;
+  }
+
+  test('行は残るが無効化され、同じチャネルをもう一度登録できる', async () => {
+    const { db, raw } = createTestD1({ foreignKeys: true });
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    raw
+      .prepare(
+        `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, login_channel_id, liff_id, is_default)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+      )
+      .run('account-del-fail', 'channel-del-fail', '削除できない一時行', 'token-x', 'secret-x', 'login-del-fail', 'liff-del-fail');
+    raw
+      .prepare(`INSERT INTO account_settings (line_account_id, key, value) VALUES (?, 'follower_import_v1', '{}')`)
+      .run('account-del-fail');
+
+    await deleteUncommittedLineAccount(withParentDeleteFailure(db), 'account-del-fail');
+
+    const row = raw
+      .prepare(
+        `SELECT channel_id, login_channel_id, liff_id, channel_access_token, channel_secret,
+                is_active, is_default, archived_at
+           FROM line_accounts WHERE id = ?`,
+      )
+      .get('account-del-fail') as Record<string, unknown>;
+    expect(row).toMatchObject({
+      channel_id: 'abandoned:account-del-fail',
+      login_channel_id: null,
+      liff_id: null,
+      channel_access_token: '',
+      channel_secret: '',
+      is_active: 0,
+      is_default: 0,
+    });
+    expect(row.archived_at).toBeTruthy();
+    // 子行は親行を消せなくても片付いている。
+    expect(raw.prepare('SELECT line_account_id FROM account_settings WHERE line_account_id = ?').all('account-del-fail')).toEqual([]);
+    // 削除失敗は S14 安全性のため silent fallback (ログ出力なし)。
+    expect(errors.mock.calls).toHaveLength(0);
+    errors.mockRestore();
+
+    // ここが本題。一意列が解放されているので、同じチャネルを登録し直せる。
+    expect(() =>
+      raw
+        .prepare(
+          `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, login_channel_id, liff_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run('account-retry', 'channel-del-fail', '再登録', 'token-y', 'secret-y', 'login-del-fail', 'liff-del-fail'),
+    ).not.toThrow();
   });
 });

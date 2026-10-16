@@ -1,64 +1,69 @@
-import { fetchApi } from './api';
-
-/*
- * ③-2 第2弾（予約の広がり：繰り返し・同伴／複数メニュー・答えで行き先を分ける）の呼び出し。
- * 形は docs/v8-requirements/gap-features/B4〜B6 の「データと API の形の案」のとおり。
- * 口（Worker）は Codex の gap2 が作る。できるまでの撮影の見本は scripts/visual-qa/mock-api.mjs。
- */
-type Result<T> = { success: true; data: T };
-const e = encodeURIComponent;
-const account = (path: string, id: string) => `${path}?account_id=${e(id)}`;
-const json = (method: string, body: unknown, key?: string) => ({ method, body: JSON.stringify(body), ...(key ? { headers: { 'Idempotency-Key': key } } : {}) });
-
-/** B4 繰り返し：毎週・隔週・毎月第 N 曜。 */
-export type SeriesFreq = 'weekly' | 'biweekly' | 'monthly_nth';
-export type SeriesRule = { freq: SeriesFreq; weekday: number; nth?: number; time: string; count?: number; until?: string };
-export type SeriesOccurrence = {
-  index: number;
-  startsAt: string;
-  available: boolean;
-  /** 取れない理由（担当が休み・別の予約・お休み など）。 */
-  reason?: string;
-  /** 近い時間の候補（最大 3）。 */
-  alternatives: string[];
+import {fetchApi} from './api';
+import type {SeriesInput,SeriesOccurrence,Gap2Booking,Gap2Series,BookingAudienceWrite,BookingRouting,FormLayout,MakeupCredit,QaEntry,QaEntryWrite,AiSummary,AiReplyDraft} from '@line-crm/shared';
+type Result<T>={success:true;data:T};
+const e=encodeURIComponent;
+const account=(path:string,id:string)=>`${path}?account_id=${e(id)}`;
+const json=(method:string,body:unknown,key?:string)=>({method,body:JSON.stringify(body),...(key?{headers:{'Idempotency-Key':key}}:{})});
+const liff=(path:string,id:string)=>`${path}?liffId=${e(id)}`;
+const bearer=(token:string,key?:string)=>({Authorization:`Bearer ${token}`,...(key?{'Idempotency-Key':key}:{})});
+export interface Gap2MenuWrite {name:string;duration_minutes:number;base_price:number;expectedVersion?:number;description?:string|null;is_active?:boolean;audienceMode?:BookingAudienceWrite['audienceMode'];audienceTagIds?:string[];addonMenuIds?:string[];addonOnly?:boolean;maxPartySize?:1}
+export const bookingAudienceApi={
+ previewAs:(accountId:string,friendId:string)=>fetchApi<Result<Array<{id:string;name:string;visible:boolean;reason:string|null}>>>(account('/api/booking/admin/menus/preview-as',accountId)+`&friend_id=${e(friendId)}`),
+ createMenu:(accountId:string,input:Gap2MenuWrite,key:string)=>fetchApi<{id:string;version:number}>(account('/api/booking/admin/menus',accountId),json('POST',input,key)),
+ saveMenu:(accountId:string,id:string,input:Gap2MenuWrite&{expectedVersion:number})=>fetchApi<{ok:true;version:number}>(account(`/api/booking/admin/menus/${e(id)}`,accountId),json('PUT',input)),
+ saveNominationFee:(accountId:string,staffId:string,nominationFee:number)=>fetchApi<{ok:true}>(account(`/api/booking/admin/staff/${e(staffId)}`,accountId),json('PUT',{nominationFee})),
+ addons:(liffId:string,menuId:string,token:string)=>fetchApi<Result<Array<{id:string;name:string;duration_minutes:number;base_price:number}>>>(liff(`/api/liff/booking/menus/${e(menuId)}/addons`,liffId),{headers:bearer(token)}),
+ request:(liffId:string,input:{menu_id:string;staff_id?:string;starts_at:string;addonIds?:string[];routingToken?:string;meeting_mode?:'online'|'in_person';customer_note?:string},token:string,key:string)=>fetchApi<{booking_id:string;status:string}>(liff('/api/liff/booking/requests',liffId),{...json('POST',input),headers:bearer(token,key)}),
 };
-export type SeriesPreview = { occurrences: SeriesOccurrence[]; unreadable?: boolean };
-export type SeriesChoice = { index: number; action: 'keep' | 'skip' | 'alternative'; alternativeStartsAt?: string };
-export type SeriesScope = 'this' | 'following';
-export type SeriesScopeImpact = { bookingId: string; startsAt: string; after?: string | null; blocked?: boolean; fee?: { amount: number; percent: number; reason: string } | null };
-
-export type BookingSeriesOf = { seriesId: string; ruleText: string; total: number; index: number; version: number; occurrences: { bookingId: string; index: number; startsAt: string; status: string }[] };
-
-export const bookingSeriesApi = {
-  /** この予約が繰り返しの 1 回なら、その組と各回。そうでなければ null。 */
-  ofBooking: (id: string, bookingId: string) => fetchApi<Result<BookingSeriesOf | null>>(account(`/api/booking/admin/bookings/${e(bookingId)}/series`, id)),
-  preview: (id: string, input: { menuId: string; staffId: string | null; startsAt: string; rule: SeriesRule }) =>
-    fetchApi<Result<SeriesPreview>>(account('/api/booking/admin/series/preview', id), json('POST', input)),
-  create: (id: string, input: { menuId: string; staffId: string | null; friendId: string; startsAt: string; rule: SeriesRule; choices: SeriesChoice[] }, key: string) =>
-    fetchApi<Result<{ seriesId: string; created: number; skipped: number }> | { success: false; conflicts: number[] }>(account('/api/booking/admin/series', id), json('POST', input, key)),
-  impact: (id: string, seriesId: string, input: { scope: SeriesScope; fromBookingId: string; change?: { startsAt?: string; staffId?: string } }) =>
-    fetchApi<Result<{ items: SeriesScopeImpact[] }>>(account(`/api/booking/admin/series/${e(seriesId)}/impact`, id), json('POST', input)),
-  change: (id: string, seriesId: string, input: { scope: SeriesScope; fromBookingId: string; change: { startsAt?: string; staffId?: string }; expectedVersion: number; notify: boolean }) =>
-    fetchApi<Result<{ changed: number; blocked: number; version: number }>>(account(`/api/booking/admin/series/${e(seriesId)}`, id), json('PATCH', input)),
-  cancel: (id: string, seriesId: string, input: { scope: SeriesScope; fromBookingId: string; notify: boolean }) =>
-    fetchApi<Result<{ cancelled: number }>>(account(`/api/booking/admin/series/${e(seriesId)}/cancel`, id), json('POST', input)),
+export const bookingSeriesApi={
+ preview:(a:string,input:SeriesInput)=>fetchApi<Result<{occurrences:SeriesOccurrence[]}>>(account('/api/booking/admin/series/preview',a),json('POST',input)),
+ create:(a:string,input:SeriesInput,key:string)=>fetchApi<Result<{series:Gap2Series;bookings:Gap2Booking[];skipped:SeriesOccurrence[]}>>(account('/api/booking/admin/series',a),json('POST',input,key)),
+ get:(a:string,id:string)=>fetchApi<Result<{series:Gap2Series;bookings:Gap2Booking[]}>>(account(`/api/booking/admin/series/${e(id)}`,a)),
+ change:(a:string,id:string,input:{scope:'this'|'following';fromBookingId:string;expectedVersion:number;change:{startsAt?:string;staffId?:string}})=>fetchApi<Result<{changed:string[];conflicts:string[];version:number}>>(account(`/api/booking/admin/series/${e(id)}`,a),json('PATCH',input)),
+ cancel:(a:string,id:string,input:{scope:'this'|'following';fromBookingId:string;expectedVersion:number;reason?:string})=>fetchApi<Result<{cancelled:string[];fees:Array<{bookingId:string;feeNow:number}>;version:number}>>(account(`/api/booking/admin/series/${e(id)}/cancel`,a),json('POST',input)),
 };
-
-/** B5 同伴・複数メニュー。 */
-export type PartyMember = { bookingId: string; label: string; menuName: string; staffName: string; startsAt: string; endsAt: string; status: string };
-export type BookingParty = { groupId: string; ownerName: string; members: PartyMember[]; version: number };
-export const bookingPartyApi = {
-  get: (id: string, bookingId: string) => fetchApi<Result<BookingParty | null>>(account(`/api/booking/admin/bookings/${e(bookingId)}/group`, id)),
-  cancel: (id: string, groupId: string, input: { scope: 'all' | 'member'; bookingId?: string; expectedVersion: number }) =>
-    fetchApi<Result<{ cancelled: number }>>(account(`/api/booking/admin/groups/${e(groupId)}/cancel`, id), json('POST', input)),
+export const formRoutingApi={
+ saveLayout:(a:string,id:string,layout:FormLayout,expectedContentRevision:number)=>fetchApi<unknown>(account(`/api/forms/${e(id)}`,a),json('PUT',{layout,expectedContentRevision})),
+ preview:(a:string,id:string,answers:Record<string,unknown>,blockId?:string)=>fetchApi<Result<{matchedIndex:number;target:BookingRouting['fallback'];usable:boolean;fellBack:boolean}>>(account(`/api/forms/${e(id)}/routing/preview`,a),json('POST',{answers,blockId})),
+ resolve:(liffId:string,id:string,answers:Record<string,unknown>,token:string,blockId?:string)=>fetchApi<Result<{matchedIndex:number;target:BookingRouting['fallback'];routingToken:string;expiresAt:string}>>(liff(`/api/liff/forms/${e(id)}/routing/resolve`,liffId),{...json('POST',{answers,blockId}),headers:bearer(token)}),
+ groups:(a:string)=>fetchApi<Result<Array<{id:string;name:string;staff_ids_json:string;version:number}>>>(account('/api/booking/admin/routing-staff-groups',a)),
+ saveGroup:(a:string,id:string,input:{name:string;staffIds:string[];expectedVersion:number})=>fetchApi<Result<{version:number}>>(account(`/api/booking/admin/routing-staff-groups/${e(id)}`,a),json('PUT',input)),
 };
-
-/** B6 答えで行き先を分ける（フォームの版の JSON の routing）。 */
-export type RoutingCondition = { questionId: string; op: 'is' | 'in' | 'between'; value: string | string[] | [number, number] };
-export type RoutingTarget = { menuId: string; staffGroupId?: string | null; staffId?: string | null; meetingMode?: 'in_person' | 'online' | null };
-export type RoutingRule = { id: string; conditions: RoutingCondition[]; target: RoutingTarget; unusable?: boolean };
-export type FormRouting = { enabled: boolean; /** 分ける質問（ブロックの ID）。 */ questionId?: string; rules: RoutingRule[]; fallback: RoutingTarget };
-export const formRoutingApi = {
-  preview: (id: string, formId: string, answers: Record<string, string | string[] | number>) =>
-    fetchApi<Result<{ matchedIndex: number; target: RoutingTarget; usable: boolean }>>(account(`/api/forms/${e(formId)}/routing/preview`, id), json('POST', { answers })),
+export const bookingMakeupApi={
+ rule:(a:string,eventId:string,rule:{enabled:boolean;cutoffHours:number;validDays:number;monthlyCap:number;target:'same_kind'|'list';targetIds:string[]},expectedRevision:number)=>fetchApi<Result<{revision:number}>>(account(`/api/events/admin/${e(eventId)}/makeup-rule`,a),json('PUT',{rule,expectedRevision})),
+ absenceByStore:(a:string,id:string,input:{grantMakeup?:boolean;reason?:string})=>fetchApi<Result<{eventBooking:{id:string;status:'absent'};makeupCredit:MakeupCredit|null;reasonIfNone:string|null}>>(account(`/api/events/admin/bookings/${e(id)}/absence`,a),json('POST',input)),
+ absence:(liffId:string,id:string,token:string,key:string)=>fetchApi<Result<{eventBooking:{id:string;status:'absent'};makeupCredit:MakeupCredit|null;reasonIfNone:string|null}>>(liff(`/api/liff/events/bookings/${e(id)}/absence`,liffId),{...json('POST',{}),headers:bearer(token,key)}),
+ list:(liffId:string,token:string)=>fetchApi<Result<MakeupCredit[]>>(liff('/api/liff/events/makeup-credits',liffId),{headers:bearer(token)}),
+ listByStore:(a:string,friendId:string)=>fetchApi<Result<MakeupCredit[]>>(account('/api/booking/admin/makeup-credits',a)+`&friend_id=${e(friendId)}`),
+ options:(liffId:string,id:string,token:string,from?:string)=>fetchApi<Result<Array<{id:string;event_id:string;starts_at:string;ends_at:string;capacity:number|null;occupied:number}>>>(liff(`/api/liff/events/makeup-credits/${e(id)}/options`,liffId)+(from?`&from=${e(from)}`:''),{headers:bearer(token)}),
+ use:(liffId:string,id:string,eventSlotId:string,token:string,key:string)=>fetchApi<Result<{bookingId:string;replayed:boolean}>>(liff(`/api/liff/events/makeup-credits/${e(id)}/use`,liffId),{...json('POST',{eventSlotId}),headers:bearer(token,key)}),
 };
+export const broadcastAbApi={
+ save:(id:string,input:{testRatioPct:10|20|30|50;metric:'click';decideAfterMinutes:60|120|240|480|1440;undecidedPolicy:'stop'|'send_a';expectedVersion:number})=>fetchApi<Result<{version:number;testMode:true}>>(`/api/broadcasts/${e(id)}/ab-test`,json('PUT',input)),
+ remove:(id:string,expectedVersion:number)=>fetchApi<Result<{deleted:true;version:number}>>(`/api/broadcasts/${e(id)}/ab-test`,json('DELETE',{expectedVersion})),
+ saveVariant:(id:string,key:'A'|'B',text:string,expectedVersion:number)=>fetchApi<Result<{key:'A'|'B';version:number}>>(`/api/broadcasts/${e(id)}/variants/${key}`,json('PUT',{text,expectedVersion})),
+ result:(id:string)=>fetchApi<Result<{status:string;winner:'A'|'B'|null;variants:Array<{key:string;sent:number;failed:number;clicks:number;clickRate:number|null}>;remainder:{count:number;sent:number};version:number;testMode:true}>>(`/api/broadcasts/${e(id)}/ab-result`),
+ startMock:(id:string,expectedVersion:number,confirmedRecipientCount:number,key:string)=>fetchApi<Result<{status:'testing';testMode:true;decideAt:string;counts:{A:number;B:number;R:number}}>>(`/api/broadcasts/${e(id)}/send`,{...json('POST',{expectedVersion,confirmedRecipientCount,testMode:true}),headers:{'Idempotency-Key':key,'X-Confirm-Irreversible':'broadcast-send'}}),
+ chooseMock:(id:string,variant:'A'|'B'|'none',confirmedRecipientCount:number,key:string)=>fetchApi<Result<{variant:'A'|'B'|'none';testMode:true}>>(`/api/broadcasts/${e(id)}/ab-test/choose`,{...json('POST',{variant,confirmedRecipientCount,testMode:true}),headers:{'Idempotency-Key':key,'X-Confirm-Irreversible':'broadcast-send'}}),
+};
+export const aiDraftApi={
+ settings:(a:string)=>fetchApi<Result<{mode:'off'|'draft_only'|'suspended';version:number;autoReplyAvailable:false}>>(account('/api/ai-settings',a)),
+ saveSettings:(a:string,input:{mode:'off'|'draft_only'|'suspended';expectedVersion:number;confirmed?:true;reason?:string})=>fetchApi<Result<{mode:string;version:number;autoReplyAvailable:false}>>(account('/api/ai-settings',a),json('PUT',input)),
+ summary:(chatId:string)=>fetchApi<Result<AiSummary>>(`/api/chats/${e(chatId)}/ai/summary`,json('POST',{})),
+ draft:(chatId:string)=>fetchApi<Result<AiReplyDraft>>(`/api/chats/${e(chatId)}/ai/draft`,json('POST',{})),
+ qa:(a:string,q='',offset=0)=>fetchApi<Result<QaEntry[]>&{total:number;nextOffset:number|null}>(account('/api/qa-entries',a)+`&q=${e(q)}&offset=${offset}`),
+ createQa:(a:string,input:QaEntryWrite,key:string)=>fetchApi<Result<QaEntry>>(account('/api/qa-entries',a),json('POST',input,key)),
+ saveQa:(a:string,id:string,input:QaEntryWrite&{expectedVersion:number})=>fetchApi<Result<{version:number;status:'draft'}>>(account(`/api/qa-entries/${e(id)}`,a),json('PUT',input)),
+ publishQa:(a:string,id:string,expectedVersion:number)=>fetchApi<Result<{version:number;status:'published'}>>(account(`/api/qa-entries/${e(id)}/publish`,a),json('POST',{expectedVersion})),
+ stopQa:(a:string,id:string,expectedVersion:number)=>fetchApi<Result<{version:number;status:'stopped'}>>(account(`/api/qa-entries/${e(id)}/stop`,a),json('POST',{expectedVersion})),
+ archiveQa:(a:string,id:string,expectedVersion:number)=>fetchApi<Result<{version:number;status:'stopped'}>>(account(`/api/qa-entries/${e(id)}`,a),json('DELETE',{expectedVersion})),
+};
+export const operatorPushApi={
+ get:()=>fetchApi<Result<{subscriptions:Array<{id:string;user_agent_label:string;revoked_at:string|null}>;preferences:{kinds_json:string;quiet_start:string;quiet_end:string;quiet_allow_critical:number;version:number};vapidPublicKey:string|null;configured:boolean}>>('/api/me/push'),
+ subscribe:(input:{endpoint:string;keys:{p256dh:string;auth:string};label:string},key:string)=>fetchApi<Result<{id:string;user_agent_label:string}>>('/api/me/push/subscriptions',json('POST',input,key)),
+ unsubscribe:(id:string)=>fetchApi<{success:true}>(`/api/me/push/subscriptions/${e(id)}`,{method:'DELETE'}),
+ savePreferences:(input:{kinds:Array<'new_inquiry'|'assigned_reply'>;quietStart:string;quietEnd:string;quietAllowCritical:boolean;expectedVersion:number})=>fetchApi<Result<{version:number}>>('/api/me/push/preferences',json('PUT',input)),
+ test:()=>fetchApi<Result<{sent:number;failed:number}>>('/api/me/push/test',json('POST',{})),
+};
+/** H1 uses the existing HQ creation/preflight/distribution APIs. */
+export {hqCatalogTemplatesApi as gap2HqTemplateApi} from './api-hq-catalog-templates';

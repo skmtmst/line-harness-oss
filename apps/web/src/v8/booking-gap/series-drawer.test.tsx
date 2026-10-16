@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import type { SeriesOccurrence } from '@/lib/api-gap2'
+import type { SeriesOccurrence } from '@line-crm/shared'
+import { ApiError } from '@/lib/api'
 
 const preview = vi.fn()
 const create = vi.fn()
@@ -11,13 +12,13 @@ const { default: SeriesBookingDrawer } = await import('./series-drawer')
 
 const day = (n: number) => `2026-11-${String(n).padStart(2, '0')}T05:00:00.000Z`
 const list: SeriesOccurrence[] = [
-  { index: 0, startsAt: day(20), available: true, alternatives: [] },
-  { index: 1, startsAt: '2026-12-04T05:00:00.000Z', available: false, reason: '佐々木が休み', alternatives: ['2026-12-04T07:00:00.000Z'] },
-  { index: 2, startsAt: '2026-12-25T05:00:00.000Z', available: false, reason: '14:00 に別の予約', alternatives: [] },
+  { index: 0, startsAt: day(20), available: true, staffId: 'bs-1', reason: null, alternatives: [] },
+  { index: 1, startsAt: '2026-12-04T05:00:00.000Z', available: false, staffId: null, reason: 'slot_unavailable', alternatives: ['2026-12-04T07:00:00.000Z'] },
+  { index: 2, startsAt: '2026-12-25T05:00:00.000Z', available: false, staffId: null, reason: 'slot_unavailable', alternatives: [] },
 ]
 const summary = { customerName: '山田 花子', friendId: 'f1', menuId: 'bm-1', menuName: 'トリミング（小型犬）', durationMin: 105, staffId: 'bs-1', staffName: '佐々木', startsAt: day(20), endsAt: '2026-11-20T06:45:00.000Z' }
 
-beforeEach(() => { preview.mockResolvedValue({ success: true, data: { occurrences: list } }); create.mockResolvedValue({ success: true, data: { seriesId: 's1', created: 2, skipped: 1 } }) })
+beforeEach(() => { preview.mockResolvedValue({ success: true, data: { occurrences: list } }); create.mockResolvedValue({ success: true, data: { series: { id: 's1' }, bookings: [{}, {}], skipped: [{}] } }) })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 const open = (onCreated = vi.fn()) => render(<SeriesBookingDrawer open accountId="a1" summary={summary} onClose={() => {}} onCreated={onCreated} />)
 
@@ -39,12 +40,13 @@ test('別の時間を飛ばすに替えると件数が減り、保存は回ご�
   await waitFor(() => expect(create).toHaveBeenCalledTimes(1))
   const body = create.mock.calls[0][1]
   expect(body.choices.map((c: { action: string }) => c.action)).toEqual(['keep', 'skip', 'skip'])
+  expect(body.friendId).toBe('f1')
   expect(typeof create.mock.calls[0][2]).toBe('string') // Idempotency-Key（二重押しは同じ組 1 つ）
   await waitFor(() => expect(onCreated).toHaveBeenCalledWith({ seriesId: 's1', created: 2 }))
 })
 
 test('保存の間に埋まった回があれば何も作らず、表を出し直す', async () => {
-  create.mockResolvedValue({ success: false, conflicts: [1] })
+  create.mockRejectedValue(new ApiError(409, 'conflict'))
   const onCreated = vi.fn()
   open(onCreated)
   fireEvent.click(await screen.findByRole('button', { name: '2 件を入れる' }))

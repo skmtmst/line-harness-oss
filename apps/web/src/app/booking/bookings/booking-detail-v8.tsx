@@ -95,7 +95,7 @@ export default function BookingDetailV8({
         </div>
       }
     >
-      {accountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={accountId} bookingId={b.id} customerName={name} menuName={b.menu_name} startsAt={b.starts_at} canOperate={canOperate} onChanged={() => setHistorySeq((n) => n + 1)} /></div> : null}
+      {accountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={accountId} bookingId={b.id} seriesId={(b as { series_id?: string | null }).series_id ?? null} customerName={name} menuName={b.menu_name} startsAt={b.starts_at} canOperate={canOperate} onChanged={() => setHistorySeq((n) => n + 1)} /></div> : null}
       <dl className="space-y-2 text-sm">
         <div>
           <dt className="text-ink-faint text-xs">日時</dt>

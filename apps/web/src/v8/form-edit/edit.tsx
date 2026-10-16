@@ -40,8 +40,7 @@ import { focusFieldById } from '@/lib/use-form-errors';
 import { useCustomerLook } from '@/components/shared/use-customer-look';
 import { FormPhone } from './phone';
 import styles from './edit.module.css'
-import { routingError, routingOf } from './routing-model'
-import type { FormRouting } from '@/lib/api-gap2'
+import { routingError, routingOf, withRouting, type FormRouting } from './routing-model'
 import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TextLink from '@/components/shared/text-link'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -474,7 +473,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   const inputCount = layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input').length, layout.header.filter((b) => b.kind === 'input').length)
 
-  const patchRouting = (next: FormRouting) => setLayout((prev) => ({ ...prev, routing: next } as FormLayout))
+  const patchRouting = (next: FormRouting) => setLayout((prev) => withRouting(prev, next))
   const patchOptions = (next: Partial<FormOptions>) => setLayout((prev) => ({ ...prev, options: { ...prev.options, ...next } }))
 
   /* ---------------- 未保存の確認 ---------------- */

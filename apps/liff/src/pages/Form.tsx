@@ -217,7 +217,10 @@ export default function Form() {
    * 答えで予約の行き先を分けるフォーム（B6）：予約の欄があるページに来たら、答えから行き先を決めてもらう。
    * 行き先はサーバーが決める（お客さまは書き換えられない）。決められなければ「どれにも当たらない」行き先へ。
    */
-  const routingOn = Boolean((layout as { routing?: { enabled?: boolean } } | undefined)?.routing?.enabled);
+  const routingBlock = layout?.sections.flatMap((s) => s.blocks).find((b): b is FormInputBlock => b.kind === 'input' && b.type === 'booking' && b.booking?.routing?.enabled === true);
+  const routingOn = Boolean(routingBlock);
+  /** 予約を作るときに添える署名（行き先は答えで決まり、お客さまは書き換えられない）。 */
+  const routingToken = useRef<string | null>(null);
   const pageHasBooking = Boolean(section?.blocks.some((b) => b.kind === 'input' && b.type === 'booking'));
   const routedPage = routingOn && pageHasBooking;
   const bookingName = section?.blocks.find((b) => b.kind === 'input' && b.type === 'booking');
@@ -230,11 +233,20 @@ export default function Form() {
     if (!routingOn || !pageHasBooking || !id) { setRouted(undefined); return; }
     let alive = true;
     setRouted({ status: 'loading' });
-    api.resolveFormRouting(id, JSON.parse(answersKey) as Record<string, unknown>)
-      .then((r) => { if (alive) setRouted({ status: 'ready', target: r.target }); })
+    api.resolveFormRouting(id, JSON.parse(answersKey) as Record<string, unknown>, routingBlock?.id)
+      .then(async (r) => {
+        /* 口は行き先の ID だけを返す。見せる名前・時間・料金・担当の名前は、メニューと担当の口で読み足す。 */
+        const [menus, staff] = await Promise.all([api.menus().catch(() => ({ menus: [] as MenuItem[] })), r.target.staffId ? api.staffOf(r.target.menuId).catch(() => ({ staff: [] as StaffItem[] })) : Promise.resolve({ staff: [] as StaffItem[] })]);
+        const menu = menus.menus.find((m) => m.id === r.target.menuId);
+        if (!alive) return;
+        routingToken.current = r.routingToken;
+        setRouted({ status: 'ready', target: {
+          menuId: r.target.menuId, menuName: menu?.name ?? 'ご案内のメニュー', durationMinutes: menu?.duration_minutes ?? 0, price: menu?.base_price ?? 0,
+          staffId: r.target.staffId ?? null, staffName: staff.staff.find((s) => s.id === r.target.staffId)?.display_name ?? null, meetingMode: r.target.meetingMode ?? null } });
+      })
       .catch((e) => { logFailure('form-routing-resolve', e); if (alive) setRouted({ status: 'error', retry: () => setRoutedRetry((n) => n + 1) }); });
     return () => { alive = false; };
-  }, [routingOn, pageHasBooking, id, answersKey, routedRetry]);
+  }, [routingOn, pageHasBooking, id, answersKey, routedRetry, routingBlock?.id]);
 
   /** いま出ているページの入力欄。検証はここだけを見る。 */
   const visibleInputs = useMemo(() => {
@@ -394,7 +406,7 @@ export default function Form() {
         const res = slot.kind === 'seats'
           ? (await restaurantBookingApi.formBooking({formId:id!,blockId:block.id,submissionKey:key})).data
           : await api.createRequest(
-          { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt },
+          { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt, ...(routingToken.current && routingBlock?.id === block.id ? { routingToken: routingToken.current } : {}) },
           `${key}:booking:${block.id}`,
         );
         if (!request.isCurrent(generation)) return null;

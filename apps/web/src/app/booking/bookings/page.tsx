@@ -1353,7 +1353,7 @@ export default function BookingsPage() {
         >
           {activeBooking ? (
             <div>
-              {selectedAccountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={selectedAccountId} bookingId={activeBooking.id} customerName={activeBooking.friend_name ?? 'お客様'} menuName={activeBooking.menu_name} startsAt={activeBooking.starts_at} canOperate={canOperate} onChanged={() => void load()} /></div> : null}
+              {selectedAccountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={selectedAccountId} bookingId={activeBooking.id} seriesId={(activeBooking as { series_id?: string | null }).series_id ?? null} customerName={activeBooking.friend_name ?? 'お客様'} menuName={activeBooking.menu_name} startsAt={activeBooking.starts_at} canOperate={canOperate} onChanged={() => void load()} /></div> : null}
               <DetailRow label="日時">
                 {formatJpDateTime(activeBooking.starts_at)} 〜 {formatJpTime(activeBooking.ends_at)}
               </DetailRow>
