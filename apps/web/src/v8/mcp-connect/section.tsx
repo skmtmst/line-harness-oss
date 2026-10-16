@@ -272,7 +272,7 @@ function McpCreateDialog({ open, defaultAccountId, accountOptions, onClose, onCr
           </Field>
           <RadioCardGroup legend="できること" legendVisible>
             {LEVELS.map((value) => (
-              <RadioCard key={value} name="mcp-level" value={value} checked={level === value} onChange={(next: string) => setLevel(next as McpLevel)} title={LEVEL_LABEL[value]} note={LEVEL_NOTE[value]} variant="compact" />
+              <RadioCard key={value} name="mcp-level" value={value} checked={level === value} onChange={(next: string) => setLevel(next as McpLevel)} title={LEVEL_LABEL[value]} note={LEVEL_NOTE[value]} variant="form" />
             ))}
           </RadioCardGroup>
           <p className={styles.note}>どの段でも、消す・設定・権限・鍵・お金・個人情報の書き出しはできません。作った後に段は変えられません。</p>

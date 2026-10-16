@@ -205,22 +205,22 @@ export default function AnswerLogV8() {
         <DataTable aria-label="AI が答えた記録" columnSizing="content">
           <thead>
             <TableHeadRow>
-              <Th>日時</Th>
-              <Th>お客さま</Th>
-              <Th grow>質問</Th>
+              <Th grow weight={1}>日時</Th>
+              <Th grow weight={1}>お客さま</Th>
+              <Th grow weight={3}>質問</Th>
               <Th>したこと</Th>
-              <Th>元の Q&A</Th>
+              <Th grow weight={2}>元の Q&A</Th>
               <Th><span className="sr-only">操作</span></Th>
             </TableHeadRow>
           </thead>
           <tbody>
             {load.items.map((log) => (
               <Tr key={log.id} data-row-id={log.id} onClick={() => setUrl({ log: log.id })}>
-                <Td>{at(log.createdAt)}</Td>
-                <Td title={log.friendName}><TruncatedText value={log.friendName} /></Td>
-                <Td grow title={log.questionText}><TruncatedText value={log.questionText} /></Td>
+                <Td grow weight={1}>{at(log.createdAt)}</Td>
+                <Td grow weight={1} title={log.friendName}><TruncatedText value={log.friendName} /></Td>
+                <Td grow weight={3} title={log.questionText}><TruncatedText value={log.questionText} /></Td>
                 <Td><StatusBadge tone={ACTION_TONE[log.action]}>{ACTION_LABEL[log.action]}</StatusBadge></Td>
-                <Td title={log.qaTitle ?? handoffReasonText(log.handoffReason)}><TruncatedText value={log.qaTitle ?? '—'} /></Td>
+                <Td grow weight={2} title={log.qaTitle ?? handoffReasonText(log.handoffReason)}><TruncatedText value={log.qaTitle ?? '—'} /></Td>
                 <ActionCell>
                   <RowMenu
                     appearance="plain"

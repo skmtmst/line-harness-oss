@@ -14,6 +14,7 @@
   border: 1px solid var(--card-edge);
   border-radius: var(--polish-radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .tabsCard {
@@ -169,8 +170,9 @@
   flex-direction: column;
   gap: var(--polish-space-field);
   padding: var(--ab-variant-pad);
+  /* カードの中の小箱（カードではない）：角丸は部品の丸み。影は重ねない。 */
   border: 1px solid var(--card-edge);
-  border-radius: var(--polish-radius-card);
+  border-radius: var(--radius-control);
 }
 
 .variant[data-winner] {

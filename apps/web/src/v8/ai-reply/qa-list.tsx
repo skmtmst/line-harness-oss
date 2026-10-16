@@ -193,8 +193,8 @@ export default function QaListV8() {
         <DataTable aria-label="Q&A" columnSizing="content">
           <thead>
             <TableHeadRow>
-              <Th grow>質問</Th>
-              <Th grow>答えの頭</Th>
+              <Th grow weight={4}>質問</Th>
+              <Th grow weight={3}>答えの頭</Th>
               <Th>使われた</Th>
               <Th>状態</Th>
               {permissions.editQa ? <Th><span className="sr-only">操作</span></Th> : null}
@@ -211,8 +211,8 @@ export default function QaListV8() {
               ]
               return (
                 <Tr key={entry.id} data-row-id={entry.id} onClick={permissions.editQa ? () => setEdit({ entry }) : undefined}>
-                  <Td grow title={title}><TruncatedText value={title} /></Td>
-                  <Td grow title={entry.answerText}><TruncatedText value={entry.status === 'draft' && entry.source !== 'manual' ? `（${entry.source === 'import_pdf' ? 'PDF' : 'Web'} から取り込み・確かめ待ち）` : entry.answerText} /></Td>
+                  <Td grow weight={4} title={title}><TruncatedText value={title} /></Td>
+                  <Td grow weight={3} title={entry.answerText}><TruncatedText value={entry.status === 'draft' && entry.source !== 'manual' ? `（${entry.source === 'import_pdf' ? 'PDF' : 'Web'} から取り込み・確かめ待ち）` : entry.answerText} /></Td>
                   <Td>{entry.useCount > 0 ? `${formatNumber(entry.useCount)} 回` : '—'}</Td>
                   <Td><StatusBadge tone={QA_STATUS_TONE[entry.status]}>{QA_STATUS_LABEL[entry.status]}</StatusBadge></Td>
                   {permissions.editQa ? (

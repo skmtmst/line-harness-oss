@@ -34,6 +34,7 @@ export function Th({
   showActionLabel = false,
   collapseAt,
   grow,
+  weight,
   inset,
   ...cellProps
 }: ThProps) {
@@ -49,7 +50,7 @@ export function Th({
   const actionHeading = children === '操作' && !showActionLabel
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
   return (
-    <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
+    <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset || weight ? { ...(inset ? { paddingInlineStart: inset } : {}), ...(weight ? { '--cell-weight': weight } : {}) } as CSSProperties : undefined} data-cell-weight={weight} {...cellProps}>
       {actionHeading ? <span className="sr-only">操作</span> : truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
@@ -236,17 +237,19 @@ export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'ch
   className?: string
   collapseAt?: 'narrow'
   grow?: boolean
+  /** 余った幅の割合（grow の列どうしの比）。 */
+  weight?: number
 }
 
 /** 標準一覧の本文セル。 */
-export function Td({ children, align = 'left', className, collapseAt, grow, ...cellProps }: TdProps) {
+export function Td({ children, align = 'left', className, collapseAt, grow, weight, style, ...cellProps }: TdProps) {
   const classes = [
     shell.bodyCell,
     align === 'right' && styles.right,
     align === 'center' && styles.center,
     className,
   ].filter(Boolean).join(' ')
-  return <td className={classes} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
+  return <td className={classes} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} data-cell-weight={weight} style={weight ? { ...style, '--cell-weight': weight } as CSSProperties : style} {...cellProps}>{children}</td>
 }
 
 /** 日時の本文セル。数字の桁と補足色は共通部品が持つ。 */
