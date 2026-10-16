@@ -134,7 +134,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
 
   /*
    * 返金（PpBzn → v6mT4f）。今の口は全額だけで、額・理由・LINE で知らせるは受け取らない（口が要る）。
-   * 一部の返金は口が来るまで共通の準備中の窓。全額は今の口へ送る。
+   * 一部の返金は口が来るまで共通の案内の窓。全額は今の口へ送る。
    */
   async function refund(input: RefundInput) {
     if (!refundTarget) return

@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertTriangle, CreditCard, ExternalLink, Plug, Split, Store } from 'lucide-react'
+import { CreditCard, Split, Store } from 'lucide-react'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifySaved } from '@/components/shared/toast'
 import { formatListTimestamp } from '@/lib/format'
@@ -18,7 +17,6 @@ import settings from '../booking-menus/settings.module.css'
 import { providerFor } from './labels'
 import { CancellationSection, ConnectionCard, DepositSection, cancellationSaveError, useCancellationSettings } from './cancellation'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
-import TestModeNote from '@/components/shared/test-mode-note'
 import PaymentRecords from './records'
 import PaymentEvents from './events'
 import styles from './payments.module.css'
@@ -26,7 +24,7 @@ import styles from './payments.module.css'
 /*
  * 予約設定 › お支払い（B-305・B-308 追記 3 の案A：お支払いの設定はこのタブ 1 つ）。
  * 絵：T91bV（つないだ後・試験モード）・UteeA（つなぐ前の状態と Stripe から届いた知らせ）・FY8HC（お支払いの記録）。
- * 読む：今ある口 getPaymentConfig／savePaymentConfig。つなぎの状態・記録・知らせは口待ち（無ければ準備中）。
+ * 読む：今ある口 getPaymentConfig／savePaymentConfig。つなぎの状態・記録・知らせは口待ち（無ければ共通の案内の窓）。
  * 受け付ける指定：?tab=payments&view=records|events。
  */
 
@@ -92,7 +90,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
   const link = connectionFrom(config, connection)
   useEffect(() => { if (status === 'ready') onConnectedChange?.(link.connected) }, [status, link.connected, onConnectedChange])
 
-  /* 決済をつなぐ：Stripe の試験の接続の画面へ（本番の鍵は入れない）。口が無ければ共通の準備中。 */
+  /* 決済をつなぐ：Stripe の試験の接続の画面へ（本番の鍵は入れない）。口が無ければ共通の案内の窓。 */
   async function connect() {
     setConnecting(true)
     try {

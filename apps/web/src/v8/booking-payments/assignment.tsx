@@ -22,7 +22,7 @@ import styles from './assignment.module.css'
 /*
  * 指名なしの予約の割り当て方（B-306・絵 QJMoY＝担当スタッフ、jmVYJ＝卓）。
  * 口：組3 の bookingAssignmentApi（人＝LINEアカウント、卓＝飲食店舗）。表が無い（storageReady=false・503・404）間は
- * 「現在準備中です」の帯を出し、保存しない（今は一覧の上の人・卓から入る）。版が古いと 409 → 比べる窓。
+ * 共通の案内の窓を出し、保存しない（今は一覧の上の人・卓から入る）。版が古いと 409 → 比べる窓。
  */
 
 export const PRIORITY: Record<BookingAssignmentPriority, { label: string; tone: StatusBadgeTone }> = {
@@ -134,10 +134,10 @@ const METHODS: Array<{ value: BookingAssignmentMethod; title: string; icon: Reac
   { value: 'random', title: 'ランダム', icon: <Shuffle size={16} aria-hidden="true" /> },
 ]
 
-/** 割り当て方の区画（題・準備中の帯・3 つの選び方・数える期間）。 */
+/** 割り当て方の区画（題・案内・3 つの選び方・数える期間）。 */
 export function AssignmentSection({ state, kind, canEdit }: { state: AssignmentState; kind: 'staff' | 'tables'; canEdit: boolean }) {
   const staff = kind === 'staff'
-  /* 表がまだ無い（not-ready）ときも選べる形で出し、保存を押すと共通の準備中の窓（B-321：手書きの帯は出さない）。 */
+  /* 表がまだ無い（not-ready）ときも選べる形で出し、保存を押すと共通の案内の窓（B-321：手書きの帯は出さない）。 */
   const locked = state.status === 'loading' || state.status === 'error'
   const notes: Record<BookingAssignmentMethod, string> = staff
     ? { balanced: '担当の少ない人から入れます', priority: '決めた順番で埋めます', random: '空いている人から無作為に' }

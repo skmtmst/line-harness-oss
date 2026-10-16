@@ -148,7 +148,7 @@ describe('V8 予約設定', () => {
   // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('ZyDd6: 予約経路タブは経路の口から表を作る', () => {
-    expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路', node: 'ZyDd6' }")
+    expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路の連携', node: 'ZyDd6' }")
     expect(SETTINGS_V8).toContain('/api/booking/admin/channels?account_id=')
     expect(SETTINGS_V8).toContain('スタッフの Google カレンダー')
     expect(SETTINGS_V8).toContain('data-design-node="wJYQb"')

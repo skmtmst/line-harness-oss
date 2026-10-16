@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { ArrowRight, CreditCard } from 'lucide-react'
 import Card, { CardHeader } from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
 import HelpTip from '@/components/shared/help-tip'
@@ -8,6 +9,7 @@ import NumberInput from '@/components/shared/number-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import SegmentedControl from '@/components/shared/segmented'
 import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
 import { gapDraftApi, type DepositRule } from '@/lib/api-gap-draft'
 import type { MenuPaymentState } from './menu-payment'
 import { MODE_LABEL } from './labels'
@@ -59,7 +61,7 @@ export function BookingMenuPaymentCard({ payment, deposit, price, readOnly }: { 
   const amount = rule && price !== null && rule.value ? (rule.kind === 'percent' ? Math.floor(price * rule.value / 100) : Math.min(rule.value, price)) : null
   const header = <CardHeader size="stacked" title="お支払い" help={<HelpTip label="お支払いの説明">いつもの方法は予約設定 › お支払いのとおりです。デポジットは予約のときに一部を先に払ってもらい、残りはお店で払います。</HelpTip>} />
   if (payment.status === 'loading') return <Card variant="form" gap="normal">{header}<p className={styles.minor}>お支払いの設定を読み込んでいます…</p></Card>
-  if (!payment.connected) return <Card variant="form" gap="normal">{header}<p className={styles.minor}>決済をつなぐと選べます（いまはお店で払うだけです）。</p></Card>
+  if (!payment.connected) return <Card variant="form" gap="normal">{header}<p className={styles.sideCardLink}><CreditCard size={15} aria-hidden="true" />先払い・デポジットを受けるには<TextLink href="/booking/menus?tab=payments">お支払いをつなぐ<ArrowRight size={14} aria-hidden="true" /></TextLink></p></Card>
   if (readOnly) return <Card variant="form" gap="normal">{header}<p className={styles.readValue}>{choice === 'deposit' ? 'デポジット（一部）' : choice === 'default' ? `いつもの方法（${MODE_LABEL[payment.defaultMode]}）` : MODE_LABEL[choice]}</p></Card>
   return (
     <Card variant="form" gap="normal">
