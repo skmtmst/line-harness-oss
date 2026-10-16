@@ -3,7 +3,11 @@ import {
   profile,
   saveProfile,
 } from '../services/style-setup.js';
-import { styleSnapshot } from '../services/style-analytics.js';
+import {
+  styleSnapshot,
+  styleRows,
+  personMetrics,
+} from '../services/style-analytics.js';
 import {
   resourceSnapshot,
   snapshotGuard,
@@ -798,4 +802,58 @@ test('HQ cannot disguise a confirmation sender by changing its sample name or ke
   });
   expect(r.status).toBe(422);
   expect(r.body.code).toBe('duplicate_confirmation_automation');
+});
+
+test('cross-style reservations remain visible without treating restaurant/class visits as pending consultations', async () => {
+  restaurant();
+  booking('person', '2026-10-01T01:00:00Z', 'f', 'completed');
+  sql.raw
+    .exec(`UPDATE bookings SET consultation_outcome='won' WHERE id='person';
+ UPDATE rt_reservations SET starts_at='2026-10-01T01:00:00Z',ends_at='2026-10-01T02:00:00Z',status='visited',line_uid=NULL WHERE id='r';
+ INSERT INTO friends(id,line_user_id,line_account_id,display_name) VALUES('g','Ug','a','教室の人');
+ INSERT INTO events(id,line_account_id,name,is_published) VALUES('lesson','a','教室',1);
+ INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity) VALUES('past-slot','lesson','2026-10-01T01:00:00Z','2026-10-01T02:00:00Z',3);
+ INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at) VALUES('past-class','a','lesson','past-slot','g','attended','2026-09-01T00:00:00Z');`);
+  const s = await styleSnapshot(sql.db, 'a', 'consult', { range: 'month' });
+  expect(s.items.map((r) => r.kind).sort()).toEqual([
+    'booking',
+    'event',
+    'restaurant',
+  ]);
+  expect(s.metrics.resultPending.value).toBe(0);
+  expect(s.analytics.resultPending).toEqual([]);
+  expect(s.metrics.conversionRate).toMatchObject({
+    value: 1,
+    numerator: 1,
+    denominator: 1,
+  });
+});
+
+test('daily history calculations scale with records rather than searching every customer for every person', async () => {
+  booking('base', '2026-10-01T01:00:00Z', 'f', 'completed');
+  const baseRow = (await styleRows(sql.db, 'a', 'salon'))[0];
+  const work = (count: number) => {
+    let reads = 0;
+    const rows = Array.from({ length: count }, (_, i) => {
+      const row = { ...baseRow, id: 'booking-' + i };
+      Object.defineProperty(row, 'personKey', {
+        get() {
+          reads++;
+          return 'person-' + i;
+        },
+      });
+      return row;
+    });
+    const result = personMetrics(
+      rows,
+      Date.parse('2026-10-01T00:00:00Z'),
+      Date.parse('2026-10-15T00:00:00Z'),
+      Date.now(),
+    );
+    expect(result.people).toHaveLength(count);
+    return reads;
+  };
+  const small = work(50),
+    large = work(100);
+  expect(large).toBeLessThan(small * 3);
 });

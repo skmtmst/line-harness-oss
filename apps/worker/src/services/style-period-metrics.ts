@@ -77,6 +77,7 @@ export function stylePeriodMetrics(rows: StyleBooking[], style: IndustryStyle, f
     past = rows.filter(
       (r) =>
         eligible(r) &&
+        ['booking', 'meet'].includes(r.kind) &&
         instant(r.endsAt) < now &&
         instant(r.endsAt) >= now - 30 * DAY,
     );
@@ -145,6 +146,7 @@ export function stylePeriodMetrics(rows: StyleBooking[], style: IndustryStyle, f
   const performed = rows.filter(
     (r) =>
       r.visited &&
+      ['booking', 'meet'].includes(r.kind) &&
       eligible(r) &&
       instant(r.startsAt) >= now - 90 * DAY &&
       instant(r.startsAt) < now,
