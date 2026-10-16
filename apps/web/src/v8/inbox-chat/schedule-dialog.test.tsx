@@ -64,7 +64,7 @@ describe('予約して送るの窓', () => {
       { id: 'a', label: '10/2 9:00', content: '前日のご案内', editable: true, defaultValue: '2026-10-02T09:00' },
       { id: 'b', label: '10/3 9:00（送信中）', content: '当日のご案内', editable: false, defaultValue: '2026-10-03T09:00' },
     ]} />)
-    const cancels = screen.getAllByRole('button', { name: '取消' })
+    const cancels = screen.getAllByRole('button', { name: '予約を取り消す' })
     fireEvent.click(cancels[0])
     expect(onCancelRow).toHaveBeenCalledWith('a')
     expect((cancels[1] as HTMLButtonElement).disabled).toBe(true)

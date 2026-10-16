@@ -43,6 +43,7 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { startVisiblePoll } from '@/lib/visible-polling'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { runOptimistic } from '@/lib/undoable'
+import { useStaffRole } from '@/lib/staff-role'
 import { useAccount } from '@/contexts/account-context'
 import TemplatePicker from '@/components/chats/template-picker'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -758,6 +759,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [sending, setSending] = useState(false)
   // N-025: 引用返信。会話の中の1件を引用して返す。
   const [quotedMessage, setQuotedMessage] = useState<ChatDetailMessage | null>(null)
+  /* 訂正：送ったあとは取り消せない。間違えた吹き出しの［訂正を送る］から、見本の文と引用を入れて人が送る。 */
+  const [correctingId, setCorrectingId] = useState<string | null>(null)
+  const staffRole = useStaffRole()
   // N-025: 送信予約。JSTの datetime-local 値をそのまま口へ渡し、
   // 保存はサーバー側でUTCへ正規化される。
   const [scheduledSends, setScheduledSends] = useState<ScheduledChatSend[]>([])
@@ -1690,6 +1694,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // メッセージ指定で口が404を返すため、ここで必ず外す。
   useEffect(() => {
     setQuotedMessage(null)
+    setCorrectingId(null)
     setShowSchedulePanel(false)
     setScheduleInput('')
   }, [selectedChatId])
@@ -2092,7 +2097,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         const content = messageContent.trim()
         const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content, quotedMessageId: quotedMessage?.id ?? null })
         const sendResult = await api.chats.send(sendingChatId,
-          { content, revision: currentRevision, quotedMessageId: quotedMessage?.id },
+          { content, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(correctingId ? { correctionOfMessageId: correctingId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -2108,6 +2113,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         }
         // Optimistic update: append message locally instead of refetching (prevents scroll jump / full reload feel)
         // Only mutate chatDetail if it still corresponds to the chat we just sent to
+        setCorrectingId(null)
         const textMessage = buildOutgoingMessage({
           messageType: 'text',
           content,
@@ -2351,8 +2357,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       if (res.success) {
         setScheduledSends((prev) => prev.filter((row) => row.id !== scheduleId))
       }
-    } catch {
-      setError('予約の取消に失敗しました。一覧を読み込み直してください。')
+    } catch (caught) {
+      setError((caught as { code?: string })?.code === 'SCHEDULE_TOO_LATE'
+        ? 'まもなく送ります。取り消せません。'
+        : '予約の取消に失敗しました。一覧を読み込み直してください。')
       void loadScheduledSends(selectedChatId)
     }
   }
@@ -3501,7 +3509,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       return <>
                         {showDateSep ? <InboxMessageDay first={idx === 0}>{formatDayJa(msg.createdAt)}</InboxMessageDay> : null}
                         <InboxMessage outgoing={isOutgoing} last={isLast} time={formatTime(msg.createdAt)} searchHit={searchHit} senderName={msg.sentByStaffName} autoLabel={autoLabel}
-                          onQuote={msg.isUnsent ? undefined : () => { setQuotedMessage(msg); textareaRef.current?.focus() }}>
+                          onQuote={msg.isUnsent ? undefined : () => { setQuotedMessage(msg); textareaRef.current?.focus() }}
+                          onCorrect={staffRole !== 'viewer' && isOutgoing && msg.messageType === 'text' && !msg.isUnsent && msg.source !== 'scenario'
+                            ? () => { setQuotedMessage(msg); setCorrectingId(msg.id); setMessageContent((prev) => prev.trim() ? prev : CORRECTION_TEMPLATE); textareaRef.current?.focus() }
+                            : undefined}>
                           {quotedNode}{bubbleContent}
                         </InboxMessage>
                       </>
@@ -3901,6 +3912,7 @@ disabled={sending || messageOverLimit || ((pendingAttachment !== null) && pendin
                         content: scheduledContentLabel(row.messageType, row.content),
                         editable: row.status === 'scheduled',
                         defaultValue: isoToJstDatetimeLocal(row.scheduledAt),
+                        tooLate: Date.parse(row.scheduledAt) - Date.now() < 60_000,
                       }))}
                       rowsFailed={scheduledSendsFailed}
                       onRetryRows={() => { if (selectedChatId) void loadScheduledSends(selectedChatId) }}
@@ -4140,6 +4152,9 @@ function ChatsPageHost() {
     </div>
   )
 }
+
+/** 訂正の見本の文（店ごとに直せる）。 */
+const CORRECTION_TEMPLATE = '先ほどのメッセージに誤りがありました。正しくは次のとおりです。\n'
 
 export default function ChatsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
