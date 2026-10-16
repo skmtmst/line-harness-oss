@@ -44,9 +44,57 @@ beforeEach(() => {
   fetchMock.mockReset(); fetchMock.mockImplementation(async () => { throw new Error('外部通信は禁止'); });
   vi.stubGlobal('fetch', fetchMock);
 });
-afterEach(() => { f.raw.close(); vi.unstubAllGlobals(); });
+afterEach(() => { f.raw.close(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('Stripe Connectの本人・店・state', () => {
+  const locks = (['exchanging', 'disconnecting'] as const)
+    .flatMap(status => (['authorize', 'disconnect'] as const).map(operation => ({ status, operation })));
+  it.each(['exchanging', 'disconnecting'])('有効期限ちょうどの%sも取り直せる', async status => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-16T00:00:00Z'));
+    await start();
+    f.raw.prepare('UPDATE booking_stripe_connect_states SET status=?,expires_at=?').run(status, new Date().toISOString());
+    await start();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it.each(locks)('期限切れの$statusを$operationで取り直し、古いstateを失効させる', async ({ status, operation }) => {
+    const previous = await start();
+    connection();
+    f.raw.prepare('UPDATE booking_stripe_connect_states SET status=?,expires_at=?')
+      .run(status, '2000-01-01T00:00:00Z');
+    if (operation === 'authorize') {
+      const next = await start();
+      expect(next.state).not.toBe(previous.state);
+      expect(f.raw.prepare('SELECT state_hash,status,expires_at FROM booking_stripe_connect_states').get())
+        .toEqual({ state_hash: await connectHash(next.state), status: 'pending', expires_at: expect.any(String) });
+      expect(fetchMock).not.toHaveBeenCalled();
+      fetchMock.mockResolvedValueOnce(token());
+      expect((await callback(next.state)).status).toBe(200);
+    } else {
+      fetchMock.mockResolvedValueOnce(Response.json({ stripe_user_id: 'acct_old1234' }));
+      expect((await request(`${base}?account_id=a`, 'DELETE')).status).toBe(200);
+      expect(f.raw.prepare('SELECT state_hash,status FROM booking_stripe_connect_states').get())
+        .toEqual({ state_hash: expect.not.stringMatching(await connectHash(previous.state)), status: 'finished' });
+      expect(f.raw.prepare('SELECT disconnected_at FROM booking_payment_connections').get())
+        .toEqual({ disconnected_at: expect.any(String) });
+    }
+    expect((await callback(previous.state)).status).toBe(400);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it.each(locks)('期限内の$statusは$operationを409で拒否し、接続とロックを変えない', async ({ status, operation }) => {
+    await start(); connection();
+    f.raw.prepare('UPDATE booking_stripe_connect_states SET status=?,expires_at=?')
+      .run(status, '2999-01-01T00:00:00Z');
+    const previous = f.raw.prepare('SELECT * FROM booking_stripe_connect_states').get();
+    const response = operation === 'authorize'
+      ? await request(`${base}/authorize?account_id=a`, 'POST', {})
+      : await request(`${base}?account_id=a`, 'DELETE');
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'stripe_connect_busy' });
+    expect(f.raw.prepare('SELECT * FROM booking_stripe_connect_states').get()).toEqual(previous);
+    expect(f.raw.prepare('SELECT provider_account_id,disconnected_at FROM booking_payment_connections').get())
+      .toEqual({ provider_account_id: 'acct_old1234', disconnected_at: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('固定URL・test設定でURLを作り、生state/セッションを保存せず、旧pendingは失効する', async () => {
     const first = await start(), second = await start();
     const url = new URL(second.data.authorizationUrl);
