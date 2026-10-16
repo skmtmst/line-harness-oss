@@ -2,7 +2,7 @@
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import SendConfirmDialog, { describeExclusion, shortWhen, type SendConfirmDialogProps } from './send-confirm-dialog'
+import SendConfirmDialog, { describeExclusion, shiftedShort, shiftedWhen, shortWhen, type SendConfirmDialogProps } from './send-confirm-dialog'
 
 const base: SendConfirmDialogProps = {
   open: true, subtitle: '新しい一斉配信', state: 'ready', recipients: 1272, purpose: 'marketing', whenLabel: '今すぐ送る',
@@ -10,6 +10,15 @@ const base: SendConfirmDialogProps = {
 }
 
 afterEach(() => cleanup())
+
+describe('夜の静かな時間の日時', () => {
+  const now = new Date('2026-10-18T03:00:00Z')
+  it('日本時間の明日なら「明日」を付け、主ボタン用は「明日 8:00」', () => {
+    expect(shiftedWhen('2026-10-18T23:00:00.000Z', now)).toBe('明日 10/19（月）8:00')
+    expect(shiftedShort('2026-10-18T23:00:00.000Z', now)).toBe('明日 8:00')
+    expect(shiftedShort('2026-10-20T23:00:00.000Z', now)).toBe('10/21 8:00')
+  })
+})
 
 describe('共通の「送る前の確かめ」窓（U1）', () => {
   it('人数・目的・日時・本文・取り消せない旨と「閉じても送りません」を出す', () => {

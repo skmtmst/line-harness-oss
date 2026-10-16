@@ -1220,8 +1220,10 @@ export default function HqBroadcastCreate() {
           /* 口は店の ID だけを返す。名前は店の一覧から引く。 */
           name: (stores ?? []).find((store) => store.id === row.accountId)?.name ?? row.accountId,
           recipients: row.recipients,
-          note: row.excluded.optedOut > 0 ? `止めている ${formatNumber(row.excluded.optedOut)} 人を除く` : undefined,
+          stopped: row.excluded.optedOut,
+          narrowed: row.excluded.optedOut > 0,
         }))}
+        accountCount={totals?.sendStores}
         purpose="marketing"
         whenLabel={when === 'now' ? '今すぐ送る' : `${sendWhenLabel} に送る（予約）`}
         whenNote={when === 'now' ? undefined : '予約は送る時刻の 1 分前まで［予約を取り消す］で止められます'}
@@ -1229,7 +1231,7 @@ export default function HqBroadcastCreate() {
         bodyHead={sendPreview.data?.firstText ?? ''}
         allRecipients={audience === 'all'}
         hidePrimary={approval.state === null}
-        primaryLabel={sendPreview.data ? (when === 'now' ? `${formatNumber(sendPreview.data.recipients)} 人に送る` : `${formatNumber(sendPreview.data.recipients)} 人に${scheduledAt ? ` ${shortWhen(scheduledAt)} で` : ''}予約する`) : '送る'}
+        primaryLabel={sendPreview.data ? `${totals ? `${formatNumber(totals.sendStores)} アカウント ` : ''}${formatNumber(sendPreview.data.recipients)} 人に${when === 'now' ? '送る' : '予約する'}` : '送る'}
         onConfirm={() => send()}
         onBack={() => { if (!sending) setConfirmOpen(false) }}
       />

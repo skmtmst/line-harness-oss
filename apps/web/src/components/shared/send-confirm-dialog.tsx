@@ -12,7 +12,7 @@
  * - 人数が数えられていない・0 人・権限が無い・代理ログイン中は主ボタンを出さない／押せない。
  */
 import { useRef, useState, type ReactNode } from 'react'
-import { Send, ShieldAlert, TriangleAlert } from 'lucide-react'
+import { ChevronDown, ChevronRight, Send, ShieldAlert, TriangleAlert } from 'lucide-react'
 import ConfirmDialog from './confirm-dialog'
 import Button from './button'
 import { Skeleton } from './skeleton'
@@ -40,10 +40,21 @@ export function describeExclusion(recipients: number, excluded: { blocked: numbe
 }
 
 /** 夜の静かな時間でずらした送信時刻「10/19（日）8:00」。日本時間。 */
-export function shiftedWhen(iso: string): string {
+export function shiftedWhen(iso: string, now: Date = new Date()): string {
   const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: false }).formatToParts(new Date(iso))
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')}（${get('weekday')}）${get('hour')}:${get('minute')}`
+  const ymd = (d: Date) => new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric' }).format(d)
+  const prefix = ymd(new Date(iso)) === ymd(new Date(now.getTime() + 24 * 60 * 60 * 1000)) ? '明日 ' : ''
+  return `${prefix}${get('month')}/${get('day')}（${get('weekday')}）${get('hour')}:${get('minute')}`
+}
+
+/** 送る日が日本時間の「明日」なら「明日 8:00」、そうでなければ「10/19 8:00」（主ボタン用）。 */
+export function shiftedShort(iso: string, now: Date = new Date()): string {
+  const ymd = (d: Date) => new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric' }).format(d)
+  const at = new Date(iso)
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+  const hm = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: 'numeric', minute: '2-digit', hour12: false }).format(at)
+  return ymd(at) === ymd(tomorrow) ? `明日 ${hm}` : `${shortWhen(iso).split(' ')[0]} ${hm}`
 }
 
 export type SendConfirmBlock = 'no-permission' | 'impersonation' | null
@@ -62,7 +73,9 @@ export interface SendConfirmDialogProps {
   /** 人数の下の 1 行（除外の内訳・「友だち全員」など）。 */
   recipientsNote?: string
   /** 統括：店ごとの内訳（合計との差は画面側で出さない）。 */
-  perAccount?: Array<{ name: string; recipients: number; note?: string }>
+  perAccount?: Array<{ name: string; recipients: number; stopped: number; narrowed?: boolean }>
+  /** 統括：送るアカウントの数（「12 アカウント ・ 合計 15,131 人」の題に使う）。 */
+  accountCount?: number
   purpose: SendPurpose
   /** 日時の表示（「10/18（土）10:00 に送る（予約）」「今すぐ送る」）。 */
   whenLabel: string
@@ -108,14 +121,14 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 export default function SendConfirmDialog(props: SendConfirmDialogProps) {
   const {
-    open, subtitle, scheduled, state, onRetry, recipients, recipientsNote, perAccount, purpose, whenLabel, whenNote, sender,
+    open, subtitle, scheduled, state, onRetry, recipients, recipientsNote, perAccount, accountCount, purpose, whenLabel, whenNote, sender,
     bodyHead, bubbleCount, bodyLabel = '本文', allRecipients, extraCaution, approval, approvalFields, primaryDisabled, block, hidePrimary, unavailableNote, primaryLabel, onConfirm, onBack, error,
   } = props
   const [busy, setBusy] = useState(false)
   const submitting = useRef(false)
   const zero = state === 'ready' && recipients === 0
   const canPress = state === 'ready' && !zero && !block && !busy && !primaryDisabled
-  const [accountsOpen, setAccountsOpen] = useState(false)
+  const [accountsOpen, setAccountsOpen] = useState(true)
 
   const confirm = async () => {
     if (submitting.current || !canPress) return
@@ -169,22 +182,24 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
             </div>
           ) : (
             <div className={styles.stack}>
-              <strong className={styles.big}>{formatNumber(recipients ?? 0)} 人</strong>
+              <strong className={styles.big}>{perAccount?.length && accountCount ? `${formatNumber(accountCount)} アカウント ・ 合計 ${formatNumber(recipients ?? 0)} 人` : `${formatNumber(recipients ?? 0)} 人`}</strong>
               {recipientsNote ? <span className={styles.note}>{recipientsNote}</span> : null}
               {approval ? <span className={styles.note}>{approval.note}</span> : null}
               {perAccount?.length ? (
-                <>
-                  <button type="button" className={styles.link} aria-expanded={accountsOpen} onClick={() => setAccountsOpen((v) => !v)}>
-                    {accountsOpen ? '店ごとの内訳を閉じる' : `${perAccount.length} アカウントの内訳を見る`}
+                <div className={styles.accountsBox}>
+                  <button type="button" className={styles.accountsHead} aria-expanded={accountsOpen} onClick={() => setAccountsOpen((v) => !v)}>
+                    {accountsOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+                    {accountsOpen ? '店ごとの内訳を畳む' : '店ごとの内訳を開く'}
+                    <span className={styles.accountsCols}>送る人 ／ 止めている人</span>
                   </button>
                   {accountsOpen ? (
                     <ul className={styles.accounts}>
                       {perAccount.map((row) => (
-                        <li key={row.name}><span>{row.name}</span><span>{formatNumber(row.recipients)} 人{row.note ? `（${row.note}）` : ''}</span></li>
+                        <li key={row.name}><span>{row.name}{row.narrowed ? '（絞り込み）' : ''}</span><span className={styles.accountsNum}>{formatNumber(row.recipients)} 人</span><span className={styles.accountsNum}>{formatNumber(row.stopped)} 人</span></li>
                       ))}
                     </ul>
                   ) : null}
-                </>
+                </div>
               ) : null}
             </div>
           )}

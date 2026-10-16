@@ -77,7 +77,7 @@ import {
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import SendConfirmDialog, { describeExclusion, shiftedWhen } from '@/components/shared/send-confirm-dialog'
+import SendConfirmDialog, { describeExclusion, shiftedShort, shiftedWhen } from '@/components/shared/send-confirm-dialog'
 import { chatSafetyApi } from '@/lib/api-gap1'
 import type { SendConfirmationPreview } from '@line-crm/shared'
 import Notice from '@/components/shared/notice'
@@ -2752,6 +2752,8 @@ export default function BroadcastForm({
       primaryDisabled={needsApproval && approverId === ''}
       primaryLabel={needsApproval ? '承認を依頼する' : (() => {
         const n = currentStep ? sendPreview.data?.recipients ?? null : audienceCount
+        const shifted = currentStep ? sendPreview.data?.quietHoursShiftTo : null
+        if (n !== null && shifted) return `${shiftedShort(shifted)} に ${formatNumber(n)} 人へ送る`
         const shortAt = sendMode === 'scheduled' && scheduledDate ? `${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime}` : null
         return n === null ? '送る' : sendMode === 'scheduled' ? `${formatNumber(n)} 人に${shortAt ? ` ${shortAt} で` : ''}予約する` : `${formatNumber(n)} 人に送る`
       })()}
