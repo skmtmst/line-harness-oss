@@ -968,9 +968,13 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    // この口は接続確認の診断に使う。LINEが返した状態番号だけは残さないと、
+    // トークン失効(401)と権限不足(403)と呼び出し上限(429)が全部 502 に潰れて
+    // 原因が分からなくなる。番号以外(本文・トークン)は出さない。
+    const status = (err as { status?: unknown } | null)?.status;
+    const lineStatus = typeof status === 'number' ? status : null;
     console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts/:id/follower-insight"}));
-    return c.json({ success: false, error: 'Failed to fetch LINE follower insight' }, 502);
+    return c.json({ success: false, error: 'Failed to fetch LINE follower insight', lineStatus }, 502);
   }
 });
 

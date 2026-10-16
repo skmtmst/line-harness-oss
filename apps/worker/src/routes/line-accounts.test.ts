@@ -589,6 +589,35 @@ describe('GET /api/line-accounts/:id/follower-insight', () => {
     expect(res.status).toBe(200);
     expect(lineClientMocks.getFollowersInsight).toHaveBeenCalled();
   });
+
+  test('reports the LINE status number on failure so 401 is not hidden behind 502', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+    const lineError = Object.assign(new Error('LINE API error: 401 Unauthorized — {}'), { status: 401 });
+    lineClientMocks.getFollowersInsight.mockRejectedValue(lineError);
+
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts/acc-1/follower-insight?date=20260616');
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { success: boolean; error: string; lineStatus: number | null };
+    expect(body.lineStatus).toBe(401);
+    // 本文・トークンは外に出さない。
+    expect(body.error).toBe('Failed to fetch LINE follower insight');
+    expect(JSON.stringify(body)).not.toContain('Unauthorized');
+    expect(JSON.stringify(body)).not.toContain(fakeAccount.channel_access_token);
+  });
+
+  test('keeps lineStatus null when the failure is not a LINE API response', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+    lineClientMocks.getFollowersInsight.mockRejectedValue(new Error('network down'));
+
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts/acc-1/follower-insight?date=20260616');
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { lineStatus: number | null };
+    expect(body.lineStatus).toBeNull();
+  });
 });
 
 function installAutoConnectFetch() {
