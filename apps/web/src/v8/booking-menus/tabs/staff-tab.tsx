@@ -19,6 +19,8 @@ import { EMPTY_STAFF, StaffEditModal } from '../staff-edit-dialog'
 import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '../../booking-payments/assignment'
 import StatusBadge from '@/components/shared/status-badge'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { StaffCalendarPanel } from '../staff-calendar'
 import assignStyles from '../../booking-payments/assignment.module.css'
 import {
   AccountIcon,
@@ -68,6 +70,9 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   const assignment = useAssignment({ kind: 'staff', accountId })
   const preparing = usePreparingDialog()
   const [assignTarget, setAssignTarget] = useState<BookingStaff | null>(null)
+  /* つなぐ先（カレンダーと会議の URL・B7 uRd8A）は右のパネル。URL の ?staff= で開く。 */
+  const [calendarStaffId, setCalendarStaffId] = useDetailPanelUrl('staff')
+  const calendarPerson = staff.find((person) => person.id === calendarStaffId) ?? null
   const staffOrder = staff.map((person) => person.id)
   useV8TabEdit({
     dirty: assignment.dirty,
@@ -194,6 +199,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
             external: false,
             href: `/booking/staff/shifts?staff_id=${person.id}`, onSelect: () => router.push(`/booking/staff/shifts?staff_id=${person.id}`),
           },
+          { id: 'calendar', label: 'カレンダーと会議の URL', onSelect: () => setCalendarStaffId(person.id) },
           ...(canEdit ? [
             { id: 'edit', label: '中身を編集', onSelect: () => setEditing(person) },
             { id: 'assign', label: '割り当ての設定', onSelect: () => setAssignTarget(person) },
@@ -288,6 +294,8 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       )}
 
       {preparing.dialog}
+      <StaffCalendarPanel accountId={accountId} person={calendarPerson} menuCount={calendarPerson ? (matrices[calendarPerson.id] ?? []).filter((entry) => entry.is_offered).length : 0}
+        canEdit={canEdit} onClose={() => setCalendarStaffId(null)} />
       <AssignmentRowDialog open={assignTarget !== null} name={assignTarget?.name ?? ''} unit="件"
         value={assignTarget ? assignment.resources[assignTarget.id] : undefined}
         onClose={() => setAssignTarget(null)}
