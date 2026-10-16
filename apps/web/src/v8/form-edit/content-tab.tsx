@@ -61,6 +61,8 @@ import { uploadImageFile, uploadToMediaLibrary } from '@/components/shared/media
 import UriTapActionField from '@/components/shared/uri-tap-action-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormEditAttempted } from './field-issues'
+import RoutingSection from './routing-section'
+import type { FormRouting } from '@/lib/api-gap2'
 import styles from './edit.module.css'
 import TextLink from '@/components/shared/text-link'
 import { SaveErrorScope, useSaveFormErrors, SaveErrorField } from '@/components/shared/save-form-errors'
@@ -96,6 +98,9 @@ type Props = {
   onMoveBlock: (id: string, to: number) => void
   onDuplicateBlock: (id: string) => void
   onRemoveBlock: (id: string) => void
+  /** 答えで予約の行き先を分ける（B6）。決まりは回答フォームの版に含める。 */
+  routing?: FormRouting
+  onChangeRouting?: (next: FormRouting) => void
 }
 
 export function ContentTab(props: Props) {
@@ -149,6 +154,8 @@ export function ContentTab(props: Props) {
           </Button>}
         </div>
       </Card>
+
+      {props.onChangeRouting ? <RoutingSection blocks={layout.sections.flatMap((s) => s.blocks)} refs={props.refs} routing={props.routing} readOnly={props.readOnly} onChange={props.onChangeRouting} /> : null}
 
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>
