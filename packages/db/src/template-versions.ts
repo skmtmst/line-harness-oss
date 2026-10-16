@@ -1,9 +1,9 @@
+import { extractBroadcastTemplateIds } from './template-reference-ids.js';
+export { extractBroadcastTemplateIds } from './template-reference-ids.js';
+import type { TemplateVersionRow } from './template-version-types.js';
+export type { TemplateVersionRow } from './template-version-types.js';
 import { jstNow } from './utils.js';
-import {
-  getTemplateById,
-  publishTemplate,
-  saveTemplateDraft,
-} from './templates.js';
+import { getTemplateById, publishTemplate, saveTemplateDraft } from './templates.js';
 
 // テンプレートの版履歴と参照表 (#820)。
 //
@@ -14,23 +14,6 @@ import {
 // JSON の文字列検索ではなくこの表を見る。利用先の保存時に書き換える。
 
 export type TemplateVersionStatus = 'in_use' | 'reserved' | 'past';
-
-export interface TemplateVersionRow {
-  id: string;
-  template_id: string;
-  version_number: number;
-  message_type: string;
-  message_content: string;
-  carousel_actions_json: string | null;
-  carousel_tap_limit_mode: string | null;
-  carousel_tap_limit_text: string | null;
-  question_json: string | null;
-  question_status: string | null;
-  /** 使い始めの日時。空は「公開と同時」。 */
-  effective_from: string | null;
-  created_by_staff_id: string | null;
-  created_at: string;
-}
 
 /** 名前は同じ組織の現在の名簿から取得。保存時の名前の写しではない。 */
 export interface TemplateVersionView extends TemplateVersionRow {
@@ -148,6 +131,7 @@ export async function revertTemplateToVersion(
   const saved = await saveTemplateDraft(db, templateId, {
     messageType: version.message_type,
     messageContent: version.message_content,
+    messageBubblesJson: version.message_bubbles_json ?? null,
     carouselActions: carouselActions ?? null,
     carouselTapLimitMode: tapLimitMode,
     carouselTapLimitText: version.carousel_tap_limit_text,
@@ -264,38 +248,17 @@ export async function refreshScenarioReferences(
 ): Promise<void> {
   const result = await db
     .prepare(
-      `SELECT DISTINCT template_id FROM scenario_steps
-        WHERE scenario_id = ? AND template_id IS NOT NULL`,
+      `SELECT template_id,message_bubbles_json FROM scenario_steps
+        WHERE scenario_id = ?`,
     )
     .bind(scenarioId)
-    .all<{ template_id: string }>();
+    .all<{ template_id: string | null; message_bubbles_json: string | null }>();
   await syncTemplateReferences(
     db,
     'scenario',
     scenarioId,
-    (result.results ?? []).map((row) => row.template_id),
+    [...new Set((result.results ?? []).flatMap(row => [...(row.template_id ? [row.template_id] : []), ...extractBroadcastTemplateIds(row.message_bubbles_json)]))],
   );
-}
-
-/**
- * 一斉配信の保存から、使ったテンプレートを数え直す。
- * 吹き出し (message_bubbles_json) が持つ templateId を読む。本文の写しは
- * 別に残るので、読めない形でも送りは壊れない（参照だけ残さない）。
- */
-export function extractBroadcastTemplateIds(bubblesJson: string | null): string[] {
-  if (!bubblesJson) return [];
-  try {
-    const bubbles = JSON.parse(bubblesJson) as Array<{
-      content?: { templateId?: unknown };
-    }>;
-    if (!Array.isArray(bubbles)) return [];
-    const ids = bubbles
-      .map((bubble) => bubble?.content?.templateId)
-      .filter((value): value is string => typeof value === 'string' && value.length > 0);
-    return [...new Set(ids)];
-  } catch {
-    return [];
-  }
 }
 
 export async function refreshBroadcastReferences(

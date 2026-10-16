@@ -54,9 +54,23 @@ describe('Upx1c: 保存した通数・差し込みで統括テンプレートを
     expect((await request('?type=template&message_count=single&has_interpolations=true')).body.data.map(row => row.id).sort()).toEqual([ids[0],ids[2]].sort());
     expect((await request('?type=template&has_interpolations=false')).body.data.map(row => row.id)).toEqual([ids[1]]);
     expect((await request('?type=template&message_count=multiple')).body.data).toEqual([]);
+    expect((await request('?type=template&kind=message&search=本文だけ&undistributed=true&folder_id=')).body.data.map(row=>row.id)).toEqual([ids[1]]);
+    expect((await request('?type=template&kind=message&search=%7B%7Bname%7D%7D')).body.data.map(row=>row.id).sort()).toEqual([ids[0],ids[1]].sort());
+    expect((await request('?type=template&undistributed=false')).body.data).toEqual([]);
     expect(JSON.stringify(listed.body)).not.toContain('名前 {{name}} 様');
     expect(totalChanges()).toBe(writes);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('組1の保管状態と組5の本文検索・通数・差し込み条件を同時に使える',async()=>{
+    const archived=await create('保管の検索 {{name}}'),active=await create('有効の検索 {{name}}');
+    sql.raw.prepare("UPDATE hq_templates SET archived_at=datetime('now') WHERE id=?").run(archived);
+    const filter='&search=検索&message_count=single&has_interpolations=true&undistributed=true&folder_id=';
+    for(const [status,ids] of [['active',[active]],['archived',[archived]],['all',[active,archived]]] as const){
+      const response=await request('?type=template&kind=message&status='+status+filter);
+      expect(response.status).toBe(200);expect(response.body.data.map(row=>row.id).sort()).toEqual([...ids].sort());
+      expect(response.body).toMatchObject({status,archive_counts:{active:1,archived:1}});
+    }
   });
 
   it('カードは1通、依存画像を通数に足さず、壊れた版・未知の複数通を1通にしない', async () => {

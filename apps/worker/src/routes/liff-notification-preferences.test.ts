@@ -10,13 +10,8 @@ interface Preferences {items:Array<{purpose:string;state:string;enabled:boolean|
 async function req(path='',body?:unknown,accountId='a') {const r=await app.request(`/api/liff/notification-preferences${path}?lineAccountId=${accountId}`,{method:body===undefined?'GET':'PUT',headers:{Authorization:'Bearer fixture','Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})},{DB:f.db} as Env['Bindings']);return {status:r.status,cache:r.headers.get('Cache-Control'),body:await r.json() as {data:Preferences}};}
 beforeEach(()=>{
  f=createTestD1({foreignKeys:true});
- // 組2の637との接続境界。統合前なので必要な台帳と監査だけを試験用DBへ作る。
- f.raw.exec(`CREATE TABLE friend_delivery_consents(line_account_id TEXT NOT NULL,friend_id TEXT NOT NULL,purpose TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('granted','unknown','revoked')),reason TEXT NOT NULL,source TEXT NOT NULL,updated_by TEXT,updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),version INTEGER NOT NULL DEFAULT 1,PRIMARY KEY(line_account_id,friend_id,purpose));
- CREATE TABLE friend_delivery_consent_events(id INTEGER PRIMARY KEY AUTOINCREMENT,line_account_id TEXT,friend_id TEXT,purpose TEXT,operation TEXT,before_json TEXT,after_json TEXT);
- CREATE TRIGGER consent_i AFTER INSERT ON friend_delivery_consents BEGIN INSERT INTO friend_delivery_consent_events(line_account_id,friend_id,purpose,operation,after_json) VALUES(NEW.line_account_id,NEW.friend_id,NEW.purpose,'insert',json_object('version',NEW.version)); END;
- CREATE TRIGGER consent_u AFTER UPDATE ON friend_delivery_consents BEGIN INSERT INTO friend_delivery_consent_events(line_account_id,friend_id,purpose,operation,before_json,after_json) VALUES(NEW.line_account_id,NEW.friend_id,NEW.purpose,'update',json_object('version',OLD.version),json_object('version',NEW.version)); END;
- CREATE TRIGGER consent_d AFTER DELETE ON friend_delivery_consents BEGIN INSERT INTO friend_delivery_consent_events(line_account_id,friend_id,purpose,operation,before_json) VALUES(OLD.line_account_id,OLD.friend_id,OLD.purpose,'delete',json_object('version',OLD.version)); END;
- INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token) VALUES('a','A','a','x','x'),('b','B','b','x','x');
+ // 統合した637の実際の表と監査トリガーを使う。
+ f.raw.exec(` INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token) VALUES('a','A','a','x','x'),('b','B','b','x','x');
  INSERT INTO friends(id,line_user_id,line_account_id) VALUES('self','U-self','a'),('other','U-other','a'),('same-user-other-shop','U-other-shop','b');`);
  app=new Hono<Env>();app.route('/',liffNotificationPreferences);
  vi.mocked(verifyCallerLineIdentity).mockResolvedValue({lineUserId:'U-self',lineAccountId:'a'});

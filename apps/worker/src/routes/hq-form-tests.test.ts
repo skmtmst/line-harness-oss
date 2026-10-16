@@ -8,7 +8,7 @@ import { authMiddleware } from '../middleware/auth.js';
 
 let sql:ReturnType<typeof createTestD1>,admin:Hono<Env>,publicApp:Hono<Env>,staff:Env['Variables']['staff'];
 async function request(path:string,method='GET',body?:unknown,token?:string,app=admin){
-  const res=await app.request(`https://worker.test${path}`,{method,headers:{'Content-Type':'application/json',...(token?{'X-Form-Test-Token':token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})},{DB:sql.db} as Env['Bindings']);
+  const res=await app.request(`https://worker.test${path}`,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`} :{})},...(body===undefined?{}:{body:JSON.stringify(body)})},{DB:sql.db} as Env['Bindings']);
   return {status:res.status,headers:res.headers,body:await res.json() as {data:{id:string;token:string;template:{id:string;revision:number};form:{name:string};answerValidation:{valid:boolean};definition:{form:Record<string,unknown>}};success:boolean}};
 }
 beforeEach(()=>{

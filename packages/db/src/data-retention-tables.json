@@ -1790,6 +1790,20 @@
       "column": "tenant_id"
     }
   },
+  "hq_broadcast_saved_views": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_form_test_tokens": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
   "hq_template_versions": {
     "category": "purge",
     "scope": {
@@ -4513,6 +4527,40 @@
       "parentColumn": "id"
     }
   },
+  "friend_delivery_consents": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "friend_delivery_consent_events": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "uid_migration_delivery_consents": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "item_id",
+      "parent": "uid_migration_items",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inventory_rule_source_events": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "slot_id",
+      "parent": "rt_inventory_slots",
+      "parentColumn": "id"
+    }
+  },
   "booking_payment_connections": {
     "category": "global"
   },
@@ -4545,6 +4593,9 @@
       "by": "lineAccount",
       "column": "line_account_id"
     }
+  },
+  "booking_stripe_connect_states": {
+    "category": "global"
   },
   "account_styles": {
     "category": "purge",
@@ -4607,6 +4658,13 @@
     "scope": {
       "by": "lineAccount",
       "column": "line_account_id"
+    }
+  },
+  "hq_template_saved_views": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
     }
   }
 }

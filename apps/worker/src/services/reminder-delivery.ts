@@ -1,3 +1,8 @@
+import { formatBookingDatetime } from './reminder-date-format.js';
+export { formatBookingDatetime } from './reminder-date-format.js';
+import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
+import type { ReminderDeliveryResult } from './reminder-delivery-result.js';
+export type { ReminderDeliveryResult } from './reminder-delivery-result.js';
 /**
  * リマインダ配信処理 — cronトリガーで定期実行
  *
@@ -71,15 +76,6 @@ export interface ReminderDeliveryOptions {
   beforePush?: (run: { id: string; friendReminderId: string }) => Promise<void>;
 }
 
-export interface ReminderDeliveryResult {
-  succeeded: number;
-  skipped: number;
-  retrying: number;
-  failed: number;
-  /** 緊急停止で claim せず残した登録数（復旧後に届く）。 */
-  held: number;
-}
-
 /** 本番配信と下書き試験が同じテンプレート・変数展開を通る共通口。 */
 /*
  * F10: リマインダの差し込み「予約日時・Google Meet URL」。
@@ -98,18 +94,6 @@ export function contentNeedsBookingPlaceholders(content: string): boolean {
 export interface BookingInterpolation {
   reservationDatetime: string;
   meetUrl: string;
-}
-
-/** 開始日時を「10月10日（木）10:00」の形にする（Meet通知と同じ形）。 */
-export function formatBookingDatetime(startsAt: string): string {
-  const start = new Date(startsAt);
-  const jst = new Date(start.getTime() + 9 * 60 * 60 * 1000);
-  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-  const iso = jst.toISOString();
-  const month = Number(iso.slice(5, 7));
-  const day = Number(iso.slice(8, 10));
-  const time = iso.slice(11, 16);
-  return `${month}月${day}日（${weekdays[jst.getUTCDay()]}）${time}`;
 }
 
 export interface BookingConsultationRow {
@@ -189,6 +173,7 @@ export async function buildReminderStepMessage(
     const pinned = options?.pinnedTemplateVersions?.[step.template_id];
     if (pinned != null) {
       const version = await getTemplateVersion(db, step.template_id, pinned);
+      if(version?.message_bubbles_json)throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
       if (version) {
         messageType = version.message_type;
         messageContent = version.message_content;
@@ -197,6 +182,7 @@ export async function buildReminderStepMessage(
     }
     if (templateVersion == null) {
       const template = await getTemplateById(db, step.template_id);
+      if(template?.message_bubbles_json)throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
       if (template) {
         messageType = template.message_type;
         messageContent = template.message_content;
@@ -540,6 +526,11 @@ export async function processReminderDeliveries(
           now: nowIso,
           expectedLeaseExpiresAt: claimLease ? [claimLease] : [],
         });
+        result.skipped++;
+        continue;
+      }
+      if (await isFriendDeliverySuppressed(db, friend.id)) {
+        await skipReminderDeliveryRun(db, {id:run.id,code:'delivery_consent_suppressed',message:'配信停止・同意の状態により送信しませんでした。',now:nowIso,expectedLeaseExpiresAt:claimLease?[claimLease]:[]});
         result.skipped++;
         continue;
       }

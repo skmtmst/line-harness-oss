@@ -8,5 +8,13 @@ export interface RestaurantChannelCloseTask {
  startDate?:string; endDate?:string; allDay?:boolean; startTime?:string|null; endTime?:string|null; tableIds?:string[]; endsAt?:string;
   id: string; storeId: string; slotId: string | null; startsAt: string; channel: string;
   status: 'close' | 'done' | 'reopen'; reason: 'full' | 'limited' | 'table_conflict' | 'closure';
+  triggerReservationId?: string | null;
+  /** 同じ回の照合へ届いた予約変更。複数起点を1件へ推測しない。 */
+  triggerSources?: Array<{reservationId:string;source:string;event:string}>;
+  /** 発生時に保存した経路。複数経路・過去の不明な在庫・休業はnull。 */
+  source?: string | null;
+  generation?: number;
+  /** 再開の確認は、閉鎖済みと別にこの世代だけへ記録する。 */
+  opened?: boolean;
   remainingSeats: number | null; recipientIds: string[]; createdAt: string; updatedAt: string;
 }

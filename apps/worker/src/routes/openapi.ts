@@ -1,23 +1,33 @@
+import { stylePaths } from './styles-openapi.js';
+import { hqTemplateListPaths } from './hq-template-list-openapi.js';
+import { hqTemplateMediaPaths } from './hq-template-media-openapi.js';
+import { api5Paths } from './api5-openapi.js';
 import { restaurantRest4Paths } from './restaurant-rest4-openapi.js';
+import { api1AuthoringPaths } from './api1-authoring-openapi.js';
+import { api2FollowupPaths } from './api2-followups-openapi.js';
 import { restaurantFollowupPaths } from './restaurant-followup-openapi.js';
 import { reservationBoardPaths } from './reservation-board-openapi.js';
 import { archiveRestorePaths } from './archive-restore-openapi.js';
 import { formDocumentPaths } from './form-documents-openapi.js';
 import { pagesParityPaths } from './pages-parity-openapi.js';
 import { folderUpgradePaths } from './folder-upgrade-openapi.js';
-import {auditstepsPaths} from './auditsteps-openapi.js';
+import { auditstepsPaths } from './auditsteps-openapi.js';
 import { tabCountPaths } from './tab-counts-openapi.js';
 import { audit3Paths } from './audit3-openapi.js';
 import { api18Paths } from './api18-openapi.js';
 import { chatAttachmentPaths } from './chat-attachments-openapi.js';
-import { api17Paths, api17TemplateKind } from './api17-openapi.js';
+import { api17Paths } from './api17-openapi.js';
 import { api9Paths, api9Schemas } from './api9-openapi.js';
 import { restaurantClosurePaths } from './restaurant-closures-openapi.js';
-import { stampPaths,hqBroadcastPaths } from './proposal-e-openapi.js';
+import { stampPaths, hqBroadcastPaths } from './proposal-e-openapi.js';
 import { Hono } from 'hono';
 import { trafficPoolSavePaths } from './traffic-pools-save-openapi.js';
 import { tenantCompanyContactPaths } from './tenant-company-contact-openapi.js';
 import type { Env } from '../index.js';
+
+import { bookingEntitlementPaths } from './booking-entitlements-openapi.js';
+import { bookingAssignmentPaths } from './booking-assignment-openapi.js';
+import { bookingPaymentAdminPaths } from './booking-payment-admin-openapi.js';
 
 const openapi = new Hono<Env>();
 
@@ -409,6 +419,10 @@ const spec = {
     },
   },
   paths: {
+    ...api1AuthoringPaths,
+    ...bookingAssignmentPaths,
+    ...bookingPaymentAdminPaths,
+    ...bookingEntitlementPaths,
     '/api/account-settings/customer-look': {
       get: { tags:['Account Settings'], summary:'店のお客さまのデザインを読む', parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'保存した版とデザイン'},'403':{description:'担当外'}} },
       put: { tags:['Account Settings'], summary:'店のお客さまのデザインを保存（オーナー・管理者）', requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['accountId','expectedVersion','look'],properties:{accountId:{type:'string'},expectedVersion:{type:'integer',minimum:0},look:{type:'object'}}}}}}, responses:{'200':{description:'保存した版とデザイン'},'403':{description:'変更権限なし・担当外'},'409':{description:'保存の版が競合'},'422':{description:'色・型・書体が不正'}} },
@@ -448,7 +462,9 @@ const spec = {
     },
     ...audit3Paths,
     ...auditstepsPaths,
+    ...api5Paths,
     ...api18Paths,
+    ...api2FollowupPaths,
     ...api17Paths,
     ...api9Paths,
     ...restaurantRest4Paths,
@@ -457,6 +473,14 @@ const spec = {
     ...hqBroadcastPaths,
 
     // V8 API integration: authenticated endpoints, with account scope and revision checks.
+  '/api/hq/templates/saved-views': {
+    get: {tags:['HQ Templates'],summary:'統括テンプレートの保存した絞り込みを取得',responses:{200:{description:'個人と統括で共有された条件'},403:{description:'統括の閲覧権限が必要'}}},
+    post: {tags:['HQ Templates'],summary:'テンプレートの絞り込みを保存',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['name','filters'],properties:{name:{type:'string',maxLength:100},scope:{type:'string',enum:['personal','tenant'],default:'personal'},filters:{type:'object',description:'kind・messageCount・hasInterpolations・undistributed・search・folderIdだけを許可'}}}}}},responses:{201:{description:'保存済みの条件とrevision'},403:{description:'統括の編集権限が必要'},422:{description:'条件または分類が不正'}}},
+  },
+  '/api/hq/templates/saved-views/{viewId}': {
+    patch:{parameters:[{name:'viewId',in:'path',required:true,schema:{type:'string'}}],tags:['HQ Templates'],summary:'保存した絞り込みを変更',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['name','filters','expectedRevision'],properties:{name:{type:'string',maxLength:100},filters:{type:'object'},scope:{type:'string',enum:['personal','tenant']},expectedRevision:{type:'integer',minimum:1}}}}}},responses:{200:{description:'更新後のrevisionと条件'},403:{description:'統括の編集権限が必要'},404:{description:'見える条件がありません'},409:{description:'版が変更されました'},422:{description:'入力が不正'}}},
+    delete:{parameters:[{name:'viewId',in:'path',required:true,schema:{type:'string'}}],tags:['HQ Templates'],summary:'保存した絞り込みを保管',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['expectedRevision'],properties:{expectedRevision:{type:'integer',minimum:1}}}}}},responses:{200:{description:'保管済み'},403:{description:'統括の編集権限が必要'},404:{description:'見える条件がありません'},409:{description:'版が変更されました'}}},
+  },
   "/api/hq/templates/folders": {
     "get": {
       "tags": [
@@ -647,36 +671,6 @@ const spec = {
               ]
             }
           }
-        }
-      }
-    }
-  },
-  "/api/hq/templates/message-references": {
-    "get": {
-      "tags": [
-        "HQ Templates"
-      ],
-      "summary": "配布先の回答フォーム・シナリオの候補を取得",
-      "parameters": [],
-      "responses": {
-        "200": {
-          "description": "成功",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiResponse"
-              }
-            }
-          }
-        },
-        "403": {
-          "description": "権限がありません"
-        },
-        "409": {
-          "description": "確認した版や対象が変わりました"
-        },
-        "422": {
-          "description": "入力を確認してください"
         }
       }
     }
@@ -2154,6 +2148,7 @@ const spec = {
         responses: { '200': { description: 'セッションを失効し、未完了のファイルを削除' }, '403': { description: '統括全体の編集権限がない' }, '404': { description: '利用者・統括に属するセッションがない' }, '409': { description: '完了済みのファイルは取り消せない' } },
       },
     },
+    ...hqTemplateMediaPaths,
     '/api/hq/templates/accounts': {
       get: {
         tags: ['HQ Templates'],
@@ -2161,27 +2156,8 @@ const spec = {
         responses: { '200': { description: 'Tenant-scoped account list' }, '403': { description: 'Owner or admin role required' } },
       },
     },
-    '/api/hq/templates': {
-      get: {
-        tags: ['HQ Templates'],
-        summary: '統括ひな形一覧を取得',
-        parameters: [{name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag']},description:'メッセージの6種類またはtagで絞る。type=templateと併用可能。応答のkind_countsは絞り込み前の件数。'},{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] } }],
-        responses: { '200': { description: 'Tenant-scoped template list' }, '400': { description: 'Invalid template type' }, '403': { description: 'Owner or admin role required' } },
-      },
-      post: {
-        tags: ['HQ Templates'],
-        summary: '統括ひな形を作成',
-        parameters: [{ name: 'Idempotency-Key', in: 'header', schema: { type: 'string' }, description: '再送時も同じ値を使用する作成依頼ID。省略時はbody.requestIdが必須' }],
-        requestBody: {
-          required: true,
-          content: { 'application/json': { schema: { type: 'object', required: ['type', 'name', 'definition'], properties: {
-            requestId: { type: 'string' }, type: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] },
-            name: { type: 'string', minLength: 1 }, description: { type: 'string' }, definition: { type: 'object' },
-          } } } },
-        },
-        responses: { '201': { description: 'Created, or the same idempotent result' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '409': { description: 'Idempotency conflict' } },
-      },
-    },
+    ...hqTemplateListPaths,
+    ...stylePaths,
     '/api/hq/templates/{id}': {
       get: {
         tags: ['HQ Templates'], summary: '統括ひな形の詳細を取得',
@@ -2197,7 +2173,7 @@ const spec = {
         responses: { '200': { description: 'Updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
       },
       delete: {
-        tags: ['HQ Templates'], summary: '統括ひな形を削除',
+        tags: ['HQ Templates'], summary: '統括ひな形を保管（店の配布済みコピーは保持）',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision'], properties: { expectedRevision: { type: 'integer', minimum: 1 } } } } } },
         responses: { '200': { description: 'Deleted' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
@@ -6302,7 +6278,7 @@ const spec = {
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],
         responses: {
-          '200': { description: '版の一覧 { versionNumber・status・messageType・messageContent・effectiveFrom・createdAt }' },
+          '200': { description: '版の一覧 { versionNumber・status・messageType・messageContent・effectiveFrom・createdAt・createdByStaffId・creatorName・creatorNameSource }。creatorNameは同じ組織の現在の名簿名（source=current_staff_profile）。旧版・不明・別組織はnull。公開時の名前の写しではない。' },
           '404': { description: 'Not found in account scope' },
         },
       },
@@ -7480,7 +7456,7 @@ const spec = {
                 type: 'object',
                 required: ['mode', 'provider', 'holdMinutes'],
                 properties: {
-                  mode: { type: 'string', enum: ['none', 'onsite', 'online'] },
+                  mode: { type: 'string', enum: ['none', 'onsite', 'online', 'customer_choice'] },
                   provider: { type: 'string', enum: ['none', 'onsite', 'stripe'] },
                   holdMinutes: { type: 'integer', minimum: 5, maximum: 1440 },
                 },
@@ -7511,7 +7487,7 @@ const spec = {
                 type: 'object',
                 required: ['mode', 'provider'],
                 properties: {
-                  mode: { type: 'string', enum: ['none', 'onsite', 'online'] },
+                  mode: { type: 'string', enum: ['none', 'onsite', 'online', 'customer_choice'] },
                   provider: { type: 'string', enum: ['none', 'onsite', 'stripe'] },
                 },
               },

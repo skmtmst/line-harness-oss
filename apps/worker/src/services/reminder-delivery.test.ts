@@ -62,6 +62,16 @@ function makeClient(
 const noPause = async () => undefined
 
 describe('リマインダ配信の実行記録', () => {
+  it('同意不明の明示台帳があれば送らず、実行記録に理由を残す',async()=>{
+    const {db,raw}=createTestD1();seedReminder(raw);
+    raw.exec("INSERT INTO friend_delivery_consents(line_account_id,friend_id,purpose,state,reason,source) VALUES('account-1','friend-1','marketing','unknown','同意未確認','manual')");
+    let sent=0;const client=makeClient(async()=>{sent++;return {requestId:null};});
+    await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:00:00.000Z'),pause:noPause,resolveClient:async()=>client});
+    expect(sent).toBe(0);
+    expect(raw.prepare('SELECT status,last_error_code FROM reminder_delivery_runs').get()).toEqual({status:'skipped',last_error_code:'delivery_consent_suppressed'});
+    raw.close();
+  });
+
   it('未来の通を送らずqueuedで先に記録し、予定件数と次回日時を出せる', async () => {
     const { db, raw } = createTestD1()
     seedReminder(raw, { offsetMinutes: 60 })

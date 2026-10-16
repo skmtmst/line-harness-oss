@@ -1,3 +1,5 @@
+import type { HqTemplateVersion } from './hq-template-version-types.js';
+export type { HqTemplateVersion } from './hq-template-version-types.js';
 import type { HqTemplateArchiveStatus } from '@line-crm/shared';
 
 export const HQ_TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form', 'scenario', 'friend_field', 'mark', 'auto_reply', 'friend_add_rule', 'reminder', 'booking_menu', 'mileage_reward'] as const;
@@ -30,17 +32,6 @@ export interface HqTemplate {
   created_at: string;
   updated_at: string;
   archived_at: string | null;
-}
-
-export interface HqTemplateVersion {
-  id: string;
-  tenant_id: string;
-  template_id: string;
-  version: number;
-  definition_json: string;
-  content_hash: string;
-  created_by: string | null;
-  created_at: string;
 }
 
 export interface HqTemplatePreflight {

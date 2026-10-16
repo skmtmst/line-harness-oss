@@ -1,3 +1,5 @@
+import type { KeywordRule } from './auto-reply-keyword-types.js';
+export type { KeywordRule } from './auto-reply-keyword-types.js';
 import { replyToUnmatchedLine } from './auto-reply-unmatched.js';
 import { runAutoReplyAction, type AutoReplyExecutionAction } from './auto-reply-operator-action.js';
 import type { Env } from '../index.js';
@@ -39,30 +41,6 @@ import {
   messageToLogPayload,
   resolveMetadata,
 } from './step-delivery.js';
-
-/**
- * キーワード1行ぶんの設定（151）。
- *
- * これまでは1ルールに言葉が1つだけだった。実運用では「渋谷」「しぶや」
- * 「シブヤ」を同じ応答にしたい、という形が普通なので、複数行を持てるようにする。
- */
-export interface KeywordRule {
-  keyword: string;
-  matchType: 'exact' | 'contains';
-  /**
-   * 受け取った文がこの字数に満たなければ当てない。
-   *
-   * 部分一致は短い言葉ほど誤爆する。「はい」を含む応答を作ると
-   * 「はいどうも」「配送はいつ」まで当たってしまう。字数の下限を置くと、
-   * ひとことの返事だけを拾える。
-   */
-  minLength?: number;
-  /**
-   * 大文字小文字・全角半角を区別するか。既定は区別する。
-   * 切ると「LINE」「line」「ＬＩＮＥ」が同じものとして当たる。
-   */
-  caseSensitive?: boolean;
-}
 
 /** 大文字小文字と全角半角の違いを均す。 */
 function normalizeForLooseMatch(text: string): string {
@@ -196,6 +174,7 @@ export async function resolveAutoReplyContent(
 ): Promise<{ messageType: string; content: string }> {
   if (rule.template_id) {
     const tpl = await getTemplateById(db, rule.template_id);
+    if (tpl?.message_bubbles_json) throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
     if (tpl) {
       return { messageType: tpl.message_type, content: tpl.message_content };
     }

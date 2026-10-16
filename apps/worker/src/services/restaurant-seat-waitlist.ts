@@ -19,6 +19,10 @@ export async function promoteSeatWaitlist(db: D1Database, slot: SeatWaitlistSlot
   if (!next) return { promoted: false, reason: 'empty' };
   const ends = next.ends_at ?? new Date(Date.parse(next.starts_at) + 120 * 60_000).toISOString();
   let tableId = slot.tableId;
+  const table = await db.prepare('SELECT min_capacity,max_capacity,join_group FROM rt_tables WHERE id=? AND store_id=? AND is_active=1').bind(tableId, slot.storeId).first<{ min_capacity: number; max_capacity: number;join_group:string|null ;}>();
+  if (!table) return { promoted: false, reason: 'no_fitting_table' };
+  if(next.guest_count<table.min_capacity)return {promoted:false,reason:'no_fitting_table'};
+  if(next.guest_count>table.max_capacity){const capacity=table.join_group?await db.prepare('SELECT SUM(min_capacity) AS min,SUM(max_capacity) AS max FROM rt_tables WHERE store_id=? AND join_group=? AND is_active=1').bind(slot.storeId,table.join_group).first<{min:number;max:number}>():null;if(!capacity||next.guest_count<capacity.min||next.guest_count>capacity.max)return {promoted:false,reason:'no_fitting_table'};}
   const settingsStore = d1AssignmentSettingsStore(db);
   const settings = await settingsStore.read({ kind: 'table', id: slot.storeId });
   if (settings.storageReady) {
@@ -26,16 +30,12 @@ export async function promoteSeatWaitlist(db: D1Database, slot: SeatWaitlistSlot
     const released=await db.prepare('SELECT id FROM rt_tables WHERE id=? AND store_id=? AND is_active=1').bind(slot.tableId,slot.storeId).first();
     if(!released)return {promoted:false,reason:'no_fitting_table'};
     const available = await openSeatTables(db,slot.storeId,next.starts_at,ends,next.guest_count);
-    if(!available.some(t=>t.id===slot.tableId||t.tableIds?.includes(slot.tableId)))return {promoted:false,reason:'no_fitting_table'};
+    if(!available.some(t=>t.id===slot.tableId||t.tableIds?.includes(slot.tableId)))return {promoted:false,reason:'unavailable'};
     const selected = await assignRestaurantTable(db,slot.storeId,next.starts_at,next.guest_count,available,
       { store: { ...settingsStore, read: async () => settings } });
     if (!selected) return { promoted: false, reason: 'no_fitting_table' };
     tableId = selected.id;
   }
-  const table = await db.prepare('SELECT min_capacity,max_capacity,join_group FROM rt_tables WHERE id=? AND store_id=? AND is_active=1').bind(tableId, slot.storeId).first<{ min_capacity: number; max_capacity: number;join_group:string|null ;}>();
-  if (!table) return { promoted: false, reason: 'no_fitting_table' };
-  if(next.guest_count<table.min_capacity)return {promoted:false,reason:'no_fitting_table'};
-  if(next.guest_count>table.max_capacity){const capacity=table.join_group?await db.prepare('SELECT SUM(min_capacity) AS min,SUM(max_capacity) AS max FROM rt_tables WHERE store_id=? AND join_group=? AND is_active=1').bind(slot.storeId,table.join_group).first<{min:number;max:number}>():null;if(!capacity||next.guest_count<capacity.min||next.guest_count>capacity.max)return {promoted:false,reason:'no_fitting_table'};}
   const now = new Date(), holdMinutes = waitlistHoldMinutes(next.starts_at, now), start = Date.parse(next.starts_at);
   if (!(await openSeatTables(db,slot.storeId,next.starts_at,ends,next.guest_count)).some(t=>t.id===tableId||t.tableIds?.includes(tableId))) return {promoted:false,reason:'unavailable'};
   let result;

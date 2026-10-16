@@ -1,3 +1,5 @@
+import { getFriendsByLineUserIds, readProxyPushRecipient } from './line-proxy-recipients.js';
+import { hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
 import { Hono } from 'hono';
 import { readBoundedBytes, readBoundedText } from '../lib/input-errors.js';
 import type { Context } from 'hono';
@@ -85,9 +87,6 @@ const MAX_FRIEND_CREATIONS = 20;
 // subrequest (25 statements), so even large broadcasts stay in budget.
 const ROWS_PER_INSERT = 12;
 const STATEMENTS_PER_BATCH = 25;
-
-// Chunk size for friend lookups via IN (...) — same 100-bind ceiling.
-const LOOKUP_CHUNK = 90;
 
 const AUTH_FAILED = {
   message:
@@ -228,48 +227,6 @@ function requiredProxyPermission(method: string, path: string): string | null {
   return null;
 }
 
-/** Look up friends for a set of userIds in IN-clause chunks (≤100 binds each). */
-async function getFriendsByLineUserIds(
-  db: D1Database,
-  userIds: string[],
-  lineAccountId: string | null,
-): Promise<Map<string, Friend>> {
-  const found = new Map<string, Friend>();
-  for (let i = 0; i < userIds.length; i += LOOKUP_CHUNK) {
-    const chunk = userIds.slice(i, i + LOOKUP_CHUNK);
-    const placeholders = chunk.map(() => '?').join(',');
-    if (lineAccountId) {
-      const scoped = await db
-        .prepare(
-          `SELECT * FROM friends
-            WHERE line_account_id = ?
-              AND line_user_id IN (${placeholders})`,
-        )
-        .bind(lineAccountId, ...chunk)
-        .all<Friend>();
-      for (const row of scoped.results ?? []) found.set(row.line_user_id, row);
-    }
-
-    // 別アカウント所有の行には触れない (Issue #961)。拾うのは未割当
-    // (line_account_id IS NULL) の行だけ。他アカウントの友だちへ送信を
-    // 記録する場合は、行を移す代わりにこのアカウント用の行を作る側へ回す。
-    const unresolved = chunk.filter((lineUserId) => !found.has(lineUserId));
-    if (unresolved.length > 0) {
-      const unresolvedPlaceholders = unresolved.map(() => '?').join(',');
-      const fallback = await db
-        .prepare(
-          `SELECT * FROM friends
-            WHERE line_account_id IS NULL
-              AND line_user_id IN (${unresolvedPlaceholders})`,
-        )
-        .bind(...unresolved)
-        .all<Friend>();
-      for (const row of fallback.results ?? []) found.set(row.line_user_id, row);
-    }
-  }
-  return found;
-}
-
 /**
  * Create a friend row for a recipient we have never seen. Mirrors
  * ensureFriendFromWebhookUser (webhook.ts) except that line_account_id is only
@@ -389,6 +346,7 @@ async function logProxySend(
   rawBody: string,
   source: ProxyLogSource,
   logKey?: string | null,
+  knownPushRecipient?: Friend | null,
 ): Promise<void> {
   try {
     const parsed = JSON.parse(rawBody) as ParsedSend;
@@ -412,7 +370,7 @@ async function logProxySend(
         return;
       }
       const friend =
-        (await getFriendByLineUserIdForAccount(db, parsed.to, lineAccountId)) ??
+        (knownPushRecipient !== undefined ? knownPushRecipient : await getFriendByLineUserIdForAccount(db, parsed.to, lineAccountId)) ??
         (await createFriendForRecipient(db, lineClient, parsed.to, lineAccountId));
       if (!friend) return;
       await insertLogRows(db, rowsFor(friend.id, 'push'), source, logKey);
@@ -616,6 +574,26 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       );
     }
 
+    let knownPushRecipient: Friend | null | undefined;
+    if(isBulkDispatch) {
+      let uids:string[]|undefined;
+      if(path.endsWith('/push')||path.endsWith('/multicast')) {
+        let payload: {to?:unknown};
+        try {payload=JSON.parse(rawBody??'{}');} catch {return c.json({message:'Invalid message payload'},400);}
+        if(typeof payload.to==='string') uids=[payload.to];
+        else if(Array.isArray(payload.to)&&payload.to.every(v=>typeof v==='string')) uids=payload.to;
+        else return c.json({message:'Invalid message recipients'},400);
+      }
+      let suppressed: boolean;
+      if(path==='/v2/bot/message/push'&&caller.lineAccountId&&uids?.length===1&&LINE_USER_ID_RE.test(uids[0])) {
+        const recipient=await readProxyPushRecipient(c.env.DB,caller.lineAccountId,uids[0]);
+        knownPushRecipient=recipient.friend; suppressed=recipient.suppressed;
+      } else suppressed=await hasSuppressedDeliveryRecipients(c.env.DB,caller.lineAccountId,uids);
+      if(suppressed) {
+        return c.json({message:'Message dispatch contains recipients with delivery suppression',code:'DELIVERY_CONSENT_SUPPRESSED'},409);
+      }
+    }
+
     let upstream: Response;
     try {
       upstream = await fetch(`${upstreamBase}${encodedPath}${url.search}`, {
@@ -643,7 +621,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       // Log in the background where possible: a multicast to hundreds of
       // friends must not delay the client response (timeout → client retry →
       // double send). Falls back to inline await outside a Workers runtime.
-      const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource, retryKey);
+      const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource, retryKey, knownPushRecipient);
       try {
         c.executionCtx.waitUntil(logging);
       } catch {

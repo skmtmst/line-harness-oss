@@ -12,7 +12,7 @@ test('issue pins revision, revoke escapes IDs, public preview omits admin creden
   const transport=vi.fn().mockResolvedValue(new Response(JSON.stringify({success:true,data:{dryRun:true}})))
   vi.stubGlobal('fetch',transport)
   await readHqFormTest('https://worker.test','id/1','secret')
-  expect(transport).toHaveBeenLastCalledWith(new URL('https://worker.test/api/liff/hq-form-tests/id%2F1'),expect.objectContaining({method:'GET',credentials:'omit',headers:{'X-Form-Test-Token':'secret'}}))
+  expect(transport).toHaveBeenLastCalledWith(new URL('https://worker.test/api/liff/hq-form-tests/id%2F1'),expect.objectContaining({method:'GET',credentials:'omit',headers:{Authorization:'Bearer secret'}}))
   transport.mockResolvedValueOnce(new Response(JSON.stringify({success:true,data:{dryRun:true}})))
   await readHqFormTest('https://worker.test','id/1','secret',{name:'試し'})
   expect(transport).toHaveBeenLastCalledWith(new URL('https://worker.test/api/liff/hq-form-tests/id%2F1/submit'),expect.objectContaining({method:'POST',body:JSON.stringify({answers:{name:'試し'}})}))

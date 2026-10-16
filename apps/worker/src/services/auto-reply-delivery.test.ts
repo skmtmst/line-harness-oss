@@ -21,6 +21,11 @@ beforeEach(()=>{
 });
 afterEach(()=>test.raw.close());
 describe('自動応答の待ち時間を過ぎた送信',()=>{
+ it('配信停止を引き継いだ人への遅延返信は送らない',async()=>{
+  test.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f','u','a');INSERT INTO friend_delivery_consents(line_account_id,friend_id,purpose,state,reason,source) VALUES('a','f','marketing','revoked','停止希望','uid_migration')");
+  const client=vi.fn();expect(await processAutoReplyDeliveries({DB:test.db} as Env['Bindings'],now,client)).toBe(0);
+  expect(client).not.toHaveBeenCalled();expect(test.raw.prepare('SELECT status FROM auto_reply_deliveries').get()).toEqual({status:'skipped'});
+ });
  it('期限前には送らず、期限後はpushで1回だけ送って結果を記録する',async()=>{
   const pushMessageWithRequestId=vi.fn().mockResolvedValue({requestId:'line-request'});
   const client=async()=>({pushMessageWithRequestId}) as unknown as LineClient;

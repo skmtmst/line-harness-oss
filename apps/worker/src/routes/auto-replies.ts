@@ -1,3 +1,4 @@
+import { readPriority } from './../services/auto-reply-priority.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -131,14 +132,6 @@ async function requireVisibleAutoReply(c: Context<Env>, next: () => Promise<void
 
 /** LINE から届くメッセージの種別。ここに無いものは対象にできない。 */
 const MESSAGE_KINDS = ['text', 'image', 'video', 'audio', 'file', 'location', 'sticker', 'postback'];
-
-function readPriority(raw: unknown): { ok: true; value: number } | { ok: false } {
-  const n = Number(raw);
-  // 上下に余裕を持たせる。間に挿し込めないと、並べ替えのたびに
-  // 全件を振り直すことになる。
-  if (!Number.isInteger(n) || n < -9999 || n > 9999) return { ok: false };
-  return { ok: true, value: n };
-}
 
 function readMessageKinds(raw: unknown): { ok: true; value: string[] | null } | { ok: false } {
   if (raw === null || raw === undefined || (Array.isArray(raw) && raw.length === 0)) {
@@ -663,6 +656,7 @@ export async function readDraftSettings(db: D1Database, raw: unknown, checkRefer
   let templateLineAccountId: string | null = null;
   if (templateId && checkReferences) {
     const template = await getTemplateById(db, templateId);
+    if (template?.message_bubbles_json) return {ok:false,error:'複数通のテンプレートは一斉配信から選んでください',field:'templateId'};
     if (!template) return { ok: false, error: '選んだテンプレートを確認できません' , field: "templateId" };
     templateLineAccountId = template.line_account_id ?? null;
     if (!responseType) responseType = template.message_type;

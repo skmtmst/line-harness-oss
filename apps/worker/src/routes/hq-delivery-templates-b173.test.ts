@@ -146,3 +146,62 @@ test('統括から店別の有効タグ・公開クーポンを名前で探し�
  expect((await req('/resources?kind=tag&accountIds=a3')).status).toBe(403);
  expect((await req('/resources?kind=arbitrary')).status).toBe(400);
 });
+
+test('組5: 選んだ店とタグIDを固定版へ保存し、同じ店はそのID・別店は同名に配る',async()=>{
+ fixture.raw.exec("INSERT INTO tags(id,name,line_account_id,status) VALUES('tag-a','会員','a1','active'),('tag-b','会員','a2','active')");
+ const definition={...auto,settings:{...auto.settings,priority:42,actions:[{actionType:'tag',config:{tagIds:['tag-a'],op:'add'},onFailure:'stop'}]},references:[{sourceId:'tag-a',kind:'tag',name:'会員',accountId:'a1'}]};
+ const id=await create('auto_reply',definition);expect((await req(`/${id}`)).body.data.definition.references).toEqual(definition.references);
+ const p=await req(`/${id}/preflight`,'POST',{accountIds:['a1','a2']});expect(p.status,JSON.stringify(p.body)).toBe(200);
+ const r=await distribute(id,p.body.data);expect(r.body.data.status).toBe('completed');
+ const versions=fixture.raw.prepare('SELECT definition_snapshot FROM auto_reply_versions ORDER BY auto_reply_id').all() as Array<{definition_snapshot:string}>;
+ expect(versions).toHaveLength(2);expect(versions.map(v=>JSON.parse(v.definition_snapshot).actions)).toEqual(expect.arrayContaining([expect.stringContaining('tag-a'),expect.stringContaining('tag-b')]));
+ expect(versions.every(v=>JSON.parse(v.definition_snapshot).priority===42)).toBe(true);
+ for(const priority of [-10000,10000,1.5])expect((await req('','POST',{type:'auto_reply',name:'不正',requestId:crypto.randomUUID(),definition:{...auto,settings:{...auto.settings,priority}}})).status).toBe(422);
+ expect((await req('','POST',{type:'auto_reply',name:'他店',requestId:crypto.randomUUID(),definition:{...definition,references:[{...definition.references[0],accountId:'a3'}]}})).status).toBe(422);
+});
+
+test.each([
+ ['flex',JSON.stringify({type:'bubble',body:{type:'box',layout:'vertical',contents:[{type:'text',text:'ご案内'}]}})],
+ ['image',JSON.stringify({originalContentUrl:'https://example.test/a.png',previewImageUrl:'https://example.test/a.png'})],
+ ['silent',''],
+])('組5: 自動応答の%sを保存し、後の処理と優先順位を店の下書きへ保持する',async(responseType,responseContent)=>{
+ const id=await create('auto_reply',{...auto,settings:{...auto.settings,responseType,responseContent,priority:8}});
+ expect((await distribute(id,await preflight(id))).body.data.status).toBe('completed');
+ const version=JSON.parse((fixture.raw.prepare('SELECT definition_snapshot FROM auto_reply_versions').get() as {definition_snapshot:string}).definition_snapshot);
+ expect(version).toMatchObject({responseType,responseContent,priority:8});
+});
+
+test('組5: 店別の素材検索と配布版の読み口は別組織・停止店を含めず、書き込みをしない',async()=>{
+ fixture.raw.exec("INSERT INTO tags(id,name,line_account_id,status) VALUES('tag-a','会員','a1','active'),('tag-b','会員','a2','active'),('other','会員','a3','active')");
+ const id=await create('auto_reply');
+ const changes=(fixture.raw.prepare('SELECT total_changes() n').get() as {n:number}).n;
+ const r=await req('/resources?kind=tag&q=会員&limit=1');expect(r.body.data).toMatchObject({total:2,nextCursor:'1'});expect(r.body.data.items[0]).toMatchObject({accountId:'a1',id:'tag-a'});
+ expect((await req('/resources?kind=tag&accountIds=a3')).status).toBe(403);
+ expect((await req(`/${id}/distribution-targets?accountIds=a1`)).body.data.stores).toMatchObject([{accountId:'a1',targetVersion:{version:null,status:'undistributed'}}]);
+ expect((await req(`/${id}/distribution-targets?accountIds=a3`)).status).toBe(404);
+ expect((await req(`/${id}/distribution-targets?accountIds=a1,a1`)).status).toBe(400);
+ expect((fixture.raw.prepare('SELECT total_changes() n').get() as {n:number}).n).toBe(changes);
+ fixture.raw.exec("UPDATE staff_members SET access_level='read_only' WHERE id='owner'");
+ expect((await req('/resources?kind=tag')).status).toBe(200);expect((await req('','POST',{type:'auto_reply',name:'拒否',requestId:crypto.randomUUID(),definition:auto})).status).toBe(403);
+});
+
+test('組5: 選んだ店の公開クーポンIDを保存し、配り先の公開内容とIDへつなぐ',async()=>{
+ for(const a of ['a1','a2'])fixture.raw.prepare("INSERT INTO broadcast_message_assets(id,line_account_id,kind,name,payload_json,published_version,created_at,updated_at) VALUES (?,?,'coupon','特典',?,1,'2026-10-16','2026-10-16')").run('coupon-'+a,a,JSON.stringify({description:'特典 '+a,startsAt:'2026-01-01',endsAt:'2027-01-01'}));
+ const definition={...auto,settings:{...auto.settings,responseType:'coupon',responseContent:JSON.stringify({assetId:'coupon-a1'})},references:[{sourceId:'coupon-a1',kind:'coupon',name:'特典',accountId:'a1'}]};
+ const id=await create('auto_reply',definition);
+ const p=await req(`/${id}/preflight`,'POST',{accountIds:['a2']});expect(p.status,JSON.stringify(p.body)).toBe(200);
+ expect((await distribute(id,p.body.data)).body.data.status).toBe('completed');
+ const settings=JSON.parse((fixture.raw.prepare('SELECT definition_snapshot FROM auto_reply_versions').get() as {definition_snapshot:string}).definition_snapshot);
+ expect(JSON.parse(settings.responseContent)).toMatchObject({assetId:'coupon-a2',description:'特典 a2'});
+ fixture.raw.exec("UPDATE broadcast_message_assets SET published_version=0 WHERE id='coupon-a2'");
+ expect((await req(`/${id}/preflight`,'POST',{accountIds:['a2']})).status).toBe(409);
+});
+
+test('組5: 後の処理の通知先は同名の店設定の版へ固定する',async()=>{
+ fixture.raw.exec("INSERT INTO notification_rules(id,name,event_type,line_account_id,version) VALUES('notice-a','担当へ','manual','a1',2),('notice-b','担当へ','manual','a2',7)");
+ const definition={...auto,settings:{...auto.settings,actions:[{actionType:'notify_staff',config:{notificationRuleId:'notice-a',notificationRuleVersion:2,message:'返信しました'},onFailure:'stop'}]},references:[{sourceId:'notice-a',kind:'notification_rule',name:'担当へ',accountId:'a1'}]};
+ const id=await create('auto_reply',definition),p=await req(`/${id}/preflight`,'POST',{accountIds:['a2']});expect(p.status,JSON.stringify(p.body)).toBe(200);
+ expect((await distribute(id,p.body.data)).body.data.status).toBe('completed');
+ const settings=JSON.parse((fixture.raw.prepare('SELECT definition_snapshot FROM auto_reply_versions').get() as {definition_snapshot:string}).definition_snapshot);
+ expect(JSON.parse(settings.actions)[0]).toMatchObject({onFailure:'stop',config:{notificationRuleId:'notice-b',notificationRuleVersion:7}});
+});

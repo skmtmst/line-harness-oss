@@ -6,6 +6,16 @@ import { ApiError, fetchApi, fetchApiBlob } from './api';
 import { bookingPaymentAdminApi as api, isNotReadyError } from './api-booking-payment-admin';
 beforeEach(()=>vi.clearAllMocks());
 describe('作業役Dと同じ支払い管理APIの形',()=>{
+  it('試験用Stripeの接続・callback・切断を管理セッションのAPIに送る',async()=>{
+    await api.authorizeConnection('a /');
+    expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/payment-connection/authorize?account_id=a+%2F',{method:'POST',body:'{}'});
+    await api.completeConnection('a',{state:'opaque',code:'ac_test'});
+    expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/payment-connection/callback?account_id=a',{method:'POST',body:'{"state":"opaque","code":"ac_test"}'});
+    await api.completeConnection('a',{state:'opaque',error:'access_denied'});
+    expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/payment-connection/callback?account_id=a',{method:'POST',body:'{"state":"opaque","error":"access_denied"}'});
+    await api.disconnectConnection('a');
+    expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/payment-connection?account_id=a',{method:'DELETE'});
+  });
   it('アカウント・検索を符号化して接続・上書き・記録・通知を読む',async()=>{
     await api.connection('a /');expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/payment-connection?account_id=a+%2F');
     await api.menuOverrides('a');expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/menu-payments?account_id=a');

@@ -78,6 +78,14 @@ export interface PaymentEvent {
 }
 
 export const bookingPaymentAdminApi = {
+  /** 接続/つなぎ直し。同じ管理ログインを保って返されたURLを開く（10分間有効）。 */
+  authorizeConnection: (accountId: string) =>
+    fetchApi<Result<{ authorizationUrl: string; expiresAt: string; testMode: true }>>(`/api/booking/admin/payment-connection/authorize?${q(accountId)}`, { method: 'POST', body: '{}' }),
+  /** ブラウザのGET callbackも可。認可コードは自動再送しない。 */
+  completeConnection: (accountId: string, callback: { state: string; code: string } | { state: string; error: 'access_denied' }) =>
+    fetchApi<Result<StripeConnection>>(`/api/booking/admin/payment-connection/callback?${q(accountId)}`, { method: 'POST', body: JSON.stringify(callback) }),
+  disconnectConnection: (accountId: string) =>
+    fetchApi<Result<StripeConnection>>(`/api/booking/admin/payment-connection?${q(accountId)}`, { method: 'DELETE' }),
   /** CSV本文。指定の検索条件全件（上限1万件）。ページ送りのoffsetは書出しに使わない。 */
   exportCsv: (accountId: string, filter: { q?: string; status?: string; method?: string; period?: string } = {}) =>
     fetchApiBlob(`/api/booking/admin/payments/export?${q(accountId, filter)}`),

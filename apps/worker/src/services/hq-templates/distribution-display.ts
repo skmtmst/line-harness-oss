@@ -49,12 +49,11 @@ export function captureDistributionName(runId: string, tenantId: string, account
   };
 }
 
-/** まだ配っていない店も含む、確認前の読取り。実行許可や上書き可否には使わない。 */
 export async function listDistributionTargets(db: D1Database, tenantId: string, templateId: string, accountIds: string[]) {
   const template = await db.prepare(`SELECT v.version FROM hq_templates t JOIN hq_template_versions v ON v.id=t.current_version_id AND v.tenant_id=t.tenant_id AND v.template_id=t.id WHERE t.id=? AND t.tenant_id=? AND t.archived_at IS NULL`).bind(templateId,tenantId).first<{version:number}>();
   if (!template) return null;
-  const accounts = (await db.prepare(`SELECT id,name FROM line_accounts WHERE tenant_id=? AND is_active=1 AND archived_at IS NULL ORDER BY name,id`).bind(tenantId).all<{id:string;name:string}>()).results;
+  const accounts = (await db.prepare(`SELECT id,name,folder_id AS folderId FROM line_accounts WHERE tenant_id=? AND is_active=1 AND archived_at IS NULL ORDER BY name,id`).bind(tenantId).all<{id:string;name:string;folderId:string|null}>()).results;
   if (accountIds.some(id=>!accounts.some(a=>a.id===id))) return null;
   const selected = accountIds.length ? accounts.filter(a=>accountIds.includes(a.id)) : accounts;
-  return {templateId, latestVersion:template.version, requiresPreflight:true, stores:await Promise.all(selected.map(async a=>({accountId:a.id,accountName:a.name,targetVersion:await targetDistributionVersion(db,tenantId,templateId,a.id,template.version)})))};
+  return {templateId, latestVersion:template.version, requiresPreflight:true, stores:await Promise.all(selected.map(async a=>({accountId:a.id,accountName:a.name,folderId:a.folderId,targetVersion:await targetDistributionVersion(db,tenantId,templateId,a.id,template.version)})))};
 }

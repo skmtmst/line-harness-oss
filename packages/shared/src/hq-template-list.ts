@@ -26,5 +26,6 @@ export interface HqTemplateListDisplay {
   assignment_method?: string | null;
   display_order?: number | null;
   display_audience?: string | null;
+  display_locations?: import('./support-mark-display.js').SupportMarkLocation[] | null;
   tap_count?: number | null;
 }

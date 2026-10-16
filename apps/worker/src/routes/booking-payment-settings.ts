@@ -44,7 +44,9 @@ export async function paymentSettingResponse(
     return c.json({ success: true, data: { [field]: row.value, version: row.version } });
   } catch (error) {
     const missing = String(error).includes(`no such table: ${table}`);
-    const code = missing ? `${target.kind}_payment_storage_not_ready` : 'payment_admin_unavailable';
+    const code = missing
+      ? target.kind === 'course' ? 'course_payment_storage_not_ready' : 'event_payment_storage_not_ready'
+      : 'payment_admin_unavailable';
     console.error(JSON.stringify({ code }));
     return c.json({ success: false, error: code, code }, 503);
   }

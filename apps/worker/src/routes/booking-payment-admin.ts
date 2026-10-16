@@ -6,11 +6,13 @@ import { paymentCsv, paymentRecordFilter, paymentRecords, paymentSummary, staffT
 import { startBookingPayment } from './booking-payments.js';
 import { paymentSettingResponse } from './booking-payment-settings.js';
 import { paymentEvent, paymentEventFilter, paymentEventList, processPaymentEvent } from '../services/booking-payment-events.js';
+import { registerStripeConnectRoutes } from './booking-stripe-connect.js';
 
 export const bookingPaymentAdmin = new Hono<Env>();
 bookingPaymentAdmin.onError((error,c)=>{
-  const missing=/no such table: (booking_payment_choices|booking_payments|booking_payment_configs|booking_payment_menu_settings|booking_payment_connections|booking_payment_events|booking_payment_event_replays|restaurant_course_payment_settings|event_payment_settings)\b/.exec(String(error))?.[1];
+  const missing=/no such table: (booking_payment_choices|booking_payments|booking_payment_configs|booking_payment_menu_settings|booking_payment_connections|booking_stripe_connect_states|booking_payment_events|booking_payment_event_replays|restaurant_course_payment_settings|event_payment_settings)\b/.exec(String(error))?.[1];
   const code=!missing?'payment_admin_unavailable':missing==='booking_payment_connections'?'payment_connection_storage_not_ready'
+    :missing==='booking_stripe_connect_states'?'stripe_connect_storage_not_ready'
     :['booking_payment_events','booking_payment_event_replays'].includes(missing)?'payment_events_storage_not_ready':'payment_storage_not_ready';
   console.error(JSON.stringify({code}));
   return c.json({success:false,error:code,code},503);
@@ -30,6 +32,8 @@ const guard = (write = false): MiddlewareHandler<Env> => async (c, next) => {
   if (!await c.env.DB.prepare('SELECT id FROM line_accounts WHERE id=?').bind(account).first()) return c.json({success:false,error:'not_found'},404);
   await next();
 };
+
+registerStripeConnectRoutes(bookingPaymentAdmin, guard);
 
 bookingPaymentAdmin.get('/api/booking/admin/payment-connection',guard(),async c => {
   const row=await c.env.DB.prepare(`SELECT provider_account_id,test_mode,connected_at,disconnected_at
