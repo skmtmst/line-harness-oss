@@ -176,7 +176,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(new URLSearchParams(window.location.search).get('step')).toBe('confirm')
     expect(replace).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
-    fireEvent.click(await screen.findByRole('button', { name: /人に予約する/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /人に.*予約する$/ }))
     await waitFor(() => expect(hq.send).toHaveBeenCalledWith('run-1', 2))
     expect(push).toHaveBeenCalledWith('/hq/broadcasts/detail?id=run-1')
   })

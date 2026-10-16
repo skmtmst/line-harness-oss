@@ -86,7 +86,7 @@ describe('V8の5手順で送信を確定する', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(200) }); await flush()
     const dialog = document.querySelector('[role="dialog"]')!
     expect(mocks.create.mock.calls[0][0].scheduledAt).toBe('2099-10-05T01:00:00.000Z')
-    await click('10 人に予約する', dialog)
+    await click('10 人に 10/5 10:00 で予約する', dialog)
     expect(mocks.confirm).toHaveBeenCalledWith('draft', expect.objectContaining({ scheduledAt: '2099-10-05T01:00:00.000Z' }))
     expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.success).toHaveBeenCalledTimes(1)
   })

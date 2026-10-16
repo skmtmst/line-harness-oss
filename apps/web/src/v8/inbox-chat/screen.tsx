@@ -1963,7 +1963,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             text: content,
             revision: currentRevision,
             quotedMessageId: quotedMessage?.id,
-          },
+            ...(senderId ? { senderId } : {}),
+          } as Parameters<typeof api.chats.sendCombined>[1],
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -2014,7 +2015,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         })
         const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'image', content: imgPayload, quotedMessageId: quotedMessage?.id ?? null })
         const sendResult = await api.chats.send(sendingChatId,
-          { messageType: 'image', content: imgPayload, revision: currentRevision, quotedMessageId: quotedMessage?.id },
+          { messageType: 'image', content: imgPayload, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -2060,7 +2061,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         const input = attachmentSendInput(sendingAttachment.attachment)
         const signature = JSON.stringify({ chatId: sendingChatId, ...input, quotedMessageId: useCombined ? null : quotedMessage?.id ?? null })
         const sendResult = await api.chats.send(sendingChatId,
-          { ...input, revision: currentRevision, quotedMessageId: useCombined ? undefined : quotedMessage?.id },
+          { ...input, revision: currentRevision, quotedMessageId: useCombined ? undefined : quotedMessage?.id, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -2184,7 +2185,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       const now = new Date().toISOString()
       const signature = JSON.stringify({ chatId: sendingChatId, combined: true, texts })
       const sendResult = await api.chats.sendCombined(sendingChatId,
-        { texts, revision: pack.revision },
+        { texts, revision: pack.revision, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.sendCombined>[1],
         sendKeysRef.current.get(signature),
       )
       sendKeysRef.current.clear(signature)

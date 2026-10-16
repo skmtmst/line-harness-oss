@@ -76,7 +76,8 @@ import {
   filterSendableTemplates,
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SendConfirmDialog from '@/components/shared/send-confirm-dialog'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import SendConfirmDialog, { describeExclusion } from '@/components/shared/send-confirm-dialog'
 import { chatSafetyApi } from '@/lib/api-gap1'
 import type { SendConfirmationPreview } from '@line-crm/shared'
 import Notice from '@/components/shared/notice'
@@ -2008,6 +2009,8 @@ export default function BroadcastForm({
    * 共通の「送る前の確かめ」の中身は、保存した配信に対するサーバーの数え直し（GET send-preview）。
    * 窓を開くたびに下書きを保存して数え直し、確定は「見た人数・版」を添えて送る（人数・版が変わっていたら 409）。
    */
+  const canSendBroadcast = useFeatureAccess('broadcasts')
+  const broadcastRole = useStaffRole()
   const [sendPreview, setSendPreview] = useState<{ state: 'loading' | 'error' | 'ready'; data: SendConfirmationPreview | null; broadcast: ApiBroadcast | null }>({ state: 'loading', data: null, broadcast: null })
   const [previewSeq, setPreviewSeq] = useState(0)
   useEffect(() => {
@@ -2712,17 +2715,12 @@ export default function BroadcastForm({
       subtitle={`${title.trim() || '新しい一斉配信'} ・ ${confirmAudienceLabel}`}
       scheduled={sendMode === 'scheduled'}
       state={currentStep ? sendPreview.state : audienceCount === null ? 'error' : 'ready'}
+      block={(broadcastRole === 'viewer' || broadcastRole === 'staff') && !canSendBroadcast ? 'no-permission' : null}
       hidePrimary={Boolean(currentStep) && approvalConfigState !== 'ready'}
       unavailableNote={currentStep && approvalConfigState === 'loading' ? '承認の設定を確認しています…' : currentStep && approvalConfigState === 'error' ? '承認の設定を確認できません。確認画面を開き直してください' : undefined}
       onRetry={() => (currentStep ? setPreviewSeq((value) => value + 1) : void runPreflight())}
       recipients={currentStep ? (sendPreview.data?.recipients ?? null) : audienceCount}
-      recipientsNote={currentStep && sendPreview.data
-        ? (() => {
-            const ex = sendPreview.data.excluded
-            const parts = [`宣伝を止めている ${formatNumber(ex.optedOut)}`, `ブロック ${formatNumber(ex.blocked)}`, `重複 ${formatNumber(ex.duplicate)}`]
-            return `除く：${parts.join('・')}`
-          })()
-        : exclusionNote ?? undefined}
+      recipientsNote={currentStep && sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : exclusionNote ?? undefined}
       purpose="marketing"
       whenLabel={currentStep && sendPreview.data?.quietHoursShiftTo
         ? `${formatScheduleTime(sendPreview.data.quietHoursShiftTo)} に送る`
@@ -2739,7 +2737,8 @@ export default function BroadcastForm({
       extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}
       primaryLabel={(() => {
         const n = currentStep ? sendPreview.data?.recipients ?? null : audienceCount
-        return n === null ? '送る' : sendMode === 'scheduled' ? `${formatNumber(n)} 人に予約する` : `${formatNumber(n)} 人に送る`
+        const shortAt = sendMode === 'scheduled' && scheduledDate ? `${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime}` : null
+        return n === null ? '送る' : sendMode === 'scheduled' ? `${formatNumber(n)} 人に${shortAt ? ` ${shortAt} で` : ''}予約する` : `${formatNumber(n)} 人に送る`
       })()}
       onConfirm={() => (currentStep ? confirmFromPreview() : save())}
       onBack={() => { if (!saving) setConfirmOpen(false) }}

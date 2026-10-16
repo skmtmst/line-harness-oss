@@ -51,6 +51,8 @@ interface ConfirmDialogProps {
   /** ★V8：絵の窓の幅 px（Dialog の designWidth と同じ）。 */
   designLayout?: 'stacked'
   footerAlign?: 'center' | 'start'
+  /** 下の帯の左に置く一言（例「閉じても送りません」）。 */
+  footerLead?: ReactNode
   /** 絵で操作の間隔が指定されている窓だけに使う。 */
   designFooterGap?: number
   confirmFirst?: boolean
@@ -104,6 +106,7 @@ export default function ConfirmDialog({
   size,
   designLayout,
   footerAlign,
+  footerLead,
   designFooterGap,
   confirmFirst,
   designTop,
@@ -175,6 +178,7 @@ export default function ConfirmDialog({
       designWidth={designWidth ?? (size ? undefined : CONFIRM_WIDTH)}
       designLayout={designLayout}
       footerAlign={footerAlign}
+      footerLead={footerLead}
       designFooterGap={designFooterGap}
       confirmFirst={confirmFirst}
       designTop={designTop}

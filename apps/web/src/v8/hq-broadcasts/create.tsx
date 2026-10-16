@@ -23,7 +23,7 @@ import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from '
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SendConfirmDialog from '@/components/shared/send-confirm-dialog'
+import SendConfirmDialog, { describeExclusion, shortWhen } from '@/components/shared/send-confirm-dialog'
 import { chatSafetyApi } from '@/lib/api-gap1'
 import type { SendConfirmationPreview } from '@line-crm/shared'
 import DateField from '@/components/shared/date-field'
@@ -1215,7 +1215,7 @@ export default function HqBroadcastCreate() {
         state={sendPreview.state}
         onRetry={() => setPreviewSeq((value) => value + 1)}
         recipients={sendPreview.data?.recipients ?? null}
-        recipientsNote={sendPreview.data ? `除く：宣伝を止めている ${formatNumber(sendPreview.data.excluded.optedOut)}・ブロック ${formatNumber(sendPreview.data.excluded.blocked)}・重複 ${formatNumber(sendPreview.data.excluded.duplicate)}` : undefined}
+        recipientsNote={sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : undefined}
         perAccount={sendPreview.data?.perAccount?.map((row) => ({
           name: chosen.find((store) => store.id === row.accountId)?.name ?? row.accountId,
           recipients: row.recipients,
@@ -1228,7 +1228,7 @@ export default function HqBroadcastCreate() {
         bodyHead={sendPreview.data?.firstText ?? ''}
         allRecipients={audience === 'all'}
         hidePrimary={approval.state === null}
-        primaryLabel={sendPreview.data ? (when === 'now' ? `${formatNumber(sendPreview.data.recipients)} 人に送る` : `${formatNumber(sendPreview.data.recipients)} 人に予約する`) : '送る'}
+        primaryLabel={sendPreview.data ? (when === 'now' ? `${formatNumber(sendPreview.data.recipients)} 人に送る` : `${formatNumber(sendPreview.data.recipients)} 人に${scheduledAt ? ` ${shortWhen(scheduledAt)} で` : ''}予約する`) : '送る'}
         onConfirm={() => send()}
         onBack={() => { if (!sending) setConfirmOpen(false) }}
       />

@@ -23,6 +23,21 @@ export type SendPurpose = 'transaction' | 'notice' | 'marketing'
 
 const PURPOSE_LABEL: Record<SendPurpose, string> = { transaction: '取引（予約・注文の連絡）', notice: 'お知らせ', marketing: '宣伝' }
 
+/** 「10/18 10:00」の短い日時（予約ボタン用）。日本時間。 */
+export function shortWhen(iso: string): string {
+  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(iso))
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
+  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+}
+
+/** 送る相手の補足「対象 1,284 人から除く 12 人：宣伝を止めている 12・ブロック 0・重複 0」。 */
+export function describeExclusion(recipients: number, excluded: { blocked: number; optedOut: number; duplicate: number; hidden?: number; missingDestination?: number }): string {
+  const other = (excluded.hidden ?? 0) + (excluded.missingDestination ?? 0)
+  const total = excluded.blocked + excluded.optedOut + excluded.duplicate + other
+  const parts = [`宣伝を止めている ${formatNumber(excluded.optedOut)}`, `ブロック ${formatNumber(excluded.blocked)}`, `重複 ${formatNumber(excluded.duplicate)}`, ...(other > 0 ? [`ほか ${formatNumber(other)}`] : [])]
+  return `対象 ${formatNumber(recipients + total)} 人から除く ${formatNumber(total)} 人：${parts.join('・')}`
+}
+
 export type SendConfirmBlock = 'no-permission' | 'impersonation' | null
 
 export interface SendConfirmDialogProps {
@@ -123,6 +138,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
       confirmDisabled={!canPress}
       onCancel={() => { if (!busy) onBack() }}
       designNode="F94nep"
+      footerLead={<span className={styles.footLead}>閉じても送りません</span>}
     >
       <dl className={styles.rows} aria-busy={state === 'loading' || undefined}>
         <Row label="送る相手">
