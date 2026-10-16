@@ -474,12 +474,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
     return () => label.removeEventListener('click', onClick)
   }, [id])
 
-  /*
-   * 箱の要素にも value を持たせる（試験・自動操作が textarea と同じに書ける）。
-   * 後回しの副作用（useEffect）にすると、箱が画面に出た直後のほんの一瞬だけ value が無い状態ができる。
-   * 試験が混み合っているとその隙間で値を書き込みに来て「値を持たない要素」と言って落ちるため、
-   * 描画が入るのと同じ時点（useLayoutEffect）で必ず持たせる。
-   */
+  /* 箱の要素にも value を持たせる（試験・自動操作が textarea と同じに書ける）。後回し（useEffect）だと混雑時に一瞬 value が無い隙間ができるため、描画と同時（useLayoutEffect）に必ず持たせる。 */
   useLayoutEffect(() => {
     const root = rootRef.current
     if (!root) return
