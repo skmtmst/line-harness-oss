@@ -427,7 +427,7 @@ export default function SeatReserve() {
   return (
     <LiffLookScope className={`${view==='pick'||view==='confirm'?'restaurant-fusion ':''}min-h-screen bg-canvas`}>
       <LiffHeader title={view==='confirm'?'確認':'ご予約'} />
-      <div className={`mx-auto w-full max-w-md px-4 ${view==='pick'||view==='confirm'?'pt-4':'pt-3'}`}>
+      <div className={`mx-auto w-full max-w-md ${view==='done'?'px-6 pt-0':`px-4 ${view==='pick'||view==='confirm'?'pt-4':'pt-3'}`}`}>
       {(view === 'pick' || view === 'confirm') && (
         <Stepper appearance="restaurant" steps={STEPS} current={view === 'pick' ? 0 : STEPS.length - 1} />
       )}
@@ -505,7 +505,7 @@ export default function SeatReserve() {
           )}
           {view === 'done' && result && (
             <SeatDone
-              booking={result.booking}
+              booking={result.booking} storeName={store.name}
               timeZone={store.timezone}
               cancelDeadlineMinutesBefore={minutes}
               changed={result.changed}

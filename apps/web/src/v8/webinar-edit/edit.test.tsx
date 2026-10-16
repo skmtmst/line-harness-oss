@@ -184,7 +184,9 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.textContent).toContain('平均離脱時間 —')
     expect(host.textContent).not.toContain('平均 6分で離脱')
     expect(host.textContent).toContain('見ていない・見逃し案内の対象')
-    const chat = host.querySelector('a[href="/chats?friend=f-1"]')
+    const menu = host.querySelector('tr[data-row-id="f-1"] button[aria-haspopup="menu"]') as HTMLButtonElement
+    await act(async () => { menu.click() })
+    const chat = document.querySelector('a[href="/chats?friend=f-1"]')
     expect(chat?.textContent).toContain('チャットを見る')
     expect(buttonText('CSVで書き出す')).toBeTruthy()
   })
@@ -200,6 +202,9 @@ describe('V8 ウェビナーの編集', () => {
     expect(metric?.querySelector('[data-kpi-number]')?.textContent).toBe('9')
     expect(metric?.textContent).toContain('9人')
     expect(metric?.textContent).not.toContain('9件')
+    const help = metric?.querySelector('[data-kpi-label] button') as HTMLButtonElement
+    await act(async () => { help.click() })
+    expect(help.getAttribute('aria-expanded')).toBe('true')
   })
 
   it('コメントの見え方は開始前2件で埋めず、開始後の最初のコメントも出す', async () => {
@@ -349,6 +354,39 @@ describe('V8 ウェビナーの編集', () => {
     expect(buttonText('下書きを保存')).toBeUndefined()
     expect(buttonText('比べてから保存')).toBeTruthy()
     expect([...host.querySelectorAll('a')].some((link) => link.textContent?.trim() === 'キャンセル')).toBe(true)
+  })
+
+  it('CTAの自動表示をスイッチで切り替え、ほかのカードの内容と一緒に保存する', async () => {
+    nav.search = 'id=webinar-1&pane=cta'
+    await render(<WebinarEditV8 />)
+    const toggle = screen.getByRole('switch', { name: 'ボタンを押したら、フォームを自動で開く' })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    await act(async () => { fireEvent.click(toggle) })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    await act(async () => { buttonText('下書きを保存')!.click() })
+    for (let i = 0; i < 4; i += 1) await act(async () => {})
+    const saved = puts.find(entry => entry.path.endsWith('/ctas'))?.body as { ctas: Array<{ autoOpen: boolean; title: string; url: string }> }
+    expect(saved.ctas).toEqual([expect.objectContaining({ autoOpen: true, title: '資料', url: 'https://example.com' })])
+  })
+
+  it('フォームの候補が持つフォルダで絞り込める', async () => {
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname
+      if (path === '/api/forms') return json({ success: true, data: [{ id: 'form-lead', name: '相談の申込', isActive: true, folderId: 'lead' }] })
+      if (path.includes('/folders')) return json({ success: true, data: [{ id: 'lead', name: '相談受付', color: '#2563eb', kind: 'form', parentId: null, displayOrder: 0 }] })
+      return originalFetch(input, init)
+    })
+    nav.search = 'id=webinar-1&pane=cta'
+    await render(<WebinarEditV8 />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^申込に使う回答フォーム：/ })) })
+    const picker = await screen.findByRole('dialog', { name: '回答フォームを選ぶ' })
+    const folder = await within(picker).findByRole('button', { name: /相談受付/ })
+    await act(async () => { fireEvent.click(folder) })
+    await act(async () => { fireEvent.click(within(picker).getByRole('radio', { name: '相談の申込' })) })
+    await act(async () => { fireEvent.click(within(picker).getByRole('button', { name: '選ぶ', exact: true })) })
+    expect(screen.getByRole('button', { name: '申込に使う回答フォーム：変える' })).toBeTruthy()
+    expect(puts).toHaveLength(0)
   })
 });
 

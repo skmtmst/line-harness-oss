@@ -381,7 +381,7 @@ export default function AccountDetailV8() {
               <CardHeader size="stacked" headingLevel={3} titleId="acd-links" title="つながる先" />
               <p className={styles.links}>
                 {LINKS.map((link, index) => (
-                  <span key={link.href}>{index > 0 ? '　' : ''}<TextLink href={link.href}>→ {link.label}</TextLink></span>
+                  <span key={link.href}>{index > 0 ? '　' : ''}<TextLink href={link.href}>{link.label}</TextLink></span>
                 ))}
               </p>
             </Card>

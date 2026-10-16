@@ -17,6 +17,7 @@
 - `api.broadcasts.getInsight(id)`：一覧に集計が同梱されていない送信済みだけ1回ずつ。
 - `api.folders.list('broadcast')`・`swapOrder`・`delete`：フォルダ。`api.broadcasts.update(id, { folderId, expectedVersion })`：フォルダへ移す（押した瞬間に移した形を見せ、失敗したら戻して「もう一度」）。
 - `api.broadcasts.delete(id)`：削除（確認の窓のあと）。
+- 一覧の選択からまとめてフォルダへ移す。選ぶ窓で確定するまで送らず、各配信の版を照合する。失敗した配信だけ再試行し、閲覧のみ・統括からの配信は選べない。
 
 ## 権限
 - 役割はサーバ（`/api/staff/me`、`useStaffRole`）。読めるまでは今までどおり出す（最後の守りはサーバの 403）。

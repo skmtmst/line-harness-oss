@@ -188,7 +188,7 @@ describe('メニューの公開・並びは先に画面を変える', () => {
   test('保存中は二重押しを止め、成功はトーストで知らせる', async () => {
     fixture.tab = 'rules'
     await openSettings()
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'お店が承認してから確定する' }))
+    fireEvent.click(await screen.findByRole('switch', { name: 'お店が承認してから確定する' }))
     const save = await screen.findByRole('button', { name: 'ルールを保存' })
     fireEvent.click(save)
     await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })

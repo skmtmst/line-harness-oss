@@ -49,7 +49,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--tpl-ev-num-w) var(--tpl-ev-num-w) var(--tpl-ev-num-w) var(--tpl-ev-state-w);
   align-items: center;
-  min-height: var(--tpl-ev-row-h);
+  min-height: var(--tpl-ev-review-row-h);
 }
 .headRow {
   min-height: var(--tpl-chip-h);
@@ -182,27 +182,6 @@
   flex-direction: column;
   gap: var(--tpl-body-pad);
 }
-.sideCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-rule-row-gap);
-  padding: var(--tpl-side-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-.impactCard {
-  min-height: var(--tpl-ev-impact-h);
-}
-.sideTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 700;
-  line-height: var(--tpl-chip-label-lh);
-}
 .sideNote {
   margin: 0;
   color: var(--color-ink-secondary);
@@ -216,8 +195,8 @@
   gap: var(--tpl-wh-ops-gap);
   padding: var(--tpl-ev-band-pad);
   border-radius: var(--radius-segment);
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
+  background: var(--tpl-ev-band-bg);
+  color: var(--tpl-ev-band-ink);
 }
 .bandDanger {
   background: var(--color-status-danger-soft);
@@ -318,10 +297,6 @@
 }
 .confirmSample {
   margin: 0;
-  padding: var(--tpl-rule-row-gap);
-  border-radius: var(--radius-segment);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
   color: var(--color-ink);
   font-size: var(--text-caption);
   line-height: var(--tpl-wh-cell-lh);

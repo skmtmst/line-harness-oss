@@ -1,12 +1,11 @@
 'use client'
 
 import { useFolderMove } from '@/components/shared/use-folder-move'
-import { RowNameLink } from '@/components/shared/table'
+import { RowNameLink, ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { moveOutgoingWebhookToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from '@/components/shared/list-navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Bookmark, LayoutTemplate, Pause, Play, Plus, Send } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
@@ -36,10 +35,9 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import ContextMenu from '@/components/shared/context-menu'
-import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { notifyToast } from '@/components/shared/toast'
-import { describeApiFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import {
   MANAGE_REASON,
@@ -54,7 +52,6 @@ import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { eventLabel, isHttpsUrl, maskedUrl, payloadLabel, shortDateTime, urlHost } from './words'
 import styles from './outgoing.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
@@ -637,9 +634,9 @@ export default function WebhooksOutgoingV8() {
                             open={menuId === item.id}
                             onOpenChange={(next) => setMenuId(next ? item.id : null)}
                             items={[
-                              { id: 'view', label: "送信の記録を見る", onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } },
+                              { id: 'view', label: "送信の記録を見る", onSelect: () => { setMenuId(null); router.replace('/webhooks?tab=interactions') } },
                               ...(item.deliverySummary.canRetry && canManage
-                                ? [{ id: 'retry', label: '失敗をやり直す', onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } }]
+                                ? [{ id: 'retry', label: '失敗をやり直す', onSelect: () => { setMenuId(null); router.replace('/webhooks?tab=interactions') } }]
                                 : []),
                               ...menuItems,
                             ]}
@@ -680,20 +677,22 @@ export default function WebhooksOutgoingV8() {
                         : item.isActive && !toggling ? <span className={styles.sub}>まだ送っていません</span> : null}
                     </Td>
                     <ActionCell className={styles.colOps}>
+                      {/* 行の右端は「…」だけ（B-253）。中身を見る・やり直すも中に入れる。見るだけの担当者にも出す。 */}
                       <div className={styles.opsBox}>
-                        {item.deliverySummary.canRetry && canManage
-                          ? <Button size="compact" href="/webhooks?tab=interactions">やり直す</Button>
-                          : <Button size="compact" href="/webhooks?tab=interactions">中身を見る</Button>}
-                        {showMenu ? (
-                          <RowMenu
-                            label={`「${item.name}」の設定`}
-                            title="設定"
-                            open={menuId === item.id}
-                            onOpenChange={(next) => setMenuId(next ? item.id : null)}
-                            items={menuItems}
-                            note={canManage ? undefined : MANAGE_REASON}
-                          />
-                        ) : null}
+                        <RowMenu
+                          label={`「${item.name}」の操作`}
+                          title="操作"
+                          open={menuId === item.id}
+                          onOpenChange={(next) => setMenuId(next ? item.id : null)}
+                          items={[
+                            { id: 'view', label: '送信の記録を見る', onSelect: () => { setMenuId(null); router.replace('/webhooks?tab=interactions') } },
+                            ...(item.deliverySummary.canRetry && canManage
+                              ? [{ id: 'retry', label: '失敗をやり直す', onSelect: () => { setMenuId(null); router.replace('/webhooks?tab=interactions') } }]
+                              : []),
+                            ...(showMenu ? menuItems : []),
+                          ]}
+                          note={canManage ? undefined : MANAGE_REASON}
+                        />
                       </div>
                     </ActionCell>
                   </Tr>
@@ -718,7 +717,7 @@ export default function WebhooksOutgoingV8() {
       skeleton
       help={<>{WEBHOOKS_DESCRIPTION}{narrow
           ? '行の「…」から 中身を見る・試しに送る・失敗をやり直す・鍵を作り直す・止める・削除。'
-          : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}</>}
+          : '行の「…」から 送信の記録を見る・直す・止める・鍵を作り直す・試しに送る・失敗をやり直す・削除。'}</>}
       explanation="友だちの動きを、決めたタイミングでほかのシステムへ送ります。送るときは秘密の鍵を付けます。鍵は「…」から作り直せます。"
       boardId={narrow ? 'AsfFB' : 'ZSbFY'}
       headingSize="regular"

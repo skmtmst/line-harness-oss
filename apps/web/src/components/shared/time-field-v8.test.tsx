@@ -6,9 +6,9 @@
  */
 import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DateTimeField, { TimeField } from './date-time-field'
-import { normalizeTimeInput, snapToStep } from './time-field-v8'
+import TimeFieldV8, { normalizeTimeInput, snapToStep } from './time-field-v8'
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
@@ -31,6 +31,21 @@ function Harness({ initial = '', step, minuteStep }: { initial?: string; step?: 
 
 const input = () => screen.getByRole('combobox', { name: '時刻（日本時間）' }) as HTMLInputElement
 const valueText = () => screen.getByTestId('value').textContent
+
+it('時計なしの欄からも時と分を選べ、閲覧のみでは開かない', () => {
+  const change = vi.fn()
+  const { rerender } = render(<TimeFieldV8 defaultValue="09:00" pickerTrigger="field" aria-label="開始" onChange={change} />)
+  expect(screen.queryByRole('button', { name: '時刻の一覧を開く' })).toBeNull()
+  fireEvent.click(screen.getByRole('combobox', { name: '開始' }))
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  fireEvent.click(within(screen.getByRole('listbox', { name: '時' })).getByRole('option', { name: '10' }))
+  fireEvent.click(within(screen.getByRole('listbox', { name: '分' })).getByRole('option', { name: '15' }))
+  expect(change).toHaveBeenLastCalledWith('10:15')
+  fireEvent.keyDown(screen.getByRole('combobox', { name: '開始' }), { key: 'Escape' })
+  rerender(<TimeFieldV8 value="09:00" pickerTrigger="field" aria-label="開始" readOnly />)
+  fireEvent.click(screen.getByRole('combobox', { name: '開始' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
 
 function typeAndCommit(text: string, key: 'Enter' | 'blur' = 'Enter') {
   const field = input()
@@ -237,7 +252,7 @@ describe('キー操作', () => {
 
 describe('欄の高さの口（size）', () => {
   const frame = (name: string) => screen.getByRole('combobox', { name }).parentElement as HTMLElement
-  it('既定は印なし（36）、field は日付の欄と並ぶ 40、compact は細い欄の 32', () => {
+  it('既定は印なし（36）、field は日付の欄と並ぶ 36、compact は細い欄の 32', () => {
     render(
       <>
         <TimeField aria-label="既定" value="09:00" />
@@ -268,7 +283,7 @@ describe('日時の欄の時刻の部分も同じ部品', () => {
     expect(within(dialog).queryByRole('button', { name: '時' })).toBeNull()
     const time = within(dialog).getByRole('combobox', { name: '時刻' }) as HTMLInputElement
     expect(time.value).toBe('10 : 00')
-    // 日付の欄（40）と並ぶので高さは field（絵 FU2aU・BBRDb・ZU4Ae）。
+    // 日付の欄（36）と並ぶので高さは field（絵 FU2aU・BBRDb・ZU4Ae）。
     expect((time.parentElement as HTMLElement).dataset.size).toBe('field')
     fireEvent.focus(time)
     fireEvent.change(time, { target: { value: '1430' } })

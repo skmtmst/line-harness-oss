@@ -72,6 +72,110 @@ export function lastContactText(items: FriendTimelineItem[]) {
   return latest ? formatRelative(latest.occurredAt) : emptyValue('unknown')
 }
 
+/**
+ * 友だち詳細の左の要点（顧客情報・対応・タグ・マイル・リッチメニュー・メモ）。
+ * 概要タブと情報欄タブ（vX3wQ）で同じ物を出す。
+ */
+export function FriendSummaryRail({ friend, friendId, data, perms, fields, values, realName, onEditSupport }: {
+  friend: FriendDetail
+  friendId: string
+  data: FriendDetailState
+  perms: FriendDetailPermissions
+  fields: FriendField[]
+  values: Record<string, string>
+  realName: string
+  onEditSupport: () => void
+}) {
+  const inbox = inboxHrefForFriend(friendId)
+  const starred = fields.filter((f) => f.isStarred)
+  const { mileage, mileageStatus, richMenu, richMenuStatus } = data
+  const support = friend.support
+  return (
+  <CustomerInfoRail><aside className={styles.summary} data-design="Left" data-friend-profile-panel>
+    <CustomerInfoPanel
+      friendId={friendId}
+      profile={{ name: realName || friend.displayName, pictureUrl: friend.pictureUrl, addedAt: friend.createdAt ? formatDay(friend.createdAt) : '追加日不明' }}
+      fields={fields}
+      state={data.fieldsStatus === 'error' ? 'error' : data.fieldsStatus === 'ready' ? 'ready' : 'loading'}
+      onRetry={() => void data.loadFields()}
+      canEdit={perms.saveFields}
+      actionWording
+      hiddenPersonalCount={data.hiddenPersonalCount}
+      sections={[
+        { key: 'support', label: '対応', action: perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={onEditSupport}>編集</Button> : null, content: <><dl className={styles.kvList}>
+        <Kv label="状況">{support ? <StatusPill tone={SUPPORT_TONES[support.status]}>{SUPPORT_LABELS[support.status]}</StatusPill> : <span className={styles.faint}>やり取りなし</span>}</Kv>
+        <Kv label="担当">{support?.operatorName ?? <span className={styles.faint}>未割り当て</span>}</Kv>
+        <Kv label="最後の連絡">{data.historyStatus === 'ready' ? lastContactText(data.historyItems) : emptyValue('unknown')}</Kv>
+      </dl></> },
+        { key: 'tags', label: 'タグ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording href={inbox}>編集</Button> : null, content: <><div className={styles.tags}>
+        {friend.tags?.length
+          ? <TagOverflow maxVisible={2}>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)}</TagOverflow>
+          : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
+        {perms.editSupport ? <Link className={`${styles.tag} ${styles.tagAdd}`} href={inbox}>＋ 追加</Link> : null}
+      </div></> },
+        { key: 'mileage', label: 'マイル', action: <Link className={styles.groupLink} href={`/mileage/friends/detail?id=${encodeURIComponent(friendId)}`}>詳細を見る</Link>, content: <>{mileageStatus === 'error' ? (
+        <p className={`${styles.memo} ${styles.faint}`}>
+          マイルを読み込めませんでした
+          <button type="button" className={styles.retry} onClick={() => void data.loadMileage()}>もう一度読み込む</button>
+        </p>
+      ) : (
+        <div className={styles.mile}>
+          <span className={styles.mileNum}>{mileageStatus === 'ready' && mileage ? formatNumber(mileage.available) : emptyValue('unknown')}</span>
+          <span className={styles.mileUnit}>
+            mile 使える{mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
+          </span>
+        </div>
+      )}</> },
+        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Link className={styles.groupLink} href="/rich-menus">変更する</Link> : null, content: <>{richMenuStatus === 'error' ? (
+        <p className={`${styles.memo} ${styles.faint}`}>
+          読み込めませんでした
+          <button type="button" className={styles.retry} onClick={() => void data.loadRichMenu()}>もう一度読み込む</button>
+        </p>
+      ) : (
+        <p className={styles.value} title={richMenu?.name ?? undefined}>
+          {richMenuStatus === 'ready'
+            ? <>{richMenu?.name ?? '既定のメニュー'}{richMenu?.isDefault ? <span className={styles.faint}>（全員に出しているもの）</span> : null}</>
+            : emptyValue('unknown')}
+        </p>
+      )}</> },
+        { key: 'memo', label: 'メモ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording href={inbox}>編集</Button> : null, content: <><p className={`${styles.memo} ${support?.notes ? '' : styles.faint}`}>{support?.notes || 'メモはありません'}</p></> }]}
+      more={<div className={styles.more}>
+        {starred.length > 0 ? (
+          <section className={styles.group} aria-label="★つき友だち情報">
+            <GroupHead title="★つき友だち情報" action={<Link className={styles.groupLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>すべて見る</Link>} />
+            <dl className={styles.kvList}>
+              {starred.map((f) => <Kv key={f.id} label={f.name}>{values[f.id] || <span className={styles.faint}>{emptyValue('unconfigured')}</span>}</Kv>)}
+            </dl>
+          </section>
+        ) : null}
+        {data.fieldsStatus === 'error' ? (
+          <p className={`${styles.memo} ${styles.faint}`}>
+            情報欄を読み込めませんでした
+            <button type="button" className={styles.retry} onClick={() => void data.loadFields()}>もう一度読み込む</button>
+          </p>
+        ) : null}
+        <section className={styles.group} aria-label="友だち情報">
+          <GroupHead title="友だち情報" />
+          <dl className={styles.kvList}>
+            <Kv label="システム表示名">{friend.systemDisplayName || <span className={styles.faint}>未設定</span>}</Kv>
+            <Kv label="追加日">{friend.createdAt ? formatDay(friend.createdAt) : emptyValue('unknown')}</Kv>
+            <Kv label="流入元">{friend.firstTrackedLinkName ?? '不明'}</Kv>
+          </dl>
+        </section>
+        <section className={styles.group} aria-label="フォーム回答">
+          <GroupHead title="フォーム回答" action={<Link className={styles.groupLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=forms`}>すべて見る</Link>} />
+          <p className={styles.value}>
+            {typeof friend.formSubmissionTotal === 'number'
+              ? friend.formSubmissionTotal > 0 ? `${friend.formSubmissionTotal} 件` : '回答はまだありません'
+              : friend.formSubmissions?.length ? `${friend.formSubmissions.length} 件` : '回答はまだありません'}
+          </p>
+        </section>
+      </div>}
+    />
+  </aside></CustomerInfoRail>
+  )
+}
+
 export default function OverviewTab({
   friend,
   friendId,
@@ -95,10 +199,7 @@ export default function OverviewTab({
   onEnrollScenario: () => void
   scenarioNotice: string
 }) {
-  const inbox = inboxHrefForFriend(friendId)
-  const starred = fields.filter((f) => f.isStarred)
-  const { upcoming, upcomingStatus, mileage, mileageStatus, mileageInsights, mileageConnections, richMenu, richMenuStatus } = data
-  const support = friend.support
+  const { upcoming, upcomingStatus, mileageStatus, mileageInsights, mileageConnections } = data
   const nextDelivery = upcoming?.nextAutoDelivery ?? null
   const deliveryFailed = upcomingStatus === 'error' || !!upcoming?.nextAutoDeliveryError
   const bookingFailed = upcomingStatus === 'error' || !!upcoming?.nextBookingError
@@ -107,88 +208,7 @@ export default function OverviewTab({
   return (
     <div className={styles.overview}>
       {/* 左：要点（顧客情報 → 対応 → タグ → マイル → リッチメニュー → メモ → すべて表示） */}
-      <CustomerInfoRail><aside className={styles.summary} data-design="Left" data-friend-profile-panel>
-        <CustomerInfoPanel
-          friendId={friendId}
-          profile={{ name: realName || friend.displayName, pictureUrl: friend.pictureUrl, addedAt: friend.createdAt ? formatDay(friend.createdAt) : '追加日不明' }}
-          fields={fields}
-          state={data.fieldsStatus === 'error' ? 'error' : data.fieldsStatus === 'ready' ? 'ready' : 'loading'}
-          onRetry={() => void data.loadFields()}
-          canEdit={perms.saveFields}
-          actionWording
-          hiddenPersonalCount={data.hiddenPersonalCount}
-          sections={[
-            { key: 'support', label: '対応', action: perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={onEditSupport}>編集</Button> : null, content: <><dl className={styles.kvList}>
-            <Kv label="状況">{support ? <StatusPill tone={SUPPORT_TONES[support.status]}>{SUPPORT_LABELS[support.status]}</StatusPill> : <span className={styles.faint}>やり取りなし</span>}</Kv>
-            <Kv label="担当">{support?.operatorName ?? <span className={styles.faint}>未割り当て</span>}</Kv>
-            <Kv label="最後の連絡">{data.historyStatus === 'ready' ? lastContactText(data.historyItems) : emptyValue('unknown')}</Kv>
-          </dl></> },
-            { key: 'tags', label: 'タグ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording href={inbox}>編集</Button> : null, content: <><div className={styles.tags}>
-            {friend.tags?.length
-              ? <TagOverflow maxVisible={2}>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)}</TagOverflow>
-              : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
-            {perms.editSupport ? <Link className={`${styles.tag} ${styles.tagAdd}`} href={inbox}>＋ 追加</Link> : null}
-          </div></> },
-            { key: 'mileage', label: 'マイル', action: <Link className={styles.groupLink} href={`/mileage/friends/detail?id=${encodeURIComponent(friendId)}`}>詳細を見る</Link>, content: <>{mileageStatus === 'error' ? (
-            <p className={`${styles.memo} ${styles.faint}`}>
-              マイルを読み込めませんでした
-              <button type="button" className={styles.retry} onClick={() => void data.loadMileage()}>もう一度読み込む</button>
-            </p>
-          ) : (
-            <div className={styles.mile}>
-              <span className={styles.mileNum}>{mileageStatus === 'ready' && mileage ? formatNumber(mileage.available) : emptyValue('unknown')}</span>
-              <span className={styles.mileUnit}>
-                mile 使える{mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
-              </span>
-            </div>
-          )}</> },
-            { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Link className={styles.groupLink} href="/rich-menus">変更する</Link> : null, content: <>{richMenuStatus === 'error' ? (
-            <p className={`${styles.memo} ${styles.faint}`}>
-              読み込めませんでした
-              <button type="button" className={styles.retry} onClick={() => void data.loadRichMenu()}>もう一度読み込む</button>
-            </p>
-          ) : (
-            <p className={styles.value} title={richMenu?.name ?? undefined}>
-              {richMenuStatus === 'ready'
-                ? <>{richMenu?.name ?? '既定のメニュー'}{richMenu?.isDefault ? <span className={styles.faint}>（全員に出しているもの）</span> : null}</>
-                : emptyValue('unknown')}
-            </p>
-          )}</> },
-            { key: 'memo', label: 'メモ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording href={inbox}>編集</Button> : null, content: <><p className={`${styles.memo} ${support?.notes ? '' : styles.faint}`}>{support?.notes || 'メモはありません'}</p></> }]}
-          more={<div className={styles.more}>
-            {starred.length > 0 ? (
-              <section className={styles.group} aria-label="★つき友だち情報">
-                <GroupHead title="★つき友だち情報" action={<Link className={styles.groupLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>すべて見る</Link>} />
-                <dl className={styles.kvList}>
-                  {starred.map((f) => <Kv key={f.id} label={f.name}>{values[f.id] || <span className={styles.faint}>{emptyValue('unconfigured')}</span>}</Kv>)}
-                </dl>
-              </section>
-            ) : null}
-            {data.fieldsStatus === 'error' ? (
-              <p className={`${styles.memo} ${styles.faint}`}>
-                情報欄を読み込めませんでした
-                <button type="button" className={styles.retry} onClick={() => void data.loadFields()}>もう一度読み込む</button>
-              </p>
-            ) : null}
-            <section className={styles.group} aria-label="友だち情報">
-              <GroupHead title="友だち情報" />
-              <dl className={styles.kvList}>
-                <Kv label="システム表示名">{friend.systemDisplayName || <span className={styles.faint}>未設定</span>}</Kv>
-                <Kv label="追加日">{friend.createdAt ? formatDay(friend.createdAt) : emptyValue('unknown')}</Kv>
-                <Kv label="流入元">{friend.firstTrackedLinkName ?? '不明'}</Kv>
-              </dl>
-            </section>
-            <section className={styles.group} aria-label="フォーム回答">
-              <GroupHead title="フォーム回答" action={<Link className={styles.groupLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=forms`}>すべて見る</Link>} />
-              <p className={styles.value}>
-                {typeof friend.formSubmissionTotal === 'number'
-                  ? friend.formSubmissionTotal > 0 ? `${friend.formSubmissionTotal} 件` : '回答はまだありません'
-                  : friend.formSubmissions?.length ? `${friend.formSubmissions.length} 件` : '回答はまだありません'}
-              </p>
-            </section>
-          </div>}
-        />
-      </aside></CustomerInfoRail>
+      <FriendSummaryRail friend={friend} friendId={friendId} data={data} perms={perms} fields={fields} values={values} realName={realName} onEditSupport={onEditSupport} />
 
       {/* 右：概要 */}
       <div className={styles.content} data-design="Right">

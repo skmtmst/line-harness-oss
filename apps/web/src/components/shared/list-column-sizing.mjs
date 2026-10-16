@@ -6,7 +6,8 @@ export function fitListColumns(frame) {
   if (!body) return
   const nameIndex = [...body.children].findIndex(cell => cell.hasAttribute('data-cell-grow') || cell.querySelector('[data-list-name], [data-row-link], [data-list-name-cell]'))
   if (nameIndex < 0) return
-  const scope = `${Math.round(frame.getBoundingClientRect().width)}:${body.children.length}:${nameIndex}:${[...body.children].map(cell => cell.getBoundingClientRect().width > 0).join(',')}`
+  const flexibleContent = frame.hasAttribute('data-column-layout') && frame.dataset.columnSizing === 'content'
+  const scope = `${Math.round(frame.getBoundingClientRect().width)}:${body.children.length}:${nameIndex}:${[...body.children].map(cell => cell.getBoundingClientRect().width > 0).join(',')}:${flexibleContent ? rows.map(row => row.textContent).join('\n') : ''}`
   if (frame.listColumnScope !== scope) {
     for (const row of rows) for (const cell of row.children) {
       cell.removeAttribute('data-content-name-column')
@@ -14,7 +15,7 @@ export function fitListColumns(frame) {
       cell.style.removeProperty('--list-content-column-width')
     }
     frame.listColumnScope = scope
-    frame.listColumnCeilings = [...body.children].map(cell => cell.getBoundingClientRect().width)
+    frame.listColumnCeilings = [...body.children].map((cell, index) => flexibleContent ? Math.max(...rows.map(row => row.children[index]?.getBoundingClientRect().width ?? 0)) : cell.getBoundingClientRect().width)
   }
   const context = document.createElement('canvas').getContext('2d')
   if (!context) return

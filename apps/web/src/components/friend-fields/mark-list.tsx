@@ -65,7 +65,6 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
   /* ★V8 の小窓 `fy5dz` の題・実行ボタン・案内を使う。 */
 
   /* R138横展開: 確認窓の名前として見出しを読ませる。 */
-  const selected = impact?.replacementOptions.find((option) => option.id === replacementMarkId)
   /*
     ATTR-17: 以前は画面上端から margin-top:310px に固定しており、
     390×600 のような縦の短い画面ではボタンが画面外に出た。
@@ -95,28 +94,25 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
   const canConfirm = !loading && !saving && Boolean(impact?.canArchive) && (!needsReplacement || Boolean(replacementMarkId))
   return (
     <Dialog open confirmation role="alertdialog" designNode="fy5dz" title={`「${mark.name}」を保管しますか`}
-      description={needsReplacement ? `いま ${friendCount} 人に付いています。保管すると、この ${friendCount} 人は下で選んだマークへ置き換え、履歴に残します。` : '使っている友だちはいないので、そのまま保管できます。'}
-      designWidth={576} designHeaderPadding="16px 16px 0" designContentPadding="12px 16px 4px" designFooterPadding="16px"
+      designWidth={560} designHeaderPadding="24px 24px 0" designContentPadding="12px 24px 12px" designFooterPadding="14px 24px 24px"
       onCancel={onCancel} onConfirm={onConfirm} busy={saving} confirmDisabled={!canConfirm}
       confirmLabel={needsReplacement ? '置き換えて保管する' : '保管する'} busyLabel="保管中…">
+      {/* ★V8 fy5dz：説明は題の段ではなく本文の頭。説明・置き換え先・注意を 12 ずつ縦に並べる。 */}
+      <div className="flex flex-col gap-3">
+          <p className="text-xs leading-[18px] text-ink-secondary">{needsReplacement ? `いま ${friendCount} 人に付いています。保管すると、この ${friendCount} 人は下で選んだマークへ置き換え、履歴に残します。` : '使っている友だちはいないので、そのまま保管できます。'}</p>
           {loading ? <p className="rounded-control bg-surface-soft p-3 text-sm text-ink-faint">影響を確認しています…</p> : impact && needsReplacement ? (
-            <div>
-              <label className="block text-sm font-semibold text-ink">置き換え先
-                <SaveErrorField names={["replacementMarkId","replacement_mark_id"]}><EntitySelect
-                  aria-label="置き換え先"
-                  value={replacementMarkId}
-                  onChange={onReplacement}
-                  options={[{ value: '', label: '選んでください' }, ...impact.replacementOptions.map((option) => ({ ...entityOptionMetadata(option), value: option.id, label: `${option.name}${option.isDefault ? '（初期値）' : ''}` }))]}
-                  size="full"
-                  className="mt-1.5"
-                /></SaveErrorField>
-              </label>
-              {selected ? <p className="mt-2 text-xs text-ink-faint">{impact.friendCount}人を「{selected.name}」へ置き換えます。</p> : null}
-            </div>
+            <SaveErrorField names={["replacementMarkId","replacement_mark_id"]}><EntitySelect
+              aria-label="置き換え先"
+              value={replacementMarkId}
+              onChange={onReplacement}
+              options={[{ value: '', label: '選んでください' }, ...impact.replacementOptions.map((option) => ({ ...entityOptionMetadata(option), value: option.id, label: `${option.name}${option.isDefault ? '（初期値）' : ''}` }))]}
+              size="full"
+            /></SaveErrorField>
           ) : null}
-          {<p className="mt-4 text-xs leading-5 text-ink-faint">初期値のマーク・共有しているマーク・自動のきまりで使っているマークは保管できません。</p>}
-          {blockReason ? <p className="mt-4 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">{blockReason}</p> : null}
-          {error ? <Notice tone="danger" className="mt-4">{error}</Notice> : null}
+          <p className="text-xs leading-[18px] text-ink-secondary">初期値のマーク・共有しているマーク・自動のきまりで使っているマークは保管できません。</p>
+          {blockReason ? <p className="rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">{blockReason}</p> : null}
+          {error ? <Notice tone="danger">{error}</Notice> : null}
+      </div>
     </Dialog>
   )
 }

@@ -1,5 +1,9 @@
 'use client'
 
+import { V8_NAV_ICONS } from './sidebar-icons'
+import { revealInScroller } from './sidebar-current-item'
+export { revealInScroller } from './sidebar-current-item'
+
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 
 import { useStaffRole } from '@/lib/staff-role'
@@ -24,36 +28,6 @@ import {
   SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
-import {
-  Bell, CalendarCheck, CalendarCog, Clipboard, ClipboardList, Clock, FileText, Folder, House, Inbox,
-  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Type, UserPlus, Users, Video, type LucideIcon,
-} from 'lucide-react'
-
-/*
- * ★V8 の左メニューの印（絵 d8X09・WQmep の「項目 〇〇 / 印」は lucide）。
- * V8 のときだけ使い、v7 は MENU_SECTIONS の線画のまま。載っていない項目も v7 の線画。鍵は MENU_SECTIONS の id。
- */
-const V8_NAV_ICONS: Record<string, LucideIcon> = {
-  dashboard: House,
-  inbox: Inbox,
-  friends: Users,
-  'friend-attributes': Tag,
-  scenarios: ClipboardList,
-  broadcasts: Send,
-  reminders: Bell,
-  'auto-replies': MessageCircleMore,
-  'friend-add-settings': UserPlus,
-  webinars: Video,
-  templates: FileText,
-  'rich-menus': LayoutGrid,
-  forms: Clipboard,
-  'common-vars': Type,
-  contents: Folder,
-  'booking-bookings': CalendarCheck,
-  'booking-menus': CalendarCog,
-  events: Ticket,
-  'booking-own-shifts': Clock,
-}
 
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
    反映するため同型のエイリアスを使う（描画後の1回分のズレを防ぐ）。 */
@@ -407,8 +381,6 @@ export default function Sidebar({
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
 
-
-
         if (item.href === '/staff' && staffReadRole !== 'owner' && staffReadRole !== 'admin') return false
         if (item.href === '/accounts' && staffReadRole === 'staff') return false
         // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
@@ -550,6 +522,7 @@ export default function Sidebar({
    */
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLElement>(null)
+  const desktopRef = useRef<HTMLElement>(null)
   const wasOpen = useRef(false)
   useEffect(() => {
     if (isOpen) {
@@ -660,6 +633,31 @@ export default function Sidebar({
     sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)),
   )
 
+  /*
+   * いまの画面の項目を、左メニューを開いたときに必ず全部見える位置へ巻く（2026-10-15 判定役）。
+   * 項目が多いと、下の方の項目（NEN配信など）が巻く領域の下端で半分切れ、
+   * 下に固定した「設定」の帯の陰に隠れて見えなかった。組を開く動き（--motion-base）が
+   * 終わってからもう一度測り、領域の中だけを巻く（ページ全体は巻かない）。
+   */
+  const activeItemKey = visibleSections
+    .flatMap((section) => section.items)
+    .find((item) => isActive(item))?.id ?? ''
+  // 機能の表示可否を読み終えて項目が増減したときも測り直す。
+  const visibleItemCount = visibleSections.reduce((sum, section) => sum + section.items.length, 0)
+  useEffect(() => {
+    if (!activeItemKey) return
+    const reveal = () => {
+      for (const root of [desktopRef.current, drawerRef.current]) {
+        const nav = root?.querySelector<HTMLElement>('[data-sidebar-scroll]')
+        const item = nav?.querySelector<HTMLElement>('[data-nav-active]')
+        if (nav && item) revealInScroller(nav, item, 8, item.closest<HTMLElement>(`.${styles.section}`))
+      }
+    }
+    const frame = requestAnimationFrame(reveal)
+    const timer = window.setTimeout(reveal, 320)
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(timer) }
+  }, [activeItemKey, isOpen, visibleItemCount])
+
   /**
    * 中身は1つ。ドロワーでも常時表示でも同じものを出す。
    *
@@ -715,7 +713,7 @@ export default function Sidebar({
       <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
-      <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
+      <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
         {/*
           ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
           小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
@@ -792,6 +790,8 @@ export default function Sidebar({
                   prefetch={false}
                   onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={visibleLabel}
+                  aria-current={active ? 'page' : undefined}
+                  data-nav-active={active ? '' : undefined}
                   /*
                     いま開いている項目は、薄い緑の地に濃い緑の文字。設計も
                     この形。緑で塗りつぶして白抜きにすると、色の面積が大きく
@@ -989,7 +989,7 @@ export default function Sidebar({
 
         中身は常に展開表示。幅で文字を出し分ける必要がなくなった。
       */}
-      <aside className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
+      <aside ref={desktopRef} className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
         {sidebarContent(false)}
       </aside>
     </>

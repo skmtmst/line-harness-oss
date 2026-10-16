@@ -28,9 +28,9 @@ describe('送るアカウントの選択窓', () => {
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     expect(screen.queryByRole('checkbox', { name: '銀座店' })).toBeNull()
     fireEvent.click(screen.getByRole('checkbox', { name: '梅田店' }))
-    expect(screen.getByText(/3 アカウントを選んでいます/)).toBeTruthy()
+    expect(screen.getByText('3 件')).toBeTruthy()
     expect(confirm).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'この 3 アカウントにする' }))
+    fireEvent.click(screen.getByRole('button', { name: '選ぶ（3件）' }))
     expect(confirm).toHaveBeenCalledWith(['a', 'b', 'c'])
   })
 
@@ -39,7 +39,8 @@ describe('送るアカウントの選択窓', () => {
     await screen.findByRole('dialog')
     fireEvent.click(screen.getByRole('button', { name: /東日本/ }))
     expect(screen.queryByRole('checkbox', { name: '梅田店' })).toBeNull()
-    expect(screen.getByText(/0 アカウントを選んでいます/)).toBeTruthy()
+    expect(screen.getByText('除く人は次の手順で決めます')).toBeTruthy()
+    expect(screen.queryByText('選んだもの：')).toBeNull()
     expect(within(screen.getByText('銀座店').closest('label')!).getByTitle('フォルダ：東日本')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /未分類/ }))
     expect(screen.getByRole('checkbox', { name: '未分類の店' })).toBeTruthy()
@@ -49,9 +50,9 @@ describe('送るアカウントの選択窓', () => {
   it('接続の要確認と送れない理由を出しても選べ、未取得の人数を0としない', async () => {
     render(<BroadcastAccountPicker {...props} />)
     await screen.findByRole('dialog')
-    expect(screen.getByText('要確認')).toBeTruthy()
-    expect(screen.getByText('アカウントを停止しているため、今は送れません。')).toBeTruthy()
-    expect(screen.getByText('友だち —（未取得） 人')).toBeTruthy()
+    expect(screen.getByText('・接続を確かめてください')).toBeTruthy()
+    expect(screen.getByText('・今は送れません（アカウントを停止中）')).toBeTruthy()
+    expect(screen.getByText('—（未取得） 人')).toBeTruthy()
     for (const name of ['新宿店', '梅田店']) {
       const checkbox = screen.getByRole('checkbox', { name }) as HTMLInputElement
       expect(checkbox.disabled).toBe(false)

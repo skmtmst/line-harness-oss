@@ -311,14 +311,14 @@ test('v8 のたまる決めごと：きっかけ（購入・配信の反応・�
   expect(host.querySelector('button[aria-label="きっかけ"], [aria-label="きっかけ"]')).toBeTruthy()
 })
 
-test('v8 の使い道：種類（クーポン・シナリオなど）は上の絞り込み。選ぶ物がない列を出さず、種類の絞り込みを保つ（W2）', async () => {
+test('v8 の使い道（S35pO）：左は使い道のフォルダの列。種類の選ぶ欄は道具の段に置かない', async () => {
   document.documentElement.dataset.theme = 'v8'
   query = 'tab=rewards'
   await act(async () => root.render(<MileagePage />))
   await settle()
   await eventually(() => expect(host.textContent).toContain('送料無料クーポン'))
-  expect(host.querySelector('[data-template-region="folders"]')).toBeNull()
-  expect(host.querySelector('[aria-label="種類"]')).toBeTruthy()
+  expect(host.querySelector('[data-template-region="folders"]')).not.toBeNull()
+  expect(host.querySelector('[aria-label="種類"]')).toBeNull()
   query = ''
 })
 

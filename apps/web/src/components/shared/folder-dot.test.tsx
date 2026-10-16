@@ -67,7 +67,7 @@ describe('フォルダの色の丸', () => {
   })
 
   it('行を選ぶチェックは省略する名前の外に出し、操作と全文を保つ', () => {
-    const html = renderToStaticMarkup(<FolderDotName><Checkbox aria-label="資料を選ぶ" checked={false} onCheckedChange={() => {}} /><button>資料をダウンロードした</button></FolderDotName>)
+    const html = renderToStaticMarkup(<FolderDotName folder={null}><Checkbox aria-label="資料を選ぶ" checked={false} onCheckedChange={() => {}} /><button>資料をダウンロードした</button></FolderDotName>)
     expect(html).toContain('aria-label="資料を選ぶ"')
     expect(html.indexOf('aria-label="資料を選ぶ"')).toBeLessThan(html.indexOf('data-folder-dot'))
     expect(html).toContain('title="資料をダウンロードした"')
@@ -76,7 +76,7 @@ describe('フォルダの色の丸', () => {
 
   it('名前を包む別の操作があっても、明示した選択は名前の外に残る', () => {
     const html=renderToStaticMarkup(<table><tbody><tr><NameCell
-      selection={<Checkbox aria-label="教室を選ぶ" checked onCheckedChange={()=>{}} />}
+      folder={null} selection={<Checkbox aria-label="教室を選ぶ" checked onCheckedChange={()=>{}} />}
       name={<div><a href="/events/edit?id=event">教室</a></div>}
     /></tr></tbody></table>)
     expect(html).toContain('aria-label="教室を選ぶ"')

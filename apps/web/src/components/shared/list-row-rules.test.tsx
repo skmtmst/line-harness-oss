@@ -38,7 +38,7 @@ describe('一覧の行の決まり（B-190/193/194/195/198）', () => {
     expect(document.querySelector('[data-kpi-number]')?.textContent).toBe('—')
     expect(document.querySelector('[data-design-node="xRvDB"]')?.textContent).toBe(text)
   })
-  it.each(['0', '1,234 人', '¥29,800', '12.4%', '1時間24分', '+3 件', '3.2 GB', '800 KB', '—', '9.8 → 9.2 kg', '3→4通目', '0→0件'])('数字の書式「%s」を保つ', (text) => {
+  it.each(['0', '1,234 人', '¥29,800', '12.4%', '1時間24分', '+3 件', '3.2 GB', '800 KB', '—', '9.8 → 9.2 kg', '3→4通目', '0→0件', 'v3'])('数字の書式「%s」を保つ', (text) => {
     expect(isKpiNumberText(text)).toBe(true)
     render(<KpiCard title="数字" value={null} valueText={text} unit="" detail={null} />)
     expect(document.querySelector('[data-kpi-number]')?.textContent).toBe(text)

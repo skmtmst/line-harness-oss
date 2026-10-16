@@ -178,7 +178,8 @@
   display: inline-flex; align-items: center; gap: var(--tpl-chip-gap);
   height: var(--tpl-chip-h); padding: var(--tpl-chip-pad);
   border-radius: var(--radius-pill);
-  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  outline: 1px solid var(--color-control-border); outline-offset: -1px;
+  box-shadow: var(--control-shadow);
   background: var(--color-canvas);
 }
 .choice:focus-within { outline-color: var(--color-focus-ring); }
@@ -187,6 +188,8 @@
   padding: 0; border: 0; outline: 0; background: transparent;
   color: var(--color-ink); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-te-choice-lh);
 }
+/* 「選択肢「〜」が選ばれたら」（絵 EsYo4）。 */
+.choiceWhen { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
 .choiceRemove { display: none; align-items: center; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: pointer; }
 .choice:hover .choiceRemove, .choice:focus-within .choiceRemove { display: inline-flex; }
 

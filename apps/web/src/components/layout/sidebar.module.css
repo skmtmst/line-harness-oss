@@ -1,5 +1,6 @@
 .nav {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 0 12px 8px;
 }
@@ -195,12 +196,19 @@
 :root .desktop {
   width: 240px;
   flex-basis: 240px;
-  /* 画面の高さいっぱい（zUg8S）。項目が多いときは .nav だけ縦に送る。 */
-  height: 100dvh;
+  /* 上の案内帯を除いた workspace の高さ。項目が多いときは .nav だけ縦に送る。 */
+  height: 100%;
+  min-height: 0;
   border-right: 0;
   background: transparent;
   transition: width var(--motion-base) var(--motion-ease-out),
     flex-basis var(--motion-base) var(--motion-ease-out);
+}
+
+/* 上の案内帯を除いた残りの高さを使い、看板・設定・版・本人カードは縮めない。 */
+:root .desktop > :not(.nav),
+.drawer > :not(.nav) {
+  flex-shrink: 0;
 }
 
 /* 1152 の絵（35 枚）は開いたまま 240。狭い幅でも 216 に詰めない（2026-10-06 司令塔、絵が正本）。 */

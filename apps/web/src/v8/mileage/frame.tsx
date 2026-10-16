@@ -100,6 +100,7 @@ export interface MileageFrameProps {
   /** 板の頭の右（CSV など）。 */
   help?: ReactNode
   explanation?: ReactNode
+  explanationInset?: 'notice' | 'content'
   actions?: ReactNode
   stats?: ReactNode
   folders?: ReactNode
@@ -113,7 +114,7 @@ export interface MileageFrameProps {
 }
 
 /** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
-export function MileageFrame({ help, explanation, actions, stats, folders, collapsedFolders, folderNav, toolbar, pagination, overlays, children }: MileageFrameProps) {
+export function MileageFrame({ help, explanation, explanationInset, actions, stats, folders, collapsedFolders, folderNav, toolbar, pagination, overlays, children }: MileageFrameProps) {
   const { tab, readonly, narrow, counts } = useMileageShell()
   const board = tab === 'earning-rules' && narrow
     ? 'ZJIyl'
@@ -124,6 +125,7 @@ export function MileageFrame({ help, explanation, actions, stats, folders, colla
     <ListPage
       skeleton
       explanation={explanation}
+      explanationInset={explanationInset}
       help={<>{"行動でマイルがたまり、クーポン・特典と交換できます。"}{help}</>}
       boardId={board}
       headingSize="regular"

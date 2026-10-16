@@ -107,7 +107,8 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     it(`タグ一覧はタグ名から始まり、星・注目の操作と絞り込みを出さない（編集=${canEdit}）`, async () => {
       await render({ type: 'tag', kind: undefined, canEdit })
       const heads = [...host.querySelectorAll('thead th')].map((th) => th.textContent?.trim())
-      expect(heads).toEqual(canEdit ? ['タグ', '人数', '付け方', '配布先', '', ''] : ['タグ', '人数', '付け方', '配布先', ''])
+      // ［配る］は「…」の中（B-253）なので、編集できる人も見出しの空の列は「…」の1つだけ。
+      expect(heads).toEqual(['タグ', '人数', '付け方', '配布先', ''])
       expect(host.querySelector('tbody tr td')?.textContent).toContain(ROWS[0].name)
       expect(host.querySelector('svg.lucide-star')).toBeNull()
       expect(host.querySelector('[aria-label*="友だち一覧に表示"]')).toBeNull()
@@ -124,12 +125,17 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.innerHTML).toContain('#8b5cf6')
   })
 
-  it('タグ名はフォルダ色の丸と1行の名前で出し、押すと詳細を開く', async () => {
+  it('タグ名はタグの札（中にフォルダ色の丸）で出し、押すと詳細を開く', async () => {
     const onOpen = vi.fn()
     await render({ type: 'tag', onOpen, folders: [{ id: 'f-1', name: 'お問い合わせ', revision: 1, color: '#8b5cf6' }] })
     const name = host.querySelector('[data-list-name]')!
     expect(name.textContent).toBe('秋の新商品')
-    expect(name.querySelector('[data-folder-dot]')!.getAttribute('style')).toContain('#8b5cf6')
+    const pill = name.querySelector('[role="group"][aria-label="タグ「秋の新商品」"]')!
+    expect(pill).not.toBeNull()
+    const dot = pill.querySelector('[role="img"][aria-label="フォルダ：お問い合わせ"]')!
+    expect(dot.getAttribute('style')).toContain('#8b5cf6')
+    expect(name.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(pill.contains(dot)).toBe(true)
     await act(async () => { name.querySelector<HTMLButtonElement>('button')!.click() })
     expect(onOpen).toHaveBeenCalledWith(ROWS[0])
   })
@@ -141,38 +147,41 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('まだ配っていない')
   })
 
-  /* 絵：テンプレート i0Ao0R・リッチメニュー noVq4・タグ DzdC3・回答フォーム wZPua。どの種類も行の「…」の左に［配る］。 */
+  /* B-253（オーナー決定）：行の右端は「…」1つ。［配る］は「…」の中にあり、押すとその行を配る。 */
+  const rowMenuButton = (name: string) => {
+    const tr = [...document.querySelectorAll('tr')].find((row) => row.querySelector('[data-list-name]')?.textContent?.includes(name))
+    return tr?.querySelector('[aria-haspopup="menu"]') as HTMLButtonElement | null
+  }
+  const distributeItem = () => [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.trim() === '配る') as HTMLElement | undefined
+
   for (const type of ['template', 'tag', 'rich_menu', 'form', 'scenario'] as const) {
-    it(`${type} の一覧は、どの行にも「…」の左に［配る］があり、押すとその行を配る`, async () => {
+    it(`${type} の一覧は、行の右端が「…」1つで、その中の［配る］を押すとその行を配る`, async () => {
       const h = await render({ type, kind: type === 'template' ? 'message' : undefined })
       for (const r of ROWS) {
-        const button = buttons().find((b) => b.getAttribute('aria-label') === `${r.name}を配る`)
-        expect(button, r.name).toBeTruthy()
-        expect(button!.textContent?.trim()).toBe('配る')
-        /* 同じ行の「…」より前（左）に置く。 */
-        const tr = button!.closest('tr')!
-        const menu = tr.querySelector('[aria-haspopup="menu"]')!
-        expect(button!.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        /* 行の右端に［配る］のボタンを並べない。 */
+        expect(buttons().some((b) => b.getAttribute('aria-label') === `${r.name}を配る`), r.name).toBe(false)
+        const menu = rowMenuButton(r.name)
+        expect(menu, r.name).toBeTruthy()
+        await act(async () => { menu!.click() })
+        expect(distributeItem(), r.name).toBeTruthy()
+        await act(async () => { menu!.click() })
       }
-      await act(async () => { buttons().find((b) => b.getAttribute('aria-label') === '定休日を配る')!.click() })
+      await act(async () => { rowMenuButton('定休日')!.click() })
+      await act(async () => { distributeItem()!.click() })
       expect(h.onDistribute).toHaveBeenCalledWith(ROWS[1])
-      /* 見出しにも［配る］の列（空の見出し）がある。 */
-      expect(document.querySelector('th[aria-label="配る"]')).not.toBeNull()
+      /* ［配る］の列（空の見出し）は無い。 */
+      expect(document.querySelector('th[aria-label="配る"]')).toBeNull()
       expect(host.textContent).not.toContain('アカウントへ配る')
     })
   }
 
-  it('テンプレートは行の［配る］と「…」の両方から配る。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
+  it('テンプレートは「…」の中から配る。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
     const rows = [
       { ...ROWS[0], outdated_account_count: 1, this_month_sent_count: 1860 },
       { ...ROWS[1], this_month_sent_count: null },
       { ...row('t-3', '予約の受付', 1), outdated_account_count: 0, this_month_sent_count: 0 },
     ]
     const h = await render({ rows, stats: { thisMonthSentCount: 1860, outdatedTemplateCount: 1 } })
-    const distribute = buttons().find((b) => b.getAttribute('aria-label') === '秋の新商品を配る')!
-    await act(async () => { distribute.click() })
-    expect(h.onDistribute).toHaveBeenCalledWith(rows[0])
-    h.onDistribute.mockClear()
     expect(host.textContent).toContain('未公開の変更')
     expect(host.textContent).toContain('下書きだけ')
     expect(host.textContent).toContain('公開中')
@@ -183,8 +192,7 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     // 統括の一覧の行の「…」は絵（i0Ao0R・noVq4・DzdC3・wZPua）どおり 28角。
     expect(menu!.getAttribute('data-size')).toBe('row')
     await act(async () => { menu!.click() })
-    const item = [...document.querySelectorAll('[role="menuitem"], button')].find((el) => el.getAttribute('role') === 'menuitem' && el.textContent?.trim() === '配る')
-    await act(async () => { (item as HTMLElement).click() })
+    await act(async () => { distributeItem()!.click() })
     expect(h.onDistribute).toHaveBeenCalledWith(rows[0])
   })
 

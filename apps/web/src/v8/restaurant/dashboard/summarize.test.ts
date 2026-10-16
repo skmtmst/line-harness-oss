@@ -16,6 +16,11 @@ const today = (hour: number, minute = 0) => { const d = new Date();return `${d.g
 const row = (id: string, over: Record<string, unknown>) => reservation(id, { starts_at: today(18), ends_at: today(20), ...over }) as unknown as RestaurantReservation
 
 describe('今日のお店の数（E-1）', () => {
+  it('時差の無い時刻は表と同じく UTC として読み、いちばん多い時間を日本時間で出す', () => {
+    const rows = [row('u', { source: 'line', guest_count: 5, starts_at: '2026-10-10T10:00:00', ends_at: '2026-10-10T12:00:00' })]
+    const s = summarizeToday(rows, tables as unknown as RestaurantTable[], Date.parse(today(12)))
+    expect(s.peak).toEqual({ label: '19:00', guests: 5 })
+  })
   it('取消・無断・押さえを除いて組と人数を数え、経路（LINE・電話・ウォークイン・予約サイト）に分ける', () => {
     const rows = [
       row('a', { source: 'line', guest_count: 2 }),

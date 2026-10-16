@@ -18,7 +18,8 @@
 /* ===== 競合の帯（頭の下・左右の列をまたぐ） ===== */
 
 .conflictRow {
-  padding: 0 var(--tpl-bm-24) var(--tpl-bm-8);
+  /* 余白は型の notice の口が持つ。 */
+  padding: 0;
 }
 
 .conflictBand {
@@ -215,16 +216,14 @@
   gap: var(--tpl-bm-8);
 }
 
-/* 使う設備：チェックを横に並べる。 */
-.checkRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-bm-24);
-}
-
 .saveNote {
   margin: 0;
   color: var(--color-status-warn-deep);
   font-size: var(--tpl-bm-13);
 }
+
+/* お支払いの3つの箱は横に並べる（絵 v5L19Z・QqER7）。 */
+.paymentChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-8); width: 100%; }
+
+/* 題の横の「？」・札（準備中）は字から 6 空ける。 */
+.titleWithMark { display: inline-flex; align-items: center; gap: var(--space-6); }

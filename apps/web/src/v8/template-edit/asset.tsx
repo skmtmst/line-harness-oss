@@ -1,5 +1,9 @@
 'use client'
 
+import { type ResearchFormat, type ResearchQuestion, visualQuestions, assetInitial } from './asset-initial'
+export type { ResearchQuestion } from './asset-initial'
+export { assetInitial } from './asset-initial'
+
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import Toggle from '@/components/shared/toggle'
@@ -10,8 +14,8 @@ import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { GripVertical, Plus, Send, X } from 'lucide-react'
-import { tapExtrasError, type TapExtras, type Folder, type MediaItem } from '@line-crm/shared'
+import { GripVertical, Plus, Send, Trash2, X } from 'lucide-react'
+import { hasTapExtras, tapExtrasError, type TapExtras, type Folder, type MediaItem, type FormBlock, type FormLayout } from '@line-crm/shared'
 import { tapExtraSaveError } from '@/lib/tap-actions'
 import { api } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -36,6 +40,8 @@ import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { readInlineActions, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
 import { TemplateEditFrame } from './frame'
+import ChoiceExtrasRows from './choice-extras'
+import { FormPhone } from '../form-edit/phone'
 import type { TemplateEditHost } from './host'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
@@ -67,47 +73,12 @@ const META: Record<AssetKind, { title: string; heading: string; lead: string; bo
 export const MAX_QUESTIONS = 10
 /** LINE のクイックリプライは13件まで。 */
 export const MAX_CHOICES = 13
-type ResearchFormat = 'single' | 'multiple' | 'free'
 const FORMAT_OPTIONS: Array<{ value: ResearchFormat; label: string }> = [
   { value: 'single', label: '1つだけ選ぶ' },
   { value: 'multiple', label: 'いくつでも選ぶ' },
   { value: 'free', label: '自由に書く' },
 ]
-export interface ResearchQuestion { key: string; text: string; format: ResearchFormat; required: boolean; choices: string[]; choiceTapExtras?: TapExtras[] }
 const newQuestion = (): ResearchQuestion => ({ key: crypto.randomUUID(), text: '', format: 'single', required: true, choices: ['', ''] })
-const visualQuestions = (): ResearchQuestion[] => [
-  { key: 'vq-1', text: '来月も定期便を続けたいと思いますか？', format: 'single', required: true, choices: ['続けたい', 'どちらともいえない', '止めたい'] },
-  { key: 'vq-2', text: 'よく使っている商品を教えてください', format: 'multiple', required: false, choices: ['フード', 'おやつ', 'ケア用品'] },
-  { key: 'vq-3', text: '改善してほしいところがあれば教えてください', format: 'free', required: false, choices: [] },
-]
-
-/** 保存してある payload（クーポン・リサーチ）を欄の値に戻す。統括の編集で使う（host.initialContent）。 */
-export function assetInitial(payload: Record<string, unknown>) {
-  const str = (value: unknown) => (typeof value === 'string' ? value : '')
-  const num = (value: unknown, fallback: string) => (typeof value === 'number' && Number.isFinite(value) ? String(value) : fallback)
-  const questions = Array.isArray(payload.questions)
-    ? payload.questions.flatMap((item): ResearchQuestion[] => {
-      if (!item || typeof item !== 'object') return []
-      const q = item as Record<string, unknown>
-      const format: ResearchFormat = q.format === 'multiple' || q.format === 'free' ? q.format : 'single'
-      return [{ key: crypto.randomUUID(), text: str(q.text), format, choiceTapExtras: Array.isArray(q.choiceTapExtras) ? q.choiceTapExtras as TapExtras[] : [], required: q.required !== false, choices: Array.isArray(q.choices) ? q.choices.map(str) : [] }]
-    })
-    : []
-  return {
-    tapExtras: payload.tapExtras as TapExtras | undefined,
-    description: str(payload.description),
-    couponTitle: str(payload.title),
-    imageUrl: str(payload.imageUrl),
-    couponOnce: payload.oncePerFriend === false ? 'unlimited' as const : 'once' as const,
-    couponVisibility: payload.visibility === 'link' ? 'link' as const : 'friends' as const,
-    lottery: payload.lottery === true,
-    lotteryRate: num(payload.lotteryRate, '20'),
-    winnerLimit: num(payload.winnerLimit, '500'),
-    startsAt: str(payload.startsAt),
-    endsAt: str(payload.endsAt),
-    questions,
-  }
-}
 
 /** `2026-08-01T00:00` → `8/1`（見本の札に出す短い日付）。 */
 function shortDate(value: string): string {
@@ -196,6 +167,15 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const dirty = snapshot !== clean && !saved
   const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
 
+  const [pickedChoice, setPickedChoice] = useState<Record<string, number>>({})
+  const activeChoice = (question: ResearchQuestion) => {
+    const failing = question.choices.findIndex((_, ci) => fields.error(`extra-${question.key}-${ci}`))
+    if (failing >= 0) return failing
+    const picked = pickedChoice[question.key]
+    if (picked !== undefined && picked < question.choices.length) return picked
+    const withExtras = question.choiceTapExtras?.findIndex((extra) => hasTapExtras(extra)) ?? -1
+    return withExtras >= 0 && withExtras < question.choices.length ? withExtras : -1
+  }
   const updateQuestion = (index: number, patch: Partial<ResearchQuestion>) =>
     setQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)))
   /*
@@ -377,34 +357,43 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     </section>
   )
 
-  const phone = (
+  /* リサーチはお客さまが答える画面（LIFF）で見せる。回答フォームの LIFF と同じ形（絵 EsYo4・B-173）。 */
+  const researchLayout: FormLayout = {
+    version: 2,
+    header: [],
+    sections: [{ id: 'research', name: '', blocks: [
+      { id: 'research-title', kind: 'heading', text: name || 'リサーチ名', level: 1 },
+      { id: 'research-lead', kind: 'text', text: `${questions.length}問・1分で終わります${researchEndsAt ? `（${shortDate(researchEndsAt)} まで）` : ''}` },
+      ...questions.map((question, index): FormBlock => ({
+        id: question.key,
+        kind: 'input',
+        type: question.format === 'single' ? 'radio' : question.format === 'multiple' ? 'checkbox' : 'textarea',
+        name: question.key,
+        label: question.text || `問 ${index + 1}`,
+        required: question.required,
+        choices: question.format === 'free' ? [] : question.choices.flatMap((choice, ci) => (choice.trim() ? [{ id: `${question.key}-${ci}`, label: choice }] : [])),
+      })),
+    ] }],
+    options: { submitLabel: '答えを送る' },
+  }
+  const phone = kind === 'research' ? (
+    <FormPhone layout={researchLayout} pageIndex={0} accountName={sendName} bookingMenus={[]} caption={null} title={name || 'リサーチ'} fixedNext progressHead />
+  ) : (
     <LinePreview title={null} note={`${meta.title}の見え方`} caption="配信日 10:00" accountName={sendName}>
       <div className={styles.assetRow}>
         <span className={styles.assetAvatar} aria-hidden="true">{sendName.slice(0, 1)}</span>
         <div className={styles.assetCard}>
-          {kind === 'coupon' ? (
-            <>
-              <div className={styles.assetImage}>
-                {imageSet ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={imageUrl.trim()} alt="" />
-                ) : <span>{couponTitle || name || 'クーポン'}</span>}
-              </div>
-              <div className={styles.assetBody}>
-                <p className={styles.assetTitle}>{couponTitle || name || 'クーポン名'}</p>
-                <p className={styles.assetSub}>{couponPeriodLine(couponStartsAt, couponEndsAt, couponOnce === 'once')}</p>
-              </div>
-              <p className={styles.assetAction}>クーポンを使う</p>
-            </>
-          ) : (
-            <>
-              <div className={styles.assetBody}>
-                <p className={styles.assetTitle}>{`${name || 'リサーチ名'}（${questions.length}問）`}</p>
-                <p className={styles.assetSub}>{researchEndsAt ? `${shortDate(researchEndsAt)} まで` : '受付の終わり 未設定'}</p>
-              </div>
-              <p className={styles.assetAction}>答える</p>
-            </>
-          )}
+          <div className={styles.assetImage}>
+            {imageSet ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imageUrl.trim()} alt="" />
+            ) : <span>{couponTitle || name || 'クーポン'}</span>}
+          </div>
+          <div className={styles.assetBody}>
+            <p className={styles.assetTitle}>{couponTitle || name || 'クーポン名'}</p>
+            <p className={styles.assetSub}>{couponPeriodLine(couponStartsAt, couponEndsAt, couponOnce === 'once')}</p>
+          </div>
+          <p className={styles.assetAction}>クーポンを使う</p>
         </div>
       </div>
     </LinePreview>
@@ -614,16 +603,17 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <span className={styles.questionNo}>問 {index + 1}</span>
                     <span className={styles.spacer} />
                     <span className={styles.toggleLabelSmall}>必ず答えてもらう</span>
-                    <SaveErrorField names={[`shown.${index}.required`,"required","question.required"]}><SettingCheckbox checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} /></SaveErrorField>
+                    <SaveErrorField names={[`shown.${index}.required`,"required","question.required"]}><Toggle checked={question.required} label={`問 ${index + 1} を必ず答えてもらう`} onChange={(checked) => updateQuestion(index, { required: checked })} /></SaveErrorField>
                     <button
                       type="button"
-                      className={`${styles.insertChip} ${styles.questionRemove}`}
+                      className={styles.insertChip}
                       disabled={questions.length <= 1}
                       title={questions.length <= 1 ? '質問は1つ必要です' : `問 ${index + 1} を消す`}
                       aria-label={`問 ${index + 1} を消す`}
                       onClick={() => setQuestions((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))}
                     >
-                      消す
+                      <Trash2 size={15} aria-hidden="true" />
+                      削除する
                     </button>
                   </div>
                   <SettingsFormRow layout="columns">
@@ -635,12 +625,14 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <>
                     <div className={styles.choiceRow} role="group" aria-label={`問 ${index + 1} の選択肢`} {...fields.bind(`qc-${question.key}`)} aria-describedby={fields.invalid(`qc-${question.key}`) ? `te-qc-${question.key}-error` : undefined}>
                       {question.choices.map((choice, choiceIndex) => (
-                        <div key={choiceIndex} className={styles.field}><div className={styles.choice}>
+                        <div key={choiceIndex} className={styles.choice} data-selected={choiceIndex === activeChoice(question) || undefined}>
                           <SaveErrorField names={["choice"]}><input
                             className={styles.choiceInput}
                             value={choice}
                             placeholder={`選択肢 ${choiceIndex + 1}`}
                             aria-label={`問 ${index + 1} の選択肢 ${choiceIndex + 1}`}
+                            title="押すと、この選択肢が選ばれたときに行うことを足せます"
+                            onFocus={() => setPickedChoice((current) => ({ ...current, [question.key]: choiceIndex }))}
                             onChange={(event) => updateQuestion(index, { choices: question.choices.map((c, i) => (i === choiceIndex ? event.target.value : c)) })}
                           /></SaveErrorField>
                           {question.choices.length > 1 ? (
@@ -648,13 +640,11 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                               type="button"
                               className={styles.choiceRemove}
                               aria-label={`問 ${index + 1} の選択肢 ${choiceIndex + 1} を消す`}
-                              onClick={() => updateQuestion(index, { choices: question.choices.filter((_, i) => i !== choiceIndex), choiceTapExtras: question.choiceTapExtras?.filter((_, i) => i !== choiceIndex) })}
+                              onClick={() => { setPickedChoice((current) => ({ ...current, [question.key]: -1 })); updateQuestion(index, { choices: question.choices.filter((_, i) => i !== choiceIndex), choiceTapExtras: question.choiceTapExtras?.filter((_, i) => i !== choiceIndex) }) }}
                             >
                               <X size={12} aria-hidden="true" />
                             </button>
                           ) : null}
-                          </div>
-                          <div {...fields.bind(`extra-${question.key}-${choiceIndex}`)}><TapExtrasField error={fields.error(`extra-${question.key}-${choiceIndex}`)} name={`問${index + 1}の選択肢${choiceIndex + 1}`} value={question.choiceTapExtras?.[choiceIndex]} accountId={host ? null : selectedAccountId} onChange={extra => updateQuestion(index, { choiceTapExtras: question.choices.map((_, ci) => ci === choiceIndex ? extra : question.choiceTapExtras?.[ci] ?? {}) })} /></div>
                         </div>
                       ))}
                       {question.choices.length < MAX_CHOICES ? (
@@ -667,6 +657,15 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                       )}
                     </div>
                     <FieldError id={`te-qc-${question.key}-error`}>{fields.error(`qc-${question.key}`)}</FieldError>
+                    {(() => {
+                      const ci = activeChoice(question)
+                      if (ci < 0) return null
+                      const label = question.choices[ci]?.trim() || `選択肢 ${ci + 1}`
+                      return <>
+                        <p className={styles.choiceWhen}>{`選択肢「${label}」が選ばれたら`}</p>
+                        <div {...fields.bind(`extra-${question.key}-${ci}`)}><ChoiceExtrasRows key={`${question.key}-${ci}`} error={fields.error(`extra-${question.key}-${ci}`)} name={`問${index + 1}の選択肢${ci + 1}`} value={question.choiceTapExtras?.[ci]} tags={actionOptions.tags} accountId={host ? null : selectedAccountId} onChange={extra => updateQuestion(index, { choiceTapExtras: question.choices.map((_, i) => i === ci ? extra : question.choiceTapExtras?.[i] ?? {}) })} /></div>
+                      </>
+                    })()}
                     </>
                   ) : null}
                 </section>

@@ -174,3 +174,8 @@
   font-size: var(--text-micro);
   line-height: var(--tpl-cn-sub-lh);
 }
+
+/* クーポン QR（絵 QUF2R）：スイッチ＋名前を左、札を右に1行で。 */
+.couponSwitchRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
+.couponSwitchLabel { flex: 1; min-width: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; white-space: nowrap; }
+.couponAudience { display: flex; flex-direction: column; gap: var(--polish-space-row); }

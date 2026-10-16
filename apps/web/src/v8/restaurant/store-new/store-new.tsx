@@ -14,6 +14,7 @@ import { ArrowRight, BookOpen, CircleCheck } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { MANUAL_LINKS } from '@/lib/manual-links'
+import { useTaskManualHref } from '@/lib/use-manual-href'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -38,6 +39,7 @@ const STEPS = [
   ['接続の確認', 'LINEへ接続し、店舗を登録します。'],
 ] as const
 
+const ONBOARDING_GUIDE_KEY = 'onboarding-line-guide'
 const PROVIDER_NOTE = '店舗ごとに、新しいプロバイダーを作ってください。LINE のユーザーIDはプロバイダーごとに発行されます。複数の店舗を同じプロバイダーにまとめると、同じお客様を店舗ごとに別々に管理できなくなります。'
 
 type FieldErrors = Partial<Record<'name' | 'channelId' | 'channelSecret', string>>
@@ -58,14 +60,15 @@ function Field({ label, required, help, error, children }: { label: string; requ
   return <SharedField label={label} htmlFor={inputId} required={required} help={help}>{field}<span id={helpId} className="sr-only">{help || '空欄なら店舗名を使います'}</span>{error ? <p id={errorId} role="alert" className={styles.error}>{error}</p> : null}</SharedField>
 }
 
-/** マニュアルへの道。URL が決まるまで（空文字）は押せない形で出す（今の画面は出さなかった）。 */
-function ManualButton({ href, children }: { href: string; children: ReactNode }) {
-  return href
-    ? <Button external href={href}   className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
-    : <Button disabled title="マニュアルの場所はまだ決まっていません"  className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
+/** マニュアルへの道。URL が決まっている時だけ出す（押しても行き先が無いボタンを置かない）。 */
+function ManualButton({ href, children }: { href: string | null; children: ReactNode }) {
+  if (!href) return null
+  return <Button external href={href} className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
 }
 
 function HelpPanel({ step }: { step: number }) {
+  /* 「アカウント作成方法・連携ガイド」は正本表の手順キー（①同意 ao15G・②基本情報 faGn4 で共通）。 */
+  const guideHref = useTaskManualHref(ONBOARDING_GUIDE_KEY)
   const faq = <><p className={styles.helpSub}>よくある質問</p><p className={styles.faq}>{'・「Messaging APIを利用する」ボタンが表示されません\n・チャネルシークレットが正しくないと表示されます'}</p></>
   return (
     <aside className={styles.helpPanel} aria-label="わからないときは">
@@ -86,7 +89,7 @@ function HelpPanel({ step }: { step: number }) {
         <><p className={styles.helpSub}>よくある質問</p><p className={styles.helpText}>接続できない場合は、1つ前の手順へ戻り、LINE Developersから値をコピーし直してください。</p></>
       ) : (
         <>
-          <ManualButton href={MANUAL_LINKS.enableMessagingApi}>アカウント作成方法・連携ガイド</ManualButton>
+          <ManualButton href={guideHref}>アカウント作成方法・連携ガイド</ManualButton>
           {faq}
         </>
       )}

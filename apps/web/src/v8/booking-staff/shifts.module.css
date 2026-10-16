@@ -293,3 +293,13 @@
 }
 
 .stateLink:hover { text-decoration: underline; }
+
+/* 何週分かのシフトを作る：開始日・週の数・［作る］を1行に並べる（板 E3YDK・d5fmnM）。 */
+.genRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--tpl-bks-row-gap);
+  min-width: 0;
+}
+.genRow > * { min-width: 0; }

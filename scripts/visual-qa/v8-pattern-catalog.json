@@ -37,6 +37,22 @@
   },
   "patterns": [
     {
+      "id": "people-day-grid",
+      "name": "人の当日予約盤",
+      "role": "時刻を縦、担当を横に並べ、実際の予約と空き枠を開く",
+      "rules": ["B-260", "B-262"],
+      "owner": {
+        "code": {
+          "files": ["apps/web/src/components/shared/reservation-board.tsx", "apps/web/src/components/shared/reservation-people-grid.tsx", "apps/web/src/components/shared/reservation-people-grid.module.css", "apps/web/src/components/templates/booking-page.tsx", "apps/web/src/components/templates/booking-day-layout.module.css"],
+          "components": ["ReservationBoard", "ReservationPeopleGrid", "BookingPage", "BookingSidebarSection"],
+          "vars": ["--tpl-people-time-width", "--tpl-people-hour-height", "--tpl-people-block-height", "--tpl-people-block-gap"]
+        },
+        "pen": [],
+        "status": "使用板はGcyTr/O2Z8u。Penの再利用する盤の部品は未指定"
+      },
+      "code": { "selectorHint": "data-people-day-grid", "overrideSelectors": [], "signals": [] }
+    },
+    {
       "id": "card",
       "name": "カード（中身のまとまりの箱）",
       "role": "中身のまとまりを白地＋薄い縁＋影＋角丸12で1枚に見せる",
@@ -315,11 +331,14 @@
           "files": [
             "apps/web/src/components/shared/list-toolbar.tsx",
             "apps/web/src/components/shared/list-toolbar.module.css",
-            "apps/web/src/components/shared/search-field.tsx"
+            "apps/web/src/components/shared/search-field.tsx",
+            "apps/web/src/components/shared/distribution-table.tsx"
           ],
           "components": [
             "ListToolbar",
             "ListToolbarSearch",
+            "ListToolbarSearchSlot",
+            "DistributionToolbar",
             "ListToolbarOptional"
           ],
           "vars": [
@@ -395,10 +414,13 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/filter-chip.tsx",
-            "apps/web/src/components/shared/filter-chip.css"
+            "apps/web/src/components/shared/filter-chip.css",
+            "apps/web/src/components/shared/filter-link.tsx",
+            "apps/web/src/components/shared/filter-link.module.css"
           ],
           "components": [
-            "FilterChip"
+            "FilterChip",
+            "FilterLink"
           ],
           "vars": [
             "--color-control-border"
@@ -474,8 +496,8 @@
             "apps/web/src/components/shared/folder-add-dialog.tsx",
             "apps/web/src/components/shared/folder-editor-dialog.tsx",
             "apps/web/src/components/shared/folder-dot.tsx",
-          "apps/web/src/components/shared/list-folder-context.tsx",
-          "apps/web/src/components/templates/list-page.tsx"
+            "apps/web/src/components/shared/list-folder-context.tsx",
+            "apps/web/src/components/templates/list-page.tsx"
           ],
           "components": [
             "ManagedFolderPanel",
@@ -905,14 +927,21 @@
             "apps/web/src/components/shared/action-words.ts",
             "apps/web/src/components/shared/dialog-choice-cards.tsx",
             "apps/web/src/components/shared/dialog-choice-cards.module.css",
-            "apps/web/src/components/shared/dialog-usage-table.tsx"
+            "apps/web/src/components/shared/dialog-usage-table.tsx",
+        "apps/web/src/components/shared/dialog-form-row.tsx",
+        "apps/web/src/components/shared/dialog-content-row.module.css",
+        "apps/web/src/components/shared/dialog-recipient-list.tsx",
+        "apps/web/src/components/shared/dialog-recipient-list.module.css"
           ],
           "components": [
             "Dialog",
             "ConfirmDialog",
             "DialogSteps",
             "DialogChoiceCards",
-            "DialogUsageTable"
+            "DialogUsageTable",
+        "DialogFormRow",
+        "DialogContentRow",
+        "DialogRecipientList"
           ],
           "vars": [
             "--radius-panel",
@@ -1062,13 +1091,16 @@
       "owner": {
         "code": {
           "files": [
-            "apps/web/src/components/shared/entity-picker.tsx"
+            "apps/web/src/components/shared/entity-picker.tsx",
+            "apps/web/src/components/shared/friend-match-row.tsx",
+            "apps/web/src/components/shared/friend-match-row.module.css"
           ],
           "components": [
             "EntityPickerSummary",
             "EntityPickerField",
             "HqAccountPickerField",
-            "HqAccountSelectField"
+            "HqAccountSelectField",
+            "FriendMatchRow"
           ],
           "vars": []
         },
@@ -1203,10 +1235,14 @@
             "apps/web/src/components/shared/tap-action-field.module.css",
             "apps/web/src/lib/tap-actions.ts",
             "apps/web/src/components/shared/use-tap-action-sources.ts"
+          ,
+            "apps/web/src/components/shared/tap-action-summary.tsx"
           ],
           "components": [
             "TapActionField",
             "TapTargetPicker"
+          ,
+            "TapActionSummary"
           ],
           "vars": []
         },
@@ -1281,9 +1317,13 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/tap-action-field.tsx"
+          ,
+            "apps/web/src/components/shared/tap-extras-rows.tsx"
           ],
           "components": [
             "TapActionField"
+          ,
+            "ChoiceExtrasRows"
           ],
           "vars": []
         },
@@ -3384,6 +3424,35 @@
       },
       "code": {
         "selectorHint": "authPage",
+        "overrideSelectors": [],
+        "signals": []
+      }
+    },
+    {
+      "id": "verification-list",
+      "name": "接続のチェックの行",
+      "role": "入力した接続情報の検査結果を印・題・説明・状態で見せる",
+      "rules": [
+        "B-172",
+        "B-178",
+        "B-260"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/verification-list.tsx",
+            "apps/web/src/components/shared/verification-list.module.css"
+          ],
+          "components": [
+            "VerificationList"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "v2KMjの接続確認の行を共通部品へ"
+      },
+      "code": {
+        "selectorHint": "verification-list",
         "overrideSelectors": [],
         "signals": []
       }

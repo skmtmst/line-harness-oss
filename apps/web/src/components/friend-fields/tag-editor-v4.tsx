@@ -1,5 +1,6 @@
 'use client'
 
+import { TAG_ADD_ACTION_LABEL } from '@/components/shared/action-words'
 import { useEffect, useState } from 'react'
 import { Coins } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
@@ -52,6 +53,26 @@ export const ACTION_TYPES = [
   ['マイル付与', 'マイル'],
 ] as const
 export type TagEditorActionLabel = (typeof ACTION_TYPES)[number][0]
+
+/**
+ * 画面に出す言葉（2026-10-15 司令塔・絵 gSsPR）。「〜を送る」「〜を付ける」の形にそろえる。
+ * 上の表の名前（「テキスト送信」など）は保存・権限・統括の絞り込みが読む内部の名前なので変えない。
+ */
+export const ACTION_DISPLAY: Record<TagEditorActionLabel, string> = {
+  'テキスト送信': 'テキストを送る',
+  'テンプレート送信': 'テンプレートを送る',
+  'タグ追加': TAG_ADD_ACTION_LABEL,
+  'タグ解除': 'タグを外す',
+  '友だち情報更新': '友だち情報を変える',
+  '対応マーク変更': '対応マークを変える',
+  'シナリオ開始': 'シナリオを始める',
+  'シナリオ停止': 'シナリオを止める',
+  'リマインダ開始': 'リマインダを始める',
+  'リマインダ解除': 'リマインダを止める',
+  'リッチメニュー切替': 'リッチメニューを変える',
+  '担当者通知': '担当者に知らせる',
+  'マイル付与': 'マイルを付ける',
+}
 
 export const ACTION_DEFINITIONS: Record<(typeof ACTION_TYPES)[number][0], { actionType: string; resource?: keyof CommonActionResources; paramKey?: string }> = {
   'テキスト送信': { actionType: 'send_message' },
