@@ -10,21 +10,28 @@ const path = fileURLToPath(new URL('../../src/app/globals.css', import.meta.url)
 const globals = await compileUiStyles(path)
 const choices = readFileSync(new URL('../../src/components/shared/dialog-choice-cards.module.css', import.meta.url), 'utf8')
 
-for (const width of [1152, 1440, 1920]) {
-  test(`choice links and plain usage keep their roles at ${width}`, async () => {
+for (const width of [1152, 1440, 1920]) for (const reducedMotion of ['reduce', 'no-preference']) {
+  test(`choice links and plain usage keep their roles at ${width} (${reducedMotion})`, async () => {
     const browser = await chromium.launch()
     try {
-      const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
+      const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion })
       await page.setContent(`<html data-theme="v8"><head><style>${globals}</style><style>${choices}</style></head><body>
         <div role="dialog" data-m1-scope>
           <div class="grid" data-dialog-choice-cards><section class="card"><a class="link" href="/templates/edit"><span class="title">メッセージ</span></a></section></div>
           <table aria-label="使っている所"><tbody><tr><td><span>名前</span></td><td><a target="_blank" href="/broadcasts"><span>開いて差し替える</span><svg aria-hidden="true"></svg></a></td></tr></tbody></table>
         </div></body></html>`)
-      const scan = () => page.evaluate(scanDialogAudit, { choices: true, plainUsage: true })
+      const scan = async () => {
+        // 故障を付ける時も戻す時も、背景色の遷移が終わった状態を検査する。
+        // reduce の 0.01ms でも、次の描画前には故障の色が残っている。
+        await page.locator('.link').evaluate(async link => {
+          await Promise.all(link.getAnimations().map(animation => animation.finished))
+        })
+        return page.evaluate(scanDialogAudit, { choices: true, plainUsage: true })
+      }
       await page.locator('.link').hover()
-      assert.equal((await scan()).findings.length, 0)
+      assert.deepEqual((await scan()).findings, [])
       await page.locator('.link').focus()
-      assert.equal((await scan()).findings.length, 0)
+      assert.deepEqual((await scan()).findings, [])
       await page.locator('.link').evaluate(el => { el.style.background = 'var(--color-canvas-sunken)' })
       await page.waitForFunction(() => {
         const link = document.querySelector('.link')
@@ -51,7 +58,7 @@ for (const width of [1152, 1440, 1920]) {
       assert.equal(extra.filter(f => f.kind === 'dialog-usage-external-icons').length, 1)
       await page.locator('[data-folder-dot]').evaluate(el => el.remove())
       await page.locator('table a svg').last().evaluate(el => el.remove())
-      assert.equal((await scan()).findings.length, 0)
+      assert.deepEqual((await scan()).findings, [])
       await page.close()
     } finally { await browser.close() }
   })
