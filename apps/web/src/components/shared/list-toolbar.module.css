@@ -238,7 +238,7 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
 @container v8-page (max-width: 1099px) {
   :root .slots[data-toolbar-single-row] { flex-wrap: nowrap; }
   :root .slots[data-toolbar-single-row] .rowBreak { display: none; }
-  :root .slots[data-toolbar-single-row] .slotTool[data-toolbar-role='search'] { flex: 0 1 280px; min-width: 120px; }
+  :root .slots[data-toolbar-single-row] .slotTool[data-toolbar-role='search'] { flex: 0 1 240px; min-width: 120px; }
   :root .slots[data-toolbar-single-row] .slotTool[data-toolbar-role='count'] { order: 4; margin-left: auto; align-self: center; }
   :root .slots[data-toolbar-single-row] .slotsRow { display: contents; }
 }
