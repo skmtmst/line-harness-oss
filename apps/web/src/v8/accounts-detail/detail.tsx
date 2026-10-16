@@ -20,6 +20,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
+import SendersCard from './senders-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import TruncatedText from '@/components/shared/truncated-text'
 import TextLink from '@/components/shared/text-link'
@@ -291,6 +292,7 @@ export default function AccountDetailV8() {
               </Row>
             </Card>
 
+            <SendersCard accountId={account.id} accountName={account.name} />
             <Card variant="form" aria-labelledby="acd-credentials">
               <Card surface="inset" layout="vertical" padding="compact" gap="var(--polish-space-row)">
                 <CardHeader size="stacked" headingLevel={3} title="登録の内容（つづき）" />
