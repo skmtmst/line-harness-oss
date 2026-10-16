@@ -3158,3 +3158,5 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 
 /* 配置の共通値。画面ごとのリセット・伸縮も同じ値を使う。 */
 :root { --tpl-layout-zero: 0; --tpl-layout-auto: auto; --tpl-layout-full: 100%; --tpl-layout-relaxed: 1.6; }
+
+:root { --tpl-sender-icon: 32px; --tpl-sender-row: 48px; --tpl-sender-tile: 88px; --tpl-sender-icon-text: 13px; --tpl-sender-note-lh: 18px; --tpl-sender-outline: 2px; }
