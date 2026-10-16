@@ -7,7 +7,7 @@ import type { LineAccountConnectData } from '@/lib/api'
 
 const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(),
-  followerImportState: vi.fn(), followerInsight: vi.fn(),
+  followerImportState: vi.fn(), stepFollowerImport: vi.fn(), followerInsight: vi.fn(),
   staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(),
 }))
 vi.mock('@/lib/api', () => ({
@@ -17,6 +17,7 @@ vi.mock('@/lib/api', () => ({
       connect: calls.connect,
       list: calls.list,
       followerImportState: calls.followerImportState,
+      stepFollowerImport: calls.stepFollowerImport,
       followerInsight: calls.followerInsight,
     },
     staff: { list: calls.staffList },
@@ -128,15 +129,17 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(await screen.findByText('登録が完了しました')).toBeTruthy()
   })
 
-  it('登録後はWorkerで進む取り込みを読み取り、完了を画面へ反映する', async () => {
+  it('登録後は画面から取り込みの続きを進め、完了を画面へ反映する', async () => {
     calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account', followerImport: { capability: 'available', phase: 'importing_ids' } } })
-    calls.followerImportState.mockResolvedValue({ success: true, data: { capability: 'available', phase: 'hydrating_profiles', received: 10, imported: 10 } })
+    /* 読むだけ（followerImportState）では次の自動処理まで進まないので、画面は step を呼ぶ。 */
+    calls.stepFollowerImport.mockResolvedValue({ success: true, data: { state: { capability: 'available', phase: 'completed', received: 10, imported: 10 }, busy: false, profilesFetched: 10 } })
     await enterCheckStep()
     fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
     const registerButton = await screen.findByRole('button', { name: '確認コードを入れて登録する' })
     fireEvent.click(screen.getByText('LINE Official Account Manager で「応答メッセージ」をオフにしたことを確かめました'))
     fireEvent.click(registerButton)
-    await waitFor(() => expect(calls.followerImportState).toHaveBeenCalledWith('new-account'))
+    await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledWith('new-account'))
+    expect(calls.followerImportState).not.toHaveBeenCalled()
     expect(await screen.findByText('登録が完了しました')).toBeTruthy()
   })
 

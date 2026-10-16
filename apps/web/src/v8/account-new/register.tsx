@@ -50,6 +50,10 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 使う口も同じ（api.lineAccounts.connectCheck / connect / followerImportState / followerInsight、
  * api.lineAccountTags、api.lineAccounts.list・api.staff.list）。違いは見せ方だけ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
+ *
+ * 2026-10-16 取り込みの進捗は followerImportState を読むだけでは次の cron（5 分ごと）まで
+ * 動かないので、画面を開いている間は stepFollowerImport で続きを進めるようにした。
+ * 画面を閉じたあとは今までどおり cron とアカウント一覧の「入る」が続きを拾う。
  */
 
 const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string; lead: string }> = [
@@ -193,17 +197,23 @@ export default function AccountRegisterV8() {
     return () => { active = false }
   }, [currentStep, saveErrors])
 
-  // ⑤：Workerが画面を閉じても進める取り込みを、読み取りだけで確認する。
+  /* ⑤：画面を開いている間は続きを進める。読み取りだけだと次の cron（5 分ごと）まで
+   * 進まないので、1 回ぶんが終わったらすぐ次を呼ぶ。1 回ぶんは Worker 側の予算で
+   * 区切られ、カーソルは D1 に残る。画面を閉じても cron と「入る」が続きを拾う。
+   * 同じアカウントを別の経路が握っているときは busy が返るだけで壊れない。 */
   useEffect(() => {
     if (!createdId || !['importing_ids', 'hydrating_profiles'].includes(importState?.phase ?? connection?.followerImport.phase ?? '') || !form.importFriends) return
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const advance = async () => {
       try {
-        const response = await api.lineAccounts.followerImportState(createdId)
+        const response = await api.lineAccounts.stepFollowerImport(createdId)
         if (!active || !response.success) return
-        setImportState(response.data)
-        if (['importing_ids', 'hydrating_profiles'].includes(response.data.phase)) timer = setTimeout(() => void advance(), 3000)
+        setImportState(response.data.state)
+        if (['importing_ids', 'hydrating_profiles'].includes(response.data.state.phase)) {
+          /* 進めた直後は待たない（0.5秒は、何も進まない応答が続いたときの空回り止め）。 */
+          timer = setTimeout(() => void advance(), response.data.busy ? 3000 : 500)
+        }
       } catch (saveFailure) {
         saveErrors.capture(saveFailure);
 

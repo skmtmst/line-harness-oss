@@ -32,7 +32,9 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
       '`${workerBase}/auth/callback`',
       'api.lineAccounts.connectCheck',
       'api.lineAccounts.connect',
-      'api.lineAccounts.followerImportState',
+      /* 2026-10-16 ⑤の進捗は読むだけだと次の cron まで動かないので、画面を開いている間は
+       * step で続きを進める。見せ方は変えていない。 */
+      'api.lineAccounts.stepFollowerImport',
       'data-design-node="xj3zz"',
       'data-design-node="GwKE2"',
       'data-design-node="JYfda"',
