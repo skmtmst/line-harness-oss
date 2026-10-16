@@ -1,3 +1,5 @@
+import {validateLayoutRouting} from '../services/form-routing.js';
+import {GapError} from '../services/gap-common.js';
 import { normalizeLayoutInput } from './form-layout-input.js';
 import { type FormFieldDef, parseFormFields } from './form-field-definition.js'
 import { reportPeriod, type ReportPeriodInput } from '@line-crm/shared';
@@ -1093,6 +1095,7 @@ forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["nu
     // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは作れない。
     if (normalized && !('error' in normalized) && normalized.layout) {
       const createdLayout = JSON.parse(normalized.layout) as FormLayout;
+      try{await validateLayoutRouting(c.env.DB,body.accountId,createdLayout);}catch(e){if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e;}
       const createContrastError = formThemeContrastError(
         resolveCustomerFormTheme(createdLayout.options),
       );
@@ -1324,6 +1327,7 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
       }
       // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
       const savedLayout = JSON.parse(normalized.layout) as FormLayout;
+      try{for(const account of await getFormAccountIds(c.env.DB,id))await validateLayoutRouting(c.env.DB,account,savedLayout);}catch(e){if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e;}
       const contrastError = formThemeContrastError(
         resolveCustomerFormTheme(savedLayout.options),
       );

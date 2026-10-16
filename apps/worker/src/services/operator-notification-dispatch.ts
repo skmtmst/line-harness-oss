@@ -1,3 +1,4 @@
+import {deliverOperatorPush} from './operator-push.js';
 // N-327 (#663): 公開済み運用者通知ルールの自動実行と回復。
 //
 // 業務イベント → dispatchOperatorEvent → 公開ルールだけ発火 → 台帳へ先に積む
@@ -20,7 +21,7 @@ import {
   EXTERNAL_DELIVERY_MAX_ATTEMPTS,
 } from './external-delivery-retry.js';
 
-const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line']);
+const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line','push']);
 
 /** 共通基盤 §6-2の値をそのまま公開し、独自の回数を持たない。 */
 export const OPERATOR_DELIVERY_MAX_ATTEMPTS = EXTERNAL_DELIVERY_MAX_ATTEMPTS;
@@ -628,7 +629,7 @@ export async function dispatchOperatorRule(
     recipientIds?: string[];
   },
 ): Promise<OperatorDispatchPerRule> {
-  const channels = ruleChannels(rule);
+  const channels = ruleChannels(rule);if(channels.includes('push')&&!channels.includes('dashboard'))channels.push('dashboard');
   const conditions = ruleConditions(rule);
   const version = ruleVersion(rule);
   const text = operatorMessage(rule, input.message);
@@ -657,6 +658,14 @@ export async function dispatchOperatorRule(
   for (const recipient of recipients) {
     const preview = recipientPreview(recipient, channels);
     for (const requestedChannel of channels) {
+      if(requestedChannel==='push'){
+        const message=await db.prepare('SELECT c.id,c.operator_id FROM messages_log m JOIN chats c ON c.friend_id=m.friend_id WHERE m.id=? AND m.line_account_id=?').bind(input.sourceEventId,input.lineAccountId).first<{id:string;operator_id:string|null}>();
+        if(message&&['inbox_new_inquiry','inbox_assigned_reply'].includes(rule.event_type)){
+          const result=await deliverOperatorPush(db,env,{staffId:recipient.id,account:input.lineAccountId,kind:rule.event_type==='inbox_new_inquiry'?'new_inquiry':'assigned_reply',refId:input.sourceEventId,chatId:message.id});accepted+=result.sent;failed+=result.failed;
+        }
+        continue;
+      }
+
       const channel = requestedChannel === 'dashboard' ? 'in_app' : requestedChannel as 'line' | 'email';
       const claimed = await claimOperatorDelivery(db, {
         lineAccountId: input.lineAccountId,

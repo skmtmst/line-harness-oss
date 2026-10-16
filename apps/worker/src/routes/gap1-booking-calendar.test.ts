@@ -78,6 +78,13 @@ test('B7-31 B7-33: 会議のURLが未発行でも空の案内を出さず、次�
  expect(renderNotificationText('approved',ctx)).toContain('会議の URL は前日までにお送りします');
  expect(renderNotificationText('hours_before',{...ctx,meetingUrl:'https://example.test/latest'})).toContain('https://example.test/latest');
 });
+test('B7-43 B7-45: 予約機能を止めた店の定時読取と予定削除は実行しない',async()=>{
+ connect();await enable();seedGapBooking(d);d.raw.exec("UPDATE bookings SET external_event_id='event',external_calendar_id='cal' WHERE id='bk'");
+ await gapCall(app(),staffPath,'PUT',{readEnabled:false,writeEnabled:false,expectedVersion:1,confirmed:true,removeFutureEvents:true});
+ d.raw.exec("INSERT INTO account_settings(id,line_account_id,key,value) VALUES('booking-off','a','feature.booking','false')");
+ await refreshCalendarBusyCaches(d.db,{},new Date());await processCalendarSwitchJobs(d.db,{});
+ expect(timed).not.toHaveBeenCalled();expect(del).not.toHaveBeenCalled();expect(d.raw.prepare("SELECT status FROM booking_calendar_switch_jobs").get()).toEqual({status:'pending'});
+});
 test('B7-06: Googleに予定の題名を要求せず、終日とfreeを塞がず時間だけ返す',async()=>{
  timed.mockRestore();
  const mock=vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({items:[

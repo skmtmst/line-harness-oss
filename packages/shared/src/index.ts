@@ -95,3 +95,4 @@ export * from './style-api.js';
 
 export * from './support-mark-display.js';
 export type {LineSenderSnapshot,LineSender,SendConfirmationPreview,InboxFirstResponseSettings,InboxFirstResponseWrite,InboxSlaState,BookingCancellationPolicy,BookingCancellationQuote,BookingCancellationCharge,BookingCalendarSwitch,BookingCalendarSwitchWrite} from './gap1.js';
+export * from './gap2.js';
