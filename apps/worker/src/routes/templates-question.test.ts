@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { Env } from '../index.js'
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js'
 
 const mocks = vi.hoisted(() => ({
   getTemplatesWithUsageCount: vi.fn(),
@@ -46,9 +47,12 @@ function app() {
 }
 
 const bindings = { DB: {} as D1Database } as Env['Bindings']
+let store: SqliteD1
 
 beforeEach(() => {
   vi.clearAllMocks()
+  store = createTestD1()
+  bindings.DB = store.db
   mocks.getCarouselTapTotals.mockResolvedValue(new Map())
   mocks.getTemplateSendCounts.mockResolvedValue(new Map())
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true)
@@ -73,6 +77,8 @@ beforeEach(() => {
     line_account_id: 'account-1',
   }))
 })
+
+afterEach(() => store.raw.close())
 
 describe('question templates', () => {
   it('stores the existing scenario question contract and keeps drafts out of accidental sending', async () => {

@@ -24,7 +24,7 @@ function request(path: string, body?: unknown) {
     permissionKeys: edit ? ['booking.settings'] : [], viewPermissionKeys: ['booking.settings'] }); await next(); });
   app.route('/', booking); app.route('/', restaurantTest);
   return app.request(path, body === undefined ? {} : { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-    { DB: f.db, RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings']);
+    { DB: f.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings']);
 }
 beforeEach(() => { f = createTestD1(); seedAssignmentFixture(f); role = 'owner'; readOnly = false; edit = false; access.allow = true; });
 afterEach(() => f.raw.close());

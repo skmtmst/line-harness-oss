@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /**
  * テンプレートの公開版固定(#645 / 点検#497 N-131)の口の契約。
@@ -53,6 +54,7 @@ function app() {
 }
 
 const bindings = { DB: {} as D1Database } as Env['Bindings'];
+let store: SqliteD1;
 
 /** 公開版が「公開中の本文」版1、下書きなしの行。 */
 function liveRow(overrides: Record<string, unknown> = {}) {
@@ -106,6 +108,8 @@ function publish(body: Record<string, unknown> = {}, key: string | null = 'publi
 
 beforeEach(() => {
   vi.clearAllMocks();
+  store = createTestD1();
+  bindings.DB = store.db;
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'],
@@ -126,6 +130,8 @@ beforeEach(() => {
   );
   mocks.getFolderById.mockResolvedValue(null);
 });
+
+afterEach(() => store.raw.close());
 
 describe('編集・保存は下書きへだけ書く', () => {
   it.each([
