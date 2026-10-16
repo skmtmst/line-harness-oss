@@ -7,6 +7,7 @@
  * - ［接続を作る］はオーナーだけ（本人確認つき）。管理者には「オーナーだけが作れます」。閲覧のみは見るだけ。スタッフには区画を出さない
  * - 鍵は作った時に 1 回だけ。閉じる時に「鍵はもう見られません」の確かめ
  */
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { useCallback, useEffect, useState } from 'react'
 import { Bot, Copy, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -227,6 +228,7 @@ function McpCreateDialog({ open, defaultAccountId, accountOptions, onClose, onCr
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+  const saveErrors = useSaveFormErrors()
   useEffect(() => {
     if (!open) return
     setName(''); setLevel('read'); setAccountId(defaultAccountId ?? ''); setDays('90'); setNameError(''); setError('')
@@ -244,14 +246,14 @@ function McpCreateDialog({ open, defaultAccountId, accountOptions, onClose, onCr
       onCreated(res.data)
     } catch (caught) {
       if (!stepUpToken && isStepUpRequired(caught)) setStepUp({ purpose: MCP_STEP_UP, action: 'AI との接続を作る', retry: (token) => submit(token) })
-      else setError(describeApiFailure(caught, '接続の作成'))
+      else if (!saveErrors.capture(caught)) setError(describeApiFailure(caught, '接続の作成'))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}>
       <Dialog
         open={open}
         title="AI との接続を作る"
@@ -283,7 +285,7 @@ function McpCreateDialog({ open, defaultAccountId, accountOptions, onClose, onCr
         </div>
       </Dialog>
       {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
-    </>
+    </SaveErrorScope>
   )
 }
 

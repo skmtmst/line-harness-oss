@@ -5,6 +5,7 @@
  * 要件 G2 §2-1・§2-2・§2-6・§4（AI-02・07・08・20・21・23・24）。
  * 見出しの右に［取り込む（PDF・Web）］［Q&A を追加］、タブ、AI の使い方の帯、探す・状態・件数、平らな表。
  */
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MessageSquareText, Plus, Upload } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -72,6 +73,7 @@ export default function QaListV8() {
   const [pendingError, setPendingError] = useState('')
   const [importOpen, setImportOpen] = useState(false)
   const generation = useRef(0)
+  const saveErrors = useSaveFormErrors()
 
   const fetchList = useCallback(async () => {
     const mine = ++generation.current
@@ -102,7 +104,7 @@ export default function QaListV8() {
       void fetchList()
       void ai.reload()
     } catch (caught) {
-      setPendingError(describeApiFailure(caught, pending.kind === 'publish' ? '公開' : pending.kind === 'stop' ? '止める操作' : '削除'))
+      if (!saveErrors.capture(caught)) setPendingError(describeApiFailure(caught, pending.kind === 'publish' ? '公開' : pending.kind === 'stop' ? '止める操作' : '削除'))
     } finally {
       setPendingBusy(false)
     }
@@ -119,7 +121,7 @@ export default function QaListV8() {
   </>
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="y4nixm"
       headingSize="regular"
       heightMode="content"
@@ -226,7 +228,7 @@ export default function QaListV8() {
           </tbody>
         </DataTable>
       ) : null}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }
 

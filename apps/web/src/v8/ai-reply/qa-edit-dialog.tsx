@@ -4,6 +4,7 @@
  * Q&A を作る・直す窓（要件 G2 §2-1 y4nixm の［Q&A を追加］・記録の［Q&A に足す］）。
  * 入るのはいつも下書き。公開は一覧の「…」から（管理者以上）。スタッフには公開のお願いの一言を出す。
  */
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { useEffect, useState } from 'react'
 import Dialog from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
@@ -23,6 +24,7 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
   onSaved: (entry: QaEntry) => void
   onClose: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [questions, setQuestions] = useState('')
   const [answer, setAnswer] = useState('')
   const [busy, setBusy] = useState(false)
@@ -58,14 +60,14 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
       notifyToast(seed?.entry ? 'Q&A を保存しました' : 'Q&A を下書きで作りました')
       onSaved(res.data)
     } catch (caught) {
-      setError(describeApiFailure(caught, 'Q&A の保存'))
+      if (!saveErrors.capture(caught)) setError(describeApiFailure(caught, 'Q&A の保存'))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open={open}
       title={seed?.entry ? 'Q&A を編集する' : 'Q&A を追加する'}
       designWidth={560}
@@ -85,6 +87,6 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
         </Field>
         {!canPublish ? <p className={styles.formNote}>公開は管理者にお願いしてください。保存すると下書きで入ります。</p> : null}
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

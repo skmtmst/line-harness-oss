@@ -8,6 +8,7 @@
  * - 止まっている・混んでいる：小さな帯だけ。入力欄はふつうに使える
  * 閲覧のみ：要約は見える・返信案は隠す。代理ログイン：要約は見える（伏せた形）・返信案は出さない。
  */
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CloudOff, CornerDownLeft, RefreshCw, Sparkles } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -17,6 +18,7 @@ import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-
 import { notifyToast } from '@/components/shared/toast'
 import { ApiError } from '@/lib/api'
 import { formatDate } from '@/lib/format'
+import { conversationAiUiEnabled } from '@/lib/environment-features'
 import { aiReplyApi, type ChatDraft, type ChatSummary } from './api'
 import { useAiSettings } from './use-ai-settings'
 import styles from './inbox-ai.module.css'
@@ -39,9 +41,13 @@ const time = (value: string) => formatDate(value, { style: 'time', fallback: '' 
  * 受信箱の 1 つの会話の AI の状態。画面（inbox-chat/screen.tsx）が 1 回呼び、出す部品へ渡す。
  * messages は今の会話の吹き出し（最後の受信の id で「新しいメッセージ」と［使わない］の続きを決める）。
  */
-export function useInboxAi(chatId: string | null, accountId: string | null, messages: ChatMessageLike[] | undefined) {
+export function useInboxAi(chatIdIn: string | null, accountIdIn: string | null, messages: ChatMessageLike[] | undefined) {
+  /* 会話の AI を出さない間（B-355）は、設定も要約も返信案も読まない。 */
+  const enabled = conversationAiUiEnabled()
+  const chatId = enabled ? chatIdIn : null
+  const accountId = enabled ? accountIdIn : null
   const ai = useAiSettings(accountId)
-  const active = ai.mode === 'draft_only' || ai.mode === 'auto_qa'
+  const active = enabled && (ai.mode === 'draft_only' || ai.mode === 'auto_qa')
   const lastIncomingId = [...(messages ?? [])].reverse().find((message) => message.direction === 'incoming')?.id ?? null
   const [summary, setSummary] = useState<Part<ChatSummary>>({ kind: 'idle' })
   const [draft, setDraft] = useState<Part<ChatDraft>>({ kind: 'idle' })
@@ -112,6 +118,7 @@ export type InboxAi = ReturnType<typeof useInboxAi>
 
 /** 会話の頭の下：要約（l1i3v）か、AI が使えない帯（OmV7B）。使っていない店では何も出さない。 */
 export function InboxAiSummary({ inboxAi }: { inboxAi: InboxAi }) {
+  if (!conversationAiUiEnabled()) return null
   const { ai, active, summary, summaryOpen, setSummaryOpen, lastIncomingId } = inboxAi
   if (ai.mode === 'suspended' || (summary.kind === 'error' && summary.busy)) {
     return (
@@ -157,6 +164,7 @@ export function InboxAiSummary({ inboxAi }: { inboxAi: InboxAi }) {
 
 /** 入力欄の上：返信案（l1i3v）。入力欄の位置は動かさない（会話の側が縮む）。 */
 export function InboxAiDraft({ inboxAi, onInsert }: { inboxAi: InboxAi; onInsert: (text: string) => void }) {
+  if (!conversationAiUiEnabled()) return null
   const { ai, active, draft, isDismissed } = inboxAi
   if (!active || !ai.permissions.useDraft || isDismissed || draft.kind === 'idle') return null
   if (draft.kind === 'error' && draft.busy) return null
@@ -193,7 +201,8 @@ export function InboxAiHeadMenu({ inboxAi, accountId }: { inboxAi: InboxAi; acco
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  if (ai.status !== 'ready' || ai.mode !== 'off' || !ai.permissions.modeChoices.includes('draft_only') || !accountId) return null
+  const saveErrors = useSaveFormErrors()
+  if (!conversationAiUiEnabled() || ai.status !== 'ready' || ai.mode !== 'off' || !ai.permissions.modeChoices.includes('draft_only') || !accountId) return null
   const turnOn = async () => {
     setBusy(true)
     setError('')
@@ -203,13 +212,13 @@ export function InboxAiHeadMenu({ inboxAi, accountId }: { inboxAi: InboxAi; acco
       setOpen(false)
       notifyToast('AI の返信案を使い始めました')
     } catch (caught) {
-      setError(describeApiFailure(caught, 'AI の使い方の変更'))
+      if (!saveErrors.capture(caught)) setError(describeApiFailure(caught, 'AI の使い方の変更'))
     } finally {
       setBusy(false)
     }
   }
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}>
       <RowMenu appearance="box" label="会話のほかの操作" items={[{ id: 'ai-on', label: 'AI の返信案を使う', onSelect: () => { setError(''); setOpen(true) } }]} />
       <ConfirmDialog
         open={open}
@@ -221,6 +230,6 @@ export function InboxAiHeadMenu({ inboxAi, accountId }: { inboxAi: InboxAi; acco
         onConfirm={() => void turnOn()}
         onCancel={() => { if (!busy) setOpen(false) }}
       />
-    </>
+    </SaveErrorScope>
   )
 }

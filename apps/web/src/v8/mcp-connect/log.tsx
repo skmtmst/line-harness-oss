@@ -155,7 +155,7 @@ export default function McpLogV8() {
               /* 承認へ進む：送る依頼の行は詳細へ。下書きの行は、承認待ちかを口が返すまで押せない形で残す（B-314）。 */
               const items = broadcast ? [
                 ...(log.kind === 'send_request' && !permissions.viewer ? [{ id: 'approve', label: '承認へ進む', href: `/broadcasts/detail?id=${encodeURIComponent(log.targetId!)}`, onSelect: () => setMenuId(null) }] : []),
-                ...(log.kind === 'draft' && !permissions.viewer ? [{ id: 'approve', label: '承認へ進む', disabled: true, disabledReason: '現在準備中です' }] : []),
+                ...(log.kind === 'draft' && !permissions.viewer ? [{ id: 'approve', label: '承認へ進む', disabled: true, disabledReason: '承認待ちかどうかを、まだ読めません' }] : []),
                 { id: 'draft', label: '下書きを開く', href: `/broadcasts/detail?id=${encodeURIComponent(log.targetId!)}`, onSelect: () => setMenuId(null) },
               ] : []
               return (

@@ -7,6 +7,7 @@
  * - 段を変えるときは必ず窓で確かめる。自動で答えるをオンにする窓は NmTj4（オーナーだけ・本人確認つき）
  * - 閲覧のみ・スタッフは［変える］を出さない（yUK7Z）
  */
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { useState } from 'react'
 import { Bot, Sparkles, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -39,6 +40,7 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+  const saveErrors = useSaveFormErrors()
   /* 組2 の今の段では Q&A の自動応答は使えない（autoReplyAvailable:false）。選ぶ欄に出さない。 */
   const autoUnavailable = settings?.autoReplyAvailable === false
   const choices = autoUnavailable ? permissions.modeChoices.filter((choice) => choice !== 'auto_qa') : permissions.modeChoices
@@ -58,7 +60,7 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: AI_SETTINGS_STEP_UP, action: '自動で答えるをオンにする', retry: (token) => save(next, token) })
       } else {
-        setError(describeApiFailure(caught, 'AI の使い方の変更'))
+        if (!saveErrors.capture(caught)) setError(describeApiFailure(caught, 'AI の使い方の変更'))
       }
     } finally {
       setBusy(false)
@@ -94,7 +96,7 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
   ) : null
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}>
       <Notice
         tone="info"
         icon={<Sparkles aria-hidden="true" />}
@@ -138,7 +140,7 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
         onCancel={close}
       />
       {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
-    </>
+    </SaveErrorScope>
   )
 }
 
