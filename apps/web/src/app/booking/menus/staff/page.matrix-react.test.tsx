@@ -153,7 +153,9 @@ describe('R309 標準の料金は一覧と同じ言葉', () => {
 
     for (const [name, price] of [['カット', '¥8,000'], ['相談', 'お問い合わせ'], ['お試し', '無料']]) {
       fireEvent.click(menuRow(name).querySelector('td')!)
+      fireEvent.click(screen.getByRole('button', { name: 'このスタッフの料金の説明' }))
       expect(screen.getByText(`メニューは ${price}`)).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'このスタッフの料金の説明' }))
     }
     // 標準の設定に金額0の表示は残らない。
     expect(screen.queryByText('¥0')).toBeNull()

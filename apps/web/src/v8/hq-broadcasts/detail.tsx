@@ -1,7 +1,6 @@
 'use client'
-import { canManageRole } from '@/lib/staff-role';
+import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 
-import { useTenantWideAccess } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -9,10 +8,10 @@ import { Ban, Check, CirclePause, Copy, Download, PencilLine, RotateCcw, Send } 
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
-import { downloadApiFile } from '@/lib/api'
+import { downloadApiFile, ApiError, describeSaveFailure } from '@/lib/api'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import type { HqBroadcastRun } from '@line-crm/shared'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
@@ -24,18 +23,13 @@ import RowMenu from './row-menu'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ApiError, describeSaveFailure } from '@/lib/api'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
-import { useStaffRole } from '@/lib/staff-role'
 import { type ResultTarget, canRetry, failedCount, failureLines, fromApiContent, jpDateTime, preflightBadge, previewText, resultBadge, runBadge, sendTotals } from './model'
 import styles from './detail.module.css'
 import detailStyles from '../broadcast-detail/detail.module.css'
 import BroadcastPhone from '../broadcast-detail/phone'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { japaneseDetailOf, permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
-import { PageHeading } from '@/components/templates/page-frame'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
@@ -507,7 +501,10 @@ export default function HqBroadcastDetail() {
       <PageFrame kind="detail" boardId="M2tJM xOXuY">
         <PageHeading title={run?.title ?? '一括配信'}
         steps={<>{run ? <HqDeliveryRail run={run} approvalPending={approval.state?.approval.status === 'pending'} /> : null}</>}
-        actions={<>{badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : null}{run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : null}{run ? (
+        /* 店の詳細（tPm3e）と同じ形：題の右に状態の札、題の下に1行の要約（絵 M2tJM）。 */
+        titleAccessory={badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : undefined}
+        crumbs={run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : undefined}
+        actions={<>{run ? (
             <div className={detailStyles.actions}>
               {/* CSV は見るだけの操作。閲覧のみにも出す。 */}
               <Button size="field" onClick={() => void exportCsv()} busy={exporting} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>

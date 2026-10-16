@@ -5,7 +5,7 @@ export interface HqDeliveryTemplateDefinition {
   schemaVersion: 1;
   settings: Record<string, unknown> & { name: string };
   /** 参照を使うときは、配布先にある同じ名前の設定へつなぐ。無い・重複は配らない。 */
-  references?: Array<{ sourceId: string; kind: 'tag' | 'template' | 'scenario' | 'form' | 'friend_field' | 'mark' | 'event' | 'reminder' | 'entry_route' | 'common_var' | 'tag_folder' | 'notification_rule'; name: string }>;
+  references?: Array<{ sourceId: string; kind: 'coupon' | 'tag' | 'template' | 'scenario' | 'form' | 'friend_field' | 'mark' | 'event' | 'reminder' | 'entry_route' | 'common_var' | 'tag_folder' | 'notification_rule'; name: string; accountId?: string }>;
 }
 
 export type HqAutoReplyDeliverySettings =

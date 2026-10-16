@@ -8,17 +8,59 @@ import { useTableActionWidth } from './use-table-action-width'
 import { useListRowDensity } from './use-list-row-density'
 import { useListColumnSizing } from './use-list-column-sizing'
 import { useListUrlState } from './list-url-state'
-import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
-import TruncatedText from './truncated-text'
+import type { ReactNode, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import shell from './data-table.module.css'
 import { loadFailureCopy } from './api-error-message'
-import HelpTip from './help-tip'
 import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
+import type { ThProps } from './table-head-cell'
+export type { ThProps } from './table-head-cell'
+import TruncatedText from './truncated-text'
+import HelpTip from './help-tip'
 import { DelayedSkeleton, ListSkeleton } from './skeleton'
 import presentationStyles from './table-presentation.module.css'
 import PageLink, { RowNavigation, useListNavigationHref } from './list-navigation'
 import { isRowControl } from './destination-policy'
+/** Pencil V5/V6の `tPTMp` を正本にした表見出しセル。 */
+export function Th({
+  children,
+  align = 'left',
+  className,
+  scope = 'col',
+  help,
+  helpLabel,
+  helpHref,
+  truncate,
+  showActionLabel = false,
+  collapseAt,
+  grow,
+  inset,
+  ...cellProps
+}: ThProps) {
+  const classes = [
+    styles.cell,
+    align === 'right' && styles.right,
+    align === 'center' && styles.center,
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const hasHelp = help !== undefined && help !== null
+  const actionHeading = children === '操作' && !showActionLabel
+  const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
+  return (
+    <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
+      {actionHeading ? <span className="sr-only">操作</span> : truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
+      {hasHelp ? (
+        <HelpTip label={`${heading}の説明`}>
+          {help}
+          {helpHref ? <a href={helpHref}>くわしく</a> : null}
+        </HelpTip>
+      ) : null}
+    </th>
+  )
+}
+
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
   className?: string
@@ -41,76 +83,6 @@ export function TableHeadRow({
     </div> : <tr data-shared-part="list-head" className={classes} data-presentation={presentation} {...rowProps}>
       {children}
     </tr>}</React.Fragment>
-  )
-}
-
-type Scope = NonNullable<ThHTMLAttributes<HTMLTableCellElement>['scope']>
-
-export type ThProps = Omit<
-  ThHTMLAttributes<HTMLTableCellElement>,
-  'align' | 'children' | 'className' | 'scope'
-> & {
-  children?: ReactNode
-  align?: 'left' | 'right' | 'center'
-  className?: string
-  scope?: Scope
-  /** 短い列では1行で省略し、titleで全文を読める。 */
-  truncate?: boolean
-  /** 白い板が狭いときだけ、補助列を畳む。見出しと本文で揃える。 */
-  collapseAt?: 'narrow'
-  /** 列の余った幅をこのセルに割り当てる。 */
-  grow?: boolean
-  /** 文字の先頭を名前のフォルダ印に揃える。 */
-  inset?: string
-  /**
-   * 定義・分母・単位・言葉の意味。見出しのすぐ右の「？」へ入れる
-   * （★V7・§2-1b）。表の下の注はここへ移し、2回書かない。
-   */
-  help?: ReactNode
-  /** 「？」の見出し。省略時は見出し文字。読み上げ名は「{見出し}の説明」。 */
-  helpLabel?: string
-  /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
-  helpHref?: string
-}
-
-/** Pencil V5/V6の `tPTMp` を正本にした表見出しセル。 */
-export function Th({
-  children,
-  align = 'left',
-  className,
-  scope = 'col',
-  help,
-  helpLabel,
-  helpHref,
-  truncate,
-  collapseAt,
-  grow,
-  inset,
-  ...cellProps
-}: ThProps) {
-  const classes = [
-    styles.cell,
-    align === 'right' && styles.right,
-    align === 'center' && styles.center,
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
-
-  const hasHelp = help !== undefined && help !== null
-  const actionHeading = children === '操作'
-  const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
-
-  return (
-    <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
-      {actionHeading ? <span className="sr-only">操作</span> : truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
-      {hasHelp ? (
-        <HelpTip label={`${heading}の説明`}>
-          {help}
-          {helpHref ? <a href={helpHref}>くわしく</a> : null}
-        </HelpTip>
-      ) : null}
-    </th>
   )
 }
 
@@ -283,13 +255,15 @@ export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>)
 }
 
 /** 顔と名前を同じ1行に保つ。狭い列では名前だけを省略する。 */
-export function PersonCell({ name, avatarName, avatarSrc, ...cellProps }: Omit<TdProps, 'children'> & {
+export function PersonCell({ name, avatarName, avatarSrc, avatarSize = 24, gap, ...cellProps }: Omit<TdProps, 'children'> & {
   name: ReactNode
   avatarName?: string | null
   avatarSrc?: string | null
+  avatarSize?: 24 | 32
+  gap?: string
 }) {
-  return <Td {...cellProps} data-list-person-cell><span className={styles.person}>
-    <Avatar name={avatarName} src={avatarSrc} size={24} />
+  return <Td {...cellProps} data-list-person-cell><span className={styles.person} style={gap ? { gap } : undefined}>
+    <Avatar name={avatarName} src={avatarSrc} size={avatarSize} />
     <span className={styles.personName}>{name}</span>
   </span></Td>
 }
@@ -300,8 +274,10 @@ export function StatusCell({ primary, children, ...cellProps }: Omit<TdProps, 'c
 }
 
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, folder, annotation, selection, className, grow }: {
+export function NameCell({ name, folder, nameCarriesDot, annotation, selection, className, grow }: {
   name: ReactNode
+  /** 名前が色の丸を持つ札（タグの札）のとき、フォルダの丸を置かない。 */
+  nameCarriesDot?: boolean
   /** 名前の横の状態札。名前やリンクの中には入れない。 */
   annotation?: ReactNode
   /** Selection stays outside the truncatable name, including its context menu. */
@@ -313,7 +289,7 @@ export function NameCell({ name, folder, annotation, selection, className, grow 
 }) {
   return (
     <td data-list-name-cell="" data-cell-grow={grow || undefined} className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
-      <div className={shell.name}><FolderDotName folder={folder} annotation={annotation} selection={selection}>{name}</FolderDotName></div>
+      <div className={shell.name}><FolderDotName folder={folder} nameCarriesDot={nameCarriesDot} annotation={annotation} selection={selection}>{name}</FolderDotName></div>
     </td>
   )
 }

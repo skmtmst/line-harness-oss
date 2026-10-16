@@ -1,3 +1,6 @@
+import { normalizeLayoutInput } from './form-layout-input.js';
+import { type FormFieldDef, parseFormFields } from './form-field-definition.js'
+import { reportPeriod, type ReportPeriodInput } from '@line-crm/shared';
 import { callFormWebhook } from '../services/form-webhook.js';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
@@ -16,6 +19,7 @@ import {
   getFormsWithStats,
   FORM_SUBMIT_CLAIM_STALE_MS,
   getFormById,
+  getFormLatestEdit,
   type FormSubmitClaim,
   type FormSubmitClaimScope,
   getFormAccountIds,
@@ -239,32 +243,6 @@ function validFormListFilter(value: string | undefined): FormListFilter {
 /** 一覧の並び順。知らない値は「最新の回答順」へ落とす（画面と同じ規則）。 */
 function validFormListSort(value: string | undefined): FormListSort {
   return value === 'answers' || value === 'updated' || value === 'name' ? value : 'latest-answer';
-}
-
-/** フォームの項目定義。forms.fields は JSON の配列で持っている。 */
-interface FormFieldDef {
-  id?: string;
-  name?: string;
-  label?: string;
-  type?: string;
-  /** 回答の登録先。友だち情報欄の項目ID。未設定なら情報欄には書かない */
-  friendFieldId?: string | null;
-}
-
-/**
- * forms.fields を読む。
- *
- * 壊れていても空配列を返す。ここで例外を投げると、項目定義が1つ壊れた
- * だけでフォームの送信そのものが失敗する。
- */
-function parseFormFields(raw: string | null | undefined): FormFieldDef[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? (parsed as FormFieldDef[]) : [];
-  } catch {
-    return [];
-  }
 }
 
 function optionalExecutionCtx(c: Context<Env>): ExecutionContext | undefined {
@@ -766,30 +744,6 @@ async function writeLegacyFriendFields(
   return result;
 }
 
-/**
- * 受け取った layout を、保存できる形にそろえる。
- *
- * 外から来た JSON をそのまま入れない。形を正した上で、互換用の `fields`
- * も同時に作り直す。`fields` はいまも送信時の必須チェックと回答一覧の
- * 見出しが読んでいて、layout だけ更新すると両者がずれる。
- */
-function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } | { error: string } | null {
-  const typeError = formBlockTypeError(raw);
-  if (typeError) return { error: typeError };
-  const layout = normalizeLayout(raw);
-  if (!layout) return null;
-  // 保存できる定義かをここで止める。画面側と同じ `validateFormDefinition`
-  // を使うので、「画面では通ったのに保存で弾かれる」にならない。
-  // 分岐の循環や設定途中の動作は下書きとして残せるため、ここでは見ず
-  // 公開の直前（publish）で止める。
-  const invalid = validateFormDefinition(layout);
-  if (invalid) return { error: invalid };
-  return {
-    layout: JSON.stringify(layout),
-    fields: JSON.stringify(layoutToFields(layout)),
-  };
-}
-
 // GET /api/forms — list all forms (with submission stats + delivering accounts)
 forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
@@ -976,7 +930,7 @@ forms.get('/api/forms/:id', async (c) => {
       layout = {...layout, options: {...layout.options, theme: resolveCustomerFormTheme(layout.options, look)}};
     }
     const data = adminView
-      ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
+      ? {...serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' }),latestEdit:await getFormLatestEdit(c.env.DB,id,form.content_revision)}
       : { ...serializePublicForm(form, layout), availability: await formAvailability({
         db: c.env.DB, formId: id, layout, active: !!form.is_active,
         submitCount: form.submit_count ?? 0, friendId,
@@ -1392,7 +1346,7 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
     if (body.ogDescription !== undefined) updates.ogDescription = body.ogDescription;
     if (body.ogImageUrl !== undefined) updates.ogImageUrl = body.ogImageUrl;
 
-    const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision);
+    const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision,c.get('staff')?.id);
 
     if (updated.kind === 'not_found') {
       return c.json({ success: false, error: 'Form not found' }, 404);
@@ -1407,11 +1361,12 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
         data: {
           contentRevision: updated.form.content_revision,
           updatedAt: updated.form.updated_at,
+          latestEdit:await getFormLatestEdit(c.env.DB,id,updated.form.content_revision),
         },
       }, 409);
     }
 
-    return c.json({ success: true, data: serializeForm(updated.form) });
+    return c.json({ success: true, data: {...serializeForm(updated.form),latestEdit:await getFormLatestEdit(c.env.DB,id,updated.form.content_revision)} });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_forms_failed","route":"PUT /api/forms/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1669,6 +1624,9 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
+    let period: ReturnType<typeof reportPeriod>;
+    try { period = reportPeriod({from:c.req.query('from'),to:c.req.query('to'),period:c.req.query('period') as ReportPeriodInput['period']}); }
+    catch { return c.json({success:false,error:'期間は正しい日付（YYYY-MM-DD）、または this_month・last_month・all で指定してください'},400); }
     const hasPagination = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
     if (!hasPagination) {
       // SDKなど既存利用先との互換性を保つ。V6管理画面だけが明示的にページ分けを要求する。
@@ -1680,7 +1638,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
        * 残る（実際、逆変異で確かめた: DB 側を 500 にしても slice があると
        * 試験が緑のままだった）。数も切る場所も1か所にする。
        */
-      const submissions = await getFormSubmissions(c.env.DB, id, NON_PAGINATED_SUBMISSIONS_MAX);
+      const submissions = await getFormSubmissions(c.env.DB, id, NON_PAGINATED_SUBMISSIONS_MAX, {...period,lineAccountId:c.req.query('account_id')});
       // Header 値は ASCII のみ。日本語の案内は PR と票に残す。
       // 数は直書きしない。名乗りと実際がずれると、取り落としに気づけない。
       c.header(
@@ -1698,13 +1656,14 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     // N-171/N-179: 一覧・件数・CSV が同じ検索条件になるよう、検索語をページング前に渡す。
     const search = (c.req.query('q') ?? '').trim().slice(0, 200) || undefined;
     const [submissions, summary] = await Promise.all([
-      getFormSubmissionsPage(c.env.DB, id, { page, limit, lineAccountId: c.req.query('account_id')!, search }),
+      getFormSubmissionsPage(c.env.DB, id, { ...period, page, limit, lineAccountId: c.req.query('account_id')!, search }),
       getFormSubmissionAnalytics(
         c.env.DB,
         id,
         c.req.query('account_id')!,
         dateFieldsOfForm(form),
         ratingFieldsOfForm(form),
+        period,
       ),
     ]);
     // N-168: 後処理の未完を運用者へ見せる。予約(claim)の工程記録と
@@ -1718,6 +1677,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
         page: submissions.page,
         limit: submissions.limit,
         summary,
+        period,
       },
     });
   } catch (err) {

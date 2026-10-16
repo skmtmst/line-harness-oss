@@ -18,6 +18,8 @@ export const hqTemplateAdapterRegistry: HqTemplateAdapterRegistry = Object.freez
   auto_reply: unsupportedHqTemplateAdapter('auto_reply'),
   friend_add_rule: unsupportedHqTemplateAdapter('friend_add_rule'),
   reminder: unsupportedHqTemplateAdapter('reminder'),
+  booking_menu: unsupportedHqTemplateAdapter('booking_menu'),
+  mileage_reward: unsupportedHqTemplateAdapter('mileage_reward'),
 });
 
 export function getHqTemplateAdapter(type: HqTemplateType, binding?: { db: D1Database; authority: HqTemplateAuthority }): HqTemplateAdapter {

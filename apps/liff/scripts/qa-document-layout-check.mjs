@@ -7,6 +7,7 @@ const base = process.env.LIFF_QA_URL ?? 'http://127.0.0.1:3670';
 const api = process.env.LIFF_QA_API ?? 'http://127.0.0.1:8798';
 for (const url of [base, api]) assert.ok(['localhost', '127.0.0.1'].includes(new URL(url).hostname));
 const output = process.env.LIFF_QA_OUT ?? '/tmp/liff-document-layout';
+const capture = process.env.LIFF_QA_CAPTURE !== '0';
 mkdirSync(output, { recursive: true });
 const browser = await chromium.launch();
 const results = [];
@@ -53,11 +54,11 @@ try {
     await page.evaluate(() => document.fonts.ready);
     const empty = await page.evaluate(measure);
     results.push({ width, state: 'empty', measured: empty, defects: defects(empty, false) });
-    await page.screenshot({ path: `${output}/empty-${width}.png` });
+    if (capture) await page.screenshot({ path: `${output}/empty-${width}.png` });
     await uploadQaDocument(page);
     const filled = await page.evaluate(measure);
     results.push({ width, state: 'filled', measured: filled, defects: defects(filled, true) });
-    await page.screenshot({ path: `${output}/filled-${width}.png` });
+    if (capture) await page.screenshot({ path: `${output}/filled-${width}.png` });
     if (!process.env.LIFF_DOCUMENT_BASELINE) {
       assert.deepEqual(defects(empty, false), []);
       assert.deepEqual(defects(filled, true), []);

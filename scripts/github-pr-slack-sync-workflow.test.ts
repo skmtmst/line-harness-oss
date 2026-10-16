@@ -11,10 +11,10 @@ const script = readFileSync(
 );
 
 describe('GitHub PR Slack sync workflow safety', () => {
-  test('PRイベント、developmentへのpush、15分ごと、手動実行で再照合できる', () => {
+  test('PRイベント、developmentへのpush、1時間ごと、手動実行で再照合できる', () => {
     expect(workflow).toContain('pull_request:');
     expect(workflow).toContain('push:');
-    expect(workflow).toContain("cron: '7,22,37,52 * * * *'");
+    expect(workflow).toContain("cron: '7 * * * *'");
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('GITHUB_SLACK_SYNC_ONLY_PR_NUMBER:');
     expect(workflow).toContain("inputs.pr_number || ''");

@@ -47,6 +47,7 @@ export interface TopBarProps {
   /** 統括配下ではアカウントを切り替えないため非表示にする。 */
   showAccountSwitcher?: boolean
   roleLabel: string
+  accountScopeLabel?: string
   /**
    * 権限バッジを押したときの行き先。渡さなければ押せない印のまま。
    * 統括は、ここから店舗の一覧へ戻る（本文に別のボタンを置かない）。
@@ -123,6 +124,7 @@ export default function TopBar({
   onAccountChange,
   showAccountSwitcher = true,
   roleLabel,
+  accountScopeLabel,
   onRoleClick,
   userName,
   onLogout,
@@ -279,11 +281,7 @@ export default function TopBar({
             */}
             {roleLabel ? (
               <span className={styles.pillText}>
-                {/*
-                  札の中の小さい字は「LINEアカウント」で固定（絵の指示）。
-                  の行なので v7 の札は変わらない。
-                */}
-                <span className={`${styles.pillRole}`}>{hq ? '統括' : 'LINEアカウント'}</span>
+                <span className={`${styles.pillRole}`}>{accountScopeLabel ?? (hq ? '統括' : 'LINEアカウント')}</span>
                 {/* ★V8 統括の画面：札は統括にいることを示す（絵 `V8-B/JKjsE`）。v7 は今までどおり。 */}
                 {hq ? (
                   <>

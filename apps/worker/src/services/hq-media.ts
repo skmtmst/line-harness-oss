@@ -133,3 +133,29 @@ export async function resolveHqAudio(db: D1Database, tenantId: string, accountId
   }
   return { originalContentUrl: url, duration: media.durationMs! / 1000 };
 }
+
+/** Registered tenant-owned HQ uploads. Pending and unrelated account media are never candidates. */
+export async function listHqRegisteredMedia(db:D1Database,bucket:R2Bucket,authority:HqTemplateAuthority,input:{kind?:string;cursor?:string;limit?:string}) {
+  const prefix=`${scope(authority)}uploads/`;
+  if(input.kind!==undefined&&!['video','audio','image'].includes(input.kind))fail('INVALID_MEDIA');
+  if(input.limit!==undefined&&(!/^\d+$/.test(input.limit)||Number(input.limit)<1||Number(input.limit)>100))fail('INVALID_LIMIT',400);
+  if(input.cursor!==undefined&&(!input.cursor||input.cursor.length>2048))fail('INVALID_CURSOR',400);
+  const page=await bucket.list({prefix,limit:Number(input.limit??30),...(input.cursor?{cursor:input.cursor}:{})});
+  const items=[];
+  for(const listed of page.objects) {
+    if(!listed.key.startsWith(prefix))continue;
+    const object=await bucket.head(listed.key);
+    if(!object)continue;
+    let media:MessageTemplateMediaDefinition;
+    try {media=JSON.parse(object.customMetadata?.hqMedia??'null');}catch{continue;}
+    if(!media!||media.r2Key!==object.key||!object.key.startsWith(prefix)||!isRegisteredHqMedia(object,media,authority.tenantId)||input.kind&&media.kind!==input.kind)continue;
+    if(!['image','video','audio'].includes(media.kind))continue;
+    let selectable=true;
+    if(media.kind!=='image') {
+      try {await hqMediaGate(db,bucket,object.key);}
+      catch(error) {if(error instanceof HqTemplateError&&error.code==='MEDIA_SCAN_PENDING')selectable=false;else throw error;}
+    }
+    items.push({...media,selectable,sizeKb:media.sizeBytes/1024});
+  }
+  return {items,nextCursor:page.truncated?page.cursor:null};
+}

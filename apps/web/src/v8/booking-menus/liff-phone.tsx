@@ -1,6 +1,8 @@
 'use client'
 
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
+import { CircleCheck, Users } from 'lucide-react'
 
 /**
  * 予約設定の右欄に出す「お客さまの予約画面」の写し（★V8 `owaS3` 右のスマホ）。
@@ -174,13 +176,13 @@ export function LiffPhoneStaffStep({
         {designationFree && (
           <div className={`${styles.phoneCard} ${styles.phoneCardPicked}`}>
             <span className={`${styles.phoneAvatar} ${styles.phoneAvatarPlain}`} aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="10" cy="7" r="3.2"/><path d="M4 16.5c1.2-3 3.4-4.5 6-4.5s4.8 1.5 6 4.5"/></svg>
+              <Users size={20} aria-hidden="true" />
             </span>
             <span className={styles.phoneCardBody}>
               <span className={styles.phoneCardName}>指名なし</span>
               <span className={styles.phoneCardDesc}>いちばん早く空いている人</span>
             </span>
-            <svg className={styles.phoneCardCheck} width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M5.5 10.4 8.7 13.6 14.5 6.8" fill="none" stroke="var(--color-canvas)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <CircleCheck className={styles.phoneCardCheck} size={20} aria-hidden="true" />
           </div>
         )}
         {shown.length === 0 && !designationFree ? (
@@ -201,7 +203,6 @@ export function LiffPhoneStaffStep({
         <span className={`${styles.phoneCta} ${shown.length === 0 && !designationFree ? styles.phoneCtaOff : ''}`}>
           日時を選ぶ
         </span>
-        <span className={styles.phoneBack}>← メニューを選び直す</span>
       </div>
     </PhoneChrome>
   )
@@ -255,7 +256,7 @@ export function LiffPhoneDatetimeStep({
           <span className={`${styles.phoneViewItem} ${view === 'calendar' ? styles.phoneViewItemNow : ''}`}>カレンダー</span>
         </div>
         <div className={styles.phoneDays}>
-          <span className={styles.phoneDayNav} aria-hidden="true">‹</span>
+          <ChevronLeft className={styles.phoneDayNav} aria-hidden="true" />
           {days.map((date) => {
             const d = new Date(`${date}T00:00:00Z`)
             const hasSlots = (byDate.get(date)?.length ?? 0) > 0
@@ -265,7 +266,7 @@ export function LiffPhoneDatetimeStep({
             return (
               <span
                 key={date}
-                className={`${styles.phoneDay} ${isNow ? styles.phoneDayNow : ''} ${!hasSlots ? styles.phoneDayOff : ''}`}
+                className={`${styles.phoneDay} ${isNow ? styles.phoneDayNow : ''} ${isClosed ? styles.phoneDayOff : !hasSlots ? styles.phoneDayFull : ''}`}
               >
                 <span className={styles.phoneDayDow}>{WEEKDAY_JP[d.getUTCDay()]}</span>
                 <span className={styles.phoneDayNum}>{d.getUTCDate()}</span>
@@ -273,7 +274,7 @@ export function LiffPhoneDatetimeStep({
               </span>
             )
           })}
-          <span className={styles.phoneDayNav} aria-hidden="true">›</span>
+          <ChevronRight className={styles.phoneDayNav} aria-hidden="true" />
         </div>
         {selected && (
           <p className={styles.phoneSectionLabel}>{formatJpDay(selected)}の空き</p>

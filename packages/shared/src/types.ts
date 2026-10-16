@@ -1,3 +1,10 @@
+import type { TagCsvImportRowCode } from './tag-import-row-code.js';
+export type { TagCsvImportRowCode } from './tag-import-row-code.js';
+import type { Tag } from './tag-types.js';
+export type { Tag } from './tag-types.js';
+import type { BroadcastBubble } from './broadcast-definition.js';
+import { type AdConversionRetryResult } from './advertising-retry-types.js'
+export { type AdConversionRetryResult } from './advertising-retry-types.js'
 import type { ApiFieldErrors } from './api-field-errors.js';
 
 // =============================================================================
@@ -77,67 +84,6 @@ export interface FriendChatStatus {
   handled: boolean;
 }
 
-// -----------------------------------------------------------------------------
-// タグ (Tag)
-// -----------------------------------------------------------------------------
-export interface Tag {
-  /** 主キー (UUIDv4) */
-  id: string;
-  /** タグ名 */
-  name: string;
-  /** 表示色 (HEX: #RRGGBB) */
-  color: string;
-  /** 所属する親分類のID。null は未分類 */
-  groupId?: string | null;
-  /** このタグを初めて獲得したときに付与するマイル */
-  mileageReward?: number;
-  /** 紹介された友だちがこのタグを獲得したとき、紹介者へ付与するマイル */
-  referralMileageReward?: number;
-  /** 今後の行動マイル倍率。10000 = 1.0倍、null = 倍率タグとして使わない */
-  mileageMultiplierBps?: number | null;
-  /** 複数の倍率タグがある場合の優先順位（大きい値を採用） */
-  mileageMultiplierPriority?: number;
-  /** 友だち一覧の「★つきタグ」列に出すか */
-  isStarred?: boolean;
-  /** 一覧での並び順。小さいほど上 */
-  displayOrder?: number;
-  /** 作成日時 (ISO 8601) */
-  createdAt: string;
-  /** 選択中のLINE公式アカウント。V6の定義詳細で返る。 */
-  lineAccountId?: string | null;
-  description?: string | null;
-  manualAssignmentAllowed?: boolean;
-  reapplyPolicy?: "first_only" | "every_time";
-  linkedEnabled?: boolean;
-  status?: "active" | "archived";
-  /** 楽観ロックに使う定義版。 */
-  version?: number;
-  updatedAt?: string;
-  /** このタグが付与されている友だち数 (GET /api/tags のみ付与) */
-  friendCount?: number;
-  /** 自動付与のきっかけ。履歴から断定できない場合は省略する。 */
-  assignSource?: "ec" | "line_login" | "form" | "ec_purchase" | "manual" | "birthday";
-  /** このタグを参照している機能と件数。0件の機能は省略する。 */
-  usedIn?: {
-    broadcasts?: number;
-    forms?: number;
-    scenarios?: number;
-    autoReplies?: number;
-    savedSearches?: number;
-  };
-  /** このタグが付いた後に動く、マイル以外のアクション数。0件なら省略する。 */
-  otherActionCount?: number;
-  /** タグ編集画面で再表示する、保存済みの連動アクション。 */
-  linkedActions?: Array<{
-    id: string;
-    type: string;
-    label: string;
-    timing: string;
-  }>;
-  /** タグ管理の整理候補に入る理由。withCounts=1 のときだけ返る。 */
-  cleanupReasons?: Array<"unused" | "duplicate_name">;
-}
-
 /** CSV一括登録で画面からAPIへ渡す1行。lineは見出しを含む元CSVの行番号。 */
 export interface TagCsvImportInputRow {
   line?: number;
@@ -151,17 +97,6 @@ export type TagCsvImportRowStatus =
   | "skipped"
   | "invalid"
   | "failed";
-
-export type TagCsvImportRowCode =
-  | "name_required"
-  | "name_too_long"
-  | "invalid_character"
-  | "already_exists"
-  | "duplicate_in_file"
-  | "folder_not_found"
-  | "folder_ambiguous"
-  | "folder_changed"
-  | "create_failed";
 
 /** 事前確認・実行結果で共通して返す1行。失敗行CSVを画面で作れる情報を残す。 */
 export interface TagCsvImportRowResult {
@@ -301,6 +236,7 @@ export interface Folder {
 /** 対応マーク */
 export interface SupportMark {
   archivedAt?: string | null;
+  displayLocations?: import('./support-mark-display.js').SupportMarkLocation[];
   id: string;
   name: string;
   color: string;
@@ -893,6 +829,8 @@ export interface ScenarioStep {
   messageType: MessageType;
   /** メッセージ内容 (テキスト or JSONシリアライズ済みFlexメッセージ等) */
   messageContent: string;
+  /** 来店フォローの複数吹き出し。保存は専用の版付きAPIを使う。 */
+  messageBubbles?: BroadcastBubble[] | null;
   /**
    * 1通ごとの配信対象 (124)。SegmentCondition。null は「購読中の全員に配信する」。
    *
@@ -2840,6 +2778,7 @@ export interface OutgoingWebhookVersionConflict {
   updatedAt: string;
 }
 export interface FormSubmissionPage {
+  period?: { from?: string; until?: string };
   items: FormSubmissionDetail[];
   total: number;
   page: number;
@@ -2853,16 +2792,6 @@ export interface FormSubmissionPage {
     dateFields: Array<{ key: string; label: string; answered: number; uniqueFriends: number; minDate: string | null; maxDate: string | null }>;
     ratingFields: Array<{ key: string; label: string; answered: number; average: number | null }>;
   };
-}
-
-/** F-22: 同じ出来事の目印を維持した広告送信のやり直し結果。 */
-export interface AdConversionRetryResult {
-  logId: string;
-  outboxId: string;
-  providerEventId: string;
-  status: 'sent' | 'failed' | 'pending';
-  /** 送信済みの結果を返した場合はtrue。 */
-  replayed: boolean;
 }
 
 export type HqBannerFolderKind = 'project' | 'image';

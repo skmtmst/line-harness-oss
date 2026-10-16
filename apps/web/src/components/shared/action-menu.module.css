@@ -79,14 +79,20 @@
   white-space: nowrap;
 }
 
+/* 押せない理由は省略せず全文を折り返して読ませる（窓の幅 320 まで・vKDj5）。行は理由の分だけ高くなる。 */
 .reason {
-  overflow: hidden;
   color: var(--color-ink-faint);
   font-size: var(--text-nano);
   font-weight: 400;
   line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.itemTall:has(.reason) {
+  height: auto;
+  min-height: 52px;
+  padding-block: 8px;
 }
 
 .item:hover:not(:disabled),

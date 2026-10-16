@@ -16,6 +16,7 @@ export default function Disclosure({
   hint,
   defaultOpen = false,
   size = 'standard',
+  appearance = 'card',
   className,
   id,
   onToggle,
@@ -26,6 +27,7 @@ export default function Disclosure({
   hint?: ReactNode
   defaultOpen?: boolean
   size?: 'standard' | 'compact'
+  appearance?: 'card' | 'inset'
   className?: string
   id?: string
   /** 開いたときにだけ必要な詳細を読み込むための口。 */
@@ -35,6 +37,7 @@ export default function Disclosure({
   return (
     <details
       id={id}
+      data-appearance={appearance}
       onToggle={onToggle ? (event) => onToggle(event.currentTarget.open) : undefined}
       open={defaultOpen || undefined}
       className={[styles.root, size === 'compact' ? styles.compact : '', className].filter(Boolean).join(' ')}

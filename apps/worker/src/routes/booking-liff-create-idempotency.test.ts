@@ -196,12 +196,33 @@ describe('B-308/B-316 LIFFの券と本人が選ぶ支払い',()=>{
    expect(pay.status).toBe(409);
   }
  });
- it('本人が選ぶ設定では選択必須。不正な選択・別の固定方式への変更は拒否',async()=>{
-  choice();expect((await create('missing')).status).toBe(400);
+ it('不正な選択・別の固定方式への変更は拒否',async()=>{
+  choice();
   expect((await create('bad',{payment_method:'none'})).status).toBe(400);
   sql.raw.exec("UPDATE booking_payment_configs SET mode='online'");
   expect((await create('wrong',{payment_method:'onsite'})).status).toBe(400);
   expect(count('bookings')).toBe(0);
+ });
+ it.each(['none','onsite','online','customer_choice'] as const)('644適用後、選択欄のないLIFFは店の%s設定で予約でき、再送でも写しを保つ',async mode=>{
+  expect(sql.raw.prepare("SELECT sql FROM sqlite_master WHERE name='booking_payment_configs'").get()).toMatchObject({sql:expect.stringContaining('customer_choice')});
+  sql.raw.prepare(`INSERT INTO booking_payment_configs VALUES('w1-account',?,?,10,'2026-10-01','2026-10-01')`).run(mode,mode==='customer_choice'||mode==='online'?'stripe':mode);
+  sql.raw.exec(`INSERT INTO booking_payment_menu_settings VALUES('w1-menu','w1-account','customer_choice','stripe','2026-10-01','2026-10-01');
+    UPDATE booking_settings SET approval_mode='automatic'`);
+  const response=await create('legacy-choice');expect(response.status).toBe(201);
+  const data=await response.json<{booking_id:string;payment_required:boolean;status:string}>();
+  const online=mode==='online'||mode==='customer_choice';
+  expect(data).toMatchObject({payment_required:online,status:online?'requested':'confirmed'});
+  const saved=sql.raw.prepare('SELECT mode FROM booking_payment_choices').get();
+  expect(saved).toEqual(mode==='none'?undefined:{mode:online?'online':'onsite'});
+  expect(sql.raw.prepare('SELECT count(*) n FROM booking_payments').get()).toEqual({n:online?1:0});
+  sql.raw.exec("UPDATE booking_payment_configs SET mode='onsite'; UPDATE booking_payment_menu_settings SET mode='online'");
+  const replay=await create('legacy-choice');expect(replay.status).toBe(201);expect(await replay.json()).toMatchObject({booking_id:data.booking_id,payment_required:online});
+  expect(count('bookings')).toBe(1);
+ });
+ it('メニュー上書きなし・店が本人選択でも選択欄なしなら店の決済先を使う',async()=>{
+  choice();const response=await create('store-choice');expect(response.status).toBe(201);
+  expect(await response.json()).toMatchObject({payment_required:true,status:'requested'});
+  expect(sql.raw.prepare('SELECT mode,provider FROM booking_payment_choices').get()).toEqual({mode:'online',provider:'stripe'});
  });
  async function grant(){return grantEntitlement(db,'w1-account','operator','manual:test',{
   friendId:'w1-friend',kind:'ticket',name:'2回券',remaining:2,validFrom:'2026-01-01T00:00:00Z',expiresAt:'2027-01-01T00:00:00Z',reason:'現金販売',

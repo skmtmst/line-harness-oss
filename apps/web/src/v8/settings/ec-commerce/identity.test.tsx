@@ -16,7 +16,8 @@ vi.mock('@/lib/staff-role', async (importOriginal) => ({
   canManageRole: (role: string) => role === 'owner',
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/ec-commerce/identity-candidates', useRouter: () => ({ push: vi.fn() }) }))
+const routerPush = vi.hoisted(() => vi.fn())
+vi.mock('next/navigation', () => ({ usePathname: () => '/ec-commerce/identity-candidates', useRouter: () => ({ push: routerPush }) }))
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api')
@@ -39,16 +40,24 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
-it('候補の行は「候補を見る」「決める」、候補なしの行は「友だちを探す」', async () => {
+it('候補の行は「…」の中に「候補を見る」「決める」、候補なしの行は「友だちを探す」（行の右端は「…」1つ・B-253）', async () => {
   render(<EcIdentityCandidatesScreen />)
   const table = await screen.findByRole('table', { name: '会員のつき合わせの候補' })
+  expect(within(table).getByRole('columnheader', { name: '操作' })).toBeTruthy()
   const rows = within(table).getAllByRole('row')
-  fireEvent.click(within(rows[1]).getByRole('button', { name: '候補を見る' }))
+  expect(within(rows[1]).getByRole('button', { name: /の候補の操作/ }).getAttribute('data-qa-open')).toBe('ELayY')
+  // 行の右端にボタンを並べない。
+  expect(within(rows[1]).queryByRole('button', { name: '候補を見る' })).toBeNull()
+  fireEvent.click(within(rows[1]).getByRole('button', { name: /の候補の操作/ }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '候補を見る' }))
   expect(fixture.select).toHaveBeenCalledWith('c-1')
-  fireEvent.click(within(rows[1]).getByRole('button', { name: '決める' }))
+  fireEvent.click(within(rows[1]).getByRole('button', { name: /の候補の操作/ }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '決める' }))
   expect(fixture.openDialog).toHaveBeenCalledWith('c-1')
-  expect(within(rows[2]).getByRole('link', { name: '友だちを探す' }).getAttribute('href')).toBe('/friends?q=%E4%B8%AD%E6%9D%91%20%E5%BD%A9')
-  expect(within(rows[2]).queryByRole('button', { name: '決める' })).toBeNull()
+  fireEvent.click(within(rows[2]).getByRole('button', { name: /の候補の操作/ }))
+  expect(screen.queryByRole('menuitem', { name: '決める' })).toBeNull()
+  fireEvent.click(await screen.findByRole('menuitem', { name: '友だちを探す' }))
+  expect(routerPush).toHaveBeenCalledWith('/friends?q=%E4%B8%AD%E6%9D%91%20%E5%BD%A9')
   await waitFor(() => expect(within(rows[1]).getByText(/EC-10422・注文 3/)).toBeTruthy())
 })
 
@@ -65,6 +74,7 @@ it('閲覧のみでは候補は確認でき、決める操作は隠す', async (
   fixture.role = 'staff'
   render(<EcIdentityCandidatesScreen />)
   const table = await screen.findByRole('table', { name: '会員のつき合わせの候補' })
-  expect(within(table).getByRole('button', { name: '候補を見る' })).toBeTruthy()
-  expect(within(table).queryByRole('button', { name: '決める' })).toBeNull()
+  fireEvent.click(within(table).getAllByRole('button', { name: /の候補の操作/ })[0])
+  expect(await screen.findByRole('menuitem', { name: '候補を見る' })).toBeTruthy()
+  expect(screen.queryByRole('menuitem', { name: '決める' })).toBeNull()
 })

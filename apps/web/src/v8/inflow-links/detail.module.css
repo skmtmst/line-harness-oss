@@ -56,7 +56,7 @@
 .searchBox :global(*) { max-width: 100%; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--tpl-toolbar-gap); }
 .toolsSpacer { flex: 1 1 0; }
-.periodBox { width: var(--tpl-wh-small-select-w); }
+.periodBox { flex: none; }
 .sizeBox { width: var(--tpl-ar-run-size-w); }
 .sizeBox :global(*) { max-width: 100%; }
 .sizeBox :global(button) { width: 100%; }

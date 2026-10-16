@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { Check, Send } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
 import Button from '@/components/shared/button'
 import DateTimeField from '@/components/shared/date-time-field'
 import { TextField } from '@/components/shared/text-field'
@@ -165,8 +166,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
 
   const side = (
     <div className={styles.side}>
-      <section className={`${styles.sideCard} ${styles.impactCard}`} aria-labelledby="ev-cr-impact" aria-live="polite">
-        <h2 className={styles.sideTitle} id="ev-cr-impact">影響の確認</h2>
+      <div aria-live="polite"><CreateSummaryCard title="影響の確認" rows={[]}>
         {preview ? (
           <>
             <div className={preview.blocked ? styles.bandDanger : styles.band}>
@@ -195,15 +195,14 @@ function ChangeReview({ eventId }: { eventId: string }) {
             {previewBusy ? '影響を確かめています…' : previewError || '左で日時・定員・受付を変えると、ここに誰への影響が出ます。'}
           </p>
         )}
-      </section>
-      <section className={styles.sideCard} aria-labelledby="ev-cr-promise">
-        <h2 className={styles.sideTitle} id="ev-cr-promise">日時・会場を変えるときの約束</h2>
+      </CreateSummaryCard></div>
+      <CreateSummaryCard title="日時・会場を変えるときの約束" rows={[]}>
         <p className={styles.promise}>
           ・変えた内容は記録に残ります（消すことはできません）<br />
           ・定員を、すでに申し込まれている人数より下げることはできません<br />
           ・日時・会場が動いた回の確定した申込へは、LINE で新旧をお知らせします
         </p>
-      </section>
+      </CreateSummaryCard>
     </div>
   )
 
@@ -213,6 +212,8 @@ function ChangeReview({ eventId }: { eventId: string }) {
       title={`変更の確認：${event.name}`}
       help={description}
       preview={side}
+      previewLabel="影響の確認を見る"
+      previewTitle="影響の確認"
       footerActions={(
         <>
           <Button href={`/events/edit?id=${encodeURIComponent(eventId)}`}>キャンセル</Button>

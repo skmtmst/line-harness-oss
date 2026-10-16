@@ -8,13 +8,11 @@ const b244Requirements = {
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { SaveConflictBand } from '@/components/shared/save-conflict';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { useSearchParams } from 'next/navigation';
 import { ArrowRight, Ban, Braces, CircleAlert, CircleCheck, FileText, IdCard, ListChecks, Pencil, Plus, Power, Route, User, UserPlus, UserRound, Workflow } from 'lucide-react';
-import Link from '@/components/shared/list-navigation'
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -41,16 +39,16 @@ import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } fr
 import FriendPickerField from '@/components/shared/friend-picker-field';
 import SegmentedControl from '@/components/shared/segmented'
 import { TextArea, TextField } from '@/components/shared/text-field';
+import SearchField from '@/components/shared/search-field'
 import ListToolbar from '@/components/shared/list-toolbar'
+import { EntityPickerSummary } from '@/components/shared/entity-picker'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field';
 import { SettingCheckbox } from '@/components/shared/checkbox';
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
 import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import type { SegmentCondition } from '@/lib/segment-condition';
-import { pruneCondition } from '@/lib/segment-condition';
-import { ApiError, api, describeSaveFailure } from '@/lib/api';
-import type { FriendAddRule, FriendAddRuleAction, FriendAddRuleDefinition, FriendAddRuleKind, FriendAddRuleOptions, FriendAddRuleStatus } from '@/lib/api';
+import { type SegmentCondition, pruneCondition } from '@/lib/segment-condition'
+import { ApiError, api, describeSaveFailure, type FriendAddRule, type FriendAddRuleAction, type FriendAddRuleDefinition, type FriendAddRuleKind, type FriendAddRuleOptions, type FriendAddRuleStatus } from '@/lib/api'
 import { formatNumber } from '@/lib/format';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
@@ -702,7 +700,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       /* 先に保存されたとき（h5rm8t）：板の頭の下に、入力欄と右の列にまたがる帯（型の notice の置き場）。
          帯は共通部品（save-conflict）。比べる窓は項目を左右に並べるこの画面のものを使う。 */
       notice={conflict ? (
-        <SaveConflictBand
+        <SaveConflictBand reloadVariant="primary"
           title={`ほかの人が先に初回案内「${rule.name}」を保存しました`}
           designNode="h5rm8t"
           compareBusy={compareBusy}
@@ -977,6 +975,8 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
   const raw = definition.friendCondition ?? ''
   const parsed = parseFriendConditionJson(raw)
   const legacy = raw.trim() !== '' && parsed === null
+  const conditionLine = conditionSummary(parsed, options.tags)
+  const conditionName = parsed && parsed.rules.length + (parsed.groups?.length ?? 0) > 0 ? conditionLine.replace(/^友だち条件：/, '') : ''
   const conditions = (<>
       <p className={styles.subDesc}>空のままなら、選んだリンクから来た全員に送ります。</p>
       <div className={styles.datePair}>
@@ -997,23 +997,23 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
         <Notice tone="warn" role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</Notice>
       ) : null}
       <div className={styles.conditionRow}>
+        {canEdit ? <Button type="button" onClick={() => setConditionOpen(true)}>条件を足す</Button> : null}
+        {/* 選んだ後の欄（B-175）：欄全体を押すと条件の組み立てを開閉する。右に「変える ›」。 */}
         {canEdit ? (
-          <button
-            type="button"
-            className={styles.conditionSummary}
-            aria-expanded={conditionOpen}
-            onClick={() => setConditionOpen((open) => !open)}
-          >
-            <span className={styles.conditionText}>{conditionSummary(parsed, options.tags)}</span>
-            <span aria-hidden="true" className={styles.conditionChevron}>⌄</span>
-          </button>
+          <div className={styles.conditionField}>
+            <EntityPickerSummary
+              label="友だち条件"
+              noun="友だち条件"
+              name={conditionName}
+              placeholder={conditionLine}
+              compact
+              onOpen={() => setConditionOpen((open) => !open)}
+            />
+          </div>
         ) : (
           // 閲覧のみ：条件を開いて変える部品は置かず、条件の中身を文字で見せる。
-          <span className={styles.conditionSummary}>
-            <span className={styles.conditionText}>{conditionSummary(parsed, options.tags)}</span>
-          </span>
+          <span className={styles.conditionReadOnly}>{conditionLine}</span>
         )}
-        {canEdit ? <Button type="button" onClick={() => setConditionOpen(true)}>条件を足す</Button> : null}
       </div>
       {canEdit && conditionOpen ? (
         <ConditionBuilder
@@ -1031,12 +1031,13 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
     <>
       <Card variant="form" gap="normal" className={styles.card} aria-label="どの流入リンクから来た人に送るか" data-friend-add-routes>
         <CardHeader size="stacked" title={<>どの流入リンクから来た人に送るか</>} meta={<>選んだリンクの URL・QR（どちらも同じ入口）から追加された人に動きます</>} />
-        <ListToolbar search={{
-          value: query,
-          placeholder: '流入リンクの名前で探す',
-          label: '流入リンクの名前で探す',
-          onChange: setQuery,
-        }} />
+        <ListToolbar searchSlot={<SearchField
+          value={query}
+          placeholder="流入リンクの名前で探す"
+          aria-label="流入リンクの名前で探す"
+          onChange={setQuery}
+          onClear={() => setQuery('')}
+        />} />
         {/* 閲覧のみ：選ぶチェックは置かず、選んでいるリンクの名前だけを並べる。 */}
         {(canEdit ? visibleRoutes : visibleRoutes.filter((route) => definition.routeIds.includes(route.id))).map((route) => {
           const checked = definition.routeIds.includes(route.id)

@@ -85,12 +85,14 @@ describe('期間の解釈', () => {
     expect(periodDays('today')).toBe(1);
     expect(periodDays('last7')).toBe(7);
     expect(periodDays('last28')).toBe(28);
+    expect(periodDays('last30')).toBe(30);
   });
 
   test('期間の始まりは、その日数ぶん遡った日', () => {
     expect(periodStart('today')).toBe(jstDate(0));
     expect(periodStart('last7')).toBe(jstDate(-6));
     expect(periodStart('last28')).toBe(jstDate(-27));
+    expect(periodStart('last30')).toBe(jstDate(-29));
   });
 });
 
@@ -156,6 +158,19 @@ describe('友だちの内訳', () => {
   });
 });
 
+describe('30日の集計境界', () => {
+  test('29日前を含み、30日前を含めない。旧28日とは結果が異なる', async () => {
+    insertFriend('included', { createdAt: `${jstDate(-29)}T12:00:00.000+09:00` });
+    insertFriend('excluded', { createdAt: `${jstDate(-30)}T12:00:00.000+09:00` });
+    const thirty = await getDashboardOverview(db, 'last30', { allTenants: true });
+    const legacy = await getDashboardOverview(db, 'last28', { allTenants: true });
+    expect(thirty.period).toBe('last30');
+    expect(thirty.sections.conversions.period).toBe('last30');
+    expect(thirty.operations.inflowTop.reduce((sum, row) => sum + row.count, 0)).toBe(1);
+    expect(legacy.operations.inflowTop).toEqual([]);
+  });
+});
+
 describe('友だち数の推移', () => {
   test('日次記録があればそれを使い、推定にしない', async () => {
     insertFriend('a');
@@ -170,7 +185,7 @@ describe('友だち数の推移', () => {
   test('上の期間切り替えに関わらず、いつも7日ぶん出る', async () => {
     // 推移は「直近どう動いたか」を見るもので、上の切り替えは KPI の集計期間。
     // 連動させていた頃は「今日」を選ぶと1行だけになり、増減が読めなかった。
-    for (const period of ['today', 'last7', 'last28'] as const) {
+    for (const period of ['today', 'last7', 'last28', 'last30'] as const) {
       const { trend } = await getDashboardOverview(db, period, { allTenants: true });
       expect(trend).toHaveLength(7);
       expect(trend[trend.length - 1].date).toBe(jstDate(0));
@@ -610,7 +625,7 @@ describe('今月の配信(#666 N-003)', () => {
   test('期間を切り替えても「今月の配信」の範囲は変わらず、区画の期間表示は this-month', async () => {
     const { countedBroadcasts } = seedDelivery();
     const scope = { allowedAccountIds: ['account-a'], includeUnassigned: false } as const;
-    for (const period of ['today', 'last7', 'last28'] as const) {
+    for (const period of ['today', 'last7', 'last28', 'last30'] as const) {
       const overview = await getDashboardOverview(db, period, scope);
       expect(overview.delivery.sent).toBe(3);
       expect(overview.delivery.broadcasts).toBe(countedBroadcasts.length);

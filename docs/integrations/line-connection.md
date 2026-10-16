@@ -390,6 +390,115 @@ PR #1738 の必須CI「Repository and shared checks」が `apps/web/scripts/v8-g
 - `pnpm --filter worker typecheck` / `pnpm --filter web typecheck` … 合格
 - **実APIでの検証・staging配備・所要時間の実測は未実施。** コミットもしていない。
 
+### マージとstaging配備は完了・実測はHTTP 401で止まった（2026-10-16／Codex報告とClaudeの原因特定）
+
+- PR #1738 は**マージ済み**（`5ace6976dc Merge pull request #1738 from skmtmst/skmtmst/LINE追加画面のアップデート`）。**staging配備も完了**し、公開ヘルスのSHAが一致。**本番は未配備**（今回の対象外）。
+- 受入条件1〜5はマージ済みHEADでCodexが再検証して合格。
+- **受入条件6（実APIでの所要時間の実測）は未達。** 止まった原因はHTTP 401が2種類あり、以下のとおりClaudeが根拠を特定した。
+
+#### 401その1：検証用LINEアカウント3件のトークン期限切れ（→ 本人のログイン不要）
+
+- トークンの再発行は `issueLineAccessToken`（`apps/worker/src/services/token-refresh.ts:65-106`）で、LINEの `POST https://api.line.me/v2/oauth/accessToken` を `grant_type=client_credentials` で叩くだけ。**必要なのは `channel_id` と `channel_secret` の2つだけで、LINE Developers のログインもMFAも要らない**（同ファイル先頭のコメント「No refresh_token needed」）。
+- その2つはstagingのD1に保管済み（`packages/db/src/line-accounts.ts:31` `channel_secret`、`:33` `channel_secret_encrypted`）。
+- **期限切れになった理由が特定できた。** 再発行を呼ぶのは `apps/worker/src/index.ts:2201` の `refreshLineAccessTokens(env.DB)` **だけ**で、これはcronの中にある。stagingは `apps/worker/wrangler.staging.toml:5` のとおり意図的に `[triggers]` を持たないため、**この更新は一度も走っていない**。3件そろって切れていたのは偶然ではなく仕様どおりの結果。
+- → 直し方は、stagingの3件について `channel_id` + `channel_secret` からトークンを再発行してD1へ書き戻すだけ。**遠隔環境の操作なのでCodex担当**（Claudeはローカルまで）。`[triggers]` の追加はしない。
+
+#### 401その2：stagingの管理API（→ MFAの設定値を先に読む必要がある）
+
+- `apps/worker/src/index.ts:539` の `authMiddleware` が全APIに掛かり、Bearerは `authenticateApiToken`（`apps/worker/src/middleware/auth.ts:653-695`）で判定される。
+- `env.API_KEY` はownerとして通る口があるが（`auth.ts:677-680`）、**`TOTP_ENCRYPTION_KEY` が設定済みで、かつ platform設定 `auth.mfa.required:<統括ID>` が `'false'` 以外のとき `null` を返して弾く**（`auth.ts:678`）。DB登録のAPIキーも同じ条件で弾かれる（`auth.ts:669-672`）。
+- つまりstagingの401は「鍵が間違っている」ではなく、**MFA必須の設定が入っているとAPIキーでは入れない**という作りの結果である可能性が高い。`admin-auth.ts` 側の401もすべて期限切れ・2要素・`STEP_UP_UNAUTHORIZED` の系統で、本物のLINEログイン＋TOTPを求めている。
+- → 本人のログインを頼む前に、stagingの `TOTP_ENCRYPTION_KEY` の有無と `auth.mfa.required:<統括ID>` の実際の値を読んで確かめる。`'false'` ならAPIキーで通るので本人の操作は不要。必須が入っていた場合だけ、本人のログインか、staging限定で必須を外す許可のどちらにするかを利用者へ1回だけ確認する。
+
+#### 利用者の質問への答えは管理画面を通さなくても測れる
+
+所要時間を決めているのはほぼLINE API側の往復（`/v2/bot/followers/ids` のページ送りと、1人ずつの `/v2/bot/profile/{userId}`）。実装の並列数は `PROFILE_CONCURRENCY = 12`（`follower-import-pages.ts:30`）。再発行したトークンで同じ2つの口を同じ並列数で叩けば、管理画面の認証を通さずに**実測と10,000人換算が出せる**。管理画面経由の「入る」で続きから始まることの確認は、401その2が解けてから行う。
+
+#### staging再検証（2026-10-16 03:35 JST、Codex）
+
+- 対象は既存のstaging検証用3件のみ。D1を読み、3件とも `channel_id` と `channel_secret` が存在し、既存トークンの保存済み期限は2026-10-03（JST）だった。資格情報の値は表示・保存しない。
+- LINE公式資料 [Issue channel access token](https://developers.line.biz/en/reference/messaging-api/#issue-channel-access-token)、[Get a list of users who added your LINE Official Account as a friend](https://developers.line.biz/en/reference/messaging-api/#get-follower-ids)、[Get profile](https://developers.line.biz/en/reference/messaging-api/#get-profile) と [Getting user IDs](https://developers.line.biz/en/docs/messaging-api/getting-user-ids/) を2026-10-16に確認。発行は `client_credentials`、ID一覧は認証済み・プレミアムの公式アカウントのみ利用可。必要な利用条件の事前確認が不足していた。
+- 3件ともLINEの `POST /v2/oauth/accessToken` は **HTTP 200**、有効期間2,592,000秒（30日）で新トークンを発行。ただし、その新トークンで `GET /v2/bot/followers/ids?limit=1000` を実行すると**3件ともHTTP 403**。発生時刻2026-10-16 03:35 JST、request ID（対象ID順）`c7d338ce-03d7-4d83-bc13-4a1a6473cd11`、`5ed894f0-c237-4a2d-a885-c968c5cac86d`、`2c944c0a-fbbe-4c8a-bc03-89f2e1d95d27`。期待値はID一覧HTTP 200、実際は403。種別の制限が有力だが、対象アカウントの認証区分そのものは未確認で、原因確定ではない。取得できたIDは0件、プロフィールへの要求は0件。**友だち総数・経過時間・10,000人換算の実測は出せない。**
+- staging Worker secret `TOTP_ENCRYPTION_KEY` は**設定あり**（値は読み出していない）。統括テナント `00000000-0000-4000-8000-000000000001` のplatform設定 `auth.mfa.required:<統括テナントID>` は**行がなく未設定**。`apps/worker/src/middleware/auth.ts:678` では未設定も `'false'` 以外なので、APIキーでの管理API認証は拒否される。MFA設定は変更せず、今回の条件に従いstep・「入る」・画面離脱の操作も実施しない。
+- 発行した新トークンはメモリ内でLINEへの読取要求にのみ使い、**D1へは書き戻していない**。作業ツリーにClaude所有の未コミット台帳変更があり、AGENTS.mdの「DB更新前は完全にクリーン」規則に抵触するため。3件の保存済み期限は変わっていない。cron無効、本番・PR・配備には変更なし。次は台帳差分を所有者が整理してクリーンにし、LINE側でID一覧が使える検証用アカウントを確保・確認した上で、staging限定のトークン更新と実測をやり直す。管理API経由の確認にはClaude窓口で正規MFAセッションまたはstagingの設定方針の判断が必要。
+
+#### 403の原因確定と、401その2の確認結果（2026-10-16／Claude）
+
+Codexの再検証で401の原因は2つとも判明したが、stagingの設定と保存済みトークンはまだ変更していない。新トークンを使った一時的な読取では**403が出た**。原因を次のとおり整理した。
+
+**403はLINE側のアカウント種別制限で、実装の不具合ではない。**
+
+- `GET /v2/bot/followers/ids` は**認証済みアカウントまたはプレミアムアカウントだけ**が使える。通常（未認証）の公式アカウントでは使えず、その場合は友だち追加のWebhookで1人ずつ受け取る以外に方法がない（[LINE公式「ユーザーIDを取得する」](https://developers.line.biz/ja/docs/messaging-api/getting-user-ids/)、[Get follower ids](https://developers.line.biz/en/reference/messaging-api/#get-follower-ids)）。stagingの検証用3件はこの条件を満たしていないため、**トークンが正しくても403になる**。Codexが記録した3件そろっての403・request ID付きの結果とも一致する。
+- **実装はこの403を正しく扱っている。** `detectFollowerImportCapability`（`apps/worker/src/services/follower-import-state.ts:128-151`）が1件だけの読み取りで利用可否を調べ、403なら `capability = 'unavailable'` にして**エラー扱いにしない**（`:140-142`）。開始側も `capability !== 'available'` なら `FOLLOWER_IMPORT_NOT_AVAILABLE` で止める（`:159-161`）ので、使えないアカウントで無駄な要求を出さない。
+- **画面もすでに代替動作を案内している。** `apps/web/src/v8/account-new/register.tsx:668` に「LINE の都合で取り込めないアカウントでは、友だちが話しかけた順に登録されます。」が常時表示され、取り込みの進み具合は `capability === 'available'` のときだけ出る（`:656,665`）。APIも409で「このアカウントでは既存友だち取得を利用できません」を返す（`apps/worker/src/routes/line-accounts.ts:1029`）。
+- → **修正は不要。** 実測には**認証済みまたはプレミアムの公式アカウント**が必要で、これはコードでは解決できない（LINE側のアカウント区分）。
+
+**401その2はClaudeの事前仮説どおりだった。**
+
+- Codexがstagingで読んだ結果：`TOTP_ENCRYPTION_KEY` は**設定あり**、platform設定 `auth.mfa.required:00000000-0000-4000-8000-000000000001` は**行がなく未設定**。
+- `apps/worker/src/middleware/auth.ts:678` の条件は `!== 'false'` なので、**未設定も「MFA必須」と判定されてAPIキーを拒否する**。鍵の誤りではない。
+- → 解き方は、**stagingだけ** `auth.mfa.required:<統括テナントID>` に `'false'` を登録すること。これはコード自身が用意している切り替え口であり、本人のLINEログインもTOTPも不要になる。**本番の設定は触らない。**
+
+**所要時間の見積に使える値（確定ぶん）**
+
+| 要素 | 値 | 根拠 |
+| --- | --- | --- |
+| ID一覧の1ページ件数 | **1,000件**（10,000人なら10回） | `follower-import-pages.ts:81` の `getFollowerIds(1000, …)`、既定も1000（`packages/line-sdk/src/client.ts:360`） |
+| プロフィール取得 | **1人1回**、並列**12** | `follower-import-pages.ts:30` `PROFILE_CONCURRENCY = 12` |
+| 1回の実行の時間予算 | 20秒 | `follower-import.ts:34` `DEFAULT_RUN_BUDGET_MS` |
+| 1回の実行の人数上限 | 9,000人 | `follower-import.ts:31` `PROFILE_MAX_PER_RUN` |
+
+→ 10,000人の所要時間はほぼ `10,000 ÷ 12 × （プロフィール1回の往復時間）`。往復が0.2秒なら約2.8分、0.3秒なら約4.2分、0.4秒なら約5.6分。**残っている未知の値は「往復時間」だけ**で、これは認証済みアカウントがなくても `GET /v2/bot/info`（通常アカウントでも使える・同じホスト・同じ認証）を複数回叩けば代用の実測が取れる。
+
+#### 本番LINE APIの読み取り実測とstaging認証の再確認（2026-10-16 09:26 JST／Codex）
+
+- 先行するClaude所有の台帳差分を点検し、状況を正確にする2箇所の文言を修正して `f6f9f478ff` にコミット。既存の機能PR #1738・staging配備は再実行していない。
+- staging D1の統括テナント設定 `auth.mfa.required:00000000-0000-4000-8000-000000000001` は**未登録**を確認してから `'false'` を1行だけ登録。既存のstaging管理者APIキーをメモリ内で読み、`GET /api/line-accounts` は**HTTP 200**（2026-10-16 09:25 JST、CF Ray `a4b2ed18ff8fd55a-NRT`）。鍵の値は出力していない。本番設定は未変更。
+- 本番D1は**読取専用**で照会し、有効なLINE接続は1件。`channel_id` と `channel_secret` はメモリ内でのみ用い、LINEの `client_credentials` で30日トークンを発行。`GET /v2/bot/followers/ids?limit=1` は**HTTP 200**（2026-10-16 09:26 JST、LINE request ID `42b4e551-db03-4bb8-ac6f-79751b860cf2`）。チャネルWebhook設定・本番D1・既存トークンに書き込みなし。
+- 同じ新トークンでID一覧（`limit=1000`）の1ページを**93ms／13人**で取得。`GET /v2/bot/profile/{userId}` は最大**12並列**で**13件全件HTTP 200、233ms**。ID一覧からプロフィール完了までの合計は**326ms**。プロフィールの平均往復は**175ms／件**（各通信時間の平均）。ユーザーID・表示名・画像・トークンは出力／保存していない。
+- 観測した13件の並列処理の経過時間を単純比例させ、ID一覧10ページ分を足すと10,000人は**約180秒（3.0分）**。これは13人・ID一覧1ページのMacからの通信を引き延ばした**参考換算**であり、Workerからの通信、D1書き込み、20秒の実行予算と再開、レート制限などは未測定。従来の約5〜6分見積より短い可能性はあるが、10,000人規模の完走所要時間とは断定しない。
+- stagingでの一時アカウントの作成とstep実行は**未実施**。「実利用者のプロフィール（表示名・画像）を保存しない」という今回の停止条件に対し、stepは取得したプロフィールをstagingの `friends` に書き込む。よって両方を同時には満たせない。作った一時アカウント・友だち行は**0件**で、削除対象もない。画面「入る」と離脱後の継続は**未検証**。
+- staging既存3件の保存済みトークンは**更新していない**。3件すべて暗号化トークン列が埋まっており、stagingの暗号鍵はWorker secretでローカルから値を取得できない。D1の平文列だけ更新してもWorkerは古い暗号化列を優先して読んでしまう。既存の管理APIの資格情報更新は本人再確認のstep-up必須で、APIキーだけでは実行できない。暗号化を外す／値を不一致にする更新は避けた。安全に更新する経路はClaudeの設計・実装側で整理する。
+
+### 「3分で終わる計算なのに10分待たされる」原因と修正（2026-10-16 09:50 JST／Claude実装・ローカル検証まで）
+
+上の実測で**LINEとの通信そのものは10,000人で約3.0分**（参考換算）と分かったのに、画面の体感は**約10〜12分**になる。差は通信ではなく**待ち時間**だった。
+
+- 1回の実行は `DEFAULT_RUN_BUDGET_MS = 20_000`（`apps/worker/src/services/follower-import.ts:26`）で区切る。1人あたり約17.9msなら**1回で約1,100人**進む。
+- 画面側（登録ウィザードの⑤）は `api.lineAccounts.followerImportState` を**読むだけ**で、3秒ごとに進捗を見ていた。自分では進めないので、次に進むのは自動処理（cron）の順番が来たとき。
+- その自動処理は `frequentHeavy = '1-56/5 * * * *'`（`apps/worker/src/services/scheduled-job-isolation.ts:11-23`、呼び出しは `index.ts:1476,1503-1509,2089`）で**5分ごと**。1アカウントに `PER_ACCOUNT_BUDGET_MS = 150_000`（2.5分）を割り当てるので1回で約8,380人進むが、**登録直後の人は最大5分待たされる**。
+- つまり利用者指示「5分に1回・25人ずつとかしなくて良いです、最速で引き継げる設計でお願いします。」に対し、worker側は最速になっていたが**画面側が5分刻みを呼び戻していた**。
+
+修正は画面側だけ。⑤の進捗の効果を `api.lineAccounts.stepFollowerImport` に替え、**1回ぶんが終わったらすぐ次を呼ぶ**自己連鎖にした（`apps/web/src/v8/account-new/register.tsx:200-228`）。
+
+- 間隔は `busy ? 3000 : 500`。`busy`（他の経路が同じアカウントを握っている）ときだけ3秒待ち、進んだ直後は0.5秒。**0msにしない**のは、何も進まない応答が続いたときに空回りで熱を出さないため（0.5秒はWorker側の約20秒に対して無視できる）。失敗時は5秒後に再試行。
+- 同時に呼ばれても壊れない。ロック期間中は `follower-import.ts:74`、CAS要求が0行なら `:95` が、どちらも**エラーではなく** `{ state, busy: true, profilesFetched: 0 }` を返す。
+- 画面を閉じたあとは**今までどおり**自動処理（5分ごと）とアカウント一覧の「入る」が続きを拾う。カーソルはD1に残るので、間違って戻っても続きから始まる（利用者指示「現在のアカウント一覧と同じデザインで入るというボタンを押すと続きから始まる仕組み」）。
+- これで10,000人は**約10回 × 20秒 ≒ 3.5分**、待ち時間ゼロになる。
+- `DEFAULT_RUN_BUDGET_MS` は**上げない**。20秒・1人17.9msで約1,111人は1 invocationのサブリクエスト上限に近い。台帳として記録しておくが、リポジトリ内に**矛盾**がある（`follower-import.ts:28` は「有料プランは10,000回まで」、`index.ts:2816` は「1kの予算では1k超の積み残しを流しきれない」）。**どちらが正しいか未確定なので、1回の実行量を増やす前提の設計はしない**。
+- Worker側は**1行も変えていない**。`/api/line-accounts/:id/follower-import/step` は `await run` のまま `{ state, busy, profilesFetched }` を返す（`apps/worker/src/routes/line-accounts.ts:1036-1053`）。
+
+変えたのは5ファイル（ブランチ `skmtmst/LINE追加画面のアップデート`、基点 `ed421c0b4d9424c052397401da53eccbca1ef8c1`）。
+
+| ファイル | 変更 |
+| --- | --- |
+| `apps/web/src/v8/account-new/register.tsx` | ⑤の効果を step の自己連鎖へ（本体の修正） |
+| `apps/web/src/v8/account-new/BEHAVIOR.md` | 動きの一覧22行目を実装に合わせた |
+| `apps/web/src/app/accounts/accounts-setup-visual-parity.test.ts` | 設計ゲートが**ソース文字列**を見ているため、期待値を `stepFollowerImport` へ |
+| `apps/web/src/app/accounts/new/register-v8.react.test.tsx` | モック追加と、`step` を呼ぶ／`followerImportState` を呼ばないの検証へ書き替え |
+| `apps/web/src/app/accounts/new/wizard.test.tsx` | モック追加と、入れ子の応答形（`{state,busy,profilesFetched}`）へ |
+
+**見た目・文言・配置・操作フローは変えていない**（進捗の表示に使う口だけを替えた）。よって**新規Pencil承認は不要**。
+
+ローカル検証（Claudeの担当範囲）：
+
+- web（登録ウィザード関連25ファイル）**159件 合格**。最初の実行は2件落ちた（`register-v8.react.test.tsx:139`／`wizard.test.tsx:174`、どちらも旧 `followerImportState` をモックしていたため）。モックと検証を直して全件合格。
+- worker `follower-import` 10件・`follower-import-background` 1件・`routes/line-accounts` 76件の**87件 合格**（worker無変更の裏取り。背景継続と「入る」が壊れていないこと）。
+- `pnpm --filter web --filter worker typecheck` 両方 `Done`（tscエラーなし）。
+- worker全件の広い実行では31件落ちるが、落ちているのは `hq_templates` など**この差分と無関係の既存失敗**（差分にworkerファイルは0件）。
+
+**実APIでの確認はまだ**。画面を開いたまま10,000人規模を進める実測と、途中で閉じて「入る」から再開する確認はstagingが必要で、Codexの担当範囲。
+
 ## 4. 気づいた不具合（未修正・実装時に扱う）
 
 1. **友だち追加URLの形が他と違う**：`logic.ts:92` と `register-v8.tsx:148,933` は `https://lin.ee/{basicId}` を組み立てているが、他の箇所は `https://line.me/R/ti/p/@{basicId}`（`services/platform-announcements.ts:48`、`routes/liff.ts:1202`、`components/dashboard/qr-dialog.tsx:56`）。`lin.ee` は個別に発行されるもので basicId から導けない（`packages/db/src/line-accounts.ts:64` のコメント、`official_profile_url` 列がその用途）。→ 画面に出すURLが開けない可能性が高い
@@ -407,7 +516,29 @@ PR #1738 の必須CI「Repository and shared checks」が `apps/web/scripts/v8-g
 - 2026-10-15 23:41：Codexの再々レビューで「状態は守れたが友だち200人が旧実行の古い値で上書きされる」を再現し、配備前にClaudeへ返却（§3 の「Codex再々レビュー」）
 - 2026-10-16 00:05：上の上書きを修正。所有権の条件を友だちへの書き込み文の中へ入れ（事前SELECTでは原子的にならないため）、交代後は1行も書けないようにした。回帰テスト1件を追加して `follower-import` 11件／worker 全件／web home 8件／型検査が合格。本物のSQLiteでも文の形と0行を確認（§3 の「友だち行の旧実行上書きの修正」）。**実APIは未検証**
 - 2026-10-16 01:22：PR #1738 の必須CIが行数ゲートで落ちていたため、`follower-import.ts` を3ファイルへ分け（公開インポート面は不変）、残り3ファイルのコメントを圧縮して**違反0件**にした。ゲート自己テスト11件／worker 11,742件／web home 8件／型検査が合格（§3 の「行数ゲートの修正」）。**実APIとstaging配備は未実施**
-- 次の1手：CodexがPR #1738 のCIを再確認し、合格すれば**マージ・staging配備・実API確認・10,000人の所要時間の実測**を行う（基準の本線は `2e2c8ca5b357aed5374fc96ee9c9613af59e811d`）。**本番は今回の対象外**
+- 2026-10-16：PR #1738 は**マージ済み**（`5ace6976dc`）、**staging配備も完了**（公開SHA一致）。**本番は未配備**。受入条件1〜5はマージ済みHEADで合格。受入条件6（実APIでの実測）だけHTTP 401で未達（§3 の「マージとstaging配備は完了・実測はHTTP 401で止まった」）
+- 2026-10-16：401は2つとも原因が判明（staging側の設定と保存済みトークンは未変更）。新トークンを用いた `/v2/bot/followers/ids` が**3件そろってHTTP 403**。LINE側のアカウント種別制限（認証済み／プレミアム限定）に合致し、アプリは403を `capability='unavailable'` として扱う。管理APIの401は「TOTP鍵設定済み＋`auth.mfa.required` 未設定」の組み合わせだった（§3 の「403の原因確定と、401その2の確認結果」）
+- 2026-10-16 09:26：stagingのMFA設定を `'false'` に変更し、管理APIが既存キーでHTTP 200を確認。本番D1読取だけで実LINE APIの対象1件（友だち13人）を実測し、ID一覧93ms＋最大12並列プロフィール233ms＝合計326ms。10,000人は単純比例で約3.0分だが標本13人の参考値。個人情報は保存せず、本番の設定・DB・Webhook・配備は無変更（§3 の「本番LINE APIの読み取り実測」）。
+- 2026-10-16 09:50：**体感10〜12分の原因を特定して直した**。LINEとの通信は約3.0分でも、画面⑤が進捗を**読むだけ**だったため次の自動処理（5分ごと）を待っていた。画面を開いている間は `stepFollowerImport` で続きを自分で進める形に替え、待ち時間をゼロにした（10,000人なら約10回×20秒≒3.5分）。web 159件／worker 87件／型検査が合格。**worker・見た目は無変更＝新規Pencil承認は不要**（§3 の「3分で終わる計算なのに10分待たされる原因と修正」）
+- 2026-10-16 11:27：**PR #1751 の必須CIの失敗を直した**。落ちていたのは実行時のテストではなく静的ゲート `Guard newly added source visual contracts (B-273)`（`.github/workflows/required-pr-gate.yml:280`）。原因は、⑤の呼ぶ口の変更に合わせて `accounts-setup-visual-parity.test.ts` の「ソース文字で中身を確かめる並び」を1語だけ差し替えたこと。`scripts/verify-no-source-visual-contracts.mjs:77` の `hit.key` は期待文字の**集合ごと**を含むため、追加でも削除でも「新しいソース契約」と判定される（削除だけにして再実行しても1件のまま残った）。台帳 `docs/qa/match-l2x-counts-1014.md:34` の前例どおり、該当の positive な並びを丸ごと外し、契約を描画の試験へ移した。呼ぶ口は `register-v8.react.test.tsx`（`stepFollowerImport` が呼ばれ `followerImportState` は呼ばれない）、5つの正本ノードは同ファイルに新設した「各段と結果の窓は絵の正本ノードを描く」（DOM の `data-design-node` を①→②→③→④→結果の窓→⑤の順に実測）＋ `scripts/visual-qa/v8-design-map-route-contract.test.ts`（ノードとURLの対応）で担保する。該当3ファイル25件が合格し、同CIステップの4コマンド（自己テスト49件／B-273 **0件**／行数ゲート自己テスト11件／行数ゲート違反0件）もローカルで合格。**本体 `register.tsx` は無変更＝見た目・文言・操作フローも無変更なので新規Pencil承認は不要**
+- 次の1手（Codexへ）：上の**テスト2ファイルの差分**を独立レビュー → コミット・PR #1751 の更新 → **必須CI → マージ → staging配備** → 下の実API検証（6a）。ブランチ `skmtmst/LINE追加画面のアップデート`、現在のHEAD `995d147993`（この差分は未コミット）
+- **前回の停止条件の衝突を解消した（Claudeの設計）**：前回の依頼文は「実stepを通す」と「実利用者のプロフィールを保存しない」を同時に求めていて両立しなかった（stepは取得したプロフィールを `friends` に書く。`maxProfiles: 0` も `Math.max(1, …)` で1に丸められ、`importIdPage` は友だち行を書く）。今回は条件をこう分ける。
+  - **6a 実APIの通し確認（実施する・2026-10-16 経路を差し替えた）**：対象は本番の認証済みアカウント1件（友だち**13人**）。前回ここに書いた「staging の登録ウィザードから新規登録する」は**取り消す**。Codexが「本番LINEチャネルのWebhook宛先とLIFF接続先を書き換えるので停止条件に反する」として実行を断ったのは**正しい判断**で、台帳側の手順が誤っていた。
+    - **使わない経路とその理由**
+      - staging の**登録ウィザード**は使えない。`apps/worker/src/services/line-account-connect.ts` は**本番チャネルそのものを書き換える**（`:141` Webhook宛先の PUT、`:149` その読み出し、`:180` LIFF一覧、`:191` LIFFアプリの作成、`:208` LIFFアプリの更新）。前回の「新規登録なら正規経路なので暗号化列が正しく作られて回避できる」という理由付けは**誤りだった**（暗号化列の問題は解けるが、本番書き込みが発生する）。
+      - `POST /api/line-accounts`（新規作成・`apps/worker/src/routes/line-accounts.ts:1483`）も使えない。`verifyConnection`（`:1607`／定義 `:481`）が、チャネルに登録済みのWebhook宛先が**stagingの** `acceptedWebhookUrls`（`:327`）に含まれることを求めるので400になり、さらに LINE の Webhook テスト（`/v2/bot/channel/webhook/test`）を本番チャネルへ投げる。
+      - `PUT /api/line-accounts/:id` も使えない。`line_account.credentials` の更新は本人再確認（step-up）が必須で、`apps/worker/src/lib/step-up.ts` は新しい管理セッションか、`X-Step-Up-Token` ＋同じセッションのハッシュを要求する。CodexはAPIキー認証で管理セッションを持たないため、**原理的に満たせない**。
+      - staging既存3件のトークン更新も使えない（3件とも暗号化列が埋まっていて、`decryptLineAccountCredentials` は暗号化列を優先する。stagingの暗号鍵は書き込み専用のWorker secretで値を取り出せない）。
+    - **使う経路（本番への書き込みが1つも無い）**
+      1. トークン：本番D1を**読取専用**で照会し、`channel_id`＋`channel_secret` をメモリ内だけで使って LINE の `client_credentials` で30日トークンを発行する。**2026-10-16 09:26 に実施済みでHTTP 200**（LINE request ID `42b4e551-db03-4bb8-ac6f-79751b860cf2`）。本番D1・チャネルWebhook設定・既存トークンへの書き込みは無い。残る副作用は、発行がLINE側のチャネル単位トークン集合（上限30本）を1本動かすこと。**ここは提案（確定ではない）**：発行は1本までにし、確認後に `POST https://api.line.me/v2/oauth/revoke` で無効化する。チャネル設定は触らない。
+      2. アカウント行：**stagingのD1へ一時行を1件だけ直接insertする**。`channel_access_token` は平文列にだけ入れ、`channel_access_token_encrypted` は**NULL**にする（`packages/db/src/line-accounts.ts:425` の `if (!encrypted) continue;` により平文列がそのまま読まれる。既存3件で詰まったのは暗号化列が埋まっていたからで、新しい行には当てはまらない）。`tenant_id` はstagingのAPIキーのスタッフと同じテナント、`archived_at` は NULL、`is_active` は **0**。見え方の関門は `tenant_id` と `archived_at` だけで（`apps/worker/src/services/account-access.ts:16-26`、`packages/db/src/line-accounts.ts:628-643`、`routes/line-accounts.ts:202-240` のいずれにも `is_active` の条件が無い）、`is_active=0` でも detect・start・step・一覧には出る一方、配信系の経路からは外れる。他の列は既存のstaging行から写してプラン列などの取りこぼしを防ぐ。stagingのD1書き込みは保存済み共通承認の範囲内（同じやり方で `auth.mfa.required` の1行を登録済み）。
+      3. 実行：`POST …/follower-import/detect`（`:990`、読み取りのLINE呼び出し1回）→ `POST …/follower-import/start`（`:1015`、LINE呼び出し無し。detect を先に通さないと `FOLLOWER_IMPORT_NOT_AVAILABLE` で409になる）→ `POST …/follower-import/step`（`:1036`）を自己連鎖で呼ぶ。これは上で決めた「『入る』が叩いている口」そのもので、取得の並列・書き戻し・カーソル・ロック・時間予算の切れ方はここで観測できる。間隔は通常500ms／`busy` が返ったら3000ms／失敗は5000ms、終端フェーズで止める。一時行は一覧（`:202`）にも出るので、画面の「入る」からの確認も取れる。
+    - **測る数値**：完了までの実時間、step の呼び出し回数、`busy` が返った回数。
+    - **保存の許可範囲**：**staging の13行だけ**。確認後に友だち行と一時アカウント行を削除し、**0件になったことを実測**する。**表示名・画像・ユーザーID・トークンは会話・ログ・リポジトリへ出さない**（出力の禁止は維持し、一時的な保存だけを許す）。
+    - stagingには**cronが無い**（`wrangler.staging.toml` 5行目「Intentionally has no [triggers] section」。`processPendingFollowerImports` の呼び出し元は cron の scheduled ハンドラ `apps/worker/src/index.ts:1490-1496` だけで、HTTPの入口は無い）。よってstagingでは**画面の連鎖だけが取り込みを進める**ので、受入条件2の確認にちょうど合う。**`[triggers]` は足さない。配備workflowの拒否も外さない。**
+    - もし 403（`FOLLOWER_IMPORT_NOT_AVAILABLE`）になったら、LINEのアカウント種別制限で**不具合ではない**。記録して止める。
+  - **6b 大量データでの途中再開（実APIでは確認できない）**：使える認証済みアカウントの友だちが13人しかなく、1回のstepで完走するため「途中で閉じて『入る』で再開」を実データでは再現できない。再開そのものは単体テスト（`follower-import.test.ts:354` の予算打ち切りからの再開、および旧実行の巻き戻り・上書き防止の回帰テスト）で担保済み。**実データでの大量件数の再開は未確認のまま残す**と記録し、合格と言わない
+- 残件（Claude）：staging既存3件の暗号化トークン列を安全に更新する正式経路。入口の候補は `packages/db/src/line-accounts.ts:926 updateLineAccount`（`:946` `channel_access_token`、`:986-988` `token_expires_at`）と `apps/worker/src/services/line-account-connect.ts:120,175`。**6a は新規登録で回避できるので、この残件は検証の前提ではない**
 - 以前の1手（済み・記録用）：Codexへ再検証・コミット・PR・CI・マージ・**staging配備**を引き継ぐ。再現スクリプト（`staleFriendWrites === 0`）での再確認を含む。最新本線 `origin/codex/development`（`e346a93acac35f1882f121f68b622b7bcdf67e69`）を取り込む。**本番は今回の対象外**。cronの自然発火は受入条件から外し、step の口で確かめる（理由は §3 の同節）
 - その次：`apps/web/src/v8/account-new/` の**v06実装**（下の実装範囲）
 - v06の実装範囲：`apps/web/src/v8/account-new/register.tsx`／`logic.ts`／`register.module.css`／`BEHAVIOR.md` へ反映（①は「事前確認」、②は「アカウント接続」）。実装に含めるもの＝Step 2 のチェック3つ・Step 3 のチェック2つが全部入るまで次へを無効／Step 4 の5項目を上から順に確認する進行と行ごとの待機中・確認中（回るリング）・OK・エラー表示／確認の行は上下中央そろえ／エラー時のカード上部の赤い案内箱／5項目すべてOKのときだけフッターの次へを活性／**Step 5 の友だち追加テスト（QR表示＋追加の検知で自動的に次へ）**／ウィザードを4段にして基本情報の段を経路から外す／**友だち引き継ぎを選んだ人だけ通る引き継ぎ中の画面（進捗・残り時間・速さの更新と、終了後の自動遷移）**／**完了画面の「早速使ってみる」で接続したアカウントのダッシュボードへ遷移**。上記の不具合1は同じPRで直すか別PRにするかを判断する

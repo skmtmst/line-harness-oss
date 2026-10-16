@@ -9,8 +9,8 @@ import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge
 import type { OpsSupportDetail } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-const mocks = vi.hoisted(() => ({ list: vi.fn(), article: vi.fn(), update: vi.fn(), review: vi.fn(), feedback: vi.fn(), retry: vi.fn() }))
-vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { ops: { knowledge: mocks } } }))
+const mocks = vi.hoisted(() => ({ list: vi.fn(), article: vi.fn(), update: vi.fn(), review: vi.fn(), feedback: vi.fn(), retry: vi.fn(), ticket: vi.fn() }))
+vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { ops: { knowledge: mocks, support: { ticket: mocks.ticket } } } }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/ops/knowledge', useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
@@ -28,6 +28,7 @@ let host: HTMLDivElement
 let root: Root
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks()
+  mocks.ticket.mockResolvedValue({ success: true, data: { ticket: { id: 'ticket', ticketLabel: '#MB-0312', stage: 'resolved', stageLabel: '解決済み' } } })
   mocks.list.mockResolvedValue({ success: true, data: [article], total: 1 })
   mocks.article.mockResolvedValue({ success: true, data: article })
   mocks.update.mockResolvedValue({ success: true, data: { ...article, version: 2 } })

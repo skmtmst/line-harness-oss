@@ -37,6 +37,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import FriendMatchRow from '@/components/shared/friend-match-row'
 
 /*
  * ★V8 電話の予約を入れる（板 `rm92Y`）。作る型（CreatePage）で、左に入れる中身、右に確かめる物。
@@ -287,7 +288,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         title="電話の予約を入れる"
         help="電話・店頭で受けた予約を台帳に入れます。空いている卓は自動で選びます。枠だけ押さえることもできます。"
         tabs={<StoreTabs current="reservations" flush />}
-        preview={preview}
+        preview={preview} previewLabel="予約内容と卓を見る" previewTitle="予約内容と卓"
         footerActions={(
           <>
             <Button onClick={onBack} disabled={busy}>キャンセル</Button>
@@ -344,12 +345,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
                     </div>
                   ) : null}
                   {person ? (
-                    <div className={styles.personRow}>
-                      <span className={styles.personName}>{person.name}</span>
-                      <StatusBadge dot={false} size="micro" surface="white" tone="success">{`${person.lineUid ? 'LINE 連携済み' : 'LINE 未連携'}${history ? `・来店 ${history.visitCount} 回` : ''}`}</StatusBadge>
-                      <span className={styles.dateSpacer} />
-                      <Button type="button" variant="text" size="inline" onClick={() => { setPerson(null); setSearch('') }}>選び直す</Button>
-                    </div>
+                    <FriendMatchRow name={person.name} selected avatar={false} onClear={() => { setPerson(null); setSearch('') }} description={<StatusBadge dot={false} size="micro" surface="white" tone="success">{`${person.lineUid ? 'LINE 連携済み' : 'LINE 未連携'}${history ? `・来店 ${history.visitCount} 回` : ''}`}</StatusBadge>} />
                   ) : null}
                 </>
               ) : (
@@ -393,8 +389,8 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
             <SettingsFormRow layout="columns">
               <Field labelSize="compact" label="卓">
                 <SaveErrorField names={["tableMode","table_mode"]}><EntitySelect aria-label="卓" size="full" value={tableMode} onChange={setTableMode} options={[
-                  { value: 'auto', label: recommended ? `自動で選ぶ（おすすめ：${recommended.code} ${recommended.label} ${recommended.max_capacity}名）` : '自動で選ぶ' },
-                  ...activeTables.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` })),
+                  { value: 'auto', color: 'var(--color-status-info)', label: recommended ? `自動で選ぶ（おすすめ：${recommended.code} ${recommended.label} ${recommended.max_capacity}名）` : '自動で選ぶ' },
+                  ...activeTables.map((t) => ({ ...entityOptionMetadata(t), color: 'var(--color-status-info)', value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` })),
                 ]} /></SaveErrorField>
               </Field>
               <Field labelSize="compact" label="コース">

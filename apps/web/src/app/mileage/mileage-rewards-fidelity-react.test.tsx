@@ -212,14 +212,14 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
     expect(container.textContent).not.toContain('交換されていない使い道')
   })
 
-  it('現役のフォルダはすべてだけを出し、行の操作を説明する', async () => {
+  it('左にフォルダの列を出し、行の操作を説明する', async () => {
     await renderTab()
     await waitForRows()
     const body = container.textContent ?? ''
     expect(body).toContain('すべて')
-    expect(container.querySelector('button[aria-label="フォルダを追加"]')).toBeNull()
+    expect(container.querySelector('[data-template-region="folders"]')).not.toBeNull()
     await act(async () => { (container.querySelector('button[aria-label="マイルの説明"]') as HTMLButtonElement).click() })
-    expect(container.textContent ?? '').toContain('行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。')
+    expect(container.textContent ?? '').toContain('行の「…」から 編集・自分で交換をテスト・出すのを止める・フォルダへ移す・複製。')
   })
 
   it('行の「…」に4つの操作が並ぶ', async () => {

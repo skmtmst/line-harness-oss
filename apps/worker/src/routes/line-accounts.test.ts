@@ -46,6 +46,9 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
+const styleMocks=vi.hoisted(()=>({initializeAccountStyle:vi.fn(async()=>({}))}));
+vi.mock('../services/style-setup.js',()=>styleMocks);
+
 const lineClientMocks = {
   getFollowersInsight: vi.fn(),
   getFollowerIds: vi.fn(),
@@ -121,6 +124,7 @@ const fakeAccount = {
 };
 
 beforeEach(() => {
+  styleMocks.initializeAccountStyle.mockClear();
   for (const fn of Object.values(dbMocks)) {
     if ('mockReset' in fn) fn.mockReset();
   }
@@ -706,6 +710,7 @@ describe('POST /api/line-accounts/connect', () => {
     });
     expect(res.status).toBe(201);
     expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();
+    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account',expect.anything(),expect.anything());
     expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
       name: 'LINE公式名',
       channelAccessToken: 'issued-token',

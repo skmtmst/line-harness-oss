@@ -84,3 +84,105 @@ export async function openSeatTables(db:D1Database,storeId:string,startsAt:strin
  if(guestCount>=min&&guestCount<=max&&members.every(t=>t.maxCapacity<guestCount))candidates.push({...members[0],tableIds:members.map(t=>t.id),label:members.map(t=>t.label).join('＋'),minCapacity:min,maxCapacity:max});}
  return candidates.sort((a,b)=>a.maxCapacity-b.maxCapacity||a.id.localeCompare(b.id));
 }
+
+/** Calendar companion to openSeatTables: load occupancy once rather than per time cell. */
+export async function openSeatTablePeriods(
+  db: D1Database,
+  storeId: string,
+  periods: ClosurePeriod[],
+  guestCount: number,
+) {
+  if (!periods.length) return [];
+  const from = periods.reduce(
+    (v, p) => (p.startsAt < v ? p.startsAt : v),
+    periods[0].startsAt,
+  );
+  const to = periods.reduce(
+    (v, p) => (p.endsAt > v ? p.endsAt : v),
+    periods[0].endsAt,
+  );
+  const tables = (
+    await db
+      .prepare(
+        'SELECT id,label,seat_type seatType,min_capacity minCapacity,max_capacity maxCapacity,join_group,is_active FROM rt_tables WHERE store_id=? ORDER BY max_capacity,id',
+      )
+      .bind(storeId)
+      .all<
+        RestaurantSeatAvailability['tables'][number] & {
+          join_group: string | null;
+          is_active: number;
+        }
+      >()
+  ).results;
+  const closed = await closuresForRange(db, storeId, from, to);
+  const busy = (
+    await db
+      .prepare(
+        `SELECT l.table_id,strftime('%Y-%m-%dT%H:%M:%fZ',r.starts_at) starts_at,strftime('%Y-%m-%dT%H:%M:%fZ',r.ends_at) ends_at FROM rt_reservations r JOIN rt_reservation_table_links l ON l.reservation_id=r.id
+  WHERE r.store_id=? AND r.status NOT IN('cancelled','no_show') AND r.departed_at IS NULL
+  AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(?) AND julianday(r.ends_at)>julianday(?)
+  UNION ALL SELECT l.table_id,strftime('%Y-%m-%dT%H:%M:%fZ',w.starts_at),strftime('%Y-%m-%dT%H:%M:%fZ',COALESCE(w.ends_at,datetime(w.starts_at,'+120 minutes'))) FROM rt_seat_waitlist w JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=w.id
+  WHERE w.store_id=? AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(?) AND julianday(COALESCE(w.ends_at,datetime(w.starts_at,'+120 minutes')))>julianday(?)`,
+      )
+      .bind(storeId, to, from, storeId, to, from)
+      .all<{ table_id: string; starts_at: string; ends_at: string }>()
+  ).results;
+  const at = (v: string) =>
+    Date.parse(
+      /(?:Z|[+-]\d\d:\d\d)$/.test(v) ? v : v.replace(' ', 'T') + '+09:00',
+    );
+  return periods.map((period) => {
+    const a = at(period.startsAt),
+      b = at(period.endsAt);
+    const open = tables.filter(
+      (t) =>
+        t.is_active &&
+        !busy.some(
+          (r) =>
+            r.table_id === t.id && at(r.starts_at) < b && at(r.ends_at) > a,
+        ) &&
+        !closed.some(
+          (c) =>
+            closureAffectsTable(c, t.id) &&
+            (JSON.parse(c.periods_json) as ClosurePeriod[]).some(
+              (p) => at(p.startsAt) < b && at(p.endsAt) > a,
+            ),
+        ),
+    );
+    const options: RestaurantSeatAvailability['tables'] = open.filter(
+      (t) => t.minCapacity <= guestCount && t.maxCapacity >= guestCount,
+    );
+    for (const group of new Set(
+      open.map((t) => t.join_group).filter(Boolean),
+    )) {
+      const members = open.filter((t) => t.join_group === group);
+      if (
+        members.length < 2 ||
+        tables
+          .filter((t) => t.join_group === group)
+          .some((t) => !members.some((m) => m.id === t.id))
+      )
+        continue;
+      const min = members.reduce((n, t) => n + t.minCapacity, 0),
+        max = members.reduce((n, t) => n + t.maxCapacity, 0);
+      if (
+        guestCount >= min &&
+        guestCount <= max &&
+        members.every((t) => t.maxCapacity < guestCount)
+      )
+        options.push({
+          ...members[0],
+          tableIds: members.map((t) => t.id),
+          label: members.map((t) => t.label).join('＋'),
+          minCapacity: min,
+          maxCapacity: max,
+        });
+    }
+    return {
+      ...period,
+      tables: options.sort(
+        (a, b) => a.maxCapacity - b.maxCapacity || a.id.localeCompare(b.id),
+      ),
+    };
+  });
+}

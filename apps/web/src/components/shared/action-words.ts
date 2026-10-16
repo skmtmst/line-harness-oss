@@ -1,6 +1,7 @@
 import { cloneElement, isValidElement, type ReactNode } from 'react'
 
 export const EDIT_ACTION_LABEL = '編集する'
+export const TAG_ADD_ACTION_LABEL = 'タグを付ける'
 
 /** Editing is one action; reload and reconstruction keep their distinct verbs. */
 export function normalizeActionLabel(label: string): string {

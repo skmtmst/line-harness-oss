@@ -1,36 +1,50 @@
-import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+// @vitest-environment happy-dom
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
+import LinePreview from '@/components/shared/line-preview'
+import { MenuPreview } from './create-preview'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const SRC = readFileSync(join(HERE, 'create-v8.tsx'), 'utf8')
-const CSS = readFileSync(join(HERE, 'create-v8.module.css'), 'utf8')
+const dims = RICH_MENU_DIMENSIONS.large
+const props = {
+  size: 'large' as const, imageUrl: null,
+  areas: [{ x: 0, y: 0, w: dims.width / 2, h: dims.height }, { x: dims.width / 2, y: 0, w: dims.width / 2, h: dims.height }],
+  pages: [{ id: 'page-1', name: 'トップ' }], activePageId: 'page-1',
+}
+function preview() {
+  const host = document.createElement('div')
+  host.innerHTML = renderToStaticMarkup(React.createElement(LinePreview, {
+    chatBarText: 'メニュー', richMenu: React.createElement(MenuPreview, props),
+  }, React.createElement('p', null, 'トークの本文')))
+  return host
+}
 
-/** MenuPreview の本体（function MenuPreview から次の関数まで）。 */
-const menuPreview = SRC.slice(SRC.indexOf('function MenuPreview('), SRC.indexOf('function groupFromSeed('))
-
-/*
- * 2026-10-08 オーナー：本物の LINE はトーク画面のいちばん下（入力の帯の位置）にメニューが出て、トークはその上で縮む。
- * 絵 gobhu・egdGx・K0gu1・gQabc：画像が画面の下、その下に「メニュー ∨」の帯が1本。
- * 店・統括のリッチメニューの作る・編集（どれも create-v8 の renderLinePreview）で同じになる。
- */
 describe('リッチメニューの「LINEでの見え方」はメニューを下に出す', () => {
-  it('メニューはトークの中身（children）ではなく、下の置き場（richMenu）に渡す', () => {
-    expect(SRC).toMatch(/<LinePreview[\s\S]{0,300}chatBarText=\{chatBarText\}[\s\S]{0,80}richMenu=\{\(\s*<MenuPreview/)
-    expect(SRC).not.toMatch(/<LinePreview[^/]*>\s*<MenuPreview/)
+  it('トークとメニューを別の置き場に出し、メニューをトークの後へ置く', () => {
+    const host = preview()
+    const talk = host.querySelector('[data-line-preview-part="talk"]')!
+    const menu = host.querySelector('[data-line-preview-part="rich-menu"]')!
+    expect(talk.textContent).toContain('トークの本文')
+    expect(talk.contains(menu)).toBe(false)
+    expect(talk.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('帯は LinePreview の1本だけ（メニューの見本の中に2本目の帯を描かない）', () => {
-    expect(menuPreview).not.toContain('previewMenuBar')
-    expect(menuPreview).not.toContain('ChevronDown')
-    expect(CSS).not.toContain('.previewMenuBar')
+  it('メニューの帯は1本だけ出る', () => {
+    const host = preview()
+    expect(host.querySelectorAll('[data-line-preview-part="menu-bar"]')).toHaveLength(1)
+    expect(host.querySelector('[data-line-preview-part="menu-bar"]')?.textContent).toContain('メニュー')
   })
 
-  it('画像が無いときも、下のメニューの場所に「画像を選ぶと、ここに出ます（n面）」と面の区切りの点線を出す', () => {
-    const empty = menuPreview.slice(menuPreview.indexOf('styles.previewMenuEmpty'))
-    expect(empty).toContain('{areaBoxes}')
-    expect(empty).toContain('画像を選ぶと、ここに出ます')
-    expect(menuPreview).toContain('aspectRatio: `${dims.width} / ${dims.height}`')
+  it('画像が無くても実寸の比率と面の位置を保ち、画像待ちを案内する', () => {
+    const host = preview()
+    const empty = host.querySelector<HTMLElement>('[data-rich-menu-size="large"]')!
+    expect(empty.textContent).toContain('画像を選ぶと、ここに出ます（2面）')
+    expect(empty.style.aspectRatio).toBe(`${dims.width} / ${dims.height}`)
+    const boxes = empty.querySelectorAll<HTMLElement>('[aria-hidden="true"] > span')
+    expect([...boxes].map(box => [box.style.left, box.style.top, box.style.width, box.style.height])).toEqual([
+      ['0%', '0%', '50%', '100%'], ['50%', '0%', '50%', '100%'],
+    ])
+    expect(empty.querySelector('img')).toBeNull()
   })
 })

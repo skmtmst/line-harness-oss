@@ -277,16 +277,18 @@ test('U5: optional controls reserve the overflowing readable width and keep the 
   } finally { await browser.close() }
 })
 
-test('U6/V3: full KPI notes wrap, actions get their next line and the strip keeps equal cells', async () => {
+test('U6/V3: one-line KPI notes preserve the full title, actions and equal cells', async () => {
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    const card = (detail, action='') => `<div class="card" data-design-version="v8" data-kpi-presentation="band"><div class="head"><p class="label">未設定</p></div><p class="value"><span class="number" data-kpi-number>2</span></p><p class="detail" data-kpi-detail data-kpi-detail-present><span class="detailText" role="note">${detail}</span>${action}</p></div>`
-    for (const width of [1440, 1152]) {
+    const card = (detail, action='') => `<div class="card" data-design-version="v8" data-kpi-presentation="band" data-kpi-detail-layout="single"><div class="head"><p class="label">未設定</p></div><p class="value"><span class="number" data-kpi-number>2</span></p><p class="detail" data-kpi-detail data-kpi-detail-present><span class="detailText" role="note" title="${detail}">${detail}</span>${action}</p></div>`
+    for (const width of [1440, 1152, 1920]) {
       await page.setViewportSize({ width, height: 900 })
-      await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('kpi-card')}\n${read('../../src/components/shared/kpi-band-v8.css')}\n*{box-sizing:border-box}</style><section data-list-skeleton style="width:520px"><div class="strip" data-kpi-strip data-kpi-presentation="band">${card('友だちになっても何も起きない', '<button type="button" class="link">未設定を見る</button>')}${card('「やり取りの記録」からやり直せます')}${card('空欄のまま送られます', '<a class="link" href="/edit">編集する</a>')}</div></section></html>`)
+      await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('kpi-card')}\n${read('../../src/components/shared/kpi-band-v8.css')}\n*{box-sizing:border-box}</style><section data-page-template="list" data-list-skeleton style="width:520px"><div class="strip" data-kpi-strip data-kpi-presentation="band">${card('友だちになっても何も起きない', '<button type="button" class="link">未設定を見る</button>')}${card('「やり取りの記録」からやり直せます')}${card('空欄のまま送られます', '<a class="link" href="/edit">編集する</a>')}</div></section></html>`)
       const failures = (await page.evaluate(scanListSkeleton)).failures
       assert.ok(!failures.includes('U6 数の補足の切れ'))
+      assert.ok(!failures.includes('U6 数の補足の折り返し'))
+      assert.ok(!(await page.evaluate(scanFixPatterns)).findings.some(f=>f.reason.startsWith('KPI note')))
       assert.ok(!failures.includes('U6 数の行き先が同じ行'))
       const heights = await page.locator('.card').evaluateAll(es=>es.map(e=>e.getBoundingClientRect().height))
       assert.ok(heights.every(h=>h===heights[0]))
@@ -294,8 +296,24 @@ test('U6/V3: full KPI notes wrap, actions get their next line and the strip keep
       await page.locator('button.link').click()
       assert.equal(await page.locator('button.link').getAttribute('data-clicked'), 'yes')
       assert.equal(await page.locator('a.link').getAttribute('href'), '/edit')
-      await page.locator('[role="note"]').first().evaluate(el=>{el.style.whiteSpace='nowrap';el.style.overflow='hidden';el.style.textOverflow='ellipsis'})
+      const note = page.locator('[role="note"]').first()
+      assert.equal(await note.evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap')
+      assert.equal(await note.evaluate(el=>el.scrollWidth>el.clientWidth),true)
+      await note.evaluate(el=>el.removeAttribute('title'))
       assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('U6 数の補足の切れ'))
+      await note.evaluate(el=>{el.title='別の補足'})
+      assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('U6 数の補足の切れ'))
+      await note.evaluate(el=>{el.title=el.textContent;el.style.textOverflow='clip'})
+      assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('U6 数の補足の切れ'))
+      await note.evaluate(el=>{el.style.textOverflow='ellipsis';el.style.whiteSpace='normal';el.style.overflow='visible'})
+      assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('U6 数の補足の折り返し'))
+      assert.ok((await page.evaluate(scanFixPatterns)).findings.some(f=>f.reason.startsWith('KPI note')))
+      await note.evaluate(el=>{el.style.whiteSpace='';el.style.overflow='';el.style.textOverflow=''})
+      assert.ok(!(await page.evaluate(scanListSkeleton)).failures.some(rule=>rule.startsWith('U6')))
+      await note.evaluate(el=>{el.closest('.card').dataset.kpiDetailLayout='qualifier';el.textContent='購読の数\n（再参加を含む）';el.title=el.textContent})
+      assert.equal(await note.evaluate(el=>getComputedStyle(el).whiteSpace),'pre-line')
+      assert.equal(await note.evaluate(el=>el.getBoundingClientRect().height),36)
+      assert.ok(!(await page.evaluate(scanListSkeleton)).failures.some(rule=>rule.startsWith('U6')))
     }
   } finally { await browser.close() }
 })
@@ -465,5 +483,17 @@ test('explicit picker widths remain readable in a flex toolbar; allowing shrink 
     assert.deepEqual(await clipped(),fields.map(([label])=>label))
     const source = read('../../src/components/shared/entity-select.tsx')
     assert.match(source,/style=\{width \? \{ width, maxWidth: '100%', flexShrink: 0 \}/)
+  } finally { await browser.close() }
+})
+
+test('grid controls reserve the full action width and preserve the right inset', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<style>${read('../../src/app/globals.css')}\n${css('data-table')}\n*{box-sizing:border-box}.frame{width:600px}button{width:117px;height:20px;flex:none}</style><div class="frame" data-grid-table data-column-sizing="controls"><table class="table" style="--table-columns:minmax(0,1fr) 108px;--table-row-padding:0 16px;--table-head-padding:8px 16px;--table-grid-gap:8px"><thead><tr><th>した人</th><th>状態</th></tr></thead><tbody><tr><td data-cell-grow>担当者</td><td><button>CSVで書き出す</button></td></tr></tbody></table></div>`)
+    const rightInset = () => page.locator('tbody tr').evaluate(row => row.getBoundingClientRect().right - row.querySelector('button').getBoundingClientRect().right)
+    assert.equal(await rightInset(), 7, 'the old 108px column lets the reserved 117px action consume the inset')
+    await page.locator('.frame').evaluate(fitListColumns)
+    assert.equal(await rightInset(), 16)
   } finally { await browser.close() }
 })

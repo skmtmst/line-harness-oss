@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
 import { Miniflare } from 'miniflare';
-import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import type { Env } from '../index.js';
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: vi.fn(async () => true) }));
 import { bookingPaymentAdmin } from './booking-payment-admin.js';
@@ -33,7 +33,28 @@ beforeAll(async () => {
   }
 }, 30000);
 afterAll(async () => { await mf?.dispose(); });
+beforeEach(async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('外部通信は禁止'); }));
+  await db.prepare('DROP TRIGGER IF EXISTS finish_crash').run();
+  await db.prepare('DELETE FROM booking_stripe_connect_states').run();
+  await db.prepare('DELETE FROM booking_payment_connections').run();
+});
 afterEach(() => vi.unstubAllGlobals());
+
+it.each(['exchanging', 'disconnecting'])('実D1で期限内の%sは409、期限切れ後は新しい要求で取り直せる', async status => {
+  const previous = await start();
+  await db.prepare('UPDATE booking_stripe_connect_states SET status=?,expires_at=?').bind(status, '2999-01-01T00:00:00Z').run();
+  expect((await request(base + '/authorize?account_id=a')).status).toBe(409);
+  expect((await request(base + '?account_id=a', 'DELETE')).status).toBe(409);
+  await db.prepare("UPDATE booking_stripe_connect_states SET expires_at='2000-01-01T00:00:00Z'").run();
+  const next = await start();
+  expect(next).not.toBe(previous);
+  expect((await request(base + '/callback', 'POST', { state: previous, code: 'ac_old' })).status).toBe(400);
+  const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({ stripe_user_id: 'acct_fixture1234', livemode: false, scope: 'read_write' }));
+  vi.stubGlobal('fetch', fetchMock);
+  expect((await request(base + '/callback', 'POST', { state: next, code: 'ac_new' })).status).toBe(200);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+}, 30000);
 
 it('実D1で同時callbackは交換1回。保存batch失敗は接続と状態を巻き戻しコードを再交換しない', async () => {
   const state = await start();

@@ -11,13 +11,14 @@ const fail = (c: Context<Env>, code: string, status: 400 | 403 | 409 | 503) => c
 const expiresAt = () => new Date(Date.now() + 10 * 60 * 1000).toISOString();
 const opaqueState = () => crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
 
-/** 同じ店の外部操作を直列化。処理中のロックを次の操作で奪わない。 */
+/** 同じ店の外部操作を直列化。期限内の処理は保護し、停止した処理は期限後に取り直せる。 */
 async function begin(db: D1Database, account: string, staff: string, session: string, state: string, status: 'pending' | 'disconnecting') {
   return db.prepare(`INSERT INTO booking_stripe_connect_states(line_account_id,state_hash,staff_id,session_hash,status,expires_at)
     VALUES(?,?,?,?,?,?) ON CONFLICT(line_account_id) DO UPDATE SET state_hash=excluded.state_hash,staff_id=excluded.staff_id,
     session_hash=excluded.session_hash,status=excluded.status,expires_at=excluded.expires_at,updated_at=datetime('now')
-    WHERE booking_stripe_connect_states.status NOT IN ('exchanging','disconnecting') RETURNING line_account_id`)
-    .bind(account, state, staff, session, status, expiresAt()).first();
+    WHERE booking_stripe_connect_states.status NOT IN ('exchanging','disconnecting')
+      OR julianday(booking_stripe_connect_states.expires_at)<=julianday(?) RETURNING line_account_id`)
+    .bind(account, state, staff, session, status, expiresAt(), new Date().toISOString()).first();
 }
 
 async function finish(db: D1Database, state: string, status: 'finished' | 'failed') {

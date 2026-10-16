@@ -509,6 +509,7 @@
 }
 
 .searchColName { width: auto; }
+.searchColStatus { width: var(--tpl-tg2-search-col-status); }
 .searchColCount { width: var(--tpl-tg2-search-col-count); }
 .searchColShare { width: var(--tpl-tg2-search-col-share); }
 .searchColUsage { width: var(--tpl-tg2-search-col-usage); }

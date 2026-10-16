@@ -2,7 +2,7 @@
 /*
  * 板 `aINnz` 支払いタブの絵合わせ。
  * - 数の帯：今回 払う額（合計・人数・件数）、次の締め（月日・あと何日）
- * - 行：確定できる／振込先待ちの札、未登録の札、明細を見るだけ
+ * - 行：確定できる／振込先待ちの札、未登録の札、行末の「…」（中に明細を見る）だけ
  * - 頭：銀行用 CSV…・支払明細をまとめて出す
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -91,7 +91,12 @@ describe('aINnz 支払いタブの絵合わせ', () => {
     })
     expect(screen.getByText('振込先待ち')).toBeTruthy()
     expect(screen.getByText('未登録')).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: '明細を見る' }).length).toBe(2)
+    // 行の右端は「…」1つ（B-253）。明細はその中にある。
+    expect(screen.queryByRole('button', { name: '明細を見る' })).toBeNull()
+    const menus = screen.getAllByRole('button', { name: /の支払いの操作/ })
+    expect(menus.length).toBe(2)
+    fireEvent.click(menus[0])
+    expect(await screen.findByRole('menuitem', { name: '明細を見る' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'この人を確定' })).toBeNull()
   })
 

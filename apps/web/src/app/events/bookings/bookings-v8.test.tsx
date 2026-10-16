@@ -373,6 +373,16 @@ describe('V8-B 申込者（Mu8qW）', () => {
     expect(document.body.textContent).toContain('加藤 舞')
   })
 
+  it('開催回の入口は曜日と時刻を1つのボタンで示し、選ぶ窓を開ける', async () => {
+    await renderV8()
+    const trigger = document.querySelector<HTMLButtonElement>('button[aria-label="開催回を選ぶ"]')!
+    expect(trigger).toBeTruthy()
+    expect(trigger.parentElement?.textContent).toBe('開催回：10/12（月） 14:00')
+    await act(async () => { trigger.click() })
+    await flush()
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('10/12（月） 14:00')
+  })
+
   it('承認すると確定の口を叩く', async () => {
     decideBooking.mockResolvedValue({})
     await renderV8()
@@ -390,6 +400,7 @@ describe('V8-B 申込者（Mu8qW）', () => {
     const input = document.querySelector('#ev-bk-message') as HTMLInputElement
     const disabledSend = [...document.querySelectorAll('button')].find((b) => b.textContent === '送る')!
     expect(disabledSend.disabled).toBe(true)
+    expect(disabledSend.querySelector('svg.lucide-send')).toBeTruthy()
     expect(disabledSend.title).toBe('メッセージを入力してください')
     await act(async () => {
       fireEvent.change(input, { target: { value: '当日は動きやすい服装でお越しください' } })

@@ -4,7 +4,7 @@ import Toggle from '@/components/shared/toggle';
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
-  ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CircleCheck, CircleDashed, CircleX,
+  ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CircleCheck,
   Copy, Download, ExternalLink, Lock, CircleHelp, Plug, QrCode, ShieldCheck, RotateCw, Users, Activity,
 } from 'lucide-react'
 import { api, type FollowerImportState, type LineAccountConnectData, type LineAccountTag } from '@/lib/api'
@@ -27,13 +27,13 @@ import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
-import { SettingCheckbox } from '@/components/shared/checkbox'
 import StatusBadge from '@/components/shared/status-badge'
+import VerificationList from '@/components/shared/verification-list'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
   DRAFT_KEY, allV8RowsPassed, canSave, channelErrors, checkRowText, insightDateJst, isDuplicateChannelError,
   matchRegisteredAccountId, readDraft, toSteps, toV8CheckRows, webhookDetail,
-  type DraftState, type StepNumber, type V8CheckRow,
+  type DraftState, type StepNumber,
 } from './logic'
 import styles from './register.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
@@ -50,6 +50,10 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 使う口も同じ（api.lineAccounts.connectCheck / connect / followerImportState / followerInsight、
  * api.lineAccountTags、api.lineAccounts.list・api.staff.list）。違いは見せ方だけ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
+ *
+ * 2026-10-16 取り込みの進捗は followerImportState を読むだけでは次の cron（5 分ごと）まで
+ * 動かないので、画面を開いている間は stepFollowerImport で続きを進めるようにした。
+ * 画面を閉じたあとは今までどおり cron とアカウント一覧の「入る」が続きを拾う。
  */
 
 const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string; lead: string }> = [
@@ -193,17 +197,23 @@ export default function AccountRegisterV8() {
     return () => { active = false }
   }, [currentStep, saveErrors])
 
-  // ⑤：Workerが画面を閉じても進める取り込みを、読み取りだけで確認する。
+  /* ⑤：画面を開いている間は続きを進める。読み取りだけだと次の cron（5 分ごと）まで
+   * 進まないので、1 回ぶんが終わったらすぐ次を呼ぶ。1 回ぶんは Worker 側の予算で
+   * 区切られ、カーソルは D1 に残る。画面を閉じても cron と「入る」が続きを拾う。
+   * 同じアカウントを別の経路が握っているときは busy が返るだけで壊れない。 */
   useEffect(() => {
     if (!createdId || !['importing_ids', 'hydrating_profiles'].includes(importState?.phase ?? connection?.followerImport.phase ?? '') || !form.importFriends) return
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const advance = async () => {
       try {
-        const response = await api.lineAccounts.followerImportState(createdId)
+        const response = await api.lineAccounts.stepFollowerImport(createdId)
         if (!active || !response.success) return
-        setImportState(response.data)
-        if (['importing_ids', 'hydrating_profiles'].includes(response.data.phase)) timer = setTimeout(() => void advance(), 3000)
+        setImportState(response.data.state)
+        if (['importing_ids', 'hydrating_profiles'].includes(response.data.state.phase)) {
+          /* 進めた直後は待たない（0.5秒は、何も進まない応答が続いたときの空回り止め）。 */
+          timer = setTimeout(() => void advance(), response.data.busy ? 3000 : 500)
+        }
       } catch (saveFailure) {
         saveErrors.capture(saveFailure);
 
@@ -480,8 +490,9 @@ export default function AccountRegisterV8() {
       <PageHeading
         title="LINEアカウントを登録"
         help={shownStep.lead}
-        steps={(
-          <Steps
+        /* ★V8 xj3zz〜TvXII：手順は題と同じ行（題・手順・？の順）。 */
+        titleAccessory={(
+          <div><Steps
             label="登録の進捗"
             currentKey={String(createdId ? 5 : currentStep)}
             steps={V8_STEPS.map((step) => ({
@@ -492,7 +503,7 @@ export default function AccountRegisterV8() {
               /* 登録する前は、済んだ段を押すとその段へ戻る（入れた値はそのまま）。登録した後は戻らない。 */
               onSelect: !createdId && currentStep > step.number ? () => setCurrentStep(step.number) : undefined,
             }))}
-          />
+          /></div>
         )}
       />
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
@@ -571,17 +582,20 @@ export default function AccountRegisterV8() {
           {currentStep === 3 && !createdId && (
             <Card surface="standard" layout="vertical" contentPadding="var(--polish-space-section)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="基本情報" data-design-node="GwKE2" data-step="3">
               <h2 className={styles.panelTitle}>基本情報</h2>
+              {/* LINE ID の右に［LINEから取得］（絵 GwKE2：欄と同じ行の右端）。 */}
+              <div className={styles.idRow}>
               <SettingsFormRow layout="columns">
                 <Field label="表示名" htmlFor="v8-display-name"><SaveErrorField names={["name","form.name"]}><TextField id="v8-display-name" value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "v8-display-name-error" : undefined} /></SaveErrorField></Field>
                 <Field label="LINE ID" htmlFor="v8-line-id"><SaveErrorField names={["lineId","form.lineId","line_id","form.line_id"]}><TextField id="v8-line-id" value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly /></SaveErrorField></Field>
               </SettingsFormRow>
               <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…"><Download size={15} aria-hidden="true" />LINEから取得</Button>
+              </div>
               {fieldErrors.name && <p id="v8-display-name-error" role="alert" className={styles.fieldError}>{fieldErrors.name}</p>}
               <div className={styles.field}>
                 <span className={styles.groupLabel}>タグ</span>
                 <div className={styles.tagRow}>
-                  <EntitySelect aria-label="タグ" noun="タグ" values={form.tagIds} onChange={(ids) => update('tagIds', ids)} options=
-                  {(tags ?? []).map((tag) =>({ value:tag.id, label:tag.name}))} />
+                  <span className={styles.tagPick}><EntitySelect aria-label="タグ" noun="タグ" values={form.tagIds} onChange={(ids) => update('tagIds', ids)} options=
+                  {(tags ?? []).map((tag) =>({ value:tag.id, label:tag.name}))} /></span>
                   {tagInputOpen ? (
                     <span className={styles.tagAdd}>
                       <SaveErrorField names={["newTagName","new_tag_name"]}><TextField value={newTagName} onChange={(event) => setNewTagName(event.target.value)} placeholder="新しいタグの名前" aria-label="新しいタグの名前" maxLength={100} autoFocus /></SaveErrorField>
@@ -612,7 +626,7 @@ export default function AccountRegisterV8() {
               )}
               <div className={styles.field}>
                 <span className={styles.groupLabel}>Callback URL</span>
-                <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
+                <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--space-8) var(--space-8) var(--space-8) var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
                   <span className={styles.endpointValue} ><TruncatedText value={String(callbackUrl ?? '')} url /></span>
                   <CopyButton value={callbackUrl} />
                 </Card>
@@ -631,15 +645,9 @@ export default function AccountRegisterV8() {
               </Card>
               )}>
               <div className={styles.column}>
-                <ol className={styles.checkList} aria-label="接続確認項目">
-                  {checkRows.map((row) => <CheckRow key={row.key} row={row} />)}
-                </ol>
-                <Card layout="horizontal" surface="inset" contentPadding="var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
-                  <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><SettingCheckbox checked={form.importFriends} label="既存の友だちの取り込み" onChange={(next) => update('importFriends', next)} /></SaveErrorField>
-                  <span className={styles.importText}>
-                    <strong>既存の友だちの取り込み</strong>
-                    <span>登録のあと、いまの友だちを musubo に取り込みます（数分かかります）</span>
-                  </span>
+                <VerificationList items={checkRows.map(row => ({ key: row.key, title: row.title, state: row.state, detail: checkRowText(row) }))} />
+                <Card surface="inset" contentPadding="var(--polish-space-card)">
+                  <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><Checkbox checked={form.importFriends} onCheckedChange={(next) => update('importFriends', next)} description="登録のあと、いまの友だちを musubo に取り込みます（数分かかります）">既存の友だちの取り込み</Checkbox></SaveErrorField>
                 </Card>
               </div>
 
@@ -749,19 +757,6 @@ export default function AccountRegisterV8() {
     </PageFrame></SaveErrorScope>
   )
 }
-function CheckRow({ row }: { row: V8CheckRow }) {
-  const Icon = row.state === 'passed' ? CircleCheck : row.state === 'failed' ? CircleX : CircleDashed
-  return (
-    <li className={styles.checkRow} data-state={row.state}>
-      <Icon size={18} className={styles.checkIcon} aria-hidden="true" />
-      <strong className={styles.checkTitle}>{row.title}</strong>
-      <span className={styles.checkDetail} title={checkRowText(row)}>{checkRowText(row)}</span>
-      <StatusBadge tone={row.state === 'passed' ? 'success' : row.state === 'failed' ? 'neutral' : 'warning'}>
-        {row.state === 'passed' ? '通った' : row.state === 'failed' ? '止まった' : 'まだ'}
-      </StatusBadge>
-    </li>
-  )
-}
 function ResultRow({ label, value, state }: { label: string; value: string; state: 'passed' | 'failed' | 'todo' }) {
   return (
     <Tr>
@@ -774,6 +769,6 @@ function ResultRow({ label, value, state }: { label: string; value: string; stat
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
   return (
-    <CopyTextButton value={value} aria-label="値をコピー" disabled={value === '—'} />
+    <CopyTextButton value={value} label="コピーする" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="値をコピー" disabled={value === '—'} />
   )
 }

@@ -121,6 +121,7 @@ shared-button-importer components/ops/notice-line-account-card.tsx
 shared-button-importer components/ops/ops-shell.tsx
 shared-button-importer components/reminders/test-recipient-guidance.tsx
 shared-button-importer components/rich-menus/apply-to-tag-modal.tsx
+shared-button-importer components/rich-menus/hq-menu-review.tsx
 shared-button-importer components/scenarios/action-editor.tsx
 shared-button-importer components/scenarios/carousel-picker.tsx
 shared-button-importer components/scenarios/insert-toolbar.tsx
@@ -192,7 +193,6 @@ shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/common-vars/export-panel.tsx
 shared-button-importer v8/common-vars/list.tsx
-shared-button-importer v8/inflow-links/coupon-settings.tsx
 shared-button-importer v8/inflow-links/bulk-dialog.tsx
 shared-button-importer v8/inflow-links/edit-route-dialog.tsx
 shared-button-importer v8/inflow-links/list.tsx
@@ -355,7 +355,7 @@ shared-button-importer v8/restaurant/google/posts.tsx
 shared-button-importer v8/restaurant/google/profile.tsx
 shared-button-importer v8/restaurant/google/reviews.tsx
 shared-button-importer v8/restaurant/google/settings.tsx
-shared-button-importer v8/restaurant/line-followup/flow-editor.tsx
+shared-button-importer v8/restaurant/line-followup/line-followup.tsx
 shared-button-importer v8/restaurant/organization/organization.tsx
 shared-button-importer v8/restaurant/store-new/store-new.tsx
 # ★V8 飲食店テスト（在庫 Y8SjT2・予約台帳 l9NlC0・座席 BERxg・メニュー MJoJR）。src/v8/restaurant に一から書いた。
@@ -471,6 +471,7 @@ shared-button-importer v8/template-detail/detail.tsx
 shared-button-importer v8/tag-edit/edit-form.tsx
 shared-button-importer v8/tag-edit/search-edit.tsx
 shared-button-importer v8/rich-menu-edit/detail.tsx
+shared-button-importer v8/rich-menu-edit/publish-review.tsx
 shared-button-importer v8/affiliate-offer-new/create.tsx
 
 # リッチビデオ編集も共通の保存・キャンセルを使う。
@@ -513,6 +514,7 @@ shared-button-importer v8/visit-stamps/qr.tsx
 shared-button-importer v8/restaurant/reservations/waitlist.tsx
 
 shared-button-importer v8/booking-bookings/day-list.tsx
+shared-button-importer v8/booking-bookings/month-navigation.tsx
 shared-button-importer v8/booking-bookings/visit-actions.tsx
 shared-button-importer app/emergency/control-feedback-v8.tsx
 shared-button-importer v8/settings/emergency/history-details.tsx
@@ -538,6 +540,7 @@ shared-button-importer components/shared/inbox-composer.tsx
 # B-244〜B-247: 新しい共通の知らせの持ち主
 shared-button-importer components/shared/aggregation-status.tsx
 shared-button-importer components/shared/friend-filter-band.tsx
+shared-button-importer components/shared/friend-match-row.tsx
 shared-button-importer components/shared/save-feedback.tsx
 shared-button-importer components/shared/inbox-list.tsx
 shared-button-importer v8/booking-menus/menu-settings-page.tsx
@@ -546,3 +549,7 @@ shared-button-importer v8/mileage/history-table.tsx
 shared-button-importer v8/tags/fields-table.tsx
 shared-button-importer v8/tags/fields-view.tsx
 shared-button-importer v8/restaurant/organization/organization-forms.tsx
+shared-button-importer components/shared/reservation-people-grid.tsx
+shared-button-importer v8/automations/common-action-sequence.tsx
+shared-button-importer v8/booking-bookings/day-frame.tsx
+shared-button-importer v8/booking-bookings/month-bar.tsx

@@ -1,3 +1,10 @@
+import { RESERVATION_FILTER_STATUSES, parseReservationFilter } from './restaurant-reservation-filter.js';
+import { deriveStoreLineStatuses, isValidTimezone, uniqueStoreConflict, validFloorCoordinate, validJoinGroup } from './restaurant-store-status.js';
+import { extractBroadcastTemplateIds, refreshScenarioReferences } from '@line-crm/db';
+import { parseBroadcastMessageParts, buildMessages } from '../services/broadcast-message-set.js';
+import { validateTemplateMessage } from '../services/template-message-validation.js';
+
+import type {OrganizationRow,OrganizationContext,RestaurantStoreRow,SelectedRestaurantStore,SeatWaitlistEntryLike} from './restaurant-context-types.js';
 import { isCalendarDate as isExistingCalendarDate, scheduledJstIso } from '@line-crm/shared';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { processScenarioSourceJobs } from '../services/scenario-source-jobs.js';
@@ -18,40 +25,23 @@ import { readCloseNotificationSettings, saveCloseNotificationSettings } from '..
 import { StampError } from '../services/visit-stamps.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import {
-  CredentialEncryptionKeyError,
-  createLineAccount,
-  deleteUncommittedLineAccount,
-  getLineAccounts,
-  type LineAccount,
-} from '@line-crm/db';
+import { CredentialEncryptionKeyError, createLineAccount, deleteUncommittedLineAccount } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
 import { requireRole, requirePermission } from '../middleware/role-guard.js';
 import { BOOKING_SETTINGS_KEY } from '@line-crm/shared';
 import { assignmentSettingsResponse } from './booking-assignment-settings.js';
 import { assignRestaurantTable } from '../services/booking-assignment.js';
-import {
-  canAccessLineAccount,
-  getVisibleLineAccountScope,
-} from '../services/account-access.js';
+import { canAccessLineAccount, getVisibleLineAccountScope } from '../services/account-access.js';
 import { sendRestaurantLineConfirmation, type RestaurantLineNotice } from '../services/restaurant-line-confirmation.js';
 import { promoteSeatWaitlist } from '../services/restaurant-seat-waitlist.js';
 import { finishExpiredWaitlists } from '../services/booking-waitlist.js';
 import { processBookingWaitlists } from '../services/waitlist-tick.js';
 import { dbFor } from '../services/db-router.js';
 import { paymentSettingResponse } from './booking-payment-settings.js';
-import {
-  issueRestaurantIntakeAddress,
-  listRestaurantIntakeAddresses,
-  RestaurantIntakeConfigurationError,
-} from '../services/restaurant-email-intake.js';
-import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
-import {
-  issueLineAccessToken,
-  LineTokenIssueError,
-  type LineTokenIssueFailure,
-} from '../services/token-refresh.js';
+import { issueRestaurantIntakeAddress, listRestaurantIntakeAddresses, RestaurantIntakeConfigurationError } from '../services/restaurant-email-intake.js';
+
+import { issueLineAccessToken, LineTokenIssueError, type LineTokenIssueFailure } from '../services/token-refresh.js';
 import { fetchBotProfile } from '../lib/bot-profile.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';
@@ -60,10 +50,7 @@ import { DEFAULT_STAY_MINUTES } from '../services/restaurant-reservation-email.j
 import { restaurantChannelState, restaurantDayBounds } from '../services/restaurant-channels.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
-import {
-  isRestaurantReservationSource,
-  validateInboundReservation,
-} from '../services/restaurant-test.js';
+import { isRestaurantReservationSource, validateInboundReservation } from '../services/restaurant-test.js';
 
 /**
  * 飲食店向け（テスト）の専用API。
@@ -94,39 +81,6 @@ restaurantTest.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS']
 
 const RESTAURANT_TERMS_DOCUMENT_KEY = 'musubo-terms';
 const RESTAURANT_TERMS_DOCUMENT_VERSION = 'v0.1-draft';
-
-type OrganizationRow = {
-  id: string;
-  account_id: string;
-  tenant_id: string | null;
-  tenant_name: string | null;
-  name: string;
-  status: string;
-};
-type OrganizationContext = OrganizationRow & { scopedStoreId: string | null };
-type RestaurantStoreRow = {
-  id: string;
-  organization_id: string;
-  name: string;
-  code: string;
-  area: string | null;
-  capacity: number;
-  timezone: string;
-  status: 'active' | 'paused' | 'archived';
-  line_status: 'connected' | 'warning' | 'error' | 'unconfigured';
-  google_status: string;
-  line_account_id: string | null;
-  line_account_name: string | null;
-  friend_count?: number | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type SelectedRestaurantStore = {
-  id: string;
-  organization_id: string;
-  name: string;
-};
 
 async function organizationByTenantId(
   c: Context<Env>,
@@ -297,61 +251,6 @@ function publicOrganization(organization: OrganizationContext): OrganizationRow 
     name: organization.name,
     status: organization.status,
   };
-}
-
-function expectedWebhookUrl(c: Context<Env>): string {
-  const base = (
-    c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin
-  ).replace(/\/$/, '');
-  return `${base}/webhook`;
-}
-
-async function deriveStoreLineStatuses(
-  c: Context<Env>,
-  stores: RestaurantStoreRow[],
-): Promise<RestaurantStoreRow[]> {
-  let accounts: LineAccount[] = [];
-  try {
-    accounts = await getLineAccounts(dbFor(c.env));
-  } catch {
-    // A credential/key failure is visible as an error status. Credential values
-    // and underlying crypto errors must not be copied into this response or logs.
-  }
-  const byId = new Map(accounts.map((item) => [item.id, item]));
-  const webhookUrl = expectedWebhookUrl(c);
-  return Promise.all(stores.map(async (store) => {
-    if (!store.line_account_id) {
-      return { ...store, line_status: 'unconfigured' as const };
-    }
-    const account = byId.get(store.line_account_id);
-    if (!account?.channel_access_token) {
-      return { ...store, line_status: 'error' as const };
-    }
-    const webhook = await fetchWebhookEndpointState(account.channel_access_token, webhookUrl);
-    const lineStatus: RestaurantStoreRow['line_status'] = webhook.status === 'matched'
-      ? 'connected'
-      : webhook.status === 'unknown'
-        ? 'error'
-        : 'warning';
-    return { ...store, line_status: lineStatus };
-  }));
-}
-
-function isValidTimezone(value: string): boolean {
-  try {
-    new Intl.DateTimeFormat('ja-JP', { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function uniqueStoreConflict(error: unknown): 'line_account' | 'code' | null {
-  const message = error instanceof Error ? error.message : String(error);
-  if (!/UNIQUE constraint failed/i.test(message)) return null;
-  if (/rt_stores\.line_account_id/i.test(message)) return 'line_account';
-  if (/rt_stores\.organization_id.*rt_stores\.code|rt_stores\.code/i.test(message)) return 'code';
-  return null;
 }
 
 async function validateStoreLineAccount(
@@ -545,61 +444,6 @@ restaurantTest.post('/api/restaurant-test/stores/selection/clear', requireRole('
   }
   return c.json({ success: true, data: { selectedStore: null } });
 });
-
-const RESERVATION_FILTER_STATUSES = ['pending', 'confirmed', 'seated', 'visited', 'cancelled', 'no_show'];
-
-/**
- * R103: 予約台帳の絞り込み条件を読む。期間は開始日時の範囲、状態は複数可、
- * 件数と開始位置でページを切る。既定は従来どおり先頭300件。
- */
-function parseReservationFilter(c: Context<Env>, orgId: string, scopedStoreId: string | null):
-  | { ok: true; where: string; params: unknown[]; limit: number; offset: number }
-  | { ok: false; error: string } {
-  const params: unknown[] = [orgId, scopedStoreId, scopedStoreId];
-  let where = 's.organization_id = ? AND (? IS NULL OR s.id = ?)';
-  const from = c.req.query('reservationFrom') || (c.req.path.endsWith('/board')?c.req.query('from'):'') || '';
-  if (from) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(from) && !isExistingCalendarDate(from)) return { ok: false, error: '期間の指定が正しくありません' };
-    const parsed = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(from) ? scheduledJstIso(from, '00:00')! : from);
-    if (!Number.isFinite(parsed)) return { ok: false, error: '期間の指定が正しくありません' };
-    where += ' AND julianday(r.starts_at) >= julianday(?)';
-    params.push(new Date(parsed).toISOString());
-  }
-  const to = c.req.query('reservationTo') || (c.req.path.endsWith('/board')?c.req.query('to'):'') || '';
-  if (to) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-      if (!isExistingCalendarDate(to)) return { ok: false, error: '期間の指定が正しくありません' };
-      // 日付だけの指定はその日の終わりまで含める（翌日0時未満）。
-      const next = new Date(scheduledJstIso(to, '00:00')!);
-      next.setUTCDate(next.getUTCDate() + 1);
-      where += ' AND julianday(r.starts_at) < julianday(?)';
-      params.push(next.toISOString());
-    } else {
-      const parsed = Date.parse(to);
-      if (!Number.isFinite(parsed)) return { ok: false, error: '期間の指定が正しくありません' };
-      where += c.req.path.endsWith('/board') ? ' AND julianday(r.starts_at) < julianday(?)' : ' AND julianday(r.starts_at) <= julianday(?)';
-      params.push(new Date(parsed).toISOString());
-    }
-  }
-  const statusParam = (c.req.query('reservationStatus') || '').trim();
-  if (statusParam && statusParam !== 'all') {
-    const list = statusParam.split(',').map((item) => item.trim()).filter(Boolean);
-    if (list.length === 0 || list.some((item) => !RESERVATION_FILTER_STATUSES.includes(item))) {
-      return { ok: false, error: '状態の指定が正しくありません' };
-    }
-    where += ` AND r.status IN (${list.map(() => '?').join(', ')})`;
-    params.push(...list);
-  }
-  const limit = Number(c.req.query('reservationLimit') || '300');
-  if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
-    return { ok: false, error: '件数の指定が正しくありません' };
-  }
-  const offset = Number(c.req.query('reservationOffset') || '0');
-  if (!Number.isInteger(offset) || offset < 0) {
-    return { ok: false, error: '開始位置の指定が正しくありません' };
-  }
-  return { ok: true, where, params, limit, offset };
-}
 
 restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin', 'staff'), async (c) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
@@ -1724,17 +1568,6 @@ restaurantTest.post('/api/restaurant-test/seat-waitlist/:id/convert', requireRol
   return c.json({ success: true, data: { status: 'converted' } });
 });
 
-interface SeatWaitlistEntryLike {
-  hold_expires_at:string|null;
-  table_id:string|null;
-  line_uid:string|null;
-  customer_phone:string|null;
-  store_id: string;
-  starts_at: string;
-  guest_count: number;
-  status: string;
-}
-
 /** 旧来店URLも共通の保存口へ渡す。版と操作IDは全更新で必須。 */
 async function attendance(c:Context<Env>,legacy?:'visit'|'undo_visit') {
  if(!hasOrganizationSelector(c))return requiredAccount(c);
@@ -1862,13 +1695,6 @@ restaurantTest.post('/api/restaurant-test/inbound/reservations', requireRole('ow
     throw error;
   }
 });
-
-function validFloorCoordinate(value: unknown): value is number {
-  return Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= 10000;
-}
-function validJoinGroup(value: unknown): value is string | null {
-  return value === null || (typeof value === 'string' && value.length <= 100);
-}
 
 restaurantTest.put('/api/restaurant-test/tables/layout', requireRole('owner', 'admin'), inputJsonBoundary({"storeId":["string"],"tables":["array"]}), async (c) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
@@ -2269,8 +2095,40 @@ restaurantTest.get('/api/restaurant-test/followups/:storeId',requireRole('owner'
  const template=await db.prepare('SELECT * FROM rt_store_followup_templates WHERE store_id=?').bind(storeId).first();
  if(!template)return c.json({success:false,error:'not_found'},404);
  const bindings=(await db.prepare('SELECT * FROM rt_store_followup_step_bindings WHERE store_id=? ORDER BY trigger,step_id').bind(storeId).all()).results;
- const jobs=(await db.prepare(`SELECT j.* FROM scenario_source_jobs j JOIN rt_reservation_events e ON e.id=j.source_event_id WHERE e.store_id=? ORDER BY j.scheduled_at DESC LIMIT 100`).bind(storeId).all()).results;
+ const jobs=(await db.prepare(`SELECT j.* FROM scenario_source_jobs j LEFT JOIN rt_reservation_events e ON e.id=j.source_event_id WHERE e.store_id=? OR (j.source_kind='restaurant_anniversary' AND j.source_id=?) ORDER BY j.scheduled_at DESC LIMIT 100`).bind(storeId,storeId).all()).results;
  return c.json({success:true,data:{template,bindings,jobs,editor:'common_scenario'}});
+});
+
+// 同じ共通シナリオの行へ保存し、既存トリガーで旧承認を失効させる。
+restaurantTest.put('/api/restaurant-test/followups/:storeId/steps/:stepId/messages',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c),storeId=c.req.param('storeId');
+ if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
+ const body=await c.req.json<{expectedVersion?:unknown;messageBubbles?:unknown}>();
+ if(!Number.isSafeInteger(body.expectedVersion)||Number(body.expectedVersion)<1)
+  return inputError(c,{success:false,error:'最新の版を指定してください'},400,['expectedVersion']);
+ if(!Array.isArray(body.messageBubbles)||body.messageBubbles.length<1||body.messageBubbles.length>5)
+  return inputError(c,{success:false,error:'吹き出しは1〜5個で指定してください'},400,['messageBubbles']);
+ let parts:ReturnType<typeof parseBroadcastMessageParts>;
+ try {
+  parts=parseBroadcastMessageParts({messageType:'text',messageContent:'',messageBubbles:body.messageBubbles});
+  buildMessages(parts);
+  for(const part of parts){const checked=validateTemplateMessage(part.messageType,part.messageContent);if(!checked.ok)throw new Error(checked.error);}
+ }catch(error){return inputError(c,{success:false,error:error instanceof Error?error.message:'吹き出しを確認してください'},422,['messageBubbles']);}
+ const db=dbFor(c.env,storeId),stepId=c.req.param('stepId');
+ const target=await db.prepare(`SELECT step.id,step.scenario_id,s.line_account_id FROM scenario_steps step JOIN rt_store_followup_templates t ON t.scenario_id=step.scenario_id JOIN rt_stores s ON s.id=t.store_id WHERE t.store_id=? AND step.id=?`).bind(storeId,stepId).first<{id:string;scenario_id:string;line_account_id:string}>();
+ if(!target)return c.json({success:false,error:'not_found'},404);
+ const templateIds=extractBroadcastTemplateIds(JSON.stringify(body.messageBubbles));
+ if(templateIds.length){
+  const found=await db.prepare('SELECT id FROM templates WHERE line_account_id=? AND id IN (SELECT value FROM json_each(?))').bind(target.line_account_id,JSON.stringify(templateIds)).all<{id:string}>();
+  if(found.results.length!==templateIds.length)return inputError(c,{success:false,error:'この店舗のテンプレートを選んでください'},422,['messageBubbles']);
+ }
+ const changed=await db.prepare(`UPDATE scenario_steps SET message_bubbles_json=?,message_type=?,message_content=?,template_id=NULL
+   WHERE id=? AND EXISTS(SELECT 1 FROM rt_store_followup_templates t WHERE t.store_id=? AND t.scenario_id=scenario_steps.scenario_id AND t.template_version=?)`)
+   .bind(JSON.stringify(body.messageBubbles),parts[0].messageType,parts[0].messageContent,stepId,storeId,body.expectedVersion).run();
+ if(!changed.meta.changes)return c.json({success:false,error:'version_conflict'},409);
+ await refreshScenarioReferences(db,target.scenario_id);
+ return c.json({success:true,data:{stepId,messageBubbles:body.messageBubbles,version:Number(body.expectedVersion)+1,sendingStatus:'stopped'}});
 });
 
 const updateRestaurantFollowupBinding=async(c:Context<Env>)=>{
@@ -2278,8 +2136,8 @@ const updateRestaurantFollowupBinding=async(c:Context<Env>)=>{
  const org=await organizationFor(c),storeId=c.req.param('storeId')??'';
  if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
  const b=await c.req.json<{expectedVersion?:number;trigger?:string;offsetMinutes?:number;enabled?:boolean}>().catch(()=>null);
- if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['reservation_created','reservation_24h','reservation_2h','post_visit','review_request','waitlist_invited'].includes(b.trigger??'')||!Number.isSafeInteger(b.offsetMinutes)||Math.abs(Number(b.offsetMinutes))>525600||typeof b.enabled!=='boolean')return inputError(c,{success:false,error:'invalid_binding'},400,['expectedVersion','trigger','offsetMinutes','enabled']);
- if((['reservation_24h','reservation_2h'].includes(b.trigger!)&&Number(b.offsetMinutes)>=0)||(['reservation_created','post_visit','review_request','waitlist_invited'].includes(b.trigger!)&&Number(b.offsetMinutes)<0))return inputError(c,{success:false,error:'invalid_timing'},400,['offsetMinutes']);
+ if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['reservation_created','reservation_24h','reservation_2h','post_visit','review_request','waitlist_invited','anniversary_before'].includes(b.trigger??'')||!Number.isSafeInteger(b.offsetMinutes)||Math.abs(Number(b.offsetMinutes))>525600||typeof b.enabled!=='boolean')return inputError(c,{success:false,error:'invalid_binding'},400,['expectedVersion','trigger','offsetMinutes','enabled']);
+ if((['reservation_24h','reservation_2h','anniversary_before'].includes(b.trigger!)&&Number(b.offsetMinutes)>=0)||(['reservation_created','post_visit','review_request','waitlist_invited','anniversary_before'].includes(b.trigger!)&&Number(b.offsetMinutes)<0))return inputError(c,{success:false,error:'invalid_timing'},400,['offsetMinutes']);
  const changed=await dbFor(c.env,storeId).prepare(`INSERT INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled)
   SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_store_followup_templates t JOIN scenario_steps step ON step.scenario_id=t.scenario_id
    WHERE t.store_id=? AND t.template_version=? AND step.id=?)
@@ -2525,7 +2383,6 @@ restaurantTest.post('/api/restaurant-test/inventory/generate', requireRole('owne
   } finally { await releaseLock(db,key,owner); }
 });
 
-
 restaurantTest.get('/api/restaurant-test/login-members', requireRole('owner','admin'), async c => {
   if(!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization=await organizationFor(c);
@@ -2593,7 +2450,28 @@ restaurantTest.get('/api/restaurant-test/channel-close-tasks',requireRole('owner
  if(!hasOrganizationSelector(c))return requiredAccount(c);
  const org=await organizationFor(c);const storeId=c.req.query('storeId')||org?.scopedStoreId;
  if(!org||!storeId||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'店舗が正しくありません'},404);
- return c.json({success:true,data:await listRestaurantCloseTasks(dbFor(c.env,storeId),storeId)});
+ const source=c.req.query('source'),channel=c.req.query('channel');
+ return c.json({success:true,data:await listRestaurantCloseTasks(dbFor(c.env,storeId),storeId,{source:source&&source!=='all'?source:undefined,channel:channel&&channel!=='all'?channel:undefined})});
+});
+restaurantTest.post('/api/restaurant-test/channel-close-tasks/:id/opened',requireRole('owner','admin','staff'),inputJsonBoundary(),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c);if(!org)return c.json({success:false,error:'組織がありません'},404);
+ const body=await c.req.json<{expectedGeneration?:unknown}>().catch(()=>null);
+ if(!body||!Number.isSafeInteger(body.expectedGeneration)||Number(body.expectedGeneration)<1)return inputError(c,{success:false,error:'読み込んだ知らせの世代を確認してください'},400,['expectedGeneration']);
+ const db=dbFor(c.env),id=c.req.param('id');
+ const task=await db.prepare(`SELECT store_id,generation,status,'rt_channel_close_tasks' AS task_table FROM rt_channel_close_tasks WHERE id=?
+ UNION ALL SELECT store_id,generation,status,'rt_reservation_close_tasks' FROM rt_reservation_close_tasks WHERE id=?
+ UNION ALL SELECT store_id,generation,status,'rt_closure_close_tasks' FROM rt_closure_close_tasks WHERE id=?`).bind(id,id,id)
+ .first<{store_id:string;generation:number;status:string;task_table:'rt_channel_close_tasks'|'rt_reservation_close_tasks'|'rt_closure_close_tasks'}>();
+ if(!task||!await storeBelongsTo(c,org.id,task.store_id))return c.json({success:false,error:'知らせがありません'},404);
+ const generation=Number(body.expectedGeneration);
+ const saved=await db.prepare(`INSERT INTO account_settings(id,line_account_id,key,value)
+ SELECT ?,s.line_account_id,?,? FROM ${task.task_table} t JOIN rt_stores s ON s.id=t.store_id
+ WHERE t.id=? AND t.store_id=? AND t.status='reopen' AND t.generation=? AND s.line_account_id IS NOT NULL
+ ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value,updated_at=datetime('now')`)
+ .bind(crypto.randomUUID(),'restaurant_close_opened:'+id,String(generation),id,task.store_id,generation).run();
+ if(!saved.meta.changes)return c.json({success:false,error:'知らせが更新されました。読み直してください'},409);
+ return c.json({success:true,data:{id,status:'reopen',opened:true,generation}});
 });
 restaurantTest.post('/api/restaurant-test/channel-close-tasks/:id/done',requireRole('owner','admin','staff'),inputJsonBoundary(), async c=>{
  if(!hasOrganizationSelector(c))return requiredAccount(c);
@@ -2605,7 +2483,6 @@ restaurantTest.post('/api/restaurant-test/channel-close-tasks/:id/done',requireR
  if(!changed.meta.changes&&task.status!=='done')return c.json({success:false,error:'知らせが更新されました。読み直してください'},409);
  return c.json({success:true,data:{id:c.req.param('id'),status:'done'}});
 });
-
 
 restaurantTest.get('/api/restaurant-test/media', requireRole('owner','admin','staff'), async c => {
   return c.json({success:true,data:(await dbFor(c.env).prepare('SELECT code,name,accepts_reservations AS acceptsReservations FROM rt_media ORDER BY name').all()).results});

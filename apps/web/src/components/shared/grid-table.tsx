@@ -25,18 +25,20 @@ export type GridTableDesign = {
   headBackground?: string
 }
 
-export function GridTable({ children, label, design, framed = true, className }: {
+export function GridTable({ children, label, design, framed = true, className, presentation, ...props }: Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'className' | 'style' | 'role' | 'aria-label'> & {
   children: ReactNode
   label: string
   design: GridTableDesign
   framed?: boolean
+  /** 時刻×担当の盤。既存のカレンダー枠と専用密度を使う。 */
+  presentation?: 'calendar'
   /** 幅と、狭い板での列の並びだけを渡す。 */
   className?: string
 }) {
   const actionWidthRef = useTableActionWidth<HTMLDivElement>()
   useListRowDensity(actionWidthRef)
   const variables = Object.fromEntries(Object.entries(design).map(([key, value]) => [`--grid-table-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value]))
-  return <div ref={actionWidthRef} data-shared-part="list-table" role="table" aria-label={label} className={[styles.table, className].filter(Boolean).join(' ')} data-framed={framed || undefined} style={variables as CSSProperties}>{children}</div>
+  return <div {...props} ref={actionWidthRef} data-shared-part="list-table" role="table" aria-label={label} className={[styles.table, className].filter(Boolean).join(' ')} data-framed={presentation === 'calendar' ? undefined : framed || undefined} data-table-presentation={presentation} data-booking-calendar={presentation === 'calendar' ? '' : undefined} style={variables as CSSProperties}>{children}</div>
 }
 
 export function GridHeadRow({ children, className }: { children: ReactNode; className?: string }) {

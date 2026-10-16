@@ -48,6 +48,13 @@ const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role
 const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '山田 太郎', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
 const readOnlyMaster: AuthenticatedStaff = { ...master, id: 'master-ro', readOnly: true };
 
+it('契約先詳細の4枠は対象組織のアカウントと保存済み値だけを集計し、未取得を0にしない',async()=>{
+  testDb.raw.exec("UPDATE tenants SET plan_key='standard' WHERE id='tenant-a';INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES('metrics-a','A','metrics-a','fixture','fixture','tenant-a'),('metrics-z','Z','metrics-z','fixture','fixture','tenant-z');INSERT INTO friends(id,line_user_id,line_account_id) VALUES('metrics-f','Uf','metrics-a'),('metrics-other','Uother','metrics-z');INSERT INTO hq_support_requests(id,tenant_id,kind,subject,body,status) VALUES('metrics-s','tenant-a','usage','質問','本文','open'),('metrics-other','tenant-z','usage','別会社','本文','open')");
+  const res=await app(readOnlyMaster).request('/api/ops/tenants/tenant-a',{},environment());expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({data:{metrics:{monthlyListPriceYen:29800,thisMonthBilledYen:null,accountCount:1,activeAccountCount:1,friendCount:1,friendChangeLastMonth:null,supportCount:1,unresolvedSupportCount:1}}});
+  expect((await app(tenantOwner).request('/api/ops/tenants/tenant-a',{},environment())).status).toBe(403);
+});
+
 function json(body: unknown) {
   return { method: 'POST', headers: { 'content-type': 'application/json', Authorization: 'Bearer lh_session:ops-fixture' }, body: JSON.stringify(body) };
 }
