@@ -6,3 +6,5 @@
 .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); font-weight: 600; line-height: normal; color: var(--color-ink); }
 .size { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro); font-variant-numeric: tabular-nums; line-height: normal; color: var(--color-ink-faint); }
 }
+
+@layer components { .tile:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); } }

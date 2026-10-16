@@ -569,3 +569,4 @@ shared-button-importer v8/webinars/list.tsx
 # B-234〜238：アレルギー・統括本文・お客さまデザインの共通操作。
 
 # B-244〜B-247: 新しい共通の知らせの持ち主
+shared-button-importer components/shared/image-multi-upload.tsx

@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .freeSlot { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: var(--polish-space-row); block-size: 100%; inline-size: 100%; border: 1px dashed var(--color-accent-border); border-radius: var(--radius-control); background: var(--tpl-sd-free); color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 600; cursor: pointer; white-space: nowrap; }
 .freeSlot:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); }
 .legendItem { display: inline-flex; align-items: center; gap: var(--polish-space-row); }
@@ -9,3 +11,4 @@
 .legendItem[data-state='star'] svg { color: var(--color-star-on); }
 .dayName { display: flex; flex-direction: column; min-inline-size: 0; }
 .dayName a { color: var(--color-accent-deep); font-size: var(--text-body); font-weight: 600; text-decoration: none; white-space: nowrap; }
+}

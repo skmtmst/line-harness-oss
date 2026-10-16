@@ -2,7 +2,7 @@
 
 
 import { isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
-import React, { useContext, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import React, { useContext, useEffect, useLayoutEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
 import Button from './button'
@@ -238,9 +238,9 @@ export default function Dialog({
       : styles.compactConfirmation
     : ''
 
-  useEffect(() => setMounted(true), [])
-  // モーダルは最初からportalへ描く。表示後のDOM移動で最初の入力を落とさない。
-  if ((!open && !leaving) || (modal && !mounted)) return null
+  // 最初の描画前にportalへ移す。利用者が触れた入力DOMは入れ替えない。
+  useLayoutEffect(() => setMounted(true), [])
+  if (!open && !leaving) return null
 
   const titleNode = (
     <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{typeof title === 'string' && tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}</h2>
@@ -365,7 +365,7 @@ export default function Dialog({
       {panel}
     </div>
   )
-  return <OverlayDepthContext.Provider value={depth + 1}>{discardDialog}{createPortal(overlay, document.body)}</OverlayDepthContext.Provider>
+  return <OverlayDepthContext.Provider value={depth + 1}>{discardDialog}{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>
 }
 
 /** q3DPdz の手順。済みは戻れるボタン、現在は aria-current で伝える。 */

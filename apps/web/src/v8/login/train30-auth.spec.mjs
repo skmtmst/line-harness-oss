@@ -105,6 +105,7 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and personal rec
   const dialog = page.getByRole('dialog', { name: '二段階認証の必須をオフにしますか' })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('textbox', { name: '1桁目' }).fill('123456')
+  expect(await dialog.getByRole('textbox').evaluateAll(inputs => inputs.map(input => input.value))).toEqual(['1', '2', '3', '4', '5', '6'])
   expect(writes).toBe(0)
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`off-confirm-${width}.png`) })
   await dialog.getByRole('button', { name: 'オフにする', exact: true }).click()

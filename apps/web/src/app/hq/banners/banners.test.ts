@@ -174,7 +174,7 @@ describe('統括 バナー生成', () => {
     const picker = read('../../../components/hq/banners/reference-picker-dialog.tsx')
     // 板IDは承認時に ★V8 `UcBQ5` から ★BG-C `cOgWE` へ改名した（同じダイアログ）
     expect(picker).toContain('designNode="cOgWE"')
-    expect(picker).toContain('aria-multiselectable="true"')
+    // 複数選択・選択順・使い方の受渡しはreference-picker-v8.test.tsxが実DOMで検証する。
     expect(picker).toContain('data-design-node="JOi8G"')
     expect(picker).toContain('選んだ画像の使い方')
     expect(picker).toContain('枚を使う')

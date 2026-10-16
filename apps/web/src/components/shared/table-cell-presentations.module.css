@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .friendListCell { padding: var(--tpl-fr-row-block) var(--tpl-fr-cell-gap) var(--tpl-fr-row-block) 0; font-size: var(--text-caption); line-height: var(--tpl-fr-delta-lh); vertical-align: middle; }
 .templatePlainCell { color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-tl-cell-lh); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
@@ -11,3 +13,4 @@
 :global(:root) .friendList th[data-column-kind='name']:first-child,
 :global(:root) .friendList td[data-column-kind='star']:first-child { padding-left: var(--tpl-fr-row-side); }
 :global(:root) .friendList [data-column-kind='menu'] { padding-right: var(--tpl-fr-row-side); }
+}

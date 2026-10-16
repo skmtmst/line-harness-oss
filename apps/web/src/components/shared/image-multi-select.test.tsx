@@ -11,6 +11,7 @@ it('上限では選択済みだけ外せて、空いた枠へ別の画像を選�
     return <ImageMultiSelect items={items} selectedIds={selected} max={2} onToggle={id => setSelected(ids => ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id])} />
   }
   render(<Page />)
+  expect(screen.getByRole('listbox').getAttribute('aria-multiselectable')).toBe('true')
   const [a, b, c] = screen.getAllByRole('option') as HTMLButtonElement[]
   expect(c.disabled).toBe(true)
   expect(a.disabled).toBe(false)
