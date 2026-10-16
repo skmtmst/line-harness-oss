@@ -387,6 +387,19 @@ export interface FormSubmitResponse {
   idempotencyKey?: string;
 }
 
+/** 予約の前のキャンセル料・デポジット（口の案）。金額は円。決まりがオフなら enabled=false。 */
+export interface BookingCancellationPreview {
+  enabled: boolean;
+  version: number;
+  /** この時刻までは無料（ISO）。 */
+  freeUntil: string | null;
+  afterPercent: number;
+  noShowPercent: number;
+  price: number;
+  /** デポジット（今払う額）。無ければ null。 */
+  deposit: { amount: number } | null;
+}
+
 export const api = {
   customerLook: () => get<{success: boolean;data:{settings:LiffLookApiSettings;look:import('@line-crm/shared').CustomerLook;version:number}}>('/api/liff/customer-look'),
   researchForm: (id: string) => getData<{ formId: string }>(`/api/liff/research/${encodeURIComponent(id)}/form`),
@@ -411,7 +424,7 @@ export const api = {
   bookingSettings: () => get<LiffBookingSettings>('/api/liff/booking/settings'),
   // Worker 側で id_token を verify するので lineUserId は body に入れない。
   createRequest: (
-    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string;waitlist_id?:string },
+    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string;waitlist_id?:string; policyAccepted?: boolean; policyVersion?: number; setupIntentId?: string },
     idempotencyKey: string,
   ) =>
     post<CreateBookingResponse>(
@@ -419,6 +432,17 @@ export const api = {
       body,
       { 'Idempotency-Key': idempotencyKey },
     ).then(assertBookingPaymentResponse),
+  /**
+   * 予約の前のキャンセル料・デポジットの見積もり（B1・kwC8E・Q8HLq）。**口の案（口が要る）**：
+   * Worker の今の見積もり（/cancellation-quote）は予約ができてからしか読めないので、確認の段で読む口を案として呼ぶ。
+   * 口が無い（404 など）ときは null を返し、確認の段は今までどおり（決まりの段を出さない）。
+   */
+  cancellationPreview: (input: { menuId: string; staffId: string; startsAt: string }) =>
+    getData<BookingCancellationPreview>(`/api/liff/booking/cancellation-preview?menu_id=${encodeURIComponent(input.menuId)}&staff_id=${encodeURIComponent(input.staffId)}&starts_at=${encodeURIComponent(input.startsAt)}`)
+      .catch(() => null),
+  /** カードの登録（gap1・試験モード）。登録済みなら status=ready、まだなら url の登録画面へ。 */
+  cancellationSetup: (menuId: string, idempotencyKey: string) =>
+    post<{ success: true; data: { setupIntentId: string; url: string; status: string; testMode: boolean } }>('/api/liff/booking/setup-intent', { menuId, policyAccepted: true }, { 'Idempotency-Key': idempotencyKey }).then((res) => res.data),
   /** お支払いありの予約だけ payment が付く。なしの店では今までどおり付かない。 */
   startBookingPayment: (bookingId: string) =>
     post<{ payment: BookingPayment | null; checkoutUrl: string | null }>(

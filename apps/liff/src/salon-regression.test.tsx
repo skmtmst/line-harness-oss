@@ -27,7 +27,8 @@ it('deployed booking history displays the server supplied cancellation deadline'
 it('deployed booking preserves input and the same operation key on failure and retry',async()=>{
  const posted: RequestInit[]=[]
  // createApi treats a 409 as a conflicting slot, before retrying the same request.
- vi.stubGlobal('fetch',vi.fn(async(_input: RequestInfo | URL, opts: RequestInit = {})=>{posted.push(opts);return new Response(JSON.stringify(posted.length===1?{success:false,error:'slot_conflict'}:{booking_id:'b',status:'requested'}),{status:posted.length===1?409:200,headers:{'Content-Type':'application/json'}})}))
+ // The confirm step also reads the cancellation-policy preview (GET); without that endpoint it answers 404 and the step stays as before.
+ vi.stubGlobal('fetch',vi.fn(async(_input: RequestInfo | URL, opts: RequestInit = {})=>{if((opts.method??'GET')==='GET')return new Response('{}',{status:404});posted.push(opts);return new Response(JSON.stringify(posted.length===1?{success:false,error:'slot_conflict'}:{booking_id:'b',status:'requested'}),{status:posted.length===1?409:200,headers:{'Content-Type':'application/json'}})}))
  const done=vi.fn();render(<MemoryRouter><Confirm menu={menu} staff={staff} slot={{date:'2026-10-20',start:'10:00'}} autoConfirm={false} onSubmitted={done} onBack={()=>{}} /></MemoryRouter>)
  const {fireEvent}=await import('@testing-library/react');fireEvent.change(screen.getByRole('textbox'),{target:{value:'fixture note'}});fireEvent.click(screen.getByRole('button',{name:'この内容で予約をリクエストする'}))
  await screen.findByText(/他の方の予約と重なりました/);expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('fixture note');expect(done).not.toHaveBeenCalled()
