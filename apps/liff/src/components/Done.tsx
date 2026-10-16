@@ -7,6 +7,7 @@ import { logFailure } from '../lib/user-message.js';
 import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import Icon from './ui/Icon.js';
+import OnlineMeetingCard from './OnlineMeetingCard.js';
 import type { SlotPick } from './DateTimePicker.js';
 
 /**
@@ -104,6 +105,7 @@ export default function Done({
           </dd>
         </div>
       </dl>
+      <OnlineMeetingCard bookingId={bookingId} status={status} />
       {prepayNotice && (
         <section
           aria-label="事前のお支払いのお願い"
