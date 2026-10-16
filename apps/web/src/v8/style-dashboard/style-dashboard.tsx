@@ -10,6 +10,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { RadioCardGroup } from '@/components/shared/radio-card'
 import Radio from '@/components/shared/radio'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import RestaurantFloorMap from '@/components/shared/restaurant-floor-map'
@@ -275,9 +276,9 @@ function ResultDialog({ row, busy, onClose, onSave }: { row: StyleRow; busy: boo
   const [value, setValue] = useState<'considering' | 'won' | 'lost'>('considering')
   return (
     <Dialog open title="結果を付ける" description={`${row.name}さま・${row.time}${row.endTime ?? ''}・${row.sub ?? ''}`} designWidth={480} busy={busy} confirmLabel="結果を付ける" onCancel={onClose} onConfirm={() => onSave(value)}>
-      <div className={styles.resultChoices} role="radiogroup" aria-label="面談の結果">
+      <RadioCardGroup className={styles.resultChoices} legend="面談の結果">
         {OUTCOMES.map((o) => <Radio key={o.value} name="outcome" checked={value === o.value} onChange={() => setValue(o.value)}>{o.label}</Radio>)}
-      </div>
+      </RadioCardGroup>
     </Dialog>
   )
 }

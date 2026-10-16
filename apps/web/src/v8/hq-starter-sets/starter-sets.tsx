@@ -205,7 +205,7 @@ export default function HqStarterSetsV8() {
                     </GridCell>
                     <GridCell><StatusBadge tone={group.how.tone} dot>{group.how.text}</StatusBadge></GridCell>
                     {/* 口は初期セット全体の更新日時を返す（種類ごとではない）。直した人は ID なので名前は出さない。 */}
-                    <GridCell className={styles.date}>{set ? shortDate(set.updatedAt) : '—'}</GridCell>
+                    <GridCell><span className={styles.date}>{set ? shortDate(set.updatedAt) : '—'}</span></GridCell>
                     <GridCell>{canEdit ? <RowMenu appearance="box" size="row" label={`${group.label}の操作`} items={[
                       { id: 'edit', label: '中身を直す', onSelect: () => preparing.open(`${group.label}の中身を直す`) },
                       ...(set ? [{ id: 'remove', label: '初期セットから外す', tone: 'danger' as const, onSelect: () => { setSaveError(''); setRemoving(group.kind) } }] : []),

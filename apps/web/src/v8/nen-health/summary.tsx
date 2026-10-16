@@ -124,8 +124,8 @@ export default function SummaryDrawerV8({
                   <Tr key={log.loggedOn}>
                     <Td><TruncatedText value={md(log.loggedOn)} /></Td>
                     <Td><TruncatedText value={log.weightKg == null ? emptyValue('unknown') : `${log.weightKg}kg`} /></Td>
-                    <Td data-tone={STOOL_OK.has(log.stool) ? undefined : 'warn'} className={styles.logCell}><TruncatedText value={summary.labels.stool[log.stool] ?? log.stool} /></Td>
-                    <Td data-tone={APPETITE_OK.has(log.appetite) ? undefined : 'warn'} className={styles.logCell}><TruncatedText value={summary.labels.appetite[log.appetite] ?? log.appetite} /></Td>
+                    <Td><TruncatedText tone={STOOL_OK.has(log.stool) ? undefined : 'warning'} value={summary.labels.stool[log.stool] ?? log.stool} /></Td>
+                    <Td><TruncatedText tone={APPETITE_OK.has(log.appetite) ? undefined : 'warning'} value={summary.labels.appetite[log.appetite] ?? log.appetite} /></Td>
                     <Td><TruncatedText value={log.skin ? SKIN_LABELS[log.skin] ?? log.skin : emptyValue('unknown')} /></Td>
                     <Td><TruncatedText value={log.tearStain ? TEAR_SHORT[log.tearStain] ?? log.tearStain : emptyValue('unknown')} /></Td>
                     <Td><TruncatedText value={notes.get(log.loggedOn) ?? emptyValue('unknown')} /></Td>

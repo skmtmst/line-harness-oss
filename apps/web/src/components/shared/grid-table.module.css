@@ -105,7 +105,7 @@ html:root .table:is([data-table-presentation='dashboard'], [data-table-presentat
   display: flex; flex-direction: column; justify-content: center;
 }
 html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .cell[data-align='right'] {
-  align-items: flex-end; padding-inline-start: 0;
+  align-items: flex-end;
 }
 html:root .table[data-table-presentation='dashboard'] .row[data-selected] { background: var(--color-accent-soft); }
 /* 分析の列幅は見出しと全行の内容から一度だけ決める。 */
