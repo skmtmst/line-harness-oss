@@ -24,7 +24,7 @@ import PrivacyNote from '../components/ui/PrivacyNote.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
 import { DateYmdField, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../components/forms/controls';
-import { type AddressDraft, AddressFields } from "./Form-gap-parts.js"
+import { type AddressDraft, AddressFields } from "../components/form-address-fields.js"
 /**
  * 回答フォーム（友だちが実際に入力する画面）。
  *

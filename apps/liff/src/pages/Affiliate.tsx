@@ -13,7 +13,7 @@ import Card from '../components/ui/Card.js';
 import Badge from '../components/ui/Badge.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import Icon from '../components/ui/Icon.js';
-import { copyText, CopyButton } from "./Affiliate-gap-parts.js"
+import { copyText, CopyButton } from "../components/affiliate-parts.js"
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 
 interface AffiliateData {

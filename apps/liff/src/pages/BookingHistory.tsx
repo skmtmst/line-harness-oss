@@ -15,7 +15,7 @@ import StatusView from '../components/ui/StatusView.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
 import Icon from '../components/ui/Icon.js';
-import { cancelFailureMessage, changeFailureMessage } from "./BookingHistory-gap-parts.js"
+import { cancelFailureMessage, changeFailureMessage } from "../lib/booking-history-errors.js"
 /** 日時を変える窓で、今日から何日先までの空きを出すか（空きの口は28日までまとめて読める）。 */
 const CHANGE_RANGE_DAYS = 14;
 /** 窓に並べる空きの数の上限（多すぎると選べない）。 */
