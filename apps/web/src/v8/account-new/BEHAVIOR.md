@@ -19,7 +19,7 @@
 - ④：「接続して設定する」＝ `api.lineAccounts.connectCheck`。5段すべて通れば結果の窓（`qw80E`）。止まった段は行が赤で示す（同じ文の帯は重ねない）。
 - 窓：手動の1項目（応答メッセージをオフにした）にチェックが無いと登録できない。「確認コードを入れて登録する」＝ `api.lineAccounts.connect`。本人確認を求められたら `StepUpPrompt` で立て直してやり直す。
 - 重複・応答なし（R523）：同じチャネルIDで作られた行を `api.lineAccounts.list` で1件だけ特定できれば、その詳細へ案内する（未保存と断定しない）。
-- ⑤：取り込みの進み `api.lineAccounts.followerImportState`（3秒ごと・失敗は5秒後）、総数は前日の友だち数 `api.lineAccounts.followerInsight`。取り込みが終わったら契約者専用LINEの案内（`NoticeLineRegisterDialog`）を一度だけ出す。
+- ⑤：取り込みは `api.lineAccounts.stepFollowerImport` で**続きを進めながら**進みを受け取る（1回ぶんが終わったらすぐ次を呼ぶ。他の経路が同じアカウントを握っている `busy` のときだけ3秒待つ。失敗は5秒後）。読むだけ（`followerImportState`）だと次の自動処理（5分ごと）まで進まないので、画面を開いている間はこちらで進める。画面を閉じたあとは自動処理とアカウント一覧の「入る」が続きを拾う。総数は前日の友だち数 `api.lineAccounts.followerInsight`。取り込みが終わったら契約者専用LINEの案内（`NoticeLineRegisterDialog`）を一度だけ出す。
 
 ## 入力の検査
 - ②：4項目すべて必須、チャネルIDは半角数字。③：表示名は40文字まで。4項目を変えると接続確認はやり直し（結果と手動チェックを消す）。
