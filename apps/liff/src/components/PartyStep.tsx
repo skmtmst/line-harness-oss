@@ -40,7 +40,8 @@ export default function PartyMenuStep({ menu, party, onParty, onChangeMenu }: {
   /** 1 人目のメニューを選び直す。 */
   onChangeMenu: () => void;
 }) {
-  const max = Math.max(1, Math.min(menu.max_party_size ?? 1, 6));
+  /* 2 人以上は口がまだ無いので、形は 3 人まで見せ、予約を送るときに「現在準備中です」を出す（B-314）。 */
+  const max = 3;
   const [picking, setPicking] = useState<number | null>(null);
   const setMember = (index: number, patch: Partial<PartyMember>) => onParty({ ...party, members: party.members.map((m, i) => (i === index ? { ...m, ...patch } : m)) });
   const toggleAddon = (index: number, id: string) => {

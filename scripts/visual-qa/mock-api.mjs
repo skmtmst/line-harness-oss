@@ -6479,7 +6479,7 @@ const server = createServer((req, res) => {
   }
 
   /* ③-2 第2弾（繰り返し・同伴・行き先を分ける）の見本。送られた回数・間隔から返す。保存はしない。 */
-  if (/^\/api\/booking\/admin\/series/.test(url.pathname)) {
+  if (/^\/api\/booking\/admin\/(series|bookings\/[^/]+\/group)/.test(url.pathname)) {
     let raw = ''
     req.on('data', (chunk) => { raw += chunk })
     req.on('end', () => {

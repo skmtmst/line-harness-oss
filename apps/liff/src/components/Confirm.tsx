@@ -11,6 +11,8 @@ import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import PrivacyNote from './ui/PrivacyNote.js';
 import type { SlotPick } from './DateTimePicker.js';
+import PreparingOverlay from './PreparingOverlay.js';
+import RecurringCard, { type RecurrenceValue } from './RecurringCard.js';
 import { menuLine, personShort, totals, yen, type PartyState } from '../lib/party.js';
 
 /**
@@ -56,6 +58,9 @@ export default function Confirm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(() => crypto.randomUUID());
+  /* 続けて予約（B4）・2 人以上の組（B5）：口がまだ無い間は、送らずに「現在準備中です」を出す（B-314）。 */
+  const [recurrence, setRecurrence] = useState<RecurrenceValue>(null);
+  const [preparing, setPreparing] = useState<string | null>(null);
 
   const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start]));
   /* 戻る（頭の「‹」から呼ぶ）：送りかけの返事は受け取らず、日時の段へ戻る。 */
@@ -70,6 +75,8 @@ export default function Confirm({
 
   async function handleSubmit() {
     if (submitting) return;
+    if (party && party.size > 1) { setPreparing('2 人以上でのご予約'); return; }
+    if (recurrence) { setPreparing('毎週の続けての予約'); return; }
     const generation = request.begin();
     setSubmitting(true);
     setError(null);
@@ -125,6 +132,8 @@ export default function Confirm({
           value={party ? `${yen(totals(party, menu).price)}（目安・お店で払う）` : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
         />
       </dl>
+      {menu.recurring?.enabled && !party ? <RecurringCard menu={menu} staff={staff} startsAt={slotStartsAtIso(slot)} onChange={setRecurrence} /> : null}
+      {preparing ? <PreparingOverlay title="ご予約" feature={preparing} /> : null}
       <BookingIntake question={menu.intake_question} value={note} onChange={setNote} />
       {error && (
         <p role="alert" className="text-[13px] leading-6 text-danger">
@@ -144,7 +153,7 @@ export default function Confirm({
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
         <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-          {submitting ? '送信中...' : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
+          {submitting ? '送信中...' : recurrence ? `${recurrence.made} 回分を予約する` : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
         </Button>
       </BottomBar>
     </div>

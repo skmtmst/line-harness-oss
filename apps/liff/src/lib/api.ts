@@ -31,6 +31,8 @@ export interface MenuItem {
   max_party_size?: number;
   /** 追加メニュー（オプション）。メニューを選んだあと addons の口で読み足す。 */
   addons?: MenuAddon[];
+  /** お客さまの繰り返し予約（B4。初期オフ）。オンのメニューだけ確認に「毎週この時間で続ける」を出す。口が出来るまでの形（B-314）。 */
+  recurring?: { enabled: boolean; max_count: number };
 }
 
 export interface MenuAddon { id: string; name: string; duration_minutes: number; price: number }
@@ -569,6 +571,9 @@ export const api = {
    */
   resolveFormRouting: (id: string, answers: Record<string, unknown>, blockId?: string) =>
     post<{ success: true; data: { matchedIndex: number; target: { menuId: string; staffId?: string; staffGroupId?: string; meetingMode?: 'online' | 'in_person' }; routingToken: string; expiresAt: string } }>(`/api/liff/forms/${encodeURIComponent(id)}/routing/resolve`, { answers, blockId }).then((r) => r.data),
+  /** 繰り返しの確かめ（B4・口はまだ無い。無い間は確認の窓で「空きを確かめられませんでした」）。 */
+  seriesPreview: (body: { menu_id: string; staff_id: string; starts_at: string; freq: 'weekly'; count: number }) =>
+    post<{ occurrences: Array<{ index: number; starts_at: string; available: boolean; reason?: string; alternatives: string[] }> }>('/api/liff/booking/series/preview', body),
   /** 追加メニュー（B5）。メニューを選んだあと読む。 */
   addons: (menuId: string) =>
     get<{ success: true; data: Array<{ id: string; name: string; duration_minutes: number; base_price: number }> }>(`/api/liff/booking/menus/${encodeURIComponent(menuId)}/addons`)

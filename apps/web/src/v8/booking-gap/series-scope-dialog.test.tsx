@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 const get = vi.fn(); const change = vi.fn(); const cancel = vi.fn()
 vi.mock('@/lib/api-gap2', () => ({ bookingSeriesApi: { get: (...a: unknown[]) => get(...a), change: (...a: unknown[]) => change(...a), cancel: (...a: unknown[]) => cancel(...a) } }))
+const impact = vi.fn()
+vi.mock('@/lib/api-gap2-pending', () => ({ seriesImpactApi: { impact: (...a: unknown[]) => impact(...a) } }))
 const notifySaved = vi.fn()
 vi.mock('@/components/shared/toast', () => ({ notifySaved: (...a: unknown[]) => notifySaved(...a), notifyToast: vi.fn() }))
 const { default: SeriesScopeDialog } = await import('./series-scope-dialog')
@@ -13,6 +15,7 @@ const bookings = [b(2, '2026-12-04T05:00:00.000Z'), b(3, '2026-12-11T05:00:00.00
 const target = { seriesId: 's1', customerName: '山田 花子', ruleText: '毎週金曜 14:00', menuName: 'トリミング（小型犬）', index: 4, bookingId: 'b3', startsAt: '2026-12-11T05:00:00.000Z' }
 
 beforeEach(() => {
+  impact.mockRejectedValue(new Error('404'))
   get.mockResolvedValue({ success: true, data: { series: { id: 's1', version: 3 }, bookings } })
   change.mockResolvedValue({ success: true, data: { changed: ['b3', 'b4'], conflicts: ['b6'], version: 4 } })
   cancel.mockResolvedValue({ success: true, data: { cancelled: ['b3', 'b4', 'b6'], fees: [{ bookingId: 'b3', feeNow: 4200 }], version: 4 } })
@@ -45,4 +48,19 @@ test('対象の日を読めないときは実行できない', async () => {
   render(<SeriesScopeDialog open mode="cancel" accountId="a1" target={target} onClose={() => {}} onDone={() => {}} />)
   expect(await screen.findByText(/対象の日を読み込めませんでした/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: /件を取り消す/ })?.hasAttribute('disabled') ?? true).toBe(true)
+})
+
+test('前もっての見込みの口があるとき：埋まっている回は前のままにして数えず、キャンセル料を表に出す。口が無い間は準備中', async () => {
+  impact.mockResolvedValue({ success: true, data: { items: [
+    { bookingId: 'b3', startsAt: bookings[1].starts_at, blocked: false, fee: { amount: 4200, percent: 50, reason: '24 時間前を過ぎた' } },
+    { bookingId: 'b6', startsAt: bookings[4].starts_at, blocked: true, fee: null },
+  ] } })
+  render(<SeriesScopeDialog open mode="change" accountId="a1" target={target} newStartsAt="2026-12-11T16:00:00+09:00" onClose={() => {}} onDone={() => {}} />)
+  expect(await screen.findByText(/埋まっています・14:00 のまま/)).toBeTruthy()
+  expect(screen.getByRole('button', { name: '2 件を変える' })).toBeTruthy()
+  cleanup()
+  impact.mockRejectedValue(new Error('404'))
+  render(<SeriesScopeDialog open mode="cancel" accountId="a1" target={target} onClose={() => {}} onDone={() => {}} />)
+  fireEvent.click((await screen.findAllByRole('button', { name: '見込みを見る' }))[0])
+  expect(await screen.findByText('現在準備中です')).toBeTruthy()
 })

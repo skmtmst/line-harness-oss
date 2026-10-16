@@ -481,6 +481,18 @@ const server = createServer(async (req, res) => {
     json(res, 200, { success: true, data: { matchedIndex: 1, routingToken: 'qa-routing-token', expiresAt: '2026-10-16T05:00:00.000Z', target: { menuId: 'qa-menu-online', staffId: state.features.includes('routed-empty') ? 'qa-staff-empty' : 'qa-staff-1', meetingMode: 'online' } } });
     return;
   }
+  // ---- 繰り返しの確かめ（B4・口はまだ無い。見本：3 回目だけ取れない）----
+  if (method === 'POST' && pathname === '/api/liff/booking/series/preview') {
+    const body = await readBody(req);
+    const start = Date.parse(body.starts_at);
+    const count = Math.min(Math.max(Number(body.count) || 4, 2), 12);
+    json(res, 200, { occurrences: Array.from({ length: count }, (_, i) => {
+      const at = start + i * 7 * 86_400_000;
+      const blocked = i === 2;
+      return { index: i, starts_at: new Date(at).toISOString(), available: !blocked, ...(blocked ? { reason: 'お休み' } : {}), alternatives: blocked ? [1, 2, 3].map((h) => new Date(at + h * 3_600_000).toISOString()) : [] };
+    }) });
+    return;
+  }
   // ---- 追加メニュー（③-2 第2弾 B5：hhUtj）。features に party があるときだけ。形は API-CONTRACT-GAP2 のとおり ----
   if (method === 'GET' && /^\/api\/liff\/booking\/menus\/[^/]+\/addons$/.test(pathname)) {
     json(res, 200, { success: true, data: state.features.includes('party') && pathname.includes('qa-menu-1') ? [{ id: 'qa-addon-1', name: '歯みがき', duration_minutes: 15, base_price: 800, version: 1 }, { id: 'qa-addon-2', name: '爪切り', duration_minutes: 10, base_price: 500, version: 1 }] : [] });
@@ -552,6 +564,9 @@ const server = createServer(async (req, res) => {
         },
       ],
     };
+    /* ③-2 第2弾 B5・B4：人数の上限・繰り返し（hhUtj・qOUmy）。features があるときだけ。 */
+    if (state.features.includes('party')) for (const m of menusBody.menus) if (m.id !== 'qa-menu-4') m.max_party_size = 3;
+    if (state.features.includes('recurring')) { const m = menusBody.menus.find((x) => x.id === 'qa-menu-1'); if (m) m.recurring = { enabled: true, max_count: 12 }; }
     /* ③-2 第2弾 B6：答えの行き先のメニュー（Z76uuv）。features に routed があるときだけ足す。 */
     if (state.features.includes('routed') || state.features.includes('routed-empty')) menusBody.menus.push({ id: 'qa-menu-online', name: 'オンライン相談 60 分', category_label: '相談', description: null, duration_minutes: 60, buffer_after_minutes: 0, base_price: 3300, sort_order: 9 });
     json(res, 200, menusBody);

@@ -4,7 +4,10 @@ import { useEffect, useState } from 'react'
 import Dialog from '@/components/shared/dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifySaved } from '@/components/shared/toast'
+import Checkbox from '@/components/shared/checkbox'
+import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { bookingSeriesApi } from '@/lib/api-gap2'
+import { seriesImpactApi, type SeriesImpactItem } from '@/lib/api-gap2-pending'
 import type { Gap2Booking } from '@line-crm/shared'
 import { dayOf, dayWithWeekday, hm } from './series-model'
 import styles from './series-scope-dialog.module.css'
@@ -40,6 +43,9 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
   onDone: (result: { count: number }) => void
 }) {
   const [all, setAll] = useState<Gap2Booking[] | null>(null)
+  /* 前もっての見込み（埋まっている回・キャンセル料）。口がまだ無い間は読めず、その列は準備中にする。 */
+  const [impact, setImpact] = useState<Record<string, SeriesImpactItem> | null>(null)
+  const preparing = usePreparingDialog()
   const [version, setVersion] = useState(0)
   const [scope, setScope] = useState<'this' | 'following'>('following')
   const [loadError, setLoadError] = useState(false)
@@ -57,6 +63,8 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
         if (!current) return
         const from = res.data.bookings.find((b) => b.id === target.bookingId)?.series_index ?? target.index
         setVersion(res.data.series.version)
+        void Promise.resolve().then(() => seriesImpactApi.impact(accountId, target.seriesId, { scope: 'following', fromBookingId: target.bookingId, change: newStartsAt ? { startsAt: newStartsAt } : undefined }))
+          .then((r) => { if (current) setImpact(Object.fromEntries(r.data.items.map((i) => [i.bookingId, i]))) }).catch(() => { if (current) setImpact(null) })
         setAll(res.data.bookings.filter((b) => (b.series_index ?? 0) >= from && !['cancelled', 'rejected', 'expired'].includes(b.status)).sort((a, b) => (a.series_index ?? 0) - (b.series_index ?? 0)))
       })
       .catch(() => { if (current) setLoadError(true) })
@@ -65,7 +73,8 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
   const items = all ? (scope === 'this' ? all.slice(0, 1) : all) : null
 
   const changing = mode === 'change'
-  const count = items?.length ?? 0
+  const blockedIds = new Set(Object.values(impact ?? {}).filter((i) => i.blocked).map((i) => i.bookingId))
+  const count = (items ?? []).filter((i) => !blockedIds.has(i.id)).length
   const last = items?.length ? items[items.length - 1].starts_at : target.startsAt
   const newTime = newStartsAt ? hm(newStartsAt) : ''
 
@@ -121,15 +130,21 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
           <thead><tr><th>日</th><th>{changing ? '前' : '時間'}</th><th>{changing ? '後' : 'キャンセル料'}</th></tr></thead>
           <tbody>
             {(items ?? []).map((item) => (
-              <tr key={item.id}>
+              <tr key={item.id} data-blocked={(changing && blockedIds.has(item.id)) || undefined}>
                 <td>{dayWithWeekday(item.starts_at)}</td>
                 <td>{hm(item.starts_at)}</td>
-                <td>{changing ? newTime : '取り消したあとに出ます'}</td>
+                <td className={(changing ? blockedIds.has(item.id) : impact?.[item.id]?.fee) ? styles.warn : undefined}>
+                  {changing ? (blockedIds.has(item.id) ? `埋まっています・${hm(item.starts_at)} のまま` : newTime)
+                    : impact ? (impact[item.id]?.fee ? `${yen(impact[item.id].fee!.amount)}（${impact[item.id].fee!.percent}%・${impact[item.id].fee!.reason}）` : 'かかりません')
+                    : <button type="button" className={styles.retry} onClick={() => preparing.open('キャンセル料の前もっての見込み')}>見込みを見る</button>}
+                </td>
               </tr>
             ))}
           </tbody>
         </table> : null}
-        {changing ? null : <p className={styles.note}>取り消すと元に戻せません。キャンセル料は期限を過ぎた回だけに掛かり、取り消しの結果の知らせに見込みの金額が出ます（請求は予約の詳細の「お支払い」から）。</p>}
+        {changing || impact ? null : <p className={styles.note}>取り消すと元に戻せません。キャンセル料は期限を過ぎた回だけに掛かり、取り消しの結果の知らせに見込みの金額が出ます（請求は予約の詳細の「お支払い」から）。</p>}
+        <Checkbox checked={false} onCheckedChange={() => preparing.open('LINE でのお知らせ')}>{target.customerName} さんに LINE で知らせる（{changing ? '変わった日と時間' : '取り消した日'}）</Checkbox>
+        {preparing.dialog}
       </div>
     </Dialog>
   )
