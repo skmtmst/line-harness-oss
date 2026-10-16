@@ -4,7 +4,7 @@
 
 ## 数え方と限界
 
-WorkerのHono実登録にある管理認証の外の入口は **175経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。既存の全入口の再生成は③-2第3波の本線統合後に司令塔が起動する。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。
+WorkerのHono実登録にある管理認証の外の入口は **182経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。既存の全入口の再生成は③-2第3波の本線統合後に司令塔が起動する。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。
 
 「全経路を列挙」と「すべての入力で安全を確認」は別。表の本人確認・期限はコードの方式で、実配備の設定や全資源ID×本人の組合せはS07/S15の未完を維持する。URLの実値・query・顧客情報は記録しない。
 
@@ -212,6 +212,20 @@ WorkerのHono実登録にある管理認証の外の入口は **175経路**（�
 | 管理画面の `apps/web/out` のHTML・JS・CSS・公開画像・version.json | 固定パスとビルドのhash。静的配信の回数制限はCloudflare側、未確認 | ログイン画面の骨組みは公開。顧客データは管理APIの本人確認後。CSPは[CSP記録](CSP-REVIEW-1016.md)。ビルドへ秘密を埋めない |
 | LIFFの `apps/liff/dist` とWorkerの `dist/client`、未知の非APIパスのSPA fallback | 画面のパス、ID/slugは秘密ではない。Worker経由は共通IP枠、Pages直配信は別確認 | 予約確認/フォーム/本人履歴の骨組みは公開。個人情報の取得は表のAPIで検証。外部ログインの実試験は今回は行わない |
 | 管理専用の添付 `/api/form-files/:id/content` | 管理認証の外ではないため173に含めない。本人確認書類はowner/admin、所属と期限・検査状態を照合 | `routes/form-documents.ts`。`private/form-documents/` のR2原本は公開画像口では404。期限付きURLへ切り替えたという意味ではない |
+
+## API列車で加わった入口（全一覧の再生成ではない）
+
+共通の回数制限はIPごと3,000回/分、Workerの単一実行環境内。分散した厳密な制限ではない。LINEの認証はLINE側のトークン期限も照合する。下の列挙は所属や期限の実装を読んだ記録であり、全資源と本人の組合せの試験完了とは扱わない。
+
+| 経路 | IDの形・推測 | 回数の制限 | 返す個人情報・確認の境界 | 期限 | 根拠 |
+| --- | --- | --- | --- | --- | --- |
+| `GET /api/liff/booking/entitlements` | 公開LIFF ID。本人はLINE tokenから確定し、友だちIDを受け取らない | 共通IP枠 | 本人の店の券・契約名、残数、期限のみ。管理者の理由・担当者は返さない | LINE tokenの期限＋券・契約の有効期間。取得URLの発行はない | `apps/worker/src/routes/booking-entitlements.ts` |
+| `POST /api/liff/booking/page-views` | 公開LIFF ID・メニューID。本人と店をLINEで照合 | 共通IP枠 | 本人の閲覧を記録し成功だけ返す。別店/無効メニュー拒否、友だちの一覧を返さない | LINE tokenの期限。記録自体の保存期限は別の残件 | `apps/worker/src/routes/booking.ts` |
+| `GET /api/liff/booking/style-readiness` | 公開LIFF IDと機能名。本人と店をLINEで照合 | 共通IP枠 | 本人の店の利用可否・不足する設定。本人の追従状態も確認し、他の友だちを返さない | LINE tokenの期限。取得URLの発行はない | `apps/worker/src/routes/booking.ts` |
+| `GET /api/liff/hq-form-tests/:id` | テンプレートID単独では不可。UUID2個から作るランダムな試験票のhashで照合 | 共通IP枠。発行はテンプレートごと有効5個まで | 試験票を持つ人へ固定版のフォーム定義。顧客の回答は返さない。作成者の役割・所属/統括の稼働・取消も確認。queryの試験票は秘密として扱う | 発行から24時間。取消・保管・作成者の停止でも拒否 | `apps/worker/src/routes/hq-form-tests.ts`、`apps/worker/src/services/hq-templates/form-test.ts` |
+| `POST /api/liff/hq-form-tests/:id/submit` | 同上。試験票を確認し、入力は100,000文字以内 | 共通IP枠 | 入力の妥当性だけ返す。回答・配信・操作イベントを保存しない。試験票なしは404 | 発行から24時間。取消等も上と同じ | `apps/worker/src/routes/hq-form-tests.ts`、`apps/worker/src/services/hq-templates/form-test.ts` |
+| `GET /api/liff/notification-preferences` | 店IDは秘密ではない。店のLINE LoginチャネルでID tokenを確認して本人を確定 | 共通IP枠 | 本人の目的別の受取状態・版・更新時刻のみ。別人/別店・停止した店/統括は拒否。no-store | LINE tokenの期限。設定は保存され、URL単独に取得権限はない | `apps/worker/src/routes/liff-notification-preferences.ts` |
+| `PUT /api/liff/notification-preferences/:purpose` | 上と同じ。目的は固定2種類、版の一致が必要 | 共通IP枠 | 本人の設定のみ変更して返す。状態の未記録を同意済みにしない | LINE tokenの期限。古い版は409 | `apps/worker/src/routes/liff-notification-preferences.ts` |
 
 ## 再確認
 
