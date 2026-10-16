@@ -4,6 +4,7 @@ import Dialog from '@/components/shared/dialog'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingAdminDetail, type BookingRequest } from '@/lib/api'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
+import BookingGapSections from '@/v8/booking-gap/booking-gap-sections'
 
 /*
  * ★V8-B 予約の詳細（`AjZhH`）。台帳の行から開く小窓。
@@ -94,6 +95,7 @@ export default function BookingDetailV8({
         </div>
       }
     >
+      {accountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={accountId} bookingId={b.id} customerName={name} menuName={b.menu_name} startsAt={b.starts_at} canOperate={canOperate} onChanged={() => setHistorySeq((n) => n + 1)} /></div> : null}
       <dl className="space-y-2 text-sm">
         <div>
           <dt className="text-ink-faint text-xs">日時</dt>

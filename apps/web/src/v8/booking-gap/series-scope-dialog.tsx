@@ -89,14 +89,17 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
   return (
     <Dialog
       open={open}
-      size="large"
-      designWidth={720}
+      size="medium"
+      designWidth={560}
+      designTop={170}
       title={changing ? '繰り返しの予約を変えますか？' : '繰り返しの予約を取り消しますか？'}
       description={`${target.customerName} さん ・ ${target.ruleText} ・ ${target.menuName} ・ ${target.index} 回目 ${dayOf(target.startsAt)}`}
       tone={changing ? 'default' : 'destructive'}
+      confirmation
       confirmLabel={`${count} 件を${changing ? '変える' : '取り消す'}`}
       busyLabel={changing ? '変えています…' : '取り消しています…'}
       confirmDisabled={!items || count === 0}
+      footerAlign="center"
       busy={busy}
       error={error || undefined}
       onConfirm={run}
@@ -115,10 +118,10 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
           <thead><tr><th>日</th><th>{changing ? '前' : '時間'}</th><th>{changing ? '後' : 'キャンセル料'}</th></tr></thead>
           <tbody>
             {(items ?? []).map((item) => (
-              <tr key={item.bookingId} data-blocked={item.blocked || undefined}>
+              <tr key={item.bookingId} data-blocked={(changing && item.blocked) || undefined}>
                 <td>{dayWithWeekday(item.startsAt)}</td>
                 <td>{hm(item.startsAt)}</td>
-                <td className={item.blocked || item.fee ? styles.warn : undefined}>
+                <td className={(changing ? item.blocked : item.fee) ? styles.warn : undefined}>
                   {changing ? (item.blocked ? `埋まっています・${hm(item.startsAt)} のまま` : hm(item.after ?? item.startsAt))
                     : item.fee ? `${yen(item.fee.amount)}（${item.fee.percent}%・${item.fee.reason}）` : 'かかりません'}
                 </td>

@@ -21,7 +21,7 @@ import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, t
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import BookingGapSections from '@/v8/booking-gap/booking-gap-sections'
-import SeriesHost from '@/v8/booking-gap/series-host'
+import SeriesHost, { SERIES_QUERY_KEYS } from '@/v8/booking-gap/series-host'
 import Button from '@/components/shared/button'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
@@ -802,6 +802,8 @@ export default function BookingsPage() {
     ...(page <= 1 ? [] : [`page=${page}`]),
     // V8 C①：開いている詳細パネルの行を残す。無いとURLの写しが ?booking= を消す。
     ...(activeBookingId ? [`booking=${encodeURIComponent(activeBookingId)}`] : []),
+    // 「繰り返して入れる」の引き出し（B4）：開いている間の指定も残す。
+    ...SERIES_QUERY_KEYS.flatMap((key) => (urlParams.get(key) ? [`${key}=${encodeURIComponent(urlParams.get(key) ?? '')}`] : [])),
   ].join('&')
   useEffect(() => {
     if (!urlInitRef.current || !ledgerRestored) return
@@ -923,6 +925,7 @@ export default function BookingsPage() {
           detailHref={`/booking/bookings/detail?id=${encodeURIComponent(detail.id)}`}
         />
       ))}
+      {selectedAccountId && canOperate ? <SeriesHost params={new URLSearchParams(urlParams.toString())} accountId={selectedAccountId} menus={menus} staffList={staffList} basePath="/booking/bookings" /> : null}
       <ConfirmDialog
         open={decideTarget !== null}
         designNode={decideTarget?.action === 'cancel' ? 'iJdAi' : undefined}
@@ -1378,8 +1381,6 @@ export default function BookingsPage() {
           ) : null}
         </DetailPanel>
       )}
-
-      {selectedAccountId && canOperate ? <SeriesHost params={new URLSearchParams(urlParams.toString())} accountId={selectedAccountId} menus={menus} staffList={staffList} basePath="/booking/bookings" /> : null}
 
       {dialogs}
     </BookingLedgerFrame>

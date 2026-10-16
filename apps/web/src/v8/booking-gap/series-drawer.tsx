@@ -7,7 +7,7 @@ import Drawer from '@/components/shared/drawer'
 import HelpTip from '@/components/shared/help-tip'
 import SegmentedControl from '@/components/shared/segmented'
 import Toggle from '@/components/shared/toggle'
-import { TextField } from '@/components/shared/text-field'
+import NumberField from '@/components/shared/number-field'
 import { Skeleton } from '@/components/shared/skeleton'
 import { notifySaved } from '@/components/shared/toast'
 import { bookingSeriesApi, type SeriesFreq, type SeriesOccurrence } from '@/lib/api-gap2'
@@ -118,15 +118,16 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
       description={`${summary.customerName} さん ・ ${summary.menuName} ${summary.durationMin} 分`}
       closeAppearance="box"
       width="editor"
+      heightMode="viewport"
       busy={busy}
       error={error || undefined}
       dirty={on && state !== 'idle'}
       showDirtyIndicator={false}
       onClose={onClose}
-      footer={<>
+      footer={<div className={styles.footer}>
         <Button variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
         <Button variant="primary" onClick={save} busy={busy} disabled={!canSave} busyLabel="入れています…">{on ? `${made} 件を入れる` : '予約を入れる'}</Button>
-      </>}
+      </div>}
     >
       <div className={styles.body}>
         <dl className={styles.summary}>
@@ -143,7 +144,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
               <SegmentedControl aria-label="繰り返しの間隔" size="booking" options={FREQ_OPTIONS} value={freq} onChange={setFreq} />
               <label className={styles.count}>
                 <span>回数</span>
-                <TextField value={countText} onChange={(event) => setCountText(event.target.value)} inputMode="numeric" aria-label="回数" invalid={countText !== '' && !countOk} />
+                <NumberField numericText unit="回" value={countText} onChange={(event) => setCountText(event.target.value)} aria-label="回数" invalid={countText !== '' && !countOk} />
               </label>
             </div>
             {!countOk ? <p className={styles.fieldError} role="alert">回数は {MIN} 回から {MAX} 回までです。</p> : null}

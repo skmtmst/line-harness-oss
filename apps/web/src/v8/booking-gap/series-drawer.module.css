@@ -1,6 +1,7 @@
-.body { --gap-s: 8px; --gap-m: 12px; --gap-l: 16px; --pad-card: 16px; --radius-card-s: 12px; display: flex; flex-direction: column; gap: var(--gap-l); }
-.summary { display: flex; flex-direction: column; gap: var(--gap-s); margin: 0; padding: var(--pad-card); border: 1px solid var(--color-hairline); border-radius: var(--radius-card-s); font-size: var(--text-label); }
+.body { --gap-s: 8px; --gap-m: 12px; --gap-l: 16px; --pad-card: 16px; --radius-card-s: 12px; display: flex; flex-direction: column; gap: var(--gap-l); padding-top: 24px; }
+.summary { display: flex; flex-direction: column; gap: var(--gap-s); margin: 0; padding: var(--pad-card); border: 1px solid var(--color-hairline); border-radius: var(--radius-card-s); font-size: var(--text-body); }
 .summary div { display: flex; gap: var(--gap-s); }
+.summary { gap: var(--gap-m); }
 .summary dt { color: var(--color-ink-secondary); }
 .summary dd { margin: 0; color: var(--color-ink); }
 .card { display: flex; flex-direction: column; gap: var(--gap-m); padding: var(--pad-card); border: 1px solid var(--color-hairline); border-radius: var(--radius-card-s); }
@@ -21,3 +22,4 @@
 .alt { color: var(--color-success); }
 .sub { color: var(--color-ink-secondary); }
 .note { margin: 0; font-size: var(--text-caption); color: var(--color-ink-secondary); }
+.footer { display: flex; justify-content: center; gap: var(--gap-s); width: 100%; }
