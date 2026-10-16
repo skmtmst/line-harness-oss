@@ -151,6 +151,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
       confirmDisabled={!canPress}
       onCancel={() => { if (!busy) onBack() }}
       designNode="F94nep"
+      designTop={64}
       footerLead={<span className={styles.footLead}>閉じても送りません</span>}
     >
       <dl className={styles.rows} aria-busy={state === 'loading' || undefined}>
