@@ -221,12 +221,7 @@ export default function Dialog({
   const motion = useStepMotion(Boolean(steps) && open && mounted, stepKey ?? (React.isValidElement<{ currentKey?: string | number }>(steps) ? steps.props.currentKey : undefined))
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
-  /*
-   * open=true で初回マウントした場合、最初の描画は通常DOMで、effect後に
-   * portal へ移る。フォーカス制御は portal の準備ができてから始める
-   * （DEEP-15）。useOverlayFocus 側もイベント時に ref.current を読むため、
-   * 常時マウントから開く場合も同じ経路で正しい面を掴む。
-   */
+  // フォーカス制御はportalの準備後に開始し、イベント時のrefを読む。
   const cancelRef = useRef<HTMLButtonElement>(null)
   const panelRef = useOverlayFocus(
     open && modal && mounted,
@@ -244,7 +239,8 @@ export default function Dialog({
     : ''
 
   useEffect(() => setMounted(true), [])
-  if (!open && !leaving) return null
+  // モーダルは最初からportalへ描く。表示後のDOM移動で最初の入力を落とさない。
+  if ((!open && !leaving) || (modal && !mounted)) return null
 
   const titleNode = (
     <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{typeof title === 'string' && tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}</h2>
@@ -369,7 +365,7 @@ export default function Dialog({
       {panel}
     </div>
   )
-  return <OverlayDepthContext.Provider value={depth + 1}>{discardDialog}{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>
+  return <OverlayDepthContext.Provider value={depth + 1}>{discardDialog}{createPortal(overlay, document.body)}</OverlayDepthContext.Provider>
 }
 
 /** q3DPdz の手順。済みは戻れるボタン、現在は aria-current で伝える。 */
