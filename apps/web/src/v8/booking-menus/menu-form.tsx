@@ -966,7 +966,7 @@ export default function MenuFormV8() {
           {/* ① メニューの中身 */}
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="メニューの中身" />
-            <SettingsFormRow layout="name-folder">
+            <SettingsFormRow layout="name-folder" keepColumns>
               <Field label="メニュー名" requirement={menuNameRequirement}><SaveErrorField names={["name"]}><TextField
                   type="text"
                   value={name}
@@ -1018,7 +1018,7 @@ export default function MenuFormV8() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="例：シャンプー・カット・爪切り"
               /></SaveErrorField></Field>
-            <SettingsFormRow layout="columns" columns={3}>
+            <SettingsFormRow layout="columns" columns={3} keepColumns>
               <Field label="かかる時間" requirement={menuDurationRequirement}>
                 <SaveErrorField names={["durationMinutes","duration_minutes"]}><NumberInput unit="分"
                   type="number"
@@ -1093,7 +1093,7 @@ export default function MenuFormV8() {
               </p>
             ) : (
               <>
-                <SettingsFormRow layout="columns" columns={3} role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
+                <SettingsFormRow layout="columns" columns={3} keepColumns role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
                   {staff.filter((person) => person.is_active).map((person) => {
                     const on = assigned.has(person.id)
                     // 絵 QqER7：トリマーは名前だけ、それ以外は（役割）を付ける。
@@ -1126,7 +1126,7 @@ export default function MenuFormV8() {
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="予約のきまり" meta="空ならお店全体のきまり（予約のルール）を使います" />
             {ownRules ? (
-              <SettingsFormRow layout="columns" columns={3}>
+              <SettingsFormRow layout="columns" columns={3} keepColumns>
                 <Field label="先の予約が取れる範囲">
                   <SaveErrorField names={["windowDays","window_days"]}><NumberInput unit="日先まで" type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" /></SaveErrorField>
                 </Field>

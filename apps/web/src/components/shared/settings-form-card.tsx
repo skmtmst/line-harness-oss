@@ -17,11 +17,13 @@ export function SettingsFormCard({ title, description, children, actions, ...pro
   </form>
 }
 
-export function SettingsFormRow({ children, postal = false, layout, columns = 2, ...props }: {
+export function SettingsFormRow({ children, postal = false, layout, columns = 2, keepColumns = false, ...props }: {
   children: ReactNode
   postal?: boolean
   layout?: 'name-folder' | 'columns'
   columns?: 2 | 3
+  /** 白い板が 1100 未満でも横並びを保つ（右の欄を畳んで本文が広いままの作る画面・絵 CnV1I・ELruS の 1152）。640 未満では縦に積む。 */
+  keepColumns?: boolean
 } & Omit<ComponentPropsWithRef<'div'>, 'children' | 'className' | 'style'>) {
-  return <div {...props} className={layout === 'name-folder' ? styles.nameFolderRow : layout === 'columns' ? styles.columnsRow : postal ? styles.postalRow : styles.row} data-form-row={layout} data-form-columns={layout === 'columns' ? columns : undefined}>{children}</div>
+  return <div {...props} className={layout === 'name-folder' ? styles.nameFolderRow : layout === 'columns' ? styles.columnsRow : postal ? styles.postalRow : styles.row} data-form-row={layout} data-form-columns={layout === 'columns' ? columns : undefined} data-keep-columns={keepColumns || undefined}>{children}</div>
 }

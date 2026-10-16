@@ -1340,9 +1340,16 @@ export default function BookingsPage() {
           }
           footer={activeBooking ? (
             <>
+              {/* 絵 Nx1kq の言葉（日時を変える）。来店にするを並べても 360 の帯で 1 行に収める。 */}
               <Button href={`/booking/bookings/detail?id=${encodeURIComponent(activeBooking.id)}`} variant="secondary">
-                時間や担当を変える
+                日時を変える
               </Button>
+              {/* 来店にする（Nx1kq・司令塔の判断）：確定の予約だけ。今ある「完了」の確かめの窓を通す。閲覧のみには出さない。 */}
+              {canOperate && activeBooking.status === 'confirmed' ? (
+                <Button variant={activeBooking.friend_id ? 'secondary' : 'primary'} onClick={() => handleDecide(activeBooking.id, 'complete')}>
+                  来店にする
+                </Button>
+              ) : null}
               {activeBooking.friend_id ? (
                 <Button href={`/chats?friend=${activeBooking.friend_id}`} variant="primary">
                   この人と話す
