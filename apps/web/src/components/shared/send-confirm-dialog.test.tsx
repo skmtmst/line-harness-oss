@@ -35,6 +35,16 @@ describe('共通の「送る前の確かめ」窓（U1）', () => {
     rerender(<SendConfirmDialog {...base} block="impersonation" />)
     expect(screen.getByText('代理ログイン中は送れません。')).toBeTruthy()
   })
+  it('承認が要るときは、承認の文と承認する人の欄を窓の中に出し、選ぶまで主ボタンを押せない', () => {
+    const props = { ...base, recipients: 1200, primaryLabel: '承認を依頼する', approval: { note: '1,000 人以上は承認が要る店です。承認されたら送ります' }, approvalFields: <select aria-label="承認をお願いする人" /> }
+    const { rerender } = render(<SendConfirmDialog {...props} primaryDisabled />)
+    expect(screen.getByText('1,200 人')).toBeTruthy()
+    expect(screen.getByText('1,000 人以上は承認が要る店です。承認されたら送ります')).toBeTruthy()
+    expect(screen.getByLabelText('承認をお願いする人')).toBeTruthy()
+    expect((screen.getAllByRole('button', { name: '承認を依頼する' })[0] as HTMLButtonElement).disabled).toBe(true)
+    rerender(<SendConfirmDialog {...props} />)
+    expect((screen.getAllByRole('button', { name: '承認を依頼する' })[0] as HTMLButtonElement).disabled).toBe(false)
+  })
   it('全員宛は途中で止められない旨を足し、主ボタンは二重に押しても 1 回だけ送る', async () => {
     let resolve!: () => void
     const onConfirm = vi.fn(() => new Promise<void>((r) => { resolve = r }))

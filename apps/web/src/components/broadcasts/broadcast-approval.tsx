@@ -83,7 +83,10 @@ export function ApprovalRequestFields({
   onApproverChange,
   note,
   onNoteChange,
+  bare = false,
 }: {
+  /** 共通の「送る前の確かめ」の窓の中に置くとき：警告の箱と文を出さず、欄だけにする。 */
+  bare?: boolean
   recipientCount: number
   threshold: number
   candidates: BroadcastApprovalCandidate[]
@@ -94,11 +97,13 @@ export function ApprovalRequestFields({
   onNoteChange: (note: string) => void
 }) {
   return (
-    <div className="bg-warning-bg rounded-control mt-3 p-3 text-xs leading-5">
-      <p className="text-warning font-semibold">
-        {formatThreshold(threshold)}以上なので、もう1人の承認が要ります。承認されるまで送られません。
-      </p>
-      <div className="mt-3 space-y-3">
+    <div className={bare ? 'text-xs leading-5' : 'bg-warning-bg rounded-control mt-3 p-3 text-xs leading-5'}>
+      {bare ? null : (
+        <p className="text-warning font-semibold">
+          {formatThreshold(threshold)}以上なので、もう1人の承認が要ります。承認されるまで送られません。
+        </p>
+      )}
+      <div className={bare ? 'space-y-3' : 'mt-3 space-y-3'}>
         <div>
           {/* ？は label の外に置く。中に入れるとラベルがボタンを指して入力欄との結びつきが壊れる。 */}
           <div className="mb-1 flex items-center gap-1">

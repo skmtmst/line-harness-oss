@@ -84,7 +84,7 @@ describe('最終確認へのまとめ（IDEA-06）', () => {
   )
   // 予約の確認窓（ConfirmDialog の中身）だけを切り出す。
   const DIALOG = FORM.slice(
-    FORM.indexOf('open={confirmOpen && needsApproval}'),
+    FORM.indexOf('open={confirmOpen && needsApprovalSingle}'),
     FORM.indexOf('open={testDialogOpen}'),
   )
 

@@ -2014,7 +2014,7 @@ export default function BroadcastForm({
   const [sendPreview, setSendPreview] = useState<{ state: 'loading' | 'error' | 'ready'; data: SendConfirmationPreview | null; broadcast: ApiBroadcast | null }>({ state: 'loading', data: null, broadcast: null })
   const [previewSeq, setPreviewSeq] = useState(0)
   useEffect(() => {
-    if (!confirmOpen || needsApproval || !currentStep) return
+    if (!confirmOpen || needsApprovalSingle || !currentStep) return
     let alive = true
     setSendPreview({ state: 'loading', data: null, broadcast: null })
     void (async () => {
@@ -2711,7 +2711,7 @@ export default function BroadcastForm({
 
     {/* 共通の「送る前の確かめ」（U1・板 F94nep／RxxfO）。承認が要るときは、承認者を選ぶ下の窓を使う。 */}
     <SendConfirmDialog
-      open={confirmOpen && !needsApproval}
+      open={confirmOpen && !needsApprovalSingle}
       subtitle={`${title.trim() || '新しい一斉配信'} ・ ${confirmAudienceLabel}`}
       scheduled={sendMode === 'scheduled'}
       state={currentStep ? sendPreview.state : audienceCount === null ? 'error' : 'ready'}
@@ -2735,18 +2735,33 @@ export default function BroadcastForm({
       bubbleCount={bubbles.length}
       allRecipients={targetMode === 'all'}
       extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}
-      primaryLabel={(() => {
+      approval={needsApproval && approvalConfig ? { note: `${formatNumber(approvalConfig.threshold)} 人以上は承認が要る店です。承認されたら${sendMode === 'scheduled' && scheduledDate ? ` ${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime} に` : ''}送ります` } : null}
+      approvalFields={needsApproval && approvalConfig && audienceCount !== null ? (
+        <ApprovalRequestFields
+          bare
+          recipientCount={audienceCount}
+          threshold={approvalConfig.threshold}
+          candidates={approvalCandidates}
+          candidatesState={approvalCandidatesState}
+          approverId={approverId}
+          onApproverChange={setApproverId}
+          note={approvalNote}
+          onNoteChange={setApprovalNote}
+        />
+      ) : undefined}
+      primaryDisabled={needsApproval && approverId === ''}
+      primaryLabel={needsApproval ? '承認を依頼する' : (() => {
         const n = currentStep ? sendPreview.data?.recipients ?? null : audienceCount
         const shortAt = sendMode === 'scheduled' && scheduledDate ? `${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime}` : null
         return n === null ? '送る' : sendMode === 'scheduled' ? `${formatNumber(n)} 人に${shortAt ? ` ${shortAt} で` : ''}予約する` : `${formatNumber(n)} 人に送る`
       })()}
-      onConfirm={() => (currentStep ? confirmFromPreview() : save())}
+      onConfirm={() => (currentStep && !needsApproval ? confirmFromPreview() : save())}
       onBack={() => { if (!saving) setConfirmOpen(false) }}
       error={error || undefined}
     />
     <div data-design-node="FpgxH">
       <ConfirmDialog
-        open={confirmOpen && needsApproval}
+        open={confirmOpen && needsApprovalSingle}
         title={sendMode === 'scheduled' ? 'この内容で予約しますか？' : 'この内容で送りますか？'}
         description={
           needsApproval && !needsApprovalSingle
@@ -2857,18 +2872,6 @@ export default function BroadcastForm({
           二者承認（設計 A-1・A-4）。承認が要る人数のときだけ出す。
           境目が読めているときだけ判定し、取得失敗中は確定させない。
         */}
-        {needsApproval && !needsApprovalSingle && audienceCount !== null && approvalConfig !== null ? (
-          <ApprovalRequestFields
-            recipientCount={audienceCount}
-            threshold={approvalConfig.threshold}
-            candidates={approvalCandidates}
-            candidatesState={approvalCandidatesState}
-            approverId={approverId}
-            onApproverChange={setApproverId}
-            note={approvalNote}
-            onNoteChange={setApprovalNote}
-          />
-        ) : null}
         {needsApprovalSingle && audienceCount !== null ? (
           <SingleOperatorFields
             recipientCount={audienceCount}

@@ -80,6 +80,10 @@ export interface SendConfirmDialogProps {
   extraCaution?: string
   /** 承認が要る（1,000 人以上など）。主ボタンは［承認を依頼する］。 */
   approval?: { note: string } | null
+  /** 承認が要るとき、窓の中に出す欄（承認する人・ひとこと）。 */
+  approvalFields?: ReactNode
+  /** 承認する人が選ばれるまで主ボタンを押せなくする。 */
+  primaryDisabled?: boolean
   block?: SendConfirmBlock
   /** 送る口がまだ使えない（承認の設定を読めていない 等）。主ボタンごと出さない。 */
   hidePrimary?: boolean
@@ -105,12 +109,12 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 export default function SendConfirmDialog(props: SendConfirmDialogProps) {
   const {
     open, subtitle, scheduled, state, onRetry, recipients, recipientsNote, perAccount, purpose, whenLabel, whenNote, sender,
-    bodyHead, bubbleCount, bodyLabel = '本文', allRecipients, extraCaution, approval, block, hidePrimary, unavailableNote, primaryLabel, onConfirm, onBack, error,
+    bodyHead, bubbleCount, bodyLabel = '本文', allRecipients, extraCaution, approval, approvalFields, primaryDisabled, block, hidePrimary, unavailableNote, primaryLabel, onConfirm, onBack, error,
   } = props
   const [busy, setBusy] = useState(false)
   const submitting = useRef(false)
   const zero = state === 'ready' && recipients === 0
-  const canPress = state === 'ready' && !zero && !block && !busy
+  const canPress = state === 'ready' && !zero && !block && !busy && !primaryDisabled
   const [accountsOpen, setAccountsOpen] = useState(false)
 
   const confirm = async () => {
@@ -213,6 +217,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
             {bubbleCount ? <span className={styles.note}>吹き出し {bubbleCount} つ</span> : null}
           </div>
         </Row>
+        {approval && approvalFields ? <Row label="承認する人">{approvalFields}</Row> : null}
       </dl>
       <div className={styles.caution} role="note">
         <TriangleAlert size={16} aria-hidden="true" />
