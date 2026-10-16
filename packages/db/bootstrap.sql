@@ -6696,31 +6696,25 @@ CREATE TABLE rt_delivery_order_items (
   UNIQUE (order_id, position)
 );
 
-CREATE TABLE rt_delivery_orders (
+CREATE TABLE "rt_delivery_orders" (
   id TEXT PRIMARY KEY,
-  -- 店舗は account_id → rt_stores.line_account_id と統括で引く。組織IDだけで信用しない。
   account_id TEXT NOT NULL,
   store_id TEXT NOT NULL,
-  service TEXT NOT NULL CHECK (service IN ('ubereats','demaecan','rocketnow')),
-  -- サービス側の注文ID。再送・重複受信をここで吸収する。
+  -- 'line' を追加。LINEから直接受けた注文も同じ表に並べ、画面と日次売上を1本に保つ。
+  service TEXT NOT NULL CHECK (service IN ('ubereats','demaecan','rocketnow','line')),
   external_order_id TEXT NOT NULL,
-  -- 画面に出す注文番号（#UE-1042 など）。桁揃えはサービスごとに違うため文字列で持つ。
   order_number TEXT NOT NULL,
-  -- 新着 → 調理中 → 準備完了 → 受け渡し済み。キャンセル・拒否は終端。
   status TEXT NOT NULL DEFAULT 'new'
     CHECK (status IN ('new','cooking','ready','handed_over','canceled','rejected')),
   total_amount INTEGER NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
   currency TEXT NOT NULL DEFAULT 'JPY',
   item_count INTEGER NOT NULL DEFAULT 0 CHECK (item_count >= 0),
-  -- 受け取り情報（D-2）。「配達（Uber Eats 配達員）」のような表示文をそのまま持つ。
   pickup_method TEXT,
   wanted_at INTEGER,
   customer_note TEXT,
-  -- 急ぎ度はバックエンドだけで判定する。画面には結果と理由だけを出す（判定の仕組み名は出さない）。
   urgency TEXT NOT NULL DEFAULT 'normal' CHECK (urgency IN ('urgent','normal','watch')),
   urgency_reason TEXT,
   urgency_computed_at INTEGER,
-  -- キャンセルは理由と発生元を残す。取り消せない操作なので履歴から消さない。
   cancel_reason_code TEXT,
   canceled_by TEXT CHECK (canceled_by IS NULL OR canceled_by IN ('store','customer','service')),
   received_at INTEGER NOT NULL,
@@ -6728,10 +6722,33 @@ CREATE TABLE rt_delivery_orders (
   ready_at INTEGER,
   handed_over_at INTEGER,
   canceled_at INTEGER,
+  -- 注文がどこから来たか。既存の3サービス経由は 'external'、LINEの自社注文は 'line_direct'。
+  -- 既存行は 'external' のまま。手数料の考え方が違うので service とは別に持つ。
+  order_source TEXT NOT NULL DEFAULT 'external'
+    CHECK (order_source IN ('external','line_direct')),
+  -- 配達を誰が運ぶか。'service'=そのサービスの配達員（既存）、'store'=店舗が自分で運ぶ、
+  -- 'uber_direct'/'wolt_drive'=自社注文の配送委託先（フェーズ2）。未確定は NULL。
+  delivery_provider TEXT CHECK (delivery_provider IS NULL OR delivery_provider IN (
+    'service','store','uber_direct','wolt_drive'
+  )),
+  -- 委託先が払い出す配達の追跡ID。お客様への追跡案内と、失敗時の照会に使う。
+  delivery_tracking_id TEXT,
+  -- 委託先へ実際に払った配送実費（円）。サービスの手数料と比べて得かどうかを
+  -- 後から数字で示すために、注文の行に残す。外部サービス経由の注文では NULL。
+  delivery_fee_amount INTEGER CHECK (delivery_fee_amount IS NULL OR delivery_fee_amount >= 0),
+  -- 自動適用したクーポン。金額の内訳を後から説明できるようにする。
+  coupon_id TEXT,
+  -- 注文したお客様（友だち）。LINEから直接受けた注文に後続の配信やタグ付けを繋げるため。
+  -- 外部サービス経由の注文は相手のIDを貰えないので NULL。本人が特定できる前の
+  -- 下書き段階でも入れられるよう、NULL を許す。
+  friend_id TEXT,
   version INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  UNIQUE (service, external_order_id)
+  UNIQUE (service, external_order_id),
+  -- 外部サービス経由の注文に委託配送は付かない。経路と業者の食い違いを表の側で止める。
+  CHECK (order_source = 'line_direct' OR delivery_provider IS NULL OR delivery_provider IN ('service','store')),
+  CHECK (order_source = 'external' OR service = 'line')
 );
 
 CREATE TABLE rt_delivery_service_states (
@@ -7378,6 +7395,24 @@ CREATE TABLE "rt_seat_waitlist" (
 CREATE TABLE rt_seat_waitlist_table_links (
  waitlist_id TEXT NOT NULL REFERENCES rt_seat_waitlist(id) ON DELETE CASCADE,
  table_id TEXT NOT NULL REFERENCES rt_tables(id), PRIMARY KEY(waitlist_id,table_id)
+);
+
+CREATE TABLE rt_store_feature_flags (
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  feature TEXT NOT NULL CHECK (feature IN (
+    'delivery',              -- デリバリー受注そのもの
+    'delivery_line_direct',  -- LINEからの自社受注（フェーズ2）
+    'delivery_dispatch',     -- 配送を外部業者へ委託する（フェーズ2）
+    'reservation',           -- 席の予約
+    'coupon'                 -- クーポン
+  )),
+  enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0,1)),
+  config_json TEXT CHECK (config_json IS NULL OR json_valid(config_json)),
+  updated_by TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (store_id, feature)
 );
 
 CREATE TABLE rt_store_followup_step_bindings (
@@ -10980,11 +11015,18 @@ CREATE INDEX rt_delivery_menu_items_store
 CREATE INDEX rt_delivery_order_items_order
   ON rt_delivery_order_items(order_id, position);
 
+CREATE INDEX rt_delivery_orders_friend_received
+  ON rt_delivery_orders(friend_id, received_at)
+  WHERE friend_id IS NOT NULL;
+
 CREATE INDEX rt_delivery_orders_store_received
   ON rt_delivery_orders(store_id, received_at);
 
 CREATE INDEX rt_delivery_orders_store_service_received
   ON rt_delivery_orders(store_id, service, received_at);
+
+CREATE INDEX rt_delivery_orders_store_source_received
+  ON rt_delivery_orders(store_id, order_source, received_at);
 
 CREATE INDEX rt_delivery_orders_store_status
   ON rt_delivery_orders(store_id, status, received_at);
@@ -11009,6 +11051,9 @@ CREATE INDEX rt_inventory_outbox_pending ON rt_inventory_notification_outbox(sen
 CREATE INDEX rt_inventory_rule_source_events_slot ON rt_inventory_rule_source_events(store_id,slot_id,id);
 
 CREATE INDEX rt_reserved_table ON rt_reservation_table_links(table_id,reservation_id);
+
+CREATE INDEX rt_store_feature_flags_feature
+  ON rt_store_feature_flags(feature, enabled);
 
 CREATE UNIQUE INDEX rt_visit_request ON rt_seat_visit_marks(reservation_id,request_id) WHERE request_id IS NOT NULL;
 

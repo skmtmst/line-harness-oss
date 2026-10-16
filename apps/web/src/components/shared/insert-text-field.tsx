@@ -474,8 +474,8 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
     return () => label.removeEventListener('click', onClick)
   }, [id])
 
-  /* 箱の要素にも value を持たせる（試験・自動操作が textarea と同じに書ける）。 */
-  useEffect(() => {
+  /* 箱の要素にも value を持たせる（試験・自動操作が textarea と同じに書ける）。後回し（useEffect）だと混雑時に一瞬 value が無い隙間ができるため、描画と同時（useLayoutEffect）に必ず持たせる。 */
+  useLayoutEffect(() => {
     const root = rootRef.current
     if (!root) return
     Object.defineProperty(root, 'value', {
