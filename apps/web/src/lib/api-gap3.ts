@@ -49,10 +49,11 @@ export const memberRanksApi={
  card:(liffId:string,token:string)=>fetchApi<Result<unknown>>(query('/api/liff/member-card',{liffId}),{headers:{Authorization:`Bearer ${token}`}}),
 };
 export const storeComparisonApi={
- get:(filters:{from?:string;to?:string;compare?:'average'|'previous';sort?:string;order?:'asc'|'desc';page?:number;pageSize?:10|20|50}={})=>fetchApi<Result<StoreComparisonResult>>(query('/api/hq/store-comparison',filters)),
+ get:(filters:{from?:string;to?:string;compare?:'average'|'previous';sort?:string;order?:'asc'|'desc';page?:number;pageSize?:10|20|50;poolId?:string}={})=>fetchApi<Result<StoreComparisonResult>>(query('/api/hq/store-comparison',filters)),
  detail:(id:string,from?:string,to?:string)=>fetchApi<Result<unknown>>(query(`/api/hq/store-comparison/${e(id)}`,{from,to})),
 };
 export const ecAutoLineApi={
+ simulate:(a:string)=>fetchApi<Result<{processed:number;sent:false;testMode:true}>>(account('/api/ec/auto-line/simulate',a),json('POST',{testMode:true})),
  rules:(a:string)=>fetchApi<Result<AutoLineRule[]>>(account('/api/ec/auto-line/rules',a)),
  save:(a:string,kind:AutoLineKind,b:{waitMinutes:number;messages:unknown[];expectedVersion:number;enabled?:false;reason?:string})=>fetchApi<Result<AutoLineRule>>(account(`/api/ec/auto-line/rules/${kind}`,a),json('PUT',{...b,testMode:true})),
  enableMock:(a:string,kind:AutoLineKind,expectedVersion:number,key:string)=>fetchApi<Result<AutoLineRule>>(account(`/api/ec/auto-line/rules/${kind}/enable`,a),json('POST',{expectedVersion,enabled:true,confirmed:true,testMode:true},key)),
@@ -70,6 +71,9 @@ export const bookingPassPlansApi={
  grant:(a:string,planId:string,friendId:string,reason:string,key:string)=>fetchApi<Result<unknown>>(account('/api/booking/admin/entitlements',a),json('POST',{planId,friendId,reason},key)),
 };
 export const gap3AiApi={
+ typing:(chatId:string,typing:boolean)=>fetchApi<Result<{typing:boolean;expiresAt?:string}>>(`/api/chats/${e(chatId)}/ai/typing`,json('POST',{typing})),
+ enableSimulation:(a:string,expectedVersion:number,stepUpToken:string)=>fetchApi<Result<{mode:'auto_qa';testMode:true;autoReplyAvailable:false}>>(account('/api/ai-settings',a),{...json('PUT',{mode:'auto_qa',expectedVersion,confirmed:true,testMode:true}),headers:{'X-Step-Up-Token':stepUpToken}}),
+ simulate:(a:string,b:{chatId:string;question:string;kind?:string},key:string)=>fetchApi<Result<unknown>>(account('/api/ai-settings/simulate',a),json('POST',{...b,testMode:true},key)),
  qa:(a:string,q='',offset=0)=>fetchApi<Result<Page<QaEntry>>>(query(account('/api/qa-entries',a),{q,offset})),
  logs:(a:string,action?:string,offset=0)=>fetchApi<Result<Page<AiAnswerLog>&{summary:unknown}>>(query(account('/api/ai-answer-logs',a),{action,offset})),
  log:(a:string,id:string)=>fetchApi<Result<AiAnswerLog&{answerText:string|null;qa:unknown;afterNote:string|null}>>(account(`/api/ai-answer-logs/${e(id)}`,a)),
@@ -77,7 +81,7 @@ export const gap3AiApi={
 };
 export const mcpConnectionsApi={
  list:(a:string)=>fetchApi<Result<McpConnection[]>>(account('/api/mcp-connections',a)),
- create:(a:string,b:{name:string;level:'read';expiryDays:30|90|180|365},stepUpToken:string)=>fetchApi<Result<{connection:McpConnection;url:string;key:string}>>(account('/api/mcp-connections',a),{...json('POST',b),headers:{'X-Step-Up-Token':stepUpToken}}),
+ create:(a:string,b:{name:string;level:'read'|'draft';expiryDays:30|90|180|365},stepUpToken:string)=>fetchApi<Result<{connection:McpConnection;url:string;key:string}>>(account('/api/mcp-connections',a),{...json('POST',b),headers:{'X-Step-Up-Token':stepUpToken}}),
  rotate:(a:string,id:string,expectedVersion:number,stepUpToken:string)=>fetchApi<Result<{connection:McpConnection;url:string;key:string}>>(account(`/api/mcp-connections/${e(id)}/rotate`,a),{...json('POST',{expectedVersion}),headers:{'X-Step-Up-Token':stepUpToken}}),
  stop:(a:string,id:string,expectedVersion:number,reason?:string)=>fetchApi<Result<McpConnection>>(account(`/api/mcp-connections/${e(id)}/stop`,a),json('POST',{expectedVersion,reason})),
  logs:(a:string,connectionId?:string,offset=0)=>fetchApi<Result<Page<unknown>&{connection:McpConnection|null}>>(query(account('/api/mcp-connections/logs',a),{connectionId,offset})),

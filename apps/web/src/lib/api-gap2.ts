@@ -47,7 +47,7 @@ export const broadcastAbApi={
  chooseMock:(id:string,variant:'A'|'B'|'none',confirmedRecipientCount:number,key:string)=>fetchApi<Result<{variant:'A'|'B'|'none';testMode:true}>>(`/api/broadcasts/${e(id)}/ab-test/choose`,{...json('POST',{variant,confirmedRecipientCount,testMode:true}),headers:{'Idempotency-Key':key,'X-Confirm-Irreversible':'broadcast-send'}}),
 };
 export const aiDraftApi={
- settings:(a:string)=>fetchApi<Result<{mode:'off'|'draft_only'|'suspended';version:number;autoReplyAvailable:false}>>(account('/api/ai-settings',a)),
+ settings:(a:string)=>fetchApi<Result<{mode:'off'|'draft_only'|'suspended'|'auto_qa';version:number;autoReplyAvailable:false}>>(account('/api/ai-settings',a)),
  saveSettings:(a:string,input:{mode:'off'|'draft_only'|'suspended';expectedVersion:number;confirmed?:true;reason?:string})=>fetchApi<Result<{mode:string;version:number;autoReplyAvailable:false}>>(account('/api/ai-settings',a),json('PUT',input)),
  summary:(chatId:string)=>fetchApi<Result<AiSummary>>(`/api/chats/${e(chatId)}/ai/summary`,json('POST',{})),
  draft:(chatId:string)=>fetchApi<Result<AiReplyDraft>>(`/api/chats/${e(chatId)}/ai/draft`,json('POST',{})),

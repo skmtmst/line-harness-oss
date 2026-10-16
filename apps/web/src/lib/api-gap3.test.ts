@@ -17,3 +17,11 @@ test('GAP3-CLIENT-02: 模擬の起動確認・再認証と停止理由、QA記�
  await gap3AiApi.log('a','log/1');expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/ai-answer-logs/log%2F1?account_id=a');
  await storeComparisonApi.get({compare:'average',pageSize:50});expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/hq/store-comparison?compare=average&pageSize=50');
 });
+
+test('GAP3-CLIENT-03: G2とECの模擬は必ず試験指定・本人確認・同じキー、店比較のプール',async()=>{
+ await gap3AiApi.enableSimulation('a',2,'step-up');expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/ai-settings?account_id=a',expect.objectContaining({method:'PUT',headers:{'X-Step-Up-Token':'step-up'},body:JSON.stringify({mode:'auto_qa',expectedVersion:2,confirmed:true,testMode:true})}));
+ await gap3AiApi.simulate('a',{chatId:'chat',question:'駐車場'},'same');expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/ai-settings/simulate?account_id=a',expect.objectContaining({headers:{'Idempotency-Key':'same'},body:JSON.stringify({chatId:'chat',question:'駐車場',testMode:true})}));
+ await gap3AiApi.typing('chat/1',false);expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/chats/chat%2F1/ai/typing',expect.objectContaining({body:'{"typing":false}'}));
+ await ecAutoLineApi.simulate('a');expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/ec/auto-line/simulate?account_id=a',expect.objectContaining({body:'{"testMode":true}'}));
+ await storeComparisonApi.get({poolId:'p/1',compare:'average'});expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/hq/store-comparison?poolId=p%2F1&compare=average');
+});
