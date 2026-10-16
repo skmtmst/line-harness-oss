@@ -14,7 +14,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import NumberInput from '@/components/shared/number-field'
@@ -93,21 +93,19 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
 
   return (
     <Drawer open={open} title="割り当てと返事の期限" description="新しい会話を、だれが・いつまでに返すかを決めます" width="editor" heightMode="viewport" dirty={dirty} busy={saving} error={error} onClose={onClose}
-      footer={<>
+      footer={<div className={styles.footerRow}>
         <Button onClick={onClose} disabled={saving}>キャンセル</Button>
         <Button variant="primary" onClick={() => void save()} disabled={!dirty || saving} busy={saving}>保存する</Button>
-      </>}>
+      </div>}>
       {loadError ? <ListState kind="error" error={loadError} onRetry={() => { setLoadError(null); void inboxRoutingApi.get(accountId).then((res) => { setSettings(res.data); setDraft(res.data); setMinutesText(String(res.data.firstResponseMinutes)) }, setLoadError) }} />
         : !draft ? <ListState kind="loading" />
           : (
             <div className={styles.body}>
               <section className={styles.card} aria-labelledby="routing-strategy-heading">
                 <h3 id="routing-strategy-heading" className={styles.cardTitle}>割り当て方</h3>
-                <RadioCardGroup legend="割り当て方" className={styles.strategies}>
-                  {STRATEGIES.map((item) => (
-                    <RadioCard key={item.value} name="routing-strategy" value={item.value} checked={item.value === 'none'} disabled={!item.ready} disabledReason="準備中です" onChange={() => {}} title={item.label} />
-                  ))}
-                </RadioCardGroup>
+                {/* 1行の切り替え。今の口で選べるのは「しない」だけなので、全体を選べない形にして並べる（準備中）。 */}
+                <SegmentedControl aria-label="割り当て方" disabled value="none" onChange={() => {}}
+                  options={STRATEGIES.map((item) => ({ value: item.value, label: item.label }))} />
                 <p className={styles.note}>均等・優先順・ランダム＋優先度は準備中です。いまは「しない」だけ選べます。</p>
               </section>
 
@@ -123,7 +121,7 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
                       invalid={!minutesValid} onChange={(event) => setMinutesText(event.target.value)} />
                   </Field>
                   <Field label="金の札を出す" htmlFor="routing-soon">
-                    <p id="routing-soon" className={styles.fixed}>{`残り ${SOON_MINUTES} 分から`}</p>
+                    <Select id="routing-soon" aria-label="金の札を出す" size="full" disabled value="soon" onChange={() => {}} options={[{ value: 'soon', label: `残り ${SOON_MINUTES} 分から` }]} />
                   </Field>
                 </div>
                 <Checkbox checked={draft.businessHoursOnly} disabled={!draft.enabled} onCheckedChange={(next) => setDraft({ ...draft, businessHoursOnly: next })}>
