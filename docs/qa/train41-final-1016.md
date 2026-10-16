@@ -68,3 +68,51 @@ ci-localの**114工程＝82成功・1失敗・31省略、終了1**。[工程一�
 今の進捗を全体像から整理するとこれ：A〜F・API・本線#1756の統合を保ち、25候補とブラウザ2件を解消し、製品検査を最後まで確認した。PR情報が必要な反映履歴チェックと集約、以前からの鍵差は残る。
 
 次のタスクはこれ：司令塔がAPI列車#1744の本線入りと最新本線を確認し、push・PR作成を行う。採番された番号を反映履歴へ入れ、通常のPRゲートを確認する。DB適用・配備は別工程。
+
+
+## 先回り確認（2026-10-17・00:20の依頼）
+
+API列車の最新を取り込み、CIの全工程を最後まで実行した。Web全試験で1件見つかった非同期フォーカス確認を直し、同じ全試験で成功を確認した。全パッケージの型検査も成功。集約はPR情報待ちのため未合格を保持する。push・PR・DB適用・配備はしていない。
+
+### 取り込みと番号の確認
+
+- 開始はクリーンな `4f2d2b332e`、doctorは `DOCTOR_LOCAL=1` で合格。fetchしたAPI先頭 `3bc9359966` を `merge --no-ff` の `67b87f71e4` へ取り込んだ。A〜Fの指定6コミットを保持。
+- 競合は `dialog-choice-audit.test.mjs` だけ。API側の色遷移完了待ちと、列車側の元の背景へ戻る確認を両方残した。1152・1440・1920 × 動きを減らす設定の有無で6試験成功。画面・LIFF・共通部品・支払い表示の正本に今回の変更はない。
+- 検査中に #1744 が本線の `b2f05ca80e` へ統合された。同じ `3bc9359966` であり、両者の内容差分は0。浅い履歴を `fetch --deepen=50` で補い、本線の合流点も `ca2751eeb7` へ取り込んだ。取り込み前後の木は `a6a4e52b69a3fb1f3da9322be27d86fbe3943a9b` で完全一致。[証拠](train41-preflight-1017/development-merge-identity.json)。rebase・force・stashなし。
+- SQLは605ファイル・最大683で、開始時・API列車と同一。API列車に含まれる追加25本を公開中37PRの追加ファイルと照合し、番号衝突0。SQLの作成・改名・書き換え・適用なし。[照合](train41-preflight-1017/open-pr-migrations.json)。画面入口も数え直して203枚のまま。
+
+### Webの1件と故障の対照
+
+Googleプロフィールの保存で入力検査が失敗したとき、理由の表示直後にフォーカスを同期確認していた。共通の保存失敗処理は次の描画で入力欄へ移るため、全体実行では `body` のまま判定することがあった。処理・画面・元の試験はAPI取り込み前後で同一。[ファイル同一性](train41-preflight-1017/focus-premerge-file-identity.json)。
+
+期待する入力欄・入力保持・エラー表示・修正・再試行は変えず、`document.activeElement` が実際に入力欄へ移るのを既存の `waitFor` で待つ1行へ変更した。タイムアウト・試験対象・件数は変えていない。独立した検査用作業場所で、描画を30ms遅らせると「元の試験は失敗 → 修正後は成功」、描画後のフォーカス処理を止めると「修正後も同じフォーカス判定で失敗」を確認。[故障対照](train41-preflight-1017/focus-proof.json)。
+
+修正した試験と全体型検査用の試験は、作業場所の1行補修とSHA-256が一致。製品コードは `67b87f71e4` から変更していない。[対象コード](train41-preflight-1017/final-source.json)。
+
+### 検査の結果
+
+Node 22.23.3・pnpm 9.15.4・UTC、heavy経由。Vitestは最大4、DBは2。CIの条件・許可・上限を維持し、速度は既存の `report`。依頼どおり既存のPlaywrightを含むCIを実行した。表の範囲は重なるので合算しない。
+
+| 対象 | 結果 |
+|---|---|
+| `pnpm typecheck` | 全11パッケージ成功。DB・SDK・文書・ひな形を含む。scriptsの型もCIで成功 |
+| Web全試験 | 修正後2,277ファイル・13,526成功・失敗0・skip1・todo1。型も再検査成功 |
+| Worker／DB | 12,241成功／2,285成功。Worker型・ビルド、DB初期構成・安全検査成功 |
+| scripts／共有／LIFF | 1,054成功・skip1／385成功（UTCとAsia/Bangkok）／485成功。型・対象のビルド成功 |
+| SDK・MCP・文書・更新・セットアップ | CIの試験・型・ビルド成功 |
+| Webビルド・設計値・実ブラウザ | 成功。認証3幅・フォーム保存・Webhook・画像権限・EC切替・LINE通知・保管タグ・セキュリティを含む |
+| SQLiteを使う既知2ファイル | Node22の再実行でも13試験成功。既定のNode26・ABI147でもSQLite 3.53.2を開けた。コード・依存ロックの変更なし |
+| 所有・ソース文字列・行数の見張り | 成功。所有の新しい候補0・一時許可0。許可・上限は変更なし |
+| V8崩れ／工程15 | 36条件の崩れ0／201条件全取得・新しい指摘0、既存許可1・本線由来9 |
+| V8故障対照・一覧・見出し | 故障203成功、一覧132・骨格93・見出し189すべて成功 |
+| 速度・表の操作・リッチメニュー文字 | 55測定完了・予算と目標の超過0。選択・キーボード・文字の3幅も成功 |
+
+[Web再実行](train41-preflight-1017/web-recheck-summary.txt)／[全体型検査](train41-preflight-1017/workspace-types-summary.txt)／[V8集計](train41-preflight-1017/v8-summary.json)。見本APIと比較元・比較先のHTTP成功を工程10・15の間にも確認し、今回はAPIの再起動や測定の採り直しなし。[生存確認](train41-preflight-1017/mock-liveness.jsonl)。
+
+元のci-localは114工程＝81成功・2失敗・31省略、終了1をそのまま保存した。失敗はWebの上記1件と集約。Webを直して全件成功後、同じ集約スクリプトへ実際の検査結果を渡して再実行し、PR情報がない `changes=unsupported` だけで終了1になることを確認した。PR番号を仮定して合格にはしていない。[元の114工程](train41-preflight-1017/ci-results.json)／[再実行後の状態](train41-preflight-1017/verification-summary.json)／[集約の再確認](train41-preflight-1017/aggregate-recheck.txt)。
+
+最初の起動は並列数を入れるためDB開始前に中断し、次の起動は手元の起動用コードの引数対応漏れでコマンド実行前に停止した。修復した上の実行を採用し、元のログも残している。長い共用枠待ちでは、自分の待機タイマー1つだけを空き枠検知時に起こした。起動はheavyの枠・メモリ検査を通り、他のPID・枠数・メモリ条件は変更していない。[起動の記録](train41-preflight-1017/waiter-wake.jsonl)。
+
+全ログは `~/lh-work/tools/hq/ci-local/logs/20261016-223049-67b87f71e4-11791/` と `/tmp/train41-api-preflight/`。[起動条件](train41-preflight-1017/ci-manifest.json)・[並列数の指定](train41-preflight-1017/run-ci.py.txt)・[Web再試験](train41-preflight-1017/web-recheck.sh.txt)・[全体型検査](train41-preflight-1017/workspace-types.sh.txt)も保存した。鍵は再取得・更新せず、前回の11,938項目の差・未取得18条件の一覧を保持。Pencil・正式台帳の更新なし。
+
+反映履歴は `docs/release-log/unreleased/pending-kenta-train41-preflight.md` に `#PR番号`・`@kenta`・JST日時で用意した。次は司令塔がpush・PR作成を行い、実際の番号で仮の履歴名と本文を確定して必須ゲートを確認する。DB適用・配備は別工程。
