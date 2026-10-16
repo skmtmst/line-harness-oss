@@ -1,7 +1,7 @@
 import type { AccountStyle, SetupAnswer, StyleCard, StyleSnapshot, StyleDisplay, StyleCalendarView, StyleSchedule, StyleTemplateSample } from '@line-crm/shared';
 import { fetchApi } from './api';
 
-import { root, url, write, Result, StyleQuery, StyleSelection, StarterSetItem, StyleBookingDetails, StyleClassDetails } from './api-styles-common.js';
+import { root, url, write, Result, StyleQuery, StyleSelection, StarterSetItem, StyleBookingDetails, StyleClassDetails } from './api-styles-common';
 export const methods1 = {
 
   get: (accountId: string) =>

@@ -1,6 +1,6 @@
 import { fetchApi, bookingApi } from './api';
 import { restaurantTestApi } from './restaurant-test-api';
-import { root, url, write, Result, StyleMember } from './api-styles-common.js';
+import { root, url, write, Result, StyleMember } from './api-styles-common';
 export const methods2 = {
 
   saveMenu: (
