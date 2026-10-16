@@ -89,7 +89,7 @@ export function toV8CheckRows(connection: LineAccountConnectData | null): V8Chec
       message: !connection || !webhookChecked || webhookPassed ? null : (steps[2]?.message ?? null),
     },
     { key: 'lineId', title: 'LINE ID の取得', detail: lineIdState === 'passed' && basicId ? basicId : '3 が通ると確かめます', state: lineIdState, message: null },
-    { key: 'addUrl', title: '友だち追加 URL', detail: addUrlState === 'passed' && basicId ? `https://lin.ee/${basicId.replace(/^@/, '')}` : '3 が通ると確かめます', state: addUrlState, message: null },
+    { key: 'addUrl', title: '友だち追加 URL', detail: addUrlState === 'passed' && basicId ? `https://line.me/R/ti/p/@${basicId.replace(/^@/, '')}` : '3 が通ると確かめます', state: addUrlState, message: null },
   ]
 }
 
