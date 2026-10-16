@@ -4,10 +4,11 @@ import {deliverOperatorPush,pushPayload} from '../services/operator-push.js';
 import {sendWebPush} from '../services/web-push.js';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
+import {useSqliteClock} from '../test-utils/sqlite-clock.js';
 let d:SqliteD1;let body:any;
 const b64=(b:Uint8Array)=>Buffer.from(b).toString('base64url');
-beforeEach(async()=>{d=gapFixture();d.raw.exec("INSERT INTO chats(id,friend_id,created_at,updated_at) VALUES('chat','f',datetime('now'),datetime('now'))");const key=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']) as CryptoKeyPair;body={endpoint:'https://fcm.googleapis.com/fcm/send/test',keys:{p256dh:b64(new Uint8Array(await crypto.subtle.exportKey('raw',key.publicKey) as ArrayBuffer)),auth:b64(crypto.getRandomValues(new Uint8Array(16)))},label:'試験端末'};vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));});
-afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
+beforeEach(async()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-19T03:00:00Z'));d=gapFixture();useSqliteClock(d.raw,()=>new Date());d.raw.exec("INSERT INTO chats(id,friend_id,created_at,updated_at) VALUES('chat','f',datetime('now'),datetime('now'))");const key=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']) as CryptoKeyPair;body={endpoint:'https://fcm.googleapis.com/fcm/send/test',keys:{p256dh:b64(new Uint8Array(await crypto.subtle.exportKey('raw',key.publicKey) as ArrayBuffer)),auth:b64(crypto.getRandomValues(new Uint8Array(16)))},label:'試験端末'};vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));});
+afterEach(()=>{d.raw.close();vi.unstubAllGlobals();vi.useRealTimers();});
 test('G4-01 G4-04 G4-14: 端末1件・本人だけ・代理で登録しない',async()=>{
  const url='/api/me/push/subscriptions';expect((await gapCall(gapApp(d,[operatorPush]),url,'POST',body)).status).toBe(201);expect((await gapCall(gapApp(d,[operatorPush]),url,'POST',body)).status).toBe(201);expect(d.raw.prepare('SELECT count(*) n FROM operator_push_subscriptions').get()).toEqual({n:1});expect((await gapCall(gapApp(d,[operatorPush],gapOwner,true),url,'POST',body)).status).toBe(403);
  expect((await gapCall(gapApp(d,[operatorPush],{...gapOwner,id:'s',role:'staff'}),url,'POST',body)).status).toBe(409);expect((await gapCall(gapApp(d,[operatorPush]),url,'POST',{...body,endpoint:'https://127.0.0.1/secret'})).status).toBe(400);
