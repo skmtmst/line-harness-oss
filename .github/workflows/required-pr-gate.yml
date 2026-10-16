@@ -556,7 +556,7 @@ jobs:
           pnpm exec playwright test
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
       - name: MFA auth input and button behavior at three widths
-        run: pnpm exec playwright test --config apps/web/src/v8/login/train30-auth.config.mjs
+        run: pnpm exec playwright test --config scripts/codex/train30-auth-isolated.config.mjs
       - name: Verify admin security headers and auth interactions
         run: node scripts/codex/train32-security-browser.mjs web
       - name: Upload MFA browser failure context

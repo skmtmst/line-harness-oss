@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { waitForOverlayLayout } from '../../../../../scripts/codex/overlay-ready.mjs'
 const mockPort = Number(process.env.TRAIN30_MOCK_PORT ?? 8788)
 const codes = ['7K2Q-9FXM','B4TN-6WJP','H8RD-3CVY','M5ZL-2QKA','P9XE-7NHU','T3GW-8BSC','Y6JA-4DRV','C2FN-5MXT']
 async function centered(button) {
@@ -104,6 +105,7 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and personal rec
   await page.getByRole('switch', { name: 'ログインで二段階認証を必須にする' }).click()
   const dialog = page.getByRole('dialog', { name: '二段階認証の必須をオフにしますか' })
   await expect(dialog).toBeVisible()
+  await waitForOverlayLayout(dialog)
   await dialog.getByRole('textbox', { name: '1桁目' }).fill('123456')
   expect(writes).toBe(0)
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`off-confirm-${width}.png`) })
@@ -111,7 +113,9 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and personal rec
   await expect.poll(() => writes).toBe(1)
   await expect(page.getByRole('switch', { name: 'ログインで二段階認証を必須にする' })).toHaveAttribute('aria-checked', 'false')
   await page.getByRole('button', { name: '回復コードを作り直す' }).click()
-  await page.getByRole('dialog').getByRole('textbox', { name: '1桁目' }).fill('234567')
+  const recoveryDialog = page.getByRole('dialog')
+  await waitForOverlayLayout(recoveryDialog)
+  await recoveryDialog.getByRole('textbox', { name: '1桁目' }).fill('234567')
   await expect(page.getByRole('list', { name: '8個の回復コード' }).getByRole('listitem')).toHaveCount(8)
   await page.getByRole('button', { name: '控えました', exact: true }).click()
   await expect(page.getByText('残り 8 / 8 個', { exact: true })).toBeVisible()
