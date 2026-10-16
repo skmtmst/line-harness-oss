@@ -170,7 +170,7 @@ function MetricCell({ def, metric, compare }: { def: MetricDef; metric: StoreCom
   return (
     <span className={styles.cell} title={diffTitle(def.key, metric.diff, compare)}>
       {formatMetric(def.key, metric.value)}
-      <span className={styles.chipSlot}>{diff && tone ? <DeltaChip tone={tone}>{diff}</DeltaChip> : null}</span>
+      <span className={styles.chipSlot}>{diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : null}</span>
     </span>
   )
 }
@@ -235,7 +235,7 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
                     <span className={styles.metricName}>{def.label}</span>
                     <span className={styles.metricValue}>
                       {metric?.available && metric.value !== null ? formatMetric(def.key, metric.value) : <span className={styles.cellEmpty}>—</span>}
-                      {diff && tone ? <DeltaChip tone={tone}>{diff}</DeltaChip> : null}
+                      {diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : null}
                     </span>
                   </div>
                 )

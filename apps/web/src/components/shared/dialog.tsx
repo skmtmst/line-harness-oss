@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
 import Button from './button'
 import IconButton from './icon-button'
-import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
+import { OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
 import { useFormInputDirty } from './form-input-dirty'
 import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
@@ -237,6 +237,7 @@ export default function Dialog({
     initialFocusId ? () => document.getElementById(initialFocusId)
       : primaryAction === 'cancel' ? () => cancelRef.current : undefined,
   )
+  const layer = useOverlayLayer(open && modal)
   const confirmationSizeClass = confirmation && compact
     ? tone === 'destructive'
       ? styles.destructiveConfirmation
@@ -363,7 +364,7 @@ export default function Dialog({
   const discardDialog = discard.confirming ? <Dialog open={discard.confirming} title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null
   if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}{discardDialog}</OverlayDepthContext.Provider>
   const overlay = (
-    <div className={`${styles.overlay} ${confirmation ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-viewport-fit={fitViewport || undefined} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-viewport-fit={fitViewport || undefined} data-design-top={designTop ? '' : undefined} style={{ zIndex: layer, ...(designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : null) }} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) discard.requestClose()
     }}>
       {panel}

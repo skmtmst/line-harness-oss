@@ -141,7 +141,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
                   <span className={styles.rowTitle}>{purpose.label}</span>
                   <span className={styles.rowNote}>{purpose.note}</span>
                 </div>
-                <StatusPill tone={STATE_TONE[state]}>{STATE_LABEL[state]}</StatusPill>
+                <StatusPill tone={STATE_TONE[state]}><span>{STATE_LABEL[state]}</span></StatusPill>
                 {canEdit ? <Button variant="secondary" onClick={() => begin(purpose.key)}>変える</Button> : null}
               </div>
             )

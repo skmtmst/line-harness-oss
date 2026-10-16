@@ -445,6 +445,7 @@ export default function HqHomeV8() {
           ...(isOwner ? [{ id: 'restore', label: '戻す', onSelect: () => setArchiveTarget({ account, mode: 'restore' as const }) }] : []),
         ]
       : [
+          ...(isOwner ? [{ id: 'billing', label: 'お支払いの設定を開く', onSelect: () => router.push('/hq/billing') }] : []),
           { id: 'login', label: 'このアカウントに切り替える', onSelect: () => login(account.id) },
           ...(canManage ? [{ id: 'settings', label: '設定', onSelect: () => setSettingsAccount(account) }] : []),
         ]

@@ -4,7 +4,7 @@
 import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
+import { OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
 import Dialog from './dialog'
 import IconButton from './icon-button'
@@ -88,6 +88,7 @@ export default function Drawer({
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
   const panelRef = useOverlayFocus<HTMLElement>(open && modal, discard.requestClose, busy)
+  const layer = useOverlayLayer(open && modal)
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
 
@@ -150,7 +151,7 @@ export default function Drawer({
   )
   const discardDialog = discard.confirming ? <Dialog open title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null
   if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}{discardDialog}</OverlayDepthContext.Provider>
-  const overlay = <div className={styles.overlay} role="presentation" data-closing={leaving || undefined} onMouseDown={(event) => {
+  const overlay = <div className={styles.overlay} role="presentation" data-closing={leaving || undefined} style={{ zIndex: layer }} onMouseDown={(event) => {
     if (!busy && event.target === event.currentTarget) discard.requestClose()
   }}>{panel}</div>
   return <OverlayDepthContext.Provider value={depth + 1}>{discardDialog}{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>

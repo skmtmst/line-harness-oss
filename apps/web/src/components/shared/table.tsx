@@ -103,9 +103,12 @@ export function DataTable({
   'aria-label': ariaLabel,
   grid,
   columnSizing,
+  columnWeights,
 }: {
   children: ReactNode
   className?: string
+  /** 列の幅の割合（1,2.2,…）。均等割りにせず、条件のような長い列に幅を取る。列の数と同じだけ渡す。 */
+  columnWeights?: readonly number[]
   'data-design'?: string
   /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
   presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery' | 'template-list'
@@ -150,7 +153,7 @@ export function DataTable({
         '--table-head-padding': grid.headPadding,
         '--table-head-text-size': grid.headTextSize ?? 'var(--tpl-sb-tbl-head)',
         '--table-body-text-size': grid.bodyTextSize ?? 'var(--tpl-sb-tbl-head)',
-      } as CSSProperties : undefined}>{children}</table>
+      } as CSSProperties : undefined}>{columnWeights?.length ? <colgroup>{columnWeights.map((weight, index) => <col key={index} style={{ width: `${(weight / columnWeights.reduce((sum, value) => sum + value, 0)) * 100}%` }} />)}</colgroup> : null}{children}</table>
     </div>
   )
 }

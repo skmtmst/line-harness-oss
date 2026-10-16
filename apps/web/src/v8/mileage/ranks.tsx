@@ -142,7 +142,7 @@ export default function RanksTab() {
   const activeLabel = program?.status === 'active' ? '動かしている' : '止めている'
 
   const table = !program ? null : (
-    <DataTable>
+    <DataTable columnWeights={[1.1, 2.2, 1.7, 1.7, 1.1, 0.5]}>
       <thead>
         <TableHeadRow>
           <Th>ランク</Th>
