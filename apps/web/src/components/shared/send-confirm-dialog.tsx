@@ -12,7 +12,7 @@
  * - 人数が数えられていない・0 人・権限が無い・代理ログイン中は主ボタンを出さない／押せない。
  */
 import { useRef, useState, type ReactNode } from 'react'
-import { ShieldAlert, TriangleAlert } from 'lucide-react'
+import { Send, ShieldAlert, TriangleAlert } from 'lucide-react'
 import ConfirmDialog from './confirm-dialog'
 import Button from './button'
 import { Skeleton } from './skeleton'
@@ -109,7 +109,9 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
   return (
     <ConfirmDialog
       open={open}
-      title={scheduled ? '予約する前の確かめ' : '送る前の確かめ'}
+      title="送る前の確かめ"
+      titleIcon={false}
+      confirmIcon={<Send size={15} aria-hidden="true" />}
       description={subtitle}
       confirmLabel={primaryLabel}
       busyLabel="送っています…"
@@ -137,7 +139,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
             </div>
           ) : (
             <div className={styles.stack}>
-              <strong className={styles.strong}>{formatNumber(recipients ?? 0)} 人</strong>
+              <strong className={styles.big}>{formatNumber(recipients ?? 0)} 人</strong>
               {recipientsNote ? <span className={styles.note}>{recipientsNote}</span> : null}
               {approval ? <span className={styles.note}>{approval.note}</span> : null}
               {perAccount?.length ? (
@@ -159,7 +161,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
         </Row>
         <Row label="送る目的">
           <div className={styles.stack}>
-            <strong className={styles.strong}>{PURPOSE_LABEL[purpose]}</strong>
+            <strong className={styles.purpose}>{PURPOSE_LABEL[purpose]}</strong>
             {purpose === 'marketing' ? <span className={styles.note}>宣伝を止めている人には送りません</span> : null}
           </div>
         </Row>

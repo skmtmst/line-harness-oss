@@ -6,6 +6,8 @@
 .value { margin: 0; min-width: 0; }
 .stack { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .strong { color: var(--color-ink); font-size: var(--text-body); font-weight: 700; line-height: 20px; }
+.big { color: var(--color-ink); font-size: 20px; font-weight: 700; line-height: 28px; }
+.purpose { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: var(--radius-pill); background: var(--color-status-warn-soft); color: var(--color-status-warn-deep, #b45309); font-size: var(--text-caption); font-weight: 700; line-height: 18px; }
 .note { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: 18px; }
 .body { color: var(--color-ink); font-size: var(--text-body); line-height: 20px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .link { padding: 0; border: 0; background: none; color: var(--color-accent-deep); font-size: var(--text-caption); font-weight: 600; cursor: pointer; }
