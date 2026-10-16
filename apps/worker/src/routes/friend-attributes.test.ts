@@ -137,6 +137,7 @@ const MARK = {
   is_default: 1,
   auto_on_inbound: 1,
   display_order: 0,
+  display_locations_json: '["inbox","friends","friend_detail"]',
   created_at: '2026-08-16',
   revision: 1,
   updated_by: 'u-1',

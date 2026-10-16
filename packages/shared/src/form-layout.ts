@@ -1,3 +1,7 @@
+import type { FormChoice, FormAction } from './form-choice-types.js';
+export type { FormChoice, FormAction } from './form-choice-types.js';
+import type { FormBookingConfig, FormBookingValue } from './form-booking-types.js';
+export type { FormBookingConfig, FormBookingValue } from './form-booking-types.js';
 import { isCalendarDateString } from './form-calendar-date.js'
 export { isCalendarDateString } from './form-calendar-date.js'
 import type { TapExtras } from './tap-extras.js';
@@ -94,81 +98,6 @@ export interface FormInputLimit {
   max?: number;
   /** 入力欄の下に出る文字数カウンタを消す */
   hideCounter?: boolean;
-}
-
-/**
- * 選択肢1つ。
- *
- * 「選んだら何が起きるか」は選択肢ごとに違う。ブロック側の `choiceMode`
- * がどの列を使うかを決める。
- */
-export interface FormChoice {
-  /** リサーチで選んだ答えの追加処理。回答を送信した後に実行する。 */
-  tapExtras?: TapExtras;
-  id: string;
-  label: string;
-  /** choiceMode = 'tag' のとき付けるタグ */
-  tagId?: string | null;
-  /** choiceMode = 'friendField' のとき情報欄へ入れる値。空ならラベルを入れる */
-  value?: string;
-  /** choiceMode = 'action' のとき実行する動作 */
-  actions?: FormAction[];
-  /** 最初から選んだ状態で出す */
-  defaultSelected?: boolean;
-  /** 定員。埋まった選択肢は選べなくする */
-  capacity?: { enabled: boolean; limit?: number } | null;
-  /** 選んだ人だけ飛ばすセクション。未設定なら次のセクションへ進む */
-  jumpToSectionId?: string | null;
-  /** 「その他」（自由入力を伴う選択肢） */
-  isOther?: boolean;
-}
-
-/**
- * 選択肢や回答後に実行する動作。
- *
- * こちら側に受け皿がある動作だけを型に入れている。Lステップにある
- * 「対応マーク操作」「イベント予約操作」「共通情報操作」は、繋ぐ先の
- * 仕様を決めてから足す。型に無い動作は保存時に落とす。
- */
-export type FormAction =
-  | ({ kind: "research_action" } & ResearchAnswerAction)
-  | { kind: "send_text"; text: string }
-  | { kind: "send_template"; templateId: string }
-  | { kind: "tag"; op: "add" | "remove"; tagIds: string[] }
-  | { kind: "friend_field"; fieldId: string; value: string }
-  | { kind: "scenario"; op: "start" | "stop"; scenarioId: string }
-  | { kind: "reminder"; reminderId: string };
-
-/**
- * 「予約を入れる」ブロックの設定。
- *
- * メニューは1つに決める（複数メニューの同時受付はしない）。
- * 担当が空なら「だれでも」（予約側の自動割り当てに任せる）。
- * 選べる期間は今日から daysAhead 日後まで。空なら14日。
- * 予約は「未承認」で入り、店が承認する（すぐ確定は作らない）。
- */
-export interface FormBookingConfig {
-  kind?: 'people' | 'seats';
-  storeId?: string;
-  courseId?: string | null;
-  menuId: string;
-  staffId?: string | null;
-  daysAhead?: number;
-}
-
-/**
- * 「予約を入れる」ブロックの回答の形。予約の確保は回答の送信後に
- * 予約の受け口で行い、枠の再確認と重なりの防止はそちらが担う。
- * ここでは「どの枠を選んだか」だけを持ち、形だけを検査する。
- */
-export interface FormBookingValue {
-  kind?: 'people' | 'seats';
-  storeId?: string;
-  courseId?: string | null;
-  guestCount?: number;
-  menuId: string;
-  staffId: string;
-  startsAt: string;
 }
 
 /** 入力欄のブロック。 */
@@ -1321,6 +1250,12 @@ export function validateFormDefinition(layout: FormLayout): string | null {
           return `回答データの見出し「${block.name}」が重複しています`;
         }
         seenNames.add(block.name);
+        if (block.type === "booking" && block.booking != null) {
+          if (typeof block.booking !== "object" || Array.isArray(block.booking)) return `${at}の予約設定を確認してください`;
+          for (const [key, label] of [["allowMenuSelection", "メニューを選んでもらう"], ["requireApproval", "未承認で入れる"]] as const) {
+            if (block.booking[key] !== undefined && typeof block.booking[key] !== "boolean") return `${at}の「${label}」はオン・オフで指定してください`;
+          }
+        }
         if (block.type === "file") {
           if (block.fileKinds !== undefined && (!Array.isArray(block.fileKinds) || !block.fileKinds.length || block.fileKinds.some(kind => !["image", "pdf", "identity"].includes(kind)))) return `${at}で受け取る種類を1つ以上選んでください`;
           if (block.fileKind && !["image", "pdf", "identity"].includes(block.fileKind)) return `${at}のファイルの種類を選んでください`;

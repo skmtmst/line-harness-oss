@@ -1,3 +1,7 @@
+import type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
+export type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
+import type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
+export type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
 import { type RichMenuPublishRun } from './api-rich-menu-publish-types'
 export { type RichMenuPublishRun } from './api-rich-menu-publish-types'
 import { SESSION_LOST_EVENT } from './session-events'
@@ -1789,44 +1793,6 @@ export type BroadcastLedger = {
 
 export type { BroadcastMessageButton, BroadcastMessageOptions } from '@line-crm/shared';
 
-export type BroadcastPreflight = {
-  audienceCount: number
-  hiddenExcluded: number
-  warnings: Array<{ level: 'info' | 'warning'; message: string }>
-  audience?: {
-    matched: number
-    sendable: number
-    evaluatedAt: string
-    representatives: Array<{
-      friendId: string
-      displayName: string | null
-      pictureUrl: string | null
-      summary: string
-    }>
-  }
-  exclusions?: {
-    blocked: number
-    hidden: number
-    missingDestination: number
-    duplicate: number
-    paused: number | null
-    total: number
-  }
-  quota?: {
-    monthlyUsed: number | null
-    monthlyLimit: number | null
-    remaining: number | null
-    planned: number
-    state: 'available' | 'insufficient' | 'unavailable'
-    reason: string | null
-  }
-  concurrentBroadcasts?: Array<{ id: string; title: string; scheduledAt: string }>
-  conditionAxes?: {
-    standard: Array<{ key: string; label: string }>
-    broadcastOnly: Array<{ key: string; label: string }>
-  }
-}
-
 export type BroadcastSavedView = {
   id: string
   name: string
@@ -3490,6 +3456,7 @@ export type MileageFriendV6 = {
   lifetimeEarned: number
   spent: number
   lastChangedAt: string | null
+  lastAction?: { name: string; amount: number; occurredAt: string; entryType: string; status: string } | null
   walletScope: 'verified_user' | 'friend'
   lineAccount: { id: string; name: string }
 }
@@ -5278,6 +5245,26 @@ export type NenPhotoRewardActionResult = {
 }
 
 /** 掲載先1件。active=0 の外した先も removed_at つきで残る（Issue #1040）。 */
+/**
+ * GET /api/nen-members/photos/publications の応答本体（Issue #1040）。
+ * `pendingWithdrawals` は同意撤回済みで掲載先の整理が残るもの、
+ * `withdrawnItems` は外し終えた履歴。撤回後に残る公開先を追うための口。
+ */
+export type NenPhotoPublicationList = {
+  summary: {
+    publishedCount: number
+    placementCount: number
+    topPhoto: Record<string, unknown> | null
+    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
+    consentedCount: number
+    attentionCount: number
+    withdrawnCount: number
+  }
+  items: Array<Record<string, unknown>>
+  pendingWithdrawals: Array<Record<string, unknown>>
+  withdrawnItems: Array<Record<string, unknown>>
+}
+
 export type NenPhotoPublicationPlacement = {
   id: string
   publication_id?: string
@@ -5342,47 +5329,6 @@ export type PhotoRewardPolicyVersion = {
   createdBy: string | null
   createdAt: string
   status: 'in_use' | 'reserved' | 'past'
-}
-
-/**
- * GET /api/nen-members/photos/publications の応答本体（Issue #1040）。
- * `pendingWithdrawals` は同意撤回済みで掲載先の整理が残るもの、
- * `withdrawnItems` は外し終えた履歴。撤回後に残る公開先を追うための口。
- */
-export type NenPhotoPublicationList = {
-  summary: {
-    publishedCount: number
-    placementCount: number
-    topPhoto: Record<string, unknown> | null
-    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
-    consentedCount: number
-    attentionCount: number
-    withdrawnCount: number
-  }
-  items: Array<Record<string, unknown>>
-  pendingWithdrawals: Array<Record<string, unknown>>
-  withdrawnItems: Array<Record<string, unknown>>
-}
-
-/** GET /api/accounts/health-summary の応答。ログ本文は含まない。 */
-export type AccountHealthSummary = {
-  items: Array<{ lineAccountId: string; riskLevel: string | null }>
-  warningCount: number
-  dangerCount: number
-}
-
-export type PhotoAssetRun = {
-  id: string
-  photoId: string
-  lineAccountId: string
-  requestedVersion: number
-  status: 'queued' | 'processing' | 'completed' | 'failed'
-  requestedBy: string
-  createdAt: string
-  startedAt: string | null
-  completedAt: string | null
-  errorMessage: string | null
-  operation?: 'review' | 'public' | 'thumbnail' | 'all'
 }
 
 export type PhotoAssetStatus = {
@@ -5604,6 +5550,7 @@ export interface UidMigrationItem {
   errorMessage: string | null
 }
 export interface UidMigrationRun {
+  suppressionReconciliation?: { status: 'unavailable'; transferredCount: null; mismatchCount: null; reason: 'delivery_consent_snapshot_missing' } | { status: 'matched' | 'mismatch' | 'rolled_back'; transferredCount: number; mismatchCount: number; reason: null }
   id: string
   fromAccountId: string
   toAccountId: string
@@ -6008,6 +5955,7 @@ export type OpsTenantDetail = {
   accounts: Array<{ id: string; name: string; is_active: number; archived_at: string | null; updated_at: string; friend_count: number }>
   members: Array<{ id: string; name: string; email: string | null; role: string; access_level: string; is_active: number; invite_status: string; last_login_at: string | null }>
   audit: OpsAuditRow[]
+  metrics: {monthlyListPriceYen:number|null;monthlyListPriceSource:string;thisMonthBilledYen:number|null;invoiceSource:string;accountCount:number;activeAccountCount:number;friendCount:number;friendChangeLastMonth:null;supportCount:number;unresolvedSupportCount:number}
 }
 
 export type OpsAuditRow = {
@@ -7455,6 +7403,7 @@ export const api = {
            * されていた。型に無いものは、来ていないことに誰も気づけない。
            */
           contentRevision: number
+          latestEdit?: {staffId:string;staffName:string;savedAt:string}|null
           /** お客さまに出している不変版。null は未公開。 */
           publishedVersionId: string | null
           /** 現在公開版の元になった編集版。 */
@@ -7490,7 +7439,10 @@ export const api = {
         name?: string
         description?: string | null
         fields?: unknown
-        /** 送ると fields もこちらから作り直される */
+        /**
+         * 送ると fields もこちらから作り直される。
+         * 予約のつまみは各ブロックのbooking.allowMenuSelection/requireApproval。
+         */
         layout?: FormLayout
         onSubmitTagId?: string | null
         onSubmitMessageType?: string | null
@@ -9050,6 +9002,7 @@ export const api = {
   },
   /** 統括から運営へのお問い合わせ（★V6 36-3）。形は `apps/worker/src/routes/hq-support.ts`。 */
   hqSupport: {
+    summary: () => fetchApi<ApiResponse<{ total: number; newCount: number; inProgressCount: number; assignedInProgressCount: number; resolvedThisMonth: number; resolvedPreviousMonth: number; averageFirstReplyHours: number | null; firstReplySampleCount: number }>>('/api/hq/support/summary'),
     context: () => fetchApi<ApiResponse<HqSupportContext>>('/api/hq/support/context'),
     kinds: () => fetchApi<ApiResponse<Array<{ key: HqSupportKind; label: string }>>>('/api/hq/support/kinds'),
     list: () => fetchApi<ApiResponse<HqSupportRequest[]>>('/api/hq/support/requests'),
@@ -10076,6 +10029,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         /** R194: 管理一覧の抜粋・検索が読む最新の下書き本文。公開版だけのときは null。 */
         draftMessageContent: string | null;
         folderId: string | null;
@@ -10133,6 +10087,7 @@ export const api = {
           category: string;
           messageType: string;
           messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
           folderId: string | null;
           question: TemplateQuestion | null;
           questionStatus: 'draft' | 'published';
@@ -10162,6 +10117,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
         folderId: string | null;
@@ -10206,6 +10162,7 @@ export const api = {
         accountId: string | null;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         publishedVersion: number;
         publishedAt: string | null;
         published: boolean;
@@ -10237,13 +10194,15 @@ export const api = {
       /** 置き場。省略・null は未分類。 */
       folderId?: string | null
     }) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; folderId: string | null; createdAt: string; updatedAt: string }>>(
         '/api/templates',
         { method: 'POST', body: JSON.stringify(data) },
       ),
     update: (
       id: string,
-      data: Partial<{ name: string; category: string; messageType: string; messageContent: string; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
+      data: Partial<{ name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null
@@ -10254,7 +10213,8 @@ export const api = {
         folderId?: string | null
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; folderId: string | null; createdAt: string; updatedAt: string }>>(
         `/api/templates/${id}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
@@ -10282,6 +10242,7 @@ export const api = {
         status: 'in_use' | 'reserved' | 'past';
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         carouselActions: unknown | null;
         carouselTapLimitMode: string | null;
         carouselTapLimitText: string | null;
@@ -10289,6 +10250,9 @@ export const api = {
         questionStatus: string | null;
         effectiveFrom: string | null;
         createdAt: string;
+        createdByStaffId: string | null;
+        creatorName: string | null;
+        creatorNameSource: 'current_staff_profile' | null;
       }>>>(`/api/templates/${id}/versions`),
     /**
      * 466: この版に戻す。過去の版は変えず、その中身で新しい版を作る。
@@ -13434,7 +13398,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<CreateEntryRouteInput>) =>
+    update: (id: string, data: Partial<CreateEntryRouteInput> & { expectedUpdatedAt?: string }) =>
       fetchApi<ApiResponse<EntryRoute>>(`/api/entry-routes/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -14645,7 +14609,7 @@ function withAccount(path: string, accountId: string): string {
 }
 
 export interface BookingPaymentAdminConfig {
-  mode: 'none' | 'onsite' | 'online';
+  mode: 'none' | 'onsite' | 'online' | 'customer_choice';
   provider: string;
   holdMinutes: number;
   keyConfigured: boolean;
@@ -14709,13 +14673,23 @@ export interface BookingSalesSummary {
 }
 
 export const bookingApi = {
+  getChannels: (accountId: string) => fetchApi<ApiResponse<{
+    timeZone: string; autoAssign: boolean;
+    staff: Array<{ staffId: string; displayName: string; status: 'connected' | 'disconnected' | 'expired'; externalEventsThisWeek: number | null; lastReadAt: string | null; readError: string | null }>;
+    channels: Array<{ key: string; status: string; todayCount: number | null; enabled?: boolean; version?: number; connectionStatus?: 'requested' | 'disabled'; operational?: false }>;
+  }>>(withAccount('/api/booking/admin/channels', accountId)),
+  /** 外部サービスの実接続ではなく、連携を希望する設定だけを保存する。 */
+  saveChannelSetting: (accountId: string, channel: 'hot_pepper_beauty' | 'google_reserve' | 'epark', data: { enabled: boolean; expectedVersion: number }) =>
+    fetchApi<ApiResponse<{ key: string; enabled: boolean; version: number; connectionStatus: 'requested' | 'disabled'; operational: false }>>(
+      withAccount(`/api/booking/admin/channels/${channel}/settings`, accountId), { method: 'PUT', body: JSON.stringify(data) },
+    ),
   getPaymentConfig: (accountId: string) =>
     fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
       withAccount('/api/booking/admin/payment-config', accountId),
     ),
   savePaymentConfig: (
     accountId: string,
-    body: { mode: 'none' | 'onsite' | 'online'; provider: 'none' | 'onsite' | 'stripe'; holdMinutes: number },
+    body: { mode: 'none' | 'onsite' | 'online' | 'customer_choice'; provider: 'none' | 'onsite' | 'stripe'; holdMinutes: number },
   ) =>
     fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
       withAccount('/api/booking/admin/payment-config', accountId),
@@ -14724,7 +14698,7 @@ export const bookingApi = {
   saveMenuPayment: (
     accountId: string,
     menuId: string,
-    body: { mode: 'none' | 'onsite' | 'online'; provider: 'none' | 'onsite' | 'stripe' },
+    body: { mode: 'none' | 'onsite' | 'online' | 'customer_choice'; provider: 'none' | 'onsite' | 'stripe' },
   ) =>
     fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
       withAccount(`/api/booking/admin/menus/${menuId}/payment`, accountId),

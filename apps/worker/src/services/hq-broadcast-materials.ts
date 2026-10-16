@@ -8,13 +8,14 @@ export async function resolveHqBroadcastMaterials(
 ): Promise<HqBroadcastInput> {
   const bubbles = input.messageBubbles ? JSON.parse(JSON.stringify(input.messageBubbles)) : (input.messageBubblesJson ? JSON.parse(input.messageBubblesJson) : null);
   if (!bubbles) return input;
+  const expanded: import('@line-crm/shared').BroadcastBubble[] = [];
   for (const bubble of bubbles) {
     const content = bubble.content;
     if (bubble.type === 'audio' && content?.state?.audio) {
       try { content.state.audio = await resolveHqAudio(db, tenantId, accountId, content.state.audio, runtime); }
       catch { throw new StampError('統括の音声を確認できません。取り込みと安全性の確認をやり直してください', 409); }
     }
-    if (!content?.hqTemplateId) continue;
+    if (!content?.hqTemplateId) { expanded.push(bubble); continue; }
     const templateId = content.hqTemplateId, versionId = content.hqTemplateVersionId;
     if (typeof templateId !== 'string' || typeof versionId !== 'string' || !versionId.trim()) {
       throw new StampError('統括のひな形の版を指定してください', 409);
@@ -79,7 +80,15 @@ export async function resolveHqBroadcastMaterials(
       if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, /^hqTemplate/.test(k) ? v : walk(v, k)]));
       return value;
     };
+    if(definition.messageBubbles) {
+      const pinned=await db.prepare('SELECT v.message_bubbles_json FROM template_versions v JOIN templates t ON t.id=v.template_id WHERE v.template_id=? AND v.hq_template_version_id=? AND t.line_account_id=? ORDER BY v.version_number DESC LIMIT 1').bind(localTemplateId,versionId,accountId).first<{message_bubbles_json:string|null}>();
+      if(!pinned?.message_bubbles_json)throw new StampError('配布した複数通の版を確認できません',409);
+      const bundled=JSON.parse(pinned.message_bubbles_json) as import('@line-crm/shared').BroadcastBubble[];
+      for(const [index,part] of bundled.entries()) expanded.push({...part,id:`${bubble.id}-${index}`});
+      continue;
+    }
     bubble.content = walk(content);
+    expanded.push(bubble);
     if (definition.asset?.kind === 'research') {
       const local = await db.prepare(`SELECT payload_json,published_version,name FROM broadcast_message_assets WHERE id=? AND line_account_id=? AND kind='research'`).bind(localTemplateId, accountId).first<{ payload_json: string; published_version: number; name: string }>();
       if (!local || local.published_version < 1) throw new StampError('店舗の公開済みリサーチを確認してください', 409);
@@ -87,5 +96,6 @@ export async function resolveHqBroadcastMaterials(
     } else if (definition.asset) bubble.content.assetId = localTemplateId;
     else if (bubble.type === 'carousel') bubble.content.templateId = localTemplateId;
   }
-  return { ...input, messageBubbles: bubbles, messageBubblesJson: undefined };
+  if(expanded.length>5) throw new StampError('複数通のテンプレートを合わせて5通以内にしてください',422);
+  return { ...input, messageBubbles: expanded, messageBubblesJson: undefined };
 }

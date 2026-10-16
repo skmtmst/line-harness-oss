@@ -1,4 +1,6 @@
 import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
+import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
+import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange } from '@line-crm/shared';
@@ -246,23 +248,6 @@ function validateMessageOptions(value: unknown): string | null {
     }
   }
   return null;
-}
-
-async function validateAfterActionVersion(
-  db: D1Database,
-  lineAccountId: string | null | undefined,
-  versionId: string | null | undefined,
-): Promise<boolean> {
-  if (!versionId) return true;
-  if (!lineAccountId) return false;
-  const row = await db.prepare(
-    `SELECT cav.id
-       FROM common_action_versions cav
-       JOIN common_actions ca ON ca.id = cav.common_action_id
-      WHERE cav.id = ? AND cav.status = 'published'
-        AND ca.line_account_id = ? AND ca.status = 'published'`,
-  ).bind(versionId, lineAccountId).first<{ id: string }>();
-  return Boolean(row);
 }
 
 /*
@@ -1214,7 +1199,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
       accountIds: Array.isArray(body.accountIds) ? body.accountIds.map(String) : undefined,
       segmentConditions,
     });
-    const audience = { total: preview.sendable, hiddenExcluded: preview.exclusions.hidden };
+    const audience = { total: preview.sendable, hiddenExcluded: preview.exclusions.hidden, consentExcluded: preview.exclusions.paused };
 
     // 同じ本文の配信が直近にあるかは、本文が渡されたときだけ見る。
     // 下書きの段階では本文が空のこともある。
@@ -1259,6 +1244,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
       data: {
         audienceCount: audience.total,
         hiddenExcluded: audience.hiddenExcluded,
+        consentExcluded: audience.consentExcluded,
         warnings: buildWarnings(audience, { hasRecentSimilar }),
         audience: {
           matched: preview.matched,
@@ -1981,7 +1967,7 @@ broadcasts.post('/api/broadcasts/:id/stop', requirePermission(BROADCAST_JOB_STOP
      * 宛先の一覧が無い。頼んだあとに止める手段が LINE 側に無いので、
      * **できないことをできるように見せない**。
      */
-    if (existing.target_type === 'all') {
+    if (existing.target_type === 'all' && !existing.segment_conditions) {
       return c.json({
         success: false,
         error: '全員への配信は、送り始めると途中で止められません（LINE側に停止の口がありません）。',
@@ -2148,7 +2134,7 @@ broadcasts.post(
         return c.json({ success: false, error: 'Broadcast not found' }, 404);
       }
       if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
-      if (existing.target_type === 'all') {
+      if (existing.target_type === 'all' && !existing.segment_conditions) {
         return c.json({
           success: false,
           error: '全員への配信は宛先の一覧を持たないため、失敗した相手だけの再送ができません。',
@@ -2384,12 +2370,12 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
 
       const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
       let audienceSql = `SELECT COUNT(*) AS total,
-                                SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                                SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
                            FROM (${sql}) q`;
       const audienceBindings = [...bindings];
       if (accountId) {
         audienceSql = `SELECT COUNT(*) AS total,
-                              SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                              SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
                          FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
         audienceBindings.unshift(accountId);
       }
@@ -2443,7 +2429,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
       && existing.target_type !== 'multi-account-dedup') {
       const rawExisting = existing as unknown as Record<string, unknown>;
       const accountId = rawExisting.line_account_id as string | null;
-      const where: string[] = ['f.is_following = 1'];
+      const where: string[] = ['f.is_following = 1', 'COALESCE(f.is_hidden,0)=0', DELIVERY_CONSENT_ALLOWED_SQL];
       const binds: unknown[] = [];
       if (accountId) {
         where.push('f.line_account_id = ?');
@@ -2687,6 +2673,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
     }
 
     const result = await getBroadcastById(c.env.DB, id);
+    if (result?.status === 'sending' && result.segment_conditions) kickQueueProcessing(c, 'consent-filtered');
     if (result?.status === 'sent' && result.line_account_id) {
       try {
         await dispatchOperatorEvent(c.env.DB, c.env, {
@@ -2795,12 +2782,12 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
       const { sql, bindings } = buildPublicSegmentQuery(body.conditions);
       const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
       let audienceSql = `SELECT COUNT(*) AS total,
-                                SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                                SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
                            FROM (${sql}) q`;
       const audienceBindings = [...bindings];
       if (accountId) {
         audienceSql = `SELECT COUNT(*) AS total,
-                              SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                              SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
                          FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
         audienceBindings.unshift(accountId);
       }

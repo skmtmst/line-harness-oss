@@ -240,3 +240,25 @@ describe('W15 フォルダと内容の複合保存（実SQL）', () => {
     expect(state()).toMatchObject({ name: '内容だけ', folder_id: 'folder-1', content_revision: 2 });
   });
 });
+
+test('J1pdB: 保存した人と時刻を同じ編集版の監査から返し、過去の未記録はnull',async()=>{
+ sqlite.raw.exec("INSERT INTO staff_members(id,name,role,api_key) VALUES('staff-1','保存した担当者','owner','fixture')");
+ const initial=await app().request('/api/forms/form-1?account_id=acc-1',{},env());
+ expect((await initial.json() as {data:{latestEdit:unknown}}).data.latestEdit).toBeNull();
+ const revision=formRow().content_revision;
+ const saved=await put({name:'先の人の保存',expectedContentRevision:revision});expect(saved.status).toBe(200);
+ const editor=(await saved.json() as {data:{latestEdit:{staffId:string;staffName:string;savedAt:string}}}).data.latestEdit;
+ expect(editor).toMatchObject({staffId:'staff-1',staffName:'保存した担当者'});expect(editor.savedAt).toMatch(/^\d{4}-\d{2}-\d{2}/);
+ const stale=await put({name:'古い画面から保存',expectedContentRevision:revision});expect(stale.status).toBe(409);
+ expect((await stale.json() as {data:{latestEdit:unknown}}).data.latestEdit).toEqual(editor);
+ expect(sqlite.raw.prepare("SELECT count(*) n FROM audit_events WHERE action='form.draft_saved'").get()).toEqual({n:1});
+ sqlite.raw.exec("UPDATE staff_members SET name='改名後' WHERE id='staff-1'");
+ const loaded=await app().request('/api/forms/form-1?account_id=acc-1',{},env());
+ expect((await loaded.json() as {data:{latestEdit:unknown}}).data.latestEdit).toEqual(editor);
+});
+
+test('J1pdB: 保存者の監査を書けなければフォームの編集も戻す',async()=>{
+ sqlite.raw.exec("INSERT INTO staff_members(id,name,role,api_key) VALUES('staff-1','担当者','owner','fixture'); CREATE TRIGGER fail_editor_audit BEFORE INSERT ON audit_events WHEN NEW.action='form.draft_saved' BEGIN SELECT RAISE(ABORT,'fixture'); END;");
+ const before=formRow();expect((await put({name:'残ってはいけない',expectedContentRevision:before.content_revision})).status).toBe(500);
+ expect(formRow()).toEqual(before);
+});

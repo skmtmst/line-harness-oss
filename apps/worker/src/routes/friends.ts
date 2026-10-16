@@ -1,4 +1,5 @@
-import { serializeFriend } from './friend-serialization.js';
+import { serializeFriend } from './friend-display.js';
+import { registerFriendDeliveryConsents } from './friend-delivery-consents.js';
 import { idChunks, sqlIdSet } from '@line-crm/db/id-queries';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
@@ -112,6 +113,8 @@ export const requireVisibleFriend: MiddlewareHandler<Env> = async (c, next) => {
   }
   await next();
 };
+
+registerFriendDeliveryConsents(friends, requireVisibleFriend);
 
 const requireIdempotencyKey: MiddlewareHandler<Env> = async (c, next) => {
   if (!isValidIdempotencyKey(c.req.header('Idempotency-Key')?.trim())) {

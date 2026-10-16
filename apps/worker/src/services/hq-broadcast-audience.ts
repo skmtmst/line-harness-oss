@@ -1,3 +1,4 @@
+import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { buildSegmentWhere } from '@line-crm/db';
 import type { HqBroadcastInput, SegmentCondition, SegmentRule } from '@line-crm/shared';
 import { StampError } from './visit-stamps.js';
@@ -65,7 +66,9 @@ export async function resolveHqBroadcastAudience(db: D1Database, tenantId: strin
 }
 export async function countHqAudience(db:D1Database,accountId:string,condition:SegmentCondition) {
   const where=buildSegmentWhere(condition);
-  const result=await db.prepare(`SELECT COUNT(*) AS count FROM friends f WHERE f.line_account_id=? AND COALESCE(f.is_hidden,0)=0
-    AND f.line_user_id IS NOT NULL AND f.line_user_id<>'' AND (${where.sql})`).bind(accountId,...where.bindings).first<{count:number}>();
-  return result!.count;
+  const result=await db.prepare(`SELECT COALESCE(SUM(${DELIVERY_CONSENT_ALLOWED_SQL}),0) AS count,
+    COALESCE(SUM(NOT (${DELIVERY_CONSENT_ALLOWED_SQL})),0) AS consentExcluded FROM friends f WHERE f.line_account_id=? AND COALESCE(f.is_hidden,0)=0
+    AND f.line_user_id IS NOT NULL AND f.line_user_id<>'' AND (${where.sql})`).bind(accountId,...where.bindings).first<{count:number;consentExcluded:number}>();
+  if (!result) throw new Error('audience_count_unavailable');
+  return result;
 }

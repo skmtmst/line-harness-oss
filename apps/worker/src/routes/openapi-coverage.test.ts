@@ -44,18 +44,24 @@ function isCoveredRoute(method: string, path: string): boolean {
   if (method === 'ALL' || method === 'OPTIONS') return false;
   if (INFRASTRUCTURE_PATHS.has(path)) return false;
   if (path.startsWith('/api/restaurant-test') && ![
+    '/api/restaurant-test/menus/:id/payment',
+    '/api/restaurant-test/assignment-settings',
     '/api/restaurant-test/store-groups', '/api/restaurant-test/store-groups/:id/members/:storeId', '/api/restaurant-test/stores/:id/referral-location',
     '/api/restaurant-test/closures', '/api/restaurant-test/closures/preview', '/api/restaurant-test/closures/:id',
     '/api/restaurant-test/availability', '/api/restaurant-test/google/hours/from-closure',
     '/api/restaurant-test/closures/:id/contact-status', '/api/restaurant-test/close-notification-settings',
     '/api/restaurant-test/opening-hours', '/api/restaurant-test/reservation-link',
     '/api/restaurant-test/followups/:storeId',
+    '/api/restaurant-test/followups/:storeId/steps/:stepId/messages',
     '/api/restaurant-test/followups/:storeId/review-history',
     '/api/restaurant-test/followups/:storeId/bindings/:stepId',
     '/api/restaurant-test/followups/:storeId/request-start',
     '/api/restaurant-test/followups/:storeId/stop',
     '/api/restaurant-test/reservations/:id',
     '/api/restaurant-test/reservations/:id/confirmations',
+    '/api/restaurant-test/channel-close-tasks',
+    '/api/restaurant-test/channel-close-tasks/:id/opened',
+    '/api/restaurant-test/google/reviews/:id/draft/generate',
 
   ].includes(path)) return false;
   if (path.startsWith('/api/internal')) return false;
@@ -131,7 +137,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 771;
+const ALLOWLIST_MAX = 770;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -144,14 +150,115 @@ const ALLOWLIST_MAX = 771;
 const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/forms/{id}/exports',
   'POST /api/mileage/exports',
+  'DELETE /api/dashboard/style/cards',
+  'GET /api/dashboard/style',
+  'GET /api/dashboard/style/analytics',
+  'GET /api/dashboard/style/analytics-settings',
+  'GET /api/dashboard/style/bookings',
+  'GET /api/dashboard/style/bookings/{id}',
+  'GET /api/dashboard/style/classes/{id}',
+  'GET /api/dashboard/style/members',
+  'GET /api/dashboard/style/menus/{id}',
+  'GET /api/dashboard/style/people',
+  'GET /api/dashboard/style/resources',
+  'GET /api/dashboard/style/schedule',
+  'GET /api/dashboard/style/starter-items',
+  'GET /api/dashboard/style/starter-set',
+  'GET /api/dashboard/style/summary',
+  'GET /api/dashboard/style/template-samples',
+  'GET /api/dashboard/style/warnings',
+  'GET /api/hq/style-attention',
+  'GET /api/hq/style-starter-sets',
+  'GET /api/hq/style-template-samples',
+  'GET /api/liff/booking/style-readiness',
+  'PATCH /api/dashboard/style/bookings/{id}',
+  'PATCH /api/dashboard/style/classes/{id}',
+  'PATCH /api/dashboard/style/event-bookings/{id}',
+  'PATCH /api/dashboard/style/event-waitlist/{id}',
+  'PATCH /api/dashboard/style/events/{id}',
+  'PATCH /api/dashboard/style/meet/{id}',
+  'PATCH /api/dashboard/style/menus/{id}',
+  'PATCH /api/dashboard/style/restaurant-reservations/{id}',
+  'POST /api/dashboard/style/activate',
+  'POST /api/dashboard/style/closures',
+  'POST /api/dashboard/style/results/{id}/audiences',
+  'POST /api/liff/booking/page-views',
+  'PUT /api/dashboard/style',
+  'PUT /api/dashboard/style/cards',
+  'PUT /api/dashboard/style/holidays/{date}',
+  'PUT /api/dashboard/style/members/{friendId}',
+  'PUT /api/dashboard/style/targets',
+  'PUT /api/hq/style-starter-sets/{style}',
+  'GET /api/hq/templates/{id}/distribution-targets',
+  'GET /api/hq/templates/resources',
+  'GET /api/liff/notification-preferences',
+  'PUT /api/liff/notification-preferences/{purpose}',
+  'DELETE /api/hq/broadcasts/saved-views/{viewId}',
+  'DELETE /api/hq/templates/{id}/test-tokens/{tokenId}',
   'GET /api/hq/billing/metrics',
   'GET /api/hq/broadcasts/quota',
+  'GET /api/hq/broadcasts/saved-views',
   'GET /api/hq/broadcasts/{id}/reactions',
   'GET /api/hq/templates/media',
+  'GET /api/liff/hq-form-tests/{id}',
+  'PATCH /api/hq/broadcasts/saved-views/{viewId}',
+  'POST /api/hq/broadcasts/saved-views',
   'POST /api/hq/broadcasts/{id}/duplicate',
   'POST /api/hq/broadcasts/{id}/followup',
   'POST /api/hq/templates/rich-menu-preview',
+  'POST /api/hq/templates/tags/import',
+  'POST /api/hq/templates/tags/import/preview',
   'POST /api/hq/templates/{id}/test-send',
+  'POST /api/hq/templates/{id}/test-token',
+  'POST /api/hq/templates/{id}/restore',
+  'POST /api/liff/hq-form-tests/{id}/submit',
+  'GET /api/webhooks/interactions/export.csv',
+  'POST /api/reminders/{id}/message-preview',
+  'GET /api/friends/{id}/delivery-consents',
+  'PUT /api/friends/{id}/delivery-consents/{purpose}',
+  'GET /api/hq/support/summary',
+  'GET /api/manual-links/lookup',
+  'GET /api/restaurant-test/channel-close-tasks',
+  'POST /api/restaurant-test/channel-close-tasks/{id}/opened',
+  'POST /api/restaurant-test/google/reviews/{id}/draft/generate',
+  'PUT /api/booking/admin/channels/{channel}/settings',
+  'GET /api/booking/admin/payment-connection',
+  'DELETE /api/booking/admin/payment-connection',
+  'GET /api/booking/admin/payment-connection/callback',
+  'POST /api/booking/admin/payment-connection/authorize',
+  'POST /api/booking/admin/payment-connection/callback',
+  'GET /api/booking/admin/menu-payments',
+  'GET /api/booking/admin/payments',
+  'GET /api/booking/admin/payments/export',
+  'GET /api/booking/admin/staff/today-counts',
+  'POST /api/booking/admin/payments/{id}/send-link',
+  'GET /api/booking/admin/payment-events',
+  'POST /api/booking/admin/payment-events/{id}/replay',
+  'GET /api/events/admin/events/{id}/payment',
+  'PUT /api/events/admin/events/{id}/payment',
+  'GET /api/events/admin/events/{id}/price',
+  'PUT /api/events/admin/events/{id}/price',
+  'GET /api/restaurant-test/menus/{id}/payment',
+  'PUT /api/restaurant-test/menus/{id}/payment',
+  'POST /api/liff/booking/requests',
+  'GET /api/booking/admin/entitlements',
+  'POST /api/booking/admin/entitlements',
+  'POST /api/booking/admin/entitlements/{id}/operations',
+  'GET /api/booking/admin/entitlements/{id}/history',
+  'GET /api/liff/booking/entitlements',
+  'GET /api/booking/admin/assignment-settings',
+  'PUT /api/booking/admin/assignment-settings',
+  'GET /api/restaurant-test/assignment-settings',
+  'PUT /api/restaurant-test/assignment-settings',
+  'GET /api/hq/templates/media',
+  'GET /api/hq/templates/resources',
+  'GET /api/hq/templates/{id}/distribution-targets',
+  'POST /api/hq/templates/rich-menu-preview',
+  'POST /api/hq/templates/{id}/test-send',
+  'GET /api/hq/templates/saved-views',
+  'POST /api/hq/templates/saved-views',
+  'PATCH /api/hq/templates/saved-views/{viewId}',
+  'DELETE /api/hq/templates/saved-views/{viewId}',
   'GET /api/auth/api-key',
   'POST /api/auth/api-key',
   'DELETE /api/auth/api-key',
@@ -175,6 +282,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/restaurant-test/stores/{id}/referral-location',
   'PATCH /api/restaurant-test/reservations/{id}',
   'GET /api/restaurant-test/followups/{storeId}',
+  'PUT /api/restaurant-test/followups/{storeId}/steps/{stepId}/messages',
   'GET /api/restaurant-test/followups/{storeId}/review-history',
   'POST /api/restaurant-test/followups/{storeId}/bindings/{stepId}',
   'PATCH /api/restaurant-test/followups/{storeId}/bindings/{stepId}',
@@ -1058,7 +1166,6 @@ const ALLOWLIST = new Set<string>([
   'POST /api/liff/affiliate/links',
   'POST /api/liff/affiliate/offers/{id}/enroll',
   'POST /api/liff/affiliate/register',
-  'POST /api/liff/booking/requests',
   'POST /api/liff/events/me/{bookingId}/cancel',
   'POST /api/liff/events/{id}/bookings',
   'POST /api/liff/friend-add-intent',
@@ -1718,9 +1825,8 @@ const ALLOWLIST = new Set<string>([
   'POST /api/identity-candidates/{id}/decide',
   'POST /api/identity-candidates/{id}/undo',
 
-  // core：ヘルプ導線設定（OpenAPI未記載・順次記載）（5件）
+  // core：ヘルプ導線設定（OpenAPI未記載・順次記載）（4件）
   'GET /api/manual-links',
-  'GET /api/manual-links/lookup',
   'POST /api/manual-links/check',
   'PUT /api/manual-links',
   'PUT /api/manual-links/{key}',
@@ -1889,7 +1995,7 @@ describe('OpenAPIと公開APIの同期', () => {
     ).toBe(true);
   });
 
-  test('暫定allowlistは777件以下（増加禁止）', async () => {
+  test('暫定allowlistは基準件数以下（増加禁止）', async () => {
     expect(
       ALLOWLIST.size <= ALLOWLIST_MAX,
       `ALLOWLISTが ${ALLOWLIST.size} 件で基準 ${ALLOWLIST_MAX} 件を超えています。` +
@@ -1956,7 +2062,7 @@ describe('OpenAPIと公開APIの同期', () => {
       const classification = routeClassification(entry.honoPath, method);
       const operation = spec.paths[path]?.[method.toLowerCase() as 'get'];
       // These LIFF handlers verify the account's LINE ID token themselves.
-      const verifiedLiff = ['/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking'].includes(entry.honoPath);
+      const verifiedLiff = ['/api/liff/notification-preferences', '/api/liff/notification-preferences/:purpose', '/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking'].includes(entry.honoPath);
       if (verifiedLiff) {
         if (JSON.stringify(operation?.security) !== '[{"liffIdToken":[]}]') problems.push(`${key}: LINE IDトークンの表示が無い`);
       } else if (classification?.kind === 'public') {

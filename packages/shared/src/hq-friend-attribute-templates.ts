@@ -22,7 +22,7 @@ export interface HqFriendFieldDefinition {
 }
 export interface HqMarkDefinition {
   schemaVersion: 1;
-  mark: { name: string; color?: string; isDefault?: boolean; autoOnInbound?: boolean; displayOrder?: number };
+  mark: { name: string; color?: string; isDefault?: boolean; autoOnInbound?: boolean; displayOrder?: number; displayLocations?: import('./support-mark-display.js').SupportMarkLocation[] };
 }
 export interface HqFriendAttributeDefinitions { friend_field: HqFriendFieldDefinition; mark: HqMarkDefinition }
 export type HqFriendAttributeInput = {

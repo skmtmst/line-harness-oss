@@ -1,6 +1,7 @@
 import { canonicalizeIdempotencyInput } from './form-idempotency.js';
 import { hasDeliveryAccess } from '@line-crm/shared';
 import { auditLog } from '../lib/audit-log.js';
+import { normalizeLayoutInput } from './form-layout-input.js';
 import { type FormFieldDef, parseFormFields } from './form-field-definition.js'
 import { reportPeriod, type ReportPeriodInput } from '@line-crm/shared';
 import { callFormWebhook } from '../services/form-webhook.js';
@@ -21,6 +22,7 @@ import {
   getFormsWithStats,
   FORM_SUBMIT_CLAIM_STALE_MS,
   getFormById,
+  getFormLatestEdit,
   type FormSubmitClaim,
   type FormSubmitClaimScope,
   getFormAccountIds,
@@ -730,30 +732,6 @@ async function writeLegacyFriendFields(
   return result;
 }
 
-/**
- * 受け取った layout を、保存できる形にそろえる。
- *
- * 外から来た JSON をそのまま入れない。形を正した上で、互換用の `fields`
- * も同時に作り直す。`fields` はいまも送信時の必須チェックと回答一覧の
- * 見出しが読んでいて、layout だけ更新すると両者がずれる。
- */
-function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } | { error: string } | null {
-  const typeError = formBlockTypeError(raw);
-  if (typeError) return { error: typeError };
-  const layout = normalizeLayout(raw);
-  if (!layout) return null;
-  // 保存できる定義かをここで止める。画面側と同じ `validateFormDefinition`
-  // を使うので、「画面では通ったのに保存で弾かれる」にならない。
-  // 分岐の循環や設定途中の動作は下書きとして残せるため、ここでは見ず
-  // 公開の直前（publish）で止める。
-  const invalid = validateFormDefinition(layout);
-  if (invalid) return { error: invalid };
-  return {
-    layout: JSON.stringify(layout),
-    fields: JSON.stringify(layoutToFields(layout)),
-  };
-}
-
 // GET /api/forms — list all forms (with submission stats + delivering accounts)
 forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
@@ -940,7 +918,7 @@ forms.get('/api/forms/:id', async (c) => {
       layout = {...layout, options: {...layout.options, theme: resolveCustomerFormTheme(layout.options, look)}};
     }
     const data = adminView
-      ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
+      ? {...serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' }),latestEdit:await getFormLatestEdit(c.env.DB,id,form.content_revision)}
       : { ...serializePublicForm(form, layout), availability: await formAvailability({
         db: c.env.DB, formId: id, layout, active: !!form.is_active,
         submitCount: form.submit_count ?? 0, friendId,
@@ -1341,7 +1319,7 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
     if (body.ogDescription !== undefined) updates.ogDescription = body.ogDescription;
     if (body.ogImageUrl !== undefined) updates.ogImageUrl = body.ogImageUrl;
 
-    const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision);
+    const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision,c.get('staff')?.id);
 
     if (updated.kind === 'not_found') {
       return c.json({ success: false, error: 'Form not found' }, 404);
@@ -1356,11 +1334,12 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
         data: {
           contentRevision: updated.form.content_revision,
           updatedAt: updated.form.updated_at,
+          latestEdit:await getFormLatestEdit(c.env.DB,id,updated.form.content_revision),
         },
       }, 409);
     }
 
-    return c.json({ success: true, data: serializeForm(updated.form) });
+    return c.json({ success: true, data: {...serializeForm(updated.form),latestEdit:await getFormLatestEdit(c.env.DB,id,updated.form.content_revision)} });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_forms_failed","route":"PUT /api/forms/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);

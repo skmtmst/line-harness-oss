@@ -35,10 +35,10 @@ export function publishedVersionStatement(
     `INSERT INTO template_versions
        (id, template_id, version_number, message_type, message_content,
         carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
-        question_json, question_status, effective_from, created_by_staff_id, created_at)
+        question_json, question_status, effective_from, created_by_staff_id, created_at, message_bubbles_json)
      SELECT ?, id, published_version, message_type, message_content,
             carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
-            question_json, question_status, ?, ?, ?
+            question_json, question_status, ?, ?, ?, message_bubbles_json
        FROM templates WHERE id = ? AND published_version = ? AND changes() = 1`,
   ).bind(crypto.randomUUID(), options.effectiveFrom ?? now,
     options.createdByStaffId ?? null, now, id, versionNumber);

@@ -1,3 +1,4 @@
+import { serializeGroup } from './rich-menu-group-display.js';
 import { type ExternalLineArea } from './rich-menu-external-types.js'
 import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../services/rich-menu-group-input.js';
@@ -116,33 +117,6 @@ import {
 } from '../lib/rich-menu-publisher.js';
 
 export const richMenuGroups = new Hono<Env>();
-
-// ----- Serialization (snake_case row → camelCase response) -----
-
-function serializeGroup(row: RichMenuGroup) {
-  return {
-    id: row.id,
-    accountId: row.account_id,
-    name: row.name,
-    chatBarText: row.chat_bar_text,
-    size: row.size,
-    defaultPageId: row.default_page_id,
-    isDefaultForAll: row.is_default_for_all === 1,
-    status: row.status,
-    publishingAt: row.publishing_at,
-    targetingCondition: row.targeting_condition,
-    targetingPriority: row.targeting_priority,
-    targetingEnabled: row.targeting_enabled === 1,
-    folderId: row.folder_id,
-    displayOrder: row.display_order,
-    // V8「トークを開いたとき メニューを開いておく」。LINE payload の selected。
-    defaultOpen: row.default_open === 1,
-    // M951: 保存時に送り返す版。古い版での保存は 409 で止める。
-    version: row.version ?? 1,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
 
 function serializeGroupWithPages(row: RichMenuGroupWithPages) {
   return {

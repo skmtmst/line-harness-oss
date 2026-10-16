@@ -1,4 +1,6 @@
-import { jstNow } from './utils.js';
+import type { RefTracking } from './entry-route-tracking-types.js';
+export type { RefTracking } from './entry-route-tracking-types.js';
+import { jstNow, nextVersionToken } from './utils.js';
 import { ensureEntryRouteGenre } from './entry-route-genres.js';
 import { DEFAULT_TENANT_ID, type EntryRouteMonth } from '@line-crm/shared';
 export interface EntryRoute {
@@ -25,26 +27,6 @@ export interface EntryRoute {
   coupon_audience?: 'new_friends' | 'all_friends';
   created_at: string;
   updated_at: string;
-}
-
-export interface RefTracking {
-  id: string;
-  ref_code: string;
-  friend_id: string | null;
-  entry_route_id: string | null;
-  source_url: string | null;
-  fbclid: string | null;
-  gclid: string | null;
-  twclid: string | null;
-  ttclid: string | null;
-  utm_source: string | null;
-  utm_medium: string | null;
-  utm_campaign: string | null;
-  user_agent: string | null;
-  ip_address: string | null;
-  line_account_id: string | null;
-  ad_conversion_consent_at: string | null;
-  created_at: string;
 }
 
 export type AdClickIdType = 'fbclid' | 'gclid' | 'twclid' | 'ttclid';
@@ -211,9 +193,12 @@ export async function createEntryRoute(
 export async function updateEntryRoute(
   db: D1Database,
   id: string,
-  input: Partial<CreateEntryRouteInput> & { stoppedReason?: string | null },
+  input: Partial<CreateEntryRouteInput> & { stoppedReason?: string | null; expectedUpdatedAt?: string },
 ): Promise<EntryRoute | null> {
-  const now = jstNow();
+  const existing = await getEntryRouteById(db,id);
+  if (!existing) return null;
+  if (input.expectedUpdatedAt !== undefined && input.expectedUpdatedAt !== existing.updated_at) throw new Error('ENTRY_ROUTE_VERSION_CONFLICT');
+  const now = nextVersionToken(existing.updated_at);
   const fields: string[] = ['updated_at = ?'];
   const values: unknown[] = [now];
 
@@ -254,11 +239,13 @@ export async function updateEntryRoute(
   }
 
   values.push(id);
+  if (input.expectedUpdatedAt !== undefined) values.push(input.expectedUpdatedAt);
 
-  await db
-    .prepare(`UPDATE entry_routes SET ${fields.join(', ')} WHERE id = ?`)
+  const saved = await db
+    .prepare(`UPDATE entry_routes SET ${fields.join(', ')} WHERE id = ?${input.expectedUpdatedAt !== undefined ? ' AND updated_at = ?' : ''}`)
     .bind(...values)
     .run();
+  if (input.expectedUpdatedAt !== undefined && !saved.meta.changes) throw new Error('ENTRY_ROUTE_VERSION_CONFLICT');
 
   return db
     .prepare(`SELECT * FROM entry_routes WHERE id = ?`)

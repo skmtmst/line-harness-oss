@@ -62,6 +62,8 @@ export function purgeTablesChildFirst(): string[] {
     // Files also reference answers and friends; remove them before either parent.
     if (name === 'form_submission_files') return ['form_submissions'];
     if (name === 'scenario_source_jobs') return ['scenario_versions'];
+    if (name === 'hq_form_test_tokens') return ['hq_template_versions'];
+    if (name === 'hq_broadcast_saved_views' || name === 'hq_template_saved_views') return ['staff_members'];
     const scope = RETENTION_TABLES[name]?.scope;
     if (!scope) return [];
     if (scope.by === 'publicIngress') return ['conversion_points', 'measurement_sites'];

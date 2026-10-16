@@ -1,4 +1,6 @@
 import { hasDeliveryAccess } from '@line-crm/shared';
+import { validateConditionForStorage } from './scenario-condition-validation.js';
+import type { ActionBody } from './scenario-action-input-types.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -226,6 +228,7 @@ function serializeStep(row: DbScenarioStep) {
     deliveryTime: row.delivery_time ?? null,
     messageType: row.message_type,
     messageContent: row.message_content,
+    messageBubbles: parseJson(row.message_bubbles_json),
     conditionType: row.condition_type ?? null,
     conditionValue: row.condition_value ?? null,
     nextStepOnFalse: row.next_step_on_false ?? null,
@@ -241,42 +244,6 @@ function serializeStep(row: DbScenarioStep) {
     isDraft: Number(row.is_draft ?? 0) !== 0,
     createdAt: row.created_at,
   };
-}
-
-/**
- * 条件ビルダーの結果を保存してよいか見る。
- *
- * 組み立てを実際に走らせて、例外が出なければ通す。形だけ見る検証を別に書くと、
- * 保存はできるのに配信時に落ちる条件が作れてしまう。**保存時と配信時で同じ
- * 関数を通す**のがここの要点。
- *
- * @returns 保存する JSON 文字列。条件なしなら null。
- */
-function validateConditionForStorage(
-  value: unknown,
-  label: string,
-): { ok: true; json: string | null } | { ok: false; error: string } {
-  if (value === null || value === undefined) return { ok: true, json: null };
-  if (typeof value !== 'object' || Array.isArray(value)) {
-    return { ok: false, error: `${label}の条件の形が不正です。` };
-  }
-  const condition = value as SegmentCondition;
-  if (condition.operator !== 'AND' && condition.operator !== 'OR') {
-    return { ok: false, error: `${label}の条件は operator に AND / OR が要ります。` };
-  }
-  if (!Array.isArray(condition.rules)) {
-    return { ok: false, error: `${label}の条件は rules の配列が要ります。` };
-  }
-  // 中身が空なら「条件なし」として保存する。空の条件を持たせておくと、
-  // 画面上は絞り込んでいるように見えて全員に届く。
-  const empty = condition.rules.length === 0 && (condition.groups?.length ?? 0) === 0;
-  if (empty) return { ok: true, json: null };
-  try {
-    buildSegmentWhere(condition);
-  } catch (err) {
-    return { ok: false, error: `${label}の条件を読めません: ${(err as Error).message}` };
-  }
-  return { ok: true, json: JSON.stringify(condition) };
 }
 
 /** 質問メッセージの中身を見る。 */
@@ -1008,6 +975,13 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenari
       }
     }
 
+    // 旧1通の編集で複数吹き出しを黙って消さない。来店フォローの版付き保存へ戻す。
+    if (body.messageType !== undefined || body.messageContent !== undefined || body.templateId !== undefined) {
+      const stored = await c.env.DB.prepare('SELECT message_bubbles_json FROM scenario_steps WHERE id=? AND scenario_id=?')
+        .bind(stepId,scenarioId).first<{message_bubbles_json:string|null}>();
+      if (stored?.message_bubbles_json) return c.json({success:false,code:'MULTIPLE_MESSAGES_REQUIRE_EDITOR',error:'複数の吹き出しは来店フォローの編集で保存してください'},409);
+    }
+
     // conditionType / conditionValue の partial-update 検証（OSS issue #120 回帰防止）。
     // どちらかが touched なときだけ走らせる。effective 値は、body に来た値を優先しつつ
     // 既存行で穴埋めして組み立て、validateStepCondition で pair を検証する。
@@ -1032,7 +1006,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenari
     let templateSnapshot: { message_type: string; message_content: string } | null = null;
     if (body.templateId !== undefined && body.templateId !== null) {
       const tpl = await c.env.DB
-        .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ?`)
+        .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ? AND message_bubbles_json IS NULL`)
         .bind(body.templateId)
         .first<{ id: string; message_type: string; message_content: string }>();
       if (!tpl) return inputError(c, { success: false, error: 'templateId not found' }, 400, ["templateId"]);
@@ -1639,17 +1613,6 @@ scenarios.post('/api/scenarios/:id/publish', requireDeliveryAccess('scenarios', 
 
 const VALID_ACTION_HOOKS = ['step_sent', 'scenario_completed', 'choice_selected'] as const;
 const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var', 'send_message', 'send_template', 'reminder', 'event_booking'] as const;
-
-interface ActionBody {
-  hook?: string;
-  stepId?: string | null;
-  choiceIndex?: number | null;
-  actionType?: string;
-  config?: unknown;
-  condition?: unknown;
-  repeatOnRefire?: boolean;
-  sortOrder?: number;
-}
 
 function serializeAction(row: {
   id: string;

@@ -46,8 +46,10 @@ function serialize(row: Awaited<ReturnType<typeof getManualLink>>) {
 
 async function lookup(c: AppContext, key: string | undefined) {
   if (!key) return inputError(c, { success: false, error: 'screen が要ります', code: 'INVALID_INPUT' }, 400, []);
+  const keyKind = c.req.query('keyKind') ?? 'screen';
+  if (keyKind !== 'screen' && keyKind !== 'task') return inputError(c, { success: false, error: 'リンクの種類を確認してください', code: 'INVALID_INPUT' }, 400, ['keyKind']);
   const row = await getManualLink(c.env.DB, key);
-  const screenRow = row?.key_kind === 'screen' ? row : null;
+  const screenRow = row?.key_kind === keyKind ? row : null;
   return c.json({
     success: true,
     data: {

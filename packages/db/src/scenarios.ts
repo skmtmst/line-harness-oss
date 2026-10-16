@@ -1,4 +1,8 @@
 import { normalizeVersionStepSnapshot } from './scenario-step-snapshot.js';
+import type { MessageType, ScenarioStep } from './scenario-step-types.js';
+export type { MessageType, ScenarioStep } from './scenario-step-types.js';
+import type { FriendScenario } from './friend-scenario-types.js';
+export type { FriendScenario } from './friend-scenario-types.js';
 import { sqlIdSet } from './id-queries.js';
 import { accountFeatureOffExclusionSql } from './account-settings.js';
 import { refreshScenarioReferences, removeConsumerReferences } from './template-versions.js';
@@ -11,7 +15,6 @@ import {
   SCENARIO_DELIVERY_BATCH_LIMIT,
 } from './scenario-delivery-timestamps.js';
 export type ScenarioTriggerType = 'friend_add' | 'tag_added' | 'form_answer' | 'booking_confirmed' | 'manual';
-export type MessageType = 'text' | 'image' | 'flex' | 'location' | 'video' | 'audio' | 'sticker' | 'carousel' | 'imagemap' | 'rich_message' | 'coupon';
 export type FriendScenarioStatus = 'active' | 'paused' | 'completed' | 'delivering';
 export type DeliveryMode = 'relative' | 'elapsed' | 'absolute_time';
 
@@ -44,55 +47,8 @@ export interface Scenario {
   updated_at: string;
 }
 
-export interface ScenarioStep {
-  id: string;
-  scenario_id: string;
-  step_order: number;
-  delay_minutes: number;
-  message_type: MessageType;
-  message_content: string;
-  condition_type: string | null;
-  condition_value: string | null;
-  next_step_on_false: number | null;
-  offset_days: number | null;
-  offset_minutes: number | null;
-  delivery_time: string | null;
-  template_id: string | null;
-  on_reach_tag_id: string | null;
-  /** この通を送ったあと。'continue' で次へ、'pause' で止める（113 で追加） */
-  after_send: string;
-  /** 1通ごとの配信対象（124）。SegmentCondition の JSON。null は購読中の全員。 */
-  target_condition_json: string | null;
-  /** 質問メッセージ（125）。ScenarioQuestion の JSON。null なら質問ではない。 */
-  question_json: string | null;
-  /** 下書き（126）。1 なら配信しない。 */
-  is_draft: number;
-  created_at: string;
-}
-
 export interface ScenarioWithSteps extends Scenario {
   steps: ScenarioStep[];
-}
-
-export interface FriendScenario {
-  id: string;
-  friend_id: string;
-  scenario_id: string;
-  current_step_order: number;
-  status: FriendScenarioStatus;
-  started_at: string;
-  next_delivery_at: string | null;
-  /** 割り込む前に読んでいたシナリオ（123）。「1つ前のシナリオを再開」で使う。 */
-  previous_scenario_id: string | null;
-  /** 開始時に固定した公開版（351）。配信はこの版だけを読む。 */
-  published_version_id: string | null;
-  /**
-   * なぜ止まっているか（432）。'manual'（画面からの停止）・'after_send'
-   * （この通を送ったら止める設定）・'delivery_failed'（配信失敗）。
-   * 止まっていない行・古い行は null。
-   */
-  pause_reason?: string | null;
-  updated_at: string;
 }
 
 /**
@@ -712,6 +668,7 @@ async function buildVersionSnapshotSteps(
       delay_minutes: s.delay_minutes,
       message_type: resolved.messageType,
       message_content: resolved.messageContent,
+      ...(s.message_bubbles_json ? { message_bubbles_json: s.message_bubbles_json } : {}),
       condition_type: s.condition_type,
       condition_value: s.condition_value,
       next_step_on_false: s.next_step_on_false,
@@ -823,6 +780,7 @@ export function parseScenarioVersionSteps(version: ScenarioVersion): PinnedScena
       delay_minutes: (r['delay_minutes'] as number) ?? 0,
       message_type: (r['message_type'] as ScenarioStep['message_type']) ?? 'text',
       message_content: (r['message_content'] as string) ?? '',
+      ...(r['message_bubbles_json'] ? { message_bubbles_json: r['message_bubbles_json'] as string } : {}),
       condition_type: (r['condition_type'] as string | null) ?? null,
       condition_value: (r['condition_value'] as string | null) ?? null,
       next_step_on_false: (r['next_step_on_false'] as number | null) ?? null,

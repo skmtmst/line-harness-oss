@@ -1,4 +1,5 @@
 import { classifyLinePushError } from './automation-line-errors.js';
+import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
 import { patchFriendMetadata } from './friend-metadata.js';
 import {
   addTagToFriend,
@@ -208,7 +209,7 @@ async function resolveMessage(
     });
     const template = await context.db.prepare(
       `SELECT message_type, message_content FROM templates
-        WHERE id = ? AND line_account_id = ?`,
+        WHERE id = ? AND line_account_id = ? AND message_bubbles_json IS NULL`,
     ).bind(id, context.lineAccountId).first<{ message_type: string; message_content: string }>();
     if (!template) throw invalid('template_not_found', 'テンプレートが見つかりません');
     return {
@@ -365,6 +366,7 @@ async function sendMessageExecutor(
   dependencies: AutomationActionExecutorDependencies,
 ): Promise<{ output: Record<string, unknown> }> {
   const friend = await requireFriend(context);
+  if(await isFriendDeliverySuppressed(context.db,friend.id)) throw invalid('delivery_consent_suppressed','配信停止・同意の状態により送信できません');
   const resolved = await resolveMessage(context);
   // テンプレート/直接本文に {{var.*}} が書かれていても、この経路は従来
   // 差し込みを展開せず生のまま送っていた。消えた共通情報は fail-closed で

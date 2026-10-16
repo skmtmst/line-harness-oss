@@ -14,6 +14,7 @@ export function normalizeVersionStepSnapshot(
     delay_minutes: entry['delay_minutes'] ?? 0,
     message_type: entry['message_type'] ?? 'text',
     message_content: entry['message_content'] ?? '',
+    ...(entry['message_bubbles_json'] ? { message_bubbles_json: entry['message_bubbles_json'] } : {}),
     condition_type: entry['condition_type'] ?? null,
     condition_value: entry['condition_value'] ?? null,
     next_step_on_false: entry['next_step_on_false'] ?? null,
