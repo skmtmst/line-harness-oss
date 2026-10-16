@@ -1,4 +1,4 @@
-import type { RestaurantFollowupPage, RestaurantFollowupTrigger, RestaurantConfirmation } from '@line-crm/shared';
+import type { RestaurantFollowupPage, RestaurantFollowupTrigger, RestaurantConfirmation, BroadcastBubble } from '@line-crm/shared';
 import { fetchApi } from './api';
 const endpoint = (accountId: string, storeId: string, suffix = '') => `/api/restaurant-test/followups/${encodeURIComponent(storeId)}${suffix}?account_id=${encodeURIComponent(accountId)}`;
 export const restaurantFollowupApi = {
@@ -6,6 +6,8 @@ export const restaurantFollowupApi = {
         success: true;
         data: RestaurantFollowupPage;
     }>(endpoint(accountId, storeId)),
+    saveMessages: (accountId: string, storeId: string, stepId: string, body: { expectedVersion: number; messageBubbles: BroadcastBubble[] }) =>
+        fetchApi<{ success: true; data: { stepId: string; messageBubbles: BroadcastBubble[]; version: number; sendingStatus: string } }>(endpoint(accountId, storeId, '/steps/' + encodeURIComponent(stepId) + '/messages'), { method: 'PUT', body: JSON.stringify(body) }),
     binding: (accountId: string, storeId: string, stepId: string, body: {
         expectedVersion: number;
         trigger: RestaurantFollowupTrigger;

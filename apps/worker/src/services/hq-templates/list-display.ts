@@ -1,3 +1,4 @@
+import { messageListFacts } from './message-list-facts.js';
 import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
 import type { HqTemplateType } from '@line-crm/db';
 import { parseTagDefinition } from './tag.js';
@@ -23,6 +24,8 @@ export function templateContentSummary(type: HqTemplateType, definitionJson: str
         return 'タグ 1';
       case 'form':
         return `質問 ${parseFormTemplateDefinition(input).form.fields.length}`;
+      case 'booking_menu': return '予約メニュー 1';
+      case 'mileage_reward': return 'マイルの景品 1';
       case 'auto_reply': return '自動応答';
       case 'friend_add_rule': return '友だち追加時の配信';
       case 'reminder': { const d=JSON.parse(definitionJson); return Array.isArray(d.settings?.steps)?`通知 ${d.settings.steps.length}`:null; }
@@ -35,6 +38,7 @@ export function templateContentSummary(type: HqTemplateType, definitionJson: str
       }
       case 'template': {
         const definition = parseMessageTemplateDefinition(JSON.parse(definitionJson));
+        if(definition.messageBubbles) return `メッセージ ${messageListFacts(definitionJson).message_count}通`;
         if (definition.template.messageType === 'imagemap') return 'リッチビデオ';
         if(definition.asset) {
           const {kind,payload}=definition.asset;

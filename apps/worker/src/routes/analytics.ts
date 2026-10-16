@@ -1,62 +1,10 @@
+import { serializeFunnel, funnelErrorStatus } from './analytics-funnel-display.js';
+import { bookingAudience } from './styles.js';
+
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
-import {
-  getDailyMessageCounts,
-  getLinkClickSummary,
-  getTrackedLinkStats,
-  getBroadcastSummary,
-  buildFunnelResult,
-  getFunnelsWithCurrentVersions,
-  getLegacyFunnels,
-  getFunnelById,
-  getFunnelSteps,
-  createFunnel,
-  deleteFunnel,
-  countFunnelStep,
-  createVersionedFunnel,
-  createFunnelVersion,
-  getFunnelWithCurrentVersion,
-  setFunnelStatus,
-  runChronologicalFunnel,
-  getLatestFunnelRun,
-  createFunnelResultAudience,
-  createAnalyticsCrossRun,
-  getAnalyticsCrossRun,
-  addConversionDefinitionUsage,
-  createAnalyticsCrossAudience,
-  getCurrentFunnelVersion,
-  getAnalyticsFriendsOverview,
-  getAnalyticsReactionsOverview,
-  getAnalyticsRoutesOverview,
-  getAnalyticsUrlClicksOverview,
-  getAnalyticsUsageOverview,
-  createSavedAnalyticsFromResult,
-  getSavedAnalytics,
-  getSavedAnalyticsSnapshots,
-  ANALYTICS_REPORT_SECTIONS,
-  createAnalyticsReportSchedule,
-  getAnalyticsReportRuns,
-  getAnalyticsReportSchedule,
-  getRecentOneTimeAnalyticsReportRuns,
-  getAnalyticsReportScheduleIncludingArchived,
-  getAnalyticsReportSchedules,
-  requeueOneTimeAnalyticsReportSchedule,
-  setAnalyticsReportScheduleStatus,
-  updateAnalyticsReportSchedule,
-  getStaffMembers,
-  getStaffAccountScopeIds,
-  getLineAccountById,
-  DEFAULT_TENANT_ID,
-  FUNNEL_STEP_KINDS,
-  type Funnel,
-  type FunnelStepKind,
-  type AnalyticsOverviewContext,
-  type AnalyticsReportAlertRule,
-  type AnalyticsReportChannel,
-  type AnalyticsReportRecipient,
-  type AnalyticsReportSection,
-} from '@line-crm/db';
+import { getDailyMessageCounts, getLinkClickSummary, getTrackedLinkStats, getBroadcastSummary, buildFunnelResult, getFunnelsWithCurrentVersions, getLegacyFunnels, getFunnelById, getFunnelSteps, createFunnel, deleteFunnel, countFunnelStep, createVersionedFunnel, createFunnelVersion, getFunnelWithCurrentVersion, setFunnelStatus, runChronologicalFunnel, getLatestFunnelRun, createFunnelResultAudience, createAnalyticsCrossRun, getAnalyticsCrossRun, addConversionDefinitionUsage, createAnalyticsCrossAudience, getCurrentFunnelVersion, getAnalyticsFriendsOverview, getAnalyticsReactionsOverview, getAnalyticsRoutesOverview, getAnalyticsUrlClicksOverview, getAnalyticsUsageOverview, createSavedAnalyticsFromResult, getSavedAnalytics, getSavedAnalyticsSnapshots, ANALYTICS_REPORT_SECTIONS, createAnalyticsReportSchedule, getAnalyticsReportRuns, getAnalyticsReportSchedule, getRecentOneTimeAnalyticsReportRuns, getAnalyticsReportScheduleIncludingArchived, getAnalyticsReportSchedules, requeueOneTimeAnalyticsReportSchedule, setAnalyticsReportScheduleStatus, updateAnalyticsReportSchedule, getStaffMembers, getStaffAccountScopeIds, getLineAccountById, DEFAULT_TENANT_ID, FUNNEL_STEP_KINDS, type FunnelStepKind, type AnalyticsOverviewContext, type AnalyticsReportAlertRule, type AnalyticsReportChannel, type AnalyticsReportRecipient, type AnalyticsReportSection } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -338,31 +286,11 @@ async function overviewContext(
   return { ok: true, value: { lineAccountId: accountId, ...range.value } };
 }
 
-function serializeFunnel(f: Funnel) {
-  return {
-    id: f.id,
-    name: f.name,
-    windowDays: f.window_days,
-    createdAt: f.created_at,
-    status: f.status,
-  };
-}
-
 function explicitTimestamp(value: unknown, code: string): string {
   if (typeof value !== 'string' || !/(Z|[+-]\d{2}:?\d{2})$/.test(value)) throw new Error(code);
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) throw new Error(code);
   return parsed.toISOString();
-}
-
-function funnelErrorStatus(error: unknown): 404 | 409 | 422 | 500 {
-  const message = error instanceof Error ? error.message : '';
-  if (message.endsWith('_not_found')) return 404;
-  if (message.endsWith('_conflict')) return 409;
-  if (message.startsWith('analytics_funnel_')
-      || message.startsWith('analytics_cross_')
-      || message.startsWith('analytics_saved_')) return 422;
-  return 500;
 }
 
 analytics.get('/api/analytics/friends', async (c) => {
@@ -1275,9 +1203,12 @@ analytics.post('/api/analytics/results/:id/audiences', requireRole('owner', 'adm
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
     const body = await c.req.json<{
-      sourceKind?: unknown; groupKey?: unknown; stepOrder?: unknown; selection?: unknown;
+      sourceKind?: unknown; groupKey?: unknown; stepOrder?: unknown; selection?: unknown; friendIds?: unknown;
       rowKey?: unknown; columnKey?: unknown;
     }>();
+    if (body.sourceKind === 'booking') {
+      return c.json({ success: true, data: await bookingAudience(c, c.req.param('id'), body as Record<string, unknown>, account.accountId) }, 201);
+    }
     if (body.sourceKind === 'cross') {
       const result = await createAnalyticsCrossAudience(c.env.DB, {
         lineAccountId: account.accountId,

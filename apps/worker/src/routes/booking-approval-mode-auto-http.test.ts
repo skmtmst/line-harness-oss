@@ -162,7 +162,7 @@ describe('予約のルール approvalMode', () => {
     vi.unstubAllGlobals();
   });
 
-  function liffCreate(key: string) {
+  function liffCreate(key: string,extra:Record<string,unknown>={}) {
     return app.request(
       '/api/liff/booking/requests?liffId=liff-am-1',
       {
@@ -171,6 +171,7 @@ describe('予約のルール approvalMode', () => {
           menu_id: 'menu-am',
           staff_id: 'staff-am',
           starts_at: STARTS_AT,
+          ...extra,
         }),
         headers: {
           'Content-Type': 'application/json',
@@ -241,4 +242,30 @@ describe('予約のルール approvalMode', () => {
       .get(body.booking_id) as { n: number };
     expect(ops.n).toBe(1);
   });
+  function savedForm(requireApproval:boolean,allowMenuSelection=false,menuId='menu-am') {
+    const layout={version:1,header:[],sections:[{id:'page',title:'予約',blocks:[{id:'booking-block',kind:'input',type:'booking',name:'visit',label:'予約',booking:{menuId,staffId:'staff-am',daysAhead:14,allowMenuSelection,requireApproval}}]}],options:{}};
+    sqlite.exec("INSERT INTO forms(id,name) VALUES('form-am','予約');INSERT INTO form_accounts(form_id,line_account_id) VALUES('form-am','account-am')");
+    sqlite.prepare("INSERT INTO form_versions(id,form_id,version_number,source_content_revision,name,layout,save_to_metadata,published_at,created_at) VALUES('fv','form-am',2,2,'予約',?,0,'2026-10-20','2026-10-20')").run(JSON.stringify(layout));
+    sqlite.prepare("INSERT INTO form_submissions(id,form_id,friend_id,form_version_id,data) VALUES('fs','form-am','friend-am','fv',?)").run(JSON.stringify({visit:{menuId:'menu-am',staffId:'staff-am',startsAt:STARTS_AT}}));
+    sqlite.exec("INSERT INTO form_submit_claims(line_account_id,form_id,friend_id,idempotency_key,request_hash,status,submission_id,owner,created_at,updated_at,expires_at) VALUES('account-am','form-am','friend-am','answer-key','hash','completed','fs','owner','2026-10-20','2026-10-20','2026-10-20')");
+    return {formId:'form-am',blockId:'booking-block',submissionKey:'answer-key'};
+  }
+  test.each([['automatic',true,'requested'],['automatic',false,'confirmed'],['manual',false,'requested']] as const)('組5: 公開版の未承認=%s/%sと店設定から%sに決め、画面の承認指定を使わない',async(mode,approval,status)=>{
+    setup(mode);const formAnswer=savedForm(approval);
+    const result=await liffCreate('form-first',{formAnswer,requireApproval:false,menu_id:'other-menu',staff_id:'other-staff',starts_at:'2030-01-01T00:00:00Z'});
+    expect(result.status,JSON.stringify(await result.clone().json())).toBe(201);
+    const first=await result.json() as {booking_id:string;status:string};expect(first.status).toBe(status);
+    const replay=await liffCreate('form-changed-key',{formAnswer});expect(await replay.json()).toMatchObject({booking_id:first.booking_id,status});
+    expect(sqlite.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({n:1});
+  });
+  test('組5: メニュー選択は受付中の同じ店だけを許し、固定メニュー・他人の回答・試しの回答を拒否する',async()=>{
+    setup('automatic');const formAnswer=savedForm(false,true,'unused-fixed');
+    expect((await liffCreate('choice',{formAnswer})).status).toBe(201);
+    sqlite.exec("UPDATE menus SET is_active=0 WHERE id='menu-am'");
+    expect((await liffCreate('inactive',{formAnswer})).status).toBe(422);
+    sqlite.exec("UPDATE menus SET is_active=1 WHERE id='menu-am';UPDATE form_submissions SET is_test=1");
+    expect((await liffCreate('test',{formAnswer})).status).toBe(404);
+    expect((await liffCreate('missing',{formAnswer:{...formAnswer,submissionKey:'other'}})).status).toBe(404);
+  });
+
 });

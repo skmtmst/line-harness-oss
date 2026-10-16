@@ -43,6 +43,7 @@ test('622の適用前にあるひな形・版・配布の記録を変更せず3�
   const before=tables.map(t=>previous.prepare(`SELECT * FROM ${t}`).all());
   previous.exec(readFileSync(new URL('../migrations/622_hq_delivery_templates.sql',import.meta.url),'utf8'));
   expect(tables.map(t=>previous.prepare(`SELECT * FROM ${t}`).all())).toEqual(before.map((rows,i)=>i===0?rows.map(row=>({...row as object,delivery_type:null})):rows));
+  previous.exec(readFileSync(new URL('../migrations/661_hq_catalog_templates.sql',import.meta.url),'utf8'));
   for(const type of ['auto_reply','friend_add_rule','reminder'] as const) {
    expect((await createHqTemplate(asD1(previous),{id:type,tenantId:'t1',type,name:type})).template_type).toBe(type);
   }

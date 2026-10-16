@@ -1,3 +1,8 @@
+import { supportMarkImpactRevision } from './support-mark-impact-revision.js';
+import type { SupportMark, SupportMarkWithUsage } from './support-mark-impact-revision.js';
+export { supportMarkImpactRevision } from './support-mark-impact-revision.js';
+export type { SupportMark, SupportMarkWithUsage } from './support-mark-impact-revision.js';
+import { parseSupportMarkLocations, type SupportMarkLocation } from '@line-crm/shared';
 import { recordOperation } from './operation-audit.js';
 import { jstNow } from './utils.js';
 
@@ -9,42 +14,6 @@ export interface SupportMarkScope {
   lineAccountId: string;
 }
 
-/**
- * 対応マーク。
- *
- * 受信箱の「未対応／対応中／解決済」は chats.status が持っているが、
- * あれは3つ固定でトークにしか付かない。マークは友だちに付き、
- * 名前も色も運用側が決められる。
- */
-
-export interface SupportMark {
-  id: string;
-  name: string;
-  color: string;
-  is_default: number;
-  auto_on_inbound: number;
-  display_order: number;
-  created_at: string;
-  archived_at: string | null;
-  version: number;
-  updated_at: string;
-  created_by: string | null;
-  updated_by: string | null;
-  /** NULL は移行前からあるテナント共通マーク。 */
-  line_account_id: string | null;
-  tenant_id: string;
-  is_inherited: number;
-}
-
-export interface SupportMarkWithUsage extends SupportMark {
-  friend_count: number;
-  broadcasts: number;
-  scenarios: number;
-  auto_replies: number;
-  saved_searches: number;
-  automations: number;
-}
-
 export interface SupportMarkArchiveImpact {
   mark: SupportMarkWithUsage;
   revision: string;
@@ -52,22 +21,9 @@ export interface SupportMarkArchiveImpact {
   checkedAt: string;
 }
 
-export function supportMarkImpactRevision(mark: SupportMarkWithUsage): string {
-  return [
-    mark.id,
-    Number(mark.version ?? 1),
-    Number(mark.friend_count),
-    Number(mark.broadcasts),
-    Number(mark.scenarios),
-    Number(mark.auto_replies),
-    Number(mark.saved_searches),
-    Number(mark.automations),
-  ].join(':');
-}
-
 const MARK_SELECT = `
   SELECT sm.id, sm.name, sm.color, sm.is_default, sm.auto_on_inbound,
-         sm.display_order, sm.created_at, sm.archived_at, sm.version,
+         sm.display_order, sm.display_locations_json, sm.created_at, sm.archived_at, sm.version,
          COALESCE(sm.updated_at, sm.created_at) AS updated_at,
          sm.created_by, sm.updated_by,
          sms.line_account_id,
@@ -598,10 +554,12 @@ export async function updateSupportMark(
     isDefault?: boolean;
     autoOnInbound?: boolean;
     displayOrder?: number;
+    displayLocations?: SupportMarkLocation[];
     actorId?: string | null;
     expectedVersion?: number;
   },
 ): Promise<SupportMark | null | 'conflict'> {
+  if(input.displayLocations!==undefined)input.displayLocations=parseSupportMarkLocations(input.displayLocations);
   const existing = await getSupportMarkById(db, id, scope);
   if (!existing) return null;
   if (input.expectedVersion !== undefined
@@ -653,8 +611,8 @@ export async function updateSupportMark(
         .prepare(
           `INSERT INTO support_marks
              (id, name, color, is_default, auto_on_inbound, display_order, created_at,
-              version, updated_at, created_by, updated_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+              version, updated_at, created_by, updated_by, display_locations_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
         )
         .bind(
           cloneId,
@@ -667,6 +625,7 @@ export async function updateSupportMark(
           now,
           input.actorId ?? null,
           input.actorId ?? null,
+          JSON.stringify(input.displayLocations ?? JSON.parse(existing.display_locations_json)),
         ),
       db
         .prepare(
@@ -706,6 +665,7 @@ export async function updateSupportMark(
   if (input.isDefault !== undefined) put('is_default', input.isDefault ? 1 : 0);
   if (input.autoOnInbound !== undefined) put('auto_on_inbound', input.autoOnInbound ? 1 : 0);
   if (input.displayOrder !== undefined) put('display_order', input.displayOrder);
+  if (input.displayLocations !== undefined) put('display_locations_json', JSON.stringify(input.displayLocations));
   if (sets.length > 0) {
     sets.push('version = version + 1');
     put('updated_at', jstNow());

@@ -7,7 +7,7 @@ import { boundedText, HqTemplateError, nextAlias } from './tag.js';
 import type { HqTemplateResolution } from './contract.js';
 export const isDeliveryType = (type: string): type is HqDeliveryTemplateType => (HQ_DELIVERY_TEMPLATE_TYPES as readonly string[]).includes(type);
 const own = (value: unknown): value is Record<string, unknown> => !!value && typeof value==='object' && !Array.isArray(value);
-const KEY_KINDS: Record<string,string> = { templateId:'template',formId:'form',scenarioId:'scenario',tagIds:'tag',tagId:'tag',targetTagId:'tag',visibleTagId:'tag',fieldId:'friend_field',triggerFieldId:'friend_field',markId:'mark',markIds:'mark',eventId:'event',triggerEventId:'event',reminderId:'reminder',routeIds:'entry_route',varKey:'common_var',folderId:'tag_folder',notificationRuleId:'notification_rule' };
+const KEY_KINDS: Record<string,string> = { assetId:'coupon',templateId:'template',formId:'form',scenarioId:'scenario',tagIds:'tag',tagId:'tag',targetTagId:'tag',visibleTagId:'tag',fieldId:'friend_field',triggerFieldId:'friend_field',markId:'mark',markIds:'mark',eventId:'event',triggerEventId:'event',reminderId:'reminder',routeIds:'entry_route',varKey:'common_var',folderId:'tag_folder',notificationRuleId:'notification_rule' };
 const ACTION_KINDS: Record<string,string> = {add_tag:'tag',remove_tag:'tag',start_scenario:'scenario',set_friend_field:'friend_field',add_support_mark:'mark',use_common_var:'common_var'};
 const CONDITION_KINDS: Record<string,string> = {
   tag_exists:'tag',tag_not_exists:'tag',tag_all:'tag',tag_not_all:'tag',
@@ -31,7 +31,7 @@ function referencesIn(value: unknown, output: Array<{id:string;kind:string}> = [
     if(kind && v!=null && v!=='') {
       for(const id of Array.isArray(v)?v:[v]) { if(typeof id!=='string') throw new HqTemplateError('INVALID_DEFINITION',422); output.push({id,kind}); }
     }
-    if(['friendCondition','config_json','condition','config'].includes(key) && typeof v==='string' && v.trim()) { try { referencesIn(JSON.parse(v),output); } catch { throw new HqTemplateError('INVALID_DEFINITION',422); } }
+    if(['responseContent','friendCondition','config_json','condition','config'].includes(key) && (key!=='responseContent'||value.responseType==='coupon') && typeof v==='string' && v.trim()) { try { referencesIn(JSON.parse(v),output); } catch { throw new HqTemplateError('INVALID_DEFINITION',422); } }
     else referencesIn(v,output);
   }
   return output;
@@ -65,7 +65,12 @@ export async function parseDeliveryDefinition(db:D1Database,type:HqDeliveryTempl
   const settings:Record<string,unknown>&{name:string}={...value.settings,name:boundedText(value.settings.name,60)};
   if(Object.hasOwn(settings,'lineAccountId') || Object.hasOwn(settings,'folderId')) throw new HqTemplateError('UNSUPPORTED_REFERENCE',422);
   const references=value.references??[];
-  if(!Array.isArray(references) || references.length>100 || references.some(r=>!own(r)||!['sourceId','kind','name'].every(k=>typeof r[k]==='string'&&!!r[k])||!['tag','template','scenario','form','friend_field','mark','event','reminder','entry_route','common_var','tag_folder','notification_rule'].includes(r.kind as string)||Object.keys(r).some(k=>!['sourceId','kind','name'].includes(k))) || new Set(references.map(r=>r.sourceId)).size!==references.length) throw new HqTemplateError('INVALID_DEFINITION',422);
+  if(!Array.isArray(references) || references.length>100 || references.some(r=>!own(r)||!['sourceId','kind','name'].every(k=>typeof r[k]==='string'&&!!r[k])||!['coupon','tag','template','scenario','form','friend_field','mark','event','reminder','entry_route','common_var','tag_folder','notification_rule'].includes(r.kind as string)||Object.keys(r).some(k=>!['sourceId','kind','name','accountId'].includes(k))) || new Set(references.map(r=>r.sourceId)).size!==references.length) throw new HqTemplateError('INVALID_DEFINITION',422);
+  for (const ref of references) if (ref.accountId !== undefined) {
+    if(typeof ref.accountId !== 'string' || !ref.accountId || ref.accountId.length>100) throw new HqTemplateError('INVALID_DEFINITION',422);
+    const scope=await db.prepare("SELECT a.id FROM line_accounts a WHERE a.id=? AND a.is_active=1 AND a.archived_at IS NULL").bind(ref.accountId).first();
+    if(!scope) throw new HqTemplateError('REFERENCE_UNAVAILABLE',422);
+  }
   const used=referencesIn(settings);
   if(used.some(r=>!references.some(ref=>ref.sourceId===r.id&&ref.kind===r.kind)) || references.some(r=>!used.some(ref=>ref.id===r.sourceId&&ref.kind===r.kind))) throw new HqTemplateError('REFERENCE_UNAVAILABLE',422);
   await readSettings(db,type,settings,'hq-validation',false);
@@ -83,7 +88,7 @@ const SNAPSHOT_COLUMNS: Record<string, readonly string[]> = {
   reminders: ["id", "name", "description", "is_active", "line_account_id", "trigger_type", "trigger_offset_minutes", "send_at_time", "target_tag_id", "folder_id", "delivery_mode", "trigger_field_id", "repeat_yearly", "created_at", "updated_at", "display_order", "deleted_at", "lifecycle_status", "current_draft_version_id", "current_published_version_id", "created_from_recipe_id", "recipe_clone_run_id", "trigger_event_id", "leap_year_policy"],
   reminder_versions: ["id", "reminder_id", "version_number", "status", "settings_snapshot", "last_test_status", "last_tested_at", "last_tested_by_staff_id", "published_at", "published_by_staff_id", "created_at", "updated_at"],
   reminder_version_steps: ["id", "reminder_version_id", "stable_step_id", "position", "offset_minutes", "message_type", "message_content", "offset_days", "send_at_time", "template_id", "target_condition_json", "action_json", "created_at"],
-  templates: ["id", "name", "category", "message_type", "message_content", "carousel_actions_json", "carousel_tap_limit_mode", "carousel_tap_limit_text", "question_json", "question_status", "created_at", "updated_at", "folder_id", "display_order", "line_account_id", "created_from_recipe_id", "recipe_clone_run_id", "published_version", "published_at", "draft_message_type", "draft_message_content", "draft_carousel_actions_json", "draft_carousel_tap_limit_mode", "draft_carousel_tap_limit_text", "draft_question_json", "draft_question_status", "publish_idempotency_key", "draft_revision"],
+  templates: ["id", "name", "category", "message_type", "message_content", "carousel_actions_json", "carousel_tap_limit_mode", "carousel_tap_limit_text", "question_json", "question_status", "created_at", "updated_at", "folder_id", "display_order", "line_account_id", "created_from_recipe_id", "recipe_clone_run_id", "published_version", "published_at", "draft_message_type", "draft_message_content", "draft_carousel_actions_json", "draft_carousel_tap_limit_mode", "draft_carousel_tap_limit_text", "draft_question_json", "draft_question_status", "publish_idempotency_key", "draft_revision", "message_bubbles_json", "draft_message_bubbles_json"],
   tags: ["id", "name", "color", "mileage_reward", "referral_mileage_reward", "mileage_multiplier_bps", "mileage_multiplier_priority", "created_at", "group_id", "folder_id", "is_starred", "display_order", "line_account_id", "description", "normalized_name", "manual_assignment_allowed", "reapply_policy", "linked_enabled", "status", "version", "created_by", "updated_by", "updated_at", "created_from_recipe_id", "recipe_clone_run_id"],
   scenarios: ["id", "name", "description", "trigger_type", "trigger_tag_id", "is_active", "delivery_mode", "created_at", "updated_at", "line_account_id", "folder_id", "display_order", "allow_concurrent", "audience_condition_json", "on_complete_mode", "on_complete_scenario_id", "created_from_recipe_id", "recipe_clone_run_id", "current_published_version_id", "stopped_reason", "stopped_by", "stopped_at"],
   forms: ["id", "name", "description", "fields", "on_submit_tag_id", "on_submit_scenario_id", "save_to_metadata", "is_active", "submit_count", "created_at", "updated_at", "on_submit_message_type", "on_submit_message_content", "on_submit_webhook_url", "on_submit_webhook_headers", "on_submit_webhook_fail_message", "og_title", "og_description", "og_image_url", "layout", "status", "archived_at", "revision", "content_revision", "current_published_version_id", "folder_id"],
@@ -92,6 +97,7 @@ const SNAPSHOT_COLUMNS: Record<string, readonly string[]> = {
   events: ["id", "line_account_id", "name", "venue_name", "venue_url", "image_url", "description", "description_centered", "max_bookings_per_friend", "requires_approval", "cancel_deadline_hours_before", "reminder_day_before_enabled", "reminder_hours_before", "is_published", "folder_id", "sort_order", "deleted_at", "created_at", "updated_at", "target_type", "account_ids", "dedup_priority", "failed_account_ids", "confirmation_message_extra", "reminder_message_extra", "og_title", "og_description", "og_image_url", "visible_tag_id", "waitlist_enabled", "entry_cutoff_hours_before", "version", "current_published_version_id", "version_write_token", "approval_deadline_hours", "questions_json", "lifecycle_status", "lifecycle_changed_at", "lifecycle_change_reason", "venue_address"],
   entry_routes: ["id", "ref_code", "name", "tag_id", "scenario_id", "redirect_url", "is_active", "created_at", "updated_at", "pool_id", "intro_template_id", "run_account_friend_add_scenarios", "genre", "tenant_id", "line_account_id", "stopped_at", "stopped_reason"],
   common_vars: ["id", "folder_id", "name", "var_key", "type", "value", "created_at", "updated_at", "line_account_id", "memo", "version", "updated_by", "archived_at", "replacement_run_id", "valid_from", "valid_until", "fallback_value", "expiry_behavior", "status", "stopped_at", "expiry_notice_14_at", "expiry_notice_3_at"],
+  broadcast_message_assets: ['id','name','kind','payload_json','published_version','updated_at','line_account_id'],
   notification_rules: ["id", "name", "event_type", "conditions", "channels", "line_account_id", "is_active", "created_at", "updated_at", "version"],
   folders: ["id", "kind", "name", "parent_id", "display_order", "created_at", "updated_at", "color", "account_id", "revision"],
 };
@@ -105,7 +111,7 @@ function snapshotSql(type:HqDeliveryTemplateType) {
     type==='friend_add_rule'?`(SELECT COUNT(*) FROM friend_add_events WHERE routing_rule_id=t.id)`:`(SELECT COUNT(*) FROM friend_reminders WHERE reminder_id=t.id)`;
   const children=type==='reminder'?rowsJson('reminder_version_steps','child',`child.reminder_version_id IN (SELECT id FROM reminder_versions WHERE reminder_id=t.id)`):"'[]'";
   const targets=`(SELECT COALESCE(json_group_array(json(row)),'[]') FROM (SELECT json_object('record',json(${recordJson(table,'t')}),'versions',json(${rowsJson(versionTable,'v',`v.${owner}=t.id`,'version_number')}),'children',json(${children}),'usage',${used}) row FROM ${table} t WHERE t.line_account_id=${scope} ORDER BY t.id))`;
-  const references=['templates','tags','scenarios','events','entry_routes','common_vars','reminders','notification_rules'].map(table=>`'${table}',json(${rowsJson(table,'ref',`ref.line_account_id=${scope}`)})`);
+  const references=['broadcast_message_assets','templates','tags','scenarios','events','entry_routes','common_vars','reminders','notification_rules'].map(table=>`'${table}',json(${rowsJson(table,'ref',`ref.line_account_id=${scope}`)})`);
   references.push(`'folders',json(${rowsJson('folders','ref',`ref.account_id=${scope} AND ref.kind='tag'`)})`);
   references.push(`'forms',json(${rowsJson('forms','ref',`EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=ref.id AND fa.line_account_id=${scope})`)})`);
   references.push(`'fields',json(${rowsJson('friend_fields','ref',`EXISTS(SELECT 1 FROM friend_field_scopes fs WHERE fs.field_id=ref.id AND fs.line_account_id=${scope})`)})`);
@@ -129,14 +135,20 @@ export function inspectDelivery(def:HqDeliveryTemplateDefinition,snapshot:string
 export async function deliveryReferenceItems(db:D1Database,accountId:string,def:HqDeliveryTemplateDefinition) {
   const items:Array<{sourceId:string;itemKind:string;name:string;targetId:string;expectedRevision:string;duplicate:true;allowedModes:['overwrite'];operation:'reuse'}>=[];
   for(const ref of def.references??[]) {
-    const table:Record<string,string>={tag:'tags',template:'templates',scenario:'scenarios',form:'forms',friend_field:'friend_fields',mark:'support_marks',event:'events',reminder:'reminders',entry_route:'entry_routes',common_var:'common_vars',tag_folder:'folders',notification_rule:'notification_rules'};
-    let scope='line_account_id=?',bindings:string[]=[accountId,ref.name];
+    const table:Record<string,string>={coupon:'broadcast_message_assets',tag:'tags',template:'templates',scenario:'scenarios',form:'forms',friend_field:'friend_fields',mark:'support_marks',event:'events',reminder:'reminders',entry_route:'entry_routes',common_var:'common_vars',tag_folder:'folders',notification_rule:'notification_rules'};
+    let scope='line_account_id=?';const bindings:string[]=[accountId,ref.name];
+    if(ref.kind==='coupon') scope+=" AND kind='coupon' AND published_version>0";
     if(ref.kind==='tag_folder') scope="account_id=? AND kind='tag'";
     if(ref.kind==='form') scope='EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=forms.id AND fa.line_account_id=?)';
     if(ref.kind==='friend_field') scope='EXISTS(SELECT 1 FROM friend_field_scopes fs WHERE fs.field_id=friend_fields.id AND fs.line_account_id=?)';
     if(ref.kind==='mark') scope='EXISTS(SELECT 1 FROM support_mark_scopes ms WHERE ms.mark_id=support_marks.id AND ms.line_account_id=?)';
-    const rows=(await db.prepare(`SELECT *,${ref.kind==='common_var'?'var_key':'id'} AS target_id FROM ${table[ref.kind]} WHERE ${scope} AND name=? ORDER BY id`).bind(...bindings).all<Record<string,unknown>&{target_id:string}>()).results;
+    const rows=(await db.prepare(`SELECT *,${ref.kind==='common_var'?'var_key':'id'} AS target_id FROM ${table[ref.kind]} WHERE ${scope} AND name=?${ref.accountId===accountId?' AND id=?':''} ORDER BY id`).bind(...bindings,...(ref.accountId===accountId?[ref.sourceId]:[])).all<Record<string,unknown>&{target_id:string}>()).results;
     if(rows.length!==1) throw new HqTemplateError('REFERENCE_UNAVAILABLE',409);
+    if (ref.accountId && ref.accountId !== accountId) {
+      const source=await db.prepare('SELECT tenant_id FROM line_accounts WHERE id=? AND is_active=1 AND archived_at IS NULL').bind(ref.accountId).first<{tenant_id:string}>();
+      const target=await db.prepare('SELECT tenant_id FROM line_accounts WHERE id=?').bind(accountId).first<{tenant_id:string}>();
+      if(!source || source.tenant_id!==target?.tenant_id) throw new HqTemplateError('REFERENCE_UNAVAILABLE',409);
+    }
     const revision=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(rows[0])))),b=>b.toString(16).padStart(2,'0')).join('');
     items.push({sourceId:`${ref.kind}:${ref.sourceId}`,itemKind:ref.kind,name:ref.name,targetId:rows[0].target_id,expectedRevision:revision,duplicate:true,allowedModes:['overwrite'],operation:'reuse'});
   }
@@ -151,11 +163,38 @@ async function mapSettings(db:D1Database,accountId:string,def:HqDeliveryTemplate
     return Object.fromEntries(Object.entries(value).map(([key,v])=>{
       const kind=referenceKind(key,value);
       if(kind) return [key,Array.isArray(v)?v.map(id=>mapped.get(String(id))??id):mapped.get(String(v))??v];
-      if(['friendCondition','config_json','condition','config'].includes(key) && typeof v==='string' && v.trim()) return [key,JSON.stringify(transform(JSON.parse(v)))];
+      if(['responseContent','friendCondition','config_json','condition','config'].includes(key) && (key!=='responseContent'||value.responseType==='coupon') && typeof v==='string' && v.trim()) return [key,JSON.stringify(transform(JSON.parse(v)))];
       return [key,transform(v)];
     }));
   };
-  return transform(def.settings) as Record<string,unknown>;
+  const settings=transform(def.settings) as Record<string,unknown>;
+  if(settings.responseType==='coupon') {
+    const payload=JSON.parse(String(settings.responseContent));
+    const asset=await db.prepare("SELECT payload_json,name FROM broadcast_message_assets WHERE id=? AND line_account_id=? AND kind='coupon' AND published_version>0").bind(payload.assetId,accountId).first<{payload_json:string;name:string}>();
+    if(!asset)throw new HqTemplateError('REFERENCE_UNAVAILABLE',409);
+    settings.responseContent=JSON.stringify({...JSON.parse(asset.payload_json),assetId:payload.assetId,assetName:asset.name});
+  }
+  const refreshNotice=(value:unknown):void=>{
+    if(Array.isArray(value)){value.forEach(refreshNotice);return;}
+    if(!own(value))return;
+    if(typeof value.notificationRuleId==='string') {
+      const item=items.find(i=>i.itemKind==='notification_rule'&&i.targetId===value.notificationRuleId);
+      if(!item)throw new HqTemplateError('REFERENCE_UNAVAILABLE',409);
+      value.notificationRuleVersion=noticeVersions.get(item.targetId);
+    }
+    for(const [key,v] of Object.entries(value)) {
+      if(key==='config_json'&&typeof v==='string'){const config=JSON.parse(v);refreshNotice(config);value[key]=JSON.stringify(config);}
+      else refreshNotice(v);
+    }
+  };
+  const noticeVersions=new Map<string,number>();
+  for(const item of items.filter(i=>i.itemKind==='notification_rule')) {
+    const rule=await db.prepare('SELECT version FROM notification_rules WHERE id=? AND line_account_id=? AND is_active=1').bind(item.targetId,accountId).first<{version:number}>();
+    if(!rule)throw new HqTemplateError('REFERENCE_UNAVAILABLE',409);
+    noticeVersions.set(item.targetId,rule.version);
+  }
+  refreshNotice(settings);
+  return settings;
 }
 export async function validateDeliveryReferences(db:D1Database,accountId:string,type:HqDeliveryTemplateType,def:HqDeliveryTemplateDefinition) {
   return readSettings(db,type,await mapSettings(db,accountId,def),accountId,true);

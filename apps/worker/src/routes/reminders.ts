@@ -1,5 +1,9 @@
+import { publicReminder } from './reminder-display.js';
+import type { ReminderListRow } from './reminder-display.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { buildReminderStepMessage } from '../services/reminder-delivery.js';
+import { getTemplateById } from '@line-crm/db';
 import { Hono, type Context } from 'hono';
 import {
   getFriendById,
@@ -42,7 +46,7 @@ import {
 } from '@line-crm/db';
 import { describeReminderTiming, LEAP_YEAR_POLICIES, REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE, resolveReminderSendAt } from '@line-crm/shared';
 import type { Env } from '../index.js';
-import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   completeOutboundSendStatement,
@@ -132,54 +136,6 @@ function canonicalTargetDate(value: unknown): string | null {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
-
-type ReminderListRow = Awaited<ReturnType<typeof getReminders>>[number] & {
-  step_count?: number | string | null;
-  has_failure?: number | string | null;
-  planned_count?: number | string | null;
-  failed_count?: number | string | null;
-  next_scheduled_at?: string | null;
-};
-
-function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: boolean, timingSummary?: string | null) {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    isActive: Boolean(row.is_active),
-    lifecycleStatus: row.lifecycle_status,
-    currentDraftVersionId: row.current_draft_version_id,
-    currentPublishedVersionId: row.current_published_version_id,
-    triggerType: row.trigger_type ?? 'manual',
-    deliveryMode: row.delivery_mode ?? 'countdown',
-    triggerFieldId: row.trigger_field_id ?? null,
-    repeatYearly: row.repeat_yearly === 1,
-    leapYearPolicy: row.leap_year_policy,
-    triggerOffsetMinutes: row.trigger_offset_minutes ?? null,
-    sendAtTime: row.send_at_time ?? null,
-    targetTagId: row.target_tag_id ?? null,
-    folderId: row.folder_id ?? null,
-    stepCount: stepCount ?? Number(row.step_count ?? 0),
-    /*
-     * REMINDER-10: 一覧の副題（日時・通数）。版から組み立てた値を渡す。
-     * null のとき画面側が reminders 行の値で組み立てる従来の形に戻る。
-     */
-    timingSummary: timingSummary ?? null,
-    hasFailure: hasFailure ?? Number(row.has_failure ?? 0) > 0,
-    /*
-     * ★V8 一覧（`apLqS`）の「これから送る」「次に送る」「失敗 N」。
-     * ページ切替の経路でだけ数える（旧配列応答は null のまま）。
-     * 数え方は「失敗あり」の絞り込みと同じ retry_wait/permanent_failed、
-     * 予定は queued/retry_wait の先に送るもの。
-     */
-    plannedDeliveries: row.planned_count == null ? null : Number(row.planned_count),
-    failedCount: row.failed_count == null ? null : Number(row.failed_count),
-    nextScheduledAt: row.next_scheduled_at ?? null,
-    displayOrder: row.display_order ?? 0,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
 }
 
 interface ReminderVersionStepSummaryRow {
@@ -1190,6 +1146,25 @@ reminders.post('/api/reminders/:id/audience', requireDeliveryAccess('reminders')
     console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/audience"}));
     return c.json({ success: false, error: '対象者を数え直せませんでした' }, 500);
   }
+});
+
+reminders.post('/api/reminders/:id/message-preview',requireRole('owner','admin'),denyReadOnly(),inputJsonBoundary({friendId:['string'],stableStepId:['string'],expectedDraftVersionId:['string'],expectedDraftUpdatedAt:['string'],deliveredAt:['string']}),async c=>{
+  const draft=await getReminderDraftVersion(c.env.DB,c.req.param('id'));
+  if(!draft)return c.json({success:false,error:'下書きが見つかりません'},404);
+  const input=await c.req.json<{friendId:string;stableStepId:string;expectedDraftVersionId:string;expectedDraftUpdatedAt:string;deliveredAt?:string}>();
+  if(input.expectedDraftVersionId!==draft.id||input.expectedDraftUpdatedAt!==draft.updated_at)return c.json({success:false,error:'下書きが更新されました。読み直してください'},409);
+  const settings=parseReminderVersionSettings(draft),friend=typeof input.friendId==='string'?await getFriendById(c.env.DB,input.friendId):null;
+  if(!friend||friend.line_account_id!==settings.lineAccountId||!friend.is_following)return c.json({success:false,error:'友だちが見つかりません'},404);
+  const step=(await getReminderVersionSteps(c.env.DB,draft.id)).find(step=>step.id===input.stableStepId);
+  if(!step)return c.json({success:false,error:'通知が見つかりません'},404);
+  if(step.template_id){const template=await getTemplateById(c.env.DB,step.template_id);if(!template||template.line_account_id!==settings.lineAccountId)return c.json({success:false,error:'テンプレートが見つかりません'},404);}
+  const deliveredAt=input.deliveredAt===undefined?new Date():new Date(input.deliveredAt);
+  if(Number.isNaN(deliveredAt.getTime()))return inputError(c,{success:false,error:'日時を確認してください'},400,['deliveredAt']);
+  const built=await buildReminderStepMessage(c.env.DB,step,friend,deliveredAt,'test_send',{previewOnly:true});
+  const current=await getReminderDraftVersion(c.env.DB,c.req.param('id'));
+  if(current?.id!==draft.id||current.updated_at!==draft.updated_at)return c.json({success:false,error:'下書きが更新されました。読み直してください'},409);
+  c.header('Cache-Control','no-store');
+  return c.json({success:true,data:{dryRun:true,sent:0,persistsSchedule:false,draftVersionId:draft.id,draftUpdatedAt:draft.updated_at,friendId:friend.id,friendName:friend.display_name,stableStepId:step.id,deliveredAt:deliveredAt.toISOString(),messageType:built.messageType,messageContent:built.messageContent,message:built.message}});
 });
 
 reminders.post('/api/reminders/:id/preview', inputJsonBoundary(), async (c) => {

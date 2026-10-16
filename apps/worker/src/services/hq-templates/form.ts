@@ -1,3 +1,4 @@
+import type { FormSnapshot, BookingResource } from './form-snapshot-types.js';
 import { normalizeScopedTagName } from '@line-crm/db';
 import { collectInputs, layoutToFields, normalizeLayout, validateFormDefinition, type FormLayout } from '@line-crm/shared';
 import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateStatement, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan, } from './contract.js';
@@ -189,45 +190,29 @@ const SNAPSHOT_SQL = `SELECT json_object(
  'forms',json((SELECT json_group_array(json_object('id',id,'name',name,'description',description,'fields',fields,'layout',layout,'tag',on_submit_tag_id,'scenario',on_submit_scenario_id,'active',is_active,'status',status,'content_revision',content_revision,'owners',json((SELECT json_group_array(line_account_id) FROM (SELECT line_account_id FROM form_accounts WHERE form_id=f.id ORDER BY line_account_id))))) FROM (SELECT f.* FROM forms f WHERE EXISTS(SELECT 1 FROM form_accounts WHERE form_id=f.id AND line_account_id=?) ORDER BY f.id) f)),
  'tags',json((SELECT json_group_array(json_object('id',id,'name',name,'version',version,'updated_at',updated_at,'status',status)) FROM (SELECT * FROM tags WHERE line_account_id=? ORDER BY id))),
  'scenarios',json((SELECT json_group_array(json_object('id',id,'name',name,'updated_at',updated_at,'active',is_active,'published',current_published_version_id)) FROM (SELECT * FROM scenarios WHERE line_account_id=? ORDER BY id))),
+ 'bookingMenus',json((SELECT json_group_array(json_object('id',id,'name',name,'accountId',line_account_id,'active',is_active,'deleted',deleted_at,'version',version)) FROM menus WHERE line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=(SELECT tenant_id FROM line_accounts WHERE id=?)) ORDER BY id)),
+ 'bookingStaff',json((SELECT json_group_array(json_object('id',id,'name',name,'accountId',line_account_id,'active',is_active,'deleted',deleted_at)) FROM staff WHERE line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=(SELECT tenant_id FROM line_accounts WHERE id=?)) ORDER BY id)),
  'templates',json((SELECT json_group_array(json_object('id',id,'name',name,'updated_at',updated_at,'draft_revision',draft_revision,'published_version',published_version)) FROM (SELECT * FROM templates WHERE line_account_id=? ORDER BY id)))
 ) AS snapshot`;
-type FormSnapshot = {
-    account: {
-        id: string;
-        tenant: string | null;
-        active: number;
-        archived: string | null;
-        liff: string | null;
-    } | null;
-    forms: {
-        id: string;
-        name: string;
-        status: string;
-        content_revision: number;
-        owners: string[];
-    }[];
-    tags: {
-        id: string;
-        name: string;
-        version: number;
-        updated_at: string | null;
-        status: string;
-    }[];
-    scenarios: {
-        id: string;
-        name: string;
-        updated_at: string | null;
-    }[];
-    templates: {
-        id: string;
-        name: string;
-        updated_at: string | null;
-        draft_revision: number;
-        published_version: number;
-    }[];
-};
+function mapBookingLayout(value:FormLayout|null,state:FormSnapshot,accountId:string):FormLayout|null {
+    if(!value) return null;
+    const layout=JSON.parse(JSON.stringify(value)) as FormLayout;
+    const resolve=(id:string,rows:BookingResource[])=>{
+      const source=rows.find(r=>r.id===id && r.active===1&&!r.deleted);
+      if(!source)throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+      const matches=rows.filter(r=>r.accountId===accountId&&r.active===1&&!r.deleted&&normalizeScopedTagName(r.name)===normalizeScopedTagName(source.name));
+      if(matches.length!==1)throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+      return matches[0].id;
+    };
+    for(const block of collectInputs(layout)) if(block.type==='booking'&&block.booking) {
+      if(block.booking.kind==='seats')throw new FormTemplateError('UNSUPPORTED_REFERENCE');
+      block.booking.menuId=resolve(block.booking.menuId,state.bookingMenus??[]);
+      if(block.booking.staffId)block.booking.staffId=resolve(block.booking.staffId,state.bookingStaff??[]);
+    }
+    return layout;
+}
 export async function formTemplateSnapshot(db: D1Database, accountId: string): Promise<string> {
-    const result = await db.prepare(SNAPSHOT_SQL).bind(accountId, accountId, accountId, accountId, accountId).first<{
+    const result = await db.prepare(SNAPSHOT_SQL).bind(accountId, accountId, accountId, accountId, accountId, accountId, accountId).first<{
         snapshot: string;
     }>();
     if (!result)
@@ -260,6 +245,7 @@ export async function formTemplateWarnings(db: D1Database, accountId: string, in
 export async function inspectFormTemplate(db: D1Database, authority: HqTemplateAuthority, accountId: string, input: HqTemplateAdapterInput) {
     const def = parseFormTemplateDefinition(input), snapshot = await formTemplateSnapshot(db, accountId), state = JSON.parse(snapshot) as FormSnapshot;
     authorize(authority, { tenantId: authority.tenantId, targetAccountId: accountId }, state);
+    mapBookingLayout(def.form.layout,state,accountId);
     const found = target(state, def.form.name);
     const allowedModes = !found ? ['create'] as const : found.status === 'archived' || found.owners.length !== 1 ? ['alias'] as const : ['overwrite', 'alias'] as const;
     return { snapshot, snapshotToken: await formTemplateSnapshotToken(snapshot), sourceId: 'form', itemKind: 'form', name: def.form.name, targetId: found?.id ?? null, expectedRevision: found ? String(found.content_revision) : null, duplicate: Boolean(found), allowedModes, references: references(def) };
@@ -396,11 +382,11 @@ export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqT
                 ids[key] = value.targetId;
             const map = (kind: 'tag' | 'scenario', source: string) => { const value = ids[referenceKey(kind, source)]; if (!value)
                 throw new FormTemplateError('REFERENCE_UNAVAILABLE'); return value; };
-            const layout = def!.form.layout ? visitLayout(def!.form.layout, map) as FormLayout : null;
+            const layout = mapBookingLayout(def!.form.layout ? visitLayout(def!.form.layout, map) as FormLayout : null,state,context.targetAccountId);
             const fields = layout ? layoutToFields(layout) : def!.form.fields;
             const tagId = def!.form.on_submit_tag_id ? map('tag', def!.form.on_submit_tag_id) : null;
             const scenarioId = def!.form.on_submit_scenario_id ? map('scenario', def!.form.on_submit_scenario_id) : null;
-            const statements: HqTemplateStatement[] = [guard(`(${SNAPSHOT_SQL})=?`, [context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, snapshot!])];
+            const statements: HqTemplateStatement[] = [guard(`(${SNAPSHOT_SQL})=?`, [context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, snapshot!])];
             statements.push(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [context.targetAccountId, deps.authority.tenantId]));
             for (const value of resolved.values())
                 statements.push(...value.dbCommit ?? []);

@@ -1,4 +1,5 @@
 import { copyHqBroadcast,hqBroadcastReactions } from '../services/hq-broadcast-reactions.js';
+import { listHqBroadcastViews, saveHqBroadcastView, archiveHqBroadcastView } from '../services/hq-broadcast-saved-views.js';
 import { listHqBroadcasts,hqBroadcastQuota } from '../services/hq-broadcast-list.js';
 import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { swapHqFolderOrder,HqFolderError } from '@line-crm/db';
@@ -24,7 +25,24 @@ hqBroadcasts.get('/api/hq/broadcasts',async c=>{
   return c.json({success:true,...result});
 });
 hqBroadcasts.get('/api/hq/broadcasts/quota',async c=>{const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);return c.json({success:true,data:await hqBroadcastQuota(db,a.tenantId)})});
-hqBroadcasts.post('/api/hq/broadcasts',inputJsonBoundary({"title":["string"],"messageContent":["string"],"messageType":["string"],"messageBubbles":["array"],"messageBubblesJson":["null","string"],"altText":["null","string"],"targetType":["string"],"targetTagId":["null","string"],"segmentConditions":["null","object"],"excludedTagIds":["array"],"savedSearchId":["null","string"],"scheduledAt":["null","string"],"status":["string"],"lineAccountId":["null","string"],"accountIds":["array"],"dedupPriority":["array"],"trackLinks":["boolean"],"stealthSpreadMinutes":["number"],"folderId":["null","string"],"measureOpens":["boolean"],"saveAsDraft":["boolean"],"draftStep":["null","string"],"internalMemo":["null","string"],"messageOptions":["null","object"],"afterActionVersionId":["null","string"],"confirmedRecipientCount":["number"],"requestId":["string"],"accountTagIds":["array"],"excludedAccountIds":["array"],"audience":["object"],"followupOfRunId":["string"]}), async c=>{
+hqBroadcasts.get('/api/hq/broadcasts/saved-views',async c=>{
+  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);
+  const member=await db.prepare('SELECT access_level FROM staff_members WHERE id=? AND tenant_id=?').bind(a.actorId,a.tenantId).first<{access_level:string}>();
+  return c.json({success:true,data:await listHqBroadcastViews(db,a.tenantId,a.actorId,!!c.get('staff').readOnly||member?.access_level==='read_only')});
+});
+hqBroadcasts.post('/api/hq/broadcasts/saved-views',inputJsonBoundary(),async c=>{
+  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'));
+  return c.json({success:true,data:await saveHqBroadcastView(db,a.tenantId,a.actorId,await c.req.json())},201);
+});
+hqBroadcasts.patch('/api/hq/broadcasts/saved-views/:viewId',inputJsonBoundary(),async c=>{
+  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'));
+  return c.json({success:true,data:await saveHqBroadcastView(db,a.tenantId,a.actorId,await c.req.json(),c.req.param('viewId'))});
+});
+hqBroadcasts.delete('/api/hq/broadcasts/saved-views/:viewId',inputJsonBoundary(),async c=>{
+  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),input=await c.req.json();
+  return c.json({success:true,data:await archiveHqBroadcastView(db,a.tenantId,a.actorId,c.req.param('viewId'),input.expectedRevision)});
+});
+hqBroadcasts.post('/api/hq/broadcasts',inputJsonBoundary({"title":["string"],"messageContent":["string"],"messageType":["string"],"messageBubbles":["array"],"messageBubblesJson":["null","string"],"altText":["null","string"],"targetType":["string"],"targetTagId":["null","string"],"segmentConditions":["null","object"],"excludedTagIds":["array"],"savedSearchId":["null","string"],"scheduledAt":["null","string"],"status":["string"],"lineAccountId":["null","string"],"accountIds":["array"],"dedupPriority":["array"],"trackLinks":["boolean"],"stealthSpreadMinutes":["number"],"folderId":["null","string"],"measureOpens":["boolean"],"saveAsDraft":["boolean"],"draftStep":["null","string"],"internalMemo":["null","string"],"messageOptions":["null","object"],"afterActionVersionIds":["object"],"afterActionVersionId":["null","string"],"confirmedRecipientCount":["number"],"requestId":["string"],"accountTagIds":["array"],"excludedAccountIds":["array"],"audience":["object"],"followupOfRunId":["string"]}), async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method)),input=await c.req.json<HqBroadcastInput>();
   const run=await prepareHqBroadcast(db,a.tenantId,a.actorId,input);return c.json({success:true,data:await readHqBroadcastResult(db,run)},201);
 });
@@ -99,7 +117,7 @@ hqBroadcasts.post('/api/hq/broadcasts/:id/targets/:accountId/retry',requireIrrev
   return c.json({success:true,data:await retryHqBroadcastTarget(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),c.req.param('accountId'),a.actorId,b.expectedVersion)});
 });
 
-hqBroadcasts.patch('/api/hq/broadcasts/:id',inputJsonBoundary({"title":["string"],"messageContent":["string"],"messageType":["string"],"messageBubbles":["array"],"messageBubblesJson":["null","string"],"altText":["null","string"],"targetType":["string"],"targetTagId":["null","string"],"segmentConditions":["null","object"],"excludedTagIds":["array"],"savedSearchId":["null","string"],"scheduledAt":["null","string"],"status":["string"],"lineAccountId":["null","string"],"accountIds":["array"],"dedupPriority":["array"],"trackLinks":["boolean"],"stealthSpreadMinutes":["number"],"folderId":["null","string"],"measureOpens":["boolean"],"saveAsDraft":["boolean"],"draftStep":["null","string"],"internalMemo":["null","string"],"messageOptions":["null","object"],"afterActionVersionId":["null","string"],"confirmedRecipientCount":["number"],"requestId":["string"],"accountTagIds":["array"],"excludedAccountIds":["array"],"audience":["object"],"expectedVersion":["number"]}), async c=>{
+hqBroadcasts.patch('/api/hq/broadcasts/:id',inputJsonBoundary({"title":["string"],"messageContent":["string"],"messageType":["string"],"messageBubbles":["array"],"messageBubblesJson":["null","string"],"altText":["null","string"],"targetType":["string"],"targetTagId":["null","string"],"segmentConditions":["null","object"],"excludedTagIds":["array"],"savedSearchId":["null","string"],"scheduledAt":["null","string"],"status":["string"],"lineAccountId":["null","string"],"accountIds":["array"],"dedupPriority":["array"],"trackLinks":["boolean"],"stealthSpreadMinutes":["number"],"folderId":["null","string"],"measureOpens":["boolean"],"saveAsDraft":["boolean"],"draftStep":["null","string"],"internalMemo":["null","string"],"messageOptions":["null","object"],"afterActionVersionIds":["object"],"afterActionVersionId":["null","string"],"confirmedRecipientCount":["number"],"requestId":["string"],"accountTagIds":["array"],"excludedAccountIds":["array"],"audience":["object"],"expectedVersion":["number"]}), async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method)),b=await c.req.json<HqBroadcastDraftInput>().catch(()=>null);
  if(!b||typeof b!=='object'||Array.isArray(b))throw new StampError('入力を確認してください');
  const {expectedVersion,...input}=b,run=await getHqBroadcastRun(db,a.tenantId,c.req.param('id'));

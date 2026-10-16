@@ -31,7 +31,7 @@ describe('予約経路', () => {
     booking('b3','2026-10-04T12:00:00Z','2026-10-04T13:00:00Z','s3');
     const result = await getBookingChannels(db.db,'a',{},now);
     expect(result.staff[0]).toMatchObject({ status: 'disconnected',externalEventsThisWeek:null,lastReadAt:null });
-    expect(result.channels).toEqual([{ key:'line',status:'active',todayCount:1 },{ key:'manual',status:'active',todayCount:1 },...['hot_pepper_beauty','google_reserve','epark'].map((key) => ({ key,status:'preparing',todayCount:null }))]);
+    expect(result.channels).toEqual([{ key:'line',status:'active',todayCount:1 },{ key:'manual',status:'active',todayCount:1 },...['hot_pepper_beauty','google_reserve','epark'].map((key) => ({ key,status:'preparing',todayCount:null,enabled:false,version:0,connectionStatus:'disabled',operational:false }))]);
   });
   it('Googleの全ページを読み、取消と自社の予約を除く。秘密値や予定の本文を返さない', async () => {
     db.raw.exec(`INSERT INTO google_calendar_connections (id,calendar_id,line_account_id,staff_id,auth_type,access_token) VALUES ('gc','calendar','a','s','oauth','mock_access');`);
