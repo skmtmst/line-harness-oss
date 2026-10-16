@@ -77,6 +77,7 @@ export function stylePeriodMetrics(rows: StyleBooking[], style: IndustryStyle, f
     past = rows.filter(
       (r) =>
         eligible(r) &&
+        ['booking', 'meet'].includes(r.kind) &&
         instant(r.endsAt) < now &&
         instant(r.endsAt) >= now - 30 * DAY,
     );
@@ -145,6 +146,7 @@ export function stylePeriodMetrics(rows: StyleBooking[], style: IndustryStyle, f
   const performed = rows.filter(
     (r) =>
       r.visited &&
+      ['booking', 'meet'].includes(r.kind) &&
       eligible(r) &&
       instant(r.startsAt) >= now - 90 * DAY &&
       instant(r.startsAt) < now,
@@ -161,5 +163,5 @@ export function stylePeriodMetrics(rows: StyleBooking[], style: IndustryStyle, f
     JSON.parse(config?.answers_json ?? '{}').outcome?.mode !== 'configured'
   )
     metrics.conversionRate = missing('面談の結果が未設定');
-  return {period, metricsFor, metrics, previous, past, weekFrom, weekTo};
+  return {period, metricsFor, metrics, previous, previousFrom, previousTo, past, weekFrom, weekTo};
 }

@@ -1,3 +1,8 @@
+import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
+import {
+  paymentBadges,
+  paymentSummary,
+} from '../services/booking-payment-admin.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
 import { Hono } from 'hono';
@@ -5,12 +10,37 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
-import { StyleError, checkStyle, defaultCards, features, profile, profileAnswers, questionsForStyle, readCards, saveProfile, starter, styleWarnings } from '../services/style-setup.js';
+import {
+  dashboardPresentation,
+  readMetricIds,
+  StyleError,
+  checkStyle,
+  defaultCards,
+  features,
+  profile,
+  profileAnswers,
+  questionsForStyle,
+  readCards,
+  saveProfile,
+  starter,
+  styleWarnings,
+} from '../services/style-setup.js';
 import { styleSnapshot, styleWindow } from '../services/style-analytics.js';
 import { styleSchedule } from '../services/style-schedule.js';
 import { templateSamples } from '../services/style-template-samples.js';
 
-import { base, hq, account, json, edit, text, oneOf, version, staffFilter, bookingAudience } from './styles-common.js';
+import {
+  base,
+  hq,
+  account,
+  json,
+  edit,
+  text,
+  oneOf,
+  version,
+  staffFilter,
+  bookingAudience,
+} from './styles-common.js';
 export const styles = new Hono<Env>();
 
 styles.get(base, async (c) => {
@@ -26,7 +56,11 @@ styles.get(base, async (c) => {
       version: p?.version ?? 0,
       answers: profileAnswers(p),
       settings: JSON.parse(p?.settings_json ?? '{}'),
-      cards: p?.cards_json ? JSON.parse(p.cards_json) : defaultCards(style),
+      ...dashboardPresentation(
+        style,
+        p?.cards_json ? JSON.parse(p.cards_json) : defaultCards(style),
+        p?.metrics_json ? JSON.parse(p.metrics_json) : null,
+      ),
       questions: questionsForStyle(style).map((key) => ({
         key,
         ...(features[key] ? { changeAt: features[key] } : {}),
@@ -97,6 +131,7 @@ styles.get(base + '/resources', requireRole('owner', 'admin'), async (c) => {
     ['template', 'templates', 'line_account_id'],
     ['rich_menu', 'rich_menu_groups', 'account_id'],
     ['automation', 'automation_definitions', 'line_account_id'],
+    ['reminder', 'reminders', 'line_account_id'],
     ['booking_menu', 'menus', 'line_account_id'],
   ] as const) {
     const rows = (
@@ -106,7 +141,16 @@ styles.get(base + '/resources', requireRole('owner', 'admin'), async (c) => {
         .bind(id)
         .all<{ id: string; name: string }>()
     ).results;
-    resources.push(...rows.map((r) => ({ ...r, kind })));
+    const enriched = await withStyleSampleMetadata(c.env.DB, rows, kind);
+    resources.push(
+      ...enriched.map((r) => ({
+        ...r,
+        kind,
+        key: r.sampleKey,
+        setId: r.starterSetId,
+        setVersion: r.starterSetVersion,
+      })),
+    );
   }
   const images = (
     await c.env.DB.prepare(
@@ -131,12 +175,24 @@ styles.put(base + '/cards', async (c) => {
   if (!p) throw new StyleError('select_style_first', 409);
   const b = await json(c);
   version(b.expectedVersion, p.version);
-  const cards = readCards(b.cards, p.style);
+  const cards =
+    b.cards === undefined
+      ? p.cards_json
+        ? readCards(JSON.parse(p.cards_json), p.style)
+        : defaultCards(p.style)
+      : readCards(b.cards, p.style);
+  const metrics =
+    b.metricIds === undefined
+      ? p.metrics_json
+        ? JSON.parse(p.metrics_json)
+        : null
+      : readMetricIds(b.metricIds);
   const result = await c.env.DB.prepare(
-    'UPDATE account_styles SET cards_json=?,version=version+1,updated_at=?,updated_by=? WHERE line_account_id=? AND version=?',
+    'UPDATE account_styles SET cards_json=?,metrics_json=?,version=version+1,updated_at=?,updated_by=? WHERE line_account_id=? AND version=?',
   )
     .bind(
       JSON.stringify(cards),
+      metrics === null ? null : JSON.stringify(metrics),
       new Date().toISOString(),
       c.get('staff').id,
       id,
@@ -144,7 +200,13 @@ styles.put(base + '/cards', async (c) => {
     )
     .run();
   if (!result.meta.changes) throw new StyleError('version_conflict', 409);
-  return c.json({ success: true, data: { cards, version: p.version + 1 } });
+  return c.json({
+    success: true,
+    data: {
+      ...dashboardPresentation(p.style, cards, metrics),
+      version: p.version + 1,
+    },
+  });
 });
 
 styles.delete(base + '/cards', async (c) => {
@@ -155,14 +217,17 @@ styles.delete(base + '/cards', async (c) => {
   if (!p) throw new StyleError('select_style_first', 409);
   version(b.expectedVersion, p.version);
   const r = await c.env.DB.prepare(
-    'UPDATE account_styles SET cards_json=NULL,version=version+1 WHERE line_account_id=? AND version=?',
+    'UPDATE account_styles SET cards_json=NULL,metrics_json=NULL,version=version+1 WHERE line_account_id=? AND version=?',
   )
     .bind(id, p.version)
     .run();
   if (!r.meta.changes) throw new StyleError('version_conflict', 409);
   return c.json({
     success: true,
-    data: { cards: defaultCards(p.style), version: p.version + 1 },
+    data: {
+      ...dashboardPresentation(p.style, defaultCards(p.style), null),
+      version: p.version + 1,
+    },
   });
 });
 
@@ -193,33 +258,112 @@ for (const path of [
       ))
     )
       throw new StyleError('feature_disabled', 403);
-    const permission = style === 'lesson' ? '/events' : '/booking/bookings';
-    if (style !== 'restaurant' && !hasStaffPermission(c, permission))
+    const permission =
+      style === 'restaurant'
+        ? '/restaurant-test/reservations'
+        : style === 'lesson'
+          ? '/events'
+          : '/booking/bookings';
+    if (!hasStaffPermission(c, permission))
       throw new StyleError('forbidden', 403);
     const staffId = await staffFilter(c, id, style);
-    if (path === '/schedule')
-      return c.json({
-        success: true,
-        data: await styleSchedule(
-          c.env.DB,
-          id,
-          { style, ...(await styleWindow(c.env.DB, id, c.req.query())) },
-          c.req.query(),
-          staffId,
-          {
-            email: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-            privateKey: c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-          },
-        ),
-      });
+    const kinds: import('@line-crm/shared').StyleBooking['kind'][] = [];
+    if (
+      hasStaffPermission(c, '/booking/bookings') &&
+      (await accountFeatureIsEnabled(c.env.DB, id, 'booking'))
+    )
+      kinds.push('booking', 'meet');
+    if (
+      hasStaffPermission(c, '/events') &&
+      (await accountFeatureIsEnabled(c.env.DB, id, 'events'))
+    )
+      kinds.push('event');
+    if (
+      (await restaurantEffectivelyEnabledForTenant(c)) &&
+      hasStaffPermission(c, '/restaurant-test/reservations')
+    )
+      kinds.push('restaurant');
+    let ownMeetStaffId: string | undefined;
+    if (c.get('staff').role === 'staff' && kinds.includes('meet')) {
+      const own = await c.env.DB.prepare(
+        'SELECT id FROM staff WHERE line_account_id=? AND staff_member_id=? AND is_active=1',
+      )
+        .bind(id, c.get('staff').id)
+        .first<{ id: string }>();
+      if (own) ownMeetStaffId = own.id;
+      else kinds.splice(kinds.indexOf('meet'), 1);
+    }
+    const bookingAccess = { kinds, ownMeetStaffId };
+    if (path === '/schedule') {
+      const data = await styleSchedule(
+        c.env.DB,
+        id,
+        { style, ...(await styleWindow(c.env.DB, id, c.req.query())) },
+        c.req.query(),
+        staffId,
+        {
+          email: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+          privateKey: c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+        },
+        bookingAccess,
+      );
+      const badges = hasStaffPermission(c, '/booking/bookings')
+        ? await paymentBadges(
+            c.env.DB,
+            id,
+            data.entries.flatMap((e) =>
+              e.booking?.kind === 'booking' ? [e.booking.id] : [],
+            ),
+          )
+        : new Map();
+      data.entries = data.entries.map((e) => ({
+        ...e,
+        booking: e.booking
+          ? {
+              ...e.booking,
+              payment:
+                e.booking.kind === 'booking'
+                  ? (badges.get(e.booking.id) ?? null)
+                  : null,
+            }
+          : null,
+      }));
+      return c.json({ success: true, data });
+    }
     const data = await styleSnapshot(
       c.env.DB,
       id,
       style,
       c.req.query(),
       staffId,
+      Date.now(),
+      bookingAccess,
     );
-    return c.json({ success: true, data });
+    const badges = hasStaffPermission(c, '/booking/bookings')
+      ? await paymentBadges(
+          c.env.DB,
+          id,
+          [...data.items, ...data.newBookings]
+            .filter((r) => r.kind === 'booking')
+            .map((r) => r.id),
+        )
+      : new Map();
+    data.items = data.items.map((r) => ({
+      ...r,
+      payment: r.kind === 'booking' ? (badges.get(r.id) ?? null) : null,
+    }));
+    data.newBookings = data.newBookings.map((r) => ({
+      ...r,
+      payment: r.kind === 'booking' ? (badges.get(r.id) ?? null) : null,
+    }));
+    const payments = hasStaffPermission(c, '/booking/bookings')
+      ? {
+          status: 'available',
+          ...(await paymentSummary(c.env.DB, id, new Date(), 'today', staffId)),
+          source: '/api/booking/admin/payments',
+        }
+      : { status: 'forbidden' };
+    return c.json({ success: true, data: { ...data, payments } });
   });
 
 styles.post(base + '/results/:id/audiences', async (c) => {

@@ -58,6 +58,7 @@ export async function restaurantMetrics(context:StyleAnalyticsContext) {
         .noShowRate,
     };
 
+    metrics.tableUtilization=(analytics.rotationSummary as {utilization:StyleMetric}).utilization;
     const currentPeople = new Map(
       period(from, to)
         .filter((r) => eligible(r) && r.status !== 'no_show')

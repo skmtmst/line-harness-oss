@@ -1,4 +1,10 @@
-import type { AccountStyle, IndustryStyle, SetupAnswer, StyleCard, StyleRange } from '@line-crm/shared';
+import type {
+  AccountStyle,
+  IndustryStyle,
+  SetupAnswer,
+  StyleCard,
+  StyleRange,
+} from '@line-crm/shared';
 
 export const root = '/api/dashboard/style';
 
@@ -51,7 +57,13 @@ export type StyleSelection = {
 
 export type StarterSetItem = {
   key: string;
-  kind: 'template' | 'rich_menu' | 'automation' | 'booking_menu' | 'dashboard';
+  kind:
+    | 'template'
+    | 'rich_menu'
+    | 'automation'
+    | 'reminder'
+    | 'booking_menu'
+    | 'dashboard';
   name: string;
   feature?: string;
   text?: string;
@@ -59,6 +71,10 @@ export type StarterSetItem = {
   price?: number;
   buttons?: Array<{ label: string; feature: string }>;
   cards?: StyleCard[];
+  offsetMinutes?: number;
+  offsetDays?: number;
+  sendAtTime?: string;
+  triggerType?: 'calendar_booked' | 'restaurant.departed';
 };
 
 export type StyleBookingDetails = {
@@ -114,4 +130,35 @@ export type StyleStarterSet = {
   updatedAt: string;
   updatedBy: string | null;
   autoInsert: boolean;
+  updatedByName: string | null;
+};
+
+export type StarterDistributionTarget =
+  | { style: AccountStyle; accountIds?: never }
+  | { accountIds: string[]; style?: never };
+export type StarterDistributionInput = {
+  expectedVersion: number;
+  target: StarterDistributionTarget;
+};
+export type StarterDistributionPreview = {
+  token: string;
+  accountCount: number;
+  editedCount: number;
+  accounts: Array<{
+    accountId: string;
+    editedCount: number;
+    items: Array<{
+      key: string;
+      name: string;
+      kind: string;
+      edited: boolean;
+      action: string;
+    }>;
+  }>;
+};
+export type StyleSampleMetadata = {
+  isSample: boolean;
+  sampleKey: string | null;
+  starterSetId: string | null;
+  starterSetVersion: number | null;
 };

@@ -227,7 +227,7 @@ CREATE TABLE account_styles (
  selected_at TEXT,
 settings_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(settings_json)),
  version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL, updated_by TEXT
-, selection_mode TEXT NOT NULL DEFAULT 'configured' CHECK(selection_mode IN ('configured','later','manual')));
+, selection_mode TEXT NOT NULL DEFAULT 'configured' CHECK(selection_mode IN ('configured','later','manual')), metrics_json TEXT CHECK(metrics_json IS NULL OR json_valid(metrics_json)));
 
 CREATE TABLE action_score_rule_sets (
   id                           TEXT PRIMARY KEY,
@@ -8052,7 +8052,7 @@ CREATE TABLE style_holidays(line_account_id TEXT NOT NULL REFERENCES line_accoun
 CREATE TABLE style_starter_items (
  line_account_id TEXT NOT NULL REFERENCES line_accounts(id), style TEXT NOT NULL, item_key TEXT NOT NULL,
  kind TEXT NOT NULL, target_id TEXT NOT NULL, is_sample INTEGER NOT NULL DEFAULT 1,
- feature TEXT, set_id TEXT, set_version INTEGER NOT NULL, applied_at TEXT NOT NULL,
+ feature TEXT, set_id TEXT, set_version INTEGER NOT NULL, applied_at TEXT NOT NULL, source_snapshot TEXT CHECK(source_snapshot IS NULL OR json_valid(source_snapshot)), pending_update TEXT CHECK(pending_update IS NULL OR json_valid(pending_update)),
  PRIMARY KEY(line_account_id,style,item_key)
 );
 
@@ -10884,6 +10884,8 @@ CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
 CREATE INDEX idx_stripe_events_type ON stripe_events (event_type);
 
 CREATE INDEX idx_style_page_views ON booking_page_views(line_account_id,viewed_at);
+
+CREATE INDEX idx_style_starter_account_key ON style_starter_items(line_account_id,item_key);
 
 CREATE UNIQUE INDEX idx_style_starter_tenant_style ON style_starter_sets(COALESCE(tenant_id,''),style) WHERE archived_at IS NULL;
 

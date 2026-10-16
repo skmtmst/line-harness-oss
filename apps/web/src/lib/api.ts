@@ -3997,7 +3997,7 @@ export type RichMenuTapStats = {
   total: number
 }
 
-export type RichMenuGroupListItem = {
+export type RichMenuGroupListItem = Partial<import('@line-crm/shared').StyleSampleMetadata> & {
   id: string
   accountId: string
   name: string

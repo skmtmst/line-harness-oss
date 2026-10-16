@@ -1,17 +1,51 @@
-import { liffActionUrl, type AccountStyle, type SetupAnswer } from '@line-crm/shared';
+import { styleMenuButtons } from './style-menu-buttons.js';
+import {
+  recordSnapshot,
+  resourceSnapshot,
+  overwriteResource,
+  snapshotGuard,
+} from './style-starter-resource.js';
+import { type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 
-import { starter, StyleError, readCards, defaultCards } from './style-setup.js';
-export async function insertStyleStarterItems(db:D1Database,account:string,tenant:string|null,actor:string,input:Record<string,unknown>,selected:boolean,style:AccountStyle,answers:Record<string,SetupAnswer>,statements:D1PreparedStatement[],now:string) {
-  const set = await starter(db, tenant, style),
+import {
+  profile,
+  starter,
+  StyleError,
+  readCards,
+  defaultCards,
+} from './style-setup.js';
+export async function insertStyleStarterItems(
+  db: D1Database,
+  account: string,
+  tenant: string | null,
+  actor: string,
+  input: Record<string, unknown>,
+  selected: boolean,
+  style: AccountStyle,
+  answers: Record<string, SetupAnswer>,
+  statements: D1PreparedStatement[],
+  now: string,
+  options: {
+    set?: Awaited<ReturnType<typeof starter>>;
+    skipExisting?: boolean;
+  } = {},
+) {
+  const set = options.set ?? (await starter(db, tenant, style)),
     inserted: unknown[] = [];
   const existing = (
     await db
-      .prepare(
-        'SELECT * FROM style_starter_items WHERE line_account_id=? AND style=?',
-      )
-      .bind(account, style)
-      .all<{ item_key: string; target_id: string; kind: string }>()
+      .prepare('SELECT * FROM style_starter_items WHERE line_account_id=?')
+      .bind(account)
+      .all<{
+        item_key: string;
+        target_id: string;
+        kind: string;
+        style: string;
+        is_sample: number;
+        source_snapshot: string | null;
+      }>()
   ).results;
+  const oldProfile = await profile(db, account);
   const choice = input.choices as
     | Record<
         string,
@@ -23,9 +57,108 @@ export async function insertStyleStarterItems(db:D1Database,account:string,tenan
     (!choice || typeof choice !== 'object' || Array.isArray(choice))
   )
     throw new StyleError('invalid_choices');
+  for (const [key, chosen] of Object.entries(choice ?? {})) {
+    const item = set.definition.items.find((i) => i.key === key);
+    if (
+      !item ||
+      !chosen ||
+      !['sample', 'existing', 'configured'].includes(chosen.mode)
+    )
+      throw new StyleError('invalid_choices');
+    if (chosen.mode !== 'sample') {
+      const table =
+        item.kind === 'template'
+          ? 'templates'
+          : item.kind === 'rich_menu'
+            ? 'rich_menu_groups'
+            : item.kind === 'automation'
+              ? 'automation_definitions'
+              : item.kind === 'reminder'
+                ? 'reminders'
+                : item.kind === 'booking_menu'
+                  ? 'menus'
+                  : null;
+      if (!table || !chosen.resourceId)
+        throw new StyleError('invalid_resource');
+      const col = item.kind === 'rich_menu' ? 'account_id' : 'line_account_id';
+      if (
+        !(await db
+          .prepare(`SELECT 1 FROM ${table} WHERE id=? AND ${col}=?`)
+          .bind(chosen.resourceId, account)
+          .first())
+      )
+        throw new StyleError('resource_not_found', 404);
+    }
+  }
   for (const item of selected ? set.definition.items : []) {
+    if (item.kind === 'booking_menu' && !['salon', 'consult'].includes(style))
+      continue;
     if (!set.autoInsert && !choice?.[item.key]) continue;
-    if (existing.some((e) => e.item_key === item.key)) continue;
+    if (
+      options.skipExisting !== false &&
+      existing.some((e) => e.item_key === item.key)
+    ) {
+      if (!choice?.[item.key] || choice[item.key].mode === 'sample') {
+        const old = existing.find((e) => e.item_key === item.key)!;
+        // Reuse the same untouched resource across styles, while refreshing its industry contents.
+        if (
+          oldProfile?.style !== style &&
+          old.kind === item.kind &&
+          old.is_sample &&
+          old.source_snapshot &&
+          ['template', 'rich_menu'].includes(item.kind) &&
+          (!answers.content || answers.content.mode === 'configured')
+        ) {
+          const snapshot = await resourceSnapshot(
+            db,
+            account,
+            old.kind,
+            old.target_id,
+          );
+          if (snapshot === old.source_snapshot) {
+            statements.push(
+              snapshotGuard(db, account, old.kind, old.target_id, snapshot),
+            );
+            statements.push(
+              ...(await overwriteResource(
+                db,
+                account,
+                old.target_id,
+                item,
+                now,
+                style,
+                answers,
+              )),
+            );
+            statements.push(
+              db
+                .prepare(
+                  'UPDATE style_starter_items SET set_id=?,set_version=? WHERE line_account_id=? AND item_key=?',
+                )
+                .bind(set.id, set.version, account, item.key),
+            );
+            statements.push(
+              recordSnapshot(
+                db,
+                account,
+                old.style,
+                item.key,
+                old.kind,
+                old.target_id,
+              ),
+            );
+          }
+        }
+        continue;
+      }
+      statements.push(
+        db
+          .prepare(
+            'DELETE FROM style_starter_items WHERE line_account_id=? AND item_key=?',
+          )
+          .bind(account, item.key),
+      );
+    }
     if (
       ['template', 'rich_menu'].includes(item.kind) &&
       answers.content &&
@@ -35,7 +168,7 @@ export async function insertStyleStarterItems(db:D1Database,account:string,tenan
     const intrinsicFeature =
       item.kind === 'booking_menu'
         ? 'booking'
-        : item.kind === 'automation'
+        : ['automation', 'reminder'].includes(item.kind)
           ? 'reminders'
           : undefined;
     const requiredFeatures = [item.feature, intrinsicFeature].filter(
@@ -61,9 +194,11 @@ export async function insertStyleStarterItems(db:D1Database,account:string,tenan
           ? 'rich_menu_groups'
           : item.kind === 'automation'
             ? 'automation_definitions'
-            : item.kind === 'booking_menu'
-              ? 'menus'
-              : null;
+            : item.kind === 'reminder'
+              ? 'reminders'
+              : item.kind === 'booking_menu'
+                ? 'menus'
+                : null;
     const accountColumn =
       item.kind === 'rich_menu' ? 'account_id' : 'line_account_id';
     if (chosen && chosen.mode !== 'sample') {
@@ -104,11 +239,12 @@ export async function insertStyleStarterItems(db:D1Database,account:string,tenan
       statements.push(
         db
           .prepare(
-            `INSERT INTO automation_versions(id,automation_id,version_number,status,trigger_type,trigger_config,condition_config,action_config,created_by) VALUES(?,?,1,'draft','calendar_booked','{}','{}',?,?)`,
+            `INSERT INTO automation_versions(id,automation_id,version_number,status,trigger_type,trigger_config,condition_config,action_config,created_by) VALUES(?,?,1,'draft',?,'{}','{}',?,?)`,
           )
           .bind(
             draftId,
             id,
+            item.triggerType ?? 'calendar_booked',
             JSON.stringify([
               {
                 id: 'message',
@@ -129,6 +265,71 @@ export async function insertStyleStarterItems(db:D1Database,account:string,tenan
             'UPDATE automation_definitions SET current_draft_version_id=? WHERE id=?',
           )
           .bind(draftId, id),
+      );
+    } else if (item.kind === 'reminder') {
+      const v = crypto.randomUUID(),
+        step = crypto.randomUUID();
+      const settings = {
+        stopConditions: {
+          bookingCancelled: true,
+          supportMarkCompleted: false,
+          daysAfterTarget: null,
+          friendBlocked: true,
+        },
+        steps: [
+          {
+            stableStepId: step,
+            offsetDays: item.offsetDays ?? null,
+            sendAtTime: item.sendAtTime ?? null,
+            offsetMinutes: item.offsetMinutes ?? -1440,
+            messageType: 'text',
+            messageContent: JSON.stringify({ text: item.text ?? item.name }),
+          },
+        ],
+        lineAccountId: account,
+        name: '【見本】' + item.name,
+        description: null,
+        triggerType: style === 'lesson' ? 'event' : 'booking',
+        triggerOffsetMinutes: null,
+        sendAtTime: null,
+        targetTagId: null,
+        folderId: null,
+        deliveryMode: 'countdown',
+        triggerFieldId: null,
+        repeatYearly: false,
+        leapYearPolicy: 'mar1',
+        triggerEventId: null,
+        isActive: false,
+      };
+      statements.push(
+        db
+          .prepare(
+            `INSERT INTO reminders(id,line_account_id,name,is_active,lifecycle_status,trigger_type,current_draft_version_id) VALUES(?,?,?,0,'draft',?,?)`,
+          )
+          .bind(id, account, settings.name, settings.triggerType, v),
+      );
+      statements.push(
+        db
+          .prepare(
+            `INSERT INTO reminder_versions(id,reminder_id,version_number,status,settings_snapshot,created_at,updated_at) VALUES(?,?,1,'draft',?,?,?)`,
+          )
+          .bind(v, id, JSON.stringify(settings), now, now),
+      );
+      statements.push(
+        db
+          .prepare(
+            `INSERT INTO reminder_version_steps(id,reminder_version_id,stable_step_id,position,offset_minutes,offset_days,send_at_time,message_type,message_content,created_at) VALUES(?,?,?,0,?,?,?,'text',?,?)`,
+          )
+          .bind(
+            crypto.randomUUID(),
+            v,
+            step,
+            item.offsetMinutes ?? -1440,
+            item.offsetDays ?? null,
+            item.sendAtTime ?? null,
+            JSON.stringify({ text: item.text ?? item.name }),
+            now,
+          ),
       );
     } else if (item.kind === 'booking_menu')
       statements.push(
@@ -176,49 +377,10 @@ export async function insertStyleStarterItems(db:D1Database,account:string,tenan
             .bind(image.image_r2_key, image.image_content_type, page),
         );
       }
-      const lineAccount = await db
-        .prepare('SELECT liff_id FROM line_accounts WHERE id=?')
-        .bind(account)
-        .first<{ liff_id: string | null }>();
-      for (const [i, button] of (item.buttons ?? []).entries()) {
-        // Unconfigured features are omitted; the warning API still catches pre-existing buttons.
-        if (
-          button.feature !== 'contact' &&
-          (answers[button.feature]?.mode !== 'configured' ||
-            answers[button.feature]?.value === false)
-        )
-          continue;
-        let actionType = 'message',
-          actionData = button.label,
-          intent = 'text';
-        if (
-          lineAccount?.liff_id &&
-          ['booking', 'stamps'].includes(button.feature)
-        ) {
-          if (button.feature === 'stamps')
-            actionData = liffActionUrl({
-              kind: 'visit_stamp',
-              liffId: lineAccount.liff_id,
-            });
-          else if (style === 'restaurant') {
-            const link = await db
-              .prepare(
-                'SELECT l.token FROM rt_reservation_links l JOIN rt_stores s ON s.id=l.store_id WHERE s.line_account_id=? LIMIT 1',
-              )
-              .bind(account)
-              .first<{ token: string }>();
-            if (!link) continue;
-            actionData = `https://liff.line.me/${encodeURIComponent(lineAccount.liff_id)}?${new URLSearchParams({ page: 'restaurant', token: link.token })}`;
-          } else if (style === 'lesson')
-            actionData = `https://liff.line.me/${encodeURIComponent(lineAccount.liff_id)}?page=event`;
-          else
-            actionData = liffActionUrl({
-              kind: 'booking',
-              liffId: lineAccount.liff_id,
-            });
-          actionType = 'uri';
-          intent = 'url';
-        }
+      for (const [i, button] of (
+        await styleMenuButtons(db, account, style, item, answers)
+      ).entries()) {
+        const { actionType, actionData, intent } = button;
         statements.push(
           db
             .prepare(
@@ -270,16 +432,24 @@ export async function insertStyleStarterItems(db:D1Database,account:string,tenan
           now,
         ),
     );
+    statements.push(
+      recordSnapshot(db, account, style, item.key, item.kind, id),
+    );
     inserted.push({
       key: item.key,
+      name: item.name,
+      definition: item,
+      setId: set.id,
+      setVersion: set.version,
       kind: item.kind,
       id,
       isSample: sample,
       requiresActivation:
         item.kind === 'automation' ||
+        item.kind === 'reminder' ||
         item.kind === 'booking_menu' ||
         item.kind === 'rich_menu',
     });
   }
-return {set,inserted};
+  return { set, inserted };
 }

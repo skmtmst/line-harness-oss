@@ -19,6 +19,7 @@ export async function styleSchedule(
   query: Record<string, string | undefined>,
   staffId?: string,
   googleCredentials?: GoogleServiceAccountCredentials,
+  access:{kinds?:import('@line-crm/shared').StyleBooking['kind'][];ownMeetStaffId?:string} = {},
 ): Promise<StyleSchedule> {
   const { style, asOf, timeZone, range, from, to } = snapshot;
   const display = query.display ?? 'list';
@@ -55,9 +56,10 @@ export async function styleSchedule(
     slots: [],
     closedDates: [],
   };
-  const rows = (await styleRows(db, account, style)).filter(
+  const rows = (await styleRows(db, account, style,access.kinds)).filter(
     (r) =>
       (!staffId || r.staffId === staffId) &&
+      (r.kind!=='meet'||!access.ownMeetStaffId||r.staffId===access.ownMeetStaffId) &&
       (!query.store_id || r.storeId === query.store_id) &&
       (!query.menu_id || r.menuId === query.menu_id) &&
       instant(r.startsAt) < instant(to) &&
@@ -95,8 +97,7 @@ export async function styleSchedule(
       throw new StyleError('invalid_axis');
   } else if (query.axis && query.axis !== 'staff')
     throw new StyleError('invalid_axis');
-  if (style !== 'lesson')
-    for (const booking of rows) {
+  for (const booking of rows) {
       const tableIds = links
         .filter((l) => l.reservation_id === booking.id)
         .map((l) => l.table_id);

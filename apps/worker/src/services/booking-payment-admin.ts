@@ -46,6 +46,7 @@ const recordsCte = `WITH records AS (
 
 export async function paymentPeriod(db: D1Database, account: string, period: string, now = new Date()) {
   const timezone = await getAccountTimeZone(db, account);
+  if (period === 'today') { const w=assignmentWindows(now.toISOString(),timezone,'day'); return {from:w.dayFrom,to:w.dayTo}; }
   if (period === 'month') { const m = entitlementMonth(now.toISOString(), timezone); return { from: m.periodStart, to: m.periodEnd }; }
   return { from: new Date(now.getTime() - Number(period.slice(0, -1)) * 86400000).toISOString(), to: now.toISOString() };
 }
@@ -63,22 +64,22 @@ export async function paymentRecords(db: D1Database, account: string, filter: Pa
 }
 
 /** 集計は検索・ページ・一覧の期間と独立した店の今月。入金総額と返金額は別々に数える。 */
-export async function paymentSummary(db: D1Database, account: string, now = new Date()) {
-  const { from, to } = await paymentPeriod(db, account, 'month', now);
+export async function paymentSummary(db: D1Database, account: string, now = new Date(), period: 'month' | 'today' = 'month', staffId?: string) {
+  const { from, to } = await paymentPeriod(db, account, period, now);
   const rows = await db.prepare(`SELECT p.id,EXISTS(SELECT 1 FROM booking_payment_refunds r WHERE r.payment_id=p.id) AS has_refunds,p.amount,p.status,p.paid_at,p.updated_at,COALESCE(p.refunded_at,p.updated_at) AS refunded_at,p.created_at,b.status AS booking_status
     FROM booking_payments p LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
-    WHERE p.line_account_id=? AND (
+    WHERE p.line_account_id=? AND (? IS NULL OR b.staff_id=?) AND (
       (julianday(p.paid_at)>=julianday(?) AND julianday(p.paid_at)<julianday(?)) OR
       (julianday(COALESCE(p.refunded_at,p.updated_at))>=julianday(?) AND julianday(COALESCE(p.refunded_at,p.updated_at))<julianday(?)) OR
       (julianday(p.created_at)>=julianday(?) AND julianday(p.created_at)<julianday(?)))`)
-    .bind(account, from, to, from, to, from, to).all<{
+    .bind(account, staffId??null, staffId??null, from, to, from, to, from, to).all<{
       id:string; has_refunds:number; amount:number; status:string; paid_at:string|null; updated_at:string; refunded_at:string; created_at:string; booking_status:string|null;
     }>();
   const inMonth = (at: string | null) => at !== null && Date.parse(at) >= Date.parse(from) && Date.parse(at) < Date.parse(to);
   const summary = { paidAmount:0, paidCount:0, refundedAmount:0, refundedCount:0, expiredCount:0, pendingCount:0,
     holdMinutes:(await getBookingPaymentConfig(db, account)).holdMinutes };
-  const ledger = await db.prepare(`SELECT payment_id,amount,created_at FROM booking_payment_refunds WHERE line_account_id=? AND julianday(created_at)>=julianday(?) AND julianday(created_at)<julianday(?)`)
-    .bind(account,from,to).all<{payment_id:string;amount:number;created_at:string}>();
+  const ledger = await db.prepare(`SELECT r.payment_id,r.amount,r.created_at FROM booking_payment_refunds r LEFT JOIN booking_payments p ON p.id=r.payment_id LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id WHERE r.line_account_id=? AND (? IS NULL OR b.staff_id=?) AND julianday(r.created_at)>=julianday(?) AND julianday(r.created_at)<julianday(?)`)
+    .bind(account,staffId??null,staffId??null,from,to).all<{payment_id:string;amount:number;created_at:string}>();
   const refundedPayments = new Set<string>();
   for (const row of ledger.results) if (inMonth(row.created_at)) {
     summary.refundedAmount+=row.amount; refundedPayments.add(row.payment_id);
@@ -112,4 +113,16 @@ export async function staffTodayCounts(db: D1Database, account: string, now = ne
     WHERE s.line_account_id=? AND s.deleted_at IS NULL GROUP BY s.id ORDER BY s.sort_order,s.id`)
     .bind(w.dayFrom,w.dayTo,account).all<{staffId:string;todayCount:number}>();
   return { items: rows.results, date: new Intl.DateTimeFormat('sv-SE',{timeZone:timezone}).format(now), timezone };
+}
+
+/** Same saved payment records and status names as the payment list, without a creation-date filter. */
+export async function paymentBadges(db:D1Database,account:string,bookingIds:string[]) {
+ const byBooking=new Map<string,{bookingId:string;status:AdminPaymentRecord['status'];method:string|null;amount:number}>();
+ const ids=[...new Set(bookingIds)];
+ for(let start=0;start<ids.length;start+=80) {
+  const chunk=ids.slice(start,start+80);
+  const rows=await db.prepare(`${recordsCte} SELECT bookingId,status,method,amount FROM records WHERE bookingId IN(${chunk.map(()=>'?').join(',')}) ORDER BY julianday(createdAt) DESC,id`).bind(account,account,...chunk).all<{bookingId:string;status:AdminPaymentRecord['status'];method:string|null;amount:number}>();
+  for(const row of rows.results)if(!byBooking.has(row.bookingId))byBooking.set(row.bookingId,row);
+ }
+ return byBooking;
 }

@@ -1656,7 +1656,7 @@ export interface FriendScore {
 // テンプレート (Template)
 // -----------------------------------------------------------------------------
 
-export interface Template {
+export interface Template extends Partial<import('./style-api.js').StyleSampleMetadata> {
   id: string;
   name: string;
   category: string;
@@ -1826,7 +1826,7 @@ export interface AutomationAction {
   params: Record<string, unknown>;
 }
 
-export interface Automation {
+export interface Automation extends Partial<import('./style-api.js').StyleSampleMetadata> {
   id: string;
   name: string;
   description: string | null;

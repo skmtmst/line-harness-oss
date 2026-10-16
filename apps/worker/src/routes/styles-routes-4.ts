@@ -1,8 +1,21 @@
-import { automationRevisionToken, publishAutomationDraft } from '../services/automation-drafts.js';
+import { validateReminderDraft } from '../services/reminder-draft.js';
+import {
+  resourceTables,
+  resourceSnapshot,
+} from '../services/style-starter-resource.js';
+import {
+  automationRevisionToken,
+  publishAutomationDraft,
+} from '../services/automation-drafts.js';
 
 import { Hono } from 'hono';
 
-import { createBookingAvailabilityException } from '@line-crm/db';
+import {
+  getReminderDraftVersion,
+  parseReminderVersionSettings,
+  publishReminderDraftVersion,
+  createBookingAvailabilityException,
+} from '@line-crm/db';
 import type { Env } from '../index.js';
 
 import { hasStaffPermission } from '../middleware/role-guard.js';
@@ -178,6 +191,8 @@ styles.get(base + '/starter-items', async (c) => {
   for (const item of rows) {
     let status: unknown = null,
       draftRevision: string | null = null;
+    let blockedConfirmation =
+      item.kind === 'automation' && item.item_key === 'reminder';
     if (item.kind === 'automation') {
       const row = await c.env.DB.prepare(
         `SELECT d.status,d.current_draft_version_id,v.trigger_type,v.trigger_config,v.condition_config,v.action_config FROM automation_definitions d LEFT JOIN automation_versions v ON v.id=d.current_draft_version_id WHERE d.id=? AND d.line_account_id=?`,
@@ -192,11 +207,21 @@ styles.get(base + '/starter-items', async (c) => {
           action_config: string;
         }>();
       status = row?.status ?? 'missing';
+      blockedConfirmation =
+        blockedConfirmation || row?.trigger_type === 'calendar_booked';
       if (row?.current_draft_version_id)
         draftRevision = await automationRevisionToken(
           row.current_draft_version_id,
           row,
         );
+    } else if (item.kind === 'reminder') {
+      const row = await c.env.DB.prepare(
+        'SELECT lifecycle_status status,current_draft_version_id FROM reminders WHERE id=? AND line_account_id=?',
+      )
+        .bind(item.target_id, a)
+        .first<{ status: string; current_draft_version_id: string | null }>();
+      status = row?.status ?? 'missing';
+      draftRevision = row?.current_draft_version_id ?? null;
     } else if (item.kind === 'booking_menu')
       status = (
         await c.env.DB.prepare(
@@ -216,7 +241,62 @@ styles.get(base + '/starter-items', async (c) => {
             .bind(item.target_id, a)
             .first<{ status: string }>()
         )?.status ?? 'missing';
-    items.push({ ...item, status, draftRevision });
+    const definition =
+      item.kind === 'rich_menu'
+        ? {
+            buttons: (
+              await c.env.DB.prepare(
+                `SELECT a.label,a.action_type actionType,a.action_data actionData FROM rich_menu_areas a JOIN rich_menu_pages p ON p.id=a.page_id WHERE p.group_id=? AND p.group_id IN(SELECT id FROM rich_menu_groups WHERE account_id=?) ORDER BY p.order_index,a.bounds_y,a.bounds_x`,
+              )
+                .bind(item.target_id, a)
+                .all()
+            ).results,
+          }
+        : item.kind === 'reminder'
+          ? {
+              steps: (
+                await c.env.DB.prepare(
+                  `SELECT s.offset_minutes offsetMinutes,s.offset_days offsetDays,s.send_at_time sendAtTime,s.message_content text FROM reminder_version_steps s JOIN reminders r ON r.current_draft_version_id=s.reminder_version_id WHERE r.id=? AND r.line_account_id=? ORDER BY s.position`,
+                )
+                  .bind(item.target_id, a)
+                  .all()
+              ).results,
+            }
+          : null;
+    const table = resourceTables[String(item.kind)];
+    const resource = table
+      ? await c.env.DB.prepare(
+          `SELECT name FROM ${table.table} WHERE id=? AND ${table.account}=?`,
+        )
+          .bind(item.target_id, a)
+          .first<{ name: string }>()
+      : null;
+    items.push({
+      ...item,
+      definition,
+      key: item.item_key,
+      name: resource?.name ?? null,
+      isSample: !!item.is_sample,
+      setId: item.set_id,
+      setVersion: item.set_version,
+      pendingUpdate: item.pending_update
+        ? JSON.parse(String(item.pending_update))
+        : null,
+      requiresActivation:
+        ['automation', 'reminder', 'booking_menu', 'rich_menu'].includes(
+          String(item.kind),
+        ) && !blockedConfirmation,
+      activationAllowed: !blockedConfirmation,
+      href: item.kind === 'reminder' ? '/reminders' : undefined,
+      currentSnapshot: await resourceSnapshot(
+        c.env.DB,
+        a,
+        String(item.kind),
+        String(item.target_id),
+      ),
+      status,
+      draftRevision,
+    });
   }
   return c.json({ success: true, data: { items } });
 });
@@ -238,7 +318,7 @@ styles.post(base + '/activate', async (c) => {
       !item ||
       typeof item.id !== 'string' ||
       seen.has(item.id) ||
-      !['automation', 'booking_menu'].includes(item.kind)
+      !['automation', 'reminder', 'booking_menu'].includes(item.kind)
     )
       throw new StyleError('invalid_activation');
     seen.add(item.id);
@@ -254,7 +334,52 @@ styles.post(base + '/activate', async (c) => {
   const items = [];
   for (const item of b.items) {
     try {
-      if (item.kind === 'automation') {
+      const legacy = await c.env.DB.prepare(
+        `SELECT item_key FROM style_starter_items WHERE line_account_id=? AND target_id=? AND kind='automation' AND (item_key='reminder' OR EXISTS(SELECT 1 FROM automation_definitions d JOIN automation_versions v ON v.id=d.current_draft_version_id WHERE d.id=style_starter_items.target_id AND d.line_account_id=style_starter_items.line_account_id AND v.trigger_type='calendar_booked'))`,
+      )
+        .bind(a, item.id)
+        .first();
+      if (legacy)
+        throw new StyleError('duplicate_confirmation_automation', 422);
+      if (item.kind === 'reminder') {
+        if (!hasStaffPermission(c, '/reminders'))
+          throw new StyleError('forbidden', 403);
+        const p = await profile(c.env.DB, a),
+          answer = JSON.parse(p?.answers_json ?? '{}').reminders;
+        if (
+          p?.selection_mode !== 'configured' ||
+          answer?.mode !== 'configured' ||
+          answer.value === false
+        )
+          throw new StyleError('feature_unconfigured', 422);
+        const r = await c.env.DB.prepare(
+          'SELECT current_draft_version_id FROM reminders WHERE id=? AND line_account_id=? AND deleted_at IS NULL',
+        )
+          .bind(item.id, a)
+          .first<{ current_draft_version_id: string }>();
+        if (!r || r.current_draft_version_id !== item.expectedDraftVersionId)
+          throw new StyleError('version_conflict', 409);
+        const draft = await getReminderDraftVersion(c.env.DB, item.id);
+        if (!draft) throw new StyleError('version_conflict', 409);
+        const validation = await validateReminderDraft(
+          c.env.DB,
+          parseReminderVersionSettings(draft),
+          draft,
+        );
+        if (!validation.valid)
+          throw new StyleError(
+            draft.last_test_status !== 'succeeded'
+              ? 'test_required'
+              : 'reminder_configuration_required',
+            422,
+          );
+        const published = await publishReminderDraftVersion(
+          c.env.DB,
+          item.id,
+          c.get('staff').id,
+        );
+        items.push({ id: item.id, success: true, status: published.status });
+      } else if (item.kind === 'automation') {
         if (!hasStaffPermission(c, '/automations'))
           throw new StyleError('forbidden', 403);
         const p = await profile(c.env.DB, a);
@@ -296,7 +421,12 @@ styles.post(base + '/activate', async (c) => {
       items.push({
         id: item.id,
         success: false,
-        code: e instanceof StyleError ? e.code : 'activation_failed',
+        code:
+          e instanceof StyleError
+            ? e.code
+            : String(e).includes('REMINDER_DRAFT_NOT_TESTED')
+              ? 'test_required'
+              : 'activation_failed',
       });
     }
   }
