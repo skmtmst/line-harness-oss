@@ -123,7 +123,7 @@ interface EmailInboxItem {
 }
 
 /** 受信箱一覧の続きを読む位置。口の並び（未読が先・新しい順）と同じ3点。 */
-type ListCursor = { at: string; id: string; unread: 0 | 1; dueAt?: string }
+type ListCursor = { at: string; id: string; unread: 0 | 1 }
 
 const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'すべて' },
@@ -179,10 +179,10 @@ const CHAT_SEARCH_FILL_MAX_ROUNDS = 20
 
 /** 一覧の末尾から「続きを読む」位置を作る。口の並び（未読が先・新しい順）と同じ3点。 */
 function toListCursor(
-  last: (Pick<ChatListItem, 'id' | 'lastMessageAt' | 'isUnread'> & ChatSlaFields) | undefined,
+  last: Pick<ChatListItem, 'id' | 'lastMessageAt' | 'isUnread'> | undefined,
 ): ListCursor | null {
   if (!last?.lastMessageAt) return null
-  return { at: last.lastMessageAt, id: last.id, unread: last.isUnread ? 1 : 0, ...(last.slaDueAt ? { dueAt: last.slaDueAt } : {}) }
+  return { at: last.lastMessageAt, id: last.id, unread: last.isUnread ? 1 : 0 }
 }
 
 function StickerMessageImage({ content }: { content: string }) {
@@ -856,19 +856,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   /* 返事の期限（G3）。店が期限を使っているときだけ、札・期限超過の数・期限が近い順の並びを出す。読めなければ今までの形のまま。 */
   const [slaEnabled, setSlaEnabled] = useState(false)
   const [overdueTotal, setOverdueTotal] = useState<number | null>(null)
+  const [slaReload, setSlaReload] = useState(0)
   useEffect(() => {
     setSlaEnabled(false); setOverdueTotal(null)
     if (!selectedAccountId) return
     let live = true
     void inboxRoutingApi.get(selectedAccountId).then((res) => { if (live) setSlaEnabled(Boolean(res.data.enabled)) }, () => {})
     return () => { live = false }
-  }, [selectedAccountId])
+  }, [selectedAccountId, slaReload])
 
   const buildListParams = useCallback((cursor: ListCursor | null) => {
     const params: {
       status?: string; accountId?: string; q?: string;
       operatorId?: string; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue';
-      slaState?: 'overdue'; sort?: 'sla_due'; beforeDueAt?: string;
       limit?: number; beforeUnread?: 0 | 1; beforeAt?: string; beforeId?: string;
     } = {}
     if (statusFilter !== 'all') params.status = statusFilter
@@ -877,21 +877,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (assigneeFilter !== 'all') params.operatorId = assigneeFilter
     if (unreadOnly) params.unreadOnly = true
     if (quickFilter !== 'all') params.quickFilter = quickFilter
-    /* 返事の期限を使う店：「期限超過」は期限で絞り、並びは期限が近い順（過ぎた物が先）。 */
-    if (slaEnabled) {
-      params.sort = 'sla_due'
-      if (quickFilter === 'overdue') { delete params.quickFilter; params.slaState = 'overdue' }
-    }
+    /* 返事の期限を使う店：「期限超過」は旧い「1時間以上待ち」の絞りを使わない。期限の絞り・並びは読んだ行の slaState・slaDueAt で行う。 */
+    if (slaEnabled && quickFilter === 'overdue') delete params.quickFilter
     params.limit = CHAT_PAGE_SIZE
     if (cursor) {
-      if (slaEnabled && cursor.dueAt) {
-        params.beforeDueAt = cursor.dueAt
-        params.beforeId = cursor.id
-      } else {
-        params.beforeUnread = cursor.unread
-        params.beforeAt = cursor.at
-        params.beforeId = cursor.id
-      }
+      params.beforeUnread = cursor.unread
+      params.beforeAt = cursor.at
+      params.beforeId = cursor.id
     }
     return params
   }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled])
@@ -2854,7 +2846,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
            * ★V8：絵（XqSvX）の「対応ルール」は settings-2 の印。押してもページを移らず、
            * その場で小窓を開く（オーナー指摘：別のページへ飛ぶのはおかしい）。
            */
-          <InboxRulesPopover accountId={selectedAccountId ?? null} />
+          <InboxRulesPopover accountId={selectedAccountId ?? null} onRoutingSaved={() => setSlaReload((n) => n + 1)} />
         )}
         </InboxListHeadline>
         {[
@@ -2872,7 +2864,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           slaEnabled
             ? { key: 'overdue' as const, label: overdueTotal === null ? '期限超過' : `期限超過 ${overdueTotal}`, title: '最初の返事の期限を過ぎた会話', icon: Clock3 }
             : { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話', icon: Clock3 },
-        ].map((filter) => (
+        ].sort((a, b) => (slaEnabled ? Number(b.key === 'overdue') - Number(a.key === 'overdue') : 0)).map((filter) => (
           <FilterChip size="inbox" key={filter.key} selected={quickFilter === filter.key} onChange={() => { setQuickFilter(filter.key); dropSavedViewParam() }} title={filter.title} showCheck={false} icon={filter.icon ? <filter.icon aria-hidden size={14} /> : undefined}>
             {filter.label}
             {quickCountsNow && !(slaEnabled && filter.key === 'overdue') ? <span className="sr-only tabular-nums">{quickCountsNow[filter.key]}</span> : null}
@@ -3273,8 +3265,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     || String(b.at).localeCompare(String(a.at))
                   const rows: ChatListWindowItem[] = []
                   if (slaEnabled) {
-                    // 期限が近い順は口の並びのまま（過ぎた物が先）。期限の無いメールは後ろへ。
-                    rows.push(...lineRows, ...mailRows)
+                    // 期限が近い順（過ぎた物が先）。期限の無い行・メールは後ろへ。「期限超過」は期限を過ぎた行だけ。
+                    const dueOf = (chat: ChatSlaFields) => (chat.slaDueAt ? Date.parse(chat.slaDueAt) : Infinity)
+                    const linePicked = (quickFilter === 'overdue' ? chats.filter((chat) => (chat as ChatSlaFields).slaState === 'overdue') : chats)
+                    const keyed = new Set(linePicked.map((chat) => chat.id))
+                    const lineByDue = lineRows.filter((row) => keyed.has(row.key)).sort((a, b) => dueOf(chats.find((chat) => chat.id === a.key) as ChatSlaFields) - dueOf(chats.find((chat) => chat.id === b.key) as ChatSlaFields))
+                    rows.push(...lineByDue, ...(quickFilter === 'overdue' ? [] : mailRows))
                   } else {
                     let i = 0
                     let j = 0

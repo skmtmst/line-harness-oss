@@ -11716,7 +11716,7 @@ export const api = {
     },
     searchMessages: (friendId:string,q:string,offset=0,limit=30) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationSearchResult>>(`/api/chats/${encodeURIComponent(friendId)}/messages/search?${new URLSearchParams({q,offset:String(offset),limit:String(limit)})}`),
     messagesAt: (friendId:string,params:{cursorAt?:string;cursorId?:string;direction?:'before'|'after'|'around';limit?:number}={}) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationMessagePage>>(`/api/chats/${encodeURIComponent(friendId)}/messages?${new URLSearchParams(Object.entries(params).map(([k,v])=>[k,String(v)]))}`),
-    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; slaState?: 'overdue'; sort?: 'sla_due'; beforeDueAt?: string; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
+    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
       const query: Record<string, string> = {}
       if (params?.status) query.status = params.status
       if (params?.operatorId) query.operatorId = params.operatorId
@@ -11725,10 +11725,6 @@ export const api = {
       if (params?.unansweredOnly) query.unansweredOnly = '1'
       if (params?.unreadOnly) query.unreadOnly = '1'
       if (params?.quickFilter) query.quickFilter = params.quickFilter
-      // 返事の期限（G3）：期限超過だけ・期限が近い順（口は API-CONTRACT-GAP1.md）。
-      if (params?.slaState) query.slaState = params.slaState
-      if (params?.sort) query.sort = params.sort
-      if (params?.beforeDueAt) query.beforeDueAt = params.beforeDueAt
       if (params?.limit !== undefined) query.limit = String(params.limit)
       // カーソルページング: (未読, lastMessageAt, friendId) の複合カーソルより後の行を返す
       if (params?.beforeUnread !== undefined) query.beforeUnread = String(params.beforeUnread)
