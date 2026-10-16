@@ -150,6 +150,7 @@ export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:strin
   if(run.status!=='prepared')return readHqBroadcastResult(db,run);
   const preflight=await preflightHqBroadcast(db,run,true,runtime),selected=preflight.filter(p=>!p.excluded);
   if(!selected.length||selected.some(p=>p.blockedReasons.length))throw new StampError('送れない店舗を外して再確認してください',409);
+  if(confirmedRecipientCount!==undefined && confirmedRecipientCount!==selected.reduce((n,p)=>n+(p.audienceCount??0),0))throw new StampError('送る相手が変わりました。もう一度確かめてください',409);
   const approval=await hqBroadcastApprovalState(db,run,actorId,preflight);
   if(approval.gate.required) {
     if(approval.gate.singleOperator&&confirmedRecipientCount!==approval.gate.recipientCount)throw new StampError('送る人数を入力して確認してください',409);

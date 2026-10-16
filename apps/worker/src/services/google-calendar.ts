@@ -49,6 +49,24 @@ export class GoogleCalendarClient {
     throw new GoogleCalendarReadError(502);
   }
 
+  /** 題名・参加者・本文を要求しない。終日とfreeは予約枠を塞がない。 */
+  async getTimedBusy(timeMin:string,timeMax:string):Promise<Array<BusyInterval & {id:string}>> {
+    const result:Array<BusyInterval & {id:string}>=[];let token:string|undefined;
+    for(let page=0;page<100;page++) {
+      const query=new URLSearchParams({timeMin,timeMax,singleEvents:'true',maxResults:'2500',fields:'items(id,status,transparency,start(dateTime),end(dateTime)),nextPageToken'});
+      if(token)query.set('pageToken',token);
+      const response=await fetch(`${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events?${query}`,{headers:{Authorization:`Bearer ${this.config.accessToken}`}});
+      if(!response.ok)throw new GoogleCalendarReadError(response.status);
+      const data=await response.json() as {items?:Array<{id:string;status?:string;transparency?:string;start?:{dateTime?:string};end?:{dateTime?:string}}>;nextPageToken?:string};
+      if(!Array.isArray(data.items))throw new GoogleCalendarReadError(502);
+      for(const e of data.items){if(e.status==='cancelled'||e.transparency==='transparent'||!e.start?.dateTime||!e.end?.dateTime)continue;
+        if(!e.id||!Number.isFinite(Date.parse(e.start.dateTime))||!Number.isFinite(Date.parse(e.end.dateTime))||Date.parse(e.end.dateTime)<=Date.parse(e.start.dateTime))throw new GoogleCalendarReadError(502);
+        result.push({id:e.id,start:e.start.dateTime,end:e.end.dateTime});}
+      token=data.nextPageToken;if(!token)return result;
+    }
+    throw new GoogleCalendarReadError(502);
+  }
+
   /**
    * Get busy time intervals from Google Calendar FreeBusy API.
    * Returns an array of { start, end } intervals when the calendar is busy.

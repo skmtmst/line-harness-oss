@@ -1,3 +1,7 @@
+import { bookingCalendarSettings } from './routes/booking-calendar-settings.js';
+import { bookingCancellation } from './routes/booking-cancellation.js';
+import { inboxSla } from './routes/inbox-sla.js';
+import { lineSenders } from './routes/line-senders.js';
 import type { Env } from './worker-env.js';
 export type { Env } from './worker-env.js';
 import { liffNotificationPreferences } from './routes/liff-notification-preferences.js';
@@ -392,6 +396,8 @@ app.route('/', reminders);
 app.route('/', scoring);
 app.route('/', actionScoreRules);
 app.route('/', templates);
+app.route('/', inboxSla);
+app.route('/', lineSenders);
 app.route('/', chats);
 app.route('/', chatMessages);
 app.route('/', conversations);
@@ -425,6 +431,8 @@ app.route('/', autoReplyRuns);
 app.route('/', adminAuth);
 app.route('/', trafficPools);
 app.route('/', booking);
+app.route('/', bookingCalendarSettings);
+app.route('/', bookingCancellation);
 app.route('/', bookingPayments);
 app.route('/', bookingPaymentAdmin);
 app.route('/', bookingEntitlements);
@@ -1310,6 +1318,10 @@ async function runFrequentHeavyJobs(
       },
     },
     {
+      name: 'calendar busy cache and switch jobs',
+      run: async () => {const {refreshCalendarBusyCaches,processCalendarSwitchJobs}=await import('./services/booking-calendar-settings.js');const credentials={email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY};await refreshCalendarBusyCaches(env.DB,credentials,new Date(event.scheduledTime));await processCalendarSwitchJobs(env.DB,credentials,new Date(event.scheduledTime));},
+    },
+    {
       name: 'booking sync notices',
       run: async () => {
         const { processBookingSyncNoticeQueue } = await import('./services/booking-sync-rules.js');
@@ -1359,8 +1371,6 @@ async function runFrequentHeavyJobs(
       },
     },
     {
-      // 1対1トークの送信予約。lease付きclaimで二重起動を防ぎ、
-      // LINEへは予約のidempotency_keyをそのまま渡して二重pushを防ぐ。
       name: 'scheduled chat sends',
       run: async () => {
         const { processDueScheduledChatSends } = await import(
@@ -1873,7 +1883,7 @@ async function scheduled(
   // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
   const lane = scheduledLane(event.cron);
   if (lane === 'restaurantMinute') {
-    await runIsolatedScheduledJobs([{ name: 'restaurant events', run: () => processRestaurantEvents(env) }]);
+    await runIsolatedScheduledJobs([{ name: 'restaurant events', run: () => processRestaurantEvents(env) },{name:'inbox first response deadlines',run:async()=>{const {processInboxSla}=await import('./services/inbox-sla.js');await processInboxSla(env.DB,new Date(event.scheduledTime));}}]);
     return;
   }
   if (lane === 'frequentHeavy') {
