@@ -75,7 +75,8 @@ async function call(
   body?: unknown,
   opts: { staff?: AuthenticatedStaff; env?: Partial<Env['Bindings']>; headers?: Record<string, string> } = {},
 ) {
-  return app(opts.staff ?? hqAdmin()).request(path, {
+  const scopedPath=path+((method==='POST'&&(/\/generations$/.test(path)||/\/run$/.test(path)))?'?account_id=account-1':'');
+  return app(opts.staff ?? hqAdmin()).request(scopedPath, {
     method,
     headers: { 'Content-Type': 'application/json', ...opts.headers },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -123,6 +124,8 @@ beforeEach(() => {
      VALUES ('account-other', 'channel-x', 'よその店舗', '', '', 1, 'tenant-2')`,
   ).run();
 });
+
+beforeEach(()=>{testDb.raw.exec("INSERT INTO account_ai_features(account_id,feature,enabled,consent_by,consent_at,disclosure_version) VALUES('account-1','banner',1,'staff-1','2026-10-16','2026-10-16')");});
 
 describe('権限', () => {
   it('担当者（staff）は統括のバナー生成に入れない', async () => {

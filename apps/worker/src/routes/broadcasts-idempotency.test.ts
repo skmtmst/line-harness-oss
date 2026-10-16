@@ -76,7 +76,7 @@ function setupApp({
   role = 'owner',
 }: { changes?: number; role?: 'owner' | 'admin' | 'staff' } = {}) {
   d1Prepare.mockImplementation(() => ({
-    bind: vi.fn(() => ({ run: vi.fn(async () => ({ success: true, meta: { changes } })) })),
+    bind: vi.fn(() => ({ first:vi.fn(async()=>null),run: vi.fn(async () => ({ success: true, meta: { changes } })) })),
   }));
   const app = new Hono<{ Bindings: { DB: D1Database } }>();
   app.use('*', async (c, next) => {

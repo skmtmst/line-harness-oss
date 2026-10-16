@@ -1,4 +1,6 @@
-import {Hono,type Context} from 'hono';
+import {comparisonData,checkExportAccess} from '../services/store-comparison-export.js';
+import {gapBody,gapKey} from '../services/gap-common.js';
+import {Hono,type Context,type Handler} from 'hono';
 import type {Env} from '../index.js';
 import {GapError} from '../services/gap-common.js';
 import {getVisibleLineAccountScope} from '../services/account-access.js';
@@ -6,24 +8,29 @@ import {comparisonKeys,comparisonUnits,comparisonPeriod,storeNumbers,type Compar
 export const storeComparison=new Hono<Env>();
 storeComparison.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'comparison_unavailable'},e instanceof GapError?e.status:503));
 async function stores(c:Context<Env>){const s=c.get('staff');if(!s?.tenantId||!['owner','admin'].includes(s.role))throw new GapError('forbidden',403);const member=await c.env.DB.prepare("SELECT id FROM staff_members WHERE id=? AND tenant_id=? AND role IN('owner','admin') AND is_active=1").bind(s.id,s.tenantId).first();if(!member&&c.get('impersonation')?.tenantId!==s.tenantId)throw new GapError('forbidden',403);return (await getVisibleLineAccountScope(c.env.DB,s)).accounts;}
-storeComparison.get('/api/hq/store-comparison',async c=>{
- let accounts=await stores(c);const period=comparisonPeriod(c.req.query('from'),c.req.query('to')),compare=c.req.query('compare')??'previous',sort=(c.req.query('sort')??'bookings')as ComparisonKey,page=Number(c.req.query('page')??1),size=Number(c.req.query('pageSize')??20);
- if(!['average','previous'].includes(compare)||!comparisonKeys.includes(sort)||!Number.isSafeInteger(page)||page<1||![10,20,50].includes(size))throw new GapError('invalid_filter');
- const poolId=c.req.query('poolId');
- if(poolId){
-  const pool=await c.env.DB.prepare('SELECT p.id FROM traffic_pools p JOIN line_accounts a ON a.id=p.active_account_id WHERE p.id=? AND p.is_active=1 AND a.tenant_id=?').bind(poolId,c.get('staff').tenantId!).first();
-  if(!pool)throw new GapError('not_found',404);
-  const members=(await c.env.DB.prepare('SELECT line_account_id FROM pool_accounts WHERE pool_id=? AND is_active=1').bind(poolId).all<{line_account_id:string}>()).results;
-  accounts=accounts.filter(a=>members.some(m=>m.line_account_id===a.id));
- }
- if(c.req.query('order')&&!['asc','desc'].includes(c.req.query('order')!))throw new GapError('invalid_filter');
- const values=await Promise.all(accounts.map(async a=>({a,...await storeNumbers(c.env.DB,a.id,period)})));
- const average=Object.fromEntries(comparisonKeys.map(k=>{const nums=values.length<3?[]:values.map(v=>v.values[k]).filter((n):n is number=>n!==null);return [k,nums.length>=3?nums.reduce((n,v)=>n+v,0)/nums.length:null];})) as Record<ComparisonKey,number|null>;
- const previous=comparisonPeriod(new Date(Date.parse(period.from)-period.days*86400000).toISOString().slice(0,10),new Date(Date.parse(period.from)-86400000).toISOString().slice(0,10));
- const rows=await Promise.all(values.map(async v=>{const baseline=compare==='average'?average:(await storeNumbers(c.env.DB,v.a.id,previous)).values;return {accountId:v.a.id,name:(await c.env.DB.prepare('SELECT name FROM line_accounts WHERE id=?').bind(v.a.id).first<{name:string}>())?.name??'',style:v.style,computedAt:v.computedAt,metrics:Object.fromEntries(comparisonKeys.map(k=>[k,{value:v.values[k],diff:v.values[k]!==null&&baseline[k]!==null?v.values[k]!-baseline[k]!:null,unit:comparisonUnits[k],available:v.values[k]!==null}]))};}));
- const direction=c.req.query('order')==='desc'?-1:1;rows.sort((a,b)=>{const x=a.metrics[sort].value,y=b.metrics[sort].value;return x===null?(y===null?a.accountId.localeCompare(b.accountId):1):y===null?-1:direction*(x-y)||a.accountId.localeCompare(b.accountId);});
- return c.json({success:true,data:{rows:rows.slice((page-1)*size,page*size),average,total:rows.length,computedAt:values.every(v=>v.computedAt)?values.map(v=>v.computedAt!).sort()[0]??null:null}});
+storeComparison.get('/api/hq/store-comparison',async c=>{const visible=await stores(c);const filters=c.req.query();return c.json({success:true,data:await comparisonData(c.env.DB,visible,c.get('staff').tenantId!,filters)});});
+storeComparison.post('/api/hq/store-comparison/export',async c=>{
+ const visible=await stores(c);if(c.get('impersonation'))throw new GapError('IMPERSONATION_WRITE_BLOCKED',403);
+ const b=await gapBody(c),allowed=['from','to','compare','poolId','sort','order'];if(Object.keys(b).some(k=>!allowed.includes(k))||Object.values(b).some(v=>typeof v!=='string'))throw new GapError('invalid_filter');
+ const filters=Object.fromEntries(allowed.filter(k=>b[k]!==undefined).map(k=>[k,String(b[k])])),request=JSON.stringify(filters),key=gapKey(c),staff=c.get('staff');
+ const data=await comparisonData(c.env.DB,visible,staff.tenantId!,filters,true);
+ const old=await c.env.DB.prepare('SELECT id,filters_json FROM hq_store_comparison_export_jobs WHERE tenant_id=? AND requested_by=? AND request_key=?').bind(staff.tenantId!,staff.id,key).first<{id:string;filters_json:string}>();
+ if(old){if(old.filters_json!==request)throw new GapError('idempotency_conflict',409);return c.json({success:true,data:{id:old.id,replayed:true}},202);}
+ const id=crypto.randomUUID(),now=new Date();
+ await c.env.DB.prepare('INSERT INTO hq_store_comparison_export_jobs(id,tenant_id,requested_by,request_key,filters_json,account_ids_json,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(tenant_id,requested_by,request_key) DO NOTHING').bind(id,staff.tenantId!,staff.id,key,request,JSON.stringify(data.rows.map(r=>r.accountId)),now.toISOString(),new Date(now.getTime()+86400000).toISOString()).run();
+ const saved=await c.env.DB.prepare('SELECT id,filters_json FROM hq_store_comparison_export_jobs WHERE tenant_id=? AND requested_by=? AND request_key=?').bind(staff.tenantId!,staff.id,key).first<{id:string;filters_json:string}>();if(saved?.filters_json!==request)throw new GapError('idempotency_conflict',409);
+ return c.json({success:true,data:{id:saved.id,replayed:saved.id!==id}},202);
 });
+const exportView=(download:boolean):Handler<Env>=>async c=>{
+ await stores(c);if(c.get('impersonation'))throw new GapError('IMPERSONATION_WRITE_BLOCKED',403);const staff=c.get('staff');
+ const job=await c.env.DB.prepare('SELECT * FROM hq_store_comparison_export_jobs WHERE id=? AND tenant_id=? AND requested_by=?').bind(c.req.param('id'),staff.tenantId!,staff.id).first<Record<string,unknown>>();if(!job)throw new GapError('not_found',404);
+ if(Date.parse(String(job.expires_at))<=Date.now())throw new GapError('export_expired',410);
+ await checkExportAccess(c.env.DB,job);
+ if(download){if(job.status!=='completed')throw new GapError('export_not_ready',409);c.set('outputAudit',{accountIds:JSON.parse(String(job.account_ids_json)),count:Number(job.row_count??0)});c.header('Content-Type','text/csv; charset=utf-8');c.header('Content-Disposition','attachment; filename="store-comparison.csv"');c.header('Cache-Control','no-store');return c.body(String(job.csv_text));}
+ return c.json({success:true,data:{id:job.id,status:job.status,rowCount:job.row_count,expiresAt:job.expires_at,errorCode:job.error_code,downloadUrl:job.status==='completed'?`/api/hq/store-comparison/exports/${job.id}/download`:null}});
+};
+storeComparison.get('/api/hq/store-comparison/exports/:id',exportView(false));
+storeComparison.get('/api/hq/store-comparison/exports/:id/download',exportView(true));
 storeComparison.get('/api/hq/store-comparison/:accountId',async c=>{
  const id=c.req.param('accountId');if(!(await stores(c)).some(a=>a.id===id))throw new GapError('not_found',404);
  const numbers=await storeNumbers(c.env.DB,id,comparisonPeriod(c.req.query('from'),c.req.query('to')));

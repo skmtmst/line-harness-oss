@@ -640,6 +640,17 @@ describe('Googleビジネス：口コミ', () => {
     return (testDb.raw.prepare('SELECT id FROM rt_google_reviews WHERE review_name = ?').get(`${LOCATION}/reviews/${reviewId}`) as { id: string }).id;
   }
 
+  beforeEach(()=>{testDb.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('account-2','test-2','店','','',?)").run(TENANT);testDb.raw.exec("INSERT INTO account_ai_features(account_id,feature,enabled,consent_by,consent_at,disclosure_version) VALUES('account-2','google_review',1,'owner-1','2026-10-16','2026-10-16')");});
+
+  it('B354-GOOGLE-01: 既定off・別店の同意では呼ばず、自店の停止後もAIを呼ばない',async()=>{
+    await seedReviews();const run=vi.fn(async()=>({response:'文'}));env.AI={run} as unknown as Ai;
+    testDb.raw.exec("DELETE FROM account_ai_features");googleCalls=[];
+    const response=await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`,{body:{}});
+    expect(response.status).toBe(409);expect(await response.json()).toMatchObject({code:'ai_disabled',enabled:false});expect(run).not.toHaveBeenCalled();expect(googleCalls).toHaveLength(0);
+    testDb.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('another','test-another','別店','','','00000000-0000-4000-8000-000000000001');INSERT INTO account_ai_features(account_id,feature,enabled,consent_by,consent_at,disclosure_version) VALUES('another','google_review',1,'owner-1','2026-10-16','2026-10-16')");
+    expect((await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`,{body:{}})).status).toBe(409);expect(run).not.toHaveBeenCalled();
+  });
+
   it('AI下書き：投稿者名を送らず、生成文を下書きとして保存する。staff も使える', async () => {
     await seedReviews();
     const run = vi.fn(async () => ({ response: 'お客様、このたびはご来店ありがとうございます。' }));

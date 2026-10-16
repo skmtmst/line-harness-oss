@@ -1,3 +1,4 @@
+import {simulationContext,scheduleSimulation,processBroadcastSimulation,simulationPreview} from '../services/broadcast-simulation.js';
 import {maybeStartAb,maybeReplayAbStart} from './broadcast-ab.js';
 import {GapError} from '../services/gap-common.js';
 import { broadcastSendPreview,broadcastQuietHoursShift } from '../services/gap-send-preview.js';
@@ -85,6 +86,7 @@ import { fetchQuota, releaseQuotaSlot } from '../services/broadcast-quota-guard.
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 
 const broadcasts = new Hono<Env>();
+broadcasts.use('/api/broadcasts/:id/*',async(c,next)=>{if(c.req.method!=='GET'&&/\/(test-send|send-segment|resume|retry-failed)$/.test(c.req.path)&&await simulationContext(c.env.DB,c.req.param('id')!))return c.json({success:false,error:'simulation_transport_only'},409);await next();});
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
 const BROADCAST_NOTIFICATION_KEY = 'broadcast_slack_notifications';
@@ -350,6 +352,7 @@ function serializeBroadcast(row: DbBroadcast) {
     targetType: row.target_type,
     targetTagId: row.target_tag_id,
     status: row.status,
+    purpose:r.purpose??'marketing',executionMode:r.execution_mode??'live',testMode:r.execution_mode==='simulation',createdVia:r.created_via??'manual',
     scheduledAt: row.scheduled_at,
     sentAt: row.sent_at,
     totalCount: row.total_count,
@@ -447,7 +450,7 @@ async function failedBreakdown(db: D1Database, id: string): Promise<{ temporary:
   const rows = await db
     .prepare(
       `SELECT error_code, COUNT(*) AS cnt FROM broadcast_send_claims
-        WHERE broadcast_id = ? AND state = 'failed' GROUP BY error_code`,
+        WHERE broadcast_id = ? AND state = 'failed' AND COALESCE(error_code,'') NOT LIKE 'simulation_%' GROUP BY error_code`,
     )
     .bind(id)
     .all<{ error_code: string | null; cnt: number }>();
@@ -482,7 +485,7 @@ async function broadcastStatusView(
   });
   return {
     displayStatus,
-    displayStatusLabel: BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
+    displayStatusLabel: row.execution_mode==='simulation'&&row.status==='sent'?'模擬で確認済み':BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
     ledger: {
       sent: counts.sent,
       failed: counts.failed,
@@ -513,11 +516,11 @@ async function ledgerCountsForBroadcasts(
     const [states, failed] = await Promise.all([
       db.prepare(
         `SELECT broadcast_id, state, COUNT(*) AS cnt FROM broadcast_send_claims
-          WHERE broadcast_id IN (${placeholders}) GROUP BY broadcast_id, state`,
+          WHERE broadcast_id IN (${placeholders}) AND COALESCE(error_code,'') NOT LIKE 'simulation_%' GROUP BY broadcast_id, state`,
       ).bind(...chunk).all<{ broadcast_id: string; state: string; cnt: number }>(),
       db.prepare(
         `SELECT broadcast_id, error_code, COUNT(*) AS cnt FROM broadcast_send_claims
-          WHERE broadcast_id IN (${placeholders}) AND state = 'failed' GROUP BY broadcast_id, error_code`,
+          WHERE broadcast_id IN (${placeholders}) AND state = 'failed' AND COALESCE(error_code,'') NOT LIKE 'simulation_%' GROUP BY broadcast_id, error_code`,
       ).bind(...chunk).all<{ broadcast_id: string; error_code: string | null; cnt: number }>(),
     ]);
     for (const row of states.results ?? []) {
@@ -605,7 +608,7 @@ broadcasts.get('/api/broadcasts', async (c) => {
       return {
         ...serializeBroadcast(item),
         displayStatus,
-        displayStatusLabel: BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
+        displayStatusLabel: (item as unknown as Record<string,unknown>).execution_mode==='simulation'&&item.status==='sent'?'模擬で確認済み':BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
       };
     });
     // 同じ中身なら304（list-etag）。
@@ -1493,6 +1496,7 @@ broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"mes
     }
     if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
+    if(await simulationContext(c.env.DB,existing.id))return c.json({success:false,error:'use_simulation_draft_endpoint'},409);
     if (existing.status !== 'draft' && existing.status !== 'scheduled') {
       return inputError(c, { success: false, error: 'Only draft or scheduled broadcasts can be updated' }, 400, []);
     }
@@ -2300,6 +2304,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
     try {
       const { enforceBroadcastSendApproval } = await import('../services/broadcast-approval.js');
       const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown; expectedVersion?:unknown; scheduledAt?:unknown;testMode?:unknown }>().catch(() => null);
+      if(await simulationContext(c.env.DB,id)){const result=await scheduleSimulation(c.env.DB,id,sendBody??{},c.req.header('Idempotency-Key')??'');await processBroadcastSimulation(c.env.DB,id);return c.json({success:true,data:{...result,...await simulationPreview(c.env.DB,id)}});}
       const abReplay=await maybeReplayAbStart(c,id,sendBody);if(abReplay)return abReplay;
       if(sendBody?.expectedVersion!==undefined) {
         const current=await broadcastSendPreview(c.env.DB,existing);

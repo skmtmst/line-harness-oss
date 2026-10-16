@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import type { Env } from '../index.js';
 import { canAccessAllLineAccounts } from './account-access.js';
 export class GapError extends Error {
-  constructor(public code:string, public status:400|401|403|404|409|429|503=400) {super(code);}
+  constructor(public code:string, public status:400|401|403|404|409|410|429|503=400) {super(code);}
 }
 export async function gapAccount(c:Context<Env>, explicit?:string) {
   const id=explicit??c.req.query('account_id');

@@ -91,3 +91,10 @@ test('EC-03: 購入が事前確認の直後に増えても、最後のUPDATEで�
  }} as D1Database;
  await processAutoLineMock(racing,at);expect(injected).toBe(true);expect(states()).toEqual([{status:'skipped_purchased'}]);
 });
+
+test('EC-11: 在庫が事前確認の直後に0へ戻っても最後のUPDATEで止める',async()=>{
+ await enable('restock');scheduled('r','p','restock');d.raw.exec("INSERT INTO ec_behavior_events(id,account_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) VALUES('stock','a','restock','p','{\"stock\":5}','2026-10-16T02:55:00Z','now','stock')");
+ let injected=false;const original=d.db.prepare.bind(d.db);
+ const racing={...d.db,prepare(sql:string){if(!injected&&sql.startsWith('UPDATE ec_auto_line_sends SET status=?')){injected=true;d.raw.exec("INSERT INTO ec_behavior_events(id,account_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) VALUES('stock0','a','restock','p','{\"stock\":0}','2026-10-16T02:59:59Z','now','stock0')");}return original(sql);}} as D1Database;
+ await processAutoLineMock(racing,at);expect(injected).toBe(true);expect(states()).toEqual([{status:'skipped_stock'}]);
+});

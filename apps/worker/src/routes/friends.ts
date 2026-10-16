@@ -1360,7 +1360,7 @@ friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), re
       return c.json({ success: false, error: 'Tag not found' }, 404);
     }
     // 手動付与禁止のタグは付けられない。
-    if (Number(tag.manual_assignment_allowed ?? 1) !== 1) {
+    if (Number(tag.manual_assignment_allowed ?? 1) !== 1 || await db.prepare('SELECT id FROM member_rank_tiers WHERE tag_id=?').bind(body.tagId).first()) {
       return c.json({ success: false, error: 'Tag not found' }, 404);
     }
 
@@ -1415,6 +1415,7 @@ friends.delete('/api/friends/:id/tags/:tagId', requireRole('owner', 'admin', 'st
     const friendId = c.req.param('id');
     const tagId = c.req.param('tagId');
 
+    if(await c.env.DB.prepare('SELECT id FROM member_rank_tiers WHERE tag_id=?').bind(tagId).first())return c.json({success:false,error:'rank_tag_managed'},403);
     const removed = await c.env.DB.prepare('DELETE FROM friend_tags WHERE friend_id=? AND tag_id=?').bind(friendId,tagId).run();
     if (!removed.meta.changes) return c.json({ success: true, data: null });
 

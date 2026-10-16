@@ -23,7 +23,7 @@ mcpConnections.get('/api/mcp-connections/logs',async c=>{
 });
 mcpConnections.post('/api/mcp-connections',async c=>{
  const a=await account(c);gapWrite(c,{admin:true});if(c.get('staff').role!=='owner')throw new GapError('owner_required',403);
- const b=await gapBody(c);if(typeof b.name!=='string'||!b.name.trim()||b.name.length>80||!['read','draft'].includes(String(b.level))||![30,90,180,365].includes(Number(b.expiryDays??90)))throw new GapError('invalid_connection');
+ const b=await gapBody(c);if(typeof b.name!=='string'||!b.name.trim()||b.name.length>80||!['read','draft','send_request'].includes(String(b.level))||![30,90,180,365].includes(Number(b.expiryDays??90)))throw new GapError('invalid_connection');
  // The first API tranche offers one store per connection, preventing partial-scope key management.
  if(b.accountIds!==undefined&&(!Array.isArray(b.accountIds)||b.accountIds.length!==1||b.accountIds[0]!==a))throw new GapError('invalid_accounts');
  if(!await sensitiveStepUpSatisfied(c,'mcp.connection'))return stepUpRequiredResponse(c,'接続の作成には本人確認が必要です');

@@ -1,3 +1,4 @@
+import {g2OpenAiAvailable} from '../services/account-ai-features.js';
 import {Hono,type Context} from 'hono';
 import type {Env} from '../index.js';
 import {GapError,gapAccount,gapBody,gapKey,gapVersion,gapWrite} from '../services/gap-common.js';
@@ -14,7 +15,7 @@ async function settings(c:Context<Env>,a:string){
  const usage=await c.env.DB.prepare("SELECT count(*) n FROM ai_answer_logs WHERE account_id=? AND id LIKE 'ai-sim:%' AND action='answered' AND julianday(created_at)>=julianday(?)").bind(a,start).first<{n:number}>();
  const limit=(await c.env.DB.prepare('SELECT monthly_limit_answers FROM ai_settings WHERE account_id=?').bind(a).first<{monthly_limit_answers:number}>())?.monthly_limit_answers??3000;
  const used=usage?.n??0;
- return {...configured,...counts,suspendedReason:configured.mode==='suspended'?'suspended':used>=limit?'monthly_limit':null,simulatedUsage:{used,limit,warning:used>=limit*0.8},autoReplyAvailable:false,simulationAvailable:true,testMode:true};
+ return {...configured,...counts,providerAvailable:g2OpenAiAvailable(c.env),providerUnavailableReason:g2OpenAiAvailable(c.env)?null:'g2_ai_unavailable',suspendedReason:configured.mode==='suspended'?'suspended':used>=limit?'monthly_limit':null,simulatedUsage:{used,limit,warning:used>=limit*0.8},autoReplyAvailable:false,simulationAvailable:true,testMode:true};
 }
 async function chat(c:Context<Env>){
  const row=await c.env.DB.prepare('SELECT c.id,c.friend_id,f.line_account_id FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.id=?').bind(c.req.param('id')).first<{id:string;friend_id:string;line_account_id:string}>();
@@ -40,8 +41,8 @@ aiDrafts.put('/api/ai-settings',requirePermission('/auto-replies'),async(c)=>{
  const changes=await c.env.DB.batch([stmt,c.env.DB.prepare(`INSERT INTO operation_audit(id,target_kind,target_id,action,actor_id,detail_json) SELECT ?,'ai_settings',?,'changed',?,? WHERE changes()=1`).bind(crypto.randomUUID(),a,c.get('staff').id,JSON.stringify({mode:b.mode,testMode:true,impersonationId:im?.id??null,reason:b.reason??null}))]);if(!changes[0].meta.changes)throw new GapError('version_conflict',409);
  return c.json({success:true,data:await settings(c,a)});
 });
-aiDrafts.post('/api/chats/:id/ai/summary',async(c)=>{const row=await chat(c);return c.json({success:true,data:await makeAiDraft(c.env.DB,{account:row.line_account_id,friend:row.friend_id,chat:row.id,kind:'summary',apiKey:c.env.OPENAI_API_KEY??'',masked:!!c.get('impersonation')})});});
-aiDrafts.post('/api/chats/:id/ai/draft',async(c)=>{gapWrite(c);const row=await chat(c);if(!hasStaffPermission(c,'/chats'))throw new GapError('forbidden',403);return c.json({success:true,data:await makeAiDraft(c.env.DB,{account:row.line_account_id,friend:row.friend_id,chat:row.id,kind:'draft',apiKey:c.env.OPENAI_API_KEY??'',masked:false})});});
+aiDrafts.post('/api/chats/:id/ai/summary',async(c)=>{const row=await chat(c);return c.json({success:true,data:await makeAiDraft(c.env.DB,{account:row.line_account_id,friend:row.friend_id,chat:row.id,kind:'summary',apiKey:c.env.OPENAI_API_KEY??'',masked:!!c.get('impersonation'),providerEnabled:g2OpenAiAvailable(c.env)})});});
+aiDrafts.post('/api/chats/:id/ai/draft',async(c)=>{gapWrite(c);const row=await chat(c);if(!hasStaffPermission(c,'/chats'))throw new GapError('forbidden',403);return c.json({success:true,data:await makeAiDraft(c.env.DB,{account:row.line_account_id,friend:row.friend_id,chat:row.id,kind:'draft',apiKey:c.env.OPENAI_API_KEY??'',masked:false,providerEnabled:g2OpenAiAvailable(c.env)})});});
 aiDrafts.post('/api/chats/:id/ai/typing',async c=>{
  gapWrite(c);if(!hasStaffPermission(c,'/chats'))throw new GapError('forbidden',403);
  const row=await chat(c),b=await gapBody(c),staffId=c.get('staff').id;

@@ -1,3 +1,5 @@
+import {requireAccountAi} from '../services/account-ai-features.js';
+import {GapError} from '../services/gap-common.js';
 import { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 export { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -1048,6 +1050,7 @@ export async function runReplyDraftAi(c: Context<Env>, prompt: { system: string;
 }
 
 restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', requireRole('owner','admin','staff'), inputJsonBoundary(), async (c) => {
+  if(c.get('staff')?.readOnly||c.get('impersonation'))return fail(c,403,'この操作はできません',{code:'forbidden'});
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await reviewFor(c, store.id, c.req.param('id'));
@@ -1060,6 +1063,7 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
   if (!body || Array.isArray(body) || !['generate','shorten','polite'].includes(String(body.mode ?? 'generate'))) {
     return fail(c,400,'下書きの作り方を確認してください',{code:'invalid_mode'},['mode']);
   }
+  try{await requireAccountAi(c.env.DB,store.lineAccountId,'google_review');}catch(e){if(e instanceof GapError)return fail(c,409,'AIを使っていません',{code:e.code,enabled:false,feature:'google_review'});throw e;}
   const mode = body.mode ?? 'generate';
   const original = mode === 'generate' ? null : validateReplyText(typeof body.replyDraft === 'string' ? body.replyDraft : row.reply_draft ?? '');
   if (mode !== 'generate' && (body.replyDraft !== undefined && typeof body.replyDraft !== 'string' || !original?.ok)) {

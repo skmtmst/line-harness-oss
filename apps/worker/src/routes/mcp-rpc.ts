@@ -1,3 +1,4 @@
+import {requestMcpBroadcast} from '../services/mcp-broadcast-request.js';
 import {mcpBroadcastDraft} from '../services/mcp-broadcast-drafts.js';
 import {canAccessAllLineAccounts} from '../services/account-access.js';
 import {Hono} from 'hono';
@@ -6,6 +7,7 @@ import {sha256Hex} from '../middleware/auth.js';
 import {comparisonPeriod,storeNumbers} from '../services/store-comparison.js';
 export const mcpRpc=new Hono<Env>();
 const tools=[
+ {name:'request_broadcast_send',description:'この接続の模擬配信について人の承認を依頼する（実送信しない）'},
  {name:'create_broadcast_draft',description:'配信のテキスト下書きを作る（送らない）'},
  {name:'update_broadcast_draft',description:'この接続が作った未依頼の下書きを直す（送らない）'},
  {name:'get_account_summary',description:'店の友だちの人数（個人情報は含まない）'},
@@ -26,7 +28,7 @@ mcpRpc.post('/mcp',async c=>{
  if(!b||Array.isArray(b)||b.jsonrpc!=='2.0'||typeof b.method!=='string')return c.json({jsonrpc:'2.0',id:null,error:{code:-32600,message:'Invalid request'}},400);
  const id=b.id??null,params=b.params as {name?:string;arguments?:Record<string,unknown>}|undefined;
  const finish=async(result:unknown)=>{await c.env.DB.prepare('UPDATE mcp_connections SET last_used_at=? WHERE id=?').bind(now,row.id).run();return c.json({jsonrpc:'2.0',id,result});};
- const log=async(result:string,tool='protocol',account:string|null=null)=>{await c.env.DB.prepare("INSERT INTO mcp_call_logs(id,connection_id,tool,account_id,kind,result,summary,at) VALUES(?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),row.id,tools.some(t=>t.name===tool)?tool:'unknown',account,tool.endsWith('_draft')?'draft':'read',result,result==='ok'?'集計を読んだ':result==='rate_limited'?'回数の上限':'許可されていない操作',now).run();};
+ const log=async(result:string,tool='protocol',account:string|null=null)=>{await c.env.DB.prepare("INSERT INTO mcp_call_logs(id,connection_id,tool,account_id,kind,result,summary,at) VALUES(?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),row.id,tools.some(t=>t.name===tool)?tool:'unknown',account,tool==='request_broadcast_send'?'send_request':tool.endsWith('_draft')?'draft':'read',result,result==='ok'?'集計を読んだ':result==='rate_limited'?'回数の上限':'許可されていない操作',now).run();};
  // The count and insert share one transaction, including refused calls.
  const attempt=crypto.randomUUID();const claimed=await c.env.DB.batch([
  c.env.DB.prepare("INSERT INTO mcp_call_logs(id,connection_id,tool,kind,result,summary,at) SELECT ?,?,'protocol','read','ok','接続の呼び出し',? WHERE (SELECT count(*) FROM mcp_call_logs WHERE connection_id=? AND tool='protocol' AND julianday(at)>julianday(?,'-1 minute'))<60").bind(attempt,row.id,now,row.id,now)]);
@@ -34,13 +36,14 @@ mcpRpc.post('/mcp',async c=>{
  if(b.method==='initialize')return finish({protocolVersion:'2025-03-26',capabilities:{tools:{listChanged:false}},serverInfo:{name:'musubo',version:'1.0.0'}});
  if(b.method==='notifications/initialized')return c.body(null,202);
  if(b.method==='ping')return finish({});
- if(b.method==='tools/list')return finish({tools:tools.filter(t=>row.level!=='read'||!t.name.endsWith('_draft')).map(t=>({...t,inputSchema:{type:'object',properties:{accountId:{type:'string'},from:{type:'string'},to:{type:'string'},broadcastId:{type:'string'},title:{type:'string'},text:{type:'string'},targetTagId:{type:'string'},expectedVersion:{type:'integer'},idempotencyKey:{type:'string'}},required:['accountId'],additionalProperties:false}}))});
+ if(b.method==='tools/list')return finish({tools:tools.filter(t=>(row.level!=='read'||!t.name.endsWith('_draft'))&&(t.name!=='request_broadcast_send'||row.level==='send_request')).map(t=>({...t,inputSchema:{type:'object',properties:{accountId:{type:'string'},from:{type:'string'},to:{type:'string'},broadcastId:{type:'string'},title:{type:'string'},text:{type:'string'},targetTagId:{type:'string'},expectedVersion:{type:'integer'},idempotencyKey:{type:'string'},approverStaffId:{type:'string'},testMode:{type:'boolean'}},required:['accountId'],additionalProperties:false}}))});
  if(b.method!=='tools/call')return c.json({jsonrpc:'2.0',id,error:{code:-32601,message:'Method not found'}});
  const tool=typeof params?.name==='string'?params.name:'',args=params?.arguments&&typeof params.arguments==='object'&&!Array.isArray(params.arguments)?params.arguments:{},account=String(args.accountId??''),allowed=JSON.parse(row.account_ids_json) as string[];
- if(!tools.some(t=>t.name===tool)||(tool.endsWith('_draft')&&row.level==='read')||!allowed.includes(account)||!await canAccessAllLineAccounts(c.env.DB,{id:row.created_by,tenantId:row.organization_id,role:'owner',name:'',readOnly:true},[account])||!await c.env.DB.prepare('SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL').bind(account,row.organization_id).first()){
+ if(!tools.some(t=>t.name===tool)||(tool.endsWith('_draft')&&row.level==='read')||(tool==='request_broadcast_send'&&row.level!=='send_request')||!allowed.includes(account)||!await canAccessAllLineAccounts(c.env.DB,{id:row.created_by,tenantId:row.organization_id,role:'owner',name:'',readOnly:true},[account])||!await c.env.DB.prepare('SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL').bind(account,row.organization_id).first()){
  await log('refused',tool);return finish({isError:true,content:[{type:'text',text:'この操作は許可されていません'}]});}
  try{
  let data:unknown;
+ if(tool==='request_broadcast_send'){data=await requestMcpBroadcast(c.env.DB,{connectionId:row.id,account,actor:row.created_by,args,now});return finish({content:[{type:'text',text:JSON.stringify(data)}]});}
  if(tool==='create_broadcast_draft'||tool==='update_broadcast_draft'){
   data=await mcpBroadcastDraft(c.env.DB,{connectionId:row.id,account,tool,args,now});
   return finish({content:[{type:'text',text:JSON.stringify(data)}]});

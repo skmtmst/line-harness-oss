@@ -1,3 +1,4 @@
+import {simulateAttribution,simulationResults} from '../services/ec-auto-line-attribution.js';
 import {assertChanged,clearAssertions} from '../services/booking-series.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {Hono} from 'hono';
@@ -48,7 +49,7 @@ ecAutoLine.get('/api/ec/auto-line/sends',async c=>{
  const items=(await c.env.DB.prepare(`SELECT id,rule_kind kind,scheduled_at scheduledAt,status,sent_at simulatedAt,test_mode testMode FROM ec_auto_line_sends WHERE ${where} ORDER BY scheduled_at DESC,id LIMIT 20 OFFSET ?`).bind(...bindings,offset).all()).results;return c.json({success:true,data:{items,total:total?.n??0}});
 });
 ecAutoLine.get('/api/ec/auto-line/stats',async c=>{
- const a=await gapAccount(c),r=await c.env.DB.prepare("SELECT count(*) total,count(CASE WHEN status='simulated' THEN 1 END) simulated,count(CASE WHEN status LIKE 'skipped_%' THEN 1 END) skipped FROM ec_auto_line_sends WHERE account_id=?").bind(a).first();return c.json({success:true,data:{...r,sent:0,clicks:null,purchases:null,testMode:true}});
+ const a=await gapAccount(c),r=await c.env.DB.prepare("SELECT count(*) total,count(CASE WHEN status='simulated' THEN 1 END) simulated,count(CASE WHEN status LIKE 'skipped_%' THEN 1 END) skipped FROM ec_auto_line_sends WHERE account_id=?").bind(a).first();return c.json({success:true,data:{...r,sent:0,clicks:null,purchases:null,simulatedResults:await simulationResults(c.env.DB,a),testMode:true}});
 });
 ecAutoLine.post('/api/ec/auto-line/rules/:kind/test',async c=>{gapWrite(c,{admin:true});const a=await gapAccount(c),kind=c.req.param('kind');if(!autoKinds.includes(kind as typeof autoKinds[number]))throw new GapError('invalid_kind');return c.json({success:true,data:{preview:(await autoLineRules(c.env.DB,a)).find(r=>r.kind===kind),sent:false,testMode:true}});});
 
@@ -57,3 +58,6 @@ ecAutoLine.post('/api/ec/auto-line/simulate',async c=>{
  if(b.testMode!==true)throw new GapError('test_mode_required');
  return c.json({success:true,data:{...await processAutoLineMock(c.env.DB,new Date(),a),sent:false,testMode:true}});
 });
+
+ecAutoLine.post('/api/ec/auto-line/attribution/simulate',async c=>{gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c);return c.json({success:true,data:await simulateAttribution(c.env.DB,a,b)});});
+ecAutoLine.get('/api/ec/auto-line/sends/:id',async c=>{const a=await gapAccount(c);const send=await c.env.DB.prepare('SELECT id,rule_kind kind,status,scheduled_at scheduledAt,sent_at simulatedAt,test_mode testMode,messages_snapshot_json FROM ec_auto_line_sends WHERE id=? AND account_id=?').bind(c.req.param('id'),a).first<Record<string,unknown>>();if(!send)throw new GapError('not_found',404);return c.json({success:true,data:{...send,messages:JSON.parse(String(send.messages_snapshot_json)),messages_snapshot_json:undefined,results:await simulationResults(c.env.DB,a,c.req.param('id'))}});});

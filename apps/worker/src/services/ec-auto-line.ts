@@ -58,7 +58,10 @@ export async function processAutoLineMock(db:D1Database,now=new Date(),account?:
  AND NOT EXISTS(SELECT 1 FROM ec_behavior_events WHERE account_id=? AND friend_id=? AND type='purchase' AND julianday(occurred_at)>=julianday(?))
  AND NOT EXISTS(SELECT 1 FROM ec_orders WHERE line_account_id=? AND friend_id=? AND normalized_status='current' AND julianday(ordered_at)>=julianday(?))
  AND NOT EXISTS(SELECT 1 FROM friend_delivery_consents WHERE line_account_id=? AND friend_id=? AND purpose IN('promotion','marketing','advertising','宣伝') AND state='revoked')))
- AND (?!='simulated' OR NOT EXISTS(SELECT 1 FROM ec_auto_line_sends x WHERE x.account_id=? AND x.friend_id=? AND x.status='simulated' AND (julianday(x.sent_at)>=julianday(?) OR x.product_id=? AND julianday(x.sent_at)>=julianday(?,'-30 days')))) AND (?!='simulated' OR (SELECT count(*) FROM ec_auto_line_sends x WHERE x.account_id=? AND x.friend_id=? AND x.status='simulated' AND julianday(x.sent_at)>=julianday(?,'-7 days'))<3)`).bind(status,status,at,crypto.randomUUID(),s.id,status,f,a,a,s.rule_kind,a,f,s.occurred_at,a,f,s.occurred_at,a,f,status,a,f,midnight,s.product_id,at,status,a,f,at).run();
+ AND (?!='simulated' OR (
+ (rule_kind!='restock' OR COALESCE((SELECT json_extract(e.product_snapshot_json,'$.stock') FROM ec_behavior_events e WHERE e.account_id=ec_auto_line_sends.account_id AND e.product_id=ec_auto_line_sends.product_id AND e.type='restock' ORDER BY julianday(e.occurred_at) DESC,e.id DESC LIMIT 1),0)>0)
+ AND (rule_kind!='cart' OR trigger_event_id=(SELECT e.id FROM ec_behavior_events e WHERE e.account_id=ec_auto_line_sends.account_id AND e.friend_id=ec_auto_line_sends.friend_id AND e.product_id=ec_auto_line_sends.product_id AND e.type IN('cart_add','cart_remove') ORDER BY julianday(e.occurred_at) DESC,e.received_at DESC,e.id DESC LIMIT 1))))
+ AND (?!='simulated' OR NOT EXISTS(SELECT 1 FROM ec_auto_line_sends x WHERE x.account_id=? AND x.friend_id=? AND x.status='simulated' AND (julianday(x.sent_at)>=julianday(?) OR x.product_id=? AND julianday(x.sent_at)>=julianday(?,'-30 days')))) AND (?!='simulated' OR (SELECT count(*) FROM ec_auto_line_sends x WHERE x.account_id=? AND x.friend_id=? AND x.status='simulated' AND julianday(x.sent_at)>=julianday(?,'-7 days'))<3)`).bind(status,status,at,crypto.randomUUID(),s.id,status,f,a,a,s.rule_kind,a,f,s.occurred_at,a,f,s.occurred_at,a,f,status,status,a,f,midnight,s.product_id,at,status,a,f,at).run();
  if(result.meta.changes)processed++;
  else {
   const fallback=await db.prepare(`UPDATE ec_auto_line_sends SET status=CASE
@@ -66,6 +69,8 @@ export async function processAutoLineMock(db:D1Database,now=new Date(),account?:
    WHEN EXISTS(SELECT 1 FROM friend_delivery_consents WHERE line_account_id=? AND friend_id=? AND purpose IN('promotion','marketing','advertising','宣伝') AND state='revoked') THEN 'skipped_opted_out'
    WHEN NOT EXISTS(SELECT 1 FROM ec_auto_line_rules WHERE account_id=? AND kind=? AND enabled=1) THEN 'skipped_disabled'
    WHEN NOT EXISTS(SELECT 1 FROM friends WHERE id=? AND line_account_id=? AND is_following=1) THEN 'skipped_blocked'
+   WHEN rule_kind='restock' AND COALESCE((SELECT json_extract(e.product_snapshot_json,'$.stock') FROM ec_behavior_events e WHERE e.account_id=ec_auto_line_sends.account_id AND e.product_id=ec_auto_line_sends.product_id AND e.type='restock' ORDER BY julianday(e.occurred_at) DESC,e.id DESC LIMIT 1),0)<=0 THEN 'skipped_stock'
+   WHEN rule_kind='cart' AND trigger_event_id IS NOT (SELECT e.id FROM ec_behavior_events e WHERE e.account_id=ec_auto_line_sends.account_id AND e.friend_id=ec_auto_line_sends.friend_id AND e.product_id=ec_auto_line_sends.product_id AND e.type IN('cart_add','cart_remove') ORDER BY julianday(e.occurred_at) DESC,e.received_at DESC,e.id DESC LIMIT 1) THEN 'skipped_removed'
    ELSE 'skipped_cap' END WHERE id=? AND status='scheduled'`).bind(a,f,s.occurred_at,a,f,s.occurred_at,a,f,a,s.rule_kind,f,a,s.id).run();
   processed+=fallback.meta.changes;
  }
