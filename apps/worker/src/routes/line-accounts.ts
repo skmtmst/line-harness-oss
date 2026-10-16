@@ -968,11 +968,7 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
       },
     });
   } catch (err) {
-    // この口は接続確認の診断に使う。LINEが返した状態番号だけは残さないと、
-    // トークン失効(401)と権限不足(403)と呼び出し上限(429)が全部 502 に潰れて
-    // 原因が分からなくなる。番号以外(本文・トークン)は出さない。
-    const status = (err as { status?: unknown } | null)?.status;
-    const lineStatus = typeof status === 'number' ? status : null;
+    const lineStatus = typeof (err as { status?: unknown } | null)?.status === 'number' ? (err as { status: number }).status : null; // LINEの状態番号(401失効/403権限不足/429上限)だけ残す。本文・トークンは出さない
     console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts/:id/follower-insight"}));
     return c.json({ success: false, error: 'Failed to fetch LINE follower insight', lineStatus }, 502);
   }
