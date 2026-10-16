@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
+const mocks = vi.hoisted(() => ({ preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   const empty = async () => ({ success: true, data: [] })
@@ -17,6 +17,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     accountSettings: { getTestRecipients: empty },
   } }
 })
+vi.mock('@/lib/api-gap1', () => ({ chatSafetyApi: { sendPreview: mocks.preview, confirmBroadcast: mocks.confirm } }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/broadcasts/new', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }) }))
@@ -37,7 +38,7 @@ async function render(step: 'confirm' | 'audience' = 'confirm', scheduled = fals
   await flush()
   await act(async () => { await vi.advanceTimersByTimeAsync(650) }); await flush()
 }
-async function confirm() { await click('今すぐ送る', container); return document.querySelector('[role="dialog"]')! }
+async function confirm() { await click('今すぐ送る', container); await act(async () => { await vi.advanceTimersByTimeAsync(200) }); await flush(); return document.querySelector('[role="dialog"]')! }
 
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks()
@@ -47,29 +48,47 @@ beforeEach(() => {
   mocks.config.mockResolvedValue({ success: true, data: { threshold: 1000, singleOperator: false } })
   mocks.request.mockResolvedValue({ success: true, data: {} })
   mocks.preflight.mockResolvedValue({ success: true, data: { audienceCount: 10 } })
+  mocks.preview.mockResolvedValue({ success: true, data: { recipients: 10, excluded: { blocked: 0, optedOut: 0, duplicate: 0, hidden: 0, missingDestination: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '本文', sender: null, expectedVersion: 2 } })
+  mocks.confirm.mockResolvedValue({ success: true, data: {} })
 })
 afterEach(() => { if (root) act(() => root.unmount()); container?.remove(); vi.useRealTimers() })
 
 describe('V8の5手順で送信を確定する', () => {
-  it('最終確認を開く段階では保存も送信もせず、窓の確定で1回だけ送る', async () => {
-    await render(); const dialog = await confirm()
-    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled()
+  it('最終確認の窓を開くと下書きを保存して数え直し、確定は見た人数・版を添えて1回だけ送る', async () => {
+    await render(); const dialog = await confirm(); await flush()
+    expect(mocks.create).toHaveBeenCalledTimes(1); expect(mocks.preview).toHaveBeenCalledWith('draft'); expect(mocks.confirm).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(button('10 人に送る', dialog)); fireEvent.click(button('10 人に送る', dialog)) }); await flush()
-    expect(mocks.create).toHaveBeenCalledTimes(1); expect(mocks.send).toHaveBeenCalledExactlyOnceWith('draft', undefined)
-    expect(mocks.success).toHaveBeenCalledWith({ id: 'draft', status: 'sending' })
+    expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith('draft', { expectedVersion: 2, confirmedRecipientCount: 10 })
+    expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.success).toHaveBeenCalledTimes(1)
   })
   it('送信が断られたときは入力と確認窓を残し、成功として移動しない', async () => {
-    mocks.send.mockResolvedValue({ success: false, error: '送信枠が足りません' })
-    await render(); const dialog = await confirm(); await click('10 人に送る', dialog)
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('送信枠が足りません')
+    mocks.confirm.mockRejectedValue(new Error('送信枠が足りません'))
+    await render(); const dialog = await confirm(); await flush(); await click('10 人に送る', dialog)
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
     expect(container.textContent).toContain('8月キャンペーンのお知らせ'); expect(mocks.success).not.toHaveBeenCalled()
   })
   it('承認の設定を取得できないときは、送信確定の操作を出さない', async () => {
     mocks.config.mockResolvedValue({ success: false, error: '取得失敗' })
     await render(); const dialog = await confirm()
     expect(dialog.textContent).toContain('承認の設定を確認できません')
-    expect(Array.from(dialog.querySelectorAll('button')).some((item) => item.textContent === '今すぐ送る')).toBe(false)
-    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled()
+    expect(Array.from(dialog.querySelectorAll('button')).some((item) => /人に送る/.test(item.textContent ?? ''))).toBe(false)
+    expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.confirm).not.toHaveBeenCalled()
+  })
+  it('数えられなかったときは「人数を数えられませんでした」と出し、主ボタンは押せない', async () => {
+    mocks.preview.mockRejectedValue(new Error('500'))
+    await render(); const dialog = await confirm(); await flush()
+    expect(dialog.textContent).toContain('人数を数えられませんでした')
+    expect(mocks.confirm).not.toHaveBeenCalled()
+  })
+  it('予約の確定は日時を保存し、確定に予約日時を添える', async () => {
+    await render('confirm', true)
+    await click('この内容で予約する', container)
+    await act(async () => { await vi.advanceTimersByTimeAsync(200) }); await flush()
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(mocks.create.mock.calls[0][0].scheduledAt).toBe('2099-10-05T01:00:00.000Z')
+    await click('10 人に予約する', dialog)
+    expect(mocks.confirm).toHaveBeenCalledWith('draft', expect.objectContaining({ scheduledAt: '2099-10-05T01:00:00.000Z' }))
+    expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.success).toHaveBeenCalledTimes(1)
   })
   it('承認対象なら指定した人へ依頼し、即時送信しない', async () => {
     mocks.config.mockResolvedValue({ success: true, data: { threshold: 5, singleOperator: false } })
@@ -89,18 +108,12 @@ describe('V8の5手順で送信を確定する', () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull()
     expect(mocks.send).not.toHaveBeenCalled()
   })
-  it('予約の確定は日時を保存し、即時送信しない', async () => {
-    await render('confirm', true)
-    await click('この内容で予約する', container)
-    await click('10 人に予約する', document.querySelector('[role="dialog"]')!)
-    expect(mocks.create.mock.calls[0][0].scheduledAt).toBe('2099-10-05T01:00:00.000Z')
-    expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.success).toHaveBeenCalledTimes(1)
-  })
   it('1人運用では人数が合うまで保存せず、確認した人数を送信側にも渡す', async () => {
     mocks.config.mockResolvedValue({ success: true, data: { threshold: 5, singleOperator: true } })
     await render(); const dialog = await confirm()
+    const savedBefore = mocks.create.mock.calls.length + mocks.update.mock.calls.length
     await click('今すぐ送る', dialog)
-    expect(mocks.create).not.toHaveBeenCalled()
+    expect(mocks.create.mock.calls.length + mocks.update.mock.calls.length).toBe(savedBefore)
     await act(async () => { fireEvent.change(dialog.querySelector('input#approval-count')!, { target: { value: '10' } }) }); await flush()
     await click('今すぐ送る', dialog)
     expect(mocks.send).toHaveBeenCalledWith('draft', { confirmedRecipientCount: 10 })
