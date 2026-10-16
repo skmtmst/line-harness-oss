@@ -9,6 +9,7 @@
     "update:raw-color-baseline": "node ./scripts/raw-color-baseline.mjs",
     "update:direct-values-baseline": "node ./scripts/direct-values-baseline.mjs",
     "build": "next build",
+    "postbuild": "node ../../scripts/security/externalize-bootstrap.mjs out",
     "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "typecheck": "tsc --noEmit",
     "start": "next start",

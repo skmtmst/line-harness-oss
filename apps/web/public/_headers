@@ -1,10 +1,8 @@
-# The build copies this file to out/ (web) or dist/ (LIFF).
-# Script restrictions stay Report-Only until the B-351 browser findings are resolved.
+# Enforced on every static response. Web bootstrap scripts are externalized by postbuild.
 /*
   X-Robots-Tag: noindex, nofollow
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' https://static.line-scdn.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https:; frame-src 'self' https://challenges.cloudflare.com https://access.line.me; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; script-src-attr 'none'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.line-scdn.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https:; worker-src 'self' blob:; frame-src 'self' blob: https://challenges.cloudflare.com https://access.line.me; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; script-src-attr 'none'; form-action 'self'

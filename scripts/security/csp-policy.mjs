@@ -13,13 +13,12 @@ export function securityHeaders(source) {
     headers[name] = match[2];
   }
   assert.ok(headers['content-security-policy']);
-  assert.ok(headers['content-security-policy-report-only']);
   return headers;
 }
 
-export function assertReportingPolicy(headers, target) {
-  const report = headers['content-security-policy-report-only'];
-  assert.ok(report, 'Report-Only policy required in production build');
+export function assertEnforcedPolicy(headers, target) {
+  const report = headers['content-security-policy'];
+  assert.ok(report, 'enforced CSP required in production build');
   const directives = new Map(report.split(';').map(part => {
     const [name, ...sources] = part.trim().split(/\s+/);
     return [name, sources];
@@ -33,5 +32,8 @@ export function assertReportingPolicy(headers, target) {
   assert.ok(directives.get('style-src')?.includes('https://fonts.googleapis.com'));
   assert.ok(directives.get('font-src')?.includes('https://fonts.gstatic.com'));
   assert.ok(directives.get('connect-src')?.includes('https:'));
-  assert.ok(!headers['content-security-policy'].includes('script-src'), 'pending bootstrap findings must not be enforced');
+  assert.ok(!headers['content-security-policy-report-only'], 'policy must be enforced');
+  assert.deepEqual(directives.get('worker-src'), ["'self'", 'blob:']);
+  assert.ok(directives.get('frame-src')?.includes('blob:'));
+  assert.ok(!report.includes('*'), 'name specific hosts');
 }
