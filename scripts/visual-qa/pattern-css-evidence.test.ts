@@ -36,6 +36,7 @@ describe('CSSの使い先による所有監査', () => {
   })
   it.each([
     ':global(.state)[data-state="on"]',
+    '.state :global button[data-state="on"]',
     '.state:has(button)[data-state="on"]',
     '.unknown[data-state="on"]',
   ])('判断できない選択子は数える: %s', selector => {

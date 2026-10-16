@@ -55,7 +55,7 @@ export function cssConsumerIndex(files, read, codeRoot) {
 
 /** Local native elements own their state styles; shared/unknown targets stay guarded. */
 export function selectorTargetsNative(selector, uses) {
-  if (!uses || /:global\(/.test(selector)) return false
+  if (!uses || /:global\b/.test(selector)) return false
   return selector.split(',').every(part => {
     // Only simple compounds/combinators are proven. Keep :has/:is and unknown syntax.
     if (/:has\(|:is\(|:where\(|:not\(/.test(part)) return false

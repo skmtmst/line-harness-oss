@@ -296,7 +296,7 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
         && proof.imports?.[proof.tag]?.path === '@/components/shared/fixed-action-list' && codeRoot
         && existsSync(join(codeRoot, 'apps/web/src/components/shared/fixed-action-list.tsx'))) continue
       if (proof?.searchString && ['raw-grid', 'raw-dialog', 'raw-alert', 'raw-check', 'own-listbox'].includes(signal.id)) continue
-      if (signal.id === 'own-phone' && proof && !proof.returnsJsx) continue
+      if (signal.id === 'own-phone' && proof && (!proof.returnsJsx || proof.declarationReturnsJsx === false)) continue
       if (signal.id === 'own-phone' && ownedReturn(proof, pattern)) continue
       if (signal.id === 'own-types' && proof?.payloadType) continue
       // 1行の補足は一括操作の帯ではない。件数の文字だけで判定しない。
