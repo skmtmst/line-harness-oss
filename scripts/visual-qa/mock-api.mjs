@@ -4782,12 +4782,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       pagination: { limit: 50, cursor: 0, nextCursor: null },
     }
   }
+  /* U1 送る前の確かめ（板 F94nep・RxxfO）：契約 API-CONTRACT-GAP1 の send-preview。 */
+  if (/^\/api\/(hq\/)?broadcasts\/[^/]+\/send-preview$/.test(pathname)) {
+    return { success: true, data: { recipients: 1272, excluded: { blocked: 0, optedOut: 12, duplicate: 0, hidden: 0, missingDestination: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '【秋の新メニュー】10/18 からトリートメント 20%OFF', sender: { name: '渋谷店 予約係' }, expectedVersion: 2 } }
+  }
   /* G8 送り手（板 Asa6v）：契約 API-CONTRACT-GAP1 の LineSender。 */
   if (/^\/api\/line-accounts\/[^/]+\/senders$/.test(pathname)) {
-    return [
+    return { success: true, data: [
       { id: 'snd-1', name: '佐藤（然）', iconMediaId: null, iconUrl: null, visibility: 'all', ownerStaffId: null, status: 'active', version: 1 },
       { id: 'snd-2', name: '店長 Kenta', iconMediaId: null, iconUrl: null, visibility: 'owner_only', ownerStaffId: 'visual-qa-owner', status: 'active', version: 1 },
-    ]
+    ] }
   }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
