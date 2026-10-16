@@ -1,7 +1,7 @@
 .card { --pad: 16px; --gap-m: 12px; display: flex; flex-direction: column; gap: var(--gap-m); padding: var(--pad); border: 1px solid var(--color-hairline); border-radius: var(--radius-card); background: var(--color-canvas); }
 .title { margin: 0; font-size: var(--text-body); font-weight: 700; color: var(--color-ink); }
 .list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; font-size: var(--text-label); color: var(--color-ink); }
-.list li { display: grid; grid-template-columns: 64px 1fr auto; gap: var(--gap-m); padding: 8px 0; border-bottom: 1px solid var(--color-hairline); }
+.list li { --gap2-8: 8px; --gap2-64: 64px; display: grid; grid-template-columns: var(--gap2-64) 1fr auto; gap: var(--gap-m); padding: var(--gap2-8) 0; border-bottom: 1px solid var(--color-hairline); }
 .list li[data-current] { font-weight: 700; }
 .here { color: var(--color-success); font-weight: 600; }
 .actions { display: flex; gap: var(--gap-m); }

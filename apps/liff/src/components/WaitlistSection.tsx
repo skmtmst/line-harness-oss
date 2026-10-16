@@ -26,7 +26,7 @@ export default function WaitlistSection({ onChanged }: { onChanged?: () => void 
 
   useEffect(() => {
     let alive = true;
-    api.bookingWaitlists().then((r) => { if (alive) setRows(r.waitlist as WaitlistRow[]); }).catch((e) => { logFailure('waitlist-section', e); if (alive) setRows([]); });
+    Promise.resolve().then(() => api.bookingWaitlists()).then((r) => { if (alive) setRows(r.waitlist as WaitlistRow[]); }).catch((e) => { logFailure('waitlist-section', e); if (alive) setRows([]); });
     return () => { alive = false; };
   }, [reload]);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);

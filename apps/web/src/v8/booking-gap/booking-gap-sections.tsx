@@ -24,8 +24,8 @@ export default function BookingGapSections({ accountId, bookingId, customerName,
   useEffect(() => {
     let current = true
     setParty(null); setSeries(null)
-    void bookingPartyApi.get(accountId, bookingId).then((r) => { if (current) setParty(r.data) }).catch(() => undefined)
-    void bookingSeriesApi.ofBooking(accountId, bookingId).then((r) => { if (current) setSeries(r.data) }).catch(() => undefined)
+    void Promise.resolve().then(() => bookingPartyApi.get(accountId, bookingId)).then((r) => { if (current) setParty(r.data) }).catch(() => undefined)
+    void Promise.resolve().then(() => bookingSeriesApi.ofBooking(accountId, bookingId)).then((r) => { if (current) setSeries(r.data) }).catch(() => undefined)
     return () => { current = false }
   }, [accountId, bookingId, tick])
   const changed = useCallback(() => { setTick((n) => n + 1); onChanged() }, [onChanged])

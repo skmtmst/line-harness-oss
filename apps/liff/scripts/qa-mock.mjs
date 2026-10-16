@@ -483,6 +483,18 @@ const server = createServer(async (req, res) => {
     json(res, 200, { success: true, data: { matchedIndex: 1, routingToken: 'qa-routing-token', target: { menuId: 'qa-menu-online', menuName: 'オンライン相談 60 分', durationMinutes: 60, price: 3300, staffId: state.features.includes('routed-empty') ? 'qa-staff-empty' : 'qa-staff-1', staffName: '佐々木', meetingMode: 'online' } } });
     return;
   }
+  // ---- 繰り返しの確かめ（③-2 第2弾 B4：qOUmy）。3 回目だけ取れない（お休み）。 ----
+  if (method === 'POST' && pathname === '/api/liff/booking/series/preview') {
+    const body = await readBody(req);
+    const start = Date.parse(body.starts_at);
+    const count = Math.min(Math.max(Number(body.count) || 4, 2), 12);
+    json(res, 200, { occurrences: Array.from({ length: count }, (_, i) => {
+      const at = start + i * 7 * 86_400_000;
+      const blocked = i === 2;
+      return { index: i, starts_at: new Date(at).toISOString(), available: !blocked, ...(blocked ? { reason: 'お休み' } : {}), alternatives: blocked ? [1, 2, 3].map((h) => new Date(at + h * 3_600_000).toISOString()) : [] };
+    }) });
+    return;
+  }
   // ---- キャンセル待ち（③-2 第2弾：Zm2Vh・xANkO）。features に waitlist / waitlist-expired があるときだけ行を返す ----
   if (method === 'GET' && pathname === '/api/liff/booking/waitlist') {
     const base = { staff_id: 'qa-staff-1', menu_id: 'qa-menu-1', hold_minutes: 30, created_at: '2026-10-15T01:00:00.000Z', menu_name: 'トリミング（小型犬）', staff_name: '佐々木' };
@@ -557,6 +569,8 @@ const server = createServer(async (req, res) => {
         if (m.id === 'qa-menu-1') m.addons = [{ id: 'qa-addon-1', name: '歯みがき', duration_minutes: 15, price: 800 }, { id: 'qa-addon-2', name: '爪切り', duration_minutes: 10, price: 500 }];
       }
     }
+    /* ③-2 第2弾 B4：お客さまの繰り返し予約（qOUmy）。features に recurring があるときだけ。 */
+    if (state.features.includes('recurring')) { const m = menusBody.menus.find((x) => x.id === 'qa-menu-1'); if (m) m.recurring = { enabled: true, max_count: 12 }; }
     json(res, 200, menusBody);
     return;
   }

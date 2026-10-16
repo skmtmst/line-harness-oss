@@ -208,10 +208,17 @@ export default function Booking() {
         )}
         </div>
       </div>
-      {step === 'menu' && (stepReady || partyMode) && (
+      {step === 'menu' && !partyMode && stepReady && (
         <BottomBar>
-          {partyMode && menu ? <PartySummary party={party} first={menu} /> : null}
-          <Button variant="primary" disabled={!menu} onClick={() => { if (partyMode && party.size === 1) setStaff(null); setStep('staff'); }}>
+          <Button variant="primary" disabled={!menu} onClick={() => setStep('staff')}>
+            担当を選ぶ
+          </Button>
+        </BottomBar>
+      )}
+      {step === 'menu' && partyMode && menu && (
+        <BottomBar>
+          <PartySummary party={party} first={menu} />
+          <Button variant="primary" onClick={() => setStep('staff')}>
             担当を選ぶ
           </Button>
         </BottomBar>

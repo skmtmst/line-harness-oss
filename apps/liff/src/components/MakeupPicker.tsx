@@ -85,7 +85,7 @@ export default function MakeupPicker({ credit, justAbsent, onUsed, onLater }: {
             );
           })}
         </div>
-        {failed ? <p role="alert" className="text-[13px] text-danger">空いている回を読み込めませんでした。<button type="button" className="font-bold underline" onClick={load}>もう一度</button></p> : null}
+        {failed ? <p role="alert" className="text-[13px] text-danger">空いている回を読み込めませんでした。<Button variant="link" onClick={load}>もう一度</Button></p> : null}
         {options !== null && options.length === 0 ? (
           <p className="text-[13px] leading-5 text-liff-sub">期限内に空いている回がありません。お店にご相談ください。</p>
         ) : (

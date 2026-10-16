@@ -6,6 +6,7 @@ import {
   MAX_ADDONS, addonsOf, menuLine, menuOf, memberMinutes, personLabel, personShort, resize, totals, yen, type PartyMember, type PartyState,
 } from '../lib/party.js';
 import Button from './ui/Button.js';
+import { ChoiceInput } from './forms/controls.js';
 import Card from './ui/Card.js';
 import Icon from './ui/Icon.js';
 import LoadErrorView from './LoadErrorView.js';
@@ -77,19 +78,19 @@ export default function PartyMenuStep({ menu, party, onParty, onChangeMenu }: {
                   <p className="truncate text-sm font-bold text-ink">{mine.name}</p>
                   <p className="text-xs text-liff-sub">{`${memberMinutes(mine, member) - addonsOf(mine, member).reduce((n, a) => n + a.duration_minutes, 0)} 分 ・ ${bookingPriceText(mine.base_price, mine.price_mode)}`}</p>
                 </div>
-                <button type="button" className="shrink-0 text-sm font-bold text-liff-primary" onClick={() => (first ? onChangeMenu() : setPicking(index))}>変える</button>
+                <Button variant="link" onClick={() => (first ? onChangeMenu() : setPicking(index))}>変える</Button>
               </div>
             ) : (
               <div className="space-y-2" role="radiogroup" aria-label={`${personLabel(index)}のメニュー`}>
-                <button type="button" role="radio" aria-checked className="flex w-full items-start gap-2.5 text-left" onClick={() => setMember(index, { menu: null, addonIds: [] })}>
+                <Button variant="plain" role="radio" aria-checked className="items-start gap-2.5" onClick={() => setMember(index, { menu: null, addonIds: [] })}>
                   <span className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 border-liff-primary"><span className="h-2 w-2 rounded-full bg-liff-primary" /></span>
                   <span className="min-w-0"><span className="block text-[13px] font-bold text-ink">1 人目と同じ</span><span className="block text-xs text-liff-sub">{`${menu.name}${menu.duration_minutes} 分 ・ ${bookingPriceText(menu.base_price, menu.price_mode)}`}</span></span>
-                </button>
-                <button type="button" role="radio" aria-checked={false} className="flex w-full items-center gap-2.5 text-left" onClick={() => setPicking(index)}>
+                </Button>
+                <Button variant="plain" role="radio" aria-checked={false} className="items-center gap-2.5" onClick={() => setPicking(index)}>
                   <span className="h-[18px] w-[18px] shrink-0 rounded-full border-2 border-liff-line-strong" />
                   <span className="min-w-0 flex-1 text-[13px] text-ink">別のメニューを選ぶ</span>
                   <Icon name="chevron-right" className="h-[18px] w-[18px] shrink-0 text-liff-idle" />
-                </button>
+                </Button>
               </div>
             )}
             {(mine.addons?.length ?? 0) > 0 && (first || own) ? (
@@ -99,7 +100,7 @@ export default function PartyMenuStep({ menu, party, onParty, onChangeMenu }: {
                   const on = member.addonIds.includes(a.id);
                   return (
                     <label key={a.id} className="flex items-center gap-2.5 text-[13px] text-ink">
-                      <input type="checkbox" className="h-[18px] w-[18px] accent-[var(--color-liff-primary)]" checked={on} disabled={!on && member.addonIds.length >= MAX_ADDONS} onChange={() => toggleAddon(index, a.id)} />
+                      <ChoiceInput type="checkbox" checked={on} disabled={!on && member.addonIds.length >= MAX_ADDONS} onChange={() => toggleAddon(index, a.id)} />
                       <span>{`${a.name} +${a.duration_minutes} 分 ・ ${yen(a.price)}`}</span>
                     </label>
                   );
@@ -184,7 +185,7 @@ export function PartyStaffStep({ menu, party, onParty, onLoadState }: {
         <p className="mt-3.5 text-xs leading-[18px] text-liff-sub">{`${party.size} 人 ・ ${sum.sequential ? '続けて' : '同時に'} ${sum.minutes} 分`}</p>
       </div>
       <label className={`flex items-center gap-2.5 rounded-(--liff-radius-lg) p-3.5 text-sm font-bold text-ink outline-2 -outline-offset-1 ${allAny ? 'outline-liff-primary' : 'outline-liff-line'}`}>
-        <input type="checkbox" className="h-[18px] w-[18px] accent-[var(--color-liff-primary)]" checked={allAny}
+        <ChoiceInput type="checkbox" checked={allAny}
           onChange={(e) => { if (e.target.checked) onParty({ ...party, members: party.members.map((m, i) => ({ ...m, staff: chooseAny(m, menuOf(party, menu, i)), designated: false })) }); }} />
         全員 指名なし（空いている人）
       </label>

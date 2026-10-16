@@ -66,7 +66,7 @@ export default function EventBookings() {
   const [absenceTarget, setAbsenceTarget] = useState<EventBookingMine | null>(null);
   const [credits, setCredits] = useState<MakeupCredit[]>([]);
   const [justAbsent, setJustAbsent] = useState<string | null>(null);
-  const loadCredits = useCallback(() => { api.makeupCredits().then((r) => setCredits(r.credits.filter((c) => c.status === 'open'))).catch(() => setCredits([])); }, []);
+  const loadCredits = useCallback(() => { Promise.resolve().then(() => api.makeupCredits()).then((r) => setCredits(r.credits.filter((c) => c.status === 'open'))).catch(() => setCredits([])); }, []);
   useEffect(() => { loadCredits(); }, [loadCredits]);
 
   const refresh = useCallback(async () => {
