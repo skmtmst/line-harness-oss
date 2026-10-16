@@ -60,8 +60,8 @@ function assetContent(asset: BroadcastMessageAsset): Record<string, unknown> {
 
 /** 保存した吹き出し（messageBubblesJson）を画面の吹き出しに戻す。読めなければ本文1つ。 */
 function bubblesFromInput(saved: Pick<HqBroadcastInput, 'messageBubblesJson' | 'messageContent'>): Bubble[] {
-  const raw: unknown = saved.messageBubblesJson ? JSON.parse(saved.messageBubblesJson) : []
-  if (!Array.isArray(raw)) throw new Error('保存されたメッセージを読み取れませんでした。読み直してからお試しください。')
+  let raw: Array<{ id?: string; type?: string; content?: Record<string, unknown> }> = []
+  try { raw = saved.messageBubblesJson ? JSON.parse(saved.messageBubblesJson) : [] } catch { raw = [] }
   const list = (Array.isArray(raw) ? raw : []).flatMap((item): Bubble[] => { const b = fromApiBubble(item); return b ? [b] : [] })
   return list.length ? list.slice(0, MAX_BUBBLES) : [{ ...newBubble('text'), body: fromApiContent(saved.messageContent ?? '') }]
 }
