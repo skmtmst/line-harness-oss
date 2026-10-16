@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import Card from './ui/Card.js';
+import ProgressBar from './ui/ProgressBar.js';
 
 /*
  * 会員証の段（G5-3 板 I2pkdP）。マイル・紹介の画面の上に、今のランク・次の段まで・下がる予定を出す。
@@ -13,7 +14,10 @@ export interface MemberCardData {
   name: string;
   since: string;
   downgradeDueAt: string | null;
-  next: { name: string; remaining: number; metric: 'visits' | 'amount' | 'miles' } | null;
+  next: { name: string; remaining: number; metric: 'visits' | 'amount' | 'miles'; progress?: number } | null;
+  /** 受け口が返すようになったら出す行（Codex の組が追加中）。値が無い間は出さない。 */
+  memberNumber?: string | null;
+  benefit?: string | null;
 }
 
 const UNIT = { visits: '回の来店', amount: '円の購入', miles: 'マイル' } as const;
@@ -33,11 +37,13 @@ export async function fetchMemberCard(): Promise<MemberCardData | null> {
 export function MemberCardView({ card }: { card: MemberCardData }) {
   const goal = card.next && card.next.remaining > 0 ? `${card.next.name}まで あと ${card.next.remaining.toLocaleString()} ${UNIT[card.next.metric]}` : card.next ? `${card.next.name}の条件を満たしています` : '最上位のランクです';
   return <section aria-label="会員証" className="space-y-3">
-    <Card className="space-y-2 p-4">
-      <p className="text-xs text-ink-secondary">会員証</p>
-      <p className="text-2xl font-bold text-ink">{card.name}</p>
-      <p className="text-sm font-bold text-ink">{goal}</p>
-    </Card>
+    <div data-liff-card className="flex flex-col gap-2.5 rounded-(--liff-radius-lg) bg-liff-member-card p-4 text-white">
+      <div className="flex items-center justify-between text-xs text-liff-deep-sub"><span>会員証</span>{card.memberNumber ? <span>{`No. ${card.memberNumber}`}</span> : null}</div>
+      <p className="text-[28px] leading-9 font-bold">{card.name}</p>
+      {card.next && typeof card.next.progress === 'number' ? <ProgressBar value={card.next.progress} label={`${card.next.name}まで`} className="text-liff-member-bar" /> : null}
+      <p className="text-sm font-bold">{goal}</p>
+      {card.benefit ? <p className="text-xs text-liff-deep-sub">{`特典：${card.benefit}`}</p> : null}
+    </div>
     {card.downgradeDueAt ? <Card className="space-y-1 p-4">
       <p className="text-xs text-ink-secondary">ランクが下がる前のお知らせ</p>
       <p className="text-sm text-ink">{`${md(card.downgradeDueAt)} までに条件を満たすと、${card.name}のままです。`}</p>

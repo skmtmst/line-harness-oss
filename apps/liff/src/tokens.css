@@ -39,6 +39,9 @@
   --color-liff-deep: #0f3d24;
   /* 深い緑の箱の上の小さな字 (S3uBl の「使えるマイル」「マイル」)。 */
   --color-liff-deep-sub: #d7dbe0;
+  /* 会員証のカード（I2pkdP）の紺の地と、次の段までの進みの棒。 */
+  --color-liff-member-card: #2f3a4a;
+  --color-liff-member-bar: #e8c66a;
   --color-liff-wait-bg: #fff6e5;
   --color-liff-wait-ink: #b26b00;
   --color-liff-ok-bg: #e8f8ee;
