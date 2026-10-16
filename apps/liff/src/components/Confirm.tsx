@@ -132,20 +132,22 @@ export default function Confirm({
     <div className="space-y-3.5" data-design-node={wide ? 'uZqMA' : 'gLReL'}>
       <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
       <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
-        <Row label="メニュー" value={menu.name} />
+        <Row alignEnd={policy !== null} label="メニュー" value={menu.name} />
         <Row
+          alignEnd={policy !== null}
           label="日時"
           value={`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, staff.duration_minutes)}`}
         />
-        <Row label="担当" value={staff.display_name} />
+        <Row alignEnd={policy !== null} label="担当" value={staff.display_name} />
         <Row
+          alignEnd={policy !== null}
           label="料金"
           value={policy ? bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode) : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
         />
         {policy?.deposit ? (
           <>
-            <Row label="今お支払い（デポジット）" value={yen(policy.deposit.amount)} wideLabel />
-            <Row label="お店で" value={yen(Math.max(0, policy.price - policy.deposit.amount))} />
+            <Row alignEnd={policy !== null} label="今お支払い（デポジット）" value={yen(policy.deposit.amount)} wideLabel />
+            <Row alignEnd={policy !== null} label="お店で" value={yen(Math.max(0, policy.price - policy.deposit.amount))} />
           </>
         ) : null}
       </dl>
@@ -182,11 +184,11 @@ export default function Confirm({
 }
 
 /** 確認の1行。板 (gLReL) は 1行 40 (線を含む)・鍵と値は上ぞろえ。 */
-function Row({ label, value, wideLabel = false }: { label: string; value: string; wideLabel?: boolean }) {
+function Row({ label, value, wideLabel = false, alignEnd = false }: { label: string; value: string; wideLabel?: boolean; alignEnd?: boolean }) {
   return (
     <div className="flex h-10 items-start gap-2 py-2.5">
       <dt className={`${wideLabel ? 'whitespace-nowrap' : 'w-18'} shrink-0 text-xs text-liff-sub`}>{label}</dt>
-      <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={value}>
+      <dd className={`min-w-0 flex-1 truncate text-sm font-semibold text-ink${alignEnd ? ' text-right' : ''}`} title={value}>
         {value}
       </dd>
     </div>

@@ -18,8 +18,11 @@ export function liffDocumentTitle(title: string): string {
   return name ? `${name} | musubo` : 'musubo';
 }
 
-/** onBack を渡した段では、左の × の代わりに「‹」（戻る）を出す。ページの中に戻るリンクは置かない。 */
-export default function LiffHeader({ title, onBack }: { title: string; onBack?: () => void }) {
+/**
+ * onBack を渡した段では、左の × は「この段を閉じる」（前の段へ戻る）にする（絵 kwC8E の × のまま）。
+ * ページの中に戻るリンクは置かない。backLabel は読み上げの名前。
+ */
+export default function LiffHeader({ title, onBack, backLabel = '戻る' }: { title: string; onBack?: () => void; backLabel?: string }) {
   const [shopName, setShopName] = useState(cachedShopName);
 
   // ブラウザ・LINE の上に出る題も、帯の題と同じ画面名にする（「<画面名> | musubo」）。
@@ -45,8 +48,8 @@ export default function LiffHeader({ title, onBack }: { title: string; onBack?: 
     <header className="sticky top-0 z-10 border-b border-liff-line bg-canvas">
       <div className="mx-auto flex h-(--liff-header-h) w-full max-w-md items-center gap-2 px-3">
         {onBack ? (
-          <Button variant="icon" type="button" aria-label="戻る" onClick={onBack}>
-            <Icon name="chevron-left" className="h-5 w-5" />
+          <Button variant="icon" type="button" aria-label={backLabel} onClick={onBack}>
+            <Icon name="x" className="h-5 w-5" />
           </Button>
         ) : (
           <Button variant="icon"

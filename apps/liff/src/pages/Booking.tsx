@@ -111,7 +111,7 @@ export default function Booking() {
 
   return (
     <LiffLookScope className="min-h-screen bg-canvas">
-      <LiffHeader title="ご予約" onBack={step === 'confirm' ? () => setStep('datetime') : undefined} />
+      <LiffHeader title="ご予約" onBack={step === 'confirm' ? () => setStep('datetime') : undefined} backLabel="確かめを閉じて日時に戻る" />
       {(params.get('waitlist')||params.get('seat_waitlist'))&&<WaitlistOfferSheet id={params.get('waitlist')||params.get('seat_waitlist')!} seat={!!params.get('seat_waitlist')} decline={params.get('action')==='decline'} onClose={()=>{const next=new URLSearchParams(params);next.delete('waitlist');next.delete('seat_waitlist');next.delete('action');navigate({pathname:'/booking',search:next.toString()},{replace:true});}} />}
       {step !== 'done' && !waiting && !(step === 'datetime' && emptyDatetime) && <Stepper steps={steps} current={stepIndex} />}
       <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>
