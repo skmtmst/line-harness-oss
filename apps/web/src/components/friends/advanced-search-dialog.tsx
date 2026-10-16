@@ -1,6 +1,6 @@
 'use client'
 
-import { usePreparingDialog } from '@/components/shared/preparing-dialog'
+import { memberRanksApi } from '@/lib/api-gap3'
 import { useOverlayLayer } from '@/components/shared/overlay-utils'
 import TagOverflow from '@/components/shared/tag-overflow'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -52,6 +52,10 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
   status_message: 'ステータスメッセージ',
   created_at: '友だち登録日',
   chat_status: '対応状況',
+  visit_count: '来店の回数',
+  purchase_amount: '購入の合計金額',
+  last_activity_at: '最後の来店・購入の日',
+  member_tier: '会員ランク',
 }
 
 const BLOCK_HELP: Record<Block['kind'], string> = {
@@ -61,6 +65,10 @@ const BLOCK_HELP: Record<Block['kind'], string> = {
   status_message: 'ひとことに含む文字',
   created_at: '期間を指定',
   chat_status: '固定の4状態',
+  visit_count: '直近 1 年の来店',
+  purchase_amount: '直近 1 年の購入（返金後）',
+  last_activity_at: '期間外の来店・購入も含む最後の日',
+  member_tier: '会員ランクの段',
 }
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
@@ -177,8 +185,14 @@ export default function AdvancedSearchDialog({
   const marksFeatureEnabled = features?.marks !== false
   const fieldsFeatureEnabled = features?.fields !== false
   const [blocks, setBlocks] = useState<Block[]>(() => defaultBlocks(fieldsFeatureEnabled))
-  /* ★V8 fmToi：来店・購入・会員ランクの絞り込みは、一覧の受け口ができるまで形だけ残す。 */
-  const preparing = usePreparingDialog()
+  /* ★V8 fmToi：会員ランクの段の候補。ランクを動かしていない店では空。 */
+  const [rankTiers, setRankTiers] = useState<Array<{ id: string; name: string }>>([])
+  useEffect(() => {
+    if (!open || !accountId) return
+    let alive = true
+    memberRanksApi.program(accountId).then((r) => { if (alive && r.success) setRankTiers(r.data.tiers.map((t) => ({ id: t.id, name: t.name }))) }).catch(() => undefined)
+    return () => { alive = false }
+  }, [open, accountId])
   /* 共通の重なり番号：この窓の上に開く窓（準備中など）が後ろに回らない。 */
   const layer = useOverlayLayer(open)
   const [visibility, setVisibility] = useState<FriendVisibilityChoice>('visible')
@@ -347,6 +361,9 @@ export default function AdvancedSearchDialog({
       if (b.kind === 'created_at' && (b.from || b.to)) {
         out.push(`登録日 ${b.from || '…'} 〜 ${b.to || '…'}`)
       }
+      if ((b.kind === 'visit_count' || b.kind === 'purchase_amount') && (b.min || b.max)) out.push(`${BLOCK_LABEL[b.kind]} ${b.min || '…'} 〜 ${b.max || '…'}`)
+      if (b.kind === 'last_activity_at' && (b.from || b.to)) out.push(`最後の来店・購入 ${b.from || '…'} 〜 ${b.to || '…'}`)
+      if (b.kind === 'member_tier' && b.tierId) out.push(`会員ランク ${rankTiers.find((t) => t.id === b.tierId)?.name ?? '選択済み'}`)
       if (b.kind === 'chat_status') {
         out.push(
           `対応状況 ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済み' }[b.value]}`,
@@ -408,7 +425,13 @@ export default function AdvancedSearchDialog({
               ? { kind: 'status_message', keyword: '' }
               : kind === 'created_at'
                 ? { kind: 'created_at', from: '', to: '' }
-                : { kind: 'chat_status', value: 'unread' },
+                : kind === 'visit_count' || kind === 'purchase_amount'
+                  ? { kind, min: '', max: '' }
+                  : kind === 'last_activity_at'
+                    ? { kind: 'last_activity_at', from: '', to: '' }
+                    : kind === 'member_tier'
+                      ? { kind: 'member_tier', tierId: '' }
+                      : { kind: 'chat_status', value: 'unread' },
     ])
 
   const resetConditions = () => {
@@ -644,6 +667,24 @@ export default function AdvancedSearchDialog({
                   </div>
                 )}
 
+                {(b.kind === 'visit_count' || b.kind === 'purchase_amount') && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <TextInput className="w-36" type="number" min={0} value={b.min} onChange={(e) => patch(i, { ...b, min: e.target.value })} placeholder="下限なし" aria-label={`${BLOCK_LABEL[b.kind]}の下限`} />
+                    <span className="text-ink-faint text-sm">{b.kind === 'visit_count' ? '回以上〜' : '円以上〜'}</span>
+                    <TextInput className="w-36" type="number" min={0} value={b.max} onChange={(e) => patch(i, { ...b, max: e.target.value })} placeholder="上限なし" aria-label={`${BLOCK_LABEL[b.kind]}の上限`} />
+                    <span className="text-ink-faint text-sm">{b.kind === 'visit_count' ? '回以下' : '円以下'}</span>
+                  </div>
+                )}
+                {b.kind === 'last_activity_at' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DateField value={b.from} onChange={(next) => patch(i, { ...b, from: next })} aria-label="最後の来店・購入の日の開始" className="w-48" />
+                    <span className="text-ink-faint text-sm">〜</span>
+                    <DateField value={b.to} onChange={(next) => patch(i, { ...b, to: next })} aria-label="最後の来店・購入の日の終了" className="w-48" />
+                  </div>
+                )}
+                {b.kind === 'member_tier' && (
+                  <Select aria-label="会員ランク" value={b.tierId} onChange={(value) => patch(i, { ...b, tierId: value })} options={[{ value: '', label: 'ランクを選ぶ' }, ...rankTiers.map((t) => ({ value: t.id, label: `${t.name}の人` }))]} />
+                )}
                 {b.kind === 'chat_status' && (
                   <>
                     {/* FRIEND-05: 説明どおり固定4状態。保留も検索できる。 */}
@@ -686,10 +727,6 @@ export default function AdvancedSearchDialog({
                   ＋ {BLOCK_LABEL[k]}
                 </button>
               ))}
-              {['来店の回数', '購入の合計金額', '最後の来店・購入の日', '会員ランク'].map((label) => (
-                <button key={label} type="button" onClick={() => preparing.open(`${label}での絞り込み`)} className="text-action rounded-control px-1 py-1 text-xs font-semibold hover:bg-action-soft">＋ {label}</button>
-              ))}
-              {preparing.dialog}
           </div>
 
           {/* 編集画面で組み直せない保存済み条件。黙って落とさず外せる形で残す（FRIEND-32）。 */}

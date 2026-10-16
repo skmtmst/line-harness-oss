@@ -6,15 +6,18 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const api = vi.hoisted(() => ({ list: vi.fn(), save: vi.fn() }))
-vi.mock('@/lib/api-friend-delivery-consents', () => ({ friendDeliveryConsentsApi: api }))
+const api = vi.hoisted(() => ({ list: vi.fn(), save: vi.fn(), history: vi.fn() }))
+vi.mock('@/lib/api-friend-delivery-consents', () => ({ friendDeliveryConsentsApi: api, friendDeliveryConsentHistoryApi: { list: api.history } }))
 
 const { default: Drawer } = await import('./delivery-consent')
 
 const row = (purpose: string, state: string, source: string, version = 1) => ({ purpose, state, reason: '本人の操作', source, updatedBy: null, updatedAt: '2026-10-12T05:05:00.000Z', version })
 const ROWS = [row('transaction', 'granted', 'manual'), row('marketing', 'revoked', 'liff', 3)]
 
-beforeEach(() => { api.save.mockResolvedValue({ success: true, data: ROWS }) })
+beforeEach(() => {
+  api.save.mockResolvedValue({ success: true, data: ROWS })
+  api.history.mockResolvedValue({ success: true, data: { total: 1, nextCursor: null, items: [{ id: 1, purpose: 'marketing', operation: 'update', before: { state: 'granted', reason: '', source: 'manual', updatedBy: null, updatedAt: '', version: 2 }, after: { state: 'revoked', reason: '本人の操作', source: 'liff', updatedBy: null, updatedAt: '', version: 3 }, actor: { kind: 'self', id: null }, reason: '本人の操作', createdAt: '2026-10-12T05:05:00.000Z' }] } })
+})
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 const open = (canEdit = true) => render(<Drawer open friendId="f1" friendName="山田 花子" rows={ROWS as never} canEdit={canEdit} onClose={() => {}} onSaved={() => {}} />)
@@ -63,5 +66,14 @@ describe('配信の受け取り', () => {
     open(false)
     await screen.findAllByText('予約の連絡')
     expect(screen.queryByRole('button', { name: '変える' })).toBeNull()
+  })
+})
+
+describe('履歴（前 → 後）', () => {
+  it('口の履歴から、前の値・後の値・だれが変えたかを出す', async () => {
+    open()
+    expect(await screen.findByText('受け取る → 止めている')).toBeTruthy()
+    expect(screen.getByText('本人')).toBeTruthy()
+    expect(api.history).toHaveBeenCalledWith('f1', { limit: 20 })
   })
 })

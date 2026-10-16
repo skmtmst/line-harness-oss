@@ -23,6 +23,8 @@ import { notifySaved } from '@/components/shared/toast'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { bookingApi } from '@/lib/api'
 import { bookingPassPlansApi } from '@/lib/api-gap3'
+import { bookingPassNoticesApi, type PassNoticeSettings } from '@/lib/api-booking-pass-notices'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { formatNumber } from '@/lib/format'
 import { KIND_LABEL, STATUS_LABEL, countLabel, failureText, periodLabel, yen } from './words'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -64,6 +66,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
   const [busyId, setBusyId] = useState<string | null>(null)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [holdersOf, setHoldersOf] = useState<BookingPassPlan | null>(null)
+  const [noticeOf, setNoticeOf] = useState<BookingPassPlan | null>(null)
   const current = useRef(accountId)
   const errors = useSaveFormErrors()
   current.current = accountId
@@ -225,6 +228,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
                         ...(plan.status === 'draft' ? [{ id: 'edit', label: '編集する', onSelect: () => router.push(`/booking/passes/new?id=${encodeURIComponent(plan.id)}`) }] : []),
                         ...(plan.status === 'draft' || plan.status === 'stopped' ? [{ id: 'start', label: '販売を始める', disabled: busyId === plan.id, onSelect: () => setPending({ plan, action: 'start' }) }] : []),
                         ...(plan.status === 'on_sale' ? [{ id: 'stop', label: '販売をやめる', disabled: busyId === plan.id, onSelect: () => setPending({ plan, action: 'stop' }) }] : []),
+                        { id: 'notices', label: '残り・期限の知らせ', onSelect: () => setNoticeOf(plan) },
                         { id: 'duplicate', label: '複製', disabled: busyId === plan.id, onSelect: () => void duplicate(plan) },
                       ] : []),
                     ]}
@@ -261,6 +265,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
         onConfirm={() => void runPending()}
         onCancel={() => setPending(null)}
       />
+      {noticeOf ? <NoticeDialog accountId={accountId} plan={noticeOf} onClose={() => setNoticeOf(null)} /> : null}
       {holdersOf ? <HoldersDialog accountId={accountId} plan={holdersOf} onClose={() => setHoldersOf(null)} /> : null}
     </section></SaveErrorScope>
   )
@@ -304,5 +309,61 @@ function HoldersDialog({ accountId, plan, onClose }: { accountId: string; plan: 
         ) : null}
       </div>
     </Dialog>
+  )
+}
+
+/** 残り 1 回・期限の 14 日前の知らせ（試験運転：LINE へは送らず、送る予定を記録するだけ）。 */
+function NoticeDialog({ accountId, plan, onClose }: { accountId: string; plan: BookingPassPlan; onClose: () => void }) {
+  const [settings, setSettings] = useState<PassNoticeSettings | null>(null)
+  const [remainingOne, setRemainingOne] = useState(false)
+  const [expiry, setExpiry] = useState(false)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const errors = useSaveFormErrors()
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    let alive = true
+    bookingPassNoticesApi.settings(accountId, plan.id)
+      .then((response) => {
+        if (!alive) return
+        if (!response.success) throw new Error('settings_failed')
+        setSettings(response.data); setRemainingOne(response.data.remainingOne); setExpiry(response.data.expiry14Days); setStatus('ready')
+      })
+      .catch(() => { if (alive) setStatus('error') })
+    return () => { alive = false }
+  }, [accountId, plan.id, attempt])
+
+  const save = async () => {
+    if (!settings) return
+    setBusy(true); setMessage('')
+    try {
+      const response = await bookingPassNoticesApi.save(accountId, plan.id, { remainingOne, expiry14Days: expiry, expectedVersion: settings.version })
+      if (!response.success) throw new Error('save_failed')
+      notifySaved('知らせの設定を保存しました。')
+      onClose()
+    } catch (reason) {
+      if (!errors.capture(reason)) setMessage('保存できませんでした。ほかの人が先に変えたかもしれません。開き直してもう一度お試しください。')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <SaveErrorScope errors={errors}><Dialog open title={`${plan.name}の残り・期限の知らせ`} confirmLabel="保存する" busy={busy} confirmDisabled={status !== 'ready'} onConfirm={() => void save()} onCancel={onClose}>
+      <div className={styles.dialogBody}>
+        {status === 'loading' ? <ListState kind="loading" title="読み込んでいます" /> : null}
+        {status === 'error' ? <ListState kind="error" onRetry={() => { setStatus('loading'); setAttempt((n) => n + 1) }} /> : null}
+        {status === 'ready' ? (
+          <>
+            {message ? <Notice tone="danger" message={message} /> : null}
+            <p className={styles.note}>今は試験運転です。LINE へは送らず、送る予定だけを記録します。</p>
+            <span className={styles.picked}><SettingCheckbox checked={remainingOne} onChange={setRemainingOne} label="残りが 1 回になったら知らせる" /><span>残りが 1 回になったら知らせる</span></span>
+            <span className={styles.picked}><SettingCheckbox checked={expiry} onChange={setExpiry} label="期限の 14 日前に知らせる" /><span>期限の 14 日前に知らせる</span></span>
+          </>
+        ) : null}
+      </div>
+    </Dialog></SaveErrorScope>
   )
 }

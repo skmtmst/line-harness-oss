@@ -12,7 +12,7 @@ import Radio from '@/components/shared/radio'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { notifySaved } from '@/components/shared/toast'
-import { friendDeliveryConsentsApi, type FriendDeliveryConsent } from '@/lib/api-friend-delivery-consents'
+import { friendDeliveryConsentHistoryApi, friendDeliveryConsentsApi, type FriendDeliveryConsent, type FriendDeliveryConsentEvent } from '@/lib/api-friend-delivery-consents'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './delivery-consent.module.css'
 
@@ -33,6 +33,8 @@ const STATE_TONE: Record<FriendDeliveryConsent['state'], 'success' | 'danger' | 
 const STATES: FriendDeliveryConsent['state'][] = ['granted', 'revoked', 'unknown']
 
 const md = (value: string) => `${Number(value.slice(5, 7))}/${Number(value.slice(8, 10))} ${value.slice(11, 16)}`
+const ACTOR: Record<FriendDeliveryConsentEvent['actor']['kind'], string> = { self: '本人', store: '店', system: 'システム', unknown: '不明' }
+const stateOf = (side: FriendDeliveryConsentEvent['before']) => (side ? STATE_LABEL[side.state] : '—')
 const bySelf = (row: FriendDeliveryConsent | undefined) => Boolean(row && row.source !== 'manual')
 
 export function useDeliveryConsents(friendId: string) {
@@ -78,6 +80,19 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const errors = useSaveFormErrors()
+  const [events, setEvents] = useState<FriendDeliveryConsentEvent[] | null>(null)
+  const [historyFailed, setHistoryFailed] = useState(false)
+  const loadHistory = useCallback(async () => {
+    try {
+      const response = await friendDeliveryConsentHistoryApi.list(friendId, { limit: 20 })
+      if (!response.success) throw new Error('history_failed')
+      setEvents(Array.isArray(response.data?.items) ? response.data.items : [])
+      setHistoryFailed(false)
+    } catch {
+      setHistoryFailed(true)
+    }
+  }, [friendId])
+  useEffect(() => { if (open) void loadHistory() }, [open, loadHistory])
 
   const rowOf = (key: string) => rows.find((row) => row.purpose === key)
   const begin = (key: string) => {
@@ -94,6 +109,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
       notifySaved('配信の受け取りを保存しました。')
       setWarn(false); setEditing(null)
       await onSaved()
+      await loadHistory()
     } catch (reason) {
       setWarn(false)
       if (!errors.capture(reason)) setError('保存できませんでした。ほかの人が先に変えたかもしれません。読み直したので、もう一度お試しください。')
@@ -111,7 +127,6 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
     void commit()
   }
 
-  const history = rows.filter((row) => row.updatedAt).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   const label = (key: string) => PURPOSES.find((item) => item.key === key)?.label ?? key
 
   return (
@@ -164,16 +179,16 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
         ) : null}
         <section aria-label="履歴">
           <h3 className={styles.sectionTitle}>履歴</h3>
-          {history.length === 0 ? <p className={styles.faint}>まだ記録はありません。</p> : (
+          {historyFailed ? <p className={styles.faint}>履歴を読み込めませんでした。</p> : events === null ? <p className={styles.faint}>読み込んでいます</p> : events.length === 0 ? <p className={styles.faint}>まだ記録はありません。</p> : (
             <DataTable>
-              <thead><TableHeadRow><Th>いつ</Th><Th>目的</Th><Th>状態</Th><Th>だれ</Th></TableHeadRow></thead>
+              <thead><TableHeadRow><Th>いつ</Th><Th>目的</Th><Th>前 → 後</Th><Th>だれ</Th></TableHeadRow></thead>
               <tbody>
-                {history.map((row) => (
-                  <Tr key={`${row.purpose}-${row.version}`}>
-                    <Td>{md(row.updatedAt)}</Td>
-                    <Td>{label(row.purpose)}</Td>
-                    <Td>{STATE_LABEL[row.state]}</Td>
-                    <Td><span title={row.reason}>{row.source === 'manual' ? (row.updatedBy ?? 'スタッフ') : '本人'}</span></Td>
+                {events.map((event) => (
+                  <Tr key={event.id}>
+                    <Td>{md(event.createdAt)}</Td>
+                    <Td>{label(event.purpose)}</Td>
+                    <Td>{`${stateOf(event.before)} → ${stateOf(event.after)}`}</Td>
+                    <Td><span title={event.reason ?? undefined}>{ACTOR[event.actor.kind]}</span></Td>
                   </Tr>
                 ))}
               </tbody>

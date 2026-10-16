@@ -11,14 +11,14 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import NumberField from '@/components/shared/number-field'
-import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { RowMenu } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
-import { TextField } from '@/components/shared/text-field'
+import { TextArea, TextField } from '@/components/shared/text-field'
 import { notifySaved } from '@/components/shared/toast'
 import { ApiError } from '@/lib/api'
 import { useAccount as useAccountContext } from '@/contexts/account-context'
@@ -129,9 +129,9 @@ export default function RanksTab() {
     }
   }
 
-  const saveProgram = (next: Partial<Pick<RankProgram, 'metric' | 'windowMonths'>>) => {
+  const saveProgram = (next: Partial<Pick<RankProgram, 'metric' | 'windowMonths' | 'notifyUpgrade' | 'notifyDowngrade'>>) => {
     if (!accountId || !program) return
-    void run('保存する', () => memberRanksApi.save(accountId, { metric: next.metric ?? program.metric, windowMonths: next.windowMonths ?? program.windowMonths, expectedVersion: program.version }), '数える物と期間を保存しました。')
+    void run('保存する', () => memberRanksApi.save(accountId, { metric: next.metric ?? program.metric, windowMonths: next.windowMonths ?? program.windowMonths, notifyUpgrade: next.notifyUpgrade ?? program.notifyUpgrade, notifyDowngrade: next.notifyDowngrade ?? program.notifyDowngrade, expectedVersion: program.version }), 'ランクの設定を保存しました。')
   }
 
   const saveTiers = async (next: RankTier[]) => {
@@ -163,8 +163,8 @@ export default function RanksTab() {
               <Td>{index === 0 ? <span className={styles.empty}>—</span> : downText(program, tier)}</Td>
               <Td>
                 {tier.mileMultiplier > 1
-                  ? <>{`${tier.mileMultiplier} 倍`}<span className={styles.sub}>{`倍率は${PREPARING_WORD}`}</span></>
-                  : <span className={styles.empty}>—</span>}
+                  ? <>{`${tier.mileMultiplier} 倍`}{tier.benefitDescriptions?.length ? <span className={styles.sub} title={tier.benefitDescriptions.join(' ・ ')}>{tier.benefitDescriptions.join(' ・ ')}</span> : null}</>
+                  : tier.benefitDescriptions?.length ? <span title={tier.benefitDescriptions.join(' ・ ')}>{tier.benefitDescriptions.join(' ・ ')}</span> : <span className={styles.empty}>—</span>}
               </Td>
               <Td align="right">{count === undefined ? <span className={styles.empty}>—</span> : `${formatNumber(count)} 人`}</Td>
               <ActionCell>
@@ -190,7 +190,9 @@ export default function RanksTab() {
   )
 
   const sampleTier = tiers[tiers.length > 1 ? 1 : 0]
-  const sampleText = sample === 'up'
+  const messageOf = (list?: Array<{ text: string }>) => list?.map((m) => m.text).join('\n') ?? ''
+  const sampleCustom = sample === 'up' ? messageOf(sampleTier?.upgradeMessages) : messageOf(sampleTier?.downgradeMessages)
+  const sampleText = sampleCustom ? sampleCustom : sample === 'up'
     ? `${sampleTier?.name ?? 'ゴールド'}になりました。いつもありがとうございます。今日からマイルが ${sampleTier?.mileMultiplier ?? 1.5} 倍です。`
     : `あと 1 回のご来店で、${sampleTier?.name ?? 'ゴールド'}のままです。期限は 14 日後です。`
 
@@ -229,13 +231,17 @@ export default function RanksTab() {
               <span className={styles.settingsLabel}>数える物</span>
               <Select aria-label="数える物" value={program.metric} options={METRIC_OPTIONS} onChange={(value) => saveProgram({ metric: value as RankProgram['metric'] })} disabled={busy} />
               <span className={styles.settingsLabel}>期間</span>
+              <SettingCheckbox checked={program.notifyUpgrade} label="上がったときに知らせる" onChange={(checked) => saveProgram({ notifyUpgrade: checked })} disabled={busy} />
+              <span className={styles.settingsLabel}>上がったときに知らせる</span>
+              <SettingCheckbox checked={program.notifyDowngrade} label="下がる前に知らせる" onChange={(checked) => saveProgram({ notifyDowngrade: checked })} disabled={busy} />
+              <span className={styles.settingsLabel}>下がる前に知らせる</span>
               <Select aria-label="数える期間" value={String(program.windowMonths)} options={Array.from(new Set([...WINDOW_OPTIONS, program.windowMonths])).sort((a, b) => a - b).map((value) => ({ value: String(value), label: windowLabel(value) }))} onChange={(value) => saveProgram({ windowMonths: Number(value) })} disabled={busy} />
             </div>
           ) : null}
           {tiers.length === 0 ? (
             <ListState kind="empty" title="まだランクがありません" description="段を足すと、来店や購入に合わせて会員ランクを付けられます。" />
           ) : table}
-          <p className={styles.note}>条件を下回っても、14 日の猶予のあとに 1 つ下がります。下がる 14 日前に LINE で知らせる予定です（LINE の通知は{PREPARING_WORD}）。段を保存すると、いったん止まります。</p>
+          <p className={styles.note}>条件を下回っても、14 日の猶予のあとに 1 つ下がります。下がる 14 日前にお知らせします（今は試験運転で、LINE へは送らず記録だけ残します）。段を保存すると、いったん止まります。</p>
         </section>
       </div>
       {narrow ? <div className={styles.launcher}>
@@ -328,6 +334,10 @@ function TierDialog({ tier, program, prev, next, isFirst, busy, onCancel, onSave
   const [name, setName] = useState(tier?.name ?? '')
   const [threshold, setThreshold] = useState(String(tier?.threshold ?? (prev ? prev.threshold + 1 : 0)))
   const [multiplier, setMultiplier] = useState(String(tier?.mileMultiplier ?? 1))
+  const [benefits, setBenefits] = useState((tier?.benefitDescriptions ?? []).join('\n'))
+  const [coupon, setCoupon] = useState(tier?.couponCode ?? '')
+  const [upText, setUpText] = useState((tier?.upgradeMessages ?? []).map((m) => m.text).join('\n'))
+  const [downText, setDownText] = useState((tier?.downgradeMessages ?? []).map((m) => m.text).join('\n'))
   const [errors, setErrors] = useState<{ name?: string; threshold?: string; multiplier?: string }>({})
 
   const submit = () => {
@@ -343,7 +353,15 @@ function TierDialog({ tier, program, prev, next, isFirst, busy, onCancel, onSave
     if (!Number.isFinite(mul) || mul < 1 || mul > 3) found.multiplier = '1〜3 の数を入れてください。'
     setErrors(found)
     if (Object.keys(found).length) return
-    onSave({ id: tier?.id ?? crypto.randomUUID(), name: name.trim(), threshold: isFirst ? 0 : th, mileMultiplier: mul })
+    const lines = (value: string) => value.split('\n').map((line) => line.trim()).filter(Boolean)
+    onSave({
+      ...(tier ?? {}),
+      id: tier?.id ?? crypto.randomUUID(), name: name.trim(), threshold: isFirst ? 0 : th, mileMultiplier: mul,
+      benefitDescriptions: lines(benefits),
+      couponCode: coupon.trim() || null,
+      upgradeMessages: lines(upText).slice(0, 5).map((text) => ({ type: 'text' as const, text })),
+      downgradeMessages: lines(downText).slice(0, 5).map((text) => ({ type: 'text' as const, text })),
+    })
   }
 
   return (
@@ -356,6 +374,10 @@ function TierDialog({ tier, program, prev, next, isFirst, busy, onCancel, onSave
         <Field label="特典（マイルの倍率）" error={errors.multiplier} note="1 は特典なし。上の段ほど大きくします（1〜3）。">
           <NumberField aria-label="特典（マイルの倍率）" value={multiplier} unit="倍" min={1} max={3} step={0.1} onChange={(event) => setMultiplier(event.target.value)} />
         </Field>
+        <Field label="特典の説明" note="1 行に 1 つ。お客さまの会員証に出ます（10 個まで）。"><TextArea aria-label="特典の説明" value={benefits} rows={3} onChange={(event) => setBenefits(event.target.value)} /></Field>
+        <Field label="クーポンコード" note="上がったときのお知らせに添えます。"><TextField aria-label="クーポンコード" value={coupon} maxLength={100} onChange={(event) => setCoupon(event.target.value)} /></Field>
+        <Field label="上がったときのお知らせ" note="1 行が 1 通。空のままなら、決まった文を使います。"><TextArea aria-label="上がったときのお知らせ" value={upText} rows={3} onChange={(event) => setUpText(event.target.value)} /></Field>
+        <Field label="下がる前のお知らせ" note="下がる 14 日前に。空のままなら、決まった文を使います。"><TextArea aria-label="下がる前のお知らせ" value={downText} rows={3} onChange={(event) => setDownText(event.target.value)} /></Field>
       </div>
     </Dialog>
   )

@@ -83,7 +83,7 @@ export function gap3Respond(method, pathname, body = {}, query = new URLSearchPa
 
   if (method === 'GET' && pathname === '/api/member-ranks/program') {
     return ok({
-      metric: 'visits', windowMonths: 12, status: 'stopped', version: 4, activatedAt: null, notificationsAvailable: false,
+      metric: 'visits', windowMonths: 12, status: 'stopped', version: 4, activatedAt: null, notificationsAvailable: false, simulationAvailable: true, testMode: true, notifyUpgrade: true, notifyDowngrade: true,
       tiers: [
         { id: 't-1', name: 'ブロンズ', threshold: 0, mileMultiplier: 1 },
         { id: 't-2', name: 'シルバー', threshold: 3, mileMultiplier: 1.2 },
@@ -96,6 +96,15 @@ export function gap3Respond(method, pathname, body = {}, query = new URLSearchPa
   }
   if (pathname.startsWith('/api/member-ranks/')) return ok({ metric: 'visits', windowMonths: 12, status: 'active', version: 5, activatedAt: '2026-10-16T00:00:00.000Z', tiers: [], notificationsAvailable: false })
 
+  if (method === 'POST' && pathname === '/api/hq/store-comparison/export') return ok({ id: 'ex-1', replayed: false })
+  if (method === 'GET' && /^\/api\/hq\/store-comparison\/exports\/[^/]+$/.test(pathname)) return ok({ id: 'ex-1', status: 'completed', rowCount: 12, downloadUrl: null, errorCode: null })
+  if (method === 'GET' && /^\/api\/friends\/[^/]+\/delivery-consents\/history$/.test(pathname)) {
+    const side = (state, source) => ({ state, reason: '', source, updatedBy: null, updatedAt: '2026-10-12T05:05:00.000Z', version: 1 })
+    return ok({ total: 3, nextCursor: null, items: [
+      { id: 3, purpose: 'marketing', operation: 'update', before: side('granted', 'manual'), after: side('revoked', 'liff'), actor: { kind: 'self', id: null }, reason: '本人の操作', createdAt: '2026-10-12T05:05:00.000Z' },
+      { id: 2, purpose: 'notice', operation: 'insert', before: null, after: side('granted', 'manual'), actor: { kind: 'store', id: 'Kenta' }, reason: '電話で了承', createdAt: '2026-10-01T01:00:00.000Z' },
+    ] })
+  }
   if (method === 'GET' && pathname === '/api/hq/store-comparison') {
     const size = Number(query.get('pageSize') ?? 20)
     const sort = query.get('sort') ?? 'bookings'
@@ -118,7 +127,7 @@ export function gap3Respond(method, pathname, body = {}, query = new URLSearchPa
       { id: 'h2', from_tier_id: null, to_tier_id: 't-1', reason: 'activated', at: '2026-10-01T01:00:00.000Z' },
     ] })
   }
-  if (/^\/api\/friends\/[^/]+\/delivery-consents/.test(pathname)) {
+  if (/^\/api\/friends\/[^/]+\/delivery-consents$/.test(pathname)) {
     const row = (purpose, state, source, version) => ({ purpose, state, reason: source === 'manual' ? '電話で了承' : '本人の操作', source, updatedBy: source === 'manual' ? 'Kenta' : null, updatedAt: '2026-10-12T05:05:00.000Z', version })
     return ok([row('transaction', 'granted', 'manual', 1), row('notice', 'granted', 'manual', 1), row('marketing', 'revoked', 'liff', 3)])
   }

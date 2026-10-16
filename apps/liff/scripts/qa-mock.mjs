@@ -973,7 +973,7 @@ const server = createServer(async (req, res) => {
     }
   }
   if (method === 'GET' && pathname === '/api/liff/member-card') {
-    json(res, 200, { success: true, data: { name: 'シルバー', since: '2026-09-01T00:00:00.000Z', downgradeDueAt: '2026-12-31T00:00:00.000Z', next: { name: 'ゴールド', remaining: 2, metric: 'visits', progress: 0.65 }, memberNumber: '0012-3456', benefit: 'マイル 1.2 倍 ・ 誕生月 10% OFF' } });
+    json(res, 200, { success: true, data: { name: 'シルバー', since: '2026-09-01T00:00:00.000Z', downgradeDueAt: '2026-12-31T00:00:00.000Z', next: { name: 'ゴールド', remaining: 2, metric: 'visits', progress: 0.65 }, memberNumber: '0012-3456', benefits: ['マイル 1.2 倍', '誕生月 10% OFF'], benefitDetails: { couponCode: null, mileMultiplier: 1.2 } } });
     return;
   }
   if (method === 'GET' && pathname === '/api/liff/mileage/me') {

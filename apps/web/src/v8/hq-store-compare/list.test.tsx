@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { diffTone, formatDiff, formatMetric, METRICS } from './metrics'
 
-const api = vi.hoisted(() => ({ get: vi.fn(), detail: vi.fn() }))
+const api = vi.hoisted(() => ({ get: vi.fn(), detail: vi.fn(), export: vi.fn(), exportStatus: vi.fn(), download: vi.fn() }))
 vi.mock('@/lib/api-gap3', () => ({ storeComparisonApi: api }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/hq/store-comparison', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', setSelectedAccountId: vi.fn(), loading: false }) }))
@@ -83,10 +83,29 @@ describe('店の比較の表', () => {
     expect(api.detail).toHaveBeenCalledWith('s1', expect.any(String), expect.any(String))
   })
 
-  it('CSV と店の組は口が無いので「現在準備中です」の窓を出す', async () => {
+  it('CSV は書き出しを頼み、できたら受け取る（今の並び・比べる相手のまま）', async () => {
+    api.export.mockResolvedValue({ success: true, data: { id: 'x1', replayed: false } })
+    api.exportStatus.mockResolvedValue({ success: true, data: { id: 'x1', status: 'completed', rowCount: 2, downloadUrl: null, errorCode: null } })
+    api.download.mockResolvedValue(undefined)
     render(<StoreComparisonList />)
     await screen.findByText('大宮店')
-    fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' })) })
+    await waitFor(() => expect(api.download).toHaveBeenCalledWith('x1'))
+    expect(api.export).toHaveBeenCalledWith(expect.objectContaining({ sort: 'bookings', order: 'asc', compare: 'previous' }), expect.any(String))
+  })
+
+  it('書き出しに失敗したら理由を知らせる', async () => {
+    api.export.mockRejectedValue(new Error('down'))
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' })) })
+    expect(await screen.findByText(/CSV を書き出せませんでした/)).toBeTruthy()
+  })
+
+  it('店の組は口が無いので「現在準備中です」の窓を出す', async () => {
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    fireEvent.click(screen.getByRole('button', { name: '店の組：すべて' }))
     expect((await screen.findByRole('dialog')).textContent).toContain('現在準備中です')
   })
 

@@ -72,6 +72,11 @@ export type FriendSearchBlock =
   | { kind: 'status_message'; keyword: string }
   | { kind: 'created_at'; from: string; to: string }
   | { kind: 'chat_status'; value: 'unread' | 'in_progress' | 'on_hold' | 'resolved' }
+  /* 来店・購入・会員ランク（fmToi）：回数・金額は下限と上限、日は期間、ランクは段の ID。 */
+  | { kind: 'visit_count'; min: string; max: string }
+  | { kind: 'purchase_amount'; min: string; max: string }
+  | { kind: 'last_activity_at'; from: string; to: string }
+  | { kind: 'member_tier'; tierId: string }
 
 /** 「表示する友だち」の選択肢。空文字を使い回す二重管理はしない。 */
 export type FriendVisibilityChoice = 'visible' | 'hidden' | 'blocked' | 'all'
@@ -115,6 +120,17 @@ export function blockToConditions(block: FriendSearchBlock): SavedSearchConditio
     }
     case 'chat_status':
       return [{ kind: 'chat_status', op: 'eq', value: block.value }]
+    case 'visit_count':
+    case 'purchase_amount': {
+      const min = block.min.trim() === '' ? undefined : Number(block.min)
+      const max = block.max.trim() === '' ? undefined : Number(block.max)
+      if (min === undefined && max === undefined) return []
+      return [{ kind: block.kind, op: 'between', value: { min, max } }]
+    }
+    case 'last_activity_at':
+      return block.from || block.to ? [{ kind: 'last_activity_at', op: 'between', value: { from: block.from || undefined, to: block.to || undefined } }] : []
+    case 'member_tier':
+      return block.tierId ? [{ kind: 'member_tier', op: 'eq', value: block.tierId }] : []
   }
 }
 
@@ -223,6 +239,20 @@ export function conditionsToEditorState(conditions: SavedSearchConditions): Frie
         kind: 'chat_status',
         value: condition.value as 'unread' | 'in_progress' | 'on_hold' | 'resolved',
       })
+      continue
+    }
+    if ((condition.kind === 'visit_count' || condition.kind === 'purchase_amount') && condition.op === 'between' && condition.value && typeof condition.value === 'object') {
+      const range = condition.value as { min?: unknown; max?: unknown }
+      blocks.push({ kind: condition.kind, min: typeof range.min === 'number' ? String(range.min) : '', max: typeof range.max === 'number' ? String(range.max) : '' })
+      continue
+    }
+    if (condition.kind === 'last_activity_at' && condition.op === 'between' && condition.value && typeof condition.value === 'object') {
+      const range = condition.value as { from?: unknown; to?: unknown }
+      blocks.push({ kind: 'last_activity_at', from: typeof range.from === 'string' ? range.from : '', to: typeof range.to === 'string' ? range.to : '' })
+      continue
+    }
+    if (condition.kind === 'member_tier' && condition.op === 'eq' && typeof condition.value === 'string') {
+      blocks.push({ kind: 'member_tier', tierId: condition.value })
       continue
     }
     if (condition.kind === 'following' && condition.op === 'eq' && typeof condition.value === 'boolean') {
@@ -337,6 +367,16 @@ export function describeSavedCondition(
     const assigneeName = labels.assignees?.[raw] ?? (raw ? '選択済みの担当者' : '未指定')
     return NEGATED_OPS.has(condition.op) ? `担当者が「${assigneeName}」以外` : `担当者が「${assigneeName}」`
   }
+  if (condition.kind === 'visit_count' || condition.kind === 'purchase_amount') {
+    const r = (condition.value ?? {}) as { min?: number; max?: number }
+    const unit = condition.kind === 'visit_count' ? '回' : '円'
+    return `${condition.kind === 'visit_count' ? '来店の回数' : '購入の合計金額'} ${r.min ?? '…'}${unit} 〜 ${r.max ?? '…'}${unit}`
+  }
+  if (condition.kind === 'last_activity_at') {
+    const r = (condition.value ?? {}) as { from?: string; to?: string }
+    return `最後の来店・購入の日 ${r.from ?? '…'} 〜 ${r.to ?? '…'}`
+  }
+  if (condition.kind === 'member_tier') return '会員ランクを指定'
   if (condition.kind === 'chat_status') return `対応状況が「${CHAT_STATUS_LABELS[raw] ?? (raw ? '選択済みの状態' : '未指定')}」`
   if (condition.kind === 'following') return condition.value === true ? '友だち中' : 'ブロック済み'
   if (condition.kind === 'created_at') return singleDateLabel(condition, '友だち追加日')

@@ -20,7 +20,7 @@ vi.mock('./frame', async (importOriginal) => {
 const { default: RanksTab } = await import('./ranks')
 
 const PROGRAM = {
-  metric: 'visits', windowMonths: 12, status: 'stopped', version: 4, activatedAt: null, notificationsAvailable: false,
+  metric: 'visits', windowMonths: 12, status: 'stopped', version: 4, activatedAt: null, notificationsAvailable: false, notifyUpgrade: true, notifyDowngrade: true,
   tiers: [
     { id: 't1', name: 'ブロンズ', threshold: 0, mileMultiplier: 1 },
     { id: 't2', name: 'シルバー', threshold: 3, mileMultiplier: 1.2 },
@@ -73,9 +73,12 @@ describe('会員ランクの表', () => {
     expect(screen.queryByRole('button', { name: 'シルバーの操作' })).toBeNull()
   })
 
-  it('通知と倍率は口が無いので、表の注記で「準備中」と伝える', async () => {
+  it('知らせは試験運転と伝え、上がったとき・下がる前の設定を保存できる', async () => {
+    api.save.mockResolvedValue({ success: true, data: PROGRAM })
     render(<RanksTab />)
     await screen.findByText('シルバー')
-    expect(screen.getAllByText(/準備中/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/試験運転で、LINE へは送らず記録だけ/)).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: '下がる前に知らせる' })) })
+    await waitFor(() => expect(api.save).toHaveBeenCalledWith('a', expect.objectContaining({ notifyDowngrade: false, notifyUpgrade: true, expectedVersion: 4 })))
   })
 })

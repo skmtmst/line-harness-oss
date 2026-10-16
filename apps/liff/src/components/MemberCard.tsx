@@ -14,10 +14,10 @@ export interface MemberCardData {
   name: string;
   since: string;
   downgradeDueAt: string | null;
-  next: { name: string; remaining: number; metric: 'visits' | 'amount' | 'miles'; progress?: number } | null;
-  /** 受け口が返すようになったら出す行（Codex の組が追加中）。値が無い間は出さない。 */
+  next: { name: string; remaining: number; metric: 'visits' | 'amount' | 'miles'; progress: number } | null;
+  /** 会員番号と特典の行（受け口が返す）。値が無いときは出さない。 */
   memberNumber?: string | null;
-  benefit?: string | null;
+  benefits?: string[];
 }
 
 const UNIT = { visits: '回の来店', amount: '円の購入', miles: 'マイル' } as const;
@@ -42,7 +42,7 @@ export function MemberCardView({ card }: { card: MemberCardData }) {
       <p className="text-[28px] leading-9 font-bold">{card.name}</p>
       {card.next && typeof card.next.progress === 'number' ? <ProgressBar value={card.next.progress} label={`${card.next.name}まで`} className="text-liff-member-bar" /> : null}
       <p className="text-sm font-bold">{goal}</p>
-      {card.benefit ? <p className="text-xs text-liff-deep-sub">{`特典：${card.benefit}`}</p> : null}
+      {card.benefits && card.benefits.length > 0 ? <p className="text-xs text-liff-deep-sub">{`特典：${card.benefits.join(' ・ ')}`}</p> : null}
     </div>
     {card.downgradeDueAt ? <Card className="space-y-1 p-4">
       <p className="text-xs text-ink-secondary">ランクが下がる前のお知らせ</p>

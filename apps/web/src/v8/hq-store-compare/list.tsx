@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import DeltaChip from '@/components/shared/delta-chip'
 import Drawer from '@/components/shared/drawer'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Pagination from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/shared/page-size-select'
@@ -25,7 +26,7 @@ import styles from './list.module.css'
 /*
  * ★V8 統括「店の比較」（G7-1 `W4fI7A`）。行＝店、列＝7つの数。
  * 各マスに値と平均との差の札（良い＝緑・悪い＝赤）。行を押すと右の引き出し（G7-2 `z0fSYt`）。
- * CSV の書き出しと「店の組」の絞り込みは受け口がまだ無いので、形を残して「現在準備中です」を出す（B-314）。
+ * CSV は書き出しの口（頼む→待つ→受け取る）につないだ。「店の組」の絞り込みは口がまだ無いので、形を残して共通の準備中の窓を出す（B-314）。
  */
 
 type Status = 'loading' | 'ready' | 'error'
@@ -56,6 +57,8 @@ export default function StoreComparisonList() {
   const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<StoreComparisonResult | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [notice, setNotice] = useState('')
   const period = useMemo(() => pastPeriod(days), [days])
 
   const load = useCallback(async () => {
@@ -72,6 +75,28 @@ export default function StoreComparisonList() {
   }, [period.from, period.to, compare, sort, order, page, pageSize])
 
   useEffect(() => { void load() }, [load])
+
+  /* CSV：書き出しを頼み、できるまで待ってから受け取る（今の並び・期間・比べる相手のまま）。 */
+  const exportCsv = async () => {
+    setExporting(true)
+    setNotice('')
+    try {
+      const started = await storeComparisonApi.export({ from: period.from, to: period.to, compare, sort, order }, crypto.randomUUID())
+      if (!started.success) throw new Error('export_failed')
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        const status = await storeComparisonApi.exportStatus(started.data.id)
+        if (!status.success) throw new Error('export_failed')
+        if (status.data.status === 'failed') throw new Error('export_failed')
+        if (status.data.status === 'completed') { await storeComparisonApi.download(started.data.id); return }
+        await new Promise((resolve) => window.setTimeout(resolve, 1000))
+      }
+      setNotice('CSV の用意に時間がかかっています。しばらくしてからもう一度お試しください。')
+    } catch {
+      setNotice('CSV を書き出せませんでした。時間をおいてもう一度お試しください。')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const total = data?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
@@ -95,7 +120,7 @@ export default function StoreComparisonList() {
       </>}
       trailing={<>
         <PageSizeSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next as 10 | 20 | 50) }} />
-        <Button variant="secondary" onClick={() => preparing.open('CSVの書き出し')}>CSVで書き出す</Button>
+        <Button variant="secondary" onClick={() => void exportCsv()} busy={exporting} disabled={exporting}>CSVで書き出す</Button>
       </>}
     />
   )
@@ -153,6 +178,7 @@ export default function StoreComparisonList() {
           </ListPagePagination>
         ) : undefined}
       >
+        {notice ? <Notice tone="danger" message={notice} /> : null}
         {body}
       </ListPage>
       <StoreDrawer row={openRow} period={period} compare={compare} onClose={() => setOpenId(null)} />
