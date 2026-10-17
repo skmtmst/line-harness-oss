@@ -301,3 +301,21 @@ it.each(['identity', 'mixed'])('refuses new %s uploads before storing or scannin
   expect(sql.prepare('SELECT COUNT(*) AS n FROM form_submission_files').get()).toEqual({ n: 0 });
   expect(sql.prepare('SELECT COUNT(*) AS n FROM media_file_scans').get()).toEqual({ n: 0 });
 });
+
+it('still checks ordinary PDF ownership, version, block and reuse after identity intake is disabled', async () => {
+  const result = await upload('single', new TextEncoder().encode('%PDF-1.7\n%%EOF'), 'application/pdf', 'pdf');
+  const fileId = result.body.data.file.fileId;
+  const pdfLayout = layout();
+  pdfLayout.sections[0].blocks = [{ ...block, fileKind: 'pdf', fileBothSides: false }];
+  const data = () => ({ doc: [{ fileId }] });
+  const scope = { accountId: 'a', formId: 'f', friendId: 'u', versionId: null as string | null };
+  expect(await validateDocumentAnswers(db, pdfLayout, data(), scope)).toBeNull();
+  for (const other of [{ accountId: 'other' }, { formId: 'other' }, { friendId: 'other' }, { versionId: 'other' }]) {
+    expect(await validateDocumentAnswers(db, pdfLayout, data(), { ...scope, ...other })).not.toBeNull();
+  }
+  pdfLayout.sections[0].blocks[0].id = 'other-block';
+  expect(await validateDocumentAnswers(db, pdfLayout, data(), scope)).not.toBeNull();
+  pdfLayout.sections[0].blocks[0].id = block.id;
+  await insertFormSubmissionRecord(db, { formId: 'f', friendId: 'u', data: '{}', fileIds: [fileId] });
+  expect(await validateDocumentAnswers(db, pdfLayout, data(), scope)).toContain('すでに');
+});
