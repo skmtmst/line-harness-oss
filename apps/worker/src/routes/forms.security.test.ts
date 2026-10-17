@@ -1166,3 +1166,11 @@ test('Content-Typeの申告なしでも保管本文の上限を守る', async ()
   expect(response.status).toBe(413);
   expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
 });
+
+// Keep the real URL/private-IP policy and webhook fetch. Only DNS is synthetic,
+// so concurrency/event-id assertions still count actual webhook attempts.
+vi.mock('../services/form-webhook.js', async original => {
+  const actual = await original<typeof import('../services/form-webhook.js')>();
+  return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>
+    actual.callFormWebhook(form, answers, eventId, { lookupHost: async () => ['93.184.216.34'] }) };
+});

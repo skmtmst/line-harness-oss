@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const dbMocks = {
   // eager module-load deps (mirror affiliate-links-redirect.test.ts)
   listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([
-    { id: 'account-main', login_channel_id: '2000000000', tenant_status: 'active' },
+    { id: 'account-main', login_channel_id: '2000000000', tenant_status: 'active', is_active: 1, archived_at: null },
   ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
@@ -72,6 +72,13 @@ const env = {
 } as unknown as import('../index.js').Env['Bindings'];
 
 function call(path: string, init?: RequestInit) {
+  const target = new URL(`https://worker.example.com${path}`);
+  const token = target.searchParams.get('lineAccessToken');
+  if (token && !target.pathname.includes('/statements/')) {
+    target.searchParams.delete('lineAccessToken');
+    const headers = new Headers(init?.headers); headers.set('Authorization', `Bearer ${token}`);
+    init = { ...init, headers }; path = target.pathname + target.search;
+  }
   return worker.fetch(
     new Request(`https://worker.example.com${path}`, init),
     env,
@@ -206,7 +213,7 @@ beforeEach(() => {
   vi.unstubAllGlobals();
   imagesGet.mockReset();
   dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
-    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID, tenant_status: 'active' },
+    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID, tenant_status: 'active', is_active: 1, archived_at: null },
   ]);
   // No offers by default → serializeLink emits offerId/offerName = null.
   dbMocks.listAffiliateOffers.mockResolvedValue([]);
@@ -580,7 +587,7 @@ describe('LINE token verification', () => {
       {
         id: 'account-main',
         login_channel_id: '3000000000',
-        tenant_status: 'active',
+        tenant_status: 'active', is_active: 1, archived_at: null,
       } as unknown as never,
     ]);
 
@@ -772,4 +779,23 @@ describe('LIFF affiliate bank and statements', () => {
     finally { now.mockRestore(); }
     expect(imagesGet).not.toHaveBeenCalled();
   });
+});
+
+it.each(['/api/liff/mileage/me', '/api/liff/mileage/rewards', '/api/liff/affiliate/me', '/api/liff/affiliate/bank', '/api/liff/affiliate/offers'])('rejects credentials in query even with a valid Bearer at %s', async path => {
+  const res = await worker.fetch(new Request(`https://worker.example.com${path}?lineAccessToken=tok-alice`, {
+    headers: { Authorization: 'Bearer tok-alice' },
+  }), env, { waitUntil() {} } as unknown as ExecutionContext);
+  expect(res.status).toBe(400);
+  expect(res.headers.get('cache-control')).toBe('private, no-store');
+  expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+});
+
+it('keeps self-service credential filtering scoped when mounted alongside another LIFF API', async () => {
+  const { Hono } = await import('hono');
+  const { affiliateSelfRoutes } = await import('./affiliate-self.js');
+  const isolated = new Hono(); isolated.route('/', affiliateSelfRoutes);
+  isolated.get('/api/liff/other-feature', c => c.json({ reached: true }));
+  const res = await isolated.request('/api/liff/other-feature?lineAccessToken=other-feature-token');
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ reached: true });
 });

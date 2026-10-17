@@ -49,6 +49,7 @@ export async function hydrateDocumentAnswers(db: D1Database, data: Record<string
 export async function validateDocumentAnswers(db: D1Database, layout: FormLayout | null, data: Record<string, unknown>, scope: { accountId: string; formId: string; friendId: string; versionId: string | null; submissionId?: string | null }): Promise<string | null> {
   if (!layout) return null;
   for (const block of collectInputs(layout).filter(b => b.type === 'file')) {
+    if (formFileKinds(block).includes('identity') && Array.isArray(data[block.name]) && (data[block.name] as unknown[]).length) return '本人確認書類は受け取れません';
     const value = data[block.name];
     if (!Array.isArray(value)) {
       if (formFileKind(block) === 'identity' || formFileKind(block) === 'pdf') {
