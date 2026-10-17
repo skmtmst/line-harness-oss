@@ -1132,6 +1132,7 @@ function makeEventDb(state: {
 function setupApp(
   state: Parameters<typeof makeEventDb>[0],
   staffRole: 'owner' | 'admin' | 'staff' = 'owner',
+  inspectDb?: (db:D1Database) => void,
 ) {
   state.accounts ??= [];
   for (const account of state.accounts) {
@@ -1147,6 +1148,7 @@ function setupApp(
   }
   const app = new Hono<TestEnv>();
   const db = makeEventDb(state);
+  inspectDb?.(db);
   waitlistMocks.getEventOccurrenceUsedSeats.mockImplementation(
     async (_db: D1Database, slotId: string) => {
       const bookingSeats = (state.bookings ?? [])
@@ -2895,7 +2897,20 @@ describe('admin bookings management', () => {
         { id: 'r9', booking_id: 'bx', kind: 'day_before', scheduled_at: '2099-05-30T09:00:00Z', sent_at: null, status: 'pending' },
       ],
     };
-    const app = setupApp(state);
+    const reminderReads: unknown[][] = [];
+    const app = setupApp(state,'owner',db=>{
+      const prepare=db.prepare.bind(db);
+      db.prepare=(sql:string)=>{
+        const statement=prepare(sql);
+        if(!/FROM event_booking_reminders\b/.test(sql))return statement;
+        const bind=statement.bind.bind(statement);
+        statement.bind=(...args:unknown[])=>{
+          reminderReads.push(args.flatMap(value=>typeof value==='string'&&value.startsWith('[')?JSON.parse(value) as unknown[]:[value]));
+          return bind(...args);
+        };
+        return statement;
+      };
+    });
     const res = await app.request('/api/events/admin/events/e1/bookings?account_id=la1');
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
@@ -2904,6 +2919,8 @@ describe('admin bookings management', () => {
         reminders: Array<{ kind: string; status: string; scheduled_at: string }>;
       }>;
     };
+    expect(reminderReads).toHaveLength(1);
+    expect([...reminderReads[0]].sort()).toEqual(body.items.map(item=>item.id).sort());
     const b1 = body.items.find((item) => item.id === 'b1');
     const b2 = body.items.find((item) => item.id === 'b2');
     expect(b1?.reminders.map((reminder) => reminder.kind)).toEqual(['day_before', 'hours_before']);
@@ -2911,6 +2928,11 @@ describe('admin bookings management', () => {
     expect(b2?.reminders).toEqual([
       expect.objectContaining({ kind: 'day_before', status: 'cancelled' }),
     ]);
+    const page=await app.request('/api/events/admin/events/e1/bookings?account_id=la1&page=2&limit=1');
+    const pageBody=await page.json<{items:Array<{id:string;reminders:unknown[]}>}>();
+    expect(pageBody.items).toHaveLength(1);
+    expect(reminderReads).toHaveLength(2); // 2回のHTTPにつき各1問。行ごとの取得にしない。
+    expect(reminderReads[1]).toEqual([pageBody.items[0].id]);
   });
 
   test('GET /:id/bookings/summary returns all-status counts and capacity without list rows', async () => {
