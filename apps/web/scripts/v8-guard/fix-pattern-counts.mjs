@@ -2,12 +2,12 @@
 export function countFixPatterns(patterns, skeleton, layout) {
   const counts = { ...patterns.counts }, findings = [...patterns.findings]
   for (const [reason, count] of Object.entries(skeleton.failureCounts ?? Object.fromEntries(skeleton.failures.map(reason=>[reason,1])))) {
-    const pattern = /行(?:52|60)/.test(reason) ? 'F2' : /文字切れ|見本文字/.test(reason) ? 'F1' : 'F6'
+    const pattern = /文字切れ|見本文字/.test(reason) ? 'F1' : 'F6'
     counts[pattern] += count
     findings.push({ pattern, reason, count, detector: 'list-skeleton' })
   }
   for (const defect of layout.failures) {
-    const pattern = defect.kind === 'form-shrink' ? 'F10' : defect.kind === 'form-optional' ? 'F3' : defect.kind === 'form-footer-action' ? 'F8' : defect.kind === 'clip' ? 'F1' : ['wrap','squash'].includes(defect.kind) ? 'F2' : 'F6'
+    const pattern = defect.kind === 'clip' ? 'F1' : ['wrap','squash'].includes(defect.kind) ? 'F2' : 'F6'
     counts[pattern]++
     findings.push({ pattern, reason: defect.kind, detector:'layout-defects', ...defect })
   }

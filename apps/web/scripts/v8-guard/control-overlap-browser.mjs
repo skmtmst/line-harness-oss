@@ -5,8 +5,9 @@ export default function scanControlOverlap() {
     .filter(el => el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0
       && getComputedStyle(el).visibility !== 'hidden' && !el.closest('[hidden],[inert]')).at(-1)
   const root = modal || document.querySelector('main') || document.body
-  const controls = [...root.querySelectorAll('button,a[href],input:not([type="hidden"]),select,[role="button"]')]
-    .filter(el => !el.matches(':disabled,[aria-disabled="true"]') && el.closest('tr,[data-shared-part="list-row"],[role="row"],[data-list-row],[data-table-layout="columns"],[data-ctx-row]'))
+  const controls = [...root.querySelectorAll('button,a[href],input:not([type="hidden"]),textarea,select,[role="button"]')]
+    .filter(el => !el.matches(':disabled,[aria-disabled="true"]') && (el.closest('tr,[data-shared-part="list-row"],[role="row"],[data-list-row],[data-table-layout="columns"],[data-ctx-row]')
+      || el.closest('[data-page-template="create"]') && el.matches('input:not([type="checkbox"]):not([type="radio"]),textarea,select,button[aria-haspopup],button[role="combobox"]') && +getComputedStyle(el).opacity > 0))
     .map(el => ({ el, rect: el.getBoundingClientRect() }))
     .filter(({ el, rect }) => rect.width > 0 && rect.height > 0 && getComputedStyle(el).visibility !== 'hidden' && !el.closest('[inert]'))
   const name = el => el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent?.trim() || el.tagName.toLowerCase()

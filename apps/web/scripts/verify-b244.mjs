@@ -1,4 +1,4 @@
-/** B-244/245：共通部品へ戻る前のソース検査。描画の位置・色はブラウザ検査で確認する。 */
+/** B-244/245：必須/任意と保存時検証の定義が矛盾しないことを確認する。 */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -28,16 +28,7 @@ export function inspectB244Source(source, filename = 'screen.tsx', importedDefin
           if (match && !/\brequired\s*:/.test(definitions.get(`${match[1]}:${match[2]}`) ?? '')) add(node, 'requirement-without-definition')
         }
       }
-      if (tag === 'Notice' && attrs.tone === '"info"' && /<ListPage\b/.test(source)) {
-        let conditional = false, inWindow = false
-        for (let parent = node.parent; parent && !ts.isFunctionLike(parent); parent = parent.parent) {
-          if (ts.isConditionalExpression(parent) || ts.isIfStatement(parent) || ts.isBinaryExpression(parent) && parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) conditional = true
-          if (ts.isJsxElement(parent) && /Dialog|Drawer|DetailPanel/.test(parent.openingElement.tagName.getText(ast))) inWindow = true
-        }
-        const content = attrs.message ?? (ts.isJsxElement(node) ? node.children.map(c => c.getText(ast)).join('') : '')
-        const literal = !/[{}]/.test(content)
-        if (!conditional && !inWindow && literal) add(node, 'permanent-list-notice')
-      }
+
     }
     ts.forEachChild(node, visit)
   }

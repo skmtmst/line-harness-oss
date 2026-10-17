@@ -5,7 +5,7 @@
  *    だけで呼ばれない。呼ばないまま渡すと関数の値が返って `measured`
  *    が `undefined` になる。呼ぶ形（MEASURE_CALL）で渡す。
  * 2. compareAndWrite は `measured` が無いときも落とさない。
- * 3. 途中改行は Range の行数で数え、見えない・v7だけ・読み飛ばしは
+ * 3. 途中改行は Range の行数で数え、見えない・読み飛ばしは
  *    除く。省略（…）ははみ出しに数えない。
  * 4. 状態を開けない板（ダイアログ・確認・引き出し）は順位に入れない。
  * 5. 撮る前に context へ V8 テーマ＋偽ログインを置き、撮った絵が V8
@@ -14,6 +14,8 @@
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createRequire } from 'node:module'
+import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
@@ -67,10 +69,37 @@ describe('v8-parity の測り', () => {
     expect(MEASURE_SCRIPT).not.toContain('lineHeight')
   })
 
-  it('見えない・v7だけ・読み飛ばしは数えない', () => {
-    expect(MEASURE_SCRIPT).toContain('.v7-only')
-    expect(MEASURE_SCRIPT).toContain('skipLink')
-    expect(MEASURE_SCRIPT).toContain('display')
+  it('古い世代名で除外せず、見えない・読み飛ばしは数えない', () => {
+    const { Window } = createRequire(new URL('../../apps/web/package.json', import.meta.url))('happy-dom')
+    const browser = new Window()
+    const document = browser.document
+    const label = document.createElement('span')
+    label.textContent = '測定対象'
+    document.body.append(label)
+    // happy-dom does not lay out text. Supply a wrapped rectangle as the measurement input;
+    // selectors and visibility still run against the actual DOM, rather than source strings.
+    label.getBoundingClientRect = () => ({ x: 0, y: 0, top: 0, left: 0, right: 50, bottom: 40, width: 50, height: 40 })
+    const createRange = document.createRange.bind(document)
+    document.createRange = () => {
+      const range = createRange()
+      range.getClientRects = () => [{}, {}]
+      return range
+    }
+    const measure = () => runInNewContext(MEASURE_CALL, {
+      document, window: browser, NodeFilter: browser.NodeFilter,
+      getComputedStyle: browser.getComputedStyle.bind(browser),
+    })
+    try {
+      label.className = 'v7-only'
+      expect(measure().midWordBreaks).toHaveLength(1)
+      label.style.display = 'none'
+      expect(measure().midWordBreaks).toHaveLength(0)
+      label.style.display = ''
+      label.className = 'skipLink'
+      expect(measure().midWordBreaks).toHaveLength(0)
+    } finally {
+      browser.close()
+    }
   })
 
   it('省略（…）ははみ出しに数えない', () => {

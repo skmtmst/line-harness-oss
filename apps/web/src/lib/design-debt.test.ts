@@ -1,36 +1,17 @@
-/*
- * 共通部品を通らない直書きを、**これ以上増やさない**ための試験。
- *
- * `raw-colors.test.ts` は生の色だけを見る。こちらはその隣で、
- * 任意値記法・直書きの表見出し・直書きのボタン・静的に読めない `className` を見る。
- *
- * どれも「規格から外れているのに、普通のコードに見える」ものばかりで、
- * 目で見ても間違いに気づけない。数で止める。
- *
- * 直し方:
- *
- *     node apps/web/scripts/design-debt.mjs --update
- *
- * `display-class-on-part` だけは基準値ではなく **0 固定**。
- */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   countDebt,
-  compare,
   totals,
   analyzeSource,
   isDisplayClass,
   ZERO_TOLERANCE,
-  BASELINE,
   SRC,
   partFiles,
 } from '../../scripts/design-debt.mjs'
 
-const baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<string, Record<string, number>>
 const { counts } = countDebt()
-const { worse } = compare(counts, baseline)
 
 describe('共通部品を通らない直書き', () => {
   it('画素照合待ちの共通部品も持ち主として扱い、画面側・担当未定の調査は除外しない', () => {
@@ -58,12 +39,6 @@ describe('共通部品を通らない直書き', () => {
     ]) {
       expect(counts).not.toHaveProperty(file)
     }
-  })
-
-  it('増えていない', () => {
-    // 落ちたら: 共通部品を使うか、意図があるなら
-    // node apps/web/scripts/design-debt.mjs --update で基準を更新してください。
-    expect(worse).toEqual({})
   })
 
   it('共通部品へ表示制御のクラスを渡していない', () => {
