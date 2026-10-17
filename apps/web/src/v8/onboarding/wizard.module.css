@@ -1,0 +1,334 @@
+/* はじめの質問の窓（xxpM9・RZW83・lS1Gh・rJ36f・oKSsG）。値は絵の html から。 */
+.body {
+  --ob-track-h: 6px;
+  --ob-side-w: 320px;
+  --ob-steps-w: 200px;
+  --ob-row-h: 48px;
+  --ob-skip-row-h: 36px;
+  --ob-small-icon: 14px;
+  --ob-title-lh: 21px;
+  --ob-note-lh: 17px;
+  --ob-body-lh: 20px;
+  --ob-caption-lh: 18px;
+  --ob-panel-gap: 10px;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--polish-space-card);
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-field);
+}
+
+.progressCount {
+  flex: none;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--ob-caption-lh);
+  white-space: nowrap;
+}
+
+.progressName {
+  flex: none;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--ob-caption-lh);
+  white-space: nowrap;
+}
+
+.track {
+  position: relative;
+  flex: 1;
+  height: var(--ob-track-h);
+  overflow: hidden;
+  border-radius: var(--polish-radius-pill);
+  background: var(--polish-hover);
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--polish-radius-pill);
+  background: var(--color-accent);
+}
+
+.where {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--ob-caption-lh);
+}
+
+.whereIcon {
+  width: var(--ob-small-icon);
+  height: var(--ob-small-icon);
+  flex: none;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--polish-space-field);
+}
+
+/* 見た目（RZW83）：左に選ぶカード、右に入る見本。 */
+.lookRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--ob-side-w);
+  align-items: start;
+  gap: var(--polish-space-section);
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--polish-space-row);
+}
+
+.panelTitle {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--ob-body-lh);
+}
+
+.panelNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--ob-caption-lh);
+}
+
+/* 1問の画面（lS1Gh・rJ36f）：左に質問の一覧 200、右に選ぶカード。 */
+.questionRow {
+  display: grid;
+  grid-template-columns: var(--ob-steps-w) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--polish-space-section);
+}
+
+.question {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+}
+
+/* 最後の一覧（oKSsG）。 */
+.summaryRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--polish-space-card);
+}
+
+.card,
+.skipped {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--ob-panel-gap);
+  padding: var(--polish-space-card);
+  border-radius: var(--polish-radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.skipped {
+  gap: var(--polish-space-row);
+  border: 1px solid var(--card-edge);
+  background: var(--color-surface-pearl);
+  box-shadow: none;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.cardTitle {
+  color: var(--color-ink);
+  font-size: var(--text-callout);
+  font-weight: 700;
+  line-height: var(--ob-title-lh);
+  white-space: nowrap;
+}
+
+.cardMeta,
+.cardMetaEnd {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--ob-caption-lh);
+  white-space: nowrap;
+}
+
+/* 題の右の補足は行の右端へ。 */
+.cardMeta,
+.cardMetaEnd {
+  flex: 1;
+  text-align: right;
+}
+
+.rows,
+.skippedRows {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  min-height: var(--ob-row-h);
+  align-items: center;
+  gap: var(--ob-panel-gap);
+}
+
+.rowIcon {
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+  flex: none;
+  color: var(--color-ink-secondary);
+}
+
+.rowText {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.rowTitle {
+  flex: none;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--ob-body-lh);
+  white-space: nowrap;
+}
+
+.rowNote {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--ob-note-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkButton {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.link,
+.linkButton {
+  flex: none;
+  color: var(--color-status-info);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--ob-body-lh);
+  white-space: nowrap;
+}
+
+.cardFoot {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--ob-caption-lh);
+}
+
+.skippedRow {
+  display: flex;
+  min-height: var(--ob-skip-row-h);
+  align-items: center;
+  gap: var(--ob-panel-gap);
+}
+
+.skippedIcon {
+  width: var(--ob-small-icon);
+  height: var(--ob-small-icon);
+  flex: none;
+  color: var(--color-status-warn-deep);
+}
+
+.skippedNote {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--ob-caption-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loading {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
+}
+
+/* 下の段：左に戻る・真ん中に主の操作（buttons-centered）。 */
+.footer {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.footerSide {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.footerCenter {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.buttonIcon {
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+}
+
+.preview {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--polish-space-field);
+  text-align: center;
+}
+
+/* 1152 で窓が狭いとき：見本の列と質問の一覧を上に回さず、幅だけ詰める。 */
+@media (max-width: 1199px) {
+  .body {
+    --ob-side-w: 288px;
+    --ob-steps-w: 176px;
+  }
+}
+
+/* 口がまだ受け付けない質問（準備中の札）。 */
+.pending {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}

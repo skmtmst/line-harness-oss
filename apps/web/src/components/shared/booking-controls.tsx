@@ -6,8 +6,8 @@ import styles from './booking-controls.module.css'
 type ControlProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'> & { children: ReactNode }
 
 /** 行をまたぐ予約を開く操作。内容・予約元は呼び出し側が渡す。 */
-export function BookingBlock({ tone, placement, children, ...props }: ControlProps & { placement?: 'cell'; tone: 'line' | 'media' | 'phone' | 'pending' | 'hold' | 'confirmed' | 'seated' | 'departed' }) {
-  const tones = { line: styles.blockLine, media: styles.blockMedia, phone: styles.blockPhone, pending: styles.blockPending, hold: styles.blockHold,confirmed:styles.blockConfirmed,seated:styles.blockSeated,departed:styles.blockPhone }
+export function BookingBlock({ tone, placement, children, ...props }: ControlProps & { placement?: 'cell'; tone: 'line' | 'media' | 'phone' | 'pending' | 'hold' | 'confirmed' | 'seated' | 'departed' | 'over' }) {
+  const tones = { line: styles.blockLine, media: styles.blockMedia, phone: styles.blockPhone, pending: styles.blockPending, hold: styles.blockHold,confirmed:styles.blockConfirmed,seated:styles.blockSeated,departed:styles.blockPhone,over:styles.blockOver }
   return <button type="button" {...props} data-placement={placement} className={`${styles.block} ${tones[tone]}`}>{children}</button>
 }
 

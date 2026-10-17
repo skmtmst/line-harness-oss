@@ -1,8 +1,9 @@
 'use client'
 
-import DashboardV8 from '@/v8/restaurant/dashboard/dashboard'
+import { Suspense } from 'react'
+import RestaurantDashboard from '@/v8/restaurant/dashboard/entry'
 
-/* ★V8 今日のお店（提案 E-1 `hKRRF`）。全店の一覧（板 `CHz31`）は ?view=stores。完全切り替え：V8 だけで出す。画面は src/v8/restaurant/dashboard。 */
+/* ★V8 飲食の業種ダッシュボード（B-319 で前の「今日のお店」hKRRF を置き換え。絵 NqAvL）。全店の一覧（板 `CHz31`）は ?view=stores。画面は src/v8/style-dashboard。 */
 export default function Page() {
-  return <DashboardV8 />
+  return <Suspense fallback={null}><RestaurantDashboard /></Suspense>
 }

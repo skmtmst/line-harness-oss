@@ -52,6 +52,11 @@ export type DrawerProps = {
   toolbar?: ReactNode
   /** 下の帯（footer）のすぐ上に置く知らせ（保存の失敗など）。中身の帯は呼び出し側の Notice。 */
   band?: ReactNode
+  /**
+   * 開いたときに寄せる先。'panel' は面そのもの（輪を出さない）。題がその場で直せる板（tnTn9）で、
+   * 開いただけで題に輪が出て編集の入口に見えるのを避ける。Tab で先頭の操作へ進める。
+   */
+  initialFocus?: 'panel'
 }
 
 /** Pencil V5 `VJKAT` を正本にした右詳細パネル。 */
@@ -79,6 +84,7 @@ export default function Drawer({
   heading,
   toolbar,
   band,
+  initialFocus,
 }: DrawerProps) {
   const formInput = useFormInputDirty(open)
   const isDirty = dirty ?? formInput.dirty
@@ -87,7 +93,7 @@ export default function Drawer({
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
-  const panelRef = useOverlayFocus<HTMLElement>(open && modal, discard.requestClose, busy)
+  const panelRef: React.RefObject<HTMLElement | null> = useOverlayFocus<HTMLElement>(open && modal, discard.requestClose, busy, initialFocus === 'panel' ? (): HTMLElement | null => panelRef.current : undefined)
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
 
@@ -105,8 +111,8 @@ export default function Drawer({
   const panel = (
     <aside
       ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
-      onChangeCapture={formInput.onChangeCapture}
-      onInputCapture={formInput.onChangeCapture}
+      onChange={formInput.onInputChange}
+      onInput={formInput.onInputChange}
       onClickCapture={(event) => { formInput.onClickCapture(event); captureOverlayClose(event, isDirty || busy, discard.requestClose) }}
       className={`${styles.panel} ${modal ? '' : styles.inline}`}
       role="dialog"
@@ -122,6 +128,7 @@ export default function Drawer({
       data-viewport-inset={viewportInset || undefined}
       style={{ '--drawer-design-width': `${width === 'composer' ? 1160 : width === 'editor' ? 540 : drawerWidth(designWidth ?? (width === 'order' ? 540 : 480))}px` } as CSSProperties}
       tabIndex={-1}
+      data-initial-focus={initialFocus}
       data-closing={leaving || undefined}
       data-design-part="drawer"
       data-design-node="VJKAT"

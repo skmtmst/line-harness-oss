@@ -390,7 +390,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     setDragIndex(null)
   }
   /* 届き方：アイコンと横に並ぶカード（いま開いているカードを先頭に、次のカードの端を見せる）。 */
-  const sender = host ? '公式アカウント' : selectedAccount?.name ?? '公式アカウント'
+  const sender = host ? host.accountName || '公式アカウント' : selectedAccount?.name ?? '公式アカウント'
   const shown = panels.slice(selectedIndex, selectedIndex + 2)
   const phone = (
     <LinePreview title={null} note="カルーセルの見え方（横にスワイプして見えます）" accountName={sender} caption="配信日 10:00">

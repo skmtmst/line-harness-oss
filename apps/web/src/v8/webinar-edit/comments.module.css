@@ -71,7 +71,8 @@
 }
 .cell:hover:not(:disabled) { box-shadow: var(--tpl-wc-cm-cell-hover); }
 .cell:focus-visible { outline: var(--tpl-wc-tab-line) solid var(--color-status-info); outline-offset: var(--tpl-wc-tab-line); }
-.cellSec { width: var(--tpl-wc-cm-col-sec); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* 秒数は枠のある共通の入力欄のまま（内側の余白は部品が持つ）。幅と数字の形だけ決める。 */
+.cellSec { flex-shrink: 0; width: var(--tpl-wc-cm-col-sec); font-weight: 700; font-variant-numeric: tabular-nums; }
 .cellName { width: var(--tpl-wc-cm-col-name); }
 .cellBody { width: var(--tpl-wc-cm-col-body); flex-shrink: 1; text-overflow: ellipsis; }
 .remove { flex-shrink: 0; }

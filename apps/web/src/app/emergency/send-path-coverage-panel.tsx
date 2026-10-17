@@ -15,6 +15,23 @@ export const SEND_PATH_KIND_LABEL: Record<OperationSendPath['kind'], string> = {
 }
 
 /*
+ * 台帳（Worker）の言葉には作り手向けの語（cron・manual 指定・ヘッダ名・claim など）が混じる。
+ * 運用者が読む画面では運用の言葉に置き換え、置き換えられない補足は出さない（OHwbU 2026-10-15）。
+ */
+const DEV_WORDS = /cron|claim|tick|pending|queued|failed|outbox|sweep|retry_wait|requested|active|replyToken|push|multicast|broadcast|send_|process[A-Z]|nen-|\bjob\b|\btoken\b|#\d|\b\d{3}\b/
+export function operatorPathLabel(label: string): string {
+  return label
+    .replace(/（cron）/g, '')
+    .replace(/（manual 指定）/g, '（担当者の返信として送ったもの）')
+    .replace(/自動 push・multicast・broadcast/g, '自動送信')
+}
+export function operatorPathNote(text: string | null | undefined): string | null {
+  if (!text) return null
+  if (/X-Line-Harness-Source/.test(text)) return '担当者の返信として送る1対1の送信は、手動返信と同じく対象外です。'
+  return DEV_WORDS.test(text) ? null : text
+}
+
+/*
  * 停止ボタンが届く経路の一覧 (#1050)。v7 の control タブと V8 の
  * control-v8 で同じ台帳を見せるため、page.tsx から切り出した共通部品。
  * 見た目・文言は v7 のまま変えない。
@@ -93,9 +110,9 @@ export function SendPathCoveragePanel({ accountId, revision }: { accountId: stri
             <span className={`shrink-0 rounded-pill px-2 py-0.5 font-bold ${path.state === 'stopped' ? 'bg-danger-bg text-danger' : path.state === 'running' ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>
               {path.state === 'stopped' ? '停止中' : path.state === 'running' ? '稼働中' : '対象外'}
             </span>
-            <span className="min-w-0 font-bold text-ink">{path.label}</span>
+            <span className="min-w-0 font-bold text-ink">{operatorPathLabel(path.label)}</span>
             <span className="text-ink-faint">{SEND_PATH_KIND_LABEL[path.kind]}</span>
-            <span className="min-w-0 flex-1 text-ink-faint" title={path.excludedReason ?? path.note ?? undefined}>{path.excludedReason ?? path.note}</span>
+            <span className="min-w-0 flex-1 text-ink-faint">{operatorPathNote(path.excludedReason ?? path.note)}</span>
           </li>)}
         </ul>
       </div>)}

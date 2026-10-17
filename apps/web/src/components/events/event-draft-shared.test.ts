@@ -1,24 +1,25 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { EVENT_DEFAULT_DRAFT as CREATE_DEFAULT_DRAFT,ENTRY_CUTOFF_OPTIONS } from '@/v8/events/shared'
+import { dirname,join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe,expect,it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { formatJpDateTime } from '@/v8/events/edit-format'
 import {
-  EVENT_CANCEL_DEADLINE_OPTIONS,
-  EVENT_DEFAULT_DRAFT,
-  EVENT_DESCRIPTION_MAX_LENGTH,
-  EVENT_ENTRY_CUTOFF_OPTIONS,
-  EVENT_NAME_MAX_LENGTH,
-  deadlineOptionsWithSaved,
-  deadlineSelectValue,
-  parseDeadlineSelect,
-  resolveEventMultiAccountIds,
+EVENT_CANCEL_DEADLINE_OPTIONS,
+EVENT_DEFAULT_DRAFT,
+EVENT_DESCRIPTION_MAX_LENGTH,
+EVENT_ENTRY_CUTOFF_OPTIONS,
+EVENT_NAME_MAX_LENGTH,
+deadlineOptionsWithSaved,
+deadlineSelectValue,
+parseDeadlineSelect,
+resolveEventMultiAccountIds,
 } from './event-draft-shared'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 const FORM = read('..', '..', 'v8', 'events', 'edit-form.tsx')
 const CREATE = read('..', '..', 'v8', 'events', 'create.tsx')
-import { EVENT_DEFAULT_DRAFT as CREATE_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS } from '@/v8/events/shared'
 const LIST_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
 const BOOKINGS_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'bookings.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'events', 'edit', 'page.tsx'), 'utf8')
@@ -165,7 +166,7 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
   })
 
   it('編集画面の日時表示は端末の時間帯に依存しない(EVENT-05)', () => {
-    expect(FORM).toMatch(/function formatJpDateTime[\s\S]*?formatDateTime\(d\)/)
+    expect(formatJpDateTime('2026-10-16T16:30:00Z')).toMatch(/10月17日（土）01:30$/)
     // 一覧側は既に JST 固定。両方が同じ固定を持つことだけを見る。
     expect(LIST_PAGE).toContain("import { jstDay, jstTime } from './shared'")
     expect(read('..', '..', 'v8', 'events', 'shared.ts')).toContain('time + 9 * 3600_000')

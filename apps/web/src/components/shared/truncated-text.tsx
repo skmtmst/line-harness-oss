@@ -20,7 +20,7 @@ export function compactUrl(value: string): string {
 }
 
 /** 一行の省略と全文の吹き出し。短い文字には余分なTab停止を作らない。 */
-export default function TruncatedText({ value, url = false, className, ...props }: Omit<HTMLAttributes<HTMLSpanElement>, 'children' | 'title'> & { value: string; url?: boolean }) {
+export default function TruncatedText({ value, url = false, className, tone, ...props }: Omit<HTMLAttributes<HTMLSpanElement>, 'children' | 'title'> & { value: string; url?: boolean; tone?: 'warning' }) {
   const independentFocus = useContext(TruncatedTextFocus)
   const id = useId()
   const ref = useRef<HTMLSpanElement>(null)
@@ -69,7 +69,7 @@ export default function TruncatedText({ value, url = false, className, ...props 
     return () => { document.removeEventListener('keydown', escape, true); window.removeEventListener?.('scroll', close, true); window.removeEventListener?.('resize', close) }
   }, [position, close])
   return <>
-    <span {...props} ref={ref} title={value} className={[styles.text, className].filter(Boolean).join(' ')} data-truncated-text="" tabIndex={nested || !independentFocus ? undefined : clipped ? 0 : undefined} aria-describedby={position ? id : undefined} aria-label={props['aria-label'] ?? (shown !== value || clipped ? value : undefined)} onMouseEnter={open} onMouseLeave={leave} onFocus={open} onBlur={close}>{shown}</span>
+    <span {...props} ref={ref} title={value} className={[styles.text, className].filter(Boolean).join(' ')} data-text-tone={tone} data-truncated-text="" tabIndex={nested || !independentFocus ? undefined : clipped ? 0 : undefined} aria-describedby={position ? id : undefined} aria-label={props['aria-label'] ?? (shown !== value || clipped ? value : undefined)} onMouseEnter={open} onMouseLeave={leave} onFocus={open} onBlur={close}>{shown}</span>
     {position ? createPortal(<span id={id} role="tooltip" className={styles.tooltip} data-below={position.below} style={{ left: position.left, top: position.top }} onMouseEnter={clear} onMouseLeave={leave}>{value}</span>, document.body) : null}
   </>
 }

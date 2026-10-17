@@ -25,14 +25,14 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 test('birthday takes priority, fallback age and source match the displayed value',()=>{
   expect(fixedFieldValue(fields,'age',new Date('2026-10-10T00:00:00Z'))).toMatchObject({value:'26',derived:true})
   expect(fixedFieldValue(fields,'age').source).toContain('回答フォーム『登録』から 10/08 10:12')
-  expect(fixedFieldValue(fields.filter(f=>f.fixedKey!=='birthday'),'age')).toEqual({value:'18',derived:false,source:'手で入れた'})
+  expect(fixedFieldValue(fields.filter(f=>f.fixedKey!=='birthday'),'age')).toEqual({value:'18',derived:false,source:'手で入れた',label:'手で入れた'})
 })
 test('birthday with derived age and allergy, visible basics, shared display preferences persist only after save',()=>{
   const props={friendId:'f',fields,state:'ready' as const,canEdit:true,sections:[{key:'tags',label:'タグ',content:<p>VIP</p>}]}
   const first=render(<CustomerInfoPanel {...props}/>)
   for(const spec of FIXED_FRIEND_FIELDS.filter(f=>f.key!=='age')) expect(screen.getByText(spec.label)).toBeTruthy()
   expect(screen.queryByText('年齢')).toBeNull()
-  expect(screen.getByText(/2000-01-01（\d+歳）/)).toBeTruthy()
+  expect(screen.getByText(/2000年1月1日（\d+歳）/)).toBeTruthy()
   expect(screen.getByRole('button',{name:'編集'})).toBeTruthy()
   fireEvent.click(screen.getByRole('button',{name:'表示項目を編集'}))
   fireEvent.click(screen.getByRole('checkbox',{name:'タグ'}))

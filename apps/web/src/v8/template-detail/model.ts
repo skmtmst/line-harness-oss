@@ -5,6 +5,7 @@
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import type { api } from '@/lib/api'
+import { resolveDefaultToken } from '@/components/shared/insert-tokens'
 
 /** 詳細口（GET /api/templates/:id）が返す1件分の形。 */
 export type TemplateDetailData = Extract<
@@ -25,6 +26,8 @@ export interface TemplateVersionItem {
   question?: unknown | null
   effectiveFrom: string | null
   createdAt: string
+  /** 公開した人の今の名簿名（API 組5）。旧い版・不明・別組織は null。 */
+  creatorName?: string | null
 }
 
 /*
@@ -71,7 +74,7 @@ export function templateDeleteDescription(usageCount: number): string {
 }
 
 function versionText(version: number | null | undefined): string {
-  return version === null || version === undefined ? 'いまの版' : `版${version}で固定（変わらない）`
+  return version === null || version === undefined ? 'いまの版' : `版${version}で固定`
 }
 
 export function broadcastStatusText(status: string): string {
@@ -87,11 +90,14 @@ function enrollmentStatusText(status: string): string {
   return status
 }
 
-/** 本文の {名前} のような差し込みを拾う（同じ物は1つ）。 */
+/**
+ * 本文の差し込みを拾う（同じ物は1つ）。保存の形 {{name}} は札と同じ名前（「名前」）にし、
+ * 古い {名前} の書き方はそのまま名前として拾う。
+ */
 export function insertionNames(content: string): string[] {
   const found = new Set<string>()
-  for (const match of content.matchAll(/\{([^{}]+)\}/g)) {
-    const name = match[1]?.trim()
+  for (const match of content.matchAll(/\{\{[^{}\n]*\}\}|\{([^{}]+)\}/g)) {
+    const name = match[0].startsWith('{{') ? resolveDefaultToken(match[0])?.label : match[1]?.trim()
     if (name) found.add(name)
   }
   return [...found]
@@ -101,7 +107,7 @@ export interface UsageRow {
   key: string
   kind: string
   name: string
-  /** 使っている版（いまの版／版Nで固定（変わらない））。 */
+  /** 使っている版（いまの版／版Nで固定）。固定は公開しても変わらない（カードの説明に書く・絵 UTbi1）。 */
   version: string
   versionNumber: number | null
   /** 版を決めている（公開しても変わらない）。 */

@@ -25,12 +25,13 @@ export function useFormInputDirty(open: boolean) {
     if (!touched.current) initial.current = formInputSnapshot(ref.current)
     else update()
   })
-  const onChangeCapture = () => { touched.current = true; update() }
+  // React側はバブリングで呼び、入力欄のonChangeより先に制御値を戻さない。
+  const onInputChange = () => { touched.current = true; update() }
   const onClickCapture = (event: SyntheticEvent) => {
     if (!(event.target as Element).closest?.('[role="option"],[role="switch"],[role="checkbox"],[role="radio"]')) return
     touched.current = true
     queueMicrotask(update)
   }
   const resetBaseline = (snapshot: string) => { initial.current = snapshot; touched.current = true; update() }
-  return { ref, dirty, onChangeCapture, onClickCapture, resetBaseline }
+  return { ref, dirty, onInputChange, onClickCapture, resetBaseline }
 }

@@ -33,7 +33,7 @@ export default function KpiBand({
   /** 親の本文が左右の余白を持つ場合、帯の両端では重ねない。 */
   edgeInset?: 'parent'
   /** 段や引き出しの中で使う小さい帯。 */
-  layout?: 'booking'
+  layout?: 'booking' | 'link-row'
   density?: 'compact'
 } & Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'className'>) {
   return (

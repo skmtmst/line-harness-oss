@@ -35,6 +35,7 @@
 .search:focus-within { box-shadow: var(--tpl-htn-ring-focus); }
 .count { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-faint); white-space: nowrap; }
 .distSearch { width: var(--tpl-htn-search-w); flex-shrink: 0; }
+.distSelected { flex-shrink: 0; white-space: nowrap; font-size: var(--text-caption); font-weight: 700; color: var(--color-ink); }
 .bulkPick { width: var(--tpl-htn-bulk-w); flex-shrink: 0; }
 .bulkPick :global(*) { max-width: 100%; }
 
