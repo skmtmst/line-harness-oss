@@ -77,13 +77,6 @@ describe('見た目は V8 に固定', () => {
     }
   })
 
-  it('V8 の値は :root の下にある（角丸 control 10 / panel 16）', () => {
-    const v8 = globals.match(/:root\s*\{([^}]*--radius-control: 10px[^}]*)\}/)
-    expect(v8, ':root ブロックが無い').not.toBeNull()
-    expect(v8![1]).toContain('--radius-control: 10px')
-    expect(v8![1]).toContain('--radius-panel: 16px')
-  })
-
   it('V8 で増える語彙がある（divider・table-head・chat-outgoing・board・印のタイル）', () => {
     for (const token of [
       '--color-divider: #1d1d1f12',

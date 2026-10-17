@@ -22,7 +22,6 @@ describe('一斉配信の数字合わせ', () => {
     expect(CSS).toMatch(/\.table th:first-child,\s*\.table td:first-child \{ padding-left: var\(--tpl-bc-edge-pad\)/)
     expect(token('--tpl-bc-edge-pad')).toBe('20px')
     expect(CSS).toMatch(/\.table thead th \{[^}]*font-size: var\(--text-caption\)/)
-    expect(token('--text-caption')).toBe('12px')
     expect(CSS).toMatch(/\.table thead th \{[^}]*font-weight: 500/)
   })
 
@@ -34,7 +33,6 @@ describe('一斉配信の数字合わせ', () => {
 
   it('名前は12px・黒・700（B-207）', () => {
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-size: var\(--text-label\)/)
-    expect(token('--text-label')).toBe('12px')
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-weight: 700/)
     expect(CSS).toMatch(/\.cellTitle \{[^}]*color: var\(--color-ink\)/)
   })

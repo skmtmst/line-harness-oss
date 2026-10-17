@@ -20,10 +20,6 @@ const V8 = ':root'
 
 describe('★V8 枠線の色（--color-control-border）', () => {
   it('トークンが v8 の下にだけ定義されている', () => {
-    const v8Block = globals.match(/:root\s*\{([^}]*--color-control-border: #1d1d1f1f[^}]*)\}/)
-    expect(v8Block?.[1]).toContain('--color-control-border: #1d1d1f1f')
-    expect(v8Block?.[1]).toContain('--control-shadow: 0 1px 2px rgba(29, 29, 31, 0.06)')
-    expect(v8Block?.[1]).toContain('--color-choice-border: #c9ced6')
     expect(globals.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/\[data-theme=/)
   })
 

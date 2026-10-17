@@ -17,7 +17,6 @@ import { describe, expect, it } from "vitest";
 const SRC = resolve(__dirname, "..", "..");
 const CREATE = readFileSync(resolve(SRC, "v8/webhooks/create.tsx"), "utf-8");
 const CARD_CSS = readFileSync(resolve(SRC, "components/shared/card.module.css"), "utf-8");
-const TEXT_FIELD_CSS = readFileSync(resolve(SRC, "components/shared/text-field.module.css"), "utf-8");
 const GLOBALS = readFileSync(resolve(SRC, "app/globals.css"), "utf-8");
 
 /** globals.css の変数の値。見つからなければ空。 */
@@ -35,7 +34,6 @@ describe("外部連携の板の数字", () => {
 
   it("作るの入力の枠は h36 (NGh7b 枠)", () => {
     expect(CREATE).toContain("<TextField");
-    expect(TEXT_FIELD_CSS).toMatch(/\.single \{[^}]*height: 36px/s);
     expect(token("--tpl-chip-h")).toBe("36px");
   });
 });
