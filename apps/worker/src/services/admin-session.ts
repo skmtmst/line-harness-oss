@@ -9,6 +9,7 @@ import {
   deleteExpiredTwoFactorChallenges,
   getStaffById,
   recordAuditEvent,
+  recordLoginAudit,
   setPlatformSetting,
   type StaffMember,
   type TwoFactorChallengePurpose,
@@ -228,4 +229,17 @@ export function twoFactorSetupUrl(c: Context<Env>, challengeToken: string, next?
   if (next === 'ops') url.searchParams.set('next', 'ops');
   url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
   return url.toString();
+}
+
+export async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: string): Promise<void> {
+  try {
+    await recordLoginAudit(c.env.DB, {
+      adminUserId: staffId,
+      action: 'login',
+      ip: clientIp(c),
+      userAgent: c.req.header('user-agent') ?? null,
+    });
+  } catch (error) {
+    console.error(JSON.stringify({"code":"routes_auth_email_failed"}));
+  }
 }

@@ -26,7 +26,7 @@ import {
   updateStaffMember,
   type AuthEmailToken,
 } from '@line-crm/db';
-import { clientIp, issueSession, randomToken } from '../services/admin-session.js';
+import { clientIp, issueSession, randomToken, recordSuccessfulLoginAudit } from '../services/admin-session.js';
 import { hashPassword, validatePasswordPolicy, verifyPassword } from '../services/password-hash.js';
 import { turnstileErrorMessage, verifyTurnstile } from '../services/turnstile.js';
 import { candidateFromStaffRow, isPlatformAdminRow } from '../middleware/platform-admin.js';
@@ -79,19 +79,6 @@ const LOGIN_FAILED = 'メールアドレスかパスワードが違います';
 const TOO_MANY = '送信回数の上限に達しました。しばらく待ってからもう一度お試しください';
 
 type Body = Record<string, unknown>;
-
-async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: string): Promise<void> {
-  try {
-    await recordLoginAudit(c.env.DB, {
-      adminUserId: staffId,
-      action: 'login',
-      ip: clientIp(c),
-      userAgent: c.req.header('user-agent') ?? null,
-    });
-  } catch (error) {
-    console.error(JSON.stringify({"code":"routes_auth_email_failed"}));
-  }
-}
 
 async function readBody(c: Context<Env>): Promise<Body> {
   return c.req.json<Body>().catch(() => ({}) as Body);
