@@ -5,7 +5,7 @@ import { broadcastSendPreview,broadcastQuietHoursShift } from '../services/gap-s
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
-import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
+import { parseJsonArray, parseJsonObject, sameJsonMeaning } from './broadcast-json.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange } from '@line-crm/shared';
@@ -154,30 +154,6 @@ function unsupportedVariablesError(content: string): string | null {
   return unsupported.length > 0
     ? `Unsupported broadcast variables: ${unsupported.map((v) => `{{${v}}}`).join(', ')}`
     : null;
-}
-
-function canonicalJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalJsonValue);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, canonicalJsonValue(nested)]),
-    );
-  }
-  return value;
-}
-
-/** JSON列とrequest値を、objectのkey順に依存せず比較する。array順は送信順なので維持する。 */
-function sameJsonMeaning(stored: unknown, requested: unknown): boolean {
-  try {
-    const storedValue = typeof stored === 'string' ? JSON.parse(stored) as unknown : stored;
-    return JSON.stringify(canonicalJsonValue(storedValue ?? null))
-      === JSON.stringify(canonicalJsonValue(requested ?? null));
-  } catch {
-    // 壊れた既存JSONを「同じ」と扱ってsnapshotを再利用しない。
-    return false;
-  }
 }
 
 type CreateBroadcastBody = {
