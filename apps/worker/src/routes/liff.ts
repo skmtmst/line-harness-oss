@@ -42,6 +42,7 @@ import {
   ENTRY_ROUTE_STOPPED_HTML,
 } from '../services/entry-route-stop.js';
 import { buildIntroMessage } from '../services/intro-message.js';
+import { introMessagePayload } from '../lib/intro-message-payload.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
 import { notifyAffiliateFriendAdd } from '../services/affiliate-notifier.js';
@@ -56,7 +57,6 @@ import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { verifyCrossAccountToken } from '../lib/cross-account-token.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-
 
 // OAuth state base64 helpers. btoa() only accepts Latin-1, so a single
 // multibyte query param (e.g. utm_campaign=夏キャンペーン) used to throw
@@ -1161,7 +1161,7 @@ liffRoutes.get('/auth/callback', async (c) => {
         const introMessage = buildIntroMessage(introTemplate, formLiffUrl);
 
         const lineClient = new LineClient(accessToken);
-        await lineClient.pushMessage(friend.line_user_id, [introMessage as any]);
+        await lineClient.pushMessage(friend.line_user_id, [introMessagePayload(introMessage)]);
       } catch (err) {
         console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
       }
@@ -2360,8 +2360,8 @@ liffRoutes.post('/api/liff/send-form-link', inputJsonBoundary({"lineUserId":["st
     let formLiffUrl = `${new URL(c.req.url).origin}?${formQuery.toString()}`;
     const { LineClient } = await import('@line-crm/line-sdk');
     let accountToken: string | null = null;
-    if ((friend as any).line_account_id) {
-      const account = await getLineAccountById(db, (friend as any).line_account_id);
+    if (friend.line_account_id) {
+      const account = await getLineAccountById(db, friend.line_account_id);
       accountToken = account?.channel_access_token ?? null;
       if (account?.liff_id) {
         formLiffUrl = `https://liff.line.me/${account.liff_id}?${formQuery.toString()}`;
@@ -2370,7 +2370,7 @@ liffRoutes.post('/api/liff/send-form-link', inputJsonBoundary({"lineUserId":["st
     const accessToken = resolveLineToken({
       accountToken,
       defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
-      accountId: (friend as any).line_account_id ?? null,
+      accountId: friend.line_account_id ?? null,
       context: 'liff.form-send',
     });
     if (formLiffUrl.startsWith(`${new URL(c.req.url).origin}`)) {
@@ -2409,14 +2409,14 @@ liffRoutes.post('/api/liff/send-form-link', inputJsonBoundary({"lineUserId":["st
         message_content: await expandSendCommonVars(
           c.env.DB, introTemplate.message_content,
           { kind: 'liff', id: introTemplate.id },
-          { lineAccountId: (friend as any).line_account_id ?? null, friendId: friend.id, messageType: introTemplate.message_type },
+          { lineAccountId: friend.line_account_id ?? null, friendId: friend.id, messageType: introTemplate.message_type },
         ),
       };
     }
     const introMessage = buildIntroMessage(introTemplate, formLiffUrl);
 
     const lineClient = new LineClient(accessToken);
-    await lineClient.pushMessage(lineUserId, [introMessage as any]);
+    await lineClient.pushMessage(lineUserId, [introMessagePayload(introMessage)]);
 
     return c.json({ success: true });
   } catch (err) {
