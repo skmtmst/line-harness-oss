@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 
 export type FormFieldProblem = {
   key: string
@@ -144,6 +144,7 @@ export function useFormErrors() {
   const listenersRef = useRef(new WeakMap<HTMLElement, () => void>())
   /** 送信ボタンが押されたか。押すまでは上のまとめを出さない。 */
   const [submitted, setSubmitted] = useState(false)
+  const focusPending = useRef(false)
 
   /**
    * 欄の検査を登録する。描画のたびに全欄ぶん呼ぶ。順序がまとめの並びになる。
@@ -266,6 +267,13 @@ export function useFormErrors() {
     }
   }
 
+  // 送信中のdisabled解除や欄の再描画が確定してから移る。
+  useLayoutEffect(() => {
+    if (!focusPending.current) return
+    focusPending.current = false
+    focusFirst()
+  })
+
   /**
    * 送信前の総点検。全欄を「見せてよい」にして検査し、落ちた欄を返す。
    * 空なら保存へ進んでよい。落ちがあれば1つ目の欄へ移る。
@@ -279,9 +287,9 @@ export function useFormErrors() {
       touchedRef.current.add(key)
       if (def.check()) problems.push({ key, label: def.label })
     }
+    focusPending.current = problems.length > 0
     setSubmitted(true)
     bump((v) => v + 1)
-    if (problems.length > 0) requestAnimationFrame(focusFirst)
     return problems
   }
 
@@ -303,9 +311,9 @@ export function useFormErrors() {
       if (!inDialog.length) definitions().get(key)?.reveal?.()
       shown += 1
     }
+    focusPending.current = shown > 0
     setSubmitted(true)
     bump((v) => v + 1)
-    if (shown > 0) requestAnimationFrame(focusFirst)
     return shown
   }
 

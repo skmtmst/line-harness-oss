@@ -674,4 +674,6 @@ shared-button-importer v8/inbox-chat/routing-drawer.tsx
 shared-button-importer v8/restaurant/menu/edit.tsx
 shared-button-importer v8/restaurant/tables/assign.tsx
 shared-button-importer v8/tag-edit/edit-form.tsx
+
+# B-244〜B-247: 新しい共通の知らせの持ち主
 shared-button-importer components/shared/image-multi-upload.tsx

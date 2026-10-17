@@ -690,6 +690,7 @@ const server = createServer(async (req, res) => {
     json(res, 200, { lock_version: 2, status: pathname.endsWith('/cancel') ? 'cancelled' : 'confirmed' });
     return;
   }
+  // 予約の履歴・マイページ（★V8 nWby5・L5g75）。支払いの状態は by-booking で返す。
   if (method === 'GET' && pathname === '/api/liff/booking/me') {
     json(res, 200, {
       upcoming: [

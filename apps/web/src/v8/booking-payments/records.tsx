@@ -67,8 +67,8 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [refundTarget, setRefundTarget] = useState<PaymentRecord | null>(null)
+  const refundAttempt = useRef<{ signature: string; key: string } | null>(null)
   const [testMode, setTestMode] = useState(false)
-  const [refundKey, setRefundKey] = useState(() => crypto.randomUUID())
   const [refunding, setRefunding] = useState(false)
   const [refundError, setRefundError] = useState<string | null>(null)
   const preparing = usePreparingDialog()
@@ -104,7 +104,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
       ...(record.bookingId ? [{ id: 'open', label: '予約を開く', icon: <CalendarDays size={15} aria-hidden="true" />, href: `/booking/bookings?booking=${encodeURIComponent(record.bookingId)}` }] : []),
       ...(canEdit && record.status === 'pending' ? [{ id: 'link', label: '支払いのリンクを送る', icon: <Send size={15} aria-hidden="true" />, onSelect: () => void previewLink(record) }] : []),
       ...(record.receiptUrl ? [{ id: 'receipt', label: '領収書を見る', icon: <FileText size={15} aria-hidden="true" />, href: record.receiptUrl, external: true }] : []),
-      ...(canEdit && record.status === 'paid' ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={15} aria-hidden="true" />, onSelect: () => { setRefundError(null); setRefundKey(crypto.randomUUID()); setRefundTarget(record) } }] : []),
+      ...(canEdit && (record.status === 'paid' || record.status === 'partially_refunded') ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={15} aria-hidden="true" />, onSelect: () => { setRefundError(null); setRefundTarget(record) } }] : []),
     ]
   }
 
@@ -133,21 +133,18 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
     }
   }
 
-  /*
-   * 返金（PpBzn → v6mT4f）。今の口は全額だけで、額・理由・LINE で知らせるは受け取らない（口が要る）。
-   * 一部の返金は口が来るまで共通の案内の窓。全額は今の口へ送る。
-   */
+  // 同じ内容の再試行には同じキーを使い、返金を二重に記録しない。
   async function refund(input: RefundInput) {
     if (!refundTarget) return
-    if (input.amount < refundTarget.amount) {
-      setRefundTarget(null)
-      preparing.open('一部の返金')
-      return
-    }
+    if (refunding || !canEdit) return
+    const signature = JSON.stringify([accountId, refundTarget.id, input.amount, input.reason, input.notify])
+    if (refundAttempt.current?.signature !== signature) refundAttempt.current = { signature, key: crypto.randomUUID() }
     setRefunding(true)
     setRefundError(null)
     try {
-      await bookingPaymentAdminApi.refund(refundTarget.id, { amount: input.amount, reason: input.reason, notifyLine: input.notify, idempotencyKey: refundKey })
+      await bookingPaymentAdminApi.refund(refundTarget.id, {
+        amount: input.amount, reason: input.reason, notifyLine: input.notify, idempotencyKey: refundAttempt.current.key,
+      })
     } catch (cause) {
       setRefundError(cause instanceof ApiError && cause.status === 409 ? 'この支払いは返金できません（支払い済みのものだけ返金できます）。'
         : cause instanceof ApiError && cause.status === 403 ? '返金する権限がありません。'
@@ -156,7 +153,8 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
     } finally {
       setRefunding(false)
     }
-    notifySaved(`${refundTarget.friendName ?? 'お客さま'}さまに ${formatYen(input.amount)} を返金しました`)
+    refundAttempt.current = null
+    notifySaved(`${refundTarget.friendName ?? 'お客さま'}さまの ${formatYen(input.amount)} の返金を模擬で記録しました。実際の返金・LINE送信はしていません`)
     setRefundTarget(null)
     void reload()
   }
@@ -220,8 +218,8 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
         {linkPreview?.url ? <CopyTextButton value={linkPreview.url} label="リンクをコピー" aria-label="支払いのリンクをコピー" /> : <p className={styles.minor}>リンクはまだ作られていません。</p>}
       </Dialog>
       <RefundDialog open={refundTarget !== null} subtitle={`${refundTarget?.friendName ?? 'お客'}さま・${refundTarget?.bookingLabel ?? ''}`}
-        paidAmount={refundTarget?.amount ?? 0} testMode={testMode} busy={refunding} error={refundError ?? undefined}
-        facts={[{ label: '支払った額', value: `${formatYen(refundTarget?.amount)}（${refundTarget?.method === 'onsite' ? '店頭' : 'カード'}）` }, { label: 'これまでの返金', value: 'なし' }]}
+        paidAmount={Math.max(0, (refundTarget?.amount ?? 0) - (refundTarget?.refundedAmount ?? 0))} testMode={testMode} busy={refunding} error={refundError ?? undefined}
+        facts={[{ label: '支払った額', value: `${formatYen(refundTarget?.amount)}（${refundTarget?.method === 'onsite' ? '店頭' : 'カード'}）` }, { label: 'これまでの返金', value: refundTarget?.refundedAmount ? formatYen(refundTarget.refundedAmount) : 'なし' }]}
         destination={refundTarget?.method === 'onsite' ? '店頭' : 'カード'}
         messageFor={(input) => `${refundTarget?.friendName ?? 'お客'}さま　${refundTarget?.bookingLabel ?? ''}のご予約のお支払いのうち ${formatYen(input.amount)} を返金しました。カードへの反映は数日かかることがあります。`}
         onClose={() => { if (!refunding) { setRefundTarget(null); setRefundError(null) } }} onConfirm={(input) => void refund(input)} />
