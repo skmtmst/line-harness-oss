@@ -202,7 +202,7 @@ export const remindersMethods = {
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/reminders/${id}`, { method: 'DELETE' }),
     /*
-     * B 元に戻す: 削除の取り消し（定義のみ。登録・配信予定は戻さない）。
+     * 削除定義の復元（登録・配信予定は戻さない）。
      * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
      */
     restore: (id: string) =>
