@@ -114,7 +114,7 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
     expect(unknown.status).toBe(404)
   })
 
-  it('業種と空状態を切り替えても支払いの模擬送信を本送信へ変えない', async () => {
+  it('業種と空状態を切り替えても模擬の支払い・返金を本送信へ変えない', async () => {
     const root = `${baseUrl}/api/dashboard/style`
     const save = (qaEmpty: boolean) => fetch(root, {
       method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ style: 'salon', qaEmpty }),
@@ -129,6 +129,15 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
       }
       const payment = await fetch(`${baseUrl}/api/booking/admin/payments/pay-1/send-link`, { method: 'POST' })
       await expect(payment.json()).resolves.toMatchObject({ success: true, data: { sent: false, simulation: true } })
+      const refund = await fetch(`${baseUrl}/api/booking/payments/pay-1/refund`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ amount: 500, reason: '見本の返金', notifyLine: true, idempotencyKey: 'qa-refund' }),
+      })
+      expect(refund.status).toBe(200)
+      await expect(refund.json()).resolves.toMatchObject({ success: true, data: {
+        sent: false, simulation: true,
+        refund: { amount: 500, notifyLine: true, notificationStatus: 'simulated', sent: false, simulation: true },
+      } })
     } finally {
       await save(false)
     }

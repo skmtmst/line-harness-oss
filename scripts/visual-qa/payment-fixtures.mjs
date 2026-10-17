@@ -109,6 +109,7 @@ export function paymentGet(pathname, query, { restaurantTables = [] } = {}) {
   if (pathname === '/api/booking/admin/menu-payments') return { success: true, data: MENU_PAYMENT_OVERRIDES }
   if (pathname === '/api/booking/admin/payments') return { success: true, data: PAYMENT_RECORDS }
   if (pathname === '/api/booking/admin/payment-events') return { success: true, data: PAYMENT_EVENTS }
+  if (/^\/api\/booking\/payments\/[^/]+\/refunds$/.test(pathname)) return { success: true, data: { items: [] } }
   if (pathname === '/api/booking/admin/assignment-settings') return { success: true, data: STAFF_ASSIGNMENT }
   if (pathname === '/api/restaurant-test/assignment-settings') return { success: true, data: tableAssignment(restaurantTables) }
   if (/^\/api\/restaurant-test\/menus\/[^/]+\/payment$/.test(pathname)) return { success: true, data: { mode: 'online', version: 2 } }
@@ -138,7 +139,18 @@ export function paymentWrite(method, pathname, body) {
   if (method === 'PUT' && /^\/api\/(restaurant-test\/menus|events\/admin\/events)\/[^/]+\/payment$/.test(pathname)) return { success: true, data: { mode: body?.mode ?? null, version: (body?.expectedVersion ?? 0) + 1 } }
   if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/price$/.test(pathname)) return { success: true, data: { unitPrice: body?.unitPrice ?? 0, version: (body?.expectedVersion ?? 0) + 1 } }
   if (method === 'POST' && /^\/api\/booking\/admin\/payments\/[^/]+\/send-link$/.test(pathname)) return { success: true, data: { paymentId: pathname.split('/')[5], checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_visualqa', sent: false, simulation: true } }
-  if (method === 'POST' && /^\/api\/booking\/payments\/[^/]+\/refund$/.test(pathname)) return { success: true, data: { payment: { status: 'refunded' } } }
+  if (method === 'POST' && /^\/api\/booking\/payments\/[^/]+\/refund$/.test(pathname)) {
+    const record = PAYMENT_RECORDS.items.find((item) => item.id === pathname.split('/')[4])
+    return { success: true, data: {
+      payment: { status: 'refunded' }, duplicate: false, simulation: true, sent: false,
+      refund: {
+        id: 'refund-qa', amount: body?.amount ?? record?.amount ?? 0,
+        reason: body?.reason ?? '見本の返金', actorLabel: '店長 田中', createdAt: '2026-10-15T12:52:00.000Z',
+        notifyLine: Boolean(body?.notifyLine), notificationStatus: body?.notifyLine ? 'simulated' : 'not_requested',
+        simulation: true, sent: false,
+      },
+    } }
+  }
   if (method === 'POST' && /^\/api\/booking\/admin\/payment-events\/[^/]+\/replay$/.test(pathname)) return { success: true, data: { ...PAYMENT_EVENTS.items[4], result: 'applied' } }
   if (method === 'PUT' && (pathname === '/api/booking/admin/assignment-settings' || pathname === '/api/restaurant-test/assignment-settings')) {
     return { success: true, data: { ...STAFF_ASSIGNMENT, ...body, version: (body?.expectedVersion ?? 0) + 1 } }
