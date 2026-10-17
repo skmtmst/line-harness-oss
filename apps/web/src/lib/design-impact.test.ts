@@ -222,6 +222,10 @@ describe('共通部品の影響範囲', () => {
       'v8/restaurant/google/reviews.tsx',
       'v8/restaurant/google/posts.tsx',
       'v8/restaurant/google/profile-history.tsx',
+      // ★V8 デリバリー受注（kDQHr・OzHLO・h7OeT）。「さらに表示」をやめ、表の下に共通のページ送り（B-357 整え直し）。
+      'v8/restaurant/delivery/orders.tsx',
+      'v8/restaurant/delivery/history.tsx',
+      'v8/restaurant/delivery/bulk.tsx',
       // ★V8 予約台帳の一覧（Z3FoM）。src/v8/restaurant に一から書いた。表の下にページ送りを置く。
       'v8/restaurant/reservations/list.tsx',
       // ★V8 枠を閉じる知らせ（YMVFD）。表の下に件数とページ送り（2026-10-15 判定役）。

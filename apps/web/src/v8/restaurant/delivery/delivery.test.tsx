@@ -291,10 +291,13 @@ describe('kDQHr デリバリー受注', () => {
     expect(screen.getAllByText('出前館').length).toBeGreaterThan(0)
     expect(screen.getAllByText('ロケットナウ').length).toBeGreaterThan(0)
 
-    // 新着は「受け付ける」「拒否」、調理中は「準備完了」。
+    // 行の右端は、主な操作を1つだけボタンにし、残り（断る）は「…」に入れる（B-360 C）。
+    // 新着は「受け付ける」、調理中は「準備完了にする」。
     expect(screen.getByLabelText('注文UE-1001を受け付ける')).toBeTruthy()
-    expect(screen.getByLabelText('注文UE-1001を拒否')).toBeTruthy()
+    expect(screen.queryByLabelText('注文UE-1001を拒否')).toBeNull()
     expect(screen.getByLabelText('注文DM-2002を準備完了にする')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '注文UE-1001のその他の操作' }))
+    expect(await screen.findByRole('menuitem', { name: '断る' })).toBeTruthy()
 
     // 停止中のサービスには再開を置く。
     expect(screen.getByLabelText('ロケットナウの受付を再開')).toBeTruthy()
@@ -320,7 +323,7 @@ describe('kDQHr デリバリー受注', () => {
     expect(cooking.disabled).toBe(true)
 
     fireEvent.click(screen.getByLabelText('新着の注文をすべて選ぶ'))
-    expect(screen.getByText('選択中 1件')).toBeTruthy()
+    expect(screen.getByText('1件を選択中')).toBeTruthy()
 
     fireEvent.click(screen.getByText('まとめて受け付ける'))
     await waitFor(() => expect(fixture.accept).toHaveBeenCalledTimes(1))
@@ -385,8 +388,10 @@ describe('閲覧のみ（staff）', () => {
     expect(screen.queryByLabelText('注文UE-1001を拒否')).toBeNull()
     expect(screen.queryByLabelText('注文DM-2002を準備完了にする')).toBeNull()
     expect(screen.queryByLabelText('ロケットナウの受付を再開')).toBeNull()
-    expect(screen.queryByLabelText('Uber Eatsの受付を停止')).toBeNull()
-    expect(screen.queryByText('受付を一括停止')).toBeNull()
+    expect(screen.queryByLabelText('Uber Eatsの受付を止める')).toBeNull()
+    expect(screen.queryByText('受付をまとめて止める')).toBeNull()
+    // 閲覧のみの帯を出す。
+    expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
 
     // 見るだけの操作は残す。
     expect(screen.getByLabelText('注文UE-1001の詳細')).toBeTruthy()
@@ -408,40 +413,31 @@ describe('承認v02の見え方を守る', () => {
     expect(css).toMatch(/\.serviceRow \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
   })
 
-  it('3枚の中身の余白は器の任意の引数で渡す（絵 kDQHr 14/12・OzHLO 4・h7OeT 0/12）', () => {
-    // 共通の器 CHz31 は上16・段の間16。絵は板ごとに違うので、画面CSSから器を
-    // 上書きせず、RestaurantPage の bodyPadTop/bodyGap で板ごとに渡す。
+  it('3枚の頭・中身の余白は共通の器の既定に任せ、数字で渡さない（説明は「？」の中）', () => {
     const page = readFileSync(join(__dirname, 'delivery.tsx'), 'utf8')
-    expect(page).toMatch(/orders: \{ padTop: 14, gap: 12 \}/)
-    expect(page).toMatch(/history: \{ padTop: 4 \}/)
-    expect(page).toMatch(/'sold-out': \{ padTop: 0, gap: 12 \}/)
-    expect(page).toMatch(/bodyPadTop=\{VIEW_BODY\[view\]\.padTop\}/)
-    expect(page).toMatch(/bodyGap=\{VIEW_BODY\[view\]\.gap\}/)
-    // 品切れ（h7OeT）の帯を負の margin で器の外へ引き上げない。
-    expect(css).not.toMatch(/selectBarFlush/)
-  })
-
-  it('3枚の板の頭も器の任意の引数で渡す（絵 上20・間4・説明は題の下）', () => {
-    // 絵は説明を題のすぐ下に 1 行で描き、「?」は描かない。共通の器の既定（上24・間8・
-    // 説明は HelpTip の中）は変えず、RestaurantPage の任意の引数で板ごとに渡す。
-    // 題は絵のとおり kDQHr 22/700/32・注文履歴と品切れ 18/700/27（正本の順位は 絵 > 決まりの板）。
-    const page = readFileSync(join(__dirname, 'delivery.tsx'), 'utf8')
-    expect(page).toMatch(/const HEAD_PAD_TOP = 20/)
-    expect(page).toMatch(/const HEAD_TEXT_GAP = 4/)
-    expect(page).toMatch(/orders: \{ descriptionSize: 'body' \}/)
+    expect(page).not.toMatch(/HEAD_PAD_TOP|HEAD_TEXT_GAP|VIEW_BODY/)
+    expect(page).not.toMatch(/headPadTop=|headTextGap=|bodyPadTop=|bodyGap=/)
+    expect(page).not.toMatch(/descriptionAs=/)
+    // 題の大きさだけ、注文履歴と品切れは小さい題（絵 OzHLO・h7OeT）。
     expect(page).toMatch(/history: \{ titleSize: 'sub' \}/)
     expect(page).toMatch(/'sold-out': \{ titleSize: 'sub' \}/)
-    expect(page).toMatch(/descriptionAs="text"/)
-    expect(page).toMatch(/headPadTop=\{HEAD_PAD_TOP\}/)
-    expect(page).toMatch(/headTextGap=\{HEAD_TEXT_GAP\}/)
   })
 
-  it('注文一覧（kDQHr）の表はタブと同じ塊に入れて間0にする', () => {
-    // 絵は表がタブの段にくっついている。負の margin で引き戻すのではなく、
-    // タブ・選んだ数の帯・表を自分の塊（間0）にまとめる。
-    expect(css).toMatch(/\.tabTableGroup \{[^}]*gap: 0;/)
+  it('一覧の表・帯・箱は共通部品に任せ、画面専用の見た目を足さない', () => {
     const orders = readFileSync(join(__dirname, 'orders.tsx'), 'utf8')
-    expect(orders).toMatch(/<div className=\{styles\.tabTableGroup\}>/)
+    const history = readFileSync(join(__dirname, 'history.tsx'), 'utf8')
+    const bulk = readFileSync(join(__dirname, 'bulk.tsx'), 'utf8')
+    for (const source of [orders, history, bulk]) {
+      expect(source).not.toMatch(/presentation="delivery"/)
+      expect(source).not.toMatch(/delivery-(row|bulk|head)/)
+      expect(source).not.toMatch(/さらに表示/)
+    }
+    expect(css).not.toMatch(/\.sumCard|\.selectBar|\.stopCard|\.stateBox|\.tabTableGroup/)
+    expect(css).not.toMatch(/nth-child/)
+    expect(orders).toMatch(/BulkBar/)
+    expect(orders).toMatch(/Pagination/)
+    expect(history).toMatch(/KpiBand/)
+    expect(bulk).toMatch(/CheckCard/)
   })
 
   it('品切れ（h7OeT）の「品切れ」の札は赤（tone="danger"）', async () => {
@@ -474,14 +470,13 @@ describe('承認v02の見え方を守る', () => {
 
   it('注文詳細（hjdqV）の頭は題＋受信・希望の1行で、窓の上端は絵の100', () => {
     /*
-     * 絵は窓が y100 から始まり、題の段が 77（上20＋題27＋間4＋補足18＋下8）。
+     * 窓の頭の高さと欄の間は数字で渡さず、共通の窓・欄の既定に任せる。
      * 補足の行は共通の窓の任意の引数 titleNote で出し、渡さない窓の並びは変えない。
      */
     const detail = readFileSync(join(__dirname, 'order-detail.tsx'), 'utf8')
     expect(detail).toMatch(/const DETAIL_TOP = 100/)
-    expect(detail).toMatch(/const DETAIL_HEAD_H = 77/)
     expect(detail).toMatch(/titleNote=\{summaryLine\}/)
-    expect(detail).toMatch(/headerHeight=\{DETAIL_HEAD_H\}/)
+    expect(detail).not.toMatch(/headerHeight=\{|contentGap=\{/)
     // 絵の下のボタンの段に線は無い。
     expect(detail).toMatch(/footerPlain/)
     const shared = readFileSync(join(__dirname, '../../../components/shared/dialog.module.css'), 'utf8')
@@ -511,26 +506,23 @@ describe('承認v02の見え方を守る', () => {
     expect(css).not.toMatch(/\.total \{[^}]*border-top/)
   })
 
-  it('注文履歴（OzHLO）の絞り込みは折り返さない', () => {
-    // 折り返すと板の頭が2段に伸びて、下の集計・表がまるごとずれる。
-    expect(css).toMatch(/\.filterRowOneLine \{[^}]*flex-wrap: nowrap/)
-  })
-
-  it('注文履歴（OzHLO）は大きく出す値を売上金額にし、件数は頭の右に小さく置く', async () => {
+  it('注文履歴（OzHLO）は売上の4つの数を線で区切った1本の帯（KpiBand）で出す', async () => {
     at('/restaurant-test/delivery?view=history')
     render(<DeliveryPage />)
     await waitFor(() => expect(fixture.history).toHaveBeenCalled())
 
-    // 絞り込みは1行の組を足した側に出す。
-    const date = await screen.findByLabelText('日付')
-    expect(date.closest('[class*="filterRowOneLine"]')).toBeTruthy()
+    // 絞り込みは共通の道具の段（ListToolbarRow）。日付は月日の書き方で切れない。
+    expect(await screen.findByLabelText('日付')).toBeTruthy()
 
-    // 大きい値（.sumAmount は p）は金額。件数（.sumCount は span）はその前＝頭の中。
-    const amount = await screen.findByText('¥41,200')
-    expect(amount.tagName).toBe('P')
-    const count = screen.getByText('12件')
-    expect(count.tagName).toBe('SPAN')
-    expect(count.compareDocumentPosition(amount) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const band = await waitFor(() => {
+      const el = document.querySelector('[data-shared-part="kpi-band"][data-design="ZuE0v"]')
+      expect(el).toBeTruthy()
+      return el as HTMLElement
+    })
+    expect(within(band).getByText('¥41,200')).toBeTruthy()
+    expect(within(band).getByText('12件')).toBeTruthy()
+    // 合計＋サービス3つの4マス。
+    expect(band.querySelectorAll('[data-kpi-label]').length).toBe(4)
   })
 
   it('キャンセルの確認（dgeTy）は白地の頭＋注意三角で、危険用の帯を出さない', async () => {
@@ -543,7 +535,7 @@ describe('承認v02の見え方を守る', () => {
       expect(el).toBeTruthy()
       return el
     })) as HTMLElement
-    fireEvent.click(within(detail).getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(within(detail).getByRole('button', { name: '注文をキャンセルする' }))
 
     const dialog = (await waitFor(() => {
       const el = document.querySelector('[data-design-node="dgeTy"]')
@@ -560,10 +552,10 @@ describe('承認v02の見え方を守る', () => {
     expect(mark?.querySelector('svg')).toBeTruthy()
   })
 
-  it('受付の一括停止（XCVGd）は枠付きのサービス札と、別々の時間札4つを置く', async () => {
+  it('受付の一括停止（XCVGd）は共通のチェックの札（CheckCard）と、別々の時間札4つを置く', async () => {
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
-    fireEvent.click(screen.getByText('受付を一括停止'))
+    fireEvent.click(screen.getByText('受付をまとめて止める'))
 
     const dialog = (await waitFor(() => {
       const el = document.querySelector('[data-design-node="XCVGd"]')
@@ -573,13 +565,12 @@ describe('承認v02の見え方を守る', () => {
 
     expect(dialog.querySelector('[data-qa-dialog-callout]')).toBeNull()
 
-    // 枠付きの札（.stopCard）をサービスごとに置き、中に選ぶ印と丸い札を入れる。
+    // サービスごとに共通のチェックの札を置き、中に丸い札を入れる。
     for (const label of ['Uber Eats', '出前館', 'ロケットナウ']) {
-      const box = within(dialog).getByLabelText(`${label}の受付を停止する`)
-      expect(box.closest('[class*="stopCard"]')).toBeTruthy()
-      expect(within(dialog).getByText(label)).toBeTruthy()
+      const box = within(dialog).getByRole('checkbox', { name: new RegExp(`${label}の受付を止める`) })
+      expect(box.closest('label')).toBeTruthy()
+      expect(within(dialog).getAllByText(label).length).toBeGreaterThan(0)
     }
-    expect(css).toMatch(/\.stopCard \{[^}]*outline: 1px solid var\(--color-choice-border\)/)
 
     // 時間は共通の切り替え部品に任せ、つながった帯ではなく離れた札4つにする。
     const times = within(dialog).getByRole('group', { name: '停止する時間' })
