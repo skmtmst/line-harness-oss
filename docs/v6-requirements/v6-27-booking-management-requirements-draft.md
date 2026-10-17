@@ -290,6 +290,8 @@ KPI:
 
 外部反映の一部失敗でDB変更を巻き戻さない。同期失敗として再試行する。
 
+**B-365②（2026-10-17）**：予約・支払い・カレンダー・通知の各段は [段2 §5 サガの契約](../v8-requirements/cleanup-stage2-contract.md#saga) の記録→実行→結果で更新にそろえる。上の再試行は確認済みの一時失敗だけで、結果不明は [§4](../v8-requirements/cleanup-stage2-contract.md#unknown-result) の照合を先に行う。予約の正本と確認済み入金を保ち、補償も冪等に記録する。
+
 ### 3-9. 顧客向け予約履歴
 
 既存 `?page=salon-book&view=history` を正本として使う。新しい画面を作り直さない。

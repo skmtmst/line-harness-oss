@@ -82,6 +82,8 @@ CLI が以下を全部やる:
 - **リッチメニュー** — ユーザー別 / タグ別の自動切替
 - **フォーム (LIFF)** — LINE 内完結フォーム、回答 → メタデータ自動保存
 - **カレンダー予約** — Google Calendar 連携の予約システム (LIFF)
+
+Google Calendar・Meet の同期と、Google マップ/検索の「Google で予約」は別機能です。「Google で予約」は今回の対象外で、準備中の表示を含め入口を出しません（[B-353 の契約](docs/v8-requirements/cleanup-stage2-contract.md#order)）。
 - **スタッフ管理** — Owner / Admin / Staff の 3 ロール、API key 個別発行
 
 ### アフィリエイト計測（ASP）
