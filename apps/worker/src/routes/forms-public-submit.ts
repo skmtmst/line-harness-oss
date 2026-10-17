@@ -1,5 +1,5 @@
 import { canonicalizeIdempotencyInput } from './form-idempotency.js';
-import { callFormWebhook } from '../services/form-webhook.js';
+import { callFormWebhook, publicFormWebhookData } from '../services/form-webhook.js';
 import { inputError, validatedInputBody } from '../lib/input-errors.js';
 import { validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
 import { applyAccountAllergyOptions } from '../services/allergy-options.js';
@@ -699,7 +699,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
           webhookOutcome = called.data;
           await keepWebhookOutcome(webhookPassed, webhookOutcome);
         }
-        webhookData = webhookOutcome as Record<string, unknown> | null;
+        webhookData = publicFormWebhookData(webhookOutcome);
         if (!webhookPassed) {
           // Webhook rejected — send fail message and stop
           const needsFailMessage = Boolean(form.on_submit_webhook_fail_message)
@@ -742,7 +742,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
           const rejectedData = {
             ...serializeSubmission(submission),
             webhookPassed: false,
-            webhookData: webhookOutcome,
+            webhookData: publicFormWebhookData(webhookOutcome),
           };
           if (pendingWebhook.length > 0) return incompleteResponse(rejectedData, pendingWebhook);
           return settleResponse(rejectedData, 201);

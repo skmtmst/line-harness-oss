@@ -1,3 +1,4 @@
+import { publicFormWebhookData } from '../services/form-webhook.js';
 import { parseFormFields } from './form-field-definition.js';
 import { resolveCustomerFormTheme } from '@line-crm/shared';
 import type { FormSubmissionPostActions } from '@line-crm/shared';
@@ -322,13 +323,15 @@ export function serializeSubmission(
   row: DbFormSubmission & { friend_name?: string | null },
   postActions?: SubmissionPostActions | null,
 ) {
+  const publicAnswers = JSON.parse(row.data || '{}') as Record<string, unknown>;
+  delete publicAnswers._webhookResult;
   return {
     id: row.id,
     formId: row.form_id,
     formVersionId: row.form_version_id,
     friendId: row.friend_id,
     friendName: row.friend_name || null,
-    data: JSON.parse(row.data || '{}') as Record<string, unknown>,
+    data: publicAnswers,
     destinationWrite: {
       status: row.destination_write_status ?? 'unknown',
       attempted: row.destination_write_attempted ?? null,
@@ -503,7 +506,7 @@ function serializeIdempotentReplay(row: DbFormSubmission): Record<string, unknow
   try {
     const data = JSON.parse(row.data || '{}') as Record<string, unknown>;
     if ('_webhookResult' in data) {
-      return { ...base, webhookPassed: false, webhookData: data._webhookResult };
+      return { ...base, webhookPassed: false, webhookData: publicFormWebhookData(data._webhookResult) };
     }
   } catch {
     // 壊れた回答は基本形のまま返す

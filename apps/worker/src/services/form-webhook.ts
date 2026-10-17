@@ -59,13 +59,27 @@ export async function callFormWebhook(
     // Check for eligibility — support both { eligible: bool } and { success: bool, data: { eligible: bool } }
     const eligible = data.eligible ?? (data.data as Record<string, unknown> | undefined)?.eligible ?? data.success;
     // Only eligibility and the existing join link belong in the public answer.
-    const result: Record<string, unknown> = { eligible: Boolean(eligible) };
-    if (typeof data.join_url === 'string' && new URL(data.join_url).protocol === 'https:') result.join_url = data.join_url;
-    return { passed: Boolean(eligible), data: result };
+    return { passed: Boolean(eligible), data: publicFormWebhookData(data) };
   } catch {
     // fetch例外には宛先や保存済みの認証情報が入る可能性がある。
     return { passed: false, data: { error: 'Webhook request failed' } };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** Public projection also applies to outcomes persisted before this boundary existed. */
+export function publicFormWebhookData(value: unknown): Record<string, unknown> | null {
+  if (value == null) return null;
+  if (typeof value !== 'object') return { eligible: false };
+  const data = value as Record<string, unknown>;
+  const nested = data.data && typeof data.data === 'object' ? data.data as Record<string, unknown> : undefined;
+  const result: Record<string, unknown> = { eligible: Boolean(data.eligible ?? nested?.eligible ?? data.success) };
+  if (result.eligible && typeof data.join_url === 'string') {
+    try {
+      const url = new URL(data.join_url);
+      if (url.protocol === 'https:' && !url.username && !url.password) result.join_url = data.join_url;
+    } catch { /* An invalid link is never exposed as a customer destination. */ }
+  }
+  return result;
 }

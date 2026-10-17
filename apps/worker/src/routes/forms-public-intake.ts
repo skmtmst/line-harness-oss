@@ -357,6 +357,7 @@ export const get__api_forms_id_my_latest_4 = async (c: Context<Env, "/api/forms/
     } catch {
       answers = {};
     }
+    delete answers._webhookResult;
     return c.json({ success: true, data: { answers, createdAt: latest.created_at } });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id/my-latest"}));

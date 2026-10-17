@@ -1,3 +1,4 @@
+import { emptyLayout } from '@line-crm/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import { Hono } from 'hono';
@@ -6,6 +7,7 @@ import type { Env } from '../index.js';
 const mocks = vi.hoisted(() => ({
   getFormsWithStats: vi.fn(),
   getFormById: vi.fn(),
+  getLatestFormSubmission: vi.fn(),
   getFormAccountIds: vi.fn(),
   getFormDeleteImpact: vi.fn(),
   archiveFormAtRevision: vi.fn(),
@@ -52,6 +54,7 @@ vi.mock('@line-crm/db', () => ({
   getForms: vi.fn(),
   getFormsWithStats: mocks.getFormsWithStats,
   getFormById: mocks.getFormById,
+  getLatestFormSubmission: mocks.getLatestFormSubmission,
   getFormLatestEdit:vi.fn(async()=>null),
   getFormAccountIds: mocks.getFormAccountIds,
   listLineAccountsWithTenantStatus: vi.fn(async () => [
@@ -1205,4 +1208,20 @@ describe('F01 saved webhook credential origin', () => {
     expect(response.status).toBe(200);
     expect(mocks.updateForm).toHaveBeenLastCalledWith(expect.anything(), 'form-1', expect.objectContaining({ onSubmitWebhookHeaders: headers }), 1, 'owner-1');
   });
+});
+
+test('never restores a persisted upstream result through the public previous-answer API', async () => {
+  const layout = emptyLayout(); layout.options.restorePrevious = true;
+  mocks.getFormById.mockResolvedValue({ ...baseForm, layout: JSON.stringify(layout) });
+  mocks.verifyCallerLineIdentity.mockResolvedValue({ lineUserId: 'U-real', lineAccountId: 'account-a' });
+  mocks.getFriendByLineUserIdForAccount.mockResolvedValue({ id: 'friend-real', line_account_id: 'account-a' });
+  const saved = { x_username: 'answer', _webhookResult: { eligible: false, secret: 'synthetic-private-upstream' } };
+  mocks.getLatestFormSubmission.mockResolvedValue({ data: JSON.stringify(saved), created_at: '2026-10-18' });
+  const { bindings } = env();
+  const response = await app().request('/api/forms/form-1/my-latest', { headers: { Authorization: 'Bearer verified' } }, bindings);
+  expect(response.status).toBe(200);
+  const body = await response.json() as { data: { answers: Record<string, unknown> } };
+  expect(body.data.answers).toEqual({ x_username: 'answer' });
+  expect(JSON.stringify(body)).not.toContain('synthetic-private-upstream');
+  expect(saved._webhookResult.secret).toBe('synthetic-private-upstream');
 });

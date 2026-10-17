@@ -66,3 +66,10 @@ it.each(['X-Form-Event-Id', 'x-form-event-id'])('keeps the durable event id when
   vi.stubGlobal('fetch', send);
   expect((await callFormWebhook({ ...form, on_submit_webhook_headers: JSON.stringify({ [headerName]: 'wrong-event' }) }, {}, 'stable-event', { lookupHost: async () => ['93.184.216.34'] })).passed).toBe(true);
 });
+
+it('projects legacy persisted outcomes and refuses join links carrying credentials', async () => {
+  const { publicFormWebhookData } = await import('./form-webhook.js');
+  expect(publicFormWebhookData({ success: true, data: { eligible: true, credential: 'synthetic-private-upstream' }, privateData: 'synthetic-private-upstream', join_url: 'https://user:password@example.com/join' }))
+    .toEqual({ eligible: true });
+  expect(publicFormWebhookData({ eligible: false, error: 'synthetic-private-upstream', join_url: 'https://example.com/private-join' })).toEqual({ eligible: false });
+});

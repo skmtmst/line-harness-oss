@@ -35,6 +35,7 @@ export function documentAnswer(row: FormDocumentRow, role?: string, scanStatus =
 }
 export async function hydrateDocumentAnswers(db: D1Database, data: Record<string, unknown>, role?: string, submissionId?: string): Promise<Record<string, unknown>> {
   const result = { ...data };
+  delete result._webhookResult;
   for (const [name, value] of Object.entries(result)) {
     if (!Array.isArray(value) || !value.some(v => v && typeof v === 'object' && 'fileId' in v)) continue;
     result[name] = await Promise.all(value.map(async (v) => {

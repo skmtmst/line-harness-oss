@@ -1,6 +1,6 @@
 import { auditLog } from '../lib/audit-log.js';
 import { reportPeriod, type ReportPeriodInput } from '@line-crm/shared';
-import { callFormWebhook } from '../services/form-webhook.js';
+import { callFormWebhook, publicFormWebhookData } from '../services/form-webhook.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError } from '../lib/input-errors.js';
 import { hydrateDocumentAnswers } from '../services/form-documents.js';
@@ -501,7 +501,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
           }
         }
       }
-      const webhookData = (webhookOutcome?.data ?? null) as Record<string, unknown> | null;
+      const webhookData = publicFormWebhookData(webhookOutcome?.data);
       if (config.on_submit_webhook_url && webhookOutcome && !webhookOutcome.passed) {
         // 連携に弾かれた回答。残った工程(失敗通知・記録の締め)だけを補完する。
         const needsFailMessage = Boolean(config.on_submit_webhook_fail_message)
