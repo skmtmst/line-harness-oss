@@ -1,6 +1,6 @@
 # A03：通知の署名確認と本文上限の共通化
 
-> 検査した製品SHA：`4ba17e925ce6c35b7c9f01bd9e15d062146ac89b`。Worker全12,974件・管理画面13,684件・両方の型/ビルド・実ブラウザが成功。ci-localの製品失敗0、正式PR番号による反映履歴照合だけ採番待ち。
+> 前回（署名共通化）の検査した製品SHA：`4ba17e925ce6c35b7c9f01bd9e15d062146ac89b`。Worker全12,974件・管理画面13,684件・両方の型/ビルド・実ブラウザが成功。ci-localの製品失敗0、正式PR番号による反映履歴照合だけ採番待ち。
 
 ## 範囲と開始版
 
@@ -75,3 +75,21 @@ PRの題名と本文にはA03・司令塔指定の仮番号#0000を明示した�
 主ログは `/tmp/a03-ci-local.log`、各工程とmanifest/results/summaryは `~/lh-work/tools/hq/ci-local/logs/20261018-000510-4ba17e925c-5438/`。採番待ちによる元の失敗ログも保持した。故障対照の手順・集計・各ログは永続の `~/lh-work/design/v8/review/CLEANUP-1017/A03-EVIDENCE/` にも保存した。
 
 反映履歴は `docs/release-log/unreleased/0000-kenta-cleanup-a03.md`（##変更、@kenta、#0000、日本時間）。製品入力は上記SHAで固定し、最後の追記はこの検査記録だけ。全製品ファイルのGit差分がないことと作業木の清潔さを確認してコミットまでで引き継ぐ。push/PR/DB更新/配備/実送信/決済なし。
+
+
+## 続き：長いファイルの分割と F05（2026-10-18）
+
+- 開始時クリーン。doctor合格後、まとめ枝 `codex/kenta-train-cleanup-all-1018` の `e9b423eb7c798f7d5a530a05a6e86a0c26dd56f9`（A06・#1771入り）を `020d5c5d64` でmerge。浅い履歴での最初のmergeは拒否され、`git fetch --deepen=40 origin codex/development` 後に競合なく取り込んだ。rebase・force・pushなし。検査前の最新本線も同じ `e9b423eb7c`。
+- `PLAN-COVERAGE.tsv` の primaryBundle=A03 は0件。追加の計画IDはない。`LONG-FILES-1018.tsv` も bundle=A03 は0件だが、`restaurant-delivery.ts` はA08と記載されていた。分担表の「A03がHMAC route/serviceを一括所有、A08は同ファイルを分割しない」と本依頼を優先し、このファイルをA03で分割した。担当表や他束の実装は変更していない。
+- デリバリーroute本体2,216行/1ファイルを、入口39行＋types（4個の行の型）63行、common（店舗ゲート・送信台帳）387行、orders-read（一覧・詳細）362行、orders-actions（注文操作）187行、history（履歴・CSV）226行、controls（品切れ・受付）342行、webhooks（署名・受信台帳・取込）273行、uber（接続・callback・probe）397行へ分割。合計2,276行/9ファイル。公開exportと登録順は保持。SQL・処理を含む全74文の構文比較は不足0/追加0、19個の登録順も一致。新しいモジュール間の循環0。最初の分割は既存の新規400行の検査で2件指摘されたため、型と注文の読み書きをさらに分割し、違反0へ。上限・凍結一覧は変更していない。
+- `scripts/verify-staging-restaurant-delivery.test.ts` は移動先common/orders-read/orders-actions/history/controlsを読み、同じ4個のGETと4個のPOST、環境・店舗の拒否を検査するよう参照と字下げだけ変更。既存の88件を含め、試験の削除・改名・動きの期待値の緩和は0。
+- F05の指摘どおり、中継メールの送信には転送禁止がなかった。`redirect: manual` を指定し、3xx・opaqueredirect・転送済み応答をJSON読取り前に拒否してbodyを解放する。宛先は既存設定のURL1個のまま、受信署名・メール入力・署名材料・成功ID・既存エラー・送信回数は保持。転送URLや本文・署名は記録せず、結果不明の自動再送も追加しない。
+- 新しい `support-relay.test.ts` 13件は200成功、301/302/303/307/308、opaque/転送済み、エラー応答/不正JSON/切断を模擬。転送を有効に戻すと偽の転送先へ漏れるtransportで故障を検出する。実送信なし。
+- 既存の認証付き試験だけではrouteゲートの登録削除が検出できなかったため、`restaurant-delivery-boundary.test.ts` 7件を追加。実登録したrouteへ認証済みスタッフを渡し、正常成功と環境オフ/本番/不明環境/パック無し/別統括/所属外accountの拒否を検査する。上流の認証で偶然拒否される結果をrouteゲートの証拠に使わない。
+- 残した物：A06共通送信器への接続、永続journal/共有遮断・結果不明の保存先と、送信側timeout/応答容量の方針は今回の受信署名共通化へ混ぜない。`A06-HANDOFF.md` を確認済み。F05の本文と署名の転送漏えいを防ぐ最小修正を先に入れた。自動LINEの旧署名復号の互換性は前回どおり保持し、厳密化は司令塔の判断に残す。新migration・DB更新・配備なし。
+- 初期型検査はA06 SDKの生成物が古く、続くprebuildは既定Node26とSQLiteのABIが不一致だった。SDKを再生成し、CIと同じNode22で解消。分割直後の受付再開用helperの参照漏れも共通側へ移して解消した。これら初期失敗と、最初のゲート故障対照が検出できなかったログを保持する。
+
+検査結果と最終のci-local記録は下へ追記する。外部の `DONE-A03.tsv` は指定の4区分（前後の数・試験と移動先・見張り・見送った物と担当）を記録する。
+
+
+最終構成での関連試験は9ファイル184件、確認用スクリプトは14件、Node22のWorker型検査はすべて終了0。初期の失敗ログは別途保持している。
