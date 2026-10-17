@@ -1,6 +1,8 @@
 'use client'
 import { notifySaved } from '@/components/shared/toast'
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarSort } from '@/components/shared/list-toolbar'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import SaveConflictBar from '@/components/shared/save-conflict-bar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import KpiCard from '@/components/shared/kpi-card'
 import Link from '@/components/shared/list-navigation'
@@ -17,7 +19,6 @@ import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -46,22 +47,22 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  */
 
 const STATE_OPTIONS: Array<{ value: GoogleReviewFilter; label: string }> = [
-  { value: 'all', label: '状態：すべて' },
-  { value: 'unreplied', label: '状態：未返信' },
-  { value: 'draft', label: '状態：下書きあり' },
-  { value: 'attention', label: '状態：要確認' },
+  { value: 'all', label: 'すべて' },
+  { value: 'unreplied', label: '未返信' },
+  { value: 'draft', label: '下書きあり' },
+  { value: 'attention', label: '要確認' },
 ]
 
 const ORDER_OPTIONS: Array<{ value: GoogleReviewOrder; label: string }> = [
-  { value: 'newest', label: '並び：新しい順' },
-  { value: 'oldest', label: '並び：古い順' },
-  { value: 'rating_low', label: '並び：評価が低い順' },
-  { value: 'rating_high', label: '並び：評価が高い順' },
+  { value: 'newest', label: '新しい順' },
+  { value: 'oldest', label: '古い順' },
+  { value: 'rating_low', label: '評価が低い順' },
+  { value: 'rating_high', label: '評価が高い順' },
 ]
 
 const RATING_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '', label: '評価：すべて' },
-  ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `評価：★${n}` })),
+  { value: '', label: 'すべて' },
+  ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `★${n}` })),
 ]
 
 export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: string; data: GoogleConnectionData; go: GoogleNav; onSynced: () => void }) {
@@ -71,6 +72,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
   const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [page, setPage] = useListUrlValue('page', 1)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const [list, setList] = useState<GoogleReviewListData | null>(null)
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState('')
@@ -84,14 +86,14 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
     setListError('')
     try {
       const ratingNumber = Number.parseInt(rating, 10)
-      setList(await restaurantGoogleApi.listReviews(accountId, { filter, order, q: appliedSearch || undefined, page, perPage: 20, rating: Number.isInteger(ratingNumber) ? ratingNumber : undefined }))
+      setList(await restaurantGoogleApi.listReviews(accountId, { filter, order, q: appliedSearch || undefined, page, perPage, rating: Number.isInteger(ratingNumber) ? ratingNumber : undefined }))
     } catch (err) {
       setList(null)
       setListError(errorMessage(err, '口コミを読み込めませんでした。'))
     } finally {
       setListLoading(false)
     }
-  }, [accountId, appliedSearch, filter, order, page, rating])
+  }, [accountId, appliedSearch, filter, order, page, perPage, rating])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
@@ -133,25 +135,27 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         {/* Google経由の予約：結ぶ口がまだ無いので「—」（数を推測しない）。 */}
         <KpiCard density="compact" title="Google経由の予約" valueText="—" detail="この30日" help="予約の連携サービスと結ぶと数えます。いまは取れないので「—」です。" icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
       </StatRow>
-      <div className={styles.toolbar}>
-        <span className={styles.search}>
-          <SearchField placeholder="口コミを探す" aria-label="口コミを探す" value={search} onChange={setSearch} onClear={() => setSearch('')} />
-        </span>
-        <SaveErrorField names={["rating"]}><Select aria-label="評価で絞り込み" width={150} value={rating} onChange={(value) => { setRating(value); setPage(1) }} options={RATING_OPTIONS} /></SaveErrorField>
-        <SaveErrorField names={["filter"]}><Select aria-label="状態で絞り込み" width={160} value={filter} onChange={(value) => { setFilter(value as GoogleReviewFilter); setPage(1) }} options={STATE_OPTIONS} /></SaveErrorField>
-        <span className={styles.spacer} aria-hidden="true" />
-        <IconButton
-          aria-label={syncing ? 'Googleから取得中…' : 'Googleから同期する'}
-          onClick={() => void sync()}
-          disabled={syncing || connection.status !== 'connected'}
-          title={syncing ? '口コミを取得しています' : connection.status !== 'connected' ? 'Googleとの接続を確認してください' : undefined}
-        >
-          <RefreshCw aria-hidden className={`${styles.icon16} ${syncing ? styles.spin : ''}`} />
-        </IconButton>
-        <SaveErrorField names={["order"]}><ListToolbarSort aria-label="並び順" width={150} value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} /></SaveErrorField>
-      </div>
+      <ListToolbar
+        search={{ placeholder: '口コミを探す', label: '口コミを探す', value: search, onChange: setSearch }}
+        filters={<>
+          <Select label="評価" aria-label="評価で絞り込み" value={rating} onChange={(value) => { setRating(value); setPage(1) }} options={RATING_OPTIONS} />
+          <Select label="状態" aria-label="状態で絞り込み" value={filter} onChange={(value) => { setFilter(value as GoogleReviewFilter); setPage(1) }} options={STATE_OPTIONS} />
+        </>}
+        trailing={<>
+          <IconButton
+            aria-label={syncing ? 'Googleから取得中…' : 'Googleから同期する'}
+            onClick={() => void sync()}
+            disabled={syncing || connection.status !== 'connected'}
+            title={syncing ? '口コミを取得しています' : connection.status !== 'connected' ? 'Googleとの接続を確認してください' : undefined}
+          >
+            <RefreshCw aria-hidden className={`${styles.icon16} ${syncing ? styles.spin : ''}`} />
+          </IconButton>
+          <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); setPage(1) }} />
+          <ListToolbarSort aria-label="並び順" value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
+        </>}
+      />
       {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
-      {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認</Link>}>この店舗を操作する権限がありません。</Notice> : null}
+      {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認する</Link>}>この店舗を操作する権限がありません。</Notice> : null}
       {syncError ? <Notice tone="warn" action={<Button variant="text" onClick={() => sync()} busy={syncing} busyLabel="取得中…">もう一度</Button>}>{syncError}</Notice> : null}
       {syncing && (list?.total ?? 0) === 0 ? <Notice tone="info">口コミを取得中… すべてのページを取得してから表示します。</Notice> : null}
       {listLoading && !list ? <div className={styles.stateBox}><ListState kind="loading" title="口コミを読み込んでいます" /></div> : null}
@@ -201,7 +205,6 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
       {list && pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${list.total} 件 ・ 新着と未返信は別に管理`} />
       ) : null}
-      <Notice tone="info" appearance="soft" icon={null}>返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</Notice>
     </>
   )
 }
@@ -314,7 +317,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
 
   if (loading) return <SaveErrorScope errors={saveErrors}><div className={styles.stateBox}><ListState kind="loading" title="口コミを読み込んでいます" /></div></SaveErrorScope>
   if (loadError || !review) {
-    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="口コミを表示できませんでした" description={loadError} onRetry={() => void load()} action={<Button onClick={() => go({ tab: 'reviews' })}>口コミ一覧へ戻る</Button>} /></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="口コミを表示できませんでした" description={loadError} onRetry={() => void load()} /></SaveErrorScope>
   }
 
   const reviewer = review.reviewerDisplayName ?? '匿名'
@@ -356,7 +359,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
   return (
     <SaveErrorScope errors={saveErrors}><>
       {done ? <Notice tone="success">Googleに返信を送信しました。反映を確認できるまで「反映確認中」と表示します。</Notice> : null}
-      {conflict !== null ? <Notice tone="danger">{`別の担当者がすでに返信しています。表示されている返信：「${conflict}」`}</Notice> : null}
+      {conflict !== null ? <SaveConflictBar message={`別の担当者がすでに返信しています。表示されている返信：「${conflict}」`} actionLabel="最新の内容を読み込む" onAction={() => { setConflict(null); void load() }} /> : null}
       {pendingConfirm && !done ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
       <div className={styles.split}>
         <div className={styles.mainColumn}>
@@ -410,7 +413,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
             <>
               <Button onClick={() => void save()} disabled={busy !== null || textLength === 0 || textLength > 4096} busy={busy === 'save'} className={styles.fullButton}>下書きを保存する</Button>
               {canPublish && data.writeEnabled ? (
-                <Button variant="primary" onClick={() => { setChecked(false); setActionError(''); setConfirming(true) }} disabled={!canOpenConfirm} className={styles.fullButton}>返信内容を確認</Button>
+                <Button variant="primary" onClick={() => { setChecked(false); setActionError(''); setConfirming(true) }} disabled={!canOpenConfirm} className={styles.fullButton}>返信内容を確認する</Button>
               ) : (
                 /* 送れない設定（検証環境・権限なし）のときは送信へ進むボタンを出さない。場所だけ空ける。 */
                 <span className={styles.buttonSpace} aria-hidden="true" />

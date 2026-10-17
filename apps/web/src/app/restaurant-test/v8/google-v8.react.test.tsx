@@ -65,10 +65,10 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     expect(board.textContent).toContain('佐藤 S.')
     expect(board.textContent).toContain('下書きを作る')
     expect(board.textContent).toContain('返信を見る')
-    expect(screen.getByText(/^返信文は手で書くか/)).toBeTruthy()
+    // 説明は板の頭の「？」の中へ置く。表の下に説明の注記の箱は置かない。
+    expect(screen.queryByText(/^返信文は手で書くか/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Googleビジネスの説明' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '一覧の操作の説明' })).toBeNull()
-    const table = board.querySelector('[data-shared-part="list-table"]')!
-    expect(table.contains(screen.getByText(/^返信文は手で書くか/))).toBe(false)
   })
 
   it('状態で絞ると一覧の口へ条件が届く', async () => {

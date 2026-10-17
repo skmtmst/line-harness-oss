@@ -14,3 +14,28 @@ const ALIASES: Record<string, StandardStatus> = {
 export function statusLabel(status: string): string {
   return STATUS_LABELS[status as StandardStatus] ?? STATUS_LABELS[ALIASES[status]] ?? status
 }
+
+type StatusTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
+
+/** Google ビジネスの投稿の状態（API の値 → 札の言葉と色）。画面では言葉を作らず、この表だけを読む。 */
+export const GOOGLE_POST_STATUS: Record<string, { label: string; tone: StatusTone }> = {
+  draft: { label: '下書き', tone: 'neutral' },
+  scheduled: { label: '予約中', tone: 'info' },
+  pending_confirm: { label: '送信確認中', tone: 'warning' },
+  accepted: { label: '審査中', tone: 'info' },
+  published: { label: '公開済み', tone: 'success' },
+  rejected: { label: 'Googleで不承認', tone: 'danger' },
+  failed: { label: '送信失敗', tone: 'danger' },
+  cancelled: { label: '取消済み', tone: 'neutral' },
+  deleted: { label: '削除済み', tone: 'neutral' },
+}
+
+/** Google の口コミへの返信の状態（画面が決める分け方 → 札の言葉と色）。 */
+export const GOOGLE_REPLY_STATUS = {
+  published: { label: '返信済み', tone: 'success' },
+  confirming: { label: '反映確認中', tone: 'warning' },
+  draft: { label: '下書きあり', tone: 'info' },
+  aiDraft: { label: 'AI下書きあり', tone: 'info' },
+  attention: { label: '要確認', tone: 'danger' },
+  unreplied: { label: '未返信', tone: 'warning' },
+} as const satisfies Record<string, { label: string; tone: StatusTone }>

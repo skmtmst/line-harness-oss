@@ -37,7 +37,7 @@ it('閲覧のみのプロフィールでは変更操作を隠し、営業時間�
   })
   render(<ProfileBoard accountId="a" go={vi.fn()} />)
   expect(await screen.findByText(/11:00.*20:00/)).toBeTruthy()
-  for (const name of ['営業時間を変更', '今日を休みにする', '今日は早く閉める', 'プロフィールを編集']) {
+  for (const name of ['営業時間を変える', '今日を休みにする', '今日は早く閉める', 'プロフィールを編集する']) {
     expect(screen.queryByRole('button', { name })).toBeNull()
   }
 })
@@ -57,15 +57,15 @@ describe('Googleビジネスの表示の道具', () => {
 })
 
 describe('返信を作る：送れない設定のときは送信へ進むボタンを出さない', () => {
-  it('検証環境（writeEnabled=false）では「返信内容を確認」を置かず、下書きの保存はできる', async () => {
+  it('検証環境（writeEnabled=false）では「返信内容を確認する」を置かず、下書きの保存はできる', async () => {
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(false, true)} go={vi.fn()} onPublished={vi.fn()} />)
     expect(await screen.findByRole('button', { name: '下書きを保存する' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '返信内容を確認' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '返信内容を確認する' })).toBeNull()
     expect(screen.getByText('検証環境では Google へは送りません。下書きと承認まで。')).toBeTruthy()
   })
-  it('送れる設定で公開の権限があれば「返信内容を確認」を出す', async () => {
+  it('送れる設定で公開の権限があれば「返信内容を確認する」を出す', async () => {
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
-    expect(await screen.findByRole('button', { name: '返信内容を確認' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '返信内容を確認する' })).toBeTruthy()
   })
 })
 
@@ -84,7 +84,7 @@ describe('投稿フォームの入力と保存', () => {
   })
   it('特典の入力不足は最初のタイトル欄へ移し、期間の誤りも各欄に結び付ける', () => {
     render(<PostEditor accountId="a" kind="offer" postId={null} go={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: '公開内容を確認' }))
+    fireEvent.click(screen.getByRole('button', { name: '公開内容を確認する' }))
     expect(document.activeElement).toBe(screen.getByLabelText('タイトル（特典・イベントのとき）'))
     for (const label of ['期間 はじめ', '期間 おわり']) {
       const field = screen.getByLabelText(label)
