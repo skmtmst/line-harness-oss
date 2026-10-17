@@ -34,3 +34,19 @@ it('audit failure rolls back the policy change instead of enabling deletion with
   const res=await app().request(path,request(),{DB:db.db} as Env['Bindings']);expect(res.status).toBe(500);
   expect(db.raw.prepare('SELECT COUNT(*) n FROM account_settings').get()).toEqual({n:0});
 });
+
+it('simultaneous saves have one winner and one policy audit, without overwriting the winner', async () => {
+  const target = app(), env = { DB: db.db } as Env['Bindings'];
+  const responses = await Promise.all([target.request(path, request(), env), target.request(path, request(), env)]);
+  expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
+  expect(db.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='privacy.retention.policy'").get()).toEqual({ n: 1 });
+  expect(await (await target.request(path + '?accountId=a', {}, env)).json()).toMatchObject({ data: { version: 1, policy } });
+});
+
+it.each([null, [], 'enabled', { ...policy, responseDays: '30' }, { ...policy, blockedFriendDays: 3651 }])('rejects malformed policy %j without saving or auditing success', async invalid => {
+  const init = request(); init.body = JSON.stringify({ accountId: 'a', expectedVersion: 0, policy: invalid });
+  const response = await app().request(path, init, { DB: db.db } as Env['Bindings']);
+  expect(response.status).toBe(422);
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM account_settings').get()).toEqual({ n: 0 });
+  expect(db.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='privacy.retention.policy'").get()).toEqual({ n: 0 });
+});
