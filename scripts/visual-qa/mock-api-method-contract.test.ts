@@ -138,6 +138,11 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
         sent: false, simulation: true,
         refund: { amount: 500, notifyLine: true, notificationStatus: 'simulated', sent: false, simulation: true },
       } })
+      const missing = await fetch(`${baseUrl}/api/booking/payments/missing-payment/refund`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reason: '見本の返金', idempotencyKey: 'qa-missing-refund' }),
+      })
+      expect(missing.ok).toBe(false)
     } finally {
       await save(false)
     }

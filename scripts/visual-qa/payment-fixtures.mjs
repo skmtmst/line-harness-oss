@@ -141,10 +141,11 @@ export function paymentWrite(method, pathname, body) {
   if (method === 'POST' && /^\/api\/booking\/admin\/payments\/[^/]+\/send-link$/.test(pathname)) return { success: true, data: { paymentId: pathname.split('/')[5], checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_visualqa', sent: false, simulation: true } }
   if (method === 'POST' && /^\/api\/booking\/payments\/[^/]+\/refund$/.test(pathname)) {
     const record = PAYMENT_RECORDS.items.find((item) => item.id === pathname.split('/')[4])
+    if (!record) return undefined
     return { success: true, data: {
       payment: { status: 'refunded' }, duplicate: false, simulation: true, sent: false,
       refund: {
-        id: 'refund-qa', amount: body?.amount ?? record?.amount ?? 0,
+        id: 'refund-qa', amount: body?.amount ?? record.amount,
         reason: body?.reason ?? '見本の返金', actorLabel: '店長 田中', createdAt: '2026-10-15T12:52:00.000Z',
         notifyLine: Boolean(body?.notifyLine), notificationStatus: body?.notifyLine ? 'simulated' : 'not_requested',
         simulation: true, sent: false,
