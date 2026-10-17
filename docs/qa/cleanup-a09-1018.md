@@ -139,3 +139,14 @@ Worker補完：`20261017-233935-d7787f4b78-49925/`、V8差分判定の補完：`
 試験本体・job名・分類・featureId・`gated`・目印の文字列は変えず、`services/feature-enforcement.ts` の監視先4か所だけを実装へ追随させた：mileageの2か所は `mileage-queue.ts`、common-varsは `common-vars-schedules.ts`、scenariosは `scenarios-enrollment-dispatch.ts`。これは許可一覧や例外の追加ではなく、同じ停止判定を監視し続けるための参照先の変更。Workerの実行関数の本文にも変更なし。
 
 既存3ファイル17試験が成功。さらに、マイルの実行直前判定・取り出しSQLの機能判定・共通情報の予約処理の判定をそれぞれ壊す3対照は、元の試験を変更せず全て終了1、復旧後17成功を確認した。コード量も3303本文/437凍結/違反0のまま。`manifest-reference-diff.json` と `manifest-fault-results.json` に証拠を保存。旧入力の全体検査は、自分のプロセスだけを終了して失敗ログを保持し、この参照修正も含む新しい入力で全体を再実行する。
+
+
+### UI試験に混じっていたDB文字チェックを実SQLへ
+
+同種の参照を追加点検し、contents・analytics・rich-menuのUI試験に分割前のDB本文を読む7つの確認が残っていることを発見。UIやWorkerの表示・呼出し条件は保持し、DBの文字列を探す部分だけを実SQLの見張りへ移した。パスだけを新しいファイルに変える途中案はB-273で新しい文字固定6件と判定されたため採用せず、例外・許可一覧は追加していない。
+
+期限・同意情報の保存と読戻しは `packages/db/src/media-usage-terms.test.ts`、退避のCAS・監査は `packages/db/src/media-archive.test.ts`、停止中の地点への明示的な利用先登録と通常拒否は `packages/db/test/319_conversion_definition_read_contract.test.ts` の既存の実SQL試験が引き続き守る。リッチメニューの優先順は `packages/db/test/rich-menu-targeting-order.test.ts` に実SQL試験1件を追加し、同順位の作成順と2店・公開/有効/登録済み・条件ありの境界まで確認した。
+
+DB4ファイル27件・UI3ファイル42件が成功。期限値を保存しない、同意値を保存しない、監査の操作種別を誤る、退避のCASを外す、明示的な停止中登録も拒否する、優先順を逆転する、同順位の作成順を逆転する、の7対照はいずれも実SQL試験が終了1で検知し、復旧後27成功。新しい文字固定は0、コード量違反0。画面の実装・UI側の既存の判定条件は変更なし。試験の削除/skip/改名は0、DBの文字列確認7つを実データの検査へ置換した。対応は外部 `real-db-guard-map.tsv`、故障結果は `real-db-guard-fault-results.json`。途中のパス追随案の成功/失敗ログも保持する。
+
+`f6d43c4b2c` で始めた検査は、このDB確認の移し先も同じ入力へ含めるため自分の実行だけを終了し、次のコミットから全体を再実行する。途中版を最終の全体合格とは数えない。
