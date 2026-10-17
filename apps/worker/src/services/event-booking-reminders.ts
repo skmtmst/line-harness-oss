@@ -272,6 +272,11 @@ export async function processDueEventReminders(
       ]});
       sent++;
     } catch (error) {
+      if (error instanceof BookingLineDeliveryIncomplete && error.beforeSend) {
+        // 遮断・送信前の保存失敗では外部要求0。外側の準備用leaseは予算に数えない。
+        await releaseWorkflowStep(db, ref, owner, now);
+        continue;
+      }
       await failWorkflowStep(db,ref,owner,{now,unknown: error instanceof BookingLineDeliveryIncomplete && error.kind === 'unknown',delayMs:60_000,code:error instanceof BookingLineDeliveryIncomplete ? 'delivery_unknown' : 'notification_preflight_failed'});
       // Only this owner's failure may change the reminder. Cancellation and accepted sends stay intact.
       await db.prepare(`UPDATE event_booking_reminders SET status=?,retry_count=?,last_error='delivery_unknown'

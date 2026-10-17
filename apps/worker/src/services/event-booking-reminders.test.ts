@@ -1,4 +1,5 @@
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { BookingExternalCircuits } from './booking-external-circuits.js';
 import { afterEach,describe, expect, test, vi } from 'vitest';
 import {
   computeRemindersForBooking,
@@ -323,6 +324,20 @@ describe('processDueEventReminders', () => {
 });
 
 describe('W5 durable reminder delivery',()=>{
+ test('遮断中は外部要求0・試行数0のまま、再開後は同じ予定を送る',async()=>{
+  const state={rows:[dueRow()]},db=dueDB(state),item=opened.at(-1)!;
+  const base=Date.parse('2026-05-09T01:00:00Z'),circuit=new BookingExternalCircuits(db);
+  const scope={accountId:'a',storeId:'a',destination:'line',connectionId:'a'};
+  for(let n=0;n<5;n++){const admission=await circuit.acquire(scope,base);if(admission.allowed)await circuit.settle(admission.lease,'failure',base);}
+  const sender=vi.fn(async()=>undefined);
+  for(let n=0;n<4;n++)expect(await processDueEventReminders(db,{now:new Date(base+n*1000),sender})).toEqual({sent:0,failed:0});
+  expect(sender).not.toHaveBeenCalled();
+  expect(state.rows[0].status).toBe('pending');expect(state.rows[0].retry_count).toBe(0);
+  expect(item.raw.prepare("SELECT status,attempt_count FROM workflow_steps WHERE process_kind='event_reminder'").get())
+    .toEqual({status:'pending',attempt_count:0});
+  expect(await processDueEventReminders(db,{now:new Date(base+31_000),sender})).toEqual({sent:1,failed:0});
+  expect(sender).toHaveBeenCalledTimes(1);
+ });
  test('holds the send lease across await and a concurrent cron cannot send',async()=>{
   const state={rows:[dueRow()]},db=dueDB(state);let started!:()=>void,release!:()=>void;
   const entered=new Promise<void>(resolve=>started=resolve),wait=new Promise<void>(resolve=>release=resolve);

@@ -1,4 +1,5 @@
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { BookingExternalCircuits } from './booking-external-circuits.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
   calculateMeetReminderSchedule,
@@ -45,6 +46,27 @@ describe('renderMeetReminderText', () => {
 });
 
 describe('processDueMeetConsultationReminders', () => {
+  it('遮断中は送信0・試行数0を保ち、再開後も同じ予定を1回だけ送る', async () => {
+    const {db,raw}=createTestD1();
+    try {
+      raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','c','A','fixture-token','fake');
+        INSERT INTO friends(id,line_user_id,line_account_id,is_following) VALUES('f','U1','a',1);
+        INSERT INTO meet_consultations(id,external_event_id,friend_id,title,starts_at,ends_at,meet_url,status)
+          VALUES('c','event','f','Consultation','2030-01-02T01:00:00Z','2030-01-02T02:00:00Z','https://meet.google.com/abc-defg-hij','confirmed');
+        INSERT INTO meet_consultation_reminders(id,consultation_id,kind,scheduled_at)
+          VALUES('6db37bc2-f0c4-4fa8-baa6-5ec7069e1165','c','hour_before','2030-01-02T00:00:00Z');`);
+      const base=Date.parse('2030-01-02T00:00:00Z'),circuit=new BookingExternalCircuits(db);
+      const scope={accountId:'a',storeId:'a',destination:'line',connectionId:'a'};
+      for(let n=0;n<5;n++){const admission=await circuit.acquire(scope,base);if(admission.allowed)await circuit.settle(admission.lease,'failure',base);}
+      const dispatch=vi.fn(async()=>new Response('{}',{status:200}));
+      const options={now:new Date(base),proxyBaseUrl:'https://proxy.example.com',proxyDispatch:dispatch};
+      for(let n=0;n<4;n++)expect(await processDueMeetConsultationReminders(db,{...options,now:new Date(base+n*1000)})).toEqual({sent:0,failed:0});
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(raw.prepare('SELECT status,retry_count FROM meet_consultation_reminders').get()).toEqual({status:'pending',retry_count:0});
+      expect(await processDueMeetConsultationReminders(db,{...options,now:new Date(base+31_000)})).toEqual({sent:1,failed:0});
+      expect(dispatch).toHaveBeenCalledTimes(1);
+    } finally {raw.close();}
+  });
   it('sends through the Harness proxy once with a saved checkpoint and marks the reminder sent', async () => {
     const {db,raw}=createTestD1();
     try {

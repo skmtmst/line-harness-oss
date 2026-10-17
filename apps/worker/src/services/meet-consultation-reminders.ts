@@ -1,4 +1,4 @@
-import { deliverBookingLine } from './booking-line-delivery.js';
+import { deliverBookingLine, BookingLineDeliveryIncomplete } from './booking-line-delivery.js';
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import {
@@ -988,6 +988,8 @@ export async function processDueMeetConsultationReminders(
         console.error(JSON.stringify({"code":"meet_reminder_sent_after_cancel"}));
       }
     } catch (error) {
+      // 送信前に遮断された分を結果不明や上限到達にしない。次のcronで同じ段を拾う。
+      if (error instanceof BookingLineDeliveryIncomplete && error.beforeSend) continue;
       const retryCount = deliveryPrepared ? MAX_RETRY : row.retry_count + 1;
       // 失敗の確定も新版へ再利用された行に触れない (候補写しと同一文で結ぶ)。
       // 新版が勝てば 0 件になり、勝者の pending を残す。試行数は数える。
