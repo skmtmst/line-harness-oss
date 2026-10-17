@@ -10,7 +10,6 @@ const setupSource = readFileSync(join(directory, 'new/page.tsx'), 'utf8') + read
 const accountsSource = readFileSync(join(directory, '../../v8/settings/accounts/accounts.tsx'), 'utf8')
 const wizardSource = readFileSync(join(directory, '../../v8/restaurant/store-new/store-new.tsx'), 'utf8')
 const orderingSource = readFileSync(join(directory, '../../components/accounts/account-ordering.tsx'), 'utf8')
-const switcherSource = readFileSync(join(directory, '../../components/accounts/account-switcher.tsx'), 'utf8')
 const editModalSource = readFileSync(join(directory, '../../components/accounts/account-edit-modal.tsx'), 'utf8')
 
 describe('D-3 店舗追加・一覧の統括集約', () => {
@@ -77,14 +76,6 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     expect(v8ListSource.match(/<AccountOrdering\b/g) ?? []).toHaveLength(1)
     expect(v8ListSource).toMatch(/\{orderingOpen \? <AccountOrdering\s+[\s\S]*?onClose=\{[\s\S]*?onSaved=\{[\s\S]*?\/> : null\}/)
     expect(orderingSource).toContain('designNode="a7lUk"')
-  })
-
-  it('共通アカウント切替部品は確認後に管理対象を切り替える', () => {
-    for (const label of ['現在のLINEアカウント', '表示中', 'このアカウントへ移動しますか？', 'このアカウントへ移動']) {
-      expect(switcherSource).toContain(label)
-    }
-    expect(switcherSource).toContain('setSelectedAccountId(target.id)')
-    expect(switcherSource).toContain("window.location.assign('/')")
   })
 
   it('再利用する編集モーダルは秘密値を読まず、狭い画面でも入力欄を切らない', () => {

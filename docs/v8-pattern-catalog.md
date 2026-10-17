@@ -333,7 +333,7 @@
 ## detail-panel 詳細のパネル・引き出し
 
 - **役目**：行の詳細は右の DetailPanel 360、編集は Drawer 480/540
-- **持ち主（コード）**：`apps/web/src/components/shared/detail-panel.tsx`・`apps/web/src/components/shared/detail-panel.module.css`・`apps/web/src/components/shared/drawer.tsx`・`apps/web/src/components/shared/drawer.module.css`・`apps/web/src/components/shared/slide-panel.tsx`（部品 `DetailPanel`・`Drawer`）
+- **持ち主（コード）**：`apps/web/src/components/shared/detail-panel.tsx`・`apps/web/src/components/shared/detail-panel.module.css`・`apps/web/src/components/shared/drawer.tsx`・`apps/web/src/components/shared/drawer.module.css`（部品 `DetailPanel`・`Drawer`）
   - 読む変数：`--radius-panel`・`--shadow-float`
 - **持ち主（Pen）**：**未定**
   - 注：Pen の部品 ID が対応表に無い（ZBjxY の「引き出し」は板の中の名前だけ）
@@ -383,7 +383,7 @@
 ## picker-dialog 選ぶ窓
 
 - **役目**：作ってある物を、フォルダ・探す・見本付きの窓で選ぶ（受信箱の「テンプレートを選ぶ」の形1つ）
-- **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`・`apps/web/src/components/shared/entity-picker-window.tsx`・`apps/web/src/components/shared/entity-picker.module.css`・`apps/web/src/components/shared/entity-picker-sources.tsx`・`apps/web/src/components/shared/hq-account-picker.tsx`（部品 `EntityPickerDialog`・`EntityPickerWindow`・`EntityMultiPickerDialog`・`HqAccountPickerDialog`）
+- **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`・`apps/web/src/components/shared/entity-picker.module.css`・`apps/web/src/components/shared/entity-picker-sources.tsx`・`apps/web/src/components/shared/hq-account-picker.tsx`（部品 `EntityPickerDialog`・`EntityPickerWindow`・`EntityMultiPickerDialog`・`HqAccountPickerDialog`）
 - **持ち主（Pen）**：`S2Vgi`「選ぶ窓（正の形・B-165）」・`A1eZS`「選ぶ窓（V8-B の写し）」
   - 部品の板の html に書き出されていない ID：`S2Vgi`・`A1eZS`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
 - **見つけ方（コード）**：

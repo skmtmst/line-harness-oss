@@ -59,7 +59,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/inbox-chat/inbox-chat.module.css", ".inputBox", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["v8/inbox-chat/inbox-chat.module.css", ".attachPop", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["v8/inflow-links/list.module.css", ".presetPanel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
-  ["v8/inflow-links/qr-dialog.module.css", ".qr", "札・印・画像・端末の見本。カードの影を付けない。"],
   ["v8/nen-posts/review.module.css", ".tableWrap", "投稿の公開記録を表示する表の枠。影を重ねない。"],
   ["v8/ops/auth.module.css", ".digit", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["v8/restaurant/closures/closures.module.css", ".grid", "表・一覧の行。外側のカードと影を重ねない。"],
