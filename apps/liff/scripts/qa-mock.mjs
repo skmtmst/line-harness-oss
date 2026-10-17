@@ -690,10 +690,6 @@ const server = createServer(async (req, res) => {
     json(res, 200, { lock_version: 2, status: pathname.endsWith('/cancel') ? 'cancelled' : 'confirmed' });
     return;
   }
-  if (method === 'POST' && pathname === '/api/liff/booking/payments/start') {
-    json(res, 200, { payment: null, checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_qa' });
-    return;
-  }
   if (method === 'GET' && pathname === '/api/liff/booking/me') {
     json(res, 200, {
       upcoming: [
