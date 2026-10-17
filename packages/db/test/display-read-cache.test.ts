@@ -25,6 +25,9 @@ describe('display calculation cache', () => {
     expect(first).toEqual({ value: 3, asOf: '2026-10-18T00:00:00Z', state: 'partial' });
     first!.value = 99;
     expect(await select(c.db)).toEqual({ value: 3, asOf: '2026-10-18T00:00:00Z', state: 'partial' });
+    const warm = await select(c.db);
+    warm!.value = 88;
+    expect(await select(c.db)).toHaveProperty('value', 3);
     expect(f.calls).toHaveBeenCalledTimes(1);
   });
   test('concurrent identical reads make one SQL call; callers receive separate values', async () => {
