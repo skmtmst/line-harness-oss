@@ -343,7 +343,7 @@ export async function getFriendScoreHistory(db: D1Database, friendId: string): P
     `SELECT id, friend_id, scoring_rule_id, score_change, reason, created_at,
             event_type, source, rule_key, operation, score_before, score_after,
             occurred_at, executed_by_staff_id, executed_by_staff_name
-       FROM friend_scores WHERE friend_id = ? ORDER BY created_at DESC`,
+       FROM friend_scores WHERE friend_id = ? ORDER BY created_at DESC, id DESC`,
   )
     .bind(friendId).all<FriendScoreRow>();
   return result.results;
@@ -385,3 +385,5 @@ export async function applyScoring(db: D1Database, friendId: string, eventType: 
   }
   return totalChange;
 }
+
+export { getFriendScoreHistoryPage, type ScoreHistoryCursor } from './scoring-history-page.js';

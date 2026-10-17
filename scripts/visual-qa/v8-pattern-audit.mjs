@@ -28,7 +28,6 @@ import { homedir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { checkTemporaryAllowances, patternFindingKey } from './temporary-allowances.mjs'
 import { cssConsumerIndex, selectorTargetsNative, selectorIsCoordinateOverlay } from './pattern-css-evidence.mjs'
 import { clearSourceEvidence, sourceEvidence } from './pattern-source-evidence.mjs'
 
@@ -993,7 +992,7 @@ function main() {
   console.log(`→ ${join(out, 'pattern-audit.md')}`)
   if (args.base) {
     const gate = checkBase(args, report)
-    gate.temporary = checkTemporaryAllowances('pattern', gate.findings, patternFindingKey)
+    gate.temporary = { allowed: [], unexpected: gate.findings }
     writeFileSync(join(out, 'pattern-new-findings.json'), `${JSON.stringify(gate, null, 2)}\n`)
     for (const hit of gate.findings.slice(0, 50)) console.error(`(${hit.category}) ${hit.pattern} ${hit.file}:${hit.line} ${hit.text}`)
     console.log(`持ち主の見張り: base ${gate.sha} / 新しい候補 ${gate.findings.length}`)

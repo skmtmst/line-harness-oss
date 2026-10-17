@@ -12,10 +12,6 @@ const PUBLISHER = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'lib', 'rich-menu-publisher.ts'),
   'utf8',
 )
-const TARGETING_DB = readFileSync(
-  join(HERE, '..', '..', '..', '..', '..', 'packages', 'db', 'src', 'rich-menus.ts'),
-  'utf8',
-)
 
 describe('V6リッチメニューの画面契約', () => {
   it('LINEアカウント切替前の応答を捨て、全件をページ送りでたどれる', () => {
@@ -57,7 +53,7 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain('上のメニューが優先されます。')
     expect(PAGE).toContain('いちばん上の1つだけが出ます。')
     expect(PAGE).toContain("sort: sortKey")
-    expect(TARGETING_DB).toContain('ORDER BY g.targeting_priority ASC, g.created_at ASC')
+    // 実際の優先順・同順位の作成順は packages/db/test/rich-menu-targeting-order.test.ts で守る。
   })
 
   it('並び替えは見た目だけでなく実際の判定順を全件そろえる', () => {

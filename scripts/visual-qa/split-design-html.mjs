@@ -6,7 +6,7 @@
   かといって1ノードずつ書き出すのは、262画面ぶんの往復になる。
 
   そこで文字と同じく、まるごと1回書き出してからここで割る。
-  割った先は `capture-screens.mjs --design --from <dir>` にそのまま渡せる。
+  割ったHTMLは、手元で絵を確認するために使う。旧V6の撮影CLIへは接続しない。
 
   使い方:
     node scripts/visual-qa/split-design-html.mjs --html <f1.html> --out <dir> --nodes a,b,c

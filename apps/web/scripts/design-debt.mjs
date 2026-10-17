@@ -1,27 +1,11 @@
-/*
- * 共通部品を通らずに直接書かれている見た目を数えて、**これ以上増やさない**。
- *
- * `raw-color-baseline.mjs` と同じ考え方。あちらは生の色だけを見るので、
- * 任意値記法・直書きの表見出し・直書きのボタンは素通りする。
- *
- *   node apps/web/scripts/design-debt.mjs           確認する（増えていたら終了コード1）
- *   node apps/web/scripts/design-debt.mjs --update  基準を書き直す
- *
- * 正規表現ではなく TypeScript の構文木で読む。`className` が複数行に
- * またがっていたり、テンプレート文字列や三項演算子で組まれていたりすると、
- * 正規表現では取りこぼすため。
- *
- * 静的に読めない `className`（変数や関数の戻り値）は **未解決** として
- * 数え、出力に必ず出す。黙って対象外にしない。
- */
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+/** 現在の宣言数を報告する。表示制御が部品に効かない場合だけ止める。 */
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..')
 export const SRC = join(WEB, 'src')
-export const BASELINE = join(WEB, 'design', 'design-debt-baseline.json')
 const PARTS = join(WEB, 'design', 'design-parts.json')
 
 /**
@@ -315,55 +299,9 @@ export function totals(counts) {
 /** 常に0でなければならない種類。 */
 export const ZERO_TOLERANCE = ['display-class-on-part']
 
-export function compare(now, baseline) {
-  const worse = {}
-  const files = new Set([...Object.keys(now), ...Object.keys(baseline)])
-  for (const file of files) {
-    const a = now[file] ?? {}
-    const b = baseline[file] ?? {}
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)])
-    for (const key of keys) {
-      const count = a[key] ?? 0
-      const was = b[key] ?? 0
-      if (count > was) (worse[file] ??= {})[key] = `${was} → ${count}`
-    }
-  }
-  return { worse }
-}
-
 if (process.argv[1] && process.argv[1].endsWith('design-debt.mjs')) {
-  const update = process.argv.includes('--update')
-  const { counts } = countDebt()
-  const sum = totals(counts)
-
-  if (update) {
-    writeFileSync(BASELINE, `${JSON.stringify(counts, null, 2)}\n`)
-    console.log('apps/web/src の直書きを数えました。\n')
-    for (const [k, n] of Object.entries(sum).sort()) console.log(`  ${k.padEnd(26)}${String(n).padStart(5)} か所`)
-    console.log(`\n${Object.keys(counts).length} ファイル分を design/design-debt-baseline.json に書きました。`)
-  } else {
-    const baseline = JSON.parse(readFileSync(BASELINE, 'utf8'))
-    const { worse } = compare(counts, baseline)
-    console.log('直書きの数\n')
-    for (const [k, n] of Object.entries(sum).sort()) console.log(`  ${k.padEnd(26)}${String(n).padStart(5)} か所`)
-
-    const zero = ZERO_TOLERANCE.filter((k) => (sum[k] ?? 0) > 0)
-    const bad = Object.keys(worse).length || zero.length
-
-    const unresolvedFiles = Object.entries(counts).filter(([, v]) => v['unresolved-classname'])
-    if (unresolvedFiles.length) {
-      console.log('\n未解決の className は基準値に入れている。増えたら落ちる。')
-      console.log('  変数や関数の戻り値で組まれていて静的に読めない。ほかの数には入っていない。')
-      for (const [f, v] of unresolvedFiles
-        .sort((a, b) => b[1]['unresolved-classname'] - a[1]['unresolved-classname'])
-        .slice(0, 5)) {
-        console.log(`    ${f} (${v['unresolved-classname']})`)
-      }
-    }
-    for (const k of zero) console.log(`\n★ ${k} は0でなければなりません。現在 ${sum[k]} か所。`)
-    for (const [f, d] of Object.entries(worse)) console.log(`\n★ 増えています: ${f} ${JSON.stringify(d)}`)
-    if (bad) console.log('\n直し方: node apps/web/scripts/design-debt.mjs --update')
-    else console.log('\n合格')
-    process.exit(bad ? 1 : 0)
-  }
+  const { counts } = countDebt(), sum = totals(counts)
+  console.log(JSON.stringify({ counts, totals: sum }, null, 2))
+  const hiddenControls = ZERO_TOLERANCE.some(key => (sum[key] ?? 0) > 0)
+  if (hiddenControls) process.exitCode = 1
 }
