@@ -234,11 +234,16 @@ export interface ReminderDeliveryRunRow {
 
 // --- リマインダCRUD ---
 
-export async function getReminders(db: D1Database): Promise<ReminderRow[]> {
+export async function getReminders(db: D1Database, scope?: ReminderRowScope): Promise<ReminderRow[]> {
+  const bindings: unknown[] = [];
+  const predicate = reminderRowScopePredicate('line_account_id', scope, bindings);
   // 161: 並べ替えたものが先。まだ並べ替えていないものは全部 0 なので、
   // created_at の新しい順で割る（これまでの並びが変わらない）。
   const result = await db
-    .prepare(`SELECT * FROM reminders WHERE deleted_at IS NULL ORDER BY display_order ASC, created_at DESC`)
+    .prepare(`SELECT * FROM reminders WHERE deleted_at IS NULL
+      ${predicate ? `AND ${predicate}` : ''}
+      ORDER BY display_order ASC, created_at DESC, id ASC`)
+    .bind(...bindings)
     .all<ReminderRow>();
   return result.results;
 }

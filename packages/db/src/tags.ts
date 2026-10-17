@@ -1,3 +1,4 @@
+import { tagReadPredicate, type TagReadScope } from './tag-lists.js';
 import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { enqueueMileageEvent } from './mileage.js';
@@ -69,17 +70,8 @@ export interface FriendTag {
   assigned_at: string;
 }
 
-export async function getTags(db: D1Database): Promise<Tag[]> {
-  const result = await db
-    .prepare(
-      `SELECT t.*, fo.color AS folder_color
-       FROM tags t
-       LEFT JOIN folders fo ON fo.id = t.folder_id
-       ORDER BY t.name ASC`,
-    )
-    .all<Tag>();
-  return result.results;
-}
+export { getTags, getTagsWithCounts } from './tag-lists.js';
+export type { TagReadScope } from './tag-lists.js';
 
 export interface TagWithCount extends Tag {
   friend_count: number;
@@ -198,10 +190,13 @@ export function buildTagUsageBlockingReferenceQueries(
 export async function collectTagUsageBlockingTagIds(
   db: D1Database,
   selects: readonly string[] = TAG_USAGE_BLOCKING_REFERENCE_SELECTS,
+  scope?: TagReadScope,
 ): Promise<Set<string>> {
+  const predicate = tagReadPredicate(scope, 'known');
   const blockingTagIds = new Set<string>();
   for (const query of buildTagUsageBlockingReferenceQueries(selects)) {
-    const references = await db.prepare(query).all<{ tag_id: string | null }>();
+    const references = await db.prepare(`${query} WHERE ${predicate.sql}`)
+      .bind(...predicate.binds).all<{ tag_id: string | null }>();
     for (const reference of references.results) {
       if (reference.tag_id !== null) blockingTagIds.add(reference.tag_id);
     }
@@ -260,24 +255,6 @@ export async function assertTagNameAvailable(
   }
 }
 
-export async function getTagsWithCounts(
-  db: D1Database,
-): Promise<TagWithCount[]> {
-  const result = await db
-    .prepare(
-      `SELECT t.*, fo.color AS folder_color, COUNT(ft.friend_id) AS friend_count
-       FROM tags t
-       LEFT JOIN friend_tags ft ON ft.tag_id = t.id
-       LEFT JOIN folders fo ON fo.id = t.folder_id
-       GROUP BY t.id
-       -- 入れ替えたものが先。触っていないものは全部 0 なので、
-       -- そのあとの付与人数と名前で並ぶ（設計の既定は付与人数が多い順）。
-       ORDER BY t.display_order ASC, friend_count DESC, t.name ASC`,
-    )
-    .all<TagWithCount>();
-  return result.results;
-}
-
 /**
  * タグ一覧の「どこで使われているか」を返す。
  *
@@ -290,19 +267,25 @@ export async function getTagsWithCounts(
  */
 export async function getTagsWithUsage(
   db: D1Database,
+  scope?: TagReadScope,
 ): Promise<TagWithUsage[]> {
+  const predicate = tagReadPredicate(scope);
   const result = await db.prepare(
     `SELECT t.*, fo.color AS folder_color,
             COUNT(DISTINCT ft.friend_id) AS friend_count
        FROM tags t
        LEFT JOIN friend_tags ft ON ft.tag_id = t.id
        LEFT JOIN folders fo ON fo.id = t.folder_id
+      WHERE ${predicate.sql}
       GROUP BY t.id
-      ORDER BY t.display_order ASC, friend_count DESC, t.name ASC`,
-  ).all<Omit<TagWithUsageRow,
+      ORDER BY t.display_order ASC, friend_count DESC, t.name ASC, t.id ASC`,
+  ).bind(...predicate.binds).all<Omit<TagWithUsageRow,
     'assign_source' | 'used_in_broadcasts' | 'used_in_forms' |
     'used_in_scenarios' | 'used_in_auto_replies' |
     'used_in_saved_searches' | 'other_action_count'>>();
+
+  if (result.results.length === 0) return [];
+  const referenceScope = tagReadPredicate(scope, 'known');
 
   const scenarioReferenceSelects = [
     'SELECT trigger_tag_id AS tag_id, id AS entity_id FROM scenarios WHERE trigger_tag_id IS NOT NULL',
@@ -333,7 +316,8 @@ export async function getTagsWithUsage(
       .join('\nUNION\n');
     scenarioReferenceQueries.push(`WITH refs(tag_id, entity_id) AS (${references})
       SELECT DISTINCT r.tag_id, r.entity_id
-        FROM refs r JOIN tags known ON known.id = r.tag_id`);
+        FROM refs r JOIN tags known ON known.id = r.tag_id
+       WHERE ${referenceScope.sql}`);
   }
 
   const usageQueries = {
@@ -439,7 +423,8 @@ export async function getTagsWithUsage(
     const counts = await db.prepare(`${refsQuery}
       SELECT r.tag_id, COUNT(DISTINCT r.${distinctKey}) count
         FROM refs r JOIN tags known ON known.id = r.tag_id
-       GROUP BY r.tag_id`).all<TagUsageCountRow>();
+       WHERE ${referenceScope.sql}
+       GROUP BY r.tag_id`).bind(...referenceScope.binds).all<TagUsageCountRow>();
     usageCounts.set(field, new Map(
       counts.results.map((row) => [row.tag_id, Number(row.count)]),
     ));
@@ -447,7 +432,7 @@ export async function getTagsWithUsage(
 
   const scenarioReferences = new Map<string, Set<string>>();
   for (const query of scenarioReferenceQueries) {
-    const references = await db.prepare(query).all<TagUsageReferenceRow>();
+    const references = await db.prepare(query).bind(...referenceScope.binds).all<TagUsageReferenceRow>();
     for (const reference of references.results) {
       const entityIds = scenarioReferences.get(reference.tag_id) ?? new Set<string>();
       entityIds.add(reference.entity_id);
@@ -485,7 +470,7 @@ export async function getTagsWithUsage(
     };
   });
 
-  const blockingTagIds = await collectTagUsageBlockingTagIds(db);
+  const blockingTagIds = await collectTagUsageBlockingTagIds(db, TAG_USAGE_BLOCKING_REFERENCE_SELECTS, scope);
 
   const duplicateCounts = new Map<string, number>();
   for (const row of rows) {

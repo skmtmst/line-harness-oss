@@ -2793,13 +2793,12 @@ export async function getMileageAdminOverview(
               COALESCE(a.booking_count, 0) AS booking_count,
               COALESCE(a.webinar_count, 0) AS webinar_count,
               COALESCE(a.instagram_count, 0) AS instagram_count,
-              a.last_activity_at,
-              COUNT(*) OVER() AS filtered_count
+              a.last_activity_at
          FROM profiles p
          LEFT JOIN wallet w ON w.identity_key = p.identity_key
          LEFT JOIN activity a ON a.identity_key = p.identity_key
         WHERE (? = '' OR p.display_name LIKE '%' || ? || '%')
-        ORDER BY available DESC, action_count DESC, p.display_name ASC
+        ORDER BY available DESC, action_count DESC, p.display_name ASC, p.identity_key ASC
         LIMIT ? OFFSET ?`,
     )
     .bind(...scopeBinds, search, search, limit, offset)
@@ -2825,13 +2824,13 @@ export async function getMileageAdminOverview(
       following_days: number;
       unfollow_count: number;
       last_activity_at: string | null;
-      filtered_count: number;
     }>();
 
   const summary = await db
     .prepare(
       `${ctes}
        SELECT COUNT(*) AS total_members,
+              COUNT(CASE WHEN (? = '' OR p.display_name LIKE '%' || ? || '%') THEN 1 END) AS filtered_members,
               COALESCE(SUM(COALESCE(w.available, 0)), 0) AS total_available,
               SUM(CASE WHEN datetime(a.last_activity_at) >= datetime('now', '-30 days') THEN 1 ELSE 0 END) AS active_members_30d,
               COALESCE(SUM(COALESCE(a.action_count, 0)), 0) AS total_actions
@@ -2839,9 +2838,10 @@ export async function getMileageAdminOverview(
          LEFT JOIN wallet w ON w.identity_key = p.identity_key
          LEFT JOIN activity a ON a.identity_key = p.identity_key`,
     )
-    .bind(...scopeBinds)
+    .bind(...scopeBinds, search, search)
     .first<{
       total_members: number;
+      filtered_members: number;
       total_available: number;
       active_members_30d: number;
       total_actions: number;
@@ -2897,7 +2897,7 @@ export async function getMileageAdminOverview(
       lastActivityAt: row.last_activity_at,
     })),
     pagination: {
-      total: Number(rows.results[0]?.filtered_count ?? 0),
+      total: Number(summary?.filtered_members ?? 0),
       limit,
       offset,
     },
