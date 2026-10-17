@@ -86,7 +86,7 @@ describe('LINEアカウント作成ウィザード', () => {
   it('用意方法を切り替えても公式アカウント作成リンクを別タブで開ける', () => {
     render(<NewLineAccountPage />)
     expect(screen.getByRole('link', { name: /LINE公式アカウントを作る/ }).getAttribute('href')).toBe('https://manager.line.biz/')
-    fireEvent.click(screen.getByLabelText('新しく公式アカウントを作成'))
+    fireEvent.click(screen.getByLabelText('新しく公式アカウントを作る'))
     const link = screen.getByRole('link', { name: /LINE公式アカウントを作る/ })
     expect(link.getAttribute('href')).toBe('https://manager.line.biz/')
     expect(link.getAttribute('target')).toBe('_blank')

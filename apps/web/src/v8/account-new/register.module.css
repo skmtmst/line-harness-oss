@@ -40,7 +40,6 @@
 .groupLabel { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink-secondary); }
 .field { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); min-width: 0; }
 .label { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 600; color: var(--color-ink); }
-.fieldError { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-danger); }
 .help { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 .secretRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-panel-gap); }
 .secretNote {
@@ -77,12 +76,8 @@
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink);
 }
 .progressHead strong { font-weight: 700; }
-.progressTrack { height: var(--tpl-htn-progress-h); border-radius: var(--tpl-htn-radius-pill); background: var(--color-hairline); overflow: hidden; }
-.progressFill { display: block; height: 100%; border-radius: var(--tpl-htn-radius-pill); background: var(--color-accent-deep); }
 .progressWarn { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-status-warn-deep); }
 .progressNote { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
-
-/* 下の帯：本文のすぐ下に置き、長いときは画面の下に追従する。ボタンは中央。 */
 
 /* 結果の窓（qw80E） */
 .result {

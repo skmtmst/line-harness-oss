@@ -17,7 +17,8 @@ import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
-import StickyBar from '@/components/shared/sticky-bar'
+import { PageFooter } from '@/components/templates/page-footer'
+import { ProgressBar } from '@/components/shared/progress'
 import { TagToggle } from '@/components/shared/tag-pill'
 import { DataTable, Tr, Td } from '@/components/shared/table'
 import Checkbox from '@/components/shared/checkbox'
@@ -486,7 +487,7 @@ export default function AccountRegisterV8() {
   const busy = Boolean(busyAction)
 
   return (
-    <SaveErrorScope errors={saveErrors}><PageFrame kind="wizard" boardId={shownStep.node}>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="wizard" boardId={shownStep.node} hasFooter>
       <PageHeading
         title="LINEアカウントを登録"
         help={shownStep.lead}
@@ -506,7 +507,7 @@ export default function AccountRegisterV8() {
           /></div>
         )}
       />
-      <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
+      <form id="account-register-form" className={styles.body} data-template-region="body" onSubmit={submit} noValidate aria-busy={busy || undefined}>
         <div ref={stepPanelRef} tabIndex={-1} className={styles.stepBody}>
           {currentStep === 1 && !createdId && (
             <CreateStepColumns data-design-node="xj3zz" previewTitle="この5段でやること" preview={(
@@ -527,7 +528,7 @@ export default function AccountRegisterV8() {
                   <legend className={styles.panelTitle}>アカウントの用意方法</legend>
                   <div className={styles.radios}>
                     <SaveErrorField names={["account-method-v8","accountMethod"]}><Radio name="account-method-v8" value="existing" checked={accountMethod === 'existing'} onChange={() => setAccountMethod('existing')}>既存の公式アカウントを使う</Radio></SaveErrorField>
-                    <SaveErrorField names={["account-method-v8","accountMethod"]}><Radio name="account-method-v8" value="new" checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')}>新しく公式アカウントを作成</Radio></SaveErrorField>
+                    <SaveErrorField names={["account-method-v8","accountMethod"]}><Radio name="account-method-v8" value="new" checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')}>新しく公式アカウントを作る</Radio></SaveErrorField>
                   </div>
                 </fieldset>
                 <Card className={styles.noteBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
@@ -539,7 +540,7 @@ export default function AccountRegisterV8() {
                 <div className={styles.buttonRow}>
                   <Button external href="https://manager.line.biz/"  >LINE公式アカウントを作る</Button>
                   <Button external href="https://developers.line.biz/console/"  >LINE Developersを開く</Button>
-                  <Button external href={`${MANUAL}#m1`}  ><BookOpen size={15} aria-hidden="true" />全手順を見る</Button>
+                  <Button external href={`${MANUAL}#m1`}  ><BookOpen size={16} aria-hidden="true" />全手順を見る</Button>
                 </div>
               </Card>
             </CreateStepColumns>
@@ -574,7 +575,7 @@ export default function AccountRegisterV8() {
                 </SettingsFormRow>
                 <div className={styles.secretRow}>
                   <span className={styles.secretNote}><Lock size={14} aria-hidden="true" />秘密値は保存後に画面へ表示されません。</span>
-                  <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />取得方法を見る</Button>
+                  <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={16} aria-hidden="true" />取得方法を見る</Button>
                 </div>
               </Card>
             </CreateStepColumns>
@@ -585,12 +586,11 @@ export default function AccountRegisterV8() {
               {/* LINE ID の右に［LINEから取得］（絵 GwKE2：欄と同じ行の右端）。 */}
               <div className={styles.idRow}>
               <SettingsFormRow layout="columns">
-                <Field label="表示名" htmlFor="v8-display-name"><SaveErrorField names={["name","form.name"]}><TextField id="v8-display-name" value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "v8-display-name-error" : undefined} /></SaveErrorField></Field>
+                <Field label="表示名" htmlFor="v8-display-name" error={fieldErrors.name} errorId="v8-display-name-error"><SaveErrorField names={["name","form.name"]}><TextField id="v8-display-name" value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "v8-display-name-error" : undefined} /></SaveErrorField></Field>
                 <Field label="LINE ID" htmlFor="v8-line-id"><SaveErrorField names={["lineId","form.lineId","line_id","form.line_id"]}><TextField id="v8-line-id" value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly /></SaveErrorField></Field>
               </SettingsFormRow>
-              <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…"><Download size={15} aria-hidden="true" />LINEから取得</Button>
+              <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…"><Download size={16} aria-hidden="true" />LINEから取得</Button>
               </div>
-              {fieldErrors.name && <p id="v8-display-name-error" role="alert" className={styles.fieldError}>{fieldErrors.name}</p>}
               <div className={styles.field}>
                 <span className={styles.groupLabel}>タグ</span>
                 <div className={styles.tagRow}>
@@ -621,7 +621,7 @@ export default function AccountRegisterV8() {
                     <SaveErrorField names={["staffIds", "staff_ids"]}><EntitySelect aria-label="このアカウントを担当範囲に追加する人" noun="スタッフ" values={form.staffIds} onChange={(ids) => update('staffIds', ids)} options={staffOptions.map((member) => ({ value: member.id, label:member.name}))}/></SaveErrorField>
                     <p className={styles.help}>全アカウント担当者は追加操作なしで閲覧できます。</p>
                   </fieldset>
-                  {optionsError ? <p role="alert" className={styles.fieldError}>{optionsError}</p> : null}
+                  {optionsError ? <Notice tone="danger" message={optionsError} /> : null}
                 </div>
               )}
               <div className={styles.field}>
@@ -666,9 +666,7 @@ export default function AccountRegisterV8() {
                     <strong>{importingIds ? '既存の友だちを取り込んでいます' : '既存の友だちを取り込みました'}</strong>
                     <strong>{importingIds ? `${polishFormatNumber(importedCount)} 人 / ${progressTotal !== null ? `${polishFormatNumber(progressTotal)} 人` : '確認中'}` : `${polishFormatNumber(importedCount)} 人`}</strong>
                   </div>
-                  <div className={styles.progressTrack} role="progressbar" aria-valuenow={progressRate} aria-valuemin={0} aria-valuemax={100} aria-label="友だちの取り込み">
-                    <span className={styles.progressFill} style={{ width: `${progressRate}%` }} />
-                  </div>
+                  <ProgressBar value={progressRate} label="友だちの取り込み" />
                   <p className={styles.progressWarn}>取り込みは画面を閉じても続きます。もう一度開くと進み具合を確認できます。</p>
                 </> : connection.followerImport.capability === 'available' ? (
                   <p className={styles.progressNote}>既存の友だちの取り込みはオフになっています。取り込むときはアカウントの詳細から始めてください。</p>
@@ -684,9 +682,9 @@ export default function AccountRegisterV8() {
               <p className={styles.groupLabel}>次にすること</p>
               <div className={styles.buttonRow}>
                 {importingIds ? <Button disabled title="友だち情報の取り込みが終わると、登録したアカウントを開けます">登録したアカウントを見る</Button> : <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>}
-                <Button href="/friends"><Users size={15} aria-hidden="true" />友だち一覧</Button>
-                <Button href="/friend-add-settings"><QrCode size={15} aria-hidden="true" />友だち追加URL・QR</Button>
-                <Button href="/emergency"><Activity size={15} aria-hidden="true" />運用状態の接続監視</Button>
+                <Button href="/friends"><Users size={16} aria-hidden="true" />友だち一覧</Button>
+                <Button href="/friend-add-settings"><QrCode size={16} aria-hidden="true" />友だち追加URL・QR</Button>
+                <Button href="/emergency"><Activity size={16} aria-hidden="true" />運用状態の接続監視</Button>
               </div>
             </Card>
           )}
@@ -701,18 +699,18 @@ export default function AccountRegisterV8() {
         ) : error ? (
           <Notice tone="danger" message={error} onClose={() => setError('')} />
         ) : null}
-        <StickyBar presentation="account-registration" actions={createdId ? (
-            <Button href="/hq" variant="primary"><ArrowLeft size={15} aria-hidden="true" />統括コンソールへ戻る</Button>
+      </form>
+      <PageFooter actions={createdId ? (
+            <Button href="/hq" variant="primary"><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>
           ) : currentStep === 4 ? <>
-            <Button type="button" disabled={busy} onClick={() => { setError(''); setCurrentStep(3) }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
-            <Button type="button" variant="primary" disabled={busy} onClick={() => void runCheckThenReview()} busy={busyAction === 'check'} busyLabel="接続して設定しています…"><Plug size={15} aria-hidden="true" />接続して設定する</Button>
+            <Button type="button" disabled={busy} onClick={() => { setError(''); setCurrentStep(3) }}><ArrowLeft size={16} aria-hidden="true" />戻る</Button>
+            <Button type="button" variant="primary" disabled={busy} onClick={() => void runCheckThenReview()} busy={busyAction === 'check'} busyLabel="接続して設定しています…"><Plug size={16} aria-hidden="true" />接続して設定する</Button>
           </> : <>
             {currentStep === 1
               ? <Button href="/hq">キャンセル</Button>
-              : <Button type="button" disabled={busy} onClick={() => { setError(''); setCurrentStep((currentStep - 1) as StepNumber) }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>}
-            <Button type="submit" variant="primary" disabled={busy}><ArrowRight size={15} aria-hidden="true" />次へ</Button>
+              : <Button type="button" disabled={busy} onClick={() => { setError(''); setCurrentStep((currentStep - 1) as StepNumber) }}><ArrowLeft size={16} aria-hidden="true" />戻る</Button>}
+            <Button type="submit" form="account-register-form" variant="primary" disabled={busy}><ArrowRight size={16} aria-hidden="true" />次へ</Button>
           </>} />
-      </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
       <Dialog
@@ -725,8 +723,8 @@ export default function AccountRegisterV8() {
         // 絵 qw80E：窓の余白24・題の行36・本文までの間14（題を4下げ、本文の位置は今のまま）
         designHeaderPadding="24px 24px 4px"
         footer={<div className={styles.dialogFooter}>
-          <Button type="button" disabled={busy} onClick={() => void runCheckThenReview()} busy={busyAction === 'check'} busyLabel="調べています…"><RotateCw size={15} aria-hidden="true" />もう一度調べる</Button>
-          <Button type="button" variant="primary" disabled={!rowsPassed || !manualAck || busy} onClick={() => void save()} busy={busyAction === 'save'} busyLabel="登録しています…"><ShieldCheck size={15} aria-hidden="true" />確認コードを入れて登録する</Button>
+          <Button type="button" disabled={busy} onClick={() => void runCheckThenReview()} busy={busyAction === 'check'} busyLabel="調べています…"><RotateCw size={16} aria-hidden="true" />もう一度調べる</Button>
+          <Button type="button" variant="primary" disabled={!rowsPassed || !manualAck || busy} onClick={() => void save()} busy={busyAction === 'save'} busyLabel="登録しています…"><ShieldCheck size={16} aria-hidden="true" />確認コードを入れて登録する</Button>
         </div>}
       >
         <div className={styles.result}>
@@ -769,6 +767,6 @@ function ResultRow({ label, value, state }: { label: string; value: string; stat
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
   return (
-    <CopyTextButton value={value} label="コピーする" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="値をコピー" disabled={value === '—'} />
+    <CopyTextButton value={value} label="コピーする" variant="secondary" icon={<Copy size={16} aria-hidden="true" />} aria-label="値をコピーする" disabled={value === '—'} />
   )
 }
