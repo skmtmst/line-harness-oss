@@ -7,10 +7,8 @@ export { parseRetentionPolicy, RETENTION_POLICY_KEY, RETENTION_PROPOSAL, retenti
 type RetentionEnvironment = { DB: D1Database; IMAGES?: Pick<R2Bucket, 'delete'> };
 type RetentionResult = { deleted: number; failed: number; held: number };
 
-async function retentionPolicyUnchanged(db: D1Database, accountId: string, expected: RetentionPolicy): Promise<boolean> {
-  const current = parseRetentionPolicy(await getAccountSetting(db, accountId, RETENTION_POLICY_KEY));
-  return current.enabled === expected.enabled && current.hold === expected.hold
-    && current.responseDays === expected.responseDays && current.blockedFriendDays === expected.blockedFriendDays;
+async function readRetentionPolicy(db: D1Database, accountId: string): Promise<RetentionPolicy> {
+  return parseRetentionPolicy(await getAccountSetting(db, accountId, RETENTION_POLICY_KEY));
 }
 
 export async function processPersonalDataRetention(env: RetentionEnvironment, now = new Date()): Promise<RetentionResult> {
@@ -22,7 +20,7 @@ export async function processPersonalDataRetention(env: RetentionEnvironment, no
   accounts: for (const account of accounts.results) {
     if (budget <= 0) break;
     try {
-      const policy = parseRetentionPolicy(await getAccountSetting(env.DB, account.id, RETENTION_POLICY_KEY));
+      const policy = await readRetentionPolicy(env.DB, account.id);
       if (!policy.enabled) continue;
       if (policy.hold) { held++; continue; }
       const beforeDeleted = deleted, beforeFailed = failed;
@@ -33,7 +31,8 @@ export async function processPersonalDataRetention(env: RetentionEnvironment, no
         .bind(account.id, retentionCutoff(now, policy.responseDays), budget)
         .all<{ id: string; friend_id: string; form_id: string }>();
       for (const row of responses.results) {
-        if (!await retentionPolicyUnchanged(env.DB, account.id, policy)) { held++; continue accounts; }
+        const current = await readRetentionPolicy(env.DB, account.id);
+        if (JSON.stringify(current)!==JSON.stringify(policy)) { held++; continue accounts; }
         budget--;
         try {
           await deleteCustomerData(env, {
@@ -50,7 +49,8 @@ export async function processPersonalDataRetention(env: RetentionEnvironment, no
         .bind(account.id, retentionCutoff(now, policy.blockedFriendDays), budget)
         .all<{ id: string; line_user_id: string }>();
       for (const row of friends.results) {
-        if (!await retentionPolicyUnchanged(env.DB, account.id, policy)) { held++; continue accounts; }
+        const current = await readRetentionPolicy(env.DB, account.id);
+        if (JSON.stringify(current)!==JSON.stringify(policy)) { held++; continue accounts; }
         budget--;
         try {
           await deleteCustomerData(env, {
