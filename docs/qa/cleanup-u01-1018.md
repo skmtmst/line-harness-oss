@@ -18,7 +18,7 @@
 ## 検査
 
 - merge後の登録関連：7ファイル51試験成功、Web増分なし型検査成功。
-- 最終製品の関連試験：48ファイル269件成功（Node22）。Web増分なし型検査、変更した4製品ファイルのlintはエラー0。本番形式のWebビルド成功（211ページ生成、後処理208ページ/653スクリプト）。ci-localの結果は完走後に追記する。1152/1440の撮影は下記の56条件。
+- 関連試験の初回一括確認：48ファイル269件成功（Node22）。Web増分なし型検査、変更した4製品ファイルのlintはエラー0。本番形式のWebビルド成功（211ページ生成、後処理208ページ/653スクリプト）。ci-localの結果は完走後に追記する。1152/1440の撮影は下記の56条件。
 - 変更範囲のスタイル点検は指摘0。lintエラー0（共通tableに既存の未使用引数warning1）。
 
 ## 固定検査の失敗から直したもの
@@ -41,3 +41,14 @@
 - 撮影先は `~/lh-work/design/v8/review/masato-screens/after-1018/`。guard-results.jsonとvisual-review.tsvは56条件、source.jsonは製品32ファイルのSHA256・撮影版・最終製品版1dcdbed6e5・CI入力版f35e9aa90fを記録。最初の50条件以降の製品差分は共通20件既定と共通件数文の2ファイルのみ。過去のafter画像は流用していない。
 - 反映履歴は `docs/release-log/unreleased/0000-kenta-cleanup-U01.md`。#0000は司令塔の採番待ちであり、既知の実PR番号ではない。
 - PASSED.tsv、Pen、他束の持ち場は変更しない。コミットまでを渡し、push・PR・統合は司令塔が担当する。
+
+## ci-local（前回実行の確定結果）
+
+- 全体入力 `f35e9aa90ff41b54f9b689bead52ec09675c6943`、記録 `~/lh-work/tools/hq/ci-local/logs/20261017-230127-f35e9aa90f-73188/`。初回6e9の実行は修正後に止めて再開始し、初回ログも残した。最終製品は1dcdbed6e5以降同一。撮影記録だけをccdcbaeb7fでコミット。
+- Web：全体lint・選択欄・旧デザイン復活防止・型成功。2,308ファイル13,679試験成功、既存skip1/todo1。Webhook実ブラウザも成功。
+- Worker：型成功、1,094ファイル12,923試験成功。LIFF：型成功、92ファイル531試験成功。MCP/SDKも型・試験・ビルド成功。
+- 全体実行ではLIFFの3つのvarsが未指定でWorkerビルドが省略され、その成果物を使う2検査が失敗した。製品・CI・環境の設定は変更していない。
+- 追加確認：`--job worker-build --var VITE_LIFF_ID=synthetic --var VITE_BOT_BASIC_ID=@synthetic --var VITE_CALENDAR_CONNECTION_ID=synthetic`。入力ccdcbaeb7f、記録 `~/lh-work/tools/hq/ci-local/logs/20261017-233651-ccdcbaeb7f-38680/`。模擬値で依存ビルド・Worker/LIFFビルド・B247実ブラウザ・セキュリティヘッダー/SDK検査が成功した。実サービスへ書き込まない試験だけ。依存するchangesのPR内容検査はPR未作成のため評価できず、runner全体exit2。部分検査の成功をCI全体の合格とは数えない。
+- 未解決のB172の2候補は前述のG01引き継ぎ。許可追加・改名で検査をすり抜けない。
+
+- 前回全体は114工程＝成功54・失敗4・省略56。失敗はB-172の2候補、LIFFの未指定varsでビルドされなかった成果物を読む2検査、集約1。省略にはPR情報とV8_SPEED_ENFORCEMENT不足があり、V8実ブラウザ全工程は未実施。手元の56条件を標準検査の代わりに数えず、再開後に不足入力を明示して補完する。
