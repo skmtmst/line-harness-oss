@@ -1,66 +1,26 @@
+import { readOfficialProfileUrl } from './line-account-profile-url.js';
+import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { getLineAccountFoldersByAccountIds, getLineAccountTag } from '@line-crm/db';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import {
-  getLineAccountsByIds,
-  getLineAccountScopeEntries,
-  getLineAccountListStats,
-  getLineAccountTagsByAccountIds,
-  getLineAccountById,
-  getLineAccountCredentialHealth,
-  createLineAccount,
-  listLineAccountTags,
-  updateLineAccount,
-  updateLineAccountFields,
-  updateLineAccountOrder,
-  deleteUncommittedLineAccount,
-  getLineAccountArchiveBlockers,
-  setDefaultLineAccount,
-  archiveLineAccount,
-  restoreLineAccount,
-  deactivateLineAccount,
-  activateLineAccount,
-  listSkippedDeliveries,
-  getLineAccountConnectionChecksByIdempotencyKey,
-  saveLineAccountConnectionChecks,
-  LineAccountRevisionConflictError,
-  jstNow,
-  LineAccountLifecycleError,
-} from '@line-crm/db';
-import type {
-  LineAccount as DbLineAccount,
-  LineAccountConnectionCheck,
-  LineAccountScopeEntry,
-} from '@line-crm/db';
+import { getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountListStats, getLineAccountTagsByAccountIds, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
+import type { LineAccount as DbLineAccount, LineAccountConnectionCheck, LineAccountScopeEntry } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
 import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
-import {
-  detectFollowerImportCapability,
-  getFollowerImportState,
-  processFollowerImportStep,
-  startFollowerImport,
-} from '../services/follower-import.js';
+import { detectFollowerImportCapability, getFollowerImportState, processFollowerImportStep, startFollowerImport } from '../services/follower-import.js';
 import type { FollowerImportClient } from '../services/follower-import.js';
-import {
-  canAccessAllLineAccounts,
-  getVisibleLineAccountScope,
-  validateAccountHierarchy,
-} from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope, validateAccountHierarchy } from '../services/account-access.js';
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
-import {
-  lineConnectStep,
-  prepareLineConnection,
-  type LineConnectStep,
-} from '../services/line-account-connect.js';
+import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
@@ -1070,34 +1030,6 @@ function normalizeOptionalString(v: unknown): string | null | undefined {
   return trimmed === '' ? null : trimmed;
 }
 
-function readOfficialProfileUrl(
-  value: unknown,
-): { ok: true; value: string | null | undefined } | { ok: false; error: string } {
-  if (value === undefined) return { ok: true, value: undefined };
-  if (value === null) return { ok: true, value: null };
-  if (typeof value !== 'string') {
-    return { ok: false, error: 'officialProfileUrl must be a https://lin.ee/ URL' };
-  }
-  const trimmed = value.trim();
-  if (!trimmed) return { ok: true, value: null };
-  try {
-    const url = new URL(trimmed);
-    if (
-      url.protocol !== 'https:' ||
-      url.hostname !== 'lin.ee' ||
-      url.port !== '' ||
-      url.username ||
-      url.password ||
-      url.pathname === '/'
-    ) {
-      return { ok: false, error: 'officialProfileUrl must be a https://lin.ee/ URL' };
-    }
-    return { ok: true, value: url.toString() };
-  } catch {
-    return { ok: false, error: 'officialProfileUrl must be a https://lin.ee/ URL' };
-  }
-}
-
 // Pair-validate Login Channel ID / Secret. Required because the OAuth flow
 // asymmetrically gates on the two columns:
 //   /auth/line       — switches to account-specific client_id as soon as
@@ -1448,6 +1380,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
 
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
     const started = followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
+    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id);
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
     return c.json({
       success: true,
@@ -1662,6 +1595,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
       console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts"}));
     }
 
+    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id);
     return c.json({ success: true, data: serializeLineAccountFull(account) }, 201);
   } catch (err) {
     if (err instanceof CredentialEncryptionKeyError) {

@@ -281,3 +281,18 @@ test('複数アレルギー・本人確認書類は配布先へ入り、デザ�
  expect(await formTemplateWarnings(fixture.db,'a1',{...source,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'基本登録',layout,fields:[]}})})).toHaveLength(1);
  layout.options.customerDesign={mode:'fixed',preset:'night'};expect(parseFormTemplateDefinition({...source,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'基本登録',layout,fields:[]}})}).form.layout?.options.customerDesign).toEqual({mode:'fixed',preset:'night'});
 });
+
+test('組5: 予約ブロックを店の同名メニューと担当へ写し、保存した2つのつまみも保持する',async()=>{
+ for(const account of ['a1','a2']) {
+  fixture.raw.prepare("INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES (?,?,'相談',60,0)").run('menu-'+account,account);
+  fixture.raw.prepare("INSERT INTO staff(id,line_account_id,name,display_name) VALUES (?,?,'担当','担当')").run('staff-'+account,account);
+ }
+ const layout=emptyLayout();layout.sections[0].blocks=[{id:'booking',kind:'input',type:'booking',name:'visit',label:'予約',booking:{menuId:'menu-a1',staffId:'staff-a1',daysAhead:14,allowMenuSelection:true,requireApproval:true}}];
+ const source={...input,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'予約',layout,fields:[]}})};
+ const {context}=await preflight('a2','create',source);const id=await commit(await plan(context,source));
+ const result=JSON.parse((fixture.raw.prepare('SELECT layout FROM forms WHERE id=?').get(id) as {layout:string}).layout);
+ expect(result.sections[0].blocks[0].booking).toMatchObject({menuId:'menu-a2',staffId:'staff-a2',allowMenuSelection:true,requireApproval:true});
+ const p=await preflight('a2','alias',source);fixture.raw.exec("UPDATE menus SET is_active=0 WHERE id='menu-a2'");
+ await expect(plan(p.context,source)).rejects.toThrow('VERSION_CONFLICT');
+ await expect(preflight('a3','create',source)).rejects.toThrow('REFERENCE_UNAVAILABLE');
+});

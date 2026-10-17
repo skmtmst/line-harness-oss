@@ -62,6 +62,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('画面から URL を引く', () => {
+  it('ガイドはtaskを明示したときだけ引けて、未設定・不正な種類ではURLを返さない', async () => {
+    db.getManualLink.mockResolvedValue({ ...ROW, key_kind: 'task' });
+    const read = (suffix: string) => makeApp('staff').request('/api/manual-links/lookup?key=onboarding-line-guide'+suffix,{},env);
+    expect(await (await read('')).json()).toMatchObject({data:{url:null,status:'unset'}});
+    expect(await (await read('&keyKind=task')).json()).toMatchObject({data:{url:ROW.url,status:'ok'}});
+    expect((await read('&keyKind=other')).status).toBe(400);
+    db.getManualLink.mockResolvedValue({...ROW,key_kind:'task',status:'broken'});
+    expect(await (await read('&keyKind=task')).json()).toMatchObject({data:{url:null,status:'broken'}});
+  });
   it('確かめて開けるものだけ返す', async () => {
     const res = await makeApp().fetch(
       new Request('https://example.com/api/manual-links/lookup?screen=2-1'),

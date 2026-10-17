@@ -1,4 +1,4 @@
-export type RestaurantFollowupTrigger = 'reservation_created' | 'reservation_24h' | 'reservation_2h' | 'post_visit' | 'review_request' | 'waitlist_invited';
+export type RestaurantFollowupTrigger = 'reservation_created' | 'reservation_24h' | 'reservation_2h' | 'post_visit' | 'review_request' | 'waitlist_invited' | 'anniversary_before';
 export interface RestaurantFollowupTemplate {
     store_id: string;
     scenario_id: string;
@@ -21,7 +21,7 @@ export interface RestaurantFollowupJob {
     friend_id: string;
     scenario_version_id: string;
     step_id: string;
-    source_kind: 'restaurant_reservation' | 'restaurant_waitlist';
+    source_kind: 'restaurant_reservation' | 'restaurant_waitlist' | 'restaurant_anniversary';
     source_id: string;
     source_event_id: string;
     source_version: number;

@@ -1,3 +1,4 @@
+import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
 import { claimDelayedReply, beginDelayedReplyDispatch, finishDelayedReply, recoverDelayedReplies } from './auto-reply-delivery-lease.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import { dispatchLineProxyLocally } from './local-line-proxy.js';
@@ -68,6 +69,7 @@ export async function processAutoReplyDeliveries(
       if (
         !friend ||
         !friend.is_following ||
+        (await isFriendDeliverySuppressed(db,friend.id)) ||
         friend.line_account_id !== row.line_account_id ||
         !version ||
         !live?.is_active ||

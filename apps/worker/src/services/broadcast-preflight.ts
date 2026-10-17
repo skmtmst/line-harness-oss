@@ -1,3 +1,4 @@
+import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { INSIGHT_MIN_AUDIENCE } from '@line-crm/db';
 import { buildSegmentWhere, type SegmentCondition } from './segment-query.js';
@@ -56,14 +57,14 @@ export interface AudiencePreview {
     hidden: number;
     missingDestination: number;
     duplicate: number;
-    paused: null;
+    paused: number;
     total: number;
   };
 }
 
 /**
  * 条件に当たる行を一度読み、送れない理由を重複させずに分類する。
- * 配信停止の個別台帳はまだ無いため、paused は 0 で偽装せず null にする。
+ * 配信停止は同じ人の複数目的を重複させず、送信と同じ台帳で判定する。
  */
 export async function previewAudience(
   db: D1Database,
@@ -93,6 +94,7 @@ export async function previewAudience(
 
   const result = await db.prepare(
     `SELECT f.id, f.line_user_id, f.display_name, f.picture_url, f.user_id,
+            ${DELIVERY_CONSENT_ALLOWED_SQL} AS consent_allowed,
             f.is_following, COALESCE(f.is_hidden, 0) AS is_hidden,
             COALESCE((SELECT GROUP_CONCAT(t.name, '・')
                         FROM friend_tags ft JOIN tags t ON t.id = ft.tag_id
@@ -105,6 +107,7 @@ export async function previewAudience(
     display_name: string | null;
     picture_url: string | null;
     user_id: string | null;
+    consent_allowed: number;
     is_following: number;
     is_hidden: number;
     tag_names: string;
@@ -114,6 +117,7 @@ export async function previewAudience(
   let hidden = 0;
   let missingDestination = 0;
   let duplicate = 0;
+  let paused = 0;
   const uniquePeople = new Set<string>();
   const sendable: typeof result.results = [];
   for (const row of result.results) {
@@ -127,6 +131,10 @@ export async function previewAudience(
     }
     if (!row.line_user_id?.trim()) {
       missingDestination += 1;
+      continue;
+    }
+    if (!row.consent_allowed) {
+      paused += 1;
       continue;
     }
     const dedupKey = input.targetType === 'multi-account-dedup' && row.user_id
@@ -144,8 +152,8 @@ export async function previewAudience(
     hidden,
     missingDestination,
     duplicate,
-    paused: null,
-    total: blocked + hidden + missingDestination + duplicate,
+    paused,
+    total: blocked + hidden + missingDestination + duplicate + paused,
   } as const;
   return {
     matched: result.results.length,
@@ -172,7 +180,7 @@ function emptyAudiencePreview(): AudiencePreview {
       hidden: 0,
       missingDestination: 0,
       duplicate: 0,
-      paused: null,
+      paused: 0,
       total: 0,
     },
   };
@@ -188,7 +196,7 @@ export async function countAudience(
   db: D1Database,
   input: PreflightInput,
 ): Promise<{ total: number; hiddenExcluded: number }> {
-  const where: string[] = ['f.is_following = 1'];
+  const where: string[] = ['f.is_following = 1', DELIVERY_CONSENT_ALLOWED_SQL];
   const binds: unknown[] = [];
 
   if (input.targetType === 'multi-account-dedup') {
@@ -237,7 +245,7 @@ export async function countAudience(
  * 少人数へ送りたい場合に送れなくなる。
  */
 export function buildWarnings(
-  audience: { total: number; hiddenExcluded: number },
+  audience: { total: number; hiddenExcluded: number; consentExcluded?: number },
   opts: { hasRecentSimilar?: boolean } = {},
 ): PreflightWarning[] {
   const warnings: PreflightWarning[] = [];
@@ -261,6 +269,10 @@ export function buildWarnings(
       level: 'info',
       message: `非表示にした ${audience.hiddenExcluded} 人は届く人数に入っていません。`,
     });
+  }
+
+  if ((audience.consentExcluded ?? 0) > 0) {
+    warnings.push({ level: 'info', message: `配信を止めている ${audience.consentExcluded} 人には送りません。` });
   }
 
   if (opts.hasRecentSimilar) {

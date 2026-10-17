@@ -94,27 +94,27 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
       { file: 'apps/worker/src/services/dedup-broadcast.ts', marker: "'broadcast_dispatch'" },
       { file: 'apps/worker/src/routes/broadcasts.ts', marker: "'broadcast_dispatch'" },
     ],
-    note: '束と束のあいだで止まる。停止中に時刻を過ぎた予約は復旧時に下書きへ戻し、まとめて追い送りしない。',
+    note: '一度に送る分が切り替わるところで止まります。停止中に時刻を過ぎた予約は再開時に下書きへ戻し、まとめて送りません。',
   },
   {
     id: 'nen-deliveries',
-    label: 'NENキャンペーン配信',
+    label: 'キャンペーンの一斉案内',
     kind: 'scheduled',
     capability: 'broadcast_dispatch',
     enforcement: [
       { file: 'apps/worker/src/services/nen-engagement.ts', marker: "'broadcast_dispatch'" },
     ],
-    note: 'キャンペーンの一斉案内は一斉配信と同じ停止対象。停止中は pending のまま残る。',
+    note: '一斉配信の停止に合わせて止まります。待っている案内はそのまま残ります。',
   },
   {
     id: 'line-proxy-automated',
-    label: 'プロキシ経由の自動 push・multicast・broadcast',
+    label: '外部サービスからの自動配信',
     kind: 'proxy',
     capability: 'broadcast_dispatch',
     enforcement: [
       { file: 'apps/worker/src/routes/line-proxy.ts', marker: 'isOperationCapabilityStopped' },
     ],
-    note: '外部エージェント等からの直下り送信の最後の砦。経路ヘッダが無い自動送信は一斉配信として止める。',
+    note: '外部サービスから送る自動メッセージも、一斉配信の停止に合わせて止まります。',
   },
   {
     id: 'forms-confirmation',
@@ -124,17 +124,17 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/routes/line-proxy.ts', marker: 'isOperationCapabilityStopped' },
     ],
-    note: '送信はプロキシ経由。経路ヘッダを付けない自動送信は一斉配信の停止に連動して止まる。',
+    note: '回答後に送るメッセージは、一斉配信の停止に合わせて止まります。',
   },
   {
     id: 'nen-admin-sends',
-    label: 'NEN管理画面からの案内送信',
+    label: '会員管理からの案内送信',
     kind: 'proxy',
     capability: 'broadcast_dispatch',
     enforcement: [
       { file: 'apps/worker/src/routes/line-proxy.ts', marker: 'isOperationCapabilityStopped' },
     ],
-    note: 'nen-members / nen-campaigns / nen-engagement の push はすべてプロキシ経由。経路ヘッダを付けないため一斉配信の停止に連動して止まる。',
+    note: '会員への案内は、一斉配信の停止に合わせて止まります。',
   },
   {
     id: 'mileage-adjustment-notice',
@@ -144,7 +144,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/routes/line-proxy.ts', marker: 'isOperationCapabilityStopped' },
     ],
-    note: '運用者の調整操作に連動する1件通知。プロキシ経由で経路ヘッダを付けないため、一斉配信の停止中は送らず failed として監査に残る。',
+    note: 'マイルを調整したときに送る通知です。一斉配信の停止中は送らず、送れなかった記録を残します。',
   },
 
   // ----------------------------------------------------------
@@ -152,13 +152,13 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
   // ----------------------------------------------------------
   {
     id: 'scenario-cron',
-    label: 'シナリオ配信（cron）',
+    label: 'シナリオの順次配信',
     kind: 'auto',
     capability: 'scenario_dispatch',
     enforcement: [
       { file: 'apps/worker/src/services/step-delivery.ts', marker: "'scenario_dispatch'" },
     ],
-    note: '停止中は登録行を active のまま残し、claim しない。復旧で続きから届く。',
+    note: '停止中もシナリオへの登録は残ります。再開すると続きから配信します。',
   },
   {
     id: 'scenario-instant',
@@ -168,7 +168,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/services/immediate-first-step.ts', marker: "'scenario_dispatch'" },
     ],
-    note: '停止中は送らず登録行だけ残る。cron 側も同じ停止を見るので、復旧後に cron が1通目を届ける。',
+    note: '停止中は送らず、シナリオへの登録だけ残ります。再開後に1通目を配信します。',
   },
 
   // ----------------------------------------------------------
@@ -176,18 +176,18 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
   {
     id: 'visit-stamp-expiry-reminders', label: '来店スタンプの期限のお知らせ', kind: 'scheduled', capability: 'reminder_dispatch',
     enforcement: [{ file: 'apps/worker/src/services/visit-stamp-reminders.ts', marker: "'reminder_dispatch'" }],
-    note: '財布と期限で一度だけ。自動送信としてプロキシを通す。',
+    note: '同じスタンプカードの同じ期限について、1回だけお知らせします。',
   },
   // ----------------------------------------------------------
   {
     id: 'reminder-cron',
-    label: 'リマインダ配信（cron）',
+    label: 'リマインダの予約配信',
     kind: 'scheduled',
     capability: 'reminder_dispatch',
     enforcement: [
       { file: 'apps/worker/src/services/reminder-delivery.ts', marker: "'reminder_dispatch'" },
     ],
-    note: '停止中は実行行を claim しない。claim 済みの行は queued へ戻す。',
+    note: '停止中は配信を始めません。送信前の通知は待機へ戻します。',
   },
   {
     id: 'booking-reminders',
@@ -197,7 +197,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/services/booking-reminders.ts', marker: "'reminder_dispatch'" },
     ],
-    note: '停止中は pending のまま残る。claim 後に停止へ切り替わった分は claim を戻す。',
+    note: '停止中は通知を待機させます。送信前に停止へ変わった通知も待機へ戻します。',
   },
   {
     id: 'event-booking-reminders',
@@ -207,7 +207,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/services/event-booking-reminders.ts', marker: "'reminder_dispatch'" },
     ],
-    note: '停止中は pending のまま残る。',
+    note: '停止中は通知を待機させます。',
   },
   {
     id: 'meet-consultation-reminders',
@@ -217,7 +217,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/services/meet-consultation-reminders.ts', marker: "'reminder_dispatch'" },
     ],
-    note: '停止中は pending のまま残る。送信はプロキシ経由で reminder_dispatch を名乗る。',
+    note: '停止中は通知を待機させます。予約のお知らせの停止に合わせて止まります。',
   },
   {
     id: 'webinar-reminders',
@@ -227,27 +227,27 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/services/webinar-reminders.ts', marker: "'reminder_dispatch'" },
     ],
-    note: '停止中は送らず通知済みにしない。復旧後に次の tick が拾う。',
+    note: '停止中は送らず、通知済みにもしません。再開後の定期確認で配信します。',
   },
   {
     id: 'webinar-notifications',
-    label: 'ウェビナー通知（視聴・未視聴の案内ジョブ）',
+    label: 'ウェビナーの視聴・未視聴の案内',
     kind: 'scheduled',
     capability: 'reminder_dispatch',
     enforcement: [
       { file: 'apps/worker/src/services/webinar-notifications.ts', marker: "'reminder_dispatch'" },
     ],
-    note: '#745 で導入済み。停止中は queued のまま残し、claim も増やさない。',
+    note: '停止中は案内を待機させ、新しい配信を始めません。',
   },
   {
     id: 'webinar-followups',
-    label: 'ウェビナー追跡配信・ジャーニー案内',
+    label: 'ウェビナー視聴後の案内',
     kind: 'auto',
     capability: 'reminder_dispatch',
     enforcement: [
       { file: 'apps/worker/src/services/webinar-followups.ts', marker: "'reminder_dispatch'" },
     ],
-    note: '停止中は追跡行を作らず送らない。',
+    note: '停止中は視聴後の案内を登録せず、送信もしません。',
   },
   {
     id: 'waitlist-offers',
@@ -257,7 +257,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/services/event-waitlist.ts', marker: "'reminder_dispatch'" },
     ],
-    note: '停止中は job を pending のまま残す。',
+    note: '停止中は繰り上げの案内を待機させます。',
   },
   {
     id: 'booking-expirer-notice',
@@ -267,7 +267,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/services/booking-expirer.ts', marker: "'reminder_dispatch'" },
     ],
-    note: '停止中は予約を期限切れにしない（requested のまま保持）。機能オフと同じ扱い。',
+    note: '停止中は受付待ちの予約を期限切れにせず、そのまま残します。',
   },
 
   // ----------------------------------------------------------
@@ -275,23 +275,23 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
   // ----------------------------------------------------------
   {
     id: 'automation-runs',
-    label: '自動化の実行（送信・メニュー切替・Webhook起動を含む全アクション）',
+    label: '自動化した処理（送信・メニュー切り替え・外部連携）',
     kind: 'auto',
     capability: 'automation_actions',
     enforcement: [
       { file: 'apps/worker/src/services/automation-engine.ts', marker: "'automation_actions'" },
     ],
-    note: '実行本体 (processAutomationRun) の入口で止める。停止中は queued のまま残る。',
+    note: '停止中は処理を始めず、待機したまま残します。',
   },
   {
     id: 'legacy-automation',
-    label: 'イベント連動の旧自動化アクション',
+    label: '以前に設定した自動処理',
     kind: 'auto',
     capability: 'automation_actions',
     enforcement: [
       { file: 'apps/worker/src/services/event-bus.ts', marker: "'automation_actions'" },
     ],
-    note: '旧式ルールのアクション群（send_message / send_webhook / メニュー切替）をまとめて止める。',
+    note: '以前に設定したメッセージ送信・外部連携・メニュー切り替えも、まとめて止まります。',
   },
   {
     id: 'richmenu-targeting',
@@ -301,7 +301,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/services/event-bus.ts', marker: "'automation_actions'" },
     ],
-    note: 'メッセージ送信ではないが、イベントに連動して顧客側の表示を変える LINE 呼び出しのため同じ停止に連動。',
+    note: '条件に合わせてお客さまのメニューを変える処理も、自動化の停止に合わせて止まります。',
   },
 
   // ----------------------------------------------------------
@@ -315,7 +315,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/services/auto-reply.ts', marker: "'auto_reply_dispatch'" },
     ],
-    note: 'replyToken は持ち越せないため、停止中に受けた分は「停止のため未送信」として台帳へ残し、追い送りしない。',
+    note: '停止中に届いたメッセージには返信せず、送らなかった記録を残します。再開後のまとめ送りはしません。',
   },
 
   // ----------------------------------------------------------
@@ -323,23 +323,23 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
   // ----------------------------------------------------------
   {
     id: 'outgoing-webhook-immediate',
-    label: 'イベント発火時の送信Webhook初回配送',
+    label: '外部サービスへの最初の通知',
     kind: 'external',
     capability: 'webhook_outgoing',
     enforcement: [
       { file: 'apps/worker/src/services/event-bus.ts', marker: "'webhook_outgoing'" },
     ],
-    note: '停止中も台帳 (outgoing_webhook_deliveries) には積む。初回の外部送信だけ止め、復旧後に sweep が届ける。',
+    note: '停止中も送る予定は残します。外部への通知を止め、再開後に届けます。',
   },
   {
     id: 'outgoing-webhook-sweep',
-    label: '送信Webhookの再送スイープ',
+    label: '外部サービスへ届かなかった通知の再送',
     kind: 'external',
     capability: 'webhook_outgoing',
     enforcement: [
       { file: 'apps/worker/src/services/outgoing-webhook-delivery.ts', marker: "'webhook_outgoing'" },
     ],
-    note: '停止中は claim せず pending / retry_wait のまま残す。',
+    note: '停止中は送らず、送信待ち・再送待ちのまま残します。',
   },
   {
     id: 'webhook-manual-retry',
@@ -359,7 +359,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     enforcement: [
       { file: 'apps/worker/src/routes/webhooks.ts', marker: "'webhook_outgoing'" },
     ],
-    note: '管理画面の試し送信も停止中は 409 を返す。',
+    note: '停止中は試し送信もできません。画面に理由を表示します。',
   },
 
   // ----------------------------------------------------------
@@ -367,13 +367,13 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
   // ----------------------------------------------------------
   {
     id: 'ad-conversion',
-    label: '広告コンバージョン送信（Meta / X / Google / TikTok）',
+    label: '広告サービスへの成果の通知（Meta・X・Google・TikTok）',
     kind: 'external',
     capability: 'ad_postback',
     enforcement: [
       { file: 'apps/worker/src/services/ad-conversion.ts', marker: "'ad_postback'" },
     ],
-    note: '停止中も outbox へは積む。外部への送信試行だけ止め、pending へ戻す。',
+    note: '停止中も通知する予定は残します。外部へ送らず、送信待ちに戻します。',
   },
 
   // ----------------------------------------------------------
@@ -389,10 +389,10 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
   },
   {
     id: 'manual-proxy-push',
-    label: 'プロキシ経由の担当者個別返信（manual 指定）',
+    label: '外部ツールを使った担当者の個別返信',
     kind: 'manual',
     capability: null,
-    excludedReason: 'X-Line-Harness-Source: manual を付けた1対1 push は手動返信と同じく対象外です。',
+    excludedReason: '担当者が相手を確認して送る個別返信として指定されたメッセージは、緊急停止の対象外です。',
     enforcement: [
       { file: 'apps/worker/src/routes/line-proxy.ts', marker: "logSource !== 'manual'" },
     ],

@@ -19,7 +19,7 @@ const SNAPSHOT_SQL=`SELECT json_object(
   FROM friend_fields f LEFT JOIN friend_field_scopes s ON s.field_id=f.id
   WHERE COALESCE(s.tenant_id,'${LEGACY_TENANT}')=?1 AND (s.line_account_id=?2 OR s.line_account_id IS NULL) ORDER BY f.id))),
  'marks',json((SELECT json_group_array(json_object('row',json(j))) FROM (
-  SELECT json_object('id',m.id,'name',m.name,'color',m.color,'is_default',m.is_default,'auto_on_inbound',m.auto_on_inbound,'display_order',m.display_order,'archived_at',m.archived_at,'version',m.version,'updated_at',m.updated_at,'line_account_id',s.line_account_id) j
+  SELECT json_object('id',m.id,'name',m.name,'color',m.color,'is_default',m.is_default,'auto_on_inbound',m.auto_on_inbound,'display_order',m.display_order,'archived_at',m.archived_at,'version',m.version,'display_locations_json',m.display_locations_json,'updated_at',m.updated_at,'line_account_id',s.line_account_id) j
   FROM support_marks m LEFT JOIN support_mark_scopes s ON s.mark_id=m.id
   WHERE COALESCE(s.tenant_id,'${LEGACY_TENANT}')=?1 AND (s.line_account_id=?2 OR s.line_account_id IS NULL) ORDER BY m.id))),
  'folders',json((SELECT json_group_array(json_object('row',json(j))) FROM (
@@ -102,6 +102,7 @@ function plan(type:HqFriendAttributeType,definition:HqFriendFieldDefinition|HqMa
    if(m.isDefault)statements.push(stmt('UPDATE support_marks SET is_default=0,version=version+1,updated_at=?,updated_by=? WHERE id<>? AND id IN (SELECT mark_id FROM support_mark_scopes WHERE tenant_id=? AND line_account_id=?) AND is_default=1',[now,auth.actorId,id,auth.tenantId,accountId]));
    if(mode==='overwrite')statements.push(stmt('UPDATE support_marks SET name=?,color=?,is_default=?,auto_on_inbound=?,display_order=?,version=version+1,updated_at=?,updated_by=? WHERE id=?',[name,m.color!,m.isDefault?1:0,m.autoOnInbound?1:0,m.displayOrder??0,now,auth.actorId,id]));
    else statements.push(stmt('INSERT INTO support_marks(id,name,color,is_default,auto_on_inbound,display_order,created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?)',[id,name,m.color!,m.isDefault?1:0,m.autoOnInbound?1:0,m.displayOrder??0,now,now,auth.actorId,auth.actorId]),stmt('INSERT INTO support_mark_scopes(mark_id,tenant_id,line_account_id,created_at) VALUES(?,?,?,?)',[id,auth.tenantId,accountId,now]));
+   statements.push(stmt('UPDATE support_marks SET display_locations_json=? WHERE id=?',[JSON.stringify(m.displayLocations??['inbox','friends','friend_detail']),id]));
   }else{
    const field=def.field,folderId=field.folderId?ids.get(`folder:${field.folderId}`)??null:null;
    // Stable IDs of existing options survive relabeling and removal (archived).
@@ -145,6 +146,7 @@ export async function distributeFriendAttribute(db:D1Database,auth:HqTemplateAut
  const {template,definition}=await templateDetail(db,auth,id);if(!isFriendAttributeType(template.template_type))throw new HqTemplateError('INVALID_TYPE');const type=template.template_type;
  const preflights=(await db.prepare('SELECT * FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id').bind(auth.tenantId,id,runId).all<HqTemplatePreflight>()).results;
  if(!preflights.length||preflights.some(p=>p.created_by!==auth.actorId))throw new HqTemplateError('NOT_FOUND',404);
+ if(preflights.some(p=>p.status==='expired'))throw new HqTemplateError('VERSION_CONFLICT',409);
  await requireTargetAccounts(db,auth,preflights.map(p=>p.target_account_id));
  if(preflights.some(p=>p.template_version_id!==preflights[0].template_version_id))throw new HqTemplateError('INVALID_PREFLIGHT',409);
  const version=await db.prepare('SELECT definition_json FROM hq_template_versions WHERE tenant_id=? AND template_id=? AND id=?').bind(auth.tenantId,id,preflights[0].template_version_id).first<{definition_json:string}>();

@@ -283,6 +283,14 @@ function makeEventDb(state: {
               current_published_version_id: e.current_published_version_id ?? null,
             } : null) as T | null;
           }
+          if(sql.startsWith('SELECT capacity,classroom_capacity,online_capacity FROM event_slots')){
+            const slot=(state.slots??[]).find(row=>row.id===bound[0]);
+            return (slot?{capacity:slot.capacity,classroom_capacity:null,online_capacity:null}:null) as T|null;
+          }
+          if(sql.startsWith('SELECT COALESCE((SELECT SUM(party_size) FROM event_bookings')){
+            const count=(state.bookings??[]).filter(row=>(row as Record<string,unknown>).slot_id===bound[0]&&['requested','confirmed'].includes(row.status)).reduce((n,row)=>n+Number((row as Record<string,unknown>).party_size??1),0)+(state.waitlist??[]).filter(row=>row.slot_id===bound[3]&&['offered','accepted'].includes(String(row.status))).reduce((n,row)=>n+Number(row.party_size??1),0);
+            return {count} as T;
+          }
           // SELECT capacity FROM event_slots WHERE id = ?
           if (sql.startsWith('SELECT capacity FROM event_slots')) {
             const [id] = bound as [string];

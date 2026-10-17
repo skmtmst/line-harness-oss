@@ -3,12 +3,16 @@ import type { BroadcastDefinitionInput } from './broadcast-definition.js';
 export type HqBroadcastInput = BroadcastDefinitionInput & {
  /** Follow-up resolves the source run's child broadcast separately inside each account. */
  followupOfRunId?:string;
+ /** 店別の固定した公開版。null/未指定の店は後処理なし。 */
+ afterActionVersionIds?:Record<string,string|null>;
  requestId:string;accountIds:string[];accountTagIds:string[];excludedAccountIds:string[];
  audience:{kind:'all'}|{kind:'tag';tagName:string};scheduledAt:string|null;
 };
 export interface HqBroadcastPreflight {
  accountId:string;accountName:string;audienceCount:number|null;remaining:number|null;connected:boolean;paused:boolean;
+ consentExcluded?:number|null;warnings?:string[];
  blockedReasons:string[];excluded:boolean;broadcastId:string|null;
+ afterAction?:{versionId:string;name:string;versionNumber:number;actionCount:number}|null;
 }
 export interface HqBroadcastFailure { code:string; label:string; count:number; retryable:boolean }
 export type HqBroadcastDraftInput = HqBroadcastInput & { expectedVersion: number };
