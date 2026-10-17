@@ -1,5 +1,7 @@
 # A03：通知の署名確認と本文上限の共通化
 
+> 続きの製品SHA：`25b667fa6059bf7586a45647083d917685effac9`。Worker全13,054件・型・build成功。管理画面13,684件・型・build・実ブラウザ成功（変更のないGit木を照合）。修正後ci-localは製品失敗0、正式PR番号の照合は採番待ち。
+
 > 前回（署名共通化）の検査した製品SHA：`4ba17e925ce6c35b7c9f01bd9e15d062146ac89b`。Worker全12,974件・管理画面13,684件・両方の型/ビルド・実ブラウザが成功。ci-localの製品失敗0、正式PR番号による反映履歴照合だけ採番待ち。
 
 ## 範囲と開始版
@@ -102,3 +104,31 @@ PRの題名と本文にはA03・司令塔指定の仮番号#0000を明示した�
 A01の検査器・認証・許可一覧・snapshot・公開経路の文書は変更せず、分割した8ファイルを `routes/restaurant-delivery-<役割>.ts` へ移した。mainの公開口と19個の登録順、全74文の比較結果（不足0/追加0）は同じ。静的検査が実登録と再び一致し、失敗した5件を含む127件と型が成功した。`scripts/verify-staging-restaurant-delivery.test.ts` の参照先も同じ移動へ追随する。元の5失敗ログを保持し、残す安全検査が経路を見失う故障を検出した証拠とする。
 
 `routes/restaurant-delivery.ts` が入口、直下の `restaurant-delivery-types.ts` / `restaurant-delivery-common.ts` / `restaurant-delivery-orders-read.ts` / `restaurant-delivery-orders-actions.ts` / `restaurant-delivery-history.ts` / `restaurant-delivery-controls.ts` / `restaurant-delivery-webhooks.ts` / `restaurant-delivery-uber.ts` が最終の移動先。下位フォルダ版は残さない。
+
+
+## 続きの最終検査と引き継ぎ
+
+| 検査 | 結果 |
+|---|---|
+| 最終配置の安全検査・受信・店舗ゲート | 5ファイル127件成功。旧レイアウトで欠測した18経路の5失敗は、検査器・snapshotを変えず配置を直して解消 |
+| 共通署名と受信の関連検査 | 9ファイル184件成功。最終の平置き配置でもWorker全試験に含めて成功 |
+| 故障対照 | 転送followへの変更・転送応答の拒否除去・店舗ゲート登録の除去・Webhook登録の除去の4種をAssertionErrorで検出。正常・復元後13/88/7件すべて成功。初回のゲート対照が既存88件で検出できなかったログも保持し、追加7件で改善 |
+| 分割前との比較 | 全74文が同一（不足0/追加0）、登録19個の順も一致。新module間の循環0。新規400行の既存検査は違反0、上限・凍結一覧の変更0 |
+| 修正後Worker | Node22。1,100ファイル13,054件、型、Worker build、LIFF実ブラウザ入口・安全ヘッダー・公開SDK互換すべて成功 |
+| 修正後リポジトリ | scripts 1,091件成功・既存skip1、scripts型、共有385件（UTC/Asia Bangkok各）、LIFF型/531件、共通所有・DB生成物・移行安全が成功 |
+| 管理画面 | 2,308ファイル13,684件成功、既存skip/todo各1。lint・型・本番build・EC一覧/通知/タグ編集/認証/MFA/フォームの実ブラウザ・設計値・安全ヘッダーが成功 |
+| その他 | SDK53件、MCP型/68件/build、文書6件成功 |
+| V8差分の判定 | 通常条件のrun=false。apps/web・共有型・visual-qa・lockfileの変更なし。条件・上限・許可の変更なし |
+| 最終の差分 | 余白違反0。コミット後の作業ツリーはクリーン。push/PR/新migration/DB更新/配備/実送信/実決済なし |
+
+全体のci-localは製品 `1286476bc0` で114工程＝成功58/省略54/失敗2。失敗は修正前Workerの5件と、その結果および採番不足を受けた旧required-pr-gateの集計だけだった。元の終了1・全生ログを保持する。
+
+配置を直した製品 `25b667fa60` で、変更の影響する `repository-checks` / `worker-checks` / `worker-build` と依存の `changes` を再実行した。40工程＝成功28/通常省略11/正式PR番号不足で実行不能1/失敗0、終了2。新しい製品検査の失敗は0。番号を捏造したり、`[skip release-log]` を指定したりしていない。
+
+未変更範囲の結果は、apps/web・apps/liff・apps/docs・packages・visual-qa・.github・lockfile・release-log等12項目のGit木/ファイルが初回と修正版で完全一致することを照合して引き継ぐ。影響する3ジョブとchangesを修正版の結果へ置き換えた参照用集計は成功59/省略54/旧集計失敗1。**この参照用集計を正式PRゲートの合格にはしない。** 旧集計には古いWorker失敗も含まれており、正式PR番号が無いchangesの照合も未実行なので、司令塔が採番後に通常のPRチェックで確定する。
+
+単独のWorker build待機は、命令が始まっておらず枠も持っていないことを確認して終了した。成功には数えず、修正後ci-localのWorker buildで検証した。共通枠の長い待ち時間を実行時間や成功へ読み替えていない。待機中に枠・メモリ条件・他者のPIDを変更していない。
+
+証拠：`~/lh-work/design/v8/review/CLEANUP-1017/A03-EVIDENCE/RESUME-1018/`。`ci-reconciled.json`、両runのresults/summary/manifest、生の失敗/成功ログ、`unaffected-trees.json`、`fixed-source-hashes.json`、`a03-split-equivalence-flat.json`、`a03-flat-imports.json`、故障4種と正常/復元の全ログを保存した。`DONE-A03.tsv` は指定の4区分を記録。前回の署名17種の故障証拠も元の場所へ保持する。
+
+次は司令塔が枝を取り込み、#0000の反映履歴を正式PR番号へ置き換え、通常ゲートで確認する。A06の送信共通器接続・永続journal/共有遮断・送信timeout/応答容量の方針と、EC自動LINEの旧署名復号の厳密化は、既記の理由で後続の担当判断に残す。
