@@ -2,6 +2,7 @@ import { isPublicLiffOperation } from './public-api-boundary.js';
 import type { Context, MiddlewareHandler } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
+import { boundPublicLiffInput, publicLiffQuerySelector } from './public-liff-input.js';
 
 const UNAVAILABLE = {
   success: false,
@@ -11,11 +12,9 @@ const UNAVAILABLE = {
 
 /** Query selects the account first; routes retain their own identity and ownership checks. */
 async function publicAccountSelector(c: Context<Env>): Promise<{ liffId: string; accountId: string }> {
-  const url = new URL(c.req.url);
-  let liffId = (url.searchParams.get('liffId') ?? url.searchParams.get('liff_id'))?.trim() || '';
-  let accountId = (url.searchParams.get('accountId') ?? url.searchParams.get('account_id'))?.trim() || '';
+  let { liffId, accountId } = publicLiffQuerySelector(c.req.url);
   if (!liffId && !accountId && !['GET', 'HEAD'].includes(c.req.method.toUpperCase())) {
-    const parsed = await c.req.raw.clone().json<unknown>().catch(() => null);
+    const parsed: unknown = c.get('validatedInputBody');
     const body = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
       ? parsed as Record<string, unknown> : null;
     liffId = typeof body?.liffId === 'string'
@@ -36,6 +35,8 @@ async function publicAccountSelector(c: Context<Env>): Promise<{ liffId: string;
  */
 export const tenantPublicBoundaryMiddleware: MiddlewareHandler<Env> = async (c, next) => {
   if (!isPublicLiffOperation(c.req.method, new URL(c.req.url).pathname)) return next();
+  const rejected = await boundPublicLiffInput(c);
+  if (rejected) return rejected;
   const { liffId, accountId } = await publicAccountSelector(c);
   if (!liffId && !accountId) return next();
 
