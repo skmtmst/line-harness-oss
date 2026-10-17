@@ -53,4 +53,3 @@ export async function fetchQuota(
     signal.removeEventListener('abort', cancel);
   }
 }
-
