@@ -19,6 +19,7 @@ export type ThProps = Omit<
   /** 白い板が狭いときだけ、補助列を畳む。見出しと本文で揃える。 */
   collapseAt?: 'narrow'
   /** 列の余った幅をこのセルに割り当てる。 */
+  columnKind?: 'check' | 'name' | 'menu'
   grow?: boolean
   /** 文字の先頭を名前のフォルダ印に揃える。 */
   inset?: string

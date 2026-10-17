@@ -33,11 +33,11 @@ export function AutoFormLeaveGuard({ busy }: { busy?: boolean }) {
   useEffect(() => {
     const frame = input.ref.current
     if (!frame) return
-    const change = () => input.onChangeCapture()
+    const change = () => input.onInputChange()
     const click = (event: Event) => {
       const target = event.target as Element
       if (target.closest('[role="dialog"],[role="alertdialog"]')) return
-      if (target.closest('[aria-haspopup="listbox"],[role="switch"],[role="checkbox"],[role="radio"]')) input.onChangeCapture()
+      if (target.closest('[aria-haspopup="listbox"],[role="switch"],[role="checkbox"],[role="radio"]')) input.onInputChange()
       const button = target.closest('button')
       if (button && /保存|作る|公開|更新|登録/.test(button.textContent ?? '')) savingSnapshot.current = formInputSnapshot(frame)
     }

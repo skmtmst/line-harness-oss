@@ -300,6 +300,7 @@ describe('統括の左メニューを出す住所', () => {
     expect(isHqShellPath('/hq/templates')).toBe(true)
     expect(isHqShellPath('/accounts/new')).toBe(true)
     expect(isHqShellPath('/restaurant-test/stores/new')).toBe(true)
+    expect(isHqShellPath('/restaurant-test/terms')).toBe(true)
     expect(isHqShellPath('/restaurant-test/stores')).toBe(false)
     expect(isHqShellPath('/accounts')).toBe(false)
     expect(isHqShellPath('/hqx')).toBe(false)

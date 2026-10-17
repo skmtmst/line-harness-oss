@@ -33,7 +33,7 @@ describe('Googleプロフィールを現在の共通部品で編集する', () =
     await screen.findByText('店舗名を短くしてください')
     expect(name).toHaveProperty('value', '書きかけ')
     expect(name.getAttribute('aria-invalid')).toBe('true')
-    expect(document.activeElement).toBe(name)
+    await waitFor(() => expect(document.activeElement).toBe(name))
     expect(go).not.toHaveBeenCalled()
     edit('店舗名', '短い名前')
     expect(screen.queryByText('店舗名を短くしてください')).toBeNull()

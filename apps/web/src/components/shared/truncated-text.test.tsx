@@ -7,6 +7,18 @@ import TruncatedText, { compactUrl, TruncatedTextFocus } from './truncated-text'
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 describe('省略した文字の全文確認', () => {
+  it('注意が必要な値でも、全文確認を保ち、通常の値に戻すと注意色を外す', () => {
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(180)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(80)
+    const { rerender } = render(<TruncatedText value="注意が必要な長い値" tone="warning" />)
+    const text = screen.getByText('注意が必要な長い値')
+    expect(text.getAttribute('data-text-tone')).toBe('warning')
+    fireEvent.focus(text)
+    expect(screen.getByRole('tooltip').textContent).toBe('注意が必要な長い値')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    rerender(<TruncatedText value="いつもどおり" />)
+    expect(screen.getByText('いつもどおり').hasAttribute('data-text-tone')).toBe(false)
+  })
   it('URLは行き先を残し、乗せるとコピー元と同じ全文を表示する', () => {
     const value = 'https://example.com/campaign/2026/landing?source=line'
     render(<TruncatedText value={value} url />)

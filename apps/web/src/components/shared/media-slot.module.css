@@ -179,6 +179,14 @@
   gap: var(--tpl-slot-links-gap);
 }
 
+/* 小さい画像の枠（ImageFrame）：枠の下の口は左にそろえて縦に並べる。口は押せる高さ32を持つので、間は文字の間（14）から引いて小さく。 */
+.root[data-controls-below] > .links {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-slot-links-gap-below);
+  padding-top: var(--tpl-slot-links-pad-below);
+}
+
 .link {
   padding: 0;
   border: 0;

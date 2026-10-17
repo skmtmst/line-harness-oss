@@ -13,6 +13,7 @@ import shell from './data-table.module.css'
 import { loadFailureCopy } from './api-error-message'
 import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
+import cellPresentations from './table-cell-presentations.module.css'
 import type { ThProps } from './table-head-cell'
 export type { ThProps } from './table-head-cell'
 import TruncatedText from './truncated-text'
@@ -35,6 +36,7 @@ export function Th({
   collapseAt,
   grow,
   inset,
+  columnKind,
   ...cellProps
 }: ThProps) {
   const classes = [
@@ -49,7 +51,7 @@ export function Th({
   const actionHeading = children === '操作' && !showActionLabel
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
   return (
-    <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
+    <th className={classes} data-align={align} data-column-kind={columnKind} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
       {actionHeading ? <span className="sr-only">操作</span> : truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
@@ -96,6 +98,7 @@ export function DataTable({
   className,
   'data-design': dataDesign,
   presentation,
+  cellPresentation,
   density,
   columns,
   label,
@@ -108,6 +111,7 @@ export function DataTable({
   className?: string
   'data-design'?: string
   /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
+  cellPresentation?: 'friends'
   presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery' | 'template-list'
   /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
   density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
@@ -129,7 +133,7 @@ export function DataTable({
   columns ??= tableDensity && !grid && !columnLayout ? recordTableColumns(children) : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div ref={actionWidthRef} data-shared-part="list-table" data-column-sizing={columnSizing} className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
+    <div ref={actionWidthRef} data-shared-part="list-table" data-column-sizing={columnSizing} data-cell-presentation={cellPresentation} className={[shell.frame, cellPresentation === 'friends' && cellPresentations.friendList, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
@@ -227,7 +231,7 @@ export function RowNameLink({ onOpen, onClick, ...props }: React.ComponentProps<
 
 /** 名前から既存の詳細を開く操作。行き先の切り替え方は画面が保つ。 */
 export function RowNameButton({ className, selected, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }) {
-  return <button type="button" aria-pressed={selected} {...props} className={[styles.rowNameLink, className].filter(Boolean).join(' ')} />
+  return <button type="button" aria-pressed={selected} data-part="row-name" {...props} className={[styles.rowNameLink, className].filter(Boolean).join(' ')} />
 }
 
 export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'children' | 'className'> & {
@@ -236,17 +240,21 @@ export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'ch
   className?: string
   collapseAt?: 'narrow'
   grow?: boolean
+  presentation?: 'friend-list' | 'template-plain'
+  columnKind?: 'check' | 'star' | 'menu'
 }
 
 /** 標準一覧の本文セル。 */
-export function Td({ children, align = 'left', className, collapseAt, grow, ...cellProps }: TdProps) {
+export function Td({ children, align = 'left', className, collapseAt, grow, presentation, columnKind, ...cellProps }: TdProps) {
   const classes = [
     shell.bodyCell,
+    presentation === 'friend-list' && cellPresentations.friendListCell,
+    presentation === 'template-plain' && cellPresentations.templatePlainCell,
     align === 'right' && styles.right,
     align === 'center' && styles.center,
     className,
   ].filter(Boolean).join(' ')
-  return <td className={classes} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
+  return <td className={classes} data-column-kind={columnKind} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
 }
 
 /** 日時の本文セル。数字の桁と補足色は共通部品が持つ。 */

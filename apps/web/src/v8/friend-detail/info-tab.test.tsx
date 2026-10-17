@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import {afterEach, expect, test, vi} from 'vitest'
-import {cleanup, render, screen, within} from '@testing-library/react'
+import {cleanup, fireEvent, render, screen, within} from '@testing-library/react'
 import {BASIC_FRIEND_FIELDS} from '@line-crm/shared'
 import InfoTab from './info-tab'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shared/list-navigation',()=>({default:({children,...props}:React.ComponentProps<'a'>)=><a {...props}>{children}</a>}))
 afterEach(cleanup)
 test('基本8欄は先頭、古い名前を読み替え、店の欄を分類し、出どころと満年齢を示す',()=>{
@@ -15,4 +16,13 @@ test('基本8欄は先頭、古い名前を読み替え、店の欄を分類し�
  expect(within(basics).getAllByText('手で入れた').length).toBeGreaterThan(0);
  expect(screen.getByRole('region',{name:'お店が作った項目（ペット）'})).toBeTruthy();expect(screen.getByRole('region',{name:'飲食の情報'})).toBeTruthy();
  expect(screen.queryByRole('button',{name:'保存する'})).toBeNull();expect(screen.queryByRole('button',{name:'＋ 足す'})).toBeNull();
+})
+
+test('保存前の入力があるとき、ほかへのリンクを押すと「保存していない変更があります」の確認を出す（番兵）',async()=>{
+ const fields=[{id:'pet',name:'ペットの名前',type:'text',folderId:'pets',value:'もも',status:'active'}];
+ const data={fields,values:{pet:'こむぎ'},fieldsStatus:'ready',fieldFolders:[{id:'pets',name:'ペット'}],fieldFoldersStatus:'ready',hiddenPersonalCount:0,warnings:[],setValues:vi.fn(),saving:false,saveFields:vi.fn()};
+ render(<InfoTab friendId="f" group="all" data={data as never} perms={{canEditField:()=>true,saveFields:true,manage:true} as never}/>);
+ expect(screen.getByRole('button',{name:'キャンセル'}).hasAttribute('disabled')).toBe(false)
+ fireEvent.click(screen.getByText('情報欄を管理'))
+ expect(await screen.findByRole('dialog',{name:'保存していない変更があります'})).toBeTruthy()
 })

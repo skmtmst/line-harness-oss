@@ -20,6 +20,17 @@ const STEPS: StepperStep[] = [
  * 丸24（済み＝緑に白い✓・今＝墨に白い数字・まだ＝薄い枠に灰の数字）・名13（今だけ太字）・線24×1.5。
  */
 describe('手順（型の共通部品 Steps）', () => {
+  it('質問の縦の列では未回答にも移れ、現在の場所と回答済みを分ける', () => {
+    const select = vi.fn()
+    render(<Steps label="はじめの質問の一覧" layout="sidebar" currentKey="now" steps={[
+      { key: 'done', label: '使い方', state: 'done', onSelect: () => select('done') },
+      { key: 'now', label: '見た目', state: 'todo', onSelect: () => select('now') },
+      { key: 'next', label: '通知', state: 'todo', onSelect: () => select('next') },
+    ]} />)
+    expect(document.querySelector('[aria-current="step"]')?.textContent).toBe('見た目')
+    for (const name of ['使い方', '見た目', '通知']) fireEvent.click(screen.getByRole('button', { name }))
+    expect(select.mock.calls.flat()).toEqual(['done', 'now', 'next'])
+  })
   it('段ごとに済み・今・まだの印を付け、今の段だけ aria-current="step"', () => {
     render(<Steps label="配信作成の進み" steps={STEPS} currentKey="audience" />)
     const nav = screen.getByRole('navigation', { name: '配信作成の進み' })

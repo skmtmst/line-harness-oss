@@ -90,9 +90,12 @@ export default function CustomerInfoPanel({
           {[...FIXED_FRIEND_FIELDS].sort((a,b) => (order.indexOf(`fixed:${a.key}`) < 0 ? 999 : order.indexOf(`fixed:${a.key}`)) - (order.indexOf(`fixed:${b.key}`) < 0 ? 999 : order.indexOf(`fixed:${b.key}`))).filter(spec => (spec.key !== 'age' || !birthdayVisible) && !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
             const { value, source, derived } = fixedFieldValue(shownFields, spec.key)
             const age = spec.key === 'birthday' && !hidden.includes('fixed:age') ? fixedFieldValue(shownFields, 'age').value : null
-            const display = value && age ? `${value}（${age}歳）` : value
+            // 生年月日は日付の欄と同じ「1988年4月12日」の書き方で出す（狭い欄なので曜日は省き、年齢を添える・vX3wQ）。
+            const ymd = spec.key === 'birthday' && value ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null
+            const shownValue = ymd ? `${Number(ymd[1])}年${Number(ymd[2])}月${Number(ymd[3])}日` : value
+            const display = shownValue && age ? `${shownValue}（${age}歳）` : shownValue
             const field = shownFields.find(field => field.fixedKey === spec.key)!
-            return <div className={styles.row} key={spec.key}>
+            return <div className={styles.row} key={spec.key} data-layout={spec.key === 'allergy' && editing ? 'stack' : undefined}>
               <dt>{spec.label}</dt>
               <dd>{spec.key === 'allergy' ? <AllergyField value={editing ? draft[field.id] : field.value ?? null} options={field.options ?? undefined} readOnly={!editing || saving} onChange={next => setDraft(current => ({ ...current, [field.id]: next }))} />
                 : editing && !derived ? <TextField aria-label={spec.label} readOnly={saving} value={draft[field.id] ?? ''} onChange={event => setDraft(current => ({ ...current, [field.id]: event.target.value }))} />

@@ -1,0 +1,85 @@
+/* 見本のリッチメニュー（wI4ZX・RZW83・cAaGY）：3 列 × 2 段・間 2 の白・ボタンは印＋文字を真ん中に。 */
+.grid {
+  --sample-gap: 2px;
+  --sample-h: 77px;
+  --sample-icon: 22px;
+  --sample-text: var(--text-micro);
+  --sample-lh: 17px;
+  --sample-inner-gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sample-gap);
+  width: 100%;
+  background: var(--color-canvas);
+}
+
+.grid[data-size='phone'] {
+  --sample-h: 84px;
+  --sample-icon: 24px;
+  --sample-text: var(--text-caption);
+  --sample-lh: 18px;
+}
+
+.grid[data-size='preview'] {
+  --sample-h: 92px;
+  --sample-icon: 24px;
+  --sample-text: var(--text-caption);
+  --sample-lh: 18px;
+}
+
+.tile {
+  display: flex;
+  min-width: 0;
+  height: var(--sample-h);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sample-inner-gap);
+  border: 0;
+  background: var(--sample-bg);
+  color: var(--sample-ink);
+  font: inherit;
+}
+
+button.tile {
+  cursor: pointer;
+}
+
+button.tile:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: calc(var(--polish-focus-width) * -1);
+}
+
+.grid .tile[data-selected] {
+  background: var(--sample-bg);
+  outline: calc(var(--polish-focus-width) * 0.75) solid var(--sample-ink);
+  outline-offset: calc(var(--polish-focus-width) * -0.75);
+}
+
+:root .grid .tile svg.icon {
+  width: var(--sample-icon);
+  height: var(--sample-icon);
+  flex: none;
+}
+
+:root .grid .tile .label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--sample-text);
+  font-weight: 600;
+  line-height: var(--sample-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avatar {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: var(--polish-radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}

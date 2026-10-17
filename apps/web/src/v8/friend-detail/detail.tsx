@@ -233,7 +233,7 @@ function FriendDetailV8Inner() {
       ) : tab === 'scenario' ? (
         <ScenarioTab canEnroll={perms.manage} onEnroll={() => void scenario.openPicker()} />
       ) : tab === 'orders' ? (
-        <BookingsTab />
+        <BookingsTab accountId={selectedAccountId} friendId={friendId} friendName={realName || friend?.displayName || ''} canEdit={perms.manage} />
       ) : tab === 'reminders' ? (
         <RemindersTab friendId={friendId} />
       ) : tab === 'actions' ? (

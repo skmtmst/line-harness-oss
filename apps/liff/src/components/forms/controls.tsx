@@ -1,6 +1,6 @@
 /** LIFF と管理画面の見本で共有する入力の形。通信・送信は呼ぶ側が持つ。 */
 import { useEffect, useState, useRef, forwardRef, type InputHTMLAttributes, type ReactNode, type LabelHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes, type Ref } from 'react'
-import { PREFECTURES, FORM_DOCUMENT_SCAN_NOTE, type FormInputBlock, type FormFileAnswer } from '@line-crm/shared'
+import { PREFECTURES, type FormInputBlock, type FormFileAnswer } from '@line-crm/shared'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
 import styles from './controls.module.css'
@@ -149,7 +149,6 @@ export function FormFileControl({ label, uploading = false, onUpload, kind = 'im
       </div> : null}
     </div> : null}
     <p className={styles.note}>{kind === 'pdf' ? 'PDF・1ファイル10MBまで' : `JPG・PNG・GIF・WebP・HEIC・HEIF${allowedKinds.includes('pdf') ? '・PDF' : ''}・1ファイル10MBまで`}{`・${limit}枚まで`}</p>
-    <p className={styles.note}>{FORM_DOCUMENT_SCAN_NOTE}</p>
     {uploading ? <p className={styles.note}>送っています...</p> : null}
     {error ? <p role="alert" className={styles.note}>{error}</p> : null}
   </div>

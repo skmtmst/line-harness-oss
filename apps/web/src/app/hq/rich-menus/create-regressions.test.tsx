@@ -1,12 +1,11 @@
 // @vitest-environment happy-dom
-import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
-import type { StaffMember } from '@line-crm/shared'
-import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import RichMenuCreateV8 from '../../rich-menus/new/create-v8'
+import { hqRichMenuDefinitionFromSeed,type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
-import { hqRichMenuDefinitionFromSeed, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
+import { forgetStaffIdentity,rememberStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
+import { cleanup,fireEvent,render,screen,waitFor,within } from '@testing-library/react'
+import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest'
+import RichMenuCreateV8 from '../../rich-menus/new/create-v8'
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccount: null, loading: false }) }))
 vi.mock('next/navigation', () => ({
@@ -261,8 +260,8 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     fireEvent.change(screen.getByLabelText('このボタンの送る文'), { target: { value: '予約' } })
     click('次へ：配る先')
     expect(await screen.findByRole('heading', { name: '各アカウントで誰に出すか' })).toBeTruthy()
-    expect(screen.queryByText('タグが付いた人')).toBeNull()
-    expect(screen.queryByText('トークを開いたとき')).toBeNull()
+    expect(screen.getByText('タグが付いた人')).toBeTruthy()
+    expect(screen.getByText('トークを開いたとき')).toBeTruthy()
     fireEvent.click(screen.getByRole('radio', { name: /決めない/ }))
     expect(screen.getByText('各アカウントで決める')).toBeTruthy()
     click('次へ：確かめて配る')

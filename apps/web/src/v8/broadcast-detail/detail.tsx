@@ -839,7 +839,7 @@ function ApprovalBox({
       </dl>
       {mine ? (
         <>
-          <div className={styles.field}><Field label="差し戻すときの理由" htmlFor="approval-reject-reason"><SaveErrorField names={["reason"]}><TextField
+          <div className={styles.field}><Field label="差し戻すときの理由" htmlFor="approval-reject-reason" required><SaveErrorField names={["reason"]}><TextField
               id="approval-reject-reason"
               maxLength={1000}
               value={reason}
