@@ -2,10 +2,12 @@
 
 正本：[共通基盤 §6-2](../../v6-requirements/v6-shared-platform-requirements.md)（再試行の既定）・[26 外部連携](../../v6-requirements/v6-26-external-integrations-requirements-draft.md)・[32 運用状態](../../v6-requirements/v6-32-operations-status-requirements-draft.md)・各機能の要件。この文書は、外のサービスとつながる所で何が起きうるか・今の作りがどう扱うか・画面にどう出すか・どう戻すかを 1 つにまとめたもの（2026-10-16 B-333）。コードは `~/lh-work/lh-claude-f`（2026-10-16 時点）を読んだ。
 
+**2026-10-17 B-365**：再試行は [段2 §3](../cleanup-stage2-contract.md#retry)、結果不明は [§4](../cleanup-stage2-contract.md#unknown-result)、予約×支払い×通知の復旧は [§5 サガ](../cleanup-stage2-contract.md#saga)、重い表示用集計は [§6 cache](../cleanup-stage2-contract.md#cache) が共通契約。以下の「今の作り」は10-16の観察であり、段2の実装完了の宣言ではない。観察と違う箇所は契約を弱めず、実装担当が試験付きで照合する。
+
 ## 0. 共通の決まり
 
 - 再試行の既定（§6-2）：外部 API の一時失敗（LINE・EC・カレンダー・決済）は **1 分・5 分・30 分の最大 3 回（初回を含め 4 回）**、429 は `Retry-After` を優先。送信 Webhook（26）だけ **最大 8 回・24 時間**。入力不備・権限不一致・宛先なしは再試行しない（恒久失敗、理由を残す）。手動の再試行は新しい試行で、成功済みは再実行しない。
-- 送信は再試行キー（LINE は `X-Line-Retry-Key`）で 1 回だけ。LINE が 409 で「同じキーは受け付け済み」と返したら成功として扱う（`packages/line-sdk/src/client.ts:54-59`）。
+- 送信は再試行キー（LINE は `X-Line-Retry-Key`）と台帳で二重にしない。結果不明は新しく送らず、provider の保証期間・機能別の停止条件に従い照合する。LINE の同じキーが受け付け済みという根拠のある応答と、一般の 409 を区別する（段2 §4）。
 - 自動の知らせに manual の印を付けない。秘密値・お客さまの本文・URL のクエリを記録・Slack・画面へ出さない。
 - 取れない数は 0 にしない（「—」）。外の失敗で DB の正本（予約・申込）を巻き戻さず、「同期失敗」として見せる。
 - 検証環境：cron は動かない（`apps/worker/wrangler.staging.toml` に triggers が無い）。LINE は検証用のチャネル、Stripe は試験モード、Google ビジネスの書き込みは止め（`GOOGLE_BUSINESS_WRITE_ENABLED=false`）。
@@ -14,7 +16,7 @@
 
 | ID | 相手 | 何が起きうるか | 今の作りの扱い | 画面の出し方 | 復旧 | 確かめ方 |
 |---|---|---|---|---|---|---|
-| IF-01 | LINE Messaging API（送信） | 一時失敗（5xx・時間切れ） | 送信の種類ごとの台帳で再試行。予約のリマインダは失敗で数え、上限で `failed_permanent` | 詳細・配信結果に「失敗」と理由 | 次の cron で同じキーで再送 | 自動：Worker（booking-reminders・broadcast） |
+| IF-01 | LINE Messaging API（送信） | 一時失敗（5xx・時間切れ） | 送信の種類ごとの台帳で追う。結果不明は通常の失敗と分ける | 詳細・配信結果で成功/失敗/不明と理由を区別 | 確認済みの一時失敗だけ同じキーで再試行。不明は段2 §4 の照合・停止 | 自動：Worker（booking-reminders・broadcast） |
 | IF-02 | LINE | 429（送り過ぎ） | SDK はエラーに `retryAfter` を付けて投げる（`client.ts:61-70`） | 配信結果に「待っています」 | `Retry-After` 後に再送 | 自動：Worker（429 の試験） |
 | IF-03 | LINE | 月の送信上限 | 一斉配信は事前に上限を読み（`broadcast-quota-guard.ts`）、足りないと止めて知らせ（`broadcast.quota_short`） | 配信の確認で「足りません」 | 翌月か上限を上げる | 自動：Worker |
 | IF-04 | LINE | 401（アクセストークン切れ・チャネルの設定違い） | 送信は失敗として記録 | 運用状態の要対応（ダッシュボードの接続の異常の帯は API 組4） | 店の LINE 設定を直す。送れなかった分は手動の再試行 | 検証で手で（トークンを壊す） |
@@ -31,8 +33,8 @@
 | IF-15 | Stripe | 同じ通知が 2 回・順番が入れ替わる | 2 回目は `duplicate`。入金済みの再読込で二重に確定しない | 通知の記録「重複」 | — | 自動：Worker |
 | IF-16 | Stripe | 支払い失敗の通知 | 未払いを `failed` にする | 予約の札（一覧に失敗は出ない。食い違い 4） | お客さまに支払いのやり直しを頼む | 自動：Worker |
 | IF-17 | Stripe | Checkout の期限切れ・お客さまが戻らない | 取り置き（既定 10 分）の後に放す。同じ申込の再開は同じ URL | 札「期限切れ」 | 予約し直し | 自動：Worker（booking-payments-liff） |
-| IF-18 | Stripe | 返金の失敗 | 502「返金できませんでした」、状態は支払い済みのまま | 窓に理由 | もう一度［返金］ | 自動：Worker |
-| IF-19 | Stripe | 本番の通知が来る（livemode） | API 組3 で試験モードだけ受け付ける（未取り込み） | — | 本番はオーナーの承認後 | 自動：Worker（組3） |
+| IF-18 | Stripe | 返金の失敗・結果不明 | 確認済みの失敗と不明を分離し、確認できるまで返金成功にしない | 窓に理由、不明は要対応 | 同じ返金操作の台帳を照合。確認済みの一時失敗だけ再試行し、新しい返金を重ねない（段2 §4・§5） | 自動：Worker |
+| IF-19 | Stripe | 本番の通知が来る（livemode） | 列車42の土台では試験モードだけ受け付ける。模擬の返金・送信も実成功と分ける | — | 本番はオーナーの承認後 | 自動：Worker（booking-payments・stripe.security） |
 | IF-20 | Google カレンダー（空きの読み） | 共有切れ・権限切れ・時間切れ | その担当の枠を閉じる（fail-closed、`services/availability.ts:351,843`） | 空きに「カレンダーを読めません」・予約設定の担当に「確認が要る」 | 共有を直して［確認する］ | 自動：Worker（booking-slot-instant-failclosed） |
 | IF-21 | Google カレンダー（書き込み） | 予定の作成・更新・削除の失敗 | 予約は消さず、同期の台帳を `retry_wait`（`booking-calendar-sync.ts`）。削除は cron で再試行 | 予約の詳細に「同期失敗」・台帳の数に件数 | ［もう一度］（/sync/retry）か次の変更 | 自動：Worker（booking-notify-sync） |
 | IF-22 | Google Meet（個別相談） | 予定の作成後に個別相談の登録を忘れる | 登録が無いと前日・1 時間前の LINE が出ない。スタイルの口は Meet の URL を保存する前に登録を求める（422、組4） | 面談の行に「リマインド済み」の印が無い | `POST /api/meet-consultations` で登録。取消は DELETE | 自動：Worker（meet-consultations） |
@@ -41,7 +43,7 @@
 | IF-25 | Slack | 送信の失敗・署名の失敗（Codex の受け口） | 未処理のエラーの報告は失敗しても本処理を止めない（`index.ts` の unhandled の報告）。受け口は署名を確かめる | — | — | 自動：Worker（codex-slack-events.security） |
 | IF-26 | メール（送信） | 中継（XSERVER）の失敗 | 中継の設定があれば中継、無ければ直接（`services/plain-mail.ts:15-30`） | 送った記録に失敗 | もう一度送る | 自動：Worker |
 | IF-27 | メール（受信：飲食の予約メール） | 読めない形式・文字化け・同じメールの再送 | 読めない物は隔離して残す。同じメール ID は 1 回（`restaurant-email-intake.ts:254-358`）。生のメールは保存日数で消す | 経路ごとの「読めなかった件数」「最後に届いた時刻」 | 手で直して取り込む | 自動：Worker（restaurant-email-intake） |
-| IF-28 | 送信 Webhook（外向き） | 相手のサーバーの停止・429・時間切れ | 最大 8 回・24 時間。429 は Retry-After を上限 8 秒で尊重（`outgoing-webhook-delivery.ts:674,755,895-897`） | Webhook の実行履歴 | 相手を直して手で再送 | 自動：Worker（webhooks） |
+| IF-28 | 送信 Webhook（外向き） | 相手のサーバーの停止・429・時間切れ | 最大8回・24時間。既存の待機上限で Retry-After を短く切る観察は契約にしない | Webhook の実行履歴 | 段2 §3 に従い指定時刻より早く再送しない。長い待ちは次回期限へ。不明の副作用は先に照合 | 自動：Worker（webhooks） |
 | IF-29 | 広告（Meta 等の変換） | 鍵切れ・一時失敗・90 日超え | 送り箱で再試行。90 日超えは 410（`ad-conversion.ts:662`） | 送信の記録 | 鍵を直して［やり直す］ | 自動：Worker（ad-conversion） |
 | IF-30 | Uber Eats（飲食の宅配） | トークン切れ・取り込み失敗 | invalid_grant を扱う（`services/uber-eats.ts`） | 宅配の画面に接続の異常 | つなぎ直す | 自動：Worker（restaurant-delivery） |
 | IF-31 | R2（書類・画像） | 保存・削除の失敗 | 削除は R2 が先、失敗なら DB を残して次の cron で | 503「もう一度」 | 再試行 | 自動：Worker（form-documents） |
@@ -69,7 +71,7 @@
 2. **予約のリマインダの再試行が既定と違う**：初回を含め 3 回、間隔は 5 分の cron ごと（`booking-reminders.ts:229`、`REMINDER_MAX_RETRY = 3`）。§6-2 は 1・5・30 分の最大 3 回（初回を含め 4 回）。
 3. **LINE Webhook の署名失敗が画面に出ない**：200 で捨ててログだけ（`routes/webhook.ts:200-260`）。続けて失敗する（チャネルシークレットの入れ間違い）ときに運用者が気づく口が無い。32 運用状態の要件と照らして要るかは未確認。
 4. **支払いの失敗が一覧に出ない**：一覧の表示型に失敗が無い（API-CONTRACT-3 §4）。通知の記録（664、未取り込み）で見る形。
-5. **期限内のキャンセルの自動返金が無い**：[v8-liff.md](v8-liff.md) 食い違い 1。
+5. **期限内の本人キャンセルの返金**：列車42で既存の模擬返金と監査を通す経路が入った。実際の送金を行う許可ではない。段2では各停止境界の再開・結果不明・二重返金0を改めて確認する（[段2 §5](../cleanup-stage2-contract.md#saga)）。
 
 ## 4. 仕様が無い（決めていない所）
 
