@@ -8,10 +8,10 @@ import type { UpdateEvent } from './types.js';
  */
 export interface D1Like {
   prepare(sql: string): {
-    bind(...args: any[]): {
+    bind(...args: unknown[]): {
       run(): Promise<unknown>;
-      first<T = any>(): Promise<T | null>;
-      all<T = any>(): Promise<{ results: T[] }>;
+      first<T = unknown>(): Promise<T | null>;
+      all<T = unknown>(): Promise<{ results: T[] }>;
     };
   };
 }
@@ -148,7 +148,7 @@ export async function listRecent(
 ): Promise<SnapshotRow[]> {
   const result = await d1
     .prepare(
-      'SELECT * FROM update_history ORDER BY started_at DESC LIMIT ?',
+      'SELECT * FROM update_history ORDER BY started_at DESC, id DESC LIMIT ?',
     )
     .bind(limit)
     .all<SnapshotRow>();

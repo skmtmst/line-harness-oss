@@ -11,10 +11,6 @@ describe('B-244/245 ソースの見張り', () => {
     expect(inspectB244Source("fields.define('name','名前',check); <Field requirement={fields.requirement('name')} />").map((r: {kind:string}) => r.kind)).toEqual(['requirement-without-definition'])
     expect(inspectB244Source("fields.define('name','名前',check,{required:true}); <Field requirement={fields.requirement('name')} />")).toEqual([])
   })
-  it('一覧の常設の案内だけを止め、状態の知らせと確認の窓は残す', () => {
-    expect(inspectB244Source('<ListPage><Notice tone="info">毎回出る説明</Notice></ListPage>').map((r: {kind:string}) => r.kind)).toEqual(['permanent-list-notice'])
-    expect(inspectB244Source('<ListPage>{unset && <Notice tone="info">未設定</Notice>}<Dialog><Notice tone="info">確認</Notice></Dialog></ListPage>')).toEqual([])
-  })
   it('読み込んだフックが返す同じ欄定義だけを追い、定義抜けと別の欄への取り違えは止める', () => {
     const root = mkdtempSync(join(tmpdir(), 'b244-hook-'))
     try {

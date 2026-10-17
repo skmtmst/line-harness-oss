@@ -1,3 +1,5 @@
+import { verifyNenWebhook } from '../lib/hmac.js';
+import { WEBHOOK_BODY_BYTES, isWebhookBodyTooLarge } from '../lib/webhook-body.js';
 import { petWriteBody, petPatchBody } from './nen-pet-input.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -61,7 +63,7 @@ const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
   'arrival_check', 'review_request', 'cross_sell', 'column', 'birthday_coupon',
 ]);
-const MAX_BODY_BYTES = 256 * 1024;
+const MAX_BODY_BYTES = WEBHOOK_BODY_BYTES.ec;
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
 
 async function getTestRecipient(c: Context<Env>, accountId: string, friendId: string) {
@@ -118,18 +120,7 @@ function isUrl(value: string): boolean {
 }
 
 async function verifyEccubeSignature(secret: string, timestamp: string, signature: string, body: string): Promise<boolean> {
-  const seconds = Number(timestamp);
-  if (!Number.isInteger(seconds) || Math.abs(Date.now() / 1000 - seconds) > 300) return false;
-  const key = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${body}`));
-  const expected = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  const provided = signature.replace(/^sha256=/i, '').toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(provided)) return false;
-  let diff = 0;
-  for (let i = 0; i < 64; i++) diff |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
-  return diff === 0;
+  return (await verifyNenWebhook({ profile: 'ec', secret, timestamp, signature, rawBody: body })).ok;
 }
 
 nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
@@ -1229,7 +1220,7 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) return c.json({ success: false, error: 'Integration is not configured' }, 503);
   const raw = await c.req.text();
-  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return c.json({ success: false, error: 'Payload too large' }, 413);
+  if (isWebhookBodyTooLarge(raw, MAX_BODY_BYTES)) return c.json({ success: false, error: 'Payload too large' }, 413);
   const valid = await verifyEccubeSignature(
     secret, c.req.header('x-nen-timestamp') || '', c.req.header('x-nen-signature') || '', raw,
   );
@@ -1312,7 +1303,7 @@ nenCampaigns.post('/api/integrations/eccube/coupon-usages', inputJsonBoundary(),
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) return c.json({ success: false, error: 'Integration is not configured' }, 503);
   const raw = await c.req.text();
-  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return c.json({ success: false, error: 'Payload too large' }, 413);
+  if (isWebhookBodyTooLarge(raw, MAX_BODY_BYTES)) return c.json({ success: false, error: 'Payload too large' }, 413);
   const valid = await verifyEccubeSignature(
     secret, c.req.header('x-nen-timestamp') || '', c.req.header('x-nen-signature') || '', raw,
   );

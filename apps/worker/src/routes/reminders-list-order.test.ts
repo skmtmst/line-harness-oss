@@ -111,7 +111,9 @@ describe('リマインダ一覧の並び', () => {
     const res = await app.request('/api/reminders', {}, { DB: makeDb(seen) });
     expect(res.status).toBe(200);
     // 並びの決め方が2か所に散らないよう、こちらは db 側の関数を通す。
-    expect(mocks.getReminders).toHaveBeenCalled();
+    expect(mocks.getReminders).toHaveBeenCalledWith(expect.anything(), {
+      allowedAccountIds: ['acc-1'], canSeeUnassigned: false,
+    });
   });
 
   it('担当外アカウントの一覧を返さない', async () => {

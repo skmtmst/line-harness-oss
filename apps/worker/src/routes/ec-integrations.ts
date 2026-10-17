@@ -1,3 +1,5 @@
+import { validateNenWebhookHeaders, verifyNenWebhook } from '../lib/hmac.js';
+import { WEBHOOK_BODY_BYTES, isDeclaredWebhookBodyTooLarge, isWebhookBodyTooLarge } from '../lib/webhook-body.js';
 import { getConnectorSecret } from './ec-connector-secret.js';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { savePublicationDailyViews } from '@line-crm/db';
@@ -19,8 +21,7 @@ import { cancelPendingOrderFollowUps } from '../services/nen-engagement.js';
 import { markEcEventFailed, processEcEvent } from '../services/ec-event-processing.js';
 
 const ecIntegrations = new Hono<Env>();
-const MAX_BODY_BYTES = 256 * 1024;
-const MAX_CLOCK_SKEW_SECONDS = 5 * 60;
+const MAX_BODY_BYTES = WEBHOOK_BODY_BYTES.ec;
 export { EC_EVENT_TYPES } from '@line-crm/shared';
 const EVENT_TYPES = new Set<string>(EC_EVENT_TYPES);
 
@@ -133,32 +134,6 @@ export type EcEvent = {
    */
   publication_views?: PublicationViewSample[] | null;
 };
-
-function utf8Length(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
-}
-
-function hex(bytes: ArrayBuffer): string {
-  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function hmacHex(secret: string, value: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  return hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)));
-}
-
-function constantTimeHexEqual(left: string, right: string): boolean {
-  if (!/^[0-9a-f]{64}$/i.test(left) || !/^[0-9a-f]{64}$/i.test(right)) return false;
-  let diff = 0;
-  for (let i = 0; i < 64; i++) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
-  return diff === 0;
-}
 
 /**
  * 公式サイトの掲載閲覧数（F-20）。種類は共通名簿（@line-crm/shared の
@@ -503,13 +478,11 @@ export async function applyPublicationViewCounts(
 /** 候補の鍵を順に試し、1つでも合えば通す。移行期間の両受けが本体。 */
 async function verifyWithAnySecret(
   secrets: Array<string | null>,
-  signedPayload: string,
-  signature: string,
+  input: { timestamp: string; signature: string; rawBody: string; accountId?: string; nowSeconds: number },
 ): Promise<boolean> {
   for (const secret of secrets) {
     if (!secret) continue;
-    const expected = await hmacHex(secret, signedPayload);
-    if (constantTimeHexEqual(signature.toLowerCase(), expected)) return true;
+    if ((await verifyNenWebhook({ ...input, profile: 'ec', secret })).ok) return true;
   }
   return false;
 }
@@ -530,36 +503,32 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     return c.json({ success: false, error: 'Integration is not configured' }, 503);
   }
 
-  const declaredLength = Number(c.req.header('content-length') || '0');
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+  if (isDeclaredWebhookBodyTooLarge(c.req.header('content-length'), MAX_BODY_BYTES)) {
     return c.json({ success: false, error: 'Payload too large' }, 413);
   }
 
   const rawBody = await c.req.text();
-  if (utf8Length(rawBody) > MAX_BODY_BYTES) return c.json({ success: false, error: 'Payload too large' }, 413);
+  if (isWebhookBodyTooLarge(rawBody, MAX_BODY_BYTES)) return c.json({ success: false, error: 'Payload too large' }, 413);
 
   const timestamp = c.req.header('x-nen-timestamp') || '';
-  const signature = (c.req.header('x-nen-signature') || '').replace(/^sha256=/i, '');
-  const timestampSeconds = Number(timestamp);
-  if (!Number.isInteger(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > MAX_CLOCK_SKEW_SECONDS) {
+  const signature = c.req.header('x-nen-signature') || '';
+  const nowSeconds = Date.now() / 1000;
+  const input = { timestamp, signature, rawBody, accountId: requestedLineAccountId || undefined, nowSeconds };
+  const headerCheck = validateNenWebhookHeaders({ ...input, profile: 'ec' });
+  if (!headerCheck.ok && headerCheck.error === 'Expired request') {
     return c.json({ success: false, error: 'Expired request' }, 401);
   }
-  // ヘッダー無し（EC-CUBE 標準）は署名を先に確かめ、本文の line_user_id から宛先を決める。
-  // ヘッダー有りはつなぎ先の鍵を先に試し、だめなら全体の鍵（移行期間）。
-  // ヘッダー無しは全体の鍵を先に試し、だめなら宛先を決めてつなぎ先の鍵を試す。
-  const signedPayload = requestedLineAccountId
-    ? `${timestamp}.${requestedLineAccountId}.${rawBody}`
-    : `${timestamp}.${rawBody}`;
+  // 鍵候補と宛先の探索順は維持する。他アカウントの鍵へ探索を広げない。
   let verified = requestedLineAccountId
-    ? await verifyWithAnySecret([headerConnectorSecret, globalSecret], signedPayload, signature)
-    : await verifyWithAnySecret([globalSecret], signedPayload, signature);
+    ? await verifyWithAnySecret([headerConnectorSecret, globalSecret], input)
+    : await verifyWithAnySecret([globalSecret], input);
   if (!verified && !requestedLineAccountId) {
     const fallbackAccountId = await resolveAccountIdWithoutHeader(c.env.DB, lineUserIdFromRawBody(rawBody));
     if (fallbackAccountId) {
       const fallbackSecret = await getConnectorSecret(
         c.env.DB, fallbackAccountId, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
       );
-      verified = await verifyWithAnySecret([fallbackSecret], signedPayload, signature);
+      verified = await verifyWithAnySecret([fallbackSecret], input);
     }
   }
   if (!verified) {
