@@ -294,7 +294,11 @@ export function DepositSection({ state, connected, canEdit }: { state: Cancellat
 }
 
 /** 決済のつなぎ（FcGmv・i2iv4g の上の小さな区画）。 */
-export function ConnectionCard({ connected, testMode, checkedAt, canEdit, busy, onConnect }: { connected: boolean; testMode: boolean; checkedAt: string | null; canEdit: boolean; busy: boolean; onConnect: () => void }) {
+export function ConnectionCard({ connected, testMode, checkedAt, accountIdTail, dashboardUrl, canEdit, busy, onConnect, onReconnect }: {
+  connected: boolean; testMode: boolean; checkedAt: string | null;
+  accountIdTail?: string | null; dashboardUrl?: string | null;
+  canEdit: boolean; busy: boolean; onConnect: () => void; onReconnect?: () => void;
+}) {
   return (
     <section className={settings.section} aria-label="決済のつなぎ">
       <div className={styles.head}>
@@ -304,11 +308,16 @@ export function ConnectionCard({ connected, testMode, checkedAt, canEdit, busy, 
       <div className={styles.connectRow}>
         <span className={styles.connectText}>
           <strong>Stripe</strong>
-          <span className={styles.minor}>{connected ? `${testMode ? '試験モードで' : ''}つながっています${checkedAt ? `・最後に確かめた ${checkedAt}` : ''}` : 'まだつないでいません。つなぐと、キャンセル料とデポジットを使えます'}</span>
+          {connected && accountIdTail ? <span className={styles.minor}>{`アカウント acct_••••${accountIdTail}`}</span> : null}
+          <span className={styles.minor}>{connected ? `${testMode ? '試験モードで' : ''}つながっています${checkedAt ? `・${checkedAt} につないだ` : ''}` : 'まだつないでいません。つなぐと、キャンセル料とデポジットを使えます'}</span>
         </span>
         {connected ? <StatusBadge tone="success">つながっている</StatusBadge>
           : canEdit ? <Button variant="primary" busy={busy} onClick={onConnect}><Plug size={15} aria-hidden="true" />決済をつなぐ</Button> : null}
       </div>
+      {connected ? <div className={styles.links}>
+        <Button href={dashboardUrl ?? (testMode ? 'https://dashboard.stripe.com/test/payments' : 'https://dashboard.stripe.com/payments')} external>Stripe の管理画面を開く</Button>
+        {canEdit && onReconnect ? <Button onClick={onReconnect}>つなぎ直す</Button> : null}
+      </div> : null}
       {/* 記録・届いた知らせへの入口（絵 FcGmv に無い。前の右の欄 T91bV から移した＝絵を直す）。 */}
       {connected ? <p className={styles.links}><TextLink href="/booking/menus?tab=payments&view=records">お支払いの記録を見る</TextLink><TextLink href="/booking/menus?tab=payments&view=events">Stripe から届いた知らせを見る</TextLink></p> : null}
     </section>

@@ -121,8 +121,9 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
       await cancellation.save()
       notifySaved('お支払いの設定を保存しました')
     } catch (cause) {
-      saveErrors.capture(cause)
+      const fieldFailure = saveErrors.capture(cause)
       if (cancellation.dirty && cause instanceof ApiError && (cause.status === 409 || cause.status === 400)) { setSaveError(cancellationSaveError(cause)); return }
+      if (fieldFailure) return
       setSaveError(cause instanceof ApiError && cause.status === 403
         ? 'この設定を変える権限がありません。'
         : mode === 'customer_choice' && cause instanceof ApiError && cause.status === 400
@@ -156,7 +157,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
     <div className={settings.tabStack} data-design={connected ? 'Payments' : 'PaymentsNotConnected'}>
       {saveError ? <Notice tone="danger" role="alert">{saveError}</Notice> : null}
       {/* 絵 FcGmv・i2iv4g（B1）：決済のつなぎ → キャンセル料 → デポジット。つなぐのは Stripe の試験の接続（組3 の口）。 */}
-      <ConnectionCard connected={connected} testMode={testMode} checkedAt={link.connectedAt ? formatListTimestamp(link.connectedAt) : null} canEdit={canEdit} busy={connecting} onConnect={() => void connect()} />
+      <ConnectionCard connected={connected} testMode={testMode} checkedAt={link.connectedAt ? formatListTimestamp(link.connectedAt) : null} accountIdTail={link.accountIdTail} dashboardUrl={link.dashboardUrl} canEdit={canEdit} busy={connecting} onConnect={() => void connect()} onReconnect={() => preparing.open('Stripe のつなぎ直し')} />
       <CancellationSection state={cancellation} connected={connected} testMode={testMode} canEdit={canEdit} />
       <DepositSection state={cancellation} connected={connected} canEdit={canEdit} />
 
@@ -170,7 +171,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
         {canEdit ? (
           <RadioCardGroup legend="いつもの支払い方法" columns={choices.length > 2 ? 3 : choices.length === 2 ? 2 : undefined}>
             {choices.map((choice) => (
-              <SaveErrorField key={choice.value} names={["mode"]}><RadioCard key={choice.value} name="payments-default-method" value={choice.value} title={choice.title} note={choice.note}
+              <SaveErrorField key={choice.value} names={["mode", "provider"]}><RadioCard key={choice.value} name="payments-default-method" value={choice.value} title={choice.title} note={choice.note}
                 icon={choice.icon} checked={mode === choice.value} onChange={(value) => setMode(value as BookingPaymentMode)} /></SaveErrorField>
             ))}
           </RadioCardGroup>
