@@ -29,6 +29,9 @@ export type WorkerBindings = {
     RESTAURANT_INTAKE_DOMAIN?: string;
     RESTAURANT_TEST_ENABLED?: string;
     DEPLOY_ENV?: string;
+    /** Q-75: staging only, with a mandatory outbound stop and resource identity checks. */
+    STAGING_QA_ENABLED?: string;
+    STAGING_QA_OUTBOUND_DISABLED?: string;
     /** Positive integer overrides by fixed security rule key (JSON). Invalid values use safe defaults. */
     SECURITY_MONITOR_THRESHOLDS?: string;
     /** Dedicated AES-GCM key held as a Worker secret, never a normal var. */

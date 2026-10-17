@@ -1,4 +1,6 @@
 import {accountAiFeatures} from './routes/account-ai-features.js';
+import { stagingQa } from './routes/staging-qa.js';
+import { qaEnabled, qaOutboundStopped, qaSafeBindings, withQaOutboundBoundary } from './services/staging-qa-safety.js';
 import {broadcastSimulation} from './routes/broadcast-simulation.js';
 import {bookingPassNotices} from './routes/booking-pass-notices.js';
 import {bookingPassBilling} from './routes/booking-pass-billing.js';
@@ -325,6 +327,15 @@ export const ADMIN_REQUEST_HEADERS = [
 // SDK/MCP callers send no Origin header and are unaffected.
 // 検索に出さない：本物の robots.txt と、全部の応答に X-Robots-Tag（リリース前点検 2026-10-07）。
 app.use('*', noindexHeaderMiddleware);
+// Q-75: establish an invocation-local outbound boundary before any auth or error reporting.
+app.use('*', async (c, next) => {
+  if (c.req.path.startsWith('/api/ops/staging-qa/') && !qaEnabled(c.env)) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const env = c.env;
+  c.env = qaSafeBindings(env);
+  return withQaOutboundBoundary(env, next);
+});
 app.get('/robots.txt', robotsTxtHandler);
 
 // 段ごとの経過時間を Server-Timing で返す（V6R-CX-a）。ログイン済みの職員への応答だけ。
@@ -376,6 +387,7 @@ app.use('/api/*', sensitiveOperationMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
+app.route('/', stagingQa);
 app.route('/', gettingStarted);
 app.route('/', recipes);
 app.route('/', hqTemplates);
@@ -1842,6 +1854,8 @@ async function scheduled(
   ctx: ExecutionContext,
 ): Promise<void> {
   // 通知・配信と、再実行できる重い集計・走査を別のCron invocationへ分ける。
+  // QA uses the scoped manual runner; never sweep shared staging data while stopped.
+  if (qaOutboundStopped(env)) return;
   // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
   const lane = scheduledLane(event.cron);
   if (lane === 'restaurantMinute') {
@@ -2614,6 +2628,10 @@ export default {
     batch: MessageBatch<CodexMentionQueueMessage>,
     env: Env['Bindings'],
   ): Promise<void> {
+    if (qaOutboundStopped(env)) {
+      for (const message of batch.messages) message.retry({ delaySeconds: 60 });
+      return;
+    }
     for (const message of batch.messages) {
       try {
         await processCodexMentionMessage(env, message.body);
@@ -2645,6 +2663,10 @@ export default {
     env: Env['Bindings'],
     _ctx: ExecutionContext,
   ): Promise<void> {
+    if (qaOutboundStopped(env)) {
+      message.setReject('Staging QA outbound stop is active');
+      return;
+    }
     await routeInboundEmail(message, env);
   },
 };
