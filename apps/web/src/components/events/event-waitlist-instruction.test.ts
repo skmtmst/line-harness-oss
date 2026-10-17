@@ -14,7 +14,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const FORM = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'edit-form.tsx'), 'utf8')
 const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
 const BOOKINGS = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'bookings.tsx'), 'utf8')
-const ROUTES = readFileSync(join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'events.ts'), 'utf8')
+const ROUTES = ['register-liff-history.ts', 'register-admin-actions.ts'].map(file =>
+  readFileSync(join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'events', file), 'utf8'),
+).join('\n')
 
 describe('R83 キャンセル待ちの説明は自動案内にそろえる', () => {
   it('公開設定は自動案内と本人承諾を説明し、手動だけの説明をしない', () => {

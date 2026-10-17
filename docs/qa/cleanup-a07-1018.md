@@ -1,0 +1,46 @@
+# A07 予約・支払い・通知の整理（2026-10-18）
+
+指定土台 `92a53d4836df4650a1ca72bb994f8b4134b6d9c1`、枝 `codex/kenta-train-cleanup-a07-1018`。D01/A01/A06/A11等の統合済み土台を保つ。doctorはDOCTOR_LOCAL=1で合格。開始時のLINE作業木はclean。元checkoutの `.nodeterm/project.json`・`.nodeterm/settings.json`・`lh-hq.code-workspace` は既存の変更として読むだけにした。親ECへの変更なし。
+
+## 実装
+
+- `booking.ts` は7,571→126行、38モジュール、最大595行。`events.ts` は4,014→59行、18モジュール、最大582行。本人確認・枠検証・入力・資源/メニュー・作成・変更・台帳・勤務・申込・開催回・待機/承認を分離。同じHonoインスタンスへ元の順序で登録し、共通middleware・個別の権限・公開exportを保った。
+- 一時のAST照合で予約105経路とイベント40経路のメソッド・パス・middleware・登録順が同一。root middlewareも同一。新規モジュールの循環0、変更した製品範囲の明示anyは0→0。照合結果を新たな凍結試験にはしない。
+- 既存の `workflow_steps` にA06のCallState/不変の入力snapshot/結果を保存し、送信前CASと業務結果の同一batchを接続。started/unknownはlease切れでも自動再取得しない。既存のbooking操作記録と成功/取消履歴も保持。
+- 予約系の共有遮断を既存checkpointで永続化。同じaccount/store/destination/connectionのopenは要求0、half-openは同時1回。期限切れprobe回収と世代による古い結果の拒否。A06のMemoryCircuitStoreを全Worker共有と誤認する実装にはしなかった。他束の全外部呼出しへの接続完了は主張しない。
+- 予約通知、予約/イベント/Meetリマインダ、イベント確定/変更/待機案内、重複予約の通知、支払開始、Stripe接続を接続。準備失敗と送信後の不明を分け、秘密を含む例外文を保存しない。予約通知の手動再試行もdelivery_unknownは409。同じ通知のキーを手動再試行で変えない。
+- Google作成/削除は固定した参照ID・予約版・接続先で記録。応答消失や外部成功後のDB障害はGET照合だけで回収し、不明なPOST/DELETEは再送しない。409だけを作成成功とみなさない。同版の作成完了後に要約保存が落ちても、次の同期で予定を消し直さない。削除の遅い応答が新版の参照IDを消さない。Googleの読取りも同じ遮断/単発予算を通し、取得できない枠を空きにしない。
+- 同じ予約の支払開始は、別の要求キーでも同じ支払記録に集める。外部受理後の保存失敗で新しい課金を始めない。署名付きの期限後入金を捨てず、空きの再検査＋スタッフ/席/資源のCASで復元、埋まっていれば既存の全額模擬返金を一意な補償キーで実施。読取り不能では復元/返金を推測しない。店舗の要対応と監査を残す。実返金のadapterがない支払いは要対応で停止する。
+- 前日/1時間前のMeet登録・日時変更/取消の既存フェンスを保持。送信後の不明を同じ行の再利用で再送しない。下記の通知世代の不足は未解決。
+- 自動通知のmanualヘッダー追加なし。画面/画面部品/Web APIクライアントは未変更。1152/1440の新しい画面撮影対象は0。全体の崩れ確認は通常ci-localの既存工程で行う。
+
+## F04 在庫失効
+
+失効と明示再計算を同じD1 batchにした。明示再計算は変更した店・重なる枠だけを主キー/既存store-time索引で更新し、全枠SCANを外した。全既存triggerは保持し、適用済みSQLを改変していない。
+
+手元SQLite、同じデータ・同じ失効1件（10%が対象店舗）の1回の比較。クラウドD1のCPUではない。
+
+| 枠数 | 旧更新行 | 新更新行 | 旧CPU(ms) | 新CPU(ms) |
+|---|---:|---:|---:|---:|
+| 1,000 | 1,200 | 201 | 2.341 | 1.327 |
+| 10,000 | 12,000 | 2,001 | 7.789 | 2.833 |
+
+残る200/2,000行は既存DB triggerによる同店舗の全時間帯更新。これを「対象1枠だけになった」と数えない。F04の完全な時間帯限定は番号承認後のmigrationが必要。
+
+## 保存先/番号の判断待ち（SQLは作成していない）
+
+2026-10-18の読み取り照合：本線e9b423eb7c、migration最大726、公開37PRの追加SQL最大565。727はA06の共有遮断の提案があるため避け、以下は未予約の番号案。着手前・push前に再照合し、番号ごとのオーナー承認が必要。
+
+1. **728案**：`meet_consultations.schedule_revision`（非負整数）と、追記型 `meet_consultation_notification_runs`。列案：id、consultation_id、schedule_revision、booking_id/version、kind、scheduled_at、recipient/sender snapshot、retry_key、status、attempts、next_at、call_state/result、created_at/updated_at。`UNIQUE(consultation_id,schedule_revision,kind)`・retry_keyの一意性。理由：既存の子は`UNIQUE(consultation_id,kind)`で、送信済みの子を残しながら変更後の同種通知を追加できない。送信済みをpendingへ戻す・履歴を消す・汎用checkpointを第三の通知スケジューラにする変更はしない。確定/変更と同じbatchで世代と2通知の予定をそろえる。既存pendingの同じ行を変更後に再利用した場合も、過去の不明を新しい送信へ読み替えないため、安全側で停止する。この部分は完了扱いにしない。
+2. **729案**：在庫の既存trigger（`rt_inventory_reservation_insert/update/delete` 等）の対象を、OLD/NEWの店と重なる時間帯へ限定するmigration。新表/列は不要。取消・退店・卓の連結・休業・同時更新も含めて整合を確かめる。適用済み628等は書き換えない。F04の残りはここまで停止。
+
+予約リマインダの既存予算は初回込み3回を維持。共通の既定4回へ増やしていない。1/5/30分の待機方針を共通実行器へ渡し、結果不明や認証失敗を再送可能にはしていない。D01で残された3回/4回の仕様差は司令塔の判断へ残す。
+
+## 検査
+
+- 関連119ファイル1,471件成功。その後のCalendar/CAS/D1/境界の追加検査は外部のA07-EVIDENCEに生ログを保持。実送信・実課金・実返金なし。
+- 実D1のcheckpoint/Circuit 2件成功。SQLiteの並行CAS、外部成功後の業務保存失敗、不明の停止→GET照合、認証/別店/停止、3回予算とRetry-After、古いprobeの拒否を確認。
+- 故障対照：正常6件成功。CAS fence除去、不明→ready、保存障害を成功と偽る、半開CAS除去の4故障は全て赤。製品ソースを変更せず/tmpのコピーで実施。環境準備で失敗した最初の生ログも残した。
+- Worker/DB型検査成功。Worker build成功（既存のchunkサイズ警告のみ）。最後のイベント回収変更後の186件も成功。ci-localはコミット済みHEADから全工程を実施し、結果を追記する。正式PR番号が未確定のため#0000の通常照合は司令塔の採番後。
+
+外部記録：`~/lh-work/design/v8/review/CLEANUP-1017/A07-EVIDENCE/`、`DONE-A07.tsv`、`A07-HANDOFF.md`、`API-CONTRACT-A07.md`。新migration/DB適用/配備/push/PR/本番操作なし。
