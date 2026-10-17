@@ -1,4 +1,4 @@
-import { readCookie } from '../middleware/auth-http.js';
+import { bearerToken, readCookie } from '../middleware/auth-http.js';
 import { mfaConfiguration, mfaEncryptionConfigured, MFA_KEY_NOTICE } from '../lib/mfa-config.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -9,6 +9,7 @@ import {
   ADMIN_AUTH_COOKIE,
   ADMIN_SESSION_BEARER_PREFIX,
   CSRF_COOKIE,
+  CSRF_HEADER,
   SESSION_DEFAULT_MAX_AGE,
   SESSION_REMEMBER_MAX_AGE,
   adminSessionCookie,
@@ -21,7 +22,7 @@ import {
   sha256Hex,
 } from '../middleware/auth.js';
 import { clientIp, issueSession, maskIpPrefix, randomToken, recordSuccessfulLoginAudit, twoFactorLoginUrl, twoFactorSetupUrl } from '../services/admin-session.js';
-import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
+import { resolveAdminAuthConfig, resolveCorsOrigin } from '../middleware/admin-auth-config.js';
 import { recordAuditEvent, recordLoginAudit } from '@line-crm/db';
 import {
   activatePlatformAdminIfAwaitingTotp,
@@ -40,6 +41,7 @@ import {
   markAdminSessionStepUp,
   getAdminSessionByTokenHash,
   getStaffById,
+  getStaffByApiKey,
   getStaffByInviteTokenHash,
   getStaffByLineUserId,
   getStaffByLineUserIdIncludingInactive,
@@ -801,12 +803,28 @@ adminAuth.post('/api/auth/login', inputJsonBoundary(), async (c) => {
   return c.json({ success: true, data: staff, csrfToken });
 });
 
-/**
- * POST /api/auth/logout — clears both cookies. No CSRF required: clearing your
- * own session is not a meaningful CSRF target, and this keeps logout resilient
- * even if the CSRF token was lost client-side.
- */
+/** Cookie logout checks trusted Origin/CSRF before revocation. */
 adminAuth.post('/api/auth/logout', inputJsonBoundary(), async (c) => {
+  const bearer = bearerToken(c);
+  const cookie = adminSessionTokenFromCookie(c);
+  if (!bearer && cookie) {
+    const expected = csrfTokenFromCookie(c);
+    const origin = c.req.header('Origin');
+    const originDenied = origin !== undefined && (!origin || !resolveCorsOrigin(c.env, origin, c.req.url));
+    const suppliedCsrf = c.req.header(CSRF_HEADER);
+    // The existing logout client sends credentials + Origin without a CSRF header.
+    // A trusted Origin is sufficient for that browser request; missing Origin
+    // requires double-submit, and an explicitly mismatched token is always denied.
+    const csrfMismatch = suppliedCsrf !== undefined && (!expected || suppliedCsrf !== expected);
+    if (originDenied || csrfMismatch || (origin === undefined && (!expected || suppliedCsrf !== expected))) {
+      const session = await getAdminSessionByTokenHash(c.env.DB, await sha256Hex(cookie));
+      const active = session && session.expires_at > new Date().toISOString();
+      const emergencyCookie = !active && (cookie === c.env.API_KEY || cookie === c.env.LEGACY_API_KEY
+        || await getStaffByApiKey(c.env.DB, cookie));
+      // Already expired/unknown credentials remain an idempotent logout.
+      if (active || emergencyCookie) return c.json({ success: false, error: 'CSRF token mismatch' }, 403);
+    }
+  }
   // 誰がログアウトしたかは、この時点では staff から取れる場合と
   // 取れない場合がある。取れなければ null で残す。記録が無いより
   // 「誰かがログアウトした」の方が手がかりになる。
@@ -815,13 +833,10 @@ adminAuth.post('/api/auth/logout', inputJsonBoundary(), async (c) => {
     action: 'logout',
     ip: clientIp(c),
   });
-  const token = adminSessionTokenFromCookie(c);
-  if (token) await deleteAdminSession(c.env.DB, await sha256Hex(token));
-  const authorization = c.req.header('Authorization') || '';
-  const bearerPrefix = `Bearer ${ADMIN_SESSION_BEARER_PREFIX}`;
-  if (authorization.startsWith(bearerPrefix)) {
-    await deleteAdminSession(c.env.DB, await sha256Hex(authorization.slice(bearerPrefix.length)));
-  }
+  // Use the same selected credential as authentication; an incidental cookie
+  // must not revoke a second person's session on a Bearer request.
+  const tokenHash = await adminSessionTokenHashFromRequest(c);
+  if (tokenHash) await deleteAdminSession(c.env.DB, tokenHash);
   const { sameSite } = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   c.header('Set-Cookie', expiredCookie(ADMIN_AUTH_COOKIE, sameSite), { append: true });
   c.header('Set-Cookie', expiredCookie(CSRF_COOKIE, sameSite), { append: true });
