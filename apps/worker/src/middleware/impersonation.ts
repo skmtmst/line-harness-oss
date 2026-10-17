@@ -6,7 +6,8 @@ import {
   type ImpersonationSession,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { adminSessionTokenHashFromRequest, type AuthenticatedStaff } from './auth.js';
+import { adminSessionTokenHashFromRequest } from './auth/credentials/auth.js';
+import type { AuthenticatedStaff } from './auth/principal/auth.js';
 
 /**
  * 代理ログイン（★V6 37-5）。

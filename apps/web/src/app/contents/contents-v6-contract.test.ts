@@ -8,7 +8,6 @@ const DETAIL = readFileSync(new URL('../../v8/contents/media-detail-dialog.tsx',
 const REPLACEMENT = readFileSync(new URL('../../v8/contents/media-replacement-dialog.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(new URL('../../../../worker/src/routes/contents.ts', import.meta.url), 'utf8')
-const DB = readFileSync(new URL('../../../../../packages/db/src/media.ts', import.meta.url), 'utf8')
 const GUIDANCE = readFileSync(new URL('../../v8/contents/media-quota-guidance.tsx', import.meta.url), 'utf8')
 const FOLDERS = readUiSource(new URL('../../components/shared/managed-folder-panel.tsx', import.meta.url), 'utf8')
 
@@ -198,8 +197,7 @@ describe('V8 登録メディア一覧の契約', () => {
     expect(API).toContain('usageConsentNote')
     expect(WORKER).toContain('usage_expires_at')
     expect(WORKER).toContain('usage_consent_note')
-    expect(DB).toContain('usage_expires_at')
-    expect(DB).toContain('usage_consent_note')
+    // DBの保存・読戻しは packages/db/src/media-usage-terms.test.ts の実SQL試験で守る。
   })
 
   it('版ごとの実体を取り戻せ、第1版を元ファイルとして示す（IDEA-15）', () => {
@@ -225,8 +223,6 @@ describe('V8 登録メディア一覧の契約', () => {
     expect(WORKER).toContain("contents.post('/api/media/:id/archive', requireDeliveryAccess('contents')")
     expect(WORKER).toContain("contents.post('/api/media/:id/restore', requireDeliveryAccess('contents')")
     expect(WORKER).toContain("code: 'media_reason_required'")
-    // 状態遷移と監査は db 側の条件付き UPDATE で行う。
-    expect(DB).toContain('archived_at IS NULL')
-    expect(DB).toContain('operation_audit')
+    // DBの状態遷移・監査は packages/db/src/media-archive.test.ts の実SQL試験で守る。
   })
 })

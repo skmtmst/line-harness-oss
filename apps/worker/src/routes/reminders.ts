@@ -902,7 +902,7 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
       items = result.results as unknown as Awaited<ReturnType<typeof getReminders>>;
     } else {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-      const rows = await getReminders(c.env.DB);
+      const rows = await getReminders(c.env.DB, scope);
       items = rows.filter((row) => {
         const accountId = (row as { line_account_id?: string | null }).line_account_id ?? null;
         return accountId == null
@@ -918,13 +918,17 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
      * 1つも無いリマインダは行が返らないので、既定を0にする。
      */
     const counts = await c.env.DB
-      .prepare(`SELECT reminder_id, COUNT(*) AS c FROM reminder_steps GROUP BY reminder_id`)
+      .prepare(`SELECT reminder_id, COUNT(*) AS c FROM reminder_steps
+        WHERE reminder_id IN (SELECT value FROM json_each(?)) GROUP BY reminder_id`)
+      .bind(JSON.stringify(items.map((item) => item.id)))
       .all<{ reminder_id: string; c: number }>();
     const stepCounts = new Map(counts.results.map((row) => [row.reminder_id, Number(row.c)]));
 
     const failures = await c.env.DB
       .prepare(`SELECT DISTINCT reminder_id FROM reminder_delivery_runs
-        WHERE status IN ('retry_wait', 'permanent_failed')`)
+        WHERE status IN ('retry_wait', 'permanent_failed')
+          AND reminder_id IN (SELECT value FROM json_each(?))`)
+      .bind(JSON.stringify(items.map((item) => item.id)))
       .all<{ reminder_id: string }>();
     const failedReminderIds = new Set(failures.results.map((row) => row.reminder_id));
 

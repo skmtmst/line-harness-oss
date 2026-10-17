@@ -1,4 +1,5 @@
 import { type AccountStyle, type SetupAnswer } from '@line-crm/shared';
+import { storeFeatureInitialization } from '@line-crm/db/src/store-feature-initialization.js';
 
 export * from './style-setup-core.js';
 export * from './style-starter-definition.js';
@@ -193,6 +194,9 @@ export async function saveProfile(
     string,
     SetupAnswer
   >;
+  statements.push(
+    storeFeatureInitialization(db, account, tenant, actor, Date.parse(now)),
+  );
   const changedAnswers = Object.fromEntries(
     Object.entries(submittedAnswers).filter(
       ([key, value]) =>
