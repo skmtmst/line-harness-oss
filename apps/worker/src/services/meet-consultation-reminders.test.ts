@@ -67,7 +67,7 @@ describe('processDueMeetConsultationReminders', () => {
       expect(dispatch).toHaveBeenCalledTimes(1);
     } finally {raw.close();}
   });
-  it('sends through the Harness proxy once with a saved checkpoint and marks the reminder sent', async () => {
+  it.each([false,true])('Harness送信後の保存障害=%sでも2回目を送らない', async (failResultSave) => {
     const {db,raw}=createTestD1();
     try {
       raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','c','A','channel-token','fake');
@@ -83,10 +83,15 @@ describe('processDueMeetConsultationReminders', () => {
         return new Response('{}',{status:200});
       });
       const options={now:new Date('2026-08-09T00:00:00.000Z'),proxyBaseUrl:'https://proxy.example.com',proxyDispatch:dispatch};
-      expect(await processDueMeetConsultationReminders(db,options)).toEqual({sent:1,failed:0});
+      if(failResultSave)raw.exec(`CREATE TRIGGER stop_result BEFORE UPDATE ON meet_consultation_reminders
+        WHEN NEW.status='sent' BEGIN SELECT RAISE(ABORT,'fixture'); END`);
+      expect(await processDueMeetConsultationReminders(db,options)).toEqual(failResultSave?{sent:0,failed:1}:{sent:1,failed:0});
+      if(failResultSave)raw.exec('DROP TRIGGER stop_result');
       expect(await processDueMeetConsultationReminders(db,options)).toEqual({sent:0,failed:0});
       expect(dispatch).toHaveBeenCalledTimes(1);
-      expect(raw.prepare('SELECT status FROM meet_consultation_reminders').get()).toEqual({status:'sent'});
+      expect(raw.prepare('SELECT status FROM meet_consultation_reminders').get()).toEqual({status:failResultSave?'failed':'sent'});
+      expect(raw.prepare("SELECT status FROM workflow_steps WHERE process_kind='booking_line_delivery'").get())
+        .toEqual({status:failResultSave?'unknown':'succeeded'});
     }finally{raw.close();}
   });
 

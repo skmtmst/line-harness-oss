@@ -324,6 +324,18 @@ describe('processDueEventReminders', () => {
 });
 
 describe('W5 durable reminder delivery',()=>{
+ test('外部受理後の通知済み保存が失敗したら不明で停止し、再送しない',async()=>{
+  const state={rows:[dueRow()]},db=dueDB(state),item=opened.at(-1)!;
+  item.raw.exec(`CREATE TRIGGER stop_result BEFORE UPDATE ON event_booking_reminders
+    WHEN NEW.status='sent' BEGIN SELECT RAISE(ABORT,'fixture'); END`);
+  const now=new Date('2026-05-09T01:00:00Z'),sender=vi.fn(async()=>undefined);
+  expect(await processDueEventReminders(db,{now,sender})).toEqual({sent:0,failed:1});
+  expect(item.raw.prepare("SELECT status FROM workflow_steps WHERE process_kind='booking_line_delivery'").get())
+    .toEqual({status:'unknown'});
+  item.raw.exec('DROP TRIGGER stop_result');
+  await processDueEventReminders(db,{now:new Date(now.getTime()+600000),sender});
+  expect(sender).toHaveBeenCalledTimes(1);expect(state.rows[0].status).toBe('failed_permanent');
+ });
  test('遮断中は外部要求0・試行数0のまま、再開後は同じ予定を送る',async()=>{
   const state={rows:[dueRow()]},db=dueDB(state),item=opened.at(-1)!;
   const base=Date.parse('2026-05-09T01:00:00Z'),circuit=new BookingExternalCircuits(db);

@@ -969,7 +969,11 @@ export async function processDueMeetConsultationReminders(
             AND EXISTS(SELECT 1 FROM friends live_friend WHERE live_friend.id=c.friend_id AND live_friend.line_account_id=?
               AND live_friend.line_user_id=? AND live_friend.is_following=1 AND ${activeTenantLineAccountSql('live_friend.line_account_id')}))
           THEN 'true' ELSE 'meet_reminder_obsolete' END)`)
-          .bind(row.consultation_id,...candidateSnapshotBinds(row),row.line_account_id,row.line_user_id)] : [],
+          .bind(row.consultation_id,...candidateSnapshotBinds(row),row.line_account_id,row.line_user_id)]
+          : next.phase === 'succeeded' ? [db.prepare(`UPDATE meet_consultation_reminders
+              SET status='sent',sent_at=?,last_error=NULL,updated_at=?
+              WHERE id=? AND status IN ('pending','failed') ${snapshotGuardExists()}`)
+            .bind(nowIso,nowIso,row.id,...snapshotGuardBinds(row))] : [],
       });
       // 同時取消で止められた行を sent で上書きしない (状態だけ守る。送信数は数える)。
       // push の間に新版へ再利用された行も sent にしない (候補写しと同一文で結ぶ)。
@@ -985,7 +989,10 @@ export async function processDueMeetConsultationReminders(
       sent++;
       // push と確定の間に取消が確定したときは送り直さず、追跡用に記録する。
       if (Number(marked.meta?.changes ?? 0) !== 1) {
-        console.error(JSON.stringify({"code":"meet_reminder_sent_after_cancel"}));
+        // 共通checkpointと同じ取引ですでにsentなら通常の完了。
+        const saved = await db.prepare('SELECT status FROM meet_consultation_reminders WHERE id=?')
+          .bind(row.id).first<{status:string}>();
+        if (saved?.status !== 'sent') console.error(JSON.stringify({"code":"meet_reminder_sent_after_cancel"}));
       }
     } catch (error) {
       // 送信前に遮断された分を結果不明や上限到達にしない。次のcronで同じ段を拾う。

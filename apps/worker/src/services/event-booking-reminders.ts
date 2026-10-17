@@ -263,7 +263,11 @@ export async function processDueEventReminders(
           JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
           WHERE r.id=? AND r.status IN ('pending','failed') AND b.status='confirmed' AND b.line_account_id=?
             AND f.is_following=1 AND f.line_user_id=? AND ${activeTenantLineAccountSql('b.line_account_id')})
-          THEN 'true' ELSE 'event_reminder_obsolete' END)`).bind(row.id,row.line_account_id,input.toLineUserId)]:[],
+          THEN 'true' ELSE 'event_reminder_obsolete' END)`).bind(row.id,row.line_account_id,input.toLineUserId)]
+          : next.phase==='succeeded' ? [db.prepare(`UPDATE event_booking_reminders
+              SET status='sent',sent_at=?,retry_count=?,last_error=NULL
+              WHERE id=? AND status IN ('pending','failed')`)
+            .bind(params.now.toISOString(),next.attempts,row.id)] : [],
         send: (signal, saved, key) => params.sender({ ...saved, channelAccessToken: accessToken, retryKey: key, signal }),
       });
       await finishWorkflowStep(db,ref,owner,{now,result:{accepted:true},statements:[
