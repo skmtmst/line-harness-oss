@@ -22,6 +22,7 @@ describe('続けて予約（B4・お客さま）', () => {
     expect(api.seriesPreview).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('switch', { name: '毎週この時間で続ける' }));
     expect(await screen.findByText(/お休み/)).toBeTruthy();
+    expect(api.seriesPreview).toHaveBeenCalledWith({ menu_id: 'm1', staff_id: 's1', starts_at: week(0), freq: 'weekly', count: 4 });
     expect(screen.getByText('取れない回は飛ばして 3 回で予約します。1 回ずつ取り消せます。')).toBeTruthy();
     await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ count: 4, made: 3, choices: [
       { index: 0, action: 'keep' }, { index: 1, action: 'keep' }, { index: 2, action: 'skip' }, { index: 3, action: 'keep' },

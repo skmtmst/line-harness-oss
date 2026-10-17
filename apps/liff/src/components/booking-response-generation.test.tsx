@@ -5,7 +5,7 @@ import Confirm from './Confirm.js';
 import { ConfirmScreen } from '../../../worker/src/client/event-booking/main.js';
 import { api } from '../lib/api.js';
 
-vi.mock('../lib/api.js', () => ({ api: { createRequest: vi.fn() } }));
+vi.mock('../lib/api.js', () => ({ api: { cancellationPreview: vi.fn().mockResolvedValue({ enabled: false, version: 0, freeUntil: null, afterPercent: 50, noShowPercent: 100, price: 0, deposit: null }), entitlements: vi.fn().mockResolvedValue([]), createRequest: vi.fn() } }));
 const menu = {id:'m',name:'人工メニュー',category_label:null,description:null,duration_minutes:60,buffer_after_minutes:0,base_price:0,sort_order:0};
 const staff = {id:'s',display_name:'人工担当',role:null,profile_image_url:null,bio:null,is_designation_optional:0,price:0,duration_minutes:60};
 const slot = {date:'2099-01-01',start:'10:00'};
@@ -16,6 +16,7 @@ it('REV-H2: 支払い必須なのに記録がない応答では完了へ進ま�
   vi.mocked(api.createRequest).mockResolvedValue({ booking_id: 'b', status: 'requested', payment_required: true } as never);
   const onSubmitted = vi.fn();
   render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={true} onSubmitted={onSubmitted}/>);
+  await vi.waitFor(() => expect((screen.getByRole('button', { name: /予約を確定/ }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole('button', { name: /予約を確定/ }));
   await act(async () => {});
   expect(onSubmitted).not.toHaveBeenCalled();
@@ -26,6 +27,7 @@ it('REV-I2: 表示後に手動承認へ変わっても支払い不要の受付�
   vi.mocked(api.createRequest).mockResolvedValue({ booking_id: 'b', status: 'requested', payment_required: false });
   const onSubmitted = vi.fn();
   render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={true} onSubmitted={onSubmitted}/>);
+  await vi.waitFor(() => expect((screen.getByRole('button', { name: /予約を確定/ }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole('button', { name: /予約を確定/ }));
   await act(async () => {});
   expect(onSubmitted).toHaveBeenCalledWith({ bookingId: 'b', status: 'requested', payment: null, prepayNotice: null });
@@ -36,6 +38,7 @@ it('REV-I2: 表示後に店払いへ変わっても古いonlineの表示で成�
   vi.mocked(api.createRequest).mockResolvedValue({ booking_id: 'b', status: 'requested', payment_required: false });
   const onSubmitted = vi.fn();
   render(<Confirm menu={{...menu, payment_mode: 'online'}} staff={{...staff, price: 1000}} slot={slot} autoConfirm={false} onSubmitted={onSubmitted}/>);
+  await vi.waitFor(() => expect((screen.getByRole('button', { name: /予約をリクエスト/ }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole('button', { name: /予約をリクエスト/ }));
   await act(async () => {});
   expect(onSubmitted).toHaveBeenCalledWith({ bookingId: 'b', status: 'requested', payment: null, prepayNotice: null });
@@ -49,6 +52,7 @@ it('XL-01: 共通予約の送信中に戻ったあと古い成功では完了し
   vi.mocked(api.createRequest).mockReturnValue(promise);
   const onSubmitted=vi.fn();
   const view = render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={false} onSubmitted={onSubmitted}/>);
+  await vi.waitFor(() => expect((screen.getByRole('button', { name: /予約をリクエスト/ }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole('button',{name:/予約をリクエスト/}));
   view.unmount();
   await act(async () => {resolve({booking_id:'old',status:'confirmed'}); await promise;});
@@ -79,9 +83,11 @@ it('XL-01: 共通予約で前の失敗は新しい送信を解除せず、新し
   vi.mocked(api.createRequest).mockReturnValueOnce(old).mockReturnValueOnce(next);
   const onSubmitted=vi.fn();
   const first = render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={false} onSubmitted={onSubmitted}/>);
+  await vi.waitFor(() => expect((screen.getByRole('button', { name: /予約をリクエスト/ }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole('button',{name:/予約をリクエスト/}));
   first.unmount();
   render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={false} onSubmitted={onSubmitted}/>);
+  await vi.waitFor(() => expect((screen.getByRole('button', { name: /予約をリクエスト/ }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole('button',{name:/予約をリクエスト/}));
   await act(async()=>{rejectOld(new Error('古い失敗'));await old.catch(()=>{});});
   expect(screen.getByRole('button',{name:/送信中/}).hasAttribute('disabled')).toBe(true);
@@ -97,6 +103,7 @@ it('XL-01: 共通予約の送信中に登録した戻る処理を呼んだあと
   vi.mocked(api.createRequest).mockReturnValue(promise);
   const onSubmitted=vi.fn(),onBack=vi.fn();
   render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={false} onBack={onBack} onRegisterBack={f=>{if(f)goBack=f;}} onSubmitted={onSubmitted}/>);
+  await vi.waitFor(() => expect((screen.getByRole('button', { name: /予約をリクエスト/ }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole('button',{name:/予約をリクエスト/}));
   act(()=>goBack());
   expect(onBack).toHaveBeenCalledTimes(1);

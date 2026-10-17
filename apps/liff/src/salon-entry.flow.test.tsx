@@ -23,6 +23,8 @@ beforeEach(() => {
     if (url.pathname === '/api/liff/customer-look') return reply({ success: true, data: { settings: { liff_theme: 'night' } } });
     if (url.pathname === '/api/liff/config') return reply({ success: true, data: { accountName: '試験店' } });
     if (url.pathname.endsWith('/requests') && submit) return submit();
+    if (url.pathname.endsWith('/cost-estimate')) return reply({ success: true, data: { cancellation: { enabled: false, version: 0, price: 1000, cardRequired: true, tiers: [{ beforeHours: 24, percent: 0 }, { beforeHours: 0, percent: 50 }], noShowPercent: 100, freeUntil: null }, deposit: { amount: 0 } } });
+    if (url.pathname.endsWith('/entitlements')) return reply({ success: true, data: [] });
     if (url.pathname.endsWith('/settings')) return reply({ liff_calendar_mode: calendarMode, booking_window_days: 60 });
     if (url.pathname.endsWith('/menus')) return reply({ menus: [{ id: 'm', name: '試験メニュー', duration_minutes: 30, base_price: 1000 }] });
     if (url.pathname.endsWith('/staff')) return reply({ staff: [{ id: 's', display_name: '試験担当', price: 1000, duration_minutes: 30 }] });
@@ -93,7 +95,9 @@ test.each(['成功', '失敗'])('XL-01: 現役Worker入口でも選び直した�
   await datetime();
   fireEvent.click(await screen.findByRole('button', { name: /10:00/ }));
   fireEvent.click(await screen.findByRole('button', { name: '内容を確かめる' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'この内容で予約をリクエストする' }));
+  const send = await screen.findByRole('button', { name: 'この内容で予約をリクエストする' });
+  await vi.waitFor(() => expect((send as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(send);
   await vi.waitFor(() => expect(requests.some(r => r.url.pathname.endsWith('/requests'))).toBe(true));
   fireEvent.click(screen.getByRole('button', { name: '確かめを閉じて日時に戻る' }));
   await screen.findByRole('button', { name: /10:00/ });

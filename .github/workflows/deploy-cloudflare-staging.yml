@@ -113,7 +113,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec tsx scripts/security/deployment-safety.ts staging apps/worker/wrangler.staging.toml
+        run: pnpm exec tsx scripts/security/run-deployment-safety.ts staging apps/worker/wrangler.staging.toml
 
       - name: Verify staging boundary and deploy lock
         run: |
@@ -393,6 +393,7 @@ jobs:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
           NEXT_PUBLIC_HQ_TEMPLATE_DISTRIBUTION_ENABLED: '1'
           NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
+          NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED: 'true'
           # リリース前点検：ログイン前の規約・方針・表記・お問い合わせの公開先（秘密ではない）。
           # 本番の配備（deploy-cloudflare-admin.yml）には切り替えのときに同じ4つを足す。
           NEXT_PUBLIC_TERMS_URL: 'https://musubo.jp/terms/'

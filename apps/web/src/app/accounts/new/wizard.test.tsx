@@ -1,16 +1,23 @@
-import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import NewLineAccountPage from './page'
 
+/*
+ * v06（LINE新規追加_v06.pen・2026-10-15承認）の5段の通し。
+ * ②は3つ、③は2つの小さな段に分かれ、登録は③Step1の「登録する」で行う。
+ * 登録前のタグ・親アカウント・担当範囲・既存LIFF IDの入力は承認済みの設計で外したので、
+ * ここでは確かめない（wire の tagIds などは空のまま送る）。
+ */
+
 const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), followerImportState: vi.fn(), stepFollowerImport: vi.fn(), list: vi.fn(), followerInsight: vi.fn(),
 }))
+const friends = vi.hoisted(() => ({ list: vi.fn() }))
 // 登録完了直後の契約者専用LINEの登録案内（★V6 37-7）。既定は「運営側で未設定」なので何も出ない
 const accountTags = vi.hoisted(() => ({ list: vi.fn(async () => ({success:true,data:[{id:'tag-own',name:'店舗',color:null}]})) }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls, lineAccountTags: accountTags, hqNotices: notices, staff: { list: async () => ({ success: true, data: [] }) } } }))
+vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls, lineAccountTags: accountTags, hqNotices: notices, friends, staff: { list: async () => ({ success: true, data: [] }) } } }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/accounts/new', useRouter: () => ({ push: vi.fn() }) }))
 
@@ -41,46 +48,91 @@ beforeEach(() => {
   calls.list.mockResolvedValue({success:true,data:[]}); calls.followerInsight.mockResolvedValue({success:true,data:{total:null}});
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...checked.data, id: 'new-account' } })
+  friends.list.mockResolvedValue({ success: true, data: { total: 0 } })
   notices.lineRegistration.mockResolvedValue({ success: true, data: { available: false } })
 })
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
+/** ②の中だけ進むボタンの名前が違う（v06 Fqy29）。 */
+const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
+const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
 
-async function enterConnectionStep() {
+/**
+ * v06（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * 入力を変えると確認がやり直しになるので、先に全部入れる。
+ */
+function enterCheckStep() {
   render(<NewLineAccountPage />)
   next()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  nextStep()
+  ack('Webhookの利用をONにした')
+  ack('Webhookの再送をONにした')
+  ack('エラーの統計情報をONにした')
+  nextStep()
   fill('v8-login-channel-id', '2007123456')
   fill('v8-login-channel-secret', 'synthetic-login-secret')
-  next()
-  next()
-  expect(screen.getByRole('button', { name: '接続して設定する' })).toBeTruthy()
+  ack('友だち追加オプションで、この公式アカウントをリンクした')
+  ack('チャネルを「開発中」から「公開済み」にした')
+  nextStep()
+  expect(screen.getByRole('button', { name: '接続を確かめる' })).toBeTruthy()
 }
 
-async function checkConnection() {
-  fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-  await screen.findByRole('dialog', { name: '接続を確かめた結果' })
-  fireEvent.click(screen.getByRole('checkbox', { name: /応答メッセージ.*オフ/ }))
+/** 5行は1行ずつ順に出るので、すべて通るまで待つ（5行 × 420ms）。 */
+async function runCheck() {
+  fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '登録する' })).toBeTruthy(), { timeout: 5000 })
+}
+
+/** ③Step1で登録し、③Step2・④を通って⑤まで進む。 */
+async function saveAndFinish() {
+  fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+  await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
+  next()
+  fireEvent.click(screen.getByRole('radio', { name: /飲食店向け/ }))
+  next()
 }
 
 describe('LINEアカウント作成ウィザード', () => {
-  it('LINEの準備から基本情報へ進み、任意の表示名は未入力でも接続できる', () => {
+  it('①から②の3つの小さな段へ順に進む', () => {
     render(<NewLineAccountPage />)
     expect(screen.getByText('アカウントの用意方法')).toBeTruthy()
     next()
-    expect(screen.getByText('接続に必要な4項目')).toBeTruthy()
+    expect(screen.getByText('Messaging API のチャネル', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Step 1 / 3')).toBeTruthy()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
+    expect(screen.getByText('Webhook の設定', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Step 2 / 3')).toBeTruthy()
+    ack('Webhookの利用をONにした')
+    ack('Webhookの再送をONにした')
+    ack('エラーの統計情報をONにした')
+    nextStep()
+    expect(screen.getByText('LINE Login のチャネル', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Step 3 / 3')).toBeTruthy()
+  })
+
+  it('LINE側でやることの印が残っていると次の段へ進めない', () => {
+    render(<NewLineAccountPage />)
+    next()
+    fill('v8-channel-id', '123456789')
+    fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
+    ack('Webhookの利用をONにした')
+    ack('Webhookの再送をONにした')
+    ack('エラーの統計情報をONにした')
+    nextStep()
     fill('v8-login-channel-id', '2007123456')
     fill('v8-login-channel-secret', 'synthetic-login-secret')
-    next()
-    expect(document.getElementById('v8-display-name')).toBeTruthy()
-    expect((document.getElementById('v8-display-name') as HTMLInputElement).required).toBe(false)
-    expect(document.getElementById('v8-line-id')).toBeTruthy()
-    next()
-    expect(screen.getByRole('button', { name: '接続して設定する' })).toBeTruthy()
+    const step = () => screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
+    expect(step().disabled).toBe(true)
+    ack('友だち追加オプションで、この公式アカウントをリンクした')
+    expect(step().disabled).toBe(true)
+    ack('チャネルを「開発中」から「公開済み」にした')
+    expect(step().disabled).toBe(false)
   })
 
   it('用意方法を切り替えても公式アカウント作成リンクを別タブで開ける', () => {
@@ -92,10 +144,10 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(link.getAttribute('target')).toBe('_blank')
   })
 
-  it('手順2は4項目だけを必須にし、マニュアルを別タブで開く', () => {
+  it('②Step1は Messaging API の2項目だけを必須にし、マニュアルを別タブで開く', () => {
     render(<NewLineAccountPage />)
     next()
-    const ids = ['v8-channel-id', 'v8-channel-secret', 'v8-login-channel-id', 'v8-login-channel-secret']
+    const ids = ['v8-channel-id', 'v8-channel-secret']
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)
     expect(document.getElementById('channel-access-token')).toBeNull()
     expect(document.getElementById('liff-id')).toBeNull()
@@ -103,7 +155,7 @@ describe('LINEアカウント作成ウィザード', () => {
       .toEqual(['/manuals/line-connect/index.html#m1'])
   })
 
-  it('5段で止まった箇所を示し、失敗時は保存できない', async () => {
+  it('5行で止まった箇所を示し、失敗時は登録できない', async () => {
     calls.connectCheck.mockResolvedValue({
       success: true,
       data: {
@@ -113,18 +165,19 @@ describe('LINEアカウント作成ウィザード', () => {
           : index > 2 ? { ...item, state: 'skipped' } : item),
       },
     })
-    await enterConnectionStep()
-    fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-    expect(await screen.findAllByText(/Webhookの利用をオンにしてください/)).toHaveLength(1)
-    expect(screen.queryByRole('button', { name: '確認コードを入れて登録する' })).toBeNull()
+    enterCheckStep()
+    fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
+    expect(await screen.findByText('Webhook URL の登録で止まりました', {}, { timeout: 5000 })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'もう一度確かめる' })).toBeTruthy()
     expect(calls.connect).not.toHaveBeenCalled()
   })
 
-  it('未認証アカウントは保存直後から完了ボタンを使える', async () => {
-    await enterConnectionStep()
-    await checkConnection()
-    fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
-    await screen.findByText('登録が完了しました', { selector: 'h2' })
+  it('5つの確認が通ってから登録し、完了画面まで進む', async () => {
+    enterCheckStep()
+    await runCheck()
+    await saveAndFinish()
+    await screen.findByText('準備ができました')
     expect(calls.connect).toHaveBeenCalledWith(expect.objectContaining({
       name: undefined,
       channelId: '123456789',
@@ -144,10 +197,10 @@ describe('LINEアカウント作成ウィザード', () => {
       available: true, accountName: 'musubo 運営（契約者専用）', basicId: '@musubo', addFriendUrl: 'https://line.me/R/ti/p/@musubo',
       linked: false, code: '123456', codeExpiresAt: '2026-09-19T00:00:00.000Z',
     } })
-    await enterConnectionStep()
-    await checkConnection()
-    fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
-    await screen.findByText('登録が完了しました', { selector: 'h2' })
+    enterCheckStep()
+    await runCheck()
+    await saveAndFinish()
+    await screen.findByText('準備ができました')
     await screen.findByText('musubo 運営（契約者専用）の LINE を登録してください')
     expect(document.body.textContent).toContain('123456')
     fireEvent.click(screen.getByRole('button', { name: 'あとで確認する' }))
@@ -155,7 +208,7 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(notices.lineRegistration).toHaveBeenCalledTimes(1)
   })
 
-  it('認証済みはID取り込み中のボタンを止め、hydrating_profilesで有効にする', async () => {
+  it('引き継ぎ中は進み具合だけを出し、終わってから登録したアカウントを見るを出す', async () => {
     let finishStep!: (value: unknown) => void
     calls.connect.mockResolvedValue({
       success: true,
@@ -167,30 +220,17 @@ describe('LINEアカウント作成ウィザード', () => {
     })
     /* 画面を開いている間は step で続きを進める（読むだけでは自動処理を待つことになる）。 */
     calls.stepFollowerImport.mockImplementation(() => new Promise((resolve) => { finishStep = resolve }))
-    await enterConnectionStep()
-    await checkConnection()
-    fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
-    expect(await screen.findAllByText(/既存の友だちを取り込んでいます/)).toHaveLength(1)
-    expect((screen.getByRole('button', { name: '登録したアカウントを見る' }) as HTMLButtonElement).disabled).toBe(true)
+    enterCheckStep()
+    await runCheck()
+    await saveAndFinish()
+    await screen.findByText('いまの友だちを引き継いでいます', { selector: 'h2' })
+    expect(screen.getByRole('progressbar', { name: '友だちの引き継ぎ' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: '登録したアカウントを見る' })).toBeNull()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalled())
     finishStep({ success: true, data: {
-      state: { capability: 'available', phase: 'hydrating_profiles', received: 10, imported: 10 },
+      state: { capability: 'available', phase: 'completed', received: 10, imported: 10 },
       busy: false, profilesFetched: 10,
     } })
     await waitFor(() => expect(screen.getByRole('link', { name: '登録したアカウントを見る' })).toBeTruthy())
   })
 })
-
-it('V8の登録前タグを接続確認と登録へ渡す', async () => {
- document.documentElement.dataset.theme='v8';
- try {
-  render(<NewLineAccountPage />);
-  next();fill('v8-channel-id','123456789');fill('v8-channel-secret','synthetic-secret');fill('v8-login-channel-id','2007123456');fill('v8-login-channel-secret','synthetic-login-secret');next();
-  await pickEntities('タグ', ['店舗']);next();
-  fireEvent.click(screen.getByRole('button',{name:'接続して設定する'}));
-  await waitFor(()=>expect(calls.connectCheck).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag-own']})));
-  fireEvent.click(await screen.findByRole('checkbox',{name:/応答メッセージ.*オフ/}));
-  fireEvent.click(screen.getByRole('button',{name:'確認コードを入れて登録する'}));
-  await waitFor(()=>expect(calls.connect).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag-own']}),undefined));
- } finally {delete document.documentElement.dataset.theme;}
-});

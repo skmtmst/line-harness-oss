@@ -88,6 +88,25 @@ describe('security route inventory', () => {
       'POST /api/items', 'DELETE /api/items', 'POST /api/items/:id/approve', 'POST /api/items/:id/reject',
     ]);
   });
+  it('keeps recursive shared guard evidence for every method without leaking it to other paths', () => {
+    const source = `const router = new Hono();
+      function first() { second(); canAccessAllLineAccounts(); }
+      function second() { first(); verifyCallerLineIdentity(); }
+      router.use('/api/items/*', first);
+      router.on(['GET', 'POST'], '/api/items/:id', c => c.json({}));
+      router.get('/api/outside', c => c.json({}));
+      router.use('*', c => { getVisibleLineAccountScope(); });
+      router.get('/api/later', c => c.json({}));`;
+    const routes = inspectRouteSource('fixture.ts', source);
+    expect(routes.map(route => [route.method, route.path, route.evidence])).toEqual([
+      ['GET', '/api/items/:id', ['canAccessAllLineAccounts', 'verifyCallerLineIdentity']],
+      ['POST', '/api/items/:id', ['canAccessAllLineAccounts', 'verifyCallerLineIdentity']],
+      ['GET', '/api/outside', []],
+      ['GET', '/api/later', ['getVisibleLineAccountScope']],
+    ]);
+    expect(inspectRouteSource('fixture.ts', source.replace('canAccessAllLineAccounts()', 'unprotected()'))[0].evidence)
+      .toEqual(['verifyCallerLineIdentity']);
+  });
 });
 
 it('S07 inventories typed Hono registrar parameters and their guards',()=>{

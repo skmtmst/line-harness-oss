@@ -12,7 +12,7 @@ import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhoo
  * 実アプリ（app・全 middleware 込み）と実 SQLite を叩く。
  * event-bus は発行の有無だけ見るため代役にする（POST抑止の証明）。
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
@@ -51,10 +51,19 @@ describe('公開受信口の防衛', () => {
   let env: never;
 
   beforeEach(() => {
+    // 署名とヘッダーは同じ秒を使う。実行が遅くても途中で秒をまたがせない。
+    // 実タイマーは残し、SQLの受付・再送期間も同じ時計で評価する。
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-17T23:59:59.750Z'));
     fireEvent.mockReset().mockResolvedValue(undefined);
-    db = createTestD1();
+    db = createTestD1({ now: () => new Date() });
     seed(db);
     env = { DB: db.db } as never;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    db.raw.close();
   });
 
   async function receive(body: string, headers?: Record<string, string>) {

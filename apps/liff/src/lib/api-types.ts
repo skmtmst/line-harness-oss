@@ -326,12 +326,16 @@ export interface MakeupOption { slot_id: string; event_id: string; starts_at: st
 
 
 
-/** 予約の前のキャンセル料・デポジット（口の案）。金額は円。決まりがオフなら enabled=false。 */
+/** 予約前の費用見積もりから読み替えたキャンセル料・デポジット。金額は円。 */
 export interface BookingCancellationPreview {
   enabled: boolean;
   version: number;
   /** この時刻までは無料（ISO）。 */
   freeUntil: string | null;
+  /** カード登録が必要な相手だけ登録へ進む。 */
+  cardRequired?: boolean;
+  /** 実際の決まりの全段。複数段を省かず表示する。 */
+  tiers?: Array<{ beforeHours: number; percent: number }>;
   afterPercent: number;
   noShowPercent: number;
   price: number;

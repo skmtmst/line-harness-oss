@@ -179,14 +179,26 @@ export const api = {
       body,
       { 'Idempotency-Key': idempotencyKey },
     ).then(assertBookingPaymentResponse),
-  /**
-   * 予約の前のキャンセル料・デポジットの見積もり（B1・kwC8E・Q8HLq）。**口の案（口が要る）**：
-   * Worker の今の見積もり（/cancellation-quote）は予約ができてからしか読めないので、確認の段で読む口を案として呼ぶ。
-   * 口が無い（404 など）ときは null を返し、確認の段は今までどおり（決まりの段を出さない）。
-   */
-  cancellationPreview: (input: { menuId: string; staffId: string; startsAt: string }) =>
-    getData<BookingCancellationPreview>(`/api/liff/booking/cancellation-preview?menu_id=${encodeURIComponent(input.menuId)}&staff_id=${encodeURIComponent(input.staffId)}&starts_at=${encodeURIComponent(input.startsAt)}`)
-      .catch(() => null),
+  /** 予約前の見積もり。取得失敗や不完全な応答は予約確認へ伝え、同意なしで送らない。 */
+  cancellationPreview: async (input: { menuId: string; staffId: string; startsAt: string }): Promise<BookingCancellationPreview> => {
+    const path = `/api/liff/booking/cost-estimate?${new URLSearchParams({ menu_id: input.menuId, staff_id: input.staffId, starts_at: input.startsAt })}`;
+    const data = await getData<unknown>(path);
+    if (!isRecord(data) || !isRecord(data.cancellation) || !isRecord(data.deposit)) throw responseShapeError(data, path);
+    const c = data.cancellation, d = data.deposit;
+    if (typeof c.enabled !== 'boolean' || !Number.isInteger(c.version) || typeof c.price !== 'number'
+      || typeof c.cardRequired !== 'boolean' || typeof c.noShowPercent !== 'number'
+      || !(c.freeUntil === null || typeof c.freeUntil === 'string')
+      || !Array.isArray(c.tiers) || c.tiers.length < 2
+      || !c.tiers.every((t) => isRecord(t) && typeof t.beforeHours === 'number' && typeof t.percent === 'number')
+      || typeof d.amount !== 'number') throw responseShapeError(data, path);
+    return {
+      enabled: c.enabled, version: c.version as number, freeUntil: c.freeUntil,
+      tiers: c.tiers.map((t) => ({ beforeHours: t.beforeHours, percent: t.percent })),
+      afterPercent: c.tiers[c.tiers.length - 1].percent, noShowPercent: c.noShowPercent,
+      price: c.price, cardRequired: c.cardRequired,
+      deposit: d.amount > 0 ? { amount: d.amount } : null,
+    };
+  },
   /** カードの登録（gap1・試験モード）。登録済みなら status=ready、まだなら url の登録画面へ。 */
   cancellationSetup: (menuId: string, idempotencyKey: string) =>
     post<{ success: true; data: { setupIntentId: string; url: string; status: string; testMode: boolean } }>('/api/liff/booking/setup-intent', { menuId, policyAccepted: true }, { 'Idempotency-Key': idempotencyKey }).then((res) => res.data),
@@ -333,9 +345,14 @@ export const api = {
    */
   resolveFormRouting: (id: string, answers: Record<string, unknown>, blockId?: string) =>
     post<{ success: true; data: { matchedIndex: number; target: { menuId: string; staffId?: string; staffGroupId?: string; meetingMode?: 'online' | 'in_person' }; routingToken: string; expiresAt: string } }>(`/api/liff/forms/${encodeURIComponent(id)}/routing/resolve`, { answers, blockId }).then((r) => r.data),
-  /** 繰り返しの確かめ（B4・口はまだ無い。無い間は確認の窓で「空きを確かめられませんでした」）。 */
-  seriesPreview: (body: { menu_id: string; staff_id: string; starts_at: string; freq: 'weekly'; count: number }) =>
-    post<{ occurrences: Array<{ index: number; starts_at: string; available: boolean; reason?: string; alternatives: string[] }> }>('/api/liff/booking/series/preview', body),
+  /** 繰り返しの空きを本人の口で確かめる。画面向けに日時の名前をそろえる。 */
+  seriesPreview: async (body: { menu_id: string; staff_id: string; starts_at: string; freq: 'weekly'; count: number }) => {
+    const path = '/api/liff/booking/series/preview';
+    const result = unwrapSuccessData<{ occurrences: Array<{ index: number; startsAt: string; available: boolean; reason: string | null; alternatives: string[] }> }>(
+      await post<unknown>(path, { menuId: body.menu_id, staffId: body.staff_id, startsAt: body.starts_at, rule: { freq: body.freq, count: body.count } }), path,
+    );
+    return { occurrences: result.occurrences.map((o) => ({ index: o.index, starts_at: o.startsAt, available: o.available, ...(o.reason ? { reason: o.reason === 'slot_unavailable' ? '空きがありません' : '空きを確かめられません' } : {}), alternatives: o.alternatives })) };
+  },
   /** 追加メニュー（B5）。メニューを選んだあと読む。 */
   addons: (menuId: string) =>
     get<{ success: true; data: Array<{ id: string; name: string; duration_minutes: number; base_price: number }> }>(`/api/liff/booking/menus/${encodeURIComponent(menuId)}/addons`)

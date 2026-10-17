@@ -1,4 +1,3 @@
-import { pathToFileURL } from 'node:url';
 import { unstable_readConfig } from 'wrangler';
 
 export type SafetyConfig = { vars?: Record<string,unknown>; r2_buckets?: Array<{binding:string;bucket_name:string}> };
@@ -15,6 +14,10 @@ export function evaluateDeploymentSafety(config: SafetyConfig, snapshot: SafetyS
     for(const [name,value] of Object.entries(vars)) {
       if(secretName.test(name)) failures.push(`${source}:plaintext:${name}`);
       if(environment==='production' && ((/(?:TEST|MOCK|DEMO|SANDBOX|BYPASS)/.test(name) && !['','false','0','off','disabled'].includes(String(value).toLowerCase())) || (/(?:ENVIRONMENT|MODE)$/.test(name) && /^(?:test|mock|demo|sandbox)$/.test(String(value).toLowerCase())))) failures.push(`${source}:test-flag:${name}`);
+    }
+    for (const name of ['RESTAURANT_TEST_ENABLED', 'GOOGLE_BUSINESS_ENABLED']) {
+      const publicName = `NEXT_PUBLIC_${name}`;
+      if (publicName in vars && vars[publicName] !== vars[name]) failures.push(`${source}:feature-flag-mismatch:${name}`);
     }
     const origins=typeof vars.ADMIN_ORIGIN==='string'?vars.ADMIN_ORIGIN.split(',').map(s=>s.trim()):[];
     // Resolve the same public admin default as the runtime when ADMIN_ORIGIN is absent.
@@ -38,12 +41,15 @@ export async function inspectDeployment(configPath:string, environment:'producti
   const config=unstable_readConfig({config:configPath});
   const get=async(path:string):Promise<any>=>{
     const res=await fetchImpl(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/${path}`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(15000)});
-    if(!res.ok) throw new Error('deployment_safety_metadata_unavailable');
+    if(!res.ok) throw new Error(`deployment_safety_metadata_unavailable:${res.status}:${path.split('/')[0].replace(/[^a-z0-9_-]/gi,'')}`);
     const body=await res.json() as {success:boolean;result:unknown};
     if(body.success!==true || !body.result) throw new Error('deployment_safety_metadata_invalid');
     return body.result;
   };
-  if (process.env.SECURITY_ADMIN_TEST_ENABLED) config.vars.NEXT_PUBLIC_RESTAURANT_TEST_ENABLED = process.env.SECURITY_ADMIN_TEST_ENABLED;
+  // 管理画面の実際のbuild変数も評価する。別名の試験旗で上書きしない。
+  for (const name of ['NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED']) {
+    if (process.env[name] !== undefined) config.vars[name] = process.env[name];
+  }
   const name=process.env.SECURITY_WORKER_NAME || config.name;
   const settings=await get(`workers/scripts/${encodeURIComponent(name)}/settings`);
   if(!Array.isArray(settings.bindings)) throw new Error('deployment_safety_bindings_unknown');
@@ -58,13 +64,4 @@ export async function inspectDeployment(configPath:string, environment:'producti
     buckets.push({name:bucketName,managed:managed.enabled,custom:custom.domains.some((d:any)=>d.enabled)});
   }
   return evaluateDeploymentSafety(config as SafetyConfig,{bindings:settings.bindings,buckets},environment);
-}
-if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
-  const environment=process.argv[2], configPath=process.argv[3];
-  if(!['production','staging'].includes(environment)||!configPath) { console.error('deployment_safety_arguments_invalid');process.exitCode=1; }
-  else try {
-    const failures=await inspectDeployment(configPath,environment as 'production'|'staging',process.env.CLOUDFLARE_API_TOKEN??'',process.env.CLOUDFLARE_ACCOUNT_ID??'');
-    console.log(JSON.stringify({check:'deployment_safety',environment,failures}));
-    if(failures.length) process.exitCode=1;
-  } catch { console.error('deployment_safety_check_failed');process.exitCode=1; }
 }

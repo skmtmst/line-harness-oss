@@ -26,6 +26,7 @@ export default function CancellationPolicy({
   accepted: boolean;
   onAcceptedChange: (next: boolean) => void;
 }) {
+  const tiers = preview.tiers?.filter((tier) => tier.percent > 0) ?? [{ beforeHours: 0, percent: preview.afterPercent }];
   const fee = (percent: number) => `料金の ${percent}%（${yen((preview.price * percent) / 100)}）`;
   return (
     <section aria-labelledby="cancellation-policy-heading" className="space-y-3.5">
@@ -41,10 +42,12 @@ export default function CancellationPolicy({
               <dd className="font-bold">無料</dd>
             </div>
           ) : null}
-          <div className="flex gap-2">
-            <dt>それ以降</dt>
-            <dd className="font-bold">{fee(preview.afterPercent)}</dd>
-          </div>
+          {tiers.map((tier) => (
+            <div className="flex gap-2" key={tier.beforeHours}>
+              <dt>{tier.beforeHours === 0 ? 'それ以降' : `開始の${tier.beforeHours}時間前まで`}</dt>
+              <dd className="font-bold">{fee(tier.percent)}</dd>
+            </div>
+          ))}
           <div className="flex gap-2">
             <dt>連絡なしの欠席</dt>
             <dd className="font-bold">{fee(preview.noShowPercent)}</dd>

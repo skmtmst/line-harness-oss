@@ -62,8 +62,15 @@ bookingGap3.post('/api/booking/admin/groups/:id/cancel',c=>cancelGroup(c,c.req.p
 bookingGap3.get('/api/liff/booking/cost-estimate',async c=>{
  const a=await resolveAccountIdFromLiff(c),u=await verifyCallerLineUserId(c);if(!a||!u)throw new GapError('unauthorized',401);const friend=await resolveFriendId(c,u,a);if(!friend)throw new GapError('not_found',404);
  const id=c.req.query('menu_id'),start=c.req.query('starts_at')??'',people=Number(c.req.query('party_size')??1);if(!Number.isFinite(Date.parse(start))||!Number.isInteger(people)||people<1||people>6)throw new GapError('invalid_booking');
- const m=await c.env.DB.prepare('SELECT base_price FROM menus WHERE id=? AND line_account_id=? AND is_active=1 AND deleted_at IS NULL').bind(id,a).first<{base_price:number}>();if(!m)throw new GapError('not_found',404);
- return c.json({success:true,data:{cancellation:{...cancellationQuote(await cancellationPolicy(c.env.DB,a),start,m.base_price),cardRequired:await cancellationCardRequired(c.env.DB,a,friend)},deposit:await depositEstimate(c.env.DB,a,String(id),m.base_price,start,people,await getAccountTimeZone(c.env.DB,a))}});
+ const staffId=c.req.query('staff_id');
+ const m=await c.env.DB.prepare(`SELECT m.base_price,COALESCE(sm.override_price,m.base_price)+CASE WHEN s.is_designation_optional=0 THEN COALESCE(s.nomination_fee,0) ELSE 0 END price,
+   CASE WHEN s.id IS NOT NULL THEN sm.is_offered END is_offered FROM menus m LEFT JOIN staff_menus sm ON sm.menu_id=m.id AND sm.staff_id=?
+   LEFT JOIN staff s ON s.id=sm.staff_id AND s.line_account_id=m.line_account_id AND s.is_active=1 AND s.deleted_at IS NULL
+   WHERE m.id=? AND m.line_account_id=? AND m.is_active=1 AND m.deleted_at IS NULL`)
+   .bind(staffId??null,id,a).first<{base_price:number;price:number;is_offered:number|null}>();if(!m)throw new GapError('not_found',404);
+ if(staffId&&m.is_offered!==1)return c.json({success:false,error:'menu_not_offered'},422);
+ const price=staffId?m.price:m.base_price,policy=await cancellationPolicy(c.env.DB,a);
+ return c.json({success:true,data:{cancellation:{...policy,price,...cancellationQuote(policy,start,price),cardRequired:await cancellationCardRequired(c.env.DB,a,friend)},deposit:await depositEstimate(c.env.DB,a,String(id),price,start,people,await getAccountTimeZone(c.env.DB,a))}});
 });
 
 async function self(c:Context<Env>){const a=await resolveAccountIdFromLiff(c),u=await verifyCallerLineUserId(c,a??undefined);if(!a||!u)throw new GapError('unauthorized',401);const f=await resolveFriendId(c,u,a);if(!f)throw new GapError('not_found',404);return {a,f};}

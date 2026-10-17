@@ -19,6 +19,10 @@ jobs:
   deploy:
     if: github.repository != 'Shudesu/line-harness-oss' && vars.LINE_HARNESS_CLOUDFLARE_DEPLOY == 'true'
     runs-on: ubuntu-latest
+    env:
+      # Worker の本番設定と必ず一致させる。見張りとビルドで同じ値を使う。
+      NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED: 'true'
+      NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'false'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -35,8 +39,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SECURITY_ADMIN_TEST_ENABLED: 'true'
-        run: pnpm exec tsx scripts/security/deployment-safety.ts production apps/worker/wrangler.toml
+        run: pnpm exec tsx scripts/security/run-deployment-safety.ts production apps/worker/wrangler.toml
       - run: pnpm --filter @line-crm/shared --filter @line-harness/update-engine build
 
       - name: Capture build metadata
@@ -47,11 +50,6 @@ jobs:
         run: pnpm --filter web build
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          # 'true' で左メニューの「Googleビジネス」と /restaurant-test 配下が表示される。
-          # Googleの機密スコープ審査（デモ動画と実運用）のため有効にしている。
-          # Worker側の RESTAURANT_TEST_ENABLED と必ず同じ値にする。片方だけ true だと
-          # 画面はあるのにAPIが404、またはAPIはあるのに画面が無い状態になる。
-          NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
           APP_BUILD_TIME: ${{ steps.build-meta.outputs.build_time }}
 
       - name: Deploy to Cloudflare Pages

@@ -13,7 +13,7 @@ import type { MenuItem, StaffItem } from '../lib/api.js';
 
 vi.mock('../lib/api.js', () => ({
   api: {
-    createRequest: vi.fn().mockResolvedValue({ booking_id: 'bk1', status: 'pending' }),
+    cancellationPreview: vi.fn().mockResolvedValue({ enabled: false, version: 0, freeUntil: null, afterPercent: 50, noShowPercent: 100, price: 0, deposit: null }), entitlements: vi.fn().mockResolvedValue([]), createRequest: vi.fn().mockResolvedValue({ booking_id: 'bk1', status: 'pending' }),
     availability: vi.fn(),
     bookingSettings: vi.fn().mockResolvedValue({ liff_date_view: 'list', booking_window_days: 60 }),
   },
@@ -53,7 +53,9 @@ describe('監査 L10：開始の瞬間を運ぶ', () => {
     render(
       <Confirm menu={MENU} staff={STAFF} slot={BANGKOK} autoConfirm={false} onSubmitted={vi.fn()} />,
     );
-    fireEvent.click(await screen.findByRole('button', { name: /予約をリクエスト|予約する|確定/ }));
+    const submit = await screen.findByRole('button', { name: /予約をリクエスト|予約する|確定/ });
+    await vi.waitFor(() => expect((submit as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(submit);
     await vi.waitFor(() => expect(api.createRequest).toHaveBeenCalled());
     expect(vi.mocked(api.createRequest).mock.calls[0]![0].starts_at).toBe('2026-10-16T06:00:00.000Z');
   });

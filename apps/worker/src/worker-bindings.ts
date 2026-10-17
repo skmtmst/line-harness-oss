@@ -28,6 +28,7 @@ export type WorkerBindings = {
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
     RESTAURANT_TEST_ENABLED?: string;
+    GOOGLE_BUSINESS_ENABLED?: string;
     DEPLOY_ENV?: string;
     /** Positive integer overrides by fixed security rule key (JSON). Invalid values use safe defaults. */
     SECURITY_MONITOR_THRESHOLDS?: string;
