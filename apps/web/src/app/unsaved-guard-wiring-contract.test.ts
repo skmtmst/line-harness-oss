@@ -140,13 +140,13 @@ const GUARDED = [
  * dirty を子（pane・部分部品）から親へ報告し、番兵は親が持つ画面。
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
-const COVERED_BY_PARENT: Record<string, string> = {
+const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   // 統合後の入力の持ち主。各画面が dirty を型／番兵へ渡す。
   'v8/booking-gap/series-drawer.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/booking-menus/meeting-mode.tsx': 'v8/booking-menus/menu-form.tsx',
   'v8/booking-menus/staff-calendar.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/booking-menus/tabs/staff-tab.tsx': 'v8/booking-menus/settings.tsx',
-  'v8/booking-payments/assignment.tsx': 'v8/booking-menus/settings.tsx',
+  'v8/booking-payments/assignment.tsx': ['v8/booking-menus/settings.tsx', 'v8/restaurant/tables/assign.tsx'],
   'v8/booking-payments/cancellation.tsx': 'v8/booking-menus/settings.tsx',
   'v8/booking-payments/menu-deposit.tsx': 'v8/booking-menus/menu-form.tsx',
   'v8/booking-payments/menu-payment.tsx': 'v8/booking-menus/menu-form.tsx',
@@ -189,15 +189,10 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'v8/webinar-edit/notifications.tsx': 'v8/webinar-edit/edit.tsx',
   'v8/webinar-edit/video.tsx': 'v8/webinar-edit/edit.tsx',
   // 予約設定のタブ。書きかけは V8TabEditContext で殻の settings.tsx へ報告し、番兵は殻が持つ。
-  'v8/booking-menus/tabs/staff-tab.tsx': 'v8/booking-menus/settings.tsx',
-  'v8/booking-payments/payments-tab.tsx': 'v8/booking-menus/settings.tsx',
   // 割り当て方・メニューごとの支払いは「状態の持ち方」の部品。dirty を返すだけで、番兵は使う側の画面が持つ。
-  'v8/booking-payments/assignment.tsx': 'v8/restaurant/tables/assign.tsx',
-  'v8/booking-payments/menu-payment.tsx': 'v8/booking-menus/menu-form.tsx',
   // 配信の自動応答の編集は、一覧と同じ console.tsx の中で開く。書きかけの有無は親が持ち、番兵は親が持つ。
   'v8/hq-deliveries/auto-reply-editor.tsx': 'v8/hq-deliveries/console.tsx',
   // 作る・直す型（CreatePage）に dirty を渡す画面。離脱の番兵は型が持つ。
-  'v8/restaurant/menu/edit.tsx': 'components/templates/create-page.tsx',
 }
 
 /*
@@ -484,9 +479,11 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
   })
 
   it('親へ dirty を報告する画面の親は、共通フックで番兵を持っている', () => {
-    for (const [file, parent] of Object.entries(COVERED_BY_PARENT)) {
-      const parentSource = screenSources(parent)
-      expect(parentSource, `${file} の番兵を持つ親 ${parent}`).toContain('useUnsavedGuard(')
+    for (const [file, parents] of Object.entries(COVERED_BY_PARENT)) {
+      for (const parent of typeof parents === 'string' ? [parents] : parents) {
+        const parentSource = screenSources(parent)
+        expect(parentSource, `${file} の番兵を持つ親 ${parent}`).toContain('useUnsavedGuard(')
+      }
     }
   })
 
