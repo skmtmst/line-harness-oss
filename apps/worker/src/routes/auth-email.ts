@@ -337,6 +337,9 @@ authEmail.post('/api/auth/password/login', inputJsonBoundary(), async (c) => {
     return c.json({ success: false, error: '失敗が続いたため、15分ほど待ってからもう一度お試しください' }, 429);
   }
 
+  const turnstile = await verifyTurnstile(c.env, body.turnstileToken as string | undefined, clientIp(c));
+  if (!turnstile.ok) return inputError(c, { success: false, error: turnstileErrorMessage(turnstile.reason), code: 'TURNSTILE_REQUIRED' }, turnstile.reason === 'not_configured' ? 503 : 400, []);
+
   const staff = await getStaffWithPasswordByEmail(c.env.DB, email);
   const ok = staff ? await verifyPassword(password, staff.password_hash) : await verifyPassword(password, null);
   if (!staff || !ok || !staff.is_active) {

@@ -1045,6 +1045,14 @@ CREATE TABLE auth_email_tokens (
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE auth_known_devices (
+  staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  device_hash TEXT NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  PRIMARY KEY (staff_id, device_hash)
+);
+
 CREATE TABLE auth_step_up_attempts (
   staff_id          TEXT PRIMARY KEY,
   attempts          INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
@@ -9113,6 +9121,8 @@ CREATE INDEX idx_auth_email_tokens_email
 
 CREATE INDEX idx_auth_email_tokens_ip
   ON auth_email_tokens(purpose, ip_hash, created_at DESC);
+
+CREATE INDEX idx_auth_known_devices_last_seen ON auth_known_devices(last_seen_at);
 
 CREATE INDEX idx_auth_step_up_grants_staff_expiry
   ON auth_step_up_grants(staff_id, expires_at);

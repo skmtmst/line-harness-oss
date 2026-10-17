@@ -1,3 +1,4 @@
+import { parseCookieHeader } from '../middleware/auth-http.js';
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
 import { adminSessionCookie, csrfCookie, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, sha256Hex } from '../middleware/auth.js';
@@ -110,6 +111,10 @@ async function notifyUnfamiliarLogin(
     console.error(JSON.stringify({"code":"services_admin_session_failed"}));
   }
   try {
+    if (c.env.DEPLOY_ENV === 'staging' || c.env.DEPLOY_ENV === 'test') {
+      await recordAuditEvent(c.env.DB, { category: 'auth', action: 'auth.login_notice.simulated', actorPrincipalId: staffId, tenantId: staff?.tenant_id, targetKind: 'staff', targetId: staffId, result: 'success', retentionClass: 'security' });
+      return;
+    }
     if (!staff?.email) return;
     const deviceLabel = device.userAgent
       ? (/iPhone|iPad/.test(device.userAgent) ? 'iPhone / iPad'
@@ -144,20 +149,27 @@ export async function issueSession(c: Context<Env>, staffId: string, sameSite: '
   const userAgent = c.req.header('user-agent')?.slice(0, 300) ?? null;
   const ipPrefix = maskIpPrefix(clientIp(c));
   const deviceHash = await deviceHashFromUserAgent(userAgent);
+  const previousMarker = parseCookieHeader(c.req.header('Cookie')).lh_login_device;
+  const marker = previousMarker && /^[A-Za-z0-9_-]{20,128}$/.test(previousMarker) ? previousMarker : randomToken(24);
+  const knownDeviceHash = await sha256Hex(`login-device:${marker}`);
   /*
    * いつもと違う判定。過去のセッションに同じ端末・同じ場所の形跡が無いときだけ
-   * 立てる。検知クエリが失敗しても発行は止めない（未確認フラグは無いまま
-   * 通すが、監査側のログイン記録は別途残る）。
+   * 立てる。検知クエリが失敗した場合は未確認に倒し、本人確認の再利用をさせない。
    */
   let unfamiliarAt: string | null = null;
   try {
     const familiarity = await adminSessionFamiliarity(c.env.DB, staffId, { deviceHash, ipPrefix });
+    const known = await c.env.DB.prepare('SELECT device_hash FROM auth_known_devices WHERE staff_id = ?').bind(staffId).all<{ device_hash: string }>();
+    if (known.results.length && !known.results.some(row => row.device_hash === knownDeviceHash)) unfamiliarAt = new Date().toISOString();
     if (familiarity.hasBaseline && (!familiarity.deviceKnown || !familiarity.ipKnown)) {
       unfamiliarAt = new Date().toISOString();
     }
   } catch (error) {
+    unfamiliarAt = new Date().toISOString();
     console.error(JSON.stringify({"code":"services_admin_session_failed"}));
   }
+  await c.env.DB.prepare(`INSERT INTO auth_known_devices(staff_id, device_hash, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(staff_id, device_hash) DO UPDATE SET last_seen_at=excluded.last_seen_at`).bind(staffId, knownDeviceHash, new Date().toISOString(), new Date().toISOString()).run();
   await createAdminSession(c.env.DB, await sha256Hex(sessionToken), staffId, expiresAt, {
     userAgent,
     ipPrefix,
@@ -169,6 +181,7 @@ export async function issueSession(c: Context<Env>, staffId: string, sameSite: '
     await notifyUnfamiliarLogin(c, staffId, { ipPrefix, userAgent });
   }
   const csrfToken = randomToken();
+  c.header('Set-Cookie', `lh_login_device=${marker}; Path=/api/auth; HttpOnly; Secure; SameSite=${sameSite}; Max-Age=31536000`, { append: true });
   c.header('Set-Cookie', adminSessionCookie(sessionToken, sameSite, maxAge), { append: true });
   c.header('Set-Cookie', csrfCookie(csrfToken, sameSite, maxAge), { append: true });
   return { csrfToken, sessionToken };
