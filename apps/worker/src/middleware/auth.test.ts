@@ -1,5 +1,5 @@
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import {
@@ -121,6 +121,18 @@ function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
   };
 }
 
+const sessionDatabases: ReturnType<typeof createTestD1>[] = [];
+afterEach(() => { for (const db of sessionDatabases.splice(0)) db.raw.close(); });
+
+// Session issuance also records the known device, so successful login fixtures
+// need the real schema and a staff row for its foreign key.
+function sessionEnv(bindings: Env['Bindings']): Env['Bindings'] {
+  const db = createTestD1();
+  sessionDatabases.push(db);
+  db.raw.prepare("INSERT INTO staff_members(id,name,role,api_key) VALUES ('staff-1','Fixture','admin','fixture-key')").run();
+  return { ...bindings, DB: db.db };
+}
+
 // Cross-site production topology with explicit opt-in (the supported case).
 function crossSiteEnv(): Env['Bindings'] {
   return env({ ADMIN_ORIGIN: PAGES, ADMIN_ALLOW_CROSS_SITE: 'true' });
@@ -230,7 +242,7 @@ describe('admin login cookie attributes', () => {
       method: 'POST',
       body: JSON.stringify({ apiKey: 'staff-key' }),
       headers: { 'Content-Type': 'application/json' },
-    }, crossSiteEnv());
+    }, sessionEnv(crossSiteEnv()));
 
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: { id: string }; csrfToken: string };
@@ -259,7 +271,7 @@ describe('admin login cookie attributes', () => {
       method: 'POST',
       body: JSON.stringify({ apiKey: 'staff-key' }),
       headers: { 'Content-Type': 'application/json' },
-    }, env({ ADMIN_ORIGIN: 'https://admin.example.com', WORKER_URL: 'https://api.example.com' }));
+    }, sessionEnv(env({ ADMIN_ORIGIN: 'https://admin.example.com', WORKER_URL: 'https://api.example.com' })));
 
     expect(res.status).toBe(200);
     expect(cookieFor(res, 'lh_admin_session') ?? '').toContain('SameSite=Lax');
@@ -309,7 +321,7 @@ describe('LINE admin login', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ sub: 'authorized-line-user' }), { status: 200 }));
     const res = await app().request('/api/auth/line/callback?code=abc&state=expected', {
       headers: { Cookie: 'lh_line_state=expected; lh_line_nonce=nonce; lh_line_verifier=verifier' },
-    }, crossSiteEnv());
+    }, sessionEnv(crossSiteEnv()));
     expect(res.status).toBe(302);
     const redirect = new URL(res.headers.get('Location')!);
     expect(redirect.origin).toBe(PAGES);
