@@ -1,5 +1,5 @@
 import type { MileageFriendHistorySummary } from '@line-crm/shared';
-import { type SegmentCondition } from './segment-conditions.js';
+import type { SegmentCondition } from './segment-conditions.js';
 
 
 export type MileageEntryType =

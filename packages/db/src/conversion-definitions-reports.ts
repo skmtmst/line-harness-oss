@@ -310,3 +310,5 @@ export async function conversionFolder(db: D1Database, accountId: string | null,
     throw error;
   }
 }
+
+export type { ConversionReport } from './conversion-definitions-types.js';
