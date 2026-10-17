@@ -196,7 +196,7 @@ describe('N-374: Retry-After を再送スケジュールでも尊重する', () 
       attemptsDone: 1, maxAttempts: 8, queuedAt, now: NOW,
       responseStatus: 429, retryAfterMs: 6 * 60 * 60_000, jitterKey: 'd:1',
     });
-    expect(clamped!.getTime() - NOW.getTime()).toBe(30 * 60_000);
+    expect(clamped).toBeNull();
   });
 
   it('自動再送は 425・429・5xx・接続失敗だけ。408/409/その他4xxは恒久失敗', () => {
