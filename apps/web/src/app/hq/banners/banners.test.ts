@@ -95,7 +95,6 @@ describe('統括 バナー生成', () => {
 
   it('モーダルは全面1枚のオーバーレイで、幅は max-width（1920/1160 の固定幅を書かない）', () => {
     expect(frame).toContain('<Dialog')
-    expect(frame).toContain("kind === 'detail' || kind === 'reference' ? 960")
     expect(dialogCss).toMatch(/position:\s*fixed/)
     expect(dialogCss).toMatch(/width:\s*min\(/)
     expect(modal).not.toMatch(/width:\s*1160|width:\s*1920/)
@@ -175,7 +174,7 @@ describe('統括 バナー生成', () => {
     const picker = read('../../../components/hq/banners/reference-picker-dialog.tsx')
     // 板IDは承認時に ★V8 `UcBQ5` から ★BG-C `cOgWE` へ改名した（同じダイアログ）
     expect(picker).toContain('designNode="cOgWE"')
-    expect(picker).toContain('aria-multiselectable="true"')
+    // 複数選択・選択順・使い方の受渡しはreference-picker-v8.test.tsxが実DOMで検証する。
     expect(picker).toContain('data-design-node="JOi8G"')
     expect(picker).toContain('選んだ画像の使い方')
     expect(picker).toContain('枚を使う')

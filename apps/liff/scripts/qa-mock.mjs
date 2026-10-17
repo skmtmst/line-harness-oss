@@ -26,6 +26,10 @@ const state = { delayMs: 0, fail: null, features: [] };
 let qaAvailableMiles = 1250;
 let qaBankProfile = null;
 const qaRedemptions = new Map();
+const qaPrefs = [
+  { purpose: 'booking_reminders', label: '予約のお知らせ', state: 'granted', enabled: true, recorded: true, version: 1, updatedAt: null },
+  { purpose: 'marketing', label: 'キャンペーン・宣伝', state: 'granted', enabled: true, recorded: true, version: 1, updatedAt: null },
+];
 const qaBankSaves = new Map();
 
 // 見本の言葉・日付は ★V8 の絵 (gVjiC・EscPA・y1bs9A など) に合わせる。
@@ -550,6 +554,8 @@ const server = createServer(async (req, res) => {
           duration_minutes: 60,
           buffer_after_minutes: 10,
           base_price: 4200,
+          // 予約の履歴の「お店で払う」の札（nWby5）。
+          payment_mode: 'onsite',
           sort_order: 3,
         },
         {
@@ -684,15 +690,6 @@ const server = createServer(async (req, res) => {
     json(res, 200, { lock_version: 2, status: pathname.endsWith('/cancel') ? 'cancelled' : 'confirmed' });
     return;
   }
-  // お支払いの状態（B-338・nWby5）：1 件目は支払い済み、2 件目は未払い（払う期限つき）。
-  if (method === 'GET' && pathname === '/api/liff/booking/payments/by-booking') {
-    const id = url.searchParams.get('bookingId');
-    const payment = id === 'qa-history-1' ? { id: 'qa-pay-1', status: 'paid', amount: 8800, currency: 'jpy', hold_until: null }
-      : id === 'qa-history-2' ? { id: 'qa-pay-2', status: 'unpaid', amount: 4400, currency: 'jpy', hold_until: '2026-10-19T09:00:00.000Z' }
-        : null;
-    json(res, 200, { payment });
-    return;
-  }
   if (method === 'POST' && pathname === '/api/liff/booking/payments/start') {
     json(res, 200, { payment: null, checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_qa' });
     return;
@@ -702,13 +699,13 @@ const server = createServer(async (req, res) => {
       upcoming: [
         {
           id: 'qa-history-1',
-          starts_at: '2026-10-02T13:00:00+09:00',
-          status: 'requested',
+          starts_at: '2026-10-18T14:00:00+09:00',
+          status: 'confirmed',
           customer_note: null,
-          menu_name: 'トリミング（小型犬）',
-          staff_name: 'QA スタッフ',
+          menu_name: 'カット＋カラー',
+          staff_name: '佐々木',
           profile_image_url: null,
-          // F-6 本人の変更・取消に要る値（履歴の口が返すようになったときの形）。
+          // F-6 本人の変更・取消に要る値。
           lock_version: 1,
           menu_id: 'qa-menu-1',
           staff_id: 'qa-staff-1',
@@ -725,9 +722,89 @@ const server = createServer(async (req, res) => {
           menu_id: 'qa-menu-3',
           staff_id: 'qa-staff-1',
         },
+        {
+          id: 'qa-history-3',
+          starts_at: '2026-10-24T11:00:00+09:00',
+          status: 'requested',
+          customer_note: null,
+          menu_name: 'トリミング（中型犬）',
+          staff_name: 'QA スタッフ',
+          profile_image_url: null,
+          lock_version: 1,
+          menu_id: 'qa-menu-2',
+          staff_id: 'qa-staff-1',
+        },
       ],
-      past: [],
+      past: [
+        {
+          id: 'qa-history-past-1',
+          starts_at: '2026-10-02T11:00:00+09:00',
+          status: 'cancelled',
+          customer_note: null,
+          menu_name: 'カット',
+          staff_name: '佐々木',
+          profile_image_url: null,
+          lock_version: 2,
+          menu_id: 'qa-menu-1',
+          staff_id: 'qa-staff-1',
+        },
+        {
+          id: 'qa-history-past-2',
+          starts_at: '2026-09-12T15:00:00+09:00',
+          status: 'expired',
+          customer_note: null,
+          menu_name: 'トリミング（中型犬）',
+          staff_name: 'QA スタッフ',
+          profile_image_url: null,
+          lock_version: 1,
+          menu_id: 'qa-menu-2',
+          staff_id: 'qa-staff-1',
+        },
+      ],
     });
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/liff/booking/payments/by-booking') {
+    const id = url.searchParams.get('bookingId');
+    const receipt = 'https://pay.stripe.com/receipts/qa-test-receipt';
+    const payments = {
+      'qa-history-1': { id: 'qa-pay-1', status: 'paid', amount: 8800, currency: 'jpy', hold_until: null, receipt_url: receipt },
+      'qa-history-3': { id: 'qa-pay-3', status: 'unpaid', amount: 12600, currency: 'jpy', hold_until: '2026-10-16T10:00:00+09:00' },
+      'qa-history-past-1': { id: 'qa-pay-p1', status: 'refunded', amount: 4400, currency: 'jpy', hold_until: null, receipt_url: receipt },
+      'qa-history-past-2': { id: 'qa-pay-p2', status: 'expired', amount: 12600, currency: 'jpy', hold_until: null },
+    };
+    json(res, 200, { payment: payments[id] ?? null });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/liff/booking/payments/start') {
+    // 試験用の決済の見本。本番の鍵・本物の支払いページは使わない。
+    json(res, 200, { payment: { id: 'qa-pay-3', status: 'pending', amount: 12600 }, checkoutUrl: 'https://checkout.stripe.com/c/pay/qa-test-session' });
+    return;
+  }
+  // 自分のキャンセル待ち（マイページの「キャンセル待ち 1 件」）。id 指定の読み（空きの知らせ）はここでは返さない。
+  if (method === 'GET' && pathname === '/api/liff/booking/waitlist' && !url.searchParams.get('id')) {
+    json(res, 200, { waitlist: [{ id: 'qa-wl-1', staff_id: 'qa-staff-1', menu_id: 'qa-menu-1', starts_at: '2026-10-25T13:00:00+09:00', status: 'waiting', hold_minutes: 30, hold_expires_at: null, created_at: '2026-10-14T09:00:00+09:00' }] });
+    return;
+  }
+  // 組3：本人の回数券・月謝（API-CONTRACT-3 の LIFF の返り値の形）。
+  if (method === 'GET' && pathname === '/api/liff/booking/entitlements') {
+    json(res, 200, { success: true, data: [
+      { id: 'qa-ent-1', name: '10回券', kind: 'ticket', menuId: null, remaining: 9, monthlyLimit: null, monthAllowance: null, monthUsed: null, monthRemaining: null,
+        validFrom: '2026-04-01T00:00:00Z', expiresAt: '2027-03-31T15:00:00Z', periodStart: null, periodEnd: null, usable: true },
+      { id: 'qa-ent-2', name: '月謝（月4回）', kind: 'monthly', menuId: null, remaining: null, monthlyLimit: 4, monthAllowance: 4, monthUsed: 2, monthRemaining: 2,
+        validFrom: '2026-04-01T00:00:00Z', expiresAt: null, periodStart: '2026-09-30T15:00:00Z', periodEnd: '2026-10-31T15:00:00Z', usable: true },
+    ] });
+    return;
+  }
+  // 組1 の 16：お知らせの受け取り（637 を共用）。見本では目的ごとに止められる形で返す。
+  if (pathname === '/api/liff/notification-preferences' || pathname.startsWith('/api/liff/notification-preferences/')) {
+    if (method === 'PUT') {
+      const purpose = pathname.split('/').pop();
+      const body = await readBody(req);
+      const item = qaPrefs.find((p) => p.purpose === purpose);
+      if (item) { item.enabled = Boolean(body?.enabled); item.state = item.enabled ? 'granted' : 'revoked'; item.version += 1; item.recorded = true; }
+    }
+    json(res, 200, { success: true, data: { items: qaPrefs, purposeSpecificEnforcement: true, deliveryEnforcement: 'purpose_specific' } });
     return;
   }
 

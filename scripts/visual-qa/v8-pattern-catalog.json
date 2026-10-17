@@ -43,9 +43,30 @@
       "rules": ["B-260", "B-262"],
       "owner": {
         "code": {
-          "files": ["apps/web/src/components/shared/reservation-board.tsx", "apps/web/src/components/shared/reservation-people-grid.tsx", "apps/web/src/components/shared/reservation-people-grid.module.css", "apps/web/src/components/templates/booking-page.tsx", "apps/web/src/components/templates/booking-day-layout.module.css"],
-          "components": ["ReservationBoard", "ReservationPeopleGrid", "BookingPage", "BookingSidebarSection"],
-          "vars": ["--tpl-people-time-width", "--tpl-people-hour-height", "--tpl-people-block-height", "--tpl-people-block-gap"]
+          "files": [
+            "apps/web/src/components/shared/reservation-board.tsx",
+            "apps/web/src/components/shared/reservation-people-grid.tsx",
+            "apps/web/src/components/shared/reservation-people-grid.module.css",
+            "apps/web/src/components/templates/booking-page.tsx",
+            "apps/web/src/components/templates/booking-day-layout.module.css",
+            "apps/web/src/components/shared/calendar-parts.tsx",
+            "apps/web/src/components/shared/calendar-parts.module.css"
+          ],
+          "components": [
+            "ReservationBoard",
+            "ReservationPeopleGrid",
+            "BookingPage",
+            "BookingSidebarSection",
+            "CalendarSlotButton",
+            "CalendarLegendItem",
+            "CalendarPerson"
+          ],
+          "vars": [
+            "--tpl-people-time-width",
+            "--tpl-people-hour-height",
+            "--tpl-people-block-height",
+            "--tpl-people-block-gap"
+          ]
         },
         "pen": [],
         "status": "使用板はGcyTr/O2Z8u。Penの再利用する盤の部品は未指定"
@@ -256,7 +277,8 @@
             "PageExplanationToggle",
             "PageExplanationBody",
             "PageContent",
-            "CreateColumns"
+            "CreateColumns",
+            "HelpTip"
           ],
           "vars": [
             "--text-title"
@@ -271,7 +293,15 @@
             "id": "KjC1z",
             "name": "？"
           }
-        ]
+        ],
+        "liff": {
+          "files": [
+            "apps/liff/src/components/ui/PageHeading.tsx"
+          ],
+          "components": [
+            "PageHeading"
+          ]
+        }
       },
       "code": {
         "selectorHint": "pageHead|heading|header\\b|title\\b|lead|subtitle|description",
@@ -500,12 +530,14 @@
             "apps/web/src/components/shared/folder-editor-dialog.tsx",
             "apps/web/src/components/shared/folder-dot.tsx",
             "apps/web/src/components/shared/list-folder-context.tsx",
-            "apps/web/src/components/templates/list-page.tsx"
+            "apps/web/src/components/templates/list-page.tsx",
+            "apps/web/src/components/shared/category-panel.tsx"
           ],
           "components": [
             "ManagedFolderPanel",
             "FolderPanel",
-            "FolderDot"
+            "FolderDot",
+            "CategoryPanel"
           ],
           "vars": [
             "--color-hairline"
@@ -587,7 +619,10 @@
             "apps/web/src/components/shared/data-table.module.css",
             "apps/web/src/components/shared/table-presentation.module.css",
             "apps/web/src/components/shared/heatmap-table.tsx",
-            "apps/web/src/components/shared/heatmap-table.module.css"
+            "apps/web/src/components/shared/heatmap-table.module.css",
+            "apps/web/src/components/shared/month-calendar.tsx",
+            "apps/web/src/components/shared/month-calendar.module.css",
+            "apps/web/src/components/shared/table-cell-presentations.module.css"
           ],
           "components": [
             "DataTable",
@@ -601,7 +636,8 @@
             "GridRow",
             "GridCell",
             "PersonCell",
-            "HeatmapTable"
+            "HeatmapTable",
+            "MonthCalendarGrid"
           ],
           "vars": [
             "--color-table-head",
@@ -1162,11 +1198,14 @@
             "apps/web/src/components/shared/select.module.css",
             "apps/web/src/components/shared/select-menu.tsx",
             "apps/web/src/components/shared/select-menu.module.css",
-            "apps/web/src/components/shared/menu-portal.tsx"
+            "apps/web/src/components/shared/menu-portal.tsx",
+            "apps/web/src/components/shared/image-multi-select.tsx",
+            "apps/web/src/components/shared/image-multi-select.module.css"
           ],
           "components": [
             "Select",
-            "SelectMenu"
+            "SelectMenu",
+            "ImageMultiSelect"
           ],
           "vars": [
             "--color-control-border",
@@ -1442,11 +1481,13 @@
             "apps/web/src/components/shared/media-slot.tsx",
             "apps/web/src/components/shared/media-slot.module.css",
             "apps/web/src/components/shared/media-picker-dialog.tsx",
-            "apps/web/src/components/shared/media-library-upload.ts"
+            "apps/web/src/components/shared/media-library-upload.ts",
+            "apps/web/src/components/shared/image-multi-upload.tsx"
           ],
           "components": [
             "MediaSlot",
-            "MediaPickerDialog"
+            "MediaPickerDialog",
+            "ImageMultiUpload"
           ],
           "vars": []
         },
@@ -1633,7 +1674,15 @@
             "id": "fDAyI",
             "name": "入力欄/エラー"
           }
-        ]
+        ],
+        "liff": {
+          "files": [
+            "apps/liff/src/components/ui/FieldError.tsx"
+          ],
+          "components": [
+            "FieldError"
+          ]
+        }
       },
       "code": {
         "selectorHint": "error|invalid|alert",
@@ -2811,7 +2860,15 @@
             "id": "r3xz1W",
             "name": "選ぶカード/オフ"
           }
-        ]
+        ],
+        "liff": {
+          "files": [
+            "apps/liff/src/components/ui/Button.tsx"
+          ],
+          "components": [
+            "Button"
+          ]
+        }
       },
       "code": {
         "selectorHint": "toggle|switch|segment|checkbox|radio",

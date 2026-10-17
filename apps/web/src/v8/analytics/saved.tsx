@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { RowMenu } from '@/components/shared/row-actions'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
@@ -82,11 +83,18 @@ function latestPill(item: SavedAnalyticsSummary) {
   return <StatePill tone={latest.state === 'partial' ? 'warn' : 'neutral'}>{SAVED_STATE_LABELS[latest.state]}</StatePill>
 }
 
-/** 定期レポートの行の「…」：内容を変える（作る画面を開く）。 */
-function ScheduleMenu({ schedule }: { schedule: AnalyticsReportSchedule }) {
+/**
+ * 定期レポートの行の「…」（行の右端は「…」1つ・B-253）：内容を変える・止める／また送る・しまう。
+ * 止める・また送る・しまうの動きは一覧の側が持ち、ここは項目に並べるだけ。
+ */
+function ScheduleMenu({ schedule, busy, onPause, onResume, onArchive }: { schedule: AnalyticsReportSchedule; busy: boolean; onPause: () => void; onResume: () => void; onArchive: () => void }) {
   const router = useRouter()
+  const items: ActionMenuItem[] = [{ id: 'edit', label: '内容を変える', onSelect: () => router.push(`/analytics/reports/new?id=${schedule.id}`) }]
+  if (schedule.status === 'active') items.push({ id: 'pause', label: '止める', disabled: busy, onSelect: onPause })
+  if (schedule.status === 'paused') items.push({ id: 'resume', label: 'また送る', disabled: busy, onSelect: onResume })
+  items.push({ id: 'archive', label: 'しまう', tone: 'danger', disabled: busy, onSelect: onArchive })
   return <span className={styles.rowMenu}>
-    <RowMenu appearance="box" label={`定期レポート「${schedule.name}」の操作`} items={[{ id: 'edit', label: '内容を変える', onSelect: () => router.push(`/analytics/reports/new?id=${schedule.id}`) }]} />
+    <RowMenu appearance="box" label={`定期レポート「${schedule.name}」の操作`} items={items} />
   </span>
 }
 
@@ -309,19 +317,14 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <Th truncate>間隔</Th>
             <Th truncate>次に届く予定</Th>
             <Th truncate>状態</Th>
-            <Th truncate>操作</Th>
+            <Th truncate><span className="sr-only">操作</span></Th>
           </TableHeadRow></thead><tbody>
           {schedules.map((schedule) => <Tr key={schedule.id} data-table-layout="columns">
             <Td grow><TruncatedText value={String(schedule.name ?? '')} /></Td>
             <Td><TruncatedText value={schedule.isOneTime ? '1回だけ' : cadenceLabel(schedule)} /></Td>
             <Td><TruncatedText value={schedule.status === 'paused' ? emptyValue('unknown') : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')} /></Td>
             <Td><span><StatePill tone={schedule.status === 'active' ? 'ok' : 'neutral'}>{REPORT_STATUS_LABELS[schedule.status]}</StatePill></span></Td>
-            <ActionCell>{canManage ? <span className={styles.rowActions}>
-              {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')} busy={Boolean(scheduleBusyId === schedule.id)} busyLabel="処理中…">止める</Button> : null}
-              {schedule.status === 'paused' ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'active')} busy={Boolean(scheduleBusyId === schedule.id)} busyLabel="処理中…">また送る</Button> : null}
-              {!schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => setArchiveTarget(schedule)}>しまう</Button> : null}
-              {!schedule.isOneTime ? <ScheduleMenu schedule={schedule} /> : null}
-            </span> : null}</ActionCell>
+            <ActionCell>{canManage && !schedule.isOneTime ? <ScheduleMenu schedule={schedule} busy={scheduleBusyId === schedule.id} onPause={() => void changeScheduleStatus(schedule, 'paused')} onResume={() => void changeScheduleStatus(schedule, 'active')} onArchive={() => setArchiveTarget(schedule)} /> : null}</ActionCell>
           </Tr>)}</tbody>
         </DataTable></Card>}
 

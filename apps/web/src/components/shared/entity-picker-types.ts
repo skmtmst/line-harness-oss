@@ -169,7 +169,7 @@ export type FieldBase = {
   placeholder?: string
   valuePrefix?: string
   compact?: boolean
-  actionHidden?: boolean
+  actionHidden?: boolean | 'label'
   disabled?: boolean
   disabledReason?: string
   readOnly?: boolean

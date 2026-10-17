@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ListOrdered, Lock, Scale, Shuffle } from 'lucide-react'
 import type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentSettings } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
-import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict, type SaveConflictDiffLine, type SaveConflictState } from '@/components/shared/save-conflict'
+import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict, type SaveConflictDiffLine, type SaveConflictState } from '@/components/shared/save-conflict'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
@@ -18,6 +18,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { Field } from '@/components/shared/form-controls'
+
 import { notifySaved } from '@/components/shared/toast'
 import { ApiError } from '@/lib/api'
 import { bookingAssignmentApi } from '@/lib/api-booking-assignment'
@@ -41,7 +42,6 @@ const METHOD_LABEL: Record<BookingAssignmentMethod, string> = { balanced: '均�
 export type AssignmentTarget = { kind: 'staff'; accountId: string } | { kind: 'tables'; accountId: string; storeId: string }
 
 export interface AssignmentState {
-  saveErrors: ReturnType<typeof useSaveFormErrors>
   status: 'loading' | 'ready' | 'not-ready' | 'error'
   method: BookingAssignmentMethod
   period: BookingAssignmentPeriod
@@ -49,6 +49,7 @@ export interface AssignmentState {
   dirty: boolean
   saving: boolean
   error: string | null
+  saveErrors: ReturnType<typeof useSaveFormErrors>
   conflict: SaveConflictState<BookingAssignmentSettings>
   setMethod: (method: BookingAssignmentMethod) => void
   setPeriod: (period: BookingAssignmentPeriod) => void
@@ -62,7 +63,6 @@ function toMap(list: BookingAssignmentResource[]) {
 }
 
 export function useAssignment(target: AssignmentTarget | null): AssignmentState {
-  const saveErrors = useSaveFormErrors()
   const [status, setStatus] = useState<AssignmentState['status']>('loading')
   const [saved, setSaved] = useState<BookingAssignmentSettings | null>(null)
   const [method, setMethod] = useState<BookingAssignmentMethod>('balanced')
@@ -70,6 +70,7 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
   const [resources, setResources] = useState<Record<string, BookingAssignmentResource>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const saveErrors = useSaveFormErrors()
   const generation = useRef(0)
   const key = target ? JSON.stringify(target) : ''
 
@@ -114,22 +115,21 @@ export function useAssignment(target: AssignmentTarget | null): AssignmentState 
       apply(response.data); conflict.clear()
       notifySaved('割り当て方を保存しました')
     } catch (cause) {
-      saveErrors.capture(cause)
-      if (isConflictResponse(cause)) {
+      if (isSaveConflict(cause)) {
         /* 共通の帯と比べる窓（違いを比べる／最新を読み込んで続ける）。入力は捨てない。 */
         conflict.mark()
       } else if (isNotReadyError(cause)) {
         setStatus('not-ready')
-      } else {
+      } else if (!saveErrors.capture(cause)) {
         setError(cause instanceof ApiError && cause.status === 403 ? '割り当て方を変える権限がありません。' : '保存できませんでした。もう一度お試しください。')
       }
     } finally {
       setSaving(false)
     }
-  }, [target, method, period, resources, conflict])
+  }, [target, method, period, resources, conflict, saveErrors])
 
-  return { saveErrors,
-    status, method, period, resources, dirty, saving, error, conflict,
+  return {
+    saveErrors, status, method, period, resources, dirty, saving, error, conflict,
     setMethod, setPeriod,
     setResource: (id, patch) => setResources((current) => ({ ...current, [id]: { ...(current[id] ?? { resourceId: id, priority: 'normal' as const, dailyLimit: null, sortOrder: 0 }), ...patch } })),
     save: (order) => write(order, saved?.version ?? 0),
@@ -151,8 +151,8 @@ export function AssignmentSection({ state, kind, canEdit }: { state: AssignmentS
   const notes: Record<BookingAssignmentMethod, string> = staff
     ? { balanced: '担当の少ない人から入れます', priority: '決めた順番で埋めます', random: '空いている人から無作為に' }
     : { balanced: 'その日の予約の少ない卓から', priority: '決めた順番で埋めます', random: '空いている卓から無作為に' }
-  return (<SaveErrorScope errors={state.saveErrors}>{(
-    <>
+  return (
+    <SaveErrorScope errors={state.saveErrors}>
       {state.error ? <Notice tone="danger" role="alert">{state.error}</Notice> : null}
       <section className={settings.section} aria-labelledby={`assign-${kind}-heading`}>
         <div className={styles.headRow}>
@@ -166,26 +166,26 @@ export function AssignmentSection({ state, kind, canEdit }: { state: AssignmentS
           </>
         ) : null}
         {canEdit ? (
-          <RadioCardGroup legend={staff ? '指名なしの予約の割り当て方' : '同じ大きさの卓の中での選び方'} columns={3}>
+          <SaveErrorField names={['method', `assign-${kind}-method`]}><RadioCardGroup legend={staff ? '指名なしの予約の割り当て方' : '同じ大きさの卓の中での選び方'} columns={3}>
             {METHODS.map((choice) => (
-              <SaveErrorField key={choice.value} names={["method"]}><RadioCard key={choice.value} name={`assign-${kind}-method`} value={choice.value} title={choice.title} note={notes[choice.value]} icon={choice.icon}
-                checked={state.method === choice.value} disabled={locked} onChange={(value) => state.setMethod(value as BookingAssignmentMethod)} /></SaveErrorField>
+              <RadioCard key={choice.value} name={`assign-${kind}-method`} value={choice.value} title={choice.title} note={notes[choice.value]} icon={choice.icon}
+                checked={state.method === choice.value} disabled={locked} onChange={(value) => state.setMethod(value as BookingAssignmentMethod)} />
             ))}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
         ) : <p className={styles.readValue}>{`${METHODS.find((choice) => choice.value === state.method)?.title}：${notes[state.method]}`}</p>}
         {staff && canEdit ? (
           <div className={styles.periodRow}>
             <span className={styles.periodLabel}>数える期間</span>
             <span className={styles.periodSelect}>
-              <SaveErrorField names={["balancePeriod"]}><Select aria-label="数える期間" value={state.period} disabled={locked || state.method !== 'balanced'} onChange={(value) => state.setPeriod(value as BookingAssignmentPeriod)}
+              <SaveErrorField names={['balancePeriod', 'balance_period']}><Select aria-label="数える期間" value={state.period} disabled={locked || state.method !== 'balanced'} onChange={(value) => state.setPeriod(value as BookingAssignmentPeriod)}
                 options={[{ value: 'day', label: 'その日の担当数' }, { value: 'week', label: 'その週の担当数' }]} /></SaveErrorField>
             </span>
             <span className={styles.minor}>同じ数のときは 優先度 → 最近入っていない人 → ランダム の順に決めます。</span>
           </div>
         ) : null}
       </section>
-    </>
-  )}</SaveErrorScope>)
+    </SaveErrorScope>
+  )
 }
 
 /** 行の「…」→［割り当ての設定］の窓（優先度と 1 日の上限）。 */

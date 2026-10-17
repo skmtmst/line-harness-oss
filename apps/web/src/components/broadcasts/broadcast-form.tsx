@@ -5,6 +5,7 @@ import BroadcastTextBubble from './broadcast-text-bubble'
 import { ComposerCarouselPreview } from '@/components/shared/message-composer'
 
 
+import Disclosure from '@/components/shared/disclosure'
 import SegmentedControl from '@/components/shared/segmented';
 import type { BroadcastFormProps } from './broadcast-form-props';
 import { EntityPickerDialog } from '@/components/shared/entity-picker';
@@ -76,7 +77,7 @@ import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
-import ActionList from '@/components/shared/action-list';
+import ActionList, { ActionAddButton } from '@/components/shared/action-list';
 import { EntityPickerField } from '@/components/shared/entity-picker';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 export { mediaTooLargeMessage, MediaUpload } from "./broadcast-form-gap-parts"
@@ -1571,6 +1572,10 @@ export default function BroadcastForm({
    */
   const testRecipientsGeneration = useRef(0)
   useEffect(() => { testRecipientsGeneration.current += 1; setTestDialogOpen(false); setTestRecipients([]) }, [selectedAccountId])
+  const afterActionChoices = [{ id: 'common_action', label: '共通アクションを実行する', make: () => '', picker: {
+    title: '公開済みの共通アクションを選ぶ', items: publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` })), apply: (_: string, ids: string[]) => ids[0],
+  } }]
+  const testBlockReason = bubblesError(bubbles) || messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })
   const openTestDialog = async () => {
     const generation = ++testRecipientsGeneration.current
     const validationError = validate()
@@ -1780,6 +1785,7 @@ export default function BroadcastForm({
   useEffect(() => { setInlineComposer(null); setTemplateSaveIndex(null); setTemplateSaveCreatedId(null); setComposerBusy(false); setTemplateSaveError(''); setTemplateApplyError('') }, [selectedAccountId])
   const inlineHost: TemplateEditHost | undefined = inlineComposer && inlineBubble ? {
     composer: { index: inlineComposer.index, accountId: selectedAccountId },
+    accountName: selectedAccount?.name ?? null,
     description: '作った中身をこの吹き出しに入れます。', folders: [], folder: '', onFolderChange: () => {}, busy: composerBusy,
     primaryLabel: 'この吹き出しに入れる',
     initialContent: inlineComposer.kind === 'carousel' && inlineBubble.content.columnsJson ? { kind: 'carousel', name: String(inlineBubble.content.templateName ?? ''), messageContent: String(inlineBubble.content.columnsJson), tapLimitMode: inlineBubble.content.tapLimitMode === 'once' ? 'once' : 'none', tapLimitText: String(inlineBubble.content.tapLimitText ?? ''), carouselActions: inlineBubble.content.carouselActions as Record<string, Record<string, unknown[]>> | undefined, templateId: String(inlineBubble.content.templateId ?? '') } : inlineComposer.kind === 'rich_message' && inlineBubble.content.assetName ? { kind: 'rich_message', name: String(inlineBubble.content.assetName), payload: inlineBubble.content, media: [] } : inlineComposer.kind === 'rich_video' && inlineBubble.content.video ? { kind: 'message', name: String(inlineBubble.content.templateName ?? ''), messageType: 'imagemap', messageContent: JSON.stringify(inlineBubble.content) } : undefined,
@@ -2334,13 +2340,12 @@ export default function BroadcastForm({
           <ActionList
             <string> value={afterActionVersionId ? [afterActionVersionId] : []} onChange={next =>setAfterActionVersionId(next[next.length - 1] ?? '')}
             idOf={id => id} titleOf={id => publishedActions.find(action => action.versionId === id)?.name ?? '設定済みの共通アクション'}
-            choices={afterActionVersionId ? [] :[{ id: 'common_action', label: '共通アクションを実行する', make: () => '', picker: {
-              title: '公開済みの共通アクションを選ぶ', items:publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` })), apply: (_, ids) => ids[0],
-            } }]}
+            choices={afterActionVersionId ? [] :afterActionChoices}
+            addActions={afterActionVersionId ? null : <div className="flex flex-wrap gap-2"><ActionAddButton label="アクションを追加する" choices={afterActionChoices} onAdd={id => setAfterActionVersionId(id)} /></div>}
             renderEditor={(id, update) =>
           <EntityPickerField label="配信後のアクション" noun="共通アクション" items={publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` }))} value={id} onChange={update}/>}/>
         </section>}
-        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <details ref={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><summary>ほかの設定</summary><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></details> : null}
+        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <Disclosure size="compact" title="ほかの設定" hint="クリックを数える・ボタン" detailsRef={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></Disclosure> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
@@ -2504,7 +2509,7 @@ export default function BroadcastForm({
           ['送る日時', sendWhenLabel ?? '未設定'],
           ['配信後のアクション', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'],
         ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
-        <div className={styles.previewActions}><Button type="button" disabled={Boolean(validate()) || saving} title={validate() || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
+        <div className={styles.previewActions}><Button type="button" disabled={Boolean(testBlockReason) || saving} title={testBlockReason || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
         {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
         <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
       </aside>

@@ -25,6 +25,8 @@ export type TemplateHostContent =
 export interface TemplateEditHost {
   /** G-9: テンプレートの同じ編集部品を吹き出しへ入れる引き出しで使う。 */
   composer?: { index: number; accountId: string | null; canSaveTemplate?: boolean }
+  /** 見え方のスマホの上に出す名前。1つのアカウントへ送る吹き出しの引き出しは、そのアカウント名（Z6Hx5o）。渡さなければ「公式アカウント」。 */
+  accountName?: string | null
 
   /** @deprecated 板の頭の「← テンプレートへ」は 2026-10-08 に無くした（戻るのは上の帯のパンくずと［キャンセル］）。使わない。 */
   backHref?: string

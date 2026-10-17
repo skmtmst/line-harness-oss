@@ -120,3 +120,8 @@ export default function StickyBar({
     </div>
   )
 }
+
+/** 本文列の下端へ置く操作と、その直前の知らせ。 */
+export function StickyBarRegion({ children, feedback, gap }: { children: ReactNode; feedback?: ReactNode; gap: string }) {
+  return <div className={styles.region} style={{ '--sticky-region-gap': gap } as CSSProperties}>{feedback}{children}</div>
+}

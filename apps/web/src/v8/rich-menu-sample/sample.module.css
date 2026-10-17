@@ -1,0 +1,120 @@
+/* 見本のリッチメニュー（cAaGY）。表の列は絵の 48・160・残り・110・28、行の高さ 60。 */
+.section {
+  --rms-col-area: 48px;
+  --rms-col-button: 160px;
+  --rms-col-state: 110px;
+  --rms-col-menu: 28px;
+  --rms-row-h: 60px;
+  --rms-title-lh: 23px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.sectionTitle {
+  color: var(--color-ink);
+  font-size: var(--text-section);
+  font-weight: 700;
+  line-height: var(--rms-title-lh);
+}
+
+.parent {
+  align-self: center;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
+  white-space: nowrap;
+}
+
+.buttonIcon {
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+}
+
+.buttonName {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-deep);
+  font: inherit;
+  font-size: var(--text-body);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.opens {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.opensMain {
+  font-size: var(--text-body);
+}
+
+.opensNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.help {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.helpIcon {
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+  flex: none;
+}
+
+/* 右の欄：お客さまの見え方と、押したときの見え方。 */
+.aside {
+  --rms-aside-gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+}
+
+.asideHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--polish-space-row);
+}
+
+.asideTitle {
+  color: var(--color-ink);
+  font-size: var(--text-callout);
+  font-weight: 700;
+}
+
+.tap {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--polish-space-row) / 2);
+  padding: var(--polish-space-card);
+  border-radius: var(--polish-radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.tapLabel,
+.tapNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.tapTitle {
+  color: var(--color-ink);
+  font-size: var(--text-callout);
+  font-weight: 700;
+}

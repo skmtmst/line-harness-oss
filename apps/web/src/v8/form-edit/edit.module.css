@@ -170,7 +170,8 @@
 .urlTitle { margin: 0; font-size: var(--tpl-fe-body-size); font-weight: 700; line-height: var(--tpl-fe-body-lh); color: var(--color-ink); }
 .urlRow { display: flex; align-items: center; gap: var(--tpl-fe-field-gap); }
 .urlValue {
-  flex: 1; min-width: 0; height: var(--tpl-fe-choice-h); display: flex; align-items: center; padding: var(--tpl-fe-url-pad);
+  /* 字は1行のまま、はみ出す分は「…」で省く（flex だと文字の省略の印が出ない。e875x）。 */
+  flex: 1; min-width: 0; height: var(--tpl-fe-choice-h); display: block; line-height: var(--tpl-fe-choice-h); padding: var(--tpl-fe-url-pad);
   border-radius: var(--radius-control); background: var(--color-surface-pearl); font-size: var(--tpl-fe-small-size); color: var(--color-ink-secondary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -187,7 +188,7 @@
   .phoneArea { display: none; }
   .testWide { display: none; }
   .testNarrow { display: inline; }
-  .urlValue { white-space: normal; height: auto; min-height: var(--tpl-fe-choice-h); }
+  .urlValue { white-space: normal; height: auto; min-height: var(--tpl-fe-choice-h); line-height: var(--tpl-fe-small-lh); padding-block: var(--tpl-fe-field-gap); }
   .addCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .addCards[data-writing] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .addCards[data-writing] > * { grid-column: span 3; }
@@ -230,6 +231,7 @@
 .phoneHead { flex: none; height: var(--tpl-fe-phone-bar-h); display: flex; align-items: center; gap: var(--tpl-fe-row-gap); padding: var(--tpl-fe-phone-head-pad); color: var(--color-ink); }
 .phoneName { flex: 1; min-width: 0; font-size: var(--tpl-fe-sub-title-size); font-weight: 700; line-height: var(--tpl-fe-phone-name-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .phoneForm { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); padding: var(--tpl-fe-phone-form-pad); }
+.phoneBlockSlot { flex: none; display: flex; flex-direction: column; min-width: 0; }
 .phoneEmpty { margin: 0; font-size: var(--tpl-fe-small-size); color: var(--color-ink-faint); }
 .phoneImage { flex: none; display: block; width: 100%; height: var(--tpl-fe-phone-image-h); object-fit: cover; border-radius: var(--tpl-fe-phone-r); background: var(--tpl-fe-phone-image-bg); }
 .phoneHeading { margin: 0; font-size: var(--tpl-fe-title-size); font-weight: 700; line-height: var(--tpl-fe-title-lh); color: var(--color-ink); }

@@ -19,6 +19,7 @@ export type ThProps = Omit<
   /** 白い板が狭いときだけ、補助列を畳む。見出しと本文で揃える。 */
   collapseAt?: 'narrow'
   /** 列の余った幅をこのセルに割り当てる。 */
+  columnKind?: 'check' | 'name' | 'menu'
   grow?: boolean
   /** 余った幅の割合（grow の列どうしの比。省略は従来どおり）。見出しと本文に同じ値を渡す。 */
   weight?: number

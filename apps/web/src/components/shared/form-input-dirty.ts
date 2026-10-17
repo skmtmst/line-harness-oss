@@ -46,5 +46,5 @@ export function useFormInputDirty(open: boolean) {
     scheduleUpdate()
   }
   const resetBaseline = (snapshot: string) => { initial.current = snapshot; touched.current = true; update() }
-  return { ref, dirty, onChangeCapture, onChange, onClickCapture, resetBaseline }
+  return { ref, dirty, onInputChange: onChangeCapture, onChangeCapture, onChange, onClickCapture, resetBaseline }
 }

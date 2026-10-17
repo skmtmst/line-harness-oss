@@ -2720,7 +2720,7 @@ export const TEMPLATES = (() => {
   const FOLDER_LABEL = { 'tf-inquiry': 'お問い合わせ', 'tf-booking': '予約', 'tf-ec': 'EC' }
   const TOP = [
     { name: '初回お問い合わせへの返信', folderId: 'tf-inquiry', messageType: 'text', messageContent: 'ご連絡ありがとうございます。以下の内容をご確認ください。', usage: 38, sends: [1240, 18300], updatedAt: '2026-08-22T09:20:00.000Z' },
-    { name: '予約前日のご案内', folderId: 'tf-booking', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。', usage: 11, sends: [1860, 31400], updatedAt: '2026-08-21T09:02:00.000Z', hasDraft: true },
+    { name: '予約前日のご案内', folderId: 'tf-booking', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。', usage: 11, sends: [1860, 31400], updatedAt: '2026-08-21T09:02:00.000Z', hasDraft: true },
     { name: '発送完了のお知らせ', folderId: 'tf-ec', messageType: 'text', messageContent: 'ご注文の商品を発送しました。お届けまで今しばらくお待ちください。', usage: 10, sends: [480, 9720] },
     { name: '定期便 初回のご案内', folderId: null, messageType: 'flex', messageContent: JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '{名前}さん、いつもありがとうございます。初回のお届けについてご案内します。' }] } }), usage: 6, sends: [210, 3040] },
     { name: '秋の新商品（画像）', folderId: null, messageType: 'image', messageContent: JSON.stringify({ originalContentUrl: 'https://example.com/autumn.jpg', previewImageUrl: 'https://example.com/autumn.jpg' }), usage: 0, sends: [0, 0], updatedAt: '2026-09-30T10:00:00.000Z', draftOnly: true },
@@ -3720,7 +3720,13 @@ export const BROADCASTS = [
   messageType: String(messageType),
   messageContent: index === 1
     ? 'まだご購入いただいていない方へ。今なら初回20%オフでお試しいただけます。'
-    : `${title}の本文です。`,
+    // 送った後の詳細（F3X1Mo）の右のスマホに出すカルーセル。中身は columns の配列（送る形と同じ）。
+    : index === 2
+      ? JSON.stringify([
+        { title: '秋の新商品 3種', text: '定期便なら 10%オフ', actions: [{ type: 'uri', label: '商品を見る', uri: 'https://nen.example/new' }] },
+        { title: 'お試しセット', text: '初回限定 1,980円', actions: [{ type: 'uri', label: '詳しく見る', uri: 'https://nen.example/trial' }] },
+      ])
+      : `${title}の本文です。`,
   targetType: String(targetType),
   targetTagId: targetType === 'tag' ? 'tag-0' : null,
   status: String(status),
@@ -6216,6 +6222,7 @@ export const BOOKING_AVAILABILITY_OCT = {
     {
       staff_id: 'bs-1', display_name: '佐々木',
       slots: [
+        OCT_SLOT('2026-10-01', '16:00', 1),
         OCT_SLOT('2026-10-02', '09:00', 1), OCT_SLOT('2026-10-02', '10:00', 0), OCT_SLOT('2026-10-02', '13:00', 1),
         OCT_SLOT('2026-10-02', '14:00', 1), OCT_SLOT('2026-10-02', '15:00', 1), OCT_SLOT('2026-10-02', '16:00', 0),
         OCT_SLOT('2026-10-03', '10:00', 1), OCT_SLOT('2026-10-03', '13:00', 1),
@@ -6230,11 +6237,12 @@ export const BOOKING_AVAILABILITY_OCT = {
     {
       staff_id: 'bs-3', display_name: '高田',
       slots: [
-        OCT_SLOT('2026-10-02', '15:00', 1), OCT_SLOT('2026-10-03', '09:00', 1),
+        OCT_SLOT('2026-10-01', '16:00', 1), OCT_SLOT('2026-10-02', '15:00', 1), OCT_SLOT('2026-10-03', '09:00', 1),
         OCT_SLOT('2026-10-06', '15:00', 1), OCT_SLOT('2026-10-08', '13:00', 1),
         OCT_SLOT('2026-10-14', '09:00', 1), OCT_SLOT('2026-10-16', '13:00', 1),
       ],
     },
+    { staff_id: 'bs-2', display_name: '中川', slots: [OCT_SLOT('2026-10-01', '16:00', 1)] },
   ],
   closed_dates: ['2026-10-05'],
 }
@@ -6302,6 +6310,7 @@ export const BOOKING_CHANNELS = {
     { staffId: 'bs-ch-1', displayName: '高田 誠', status: 'connected', externalEventsThisWeek: 12, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
     { staffId: 'bs-ch-2', displayName: '中川 由美', status: 'connected', externalEventsThisWeek: 8, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
     { staffId: 'bs-ch-3', displayName: '佐野 直人', status: 'not_connected', externalEventsThisWeek: null, lastReadAt: null, readError: null },
+    { staffId: 'bs-1', displayName: 'Kenta Kawano', status: 'connected', externalEventsThisWeek: 3, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
     { staffId: 'bs-ch-4', displayName: '森 涼太', status: 'expired', externalEventsThisWeek: null, lastReadAt: '2026-09-28T01:02:00.000Z', readError: null },
   ],
   channels: [
@@ -6524,13 +6533,27 @@ export const MANUAL_LINKS = {
   **LINEの友だちと結びついていない行**も1つ入れる（設計の
   「LINEの友だちと結びついていません。当日の連絡ができません」を出すため）。
 */
+/* 担当はスタッフ一覧（bs-1 佐々木・bs-3 高田・bs-2 中川）の id でも持つ。名前だけだと予約の当日盤が「担当未設定」に落とす（GcyTr）。 */
+const BOOKING_STAFF_IDS = { 佐々木: 'bs-1', 高田: 'bs-3', 中川: 'bs-2' }
 const booking = (id, friendId, name, start, end, menu, staff, price, status = 'confirmed') => ({
   id, friend_id: friendId, starts_at: start, ends_at: end, status,
   customer_note: null, internal_note: null, price_at_booking: price,
-  menu_name: menu, staff_name: staff, friend_name: name,
+  menu_name: menu, staff_id: BOOKING_STAFF_IDS[staff] ?? null, staff_name: staff, friend_name: name,
   requested_at: '2026-09-02T02:00:00.000Z', decided_at: '2026-09-02T02:05:00.000Z',
   external_event_id: null,
 })
+
+/* 予約管理「今日」（絵 O2Z8u・時計 2026-10-01）用。この日の窓で読んだときだけ返す（ほかの画面の件数は変えない）。 */
+export const BOOKING_TODAY_REQUESTS = [
+  { ...booking('bt-1', 'friend-1', 'ぽん太 さん', '2026-10-01T00:00:00.000Z', '2026-10-01T01:00:00.000Z', 'トリミング（小型犬）', '佐々木', 8400), source: 'liff' },
+  { ...booking('bt-2', 'friend-2', 'ココ さん', '2026-10-01T01:00:00.000Z', '2026-10-01T01:30:00.000Z', 'シャンプーのみ', '高田', 4200), source: 'phone' },
+  { ...booking('bt-3', 'friend-3', 'ハナ さん', '2026-10-01T02:00:00.000Z', '2026-10-01T02:15:00.000Z', '爪切り', '高田', 1200), source: 'liff' },
+  { ...booking('bt-4', 'friend-4', 'レオ さん', '2026-10-01T02:00:00.000Z', '2026-10-01T02:30:00.000Z', '足裏ケア', '中川', 2000), source: 'liff' },
+  { ...booking('bt-5', 'friend-5', 'マロン さん', '2026-10-01T04:00:00.000Z', '2026-10-01T05:30:00.000Z', 'トリミング（中型犬）', '佐々木', 9800), source: 'liff' },
+  { ...booking('bt-6', 'friend-6', 'きなこ さん', '2026-10-01T06:00:00.000Z', '2026-10-01T06:30:00.000Z', '初回相談', '中川', 0), source: 'liff' },
+  /* 同じ人の同じ時間に重なった電話の予約（受付1人ずつを超える・赤い帯）。 */
+  { ...booking('bt-7', '', null, '2026-10-01T04:30:00.000Z', '2026-10-01T04:45:00.000Z', '爪切り', '佐々木', 1200), friend_name: 'チョコ さん', source: 'phone' },
+]
 
 export const BOOKING_REQUESTS = [
   booking('bk-1', 'friend-1', '高橋 直人', '2026-09-03T00:00:00.000Z', '2026-09-03T01:45:00.000Z', 'トリミング（小型犬）', '佐々木', 8400),

@@ -113,7 +113,6 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
   <><CustomerInfoRail><aside className={styles.summary} data-design="Left" data-friend-profile-panel>
     <CustomerInfoPanel
       friendId={friendId}
-      profile={{ name: realName || friend.displayName, pictureUrl: friend.pictureUrl, addedAt: friend.createdAt ? formatDay(friend.createdAt) : '追加日不明' }}
       fields={fields}
       state={data.fieldsStatus === 'error' ? 'error' : data.fieldsStatus === 'ready' ? 'ready' : 'loading'}
       onRetry={() => void data.loadFields()}

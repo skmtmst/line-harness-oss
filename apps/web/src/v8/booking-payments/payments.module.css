@@ -262,6 +262,10 @@
   line-height: var(--tpl-bm-18);
 }
 
+.footNote svg {
+  flex: none;
+}
+
 /* メニューごとのお支払いの段（mauOC・XFRyO） */
 .choiceRow {
   display: flex;
@@ -281,8 +285,13 @@
   font-weight: 700;
 }
 
+.amountBox svg {
+  flex: none;
+  color: var(--color-ink-secondary);
+}
+
 .amountNote {
-  margin-left: var(--tpl-layout-auto);
+  margin-left: var(--polish-space-auto);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
   font-weight: 400;
@@ -323,8 +332,13 @@
   font-size: var(--tpl-bm-12);
 }
 
+.connectionIcon {
+  flex: none;
+  color: var(--color-link);
+}
+
 .readValue {
-  margin: var(--tpl-layout-zero);
+  margin: var(--polish-space-none);
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 700;

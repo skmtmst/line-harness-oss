@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { readUiSource } from '../../scripts/test-ui-source.mjs'
+// @ts-expect-error 型を持たない点検の道具（.mjs）。
+import { screensWithoutLeaveGuard } from '../../scripts/unsaved-guard-wiring.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -20,6 +22,8 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  // 友だち詳細の情報欄（vX3wQ）。保存前の入力があればタブ・ほかの画面へ移る前に確認する。
+  'v8/friend-detail/info-tab.tsx',
   'v8/restaurant/organization/store-groups.tsx',
   'v8/inbox-chat/screen.tsx',
   'v8/settings/customer-look/screen.tsx',
@@ -56,6 +60,8 @@ const GUARDED = [
   'app/reminders/new/new-v8.tsx',
   'app/reminders/new/page.tsx',
   'v8/restaurant/google/profile-edit.tsx',
+  // 卓の割り当て方（jmVYJ）。下の帯で保存する変更を、離れる前に確認する。
+  'v8/restaurant/tables/assign.tsx',
   'v8/restaurant/google/profile-hours.tsx',
   'app/rich-menus/new/create-v8.tsx',
   'app/rich-menus/new/page.tsx',
@@ -182,6 +188,16 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'v8/webinar-edit/cta.tsx': 'v8/webinar-edit/edit.tsx',
   'v8/webinar-edit/notifications.tsx': 'v8/webinar-edit/edit.tsx',
   'v8/webinar-edit/video.tsx': 'v8/webinar-edit/edit.tsx',
+  // 予約設定のタブ。書きかけは V8TabEditContext で殻の settings.tsx へ報告し、番兵は殻が持つ。
+  'v8/booking-menus/tabs/staff-tab.tsx': 'v8/booking-menus/settings.tsx',
+  'v8/booking-payments/payments-tab.tsx': 'v8/booking-menus/settings.tsx',
+  // 割り当て方・メニューごとの支払いは「状態の持ち方」の部品。dirty を返すだけで、番兵は使う側の画面が持つ。
+  'v8/booking-payments/assignment.tsx': 'v8/restaurant/tables/assign.tsx',
+  'v8/booking-payments/menu-payment.tsx': 'v8/booking-menus/menu-form.tsx',
+  // 配信の自動応答の編集は、一覧と同じ console.tsx の中で開く。書きかけの有無は親が持ち、番兵は親が持つ。
+  'v8/hq-deliveries/auto-reply-editor.tsx': 'v8/hq-deliveries/console.tsx',
+  // 作る・直す型（CreatePage）に dirty を渡す画面。離脱の番兵は型が持つ。
+  'v8/restaurant/menu/edit.tsx': 'components/templates/create-page.tsx',
 }
 
 /*
@@ -193,6 +209,8 @@ const EXEMPTIONS: Record<string, string> = {
     '③-2 第3波：会員ランクのタブ。入力は段を足す・直す小窓（Dialog）の中だけで、窓の保存か［キャンセル］で閉じる。タブ本体は入力を溜めず、数える物・期間は選ぶと即保存する。',
   'v8/ec-auto-line/edit-drawer.tsx':
     '③-2 第3波：自動の LINE の編集の引き出し。Drawer に dirty を渡しており、閉じる・Esc・外側押しは共通の離脱の確認（useOverlayDiscard）が止める。画面の遷移は引き出しが開いている間は起きない。',
+  'v8/style-dashboard/settings-panels.tsx': '表示を変える引き出し・休みを入れる窓。入力は引き出し・窓の中だけで、閉じると戻る。引き出しは dirty の間、閉じる前に破棄の確認を出す',
+  'v8/onboarding/wizard.tsx': 'はじめの質問の窓（B-313）。答えは途中で閉じても保存してから閉じる（失わない）。どの答えも「あとから変えられます」で、離れる確認で止める物が無い',
   'components/friend-fields/edit-tag-page-v4.tsx':
     '保管済みタグの名前と説明の訂正。元の取消は確認なしで入力を破棄するため、共通作成型も dirty=false で同じ動きを保つ。番兵の要否は削除台帳の司令塔に確認へ記録する',
   'v8/restaurant/google/google.tsx':
@@ -461,11 +479,8 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
   }
 
   it('番兵を持つ画面は共通フックと離脱確認ダイアログを配線している', () => {
-    for (const file of GUARDED) {
-      const source = screenSources(file)
-      expect(source, file).toContain('useUnsavedGuard(')
-      expect(source, `${file} の離脱確認`).toContain('leaveTarget !== null')
-    }
+    // 足りない画面の一覧が空であること（ソース文字を直接は比べない。点検は scripts/unsaved-guard-wiring.mjs）。
+    expect(screensWithoutLeaveGuard(SRC, [...new Set(GUARDED)])).toEqual([])
   })
 
   it('親へ dirty を報告する画面の親は、共通フックで番兵を持っている', () => {

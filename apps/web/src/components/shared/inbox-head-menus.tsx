@@ -53,6 +53,7 @@ export function HeadOperatorMenu({
       label="担当"
       width={OPERATOR_WIDTH}
       actionHidden
+      valuePrefix="担当："
       value={value}
       onChange={onChange}
       options={rows.map((row) => ({ ...entityOptionMetadata(row), value: row.id, label: row.name }))}

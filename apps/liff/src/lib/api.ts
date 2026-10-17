@@ -1,134 +1,20 @@
-import type { EntryRouteCouponReceived } from '@line-crm/shared';
-import type { CustomerBookingWaitlist, CustomerSeatWaitlist, RegisterSeatWaitlistInput, AcceptBookingWaitlistInput } from '@line-crm/shared';
-import type { FormLayout } from '@line-crm/shared';
-import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
-import type { WebinarAudience } from '@line-crm/shared';
-import type { BookingHistoryResponse, LiffBookingChangeResponse } from '@line-crm/shared';
-import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
-import { getIdToken, getLiffId } from './liff-auth.js';
+import type { BookingCancellationPreview, MenuAddon, RoutedTarget, MakeupCredit, MakeupOption } from './api-types.js';
+export type { BookingCancellationPreview, MenuAddon, RoutedTarget, MakeupCredit, MakeupOption, EventBookingMakeup } from './api-types.js';
+import type { AcceptBookingWaitlistInput,BookingHistoryResponse,CustomerBookingWaitlist,CustomerSeatWaitlist,EntryRouteCouponReceived,EventWaitlistMine,EventWaitlistOfferDetail,LiffBookingChangeResponse,RegisterSeatWaitlistInput,WebinarAudience } from '@line-crm/shared';
+import { buildFormSubmitHeaders,toFormIdempotencyKey } from '@line-crm/shared';
+import { type AvailabilityResponse,type BookingEntitlement,type BookingPayment,type CreateBookingResponse,type CreateEventBookingResponse,type EventBookingMine,type EventDetail,type EventSlot,type FormSubmitResponse,type LastBookingResponse,type LiffBookingSettings,type MenuItem,type NotificationPreferences,type NotificationPurpose,type PostalCodeSearchResponse,type PublicForm,type StaffItem,type WaitlistMineResponse,type WebinarState } from './api-types.js';
+import { getIdToken,getLiffId } from './liff-auth.js';
 import type { LiffLookApiSettings } from './liff-look.js';
-import { type EventDetail, type EventSlot, type EventBookingMine, type WebinarState } from "./api-gap-parts.js"
-export { type EventQuestion, type EventDetail, type EventSlot, type EventBookingMakeup, type EventBookingMine, type WebinarCta, type WebinarSakuraComment, type WebinarState } from "./api-gap-parts.js"
-export type { BookingHistoryItem } from '@line-crm/shared';
-export type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
-export type { WebinarAudience } from '@line-crm/shared';
+export type { BookingHistoryItem,EventWaitlistMine,EventWaitlistOfferDetail,WebinarAudience } from '@line-crm/shared';
+export { type AvailabilityResponse,type BookingEntitlement,type BookingPayment,type CreateBookingResponse,type CreateEventBookingResponse,type EventBookingMine,type EventDetail,type EventQuestion,type EventSlot,type FormSubmitResponse,type LastBookingResponse,type LiffBookingSettings,type MenuItem,type NotificationPreferenceItem,type NotificationPreferences,type NotificationPurpose,type PostalCodeCandidate,type PostalCodeSearchResponse,type PublicForm,type StaffItem,type WaitlistMineResponse,type WebinarCta,type WebinarSakuraComment,type WebinarState } from './api-types.js';
+
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
-
-export interface MenuItem {
-  id: string;
-  name: string;
-  category_label: string | null;
-  description: string | null;
-  duration_minutes: number;
-  buffer_after_minutes: number;
-  base_price: number;
-  price_mode?: 'fixed' | 'free' | 'inquiry';
-  payment_mode?: 'none' | 'onsite' | 'online';
-  sort_order: number;
-  /** キャンセル期限 (開始の何時間前まで)。null は店の既定を使う。 */
-  cancel_deadline_hours_before?: number | null;
-  intake_question?: string | null;
-  /** 同時に予約できる人数（B5。口は今 1 だけ。2 以上になったら「何人で予約しますか」を出す）。 */
-  max_party_size?: number;
-  /** 追加メニュー（オプション）。メニューを選んだあと addons の口で読み足す。 */
-  addons?: MenuAddon[];
-  /** お客さまの繰り返し予約（B4。初期オフ）。オンのメニューだけ確認に「毎週この時間で続ける」を出す。口が出来るまでの形（B-314）。 */
-  recurring?: { enabled: boolean; max_count: number };
-}
-
-export interface MenuAddon { id: string; name: string; duration_minutes: number; price: number }
-
-export interface StaffItem {
-  id: string;
-  display_name: string;
-  role: string | null;
-  profile_image_url: string | null;
-  bio: string | null;
-  is_designation_optional: number;
-  price: number;
-  price_mode?: 'fixed' | 'free' | 'inquiry';
-  duration_minutes: number;
-}
-
-export interface AvailabilityResponse {
-  by_staff: Array<{
-    staff_id: string;
-    display_name: string;
-    slots: Array<{
-      date: string;
-      start: string;
-      end: string;
-      /** 残り枠。0 は埋まった枠（カレンダーの「満」の判定に使う）。無いときは空きありと扱う。 */
-      remaining?: number;
-      /** 枠の状態（Worker が付ける。'full' は埋まった枠）。 */
-      state?: 'available' | 'limited' | 'full' | 'closed';
-      /** 店のタイムゾーン名（date・start はこの zone の暦日・壁時刻）。 */
-      timeZone?: string;
-      /** 開始の瞬間（offset 付き ISO）。予約・待ちの登録はこれを送る。 */
-      startUtc?: string;
-      /** 終了の瞬間（offset 付き ISO）。 */
-      endUtc?: string;
-    }>;
-  }>;
-  /** 休みの日（お店・担当が閉めている日）。カレンダーの「休」の印に使う。 */
-  closed_dates?: string[];
-}
-
-/**
- * LIFF 予約の設定（日時を選ぶ段の最初の形と受付期間＋見た目）。
- * 見た目の欄（型・店の色・カレンダーの出し方・空きの点）は M3 が足す。
- * 来ない欄は呼び側が既定に倒す。
- */
-export interface LiffBookingSettings extends LiffLookApiSettings {
-  liff_date_view: 'list' | 'calendar';
-  booking_window_days: number;
-  /** 予約のルール「お店が承認してから確定する」。無いときは承認あり扱い。 */
-  approval_mode?: 'automatic' | 'manual';
-  cancel_deadline_minutes_before?: number;
-}
-
-/** 予約作成の応答。お支払いありの店・メニューだけ payment が付く。 */
-export interface CreateBookingResponse {
-  booking_id: string;
-  status: string;
-  payment_required?: boolean;
-  payment?: { id: string; status: string; holdUntil: string | null } | null;
-  /** 無断キャンセルが続いている人への前払いのみの案内。対象のときだけ付く。 */
-  prepayNotice?: string;
-}
 
 /** 支払い必須の不完全な成功応答は、通常予約・待ちからの予約とも完了にしない。 */
 export function assertBookingPaymentResponse(created: CreateBookingResponse): CreateBookingResponse {
   if (created.payment_required && !created.payment?.id) throw new Error('booking_payment_unavailable');
   return created;
-}
-
-/** 前回と同じで予約：本人の前回の予約。無い・使えないときは available=false。 */
-export interface LastBookingResponse {
-  available: boolean;
-  reason?: string;
-  booking?: {
-    id: string;
-    starts_at: string;
-    status: string;
-    menu: { id: string; name: string };
-    staff: { id: string; display_name: string; profile_image_url: string | null };
-  };
-}
-
-/** 自分のキャンセル待ち登録。無いときは entry: null。 */
-export interface WaitlistMineResponse {
-  entry: { id: string; status: string; created_at: string } | null;
-}
-
-/** お客さまが見る支払いの状態。 */
-export interface BookingPayment {
-  id: string;
-  status: 'unpaid' | 'pending' | 'paid' | 'failed' | 'refunded' | 'expired';
-  amount?: number | null;
-  currency?: string | null;
-  hold_until?: string | null;
 }
 
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
@@ -211,11 +97,11 @@ async function remove<T>(path:string):Promise<T>{
  const url=new URL(`${BASE}${path}`,window.location.origin);url.searchParams.set('liffId',getLiffId());
  const res=await fetch(url,{method:'DELETE',headers:authHeaders()});if(!res.ok)throw new Error(`API ${res.status}`);return res.json();
 }
-async function post<T>(path: string, body: unknown, headers: Record<string, string> = {}): Promise<T> {
+async function post<T>(path: string, body: unknown, headers: Record<string, string> = {}, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
   url.searchParams.set('liffId', getLiffId());
   const res = await fetch(url.toString(), {
-    method: 'POST',
+    method,
     headers: authHeaders({ 'Content-Type': 'application/json', ...headers }),
     body: JSON.stringify(body),
   });
@@ -253,84 +139,6 @@ async function postBinary<T>(path: string, file: Blob): Promise<T> {
   return res.json();
 }
 
-/**
- * 申込の返し。席が取れたときは {id, status} (status は requested=承認待ち /
- * confirmed=確定)。満席で待ちに入ったときは 200 で {waitlisted: true} が
- * 返る (Worker events.ts runBookingFlow/enterWaitlist)。409 だと画面側が
- * 失敗として扱い「キャンセル待ちに入りました」を出せないための形。
- */
-export type CreateEventBookingResponse =
-  | { id: string; status: string }
-  | { waitlisted: true; slot_id: string };
-
-/**
- * 欠席の振替（B3）。口（Worker）は Codex の gap2 が作る。形は B3 の「データと API の形の案」。
- * makeup が無い予約は、今までどおり欠席の入口を出さない。
- */
-/** 答えで決まった予約の行き先（B6）。 */
-export interface RoutedTarget { menuId: string; menuName: string; durationMinutes: number; price: number; staffId: string | null; staffName: string | null; meetingMode: 'in_person' | 'online' | null }
-
-export interface MakeupCredit { id: string; expires_at: string; status: 'open' | 'used' | 'expired' | 'revoked'; source_event_booking_id?: string | null; source_event_id?: string; /** 口はまだ返さない（欠席した回の日時・名前）。返すようになったら帯の 1 行目に出す。 */ source_starts_at?: string | null; source_name?: string | null }
-export interface MakeupOption { slot_id: string; event_id: string; starts_at: string; ends_at: string; name: string; remaining: number | null; full: boolean }
-
-
-// ============================================================
-// 回答フォーム
-// ============================================================
-
-/** 公開して良い範囲だけを返した回答フォーム。 */
-export interface PublicForm {
-  id: string;
-  name: string;
-  description: string | null;
-  layout: FormLayout;
-  isActive: boolean;
-  /** P（試し回答）：true は下書きの試し。集計に入らず、後処理も動かない。 */
-  isTest?: boolean;
-  availability?: import('@line-crm/shared').FormAvailability;
-}
-
-/** F-11：郵便番号検索の結果。status が matched/multiple のとき候補から選ぶ。 */
-export interface PostalCodeCandidate {
-  postalCode: string;
-  prefecture: string;
-  city: string;
-  town: string;
-}
-
-export interface PostalCodeSearchResponse {
-  success: boolean;
-  data: {
-    query: string;
-    normalized: string | null;
-    status: 'invalid' | 'none' | 'matched' | 'multiple';
-    candidates: PostalCodeCandidate[];
-  };
-}
-
-/** フォーム回答の送信結果。未完のとき data.complete が false で返る。 */
-export interface FormSubmitResponse {
-  success: boolean;
-  data?: Record<string, unknown> & { complete?: boolean; pendingEffects?: string[] };
-  retryable?: boolean;
-  error?: string;
-  code?: string;
-  idempotencyKey?: string;
-}
-
-/** 予約の前のキャンセル料・デポジット（口の案）。金額は円。決まりがオフなら enabled=false。 */
-export interface BookingCancellationPreview {
-  enabled: boolean;
-  version: number;
-  /** この時刻までは無料（ISO）。 */
-  freeUntil: string | null;
-  afterPercent: number;
-  noShowPercent: number;
-  price: number;
-  /** デポジット（今払う額）。無ければ null。 */
-  deposit: { amount: number } | null;
-}
-
 export const api = {
   customerLook: () => get<{success: boolean;data:{settings:LiffLookApiSettings;look:import('@line-crm/shared').CustomerLook;version:number}}>('/api/liff/customer-look'),
   researchForm: (id: string) => getData<{ formId: string }>(`/api/liff/research/${encodeURIComponent(id)}/form`),
@@ -359,6 +167,7 @@ export const api = {
       menu_id: string; staff_id: string; starts_at: string; customer_note?: string; waitlist_id?: string; policyAccepted?: boolean; policyVersion?: number; setupIntentId?: string;
       /** B5：追加メニュー（1 人分・0〜3 個）。2 人以上の組は口がまだ受けない。 */
       addonIds?: string[];
+      entitlement_id?: string;
       /** B6：答えで決まった行き先の署名（resolve の返事）。 */
       routingToken?: string;
       meeting_mode?: 'online' | 'in_person';
@@ -392,6 +201,24 @@ export const api = {
       `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
     ),
   me: () => get<BookingHistoryResponse>('/api/liff/booking/me'),
+  /** 組3：本人の回数券・月謝。menu_id・starts_at を渡すとその予約で使えるかが付く。 */
+  entitlements: (query: { menuId?: string; startsAt?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (query.menuId) qs.set('menu_id', query.menuId);
+    if (query.startsAt) qs.set('starts_at', query.startsAt);
+    const tail = qs.toString();
+    return getData<BookingEntitlement[]>(`/api/liff/booking/entitlements${tail ? `?${tail}` : ''}`);
+  },
+  /** 組1：お知らせの受け取り。店は /api/liff/config の accountId。 */
+  notificationPreferences: (lineAccountId: string) =>
+    getData<NotificationPreferences>(`/api/liff/notification-preferences?${new URLSearchParams({ lineAccountId })}`),
+  updateNotificationPreference: (lineAccountId: string, purpose: NotificationPurpose, enabled: boolean, expectedVersion: number) =>
+    post<{ success: true; data: NotificationPreferences }>(
+      `/api/liff/notification-preferences/${encodeURIComponent(purpose)}?${new URLSearchParams({ lineAccountId })}`,
+      { enabled, expectedVersion },
+      {},
+      'PUT',
+    ).then((r) => unwrapSuccessData<NotificationPreferences>(r, '/api/liff/notification-preferences')),
   /** F-6 本人の取消。版（lock_version）が合わないと 409。期限を過ぎると 403 self_deadline_passed。 */
   cancelMyBooking: (id: string, lockVersion: number) =>
     post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/cancel`, { lock_version: lockVersion }),

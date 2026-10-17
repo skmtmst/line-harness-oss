@@ -1,69 +1,77 @@
 import BookingCancelDeadline from './BookingCancelDeadline.js';
 import type { BookingHistoryItem } from '../lib/api.js';
+import { paymentText, type PaymentView } from '../lib/booking-payment-view.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import Card from './ui/Card.js';
 import Badge from './ui/Badge.js';
 import Button from './ui/Button.js';
 import Icon from './ui/Icon.js';
-import PaymentBadge from './PaymentBadge.js';
-import type { BookingPayment } from '../lib/api.js';
-import { PAYMENT_STATUS, paymentBadge } from '@line-crm/shared';
+import UnpaidPaymentNote from './UnpaidPaymentNote.js';
 
 /**
- * 予約の履歴の札 (★V8・YvTJ3)。日付の四角＋メニュー名＋状態の札。
+ * 予約の履歴の札 (★V8・nWby5)。日付の四角＋メニュー名＋支払いの札（無いときは予約の状態の札）。
+ * 支払い済み・返金済みは「領収書を見る」（Stripe のページ）。未払いは払う期限と［お支払いへ進む］（B-338）。
  * 下に「日時を変える／キャンセル」の2ボタン (F-6 本人の変更・取消)。
  * 押す口が渡されたときだけ出す (履歴の口が版などを返さないと送れないため、呼び側が決める)。
  */
 export default function HistoryCard({
   booking,
+  payment = null,
   onChange,
   onCancel,
   onPay,
-  payment = null,
+  onReceipt,
   disabled = false,
 }: {
   booking: BookingHistoryItem;
+  payment?: PaymentView | null;
   onChange?: () => void;
   onCancel?: () => void;
-  /** 未払いのときの［お支払いへ進む］（B-338・nWby5）。 */
+  /** 未払いの先払いのときだけ渡す。Stripe の支払いページへ。 */
   onPay?: () => void;
-  /** この予約のお支払い（先払いの予約だけ）。 */
-  payment?: BookingPayment | null;
+  /** 支払い済み・返金済みのときだけ渡す。 */
+  onReceipt?: () => void;
   disabled?: boolean;
 }) {
-  const payBadge = paymentBadge(payment?.status);
-  const unpaid = payBadge === PAYMENT_STATUS.unpaid;
   const meta = STATUS_META[booking.status] ?? { label: booking.status, tone: 'neutral' as const };
   const hasActions = Boolean(onChange || onCancel || onPay);
+  // 支払いの札があるときは、予約の状態は「確定」以外だけを札の右に文字で添える（絵の「返金済み キャンセル」）。
+  const statusAside = payment && booking.status !== 'confirmed' && booking.status !== 'completed' && meta.label !== payment.label ? meta.label : null;
   return (
     <li>
       <Card className="flex flex-col gap-2.5 p-3.5">
         <div className="flex items-center gap-3">
-          <div className="flex w-14 shrink-0 flex-col items-center rounded-(--liff-radius) bg-liff-off-bg py-1.5">
+          <div className="flex w-14 shrink-0 flex-col items-center gap-0.5 rounded-(--liff-radius) bg-liff-off-bg py-2">
             <span className="liff-num text-[15px] leading-[18px] font-bold whitespace-nowrap text-ink">
               {utcToJstMd(booking.starts_at)}
             </span>
             <span className="liff-num text-[11px] leading-[13px] text-liff-sub">{utcToJstHm(booking.starts_at)}</span>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col items-start gap-[3px]">
-            <div className="w-full truncate text-sm leading-normal font-bold text-ink" title={booking.menu_name}>
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+            <div className="w-full truncate text-[15px] leading-normal font-bold text-ink" title={booking.menu_name}>
               {booking.menu_name}
             </div>
-            {payBadge ? <PaymentBadge status={payment!.status} amount={payment?.amount ?? null} /> : <Badge tone={meta.tone}>{meta.label}</Badge>}
+            <div className="flex min-w-0 items-center gap-2">
+              {payment ? <Badge size="md" tone={payment.tone}>{paymentText(payment)}</Badge> : <Badge size="md" tone={meta.tone}>{meta.label}</Badge>}
+              {statusAside && <span className="truncate text-xs text-liff-sub">{statusAside}</span>}
+            </div>
           </div>
         </div>
-        {unpaid && payment?.hold_until ? (
-          <div className="flex flex-col gap-1">
-            <p className="flex items-center gap-1.5 text-[12.5px] leading-[18px] font-bold text-liff-wait-ink">
-              <Icon name="clock" className="h-3.5 w-3.5 shrink-0" />
-              {`${utcToJstMd(payment.hold_until)} ${utcToJstHm(payment.hold_until)} までにお支払いください`}
-            </p>
-            <p className="text-[11.5px] leading-[17px] text-liff-sub">過ぎると予約は取り消され、枠はほかの方に回ります</p>
+        {onReceipt && (
+          <div className="flex items-center justify-between gap-2">
+            <Button variant="link" onClick={onReceipt} disabled={disabled}>
+              <Icon name="receipt" className="h-4 w-4" />
+              領収書を見る
+              <Icon name="external-link" className="h-3.5 w-3.5" />
+            </Button>
+            <span className="truncate text-[11px] text-liff-sub">Stripe のページが開きます</span>
           </div>
-        ) : <BookingCancelDeadline deadline={booking.cancel_deadline_at} />}
+        )}
+        {/* 未払い（B-338・nWby5）：払う期限と、［お支払いへ進む］を日時を変えるの位置に（主ボタン）。 */}
+        {payment?.kind === 'unpaid' && payment.holdUntil ? <UnpaidPaymentNote holdUntil={payment.holdUntil} /> : <BookingCancelDeadline deadline={booking.cancel_deadline_at} />}
         {hasActions && (
           <div className="flex gap-2">
-            {unpaid && onPay ? (
+            {onPay ? (
               <Button variant="primary" className="flex-1" disabled={disabled} onClick={onPay}>
                 お支払いへ進む
               </Button>
@@ -74,7 +82,7 @@ export default function HistoryCard({
             )}
             {onCancel && (
               <Button variant="secondary" className="flex-1" disabled={disabled} onClick={onCancel}>
-                キャンセルする
+                キャンセル
               </Button>
             )}
           </div>

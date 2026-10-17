@@ -213,11 +213,11 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
               onChange={(value) => { setAction(value as Action); if (value !== 'give' && targetId === NEW_TICKET && items[0]) setTargetId(items[0].id) }} />
           ))}
         </RadioCardGroup>
-        <div className={styles.fullSelect}><EntitySelect aria-label="対象の回数券" value={targetId} onChange={setTargetId} size="full"
-          options={[...items.map((item) => ({ value: item.id, label: optionLabel(item) })), ...(action === 'give' ? [{ value: NEW_TICKET, label: '新しい回数券を付ける' }] : [])]} /></div>
+        <div className={styles.fullSelect}><SaveErrorField names={['entitlementId', 'entitlement_id', 'targetId']}><EntitySelect aria-label="対象の回数券" noun="回数券" value={targetId} onChange={setTargetId} size="full"
+          options={[...items.map((item) => ({ value: item.id, label: optionLabel(item) })), ...(action === 'give' ? [{ value: NEW_TICKET, label: '新しい回数券を付ける' }] : [])]} /></SaveErrorField></div>
         {isNew ? (
           <Field label="回数券の名前" required error={submitted && !name.trim() ? '名前を入れてください' : undefined}>
-            <SaveErrorField names={["name"]}><TextField aria-label="回数券の名前" value={name} maxLength={100} placeholder="例：カット 10回券" onChange={(event) => setName(event.target.value)} /></SaveErrorField>
+            <SaveErrorField names={['name']}><TextField aria-label="回数券の名前" value={name} maxLength={100} placeholder="例：カット 10回券" onChange={(event) => setName(event.target.value)} /></SaveErrorField>
           </Field>
         ) : null}
         {action !== 'revoke' ? (
@@ -287,10 +287,10 @@ export function EntitlementDrawer({ item, accountId, friendName, canEdit, onClos
     <Drawer open={item !== null} title={item?.name ?? ''} description={`${friendName || 'この友だち'} さん`} onClose={onClose} width="editor" closeAppearance="box" heightMode="viewport">
       {item ? (
         <div className={styles.drawerBody}>
-          <KpiBand>
-            <KpiCard detail="" presentation="band" title="残り" value={item.kind === 'monthly' ? item.monthRemaining : item.remaining} unit="回" />
-            <KpiCard detail="" presentation="band" title="期限" value={null} valueText={shortDay(item.expires_at)} unit="" />
-            <KpiCard detail="" presentation="band" title="使った" value={used} unit="回" />
+          <KpiBand presentation="band" density="compact" gridClassName="grid grid-cols-3" aria-label={`${item.name}の残り・期限・使った回数`}>
+            <KpiCard presentation="band" density="compact" icon={null} title="残り" value={item.kind === 'monthly' ? item.monthRemaining : item.remaining ?? 0} unit="回" detail="" />
+            <KpiCard presentation="band" density="compact" icon={null} title="期限" value={null} valueText={shortDay(item.expires_at)} unit="" detail="" />
+            <KpiCard presentation="band" density="compact" icon={null} title="使った" value={used} unit="回" detail="" />
           </KpiBand>
           <div className={styles.historyHead}>
             <h3 className={styles.historyTitle}>履歴</h3>

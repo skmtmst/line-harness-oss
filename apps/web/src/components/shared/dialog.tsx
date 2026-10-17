@@ -2,7 +2,7 @@
 
 
 import { isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
-import React, { useContext, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import React, { useContext, useEffect, useLayoutEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
 import Button from './button'
@@ -221,12 +221,7 @@ export default function Dialog({
   const motion = useStepMotion(Boolean(steps) && open && mounted, stepKey ?? (React.isValidElement<{ currentKey?: string | number }>(steps) ? steps.props.currentKey : undefined))
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
-  /*
-   * open=true で初回マウントした場合、最初の描画は通常DOMで、effect後に
-   * portal へ移る。フォーカス制御は portal の準備ができてから始める
-   * （DEEP-15）。useOverlayFocus 側もイベント時に ref.current を読むため、
-   * 常時マウントから開く場合も同じ経路で正しい面を掴む。
-   */
+  // フォーカス制御はportalの準備後に開始し、イベント時のrefを読む。
   const cancelRef = useRef<HTMLButtonElement>(null)
   const panelRef = useOverlayFocus(
     open && modal && mounted,
@@ -244,7 +239,8 @@ export default function Dialog({
       : styles.compactConfirmation
     : ''
 
-  useEffect(() => setMounted(true), [])
+  // 最初の描画前にportalへ移す。利用者が触れた入力DOMは入れ替えない。
+  useLayoutEffect(() => setMounted(true), [])
   if (!open && !leaving) return null
 
   const titleNode = (

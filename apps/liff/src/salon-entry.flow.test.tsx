@@ -76,7 +76,7 @@ test.each(['week-first', 'month-first', 'week-only', 'month-only'])('NORMAL3-04:
 });
 test('NORMAL3-03: 現役履歴から版つきの取消を確かめて既存APIへ送る', async () => {
   await open(true);
-  fireEvent.click(await screen.findByRole('button', { name: 'キャンセルする' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'キャンセル' }));
   expect(screen.getByRole('button', { name: '日時を変える' })).toBeTruthy();
   fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセルする' }));
   await vi.waitFor(() => expect(requests.find(r => r.url.pathname.endsWith('/cancel'))).toBeTruthy());

@@ -253,6 +253,42 @@ const PATHS = {
     <path key="a" d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />,
     <circle key="c" cx="12" cy="13" r="3" />,
   ],
+  /** マイページの回数券（lucide ticket と同じ線） */
+  ticket: [
+    <path key="a" d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />,
+    <path key="b" d="M13 5v2" />,
+    <path key="c" d="M13 17v2" />,
+    <path key="d" d="M13 11v2" />,
+  ],
+  /** マイページのスタンプ（lucide stamp と同じ線） */
+  stamp: [
+    <path key="a" d="M5 22h14" />,
+    <path key="b" d="M19.27 13.73A2.5 2.5 0 0 0 17.5 13h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1.5c0-.66-.26-1.3-.73-1.77Z" />,
+    <path key="c" d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-3-3c-1.66 0-3 1-3 3s1 2 1 3.5V13" />,
+  ],
+  /** マイページのマイル（lucide gem と同じ線） */
+  gem: [
+    <path key="a" d="M6 3h12l4 6-10 13L2 9Z" />,
+    <path key="b" d="M11 3 8 9l4 13 4-13-3-6" />,
+    <path key="c" d="M2 9h20" />,
+  ],
+  /** マイページのクーポン（lucide tag と同じ線） */
+  tag: [
+    <path key="a" d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />,
+    <circle key="c" cx="7.5" cy="7.5" r=".5" />,
+  ],
+  /** 予約の履歴の領収書（lucide receipt と同じ線） */
+  receipt: [
+    <path key="a" d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />,
+    <path key="b" d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />,
+    <path key="c" d="M12 17.5v-11" />,
+  ],
+  /** 外のページが開く（lucide external-link と同じ線） */
+  'external-link': [
+    <path key="a" d="M15 3h6v6" />,
+    <path key="b" d="M10 14 21 3" />,
+    <path key="c" d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />,
+  ],
 } as const;
 
 export type IconName = keyof typeof PATHS;

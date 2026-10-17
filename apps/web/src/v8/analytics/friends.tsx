@@ -115,14 +115,15 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
             <Link href="/inflow-links" className={styles.more}>流入と計測で詳しく見る →</Link>
           </Card>
           <Card variant="form" padding="roomy" layout="vertical" gap="normal" aria-labelledby="friends-removed-title">
-            <CardHeader size="stacked" titleId="friends-removed-title" title={<>減った友だち<HelpTip label="減った友だちの説明">ブロックと友だち解除を合わせた人数です。ブロックだけの内訳は未取得です。</HelpTip></>} />
+            <CardHeader size="stacked" titleId="friends-removed-title" title="減った友だち" help={<HelpTip label="減った友だちの説明">ブロックと友だち解除を合わせた人数です。ブロックだけの内訳は未取得です。</HelpTip>} />
             <div className={styles.sideRow}><span className={styles.sideName}>ブロック・友だち解除の合計</span><strong className={styles.sideValue}>{`${metricText(overview.metrics.removed)} 人`}</strong></div>
             <p className={styles.sideNote}>{`ブロックの内訳は未取得です。${formatAnalyticsDate(state.data.period.from)}〜${formatAnalyticsDate(state.data.period.to)} の合計を表示します。`}</p>
           </Card>
       </>}>
         <Card variant="form" padding="roomy" layout="vertical" gap="normal" aria-labelledby="friends-daily-title">
           <CardHeader size="stacked" titleId="friends-daily-title"
-            title={<>{`日ごとの増減（この${days}日）`}<HelpTip label="日ごとの増減の説明">{`棒を選ぶとその日の数と配信・シナリオが出ます。${caption}`}</HelpTip></>}
+            title={`日ごとの増減（この${days}日）`}
+            help={<HelpTip label="日ごとの増減の説明">{`棒を選ぶとその日の数と配信・シナリオが出ます。${caption}`}</HelpTip>}
             action={<RangePickerV8 customRange={customRange} onRangeChange={setRange} size="small" days={days} onChange={(value) => { setDays(value); setSelectedDate('') }} />} />
           <BarChartLegend layout="analytics" items={[
             { label: '増えた', tone: 'added' }, { label: '減った', tone: 'removed' },

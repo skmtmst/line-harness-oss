@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { describe,expect,it } from 'vitest';
 import Badge from '../components/ui/Badge.js';
 import { statusMeta } from './event-bookings-policy.js';
 
@@ -25,7 +25,7 @@ const confirm = src('pages', 'EventConfirm.tsx');
 const done = src('pages', 'EventDone.tsx');
 const bookings = src('pages', 'EventBookings.tsx');
 const offer = src('pages', 'EventWaitlistOffer.tsx');
-const api = src('lib', 'api.ts');
+const api = src('lib', 'api.ts') + src('lib', 'api-types.ts');
 const EVENT_FILES = [event, confirm, done, bookings, offer];
 
 describe('素の Tailwind 色・16進数・絵文字が無い', () => {

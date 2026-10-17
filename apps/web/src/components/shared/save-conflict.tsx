@@ -40,6 +40,11 @@ export function saveConflictTitle(updatedAt: string, kind: string, name: string)
   return when ? `ほかの人が ${when} に${subject}を保存しました` : `ほかの人が先に${subject}を保存しました`
 }
 
+/** 保存のぶつかり（409）か。画面ごとに状態の数字を比べず、この関数で見分ける。 */
+export function isSaveConflict(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'status' in error && error.status === 409
+}
+
 /** 比べる窓に出す違いの1行。add=最新で増えた、remove=最新で消えた、change=変わった。 */
 export type SaveConflictDiffLine = { text: string; kind?: 'add' | 'remove' | 'change' }
 
@@ -139,7 +144,7 @@ export function SaveConflictBand({
   compareBusy = false,
   compareDisabled = false,
   reloadHref,
-  reloadVariant = 'secondary',
+  reloadVariant = 'primary',
   onCompare,
   compareHref,
   onReload,

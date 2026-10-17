@@ -179,7 +179,7 @@ export default function EcIdentityCandidatesScreen() {
       <>
         <KpiBand presentation="band">
           <KpiCard presentation="band" icon={<Link2 size={13} aria-hidden="true" />} title="自動で結びついた" value={operationsReady ? (operations?.summary.linked ?? null) : null} unit="人" detail={operationsDetail('メールか電話番号が同じ')} loading={operationsState === 'loading'} onRetry={operationsState === 'error' ? () => { void loadOperations() } : undefined} />
-          <KpiCard presentation="band" icon={<UserSearch size={13} aria-hidden="true" />} title="候補が見つかった" value={operationsReady ? candidateCount : null} unit="人" detailLayout="single" detail={operationsReady ? `人が決める（つき合わせ ${formatNumber(operations?.summary.unmatched ?? 0)} のうち）` : operationsDetail('人が決める')} loading={operationsState === 'loading'} />
+          <KpiCard presentation="band" icon={<UserSearch size={13} aria-hidden="true" />} title="候補が見つかった" value={operationsReady ? candidateCount : null} unit="人" detailLayout="single" detail={operationsReady ? `人が決める（${formatNumber(operations?.summary.unmatched ?? 0)} 件のうち）` : operationsDetail('人が決める')} loading={operationsState === 'loading'} />
           <KpiCard presentation="band" icon={<Unlink size={13} aria-hidden="true" />} title="結びついていない" value={operationsReady ? noneCount : null} unit="人" detail={operationsDetail('候補なし')} loading={operationsState === 'loading'} />
           <KpiCard
             presentation="band"

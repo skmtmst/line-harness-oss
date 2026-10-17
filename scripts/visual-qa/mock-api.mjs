@@ -35,6 +35,7 @@ import { gap2Respond } from './mock-gap2.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
+import { styleDashboardMock } from './style-dashboard-mock.mjs'
 import { encodePng } from './v8-png.mjs'
 import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
 import { BILLING_INVOICES, BILLING_SUMMARY } from './billing-fixture.mjs'
@@ -80,7 +81,7 @@ import {
   BROADCAST_RECIPIENTS, BROADCAST_ACTIVITY,
   BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
   FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW, FRIEND_FIELD_MIGRATION_PREVIEW_DOG,
-  INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
+  INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, BOOKING_TODAY_REQUESTS,
   TEMPLATES, TEMPLATE_FOLDERS, TEMPLATE_TEST_RECIPIENTS,
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
@@ -226,7 +227,7 @@ const TAG_EC_CUSTOMER_AUTOMATION = {
 
 
 /* 詳細の絵（UTbi1）の template-1。一覧の行（TEMPLATES）は変えず、詳細と版の口だけこの形を返す。 */
-const TEMPLATE_1_CONTENT = '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking'
+const TEMPLATE_1_CONTENT = '{{name}}さん、こんにちは。\n明日 {{date}} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking'
 const TEMPLATE_1_DETAIL = (template) => ({
   ...template,
   folderId: 'tf-booking',
@@ -263,8 +264,8 @@ const TEMPLATE_1_DETAIL = (template) => ({
   },
 })
 const TEMPLATE_1_VERSIONS = [
-  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' },
-  { versionNumber: 1, status: 'past', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日のご予約をお待ちしています。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-07-14T09:40:00+09:00' },
+  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' , createdByStaffId: 'visual-qa-owner', creatorName: 'Kenta Kawano', creatorNameSource: 'current_staff_profile' },
+  { versionNumber: 1, status: 'past', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日のご予約をお待ちしています。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-07-14T09:40:00+09:00' , createdByStaffId: 'visual-qa-owner', creatorName: 'Masato', creatorNameSource: 'current_staff_profile' },
 ]
 
 
@@ -354,7 +355,11 @@ function hqTemplateDefinitionHtn(row) {
       ...(i === 0 ? { actionType: 'uri', actionData: { uri: 'https://nen.example/booking' }, intent: 'url' } : i < 3 ? { actionType: 'uri', actionData: { uri: 'https://nen.example/news' }, intent: 'url' } : { actionType: 'message', actionData: { text: label }, intent: 'text' }),
       label,
     }))
-    return { schemaVersion: 1, richMenu: { id: 'visual-menu-1', name: '通常メニュー（会員向け）', chatBarText: 'メニュー', size: 'large', defaultPageId: 'visual-page-1', displayOrder: 1, displayAudience: 'all', pages: [{ id: 'visual-page-1', name: 'トップ', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas }] } }
+    return { schemaVersion: 1, richMenu: { id: 'visual-menu-1', name: '通常メニュー（会員向け）', chatBarText: 'メニュー', size: 'large', defaultPageId: 'visual-page-1', displayOrder: 1, displayAudience: 'all', pages: [
+      { id: 'visual-page-1', name: '予約', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas },
+      /* 切替タブの2枚目（絵 cmRZc の直すタブ「タブ2「会員」」）。 */
+      { id: 'visual-page-2', name: '会員', imageR2Key: 'hq-templates/visual-tenant-1/menu-member.png', areas: areas.map((area) => ({ ...area, id: `${area.id}-p2` })) },
+    ] } }
   }
   if (row.template_type === 'form') {
     return {
@@ -2247,10 +2252,73 @@ function broadcastAbWrite(method, pathname) {
   if (method === 'POST' && /^\/api\/broadcasts\/[^/]+\/ab-test\/choose$/.test(pathname)) return { variant: 'A', testMode: true }
   return null
 }
+/*
+ * B-311〜B-313（はじめの質問・スタイルの初期セット・対応が要るもの）の見本。本物の口は組4（codex/kenta-api4-1015）が作り中。
+ * 絵：VHp7p の Bdfxm（7 / 11 済み・警告 1・あとで 2・止めている自動の送信 3）・oKSsG・cAaGY・J6647・Kyf8U。
+ */
+const STYLE_SETUP_STATE = {
+  style: 'restaurant', styleSelected: true, styleMode: 'configured', version: 3,
+  answers: {
+    image: { mode: 'configured', value: 'keep' }, booking: { mode: 'configured', value: true }, approval: { mode: 'configured', value: 'automatic' },
+    payment: { mode: 'later' }, reminders: { mode: 'configured', value: true }, stamps: { mode: 'later' }, coupons: { mode: 'configured', value: true }, content: { mode: 'configured', value: true },
+  },
+}
+const STYLE_QUESTION_KEYS = ['image', 'booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'tickets', 'outcome', 'content']
+const STYLE_SETUP_ITEMS = [
+  { key: 'menu', kind: 'rich_menu', name: '飲食店の見本', buttons: [{ label: '予約する', feature: 'booking' }, { label: '予約の確認', feature: 'booking' }, { label: 'クーポン', feature: 'coupons' }, { label: 'メニュー', feature: 'contact' }, { label: 'スタンプ', feature: 'stamps' }, { label: 'お問い合わせ', feature: 'contact' }] },
+  { key: 'sample-reservation-confirm', kind: 'template', name: '【見本】予約の確認' }, { key: 'sample-thanks', kind: 'template', name: '【見本】来店のお礼' }, { key: 'sample-day', kind: 'template', name: '【見本】当日のご案内' },
+  { key: 'sample-review', kind: 'template', name: '【見本】口コミのお願い' }, { key: 'sample-closed', kind: 'template', name: '【見本】臨時休業のお知らせ' },
+  { key: 'booking-lunch', kind: 'booking_menu', feature: 'booking', name: 'ランチコース' }, { key: 'booking-dinner', kind: 'booking_menu', feature: 'booking', name: 'ディナーコース' }, { key: 'booking-seat', kind: 'booking_menu', feature: 'booking', name: '席のみ' },
+  { key: 'reminder', kind: 'automation', feature: 'reminders', name: '予約確定のご案内', text: 'ご予約ありがとうございます。日時をご確認ください。' },
+  { key: 'reminder-day-before', kind: 'automation', feature: 'reminders', name: '前日のお知らせ', text: '予約の前日 18:00 に LINE で送る' },
+  { key: 'reminder-day', kind: 'automation', feature: 'reminders', name: '当日のお知らせ', text: '来店の 2 時間前に送る' },
+  { key: 'dashboard', kind: 'dashboard', name: '今日のお店' },
+]
+/* 口の starter-items は item_key・name を返さない（API-CONTRACT-4 §10）。種類と並びだけ。 */
+const STYLE_SETUP_STATES = STYLE_SETUP_ITEMS.map((item, i) => ({ target_id: `starter-${i}`, kind: item.kind, is_sample: 1, status: item.kind === 'automation' ? 'draft' : item.kind === 'booking_menu' ? 'inactive' : 'active', draftRevision: item.kind === 'automation' ? `draft-${i}` : null }))
+const STYLE_SETUP_WARNINGS = { count: 1, items: [{ feature: 'stamps', areaId: 'area-e', groupId: 'rm-sample-restaurant', href: '/visit-stamps', customerState: 'preparing' }], pending: [{ key: 'payment', href: '/booking/settings?tab=payment', mode: 'later' }, { key: 'stamps', href: '/visit-stamps', mode: 'later' }], manual: [] }
+const HQ_STARTER_SETS = [
+  { id: 'starter-set-restaurant', style: 'restaurant', name: '飲食店向けの初期セット', version: 2, accountCount: 12, updatedAt: '2026-10-14T03:00:00.000Z', updatedBy: 'stf-1', autoInsert: true, definition: { items: STYLE_SETUP_ITEMS } },
+  ...[['salon', 8], ['consult', 3], ['lesson', 5], ['ec', 2], ['standard', 4]].map(([style, accountCount]) => ({ id: `starter-set-${style}`, style, name: `${style}の初期セット`, version: 1, accountCount, updatedAt: '2026-10-10T03:00:00.000Z', updatedBy: 'stf-2', autoInsert: true, definition: { items: STYLE_SETUP_ITEMS.filter((item) => item.kind !== 'booking_menu') } })),
+]
+const STYLE_TEMPLATE_SAMPLES = [
+  ['sample-reservation-confirm', '予約の確認', 'common'], ['sample-reminder', '前日のリマインド', 'common'], ['sample-day', '当日の案内', 'common'], ['sample-thanks', '来店のお礼', 'common'],
+  ['sample-review', '口コミのお願い', 'common'], ['sample-closed', '臨時休業のお知らせ', 'common'], ['sample-course', 'コースの予約確認', 'restaurant'], ['sample-seat-ready', '席の準備ができました', 'restaurant'], ['sample-banquet', '宴会の事前確認', 'restaurant'],
+].map(([key, name, category]) => ({ key, name, category, text: `{{name}} 様\n${name}のご案内です。{{account.name}}`, placeholders: [{ token: '{{name}}', label: 'お名前', requiresConfiguration: false }, { token: '{{account.name}}', label: '店名', requiresConfiguration: false }], preparation: '日時・場所などは送る前に共通情報へ入れてください。', starterItem: { key, kind: 'template', name: `【見本】${name}`, text: name }, hqDefinition: {} }))
+const HQ_STYLE_ATTENTION = {
+  asOf: '2026-10-15T08:30:00.000Z',
+  items: [
+    { accountId: 'visual-qa-account', name: '然 渋谷店', style: 'restaurant', counts: { unhandledChats: 9, pendingBookings: 3, unpaid: 2, connections: 1, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-2', name: '然 新宿店', style: 'restaurant', counts: { unhandledChats: 6, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
+    { accountId: 'visual-qa-account-3', name: 'Hair Salon 然 表参道', style: 'salon', counts: { unhandledChats: 4, pendingBookings: 0, unpaid: 2, connections: 0, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-4', name: '然 相談窓口', style: 'consult', counts: { unhandledChats: 3, pendingBookings: 2, unpaid: 0, connections: 0, stoppedDeliveries: 0 } },
+    { accountId: 'visual-qa-account-5', name: '然 ヨガスタジオ', style: 'lesson', counts: { unhandledChats: 1, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
+  ].map((item) => ({ ...item, details: { unhandledChats: [{ id: 'c', href: '/chats' }], pendingBookings: [{ id: 'b', href: '/booking/bookings' }], unpaid: [{ id: 'p', href: '/booking/settings?tab=payment' }], connections: [{ id: 'l', href: '/line-accounts' }], stoppedDeliveries: [{ id: 'd', href: '/broadcasts' }] } })),
+}
+function styleSetupRead(method, pathname, query) {
+  if (method !== 'GET') return null
+  if (pathname === '/api/dashboard/style') return { success: true, data: { ...STYLE_SETUP_STATE, settings: {}, cards: [], questions: STYLE_QUESTION_KEYS.map((key) => ({ key, changeAt: '/booking/settings', canChangeLater: true, recommended: key !== 'payment', modes: ['configured', 'later', 'manual'] })), warnings: STYLE_SETUP_WARNINGS } }
+  if (pathname === '/api/dashboard/style/resources') return { success: true, data: { items: [{ id: 'rm-1', name: '秋のメニュー', kind: 'rich_menu' }, { id: 'page-1', name: '秋のメニューの画像', kind: 'image' }] } }
+  if (/^\/api\/dashboard\/style\/menus\/[^/]+$/.test(pathname)) return { success: true, data: { id: pathname.split('/').pop(), name: 'ランチコース', version: 1, meetingMode: 'in_person', location: null } }
+  if (pathname === '/api/dashboard/style/warnings') return { success: true, data: STYLE_SETUP_WARNINGS }
+  if (pathname === '/api/dashboard/style/starter-set') return { success: true, data: { id: `starter-set-${query.get('style') ?? 'restaurant'}`, version: 2, definition: { items: STYLE_SETUP_ITEMS } } }
+  if (pathname === '/api/dashboard/style/starter-items') return { success: true, data: { items: STYLE_SETUP_STATES } }
+  if (pathname === '/api/hq/style-starter-sets') return { success: true, data: HQ_STARTER_SETS }
+  if (pathname === '/api/hq/style-attention') return { success: true, data: HQ_STYLE_ATTENTION }
+  if (pathname === '/api/hq/style-template-samples' || pathname === '/api/dashboard/style/template-samples') return { success: true, data: { style: query.get('style') ?? 'restaurant', items: STYLE_TEMPLATE_SAMPLES } }
+  return null
+}
+function styleSetupWrite(method, pathname) {
+  if (method === 'PUT' && pathname === '/api/dashboard/style') return { style: 'restaurant', version: STYLE_SETUP_STATE.version + 1, inserted: [] }
+  if (method === 'POST' && pathname === '/api/dashboard/style/activate') return { complete: true, items: [] }
+  if (method === 'PUT' && /^\/api\/hq\/style-starter-sets\/[^/]+$/.test(pathname)) return { id: 'starter-set-restaurant', version: 3, autoInsert: true }
+  return null
+}
 
 function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   { const gapuiC = gapuiCWrite(method, pathname, query); if (gapuiC) return gapuiC }
   { const ab = broadcastAbWrite(method, pathname); if (ab) return ab }
+  { const style = styleSetupWrite(method, pathname); if (style) return style }
   /*
    * B-6 受信箱の添付（API-15・M0393「7. 添付」）：画像以外の準備（アップロード）は保存しないで同じ形を返す。
    * B-26 右の欄でその場で直す：対応状況・担当・メモの更新は、送った値を当てた会話を返す（保存はしない）。
@@ -2473,6 +2541,9 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/publish$/.test(pathname)) {
     return AUTO_REPLY_PUBLISH_RESULT
+  }
+  if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/pages\/[^/]+\/image$/.test(pathname)) {
+    return { imageR2Key: 'rich-menus/visual-qa.png', imageContentType: 'image/png', size: 'large' }
   }
   if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
     return {
@@ -3023,6 +3094,7 @@ function gapuiCWrite(method, pathname, query) {
 function bodyFor(method, pathname, query = new URLSearchParams()) {
   { const gapuiC = gapuiCRead(method, pathname, query); if (gapuiC) return gapuiC }
   { const ab = broadcastAbRead(method, pathname); if (ab) return ab }
+  { const style = styleSetupRead(method, pathname, query); if (style) return style }
   { const stamps = method === 'GET' ? visitStampRead(pathname, query) : null; if (stamps) return stamps }
   if (method === 'GET' && pathname === '/api/restaurant-test/media-links') return { success: true, data: RESTAURANT_MEDIA_LINKS }
   if (method === 'GET' && pathname === '/api/restaurant-test/media') return { success: true, data: RESTAURANT_MEDIA_LINKS.map(({ code, name, acceptsReservations }) => ({ code, name, acceptsReservations })) }
@@ -3177,6 +3249,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: RESTAURANT_INTAKE_ADDRESSES }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/google/connection') return GOOGLE_CONNECTION_DATA
+  // SNS 連携（y3GGTs）の Instagram：まだつないでいない（絵の「まだつないでいません」）。汎用の一覧を返すと読み込み中のまま止まる。
+  if (method === 'GET' && pathname === '/api/instagram/connection') return { success: true, data: { state: 'disconnected', replyEnabled: false } }
   if (method === 'GET' && pathname === '/api/restaurant-test/google/reviews') {
     return { success: true, reviews: GOOGLE_REVIEWS, page: 1, perPage: 20, total: GOOGLE_REVIEWS.length, connection: GOOGLE_CONNECTION }
   }
@@ -3687,11 +3761,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     if (deliveries.length) return {success:true,data:deliveries.map(row=>row.template)}
     if (type === 'friend_field' || type === 'mark') {
       const rows = HQ_ATTRIBUTE_ROWS.filter((item) => item.template.template_type === type).map((item) => item.template)
-      return { success: true, data: rows, stats: { totalTemplates: rows.length, distributedAccountCount: 1, undistributedTemplateCount: 0, thisMonthSentCount: null, outdatedTemplateCount: 0 } }
+      return { success: true, data: rows, stats: { totalTemplates: rows.length, distributedAccountCount: 1, undistributedTemplateCount: 0, thisMonthSentCount: null, outdatedTemplateCount: 0, ...(type === 'mark' ? { supportStatus: { source: 'chats', friendCount: 76, unhandledFriendCount: 23, inProgressFriendCount: 19, unhandledPercent: 30.1 }, markChanges: { source: 'operation_audit', count: 74, coverage: 'recorded_events_only', since: '2026-09-24T00:00:00.000Z', until: '2026-10-01T00:00:00.000Z' }, scope: 'active_accounts_visible_friends', updatedAt: '2026-10-01T00:00:00.000Z' } : {}) } }
     }
     /* API-17：テンプレートは店と同じ6種類（?kind=）。種類の無い古い行はメッセージ。 */
     const rows = (type ? HQ_TEMPLATES_HTN.filter((row) => row.template_type === type) : HQ_TEMPLATES_HTN)
-      .map((row) => (row.template_type === 'template' ? { ...row, kind: row.kind ?? 'message' } : row))
+      .map((row, index) => (row.template_type === 'template' ? { ...row, kind: row.kind ?? 'message', message_type: row.message_type ?? ['text', 'text', 'text', 'flex', 'image', 'text'][index % 6], message_count: row.message_count ?? 1, has_interpolations: row.has_interpolations ?? (index % 3 === 0) } : row))
     /* API-18：一覧の集計（今月送った数・新しい版を未配布）。 */
     const stats = { thisMonthSentCount: rows.some((row) => row.this_month_sent_count === null) ? null : rows.reduce((n, row) => n + (row.this_month_sent_count ?? 0), 0), outdatedTemplateCount: rows.filter((row) => (row.outdated_account_count ?? 0) > 0).length }
     return { success: true, data: kind ? rows.filter((row) => row.kind === kind) : rows, stats }
@@ -3719,6 +3793,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       const version = older ? Math.max(1, latest - 1) : latest
       return { accountId: account.id, accountName: account.name, receivedAt: '2026-08-21T09:10:00.000Z', targetVersion: { version, latestVersion: current, status: older ? 'older' : 'latest', label: `版${version}` } }
     }) }
+  }
+  /* 配る前に「配布先が今受け取っている版」を読む（API 組1 の契約：GET /api/hq/templates/:id/distribution-targets）。同名の有無は返さない。 */
+  const distributionTargetsMatch = pathname.match(/^\/api\/hq\/templates\/([^/]+)\/distribution-targets$/)
+  if (distributionTargetsMatch && method === 'GET') {
+    const wanted = (query.get('accountIds') ?? '').split(',').filter(Boolean)
+    const latest = 2
+    const states = [{ version: null, status: 'undistributed', label: '未配布' }, { version: latest, status: 'latest', label: `版 ${latest}（最新）` }, { version: 1, status: 'older', label: '版 1' }]
+    return { success: true, data: {
+      templateId: decodeURIComponent(distributionTargetsMatch[1]), latestVersion: latest, requiresPreflight: true,
+      stores: HQ_TEMPLATE_ACCOUNTS_HTN.filter((a) => !wanted.length || wanted.includes(a.id)).map((a, i) => ({ accountId: a.id, accountName: a.name, targetVersion: { ...states[i % states.length], latestVersion: latest } })),
+    } }
   }
   if (pathname === '/api/hq/templates/kind-counts' && method === 'GET') {
     const counts = { message: 0, carousel: 0, rich_message: 0, question: 0, coupon: 0, research: 0 }
@@ -4168,6 +4253,22 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       row('fs-5', 'メッセージに返信した', 5, 5, '2026-09-02T19:20:00+09:00'),
     ] } }
   }
+  if (pathname === '/api/booking/admin/today') {
+    // 予約管理「今日」（絵 O2Z8u・時計 2026-10-01）。人（スタッフ）ごとの 6 件。
+    const row = (id, staffId, staffName, customer, menu, start, end, status = 'confirmed') => ({
+      kind: 'staff', id, starts_at: `2026-10-01T${start}:00+09:00`, ends_at: `2026-10-01T${end}:00+09:00`, status, price_at_booking: 5500,
+      friend_id: null, booking_customer_id: null, menu_id: 'bm-1', menu_name: menu, staff_id: staffId, staff_name: staffName, customer_name: customer, visit_mark: null,
+    })
+    const bookings = [
+      row('tb-1', 'bs-1', '佐々木 亮太', 'ぽん太 さん', 'トリミング（小型犬）', '09:00', '10:00'),
+      row('tb-2', 'bs-3', '高田 誠', 'ハナ さん', '爪切り', '11:00', '11:15'),
+      row('tb-3', 'bs-2', '中川 由美', 'レオ さん', '足裏ケア', '11:00', '11:30'),
+      row('tb-4', 'bs-1', '佐々木 亮太', 'マロン さん', 'トリミング（中型犬）', '13:00', '14:30'),
+      row('tb-5', 'bs-3', '高田 誠', 'ココ さん', 'シャンプーのみ', '10:00', '10:30', 'pending'),
+      row('tb-6', 'bs-2', '中川 由美', 'きなこ さん', '初回相談', '15:00', '15:30'),
+    ]
+    return { date: '2026-10-01', mode: 'staff', has_seat_stores: false, bookings, seats: [], timeline: bookings }
+  }
   if (pathname === '/api/friends/friend-1/timeline') {
     const item = (id, type, summary, occurredAt, source, account = { id: 'visual-qa-account', name: '然-NEN-TEST' }) => ({
       id, type, summary, status: null, source, occurredAt, lineAccount: account,
@@ -4302,7 +4403,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         name: '店舗のご案内',
         category: '未分類',
         messageType: 'text',
-        messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking',
+        messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。\nhttps://nen.example/booking',
         folderId: null,
         question: null,
         questionStatus: 'draft',
@@ -4388,6 +4489,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
+  }
+  // 店のアレルギーの選択肢（本物は accountAllergyOptions。まだ保存していない店は決まりの8つ・版0）。
+  if (method === 'GET' && pathname === '/api/account-settings/allergy-options') {
+    return { success: true, data: { version: 0, options: ['卵', '乳', '小麦', 'そば', '落花生', 'えび', 'かに', 'くるみ'] } }
   }
   if (method === 'GET' && pathname === '/api/account-settings/customer-look') {
     return { success: true, data: { version: 1, look: { ...DEFAULT_CUSTOMER_LOOK } } }
@@ -6053,7 +6158,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (/^\/api\/rich-menu-groups\/[^/]+\/schedules$/.test(pathname)) return { success: true, data: [] }
   const richMenuGroup = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(pathname)
   if (richMenuGroup) {
-    const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]]
+    const group = RICH_MENU_GROUP_DETAILS[richMenuGroup[1]] ?? (richMenuGroup[1] === 'rmg-new' && RICH_MENU_GROUP_DETAILS['rmg-1'] ? { ...RICH_MENU_GROUP_DETAILS['rmg-1'], id: 'rmg-new', name: 'テスト' } : undefined)
     return group
       ? { success: true, data: group }
       : { success: false, error: 'リッチメニューが見つかりません' }
@@ -6830,7 +6935,8 @@ const server = createServer((req, res) => {
     const menuName = url.searchParams.get('menu_name')
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
-    const filtered = BOOKING_REQUESTS.filter((item) =>
+    const pool = from && from.startsWith('2026-09-30T15') ? [...BOOKING_REQUESTS, ...BOOKING_TODAY_REQUESTS] : BOOKING_REQUESTS
+    const filtered = pool.filter((item) =>
       (status === 'all' || item.status === status)
       && (!query || (item.friend_name || '').includes(query))
       && (!menuName || item.menu_name === menuName)
@@ -6932,6 +7038,20 @@ const server = createServer((req, res) => {
     return
   }
 
+  // 業種ダッシュボード（XBkC2）と使い方のスタイル。PUT の中身を読むので、ここで受ける。
+  if (url.pathname === '/api/dashboard/style' || url.pathname.startsWith('/api/dashboard/style/')) {
+    let raw = ''
+    req.on('data', (chunk) => { raw += chunk })
+    req.on('end', () => {
+      let parsed = null
+      try { parsed = raw ? JSON.parse(raw) : null } catch { parsed = null }
+      const out = styleDashboardMock(method, url.pathname, url.searchParams, parsed)
+      if (!out) { res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' })); return }
+      res.writeHead(200).end(JSON.stringify(out))
+    })
+    return
+  }
+
   if (method !== 'GET') {
     const formWriteRequest = (
       (method === 'POST' && (url.pathname === '/api/forms/drafts'
@@ -7015,6 +7135,34 @@ const server = createServer((req, res) => {
           return
         }
         res.writeHead(405).end(JSON.stringify({ success: false, error: '画面確認用のため、更新はできません' }))
+      })
+      return
+    }
+    /* 統括リッチメニューの配る前の確認（API 組1 の契約：POST /api/hq/templates/rich-menu-preview）。保存・配布はしない。 */
+    if (method === 'POST' && url.pathname === '/api/hq/templates/rich-menu-preview') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const ids = Array.isArray(body.accountIds) ? body.accountIds : []
+        const accounts = ids.map((id) => ({ id, name: HQ_TEMPLATE_ACCOUNTS_HTN.find((a) => a.id === id)?.name ?? id }))
+        const refs = []
+        const seen = new Set()
+        for (const page of body.definition?.richMenu?.pages ?? []) for (const area of page.areas ?? []) {
+          for (const tagId of area.tagIds ?? []) if (!seen.has(`tag:${tagId}`)) { seen.add(`tag:${tagId}`); refs.push({ kind: 'tag', sourceId: tagId, name: tagId === 'visual-hq-tag-booking' ? '予約ボタン' : tagId }) }
+          if (area.formId && !seen.has(`form:${area.formId}`)) { seen.add(`form:${area.formId}`); refs.push({ kind: 'form', sourceId: area.formId, name: area.formId }) }
+          if (area.templateId && !seen.has(`template:${area.templateId}`)) { seen.add(`template:${area.templateId}`); refs.push({ kind: 'template', sourceId: area.templateId, name: area.templateId }) }
+        }
+        const sameName = accounts.slice(0, 1)
+        const data = {
+          name: body.name ?? '',
+          summary: { accountCount: accounts.length, sameNameAccountCount: sameName.length, overwriteCount: 0, createCount: accounts.length - sameName.length, missingReferences: refs.length ? 1 : 0, missingTags: 0 },
+          stores: accounts.map((a, i) => ({ accountId: a.id, accountName: a.name, sameNameMenus: i === 0 ? [{ id: 'visual-menu-same', name: body.name ?? '', status: 'published', can_overwrite: 0 }] : [], canOverwrite: false, missingReferences: [] })),
+          references: refs.map((ref, i) => ({ ...ref, availableAccountCount: Math.max(0, accounts.length - (i === 0 && ref.kind === 'tag' ? 1 : 0)), totalAccountCount: accounts.length, accounts: accounts.map((a) => ({ accountId: a.id, accountName: a.name, status: 'available', targetId: `${ref.sourceId}@${a.id}` })) })),
+          images: [], requiresPreflight: true,
+        }
+        res.writeHead(200).end(JSON.stringify({ success: true, data }))
       })
       return
     }

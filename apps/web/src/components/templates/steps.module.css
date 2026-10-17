@@ -154,3 +154,62 @@ button.step:focus-visible {
 .sectionTitle { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; white-space: nowrap; }
 .sectionSummary { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-body); text-overflow: ellipsis; white-space: nowrap; }
 .sectionBody { display: flex; flex-direction: column; gap: var(--space-16); }
+/* はじめの質問：縦の手順も同じ持ち主が描く。 */
+.root[data-layout="sidebar"] { --sidebar-step-height: 30px; --sidebar-step-padding: 10px; --sidebar-step-icon: 14px; }
+.sidebarList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--polish-space-row) / 4);
+  list-style: none;
+}
+
+.sidebarStep {
+  display: flex;
+  width: 100%;
+  height: var(--sidebar-step-height);
+  align-items: center;
+  gap: var(--polish-space-row);
+  border: 0;
+  border-radius: var(--polish-space-row);
+  padding-inline: var(--sidebar-step-padding);
+  background: transparent;
+  color: var(--color-ink-faint);
+  font: inherit;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebarStep:hover {
+  background: var(--polish-hover);
+}
+
+.sidebarStep[data-state='done'] {
+  color: var(--color-ink-secondary);
+}
+
+:root .sidebarStep[data-state='current'] {
+  box-shadow: none;
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.sidebarIcon {
+  width: var(--sidebar-step-icon);
+  height: var(--sidebar-step-icon);
+  flex: none;
+  color: var(--color-ink-faint);
+}
+
+.sidebarStep[data-state='done'] .sidebarIcon,
+.sidebarStep[data-state='current'] .sidebarIcon {
+  color: var(--color-accent-deep);
+}
+
+.sidebarName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

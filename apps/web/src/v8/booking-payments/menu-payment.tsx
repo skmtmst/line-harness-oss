@@ -1,9 +1,5 @@
 'use client'
 
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
-import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
-
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRight, Calculator, CreditCard, Pencil, Settings } from 'lucide-react'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -13,9 +9,10 @@ import { Field } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import TextLink from '@/components/shared/text-link'
-import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict, type SaveConflictDiffLine, type SaveConflictState } from '@/components/shared/save-conflict'
+import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict, type SaveConflictDiffLine, type SaveConflictState } from '@/components/shared/save-conflict'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { formatYen } from '@/lib/format'
-import { ApiError, bookingApi } from '@/lib/api'
+import { bookingApi } from '@/lib/api'
 import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode } from '@/lib/api-booking-payment-admin'
 import { MODE_LABEL, providerFor } from './labels'
 import styles from './payments.module.css'
@@ -32,7 +29,6 @@ type Status = 'loading' | 'ready' | 'not-ready' | 'error'
 type Latest = { mode: BookingPaymentMode | null; price: number | null }
 
 export interface MenuPaymentState {
-  saveErrors: ReturnType<typeof useSaveFormErrors>
   status: Status
   connected: boolean
   defaultMode: BookingPaymentMode
@@ -47,6 +43,7 @@ export interface MenuPaymentState {
   save: (id?: string) => Promise<void>
   reset: () => void
   conflict: SaveConflictState<Latest>
+  saveErrors: ReturnType<typeof useSaveFormErrors>
 }
 
 function normal(mode: BookingPaymentMode | null | undefined): BookingPaymentMode {
@@ -57,7 +54,6 @@ function normal(mode: BookingPaymentMode | null | undefined): BookingPaymentMode
 export class PaymentConflictError extends Error {}
 
 export function useMenuPayment(kind: MenuPaymentKind, accountId: string | null, id: string | null): MenuPaymentState {
-  const saveErrors = useSaveFormErrors()
   const [status, setStatus] = useState<Status>('loading')
   const [connected, setConnected] = useState(false)
   const [defaultMode, setDefaultMode] = useState<BookingPaymentMode>('onsite')
@@ -66,6 +62,7 @@ export function useMenuPayment(kind: MenuPaymentKind, accountId: string | null, 
   const [price, setPrice] = useState<number | null>(null)
   const [version, setVersion] = useState<{ mode: number; price: number }>({ mode: 0, price: 0 })
   const [reloadSeq, setReloadSeq] = useState(0)
+  const saveErrors = useSaveFormErrors()
   const generation = useRef(0)
 
   const readLatest = useCallback(async (): Promise<Latest & { modeVersion: number; priceVersion: number }> => {
@@ -129,18 +126,21 @@ export function useMenuPayment(kind: MenuPaymentKind, accountId: string | null, 
         }
       }
     } catch (cause) {
-      saveErrors.capture(cause)
-      if (isConflictResponse(cause)) {
+      if (isSaveConflict(cause)) {
         conflict.mark()
         throw new PaymentConflictError('version_conflict')
       }
+      // 400/422 の欄の理由は、支払いの欄の下に出す。投げ直すので、保存した側の知らせも残る。
+      saveErrors.capture(cause)
       throw cause
     }
     setSaved({ mode: value, price })
     conflict.clear()
-  }, [accountId, id, kind, status, dirty, value, price, saved, version, conflict])
+  }, [accountId, id, kind, status, dirty, value, price, saved, version, conflict, saveErrors])
 
-  return { saveErrors, status, connected, defaultMode, value, price, dirty, setValue, setPrice, save, reset: () => { setValue(saved.mode); setPrice(saved.price) }, conflict }
+  return {
+    saveErrors, status, connected, defaultMode, value, price, dirty, setValue, setPrice, save, reset: () => { setValue(saved.mode); setPrice(saved.price) }, conflict,
+  }
 }
 
 /** ぶつかったときの共通の帯と比べる窓（B-319：比べる窓は共通の部品）。 */
@@ -175,7 +175,7 @@ export function MenuPaymentFields({ state, name, price, people, unit, readOnly =
   if (state.status === 'loading') return <p className={styles.minor}>お支払いの設定を読み込んでいます…</p>
   if (state.status === 'error') return <p className={styles.minor}>お支払いの設定を読み込めませんでした。いつもの方法（予約設定 › お支払い）で受けます。</p>
   if (!state.connected) {
-    return <p className={styles.sideCardLink}><CreditCard size={15} aria-hidden="true" />先払いを受けるには<TextLink href="/booking/menus?tab=payments">お支払いをつなぐ<ArrowRight size={14} aria-hidden="true" /></TextLink></p>
+    return <p className={styles.sideCardLink}><CreditCard size={15} aria-hidden="true" className={styles.connectionIcon} />先払いを受けるには<TextLink iconTone="link" href="/booking/menus?tab=payments">お支払いをつなぐ<ArrowRight size={14} aria-hidden="true" /></TextLink></p>
   }
   const own = state.value !== null
   const effective = state.value ?? state.defaultMode
@@ -183,24 +183,24 @@ export function MenuPaymentFields({ state, name, price, people, unit, readOnly =
   const locked = state.status === 'not-ready'
   const conflictBand = <MenuPaymentConflict state={state} subject={name === 'event' ? 'クラスのお支払い' : name === 'course' ? 'コースのお支払い' : 'メニューのお支払い'} />
   if (readOnly) return <p className={styles.readValue}>{own ? `このメニューだけ：${MODE_LABEL[effective]}` : `いつもの方法（${MODE_LABEL[state.defaultMode]}）`}</p>
-  return (<SaveErrorScope errors={state.saveErrors}>{(
-    <>
+  return (
+    <SaveErrorScope errors={state.saveErrors}>
       {conflictBand}
       {state.status === 'not-ready' ? <Notice tone="info">このメニューだけ変える設定は、データの準備が済むと保存できます（今はいつもの方法で受けます）。</Notice> : null}
-      <RadioCardGroup legend={`${name}のお支払い`} columns={2}>
+      <SaveErrorField names={['mode', 'payment_mode', 'provider']}><RadioCardGroup legend={`${name}のお支払い`} columns={2}>
         <RadioCard name={`${name}-payment-source`} value="default" title="いつもの方法を使う" note={`今は：${MODE_LABEL[state.defaultMode]}（予約設定 › お支払い）`}
           icon={<Settings size={16} aria-hidden="true" />} checked={!own} disabled={locked} onChange={() => state.setValue(null)} />
         <RadioCard name={`${name}-payment-source`} value="own" title="このメニューだけ変える" note="下で選んだ方法にします"
           icon={<Pencil size={16} aria-hidden="true" />} checked={own} disabled={locked}
           onChange={() => state.setValue(state.value ?? (state.defaultMode === 'online' ? 'onsite' : 'online'))} />
-      </RadioCardGroup>
+      </RadioCardGroup></SaveErrorField>
       {own ? (
-        <RadioCardGroup legend="このメニューの支払い方法" className={styles.choiceRow}>
+        <SaveErrorField names={['mode', 'payment_mode', 'provider']}><RadioCardGroup legend="このメニューの支払い方法" className={styles.choiceRow}>
           {OVERRIDE_CHOICES.map((mode) => (
-            <SaveErrorField key={mode} names={["mode"]}><RadioCard key={mode} variant="row" name={`${name}-payment-mode`} value={mode} title={MODE_LABEL[mode]}
-              checked={state.value === mode} disabled={locked} onChange={() => state.setValue(mode)} /></SaveErrorField>
+            <RadioCard key={mode} variant="row" name={`${name}-payment-mode`} value={mode} title={MODE_LABEL[mode]}
+              checked={state.value === mode} disabled={locked} onChange={() => state.setValue(mode)} />
           ))}
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
       ) : null}
       {effective === 'online' && price !== null ? (
         <div className={styles.amountBox}>
@@ -209,26 +209,28 @@ export function MenuPaymentFields({ state, name, price, people, unit, readOnly =
           <span className={styles.amountNote}>人数に合わせて計算</span>
         </div>
       ) : null}
-    </>
-  )}</SaveErrorScope>)
+    </SaveErrorScope>
+  )
 }
 
 export function MenuPaymentCard({ priceField = false, readOnly = false, ...props }: Parameters<typeof MenuPaymentFields>[0] & { priceField?: boolean }) {
   const { state } = props
   return (
-    <SaveErrorScope errors={state.saveErrors}><Card variant="form" gap="normal">
+    <Card variant="form" gap="normal">
       <CardHeader size="stacked" title="お支払い" help={<HelpTip label="お支払いの説明">先払いのときは、予約の最後に Stripe の支払いページへ進みます。払い終わると予約が決まります。</HelpTip>} />
       {/* 絵 XFRyO：クラスの 1 回の値段（組3 の口・版つき）。決済をつないでいなくても値段は決められる。 */}
       {priceField && state.status === 'ready' ? (
         readOnly ? <p className={styles.readValue}>{`1回の値段：${formatYen(state.price ?? 0)}`}</p> : (
-          <Field label="1回の値段" htmlFor={`${props.name}-unit-price`}>
-            <NumberInput id={`${props.name}-unit-price`} aria-label="1回の値段" unit="円" type="number" min={0} step={1} value={state.price ?? ''}
-              onChange={(event) => state.setPrice(event.target.value === '' ? null : Math.max(0, Math.floor(Number(event.target.value))))} />
-          </Field>
+          <SaveErrorScope errors={state.saveErrors}>
+            <Field label="1回の値段" htmlFor={`${props.name}-unit-price`}>
+              <SaveErrorField names={['unitPrice', 'unit_price', 'price']}><NumberInput id={`${props.name}-unit-price`} aria-label="1回の値段" unit="円" type="number" min={0} step={1} value={state.price ?? ''}
+                onChange={(event) => state.setPrice(event.target.value === '' ? null : Math.max(0, Math.floor(Number(event.target.value))))} /></SaveErrorField>
+            </Field>
+          </SaveErrorScope>
         )
       ) : null}
       <MenuPaymentFields {...props} readOnly={readOnly} price={priceField ? state.price : props.price} />
-    </Card></SaveErrorScope>
+    </Card>
   )
 }
 

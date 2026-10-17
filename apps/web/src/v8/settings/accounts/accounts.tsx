@@ -25,6 +25,7 @@ import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import StyleEntry from '@/v8/onboarding/style-entry'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import {
   ACCOUNT_FILTERS,
@@ -197,6 +198,9 @@ export default function AccountsV8() {
           <KpiCard title="接続に問題" icon={<TriangleAlert size={13} aria-hidden="true" />} value={kpis?.problem} unit="件" detail={null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
           <KpiCard title="友だちの合計" icon={<Users size={13} aria-hidden="true" />} value={kpis?.friends} unit="人" detail={null} />
         </KpiBand>
+
+        {/* B-335：スタイルを変える入口（今のアカウント）。オーナー・管理者だけ。 */}
+        {canManage ? <StyleEntry /> : null}
 
         <div className={styles.toolbar}>
           <SearchField

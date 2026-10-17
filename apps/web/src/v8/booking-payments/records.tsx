@@ -46,15 +46,15 @@ const STATUS_FILTER = [
   { value: 'onsite', label: 'お店で払う' },
 ]
 const METHOD_FILTER = [
-  { value: '', label: '方法：すべて' },
-  { value: 'online', label: '方法：オンライン' },
-  { value: 'onsite', label: '方法：店頭' },
+  { value: '', label: 'すべて' },
+  { value: 'online', label: 'オンライン' },
+  { value: 'onsite', label: '店頭' },
 ]
 const PERIOD_FILTER = [
-  { value: 'month', label: '期間：今月' },
-  { value: '7d', label: '期間：過去7日' },
-  { value: '30d', label: '期間：過去30日' },
-  { value: '90d', label: '期間：過去90日' },
+  { value: 'month', label: '今月' },
+  { value: '7d', label: '過去7日' },
+  { value: '30d', label: '過去30日' },
+  { value: '90d', label: '過去90日' },
 ]
 
 type Load = { state: 'loading' } | { state: 'ready'; page: PaymentRecordsPage } | { state: 'not-ready' } | { state: 'error' }
@@ -181,9 +181,9 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
           <div data-template-region="toolbar"><ListToolbar
             search={{ placeholder: '名前・タグ・メモで探す', value: query, onChange: setQuery, width: 260 }}
             filters={<>
-              <Select aria-label="状態" value={status} onChange={setStatus} options={STATUS_FILTER} />
-              <Select aria-label="方法" value={method} onChange={setMethod} options={METHOD_FILTER} />
-              <Select aria-label="期間" value={period} onChange={setPeriod} options={PERIOD_FILTER} />
+              <Select aria-label="状態" label="状態" value={status} onChange={setStatus} options={STATUS_FILTER} />
+              <Select aria-label="方法" label="方法" value={method} onChange={setMethod} options={METHOD_FILTER} />
+              <Select aria-label="期間" label="期間" value={period} onChange={setPeriod} options={PERIOD_FILTER} />
             </>}
             trailing={<span className={styles.count}>{load.state === 'ready' ? `${load.page.total}件表示` : ''}</span>}
           /></div>

@@ -3,7 +3,7 @@
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 
-import { Check } from 'lucide-react'
+import { Check, Circle, CircleCheck, CircleDot } from 'lucide-react'
 import type { StepperStep } from '@/components/shared/stepper'
 import styles from './steps.module.css'
 
@@ -26,6 +26,7 @@ export function Steps({
   steps,
   currentKey,
   connectorSize,
+  layout = 'horizontal',
 }: {
   /** 何の進みか（例：「リッチメニューを作る手順」）。nav の読み上げ名。 */
   label: string
@@ -33,6 +34,8 @@ export function Steps({
   /** いまいる段の key（例：URL の `?step=`）。渡さないときは state が current の最初の段。 */
   currentKey?: string
   connectorSize?: 'short'
+  /** 窓の左で、回答済み・現在・未回答の質問へ移る列。 */
+  layout?: 'horizontal' | 'sidebar'
 }) {
   const items = steps.map((raw, index) => ({ ...raw, key: raw.key ?? raw.label, order: raw.order ?? index + 1 }))
   const currentIndex = currentKey !== undefined
@@ -43,6 +46,22 @@ export function Steps({
     const state = items[index].state
     return state === 'current' ? 'todo' : state
   }
+
+  if (layout === 'sidebar') return (
+    <nav aria-label={label} data-part="steps" data-layout="sidebar" className={styles.root}>
+      <ol className={styles.sidebarList}>
+        {items.map((step, index) => {
+          const state = stateOf(index)
+          const Icon = state === 'current' ? CircleDot : state === 'done' ? CircleCheck : Circle
+          return <li key={step.key} aria-current={state === 'current' ? 'step' : undefined}>
+            <button type="button" className={styles.sidebarStep} data-state={state} onClick={step.onSelect} disabled={!step.onSelect}>
+              <Icon aria-hidden="true" className={styles.sidebarIcon} /><span className={styles.sidebarName}>{step.label}</span>
+            </button>
+          </li>
+        })}
+      </ol>
+    </nav>
+  )
 
   return (
     <nav aria-label={label} data-part="steps" data-connector-size={connectorSize} className={styles.root}>

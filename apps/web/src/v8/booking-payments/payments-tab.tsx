@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifySaved } from '@/components/shared/toast'
 import { formatListTimestamp } from '@/lib/format'
@@ -19,6 +20,7 @@ import settings from '../booking-menus/settings.module.css'
 import { providerFor } from './labels'
 import { CancellationSection, ConnectionCard, DepositSection, cancellationSaveError, useCancellationSettings } from './cancellation'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
+import TestModeNote from '@/components/shared/test-mode-note'
 import PaymentRecords from './records'
 import PaymentEvents from './events'
 import styles from './payments.module.css'
@@ -185,7 +187,7 @@ export function PaymentsTabV8({ accountId, canEdit, onConnectedChange }: { accou
         </div>
         <div className={styles.holdRow}>
           <span className={styles.holdSelect}>
-            {canEdit ? <SaveErrorField names={["holdMinutes"]}><Select aria-label="お支払いを待つ時間" value={String(hold)}
+            {canEdit ? <SaveErrorField names={['holdMinutes', 'hold_minutes']}><Select aria-label="お支払いを待つ時間" value={String(hold)}
               onChange={(value) => setHold(Number(value))}
               options={HOLD_CHOICES.map((minutes) => ({ value: String(minutes), label: `${minutes} 分` }))} /></SaveErrorField> : <span className={styles.readValue}>{`${hold} 分`}</span>}
           </span>

@@ -770,7 +770,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const publishChanges = describePublishChanges(publishedSide ?? savedSide, { name, description, layout })
 
   const phone = (
-    <FormPhone accountLook={customerLook.look} layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} />
+    <FormPhone accountLook={customerLook.look} layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} fixedNext focusBlockId={selectedBlockId} />
   )
 
   const preview = (

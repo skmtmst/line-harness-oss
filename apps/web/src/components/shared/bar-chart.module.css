@@ -194,6 +194,11 @@
 .chart[data-chart-distribution='diverging'] .dayButton { flex: 0 0 auto; height: 100%; }
 .chart[data-chart-distribution='diverging'] .bars { position: relative; padding: 0; }
 .chart[data-chart-distribution='diverging'] .bar { position: absolute; }
+/* 分析の日ごとの増減（絵 L4Uov・eEhYU）：棒は細く（5px）、増えたは LINE の緑。凡例の四角も同じ色。 */
+.chart[data-chart-distribution='diverging'] .bars { gap: 0; }
+.chart[data-chart-distribution='diverging'] .bar { width: var(--tpl-an-bar-w); min-width: var(--tpl-an-bar-w); max-width: var(--tpl-an-bar-w); left: calc(50% - var(--tpl-an-bar-w) / 2); }
+.chart[data-chart-distribution='diverging'] .addedBar,
+.legend[data-layout='analytics'] .swatchAdded { background: var(--color-accent); }
 .chart[data-chart-distribution='diverging'] .addedBar { bottom: var(--chart-zero); }
 .chart[data-chart-distribution='diverging'] .removedBar { top: calc(100% - var(--chart-zero)); border-radius: var(--radius-mini); border-start-start-radius: 0; border-start-end-radius: 0; }
 .chart[data-chart-distribution='diverging'] .axisLabel { position: absolute; top: 100%; width: 100%; }
