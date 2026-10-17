@@ -63,6 +63,7 @@ function setup() {
   `)
   sqlite.exec(migration)
   sqlite.exec(migration347)
+  sqlite.exec('ALTER TABLE templates ADD COLUMN deleted_at TEXT')
   return sqlite
 }
 

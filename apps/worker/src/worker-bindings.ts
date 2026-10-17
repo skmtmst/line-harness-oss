@@ -1,6 +1,9 @@
 import type { CodexMentionQueueMessage } from './services/codex-cloud-monitor.js';
 
 export type WorkerBindings = {
+    OPERATOR_PUSH_VAPID_PUBLIC_KEY?:string;
+    OPERATOR_PUSH_VAPID_PRIVATE_KEY?:string;
+    OPERATOR_PUSH_VAPID_SUBJECT?:string;
     DB: D1Database;
     BUILD_GIT_COMMIT?: string;
     BUILD_VERSION?: string;
@@ -25,6 +28,7 @@ export type WorkerBindings = {
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
     RESTAURANT_TEST_ENABLED?: string;
+    GOOGLE_BUSINESS_ENABLED?: string;
     DEPLOY_ENV?: string;
     /** Positive integer overrides by fixed security rule key (JSON). Invalid values use safe defaults. */
     SECURITY_MONITOR_THRESHOLDS?: string;
@@ -86,6 +90,8 @@ export type WorkerBindings = {
     BOOKING_STRIPE_CONNECT_REDIRECT_URI?: string;
     /** 統括のバナー生成（OpenAI 画像生成）。未設定時は生成だけ503で断る。 */
     OPENAI_API_KEY?: string;
+    /** B-355: operations-only deployment flag; production is always closed. */
+    G2_OPENAI_ENABLED?: string;
     /** 画像生成モデル名。未設定時は gpt-image-1。 */
     OPENAI_IMAGE_MODEL?: string;
     /** 統括ごとの月間生成上限（枚）。未設定時は150。料金プラン導入後はプランの値を使う。 */

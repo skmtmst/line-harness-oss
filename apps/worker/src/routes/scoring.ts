@@ -1,3 +1,5 @@
+import { createMileageRuleIdempotent, serializeMileageRule, mileageRuleIdForKey } from './mileage-rule-create.js';
+import { recordAuditEvent } from '@line-crm/db';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
@@ -112,6 +114,65 @@ function mileageV6Error(c: Parameters<typeof auditLog>[0], error: unknown) {
   return c.json({ success: false, error: 'マイル情報を処理できませんでした' }, 500);
 }
 
+function requireMileageExport(key: 'mileage.ledger.export' | 'action_score.list.export'): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const staff = c.get('staff');
+    if (!staff || staff.readOnly || staff.role === 'staff'
+        || (staff.role !== 'owner' && !staff.permissionKeys?.includes(key))) {
+      return c.json({ success: false, error: 'CSVを書き出す権限がありません' }, 403);
+    }
+    return next();
+  };
+}
+
+scoring.post('/api/mileage/exports', async (c, next) => {
+  const staff = c.get('staff');
+  if (!staff || staff.readOnly || staff.role === 'staff' || (staff.role !== 'owner' && !staff.permissionKeys?.some(key => ['mileage.ledger.export','action_score.list.export'].includes(key)))) return c.json({ success: false, error: 'CSVを書き出す権限がありません' }, 403);
+  return next();
+}, inputJsonBoundary({ accountId: ['string'], kind: ['string'], reason: ['string'] }), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: string; kind?: string; reason?: string }>();
+    const accountId = body.accountId?.trim() ?? '';
+    if (!accountId || !await canUseMileageAccount(c, accountId)) return c.json({ success: false, error: '対象のアカウントが見つかりません' }, 404);
+    if (!body.reason?.trim() || body.reason.length > 300) return inputError(c, { success: false, error: '書き出す理由を300字以内で入力してください' }, 400, ['reason']);
+    const kind = body.kind;
+    const staffForExport = c.get('staff');
+    if (staffForExport.role !== 'owner' && !staffForExport.permissionKeys?.includes(kind === 'scores' ? 'action_score.list.export' : 'mileage.ledger.export')) return c.json({ success: false, error: 'CSVを書き出す権限がありません' }, 403);
+    if (!['balances', 'history', 'rewards', 'scores'].includes(kind ?? '')) return inputError(c, { success: false, error: '書き出す種類を指定してください' }, 400, ['kind']);
+    const rows: Record<string, unknown>[] = [];
+    if (kind === 'rewards') rows.push(...(await getMileageRewardAdminOverview(c.env.DB, accountId)).rewards.map(row => ({ ...row })));
+    else {
+      let offset = 0;
+      while (true) {
+        const result = kind === 'balances'
+          ? await getMileageFriendsV6(c.env.DB, { lineAccountId: accountId, visibleAccountIds: [accountId], search: '', limit: 100, offset })
+          : kind === 'history'
+            ? await getMileageAdminHistory(c.env.DB, { accountId, visibleAccountIds: [accountId], limit: 100, offset })
+            : await getActionScoreOverview(c.env.DB, { accountId, limit: 100, offset });
+        rows.push(...result.items as unknown as Record<string, unknown>[]);
+        offset += result.items.length;
+        if (result.items.length === 0 || offset >= result.pagination.total) break;
+      }
+    }
+    const columns: Array<[string, string]> = kind === 'balances'
+      ? [['friendId','友だちID'],['displayName','名前'],['available','利用可能マイル'],['pending','確定待ち'],['lastChangedAt','更新日時']]
+      : kind === 'history'
+        ? [['id','記録ID'],['displayName','名前'],['amount','マイル'],['reason','理由'],['occurredAt','日時']]
+        : kind === 'scores'
+          ? [['friendId','友だちID'],['displayName','名前'],['currentScore','スコア'],['lastReason','理由'],['lastChangedAt','更新日時']]
+          : [['id','使い道ID'],['name','名前'],['status','状態'],['requiredMiles','必要マイル']];
+    const csv = '\uFEFF' + [columns.map(([,label])=>label), ...rows.map(row=>columns.map(([key])=>row[key]))]
+      .map(row=>row.map(mileageCsvCell).join(',')).join('\r\n') + '\r\n';
+    const staff = c.get('staff');
+    await recordAuditEvent(c.env.DB, { tenantId: staff?.tenantId, lineAccountId: accountId,
+      category: 'business', actorPrincipalId: staff?.id, actorRole: staff?.role ?? 'unknown',
+      action: kind === 'scores' ? 'action_score.list.export' : 'mileage.ledger.export',
+      targetKind: kind!, targetId: accountId, result: 'success', reason: body.reason.trim() });
+    return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${kind}.csv"`, 'Cache-Control': 'no-store' } });
+  } catch { return c.json({ success: false, error: '書き出しに失敗しました' }, 500); }
+});
+
 async function canUseMileageAccount(c: Parameters<typeof auditLog>[0], accountId: string) {
   if (!accountId) return false;
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -131,29 +192,6 @@ const requireVisibleFriendForScore: MiddlewareHandler<Env> = async (c, next) => 
   }
   await next();
 };
-
-function serializeMileageRule(rule: MileageRuleRow) {
-  let conditions: Record<string, unknown> = {};
-  if (rule.conditions) {
-    try { conditions = JSON.parse(rule.conditions) as Record<string, unknown>; } catch { conditions = {}; }
-  }
-  return {
-    id: rule.id,
-    name: rule.name,
-    eventType: rule.event_type,
-    source: rule.source,
-    amount: rule.amount,
-    initialStatus: rule.initial_status,
-    conditions,
-    // 334(#521): 帰属アカウント。null は変更不可の既存全店ルール。
-    lineAccountId: rule.line_account_id ?? null,
-    isActive: Boolean(rule.is_active),
-    validFrom: rule.valid_from,
-    validUntil: rule.valid_until,
-    createdAt: rule.created_at,
-    updatedAt: rule.updated_at,
-  };
-}
 
 function publicMileageRedemption(redemption: Awaited<ReturnType<typeof getMileageRedemption>>) {
   if (!redemption) return null;
@@ -1536,7 +1574,7 @@ function mileageCsvCell(value: unknown): string {
   return `"${safe.replaceAll('"', '""')}"`;
 }
 
-scoring.get('/api/mileage/rules/export', requireRole('owner', 'admin', 'staff'), async (c) => {
+scoring.get('/api/mileage/rules/export', requireMileageExport('mileage.ledger.export'), async (c) => {
   try {
     const staff = c.get('staff');
     const accountId = (c.req.query('accountId') ?? '').trim();
@@ -1632,21 +1670,7 @@ scoring.post('/api/mileage/events', requireRole('owner', 'admin'), inputJsonBoun
   }
 });
 
-/**
- * N-240(#813): 決めごと作成の冪等。reminders の N-067 と同じ約束:
- * - keyは `mileage-rule:<account>:<requestKey>` でaccountごとに名前空間を分ける
- * - 同一key＋同一内容→同じrule ID・同じ応答（行は1件）
- * - 同一key＋別内容→409（上書きしない）
- * - 予約後・作成前の失敗は in_progress のまま残し、再送は同じ束で回収する
- * - 同時押下はIDをkeyから決めるため何回通っても1行に収まる
- * - 入力不備・権限拒否は予約を残さない（route側で先に検査する）
- */
-async function mileageRuleIdForKey(namespacedKey: string): Promise<string> {
-  const hex = await hashOutboundPayload(namespacedKey);
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-}
-
-type MileageRuleCreateInput = {
+export type MileageRuleCreateInput = {
   name: string;
   eventType: string;
   source: string | null;
@@ -1667,76 +1691,6 @@ type MileageRuleCreateInput = {
   /** DRAFT-01: false なら最初のINSERTから停止。省略は従来どおり稼働。 */
   isActive?: boolean;
 };
-
-async function createMileageRuleIdempotent(
-  db: D1Database,
-  args: MileageRuleCreateInput & { requestKey: string },
-): Promise<{ status: 201 | 409; body: unknown }> {
-  // 衝突判定は保存される値だけを正規化する。保存に影響しない余分は入れない。
-  const normalized = {
-    lineAccountId: args.lineAccountId,
-    name: args.name,
-    eventType: args.eventType,
-    source: args.source,
-    amount: args.amount,
-    initialStatus: args.initialStatus ?? 'available',
-    conditions: args.conditions ?? null,
-    validFrom: args.validFrom,
-    validUntil: args.validUntil,
-    // 稼働/停止も保存される値なので衝突判定に含める（止めるはずの再送が
-    // 稼働中の行を回収しないよう、同じkeyで別状態は409にする）。
-    isActive: args.isActive !== false,
-  };
-  const namespacedKey = `mileage-rule:${args.lineAccountId}:${args.requestKey}`;
-  const now = new Date().toISOString();
-  const reservation = await reserveOutboundSend(db, {
-    key: namespacedKey,
-    channel: 'line',
-    resourceId: args.lineAccountId,
-    payloadHash: await hashOutboundPayload(JSON.stringify(normalized)),
-    retryInProgress: true,
-    now,
-  });
-  if (reservation.kind === 'conflict') {
-    return { status: 409, body: { success: false, error: '同じ登録キーを別の内容には使用できません' } };
-  }
-  if (reservation.kind === 'replay') {
-    const existing = await getMileageRuleById(db, reservation.responseId);
-    if (existing) {
-      return { status: 201, body: { success: true, data: serializeMileageRule(existing) } };
-    }
-    // 成功確定のはずが行方不明。下の束で作り直す（INSERT OR IGNORE のため安全）。
-  }
-  const ruleId = await mileageRuleIdForKey(namespacedKey);
-  await ensureDefaultMileageProgram(db);
-  const nowJst = jstNow();
-  await db.batch([
-    db.prepare(
-      `INSERT OR IGNORE INTO mileage_rules
-         (id, program_id, name, event_type, source, amount, initial_status,
-          conditions, line_account_id, is_active, valid_from, valid_until, created_at, updated_at)
-       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      ruleId,
-      args.name,
-      args.eventType,
-      args.source,
-      args.amount,
-      args.initialStatus ?? 'available',
-      args.conditions ? JSON.stringify(args.conditions) : null,
-      args.lineAccountId,
-      args.isActive === false ? 0 : 1,
-      args.validFrom,
-      args.validUntil,
-      nowJst,
-      nowJst,
-    ),
-    completeOutboundSendStatement(db, { key: namespacedKey, responseId: ruleId, now }),
-  ]);
-  const created = await getMileageRuleById(db, ruleId);
-  if (!created) throw new Error('mileage rule idempotency recovery failed');
-  return { status: 201, body: { success: true, data: serializeMileageRule(created) } };
-}
 
 scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"eventType":["string"],"source":["null","string"],"amount":["number"],"initialStatus":["string"],"conditions":["null","object"],"validFrom":["null","string"],"validUntil":["null","string"],"lineAccountId":["string"],"isActive":["boolean"]}), async (c) => {
   auditLog(c, 'mileage.rule.create', { kind: 'mileage_rule' });
@@ -1989,7 +1943,9 @@ scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVis
     if (typeof body.scoreChange !== 'number' || !Number.isFinite(body.scoreChange)) {
       return inputError(c, { success: false, error: 'scoreChange must be a finite number' }, 400, ["scoreChange"]);
     }
+    if (typeof body.reason !== 'string' || !body.reason.trim() || body.reason.length > 500) return inputError(c, { success: false, error: '点数を変更する理由が必要です' }, 400, ['reason']);
     const requestKey = c.req.header('Idempotency-Key');
+    if (!requestKey?.trim()) return inputError(c, { success: false, error: 'Idempotency-Key が必要です' }, 400, []);
     if (requestKey !== undefined && (!requestKey.trim() || requestKey.length > 128)) {
       return inputError(c, { success: false, error: 'Invalid Idempotency-Key' }, 400, ["friendId","rewardId","requestId"]);
     }

@@ -1,3 +1,4 @@
+import {catalogWarnings} from './catalog.js';
 import { canonicalDefinition } from './canonical-definition.js';
 import { isCatalogType, parseCatalogDefinition, catalogSnapshot, inspectCatalog, planCatalog } from './catalog.js';
 import { listTemplateAccounts, requireTargetAccounts } from './accounts.js';
@@ -177,7 +178,7 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
   const scenarioDefinition = template.template_type === 'scenario' ? parseScenarioDefinition(definition) : null;
   const deliveryDefinition = isDeliveryType(template.template_type) ? await parseDeliveryDefinition(db,template.template_type,definition) : null;
   if(deliveryDefinition && (1+(deliveryDefinition.references?.length??0))*accountIds.length>270) throw new HqTemplateError('INVALID_ACCOUNTS');
-  const preflightId = crypto.randomUUID(), expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
+  const preflightId = crypto.randomUUID(), expiresAt = new Date(Date.now() + (template.template_type==='booking_menu'?30:15) * 60_000).toISOString();
   const statements: HqTemplateStatement[] = [], stores = [];
   for (const account of accounts) {
     const snapshot = catalogDefinition ? await catalogSnapshot(db,account.id,template.template_type as import('@line-crm/shared').HqCatalogTemplateType) : tagDefinition ? await tagSnapshot(db, account.id) : scenarioDefinition ? await scenarioSnapshot(db,account.id) : deliveryDefinition ? await deliverySnapshot(db,account.id,template.template_type as import('@line-crm/shared').HqDeliveryTemplateType) : null;
@@ -212,7 +213,7 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
       statements.push({ sql: `INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, item.sourceId, item.itemKind, fixedRichReferenceMode, item.targetId, item.expectedRevision] });
     }
     const targetVersion = await targetDistributionVersion(db, authority.tenantId, id, account.id, latest.version);
-    stores.push({ accountId: account.id, accountName: account.name, items, targetVersion, ...(form ? {warnings: await formTemplateWarnings(db, account.id, input)} : {}), ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
+    stores.push({ accountId: account.id, accountName: account.name, items, targetVersion,...(catalogDefinition?{warnings:catalogWarnings(catalogDefinition,snapshot!,template.template_type as import('@line-crm/shared').HqCatalogTemplateType)}:{}), ...(form ? {warnings: await formTemplateWarnings(db, account.id, input)} : {}), ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
   }
   for (const account of accounts) statements.unshift(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [account.id, authority.tenantId]));
   await batch(db, statements);
@@ -332,7 +333,14 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     let plan: ReturnType<typeof planTags> | null = null;
     if (!conflict) {
       try {
-        if(isCatalogType(template.template_type)) plan = planCatalog(p.target_account_id,parseCatalogDefinition(template.template_type,definition),snapshot,template.template_type,selected);
+        if(template.template_type==='booking_menu'){
+          const adapter=getHqTemplateAdapter('booking_menu',{db,authority}),input={templateVersionId:p.template_version_id,definitionJson:version.definition_json};
+          const context={tenantId:authority.tenantId,targetAccountId:p.target_account_id,preflightId:p.id,idempotencyFingerprint:runId,mode:p.distribution_mode,snapshotToken:p.snapshot_token as HqTemplateSnapshotToken,resolutions:selected};
+          const refs=await adapter.extractReferences(input);if(refs.kind!=='OK')throw new HqTemplateError('UNSUPPORTED',422);
+          await adapter.verifyReferences(context,refs.value);const commit=await adapter.buildCommitPlan(context,input,{});if(commit.kind!=='OK')throw new HqTemplateError('UNSUPPORTED',422);
+          plan={statements:[...commit.value.dbCommit],resolutions:[...commit.value.resolutions],counts:{created:1,overwritten:0,aliased:0}};
+        }
+        else if(isCatalogType(template.template_type)) plan = planCatalog(p.target_account_id,parseCatalogDefinition(template.template_type,definition),snapshot,template.template_type,selected,{templateId,versionId:p.template_version_id});
         else if(isDeliveryType(template.template_type)) plan = await planDelivery(db,p.target_account_id,await parseDeliveryDefinition(db,template.template_type,definition),snapshot,template.template_type,selected);
         else if (template.template_type === 'scenario') plan = planScenario(p.target_account_id,parseScenarioDefinition(definition),snapshot,selected);
         else {

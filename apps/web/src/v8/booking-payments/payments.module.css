@@ -10,7 +10,7 @@
 }
 
 .minor {
-  margin: var(--polish-space-none);
+  margin: var(--tpl-layout-zero);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-18);
@@ -119,11 +119,30 @@
 
 .connectTitle {
   align-self: stretch;
-  margin: var(--polish-space-none);
+  margin: var(--tpl-layout-zero);
   color: var(--color-ink);
   font-size: var(--tpl-bm-15);
   font-weight: 700;
   line-height: var(--tpl-bm-22);
+}
+
+.connectList {
+  display: flex;
+  align-self: stretch;
+  flex-direction: column;
+  gap: var(--tpl-bm-12);
+  margin: var(--tpl-layout-zero);
+  padding: var(--tpl-layout-zero);
+  list-style: none;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-13);
+  line-height: var(--tpl-bm-20);
+}
+
+.connectList li {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-8);
 }
 
 /* 右の欄 */
@@ -145,8 +164,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-bm-24);
-  margin: var(--polish-space-none);
-  padding: var(--polish-space-none);
+  margin: var(--tpl-layout-zero);
+  padding: var(--tpl-layout-zero);
   list-style: none;
 }
 
@@ -173,7 +192,7 @@
 
 .sideValue {
   flex: none;
-  margin: var(--polish-space-none);
+  margin: var(--tpl-layout-zero);
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 700;
@@ -201,7 +220,7 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-bm-6);
-  margin: var(--polish-space-none);
+  margin: var(--tpl-layout-zero);
   color: var(--color-ink);
   font-size: var(--tpl-bm-15);
   font-weight: 700;
@@ -237,7 +256,7 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-bm-6);
-  margin: var(--polish-space-none);
+  margin: var(--tpl-layout-zero);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-18);
@@ -292,14 +311,14 @@
 }
 
 .sideCardTitle {
-  margin: var(--polish-space-none);
+  margin: var(--tpl-layout-zero);
   color: var(--color-ink);
   font-size: var(--tpl-bm-12);
   font-weight: 700;
 }
 
 .sideCardText {
-  margin: var(--polish-space-none);
+  margin: var(--tpl-layout-zero);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-18);
@@ -341,3 +360,13 @@
   flex: none;
   gap: var(--tpl-bm-8);
 }
+
+/* 予約メニューのお支払い 4 つ（CnV1I） */
+.fourChoices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-bm-12); }
+.depositLine { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--tpl-bm-12); }
+/* 物差し（%・金額）と結果は、入れる欄の高さにそろえる（題の下・補足の上）。 */
+.depositLine > :first-child { margin-top: var(--tpl-bm-28); }
+.depositResult { padding-top: var(--tpl-bm-36); color: var(--color-ink); font-size: var(--tpl-bm-13); white-space: nowrap; }
+.subLabel { margin: var(--tpl-layout-zero); color: var(--color-ink); font-size: var(--tpl-bm-13); font-weight: 700; }
+.checkRow { display: flex; flex-wrap: wrap; gap: var(--tpl-bm-24); }
+@container (max-width: 760px) { .fourChoices { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

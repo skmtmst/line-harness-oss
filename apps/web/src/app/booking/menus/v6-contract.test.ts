@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ChannelsTabV8 from '@/v8/booking-menus/channels-tab'
+import { V8_TABS } from '@/v8/booking-menus/settings-parts'
 
 vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -148,7 +149,7 @@ describe('V8 予約設定', () => {
   // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('ZyDd6: 予約経路タブは経路の口から表を作る', () => {
-    expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路', node: 'ZyDd6' }")
+    expect(V8_TABS.find(tab => tab.key === 'channels')).toEqual({ key: 'channels', label: '予約経路の連携', node: 'ZyDd6' })
     expect(SETTINGS_V8).toContain('/api/booking/admin/channels?account_id=')
     expect(SETTINGS_V8).toContain('スタッフの Google カレンダー')
     expect(SETTINGS_V8).toContain('data-design-node="wJYQb"')

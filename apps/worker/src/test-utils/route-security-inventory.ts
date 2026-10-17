@@ -9,7 +9,7 @@ export type SecurityRoute = {
 };
 
 /** Evidence of a call is a review aid, never proof that its result is enforced. */
-export function inspectRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
+function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
   const ast = typeof source === 'string' ? ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true) : source;
   const imports = importedRouters(ast);
   const locals = new Map<string, ts.Node>();
@@ -107,29 +107,54 @@ export function inspectRouteSource(file: string, source: string | ts.SourceFile,
     return receiver;
   };
   const verb = (call: ts.CallExpression) => ts.isPropertyAccessExpression(call.expression) ? call.expression.name.text : 'computed';
-  const registered = registrations.filter(call => routers.has(routerName(call))).flatMap(call => {
+  const registered = registrations.flatMap(call => {
+    const router = routerName(call);
+    if (!routers.has(router)) return [];
     const on = verb(call) === 'on';
     const methods = on ? values(call.arguments[0]) : ts.isElementAccessExpression(call.expression)
       ? values(call.expression.argumentExpression).map(value => value.toUpperCase()) : [verb(call).toUpperCase()];
     const paths = values(call.arguments[on ? 1 : 0]);
     if (!methods.length || !paths.length) throw new Error(`Unresolved route expression: ${file}:${ast.getLineAndCharacterOfPosition(call.getStart(ast)).line + 1}`);
-    return methods.flatMap(method => paths.map(path => ({ call, method, path, argumentOffset: on ? 2 : 1 })));
+    return methods.flatMap(method => paths.map(path => ({ call, method, path, router,
+      position: call.getStart(ast), argumentOffset: on ? 2 : 1 })));
   });
+  const middleware = new Map<string, typeof registered>();
+  for (const registration of registered.filter(route => route.method === 'USE')) {
+    const prior = middleware.get(registration.router) ?? [];
+    prior.push(registration);
+    middleware.set(registration.router, prior);
+  }
+  // The same middleware argument can guard hundreds of routes. Its complete
+  // call graph is stable within this source scan, including recursive helpers.
+  const argumentCalls = new Map<ts.Node, Set<string>>();
+  const callsOnce = (argument: ts.Node): Set<string> => {
+    const cached = argumentCalls.get(argument);
+    if (cached) return cached;
+    const result = calls(argument);
+    argumentCalls.set(argument, result);
+    return result;
+  };
   return registered.filter(route => route.method !== 'USE').map(route => {
-    const inherited = registered.filter(prior => prior.method === 'USE'
-      && routerName(prior.call) === routerName(route.call) && prior.call.getStart(ast) < route.call.getStart(ast)
+    const inherited = (middleware.get(route.router) ?? []).filter(prior => prior.position < route.position
       && matchesMiddleware(prior.path, route.path));
     const reachable = new Set<string>();
     for (const registration of [...inherited, route]) {
       for (const argument of registration.call.arguments.slice(registration.argumentOffset)) {
-        for (const name of calls(argument)) reachable.add(name);
+        for (const name of callsOnce(argument)) reachable.add(name);
       }
     }
     const names = [...reachable].sort();
-    return { file, line: ast.getLineAndCharacterOfPosition(route.call.getStart(ast)).line + 1,
-      router: routerName(route.call), method: route.method, path: route.path, calls: names,
+    return { file, line: ast.getLineAndCharacterOfPosition(route.position).line + 1,
+      router: route.router, method: route.method, path: route.path, calls: names,
       evidence: names.filter(name => /canAccess|[Ss]cope|[Vv]isible|verifyCallerLineIdentity|resolveFriendFromLineToken/.test(name)) };
   });
+}
+
+
+/** Keep the reported router name stable while matching registrations by their lexical scope. */
+export function inspectRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
+  return inspectScopedRouteSource(file, source, importedConstant)
+    .map(route => ({ ...route, router: route.router.split(':').pop()! }));
 }
 
 export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
@@ -152,7 +177,7 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
         .filter(node => node.name).map(node => [node.name!.text, node])),
     }] as const;
   }));
-  const routes = new Map([...sources].map(([file]) => [file, inspectRouteSource(file, metadata.get(file)!.ast, (module, name) => {
+  const routes = new Map([...sources].map(([file]) => [file, inspectScopedRouteSource(file, metadata.get(file)!.ast, (module, name) => {
     const importedSource = readFileSync(resolve(dirname(file), module.replace(/\.js$/, '.ts')), 'utf8');
     const ast = ts.createSourceFile(module, importedSource, ts.ScriptTarget.Latest, true);
     for (const statement of ast.statements) {

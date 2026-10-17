@@ -13,6 +13,8 @@ const dbMocks = {
   getWebinarBySlug: vi.fn(),
   createWebinar: vi.fn(),
   updateWebinar: vi.fn(),
+  isWebinarMissedInWindow: vi.fn(async () => true),
+  getWebinarWatchedSeconds: vi.fn(async () => 0),
   archiveWebinar: vi.fn(),
   getWebinarActions: vi.fn(),
   replaceWebinarActions: vi.fn(),
@@ -177,6 +179,9 @@ adminApp.use('*', async (c, next) => {
 adminApp.route('/', webinarRoutes);
 
 function adminReq(path: string, init?: RequestInit) {
+  if (init?.method === 'PUT' && /^\/api\/webinars\/[^/]+$/.test(path) && typeof init.body === 'string') {
+    init = { ...init, body: JSON.stringify({ expectedVersion: 0, ...JSON.parse(init.body) }) };
+  }
   return adminApp.request(path, init, env, execCtx);
 }
 
@@ -892,7 +897,8 @@ describe('POST /api/liff/webinars/:slug/heartbeat', () => {
     expect(await res.json()).toEqual({ ok: true, counted: false, reason: 'position_jump' });
   });
 
-  test('90%視聴で完了通知を一度だけ作る処理へ渡す', async () => {
+  test('実視聴の合計90%で完了通知を一度だけ作る処理へ渡す', async () => {
+    dbMocks.getWebinarWatchedSeconds.mockResolvedValueOnce(6480);
     const res = await postJson('/api/liff/webinars/test-webinar/heartbeat', {
       sessionStartAt: SESSION_START,
       positionSeconds: 6480,
@@ -1980,7 +1986,7 @@ describe('admin CRUD', () => {
 
     expect(res.status).toBe(200);
     expect(dbMocks.updateWebinar).toHaveBeenCalledWith(
-      expect.anything(), 'w1', expect.objectContaining({ durationSeconds: 1 }),
+      expect.anything(), 'w1', expect.objectContaining({ durationSeconds: 1 }), 0,
     );
   });
 
@@ -1999,7 +2005,7 @@ describe('admin CRUD', () => {
 
     expect(res.status).toBe(200);
     expect(dbMocks.updateWebinar).toHaveBeenCalledWith(
-      expect.anything(), 'w1', expect.not.objectContaining({ durationSeconds: expect.anything() }),
+      expect.anything(), 'w1', expect.not.objectContaining({ durationSeconds: expect.anything() }), 0,
     );
     await expect(res.json()).resolves.toMatchObject({
       success: true, data: { durationSeconds: 7200 },
@@ -2355,6 +2361,7 @@ describe('R97 視聴後アクションを実行口へ接続する', () => {
   }
 
   test('視聴完了で完了きっかけのタグ付けが実行され記録される', async () => {
+    dbMocks.getWebinarWatchedSeconds.mockResolvedValueOnce(7200);
     dbMocks.getWebinarActions.mockResolvedValue([{
       id: 'action-1', webinar_id: 'w1', trigger: 'completed', action_type: 'add_tag',
       config_json: JSON.stringify({ tagId: 'tag-done' }), position: 0, version: 1,
@@ -2401,6 +2408,7 @@ describe('R97 視聴後アクションを実行口へ接続する', () => {
   });
 
   test('実行口のない種類は実行せず見送りとして記録する', async () => {
+    dbMocks.getWebinarWatchedSeconds.mockResolvedValueOnce(7200);
     dbMocks.getWebinarActions.mockResolvedValue([{
       id: 'action-9', webinar_id: 'w1', trigger: 'completed', action_type: 'unsupported_future_action',
       config_json: JSON.stringify({ templateId: 'tmpl-1' }), position: 0, version: 1,
@@ -2516,5 +2524,34 @@ describe('GET /api/liff/webinars/:slug/audience', () => {
     dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ publication_ends_at: new Date(SESSION_START * 1000).toISOString() }));
     expect((await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } })).status).toBe(404);
     expect(audienceMock.countRecentWebinarViewers).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('B-333 ウェビナーの見逃し・完了・保存', () => {
+  test('期限の切れた見逃しは専用リンクでも開けない', async () => {
+    vi.setSystemTime(new Date((SESSION_START + 9 * 86400) * 1000));
+    dbMocks.isWebinarMissedInWindow.mockResolvedValueOnce(false);
+    dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ publication_ends_at: '2000-01-01T00:00:00Z' }));
+    const response = await req(`/api/liff/webinars/test-webinar?sessionStartAt=${SESSION_START}`, { headers: { Authorization: 'Bearer t' } });
+    expect(response.status).toBe(404);
+  });
+  test('移動中の位置だけでは完了の副作用を実行しない', async () => {
+    dbMocks.recordWebinarHeartbeat.mockResolvedValueOnce({ status: 'moved' });
+    const response = await postJson('/api/liff/webinars/test-webinar/heartbeat', { sessionStartAt: SESSION_START, positionSeconds: 6480, playerState: 'seeking' });
+    expect(response.status).toBe(200);
+    expect(webinarNotificationMocks.enqueueWebinarCompletedNotification).not.toHaveBeenCalled();
+    expect(dbMocks.recordConversionSourceEvent).not.toHaveBeenCalled();
+  });
+  test('位置が90%でも実視聴が少なければ完了しない', async () => {
+    dbMocks.getWebinarWatchedSeconds.mockResolvedValueOnce(15);
+    await postJson('/api/liff/webinars/test-webinar/heartbeat', { sessionStartAt: SESSION_START, positionSeconds: 6480 });
+    expect(webinarNotificationMocks.enqueueWebinarCompletedNotification).not.toHaveBeenCalled();
+  });
+  test('基本設定を版番号なしで保存できない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
+    const response = await adminApp.request('/api/webinars/w1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '上書き' }) }, env, execCtx);
+    expect(response.status).toBe(400);
+    expect(dbMocks.updateWebinar).not.toHaveBeenCalled();
   });
 });

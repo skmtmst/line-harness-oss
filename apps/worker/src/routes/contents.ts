@@ -1,3 +1,5 @@
+import { hasMediaSignature } from './media-signature.js';
+import { getMediaVersionKeys } from '@line-crm/db';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { isWebinarSource, privateImageKey, publicDeliveryContentType, publicImageKey } from '../services/image-access.js';
 import { mediaTabCounts } from '../services/tab-counts.js';
@@ -182,34 +184,6 @@ function extensionOf(filename: string): string {
   return dot >= 0 ? filename.slice(dot + 1).toLowerCase() : '';
 }
 
-/** ブラウザの申告ではなく、実際の先頭バイトが選んだ形式と一致するかを見る。 */
-function hasMediaSignature(bytes: Uint8Array, mimeType: string): boolean {
-  const ascii = (start: number, length: number) =>
-    String.fromCharCode(...bytes.slice(start, start + length));
-  switch (mimeType) {
-    case 'image/png':
-      return bytes.length >= 8
-        && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
-          .every((value, index) => bytes[index] === value);
-    case 'image/jpeg':
-      return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-    case 'image/gif':
-      return ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a';
-    case 'image/webp':
-      return ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP';
-    case 'video/mp4':
-    case 'audio/mp4':
-      return bytes.length >= 12 && ascii(4, 4) === 'ftyp';
-    case 'audio/mpeg':
-      return ascii(0, 3) === 'ID3'
-        || (bytes.length >= 2 && bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0);
-    case 'application/pdf':
-      return ascii(0, 5) === '%PDF-';
-    default:
-      return false;
-  }
-}
-
 /**
  * `url` は配信用の公開URLとして返す。配信本文に文字列として埋まり、
  * LINEのサーバーが認証なしで取りに行くため、公開のままにしている。
@@ -237,6 +211,7 @@ async function uploaderNameMap(
 
 function serializeMedia(row: Media, workerUrl: string, uploaderNames?: Map<string, string>) {
   return {
+    revision: row.revision ?? 1,
     id: row.id,
     lineAccountId: row.line_account_id,
     folderId: row.folder_id,
@@ -1158,6 +1133,10 @@ contents.patch('/api/media/:id', requireDeliveryAccess('contents'), inputJsonBou
         versionNo?: unknown;
       };
     }>();
+    const revisionHeader = c.req.header('If-Match')?.replace(/^"|"$/g, '');
+    const expectedRevision = Number(revisionHeader);
+    if (!revisionHeader || !Number.isInteger(expectedRevision) || expectedRevision < 1) return inputError(c, { success: false, code: 'EXPECTED_VERSION_REQUIRED', error: 'If-Match に確認した版が必要です' }, 400, []);
+    if (expectedRevision !== (existing.revision ?? 1)) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
     // 名前は空・長すぎ・制御文字を受け付けない（直接アップロードの申告時と同じ決まり）。
     const filename = body.filename === undefined ? undefined : String(body.filename).trim();
     if (filename !== undefined) {
@@ -1214,11 +1193,13 @@ contents.patch('/api/media/:id', requireDeliveryAccess('contents'), inputJsonBou
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
     if (body.usageReference === undefined) {
       const media = await updateMedia(c.env.DB, id, accountId, {
+        expectedRevision,
         ...(filename !== undefined ? { filename } : {}),
         ...(folderId !== undefined ? { folderId } : {}),
         ...(usageExpiresAt !== undefined ? { usageExpiresAt } : {}),
         ...(usageConsentNote !== undefined ? { usageConsentNote } : {}),
       });
+      if (!media) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
       const names = await uploaderNameMap(c.env.DB, [media!]);
       return c.json({ success: true, data: serializeMedia(media!, workerUrl, names) });
     }
@@ -1253,6 +1234,7 @@ contents.patch('/api/media/:id', requireDeliveryAccess('contents'), inputJsonBou
         refId,
         target,
         mediaUpdate: {
+          expectedRevision,
           ...(filename !== undefined ? { filename } : {}),
           ...(folderId !== undefined ? { folderId } : {}),
         },
@@ -1284,6 +1266,8 @@ contents.patch('/api/media/:id', requireDeliveryAccess('contents'), inputJsonBou
     } catch (error) {
       if (error instanceof MediaUsageReferenceError) {
         switch (error.code) {
+          case 'media_metadata_conflict':
+            return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
           case 'media_usage_not_found':
             return c.json({ success: false, error: 'その使用先は見つかりませんでした' }, 404);
           case 'media_version_not_found':
@@ -1642,21 +1626,15 @@ contents.delete('/api/media/:id', requireDeliveryAccess('contents'), async (c) =
       );
     }
 
-    // R2 の実体を先に消すと、DBの削除に失敗したときに「行はあるが実体が無い」
-    // 状態になる。行を消してから実体を消す。逆なら孤児のファイルが残るだけで、
-    // 画面には出てこない。
-    await deleteMedia(c.env.DB, id, accountId);
-    const removal = c.env.IMAGES.delete(existing.r2_key).catch((err) =>
-      console.error(JSON.stringify({"code":"routes_contents_failed","route":"DELETE /api/media/:id"})),
-    );
-    // c.executionCtx は使えない場面で参照そのものが例外を投げるので、
-    // 参照ごと守る。使えなければ待つ。実体の削除はどちらでも構わない
-    // （行はもう消えているので、画面には出てこない）。
+    // 実体の削除失敗は記録を保持して再試行できるようにする。
+    const keys = await getMediaVersionKeys(c.env.DB, id);
+    if (!c.env.IMAGES) return c.json({ success: false, code: 'MEDIA_STORAGE_UNAVAILABLE', error: '保管庫へ接続できないため削除していません' }, 503);
     try {
-      c.executionCtx.waitUntil(removal);
+      await c.env.IMAGES.delete([...new Set([existing.r2_key, ...keys])]);
     } catch {
-      await removal;
+      return c.json({ success: false, code: 'MEDIA_STORAGE_DELETE_FAILED', error: 'ファイルを削除できませんでした。記録を保持しているので、もう一度お試しください' }, 503);
     }
+    await deleteMedia(c.env.DB, id, accountId);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_contents_failed","route":"DELETE /api/media/:id"}));
@@ -2242,8 +2220,8 @@ contents.patch('/api/common-vars/:id', requireDeliveryAccess('commonVars'), inpu
             '差し込み名は後から変えられません。テンプレートの差し込みが空になるためです。新しく作ってください。',
         }, 422, ["varKey","accountId"]);
     }
-    // 空の名前は作れない(登録時と同じ)。版番号なしの上書きは許すが、
-    // その旨は契約テストに明記する(同時編集の衝突検出は版番号つきのみ)。
+    if (expectedVersion === undefined) return inputError(c, { success: false, code: 'EXPECTED_VERSION_REQUIRED', error: '確認した版が必要です' }, 400, ['expectedVersion']);
+    // 空の名前は作れない(登録時と同じ)。
     const patchName = body.name === undefined ? undefined : String(body.name).trim();
     if (patchName !== undefined && !patchName) {
       return inputError(c, { success: false, error: '名前を入力してください' }, 400, ["name"]);

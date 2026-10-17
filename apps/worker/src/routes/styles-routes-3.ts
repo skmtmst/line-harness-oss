@@ -4,11 +4,24 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
-import { StyleError, checkStyle, profile, readDefinition } from '../services/style-setup.js';
+import {
+  StyleError,
+  checkStyle,
+  profile,
+  readDefinition,
+} from '../services/style-setup.js';
 import { instant } from '../services/style-analytics.js';
 
 import { validRestaurantDate } from '../services/restaurant-booking.js';
-import { base, hq, account, json, edit, text, version } from './styles-common.js';
+import {
+  base,
+  hq,
+  account,
+  json,
+  edit,
+  text,
+  version,
+} from './styles-common.js';
 export const styles = new Hono<Env>();
 
 styles.put(base + '/members/:friendId', async (c) => {
@@ -163,7 +176,7 @@ styles.get('/api/hq/style-starter-sets', async (c) => {
     success: true,
     data: (
       await c.env.DB.prepare(
-        `SELECT s.*, (SELECT COUNT(*) FROM account_styles p JOIN line_accounts a ON a.id=p.line_account_id WHERE a.tenant_id=s.tenant_id AND a.archived_at IS NULL AND a.is_active=1 AND p.style=s.style AND p.selection_mode='configured' AND p.selected_at IS NOT NULL) accountCount FROM style_starter_sets s WHERE s.tenant_id=? AND s.archived_at IS NULL`,
+        `SELECT s.*, (SELECT name FROM staff_members u WHERE u.id=s.updated_by AND u.tenant_id=s.tenant_id) updatedByName, (SELECT COUNT(*) FROM account_styles p JOIN line_accounts a ON a.id=p.line_account_id WHERE a.tenant_id=s.tenant_id AND a.archived_at IS NULL AND a.is_active=1 AND p.style=s.style AND p.selection_mode='configured' AND p.selected_at IS NOT NULL) accountCount FROM style_starter_sets s WHERE s.tenant_id=? AND s.archived_at IS NULL`,
       )
         .bind(tenant)
         .all<{
@@ -175,6 +188,7 @@ styles.get('/api/hq/style-starter-sets', async (c) => {
           auto_insert: number;
           updated_at: string;
           updated_by: string | null;
+          updatedByName: string | null;
           accountCount: number;
         }>()
     ).results.map(
@@ -189,58 +203,62 @@ styles.get('/api/hq/style-starter-sets', async (c) => {
   });
 });
 
-styles.put('/api/hq/style-starter-sets/:style', requireRole('owner', 'admin'), async (c) => {
-  const tenant = await hq(c),
-    style = checkStyle(c.req.param('style')),
-    b = await json(c);
-  const definition = readDefinition(b.definition, style),
-    current = await c.env.DB.prepare(
-      'SELECT id,version,auto_insert FROM style_starter_sets WHERE tenant_id=? AND style=? AND archived_at IS NULL',
-    )
-      .bind(tenant, style)
-      .first<{ id: string; version: number; auto_insert: number }>();
-  if (b.autoInsert !== undefined && typeof b.autoInsert !== 'boolean')
-    throw new StyleError('invalid_auto_insert');
-  const autoInsert = b.autoInsert ?? !!(current?.auto_insert ?? 1);
-  version(b.expectedVersion, current?.version ?? 0);
-  const id = current?.id ?? crypto.randomUUID(),
-    now = new Date().toISOString();
-  if (current) {
-    const r = await c.env.DB.prepare(
-      'UPDATE style_starter_sets SET name=?,definition_json=?,version=version+1,updated_at=?,updated_by=?,auto_insert=? WHERE id=? AND tenant_id=? AND version=?',
-    )
-      .bind(
-        text(b.name, 100) ?? style,
-        JSON.stringify(definition),
-        now,
-        c.get('staff').id,
-        Number(autoInsert),
-        id,
-        tenant,
-        current.version,
+styles.put(
+  '/api/hq/style-starter-sets/:style',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const tenant = await hq(c),
+      style = checkStyle(c.req.param('style')),
+      b = await json(c);
+    const definition = readDefinition(b.definition, style),
+      current = await c.env.DB.prepare(
+        'SELECT id,version,auto_insert FROM style_starter_sets WHERE tenant_id=? AND style=? AND archived_at IS NULL',
       )
-      .run();
-    if (!r.meta.changes) throw new StyleError('version_conflict', 409);
-  } else
-    await c.env.DB.prepare(
-      'INSERT INTO style_starter_sets(id,tenant_id,style,name,definition_json,updated_at,updated_by,auto_insert) VALUES(?,?,?,?,?,?,?,?)',
-    )
-      .bind(
-        id,
-        tenant,
-        style,
-        text(b.name, 100) ?? style,
-        JSON.stringify(definition),
-        now,
-        c.get('staff').id,
-        Number(autoInsert),
+        .bind(tenant, style)
+        .first<{ id: string; version: number; auto_insert: number }>();
+    if (b.autoInsert !== undefined && typeof b.autoInsert !== 'boolean')
+      throw new StyleError('invalid_auto_insert');
+    const autoInsert = b.autoInsert ?? !!(current?.auto_insert ?? 1);
+    version(b.expectedVersion, current?.version ?? 0);
+    const id = current?.id ?? crypto.randomUUID(),
+      now = new Date().toISOString();
+    if (current) {
+      const r = await c.env.DB.prepare(
+        'UPDATE style_starter_sets SET name=?,definition_json=?,version=version+1,updated_at=?,updated_by=?,auto_insert=? WHERE id=? AND tenant_id=? AND version=?',
       )
-      .run();
-  return c.json({
-    success: true,
-    data: { id, version: (current?.version ?? 0) + 1, autoInsert },
-  });
-});
+        .bind(
+          text(b.name, 100) ?? style,
+          JSON.stringify(definition),
+          now,
+          c.get('staff').id,
+          Number(autoInsert),
+          id,
+          tenant,
+          current.version,
+        )
+        .run();
+      if (!r.meta.changes) throw new StyleError('version_conflict', 409);
+    } else
+      await c.env.DB.prepare(
+        'INSERT INTO style_starter_sets(id,tenant_id,style,name,definition_json,updated_at,updated_by,auto_insert) VALUES(?,?,?,?,?,?,?,?)',
+      )
+        .bind(
+          id,
+          tenant,
+          style,
+          text(b.name, 100) ?? style,
+          JSON.stringify(definition),
+          now,
+          c.get('staff').id,
+          Number(autoInsert),
+        )
+        .run();
+    return c.json({
+      success: true,
+      data: { id, version: (current?.version ?? 0) + 1, autoInsert },
+    });
+  },
+);
 
 styles.get('/api/hq/style-attention', async (c) => {
   await hq(c, true);

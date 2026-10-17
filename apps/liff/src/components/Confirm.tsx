@@ -1,13 +1,21 @@
 import { useEffect,useState } from 'react';
 import { api,type BookingEntitlement,type CreateBookingResponse,type MenuItem,type StaffItem } from '../lib/api.js';
 import { bookingPriceText } from '../lib/booking-price.js';
-import { addMinutesHm,formatJpLong,slotStartsAtIso } from '../lib/datetime.js';
+import { useRef } from 'react';
+import { type BookingCancellationPreview } from '../lib/api.js';
+import CancellationPolicy from './CancellationPolicy.js';
+import { addMinutesHm, formatJpLong, slotStartsAtIso } from '../lib/datetime.js';
+import { logFailure } from '../lib/user-message.js';
+
 import { isNotReadyYet } from '../lib/not-ready.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
-import { logFailure } from '../lib/user-message.js';
+
 import BookingIntake from './BookingIntake.js';
 import type { SlotPick } from './DateTimePicker.js';
+import PreparingOverlay from './PreparingOverlay.js';
+import RecurringCard, { type RecurrenceValue } from './RecurringCard.js';
+import { menuLine, personShort, totals, yen, type PartyState } from '../lib/party.js';
 import BottomBar from './ui/BottomBar.js';
 import Button from './ui/Button.js';
 import Icon from './ui/Icon.js';
@@ -23,8 +31,11 @@ export default function Confirm({
   staff,
   slot,
   autoConfirm,
+  party,
   cancelDeadlineMinutesBefore = null,
+  onPolicyChange,
   onBack,
+  onRegisterBack,
   onSubmitted,
 }: {
   menu: MenuItem;
@@ -32,9 +43,15 @@ export default function Confirm({
   slot: SlotPick;
   /** 予約のルールが承認なし確定のとき真。未承認の案内を出さない。 */
   autoConfirm: boolean;
+  /** 2 人以上・追加メニューのとき（B5）。人ごとの行と合計を出し、組で送る。 */
+  party?: PartyState;
   cancelDeadlineMinutesBefore?: number | null;
-  /** 「← 日時を選び直す」。日時の段へ戻る。 */
-  onBack: () => void;
+  /** キャンセル料の決まりがオンか（手順の帯に「お支払い」を足す）。 */
+  onPolicyChange?: (enabled: boolean) => void;
+  /** 日時の段へ戻る。戻るボタンは頭の「‹」にだけある（この画面には置かない）。 */
+  onBack?: () => void;
+  /** 頭の「‹」から呼べるよう、戻る処理を親へ渡す。 */
+  onRegisterBack?: (back: (() => void) | null) => void;
   /** 予約ができたら予約ID・状態・支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
   onSubmitted: (result: {
     bookingId: string;
@@ -50,6 +67,35 @@ export default function Confirm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(() => crypto.randomUUID());
+  const [setupKey] = useState(() => crypto.randomUUID());
+  /* 見積もりを読めたときだけ予約を送る。失敗を「決まりなし」に読み替えない。 */
+  const [policy, setPolicy] = useState<BookingCancellationPreview | null>(null);
+  const [policyState, setPolicyState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [policyRetry, setPolicyRetry] = useState(0);
+  const [policyKey, setPolicyKey] = useState('');
+  const [accepted, setAccepted] = useState(false);
+  const startsAt = slotStartsAtIso(slot);
+  const currentPolicyKey = JSON.stringify([menu.id, staff.id, startsAt]);
+  const policyReady = policyState === 'ready' && policyKey === currentPolicyKey;
+  useEffect(() => {
+    let alive = true;
+    setPolicyState('loading'); setPolicy(null); setAccepted(false);
+    void Promise.resolve().then(() => api.cancellationPreview({ menuId: menu.id, staffId: staff.id, startsAt })).then((data) => {
+      if (!alive) return;
+      setPolicy(data && data.enabled ? data : null);
+      setPolicyKey(currentPolicyKey); setPolicyState('ready');
+      onPolicyChange?.(Boolean(data && data.enabled));
+    }).catch((e) => {
+      if (!alive) return;
+      logFailure('cancellation-preview', e);
+      setPolicyState('error');
+    });
+    return () => { alive = false; };
+  }, [menu.id, staff.id, startsAt, currentPolicyKey, onPolicyChange, policyRetry]);
+
+  /* 続けて予約（B4）・2 人以上の組（B5）：口がまだ無い間は、送らずに「現在準備中です」を出す（B-314）。 */
+  const [recurrence, setRecurrence] = useState<RecurrenceValue>(null);
+  const [preparing, setPreparing] = useState<string | null>(null);
   /* 使う回数券・月謝（組3）。口が無い間は 'soon'＝準備中の 1 行だけ出す。使えるものが無ければ段ごと出さない。 */
   const [entitlements, setEntitlements] = useState<BookingEntitlement[] | 'soon' | null>(null);
   const [entitlementError, setEntitlementError] = useState<string | null>(null);
@@ -70,25 +116,47 @@ export default function Confirm({
   const chosenEntitlement = Array.isArray(entitlements) ? entitlements.find((e) => e.id === entitlementId) ?? null : null;
 
   const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start]));
+  /* 戻る（頭の「‹」から呼ぶ）：送りかけの返事は受け取らず、日時の段へ戻る。 */
   function back() {
     request.invalidate();
     setSubmitting(false);
-    onBack();
+    onBack?.();
   }
+  const backRef = useRef(back);
+  backRef.current = back;
+  useEffect(() => { onRegisterBack?.(() => backRef.current()); return () => onRegisterBack?.(null); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
-    if (submitting) return;
+    if (submitting || !policyReady || (policy !== null && !accepted)) return;
+    if (party && party.size > 1) { setPreparing('2 人以上でのご予約'); return; }
+    if (recurrence) { setPreparing('毎週の続けての予約'); return; }
     const generation = request.begin();
     setSubmitting(true);
     setError(null);
     try {
+      /* キャンセル料がオンの店：カードを登録（試験モード）してから、確かめた決まりの版と一緒に送る。登録がまだなら登録の画面へ。 */
+      let consent: { policyAccepted: true; policyVersion: number; setupIntentId?: string } | null = null;
+      if (policy) {
+        consent = { policyAccepted: true, policyVersion: policy.version };
+        if (policy.cardRequired !== false) {
+          const setup = await api.cancellationSetup(menu.id, setupKey);
+          if (!request.isCurrent(generation)) return;
+          if (setup.status !== 'ready') {
+            window.location.assign(setup.url);
+            return;
+          }
+          consent.setupIntentId = setup.setupIntentId;
+        }
+      }
       const created = await api.createRequest(
         {
           menu_id: menu.id,
           staff_id: staff.id,
           // 空き枠が返した開始の瞬間を送る（店が日本時間以外でもずれない）。
-          starts_at: slotStartsAtIso(slot),
+          starts_at: startsAt,
           customer_note: note || undefined,
+          ...(consent ?? {}),
+          ...(party && party.members[0].addonIds.length ? { addonIds: party.members[0].addonIds } : {}),
           ...(chosenEntitlement ? { entitlement_id: chosenEntitlement.id } : {}),
         },
         idemKey,
@@ -108,7 +176,17 @@ export default function Confirm({
       if (!request.isCurrent(generation)) return;
       logFailure('create-request', e);
       const err = e as { status?: number; body?: { error?: string } };
-      if (err.status === 409 && err.body?.error === 'slot_conflict') {
+      if (err.status === 409 && err.body?.error === 'policy_changed') {
+        setAccepted(false);
+        setPolicyState('loading');
+        setPolicyRetry((n) => n + 1);
+        setError('キャンセル料の決まりが変わりました。もう一度確かめてから予約してください。');
+      } else if (err.status === 409 && err.body?.error === 'card_not_registered') {
+        setError('カードの登録が済んでいません。もう一度押して、カードを登録してください。');
+      } else if (err.status === 409 && err.body?.error === 'payment_not_connected') {
+        setError('いまはこのお店でカードの登録ができません。お店にご連絡ください。');
+      } else if (err.status === 409 && err.body?.error === 'slot_conflict') {
+
         setError('この時間枠は他の方の予約と重なりました。日時を選び直してください。');
       } else {
         setError('予約できませんでした。もう一度お試しください');
@@ -122,17 +200,27 @@ export default function Confirm({
     <div className="space-y-3.5" data-design-node={wide ? 'uZqMA' : 'gLReL'}>
       <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
       <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
-        <Row label="メニュー" value={menu.name} />
+        {party ? totals(party, menu).rows.map((r) => <Row alignEnd={policy !== null} key={r.index} label={personShort(r.index)} value={`${menuLine(r.menu, r.member)}・${(r.index === 0 ? (r.member.staff ?? staff) : r.member.staff)?.display_name ?? '指名なし'}`} />) : <Row alignEnd={policy !== null} label="メニュー" value={menu.name} />}
         <Row
+          alignEnd={policy !== null}
           label="日時"
-          value={`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, staff.duration_minutes)}`}
+          value={`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, party ? totals(party, menu).minutes : staff.duration_minutes)}`}
         />
-        <Row label="担当" value={staff.display_name} />
+        {party ? null : <Row alignEnd={policy !== null} label="担当" value={staff.display_name} />}
         <Row
+          alignEnd={policy !== null}
           label="料金"
-          value={chosenEntitlement ? `${chosenEntitlement.name}を使う` : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
+          value={chosenEntitlement ? `${chosenEntitlement.name}を使う` : party ? `${yen(totals(party, menu).price)}（目安・お店で払う）` : policy ? bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode) : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
         />
+        {policy?.deposit ? (
+          <>
+            <Row alignEnd={policy !== null} label="今お支払い（デポジット）" value={yen(policy.deposit.amount)} wideLabel />
+            <Row alignEnd={policy !== null} label="お店で" value={yen(Math.max(0, policy.price - policy.deposit.amount))} />
+          </>
+        ) : null}
       </dl>
+      {menu.recurring?.enabled && !party ? <RecurringCard menu={menu} staff={staff} startsAt={slotStartsAtIso(slot)} onChange={setRecurrence} /> : null}
+      {preparing ? <PreparingOverlay title="ご予約" feature={preparing} /> : null}
       {entitlementError ? <p role="status" className="text-[13px] leading-6 text-danger">{entitlementError}</p> : null}
       {entitlements === 'soon' ? (
         <p className="flex items-center gap-2 text-xs text-liff-sub">
@@ -166,6 +254,14 @@ export default function Confirm({
           {error}
         </p>
       )}
+      {policyState === 'error' ? (
+        <p role="alert" className="text-[13px] leading-6 text-danger">
+          キャンセル料の決まりを読み込めませんでした。
+          <Button variant="link" onClick={() => { setPolicyState('loading'); setPolicyRetry((n) => n + 1); }}>もう一度</Button>
+        </p>
+      ) : !policyReady ? <p role="status" aria-busy="true" className="text-[13px] leading-6 text-liff-sub">キャンセル料の決まりを確かめています…</p> : null}
+      {policy ? <CancellationPolicy preview={policy} accepted={accepted} onAcceptedChange={setAccepted} /> : null}
+      {policy ? null : (
       <div className="flex gap-2 rounded-(--liff-radius) bg-liff-note p-3 text-xs leading-[18px] text-ink">
         <Icon name="info" tone="booking-info" className="h-4 w-4 shrink-0" />
         <p>
@@ -175,17 +271,15 @@ export default function Confirm({
           {deadline != null ? `キャンセルは開始の${deadline % 60 === 0 ? `${deadline / 60}時間` : `${deadline}分`}前まで。` : 'キャンセル期限は予約の履歴で確認してください。'}
         </p>
       </div>
+      )}
       <PrivacyNote />
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
-        <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-          {submitting ? '送信中...' : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
-        </Button>
-        <Button variant="text"
-          type="button"
-          onClick={back}
-        >
-          ← 日時を選び直す
+        <Button variant="primary" onClick={handleSubmit} disabled={submitting || !policyReady || (policy !== null && !accepted)}>
+          {submitting ? '送信中...'
+            : policy?.deposit ? `${yen(policy.deposit.amount)} を払って予約する`
+              : policy && policy.cardRequired !== false ? 'カードを登録して予約する'
+                : recurrence ? `${recurrence.made} 回分を予約する` : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
         </Button>
       </BottomBar>
     </div>
@@ -193,11 +287,11 @@ export default function Confirm({
 }
 
 /** 確認の1行。板 (gLReL) は 1行 40 (線を含む)・鍵と値は上ぞろえ。 */
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, wideLabel = false, alignEnd = false }: { label: string; value: string; wideLabel?: boolean; alignEnd?: boolean }) {
   return (
     <div className="flex h-10 items-start gap-2 py-2.5">
-      <dt className="w-18 shrink-0 text-xs text-liff-sub">{label}</dt>
-      <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={value}>
+      <dt className={`${wideLabel ? 'whitespace-nowrap' : 'w-18'} shrink-0 text-xs text-liff-sub`}>{label}</dt>
+      <dd className={`min-w-0 flex-1 truncate text-sm font-semibold text-ink${alignEnd ? ' text-right' : ''}`} title={value}>
         {value}
       </dd>
     </div>

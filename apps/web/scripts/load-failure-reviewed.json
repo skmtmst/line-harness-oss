@@ -1,5 +1,12 @@
 [
   {
+    "filename": "src/v8/ai-reply/api.ts",
+    "fingerprint": "3564c53a892dc0be",
+    "disposition": "local-parser",
+    "count": 1,
+    "reason": "保存済みの JSON 文字列を読む部品。壊れた値は質問なしとして扱い、読み込みの失敗ではない。"
+  },
+  {
     "filename": "src/app/accounts/use-uid-migration.ts",
     "fingerprint": "c304f9b5abadfe10",
     "disposition": "error-visible",
@@ -231,7 +238,7 @@
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
-    "filename": "src/v8/hq-broadcasts/create.tsx",
+    "filename": "src/v8/hq-broadcasts/create-gap-parts.tsx",
     "fingerprint": "987114d142fa1bfc",
     "disposition": "local-parser",
     "count": 1,

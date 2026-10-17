@@ -352,7 +352,7 @@ describe('#699 タグ付与後の副作用の工程別台帳', () => {
     expect(reopened.last_error).toMatch(/d1 read failed/);
 
     await retryFriendTagSideEffects(db, 'friend-1', 'tag-1');
-    expect(counts(raw).tagChangeScores).toBe(2); // 人の判断で走り直した
+    expect(counts(raw).tagChangeScores).toBe(1); // 同じ付与の再開は安定IDで二重加点しない
     expect(ledgerStatuses(raw).event_tag_change).toBe('completed');
     expect(await countStuckFriendTagSideEffectRuns(db)).toBe(0);
   });

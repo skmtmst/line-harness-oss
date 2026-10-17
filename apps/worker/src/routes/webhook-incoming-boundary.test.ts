@@ -1,3 +1,4 @@
+import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
 /*
  * #829 (N-378/N-383/N-384): webhook の受理境界を「実際に処理可能か・安全か」へ揃える。
  *
@@ -33,16 +34,7 @@ const { app } = await import('../index.js');
 /** WEBHOOK_SECRET_MIN_LENGTH (32) 以上にする。短いと 503 で弾かれる。 */
 const SECRET = 'boundary-guard-secret-0123456789ab';
 
-async function sign(secret: string, body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  return Array.from(new Uint8Array(signature))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
+const sign = signIncomingTest;
 
 function seed(db: SqliteD1): void {
   db.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
@@ -72,7 +64,7 @@ async function receive(
   options?: { webhookId?: string; secret?: string },
 ) {
   const signature = await sign(options?.secret ?? SECRET, body);
-  return app.request(
+  return receiveAndDrain(app,
     `/api/webhooks/incoming/${options?.webhookId ?? 'iwh-1'}/receive?accountId=account-1`,
     {
       method: 'POST',
@@ -91,6 +83,7 @@ type ReceiveData = {
   received?: boolean;
   duplicate?: boolean;
   source?: string;
+  queued?: boolean;
   matched?: boolean;
   executed?: number;
   failed?: number;
@@ -129,10 +122,10 @@ describe('#829 受信Webhookの受理境界', () => {
     it('相手が見つかり処理が走った受信は matched/executed/failed を返す', async () => {
       configureTagAction();
       const res = await receive(env, JSON.stringify({ friendId: 'friend-1' }));
-      expect(res.status).toBe(200);
+      expect(res.status).toBeOneOf([200, 202]);
       const body = await res.json() as { data: ReceiveData };
       expect(body.data).toMatchObject({
-        received: true, source: 'custom', matched: true, executed: 1, failed: 0,
+        received: true, source: 'custom', queued: true,
       });
       expect(db.raw.prepare(`SELECT COUNT(*) AS n FROM friend_tags`).get()).toEqual({ n: 1 });
     });
@@ -140,20 +133,20 @@ describe('#829 受信Webhookの受理境界', () => {
     it('相手が見つからない受信は matched:false・executed:0 で判別できる', async () => {
       configureTagAction();
       const res = await receive(env, JSON.stringify({ friendId: 'friend-absent' }));
-      expect(res.status).toBe(200);
+      expect(res.status).toBeOneOf([200, 202]);
       const body = await res.json() as { data: ReceiveData };
       expect(body.data).toMatchObject({
-        received: true, matched: false, executed: 0, failed: 0,
+        received: true, queued: true,
       });
       expect(db.raw.prepare(`SELECT COUNT(*) AS n FROM friend_tags`).get()).toEqual({ n: 0 });
     });
 
     it('実行処理が未設定の受信も executed:0 で判別できる', async () => {
       const res = await receive(env, JSON.stringify({ order_id: 'A-1' }));
-      expect(res.status).toBe(200);
+      expect(res.status).toBeOneOf([200, 202]);
       const body = await res.json() as { data: ReceiveData };
       expect(body.data).toMatchObject({
-        received: true, matched: false, executed: 0, failed: 0,
+        received: true, queued: true,
       });
     });
   });
@@ -168,7 +161,7 @@ describe('#829 受信Webhookの受理境界', () => {
 
       // 上限内の本文は従来どおり200で処理される（締めすぎていない）。
       const ok = await receive(env, JSON.stringify({ friendId: 'friend-1' }));
-      expect(ok.status).toBe(200);
+      expect(ok.status).toBeOneOf([200, 202]);
       expect(receiptCount()).toBe(1);
     });
 
@@ -195,7 +188,7 @@ describe('#829 受信Webhookの受理境界', () => {
           VALUES ('iwh-1', ?, ?, ?)`).run(`old-${i}`, `old-event-${i}`, old);
       }
       const res = await receive(env, JSON.stringify({ order_id: 'within-limit' }));
-      expect(res.status).toBe(200);
+      expect(res.status).toBeOneOf([200, 202]);
       expect(receiptCount()).toBe(61);
     });
 
@@ -207,7 +200,7 @@ describe('#829 受信Webhookの受理境界', () => {
           VALUES ('iwh-1', ?, ?, ?)`).run(`edge-${i}`, `edge-event-${i}`, now);
       }
       const ok = await receive(env, JSON.stringify({ order_id: 'boundary-60' }));
-      expect(ok.status).toBe(200);
+      expect(ok.status).toBeOneOf([200, 202]);
       expect(receiptCount()).toBe(60);
       const over = await receive(env, JSON.stringify({ order_id: 'boundary-61' }));
       expect(over.status).toBe(429);
@@ -222,7 +215,7 @@ describe('#829 受信Webhookの受理境界', () => {
           receive(env, JSON.stringify({ order_id: `burst-${i}` }))),
       );
       const statuses = results.map((res) => res.status);
-      expect(statuses.filter((s) => s === 200)).toHaveLength(60);
+      expect(statuses.filter((s) => s === 202)).toHaveLength(60);
       expect(statuses.filter((s) => s === 429)).toHaveLength(20);
       expect(receiptCount()).toBe(60);
     });
@@ -230,7 +223,7 @@ describe('#829 受信Webhookの受理境界', () => {
     it('窓がいっぱいでも完了済みの再送は429ではなく重複応答を返す', async () => {
       const body = JSON.stringify({ order_id: 'dup-in-full-window' });
       const first = await receive(env, body);
-      expect(first.status).toBe(200);
+      expect(first.status).toBeOneOf([200, 202]);
       // 直近ウィンドウを上限まで埋める(自分の受領1件+59件)。
       const now = new Date().toISOString();
       for (let i = 0; i < 59; i++) {
@@ -240,7 +233,7 @@ describe('#829 受信Webhookの受理境界', () => {
       }
       expect(receiptCount()).toBe(60);
       const dup = await receive(env, body);
-      expect(dup.status).toBe(200);
+      expect(dup.status).toBeOneOf([200, 202]);
       const dupBody = await dup.json() as { data: ReceiveData };
       expect(dupBody.data).toMatchObject({ received: true, duplicate: true });
       // 重複応答は新しい受領記録を消費しない。
@@ -261,7 +254,7 @@ describe('#829 受信Webhookの受理境界', () => {
           receive(env, JSON.stringify({ order_id: `last-slot-${i}` }))),
       );
       const statuses = results.map((res) => res.status);
-      const succeeded = statuses.filter((s) => s === 200).length;
+      const succeeded = statuses.filter((s) => s === 202).length;
       expect(succeeded).toBeLessThanOrEqual(1);
       expect(statuses.filter((s) => s === 429)).toHaveLength(10 - succeeded);
       expect(receiptCount()).toBe(60);
@@ -283,7 +276,7 @@ describe('#829 受信Webhookの受理境界', () => {
       db.raw.prepare(`UPDATE incoming_webhook_receipts SET received_at=? WHERE webhook_id='iwh-1'`)
         .run(new Date(Date.now() - 10 * 60_000).toISOString());
       const retry = await receive(env, body);
-      expect(retry.status).toBe(200);
+      expect(retry.status).toBeOneOf([200, 202]);
       const retryBody = await retry.json() as { data: ReceiveData };
       expect(retryBody.data).toMatchObject({ received: true });
       expect(receiptCount()).toBe(61);

@@ -14,6 +14,7 @@ vi.mock('../services/account-access.js', () => ({
 }));
 
 const { bookingPayments } = await import('./booking-payments.js');
+const { default: booking } = await import('./booking.js');
 
 const LINE_USER_ID = `U${'e'.repeat(32)}`;
 let sqlite: SqliteD1['raw'];
@@ -29,6 +30,7 @@ vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
 function app() {
   const instance = new Hono<Env>();
   instance.route('/', bookingPayments);
+  instance.route('/', booking);
   return instance;
 }
 
@@ -66,6 +68,26 @@ beforeEach(() => {
 });
 
 describe('LIFFの支払いの口', () => {
+  it('本人の予約履歴に保存済みの店払い・金額・領収書を出し、店内の操作理由を出さない', async()=>{
+    sqlite.exec(`INSERT INTO booking_payment_choices VALUES('booking-a','account-a','onsite','onsite',10);
+      INSERT INTO booking_payments(id,line_account_id,booking_id,amount,status,provider,provider_payment_id,idempotency_key,
+        created_at,updated_at,actor_label,action_reason,receipt_url,refunded_amount)
+      VALUES('paid','account-a','booking-other',8000,'paid','stripe','pi_test_paid','paid','2026-10-01','2026-10-01',
+        '店内の担当','非公開の理由','https://pay.stripe.com/receipts/test',300);`);
+    const instance=app();
+    const response=await instance.request('/api/liff/booking/me?liffId=liff-1',{headers},{DB:db});
+    expect(response.status).toBe(200);
+    const body=await response.json() as {upcoming:{id:string;payment?:unknown}[];past:{id:string;payment?:unknown}[]};
+    const items=[...body.upcoming,...body.past];
+    expect(items.find(b=>b.id==='booking-a')).toMatchObject({payment:{method:'onsite',status:'onsite',amount:8000}});
+    expect(items.find(b=>b.id==='booking-other')).toMatchObject({payment:{method:'online',status:'partially_refunded',amount:8000,
+      refundedAmount:300,receiptUrl:'https://pay.stripe.com/receipts/test'}});
+    expect(JSON.stringify(body)).not.toMatch(/店内の担当|非公開の理由|pi_test_paid/);
+    const status=await instance.request('/api/liff/booking/payments/by-booking?liffId=liff-1&bookingId=booking-other',{headers},{DB:db});
+    const statusBody=await status.json();expect(JSON.stringify(statusBody)).not.toMatch(/店内の担当|非公開の理由|pi_test_paid/);
+    expect(statusBody).toMatchObject({payment:{refunded_amount:300,receipt_url:'https://pay.stripe.com/receipts/test'}});
+  });
+
   it('自分の予約だけ始められ、状態を見られる', async () => {
     await saveBookingPaymentConfig(db, 'account-a', { mode: 'online', provider: 'stripe', holdMinutes: 30 });
     const instance = app();

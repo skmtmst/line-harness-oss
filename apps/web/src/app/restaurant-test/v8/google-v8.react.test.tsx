@@ -97,3 +97,17 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     expect(board.textContent).toContain('9/20')
   })
 })
+
+
+it('B-368 本番で飲食店の試験を閉じてもGoogleだけで読み込める', async () => {
+  vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'false')
+  vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
+  try {
+    fixture.snapshot.mockRejectedValue(new Error('本番では飲食店の試験APIを呼ばない'))
+    fixture.connection.mockResolvedValue({ ...connectionData, stores: [{ id: store.id, name: store.name, line_account_id: store.line_account_id }] })
+    render(<GoogleV8 />)
+    await screen.findByText('佐藤 S.')
+    expect(fixture.snapshot).not.toHaveBeenCalled()
+    expect(fixture.connection).toHaveBeenCalledWith('account-1')
+  } finally { vi.unstubAllEnvs() }
+})

@@ -120,6 +120,9 @@ export interface BookingPaymentRecord {
   idempotency_key: string;
   hold_until: string | null;
   paid_at: string | null;
+  refunded_amount?: number;
+  actor_label?: string | null;
+  action_reason?: string | null;
   refunded_at?: string | null;
   receipt_url?: string | null;
 }

@@ -1,3 +1,4 @@
+import {staffName} from './broadcast-approval-actor.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { getBroadcastById, createNotification, type Broadcast } from '@line-crm/db';
@@ -88,16 +89,6 @@ function serializeApproval(broadcast: Broadcast) {
   };
 }
 
-async function staffName(db: D1Database, staffId: string | null): Promise<string> {
-  if (!staffId) return '担当者';
-  try {
-    const row = await db.prepare(`SELECT name FROM staff_members WHERE id = ?`)
-      .bind(staffId).first<{ name: string }>();
-    return row?.name?.trim() || '担当者';
-  } catch {
-    return '担当者';
-  }
-}
 
 
 // GET /api/broadcasts/approvals/candidates — 承認を頼める相手の一覧（自分は除く）
@@ -322,7 +313,8 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-approve', inputJsonBoundar
     }
     const raw = broadcast as unknown as Record<string, unknown>;
     const requestedBy = (raw.approval_requested_by_staff_id as string | null | undefined) ?? null;
-    if (requestedBy && requestedBy === staff?.id) {
+    // G9: a human may approve a draft requested by their AI connection (step-up below).
+    if (requestedBy && requestedBy === staff?.id && !(raw.created_via==='mcp'&&raw.execution_mode==='simulation')) {
       return c.json({ success: false, error: '自分の依頼は承認できません', code: 'SELF_APPROVAL' }, 403);
     }
     // 一斉配信の承認は大事な操作（V）。二者承認の承認も同じ再確認の枠に乗せる。

@@ -3177,3 +3177,8 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 :root { --tpl-rm-review-thumb-w: 165px; --tpl-rm-face-row-h: 38px; --tpl-rm-face-label-lh: 18px; --tpl-rm-face-name-lh: 19px; --tpl-rm-face-summary-lh: 16px; --tpl-ledger-month-lh: normal; --tpl-cv-delete-reason-w: 92px; --tpl-fr-name-content-min: 160px; --tpl-rt-flow-timing-w: 132px; --tpl-rt-flow-row-h: 58px; --tpl-rt-flow-name-lh: 20px; --tpl-rt-flow-note-lh: 18px; --tpl-rm-review-label-lh: 17px; --tpl-rm-review-action-h: 38px; --tpl-rm-review-letter: 22px; }
 
 :root { --tpl-rm-state-pad: 32px 20px; --tpl-rm-head-pad: 20px 24px 16px; }
+
+/* 配置の共通値。画面ごとのリセット・伸縮も同じ値を使う。 */
+:root { --tpl-layout-zero: 0; --tpl-layout-auto: auto; --tpl-layout-full: 100%; --tpl-layout-relaxed: 1.6; }
+
+:root { --tpl-sender-icon: 32px; --tpl-sender-row: 48px; --tpl-sender-tile: 88px; --tpl-sender-icon-text: 13px; --tpl-sender-note-lh: 18px; --tpl-sender-outline: 2px; }

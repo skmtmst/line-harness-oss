@@ -21,7 +21,7 @@ export default function Button({
   ref,
   ...rest
 }: {
-  variant?: 'counter' | 'compact-secondary' | 'stamp-primary' | 'stamp-choice' | 'stamp-reward' | 'inline-action' | 'inline-danger' | 'notify-text' | 'restaurant-select' | 'restaurant-date' | 'restaurant-primary' | 'restaurant-control' | 'restaurant-time' | 'choice' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'night-cta' | 'night-text' | 'sound' | 'send' | 'slot-row' | 'reward-row' | 'overlay-bell' | 'segment' | 'primary' | 'secondary' | 'danger' | 'text' | 'icon' | 'arrow' | 'notify' | 'chip' | 'tab' | 'option' | 'optionRow' | 'day' | 'time' | 'calendarDay' | 'overlay' | 'nightAction' | 'nightText' | 'nightSound' | 'nightSend' | 'switch' | 'menuRow' | 'link';
+  variant?: 'counter' | 'compact-secondary' | 'stamp-primary' | 'stamp-choice' | 'stamp-reward' | 'inline-action' | 'inline-danger' | 'notify-text' | 'restaurant-select' | 'restaurant-date' | 'restaurant-primary' | 'restaurant-control' | 'restaurant-time' | 'choice' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'night-cta' | 'night-text' | 'sound' | 'send' | 'slot-row' | 'reward-row' | 'overlay-bell' | 'segment' | 'primary' | 'secondary' | 'danger' | 'text' | 'icon' | 'arrow' | 'notify' | 'chip' | 'tab' | 'option' | 'optionRow' | 'day' | 'time' | 'calendarDay' | 'overlay' | 'nightAction' | 'nightText' | 'nightSound' | 'nightSend' | 'switch' | 'link' | 'plain' | 'menuRow';
   selected?: boolean;
   unavailable?: boolean;
   waitlisted?: boolean;
@@ -58,6 +58,10 @@ export default function Button({
     'restaurant-primary': `${action} min-h-9 text-[13px] leading-5 font-semibold bg-liff-primary text-(--liff-on-primary) shadow-(--liff-card-shadow)`,
     'restaurant-control': 'liff-hit inline-flex min-h-9 items-center justify-center gap-2 rounded-(--liff-radius) px-4 text-[13px] leading-5 font-semibold bg-canvas text-ink outline-1 -outline-offset-1 outline-liff-line-strong shadow-(--liff-control-shadow)',
     'restaurant-time': `liff-hit inline-flex min-h-9 items-center rounded-full px-3 text-xs leading-[18px] shadow-(--liff-control-shadow) outline-1 -outline-offset-1 ${selected ? 'bg-liff-soft text-liff-primary font-semibold outline-liff-primary' : 'bg-canvas text-ink font-medium outline-liff-line-strong'} disabled:text-liff-off-ink`,
+    /** オン・オフの切り替え（B4 続けて予約）。つまみは子の span。 */
+    /** 文の中・札の右の小さな緑の操作（「変える」「もう一度」）。 */
+    /** 中身を自分で組む行（丸の選択肢など）。見た目は付けず、押せる範囲と手応えだけ。 */
+    plain: 'liff-hit flex w-full text-left',
     primary: `${action} min-h-12 bg-liff-primary text-[15px] text-(--liff-on-primary) focus-visible:outline-liff-primary active:opacity-90`,
     danger: `${action} min-h-12 bg-danger text-[15px] text-white focus-visible:outline-danger active:opacity-90`,
     secondary: `${action} min-h-11 border border-liff-line-strong bg-canvas text-sm font-semibold text-ink active:bg-liff-off-bg`,

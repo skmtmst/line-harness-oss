@@ -9,6 +9,7 @@ it('一斉配信の期間は全件と所属条件に適用され、UTC表記も�
   const raw = new Database(':memory:');
   try {
     raw.exec(`CREATE TABLE broadcasts (id TEXT, sent_at TEXT, scheduled_at TEXT, created_at TEXT, line_account_id TEXT, target_type TEXT, account_ids TEXT);
+      CREATE TABLE broadcast_execution_contexts(broadcast_id TEXT,purpose TEXT,execution_mode TEXT,created_via TEXT);
       CREATE TABLE broadcast_insights (id TEXT, broadcast_id TEXT, created_at TEXT, status TEXT, delivered INTEGER, unique_impression INTEGER, unique_click INTEGER, open_rate REAL, click_rate REAL);`);
     const add = raw.prepare('INSERT INTO broadcasts VALUES (?, ?, NULL, ?, ?, ?, NULL)');
     for (const [id, time, account] of [['before', '2026-09-29T23:59:59+09:00', 'a'], ['start', '2026-09-29T15:00:00Z', 'a'], ['end', '2026-09-30T23:59:59+09:00', 'a'], ['after', '2026-10-01T00:00:00+09:00', 'a'], ['private', '2026-09-30T12:00:00+09:00', 'b']]) add.run(id, time, time, account, 'all');

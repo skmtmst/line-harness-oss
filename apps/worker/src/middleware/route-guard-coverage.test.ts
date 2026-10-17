@@ -4,6 +4,7 @@ import { registrations, hasPriorGuard, importedRouters, exportedRouters } from '
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import {requireRole} from './role-guard.js';
 import { isOutputRequest } from './output-audit.js';
 
 const authState = vi.hoisted(() => ({ readOnly: false, role: 'staff' as 'owner' | 'admin' | 'staff', permissionKeys: [] as string[], viewKeys: [] as string[] }));
@@ -80,7 +81,9 @@ function collectUnguarded(fixtures?: Record<string, string>): Finding[] {
 }
 
 describe('更新系の権限ガードの網羅', () => {
-  it('S07 read-only owner/admin/staff cannot export through any admin GET with format=csv', async () => {
+  it('S07 read-only exports are denied except the aggregate comparison CSV for owner/admin', async () => {
+    const aggregate=new Hono();aggregate.use('*',authMiddleware as never);
+    aggregate.get('/api/hq/store-comparison/exports/:id/download',requireRole('owner','admin') as never,c=>c.json({success:true}));
     const routes = [...new Map(app.routes.filter(route => route.method === 'GET'
       && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path))
       .map(route => [route.path, route])).values()];
@@ -91,11 +94,12 @@ describe('更新系の権限ガードの網羅', () => {
       authState.role = role;
       for (const route of routes) {
         const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
-        const response = await app.request(`${path}?format=csv`, { headers: {
+        const aggregateCsv=route.path==='/api/hq/store-comparison/exports/:id/download';
+        const response = await (aggregateCsv?aggregate:app).request(`${path}?format=csv`, { headers: {
           Authorization: `Bearer ${String(++index).padStart(16, '0')}`,
           'CF-Connecting-IP': `s07-output-${index}`,
         } }, { DB: {} } as never);
-        expect(response.status, `${role} GET ${route.path}: read-only export`).toBe(403);
+        expect(response.status, `${role} GET ${route.path}: read-only export`).toBe(aggregateCsv&&role!=='staff'?200:403);
       }
     }
   }, 120_000);
@@ -143,7 +147,7 @@ describe('更新系の権限ガードの網羅', () => {
       writeFileSync(process.env.SECURITY_INVENTORY_REPORT,
         'method\tpath\tsource\tlogin\tstore_hq_scope_evidence\tstaff_permission\tread_only\tcalled_authorization_helpers\n' + lines.join('\n') + '\n');
     }
-  });
+  }, 120_000);
 
   it('S07 all reads and exports reject a staff member with no feature permission', async () => {
     const routes = [...new Map(app.routes.filter(route =>
@@ -393,6 +397,10 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/hq/billing/preview',
     'GET /api/hq/billing/summary',
     'GET /api/hq/operator-history',
+    'GET /api/hq/store-comparison',
+    'GET /api/hq/store-comparison/:accountId',
+    'GET /api/hq/store-comparison/exports/:id',
+    'GET /api/hq/store-comparison/exports/:id/download',
     'GET /api/hq/style-attention',
     'GET /api/hq/style-starter-sets',
     'GET /api/hq/style-template-samples',
@@ -439,6 +447,9 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/login-audit',
     'GET /api/manual-links',
     'GET /api/manual-links/lookup',
+    // Store comparison and MCP management remain owner/admin only.
+    'GET /api/mcp-connections',
+    'GET /api/mcp-connections/logs',
     'GET /api/notifications',
     'GET /api/notifications/center',
     'GET /api/notifications/operator-deliveries.csv',
@@ -567,6 +578,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/hq/banners/projects/:id/uploads',
     'POST /api/hq/billing/checkout',
     'POST /api/hq/billing/portal',
+    'POST /api/hq/store-comparison/export',
     'POST /api/hq/support/requests',
     'POST /api/hq/support/requests/:id/messages',
     'POST /api/hq/templates',
@@ -611,6 +623,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/line-webhook-events/:id/retry',
     'POST /api/links/wrap',
     'POST /api/manual-links/check',
+    'POST /api/mcp-connections',
     'POST /api/notifications/center/:id/read',
     'POST /api/notifications/center/read-all',
     'POST /api/notifications/operator-events',

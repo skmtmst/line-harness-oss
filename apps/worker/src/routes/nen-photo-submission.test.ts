@@ -176,7 +176,7 @@ describe('POST /api/liff/nen/photos のメタデータ除去と寸法検査(#931
 
     // 公開されるURLは審査用派生を指す。原本キーは返さない。
     const body = await res.json() as { data: { imageUrl: string } };
-    expect(body.data.imageUrl).toContain('/images/nen-photo-review/');
+    expect(body.data.imageUrl).toBeNull(); // 検査記録を確定できない段ではURLを出さない
   });
 
   it('テキスト・EXIF付きPNGは審査用から付帯チャンクが外れ、IHDRは残る', async () => {

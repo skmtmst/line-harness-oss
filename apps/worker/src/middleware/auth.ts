@@ -1,5 +1,5 @@
-import { isPublicApiBoundary } from './public-api-boundary.js';
 import { parseCookieHeader, bearerToken } from './auth-http.js';
+import { isPublicApiBoundary } from './public-api-boundary.js';
 import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
 import { DELIVERY_API_PERMISSIONS, effectiveStaffEditKeys } from '@line-crm/shared';
 import type { Context, Next } from 'hono';
@@ -136,7 +136,7 @@ export type AuthenticatedStaff = {
   credential?: 'session' | 'api-key';
 };
 
-function toAuthenticatedStaff(staff: {
+export function toAuthenticatedStaff(staff: {
   id: string;
   name: string;
   role: StaffRole;
@@ -256,7 +256,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   // 予約の細かい権限（N-411）。広い '/api/booking' → '/booking/bookings' より先に評価する。
   // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
   [/^\/api\/booking\/admin\/staff\/me(?:\/|$)/, 'booking.staff.own'],
-  [/^\/api\/booking\/admin\/staff\/[^/]+\/(?:availability-rules|breaks|break-dates|shifts|google-calendar)(?:\/|$)/, 'booking.staff.own'],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/(?:availability-rules|breaks|break-dates|shifts|google-calendar|calendar-sync|meeting-url)(?:\/|$)/, 'booking.staff.own'],
     // メニューと担当割当は「予約メニュー」の鍵。
   [/^\/api\/booking\/admin\/staff-menus(?:\/|$)/, '/booking/menus'],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/menus(?:\/|$)/, '/booking/menus'],
@@ -289,7 +289,19 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
 ];
 
+export function gap2ReadOperation(method:string,path:string){return method==='POST'&&(/^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)||/^\/api\/chats\/[^/]+\/ai\/summary$/.test(path)||path==='/api/booking/admin/series/preview'||path==='/api/member-ranks/preview'||path==='/api/hq/store-comparison/export'||path==='/api/delivery-purposes/preview'||/^\/api\/booking\/admin\/series\/[^/]+\/impact$/.test(path));}
+function gap2SelfPreference(method:string,path:string){return (method==='POST'&&/^\/api\/me\/push\/(subscriptions|test)$/.test(path))||(method==='PUT'&&path==='/api/me/push/preferences')||(method==='DELETE'&&/^\/api\/me\/push\/subscriptions\/[^/]+$/.test(path));}
 export function permissionForApiPath(path: string): string | null {
+  if(/^\/api\/friends\/[^/]+\/member-rank$/.test(path))return '/mileage';
+  if(path.startsWith('/api/analytics/customer-segments'))return '/analytics';
+  if(path.startsWith('/api/inbox/routing'))return '/chats';
+  if(path.startsWith('/api/delivery-purposes'))return '/broadcasts';
+  if(path.startsWith('/api/member-ranks'))return '/mileage';
+  if(path.startsWith('/api/ec/auto-line'))return '/ec-commerce';
+  if(path.startsWith('/api/ai-answer-logs'))return '/auto-replies';
+  if(path.startsWith('/api/ai-features'))return '/settings';
+  if(path.startsWith('/api/qa-entries')||path.startsWith('/api/ai-settings'))return '/auto-replies';
+  if (/^\/api\/line-accounts\/[^/]+\/(?:senders|sender-icons)(?:\/|$)/.test(path)) return '/chats';
   const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
   if (override) return override[1];
   return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
@@ -309,6 +321,7 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['POST', '/api/auth/api-key'],
   ['DELETE', '/api/auth/api-key'],
   ['GET', '/api/auth/session'],
+  ['PUT', '/api/me/presence'],
   // These routes derive the target exclusively from the authenticated principal.
   ['GET', '/api/auth/two-factor/self'],
   ['POST', '/api/auth/two-factor/recovery'],
@@ -351,6 +364,7 @@ const STAFF_SELF_ROUTE_TEMPLATES: Array<[method: string, path: string]> = [
 
 export function isStaffSelfRouteTemplate(method: string, path: string): boolean {
   const normalizedMethod = method.toUpperCase();
+  if((normalizedMethod==='GET'&&path==='/api/me/push')||gap2SelfPreference(normalizedMethod,path))return true;
   if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
   return STAFF_SELF_ROUTE_TEMPLATES.some(([m, p]) => m === normalizedMethod && p === path);
 }
@@ -668,12 +682,12 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     return c.json({ success: false, code: TENANT_SUSPENDED_CODE, error: TENANT_SUSPENDED_ERROR }, 403);
   }
 
-  if (staff.readOnly && !SAFE_METHODS.has(method)) {
+  if (staff.readOnly && !SAFE_METHODS.has(method) && !gap2ReadOperation(method,path) && !gap2SelfPreference(method,path)) {
     return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
   }
 
   const outputRequest = isOutputRequest(path, c.req.query('format'), method);
-  if (staff.readOnly && outputRequest) {
+  if (staff.readOnly && outputRequest && !(path==='/api/hq/store-comparison/export'||/^\/api\/hq\/store-comparison\/exports\/[^/]+\/download$/.test(path))) {
     return c.json({ success: false, error: '閲覧のみの権限では書き出しを実行できません' }, 403);
   }
 
@@ -692,7 +706,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     // N-424: 「見えるだけ」の key は GET系だけを許可する。変更系は edit の key が要る。
     const granted = requiredPermission
       && (staff.permissionKeys?.includes(requiredPermission)
-        || (SAFE_METHODS.has(method) && !outputRequest && staff.viewPermissionKeys?.includes(requiredPermission)));
+        || ((SAFE_METHODS.has(method)||gap2ReadOperation(method,path)) && !outputRequest && staff.viewPermissionKeys?.includes(requiredPermission)));
     if (!requiredPermission || !granted) {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }

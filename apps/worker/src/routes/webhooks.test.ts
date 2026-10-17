@@ -1,10 +1,14 @@
-import { describe, expect, test, vi, beforeEach } from 'vitest';
+import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
+import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
 
 vi.mock('@line-crm/db', async (importOriginal) => {
   // N-383: 発火種別の正本リストと判定は純粋関数なので実物を通す。
   const actual = await importOriginal<typeof import('@line-crm/db')>();
   return {
+  encryptCredential:actual.encryptCredential,
+  decryptCredential:actual.decryptCredential,
   KNOWN_OUTGOING_EVENT_TYPES: actual.KNOWN_OUTGOING_EVENT_TYPES,
   isKnownOutgoingEventType: actual.isKnownOutgoingEventType,
   // F-13：フォルダの所属が正しくないときの誤り（instanceof で見分けるので実物を通す）。
@@ -216,18 +220,12 @@ const baseEnv = {
   } as unknown as D1Database,
 } as Record<string, unknown>;
 
-async function webhookSignature(body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(VALID_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  return Array.from(new Uint8Array(signature))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
+async function webhookSignature(body:string):Promise<string>{return signIncomingTest(VALID_SECRET,body);}
 
+let receiptDb:SqliteD1;
+afterEach(()=>receiptDb.raw.close());
 beforeEach(() => {
+  receiptDb=createTestD1();baseEnv.DB=receiptDb.db;keyedEnv.DB=receiptDb.db;
   vi.clearAllMocks();
   vi.mocked(canAccessAllLineAccounts).mockResolvedValue(true);
   vi.mocked(createWebhookInteraction).mockResolvedValue({
@@ -272,7 +270,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
   test('WEB232 forwards inactive creation and rejects non-boolean creation state', async () => {
     vi.mocked(createOutgoingWebhook).mockResolvedValue({ id: 'draft', name: 'draft', url: 'https://example.com/hook', event_types: '["*"]', secret: null, secret_encrypted: null, is_active: 0, max_retries: 0, consecutive_failures: 0, last_failed_at: null, created_at: '2026-10-08', updated_at: '2026-10-08' });
     const body = { lineAccountId: ACCOUNT_ID, name: 'draft', url: 'https://example.com/hook', eventTypes: ['*'], secret: VALID_SECRET, isActive: false };
-    const send = (payload: unknown) => setupApp().request('/api/webhooks/outgoing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }, baseEnv);
+    const send = (payload: unknown) => receiveAndDrain(setupApp(),'/api/webhooks/outgoing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }, baseEnv);
     const response = await send(body);
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ data: { isActive: false } });
@@ -282,7 +280,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
 
   test('rejects missing secret with 400', async () => {
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/outgoing',
       {
         method: 'POST',
@@ -295,12 +293,12 @@ describe('POST /api/webhooks/outgoing — validation', () => {
     expect(createOutgoingWebhook).not.toHaveBeenCalled();
     const body = (await res.json()) as { success: boolean; error: string };
     expect(body.success).toBe(false);
-    expect(body.error).toMatch(/secret/i);
+    expect(body.error).toContain('LINEアカウント');
   });
 
   test('rejects secret shorter than 32 chars with 400', async () => {
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/outgoing',
       {
         method: 'POST',
@@ -321,7 +319,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
 
   test('rejects http:// URL with 400', async () => {
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/outgoing',
       {
         method: 'POST',
@@ -343,7 +341,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
 
   test('rejects malformed URL with 400', async () => {
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/outgoing',
       {
         method: 'POST',
@@ -379,7 +377,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
     });
 
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/outgoing',
       {
         method: 'POST',
@@ -402,7 +400,8 @@ describe('POST /api/webhooks/outgoing — validation', () => {
       data: { id: string; secret: string; name: string };
     };
     expect(body.success).toBe(true);
-    expect(body.data.secret).toBe(VALID_SECRET);
+    expect(body.data.secret).toMatch(/^[a-f0-9]{64}$/);
+    expect(body.data.secret).not.toBe(VALID_SECRET);
     expect(body.data.id).toBe('wh-1');
     expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }), { current: undefined, previous: undefined });
   });
@@ -444,7 +443,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
   });
   test('rejects updating to http:// URL with 400', async () => {
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
@@ -457,9 +456,9 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
     expect(updateOutgoingWebhook).not.toHaveBeenCalled();
   });
 
-  test('rejects updating secret to fewer than 32 chars with 400', async () => {
+  test('入れ替えは短い送り手の値を使わず256bitをサーバーで作る', async () => {
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
@@ -468,13 +467,13 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
       },
       baseEnv,
     );
-    expect(res.status).toBe(400);
-    expect(updateOutgoingWebhook).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(updateOutgoingWebhook).toHaveBeenCalledWith(expect.anything(),expect.any(String),ACCOUNT_ID,expect.objectContaining({secret:expect.stringMatching(/^[0-9a-f]{64}$/)}),expect.anything(),expect.anything());
   });
 
   test('rejects truthy non-boolean isActive with 400 (migration bypass)', async () => {
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       `/api/webhooks/outgoing/wh-legacy?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
@@ -505,7 +504,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
     });
 
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       `/api/webhooks/outgoing/wh-legacy?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
@@ -535,7 +534,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
     });
 
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       `/api/webhooks/outgoing/wh-legacy-http?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
@@ -565,7 +564,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
     });
 
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
@@ -612,7 +611,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
     ]);
 
     const app = setupApp();
-    const res = await app.request(`/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
+    const res = await receiveAndDrain(app,`/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).not.toContain(VALID_SECRET);
@@ -641,7 +640,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
     ]);
 
     const app = setupApp();
-    const res = await app.request(`/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
+    const res = await receiveAndDrain(app,`/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
     const body = (await res.json()) as { data: Array<Record<string, unknown>> };
     expect(body.data[0]).not.toHaveProperty('secret');
     expect(body.data[0].hasSecret).toBe(false);
@@ -662,7 +661,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
       last_failure_reason: 'response_5xx', can_retry: 1,
     }]);
 
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
       { method: 'GET' },
       baseEnv,
@@ -687,7 +686,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
       last_failed_at: null, created_at: '2026-05-08', updated_at: '2026-05-08',
     }]);
 
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
       { method: 'GET' },
       baseEnv,
@@ -701,7 +700,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
 
   test('対象外アカウントの集計を読めない', async () => {
     vi.mocked(canAccessAllLineAccounts).mockResolvedValue(false);
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       '/api/webhooks/outgoing?lineAccountId=account-b',
       { method: 'GET' },
       baseEnv,
@@ -712,7 +711,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
 
   test('集計取得に失敗したら安全な500を返す', async () => {
     vi.mocked(getOutgoingWebhookDeliverySummaries).mockRejectedValue(new Error('private DB detail'));
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
       { method: 'GET' },
       baseEnv,
@@ -729,14 +728,14 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
 describe('POST /api/webhooks/incoming — validation', () => {
   test('requires an account outside the default tenant and checks an explicit account', async () => {
     const app = setupApp('tenant-b');
-    const omitted = await app.request('/api/webhooks/incoming', {
+    const omitted = await receiveAndDrain(app,'/api/webhooks/incoming', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'test', secret: VALID_SECRET }),
     }, baseEnv);
     expect(omitted.status).toBe(400);
 
     vi.mocked(canAccessAllLineAccounts).mockResolvedValueOnce(false);
-    const forbidden = await app.request('/api/webhooks/incoming', {
+    const forbidden = await receiveAndDrain(app,'/api/webhooks/incoming', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'test', secret: VALID_SECRET, lineAccountId: 'account-a' }),
     }, baseEnv);
@@ -746,7 +745,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
 
   test('rejects missing secret with 400', async () => {
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/incoming',
       {
         method: 'POST',
@@ -761,7 +760,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
 
   test('rejects secret shorter than 32 chars with 400', async () => {
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/incoming',
       {
         method: 'POST',
@@ -778,7 +777,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
     vi.mocked(createIncomingWebhook).mockResolvedValue(incomingWebhookRow());
 
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/incoming',
       {
         method: 'POST',
@@ -791,7 +790,8 @@ describe('POST /api/webhooks/incoming — validation', () => {
     expect(createIncomingWebhook).toHaveBeenCalledOnce();
     expect(createIncomingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }), { current: undefined, previous: undefined });
     const body = (await res.json()) as { data: { id: string; secret: string } };
-    expect(body.data.secret).toBe(VALID_SECRET);
+    expect(body.data.secret).toMatch(/^[a-f0-9]{64}$/);
+    expect(body.data.secret).not.toBe(VALID_SECRET);
   });
 });
 
@@ -810,9 +810,9 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
     expect(updateIncomingWebhook).not.toHaveBeenCalled();
   });
 
-  test('rejects updating secret to fewer than 32 chars with 400', async () => {
+  test('入れ替えは短い送り手の値を使わず256bitをサーバーで作る', async () => {
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
@@ -821,8 +821,8 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
       },
       baseEnv,
     );
-    expect(res.status).toBe(400);
-    expect(updateIncomingWebhook).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(updateIncomingWebhook).toHaveBeenCalledWith(expect.anything(),expect.any(String),ACCOUNT_ID,expect.objectContaining({secret:expect.stringMatching(/^[0-9a-f]{64}$/)}),expect.anything(),);
   });
 
   test('rejects re-activating webhook whose stored secret is too short (migration bypass)', async () => {
@@ -831,7 +831,7 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
     }));
 
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       `/api/webhooks/incoming/iwh-legacy?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
@@ -863,7 +863,7 @@ describe('GET /api/webhooks/incoming — secret exposure', () => {
     vi.mocked(getIncomingWebhooks).mockResolvedValue([incomingWebhookRow()]);
 
     const app = setupApp();
-    const res = await app.request(`/api/webhooks/incoming?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
+    const res = await receiveAndDrain(app,`/api/webhooks/incoming?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
     const text = await res.text();
     expect(text).not.toContain(VALID_SECRET);
     const body = JSON.parse(text) as { data: Array<Record<string, unknown>> };
@@ -882,7 +882,7 @@ describe('受け取り口の詳細と設定', () => {
       latest_received_at: '2026-09-07T09:00:00.000+09:00',
     }));
 
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
       { method: 'GET' },
       baseEnv,
@@ -910,7 +910,7 @@ describe('受け取り口の詳細と設定', () => {
   });
 
   test('受信前は最新見本と差し込み項目を空で返す', async () => {
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
       { method: 'GET' },
       baseEnv,
@@ -927,7 +927,7 @@ describe('受け取り口の詳細と設定', () => {
 
   test('詳細取得に失敗したら顧客値を含まない500を返す', async () => {
     vi.mocked(getIncomingWebhookById).mockRejectedValue(new Error('private@example.com'));
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
       { method: 'GET' },
       baseEnv,
@@ -938,7 +938,7 @@ describe('受け取り口の詳細と設定', () => {
 
   test('対象外アカウントは存在も返さない', async () => {
     vi.mocked(canAccessAllLineAccounts).mockResolvedValue(false);
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       '/api/webhooks/incoming/iwh-1?lineAccountId=account-b',
       { method: 'GET' },
       baseEnv,
@@ -961,7 +961,7 @@ describe('受け取り口の詳細と設定', () => {
     vi.mocked(updateIncomingWebhookConfig).mockResolvedValue({
       status: 'updated', item: incomingWebhookRow({ version: 4 }),
     });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -991,7 +991,7 @@ describe('受け取り口の詳細と設定', () => {
     vi.mocked(updateIncomingWebhookConfig).mockResolvedValue({
       status: 'conflict', currentVersion: 5,
     });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -1010,7 +1010,7 @@ describe('受け取り口の詳細と設定', () => {
   });
 
   test('名前照合や自由記述アクションを受け付けない', async () => {
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -1051,7 +1051,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
     vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow({ line_account_id: null }));
 
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST',
@@ -1067,7 +1067,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
     vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow({ line_account_id: null }));
 
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST',
@@ -1089,7 +1089,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
     const hexSignature = await webhookSignature(body);
 
     const app = setupApp();
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST',
@@ -1101,7 +1101,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       },
       baseEnv,
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const fencedDb = vi.mocked(fireEvent).mock.calls[0]![5]!.db;
     expect(fencedDb).not.toBe(baseEnv.DB);
     expect(fireEvent).toHaveBeenCalledWith(
@@ -1110,7 +1110,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       expect.anything(),
       undefined,
       'account-a',
-      expect.objectContaining({ sourceEventId: 'receipt-event-1', step: expect.any(Function) }),
+      expect.objectContaining({ sourceEventId: expect.any(String), step: expect.any(Function) }),
     );
     expect(createWebhookInteraction).toHaveBeenCalledWith(fencedDb, expect.objectContaining({
       lineAccountId: 'account-a',
@@ -1144,7 +1144,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       matchedFriendId: 'friend-a', executed: 1, failed: 0, matchStatus: 'matched',
     });
     const body = JSON.stringify({ friendId: 'friend-a' });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST',
@@ -1156,7 +1156,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       },
       baseEnv,
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const fencedDb = vi.mocked(fireEvent).mock.calls[0]![5]!.db;
     expect(fencedDb).not.toBe(baseEnv.DB);
     expect(executeIncomingWebhookActions).toHaveBeenCalledWith(fencedDb, expect.objectContaining({
@@ -1171,14 +1171,14 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       expect.objectContaining({ friendId: 'friend-a' }),
       undefined,
       ACCOUNT_ID,
-      expect.objectContaining({ sourceEventId: 'receipt-event-1', step: expect.any(Function) }),
+      expect.objectContaining({ sourceEventId: expect.any(String), step: expect.any(Function) }),
     );
   });
 
   test('最新項目の保存が失敗しても署名済みの受信処理は止めない', async () => {
     vi.mocked(updateIncomingWebhookMaskedSample).mockRejectedValue(new Error('D1 unavailable'));
     const body = JSON.stringify({ customer: { email: 'private@example.com' } });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST',
@@ -1190,7 +1190,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       },
       baseEnv,
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     expect(fireEvent).toHaveBeenCalledOnce();
   });
 });
@@ -1200,7 +1200,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
     // 現行の合言葉では合わないが、併用期間内の前の合言葉では通る。
     vi.mocked(resolvePreviousWebhookSecret).mockResolvedValue('o'.repeat(32));
     const body = JSON.stringify({ ping: true });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST',
@@ -1212,7 +1212,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
       },
       baseEnv,
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     expect(resolvePreviousWebhookSecret).toHaveBeenCalled();
   });
 
@@ -1220,7 +1220,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
     // 期限切れ・無い前の合言葉は resolvePreviousWebhookSecret が null を返す。
     vi.mocked(resolvePreviousWebhookSecret).mockResolvedValue(null);
     const body = JSON.stringify({ ping: true });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST',
@@ -1246,7 +1246,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
         plan: [{ type: 'add_tag' }],
       }],
     });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1/test?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'POST',
@@ -1310,7 +1310,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
     ],
   ])('受け取りの試しの記録は試算の結果を残す: %s', async (_name, preview, summaryPart, keyPrefix) => {
     vi.mocked(previewIncomingWebhook).mockResolvedValue(preview as never);
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1/test?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'POST',
@@ -1331,7 +1331,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
   });
 
   test('受け取りの試しは payload が無ければ400', async () => {
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1/test?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'POST',
@@ -1366,7 +1366,8 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
       { id: 'f-1', display_name: '田中' },
       { id: 'f-2', display_name: '佐藤' },
     ];
-    const res = await setupApp().request(
+    for(const row of friendNameRows) receiptDb.raw.prepare('INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES(?,?,?,?)').run(row.id,`U${row.id}`,row.display_name,ACCOUNT_ID);
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1/unmatched?lineAccountId=${ACCOUNT_ID}`,
       {},
       baseEnv,
@@ -1383,7 +1384,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
 
 describe('POST /api/webhooks/outgoing/:id/test', () => {
   test('アカウント内の有効な送り先へ1回試し送信して記録する', async () => {
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing/wh-1/test?lineAccountId=${ACCOUNT_ID}`,
       { method: 'POST' },
       baseEnv,
@@ -1436,7 +1437,7 @@ describe('Webhookやり取り記録', () => {
         resultUnknown: 0, outgoingFailed: 1, retryable: 1, averageDurationMs: 820,
       },
     });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/interactions?lineAccountId=${ACCOUNT_ID}`,
       { method: 'GET' },
       baseEnv,
@@ -1456,7 +1457,7 @@ describe('Webhookやり取り記録', () => {
 
   test('権限外のアカウントは一覧を読めない', async () => {
     vi.mocked(canAccessAllLineAccounts).mockResolvedValue(false);
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       '/api/webhooks/interactions?lineAccountId=account-b',
       { method: 'GET' },
       baseEnv,
@@ -1468,7 +1469,7 @@ describe('Webhookやり取り記録', () => {
   test('失敗した送信だけを同じアカウントの中でやり直す', async () => {
     vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
     vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, id: 'retry-a', status: 'succeeded' });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
       baseEnv,
@@ -1481,7 +1482,7 @@ describe('Webhookやり取り記録', () => {
   test('secretを読めない送り直しは503にし、秘密値を出さない(#650)', async () => {
     vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
     vi.mocked(retryWebhookInteraction).mockRejectedValueOnce(new Error('webhook_secret_unavailable'));
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
       keyedEnv,
@@ -1501,7 +1502,7 @@ describe('Webhookやり取り記録', () => {
     vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue(items);
     vi.mocked(countFailedWebhookInteractionsForRetry).mockResolvedValue(8);
     vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, status: 'succeeded' });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/interactions/retry-failed?lineAccountId=${ACCOUNT_ID}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
       baseEnv,
@@ -1518,7 +1519,7 @@ describe('Webhookやり取り記録', () => {
     vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue([failedRow]);
     vi.mocked(countFailedWebhookInteractionsForRetry).mockResolvedValue(1);
     vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, status: 'succeeded' });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/interactions/retry-failed?lineAccountId=${ACCOUNT_ID}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
       baseEnv,
@@ -1532,7 +1533,7 @@ describe('Webhookやり取り記録', () => {
   // 確認なしの要求は 409 で止め、確かめた旨(confirmed)を添えた要求だけ通す。
   test('届いたか分からない失敗は、確認なしの送り直しを409で止める', async () => {
     vi.mocked(getWebhookInteractionById).mockResolvedValue({ ...failedRow, failure_reason: 'unknown' });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
       baseEnv,
@@ -1546,7 +1547,7 @@ describe('Webhookやり取り記録', () => {
   test('届いたか分からない失敗は、確かめた確認つきなら送り直せる', async () => {
     vi.mocked(getWebhookInteractionById).mockResolvedValue({ ...failedRow, failure_reason: 'unknown' });
     vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, id: 'retry-a', status: 'succeeded' });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"confirmed":true}' },
       baseEnv,
@@ -1564,7 +1565,7 @@ describe('Webhookやり取り記録', () => {
     vi.mocked(countFailedWebhookInteractionsForRetry).mockResolvedValue(1);
     vi.mocked(countUnverifiedWebhookInteractions).mockResolvedValue(2);
     vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, status: 'succeeded' });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/interactions/retry-failed?lineAccountId=${ACCOUNT_ID}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
       baseEnv,
@@ -1590,7 +1591,7 @@ describe('GET /api/webhooks/outgoing — broken event_types (#506 W2)', () => {
 
   test('壊れた行は空の種類で返し、一覧は 200 のまま', async () => {
     vi.mocked(getOutgoingWebhooks).mockResolvedValue([brokenRow]);
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
       { method: 'GET' },
       baseEnv,
@@ -1656,7 +1657,7 @@ describe('PATCH /api/webhooks/incoming/:id/config (#506 W5)', () => {
     },
     actions: [{ refKind: 'scenario', refId: 'scenario-a', refVersionId: 'version-a' }],
   };
-  const patchConfig = (body: unknown) => setupApp().request(
+  const patchConfig = (body: unknown) => receiveAndDrain(setupApp(),
     `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
     { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     baseEnv,
@@ -1679,7 +1680,7 @@ describe('PATCH /api/webhooks/incoming/:id/config (#506 W5)', () => {
 });
 
 describe('名前・種別の上限 (#506 軽)', () => {
-  const post = (path: string, body: unknown) => setupApp().request(
+  const post = (path: string, body: unknown) => receiveAndDrain(setupApp(),
     path,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     baseEnv,
@@ -1720,12 +1721,12 @@ describe('名前・種別の上限 (#506 軽)', () => {
 // イベントは一度も送られなかった。未知の種別は一覧を添えて400で拒否する。
 
 describe('N-383 送信eventTypesは実発火種別と照合する', () => {
-  const post = (body: unknown) => setupApp().request(
+  const post = (body: unknown) => receiveAndDrain(setupApp(),
     '/api/webhooks/outgoing',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     baseEnv,
   );
-  const put = (body: unknown) => setupApp().request(
+  const put = (body: unknown) => receiveAndDrain(setupApp(),
     `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     baseEnv,
@@ -1792,7 +1793,7 @@ describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
 
   test('既定はdry-runで件数だけ返し、鍵束を渡す', async () => {
     vi.mocked(backfillWebhookSecrets).mockResolvedValueOnce(report);
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       '/api/webhooks/maintenance/secret-backfill',
       {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1812,7 +1813,7 @@ describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
 
   test('dryRun=falseとbatchSizeを通し、不正値は400にする', async () => {
     vi.mocked(backfillWebhookSecrets).mockResolvedValueOnce({ ...report, dryRun: false });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       '/api/webhooks/maintenance/secret-backfill',
       {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1825,7 +1826,7 @@ describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
       dryRun: false, batchSize: 10,
     }));
 
-    const bad = await setupApp().request(
+    const bad = await receiveAndDrain(setupApp(),
       '/api/webhooks/maintenance/secret-backfill',
       {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1834,7 +1835,7 @@ describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
       keyedEnv,
     );
     expect(bad.status).toBe(400);
-    const missing = await setupApp().request(
+    const missing = await receiveAndDrain(setupApp(),
       '/api/webhooks/maintenance/secret-backfill',
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
       keyedEnv,
@@ -1844,7 +1845,7 @@ describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
 
   test('他アカウントは403にし、鍵なしは503にする', async () => {
     vi.mocked(canAccessAllLineAccounts).mockResolvedValueOnce(false);
-    const forbidden = await setupApp().request(
+    const forbidden = await receiveAndDrain(setupApp(),
       '/api/webhooks/maintenance/secret-backfill',
       {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1858,7 +1859,7 @@ describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
     const keyError = new Error('LINE_CREDENTIAL_ENCRYPTION_KEY is not configured');
     keyError.name = 'CredentialEncryptionKeyError';
     vi.mocked(backfillWebhookSecrets).mockRejectedValueOnce(keyError);
-    const noKey = await setupApp().request(
+    const noKey = await receiveAndDrain(setupApp(),
       '/api/webhooks/maintenance/secret-backfill',
       {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1874,7 +1875,7 @@ describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
 // #650 secret の暗号化保存 — secret-safe と fail-closed の契約
 // =====================================================
 
-const TEST_KEY = 'test-key-for-webhook-secret-encryption-01';
+const TEST_KEY = btoa('k'.repeat(32));
 // baseEnv と同じ理由で、受信口の予約 INSERT を受ける代役を置く(#746)。
 const keyedEnv = {
   DB: { prepare: receiptPrepare } as unknown as D1Database,
@@ -1891,7 +1892,7 @@ const BROKEN_ROW = { ...ENCRYPTED_ROW, secret_encrypted: 'v1-broken-xyz' };
 describe('#650 secret-safe: 平文を保存・表示しない', () => {
   test('作成は鍵を渡して暗号化保存し、平文は作成直後の1回だけ返す', async () => {
     vi.mocked(createOutgoingWebhook).mockResolvedValueOnce({ ...ENCRYPTED_ROW, id: 'wh-new' });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1906,16 +1907,17 @@ describe('#650 secret-safe: 平文を保存・表示しない', () => {
     expect(res.status).toBe(201);
     expect(createOutgoingWebhook).toHaveBeenCalledWith(
       keyedEnv.DB,
-      expect.objectContaining({ secret: VALID_SECRET }),
+      expect.objectContaining({ secret: expect.stringMatching(/^[a-f0-9]{64}$/) }),
       { current: TEST_KEY, previous: undefined },
     );
     const body = (await res.json()) as { data: { secret: string } };
-    expect(body.data.secret).toBe(VALID_SECRET);
+    expect(body.data.secret).toMatch(/^[a-f0-9]{64}$/);
+    expect(body.data.secret).not.toBe(VALID_SECRET);
   });
 
   test('一覧・詳細は暗号文も含めてsecretを出さず、hasSecretだけ返す', async () => {
     vi.mocked(getOutgoingWebhooks).mockResolvedValueOnce([ENCRYPTED_ROW]);
-    const list = await setupApp().request(
+    const list = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
       { method: 'GET' },
       baseEnv,
@@ -1930,7 +1932,7 @@ describe('#650 secret-safe: 平文を保存・表示しない', () => {
     vi.mocked(getIncomingWebhookById).mockResolvedValueOnce({
       ...incomingWebhookRow(), secret: null, secret_encrypted: 'v1-enc-abc',
     });
-    const detail = await setupApp().request(
+    const detail = await receiveAndDrain(setupApp(),
       `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
       { method: 'GET' },
       baseEnv,
@@ -1948,7 +1950,7 @@ describe('#650 secret-safe: 平文を保存・表示しない', () => {
       .mockResolvedValueOnce({ ...ENCRYPTED_ROW, secret_encrypted: 'v1-enc-new' })
       .mockResolvedValueOnce({ ...ENCRYPTED_ROW, secret_encrypted: 'v1-enc-new' })
       .mockResolvedValueOnce({ ...ENCRYPTED_ROW, secret_encrypted: 'v1-enc-new', name: 'renamed' });
-    const first = await setupApp().request(
+    const first = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -1958,10 +1960,10 @@ describe('#650 secret-safe: 平文を保存・表示しない', () => {
     );
     expect(first.status).toBe(200);
     expect(updateOutgoingWebhook).toHaveBeenCalledWith(
-      keyedEnv.DB, 'wh-1', ACCOUNT_ID, expect.objectContaining({ secret: rotated }), { current: TEST_KEY, previous: undefined },
+      keyedEnv.DB, 'wh-1', ACCOUNT_ID, expect.objectContaining({ secret: expect.stringMatching(/^[a-f0-9]{64}$/) }), { current: TEST_KEY, previous: undefined },
       expect.objectContaining({ updatedByStaffId: expect.any(String) }),
     );
-    const second = await setupApp().request(
+    const second = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -1981,7 +1983,7 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     const keyError = new Error('LINE_CREDENTIAL_ENCRYPTION_KEY is not configured');
     keyError.name = 'CredentialEncryptionKeyError';
     vi.mocked(createOutgoingWebhook).mockRejectedValueOnce(keyError);
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1999,7 +2001,7 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
 
   test('復号できない送り先の再有効化は503にし、止めたままにする', async () => {
     vi.mocked(getOutgoingWebhookById).mockResolvedValueOnce({ ...BROKEN_ROW, is_active: 0 });
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -2013,7 +2015,7 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
 
   test('復号できない送り先の試し送信は503にし、送らない', async () => {
     vi.mocked(getOutgoingWebhookById).mockResolvedValueOnce(BROKEN_ROW);
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing/wh-1/test?lineAccountId=${ACCOUNT_ID}`,
       { method: 'POST' },
       keyedEnv,
@@ -2025,7 +2027,7 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
 
   test('試し送信は復号した値で署名し、他アカウントは403にする', async () => {
     vi.mocked(getOutgoingWebhookById).mockResolvedValueOnce(ENCRYPTED_ROW);
-    const res = await setupApp().request(
+    const res = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing/wh-1/test?lineAccountId=${ACCOUNT_ID}`,
       { method: 'POST' },
       keyedEnv,
@@ -2049,7 +2051,7 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     expect(sendOptions.idempotencyKey).toBe(testEnvelope.id);
 
     vi.mocked(canAccessAllLineAccounts).mockResolvedValueOnce(false);
-    const forbidden = await setupApp().request(
+    const forbidden = await receiveAndDrain(setupApp(),
       `/api/webhooks/outgoing/wh-1/test?lineAccountId=account-b`,
       { method: 'POST' },
       keyedEnv,
@@ -2062,7 +2064,7 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
       ...incomingWebhookRow(), secret: null, secret_encrypted: 'v1-enc-abc',
     });
     const okBody = JSON.stringify({ hello: 'world' });
-    const ok = await setupApp().request(
+    const ok = await receiveAndDrain(setupApp(),
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST', headers: {
@@ -2073,12 +2075,12 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
       },
       keyedEnv,
     );
-    expect(ok.status).toBe(200);
+    expect(ok.status).toBe(202);
 
     vi.mocked(getIncomingWebhookById).mockResolvedValueOnce({
       ...incomingWebhookRow(), secret: null, secret_encrypted: 'v1-broken-xyz',
     });
-    const broken = await setupApp().request(
+    const broken = await receiveAndDrain(setupApp(),
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST', headers: {
@@ -2098,7 +2100,7 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     vi.mocked(getIncomingWebhookById).mockResolvedValueOnce({
       ...incomingWebhookRow(), secret: staleSecret, secret_encrypted: 'v1-broken-xyz',
     });
-    const stale = await setupApp().request(
+    const stale = await receiveAndDrain(setupApp(),
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST', headers: {
@@ -2116,13 +2118,4 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
   });
 });
 
-async function signedWith(secret: string, body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  return Array.from(new Uint8Array(signature))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
+const signedWith=signIncomingTest;

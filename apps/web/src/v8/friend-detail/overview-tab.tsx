@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import StatusPill from '@/components/shared/status-pill'
 import Link from '@/components/shared/list-navigation'
 import {
@@ -32,6 +33,9 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import Notice from '@/components/shared/notice'
+import { useAccount } from '@/contexts/account-context'
+import { memberRanksApi } from '@/lib/api-gap3'
+import DeliveryConsentDrawer, { DeliveryConsentSummary, useDeliveryConsents } from './delivery-consent'
 
 
 /*
@@ -90,8 +94,23 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
   const starred = fields.filter((f) => f.isStarred)
   const { mileage, mileageStatus, richMenu, richMenuStatus } = data
   const support = friend.support
+  /* ★V8 mAbif：配信の受け取り（段と右の引き出し）と、会員ランクの1行。 */
+  const consents = useDeliveryConsents(friendId)
+  const [consentOpen, setConsentOpen] = useState(false)
+  const { selectedAccountId } = useAccount()
+  const [rankLine, setRankLine] = useState<string | null>(null)
+  useEffect(() => {
+    if (!selectedAccountId) return
+    let alive = true
+    void memberRanksApi.friend(selectedAccountId, friendId).then((response) => {
+      if (!alive || !response.success) return
+      const current = (response.data as { current?: { name?: string } | null } | null)?.current
+      setRankLine(current?.name ? `会員ランク：${current.name}` : null)
+    }).catch(() => undefined)
+    return () => { alive = false }
+  }, [selectedAccountId, friendId])
   return (
-  <CustomerInfoRail><aside className={styles.summary} data-design="Left" data-friend-profile-panel>
+  <><CustomerInfoRail><aside className={styles.summary} data-design="Left" data-friend-profile-panel>
     <CustomerInfoPanel
       friendId={friendId}
       fields={fields}
@@ -124,7 +143,8 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
             mile 使える{mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
           </span>
         </div>
-      )}</> },
+      )}{rankLine ? <p className={styles.memo}>{rankLine}</p> : null}</> },
+        { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)}>{perms.manage ? '変える' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} /> },
         { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Link className={styles.groupLink} href="/rich-menus">変更する</Link> : null, content: <>{richMenuStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>
           読み込めませんでした
@@ -171,7 +191,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         </section>
       </div>}
     />
-  </aside></CustomerInfoRail>
+  </aside></CustomerInfoRail><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} rows={consents.rows} canEdit={perms.manage} onClose={() => setConsentOpen(false)} onSaved={consents.reload} /></>
   )
 }
 

@@ -42,6 +42,10 @@ export const SAVED_SEARCH_FIELD_OPS = [
 ] as const;
 
 export const SAVED_SEARCH_CONDITION_OPS: Record<SavedSearchConditionKind, readonly string[]> = {
+  visit_count: ['between'],
+  purchase_amount: ['between'],
+  last_activity_at: ['between'],
+  member_tier: ['eq'],
   name: ['eq', 'contains'],
   tag: ['has', 'includes', 'eq', 'not_has', 'excludes', 'ne'],
   field: SAVED_SEARCH_FIELD_OPS,

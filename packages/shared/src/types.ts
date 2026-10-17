@@ -264,6 +264,7 @@ export interface SupportMark {
 
 /** メディアライブラリの1件 */
 export interface MediaItem {
+  revision?: number;
   id: string;
   lineAccountId: string | null;
   folderId: string | null;
@@ -525,6 +526,7 @@ export interface CommonVarChangeImpact extends Omit<CommonVarDeleteImpact, "item
 }
 
 export type SavedSearchConditionKind =
+  | "visit_count" | "purchase_amount" | "last_activity_at" | "member_tier"
   | "name"
   | "tag"
   | "field"
@@ -575,6 +577,7 @@ export interface SavedSearchConditions {
 /** 共通の配信対象条件1本。画面・人数確認・実送信で同じ形を使う。 */
 export interface SavedSegmentRule {
   type:
+    | "customer_segment" | "visit_count" | "purchase_amount" | "last_activity_at" | "member_tier"
     | "tag_exists"
     | "tag_not_exists"
     | "tag_all"
@@ -1656,7 +1659,7 @@ export interface FriendScore {
 // テンプレート (Template)
 // -----------------------------------------------------------------------------
 
-export interface Template {
+export interface Template extends Partial<import('./style-api.js').StyleSampleMetadata> {
   id: string;
   name: string;
   category: string;
@@ -1826,7 +1829,7 @@ export interface AutomationAction {
   params: Record<string, unknown>;
 }
 
-export interface Automation {
+export interface Automation extends Partial<import('./style-api.js').StyleSampleMetadata> {
   id: string;
   name: string;
   description: string | null;

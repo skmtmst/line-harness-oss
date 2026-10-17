@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// 登録は予定より前に行い、過去登録の送信停止とは別に本文の固定を検査する。
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-08-27T00:00:00Z')) })
+afterEach(() => vi.useRealTimers())
 
 import type { LineClient } from '@line-crm/line-sdk'
 import { enrollFriendInReminder } from '@line-crm/db'

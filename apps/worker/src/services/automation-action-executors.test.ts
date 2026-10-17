@@ -1,3 +1,4 @@
+import { sweepOutgoingWebhookDeliveries } from './outgoing-webhook-delivery.js';
 import type Database from 'better-sqlite3';
 import { encryptCredential } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
@@ -41,7 +42,7 @@ function addFriend(raw: Database.Database, id: string, accountId: string): void 
 function addAutomation(
   raw: Database.Database,
   accountId: string,
-  action: ActionDefinition,
+  action: ActionDefinition | ActionDefinition[],
 ): { automationId: string } {
   const automationId = crypto.randomUUID();
   const versionId = crypto.randomUUID();
@@ -53,7 +54,7 @@ function addAutomation(
     `INSERT INTO automation_versions
        (id, automation_id, version_number, status, trigger_type, action_config, published_at)
      VALUES (?, ?, 1, 'published', 'friend_add', ?, ?)`,
-  ).run(versionId, automationId, JSON.stringify([action]), NOW);
+  ).run(versionId, automationId, JSON.stringify(Array.isArray(action) ? action : [action]), NOW);
   raw.prepare(
     `UPDATE automation_definitions SET current_published_version_id = ? WHERE id = ?`,
   ).run(versionId, automationId);
@@ -579,6 +580,9 @@ describe('V6オートメーションの既存処理接続', () => {
     });
 
     expect(result.status).toBe('waiting');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await sweepOutgoingWebhookDeliveries(testDb.db,{now:new Date(Date.now()+6*60_000),fetchImpl:fetchMock as typeof fetch,lookupHost:async()=>['93.184.216.34']});
+    expect(testDb.raw.prepare('SELECT status,max_attempts FROM outgoing_webhook_deliveries').get()).toEqual({status:'retry_wait',max_attempts:8});
     const init = fetchMock.mock.calls[0]?.[1] as { headers: Record<string, string>; body: string };
     const headers = init.headers;
     const step = testDb.raw.prepare(
@@ -596,6 +600,38 @@ describe('V6オートメーションの既存処理接続', () => {
       attempt: 1,
     });
     expect(typeof envelope.occurred_at).toBe('string');
+  });
+
+  it('Webhookの配送待ちは後続を実行せず、8回の配送予算を通常処理の4回で打ち切らない', async () => {
+    testDb.raw.prepare(`INSERT INTO outgoing_webhooks
+      (id,name,url,event_types,is_active,line_account_id)
+      VALUES ('wait-hook','CRM','https://hooks.example.com/events','[]',1,'account-1')`).run();
+    const setup = addAutomation(testDb.raw, 'account-1', [
+      {id:'webhook',type:'send_webhook',params:{webhookId:'wait-hook'},onFailure:'stop'},
+      {id:'next',type:'notify_staff',params:{},onFailure:'stop'},
+    ]);
+    const started=await startAutomationRun(testDb.db,{
+      lineAccountId:'account-1',automationId:setup.automationId,friendId:'friend-1',
+      sourceEventId:crypto.randomUUID(),idempotencyKey:crypto.randomUUID(),inputEvent:{type:'friend_add'},conditionMatched:true,now:NOW,
+    });
+    const next=vi.fn(async()=>({output:{done:true}}));
+    const executors={...createAutomationActionExecutors(),notify_staff:next};
+    for(let i=0;i<10;i++) {
+      expect(await processAutomationRun(testDb.db,started.runId!,{
+        now:new Date(Date.parse(NOW)+i*6*60_000).toISOString(),executors,
+      })).toBe('waiting');
+      expect(next).not.toHaveBeenCalled();
+    }
+    expect(testDb.raw.prepare(`SELECT attempt_number FROM automation_run_steps WHERE step_key='webhook'`).get()).toEqual({attempt_number:1});
+    expect(testDb.raw.prepare(`SELECT COUNT(*) count FROM outgoing_webhook_deliveries`).get()).toEqual({count:1});
+    await sweepOutgoingWebhookDeliveries(testDb.db,{
+      now:new Date(Date.now()+6*60_000),fetchImpl:vi.fn(async()=>new Response('',{status:200})) as typeof fetch,
+      lookupHost:async()=>['93.184.216.34'],
+    });
+    expect(await processAutomationRun(testDb.db,started.runId!,{
+      now:'2026-08-26T06:10:00.000Z',executors,
+    })).toBe('success');
+    expect(next).toHaveBeenCalledOnce();
   });
 
   it('暗号化された送り先は復号して署名し、鍵なしでは送らず止める(#650)', async () => {
@@ -619,7 +655,13 @@ describe('V6オートメーションの既存処理接続', () => {
         lookupHost: async () => ['93.184.216.34'],
       }),
     });
-    expect(ok.status).toBe('success');
+    expect(ok.status).toBe('waiting');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await sweepOutgoingWebhookDeliveries(testDb.db,{now:new Date(Date.now()+6*60_000),fetchImpl:fetchMock as typeof fetch,credentialKeys:AUTO_KEY,lookupHost:async()=>['93.184.216.34']});
+    expect(await processAutomationRun(testDb.db, ok.runId!, {
+      now: '2026-08-26T05:10:00.000Z',
+      executors: createAutomationActionExecutors({ credentialEncryptionKey: AUTO_KEY }),
+    })).toBe('success');
     const sent = fetchMock.mock.calls[0]?.[1] as { headers: Record<string, string>; body: string };
     const okStep = testDb.raw.prepare(
       `SELECT id FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'webhook'`,
@@ -671,8 +713,10 @@ describe('V6オートメーションの既存処理接続', () => {
     });
 
     expect(other.status).toBe('failed');
-    expect(local.status).toBe('failed');
+    expect(local.status).toBe('waiting');
+    await sweepOutgoingWebhookDeliveries(testDb.db,{now:new Date(Date.now()+6*60_000),fetchImpl:fetchMock as typeof fetch,lookupHost:async()=>['93.184.216.34']});
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(await processAutomationRun(testDb.db, local.runId!, {now:'2026-08-26T05:10:00.000Z',executors:createAutomationActionExecutors(deps)})).toBe('failed');
     // 止めた送り先は秘密値を残さず失敗台帳だけに数える。
     expect(testDb.raw.prepare(
       `SELECT consecutive_failures FROM outgoing_webhooks WHERE id = 'local-hook'`,
@@ -702,6 +746,7 @@ describe('V6オートメーションの既存処理接続', () => {
         lookupHost: async () => ['10.9.9.9'],
       }),
     });
+    await sweepOutgoingWebhookDeliveries(testDb.db,{now:new Date(Date.now()+6*60_000),fetchImpl:fetchMock as typeof fetch,lookupHost:async()=>['10.9.9.9']});
     const redirect = await execute(testDb, {
       accountId: 'account-1', friendId: 'friend-1',
       action: { id: 'redirect', type: 'send_webhook', params: { webhookId: 'redirect-hook' }, onFailure: 'stop' },
@@ -711,8 +756,9 @@ describe('V6オートメーションの既存処理接続', () => {
       }),
     });
 
-    expect(rebind.status).toBe('failed');
-    expect(redirect.status).toBe('failed');
+    expect(rebind.status).toBe('waiting');
+    expect(redirect.status).toBe('waiting');
+    await sweepOutgoingWebhookDeliveries(testDb.db,{now:new Date(Date.now()+6*60_000),fetchImpl:fetchMock as typeof fetch,lookupHost:async()=>['93.184.216.34']});
     // 転送先へは送らないので転送元の1回だけ。
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(testDb.raw.prepare(

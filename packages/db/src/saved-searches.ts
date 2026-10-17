@@ -1,3 +1,5 @@
+import {savedSearchMonth,getSavedSearchUsageCounts,getSavedSearchReferenceUsageCounts} from './saved-search-usage-read.js';
+export {getSavedSearchUsageCounts,getSavedSearchReferenceUsageCounts} from './saved-search-usage-read.js';
 import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { isSavedSearchOpAllowed } from '@line-crm/shared';
@@ -104,6 +106,7 @@ export interface InboxSavedViewConditions {
 }
 
 const CONDITION_KINDS = new Set([
+  'visit_count','purchase_amount','last_activity_at','member_tier',
   'tag',
   'name',
   'field',
@@ -240,6 +243,7 @@ export function validateSearchConditions(
 }
 
 const SEGMENT_RULE_TYPES = new Set([
+  'customer_segment','visit_count','purchase_amount','last_activity_at','member_tier',
   'tag_exists',
   'tag_not_exists',
   'tag_all',
@@ -543,58 +547,8 @@ export async function upsertSavedSearchReference(
   ).run();
 }
 
-function savedSearchMonth(now = jstNow()): string {
-  return now.slice(0, 7);
-}
 
-/** 一覧の「今月の呼び出し」を検索ごとにまとめて返す。 */
-export async function getSavedSearchUsageCounts(
-  db: D1Database,
-  savedSearchIds: string[],
-  lineAccountId: string,
-  now = jstNow(),
-): Promise<Map<string, number>> {
-  const ids = [...new Set(savedSearchIds.filter(Boolean))];
-  if (ids.length === 0) return new Map();
-  const placeholders = sqlIdSet(ids).sql;
-  const result = await db.prepare(
-    `SELECT saved_search_id, COUNT(*) AS call_count_this_month
-       FROM saved_search_usage_events
-      WHERE line_account_id = ?
-        AND saved_search_id IN (${placeholders})
-        AND substr(used_at, 1, 7) = ?
-      GROUP BY saved_search_id`,
-  ).bind(lineAccountId, ...(ids.length ? sqlIdSet(ids).binds : []), savedSearchMonth(now)).all<SavedSearchUsageCount>();
-  return new Map(result.results.map((row) => [
-    row.saved_search_id,
-    Number(row.call_count_this_month),
-  ]));
-}
 
-/** 詳細の使用先ごとに、今月何回呼ばれたかを返す。 */
-export async function getSavedSearchReferenceUsageCounts(
-  db: D1Database,
-  savedSearchIds: string[],
-  lineAccountId: string,
-  now = jstNow(),
-): Promise<Map<string, number>> {
-  const ids = [...new Set(savedSearchIds.filter(Boolean))];
-  if (ids.length === 0) return new Map();
-  const placeholders = sqlIdSet(ids).sql;
-  const result = await db.prepare(
-    `SELECT saved_search_id, reference_kind, reference_id,
-            COUNT(*) AS call_count_this_month
-       FROM saved_search_usage_events
-      WHERE line_account_id = ?
-        AND saved_search_id IN (${placeholders})
-        AND substr(used_at, 1, 7) = ?
-      GROUP BY saved_search_id, reference_kind, reference_id`,
-  ).bind(lineAccountId, ...(ids.length ? sqlIdSet(ids).binds : []), savedSearchMonth(now)).all<SavedSearchReferenceUsageCount>();
-  return new Map(result.results.map((row) => [
-    `${row.saved_search_id}:${row.reference_kind}:${row.reference_id ?? ''}`,
-    Number(row.call_count_this_month),
-  ]));
-}
 
 /** 保存した検索を実際に使った時だけ追記する。 */
 export async function recordSavedSearchUsage(

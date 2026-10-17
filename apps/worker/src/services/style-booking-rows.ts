@@ -38,7 +38,7 @@ function normalized(r: Row): StyleBooking {
   };
 }
 /** Every join stays within the selected account. Meet rows linked to bookings are not counted twice. */
-export async function styleRows(
+async function industryRows(
   db: D1Database,
   account: string,
   style: IndustryStyle,
@@ -88,5 +88,33 @@ export async function styleRows(
   return rows.sort(
     (a, b) =>
       instant(a.startsAt) - instant(b.startsAt) || a.id.localeCompare(b.id),
+  );
+}
+
+/** All reservation systems survive a style change. Kind is part of the identity. */
+export async function styleRows(
+  db: D1Database,
+  account: string,
+  _style: IndustryStyle,
+  kinds: StyleBooking['kind'][] = ['booking', 'restaurant', 'event', 'meet'],
+): Promise<StyleBooking[]> {
+  const rows = (
+    await Promise.all([
+      kinds.includes('booking') || kinds.includes('meet')
+        ? industryRows(db, account, 'consult')
+        : [],
+      kinds.includes('restaurant')
+        ? industryRows(db, account, 'restaurant')
+        : [],
+      kinds.includes('event') ? industryRows(db, account, 'lesson') : [],
+    ])
+  )
+    .flat()
+    .filter((r) => kinds.includes(r.kind));
+  return rows.sort(
+    (a, b) =>
+      instant(a.startsAt) - instant(b.startsAt) ||
+      a.kind.localeCompare(b.kind) ||
+      a.id.localeCompare(b.id),
   );
 }

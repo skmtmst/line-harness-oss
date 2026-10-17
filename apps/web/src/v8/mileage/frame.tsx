@@ -33,6 +33,7 @@ export const MILEAGE_TABS = [
   { key: 'balances', label: '友だちの残高', board: 'CJlf4' },
   { key: 'history', label: '履歴', board: 'oRbJi' },
   { key: 'score', label: '行動スコア', board: 'IRPw8' },
+  { key: 'ranks', label: '会員ランク', board: 'QpgfW' },
 ] as const
 
 export type MileageTabKey = (typeof MILEAGE_TABS)[number]['key']

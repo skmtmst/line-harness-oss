@@ -1,10 +1,12 @@
+import type { BookingCancellationPreview, MenuAddon, RoutedTarget, MakeupCredit, MakeupOption } from './api-types.js';
+export type { BookingCancellationPreview, MenuAddon, RoutedTarget, MakeupCredit, MakeupOption, EventBookingMakeup } from './api-types.js';
 import type { AcceptBookingWaitlistInput,BookingHistoryResponse,CustomerBookingWaitlist,CustomerSeatWaitlist,EntryRouteCouponReceived,EventWaitlistMine,EventWaitlistOfferDetail,LiffBookingChangeResponse,RegisterSeatWaitlistInput,WebinarAudience } from '@line-crm/shared';
 import { buildFormSubmitHeaders,toFormIdempotencyKey } from '@line-crm/shared';
-import { type AvailabilityResponse,type BookingEntitlement,type BookingPayment,type CreateBookingResponse,type CreateEventBookingResponse,type EventBookingMine,type EventDetail,type EventSlot,type FormSubmitResponse,type LastBookingResponse,type LiffBookingSettings,type MenuItem,type NotificationPreferences,type NotificationPurpose,type PostalCodeSearchResponse,type PublicForm,type StaffItem,type WaitlistMineResponse,type WebinarState } from './api-types';
+import { type AvailabilityResponse,type BookingEntitlement,type BookingPayment,type CreateBookingResponse,type CreateEventBookingResponse,type EventBookingMine,type EventDetail,type EventSlot,type FormSubmitResponse,type LastBookingResponse,type LiffBookingSettings,type MenuItem,type NotificationPreferences,type NotificationPurpose,type PostalCodeSearchResponse,type PublicForm,type StaffItem,type WaitlistMineResponse,type WebinarState } from './api-types.js';
 import { getIdToken,getLiffId } from './liff-auth.js';
 import type { LiffLookApiSettings } from './liff-look.js';
 export type { BookingHistoryItem,EventWaitlistMine,EventWaitlistOfferDetail,WebinarAudience } from '@line-crm/shared';
-export { type AvailabilityResponse,type BookingEntitlement,type BookingPayment,type CreateBookingResponse,type CreateEventBookingResponse,type EventBookingMine,type EventDetail,type EventQuestion,type EventSlot,type FormSubmitResponse,type LastBookingResponse,type LiffBookingSettings,type MenuItem,type NotificationPreferenceItem,type NotificationPreferences,type NotificationPurpose,type PostalCodeCandidate,type PostalCodeSearchResponse,type PublicForm,type StaffItem,type WaitlistMineResponse,type WebinarCta,type WebinarSakuraComment,type WebinarState } from './api-types';
+export { type AvailabilityResponse,type BookingEntitlement,type BookingPayment,type CreateBookingResponse,type CreateEventBookingResponse,type EventBookingMine,type EventDetail,type EventQuestion,type EventSlot,type FormSubmitResponse,type LastBookingResponse,type LiffBookingSettings,type MenuItem,type NotificationPreferenceItem,type NotificationPreferences,type NotificationPurpose,type PostalCodeCandidate,type PostalCodeSearchResponse,type PublicForm,type StaffItem,type WaitlistMineResponse,type WebinarCta,type WebinarSakuraComment,type WebinarState } from './api-types.js';
 
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -161,9 +163,15 @@ export const api = {
   bookingSettings: () => get<LiffBookingSettings>('/api/liff/booking/settings'),
   // Worker 側で id_token を verify するので lineUserId は body に入れない。
   createRequest: (
-    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string;waitlist_id?:string;
-      /** 組3：使う回数券・月謝。選んだときだけ送る。 */
-      entitlement_id?: string },
+    body: {
+      menu_id: string; staff_id: string; starts_at: string; customer_note?: string; waitlist_id?: string; policyAccepted?: boolean; policyVersion?: number; setupIntentId?: string;
+      /** B5：追加メニュー（1 人分・0〜3 個）。2 人以上の組は口がまだ受けない。 */
+      addonIds?: string[];
+      entitlement_id?: string;
+      /** B6：答えで決まった行き先の署名（resolve の返事）。 */
+      routingToken?: string;
+      meeting_mode?: 'online' | 'in_person';
+    },
     idempotencyKey: string,
   ) =>
     post<CreateBookingResponse>(
@@ -171,6 +179,29 @@ export const api = {
       body,
       { 'Idempotency-Key': idempotencyKey },
     ).then(assertBookingPaymentResponse),
+  /** 予約前の見積もり。取得失敗や不完全な応答は予約確認へ伝え、同意なしで送らない。 */
+  cancellationPreview: async (input: { menuId: string; staffId: string; startsAt: string }): Promise<BookingCancellationPreview> => {
+    const path = `/api/liff/booking/cost-estimate?${new URLSearchParams({ menu_id: input.menuId, staff_id: input.staffId, starts_at: input.startsAt })}`;
+    const data = await getData<unknown>(path);
+    if (!isRecord(data) || !isRecord(data.cancellation) || !isRecord(data.deposit)) throw responseShapeError(data, path);
+    const c = data.cancellation, d = data.deposit;
+    if (typeof c.enabled !== 'boolean' || !Number.isInteger(c.version) || typeof c.price !== 'number'
+      || typeof c.cardRequired !== 'boolean' || typeof c.noShowPercent !== 'number'
+      || !(c.freeUntil === null || typeof c.freeUntil === 'string')
+      || !Array.isArray(c.tiers) || c.tiers.length < 2
+      || !c.tiers.every((t) => isRecord(t) && typeof t.beforeHours === 'number' && typeof t.percent === 'number')
+      || typeof d.amount !== 'number') throw responseShapeError(data, path);
+    return {
+      enabled: c.enabled, version: c.version as number, freeUntil: c.freeUntil,
+      tiers: c.tiers.map((t) => ({ beforeHours: t.beforeHours, percent: t.percent })),
+      afterPercent: c.tiers[c.tiers.length - 1].percent, noShowPercent: c.noShowPercent,
+      price: c.price, cardRequired: c.cardRequired,
+      deposit: d.amount > 0 ? { amount: d.amount } : null,
+    };
+  },
+  /** カードの登録（gap1・試験モード）。登録済みなら status=ready、まだなら url の登録画面へ。 */
+  cancellationSetup: (menuId: string, idempotencyKey: string) =>
+    post<{ success: true; data: { setupIntentId: string; url: string; status: string; testMode: boolean } }>('/api/liff/booking/setup-intent', { menuId, policyAccepted: true }, { 'Idempotency-Key': idempotencyKey }).then((res) => res.data),
   /** お支払いありの予約だけ payment が付く。なしの店では今までどおり付かない。 */
   startBookingPayment: (bookingId: string) =>
     post<{ payment: BookingPayment | null; checkoutUrl: string | null }>(
@@ -257,6 +288,17 @@ export const api = {
     ),
   myEventBookings: (tab: 'upcoming' | 'past') =>
     get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
+  /** 欠席する。締めの内なら振替が 1 回付く（credit）。付かないときは reason_if_none に理由（B3・契約どおり）。 */
+  eventAbsence: (bookingId: string, key: string) =>
+    post<{ success: true; data: { makeupCredit: MakeupCredit | null; reasonIfNone: string | null } }>(`/api/liff/events/bookings/${encodeURIComponent(bookingId)}/absence`, {}, { 'Idempotency-Key': key })
+      .then((r) => ({ credit: r.data.makeupCredit, reason_if_none: r.data.reasonIfNone ?? undefined })),
+  makeupCredits: () => get<{ success: true; data: MakeupCredit[] }>('/api/liff/events/makeup-credits').then((r) => ({ credits: r.data })),
+  /** 振替先の回。from はその週の最初の日（YYYY-MM-DD）。空きは定員−埋まりで数える。 */
+  makeupOptions: (id: string, from: string) =>
+    get<{ success: true; data: Array<{ id: string; event_id: string; starts_at: string; ends_at: string; capacity: number | null; occupied: number; name?: string | null }> }>(`/api/liff/events/makeup-credits/${encodeURIComponent(id)}/options?from=${encodeURIComponent(from)}`)
+      .then((r) => ({ options: r.data.map((o): MakeupOption => ({ slot_id: o.id, event_id: o.event_id, starts_at: o.starts_at, ends_at: o.ends_at, name: o.name ?? '', remaining: o.capacity == null ? null : Math.max(0, o.capacity - o.occupied), full: o.capacity != null && o.occupied >= o.capacity })) })),
+  useMakeup: (id: string, eventSlotId: string, key: string) =>
+    post<{ success: true; data: { bookingId: string; replayed: boolean } }>(`/api/liff/events/makeup-credits/${encodeURIComponent(id)}/use`, { eventSlotId }, { 'Idempotency-Key': key }).then((r) => ({ id: r.data.bookingId, status: 'confirmed' })),
   myEventWaitlist: () => get<{ items: EventWaitlistMine[] }>('/api/liff/events/me/waitlist'),
   myEventWaitlistEntry: (waitlistId: string) =>
     get<EventWaitlistMine>(`/api/liff/events/me/waitlist/${encodeURIComponent(waitlistId)}`),
@@ -297,6 +339,24 @@ export const api = {
    * 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る。
    * Worker は `{ success: true, data: { answers, createdAt } | null }` で返す。
    */
+  /**
+   * 答えで予約の行き先を決める（B6）。口（Worker）は Codex の gap2 が作る。
+   * 行き先はこの口の返事で決まり、お客さまは書き換えられない（予約には routingToken を添える）。
+   */
+  resolveFormRouting: (id: string, answers: Record<string, unknown>, blockId?: string) =>
+    post<{ success: true; data: { matchedIndex: number; target: { menuId: string; staffId?: string; staffGroupId?: string; meetingMode?: 'online' | 'in_person' }; routingToken: string; expiresAt: string } }>(`/api/liff/forms/${encodeURIComponent(id)}/routing/resolve`, { answers, blockId }).then((r) => r.data),
+  /** 繰り返しの空きを本人の口で確かめる。画面向けに日時の名前をそろえる。 */
+  seriesPreview: async (body: { menu_id: string; staff_id: string; starts_at: string; freq: 'weekly'; count: number }) => {
+    const path = '/api/liff/booking/series/preview';
+    const result = unwrapSuccessData<{ occurrences: Array<{ index: number; startsAt: string; available: boolean; reason: string | null; alternatives: string[] }> }>(
+      await post<unknown>(path, { menuId: body.menu_id, staffId: body.staff_id, startsAt: body.starts_at, rule: { freq: body.freq, count: body.count } }), path,
+    );
+    return { occurrences: result.occurrences.map((o) => ({ index: o.index, starts_at: o.startsAt, available: o.available, ...(o.reason ? { reason: o.reason === 'slot_unavailable' ? '空きがありません' : '空きを確かめられません' } : {}), alternatives: o.alternatives })) };
+  },
+  /** 追加メニュー（B5）。メニューを選んだあと読む。 */
+  addons: (menuId: string) =>
+    get<{ success: true; data: Array<{ id: string; name: string; duration_minutes: number; base_price: number }> }>(`/api/liff/booking/menus/${encodeURIComponent(menuId)}/addons`)
+      .then((r) => r.data.map((a): MenuAddon => ({ id: a.id, name: a.name, duration_minutes: a.duration_minutes, price: a.base_price }))),
   getMyLatestFormAnswer: (id: string) =>
     getLatestFormAnswer(`/api/forms/${id}/my-latest`),
   /**

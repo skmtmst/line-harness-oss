@@ -1,9 +1,13 @@
+import { gap1Paths } from './gap1-openapi.js';
+import { gap3Paths } from './gap3-openapi.js';
+import { gap2Paths } from './gap2-openapi.js';
 import { STEP_UP_PURPOSES } from '../lib/step-up.js';
 import { personalDataRetentionPaths } from './personal-data-retention-openapi.js';
 import { stylePaths } from './styles-openapi.js';
 import { hqTemplateListPaths } from './hq-template-list-openapi.js';
 import { hqTemplateMediaPaths } from './hq-template-media-openapi.js';
 import { api5Paths } from './api5-openapi.js';
+import { behaviorFixPaths } from './behavior-fix-openapi.js';
 import { restaurantRest4Paths } from './restaurant-rest4-openapi.js';
 import { api1AuthoringPaths } from './api1-authoring-openapi.js';
 import { api2FollowupPaths } from './api2-followups-openapi.js';
@@ -13,6 +17,7 @@ import { archiveRestorePaths } from './archive-restore-openapi.js';
 import { formDocumentPaths } from './form-documents-openapi.js';
 import { pagesParityPaths } from './pages-parity-openapi.js';
 import { folderUpgradePaths } from './folder-upgrade-openapi.js';
+import { auditstepsPaths } from './auditsteps-openapi.js';
 import { auditPaths } from './openapi-audit-paths.js';
 import { tabCountPaths } from './tab-counts-openapi.js';
 import { api18Paths } from './api18-openapi.js';
@@ -423,7 +428,11 @@ const spec = {
     ...api1AuthoringPaths,
     ...bookingAssignmentPaths,
     ...bookingPaymentAdminPaths,
+    ...gap1Paths,
+    ...gap2Paths,
+    ...gap3Paths,
     ...bookingEntitlementPaths,
+    ...behaviorFixPaths,
     '/api/account-settings/customer-look': {
       get: { tags:['Account Settings'], summary:'店のお客さまのデザインを読む', parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'保存した版とデザイン'},'403':{description:'担当外'}} },
       put: { tags:['Account Settings'], summary:'店のお客さまのデザインを保存（オーナー・管理者）', requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['accountId','expectedVersion','look'],properties:{accountId:{type:'string'},expectedVersion:{type:'integer',minimum:0},look:{type:'object'}}}}}}, responses:{'200':{description:'保存した版とデザイン'},'403':{description:'変更権限なし・担当外'},'409':{description:'保存の版が競合'},'422':{description:'色・型・書体が不正'}} },
@@ -462,8 +471,8 @@ const spec = {
       post:{tags:['Broadcasts'],summary:'容量・形式・所属・ETagを検査して配信用URLを返す',parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}}],requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['etag'],properties:{etag:{type:'string'}}}}}},responses:{'201':{description:'安全性の検査対象として登録し、配信用URLを発行'},'200':{description:'確定済みの再要求'},'409':{description:'期限切れまたは内容不一致'},'422':{description:'ファイルの形式が不正'}}},
     },
     ...personalDataRetentionPaths,
-    ...auditPaths,
     ...api5Paths,
+    ...auditPaths,
     ...api18Paths,
     ...api2FollowupPaths,
     ...api17Paths,
@@ -5861,7 +5870,7 @@ const spec = {
       post: {
         tags: ['Conversions'],
         summary: '外部システムからの成果受信(公開口・HMAC署名)',
-        description: '管理認証を通さない公開口。X-Conversion-Signature ヘッダに'
+        description: '本文のtimestamp（UNIX秒、前後300秒以内）とnonce（英数字・_・-の16〜128字）も署名の対象。nonceは地点ごとに1回だけ。正規再試行は新nonceと同じsourceEventId。管理認証を通さない公開口。X-Conversion-Signature ヘッダに'
           + '本文のHMAC-SHA256(hex)を、X-Conversion-Event-Id または本文の sourceEventId に'
           + '再送を捌くイベントIDを入れる。成否は受信履歴に残る。',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
@@ -5871,7 +5880,10 @@ const spec = {
             'application/json': {
               schema: {
                 type: 'object',
+                required: ['timestamp','nonce'],
                 properties: {
+                  timestamp: { type: 'integer', description: '署名した送信時刻（UNIX秒）' },
+                  nonce: { type: 'string', minLength: 16, maxLength: 128 },
                   sourceEventId: { type: 'string', description: 'ヘッダの代わりに本文で渡せる' },
                   friendId: { type: 'string' },
                   lineUserId: { type: 'string' },
@@ -7557,7 +7569,11 @@ const spec = {
     '/api/booking/payments/{id}/refund': {
       post: {
         tags: ['Booking'],
-        summary: '支払い済みを返金する',
+        summary: '試験用の支払いを一部または全額返金する',
+        description: 'owner/admin、閲覧のみ不可。697が必要。試験用Stripe IDとJPYだけ。amount省略は残額全部。同じidempotencyKeyは1回だけ、本文違い409。data:{payment,refund,duplicate,simulation:true,sent:false}。LINE希望は保存するが送信しない。',
+        requestBody: {required:true,content:{'application/json':{schema:{type:'object',required:['reason','idempotencyKey'],properties:{
+          amount:{type:'integer',minimum:1},reason:{type:'string',minLength:1,maxLength:500},notifyLine:{type:'boolean',default:false},idempotencyKey:{type:'string',minLength:1,maxLength:200}
+        }}}}},
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],

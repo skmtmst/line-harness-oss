@@ -1,3 +1,4 @@
+import {tagDefinitionError} from './tag-definition-error.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -182,24 +183,6 @@ async function visibleTagFolder(c: Context<Env>, id: string, accountId?: string 
   return null;
 }
 
-function tagDefinitionError(c: Context<Env>, error: unknown): Response | null {
-  if (error instanceof TagDefinitionError) {
-    const status = error.code === 'not_found' || error.code === 'folder_not_found' ? 404 : 409;
-    return inputError(c, { success: false, code: error.code, error: error.message }, status, []);
-  }
-  if (error instanceof CommonActionValidationError) {
-    return inputError(c, {
-      success: false,
-      code: error.code,
-      error: error.message,
-      ...(error.field ? { field: error.field } : {}),
-    }, 422, ["automationDraft"]);
-  }
-  if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
-    return c.json({ success: false, code: 'name_conflict', error: '同じ名前のタグがあります' }, 409);
-  }
-  return null;
-}
 
 function text(value: unknown): string | undefined {
   return typeof value === 'string' ? value.trim() : undefined;
@@ -1018,6 +1001,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), 
       if (name !== undefined && TAG_NAME_CONTROL_CHARACTER_PATTERN.test(name)) {
         return inputError(c, { success: false, error: 'name must not contain control characters' }, 400, ["name"]);
       }
+      if(body.manualAssignmentAllowed===true&&await c.env.DB.prepare('SELECT id FROM member_rank_tiers WHERE tag_id=?').bind(c.req.param('id')).first())return c.json({success:false,error:'rank_tag_managed'},403);
       const reapplyPolicy = body.reapplyPolicy;
       if (reapplyPolicy !== undefined
         && reapplyPolicy !== 'first_only'

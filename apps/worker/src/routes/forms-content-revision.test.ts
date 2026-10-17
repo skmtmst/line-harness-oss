@@ -183,11 +183,13 @@ describe('W15 フォルダと内容の複合保存（実SQL）', () => {
     expect((await put({ folderId: 'folder-1', layout: null, expectedContentRevision: 1 })).status).toBe(400);
     expect(state()).toEqual(before);
   });
-  test('配色違反の422でフォルダだけが動かない', async () => {
-    const before = state();
+  test('読みにくい配色は注意を返し、フォルダと内容を一緒に保存する', async () => {
+    const before = formRow();
     const layout = { sections: [], options: { theme: { text: '#ffffff', sub: '#ffffff' } } };
-    expect((await put({ folderId: 'folder-1', layout, expectedContentRevision: 1 })).status).toBe(422);
-    expect(state()).toEqual(before);
+    const response = await put({ folderId: 'folder-1', layout, expectedContentRevision: 1 });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { warnings: [{ code: 'LOW_CONTRAST' }] } });
+    expect(state()).toMatchObject({ folder_id: 'folder-1', content_revision: before.content_revision + 1 });
   });
   test('正しい版で内容とフォルダが一緒に保存され版は一度だけ進む', async () => {
     const before = formRow();

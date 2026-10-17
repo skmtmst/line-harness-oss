@@ -1,0 +1,90 @@
+/*
+ * 外部連携 › API 接続の区画「AI とつなぐ（MCP）」（Xb0yc）と作る窓・作った後の窓（Ge1vp）。
+ * 区画は共通の Card。ここは区画の説明の行、窓の中の並び、URL と鍵の行だけ。
+ */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.purpose,
+.note,
+.ownerOnly {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.note,
+.ownerOnly {
+  font-size: var(--text-micro);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.selects {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-12);
+}
+
+.issued {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-14);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken);
+}
+
+.issuedMeta {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.issuedRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.issuedLabel {
+  flex: 0 0 auto;
+  font-size: var(--text-micro);
+  color: var(--color-ink-secondary);
+}
+
+.code {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.howto {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin: 0;
+  font-size: var(--text-micro);
+  color: var(--color-ink-secondary);
+}
+
+.issuedFooter {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}

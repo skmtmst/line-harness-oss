@@ -1,34 +1,26 @@
 'use client'
 
-import TagOverflow from '@/components/shared/tag-overflow'
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { X } from 'lucide-react'
-import TagPill from '@/components/shared/tag-pill'
-import type { SavedSearchCondition, Scenario, Tag } from '@line-crm/shared'
-import { api, type FriendListParams } from '@/lib/api'
-import {
-  conditionsToEditorState,
-  describeSavedCondition,
-  describeSavedVisibility,
-  editorStateToConditions,
-  hasSavedSearchFilter,
-  type FriendSearchBlock,
-  type FriendSearchEditorState,
-  type FriendVisibilityChoice,
-  type SavedSearchConditionLabels,
-} from './saved-search-utils'
-import { TextInput } from '@/components/shared/form-controls'
-import DateField from '@/components/shared/date-field'
-import Button from '@/components/shared/button'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Combobox from '@/components/shared/combobox'
-import Select from '@/components/shared/select'
-import HelpTip from '@/components/shared/help-tip'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import { formatNumber } from '@/lib/format'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-
+import { memberRanksApi } from '@/lib/api-gap3';
+import { useOverlayLayer } from '@/components/shared/overlay-utils';
+import TagOverflow from '@/components/shared/tag-overflow';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { X } from 'lucide-react';
+import TagPill from '@/components/shared/tag-pill';
+import type { SavedSearchCondition, Scenario, Tag } from '@line-crm/shared';
+import { api, type FriendListParams } from '@/lib/api';
+import { conditionsToEditorState, describeSavedCondition, describeSavedVisibility, editorStateToConditions, hasSavedSearchFilter, type FriendSearchBlock, type FriendSearchEditorState, type FriendVisibilityChoice, type SavedSearchConditionLabels } from './saved-search-utils';
+import { TextInput } from '@/components/shared/form-controls';
+import DateField from '@/components/shared/date-field';
+import Button from '@/components/shared/button';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import Select from '@/components/shared/select';
+import HelpTip from '@/components/shared/help-tip';
+import { useOverlayFocus } from '@/components/shared/overlay-utils';
+import { formatNumber } from '@/lib/format';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import { BLOCK_HELP, type AdvancedSearchResult } from './advanced-search-dialog-gap-parts'
+export type { AdvancedSearchResult } from './advanced-search-dialog-gap-parts'
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
  *
@@ -42,6 +34,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 
 /** 絞り込みの1ブロック。設計の「条件」1つぶん。 */
 type Block = FriendSearchBlock
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 
 const BLOCK_LABEL: Record<Block['kind'], string> = {
   name: '名前',
@@ -50,18 +43,15 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
   status_message: 'ステータスメッセージ',
   created_at: '友だち登録日',
   chat_status: '対応状況',
+  visit_count: '来店の回数',
+  purchase_amount: '購入の合計金額',
+  last_activity_at: '最後の来店・購入の日',
+  member_tier: '会員ランク',
 }
 
-const BLOCK_HELP: Record<Block['kind'], string> = {
-  name: 'LINE登録名・本名・システム表示名',
-  tag: '含む／含まない',
-  field: '項目と値',
-  status_message: 'ひとことに含む文字',
-  created_at: '期間を指定',
-  chat_status: '固定の4状態',
-}
 
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
+
+
 
 const VISIBILITY_OPTIONS: Array<{ value: FriendVisibilityChoice; label: string }> = [
   { value: 'visible', label: '表示中' },
@@ -70,59 +60,7 @@ const VISIBILITY_OPTIONS: Array<{ value: FriendVisibilityChoice; label: string }
   { value: 'all', label: 'すべて' },
 ]
 
-/*
- * FRIEND-03: ORの軸は「項目→比較方法→値」を自分で選ぶ。
- * 先頭の候補や固定の日付を勝手に使うと、選んだ覚えのない条件で
- * 絞り込まれる。値が要る軸は入力が揃うまで「追加」を押せない。
- */
-type OrAxisInput = 'mark' | 'scenario' | 'date' | 'text' | null
-const OR_AXES: Array<{
-  label: string
-  feature?: 'support_marks'
-  input: OrAxisInput
-  placeholder?: string
-  make: (value: string) => SavedSearchCondition | null
-}> = [
-  { label: '対応マーク', feature: 'support_marks', input: 'mark', make: (value) => value ? { kind: 'mark', op: 'eq', value } : null },
-  { label: 'シナリオ', input: 'scenario', make: (value) => value ? { kind: 'scenario', op: 'eq', value } : null },
-  { label: 'イベント予約', input: null, make: () => ({ kind: 'event_booking', op: 'exists' }) },
-  { label: 'カレンダー予約', input: null, make: () => ({ kind: 'calendar_booking', op: 'exists' }) },
-  { label: '回答フォーム', input: null, make: () => ({ kind: 'form', op: 'exists' }) },
-  { label: '最終反応日', input: 'date', make: (value) => value ? { kind: 'last_activity', op: 'after', value } : null },
-  { label: 'リマインダ', input: null, make: () => ({ kind: 'reminder', op: 'exists' }) },
-  { label: 'メモ', input: null, make: () => ({ kind: 'memo', op: 'exists' }) },
-  { label: 'ステータスメッセージ', input: 'text', placeholder: '含む文字', make: (value) => value.trim() ? { kind: 'status_message', op: 'contains', value: value.trim() } : null },
-  { label: '友だち登録日', input: 'date', make: (value) => value ? { kind: 'created_at', op: 'after', value } : null },
-  { label: 'その他', input: 'text', placeholder: 'イベント種別（例：conversion）', make: (value) => value.trim() ? { kind: 'common_event', op: 'exists', value: value.trim() } : null },
-]
 
-export interface AdvancedSearchResult {
-  params: Pick<
-    FriendListParams,
-    | 'search'
-    | 'tagIds'
-    | 'excludeTagIds'
-    | 'metadata'
-    | 'metadataNot'
-    | 'statusMessage'
-    | 'createdFrom'
-    | 'createdTo'
-    | 'chatStatus'
-    | 'visibility'
-    | 'sort'
-    | 'limit'
-    | 'savedSearchId'
-    | 'conditions'
-  >
-  /** 画面に「絞り込み中」を出すための、人が読める形 */
-  summary: string[]
-  /**
-   * 詳細条件をもう一度開いたとき、この編集状態から再開する（FRIEND-32）。
-   * URL直指定の保存検索など実条件が手元に無い適用では未設定のままにし、
-   * 開いたときに保存済み一覧から引き直す。
-   */
-  editorState?: FriendSearchEditorState
-}
 
 function defaultBlocks(fieldsEnabled: boolean): Block[] {
   const blocks: Block[] = [
@@ -175,6 +113,16 @@ export default function AdvancedSearchDialog({
   const marksFeatureEnabled = features?.marks !== false
   const fieldsFeatureEnabled = features?.fields !== false
   const [blocks, setBlocks] = useState<Block[]>(() => defaultBlocks(fieldsFeatureEnabled))
+  /* ★V8 fmToi：会員ランクの段の候補。ランクを動かしていない店では空。 */
+  const [rankTiers, setRankTiers] = useState<Array<{ id: string; name: string }>>([])
+  useEffect(() => {
+    if (!open || !accountId) return
+    let alive = true
+    memberRanksApi.program(accountId).then((r) => { if (alive && r.success) setRankTiers(r.data.tiers.map((t) => ({ id: t.id, name: t.name }))) }).catch(() => undefined)
+    return () => { alive = false }
+  }, [open, accountId])
+  /* 共通の重なり番号：この窓の上に開く窓（準備中など）が後ろに回らない。 */
+  const layer = useOverlayLayer(open)
   const [visibility, setVisibility] = useState<FriendVisibilityChoice>('visible')
   const [any, setAny] = useState<SavedSearchCondition[]>([])
   const [extraAll, setExtraAll] = useState<SavedSearchCondition[]>([])
@@ -341,6 +289,9 @@ export default function AdvancedSearchDialog({
       if (b.kind === 'created_at' && (b.from || b.to)) {
         out.push(`登録日 ${b.from || '…'} 〜 ${b.to || '…'}`)
       }
+      if ((b.kind === 'visit_count' || b.kind === 'purchase_amount') && (b.min || b.max)) out.push(`${BLOCK_LABEL[b.kind]} ${b.min || '…'} 〜 ${b.max || '…'}`)
+      if (b.kind === 'last_activity_at' && (b.from || b.to)) out.push(`最後の来店・購入 ${b.from || '…'} 〜 ${b.to || '…'}`)
+      if (b.kind === 'member_tier' && b.tierId) out.push(`会員ランク ${rankTiers.find((t) => t.id === b.tierId)?.name ?? '選択済み'}`)
       if (b.kind === 'chat_status') {
         out.push(
           `対応状況 ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済み' }[b.value]}`,
@@ -402,7 +353,13 @@ export default function AdvancedSearchDialog({
               ? { kind: 'status_message', keyword: '' }
               : kind === 'created_at'
                 ? { kind: 'created_at', from: '', to: '' }
-                : { kind: 'chat_status', value: 'unread' },
+                : kind === 'visit_count' || kind === 'purchase_amount'
+                  ? { kind, min: '', max: '' }
+                  : kind === 'last_activity_at'
+                    ? { kind: 'last_activity_at', from: '', to: '' }
+                    : kind === 'member_tier'
+                      ? { kind: 'member_tier', tierId: '' }
+                      : { kind: 'chat_status', value: 'unread' },
     ])
 
   const resetConditions = () => {
@@ -453,7 +410,8 @@ export default function AdvancedSearchDialog({
 
   return (
     <SaveErrorScope errors={saveErrors}><div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-scrim p-4"
+      className="fixed inset-0 flex items-center justify-center bg-scrim p-4"
+      style={{ zIndex: layer }}
       data-design-node="CYJ0L"
       onClick={onClose}
     >
@@ -637,6 +595,24 @@ export default function AdvancedSearchDialog({
                   </div>
                 )}
 
+                {(b.kind === 'visit_count' || b.kind === 'purchase_amount') && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <TextInput className="w-36" type="number" min={0} value={b.min} onChange={(e) => patch(i, { ...b, min: e.target.value })} placeholder="下限なし" aria-label={`${BLOCK_LABEL[b.kind]}の下限`} />
+                    <span className="text-ink-faint text-sm">{b.kind === 'visit_count' ? '回以上〜' : '円以上〜'}</span>
+                    <TextInput className="w-36" type="number" min={0} value={b.max} onChange={(e) => patch(i, { ...b, max: e.target.value })} placeholder="上限なし" aria-label={`${BLOCK_LABEL[b.kind]}の上限`} />
+                    <span className="text-ink-faint text-sm">{b.kind === 'visit_count' ? '回以下' : '円以下'}</span>
+                  </div>
+                )}
+                {b.kind === 'last_activity_at' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DateField value={b.from} onChange={(next) => patch(i, { ...b, from: next })} aria-label="最後の来店・購入の日の開始" className="w-48" />
+                    <span className="text-ink-faint text-sm">〜</span>
+                    <DateField value={b.to} onChange={(next) => patch(i, { ...b, to: next })} aria-label="最後の来店・購入の日の終了" className="w-48" />
+                  </div>
+                )}
+                {b.kind === 'member_tier' && (
+                  <EntitySelect aria-label="会員ランク" value={b.tierId} onChange={(value) => patch(i, { ...b, tierId: value })} options={[{ value: '', label: 'ランクを選ぶ' }, ...rankTiers.map((t) => ({ value: t.id, label: `${t.name}の人` }))]} />
+                )}
                 {b.kind === 'chat_status' && (
                   <>
                     {/* FRIEND-05: 説明どおり固定4状態。保留も検索できる。 */}
@@ -865,77 +841,6 @@ export default function AdvancedSearchDialog({
   )
 }
 
-/**
- * ORの軸1つぶん。値が要る軸は入力が揃うまで追加できない（FRIEND-03）。
- * 先頭の候補・固定の日付を勝手に使うことはない。
- */
-function OrAxisPicker({
-  axis,
-  marks,
-  scenarios,
-  onAdd,
-}: {
-  axis: (typeof OR_AXES)[number]
-  marks: Array<{ id: string; name: string }>
-  scenarios: Scenario[]
-  onAdd: (condition: SavedSearchCondition) => void
-}) {
-  const [draft, setDraft] = useState('')
-  const options = axis.input === 'mark' ? marks : axis.input === 'scenario' ? scenarios : []
-  const waitingForOptions = (axis.input === 'mark' || axis.input === 'scenario') && options.length === 0
-  const condition = axis.make(draft)
-  const addable = !waitingForOptions && (axis.input === null || condition !== null)
-
-  return (
-    <div className="flex max-w-xs flex-col gap-1">
-      <span className="text-xs font-semibold text-ink-secondary">{axis.label}</span>
-      <div className="flex items-center gap-1.5">
-        {axis.input === 'mark' || axis.input === 'scenario' ? (
-          <SaveErrorField names={["draft"]}><EntitySelect clearable size="full"
-            aria-label={`${axis.label}を選ぶ`}
-            placeholder="選ぶ"
-            value={draft}
-            onChange={setDraft}
-            disabled={waitingForOptions}
-            options={options.map((option) => ({ ...entityOptionMetadata(option), value: option.id, label: option.name }))}
-            className="min-w-0 flex-1"
-          /></SaveErrorField>
-        ) : axis.input === 'date' ? (
-          <SaveErrorField names={["draft"]}><DateField
-            value={draft}
-            onChange={setDraft}
-            aria-label={`${axis.label}の日付（この日以降）`}
-            className="min-w-0 flex-1"
-          /></SaveErrorField>
-        ) : axis.input === 'text' ? (
-          <SaveErrorField names={["draft"]}><input
-            type="text"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder={axis.placeholder}
-            aria-label={`${axis.label}の値`}
-            className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-2 py-1.5 text-xs"
-          /></SaveErrorField>
-        ) : null}
-        <button
-          type="button"
-          disabled={!addable}
-          onClick={() => {
-            if (!condition) return
-            onAdd(condition)
-            setDraft('')
-          }}
-          className="shrink-0 rounded-pill border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
-        >
-          ＋ 追加する
-        </button>
-      </div>
-      {waitingForOptions ? <span className="text-ink-faint text-nano leading-tight">選択肢を読み込むと使えます</span> : null}
-      {axis.input === 'date' ? <span className="text-ink-faint text-nano leading-tight">指定した日以降</span> : null}
-    </div>
-  )
-}
-
 function TagPicker({
   tags,
   include,
@@ -1008,6 +913,100 @@ function TagPicker({
           </span>
         ))}</TagOverflow>
       </div>
+    </div>
+  )
+}
+
+type OrAxisInput = 'mark' | 'scenario' | 'date' | 'text' | null
+
+const OR_AXES: Array<{
+  label: string
+  feature?: 'support_marks'
+  input: OrAxisInput
+  placeholder?: string
+  make: (value: string) => SavedSearchCondition | null
+}> = [
+  { label: '対応マーク', feature: 'support_marks', input: 'mark', make: (value) => value ? { kind: 'mark', op: 'eq', value } : null },
+  { label: 'シナリオ', input: 'scenario', make: (value) => value ? { kind: 'scenario', op: 'eq', value } : null },
+  { label: 'イベント予約', input: null, make: () => ({ kind: 'event_booking', op: 'exists' }) },
+  { label: 'カレンダー予約', input: null, make: () => ({ kind: 'calendar_booking', op: 'exists' }) },
+  { label: '回答フォーム', input: null, make: () => ({ kind: 'form', op: 'exists' }) },
+  { label: '最終反応日', input: 'date', make: (value) => value ? { kind: 'last_activity', op: 'after', value } : null },
+  { label: 'リマインダ', input: null, make: () => ({ kind: 'reminder', op: 'exists' }) },
+  { label: 'メモ', input: null, make: () => ({ kind: 'memo', op: 'exists' }) },
+  { label: 'ステータスメッセージ', input: 'text', placeholder: '含む文字', make: (value) => value.trim() ? { kind: 'status_message', op: 'contains', value: value.trim() } : null },
+  { label: '友だち登録日', input: 'date', make: (value) => value ? { kind: 'created_at', op: 'after', value } : null },
+  { label: 'その他', input: 'text', placeholder: 'イベント種別（例：conversion）', make: (value) => value.trim() ? { kind: 'common_event', op: 'exists', value: value.trim() } : null },
+]
+
+
+/**
+ * ORの軸1つぶん。値が要る軸は入力が揃うまで追加できない（FRIEND-03）。
+ * 先頭の候補・固定の日付を勝手に使うことはない。
+ */
+function OrAxisPicker({
+  axis,
+  marks,
+  scenarios,
+  onAdd,
+}: {
+  axis: (typeof OR_AXES)[number]
+  marks: Array<{ id: string; name: string }>
+  scenarios: Scenario[]
+  onAdd: (condition: SavedSearchCondition) => void
+}) {
+  const [draft, setDraft] = useState('')
+  const options = axis.input === 'mark' ? marks : axis.input === 'scenario' ? scenarios : []
+  const waitingForOptions = (axis.input === 'mark' || axis.input === 'scenario') && options.length === 0
+  const condition = axis.make(draft)
+  const addable = !waitingForOptions && (axis.input === null || condition !== null)
+
+  return (
+    <div className="flex max-w-xs flex-col gap-1">
+      <span className="text-xs font-semibold text-ink-secondary">{axis.label}</span>
+      <div className="flex items-center gap-1.5">
+        {axis.input === 'mark' || axis.input === 'scenario' ? (
+          <SaveErrorField names={["draft"]}><EntitySelect clearable size="full"
+            aria-label={`${axis.label}を選ぶ`}
+            placeholder="選ぶ"
+            value={draft}
+            onChange={setDraft}
+            disabled={waitingForOptions}
+            options={options.map((option) => ({ ...entityOptionMetadata(option), value: option.id, label: option.name }))}
+            className="min-w-0 flex-1"
+          /></SaveErrorField>
+        ) : axis.input === 'date' ? (
+          <SaveErrorField names={["draft"]}><DateField
+            value={draft}
+            onChange={setDraft}
+            aria-label={`${axis.label}の日付（この日以降）`}
+            className="min-w-0 flex-1"
+          /></SaveErrorField>
+        ) : axis.input === 'text' ? (
+          <SaveErrorField names={["draft"]}><input
+            type="text"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={axis.placeholder}
+            aria-label={`${axis.label}の値`}
+            className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-2 py-1.5 text-xs"
+          /></SaveErrorField>
+        ) : null}
+        <button
+          type="button"
+          disabled={!addable}
+          onClick={() => {
+            if (!condition) return
+            onAdd(condition)
+            setDraft('')
+          }}
+          className="shrink-0 rounded-pill border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
+        >
+          ＋ 追加する
+        </button>
+      </div>
+      {waitingForOptions ? <span className="text-ink-faint text-nano leading-tight">選択肢を読み込むと使えます</span> : null}
+      {axis.input === 'date' ? <span className="text-ink-faint text-nano leading-tight">指定した日以降</span> : null}
     </div>
   )
 }

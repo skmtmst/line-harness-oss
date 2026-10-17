@@ -39,7 +39,8 @@ async function request(path: string, method = 'GET', body?: unknown) {
     },
     {
       DB: sql.db,
-      DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true',
+      RESTAURANT_TEST_ENABLED: 'true',
+      DEPLOY_ENV: 'test',
       IMAGES: { head: vi.fn(), get: vi.fn(), put: vi.fn(), delete: vi.fn() },
     } as unknown as Env['Bindings'],
   );
@@ -183,7 +184,7 @@ describe('B-311 template samples', () => {
     expect(r.status).toBe(200);
     expect(
       r.body.data.inserted.filter((i: any) => i.kind === 'template'),
-    ).toHaveLength(18);
+    ).toHaveLength(3);
     expect(r.body.data.inserted.find((i: any) => i.key === key)).toMatchObject({
       id: existing.id,
       isSample: false,

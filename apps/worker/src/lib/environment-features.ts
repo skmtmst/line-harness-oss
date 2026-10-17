@@ -1,3 +1,8 @@
+/** Google ビジネスは本番でも利用する。飲食店の試験用スイッチには従わない。 */
+export function googleBusinessEnabled(env: { GOOGLE_BUSINESS_ENABLED?: string }): boolean {
+  return env.GOOGLE_BUSINESS_ENABLED?.trim().toLowerCase() === 'true';
+}
+
 /**
  * 環境限定機能の安全側判定。
  *

@@ -7,7 +7,6 @@ import { api } from '@/lib/api'
 import {canEditManualLinks as canEditTable} from '@/lib/manual-link-access'
 import styles from './settings-nav-v8.module.css'
 import { Palette, Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Share2, Bell, Store, Truck, type LucideIcon } from 'lucide-react'
-import { restaurantTestUiEnabled } from '@/lib/environment-features'
 
 /**
  * 設定の中のメニュー（★V8 `ywFJT` の左欄）。
@@ -56,7 +55,7 @@ const TAIL_LINKS: NavLink[] = [
 ]
 
 /* 予約サイト・グルメ媒体（提案 E-4）とデリバリー連携（承認案 DL-1 `dF4Ov`）。
-   飲食店向け（テスト）が使える環境だけ、SNS 連携の下に足す。 */
+   本番でも入口を残し、未公開なら移動先で共通の案内を出す。 */
 const RESTAURANT_LINKS: NavLink[] = [
   { href: '/settings/booking-media', label: '予約サイト・グルメ媒体', icon: Store },
   { href: '/settings/delivery', label: 'デリバリー連携', icon: Truck },
@@ -93,7 +92,7 @@ export function SettingsNavV8() {
         {showManualLinks && item({ href: '/settings/manual-links', label: 'マニュアルの正本表' }, true)}
         {FEATURE_SUB_LINKS.map((link) => item(link, true))}
         {TAIL_LINKS.map((link) => item(link))}
-        {restaurantTestUiEnabled() ? RESTAURANT_LINKS.map((link) => item(link)) : null}
+        {RESTAURANT_LINKS.map((link) => item(link))}
       </ul>
     </nav>
   )

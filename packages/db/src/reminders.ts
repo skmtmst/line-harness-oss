@@ -1,3 +1,5 @@
+import { parseTemplateVersionSnapshot, snapshotReminderTemplateVersions } from './reminder-template-snapshot.js';
+export { snapshotReminderTemplateVersions, parseTemplateVersionSnapshot };
 import { sqlIdSet } from './id-queries.js';
 import type { ReminderRunReadOptions, ReminderScheduleMetrics } from '@line-crm/shared';
 import { jstNow, nextVersionToken } from './utils.js';
@@ -904,49 +906,6 @@ async function ensureReminderPublishedVersion(
   const current = await getReminderById(db, reminder.id);
   if (!current?.current_published_version_id) throw new Error('REMINDER_PUBLISHED_VERSION_NOT_CREATED');
   return current.current_published_version_id;
-}
-
-/**
- * R346: 登録時に使っていたテンプレートの公開版を写す。
- * {"テンプレートID": 公開版番号} の JSON。本文は作らない。
- * まだ公開されていない・消えたテンプレートは載せず、送るときに今の版を読む。
- */
-export async function snapshotReminderTemplateVersions(
-  db: D1Database,
-  templateIds: Array<string | null>,
-): Promise<string | null> {
-  const ids = [...new Set(templateIds.filter((id): id is string => !!id))];
-  if (ids.length === 0) return null;
-  const rows = await db.prepare(
-    `SELECT id, published_version FROM templates WHERE id IN (${sqlIdSet(ids).sql})`,
-  ).bind(...sqlIdSet(ids).binds).all<{ id: string; published_version: number }>();
-  const map: Record<string, number> = {};
-  for (const row of rows.results ?? []) {
-    const version = Number(row.published_version);
-    if (Number.isFinite(version) && version > 0) map[row.id] = version;
-  }
-  return Object.keys(map).length > 0 ? JSON.stringify(map) : null;
-}
-
-/**
- * R346: 登録に残した版指定を読む。壊れた記録は「指定なし」と同じにする。
- */
-export function parseTemplateVersionSnapshot(
-  value: string | null | undefined,
-): Record<string, number> | null {
-  if (!value) return null;
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    const map: Record<string, number> = {};
-    for (const [key, version] of Object.entries(parsed as Record<string, unknown>)) {
-      const n = Number(version);
-      if (key && Number.isFinite(n) && n > 0) map[key] = n;
-    }
-    return Object.keys(map).length > 0 ? map : null;
-  } catch {
-    return null;
-  }
 }
 
 export async function enrollFriendInReminder(
@@ -2014,6 +1973,21 @@ export async function claimReminderDeliveryRun(
   ).bind(input.friendReminderId, input.reminderStepId, input.scheduledAt)
     .first<ReminderDeliveryRunRow>();
   if (!row) return null;
+
+  // 登録・基準日変更・再開より前に過ぎた通は、遡って送らず記録を残す。
+  // cron の遅れや、すでに送信を試みた通の再試行とは区別する。
+  await db.prepare(
+    `UPDATE reminder_delivery_runs
+        SET status = 'skipped', last_error_code = 'scheduled_before_enrollment',
+            last_error_message = '登録・変更時点で予定の時刻を過ぎていたため送信しませんでした',
+            completed_at = ?, updated_at = ?
+      WHERE id = ? AND status = 'queued' AND attempt_count = 0
+        AND EXISTS (SELECT 1 FROM friend_reminders fr
+          WHERE fr.id = friend_reminder_id
+            AND julianday(reminder_delivery_runs.scheduled_at) < julianday(CASE
+              WHEN fr.updated_at GLOB '*Z' OR fr.updated_at GLOB '*[+-]??:??' THEN fr.updated_at
+              ELSE fr.updated_at || '+09:00' END))`,
+  ).bind(input.now, input.now, row.id).run();
 
   // 取消と取得の競合対策: 登録が active のままのときだけ握る (原子的)。
   // getPending (active 読み) から claim の間に取消が入っても、ここで弾く。

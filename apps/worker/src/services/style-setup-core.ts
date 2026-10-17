@@ -1,4 +1,11 @@
-import { ACCOUNT_STYLES, DASHBOARD_CARD_GROUPS, type AccountStyle, type SetupAnswer, type StyleCard } from '@line-crm/shared';
+import { STYLE_METRIC_IDS, STYLE_DEFAULT_METRIC_IDS } from '@line-crm/shared';
+import {
+  ACCOUNT_STYLES,
+  DASHBOARD_CARD_GROUPS,
+  type AccountStyle,
+  type SetupAnswer,
+  type StyleCard,
+} from '@line-crm/shared';
 
 export class StyleError extends Error {
   constructor(
@@ -176,4 +183,47 @@ export function readCards(input: unknown, style: AccountStyle): StyleCard[] {
   for (const c of defaultCards(style))
     if (!seen.has(c.id)) out.push({ ...c, visible: c.id.endsWith('-alert') });
   return out;
+}
+
+export function readMetricIds(value: unknown): string[] {
+  if (
+    !Array.isArray(value) ||
+    value.length > STYLE_METRIC_IDS.length ||
+    new Set(value).size !== value.length ||
+    value.some((v) => !STYLE_METRIC_IDS.includes(v))
+  )
+    throw new StyleError('invalid_metrics');
+  return value;
+}
+export function dashboardPresentation(
+  style: AccountStyle,
+  cards: StyleCard[],
+  metrics: string[] | null,
+) {
+  const tabCard: Partial<Record<string, string>> =
+    style === 'standard' || style === 'ec'
+      ? {}
+      : {
+          [style === 'restaurant'
+            ? 'today-seats'
+            : style === 'salon'
+              ? 'ledger'
+              : style === 'consult'
+                ? 'consultations'
+                : 'classes']: 'main',
+          [style === 'consult'
+            ? 'results-pending'
+            : style === 'lesson'
+              ? 'trials'
+              : 'reservations']: 'bookings',
+          [style === 'lesson' ? 'members' : 'customers']: 'people',
+          analytics: 'analytics',
+        };
+  return {
+    cards,
+    visibleTabs: cards
+      .filter((c) => c.visible && tabCard[c.id])
+      .map((c) => tabCard[c.id]!),
+    metricIds: metrics ?? [...STYLE_DEFAULT_METRIC_IDS[style]],
+  };
 }

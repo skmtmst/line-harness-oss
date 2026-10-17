@@ -449,7 +449,7 @@ async function processAutomations(
     const allAutomations = await getActiveAutomationsByEvent(db, eventType);
     // Filter by account: match this account's automations + unassigned (backward compat)
     const automations = allAutomations.filter(
-      (a) => !a.line_account_id || !lineAccountId || a.line_account_id === lineAccountId,
+      (a) => Boolean(a.line_account_id && lineAccountId && a.line_account_id === lineAccountId),
     );
 
     for (const automation of automations) {

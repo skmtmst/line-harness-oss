@@ -72,6 +72,7 @@ function stubDB(data: StubData): D1Database {
             return data.timezone === undefined ? null : { timezone: data.timezone };
           }
           if (sql.includes('FROM menus')) return data.menu ?? null;
+          if (sql.includes('FROM booking_calendar_switches')) return data.calendarConnection ? { read_enabled: 1, write_enabled: 0, version: 1 } : null;
           if (sql.includes('FROM google_calendar_connections')) return data.calendarConnection ?? null;
           return null;
         },
@@ -290,7 +291,7 @@ describe('explainBookingSlot', () => {
 
   test('外部カレンダーの予定が重なる → google_busy（詳細は返さない）', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      calendars: { 'cal@example.com': { busy: [{ start: '2026-05-09T01:00:00Z', end: '2026-05-09T02:00:00Z' }] } },
+      items: [{ start: '2026-05-09T01:00:00Z', end: '2026-05-09T02:00:00Z' }].map((entry,index)=>({id:'external-'+index,start:{dateTime:entry.start},end:{dateTime:entry.end}})),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
     try {
       const data: StubData = {
@@ -479,7 +480,7 @@ describe('explainBookingSlot', () => {
   });
 });
 
-test('GoogleがHTTP200でも対象カレンダーの取得失敗なら予約不可を保つ', async () => {
+test('GoogleがHTTP200でも予定一覧が欠けていたら予約不可を保つ', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ calendars: {
     'cal@example.com': { errors: [{ domain: 'global', reason: 'internalError' }] },
   } }), { status: 200 })));

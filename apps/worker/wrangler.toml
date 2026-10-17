@@ -47,7 +47,9 @@ crons = ["* * * * *", "*/5 * * * *", "1-56/5 * * * *", "0 */6 * * *"]
 DEPLOY_ENV = "production"
 # Googleの機密スコープ審査（デモ動画の撮影と本番運用）のため本番でも有効。
 # 書き込みは確認画面＋owner/adminの権限が前提で、自動送信はしない。
-RESTAURANT_TEST_ENABLED = "true"
+GOOGLE_BUSINESS_ENABLED = "true"
+# 飲食店の試験機能は本番では公開しない。
+RESTAURANT_TEST_ENABLED = "false"
 # 返信・店舗情報・写真・投稿のGoogleへの送信を許可する。
 # クライアントIDとシークレットは [vars] に書かず、本番Workerのシークレットとして登録する
 # （GOOGLE_BUSINESS_OAUTH_CLIENT_ID / GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET）。

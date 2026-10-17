@@ -27,6 +27,8 @@ export type ScheduledRowView = {
   editable: boolean
   /** 時刻を直す欄の初期値（日本時間の datetime-local） */
   defaultValue: string
+  /** 送る時刻の 1 分前を過ぎた（Q-38）。取り消せず「まもなく送ります」と出す。 */
+  tooLate?: boolean
 }
 
 export default function ScheduleSendDialog({
@@ -128,11 +130,13 @@ export default function ScheduleSendDialog({
                 <DateTimeField
                   aria-label="予約時刻を変更(日本時間)"
                   defaultValue={row.defaultValue}
-                  disabled={!row.editable}
+                  disabled={!row.editable || row.tooLate}
                   onChange={(next) => { if (next) onReschedule(row.id, next) }}
                   className={styles.schRowField}
                 />
-                <button type="button" className={styles.schLink} disabled={!row.editable} onClick={() => onCancelRow(row.id)}>取消</button>
+                {row.tooLate
+                  ? <span className={styles.schRowText}>まもなく送ります。取り消せません</span>
+                  : <button type="button" className={styles.schLink} disabled={!row.editable} onClick={() => onCancelRow(row.id)}>予約を取り消す</button>}
               </li>
             ))}
           </ul>

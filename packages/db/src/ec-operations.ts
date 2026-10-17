@@ -1,3 +1,5 @@
+import { maskSensitiveString } from './ec-identity-mask.js';
+import { reverseSourceConversions } from './conversion-event-sources.js';
 import { sqlIdSet } from './id-queries.js';
 import { REVENUE_IMPACT_KEYS, type EcIdentityCandidateSummary, type EcIdentityDuplicateSignal } from '@line-crm/shared';
 
@@ -176,6 +178,9 @@ export async function upsertEcEventReadModels(
     `SELECT id, last_event_id FROM ec_orders
       WHERE line_account_id = ? AND source_key = ? AND external_order_id = ?`,
   ).bind(event.lineAccountId, event.sourceKey, orderNumber).first<{ id: string; last_event_id: string }>();
+  if (order?.last_event_id === event.eventId && orderState(event.eventType) !== 'current') {
+    await reverseSourceConversions(db, { lineAccountId: event.lineAccountId, sourceType: 'ec_order_confirmed', orderNumber, friendId: event.friendId });
+  }
   if (!order || order.last_event_id !== event.eventId || !Array.isArray(event.order?.items)) return;
 
   const statements: D1PreparedStatement[] = [
@@ -628,16 +633,6 @@ export async function retryEcActionExecution(
   const execution = await getActionExecutionForResult(db, input.lineAccountId, input.id);
   if (!execution) return { kind: 'not_found' };
   return { kind: 'queued', execution };
-}
-
-function maskSensitiveString(value: string): string {
-  if (/[*\u2022\u25cf\u2026]/.test(value)) return value;
-  const email = value.match(/^([^@\s]+)@([^@\s]+)$/);
-  if (email) return `${email[1]!.slice(0, 2)}***@${email[2]}`;
-  if (/^\+?[0-9 ()-]{10,20}$/.test(value) && value.replace(/\D/g, '').length >= 10) {
-    return `***${value.replace(/\D/g, '').slice(-4)}`;
-  }
-  return value;
 }
 
 function parseMaskedJson(value: unknown): unknown {

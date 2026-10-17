@@ -234,6 +234,15 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
   :root .slotsEnd { margin-left: auto; }
 }
 
+/* 1 行指定（singleRow）：狭い板でも段を分けず、検索が縮んで全部を 1 行に収める。 */
+@container v8-page (max-width: 1099px) {
+  :root .slots[data-toolbar-single-row] { flex-wrap: nowrap; }
+  :root .slots[data-toolbar-single-row] .rowBreak { display: none; }
+  :root .slots[data-toolbar-single-row] .slotTool[data-toolbar-role='search'] { flex: 0 1 240px; min-width: 120px; }
+  :root .slots[data-toolbar-single-row] .slotTool[data-toolbar-role='count'] { order: 4; margin-left: auto; align-self: center; }
+  :root .slots[data-toolbar-single-row] .slotsRow { display: contents; }
+}
+
 /* B-244：保存した条件などの道具は、狭い板の2段目へ。広い板の順は保つ。 */
 .actions { display: contents; }
 :root .actions > * { order: 3; }

@@ -1,3 +1,5 @@
+import { serializeConversionPoint } from './conversion-point-serialization.js';
+import { consumePublicIngressReceipt } from '@line-crm/db';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { hasStaffAccess } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -115,24 +117,6 @@ const requireVisibleConversionEvent: MiddlewareHandler<Env> = async (c, next) =>
 };
 
 const MEASURE_METHODS: ConversionMeasureMethod[] = ['url_reach', 'webhook', 'manual'];
-
-function serializeConversionPoint(p: ConversionPoint) {
-  return {
-    id: p.id,
-    name: p.name,
-    eventType: p.event_type,
-    value: p.value,
-    measureMethod: p.measure_method,
-    targetUrl: p.target_url,
-    countRepeat: p.count_repeat !== 0,
-    attributionDays: p.attribution_days,
-    lineAccountId: p.line_account_id,
-    version: p.version,
-    status: p.status,
-    stoppedAt: p.stopped_at,
-    createdAt: p.created_at,
-  };
-}
 
 type ConversionPermission = 'view' | 'edit' | 'export';
 
@@ -923,6 +907,19 @@ conversions.post('/api/conversions/ingest/:id', inputJsonBoundary(), async (c) =
     if (!payload) {
       await log({ result: 'rejected', reason: 'invalid_json', signatureSha256: signatureHash });
       return inputError(c, { success: false, error: 'Invalid JSON body' }, 400, []);
+    }
+    // 時刻とnonceも本文HMACの対象。署名だけを別のイベントへ使い回せない。
+    const timestamp = payload.timestamp;
+    const nonce = payload.nonce;
+    if (typeof timestamp !== 'number' || !Number.isInteger(timestamp)
+        || Math.abs(Date.now() / 1000 - timestamp) > 300
+        || typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(nonce)) {
+      await log({ result: 'rejected', reason: 'invalid_freshness', signatureSha256: signatureHash });
+      return c.json({ success: false, error: '有効な送信時刻とnonceが必要です', code: 'INVALID_FRESHNESS' }, 401);
+    }
+    if (!await consumePublicIngressReceipt(c.env.DB, { kind: 'conversion_nonce', scopeId: pointId, key: await sha256Hex(nonce) })) {
+      await log({ result: 'rejected', reason: 'nonce_reused', signatureSha256: signatureHash });
+      return c.json({ success: false, error: '同じnonceは再利用できません', code: 'NONCE_REUSED' }, 409);
     }
     const payloadShape = maskedPayloadShape(payload);
     /*

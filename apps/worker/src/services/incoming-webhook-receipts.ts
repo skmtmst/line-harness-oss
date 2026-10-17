@@ -14,6 +14,7 @@ export interface IncomingWebhookExecution {
   step<T>(key: string, work: () => Promise<T>): Promise<T>;
   complete(): Promise<void>;
   fail(): Promise<void>;
+  defer?(): Promise<void>;
 }
 
 /**
@@ -221,6 +222,13 @@ async function claimKnownReceipt(
         WHERE source_event_id=? AND lease_owner=? AND status='processing'`)
         .bind(new Date().toISOString(), rowRef.source_event_id, owner).run();
       if ((result.meta?.changes ?? 0) !== 1) throw new Error('incoming_receipt_lease_lost');
+    },
+    async defer() {
+      const released=await db.prepare(`UPDATE incoming_webhook_receipts SET status='accepted',
+        attempt_count=MAX(0,attempt_count-1),lease_owner=NULL,lease_expires_at=NULL,last_error_code=NULL
+        WHERE source_event_id=? AND lease_owner=? AND status='processing' AND lease_expires_at>?`)
+        .bind(rowRef.source_event_id,owner,Date.now()).run();
+      if(released.meta.changes!==1) throw new Error('incoming_receipt_lease_lost');
     },
     async fail() {
       await db.prepare(`UPDATE incoming_webhook_receipts

@@ -1,3 +1,5 @@
+import { currentOrderState, orderNumberFromPayload } from './nen-order-state.js';
+import { EXTERNAL_DELIVERY_MAX_ATTEMPTS as MAX_DELIVERY_ATTEMPTS } from './external-delivery-retry.js';
 import {
   accountFeatureOffExclusionSql,
   activeTenantLineAccountSql,
@@ -23,7 +25,8 @@ const FOLLOW_UP_KEYS = ['arrival_check', 'review_request', 'cross_sell'] as cons
 const MAX_JOBS_PER_TICK = 30;
 // 送信に失敗した job を何回まで試すか。これを超えた job は拾われなくなり、
 // status='failed' のまま残る（last_error に理由が入る）。
-const MAX_DELIVERY_ATTEMPTS = 5;
+const DELIVERY_LEASE_MS = 5 * 60_000;
+const RETRY_DELAYS_MS = [60_000, 300_000, 1_800_000];
 // 要件 v6-21 §8: 1アカウントが1回の実行で送る上限。一斉配信の batch と同じく、
 // 1つのアカウントが上限ぶん先頭を占めて他のアカウントを止めないようにする。
 const MAX_JOBS_PER_ACCOUNT_PER_TICK = 10;
@@ -162,6 +165,7 @@ async function writeAccountSetting(db: D1Database, lineAccountId: string, key: s
 }
 
 type DeliveryJob = {
+  attempts?: number;
   id: string;
   campaign_key: string;
   friend_id: string;
@@ -373,43 +377,6 @@ export async function hasEarlierWindowDelivery(
     input.scheduledAt, input.scheduledAt, input.jobId,
   ).first<{ found: number }>();
   return earlier?.found === 1;
-}
-
-/**
- * IDEA-21: job の payload から起点となった注文番号を取り出す。
- * 発送後の案内（arrival_check / review_request / cross_sell）の payload は
- * `{ event }` の形で `event.order.number` を持つ。コラム・誕生日の payload は
- * 注文を持たないので null が返り、後続の注文状態チェックを素通りする。
- */
-function orderNumberFromPayload(raw: string): string | null {
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown> | null;
-    const event = parsed?.event as Record<string, unknown> | undefined;
-    const order = event?.order as Record<string, unknown> | undefined;
-    const number = order?.number;
-    return typeof number === 'string' && number.trim() ? number.trim() : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * IDEA-21: ECの注文台帳（ec_orders）の現在状態を返す。
- * `external_order_id` は注文番号。行が無いときは「取り消しとは言えない」ので
- * null を返し、呼び出し側は送信を止めない（連携の未到着で案内を欠かさない）。
- */
-async function currentOrderState(
-  db: D1Database,
-  lineAccountId: string | null,
-  orderNumber: string,
-): Promise<string | null> {
-  if (!lineAccountId) return null;
-  const row = await db.prepare(
-    `SELECT normalized_status FROM ec_orders
-      WHERE line_account_id = ? AND external_order_id = ?
-      ORDER BY updated_at DESC LIMIT 1`,
-  ).bind(lineAccountId, orderNumber).first<{ normalized_status: string }>();
-  return row?.normalized_status ?? null;
 }
 
 /**
@@ -909,7 +876,7 @@ export async function enqueueBirthdayCoupons(
   const pets = await db.prepare(
     `SELECT p.id, p.friend_id, p.name, p.birthday, f.line_account_id
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
-      WHERE p.birthday IS NOT NULL AND substr(p.birthday, -5) IN (?, '02-29') AND f.is_following = 1`,
+      WHERE p.archived_at IS NULL AND p.birthday IS NOT NULL AND substr(p.birthday, -5) IN (?, '02-29') AND f.is_following = 1`,
   ).bind(monthDay).all<{ id: string; friend_id: string; name: string; birthday: string; line_account_id: string | null }>();
   const issuedAt = jstNow();
   const accountConfiguration = new Map<string, {
@@ -982,7 +949,7 @@ export async function enqueueBirthdayCoupons(
           const snapshot = campaignSnapshot(campaign);
           const revived = await db.prepare(
             `UPDATE nen_delivery_jobs
-             SET status = 'pending', attempts = 0, scheduled_at = ?, payload = ?, campaign_snapshot = ?, updated_at = ?
+             SET status = 'pending', attempts = 0, next_attempt_at = NULL, claim_token = NULL, scheduled_at = ?, payload = ?, campaign_snapshot = ?, updated_at = ?
              WHERE campaign_key = 'birthday_coupon' AND source_key = ? AND status = 'cancelled'`,
           ).bind(sqliteDate(deliveryAt), payload, snapshot, issuedAt, jobKey).run();
           if (revived.meta.changes) {
@@ -1068,7 +1035,7 @@ export async function syncNenPetProfiles(
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(external_id) DO UPDATE SET friend_id = excluded.friend_id,
            customer_id = excluded.customer_id, name = excluded.name, animal_type = excluded.animal_type,
-           gender = excluded.gender, birthday = excluded.birthday, updated_at = excluded.updated_at`,
+           gender = excluded.gender, birthday = excluded.birthday, updated_at = excluded.updated_at WHERE nen_pet_profiles.archived_at IS NULL`,
       ).bind(
         crypto.randomUUID(), externalId, friendId,
         event.customer_id == null ? null : String(event.customer_id), name,
@@ -1096,27 +1063,33 @@ export async function processNenDeliveries(
   const now = options.now ?? new Date();
   const maxJobsPerTick = options.maxJobsPerTick ?? MAX_JOBS_PER_TICK;
   const maxJobsPerAccountPerTick = options.maxJobsPerAccountPerTick ?? MAX_JOBS_PER_ACCOUNT_PER_TICK;
-  const dueWhere = `status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
-        AND attempts < ?`;
+  // Reuse the same proxy idempotency key after a crashed attempt.
+  await db.prepare(`UPDATE nen_delivery_jobs SET status='failed', next_attempt_at=?, updated_at=?
+    WHERE status='processing' AND datetime(updated_at) <= datetime(?)`).bind(
+      now.toISOString(), now.toISOString(), new Date(now.getTime() - DELIVERY_LEASE_MS).toISOString(),
+    ).run();
+  const dueWhere = `status IN ('pending', 'failed') AND attempts < ?
+        AND datetime(scheduled_at) <= datetime(?)
+        AND (next_attempt_at IS NULL OR datetime(next_attempt_at) <= datetime(?))`;
   await db.prepare(
     `UPDATE nen_delivery_jobs
         SET status='skipped', last_error='tenant_suspended', updated_at=?
       WHERE ${dueWhere}
         AND line_account_id IS NOT NULL
         AND ${stoppedTenantLineAccountSql('nen_delivery_jobs.line_account_id')}`,
-  ).bind(jstNow(), MAX_DELIVERY_ATTEMPTS).run();
+  ).bind(jstNow(), MAX_DELIVERY_ATTEMPTS, now.toISOString(), now.toISOString()).run();
   const campaignsOff = accountFeatureOffExclusionSql('nen_delivery_jobs.line_account_id', 'nen_campaigns');
   // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が
   // 上限ぶん先頭を占めたまま、後ろに並ぶ動作中アカウントの配信が進まない。
   const jobs = await db.prepare(
     `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
-            scheduled_at, retry_generation
+            scheduled_at, retry_generation, attempts
        FROM nen_delivery_jobs
       WHERE ${dueWhere}
         AND NOT ${campaignsOff}
         AND (line_account_id IS NULL OR ${activeTenantLineAccountSql('nen_delivery_jobs.line_account_id')})
       ORDER BY scheduled_at ASC LIMIT ?`,
-  ).bind(MAX_DELIVERY_ATTEMPTS, maxJobsPerTick).all<DeliveryJob>();
+  ).bind(MAX_DELIVERY_ATTEMPTS, now.toISOString(), now.toISOString(), maxJobsPerTick).all<DeliveryJob>();
   // 止めた行も同じ上限ぶんだけ読み、skipped に数えて監査を残す。
   // 読むだけで status も attempts も動かさない。
   const offJobs = await db.prepare(
@@ -1125,7 +1098,7 @@ export async function processNenDeliveries(
         AND line_account_id IS NOT NULL
         AND ${campaignsOff}
       ORDER BY scheduled_at ASC LIMIT ?`,
-  ).bind(MAX_DELIVERY_ATTEMPTS, MAX_JOBS_PER_TICK).all<{ line_account_id: string }>();
+  ).bind(MAX_DELIVERY_ATTEMPTS, now.toISOString(), now.toISOString(), MAX_JOBS_PER_TICK).all<{ line_account_id: string }>();
   let sent = 0;
   let failed = 0;
   let skipped = 0;
@@ -1162,10 +1135,12 @@ export async function processNenDeliveries(
         await isOperationCapabilityStopped(db, job.line_account_id, 'broadcast_dispatch')) {
       continue;
     }
+    const claimToken = crypto.randomUUID();
     const claim = await db.prepare(
-      `UPDATE nen_delivery_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ?
-        WHERE id = ? AND status IN ('pending', 'failed')`,
-    ).bind(jstNow(), job.id).run();
+      `UPDATE nen_delivery_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ?, claim_token = ?
+        WHERE id = ? AND status IN ('pending', 'failed') AND attempts = ?
+          AND (next_attempt_at IS NULL OR datetime(next_attempt_at) <= datetime(?))`,
+    ).bind(now.toISOString(), claimToken, job.id, Number(job.attempts ?? 0), now.toISOString()).run();
     if (!claim.meta.changes) continue;
     try {
       const [friend, currentCampaign, account] = await Promise.all([
@@ -1191,8 +1166,8 @@ export async function processNenDeliveries(
                 ? 'campaign_snapshot_missing'
                 : 'campaign_disabled';
         await db.prepare(
-          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
-        ).bind(reason, jstNow(), job.id).run();
+          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
+        ).bind(reason, jstNow(), job.id, claimToken).run();
         skipped++;
         continue;
       }
@@ -1208,16 +1183,16 @@ export async function processNenDeliveries(
         const orderState = await currentOrderState(db, job.line_account_id, orderNumber);
         if (orderState === 'cancelled' || orderState === 'refunded') {
           await db.prepare(
-            `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
-          ).bind(orderState === 'cancelled' ? 'order_cancelled' : 'order_refunded', jstNow(), job.id).run();
+            `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
+          ).bind(orderState === 'cancelled' ? 'order_cancelled' : 'order_refunded', jstNow(), job.id, claimToken).run();
           skipped++;
           continue;
         }
       }
       if (await alreadyRespondedToCampaignForm(db, campaign, friend.id)) {
         await db.prepare(
-          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
-        ).bind('campaign_form_already_submitted', jstNow(), job.id).run();
+          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
+        ).bind('campaign_form_already_submitted', jstNow(), job.id, claimToken).run();
         skipped++;
         continue;
       }
@@ -1232,8 +1207,8 @@ export async function processNenDeliveries(
         windowDays,
       })) {
         await db.prepare(
-          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
-        ).bind('frequency_suppressed', jstNow(), job.id).run();
+          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
+        ).bind('frequency_suppressed', jstNow(), job.id, claimToken).run();
         skipped++;
         continue;
       }
@@ -1243,8 +1218,8 @@ export async function processNenDeliveries(
           await isOperationCapabilityStopped(db, job.line_account_id, 'broadcast_dispatch')) {
         await db.prepare(
           `UPDATE nen_delivery_jobs SET status = 'pending', attempts = attempts - 1, updated_at = ?
-            WHERE id = ? AND status = 'processing'`,
-        ).bind(jstNow(), job.id).run();
+            WHERE id = ? AND status = 'processing' AND claim_token = ?`,
+        ).bind(jstNow(), job.id, claimToken).run();
         continue;
       }
       const accessToken = account.channel_access_token;
@@ -1258,8 +1233,8 @@ export async function processNenDeliveries(
         options.proxyBaseUrl, accessToken, friend.line_user_id, messages, idempotencyKey, options.proxyDispatch,
       );
       await db.prepare(
-        `UPDATE nen_delivery_jobs SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
-      ).bind(jstNow(), jstNow(), job.id).run();
+        `UPDATE nen_delivery_jobs SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ? AND claim_token = ?`,
+      ).bind(jstNow(), jstNow(), job.id, claimToken).run();
       sent++;
       if (job.line_account_id) {
         perAccountSent.set(job.line_account_id, (perAccountSent.get(job.line_account_id) ?? 0) + 1);
@@ -1267,8 +1242,8 @@ export async function processNenDeliveries(
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 500) : 'Unknown error';
       await db.prepare(
-        `UPDATE nen_delivery_jobs SET status = 'failed', last_error = ?, updated_at = ? WHERE id = ?`,
-      ).bind(message, jstNow(), job.id).run();
+        `UPDATE nen_delivery_jobs SET status = 'failed', last_error = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
+      ).bind(message, new Date(now.getTime() + RETRY_DELAYS_MS[Math.min(Number(job.attempts ?? 0), 2)]).toISOString(), now.toISOString(), job.id, claimToken).run();
       console.error(JSON.stringify({"code":"nen_delivery_failed"}));
       failed++;
     }

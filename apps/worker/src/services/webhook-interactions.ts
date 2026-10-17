@@ -15,9 +15,10 @@ import {
 
 import {
   claimOutgoingDelivery,
-  deliverWebhook,
+  deliverOnce,
   failureReasonForDelivery,
   findOutgoingDeliveryByKey,
+  enqueueOutgoingWebhookDelivery,
   finishOutgoingDelivery,
   outgoingAttemptOf,
   recordDeliveryOutcome,
@@ -112,14 +113,19 @@ export async function retryWebhookInteraction(
   if (!webhook.is_active) throw new Error('webhook_inactive');
   if (!original.request_body_json) throw new Error('payload_unavailable');
 
-  const delivery = await findOutgoingDeliveryByKey(db, webhookId, original.idempotency_key);
+  let delivery = await findOutgoingDeliveryByKey(db, webhookId, original.idempotency_key);
+  if (!delivery) {
+    delivery = await enqueueOutgoingWebhookDelivery(db,{
+      lineAccountId:original.line_account_id,webhookId,eventType:original.event_type,
+      body:original.request_body_json,idempotencyKey:original.idempotency_key,maxAttempts:8,
+    }) ?? await findOutgoingDeliveryByKey(db,webhookId,original.idempotency_key);
+    if (!delivery) throw new Error('delivery_ledger_unavailable');
+  }
   let deliveryLease: string | null = null;
   if (delivery) {
     if (delivery.status === 'delivered') throw new Error('already_delivered');
-    if (delivery.status !== 'failed') {
-      deliveryLease = await claimOutgoingDelivery(db, delivery);
-      if (!deliveryLease) throw new Error('auto_retry_scheduled');
-    }
+    deliveryLease = await claimOutgoingDelivery(db, delivery);
+    if (!deliveryLease) throw new Error('auto_retry_scheduled');
   }
   const releaseDelivery = async (row: OutgoingDeliveryRow | null, lease: string | null) => {
     if (row && lease) {
@@ -187,7 +193,7 @@ export async function retryWebhookInteraction(
   try {
     // 署名用の復号は deliverWebhook が行う。ここでの復号は、送り直しを
     // 始める前に止めるための事前確認(#650 再審査)。
-    const result = await deliverWebhook(sendTarget, original.request_body_json, {
+    const result = await deliverOnce(sendTarget, original.request_body_json, {
       idempotencyKey: original.idempotency_key,
       credentialKeys: keys,
     });

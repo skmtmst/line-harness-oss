@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import liff from '@line/liff';
-import { formatJpLong } from '../lib/datetime.js';
+import { addMinutesHm, formatJpLong } from '../lib/datetime.js';
 import { api } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import Icon from './ui/Icon.js';
+import OnlineMeetingCard from './OnlineMeetingCard.js';
 import type { SlotPick } from './DateTimePicker.js';
 
 /**
@@ -17,12 +18,15 @@ import type { SlotPick } from './DateTimePicker.js';
 export default function Done({
   menuName,
   slot,
+  durationMinutes,
   status,
   bookingId,
   prepayNotice,
 }: {
   menuName: string;
   slot: SlotPick;
+  /** 所要時間（分）。渡したときは日時に終わりの時刻も出す（★V8 sjkwK・I5hxa）。 */
+  durationMinutes?: number;
   /** 作られた予約の状態。confirmed なら未承認の表示を出さない。 */
   status: string;
   /** 予約ID（前払いのみの案内があるときだけ使う）。 */
@@ -70,13 +74,13 @@ export default function Done({
         <p className="mt-3.5 text-[13px] leading-[21px] text-pretty text-liff-sub">
           {status === 'confirmed' ? (
             <>
-              変更・キャンセルはお店へご連絡ください。
+              前日と 1 時間前に LINE でお知らせします。
               <br />
               この画面は閉じてかまいません。
             </>
           ) : (
             <>
-              お店が確かめたら、LINEでお知らせします。
+              お店が確かめたら、LINE でお知らせします。
               <br />
               この画面は閉じてかまいません。
             </>
@@ -87,8 +91,8 @@ export default function Done({
         <div className="flex h-10 items-start gap-2 py-2.5">
           <dt className="w-18 shrink-0 text-xs text-liff-sub">日時</dt>
           <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">
-            {/* 板 VU6Xi は始まりの時刻だけ (「13:00〜」)。終わりは確認の段で見せている。 */}
-            {`${formatJpLong(slot.date)}${slot.start}〜`}
+            {/* 終わりの時刻まで出す（★V8 sjkwK・I5hxa）。所要時間が分からないときは始まりだけ。 */}
+            {`${formatJpLong(slot.date)}${slot.start}〜${durationMinutes ? addMinutesHm(slot.start, durationMinutes) : ''}`}
           </dd>
         </div>
         <div className="flex h-10 items-start gap-2 py-2.5">
@@ -104,6 +108,7 @@ export default function Done({
           </dd>
         </div>
       </dl>
+      <OnlineMeetingCard bookingId={bookingId} status={status} />
       {prepayNotice && (
         <section
           aria-label="事前のお支払いのお願い"

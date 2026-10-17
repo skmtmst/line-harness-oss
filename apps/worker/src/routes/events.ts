@@ -1,8 +1,8 @@
-import { bad } from '../services/event-input-error.js';
 import { normalizeEventQuestions, validateEventInput } from './event-input.js';
 import type { EventQuestion } from './event-input.js';
 export type { EventQuestion } from './event-input.js';
 import { eventModeRemaining } from '../services/event-mode-capacity.js';
+import { bad } from '../services/event-input-error.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { EventApplicationPreview } from '@line-crm/shared';

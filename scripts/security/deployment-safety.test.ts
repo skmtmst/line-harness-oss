@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { evaluateDeploymentSafety, inspectDeployment, REQUIRED_SECURITY_SECRETS, type SafetySnapshot } from './deployment-safety.js';
+import { evaluateDeploymentSafety, inspectDeployment, REQUIRED_SECURITY_SECRETS, type SafetySnapshot, type SafetyConfig } from './deployment-safety.js';
 const vars={DEPLOY_ENV:'production',ADMIN_ORIGIN:'https://admin.musubo.jp',RESTAURANT_TEST_ENABLED:'false'};
 function snapshot():SafetySnapshot { return {bindings:[{name:'IMAGES',type:'r2_bucket',bucket_name:'private-fixture'},...Object.entries(vars).map(([name,text])=>({name,type:'plain_text',text})),...REQUIRED_SECURITY_SECRETS.map(name=>({name,type:'secret_text'}))],buckets:[{name:'private-fixture',managed:false,custom:false}]}; }
 const config={vars,r2_buckets:[{binding:'IMAGES',bucket_name:'private-fixture'}]};
@@ -46,4 +46,67 @@ describe('配備の仕組みから呼ぶ入口（run-deployment-safety.ts）', (
     expect(r.status).toBe(1);
     expect(r.stderr).toContain('deployment_safety_arguments_invalid');
   }, 30000);
+});
+
+
+describe('B-368 本番の実設定と管理画面buildの整合', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  async function realConfig(environment: 'production' | 'staging') {
+    const { unstable_readConfig } = await import('wrangler');
+    return unstable_readConfig({ config: environment === 'production' ? 'apps/worker/wrangler.toml' : 'apps/worker/wrangler.staging.toml' });
+  }
+  function privateState(c: SafetyConfig): SafetySnapshot {
+    return {
+      bindings: [
+        ...Object.entries(c.vars ?? {}).map(([name, text]) => ({ name, type: 'plain_text', text: String(text) })),
+        ...(c.r2_buckets ?? []).map(b => ({ name: b.binding, type: 'r2_bucket', bucket_name: b.bucket_name })),
+        ...REQUIRED_SECURITY_SECRETS.map(name => ({ name, type: 'secret_text' })),
+      ],
+      buckets: (c.r2_buckets ?? []).map(b => ({ name: b.bucket_name, managed: false, custom: false })),
+    };
+  }
+  it.each(['production', 'staging'] as const)('%s のWorkerと画面の旗が一致し、例外なしで見張りを通る', async environment => {
+    const c = await realConfig(environment);
+    const workflow = readFileSync(`.github/workflows/deploy-cloudflare-${environment === 'production' ? 'admin' : 'staging'}.yml`, 'utf8');
+    const publicFlags: Record<string, string> = {};
+    for (const name of ['GOOGLE_BUSINESS_ENABLED', 'RESTAURANT_TEST_ENABLED']) {
+      const publicName = `NEXT_PUBLIC_${name}`;
+      const value = workflow.match(new RegExp(`^\\s*${publicName}: '([^']+)'$`, 'm'))?.[1];
+      expect([...workflow.matchAll(new RegExp(`^\\s*${publicName}:`, 'gm'))]).toHaveLength(1);
+      expect(value).toBe(c.vars[name]);
+      expect(value).toBe(name === 'GOOGLE_BUSINESS_ENABLED' || environment === 'staging' ? 'true' : 'false');
+      publicFlags[publicName] = value!;
+    }
+    expect(workflow).not.toContain('SECURITY_ADMIN_TEST_ENABLED');
+    const candidate = { ...c, vars: { ...c.vars, ...publicFlags } };
+    expect(evaluateDeploymentSafety(candidate, privateState(c), environment)).toEqual([]);
+    if (environment === 'production') {
+      for (const name of ['RESTAURANT_TEST_ENABLED', 'NEXT_PUBLIC_RESTAURANT_TEST_ENABLED']) {
+        expect(evaluateDeploymentSafety({ ...candidate, vars: { ...candidate.vars, [name]: 'true' } }, privateState(c), environment)).toContain(`candidate:test-flag:${name}`);
+      }
+      const live = privateState(c);
+      live.bindings.push({ name: 'RESTAURANT_TEST_ENABLED', type: 'plain_text', text: 'true' });
+      expect(evaluateDeploymentSafety(candidate, live, environment)).toContain('deployed:test-flag:RESTAURANT_TEST_ENABLED');
+    }
+    expect(evaluateDeploymentSafety({ ...candidate, vars: { ...candidate.vars, NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED: 'false' } }, privateState(c), environment)).toContain('candidate:feature-flag-mismatch:GOOGLE_BUSINESS_ENABLED');
+  });
+  it('本番の実引数・鍵なしのCLIは失敗で止まる', async () => {
+    const { spawnSync } = await import('node:child_process');
+    const r = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/security/run-deployment-safety.ts', 'production', 'apps/worker/wrangler.toml'], {
+      encoding: 'utf8', env: { ...process.env, CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_ACCOUNT_ID: '' },
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('deployment_safety_check_failed');
+    expect(r.stdout).not.toContain('"failures":[]');
+  }, 30000);
+  it('本番で管理画面の試験旗を有効にしたら、実際のinspectでも拒否する', async () => {
+    const c = await realConfig('production');
+    const bindings = privateState(c).bindings;
+    const fake = (async (url: unknown) => Response.json({ success: true, result: String(url).endsWith('/settings') ? { bindings } : String(url).endsWith('/managed') ? { enabled: false } : { domains: [] } })) as typeof fetch;
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true');
+    expect(await inspectDeployment('apps/worker/wrangler.toml', 'production', 'fixture-token', 'fixture-account', fake)).toContain('candidate:test-flag:NEXT_PUBLIC_RESTAURANT_TEST_ENABLED');
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'false');
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true');
+    expect(await inspectDeployment('apps/worker/wrangler.toml', 'production', 'fixture-token', 'fixture-account', fake)).toEqual([]);
+  });
 });

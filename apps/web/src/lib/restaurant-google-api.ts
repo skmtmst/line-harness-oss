@@ -22,10 +22,13 @@ export type GoogleConnection = {
 
 export type GoogleLocationCandidate = { locationName: string; locationTitle: string; addressText: string | null }
 
+export type GoogleBusinessStore = { id: string; name: string; line_account_id: string | null }
+
 export type GoogleConnectionData = {
   success: true
   store: { id: string; name: string; lineAccountId: string }
   connection: GoogleConnection
+  stores?: GoogleBusinessStore[]
   candidates: GoogleLocationCandidate[]
   summary: { unrepliedCount: number; draftCount: number; attentionCount: number; newCount: number; storedCount: number; postsAttentionCount: number; syncStale: boolean }
   writeEnabled: boolean

@@ -10,7 +10,8 @@ const editor: AuthenticatedStaff = {
   id: 'editor', name: '担当者', role: 'staff', readOnly: false, tenantId: 'tenant-1',
   permissionKeys: ['/scenarios', 'scenario.definition.edit'],
 };
-function app(staff = editor) {
+const publisher: AuthenticatedStaff = { ...editor, role: 'admin', permissionKeys: [...editor.permissionKeys!, 'scenario.definition.publish'] };
+function app(staff = publisher) {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => {
     c.env = { DB: sqlite.db } as Env['Bindings'];
@@ -20,7 +21,7 @@ function app(staff = editor) {
   instance.route('/', scenarios);
   return instance;
 }
-function put(body: unknown, staff = editor, id = 'sc-1') {
+function put(body: unknown, staff = publisher, id = 'sc-1') {
   return app(staff).request(`/api/scenarios/${id}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });

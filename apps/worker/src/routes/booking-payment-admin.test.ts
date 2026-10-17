@@ -19,7 +19,7 @@ function request(path:string,method='GET',body?:unknown,extra:Record<string,stri
   app.use('*',async(c,next)=>{c.set('staff',{id:'login',name:'試験',role,readOnly});await next();});
   app.route('/',bookingPaymentAdmin);app.route('/',restaurantTest);
   return app.request(path,{method,...(body===undefined?{}:{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})},
-    {DB:f.db,DEPLOY_ENV:'test',RESTAURANT_TEST_ENABLED:'true',...extra} as Env['Bindings']);
+    {DB:f.db,RESTAURANT_TEST_ENABLED:'true',DEPLOY_ENV:'test',...extra} as Env['Bindings']);
 }
 const path=(part:string)=>`/api/booking/admin/${part}?account_id=a`;
 let sequence=0;

@@ -1,0 +1,29 @@
+/*
+ * ★V8 分析「お客さまの分け方」（G5-1 `RMajm`）。5×5 の濃淡の表と、押したマスの人の引き出し。
+ * 濃淡は --color-accent-deep を地に混ぜて作る（色を直書きしない）。
+ */
+.panel { display: flex; flex-direction: column; gap: var(--space-16); }
+.summary { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-12); color: var(--color-ink-secondary); font-size: var(--text-body); }
+.summaryStrong { color: var(--color-ink); font-weight: 700; }
+.tools { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-12); }
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-24);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--card-edge, var(--color-hairline));
+}
+.cardHead { display: flex; align-items: center; gap: var(--space-8); }
+.cardTitle { color: var(--color-ink); font-size: var(--text-lead); font-weight: 700; }
+.cardNote { flex: 1; text-align: right; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+/* 引き出し */
+.drawerBody { display: flex; flex-direction: column; gap: var(--space-12); }
+.mute { color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.optOut { display: flex; align-items: center; gap: var(--space-8); }
+.nameCell { color: var(--color-ink); font-weight: 600; }
+.footer { display: flex; justify-content: center; gap: var(--space-8); width: 100%; }
+
+.cell:focus-visible { outline: var(--focus-ring); outline-offset: var(--polish-focus-offset); }

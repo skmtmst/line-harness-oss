@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
 import { connectGuardBrowser } from '../../apps/web/scripts/v8-guard/browser-session.mjs'
-import { friendsTableReady } from './friends-table-state.mjs'
+import { friendsTableReady, snapshotFriendsTable } from './friends-table-state.mjs'
 
 let browser
 before(async () => { browser = await connectGuardBrowser() })
@@ -63,6 +63,44 @@ test('waits for the actual measured spacer and requested row/focus; rejects inco
   for (const [count, rendered] of [[1999, 12], [2000, 60], [2000, 0]]) {
     const page = await fixture(0, count, rendered)
     try { assert.equal(await page.evaluate(friendsTableReady, {}), false) }
+    finally { await page.close() }
+  }
+})
+
+test('captures ready geometry before a later render and rejects inconsistent snapshots', async () => {
+  const wrap = page => page.evaluate(() => {
+    const main = document.createElement('main')
+    const table = document.querySelector('table')
+    table.before(main)
+    main.append(table)
+  })
+  const page = await fixture()
+  try {
+    await wrap(page)
+    const interleaved = {
+      async waitForFunction(...args) {
+        const handle = await page.waitForFunction(...args)
+        // Reproduce a render between the ready predicate and the driver's next read.
+        await page.evaluate(() => { document.querySelector('[data-friend-row] td').style.height = '52px' })
+        return handle
+      },
+      evaluate: (...args) => page.evaluate(...args),
+    }
+    const captured = await snapshotFriendsTable(interleaved, { targetIndex: 11 })
+    assert.equal(captured.rows, 2000)
+    assert.equal(captured.rendered, 12)
+    assert.equal(captured.height, 120000)
+    assert.deepEqual(captured.rowHeights, [60])
+    assert.equal(await page.evaluate(friendsTableReady, { snapshot: true }), false)
+    const splitRead = await page.evaluate(() => document.querySelector('tbody').getBoundingClientRect().height)
+    assert.notEqual(splitRead, captured.height, 'a separate read would capture the later, unready render')
+  } finally { await page.close() }
+  for (const [delta, count, rendered] of [[-1, 2000, 12], [1, 2000, 12], [60, 2000, 12], [0, 1999, 12], [0, 2000, 60], [0, 2000, 0]]) {
+    const page = await fixture(delta, count, rendered)
+    try {
+      await wrap(page)
+      assert.equal(await page.evaluate(friendsTableReady, { snapshot: true }), false)
+    }
     finally { await page.close() }
   }
 })

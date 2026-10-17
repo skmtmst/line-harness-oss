@@ -96,7 +96,8 @@ describe('POST /api/nen-campaigns/columns', () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ success: true, data: { id: expect.any(String) } });
     expect(mocks.canAccess).toHaveBeenCalledWith(expect.anything(), expect.anything(), ['account-a']);
-    expect(state.preparedSql).toHaveLength(2);
+    expect(state.preparedSql.filter(sql => !sql.includes('audit_events'))).toHaveLength(2);
+    expect(state.preparedSql.some(sql => sql.includes('audit_events'))).toBe(true);
     expect(state.preparedSql[1]).toContain('delivery_status, delivery_at');
     expect(state.preparedSql[1]).toContain("VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     expect(state.insertBinds).toEqual([
@@ -135,7 +136,8 @@ describe('POST /api/nen-campaigns/columns', () => {
      * 走ると prepare が増える。SELECT slug + INSERT の2本だけが、
      * 「下書きを作っただけで配信を予約していない」ことの印。
      */
-    expect(state.preparedSql).toHaveLength(2);
+    expect(state.preparedSql.filter(sql => !sql.includes('audit_events'))).toHaveLength(2);
+    expect(state.preparedSql.some(sql => sql.includes('audit_events'))).toBe(true);
     // delivery_at のbind位置（published_at の次）に希望日時が入る。
     expect(state.insertBinds?.[9]).toBe('2099-05-01T01:30:00.000Z');
   });

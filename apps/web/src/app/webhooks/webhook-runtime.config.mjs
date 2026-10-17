@@ -21,11 +21,12 @@
 */
 import { defineConfig, devices } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
+import { allocateTestPort } from '../../../scripts/test-port.mjs'
 
 const HERE = fileURLToPath(new URL('.', import.meta.url))
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url))
-const API_PORT = Number(process.env.WEBHOOK_RUNTIME_API_PORT ?? 8788)
-const PORT = Number(process.env.WEBHOOK_RUNTIME_PORT ?? 3101)
+const API_PORT = await allocateTestPort(process.env.WEBHOOK_RUNTIME_API_PORT)
+const PORT = await allocateTestPort(process.env.WEBHOOK_RUNTIME_PORT)
 const API_BASE = `http://127.0.0.1:${API_PORT}`
 const BASE = process.env.WEBHOOK_RUNTIME_BASE ?? `http://127.0.0.1:${PORT}`
 
@@ -34,6 +35,8 @@ const BASE = process.env.WEBHOOK_RUNTIME_BASE ?? `http://127.0.0.1:${PORT}`
   ワーカー側でも読み込まれるので、ここで入れておけば宛先が揃う。
 */
 process.env.WEBHOOK_RUNTIME_BASE = BASE
+process.env.WEBHOOK_RUNTIME_API_PORT = String(API_PORT)
+process.env.WEBHOOK_RUNTIME_PORT = String(PORT)
 
 export default defineConfig({
   testDir: HERE,

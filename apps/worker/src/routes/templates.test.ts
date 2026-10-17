@@ -42,7 +42,10 @@ function makeApp() {
   return app;
 }
 
-const env = { DB: {} as D1Database };
+const env = { DB: {prepare:(query:string)=>{
+  if(!query.includes('FROM style_starter_items'))throw new Error('Unexpected direct query');
+  return {bind:()=>({all:async()=>({results:[]})})};
+}} as unknown as D1Database };
 
 const EMPTY_USAGE = {
   autoReplies: [],

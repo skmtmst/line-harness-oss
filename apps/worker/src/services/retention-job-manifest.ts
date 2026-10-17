@@ -5,7 +5,17 @@ import type { FeatureJobMetadata } from './feature-enforcement.js';
 export const PERSONAL_DATA_RETENTION_JOB = {
   name: 'personal data retention',
   classification: { kind: 'core', reason: '店が承認した保存期限に従う個人情報の削除' },
-  enforcement: { mode: 'exempt', reason: '機能の停止中も保存期限を守る。既定は無効で、店ごとの有効化と保留を削除ごとに確認する' },
+  // Product feature switches do not suspend retention, but the store's
+  // explicit approval and hold checks must remain enforced and audited.
+  enforcement: {
+    mode: 'gated',
+    sources: ['apps/worker/src/services/personal-data-retention.ts'],
+    markers: [
+      'if (!policy.enabled) continue;',
+      'if (policy.hold) { held++; continue; }',
+      'if (JSON.stringify(current)!==JSON.stringify(policy)) { held++; continue accounts; }',
+    ],
+  },
 } as const satisfies FeatureJobMetadata;
 
 export const TENANT_DATA_RETENTION_JOB = {

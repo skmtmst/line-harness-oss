@@ -9,15 +9,16 @@ export interface PaymentRecordFilter {
 export interface AdminPaymentRecord {
   id: string; bookingId: string | null; friendId: string | null; friendName: string | null;
   bookingStartsAt: string | null; bookingLabel: string | null; bookingNote: string | null;
-  amount: number; status: 'paid' | 'pending' | 'refunded' | 'expired' | 'onsite';
+  amount: number; status: 'paid' | 'partially_refunded' | 'pending' | 'refunded' | 'expired' | 'onsite';
   method: string | null; createdAt: string; receiptUrl: string | null;
+  refundedAmount: number; actorLabel: string | null; reason: string | null;
 }
 export function paymentRecordFilter(query: Record<string, string>): PaymentRecordFilter | null {
   const integer = (value: string | undefined, fallback: number, max: number) => value === undefined ? fallback
     : /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) && Number(value) <= max ? Number(value) : NaN;
   const filter = { q: (query.q ?? '').trim(), status: query.status ?? '', method: query.method ?? '',
     period: query.period || 'month', limit: integer(query.limit, 20, 100), offset: integer(query.offset, 0, 100000) };
-  return filter.q.length <= 200 && ['', 'paid', 'pending', 'refunded', 'expired', 'onsite'].includes(filter.status)
+  return filter.q.length <= 200 && ['', 'paid', 'partially_refunded', 'pending', 'refunded', 'expired', 'onsite'].includes(filter.status)
     && ['', 'online', 'onsite'].includes(filter.method) && ['month', '7d', '30d', '90d'].includes(filter.period)
     && filter.limit >= 1 && filter.offset >= 0 ? filter : null;
 }
@@ -27,15 +28,15 @@ export function paymentRecordFilter(query: Record<string, string>): PaymentRecor
 const recordsCte = `WITH records AS (
  SELECT p.id,p.booking_id AS bookingId,b.friend_id AS friendId,f.display_name AS friendName,
  b.starts_at AS bookingStartsAt,m.name AS bookingLabel,b.internal_note AS bookingNote,p.amount,
- CASE WHEN p.status IN ('unpaid','pending') THEN 'pending' ELSE p.status END AS status,
- 'online' AS method,p.created_at AS createdAt,p.receipt_url AS receiptUrl
+ CASE WHEN p.status IN ('unpaid','pending') THEN 'pending' WHEN p.status='paid' AND p.refunded_amount>0 THEN 'partially_refunded' ELSE p.status END AS status,
+ 'online' AS method,p.created_at AS createdAt,p.receipt_url AS receiptUrl,p.refunded_amount AS refundedAmount,p.actor_label AS actorLabel,p.action_reason AS reason
  FROM booking_payments p LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
  LEFT JOIN friends f ON f.id=b.friend_id AND f.line_account_id=p.line_account_id
  LEFT JOIN menus m ON m.id=b.menu_id AND m.line_account_id=p.line_account_id
  WHERE p.line_account_id=? AND p.status IN ('unpaid','pending','paid','refunded','expired')
  UNION ALL
  SELECT 'onsite:'||b.id,b.id,b.friend_id,f.display_name,b.starts_at,m.name,b.internal_note,b.price_at_booking,
- 'onsite','onsite',b.requested_at,NULL
+ 'onsite','onsite',b.requested_at,NULL,0,NULL,NULL
  FROM booking_payment_choices ch JOIN bookings b ON b.id=ch.booking_id AND b.line_account_id=ch.line_account_id
  LEFT JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
  LEFT JOIN menus m ON m.id=b.menu_id AND m.line_account_id=b.line_account_id
@@ -45,6 +46,7 @@ const recordsCte = `WITH records AS (
 
 export async function paymentPeriod(db: D1Database, account: string, period: string, now = new Date()) {
   const timezone = await getAccountTimeZone(db, account);
+  if (period === 'today') { const w=assignmentWindows(now.toISOString(),timezone,'day'); return {from:w.dayFrom,to:w.dayTo}; }
   if (period === 'month') { const m = entitlementMonth(now.toISOString(), timezone); return { from: m.periodStart, to: m.periodEnd }; }
   return { from: new Date(now.getTime() - Number(period.slice(0, -1)) * 86400000).toISOString(), to: now.toISOString() };
 }
@@ -62,24 +64,31 @@ export async function paymentRecords(db: D1Database, account: string, filter: Pa
 }
 
 /** 集計は検索・ページ・一覧の期間と独立した店の今月。入金総額と返金額は別々に数える。 */
-export async function paymentSummary(db: D1Database, account: string, now = new Date()) {
-  const { from, to } = await paymentPeriod(db, account, 'month', now);
-  const rows = await db.prepare(`SELECT p.amount,p.status,p.paid_at,p.updated_at,COALESCE(p.refunded_at,p.updated_at) AS refunded_at,p.created_at,b.status AS booking_status
+export async function paymentSummary(db: D1Database, account: string, now = new Date(), period: 'month' | 'today' = 'month', staffId?: string) {
+  const { from, to } = await paymentPeriod(db, account, period, now);
+  const rows = await db.prepare(`SELECT p.id,EXISTS(SELECT 1 FROM booking_payment_refunds r WHERE r.payment_id=p.id) AS has_refunds,p.amount,p.status,p.paid_at,p.updated_at,COALESCE(p.refunded_at,p.updated_at) AS refunded_at,p.created_at,b.status AS booking_status
     FROM booking_payments p LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
-    WHERE p.line_account_id=? AND (
+    WHERE p.line_account_id=? AND (? IS NULL OR b.staff_id=?) AND (
       (julianday(p.paid_at)>=julianday(?) AND julianday(p.paid_at)<julianday(?)) OR
       (julianday(COALESCE(p.refunded_at,p.updated_at))>=julianday(?) AND julianday(COALESCE(p.refunded_at,p.updated_at))<julianday(?)) OR
       (julianday(p.created_at)>=julianday(?) AND julianday(p.created_at)<julianday(?)))`)
-    .bind(account, from, to, from, to, from, to).all<{
-      amount:number; status:string; paid_at:string|null; updated_at:string; refunded_at:string; created_at:string; booking_status:string|null;
+    .bind(account, staffId??null, staffId??null, from, to, from, to, from, to).all<{
+      id:string; has_refunds:number; amount:number; status:string; paid_at:string|null; updated_at:string; refunded_at:string; created_at:string; booking_status:string|null;
     }>();
   const inMonth = (at: string | null) => at !== null && Date.parse(at) >= Date.parse(from) && Date.parse(at) < Date.parse(to);
   const summary = { paidAmount:0, paidCount:0, refundedAmount:0, refundedCount:0, expiredCount:0, pendingCount:0,
     holdMinutes:(await getBookingPaymentConfig(db, account)).holdMinutes };
+  const ledger = await db.prepare(`SELECT r.payment_id,r.amount,r.created_at FROM booking_payment_refunds r LEFT JOIN booking_payments p ON p.id=r.payment_id LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id WHERE r.line_account_id=? AND (? IS NULL OR b.staff_id=?) AND julianday(r.created_at)>=julianday(?) AND julianday(r.created_at)<julianday(?)`)
+    .bind(account,staffId??null,staffId??null,from,to).all<{payment_id:string;amount:number;created_at:string}>();
+  const refundedPayments = new Set<string>();
+  for (const row of ledger.results) if (inMonth(row.created_at)) {
+    summary.refundedAmount+=row.amount; refundedPayments.add(row.payment_id);
+  }
+  summary.refundedCount=refundedPayments.size;
   for (const row of rows.results) {
     if (['paid','refunded'].includes(row.status) && inMonth(row.paid_at)) { summary.paidAmount += row.amount; summary.paidCount++; }
     // 移行前の返金は元のupdated_atを使う。新規返金は固定した返金日時を使う。
-    if (row.status==='refunded' && inMonth(row.refunded_at)) { summary.refundedAmount+=row.amount; summary.refundedCount++; }
+    if (row.status==='refunded' && !row.has_refunds && inMonth(row.refunded_at)) { summary.refundedAmount+=row.amount; summary.refundedCount++; }
     if (row.status==='expired' && row.booking_status==='expired' && inMonth(row.updated_at)) summary.expiredCount++;
     if (['unpaid','pending'].includes(row.status) && inMonth(row.created_at)) summary.pendingCount++;
   }
@@ -89,8 +98,8 @@ export async function paymentSummary(db: D1Database, account: string, now = new 
 /** 表計算で実行される数式を防ぎ、改行・引用符・日本語を保つ。 */
 export function paymentCsv(items: AdminPaymentRecord[]) {
   const cell = (v: unknown) => { const s=String(v ?? ''); return `"${(/^[\s\u0000-\u001f]*[=+@-]/u.test(s) ? "'"+s : s).replace(/"/g,'""')}"`; };
-  const rows: unknown[][] = [['記録ID','予約ID','お客さま','予約日時','メニュー','金額','状態','方法','作成日時']];
-  for (const p of items) rows.push([p.id,p.bookingId,p.friendName,p.bookingStartsAt,p.bookingLabel,p.amount,p.status,p.method,p.createdAt]);
+  const rows: unknown[][] = [['記録ID','予約ID','お客さま','予約日時','メニュー','金額','状態','方法','作成日時','返金額','操作した人','理由']];
+  for (const p of items) rows.push([p.id,p.bookingId,p.friendName,p.bookingStartsAt,p.bookingLabel,p.amount,p.status,p.method,p.createdAt,p.refundedAmount,p.actorLabel,p.reason]);
   return '\uFEFF'+rows.map(r=>r.map(cell).join(',')).join('\r\n')+'\r\n';
 }
 
@@ -104,4 +113,16 @@ export async function staffTodayCounts(db: D1Database, account: string, now = ne
     WHERE s.line_account_id=? AND s.deleted_at IS NULL GROUP BY s.id ORDER BY s.sort_order,s.id`)
     .bind(w.dayFrom,w.dayTo,account).all<{staffId:string;todayCount:number}>();
   return { items: rows.results, date: new Intl.DateTimeFormat('sv-SE',{timeZone:timezone}).format(now), timezone };
+}
+
+/** Same saved payment records and status names as the payment list, without a creation-date filter. */
+export async function paymentBadges(db:D1Database,account:string,bookingIds:string[]) {
+ const byBooking=new Map<string,{bookingId:string;status:AdminPaymentRecord['status'];method:string|null;amount:number}>();
+ const ids=[...new Set(bookingIds)];
+ for(let start=0;start<ids.length;start+=80) {
+  const chunk=ids.slice(start,start+80);
+  const rows=await db.prepare(`${recordsCte} SELECT bookingId,status,method,amount FROM records WHERE bookingId IN(${chunk.map(()=>'?').join(',')}) ORDER BY julianday(createdAt) DESC,id`).bind(account,account,...chunk).all<{bookingId:string;status:AdminPaymentRecord['status'];method:string|null;amount:number}>();
+  for(const row of rows.results)if(!byBooking.has(row.bookingId))byBooking.set(row.bookingId,row);
+ }
+ return byBooking;
 }

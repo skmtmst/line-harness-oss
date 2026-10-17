@@ -1,3 +1,5 @@
+import {defaultWindow} from './automation-execution-window.js';
+import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { automationTabCounts } from '../services/tab-counts.js';
 import { Hono } from 'hono';
@@ -251,11 +253,6 @@ function safeFailureReason(code: string | null, failedAction: string | null): st
   return `${failedAction ?? '登録した処理'}を完了できませんでした`;
 }
 
-function defaultWindow() {
-  const to = new Date();
-  const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1_000);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
 
 /**
  * まだ終わっていない実行が「運用停止」「機能無効」で claim できないとき、
@@ -572,7 +569,7 @@ automations.put(
 automations.post(
   '/api/automation-drafts/:id/publish',
   requireAutomationPermission,
-  requireRole('owner', 'admin', 'staff'),
+  requireRole('owner', 'admin'),
   inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
@@ -626,7 +623,7 @@ automations.get(
     );
     return c.json({
       success: true,
-      data: result.items,
+      data: await withStyleSampleMetadata(c.env.DB,result.items,'automation'),
       summary: result.summary,
       freshness: result.freshness,
       pagination: {
@@ -948,7 +945,7 @@ automations.post(
 automations.post(
   '/api/automations/:id/status',
   requireAutomationPermission,
-  requireRole('owner', 'admin', 'staff'),
+  requireRole('owner', 'admin'),
   inputJsonBoundary(), async (c) => {
     const accountId = await definitionAccountId(c);
     if (typeof accountId !== 'string') return accountId;

@@ -2,7 +2,7 @@ import { type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 
 export * from './style-setup-core.js';
 export * from './style-starter-definition.js';
-export {featureReadiness, styleWarnings} from './style-readiness.js';
+export { featureReadiness, styleWarnings } from './style-readiness.js';
 import { StyleError, checkStyle, readAnswers } from './style-setup-core.js';
 import { readDefinition, standardStarter } from './style-starter-definition.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
@@ -11,6 +11,7 @@ export type StyleProfile = {
   style: AccountStyle;
   answers_json: string;
   cards_json: string | null;
+  metrics_json: string | null;
   settings_json: string;
   selected_at: string | null;
   selection_mode: SetupAnswer['mode'];
@@ -55,7 +56,23 @@ export async function starter(
         id: saved.id,
         version: saved.version,
         autoInsert: !!saved.auto_insert,
-        definition: readDefinition(JSON.parse(saved.definition_json), style),
+        definition: readDefinition(
+          {
+            items: (
+              JSON.parse(saved.definition_json)
+                .items as import('./style-starter-definition.js').StarterItem[]
+            ).filter(
+              (i) =>
+                !(
+                  i.kind === 'automation' &&
+                  (i.triggerType !== 'restaurant.departed' ||
+                    i.key === 'reminder' ||
+                    /予約確定/.test(i.name))
+                ),
+            ),
+          },
+          style,
+        ),
       }
     : {
         id: 'musubo:' + style,
@@ -172,20 +189,32 @@ export async function saveProfile(
         styleMode,
       ),
   );
-  if (selected && answers.approval?.mode === 'configured') {
-    const mode =
-      answers.approval.value === true || answers.approval.value === 'manual'
-        ? 'manual'
-        : 'automatic';
-    statements.push(
-      db
-        .prepare(
-          `INSERT INTO booking_settings(id,line_account_id,approval_mode) VALUES(?,?,?) ON CONFLICT(line_account_id) DO UPDATE SET approval_mode=excluded.approval_mode,version=booking_settings.version+1`,
-        )
-        .bind(crypto.randomUUID(), account, mode),
-    );
-  }
-  const {set,inserted}=await insertStyleStarterItems(db,account,tenant,actor,input,selected,style,answers,statements,now);
+  const previousAnswers = JSON.parse(current?.answers_json ?? '{}') as Record<
+    string,
+    SetupAnswer
+  >;
+  const changedAnswers = Object.fromEntries(
+    Object.entries(submittedAnswers).filter(
+      ([key, value]) =>
+        JSON.stringify(previousAnswers[key]) !== JSON.stringify(value),
+    ),
+  );
+  // Saving answers never writes live reservation settings. UI confirms these changes through the existing versioned settings API.
+  const bookingSettingsChanges = Object.entries(changedAnswers).map(
+    ([key, answer]) => ({ key, answer }),
+  );
+  const { set, inserted } = await insertStyleStarterItems(
+    db,
+    account,
+    tenant,
+    actor,
+    input,
+    selected,
+    style,
+    answers,
+    statements,
+    now,
+  );
   statements.push(
     db
       .prepare(
@@ -214,6 +243,8 @@ export async function saveProfile(
     styleSelected: selected,
     answers,
     settings,
+    changedAnswers,
+    bookingSettingsChanges,
     version,
     inserted,
     starterSet: { id: set.id, version: set.version },
