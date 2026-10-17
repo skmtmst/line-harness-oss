@@ -14,10 +14,28 @@ import {
   runBookingGoogleSync,
   runCalendarDeleteOperation,
   syncConfirmedBookingToGoogle,
+  verifyStaffCalendarConnection,
 } from './booking-calendar-sync.js';
+import { BookingExternalCircuits } from './booking-external-circuits.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 
 const ACCOUNT = 'cal-account-1';
+
+it('接続確認の読取りも同じ店/接続先の共有遮断を通す', async () => {
+  const {db,raw}=createTestD1();
+  try {
+    const circuit=new BookingExternalCircuits(db),now=Date.now();
+    const scope={accountId:ACCOUNT,storeId:ACCOUNT,destination:'google_calendar',connectionId:'connection'};
+    for(let n=0;n<5;n++){const admission=await circuit.acquire(scope,now);if(admission.allowed)await circuit.settle(admission.lease,'failure',now);}
+    const fetchMock=vi.fn(async()=>new Response(JSON.stringify({calendars:{calendar:{busy:[]}}}),{status:200}));
+    vi.stubGlobal('fetch',fetchMock);
+    const connection={id:'connection',calendar_id:'calendar',auth_type:'oauth',access_token:'fixture-token'};
+    await expect(verifyStaffCalendarConnection(connection,{}, {db,accountId:ACCOUNT})).rejects.toThrow('calendar_read_failed');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(verifyStaffCalendarConnection(connection,{}, {db,accountId:'other'})).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  } finally {raw.close();}
+});
 
 function seed(raw: import('better-sqlite3').Database, bookingId: string, externalEventId: string | null): void {
   raw.prepare(

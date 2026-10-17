@@ -60,7 +60,7 @@ booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
       calendar_id: calendarId,
       auth_type: 'service_account',
       access_token: null,
-    }, googleCredentials(c.env));
+    }, googleCredentials(c.env), {db:c.env.DB,accountId});
   } catch (error) {
     console.error(JSON.stringify({"code":"routes_booking_failed","route":"PUT /api/booking/admin/staff/:id/google-calendar"}));
     const message = error instanceof Error ? error.message : String(error);

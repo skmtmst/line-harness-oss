@@ -74,8 +74,9 @@ export async function getStaffGoogleBusy(
 export async function verifyStaffCalendarConnection(
   connection: StaffCalendarConnection,
   credentials: GoogleServiceAccountCredentials,
+  execution?: {db:D1Database;accountId:string},
 ): Promise<void> {
-  const client = await clientForConnection(connection, credentials);
+  const client = await clientForConnection(connection, credentials, execution);
   const now = new Date();
   await client.getFreeBusy(now.toISOString(), new Date(now.getTime() + 60_000).toISOString());
 }
