@@ -428,9 +428,20 @@ jobs:
       - name: Install Chromium for the webhook runtime contract
         run: pnpm exec playwright install --with-deps chromium
       - name: Webhook screen runtime contract on a real browser (#704, #705)
-        run: >-
-          pnpm exec playwright test
-          --config scripts/codex/webhook-runtime-isolated.config.mjs
+        run: |
+          webhook_ports="$(node --input-type=module -e '
+            import { createServer } from "node:net";
+            const servers = [createServer(), createServer()];
+            await Promise.all(servers.map(server => new Promise((resolve, reject) => {
+              server.once("error", reject);
+              server.listen(0, "127.0.0.1", resolve);
+            })));
+            console.log(servers.map(server => server.address().port).join(" "));
+            await Promise.all(servers.map(server => new Promise(resolve => server.close(resolve))));
+          ')"
+          read -r webhook_api_port webhook_web_port <<< "$webhook_ports"
+          WEBHOOK_RUNTIME_API_PORT="$webhook_api_port" WEBHOOK_RUNTIME_PORT="$webhook_web_port" \
+            pnpm exec playwright test --config apps/web/src/app/webhooks/webhook-runtime.config.mjs
       # 失敗したときのDOMを残す。#705 は「吹き出しが次の行のボタンを覆う」という
       # 見た目の重なりで、後から読めないと原因に辿り着けない種類の失敗だった。
       - name: Upload webhook runtime contract failure context
