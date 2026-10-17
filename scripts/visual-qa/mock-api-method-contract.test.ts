@@ -98,4 +98,39 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
     const write = await fetch(url,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({accountId:'visual-qa-account',expectedVersion:1,look:{preset:'warm'}})})
     expect(write.status).toBe(405)
   })
+
+  it('初期設定の見本はダッシュボードの受付に遮られず、読込・確認・開始まで届く', async () => {
+    for (const path of ['warnings', 'starter-set', 'starter-items', 'template-samples', 'resources']) {
+      const response = await fetch(`${baseUrl}/api/dashboard/style/${path}?style=restaurant`)
+      expect(response.status, path).toBe(200)
+      await expect(response.json()).resolves.toMatchObject({ success: true })
+    }
+    const activate = await fetch(`${baseUrl}/api/dashboard/style/activate`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmed: true, items: [] }),
+    })
+    expect(activate.status).toBe(200)
+    await expect(activate.json()).resolves.toMatchObject({ success: true, data: { complete: true } })
+    const unknown = await fetch(`${baseUrl}/api/dashboard/style/unknown`)
+    expect(unknown.status).toBe(404)
+  })
+
+  it('業種と空状態を切り替えても支払いの模擬送信を本送信へ変えない', async () => {
+    const root = `${baseUrl}/api/dashboard/style`
+    const save = (qaEmpty: boolean) => fetch(root, {
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ style: 'salon', qaEmpty }),
+    })
+    try {
+      for (const qaEmpty of [false, true]) {
+        const selected = await save(qaEmpty)
+        expect(selected.status).toBe(200)
+        const schedule = await fetch(`${root}/schedule?style=salon&range=today`).then(response => response.json())
+        expect(schedule.data.style).toBe('salon')
+        expect(schedule.data.entries.length > 0).toBe(!qaEmpty)
+      }
+      const payment = await fetch(`${baseUrl}/api/booking/admin/payments/pay-1/send-link`, { method: 'POST' })
+      await expect(payment.json()).resolves.toMatchObject({ success: true, data: { sent: false, simulation: true } })
+    } finally {
+      await save(false)
+    }
+  })
 })
