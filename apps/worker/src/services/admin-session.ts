@@ -1,7 +1,7 @@
 import { parseCookieHeader } from '../middleware/auth-http.js';
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
-import { adminSessionCookie, csrfCookie, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, sha256Hex } from '../middleware/auth.js';
+import { adminSessionCookie, csrfCookie, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, sha256Hex } from '../middleware/auth/credentials/auth.js';
 import {
   adminSessionFamiliarity,
   createAdminSession,
@@ -231,7 +231,7 @@ export function twoFactorSetupUrl(c: Context<Env>, challengeToken: string, next?
   return url.toString();
 }
 
-export async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: string): Promise<void> {
+export async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: string, onFailure?: () => void): Promise<void> {
   try {
     await recordLoginAudit(c.env.DB, {
       adminUserId: staffId,
@@ -240,6 +240,7 @@ export async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: strin
       userAgent: c.req.header('user-agent') ?? null,
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_auth_email_failed"}));
+    if (onFailure) onFailure();
+    else console.error(JSON.stringify({"code":"routes_auth_email_failed"}));
   }
 }

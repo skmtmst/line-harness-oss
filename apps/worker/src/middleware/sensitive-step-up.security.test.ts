@@ -58,3 +58,57 @@ it.each(['POST','PUT'])('scheduled broadcast %s cannot bypass the guard via crea
   expect((await send(false)).status).toBe(401);expect(reached).toBe(0);
   expect((await send(true)).status).toBe(200);expect(reached).toBe(1);
 });
+
+async function concurrentGrantFixture() {
+  const db = createTestD1(); opened.push(db);
+  db.raw.exec("INSERT INTO staff_members(id,name,role,api_key) VALUES ('actor','Fixture','owner','unused-fixture')");
+  const expires = new Date(Date.now() + 60000).toISOString();
+  db.raw.prepare('INSERT INTO admin_sessions(token_hash,staff_id,expires_at) VALUES (?, ?, ?)')
+    .run(await sha256Hex('session'), 'actor', expires);
+  db.raw.prepare(`INSERT INTO auth_step_up_grants(token_hash,staff_id,purpose,session_token_hash,expires_at,created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`)
+    .run(await sha256Hex('grant'), 'actor', 'data.export', await sha256Hex('session'), expires);
+  const app = new Hono<Env>();
+  app.use('*', async (c, next) => {
+    c.set('staff', { id: 'actor', name: 'Fixture', role: 'owner', readOnly: false });
+    await next();
+  });
+  app.get('/export', async c => {
+    const checks = await Promise.all(Array.from({ length: 3 }, () => sensitiveStepUpSatisfied(c, 'data.export')));
+    return c.json({ checks, otherPurpose: await sensitiveStepUpSatisfied(c, 'secrets.reveal') }, checks.every(Boolean) ? 200 : 401);
+  });
+  const request = () => app.request('/export', { headers: { Authorization: 'Bearer lh_session:session', 'X-Step-Up-Token': 'grant' } }, { DB: db.db } as Env['Bindings']);
+  return { db, request };
+}
+
+it('parallel guards in one request share one grant; another purpose and request cannot reuse it', async () => {
+  const { db, request } = await concurrentGrantFixture();
+  const response = await request();
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ checks: [true, true, true], otherPurpose: false });
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM auth_step_up_grants WHERE consumed_at IS NOT NULL').get()).toEqual({ n: 1 });
+  const replay = await request();
+  expect(replay.status).toBe(401);
+  expect(await replay.json()).toEqual({ checks: [false, false, false], otherPurpose: false });
+});
+
+it('two simultaneous requests cannot spend the same grant twice', async () => {
+  const { db, request } = await concurrentGrantFixture();
+  const responses = await Promise.all([request(), request()]);
+  expect(responses.map(response => response.status).sort()).toEqual([200, 401]);
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM auth_step_up_grants WHERE consumed_at IS NOT NULL').get()).toEqual({ n: 1 });
+});
+
+it.each(['read-only', 'impersonation'] as const)('%s stops before consuming a grant or releasing output', async mode => {
+  const { db } = await concurrentGrantFixture();
+  const app = new Hono<Env>(); let reached = 0;
+  app.use('*', async (c, next) => {
+    c.set('staff', { id: 'actor', name: 'Fixture', role: 'owner', readOnly: mode === 'read-only' });
+    if (mode === 'impersonation') c.set('impersonation', { id: 'proxy', tenantId: 'other-tenant', mode: 'write', piiRevealed: true, startedAt: new Date().toISOString() });
+    await next();
+  });
+  app.use('*', sensitiveOperationMiddleware);
+  app.get('/api/friends/export', c => { reached++; return c.text('private'); });
+  const response = await app.request('/api/friends/export', { headers: { Authorization: 'Bearer lh_session:session', 'X-Step-Up-Token': 'grant' } }, { DB: db.db } as Env['Bindings']);
+  expect(response.status).toBe(403); expect(reached).toBe(0);
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM auth_step_up_grants WHERE consumed_at IS NOT NULL').get()).toEqual({ n: 0 });
+});
