@@ -30,6 +30,7 @@ export interface TemplateRow {
   published_version: number;
   /** 347: 最後に公開した日時。既存行は移行時に updated_at を入れる。 */
   published_at: string | null;
+  deleted_at?: string | null;
   /**
    * 347: 編集中の下書き。PUT はここへだけ書く。
    * どれか1つでも入っていれば「公開待ちの下書きあり」。
