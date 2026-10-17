@@ -1,11 +1,8 @@
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
-// @ts-expect-error JS fixture, checked against the real API types below
 import { paymentGet, paymentWrite } from './payment-fixtures.mjs'
-// @ts-expect-error JS fixture, checked against the real API types below
 import { styleDashboardMock } from './style-dashboard-mock.mjs'
-// @ts-expect-error JS fixture, checked against the real API types below
 import { styleSetupRead, styleSetupWrite } from './style-setup-fixtures.mjs'
 
 type Sample = { api: 'styleApi' | 'bookingPaymentAdminApi'; method: string; value: unknown }
@@ -22,6 +19,7 @@ function diagnostics(samples: Sample[]) {
   const options: ts.CompilerOptions = {
     strict: true, noEmit: true, skipLibCheck: true, target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler,
+    baseUrl: fileURLToPath(new URL('../../apps/web/', import.meta.url)), paths: { '@/*': ['./src/*'] },
   }
   const host = ts.createCompilerHost(options)
   const originalRead = host.readFile
@@ -29,8 +27,9 @@ function diagnostics(samples: Sample[]) {
   const program = ts.createProgram([filename], options, host)
   const file = program.getSourceFile(filename)
   if (!file) throw new Error('fixture contract source was not compiled')
-  return [...program.getSyntacticDiagnostics(file), ...program.getSemanticDiagnostics(file)]
-    .map(diagnostic => `${diagnostic.start === undefined ? '' : file.getLineAndCharacterOfPosition(diagnostic.start).line + 1}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`)
+  const missingModules = program.getSemanticDiagnostics().filter(diagnostic => diagnostic.code === 2307)
+  return [...program.getSyntacticDiagnostics(file), ...program.getSemanticDiagnostics(file), ...missingModules]
+    .map(diagnostic => `${diagnostic.start === undefined || !diagnostic.file ? '' : diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start).line + 1}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`)
 }
 
 const query = new URLSearchParams({ style: 'restaurant', date: '2026-10-15' })
@@ -66,7 +65,7 @@ describe('P04 QA fixtures use the current public API types', () => {
   it('必須項目の欠落・未知の支払い状態・送信成功への偽装を拒否する', () => {
     const broken = [
       { api: 'bookingPaymentAdminApi', method: 'records', value: { success: true, data: { items: [], total: 0 } } },
-      { api: 'bookingPaymentAdminApi', method: 'events', value: { success: true, data: { items: [{ ...paymentGet('/api/booking/admin/payment-events', query).data.items[0], result: 'unknown' }], total: 1 } } },
+      { api: 'bookingPaymentAdminApi', method: 'events', value: { success: true, data: { items: [{ id: 'event-1', receivedAt: '2026-10-15T12:52:00.000Z', kind: 'paid', amount: null, repeat: false, bookingId: null, bookingLabel: null, note: null, result: 'unknown' }], total: 1 } } },
       { api: 'bookingPaymentAdminApi', method: 'previewPaymentLink', value: { success: true, data: { paymentId: 'pay-1', checkoutUrl: null, sent: true, simulation: false } } },
     ] satisfies Sample[]
     const errors = diagnostics(broken)
