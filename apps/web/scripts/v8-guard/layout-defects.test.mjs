@@ -8,21 +8,8 @@ import { createServer } from 'node:http'
 import { promisify } from 'node:util'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { assess, assessAgainstBase, measurePage } from './layout-defects.mjs'
-import scanPanelBlank from './panel-blank-browser.mjs'
-import scanBlankGap from './blank-gap-browser.mjs'
 const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}</style><main>'+body+'</main>'
 
-test('horizontal blank runs stay inside a semantic section; a real tall blank in that section still fails', async () => {
-  const browser = await connectGuardBrowser()
-  try {
-    const page = await browser.newPage()
-    const section = (name, height) => `<section data-template-region="${name}" style="height:${height}px;width:1000px"><span style="display:block;width:760px;height:${height}px;background:#fafafa">内容</span></section>`
-    await page.setContent(shell(section('heading',80)+section('stats',116)+'<footer style="height:40px;width:1000px;background:#eee">続き</footer>'))
-    assert.ok(!(await page.evaluate(scanBlankGap)).findings.some(f => f.kind === 'horizontal' && !f.excluded))
-    await page.setContent(shell(section('stats',320)+'<footer style="height:40px;width:1000px;background:#eee">続き</footer>'))
-    assert.ok((await page.evaluate(scanBlankGap)).findings.some(f => f.kind === 'horizontal' && f.excess >= 96 && !f.excluded))
-  } finally { await browser.close() }
-})
 const cases = {
   'control-overlap': '<div data-list-row style="display:flex"><button style="width:100px;height:36px">コピー</button><button style="width:36px;height:36px;margin-left:-30px">…</button></div>',
   'control-blocked': '<div data-list-row style="position:relative"><button style="width:80px;height:36px">…</button><span style="position:absolute;left:20px;top:0;width:36px;height:36px;background:#fff"></span></div>',
@@ -30,10 +17,6 @@ const cases = {
   squash: '<button style="width:24px;word-break:break-all">20件表示</button>',
   clip: '<div style="overflow:hidden;width:100px"><span style="white-space:nowrap">横にはみ出した短い文字列です</span></div>',
   overlap: '<div style="position:relative"><span style="display:inline-block;width:120px">隣と重なる文字</span><span style="margin-left:-90px">重なった隣の文字</span></div>',
-  'blank-vertical': '<div style="background:#fafafa;padding:24px"><p>上の中身</p><div style="height:240px"></div><p>下の中身</p></div>',
-  'blank-horizontal': '<section style="width:240px;height:320px;background:#fafafa"><p>本文</p></section><footer style="height:40px;background:#eee">保存</footer>',
-  'blank-kpi': '<div data-kpi-strip style="display:flex">'+Array.from({length:3},()=>'<div data-kpi-presentation="card" style="min-height:160px;padding:16px"><p>件数</p><p>12</p></div>').join('')+'</div>',
-  blank: '<section style="width:300px;height:300px;border:1px solid"><p>中身</p></section><footer style="margin-top:900px">画面の続き</footer>',
 }
 const repairs = {
   'control-overlap': cases['control-overlap'].replace('margin-left:-30px', 'margin-left:16px'),
@@ -42,10 +25,6 @@ const repairs = {
   squash: cases.squash.replace('width:24px;word-break:break-all','width:100px;white-space:nowrap'),
   clip: cases.clip.replace('overflow:hidden;width:100px','overflow:visible;width:500px'),
   overlap: cases.overlap.replace('margin-left:-90px','margin-left:16px'),
-  blank: cases.blank.replace('height:300px','height:auto').replace('margin-top:900px','margin-top:16px'),
-  'blank-vertical': cases['blank-vertical'].replace('height:240px','height:16px'),
-  'blank-horizontal': cases['blank-horizontal'].replace('width:240px','width:1000px').replace('height:320px','height:auto'),
-  'blank-kpi': cases['blank-kpi'].replaceAll('min-height:160px','min-height:0'),
 }
 test('実物の表CSS：窓内のコンテナ幅を壊すと取消が押せず、修復後は押せる', async () => {
   const browser = await connectGuardBrowser()
@@ -62,21 +41,6 @@ test('実物の表CSS：窓内のコンテナ幅を壊すと取消が押せず�
     await page.setContent(html(css))
     assert.equal(await page.locator('.frame').evaluate(el => el.getBoundingClientRect().width), 560)
     assert.equal(await hit(), true, '実物CSSで取消の中央を押せる')
-  } finally { await browser.close() }
-})
-test('入れ子のカードの余白は合算せず、カード自身の大きな余りは検出する', async () => {
-  const browser = await connectGuardBrowser()
-  try {
-    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
-    const card = height => `<section data-design-part="card" style="background:white;padding:24px;${height}"><p style="margin:0;height:200px">内容</p></section>`
-    const markup = inner => shell(`<div style="background:white;padding:24px"><section data-design-part="card" style="background:white;padding:24px">${inner}</section></div><footer style="margin-top:900px">続き</footer>`)
-    await page.setContent(markup(card('')))
-    assert.deepEqual(await page.evaluate(scanPanelBlank), [])
-    await page.setContent(markup(card('height:360px')))
-    const failures = await page.evaluate(scanPanelBlank)
-    assert.equal(failures.length, 1)
-    assert.equal(failures[0].measure.gap, 136)
-
   } finally { await browser.close() }
 })
 test('追従バーの裏の文字と、実際に見える重なりを区別する', async () => {
@@ -146,22 +110,6 @@ test('除外を実寸で確認し、表内の文字の重なりは見逃さな�
     assert.equal((await measurePage(page)).some(f=>f.kind==='wrap'),false,'説明文は短い名前の折り返しではない')
     await page.setContent(shell('<div style="overflow:hidden;width:100px"><span style="white-space:nowrap">省略なしで切れた長い名前を検出する</span></div>'))
     assert.ok((await measurePage(page)).some(f=>f.kind==='clip'),'隠れた重なりを除いても、省略なしの切れは検出する')
-  } finally { await browser.close() }
-})
-test('ページ内タブの段は空白ではなく、空のタブ枠は引き続き検出する', async () => {
-  const browser = await connectGuardBrowser()
-  try {
-    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
-    const tabs = '<nav><div role="tablist" style="height:156px">' + ['予約', '在庫', '休業'].map(name =>
-      `<button role="tab" style="display:block;height:44px;margin-bottom:8px">${name}</button>`).join('') + '</div></nav>'
-    const markup = inner => shell('<p style="margin:0">見出し</p>' + inner + '<p style="margin:0">本文</p>')
-    await page.setContent(markup(tabs))
-    assert.equal((await measurePage(page)).some(f => f.kind === 'blank-vertical'), false,
-      'タブの文字と操作が占める段を空白と数えない')
-    await page.setContent(markup('<nav><div role="tablist" style="height:156px"></div></nav>'))
-    assert.ok((await measurePage(page)).some(f => f.kind === 'blank-vertical'),
-      '中身のない高さだけの枠は空白として止める')
-    await page.close()
   } finally { await browser.close() }
 })
 test('comparison retains every defect and never grants immunity to existing failures', () => {

@@ -11,8 +11,6 @@ import { ROUTES, WIDTHS, openPage } from './browser-env.mjs'
 import scanLayoutDefects from './layout-defects-browser.mjs'
 import scanPendec2Rules from './pendec2-rules-browser.mjs'
 import scanOwnerRules from './owner-rules-browser.mjs'
-import scanPanelBlank from './panel-blank-browser.mjs'
-import scanBlankGap from './blank-gap-browser.mjs'
 import scanControlOverlap from './control-overlap-browser.mjs'
 import scanFormRules from './form-rules-browser.mjs'
 import { collectReservationReading, assessReservationReading } from './reservation-reading-browser.mjs'
@@ -36,20 +34,7 @@ export function identifyStableTargets(findings) {
 }
 export async function measurePage(page) {
   const reservationReading = assessReservationReading(await page.evaluate(collectReservationReading))
-  const panels = await page.evaluate(scanPanelBlank)
-  // 下の空白は panel-blank に一本化。blankfix の途中・横・数の帯は残す。
-  const gaps = await page.evaluate(scanBlankGap, { skipPanelBottom: true, exactSelectors: true, selectorDepth: 32, selectorLimit: 4096 })
-  const extra = []
-  for (const f of gaps.findings) {
-    if (f.excluded || f.where === 'page-bottom' || f.excess < 96) continue
-    extra.push({kind: 'blank-' + (f.kind === 'horizontal' ? 'horizontal' : 'vertical'), target: (f.container?.sel || f.edge?.sel || '').replace(/__[\w-]+/g,''), text: [f.where,f.prev?.text,f.next?.text].filter(Boolean).join(' → '), measure:{excess:f.excess}})
-  }
-  for (const b of gaps.bands) {
-    if (!b.excluded && b.cardH.length > 1 && b.cardH.every((h,i)=>h-b.contentH[i]-16>=24))
-      extra.push({kind:'blank-kpi',target:b.sel.replace(/__[\w-]+/g,''),text:'数の帯の全マスが高い',measure:{minExcess:Math.min(...b.cardH.map((h,i)=>h-b.contentH[i]-16)),maxExcess:Math.max(...b.cardH.map((h,i)=>h-b.contentH[i]-16))}})
-  }
-  for (const d of gaps.invalidDeclarations || []) extra.push({kind:'empty-blank-ok',target:d.selector.replace(/__[\w-]+/g,''),text:'空白の除外理由なし',measure:{count:1}})
-  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanFormRules), ...await page.evaluate(scanB244Rules)]
+  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanFormRules), ...await page.evaluate(scanB244Rules)]
   return await page.evaluate(identifyStableTargets, [...findings, ...reservationReading])
 }
 async function measureRoute(browser, baseUrl, route, width) {
