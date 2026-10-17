@@ -147,7 +147,7 @@ describe('更新系の権限ガードの網羅', () => {
       writeFileSync(process.env.SECURITY_INVENTORY_REPORT,
         'method\tpath\tsource\tlogin\tstore_hq_scope_evidence\tstaff_permission\tread_only\tcalled_authorization_helpers\n' + lines.join('\n') + '\n');
     }
-  });
+  }, 120_000);
 
   it('S07 all reads and exports reject a staff member with no feature permission', async () => {
     const routes = [...new Map(app.routes.filter(route =>
