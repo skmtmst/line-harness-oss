@@ -18,7 +18,7 @@
 ## 検査
 
 - merge後の登録関連：7ファイル51試験成功、Web増分なし型検査成功。
-- 最終製品の関連試験：48ファイル269件成功（Node22）。Web増分なし型検査、変更した4製品ファイルのlintはエラー0。本番形式のWebビルド成功（211ページ生成、後処理208ページ/653スクリプト）。ci-local、1152/1440撮影の結果は完了時に追記する。
+- 最終製品の関連試験：48ファイル269件成功（Node22）。Web増分なし型検査、変更した4製品ファイルのlintはエラー0。本番形式のWebビルド成功（211ページ生成、後処理208ページ/653スクリプト）。ci-localの結果は完走後に追記する。1152/1440の撮影は下記の56条件。
 - 変更範囲のスタイル点検は指摘0。lintエラー0（共通tableに既存の未使用引数warning1）。
 
 ## 固定検査の失敗から直したもの
@@ -31,13 +31,13 @@
 
 - 本番形式の書き出しを3167、模擬APIを8761で配信。模擬API指紋は `bc14bc751c7ea7ef`。実際の外部サービスを呼んでいない。
 - 25状態×1152/1440＝50枚を新規保存。連携設定/共通準備中/SNS、受注の新着/すべて/詳細/キャンセル確認/停止確認/履歴/品切れ、Google5タブ/推移、登録①/②の3段/③前後/友だち確認/④/⑤引き継ぎ中。
-- 50条件すべて、既存layout-overflowのはみ出し・右端越え・横スクロール・省略のtitle不足とcontrol-overlapは0。文字の重なり・1文字折り返しは50枚の見える範囲を目視し0。Browserの読み取りAPIにTreeWalker/Rangeがないため、文字Rangeを使う標準layout-defectsをこのBrowserで動かせたとは数えない。ci-localの標準実ブラウザ検査とは区別する。
+- 下端6条件を加えた56条件すべて、既存layout-overflowのはみ出し・右端越え・横スクロール・省略のtitle不足とcontrol-overlapは0。文字の重なり・1文字折り返しは56枚の見える範囲を目視し0。Browserの読み取りAPIにTreeWalker/Rangeがないため、文字Rangeを使う標準layout-defectsをこのBrowserで動かせたとは数えない。ci-localの標準実ブラウザ検査とは区別する。
 - 登録はダミー値を画面から入力し、Webhook/Login確認を経て模擬の接続確認5項目→模擬登録→友だち確認→使い方→引き継ぎ表示まで確認。外部ログイン・実登録・実送信なし。引き継ぎの完了状態は模擬APIが0件のまま返すため撮影に数えず、既存動作試験で確認する。
-- 長い一覧とグラフの下端の追加撮影、共通件数文への修正後の履歴2幅は最終ビルド後に記録する。過去画像を新しい版の証拠へ取り違えない。
+- 最終ビルド後、注文一覧・Googleプロフィール・推移グラフの下端を両幅で6枚追加。mainのscrollTop＋高さ＝scrollHeight（atBottom=true）も記録。初回の下端に達しなかった6枚はattempt-bottom-scrollへ残し、合格56条件には含めない。共通件数文へ修正後の履歴2幅も撮り直し、旧2枚はbefore-common-rangeへ保存。
 
 ## 証拠と渡し方
 
-- 元の67行のstatusは `~/lh-work/design/v8/review/CLEANUP-1017/B360-67.tsv` を更新する。実測前に崩れ0と記録しない。
-- 撮影先は `~/lh-work/design/v8/review/masato-screens/after-1018/`。過去のafter画像を今回の証拠へ流用しない。
+- 元の67行のstatusは `~/lh-work/design/v8/review/CLEANUP-1017/B360-67.tsv` を更新済み。対応表を `docs/qa/cleanup-u01-1018.tsv` にも保存し、実装修正とCI判定を分けて記載した。
+- 撮影先は `~/lh-work/design/v8/review/masato-screens/after-1018/`。guard-results.jsonとvisual-review.tsvは56条件、source.jsonは製品32ファイルのSHA256・撮影版・最終製品版1dcdbed6e5・CI入力版f35e9aa90fを記録。最初の50条件以降の製品差分は共通20件既定と共通件数文の2ファイルのみ。過去のafter画像は流用していない。
 - 反映履歴は `docs/release-log/unreleased/0000-kenta-cleanup-U01.md`。#0000は司令塔の採番待ちであり、既知の実PR番号ではない。
 - PASSED.tsv、Pen、他束の持ち場は変更しない。コミットまでを渡し、push・PR・統合は司令塔が担当する。
