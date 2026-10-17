@@ -54,7 +54,7 @@ tags: [memory, core]
 
 ## 進行中（2026-10-17）
 
-- 列車42（lh-gapuitrain / codex/kenta-train-42-1017、PR #1765）：本線aec0da3e99（#1764）と固定gap3 a57806183e・behaviorfix 889b698eab・secfix 3149f517cbを--no-ffで統合。競合は移動先の修正・双方の操作を保持。686〜691・698〜726は各番号1本、SQLの改変なし。反映履歴を#1765へ整理し、ci-local全工程の確認中。結果はdocs/qa/train42-preflight-1017.md。push・DB・配備なし。
+- 列車42（lh-gapuitrain / codex/kenta-train-42-1017、PR #1765）：本線05b243b13d（#1761・#1764）と固定gap3 a57806183e・behaviorfix 889b698eab・secfix 3149f517cbを--no-ffで統合。競合は移動先の修正・双方の操作を保持。追加SQL37本は元と同一、686〜691・698〜726は各番号1本。反映履歴を#1765へ整理。入口・Repository・Worker（12,900件）・Admin（13,675件）・両build・MCP・Docs・V8全工程と補修後の最終集約は合格。V8は3幅の崩れ0、速度の予算・参考目標も合格。記録はdocs/qa/train42-preflight-1017.md。push・DB・配備なし。
 
 - 列車41・00:20の先回り確認：API最新3bc9359966を67b87f71e4、本線#1744のb2f05ca80eをca2751eeb7へ包含（後者の木は完全一致）。色遷移と復帰確認の競合1件を両方保持し6試験成功。SQL25本は公開37PRとの番号衝突0、SQL変更0。Webの非同期フォーカス確認1行を正しく待つ形へ直し、30ms遅延で旧失敗→新成功・移動停止で新も失敗を確認。Node22/heavy/最大4（DB2）でWeb13526/Worker12241/DB2285/scripts1054（skip1）/共有385/LIFF485、全11パッケージのpnpm typecheck・scripts型・対象ビルドと実ブラウザ成功。V8全工程成功：崩れ36条件0、工程15の201条件新規0（既存許可1/本線由来9）、故障203・一覧132・骨格93・見出し189成功、速度55測定超過0。元ci-local114＝81成功/2失敗/31省略を保持し、Web再試験後の集約はPR情報待ちだけで未合格。Node22のSQLite既知2ファイル13成功。鍵11938差/未取得18は未再取得、許可/上限/Pen/正式台帳更新0。docs/qa/train41-final-1016.mdの先回り確認とtrain41-preflight-1017/を参照。pending反映履歴は#PR番号・JST日時付き。コミットで引き継ぎ、push/PR/DB/配備なし。次は司令塔がpush・PR作成→履歴の番号確定→通常ゲートへ。
 
