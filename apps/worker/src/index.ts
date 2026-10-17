@@ -1,3 +1,4 @@
+import { sensitiveOperationMiddleware } from './middleware/sensitive-step-up.js';
 import type { Env } from './worker-env.js';
 export type { Env } from './worker-env.js';
 import { liffNotificationPreferences } from './routes/liff-notification-preferences.js';
@@ -340,6 +341,7 @@ app.use('/api/*', timingMark('audit'));
 // manifest と実 route の全件照合を必須テストにした上で、未分類も fail closed にする。
 app.use('/api/*', featureEnforcementMiddleware);
 app.use('/api/*', timingMark('feature'));
+app.use('/api/*', sensitiveOperationMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
@@ -1669,6 +1671,14 @@ async function runSixHourlyHeavyJobs(
         const { refreshAllNenTags } = await import('./services/nen-tag-sync.js');
         const result = await refreshAllNenTags(env.DB, { allTenants: true }, 500, new Date());
         if (result.added + result.removed > 0) console.log(JSON.stringify({"code":"nen_tag_refresh"}));
+      },
+    },
+    {
+      name: 'personal data retention',
+      run: async () => {
+        const { processPersonalDataRetention } = await import('./services/personal-data-retention.js');
+        const result = await processPersonalDataRetention(env, new Date(event.scheduledTime));
+        if (result.failed) throw new Error('personal_data_retention_retry_required');
       },
     },
     {

@@ -356,7 +356,7 @@ affiliatePayouts.post(
       if (snapshot.settlementVersion !== version) {
         return c.json({ success: false, error: '締め内容が更新されています', code: 'VERSION_CONFLICT' }, 409);
       }
-      const pdf = simplePdf(snapshot);
+      const pdf = simplePdf({...snapshot,exportedBy:c.get('staff').id,exportedAt:new Date().toISOString()});
       const checksum = await sha256Hex(new TextDecoder().decode(pdf));
       const objectKey = `affiliate-statements/${body.lineAccountId}/${randomToken(18)}.pdf`;
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60_000).toISOString();

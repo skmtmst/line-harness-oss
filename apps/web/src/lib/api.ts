@@ -6184,6 +6184,12 @@ export type OpsSupportDetail = {
 
 /** 大事な操作の直前再確認（V）が対象にする操作の名前。Workerの STEP_UP_PURPOSES と一致させる。 */
 export type StepUpPurpose =
+  | 'auth.api_key'
+  | 'privacy.retention'
+  | 'data.export'
+  | 'broadcast.send'
+  | 'ops.impersonation'
+  | 'secrets.reveal'
   | 'auth.mfa.policy'
   | 'auth.mfa.recovery'
   | 'auth.mfa.reenroll'

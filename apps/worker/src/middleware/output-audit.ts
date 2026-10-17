@@ -59,6 +59,34 @@ export const outputAuditMiddleware: MiddlewareHandler<Env> = async (c, next) => 
         riskLevel: 'high', retentionClass: 'security',
       })));
       if (csv || document) c.header('Cache-Control', 'private, no-store');
+      if (status < 300 && (csv || requested) && !c.res.headers.has('X-Exported-At')) {
+        const actor = staff.id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 100);
+        const at = new Date().toISOString();
+        c.header('X-Exported-By', actor); c.header('X-Exported-At', at);
+        const disposition = c.res.headers.get('Content-Disposition');
+        if (disposition) c.header('Content-Disposition', disposition.replace(/filename="([^"]+)"/, (_, name: string) => {
+          const dot = name.lastIndexOf('.');
+          const suffix = `-by-${actor}-${at.replace(/[^0-9TZ]/g, '')}`;
+          return `filename="${dot < 0 ? name + suffix : name.slice(0,dot) + suffix + name.slice(dot)}"`;
+        }));
+        const named = c.res.headers.get('Content-Disposition');
+        if (named) c.header('Content-Disposition', named.replace(/filename\*=UTF-8''([^;]+)/i, (_: string, encoded: string) => {
+          let name: string; try { name = decodeURIComponent(encoded); } catch { name = 'download'; }
+          const dot = name.lastIndexOf('.'), suffix = `-by-${actor}-${at.replace(/[^0-9TZ]/g, '')}`;
+          return `filename*=UTF-8''${encodeURIComponent(dot < 0 ? name + suffix : name.slice(0,dot) + suffix + name.slice(dot))}`;
+        }));
+        // Append an ASCII comment without buffering or changing the CSV's BOM,
+        // header, encoding or data rows. The audit count excludes comment rows.
+        if (csv && c.res.body) {
+          const footer = new TextEncoder().encode(`\r\n# exported_by=${actor} exported_at=${at}\r\n`);
+          const body = c.res.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+            transform(chunk, controller) { controller.enqueue(chunk); },
+            flush(controller) { controller.enqueue(footer); },
+          }));
+          const headers = new Headers(c.res.headers); headers.delete('Content-Length'); headers.delete('ETag');
+          c.res = new Response(body, { status: c.res.status, headers });
+        }
+      }
     }
   }
 };

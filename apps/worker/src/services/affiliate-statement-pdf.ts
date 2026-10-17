@@ -1,11 +1,12 @@
 export function simplePdf(snapshot: {
   affiliateCode: string; periodFrom: string; periodTo: string; totalAmount: number; currency: string;
-  grossAmount?: number; deductionAmount?: number;
+  grossAmount?: number; deductionAmount?: number; exportedBy?: string; exportedAt?: string;
 }): Uint8Array {
   const ascii = (value: string) => value.replace(/[^\x20-\x7E]/g, '?').replace(/[()\\]/g, '\\$&');
   const deduction = snapshot.deductionAmount ?? 0;
   const lines = [
     'Affiliate payment statement',
+    ...(snapshot.exportedBy && snapshot.exportedAt ? [`Exported by: ${ascii(snapshot.exportedBy)}`, `Exported at: ${ascii(snapshot.exportedAt)}`] : []),
     `Affiliate: ${ascii(snapshot.affiliateCode)}`,
     `Period: ${ascii(snapshot.periodFrom)} - ${ascii(snapshot.periodTo)}`,
     // R288: 取消の差し引きがあるときだけ内訳を分けて出す。

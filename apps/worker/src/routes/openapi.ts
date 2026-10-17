@@ -1,3 +1,5 @@
+import { STEP_UP_PURPOSES } from '../lib/step-up.js';
+import { personalDataRetentionPaths } from './personal-data-retention-openapi.js';
 import { stylePaths } from './styles-openapi.js';
 import { hqTemplateListPaths } from './hq-template-list-openapi.js';
 import { hqTemplateMediaPaths } from './hq-template-media-openapi.js';
@@ -459,6 +461,7 @@ const spec = {
     '/api/broadcast-message-assets/upload-sessions/{id}/complete': {
       post:{tags:['Broadcasts'],summary:'容量・形式・所属・ETagを検査して配信用URLを返す',parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}}],requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['etag'],properties:{etag:{type:'string'}}}}}},responses:{'201':{description:'安全性の検査対象として登録し、配信用URLを発行'},'200':{description:'確定済みの再要求'},'409':{description:'期限切れまたは内容不一致'},'422':{description:'ファイルの形式が不正'}}},
     },
+    ...personalDataRetentionPaths,
     ...auditPaths,
     ...api5Paths,
     ...api18Paths,
@@ -1447,8 +1450,8 @@ const spec = {
     '/api/auth/password/login': {
       post: {
         tags: ['Auth'], summary: 'メールアドレスとパスワードでログイン', security: [],
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'password'], properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' } } } } } },
-        responses: { '200': { description: 'Session issued' }, '401': { description: 'Invalid credentials' }, '429': { description: 'Rate limit exceeded' } },
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'password', 'turnstileToken'], properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' }, turnstileToken: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Session issued' }, '400': { description: 'Robot verification required' }, '503': { description: 'Robot verification unavailable' }, '401': { description: 'Invalid credentials' }, '429': { description: 'Rate limit exceeded' } },
       },
     },
     '/api/auth/password/forgot': {
@@ -1544,7 +1547,7 @@ const spec = {
     '/api/auth/step-up': {
       post: {
         tags: ['Auth'], summary: '高危険操作用の5分・1回限り再認証grantを発行（V: パスワード経路あり）',
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['purpose'], properties: { code: { type: 'string', description: '6桁コード（2段階認証の設定がある人）' }, password: { type: 'string', description: 'パスワード（2段階認証の設定が無い人）' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove', 'line_account.connect', 'line_account.credentials', 'line_account.archive', 'broadcast.approval', 'webhook.api_token', 'webhook.secret', 'auth.mfa.policy', 'auth.mfa.recovery', 'auth.mfa.reenroll'] } } } } } },
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['purpose'], properties: { code: { type: 'string', description: '6桁コード（2段階認証の設定がある人）' }, password: { type: 'string', description: 'パスワード（2段階認証の設定が無い人）' }, purpose: { type: 'string', enum: [...STEP_UP_PURPOSES] } } } } } },
         responses: { '201': { description: 'Step-up grant issued' }, '400': { description: 'Invalid or wrong credential' }, '401': { description: 'Not authenticated (STEP_UP_UNAUTHORIZED)' }, '403': { description: 'Neither TOTP nor password configured' }, '409': { description: 'Code already used' }, '429': { description: 'Attempt limit exceeded' } },
       },
     },
