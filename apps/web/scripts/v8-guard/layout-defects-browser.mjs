@@ -77,8 +77,13 @@ export default function scanLayoutDefects() {
       layer = layer.parentElement
     }
     leaves.push({ el, text, rects: painted, lines, layer })
-    const explanation = el.closest('small,[role="note"]') || el.closest('p') && /[。！？]/.test(text)
-    if (!explanation && lines >= 2 && text.length <= 24) add('wrap', el, text, { lines })
+    // Wrapping is a defect for short labels and names, not prose. Use semantic
+    // roles instead of punctuation, page-specific selectors or allowed text.
+    const label = el.closest('button,a,label,legend,h1,h2,h3,h4,h5,h6,th,[role="button"],[role="heading"],[role="tab"],[role="columnheader"],[data-list-name],[data-list-date-time],[data-list-number],[data-kpi-number],[data-select-value],[data-status-pill],[data-page-title]')
+    const prose = el.closest('p,pre,textarea,[contenteditable]')
+    const shortLabel = label && (!prose || prose.contains(label))
+    const explanation = el.closest('small,[role="note"]')
+    if (shortLabel && !explanation && lines >= 2 && text.length <= 24) add('wrap', el, text, { lines })
     if (lines >= 2 && text.length / lines <= 2.5) add('squash', el, text, { lines })
     // 正規の1行省略は既存 layout-overflow の title 検査に任せる。
     const ellipsis = (() => { for (let p = el; p && p !== root; p = p.parentElement) if (css(p).textOverflow === 'ellipsis') return true; return false })()

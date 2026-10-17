@@ -13,7 +13,7 @@ const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20
 const cases = {
   'control-overlap': '<div data-list-row style="display:flex"><button style="width:100px;height:36px">コピー</button><button style="width:36px;height:36px;margin-left:-30px">…</button></div>',
   'control-blocked': '<div data-list-row style="position:relative"><button style="width:80px;height:36px">…</button><span style="position:absolute;left:20px;top:0;width:36px;height:36px;background:#fff"></span></div>',
-  wrap: '<span style="display:block;width:50px">短い名前の折り返し</span>',
+  wrap: '<span data-list-name style="display:block;width:50px">短い名前の折り返し</span>',
   squash: '<button style="width:24px;word-break:break-all">20件表示</button>',
   clip: '<div style="overflow:hidden;width:100px"><span style="white-space:nowrap">横にはみ出した短い文字列です</span></div>',
   overlap: '<div style="position:relative"><span style="display:inline-block;width:120px">隣と重なる文字</span><span style="margin-left:-90px">重なった隣の文字</span></div>',
@@ -119,4 +119,17 @@ test('comparison retains every defect and never grants immunity to existing fail
   assert.deepEqual(result.allowed, [])
   assert.deepEqual(result.existing, [])
   assert.deepEqual(assess([]).failures, [])
+})
+
+test('short names fail when wrapped; paragraphs and message bodies can wrap without punctuation rules', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(shell('<p style="width:120px">再開すると、止めたところから続きを送ります</p><div style="width:120px;white-space:pre-wrap">さん、こんにちは。\n明日お待ちしています</div><span data-list-name style="display:block;width:40px">短い名前の折り返し</span>'))
+    const wrapped = (await measurePage(page)).filter(f => f.kind === 'wrap')
+    assert.equal(wrapped.length, 1)
+    assert.match(wrapped[0].text, /短い名前/)
+    await page.locator('[data-list-name]').evaluate(el => { el.style.width = '400px'; el.style.whiteSpace = 'nowrap' })
+    assert.equal((await measurePage(page)).some(f => f.kind === 'wrap'), false)
+  } finally { await browser.close() }
 })
