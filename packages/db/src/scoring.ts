@@ -385,3 +385,5 @@ export async function applyScoring(db: D1Database, friendId: string, eventType: 
   }
   return totalChange;
 }
+
+export { getFriendScoreHistoryPage, type ScoreHistoryCursor } from './scoring-history-page.js';

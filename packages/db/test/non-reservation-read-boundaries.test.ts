@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getTags, getTagsWithCounts, getTagsWithUsage } from '../src/tags.js';
+import { createTag, getTags, getTagsWithCounts, getTagsWithUsage } from '../src/tags.js';
 import { getReminders } from '../src/reminders.js';
 import { getFriendScoreHistory } from '../src/scoring.js';
 import { getMileageAdminOverview, postMileageEntry, ensureDefaultMileageProgram } from '../src/mileage.js';
@@ -49,6 +49,15 @@ describe('非予約DBの取得範囲とページの境界', () => {
     expect(tag.cleanup_reasons).not.toContain('unused');
     expect(tag.cleanup_reasons).not.toContain('duplicate_name');
     expect(await getTagsWithUsage(db, { allowedAccountIds: [], canSeeUnassigned: false })).toEqual([]);
+  });
+
+  it('SQLに見えるタグ名や所属IDもSQL本文へ混ぜず値として扱う', async () => {
+    const name = "会員'); DROP TABLE friends; --";
+    const tag = await createTag(db, { name });
+    expect(tag.name).toBe(name);
+    expect((await getTags(db, { allowedAccountIds: [], canSeeUnassigned: true })).find(row => row.id === tag.id)?.name).toBe(name);
+    expect(await getTags(db, { allowedAccountIds: ["a') OR 1=1 --"], canSeeUnassigned: false })).toEqual([]);
+    expect(raw.prepare('SELECT COUNT(*) AS n FROM friends').get()).toEqual({ n: 4 });
   });
 
   it('100を超える所属IDでもSQLの変数上限を越えない', async () => {
