@@ -65,12 +65,6 @@
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary);
 }
 
-/* ⑤ 完了 */
-.doneLine {
-  margin: 0; display: flex; align-items: center; gap: var(--tpl-htn-gap-s); /* 絵：印の円 22（線込み）＋間 10。lucide 24 の円は 22 なので間は 8 */
-  font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink);
-}
-.doneLine svg { color: var(--color-accent-deep); flex-shrink: 0; }
 .progressHead {
   display: flex; justify-content: space-between; gap: var(--tpl-htn-panel-gap);
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink);
