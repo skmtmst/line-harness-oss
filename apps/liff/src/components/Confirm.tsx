@@ -68,17 +68,30 @@ export default function Confirm({
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(() => crypto.randomUUID());
   const [setupKey] = useState(() => crypto.randomUUID());
-  /* キャンセル料の決まり（B1）。口が無い・オフの店は null で、今までどおり。 */
+  /* 見積もりを読めたときだけ予約を送る。失敗を「決まりなし」に読み替えない。 */
   const [policy, setPolicy] = useState<BookingCancellationPreview | null>(null);
+  const [policyState, setPolicyState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [policyRetry, setPolicyRetry] = useState(0);
+  const [policyKey, setPolicyKey] = useState('');
   const [accepted, setAccepted] = useState(false);
   const startsAt = slotStartsAtIso(slot);
+  const currentPolicyKey = JSON.stringify([menu.id, staff.id, startsAt]);
+  const policyReady = policyState === 'ready' && policyKey === currentPolicyKey;
   useEffect(() => {
     let alive = true;
-    void Promise.resolve().then(() => api.cancellationPreview({ menuId: menu.id, staffId: staff.id, startsAt })).catch(() => null).then((data) => {
-      if (alive) { setPolicy(data && data.enabled ? data : null); setAccepted(false); onPolicyChange?.(Boolean(data && data.enabled)); }
+    setPolicyState('loading'); setPolicy(null); setAccepted(false);
+    void Promise.resolve().then(() => api.cancellationPreview({ menuId: menu.id, staffId: staff.id, startsAt })).then((data) => {
+      if (!alive) return;
+      setPolicy(data && data.enabled ? data : null);
+      setPolicyKey(currentPolicyKey); setPolicyState('ready');
+      onPolicyChange?.(Boolean(data && data.enabled));
+    }).catch((e) => {
+      if (!alive) return;
+      logFailure('cancellation-preview', e);
+      setPolicyState('error');
     });
     return () => { alive = false; };
-  }, [menu.id, staff.id, startsAt, onPolicyChange]);
+  }, [menu.id, staff.id, startsAt, currentPolicyKey, onPolicyChange, policyRetry]);
 
   /* 続けて予約（B4）・2 人以上の組（B5）：口がまだ無い間は、送らずに「現在準備中です」を出す（B-314）。 */
   const [recurrence, setRecurrence] = useState<RecurrenceValue>(null);
@@ -114,7 +127,7 @@ export default function Confirm({
   useEffect(() => { onRegisterBack?.(() => backRef.current()); return () => onRegisterBack?.(null); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
-    if (submitting) return;
+    if (submitting || !policyReady || (policy !== null && !accepted)) return;
     if (party && party.size > 1) { setPreparing('2 人以上でのご予約'); return; }
     if (recurrence) { setPreparing('毎週の続けての予約'); return; }
     const generation = request.begin();
@@ -122,15 +135,18 @@ export default function Confirm({
     setError(null);
     try {
       /* キャンセル料がオンの店：カードを登録（試験モード）してから、確かめた決まりの版と一緒に送る。登録がまだなら登録の画面へ。 */
-      let consent: { policyAccepted: true; policyVersion: number; setupIntentId: string } | null = null;
+      let consent: { policyAccepted: true; policyVersion: number; setupIntentId?: string } | null = null;
       if (policy) {
-        const setup = await api.cancellationSetup(menu.id, setupKey);
-        if (!request.isCurrent(generation)) return;
-        if (setup.status !== 'ready') {
-          window.location.assign(setup.url);
-          return;
+        consent = { policyAccepted: true, policyVersion: policy.version };
+        if (policy.cardRequired !== false) {
+          const setup = await api.cancellationSetup(menu.id, setupKey);
+          if (!request.isCurrent(generation)) return;
+          if (setup.status !== 'ready') {
+            window.location.assign(setup.url);
+            return;
+          }
+          consent.setupIntentId = setup.setupIntentId;
         }
-        consent = { policyAccepted: true, policyVersion: policy.version, setupIntentId: setup.setupIntentId };
       }
       const created = await api.createRequest(
         {
@@ -162,7 +178,8 @@ export default function Confirm({
       const err = e as { status?: number; body?: { error?: string } };
       if (err.status === 409 && err.body?.error === 'policy_changed') {
         setAccepted(false);
-        setPolicy(await api.cancellationPreview({ menuId: menu.id, staffId: staff.id, startsAt }).then((data) => (data && data.enabled ? data : null)));
+        setPolicyState('loading');
+        setPolicyRetry((n) => n + 1);
         setError('キャンセル料の決まりが変わりました。もう一度確かめてから予約してください。');
       } else if (err.status === 409 && err.body?.error === 'card_not_registered') {
         setError('カードの登録が済んでいません。もう一度押して、カードを登録してください。');
@@ -237,6 +254,12 @@ export default function Confirm({
           {error}
         </p>
       )}
+      {policyState === 'error' ? (
+        <p role="alert" className="text-[13px] leading-6 text-danger">
+          キャンセル料の決まりを読み込めませんでした。
+          <Button variant="link" onClick={() => { setPolicyState('loading'); setPolicyRetry((n) => n + 1); }}>もう一度</Button>
+        </p>
+      ) : !policyReady ? <p role="status" aria-busy="true" className="text-[13px] leading-6 text-liff-sub">キャンセル料の決まりを確かめています…</p> : null}
       {policy ? <CancellationPolicy preview={policy} accepted={accepted} onAcceptedChange={setAccepted} /> : null}
       {policy ? null : (
       <div className="flex gap-2 rounded-(--liff-radius) bg-liff-note p-3 text-xs leading-[18px] text-ink">
@@ -252,10 +275,10 @@ export default function Confirm({
       <PrivacyNote />
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
-        <Button variant="primary" onClick={handleSubmit} disabled={submitting || (policy !== null && !accepted)}>
+        <Button variant="primary" onClick={handleSubmit} disabled={submitting || !policyReady || (policy !== null && !accepted)}>
           {submitting ? '送信中...'
             : policy?.deposit ? `${yen(policy.deposit.amount)} を払って予約する`
-              : policy ? 'カードを登録して予約する'
+              : policy && policy.cardRequired !== false ? 'カードを登録して予約する'
                 : recurrence ? `${recurrence.made} 回分を予約する` : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
         </Button>
       </BottomBar>

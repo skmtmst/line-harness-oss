@@ -45,10 +45,12 @@ it('デポジットがある店は今払う額とお店で払う額を出し、�
   expect(screen.getByText('キャンセル料とデポジット')).toBeTruthy();
 });
 
-it('決まりの口が無い・オフの店は今までどおり（決まりの段を出さず、カードも登録しない）', async () => {
-  vi.mocked(api.cancellationPreview).mockResolvedValue(null);
+it('決まりがオフの正常応答なら、決まりの段を出さず、カードも登録しない', async () => {
+  vi.mocked(api.cancellationPreview).mockResolvedValue({ ...POLICY, enabled: false });
   renderConfirm();
-  fireEvent.click(await screen.findByRole('button', { name: 'この内容で予約を確定する' }));
+  const submit = await screen.findByRole('button', { name: 'この内容で予約を確定する' });
+  await vi.waitFor(() => expect((submit as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(submit);
   await vi.waitFor(() => expect(api.createRequest).toHaveBeenCalled());
   expect(screen.queryByRole('checkbox')).toBeNull();
   expect(api.cancellationSetup).not.toHaveBeenCalled();

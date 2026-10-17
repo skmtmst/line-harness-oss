@@ -5,6 +5,8 @@ import {bookingAddons,readAddonSettings} from '../services/booking-addons.js';
 import {menuAudience,readAudienceWrite} from '../services/booking-audience.js';
 import {gapWrite,GapError} from '../services/gap-common.js';
 import { cancellationPolicy, cancellationQuote, bookingCancellationQuote, requireCancellationTestConnection } from '../services/booking-cancellation.js';
+import { simulatePaymentRefund } from '../services/booking-payment-refunds.js';
+import type { BookingPaymentRecord } from '@line-crm/db';
 import { customerBookingPayments } from '../services/booking-payment-history.js';
 import { syncSelfBookingMeet } from './booking-self-meet-sync.js';
 import type { SelfBookingChange } from './booking-self-meet-sync.js';
@@ -1296,7 +1298,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
     const claimId = crypto.randomUUID();
     const claim = await c.env.DB
       .prepare(
-        `UPDATE bookings SET decided_at = ?, cancel_claim_id = ?,
+        `UPDATE bookings SET decided_at = COALESCE(decided_at, ?), cancel_claim_id = ?,
                               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
           WHERE id = ? AND line_account_id = ?
             AND status IN ('cancelled','expired')
@@ -1318,7 +1320,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       lineAccountId: accountId,
       action: 'cancel_retry_claimed',
       before: { status: row.status },
-      after: { status: row.status, decided_at: claimAt, cancel_claim_id: claimId },
+      after: { status: row.status, decided_at: row.decided_at ?? claimAt, cancel_claim_id: claimId },
       reason: 'self_cancel_retry',
       actorType: 'customer',
       actorId: caller.friendId,
@@ -1407,6 +1409,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
     }
     throw error;
   }
+  await refundSelfBookingPayment(c.env.DB, self, bookingId);
   await cancelLegacyBookingReminders(c.env.DB, bookingId);
   await cancelObsoleteConfirmationRuns(c.env.DB, bookingId, accountId);
   await enqueueCalendarDeleteOperation(c.env.DB, { bookingId, lineAccountId: accountId });
@@ -1448,6 +1451,26 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   });
 });
 
+/** 期限内の本人取消は、既存の模擬返金と同じ取引・監査を通す。失敗時は取消の再送で回復する。 */
+async function refundSelfBookingPayment(db: D1Database, self: SelfBookingChange, bookingId: string) {
+  const payment = await db.prepare(`SELECT p.* FROM booking_payments p JOIN bookings b
+    ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
+    WHERE b.id=? AND b.line_account_id=? AND b.friend_id=? AND b.status='cancelled' AND p.status='paid'`)
+    .bind(bookingId, self.accountId, self.friendId).first<BookingPaymentRecord>();
+  if (!payment) return; // 店頭払い・未払い・返金済みは自動返金の対象外。
+  const booking = await db.prepare('SELECT starts_at,decided_at,menu_id FROM bookings WHERE id=? AND line_account_id=?')
+    .bind(bookingId, self.accountId).first<{ starts_at: string; decided_at: string; menu_id: string }>();
+  if (!booking || !Number.isFinite(Date.parse(booking.decided_at))) throw new Error('cancellation_time_unavailable');
+  const at = new Date(booking.decided_at);
+  const quote = await bookingCancellationQuote(db, bookingId, self.accountId, at);
+  const rules = await readSelfBookingRules(db, self.accountId, booking.menu_id);
+  if (at.getTime() >= Date.parse(booking.starts_at) || quote.feeNow > 0
+    || (!quote.policyAcceptedRequired && at.getTime() > Date.parse(booking.starts_at) - rules.cancelDeadlineMinutesBefore * 60_000)) return;
+  await simulatePaymentRefund(db, payment, {
+    reason: '期限内の予約キャンセル', notifyLine: false, idempotencyKey: `self-cancel:${bookingId}`,
+  }, { id: self.friendId, name: 'お客さま本人（予約キャンセル）' });
+}
+
 // 本人取消の副作用 (初回・再送で共通)。管理者取消と同じ順番でそろえる。
 async function runSelfBookingCancelSideEffects(
   c: Context<Env>,
@@ -1467,6 +1490,7 @@ async function runSelfBookingCancelSideEffects(
     cancelReason,
     failOnSendInFlight: true,
   });
+  await refundSelfBookingPayment(c.env.DB, self, row.id);
   await cancelLegacyBookingReminders(c.env.DB, row.id);
   await cancelObsoleteConfirmationRuns(c.env.DB, row.id, self.accountId);
   await enqueueCalendarDeleteOperation(c.env.DB, { bookingId: row.id, lineAccountId: self.accountId });
