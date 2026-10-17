@@ -68,16 +68,16 @@ describe('返信を作る：送れない設定のときは送信へ進むボタ�
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
     expect(await screen.findByRole('button', { name: '返信内容を確認する' })).toBeTruthy()
   })
-  it('返信済みの競合は相手の返信を表示し、再取得に失敗しても再送せず最新を確認できる', async () => {
+  it.each([true, false])('返信済みの競合は再送せず、返信文の有無にかかわらず最新を確認できる（返信文あり=%s）', async (withExistingReply) => {
     const existingReply = '別の担当者による返信です。'.repeat(15)
-    fixture.publishReply.mockRejectedValue(new ApiError(409, '返信済み', 'already_replied', { existingReply }))
+    fixture.publishReply.mockRejectedValue(new ApiError(409, '返信済み', 'already_replied', withExistingReply ? { existingReply } : undefined))
     const onPublished = vi.fn()
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={onPublished} />)
     fireEvent.click(await screen.findByRole('button', { name: '返信内容を確認する' }))
     fireEvent.click(screen.getByRole('checkbox', { name: '返信先・内容・個人情報の有無を確認しました' }))
     fireEvent.click(screen.getByRole('button', { name: 'この内容で返信する' }))
     expect(await screen.findByText('別の担当者がすでに返信しています。')).toBeTruthy()
-    expect(screen.getByText(new RegExp(existingReply))).toBeTruthy()
+    expect(screen.getByText(withExistingReply ? new RegExp(existingReply) : /返信文を読み込めませんでした/)).toBeTruthy()
     const confirm = screen.getByRole('button', { name: '返信内容を確認する' }) as HTMLButtonElement
     expect(confirm.disabled).toBe(true)
     fireEvent.click(confirm)
