@@ -143,6 +143,9 @@ describe('one durable external budget', () => {
     const h = setup();
     h.execute.mockResolvedValueOnce({ kind: 'transient', reason: 'network' });
     await h.call(); h.at(h.journal.state.nextAt); await h.call();
+    expect(h.journal.state).toMatchObject({ phase: 'succeeded' });
+    expect(h.journal.state.reason).toBeUndefined();
+    expect(h.journal.state.status).toBeUndefined();
     expect(h.execute.mock.calls.map(call => call[1])).toEqual([identity, identity]);
     const again = setup();
     const state = structuredClone(again.state);

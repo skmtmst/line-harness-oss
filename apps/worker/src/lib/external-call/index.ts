@@ -79,7 +79,11 @@ export function createExternalCall(options: { circuits: CircuitStore; now?: () =
     if (outcome.kind !== 'success' && outcome.status !== undefined && outcome.status >= 400 && outcome.status < 500
       && outcome.status !== 408 && outcome.status !== 429) outcome = { ...outcome, kind: 'permanent' };
     let next: CallState = { ...started, revision: started.revision + 1 };
-    if (outcome.kind === 'success') next.phase = 'succeeded';
+    if (outcome.kind === 'success') {
+      next.phase = 'succeeded';
+      delete next.reason;
+      delete next.status;
+    }
     else {
       next.reason = outcome.reason;
       next.status = outcome.status;
