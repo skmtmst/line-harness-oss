@@ -10,22 +10,24 @@ import Checkbox from '@/components/shared/checkbox'
 import StatusBadge from '@/components/shared/status-badge'
 import TagPill from '@/components/shared/tag-pill'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
-import { HqAccountPickerField } from '@/components/shared/hq-account-picker'
+import DistributionAccountPicker from './distribution-account-picker'
+import { ALL_ACCOUNTS, type useDistributionFolders } from './distribution-accounts'
 import styles from './folder-distribution-dialog.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { EntityPickerField } from '@/components/shared/entity-picker'
 
 export function distributionKind(row: HqTemplate) {
   if (row.template_type === 'template' && (row.kind ?? 'message') === 'message' && row.content_summary) return row.content_summary.replace(/\s+\d+$/u, '')
   return row.template_type === 'template' ? ({ message: 'メッセージ', carousel: 'カルーセル', rich_message: 'リッチメッセージ', rich_video: 'リッチビデオ', question: '質問', coupon: 'クーポン', research: 'リサーチ' }[row.kind ?? 'message'])
     : ({ tag: 'タグ', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }[row.template_type])
 }
-export default function FolderDistributionDialog({ name, templates, templateFolders = [], accounts, busy, error, onCancel, onConfirm }: {
-  name: string; templates: HqTemplate[]; templateFolders?: HqTemplateFolder[]; accounts: HqAccount[]; busy: boolean; error?: string
+export default function FolderDistributionDialog({ name, templates, templateFolders = [], accounts, accountFolders, busy, error, onCancel, onConfirm }: {
+  name: string; templates: HqTemplate[]; templateFolders?: HqTemplateFolder[]; accounts: HqAccount[]; accountFolders: ReturnType<typeof useDistributionFolders>; busy: boolean; error?: string
   onCancel: () => void; onConfirm: (templates: HqTemplate[], ids: string[]) => void
 }) {
   const [picked, setPicked] = useState(templates.map((row) => row.id))
   const [selected, setSelected] = useState<string[]>([])
+  const [accountFilter, setAccountFilter] = useState(ALL_ACCOUNTS)
+  const [accountSearch, setAccountSearch] = useState('')
   return <Dialog open designNode="JSirC" designWidth={720} title={`フォルダ「${name}」の ${templates.length} 件を配る`}
     description="フォルダの中のひな形をまとめて、選んだアカウントへ配ります。"
     busy={busy} error={error} onCancel={onCancel}
@@ -38,14 +40,21 @@ export default function FolderDistributionDialog({ name, templates, templateFold
     </div>}
   >
     <div className={styles.sections}>
-      <section className={styles.section} aria-label="配るひな形">
-        <div className={styles.heading}><strong>配るひな形</strong><span>{`${picked.length} / ${templates.length} 件を選択`}</span></div>
-        <EntityPickerField label="配るひな形" noun="ひな形" multiple value={picked} onChange={setPicked} disabled={busy} folders={templateFolders} items=
-          {templates.map((row) =>({ id:row.id, name : row.name, folderId: row.folder_id, meta:distributionKind(row)}))}/>
+      {/* 絵 W2GYgL：配るテンプレートはチェックの一覧（種類の札つき）、配る先はフォルダの列＋アカウントのチェックの一覧。 */}
+      <section className={styles.section} aria-label="配るテンプレート">
+        <div className={styles.heading}><strong>配るテンプレート</strong><span>{`${picked.length} / ${templates.length} 件を選択`}</span></div>
+        <div className={styles.list}>
+          {templates.map((row) => <div key={row.id} className={styles.row}>
+            <SaveErrorField names={["picked"]}><Checkbox checked={picked.includes(row.id)} disabled={busy}
+              onCheckedChange={(checked) => setPicked((current) => checked ? [...current, row.id] : current.filter((id) => id !== row.id))}>{row.template_type === 'tag' ? <TagPill name={row.name} color={(() => { const folder = templateFolders.find((item) => item.id === row.folder_id); return folder ? folderDisplayColor(folder) : undefined })()} size="sm" /> : row.name}</Checkbox></SaveErrorField>
+            <StatusBadge size="compact" tone="neutral" dot={false}>{distributionKind(row)}</StatusBadge>
+          </div>)}
+        </div>
       </section>
       <section className={styles.section} aria-label="配る先">
         <div className={styles.heading}><strong>配る先</strong><span>{`${selected.length} アカウントを選択`}</span></div>
-        <HqAccountPickerField label="配る先" title="配るアカウントを選ぶ" accounts={accounts} value={selected} onChange={setSelected} disabled={busy} />
+        <DistributionAccountPicker compact selectAll showCount={false} accounts={accounts} folders={accountFolders} selected={selected} onChange={setSelected}
+          filter={accountFilter} onFilter={setAccountFilter} search={accountSearch} onSearch={setAccountSearch} busy={busy} />
       </section>
       <p className={styles.note}>同じ名前のひな形があるアカウントは、配布方法（上書き・新しく作る）を次の確認で選べます。</p>
     </div>

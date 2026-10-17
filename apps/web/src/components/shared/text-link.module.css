@@ -52,3 +52,5 @@
 :root .label { font-weight: var(--polish-weight-label); }
 
 @layer components { .root[data-tone='action']{color:var(--color-accent-deep);} }
+
+.root[data-icon-tone='link'] svg { flex: none; color: var(--color-link); }

@@ -430,7 +430,9 @@
 
 :global(:root) .frame[data-template-layout='distribution'] { --tpl-toolbar-pad-block: var(--tpl-distribution-toolbar-pad); }
 :global(:root) .frame[data-template-layout='distribution'] .listBody { flex: none; }
-:global(:root) .frame[data-template-layout='distribution'] > .footer { margin: var(--tpl-toolbar-gap) 0 0; }
+:global(:root) .frame[data-template-layout='distribution'] .listBody { margin-bottom: var(--tpl-toolbar-gap); }
+/* 下の帯は表の直後で浮かせず、白い板の下端に置く（Ft2Ey・J7HNK）。表が長いときは sticky で画面の下に追従する。 */
+:global(:root) .frame[data-template-layout='distribution'] > .footer { margin: auto 0 0; }
 .subtitle{margin:0;color:var(--color-ink-secondary);font-size:var(--text-caption);line-height:var(--tpl-rs-lh-13);}
 
 :global(:root) [data-page-template='restaurant'] .heading { min-height: 60px; }
@@ -524,4 +526,24 @@
  .detailColumns[data-presentation='analysis'][data-detail-columns='analysis-history'] { grid-template-columns: minmax(0, 1fr); }
  .detailColumns[data-presentation='analysis'] .detailColumnAside { display: none; }
  .detailColumns[data-presentation='analysis'] .detailColumnAside[data-expanded] { display: flex; }
+}
+
+/* 業種の本文と補助欄。盤・分析・名簿も同じ型の開閉を使う。 */
+.detailColumns:is([data-detail-columns='style-dashboard'], [data-detail-columns='style-roster']) {
+  display: flex; align-items: flex-start; gap: var(--tpl-sd-col-gap); min-inline-size: 0; margin-right: 0;
+}
+.detailColumns:is([data-detail-columns='style-dashboard'], [data-detail-columns='style-roster']) .detailColumnMain {
+  display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--polish-space-field); min-inline-size: 0;
+}
+.detailColumns:is([data-detail-columns='style-dashboard'], [data-detail-columns='style-roster']) .detailColumnAside {
+  display: flex; flex: 0 0 var(--tpl-sd-side-w); flex-direction: column; gap: var(--polish-space-field);
+  inline-size: var(--tpl-sd-side-w); min-inline-size: 0; min-height: 0; padding: 0; border: 0;
+}
+.detailColumns[data-detail-columns='style-roster'] .detailColumnAside { flex-basis: var(--tpl-sd-roster-w); inline-size: var(--tpl-sd-roster-w); }
+@container v8-page (max-width: 1099px) {
+  .detailColumns:is([data-detail-columns='style-dashboard'], [data-detail-columns='style-roster']) { flex-direction: column; align-items: stretch; gap: var(--tpl-sd-col-gap); }
+  .detailColumns:is([data-detail-columns='style-dashboard'], [data-detail-columns='style-roster']) .detailColumnToggle { display: flex; }
+  .detailColumns:is([data-detail-columns='style-dashboard'], [data-detail-columns='style-roster']) .detailColumnAside { display: none; flex-basis: auto; inline-size: auto; }
+  .detailColumns[data-detail-columns='style-dashboard'] .detailColumnAside[data-expanded] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .detailColumns[data-detail-columns='style-roster'] .detailColumnAside[data-expanded] { display: flex; }
 }

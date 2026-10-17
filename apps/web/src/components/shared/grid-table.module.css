@@ -85,3 +85,40 @@ html:root .table[data-table-presentation='calendar'] {
   outline: 1px solid var(--color-hairline);
   outline-offset: -1px;
 }
+
+/* ダッシュボードの一覧。板の寸法はdesign、線・地・省略は共通で持つ。 */
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row {
+  height: auto; min-height: var(--grid-table-row-height);
+  padding: var(--grid-table-row-padding); font-size: var(--grid-table-font-size);
+  line-height: var(--grid-table-line-height, inherit); box-shadow: none;
+  border-block-end: 1px solid var(--color-hairline);
+}
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row[data-head] {
+  height: auto; min-height: var(--grid-table-head-height);
+  border-block-end: 0; border-radius: var(--radius-control);
+}
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row[data-head] .cell {
+  color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .cell {
+  display: flex; flex-direction: column; justify-content: center;
+}
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .cell[data-align='right'] {
+  align-items: flex-end;
+}
+html:root .table[data-table-presentation='dashboard'] .row[data-selected] { background: var(--color-accent-soft); }
+/* 分析の列幅は見出しと全行の内容から一度だけ決める。 */
+html:root .table[data-table-presentation='metrics'] { display: grid; grid-template-columns: var(--grid-table-columns); }
+html:root .table[data-table-presentation='metrics'] .row { display: contents; }
+html:root .table[data-table-presentation='metrics'] .row > * {
+  min-height: var(--grid-table-row-height); border-block-end: 1px solid var(--color-hairline);
+}
+html:root .table[data-table-presentation='metrics'] .row[data-head] > * {
+  min-height: var(--grid-table-head-height); border-block-end: 0; background: var(--polish-table-head-bg);
+}
+html:root .table[data-table-presentation='metrics'] .row > :first-child { padding-inline-start: var(--grid-table-row-padding); }
+html:root .table[data-table-presentation='metrics'] .row > * + * { padding-inline-start: var(--grid-table-gap); }
+html:root .table[data-table-presentation='metrics'] .row > :last-child { padding-inline-end: var(--grid-table-row-padding); }
+html:root .table[data-table-presentation='metrics'] .row[data-head] > :first-child { border-start-start-radius: var(--radius-control); border-end-start-radius: var(--radius-control); }
+html:root .table[data-table-presentation='metrics'] .row[data-head] > :last-child { border-start-end-radius: var(--radius-control); border-end-end-radius: var(--radius-control); }

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
+import { cleanup,fireEvent,render,screen,within } from '@testing-library/react'
 import React from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach,expect,test,vi } from 'vitest'
+import List from './list'
 const push = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/friends' }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...props}>{children}</a> }))
@@ -9,6 +10,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false }) }))
+vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
 vi.mock('@/lib/operators-cache', () => ({ loadOperators: async () => [] }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
@@ -18,7 +20,6 @@ vi.mock('@/lib/api', async original => {
     friendStats: { get: async () => ({ success: false }) }, tags: { list: async () => ({ success: true, data: [] }) }, scenarios: { list: async () => ({ success: true, data: [] }) },
   } }
 })
-import List from './list'
 afterEach(() => { cleanup(); sessionStorage.clear() })
 test('友だち行で同じ対応状態は一度、異なるマークと担当は残す', async () => {
   render(<List />)
@@ -27,9 +28,9 @@ test('友だち行で同じ対応状態は一度、異なるマークと担当�
   expect(within(same).getAllByText('未対応')).toHaveLength(1)
   expect(within(other).getAllByText('未対応')).toHaveLength(1)
   expect(within(other).getByTitle('対応マーク：折り返し')).toBeTruthy()
-  expect(within(other).getByText('担当：担当なし')).toBeTruthy()
-  expect(same.querySelector('[data-list-person-cell] [data-avatar]')?.textContent).toBe('同')
-  expect(other.querySelector('[data-list-person-cell] [data-avatar]')?.textContent).toBe('別')
+  expect(within(other).getByText('担当：なし')).toBeTruthy()
+  expect(same.querySelector('[data-avatar]')?.textContent).toBe('同')
+  expect(other.querySelector('[data-avatar]')?.textContent).toBe('別')
   expect(same.tabIndex).toBe(0)
   fireEvent.keyDown(same, { key: 'Enter' })
   expect(push).toHaveBeenCalledWith(expect.stringContaining('/friends/detail?id=one'))

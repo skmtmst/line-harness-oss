@@ -77,11 +77,12 @@ describe('統括コンソール', () => {
   it('統括とアカウントのサイドバーを分け、採用フローを作らない', () => {
     expect(sidebar).toContain('HQ_MENU_SECTIONS')
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.label)).toEqual([
-      // 提案 E-9（2026-10-07 オーナー採用）：統括の一括配信を末尾に足した。
-      'アカウント', 'タグ', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成', '一括配信',
+      // 提案 E-9（2026-10-07 オーナー採用）：統括の一括配信を末尾に足した。B-322（2026-10-16）：一番上に「対応が要るもの」。
+      '対応が要るもの', 'アカウント', 'タグ', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成', '一括配信',
     ])
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.label === '採用フロー管理')).toBe(false)
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.href)).toEqual([
+      '/hq/attention',
       '/hq',
       '/hq/friend-attributes',
       '/hq/templates',

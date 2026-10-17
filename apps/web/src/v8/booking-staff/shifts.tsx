@@ -1,44 +1,43 @@
 'use client'
-import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
-import Toggle from '@/components/shared/toggle'
-import { jstDate } from '@/lib/jst-datetime'
-import { usePermissionAccess } from '@/lib/use-feature-access'
-import { useStaffRole } from '@/lib/staff-role'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from '@/components/shared/list-navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { CalendarPlus, Plus, Smartphone, Trash2, UserX } from 'lucide-react'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ApiError, api, bookingApi, type BookingAvailabilitySlot, type BookingException, type BookingMenu, type BookingShift, type BookingStaff } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
+import { isForbiddenOrRateLimited,permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
-import StatusBadge from '@/components/shared/status-badge'
-import Card, { CardHeader } from '@/components/shared/card'
-import { TextField } from '@/components/shared/text-field'
+import Card,{ CardHeader } from '@/components/shared/card'
+import Checkbox,{ SettingCheckbox } from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import Checkbox, { SettingCheckbox } from '@/components/shared/checkbox'
-import Select from '@/components/shared/select'
-import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
-import ListState from '@/components/shared/list-state'
-import { PhoneDatetimeStep } from './phone'
-import layout from './layout.module.css'
-import styles from './shifts.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { PageHeading } from '@/components/templates/page-frame'
-import { CreatePage } from '@/components/templates/create-page'
-import PreviewLauncher from '@/components/templates/preview-launcher'
-import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select'
+import { Field } from '@/components/shared/form-controls'
+import IconButton from '@/components/shared/icon-button'
+import Link,{ useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import NumberInput from '@/components/shared/number-field'
 import { useSaveConflict } from '@/components/shared/save-conflict'
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Select from '@/components/shared/select'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import StatusBadge from '@/components/shared/status-badge'
+import { TextField } from '@/components/shared/text-field'
+import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
+import { CreatePage } from '@/components/templates/create-page'
+import { PageHeading } from '@/components/templates/page-frame'
+import PreviewLauncher from '@/components/templates/preview-launcher'
+import { useAccount } from '@/contexts/account-context'
+import { ApiError,bookingApi,type BookingAvailabilitySlot,type BookingException,type BookingMenu,type BookingShift,type BookingStaff } from '@/lib/api'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { jstDate } from '@/lib/jst-datetime'
+import { canViewFeature } from '@/lib/staff-capability'
+import { useStaffRole } from '@/lib/staff-role'
+import { usePermissionAccess } from '@/lib/use-feature-access'
+import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { CalendarPlus,Plus,Smartphone,Trash2,UserX } from 'lucide-react'
+import { useCallback,useEffect,useMemo,useRef,useState,type ReactNode } from 'react'
+import { bookingChannelsApi } from '../booking-menus/lib/booking-channels'
+import layout from './layout.module.css'
+import { PhoneDatetimeStep } from './phone'
+import styles from './shifts.module.css'
 
 /*
  * ★V8「勤務とシフト」（板 d5fmnM・管理者）・「自分の勤務」（板 E3YDK・スタッフ本人）・
@@ -337,6 +336,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const [calendarId, setCalendarId] = useState<string | null>(null)
   const [calendarVerifiedAt, setCalendarVerifiedAt] = useState<string | null>(null)
   const [calendarError, setCalendarError] = useState<string | null>(null)
+  const [externalEvents, setExternalEvents] = useState<number | null>(null)
   const [serviceConfigured, setServiceConfigured] = useState(true)
   const [slots, setSlots] = useState<BookingAvailabilitySlot[]>([])
   // 予約枠の返事に入っている休みの日（お店・担当が閉めている日）。
@@ -524,6 +524,11 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setCalendarId(calendarRes.connection?.calendar_id ?? null)
       setCalendarVerifiedAt(calendarRes.connection?.last_verified_at ?? null)
       setCalendarError(calendarRes.connection?.last_error ?? null)
+      // 今週の外の予定の件数（予約設定の予約経路の表と同じ受け口）。読めなくても画面は出す。
+      void Promise.resolve().then(() => bookingChannelsApi.channels(selectedAccountId)).then((res) => {
+        if (requestId !== requestRef.current) return
+        setExternalEvents(res.success ? (res.data.staff.find((person) => person.staffId === staffId)?.externalEventsThisWeek ?? null) : null)
+      }).catch(() => { if (requestId === requestRef.current) setExternalEvents(null) })
       setServiceConfigured(calendarRes.service_account.configured)
       setCalendarInput('')
       setCalendarFormError(null)
@@ -1369,6 +1374,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               {calendarId ? (
                 <p className={styles.calMeta}>
                   <span>最後に読んだ {calendarVerifiedAt ? shortStamp(calendarVerifiedAt) : emptyValue('unknown')}</span>
+                  {externalEvents != null ? <span>今週の外の予定 {externalEvents}件</span> : null}
                   {calendarError ? <span className={styles.calMetaError}>最新の確認で失敗しています：{calendarError}</span> : null}
                 </p>
               ) : null}

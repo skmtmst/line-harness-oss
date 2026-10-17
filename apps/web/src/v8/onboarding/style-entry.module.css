@@ -1,0 +1,31 @@
+/* 設定 › アカウントのスタイルの行（B-335）。 */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-field);
+  padding: var(--polish-space-card);
+  border-radius: var(--polish-radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.title {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}

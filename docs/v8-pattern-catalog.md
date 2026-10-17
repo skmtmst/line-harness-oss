@@ -1123,3 +1123,11 @@
 - 役目：入力した接続情報の検査結果。一般の表ではなく、検査の印・題・説明・状態を並べる。
 - 持ち主：`shared/verification-list.tsx` の `VerificationList`。箱は共通Card、状態はStatusBadge、行は文字と上下12の自然高。
 - 失敗の説明は全文を折り返して高さを増やす。その他は1行で省略し、titleで全文を残す。使用先：LINEアカウント登録の接続確認（v2KMj）。
+
+## 月の盤・複数画像・固定分類の共通口（2026-10-16）
+
+- 月の盤は `shared/month-calendar.tsx` の `MonthCalendarGrid`。曜日7列・月外・休み・今日・予約数と日付を選ぶ操作を持つ。時間盤の空き枠・凡例・人物名は `shared/calendar-parts.tsx`。
+- 複数画像の一覧は `shared/image-multi-select.tsx` の `ImageMultiSelect`、手元の画像の追加は `shared/image-multi-upload.tsx`。選択順・上限・選択解除を共通で扱い、取得・用途・上限の値は呼び出し側が渡す。
+- 固定分類は `shared/category-panel.tsx` の `CategoryPanel`。フォルダ管理の追加・変更・削除を持たず、既存の分類を選ぶ。操作と直前の知らせを本文列の下端に置く場合は `StickyBarRegion`。
+- 友だち一覧の表は `DataTable cellPresentation="friends"`。チェック・注目・操作の端の余白は共通セルの `columnKind`、ひな形の通常セルは `Td presentation="template-plain"`。
+- LIFFの見出し・欄の失敗・切替は `apps/liff/src/components/ui/` の `PageHeading`・`FieldError`・`Button variant="switch"`。監査は実際の読み込み先を照合し、生の手書きと部品の上書きは引き続き止める。

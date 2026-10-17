@@ -17,16 +17,18 @@ export default function TextLink({
   className,
   external = false,
   tone,
+  iconTone,
   ...rest
 }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
   tone?:'action'
+  iconTone?: 'link'
   external?: boolean
   href: string
   children: React.ReactNode
   className?: string
 }) {
   return (
-    <Link href={href} data-tone={tone} className={[styles.root, className].filter(Boolean).join(' ')} {...rest} target={external ? '_blank' : rest.target} rel={external || rest.target === '_blank' ? 'noopener noreferrer' : rest.rel}>
+    <Link href={href} data-tone={tone} data-icon-tone={iconTone} className={[styles.root, className].filter(Boolean).join(' ')} {...rest} target={external ? '_blank' : rest.target} rel={external || rest.target === '_blank' ? 'noopener noreferrer' : rest.rel}>
       <span className={styles.label}>{children}</span>
       {external || rest.target === '_blank' ? <ArrowUpRight size={12} aria-hidden="true" data-external-icon className={styles.arrow} /> : <ArrowRight size={12} aria-hidden="true" className={styles.arrow} />}
     </Link>

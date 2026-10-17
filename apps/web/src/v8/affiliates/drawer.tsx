@@ -460,7 +460,7 @@ export default function AffiliateDrawer({
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} width="editor" heightMode="viewport" layout="inset" busy={paymentOpen} onClose={onClose}
+      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} width="editor" heightMode="viewport" layout="inset" initialFocus="panel" busy={paymentOpen} onClose={onClose}
         heading={<span className={styles.titleRow}>{readonly ? <span>{affiliate.name}</span> : <InlineEdit value={affiliate.name} label="紹介者の名前を直す" maxLength={100} onSave={async (next) => {
           if (!next.trim()) throw new Error('名前を入力してください')
           const response = await api.affiliates.update(affiliate.id, { name: next.trim() })
@@ -468,7 +468,7 @@ export default function AffiliateDrawer({
           notifyToast('名前を保存しました'); onChanged()
         }} />}<StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
         toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => setTab(item.key) }))} />}
-        footer={(<>{readonly ? <span /> : (
+        footer={(<div className={styles.footerRow}>{readonly ? <span /> : (
             <button type="button" className={styles.stop} onClick={() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }} disabled={!affiliate.isActive}>
               <PauseCircle size={14} aria-hidden="true" />
               紹介を止める
@@ -491,7 +491,7 @@ export default function AffiliateDrawer({
                 支払いを確定する
               </Button>
             </>
-          )}</>)}
+          )}</div>)}
       >
         {loading ? (
             <ListState kind="loading" title="詳細を読み込んでいます" />

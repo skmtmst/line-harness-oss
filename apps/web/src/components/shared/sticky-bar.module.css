@@ -100,11 +100,13 @@
  * 一言を渡さない画面（40画面以上）は3列・中央寄せのままで変わらない。
  */
 .withInfo {
-  grid-template-columns: 1fr auto 1fr;
+  /* 左の文が残りの幅を使い、一言と操作は中身の幅で右端に並ぶ（操作を2段に折らない・zOpMG）。 */
+  grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
 .withInfo .actions {
   justify-content: flex-end;
+  flex-wrap: nowrap;
 }
 
 /*
@@ -148,7 +150,7 @@
 }
 /* 左の一覧と右の作る欄が独立した操作を持つ板用。既定の帯は変えない。 */
 :root .bar.splitBar.outlined { border: 0; background: transparent; }
-.bar.splitBar { grid-template-columns: minmax(0, 1fr) var(--sticky-trailing-width); gap: 0; padding: 0; }
+.bar.splitBar { grid-template-columns: minmax(0, 1fr) var(--sticky-trailing-width); gap: 0; padding: 0; align-items: stretch; }
 .splitLead:empty { padding: 0; }
 .splitLead:not(:empty) { background: var(--color-canvas); border: 1px solid var(--color-hairline); border-right: 0; border-radius: var(--radius-card) 0 0 var(--radius-card); }
 .splitLead { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 12px 24px; }
@@ -163,3 +165,5 @@
 }
 
 .inlineBar[data-presentation='distribution'] { justify-content: center; gap: var(--tpl-wh-check-gap); padding: var(--tpl-htn-footer-pad); background: var(--color-canvas); box-shadow: var(--tpl-htn-line-top); }
+
+.region { position: sticky; bottom: 0; z-index: 2; margin-top: auto; display: flex; flex-direction: column; gap: var(--sticky-region-gap); }
