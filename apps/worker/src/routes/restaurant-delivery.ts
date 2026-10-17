@@ -1,3 +1,4 @@
+import { isDeclaredWebhookBodyTooLarge, isWebhookBodyTooLarge } from '../lib/webhook-body.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 /**
  * 飲食店向け（テスト）「デリバリー受注」。
@@ -56,7 +57,6 @@ import {
 import {
   MAX_WEBHOOK_BODY_BYTES,
   parseWebhookPayload,
-  utf8Length,
   type WebhookOrder,
 } from '../services/delivery-webhook-payload.js';
 import {
@@ -1732,12 +1732,11 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
     return c.json({ success: false, error: 'Integration is not configured' }, 503);
   }
 
-  const declaredLength = Number(c.req.header('content-length') || '0');
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_WEBHOOK_BODY_BYTES) {
+  if (isDeclaredWebhookBodyTooLarge(c.req.header('content-length'), MAX_WEBHOOK_BODY_BYTES)) {
     return c.json({ success: false, error: 'Payload too large' }, 413);
   }
   const rawBody = await c.req.text();
-  if (utf8Length(rawBody) > MAX_WEBHOOK_BODY_BYTES) {
+  if (isWebhookBodyTooLarge(rawBody, MAX_WEBHOOK_BODY_BYTES)) {
     return c.json({ success: false, error: 'Payload too large' }, 413);
   }
 
