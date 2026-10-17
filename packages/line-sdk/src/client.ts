@@ -11,6 +11,24 @@ import type {
 
 const LINE_API_BASE = 'https://api.line.me';
 
+/** Single-attempt seam. The Worker owns timeout, durable budget and retry scheduling. */
+export type LineTransport = (url: string, init: RequestInit) => Promise<Response>;
+export interface LineClientOptions { transport?: LineTransport }
+
+/** Safe to record: excludes upstream body, status text, URL and credentials. */
+export class LineApiError extends Error {
+  readonly retryAfter: string | null;
+  constructor(public readonly status: number, retryAfter: string | null) {
+    super(`LINE API error: ${status}`);
+    this.name = 'LineApiError';
+    const value = retryAfter?.trim();
+    this.retryAfter = value && /^\d+(\.\d+)?$/.test(value)
+      ? String(Math.min(Number(value), 9_007_199_254_740))
+      : value && /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(value)
+        && Number.isFinite(Date.parse(value)) ? value : null;
+  }
+}
+
 export interface FollowersInsight {
   status: string;
   followers?: number;
@@ -24,7 +42,21 @@ export interface FollowerIdsPage {
 }
 
 export class LineClient {
-  constructor(private readonly channelAccessToken: string) {}
+  private readonly transport: LineTransport;
+  constructor(private readonly channelAccessToken: string, options: LineClientOptions = {}) {
+    this.transport = options.transport ?? ((url, init) => fetch(url, init));
+  }
+
+  private async fetch(url: string, init: RequestInit): Promise<Response> {
+    const transport = this.transport;
+    try { return await transport(url, { ...init, redirect: 'manual' }); }
+    catch { throw new Error('LINE API network error'); }
+  }
+
+  private fail(response: Response): never {
+    void response.body?.cancel().catch(() => {});
+    throw new LineApiError(response.status, response.headers.get('retry-after'));
+  }
 
   // ─── Core request helper ──────────────────────────────────────────────────
 
@@ -49,32 +81,25 @@ export class LineClient {
       options.body = JSON.stringify(body);
     }
 
-    const res = await fetch(url, options);
+    const res = await this.fetch(url, options);
 
     // LINE returns 409 when a request with the same X-Line-Retry-Key was
     // already accepted. For a caller retrying the exact same operation this
     // is a successful idempotent outcome, not a delivery failure.
-    if (res.status === 409 && requestHeaders['X-Line-Retry-Key']) {
+    if (res.status === 409 && new Headers(requestHeaders).get('X-Line-Retry-Key')?.trim()
+      && method === 'POST' && /^\/v2\/bot\/message\/(push|multicast|broadcast|narrowcast)$/.test(path)) {
+      void res.body?.cancel().catch(() => {});
       return { data: { retryAccepted: true }, headers: res.headers };
     }
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      const error = new Error(
-        `LINE API error: ${res.status} ${res.statusText} — ${text}`,
-      );
-      Object.assign(error, {
-        status: res.status,
-        retryAfter: res.headers.get('retry-after'),
-      });
-      throw error;
-    }
+    if (!res.ok) this.fail(res);
 
     // Some endpoints (e.g. push, reply) return an empty body with 200.
     const contentType = res.headers.get('content-type') ?? '';
     let data: unknown;
     if (contentType.includes('application/json')) {
-      data = await res.json();
+      try { data = await res.json(); }
+      catch { throw new Error('LINE API invalid response'); }
     } else {
       data = undefined;
     }
@@ -244,19 +269,18 @@ export class LineClient {
 
   async getDefaultRichMenuId(): Promise<string | null> {
     const url = `${LINE_API_BASE}/v2/bot/user/all/richmenu`;
-    const res = await fetch(url, {
+    const res = await this.fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.channelAccessToken}`,
       },
     });
-    if (res.status === 404) return null;
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`LINE API error: ${res.status} ${res.statusText} — ${text}`);
-    }
-    const data = (await res.json()) as { richMenuId: string };
+    if (res.status === 404) { void res.body?.cancel().catch(() => {}); return null; }
+    if (!res.ok) this.fail(res);
+    let data: { richMenuId: string };
+    try { data = (await res.json()) as { richMenuId: string }; }
+    catch { throw new Error('LINE API invalid response'); }
     return data.richMenuId;
   }
 
@@ -291,7 +315,7 @@ export class LineClient {
     contentType: 'image/png' | 'image/jpeg' = 'image/png',
   ): Promise<void> {
     const url = `https://api-data.line.me/v2/bot/richmenu/${encodeURIComponent(richMenuId)}/content`;
-    const res = await fetch(url, {
+    const res = await this.fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': contentType,
@@ -299,12 +323,8 @@ export class LineClient {
       },
       body: imageData,
     });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(
-        `LINE API error: ${res.status} ${res.statusText} — ${text}`,
-      );
-    }
+    if (!res.ok) this.fail(res);
+    void res.body?.cancel().catch(() => {});
   }
 
   // ─── Insight API ─────────────────────────────────────────────────────────
