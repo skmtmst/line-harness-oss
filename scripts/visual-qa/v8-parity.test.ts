@@ -5,7 +5,7 @@
  *    だけで呼ばれない。呼ばないまま渡すと関数の値が返って `measured`
  *    が `undefined` になる。呼ぶ形（MEASURE_CALL）で渡す。
  * 2. compareAndWrite は `measured` が無いときも落とさない。
- * 3. 途中改行は Range の行数で数え、見えない・v7だけ・読み飛ばしは
+ * 3. 途中改行は Range の行数で数え、見えない・読み飛ばしは
  *    除く。省略（…）ははみ出しに数えない。
  * 4. 状態を開けない板（ダイアログ・確認・引き出し）は順位に入れない。
  * 5. 撮る前に context へ V8 テーマ＋偽ログインを置き、撮った絵が V8
@@ -67,8 +67,8 @@ describe('v8-parity の測り', () => {
     expect(MEASURE_SCRIPT).not.toContain('lineHeight')
   })
 
-  it('見えない・v7だけ・読み飛ばしは数えない', () => {
-    expect(MEASURE_SCRIPT).toContain('.v7-only')
+  it('古い世代名で除外せず、見えない・読み飛ばしは数えない', () => {
+    expect(MEASURE_SCRIPT).not.toContain('.v7-only')
     expect(MEASURE_SCRIPT).toContain('skipLink')
     expect(MEASURE_SCRIPT).toContain('display')
   })

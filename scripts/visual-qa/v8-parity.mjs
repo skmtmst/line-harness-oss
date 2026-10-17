@@ -125,8 +125,8 @@ export const MEASURE_SCRIPT = `() => {
   const seen = new Set()
   const isCounted = (el) => {
     if (!el || el === document.body) return true
-    // 見えない・v7だけ・読み飛ばしは数えない。
-    if (el.closest('.v7-only, [class*="skipLink"], a[href^="#"]')) return false
+    // 見えない要素・読み飛ばしは数えない。古い世代名だけでは除外しない。
+    if (el.closest('[class*="skipLink"], a[href^="#"]')) return false
     return getComputedStyle(el).display !== 'none'
   }
   while (walker.nextNode()) {
