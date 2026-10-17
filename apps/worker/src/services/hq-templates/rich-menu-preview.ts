@@ -19,6 +19,8 @@ export async function previewRichMenu(db: D1Database, authority: HqTemplateAutho
   if (definition && definition.richMenu.name !== name) throw new HqTemplateError('INVALID_NAME');
   const refs: Reference[] = definition ? richMenuReferences(definition) : [];
   if (definition) for (const p of definition.richMenu.pages) for (const a of p.areas) {
+    for(const name of Object.values(a.dataBindings ?? {})) refs.push({kind:'common_var',sourceId:`name:${name}`,name});
+    if (a.intent === 'booking' && a.bookingMenuName) refs.push({kind:'booking',sourceId:`name:${a.bookingMenuName}`,name:a.bookingMenuName});
     if (a.intent === 'booking' && a.actionData.menuId) refs.push({kind:'booking',sourceId:a.actionData.menuId});
     if (a.intent === 'visit_stamp' && a.actionData.cardId) refs.push({kind:'visit_stamp',sourceId:a.actionData.cardId});
   }
@@ -40,9 +42,9 @@ export async function previewRichMenu(db: D1Database, authority: HqTemplateAutho
       sql = `SELECT c.id,c.name,1 available FROM visit_stamp_cards c WHERE c.tenant_id=? AND c.active=1 ${accountId ? 'AND EXISTS(SELECT 1 FROM visit_stamp_card_accounts ca WHERE ca.card_id=c.id AND ca.line_account_id=?)' : ''}`;
       bindings = [authority.tenantId,...(accountId ? [accountId] : [])];
     } else {
-      const table = {tag:'tags',audience_tag:'tags',template:'templates',scenario:'scenarios',booking:'menus'}[kind];
+      const table = {tag:'tags',audience_tag:'tags',template:'templates',scenario:'scenarios',booking:'menus',common_var:'common_vars'}[kind];
       if (!table) throw new HqTemplateError('INVALID_REFERENCE');
-      const available = kind === 'tag' || kind === 'audience_tag' ? "r.status='active'" : kind === 'booking' ? 'r.is_active=1 AND r.deleted_at IS NULL' : '1';
+      const available = kind === 'tag' || kind === 'audience_tag' ? "r.status='active'" : kind === 'booking' ? 'r.is_active=1 AND r.deleted_at IS NULL' : kind==='common_var' ? "r.archived_at IS NULL AND r.status='active' AND (r.valid_from IS NULL OR julianday(r.valid_from)<=julianday('now')) AND (r.valid_until IS NULL OR julianday(r.valid_until)>julianday('now'))" : '1';
       sql = `SELECT r.id,r.name,CASE WHEN ${available} THEN 1 ELSE 0 END available FROM ${table} r JOIN line_accounts a ON a.id=r.line_account_id WHERE a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL ${accountId ? 'AND a.id=?' : ''}`;
       bindings = [authority.tenantId,...(accountId ? [accountId] : [])];
     }

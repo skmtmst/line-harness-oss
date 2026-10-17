@@ -9,7 +9,9 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 
 import MenuV8 from '@/v8/restaurant/menu/menu'
-vi.mock('next/navigation',async()=> (await import('@/test-utils/navigation-mock')).navigationMock())
+import MenuEditV8 from '@/v8/restaurant/menu/edit'
+const nav = vi.hoisted(() => ({ params: new URLSearchParams('id=m1') }))
+vi.mock('next/navigation',async()=> ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => nav.params }))
 vi.mock('@/components/shell/page-chrome',async()=> (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=> 'owner',canManageRole:()=>true}))
 
@@ -60,24 +62,18 @@ describe('MJoJR メニュー管理のV8', () => {
     expect(screen.getAllByRole('button', { name: '再開' })).toHaveLength(1)
   })
 
-  it('一覧から変更・停止が今の口へ届く', async () => {
-    render(<MenuV8 />)
-    await screen.findByText('メニュー一覧')
-    const row = screen.getByText('秋の鹿肉コース').closest('tr')!
-    fireEvent.click(within(row).getByRole('button', { name: /その他操作|操作/ }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
-    fireEvent.change(screen.getByDisplayValue('秋の鹿肉コース'), { target: { value: '冬の鹿肉コース' } })
+  it('編集ページ（mauOC）で変えた名前が今の口へ届く', async () => {
+    render(<MenuEditV8 />)
+    fireEvent.change(await screen.findByDisplayValue('秋の鹿肉コース'), { target: { value: '冬の鹿肉コース' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ name: '冬の鹿肉コース' })))
   })
 
-  it('変更の枠に板 NkmwU の印が付く', async () => {
-    render(<MenuV8 />)
-    await screen.findByText('メニュー一覧')
-    const row = screen.getByText('秋の鹿肉コース').closest('tr')!
-    fireEvent.click(within(row).getByRole('button', { name: /その他操作|操作/ }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
-    expect(document.querySelector('[data-design-node="NkmwU"]')).not.toBeNull()
+  it('変更は窓（NkmwU）ではなく 1 枚の編集ページ（板 mauOC）', async () => {
+    render(<MenuEditV8 />)
+    await screen.findByDisplayValue('秋の鹿肉コース')
+    expect(document.querySelector('[data-design-node="mauOC"]')).not.toBeNull()
+    expect(document.querySelector('[data-design-node="NkmwU"]')).toBeNull()
   })
 
   it('停止の確認に板 MV5Os の印が付く', async () => {
@@ -99,11 +95,8 @@ it('申請中と承認済み開始待ちの新価格を現行価格と併記す�
 })
 it.each(['2026-10-11T15:09:00Z','2026-10-11T23:59:00Z'])('日本時間00:09・08:59でも価格変更の開始日時を添えて承認へ送る（%s）',async(now)=>{
  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(now))
- render(<MenuV8 />)
- const row=(await screen.findByText('秋の鹿肉コース')).closest('tr')!
- fireEvent.click(within(row).getByRole('button',{name:/その他操作|操作/}))
- fireEvent.click(screen.getByRole('menuitem',{name:'変更'}))
- fireEvent.change(screen.getByLabelText('価格（税込）'),{target:{value:'9900'}})
+ render(<MenuEditV8 />)
+ fireEvent.change(await screen.findByLabelText('価格（税込）'),{target:{value:'9900'}})
  fireEvent.click(screen.getByLabelText('新しい価格の開始日時'))
  const picker=screen.getByRole('dialog',{name:'日時を選ぶ'})
  fireEvent.click(within(picker).getByRole('button',{name:'日付'}))

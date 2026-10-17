@@ -1,3 +1,8 @@
+import type {MessageTemplateSourceMediaBinding} from './message-media-binding.js';
+export type {MessageTemplateSourceMediaBinding} from './message-media-binding.js';
+import type { MessageTemplateTargetSnapshot } from './message-target-snapshot.js';
+export type { MessageTemplateTargetSnapshot } from './message-target-snapshot.js';
+import { parseBroadcastMessageParts } from '../broadcast-message-set.js';
 import { parseHqMessageCard, composeHqMessageCard, validateImagemapMessage, type HqMessageCard, isLiffActionKind, collectLiffActionLocators, replaceLiffActionLocators } from '@line-crm/shared';
 import { HQ_MEDIA_MAX_BYTES, type HqMediaStreamSource } from '../hq-media-stream.js';
 import type { HqTemplateBinding, HqTemplateStatement } from '@line-crm/db';
@@ -27,23 +32,6 @@ export class TemplateHqTemplateError extends Error {
 export type { MessageTemplateDefinition, MessageTemplateMediaDefinition } from '@line-crm/shared';
 import { type MessageTemplateDefinition, type MessageTemplateMediaDefinition, validateAssetPayload, validateTapExtrasTree, tapExtrasError, isBroadcastAssetKind, convertBroadcastAsset, templateKind } from '@line-crm/shared';
 import { parseQuestion } from '../scenario-question.js';
-export type MessageTemplateTargetSnapshot = Readonly<{
-  tenantId: string;
-  targetAccountId: string;
-  snapshotToken: HqTemplateSnapshotToken;
-  templates: readonly Readonly<{ id: string; name: string; updatedAt: string }>[];
-  media: readonly Readonly<{
-    id: string;
-    filename: string;
-    mimeType: string;
-    sizeBytes: number;
-    r2Key: string;
-    publicUrl: string | null;
-    contentHash: string;
-    revision: string;
-    versionNo: number;
-  }>[];
-}>;
 
 /**
  * The factory is bound to this authority before it receives an adapter input.
@@ -52,20 +40,6 @@ export type MessageTemplateTargetSnapshot = Readonly<{
 export type MessageTemplateSourceAuthority = Readonly<{
   tenantId: string;
   sourceAccountId: string;
-}>;
-
-export type MessageTemplateSourceMediaBinding = Readonly<{
-  tenantId: string;
-  templateVersionId: string;
-  sourceAccountId: string;
-  mediaId: string;
-  mediaVersionId: string;
-  versionNo: number;
-  r2Key: string;
-  r2KeyPrefix: string;
-  sizeBytes: number;
-  contentHash: string;
-  etag: string | null;
 }>;
 
 /** Result of a tenant-scoped DB lookup by immutable template version id. */
@@ -240,7 +214,7 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
   if (root.schemaVersion !== 1 || !Array.isArray(root.media) || root.media.length > 50) {
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
   }
-  const messageType = template.messageType;
+  let messageType = template.messageType;
   if (!['text', 'image', 'flex', 'carousel', 'imagemap'].includes(String(messageType))) {
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
   }
@@ -284,6 +258,17 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     || new Set(media.map((item) => item.r2Key)).size !== media.length) {
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
   }
+  let messageBubbles: MessageTemplateDefinition['messageBubbles'];
+  if(root.messageBubbles !== undefined) {
+    if(!Array.isArray(root.messageBubbles)||root.messageBubbles.length<1||root.messageBubbles.length>5||root.card||root.asset||template.questionJson) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    try {
+      const parts=parseBroadcastMessageParts({messageType:'text',messageContent:'',messageBubbles:root.messageBubbles});
+      messageType=parts[0].messageType; template.messageType=messageType; template.messageContent=parts[0].messageContent;
+    } catch { throw new TemplateHqTemplateError('INVALID_DEFINITION',422); }
+    messageBubbles=root.messageBubbles as NonNullable<MessageTemplateDefinition['messageBubbles']>;
+    if(messageBubbles.some(b=>!['text','image','flex','carousel','imagemap'].includes(b.type)||b.content.templateId||b.content.hqTemplateId||b.content.assetId)) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    if(validateTapExtrasTree(messageBubbles)) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+  }
   let card: HqMessageCard | undefined;
   if (root.card !== undefined) {
     try { card = parseHqMessageCard(root.card); }
@@ -326,6 +311,7 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     if(asset || card) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
   }
   const parsed: MessageTemplateDefinition = {
+    ...(messageBubbles?{messageBubbles}:{}),
     ...(asset?{asset}:{}),
     ...(card?{card}:{}),
     schemaVersion: 1,
@@ -470,6 +456,7 @@ function templateTextFields(definition: MessageTemplateDefinition): readonly str
     template.carouselTapLimitText,
     template.questionJson,
     definition.asset ? JSON.stringify(definition.asset.payload) : null,
+    definition.messageBubbles ? JSON.stringify(definition.messageBubbles) : null,
   ].filter((value): value is string => value !== null);
 }
 
@@ -863,6 +850,12 @@ export async function planMessageTemplateDistribution(input: {
     } else dbCommit.push({sql:`INSERT INTO broadcast_message_assets(id,line_account_id,kind,name,payload_json,published_version,published_at,draft_revision,created_at,updated_at) VALUES (?,?,?,?,?,1,?,0,?,?)`,bindings:[targetTemplateId,context.targetAccountId,asset.kind,rootName,json,now,now,now]});
     dbCommit.push({sql:`INSERT INTO broadcast_asset_versions(id,asset_id,version_number,payload_json,created_at) SELECT ?,id,published_version,payload_json,? FROM broadcast_message_assets WHERE id=? AND line_account_id=?`,bindings:[crypto.randomUUID(),now,targetTemplateId,context.targetAccountId]});
     if(asset.kind==='rich_message') for(const m of referencedMedia(definition)) dbCommit.push({sql:'INSERT OR IGNORE INTO imagemap_images(id,line_account_id,r2_key,created_at) VALUES (?,?,?,?)',bindings:[crypto.randomUUID(),context.targetAccountId,replacements.get(m.r2Key)!,now]});
+  }
+  if(!definition.asset) {
+    const bubbles=definition.messageBubbles ? replaceExactLocators(JSON.stringify(replaceLiffActionLocators(definition.messageBubbles,dependencies.liffTargets ?? {})),replacements) : null;
+    dbCommit.push({sql:'UPDATE templates SET message_bubbles_json=?,draft_message_bubbles_json=NULL WHERE id=? AND line_account_id=?',bindings:[bubbles,targetTemplateId,context.targetAccountId]});
+    dbCommit.push({sql:`INSERT INTO template_versions(id,template_id,version_number,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json,created_at,hq_template_version_id)
+      SELECT ?,id,published_version,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json,?,? FROM templates WHERE id=? AND line_account_id=?`,bindings:[crypto.randomUUID(),now,source.version.templateVersionId,targetTemplateId,context.targetAccountId]});
   }
   for (const media of referencedMedia(definition)) {
     dbCommit.push({

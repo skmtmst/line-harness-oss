@@ -1,77 +1,57 @@
 'use client'
 import { FOLDER_SELECT_COLORS } from '@/components/shared/folder-select'
 
-import { KIND_TABS, KIND_LABEL, WORDS, type TagQuickFilter, TAG_QUICK_FILTERS } from './store-list-options'
-export { KIND_TABS } from './store-list-options'
-
-import { type HqStoreListProps } from './store-list-types'
+import { KIND_LABEL,KIND_TABS,STARTER_SET_TAB,TAG_QUICK_FILTERS,WORDS,type TagQuickFilter } from './store-list-options'
+export { KIND_TABS,hqTemplateTabsForStarterSets } from './store-list-options'
+export { sentLabel,stateOf } from './store-list-stats'
 export { type HqStoreListProps } from './store-list-types'
 
-import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
-import ListDateTime from '@/components/shared/list-date-time'
-import StatusBadge from '@/components/shared/status-badge'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import TagPill from '@/components/shared/tag-pill'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useMemo, useState, type ReactNode } from 'react'
-import { Archive, Bookmark, Check, CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link, MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users } from 'lucide-react'
-import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-crm/shared'
-import { ListPage } from '@/components/templates'
+import { type HqStoreListProps } from './store-list-types'
+
+import ActionMenu,{ type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import EmptyList from '@/components/shared/empty-list'
+import { emptyValue } from '@/components/shared/empty-value'
+import FilterChip from '@/components/shared/filter-chip'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { describeFolderFailure } from '@/components/shared/folder-failure'
-import { notifyToast } from '@/components/shared/toast'
-import EmptyList from '@/components/shared/empty-list'
-import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
+import FolderPanel,{ FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import ListDateTime from '@/components/shared/list-date-time'
 import ListToolbar from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import Notice from '@/components/shared/notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import { RowMenu } from '@/components/shared/row-actions'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Select from '@/components/shared/select'
-import { RowNameLink, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { Tabs } from '@/components/shared/tabs'
+import StatusBadge from '@/components/shared/status-badge'
+import { DataTable,NameCell,RowNameLink,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
+import { Tabs,type TabItem } from '@/components/shared/tabs'
+import TagPill from '@/components/shared/tag-pill'
+import { notifyToast } from '@/components/shared/toast'
+import { ListPage } from '@/components/templates'
 import { formatNumber } from '@/lib/format'
-import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
-import { distributedAccountsLine, templateSubLine, hqMessageTypeLabel } from './list-row'
-import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, cleanupTagIds, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
+import type { HqTemplate } from '@/lib/hq-templates-api'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import type { HqTemplateFolder,TemplateKind } from '@line-crm/shared'
+import { Archive,Bookmark,Braces,Check,CircleDashed,Copy,FileText,Inbox,Layers,Link,MessageSquare,Pencil,Plus,Send,Sparkles,Trash2,Unlink,Users } from 'lucide-react'
+import { useMemo,useState,type ReactNode } from 'react'
 import storeStyles from '../templates/list.module.css'
-import hqStyles from './store-list.module.css'
+import { AttributeTabs,OtherTabPanel,assignmentMethods,cleanupTagCount,cleanupTagIds,matchesTagFilters,unusedTagCount,useAttributeTab,type TagUsageFilter } from './attribute-tabs'
 import attributeStyles from './attribute-tabs.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import Notice from '@/components/shared/notice'
+import { distributedAccountsLine,hqMessageTypeLabel,templateSubLine } from './list-row'
+import { sentLabel,stateOf,sumOrNull } from './store-list-stats'
+import hqStyles from './store-list.module.css'
+
 
 const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
-
-/** M月D日（店の一覧と同じ。時刻は title）。 */
-
-/**
- * 公開の札（店と同じ3つ：公開中／未公開の変更／下書きだけ。絵 i0Ao0R）。統括では「配ったか」で決める：
- * 配った先がいまの版を持っている＝公開中、直したあと配っていない先がある（API-18 の outdated_account_count）＝未公開の変更、まだ配っていない＝下書きだけ。
- */
-export function stateOf(row: HqTemplate): { label: string; tone: 'live' | 'changes' | 'draft' } {
-  if ((row.distributed_account_count ?? 0) === 0) return { label: '下書きだけ', tone: 'draft' }
-  if ((row.outdated_account_count ?? 0) > 0) return { label: '未公開の変更', tone: 'changes' }
-  return { label: '公開中', tone: 'live' }
-}
-
-/** 合計（API-18）。1つでも数えていない行があれば null（「—」）。 */
-function sumOrNull(values: Array<number | null | undefined>): number | null {
-  if (values.some((value) => value == null)) return null
-  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
-}
-
-/** 今月送った数（API-18）。取れない種類（別資産のクーポン等）は null＝「—」。0 は「0通」。 */
-export function sentLabel(count: number | null | undefined): string {
-  return count == null ? emptyValue('unknown') : `${formatNumber(count)}通`
-}
 
 export default function HqStoreList(props: HqStoreListProps) {
   const saveErrors = useSaveFormErrors()
@@ -89,6 +69,10 @@ export default function HqStoreList(props: HqStoreListProps) {
   /* タグ（DzdC3）の「よく使う絞り込み」：数の帯と同じ2つ（新しい版を未配布・整理の候補）を重ねて絞る。 */
   const [tagQuick, setTagQuick] = useState<TagQuickFilter[]>([])
   const [tagQuickOpen, setTagQuickOpen] = useState(false)
+  /* テンプレート（Upx1c）：1通のみ・複数通・差し込みありの札（保存版の通数・差し込みの有無。API 組5）と、行のまとめて選ぶ印。 */
+  const [tplCount, setTplCount] = useState<'single' | 'multiple' | null>(null)
+  const [tplVars, setTplVars] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const narrow = useNarrowViewport()
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
@@ -114,12 +98,15 @@ export default function HqStoreList(props: HqStoreListProps) {
       if (folderFilter !== 'all' && (row.folder_id ?? 'none') !== folderFilter) return false
       if (undistributedOnly && (row.distributed_account_count ?? 0) > 0) return false
       if (type === 'tag' && !matchesTagFilters(row, tagUsage, tagMethod)) return false
+      if (type === 'template' && tplCount === 'single' && row.message_count !== 1) return false
+      if (type === 'template' && tplCount === 'multiple' && !((row.message_count ?? 0) > 1)) return false
+      if (type === 'template' && tplVars && row.has_interpolations !== true) return false
       if (type === 'tag' && tagQuick.includes('outdated') && (row.outdated_account_count ?? 0) === 0) return false
       if (type === 'tag' && tagQuick.includes('cleanup') && !cleanupNames.has(row.id)) return false
       if (!words) return true
       return [row.name, row.description ?? '', row.content_summary ?? ''].some((text) => text.normalize('NFKC').toLocaleLowerCase('ja-JP').includes(words))
     })
-  }, [rows, folderFilter, undistributedOnly, query, type, tagUsage, tagMethod, tagQuick, cleanupNames])
+  }, [rows, folderFilter, undistributedOnly, query, type, tagUsage, tagMethod, tagQuick, cleanupNames, tplCount, tplVars])
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
@@ -161,12 +148,12 @@ export default function HqStoreList(props: HqStoreListProps) {
       <Tabs
         size="compact"
         label={`${words.title}の種類`}
-        items={KIND_TABS.map((tab) => ({
+        items={[...KIND_TABS.map((tab): TabItem => ({
           label: tab.label,
           count: kindCounts?.[tab.kind],
           current: kind === tab.kind,
           onClick: () => { onKindChange(tab.kind); setPage(1) },
-        }))}
+        })), STARTER_SET_TAB]}
       />
   ) : undefined
 
@@ -300,6 +287,19 @@ export default function HqStoreList(props: HqStoreListProps) {
             </>
           ) : null}
           <div role="group" aria-label="配ったかで絞り込む" className={storeStyles.chipGroup}>
+            {type === 'template' ? (
+              <>
+                <FilterChip selected={tplCount === 'single'} onChange={() => { setTplCount((value) => (value === 'single' ? null : 'single')); setPage(1) }} title="1通だけのテンプレート" icon={<MessageSquare size={13} aria-hidden="true" />}>
+                  1通のみ
+                </FilterChip>
+                <FilterChip selected={tplCount === 'multiple'} onChange={() => { setTplCount((value) => (value === 'multiple' ? null : 'multiple')); setPage(1) }} title="複数通に分かれるテンプレート" icon={<Layers size={13} aria-hidden="true" />}>
+                  複数通
+                </FilterChip>
+                <FilterChip selected={tplVars} onChange={() => { setTplVars((value) => !value); setPage(1) }} title="名前や情報を差し込むテンプレート" icon={<Braces size={13} aria-hidden="true" />}>
+                  差し込みあり
+                </FilterChip>
+              </>
+            ) : null}
             <FilterChip selected={undistributedOnly} onChange={() => { setUndistributedOnly((value) => !value); setPage(1) }} title="まだどのアカウントへも配っていないひな形" icon={<Unlink size={13} aria-hidden="true" />}>
               未配布
             </FilterChip>
@@ -331,6 +331,28 @@ export default function HqStoreList(props: HqStoreListProps) {
                   onSelect: () => { setTagQuick((current) => current.includes(value) ? current.filter((key) => key !== value) : [...current, value]); setPage(1) },
                 })),
                 ...(tagQuick.length ? [{ id: 'quick-clear', label: 'すべて外す', dividerBefore: true, onSelect: () => { setTagQuick([]); setPage(1) } }] : []),
+              ]} />
+            </span>
+          ) : null}
+          {type === 'template' ? (
+            <span className={hqStyles.menuAnchor}>
+              <Button
+                type="button"
+                variant="secondary"
+                aria-haspopup="menu"
+                aria-expanded={tagQuickOpen}
+                aria-label="よく使う絞り込み"
+                title="よく使う絞り込み"
+                onClick={() => setTagQuickOpen((open) => !open)}
+              >
+                <Bookmark size={15} aria-hidden="true" />
+                {narrow ? null : <span>よく使う絞り込み</span>}
+              </Button>
+              <ActionMenu open={tagQuickOpen} onClose={() => setTagQuickOpen(false)} ariaLabel="よく使う絞り込み" items={[
+                { id: 'quick-undistributed', label: 'まだ配っていない', icon: undistributedOnly ? <Check size={14} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />, onSelect: () => { setUndistributedOnly((value) => !value); setPage(1) } },
+                { id: 'quick-vars', label: '差し込みがある', icon: tplVars ? <Check size={14} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />, onSelect: () => { setTplVars((value) => !value); setPage(1) } },
+                { id: 'quick-multiple', label: '複数通に分かれている', icon: tplCount === 'multiple' ? <Check size={14} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />, onSelect: () => { setTplCount((value) => (value === 'multiple' ? null : 'multiple')); setPage(1) } },
+                ...(undistributedOnly || tplVars || tplCount ? [{ id: 'quick-clear', label: 'すべて外す', dividerBefore: true, onSelect: () => { setUndistributedOnly(false); setTplVars(false); setTplCount(null); setPage(1) } }] : []),
               ]} />
             </span>
           ) : null}
@@ -378,7 +400,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   }
   /* 列の幅（col）と中身の箱（Td）は列ごとに書く（className を変数で渡すと見張りが読めない）。 */
   type Column = { key: string; head: string; col: ReactNode; cell: (row: HqTemplate) => ReactNode }
-  const plainTd = (key: string, text: ReactNode, title?: string) => <Td key={key} className={storeStyles.cellPlain} title={title}>{text}</Td>
+  const plainTd = (key: string, text: ReactNode, title?: string) => <Td key={key} presentation="template-plain" title={title}>{text}</Td>
   const boxedTd = (key: string, inner: ReactNode) => <Td key={key}>{inner}</Td>
   const columns: Column[] = type === 'template' ? [
     { key: 'kind', head: '種類', col: <col key="kind" className={storeStyles.colKind} />, cell: (row) => {
@@ -426,7 +448,7 @@ export default function HqStoreList(props: HqStoreListProps) {
     <div className={`${storeStyles.tableWrap} ${storeStyles.hqTable}`}>
       <DataTable columnSizing="content">
         <colgroup>
-          {type === 'rich_menu' ? <col className={storeStyles.colSelect} /> : null}
+          {type === 'rich_menu' || type === 'template' ? <col className={storeStyles.colSelect} /> : null}
           <col />
           {columns.map((column) => column.col)}
           <col className={storeStyles.colMenu} />
@@ -434,6 +456,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         <thead>
           <TableHeadRow>
             {type === 'rich_menu' ? <Th className={storeStyles.headCell}>順</Th> : null}
+            {type === 'template' ? <Th className={storeStyles.headCell}><Checkbox aria-label="表示中のテンプレートをすべて選ぶ" checked={shown.length > 0 && shown.every((row) => selectedIds.includes(row.id))} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...new Set([...current, ...shown.map((row) => row.id)])] : current.filter((id) => !shown.some((row) => row.id === id)))} /></Th> : null}
             <Th className={storeStyles.headCell}>{words.column}</Th>
             {columns.map((column) => <Th key={column.key} className={storeStyles.headCell}>{column.head}</Th>)}
             <Th aria-label="操作" />
@@ -445,7 +468,8 @@ export default function HqStoreList(props: HqStoreListProps) {
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
             return (
               <Tr key={row.id} data-row-id={row.id} density="template" onOpen={() => (onOpen ?? onEdit)(row)}>
-                {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
+                {type === 'rich_menu' ? <Td presentation="template-plain">{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
+                {type === 'template' ? <Td presentation="template-plain"><Checkbox aria-label={`「${row.name}」を選ぶ`} checked={selectedIds.includes(row.id)} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...current, row.id] : current.filter((id) => id !== row.id))} /></Td> : null}
                 {type === 'tag' ? (
                   /* タグ（DzdC3）は名前をタグの札で出す。フォルダの色は札の中の丸（名前の前の丸を二重に置かない）。 */
                   <NameCell name={(

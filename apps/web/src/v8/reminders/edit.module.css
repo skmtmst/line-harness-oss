@@ -350,6 +350,10 @@
   line-height: var(--tpl-rm-bubble-lh);
   white-space: pre-wrap;
   word-break: break-word;
+  /* 行末の1字だけが次の行へ落ちないよう、文節で折る（共通の LINE の見本と同じ・p5YuP「くださ／い。」）。 */
+  word-break: auto-phrase;
+  overflow-wrap: break-word;
+  text-wrap: pretty;
 }
 
 .fieldError { margin: var(--tpl-field-error-margin); color: var(--color-status-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }

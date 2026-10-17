@@ -654,6 +654,42 @@ describe('Googleビジネス：口コミ', () => {
     expect(testDb.raw.prepare('SELECT reply_status, reply_draft_ai_generated FROM rt_google_reviews WHERE review_name = ?').get(`${LOCATION}/reviews/r1`)).toEqual({ reply_status: 'draft', reply_draft_ai_generated: 1 });
   });
 
+  it('本文のない従来の生成リクエストも受け付ける',async()=>{
+    await seedReviews();env.AI={run:vi.fn(async()=>({response:'ご来店ありがとうございます。'}))} as unknown as Ai;
+    expect((await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`,{method:'POST'})).status).toBe(200);
+  });
+
+  it.each(['shorten','polite'])('AIで%s：編集中の下書きを使い、Googleへ送らず保存する',async(mode)=>{
+    await seedReviews();
+    const run=vi.fn(async()=>({response:'ご来店ありがとうございます。'}));env.AI={run} as unknown as Ai;
+    const response=await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`,{body:{mode,replyDraft:'ご来店ありがとうございました。またのご来店を心よりお待ちしています。'}});
+    expect(response.status).toBe(200);expect(await response.json()).toMatchObject({draft:'ご来店ありがとうございます。'});
+    const payload=JSON.stringify(run.mock.calls[0]);
+    expect(payload).toContain('整える下書き');expect(payload).toContain(mode==='shorten'?'元の文より短く':'自然で丁寧');
+    expect(payload).not.toContain('Aki');
+  });
+
+  it('AI整形は不正な入力と生成中の他の保存を拒み、元の文を残す',async()=>{
+    await seedReviews();const id=reviewIdOf('r1'),path=`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`;
+    expect((await call(path,{body:{mode:'other'}})).status).toBe(400);
+    expect((await call(path,{body:{mode:'shorten',replyDraft:''}})).status).toBe(400);
+    env.AI={run:vi.fn(async()=>{
+      testDb.raw.prepare("UPDATE rt_google_reviews SET reply_draft='別の担当の文' WHERE id=?").run(id);
+      return {response:'生成した文'};
+    })} as unknown as Ai;
+    expect((await call(path,{body:{mode:'polite',replyDraft:'お礼の文'}})).status).toBe(409);
+    expect(testDb.raw.prepare('SELECT reply_draft FROM rt_google_reviews WHERE id=?').get(id)).toEqual({reply_draft:'別の担当の文'});
+  });
+
+  it('短くするAIが元の文より長い文を返したら保存しない',async()=>{
+    await seedReviews();const id=reviewIdOf('r1');
+    testDb.raw.prepare("UPDATE rt_google_reviews SET reply_draft='お礼の文' WHERE id=?").run(id);
+    env.AI={run:vi.fn(async()=>({response:'元よりも長くなったお礼の文章です。'}))} as unknown as Ai;
+    const response=await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`,{body:{mode:'shorten'}});
+    expect(response.status).toBe(502);expect(await response.json()).toMatchObject({code:'ai_not_shorter'});
+    expect(testDb.raw.prepare('SELECT reply_draft FROM rt_google_reviews WHERE id=?').get(id)).toEqual({reply_draft:'お礼の文'});
+  });
+
   /** OpenAI の文章生成APIの返事を真似る。 */
   function openAiHandler(body: unknown, status = 200): (url: string, init?: RequestInit) => Response {
     return (url) => (url.startsWith('https://api.openai.com/') ? jsonResponse(body, status) : jsonResponse({}, 404));

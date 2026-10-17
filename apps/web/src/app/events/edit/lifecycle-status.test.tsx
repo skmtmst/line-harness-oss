@@ -64,7 +64,8 @@ describe('公開の状態（WEB318/319）', () => {
     await act(async () => { confirm.click() })
     await waitFor(() => expect(screen.getByText('停止中')).toBeTruthy())
     expect(net.setEventLifecycle).toHaveBeenCalledWith('acc-1', 'ev-1', expect.objectContaining({ to: 'paused', reason: '台風' }))
-    expect(net.getEvent).toHaveBeenCalledTimes(3)
+    // 題の名前（XFRyO「イベント予約 › 名前」）を読む1回を足して4回。状態を変えたあとに申込の状況を読み直すのは今と同じ。
+    expect(net.getEvent).toHaveBeenCalledTimes(4)
   })
 
   it('理由なしの中止を止め、二度押しと失敗後の再送でも同じ操作の鍵を使う', async () => {

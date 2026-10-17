@@ -418,3 +418,17 @@ describe('予約の支払いの共通口', () => {
       .toEqual({ status: 'confirmed' });
   });
 });
+
+describe('B-316 お客さまが選ぶ支払い設定',()=>{
+ it('店の既定・メニュー上書き・解除を保存し、Stripe以外との組合せは断る',async()=>{
+  seedBooking();const headers={'Content-Type':'application/json'};
+  const store='/api/booking/admin/payment-config?account_id=account-a';
+  expect((await app().request(store,{method:'PUT',headers,body:JSON.stringify({mode:'customer_choice',provider:'stripe',holdMinutes:10})},env())).status).toBe(200);
+  expect(await getBookingPaymentConfig(db,'account-a')).toMatchObject({mode:'customer_choice',provider:'stripe'});
+  const menu='/api/booking/admin/menus/menu-a/payment?account_id=account-a';
+  expect((await app().request(menu,{method:'PUT',headers,body:JSON.stringify({mode:'customer_choice',provider:'stripe'})},env())).status).toBe(200);
+  expect((await app().request(menu,{method:'PUT',headers,body:JSON.stringify({mode:'customer_choice',provider:'onsite'})},env())).status).toBe(400);
+  expect((await app().request(store,{method:'PUT',headers,body:JSON.stringify({mode:'customer_choice',provider:'none',holdMinutes:10})},env())).status).toBe(400);
+  expect((await app().request(menu,{method:'DELETE'},env())).status).toBe(200);
+ });
+});

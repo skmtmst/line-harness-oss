@@ -1,3 +1,5 @@
+import { HQ_SUPPORT_KIND_LABELS, serialize } from './hq-support-display.js';
+export { HQ_SUPPORT_KIND_LABELS } from './hq-support-display.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -42,14 +44,6 @@ const ATTACHMENT_MAX = 3;
 const ATTACHMENT_BYTES_MAX = 5 * 1024 * 1024;
 const ATTACHMENT_TYPES = new Set(['image/png', 'image/jpeg']);
 
-export const HQ_SUPPORT_KIND_LABELS: Record<HqSupportKind, string> = {
-  usage: '使い方について',
-  bug: '不具合の報告',
-  billing: '料金・契約について',
-  feature: '要望・提案',
-  other: 'その他',
-};
-
 function tenantOf(c: Context<Env>): string {
   return c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
 }
@@ -67,35 +61,6 @@ function supportPlanLabel(billing: Awaited<ReturnType<typeof getTenantBilling>>)
   if (billing.plan_status === 'exempt') return '課金対象外';
   if (billing.plan_status === 'canceled') return '契約終了';
   return findPlan(billing.plan_key)?.name ?? '—';
-}
-
-type ReplyView = { id: string; authorName: string; body: string; createdAt: string };
-
-function serialize(row: HqSupportRequest, base: string, replies: ReplyView[] = []) {
-  let keys: string[] = [];
-  try {
-    const parsed = JSON.parse(row.attachment_keys) as unknown;
-    keys = Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === 'string') : [];
-  } catch {
-    keys = [];
-  }
-  return {
-    id: row.id,
-    kind: row.kind,
-    kindLabel: HQ_SUPPORT_KIND_LABELS[row.kind] ?? row.kind,
-    subject: row.subject,
-    body: row.body,
-    lineAccountId: row.line_account_id,
-    attachments: keys.map((key) => ({ key, url: `${base}/images/${key}` })),
-    status: row.status,
-    staffName: row.staff_name,
-    notified: row.notified_at !== null,
-    createdAt: row.created_at,
-    // 運営側のチケット番号と返信（★V6 37-6 の返信は統括の履歴にも載る）
-    ticketLabel: formatTicketNo(row.ticket_no ?? null),
-    stage: row.stage,
-    replies,
-  };
 }
 
 function hasImageSignature(bytes: Uint8Array, mimeType: string): boolean {
@@ -140,6 +105,21 @@ function parseAttachments(raw: unknown): { uploads: Upload[] } | { error: string
   }
   return { uploads };
 }
+
+/** 一覧のページ数に左右されない、所属する統括のお問い合わせ集計。 */
+hqSupport.get('/api/hq/support/summary', async (c) => {
+  const data = await c.env.DB.prepare(`SELECT COUNT(*) AS total,
+    COALESCE(SUM(stage='new'),0) AS newCount,
+    COALESCE(SUM(stage='in_progress'),0) AS inProgressCount,
+    COALESCE(SUM(stage='in_progress' AND assignee_staff_id IS NOT NULL),0) AS assignedInProgressCount,
+    COALESCE(SUM(strftime('%Y-%m',resolved_at)=strftime('%Y-%m','now','+9 hours')),0) AS resolvedThisMonth,
+    COALESCE(SUM(strftime('%Y-%m',resolved_at)=strftime('%Y-%m','now','+9 hours','start of month','-1 month')),0) AS resolvedPreviousMonth,
+    AVG(CASE WHEN julianday(first_replied_at)>=julianday(created_at)
+      THEN (julianday(first_replied_at)-julianday(created_at))*24 END) AS averageFirstReplyHours,
+    COUNT(CASE WHEN julianday(first_replied_at)>=julianday(created_at) THEN 1 END) AS firstReplySampleCount
+    FROM hq_support_requests WHERE tenant_id=?`).bind(tenantOf(c)).first();
+  return c.json({ success: true, data });
+});
 
 hqSupport.get('/api/hq/support/requests', async (c) => {
   try {

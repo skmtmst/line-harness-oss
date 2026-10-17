@@ -1,3 +1,4 @@
+import { parseSupportMarkLocations } from '@line-crm/shared';
 import { FRIEND_FIELD_TYPES, validateFieldKey, validateFriendFieldValue } from '@line-crm/db';
 import type { HqFriendFieldDefinition, HqMarkDefinition } from '@line-crm/shared';
 import { boundedText, HqTemplateError } from './tag.js';
@@ -64,7 +65,9 @@ export function parseFriendFieldDefinition(value: unknown): HqFriendFieldDefinit
 }
 export function parseMarkDefinition(value: unknown): HqMarkDefinition {
   const root=object(value),mark=object(root.mark);
-  keys(root,['schemaVersion','mark']);keys(mark,['name','color','isDefault','autoOnInbound','displayOrder']);
+  keys(root,['schemaVersion','mark']);keys(mark,['name','color','isDefault','autoOnInbound','displayOrder','displayLocations']);
   if(root.schemaVersion!==1) throw new HqTemplateError('INVALID_DEFINITION');
-  return {schemaVersion:1,mark:{name:boundedText(mark.name),color:color(mark.color)??'#3B82F6',isDefault:bool(mark.isDefault),autoOnInbound:bool(mark.autoOnInbound),displayOrder:order(mark.displayOrder)}};
+  let locations;
+  try { locations = mark.displayLocations === undefined ? undefined : parseSupportMarkLocations(mark.displayLocations); } catch { throw new HqTemplateError('INVALID_DEFINITION',422); }
+  return {schemaVersion:1,mark:{name:boundedText(mark.name),color:color(mark.color)??'#3B82F6',isDefault:bool(mark.isDefault),autoOnInbound:bool(mark.autoOnInbound),displayOrder:order(mark.displayOrder),...(locations===undefined?{}:{displayLocations:locations})}};
 }

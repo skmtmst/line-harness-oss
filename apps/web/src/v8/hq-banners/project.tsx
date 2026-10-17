@@ -1,57 +1,59 @@
 'use client'
-import { useListUrlValue } from '@/components/shared/list-url-state'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
-import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Send, Sparkles, Star, Upload, X } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ListPage } from '@/components/templates'
-import Breadcrumb from '@/components/shared/breadcrumb'
-import Button from '@/components/shared/button'
-import MediaSlot from '@/components/shared/media-slot'
-import { RowMenu } from '@/components/shared/row-actions'
-import FilterChip from '@/components/shared/filter-chip'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import StickyBar from '@/components/shared/sticky-bar'
-import TargetMissing from '@/components/shared/target-missing'
-import Checkbox from '@/components/shared/checkbox'
-import SavedDistributionDialog from '../hq-templates/saved-distribution-dialog'
-import { useDistributionFolders } from '../hq-templates/distribution-accounts'
 import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
-import ReferenceFrame from './reference-frame'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import type { AccountWithStats } from '@/contexts/account-context'
-import { api, ApiError } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import {
-  BANNER_MAX_REFERENCE_IMAGES,
-  EMPTY_GENERATION_INPUT,
-  activeGeneration,
-  exportSizeText,
-  inputFromGeneration,
-  packedTextLines,
-  readFileAsBase64,
-  usageRefusal,
-  validateGenerationInput,
-  type BannerCropPosition,
-  type BannerGeneration,
-  type BannerGenerationInput,
-  type BannerImage,
-  type BannerPreset,
-  type BannerProject,
-  type BannerReference,
-  type BannerReferenceMode,
-  type BannerUsage,
-} from '@/lib/hq-banners'
-import { BannerImageDetailV8 } from './image-detail'
-import { BANNER_UPLOAD_ACCEPT, BannerConfirmDialogV8, CreateProjectDialogV8, uploadRefusal } from './dialogs'
-import { bannerLimitKind } from './limit-notice'
-import { bannerFailureMessage, tileLabel } from './words'
-import styles from './project.module.css'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import FilterChip from '@/components/shared/filter-chip'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import ListState from '@/components/shared/list-state'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import MediaSlot from '@/components/shared/media-slot'
+import Notice from '@/components/shared/notice'
+import { RowMenu } from '@/components/shared/row-actions'
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import StickyBar, { StickyBarRegion } from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
+import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
+import { ListPage } from '@/components/templates'
+import type { AccountWithStats } from '@/contexts/account-context'
+import { api,ApiError } from '@/lib/api'
+import {
+activeGeneration,
+BANNER_MAX_REFERENCE_IMAGES,
+EMPTY_GENERATION_INPUT,
+exportSizeText,
+inputFromGeneration,
+packedTextLines,
+presetSizeLabel,
+readFileAsBase64,
+usageRefusal,
+usageStatusText,
+validateGenerationInput,
+type BannerGeneration,
+type BannerGenerationInput,
+type BannerImage,
+type BannerPreset,
+type BannerProject,
+type BannerReference,
+type BannerReferenceMode,
+type BannerUsage
+} from '@/lib/hq-banners'
+import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { Archive,ArchiveRestore,Copy,Hourglass,LoaderCircle,Pencil,Send,Sparkles,Star,Upload,X } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense,useCallback,useEffect,useId,useMemo,useRef,useState } from 'react'
+import { useDistributionFolders } from '../hq-templates/distribution-accounts'
+import SavedDistributionDialog from '../hq-templates/saved-distribution-dialog'
+import { BANNER_UPLOAD_ACCEPT,BannerConfirmDialogV8,CreateProjectDialogV8,uploadRefusal } from './dialogs'
+import { BannerImageDetailV8 } from './image-detail'
+import { bannerLimitKind } from './limit-notice'
+import { PendingTile,Thumb } from './project-tiles'
+import styles from './project.module.css'
+import ReferenceFrame from './reference-frame'
+import { bannerFailureMessage,tileLabel } from './words'
+
 
 
 /*
@@ -98,6 +100,7 @@ function ProjectInner() {
   const [accountsFailed, setAccountsFailed] = useState(false)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [input, setInput] = useState<BannerGenerationInput>(EMPTY_GENERATION_INPUT)
+  const [inputTouched, setInputTouched] = useState(false)
   const [filter, setFilter] = useListUrlValue<Filter>('filter', 'all')
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [distributionOpen, setDistributionOpen] = useState(false)
@@ -251,6 +254,9 @@ function ProjectInner() {
   }, [status, generations, running, runLoop])
 
   const validation = validateGenerationInput(input, maxCount)
+  // 左に［配る］の帯が出ている間は、札を寸法だけの短い形にして左の帯へ重ねない（絵 tSgl6「1040 × 1040」）。
+  const sizePreset = presets.find((preset) => preset.key === input.presetKey)
+  const sizeChipText = selectedImages.length > 0 && sizePreset ? presetSizeLabel(sizePreset) : exportSizeText(presets, input.presetKey)
   const refusal = usageRefusal(usage, input.count)
   const blockedReason = !engineReady
     ? '画像生成の接続設定がまだありません。運営にお問い合わせください'
@@ -591,8 +597,8 @@ function ProjectInner() {
   ) : undefined
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage boardId={boardId} title={project.name} help={description} actions={actions}
-      crumbs={<Breadcrumb appearance="banner" items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
+    <SaveErrorScope errors={saveErrors}><ListPage boardId={boardId} title={project.name} help={description} actions={actions}>
+      {/* ページ内の戻るリンク（プロジェクト一覧 › …）は置かない。戻るは上のパンくずだけ（決まり 2026-10-08）。 */}
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
         <div className={styles.split}>
@@ -657,7 +663,7 @@ function ProjectInner() {
                       <span className={styles.spacer} />
                       {image.deliveredAccountIds.length > 0 ? <span className={styles.pillOk}><span className={styles.dot} aria-hidden="true" />配布済み</span> : null}
                       {canManage ? (
-                        <button type="button" className={styles.star} onClick={() => void toggleImageFavorite(image)} aria-pressed={image.isFavorite} aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}>
+                        <button type="button" data-part="attention-star" className={styles.star} onClick={() => void toggleImageFavorite(image)} aria-pressed={image.isFavorite} aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}>
                           <Star aria-hidden="true" className={image.isFavorite ? styles.starOn : styles.starOff} />
                         </button>
                       ) : null}
@@ -666,6 +672,49 @@ function ProjectInner() {
                 ) })())}
               </div>
             )}
+            {/* 下の帯は左の本文の幅だけに置き、右の生成パネルに重ねない（司令塔 2026-10-15・iMnph）。 */}
+            <StickyBarRegion gap="var(--tpl-hb-gallery-gap)" feedback={blockedReason && input.presetKey && !running && (inputTouched || !validation) ? <p className={styles.warnText}>{blockedReason}</p> : null}>
+            {/* 入力が足りないだけの理由は、開いたばかりでは出さない（触ってから）。接続・アーカイブ・上限はすぐ出す。 */}
+
+            {/* G-6（sr0Po）：左は選んだ画像の配布、右は生成の操作。0枚なら左の帯は出さない。 */}
+            {canManage ? (
+              <StickyBar
+                outlined
+                className={styles.footer}
+                /* 1つの帯（zOpMG）：左に選んだ画像の操作か残りの枚数、右に書き出しの大きさと生成の操作。上限の枚数は右の欄の知らせと title にあるので、帯では1行に収まる短い形。入らない幅では文の切れ目で2行に折る。 */
+                destructive={selectedImages.length > 0 ? <>
+                  <span className={styles.selectionCount} aria-live="polite">{`${selectedImages.length} 枚を選んでいます`}</span>
+                  <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
+                  <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
+                </> : undefined}
+                status={selectedImages.length > 0 ? undefined : running ? `${running.requestedCount}枚中${doneSoFar}枚できました・今月の残り${usage?.month.remaining ?? emptyValue('unknown')}枚` : usage && input.count > usage.month.remaining
+                  ? <span className={styles.limitText} title={`今月の上限 ${usage.month.limit}枚に達しています（必要 ${input.count}枚）`}>今月の上限に達しています<span className={styles.nowrap}>{`（必要 ${input.count}枚）`}</span></span>
+                  : usageStatusText(usage, input.count)}
+                info={sizeChipText ? <ExportSizeChip text={sizeChipText} /> : <span className={styles.generationInfo}>寸法 —</span>}
+                actions={
+                  running ? (
+                    <>
+                      <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる</Button>
+                      {/* key：生成する→生成中で同じボタンを使い回すと、前の言葉の幅のまま固まり文字が切れた（p03ImY）。 */}
+                      <Button key="running" variant="primary" disabled>
+                        <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
+                        生成中… 画面を離れても続きます
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy}>条件をクリア</Button>
+                      <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || starting || Boolean(blockedReason)} busy={starting}>
+                        <Sparkles aria-hidden="true" className={styles.icon} />
+                        {/* 板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。パネルの見出し `S0ay0i`「画像を生成」とは別。 */}
+                        生成する（{input.count} 枚）
+                      </Button>
+                    </>
+                  )
+                }
+              />
+            ) : null}
+            </StickyBarRegion>
           </section>
 
           {canManage ? (
@@ -675,7 +724,7 @@ function ProjectInner() {
                 presets={presets}
                 maxCount={maxCount}
                 value={input}
-                onChange={setInput}
+                onChange={(next) => { setInputTouched(true); setInput(next) }}
                 disabled={Boolean(running) || archived || !engineReady}
                 referenceImages={referenceImages}
                 onPickReference={openPicker}
@@ -691,45 +740,6 @@ function ProjectInner() {
           ) : null}
         </div>
 
-        {blockedReason && input.presetKey && !running ? <p className={styles.warnText}>{blockedReason}</p> : null}
-
-        {/* G-6（sr0Po）：左は選んだ画像の配布、右は生成の操作。0枚なら左の帯は出さない。 */}
-        {canManage ? (
-          <StickyBar
-            outlined
-            className={styles.footer}
-            split={{ trailingWidth: 'calc(var(--tpl-hb-panel-w) + var(--tpl-hb-footer-inset))', lead: selectedImages.length > 0 ? <>
-              <span className={styles.selectionCount} aria-live="polite">{`${selectedImages.length} 枚を選んでいます`}</span>
-              <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
-              <span className={styles.spacer} />
-              <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
-            </> : undefined }}
-            info={<span className={styles.generationInfo}>
-              <span>{`今日の残り ${usage?.today.remaining ?? emptyValue('unknown')}枚`}</span>
-              {exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span>寸法 —</span>}
-            </span>}
-            actions={
-              running ? (
-                <>
-                  <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる</Button>
-                  <Button variant="primary" disabled>
-                    <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
-                    生成中… 画面を離れても続きます
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy}>条件をクリア</Button>
-                  <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || starting || Boolean(blockedReason)} busy={starting}>
-                    <Sparkles aria-hidden="true" className={styles.icon} />
-                    {/* 板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。パネルの見出し `S0ay0i`「画像を生成」とは別。 */}
-                    生成する（{input.count} 枚）
-                  </Button>
-                </>
-              )
-            }
-          />
-        ) : null}
       </div>
 
       {distributionOpen ? <SavedDistributionDialog
@@ -821,32 +831,13 @@ function ProjectInner() {
         selected={input.references}
         onClose={() => setPickerOpen(false)}
         onPick={applyReferences}
+        /* UcBQ5：押したその場で参照に入る。窓は×で閉じる。 */
+        onLivePick={(references, picked) => {
+          setReferencePool((prev) => [...picked, ...prev.filter((candidate) => !picked.some((image) => image.id === candidate.id))])
+          setInput((cur) => ({ ...cur, references }))
+        }}
         onUpload={(file) => { setPickerOpen(false); void uploadReference(file) }}
       />
     </ListPage></SaveErrorScope>
-  )
-}
-
-/** 作っている途中の1枚（絵 p03ImY の「作っています…」「待っています」）。 */
-function PendingTile({ running, label }: { running: boolean; label: string }) {
-  return (
-    <article className={styles.tile} role="status" aria-live="polite">
-      <div className={`${styles.tileImage} ${styles.pending}`}>
-        <Hourglass aria-hidden="true" className={styles.pendingIcon} />
-        <span className={styles.pendingText}>{running ? '作っています…' : '待っています'}</span>
-      </div>
-      <div className={styles.tileMeta}><span className={styles.metaText}>{label}</span></div>
-    </article>
-  )
-}
-
-/** 画像の1枚。読めない画像は壊れた印を出さず、地の色のままにする。 */
-function Thumb({ image }: { image: BannerImage }) {
-  const [failed, setFailed] = useState(false)
-  return (
-    <span className={styles.thumb}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {!failed ? <img src={image.media.url} alt="" loading="lazy" onError={() => setFailed(true)} /> : null}
-    </span>
   )
 }

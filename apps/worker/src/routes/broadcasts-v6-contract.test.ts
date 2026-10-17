@@ -181,13 +181,27 @@ describe('V6 broadcast data contracts', () => {
     };
     expect(body.data.audience).toMatchObject({ matched: 3, sendable: 1 });
     expect(body.data.audience.representatives).toHaveLength(1);
-    expect(body.data.exclusions).toMatchObject({ blocked: 1, hidden: 1, total: 2, paused: null });
+    expect(body.data.exclusions).toMatchObject({ blocked: 1, hidden: 1, total: 2, paused: 0 });
     expect(body.data.quota).toEqual({
       monthlyUsed: 1213, monthlyLimit: 5000, remaining: 3787, planned: 1, state: 'available', reason: null,
     });
     expect(body.data.concurrentBroadcasts).toHaveLength(1);
     expect(body.data.conditionAxes.standard).toHaveLength(15);
     expect(body.data.conditionAxes.broadcastOnly).toHaveLength(6);
+  });
+
+  it('637後の送信前確認は停止者を人で数え、送る人数・枠・案内へ反映する', async () => {
+    for (const id of ['ready','stop','unknown']) insertFriend(testDb.raw,id,{line_account_id:'account-1'});
+    testDb.raw.exec(`INSERT INTO friend_delivery_consents(line_account_id,friend_id,purpose,state,reason,source) VALUES
+      ('account-1','stop','marketing','revoked','本人希望','manual'),
+      ('account-1','stop','news','unknown','未確認','manual'),
+      ('account-1','unknown','marketing','unknown','未確認','manual')`);
+    const response=await app(testDb.db).request('/api/broadcasts/preflight',json('POST',{targetType:'all',lineAccountId:'account-1'}));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({success:true,data:{audienceCount:1,consentExcluded:2,
+      audience:{matched:3,sendable:1,representatives:[{friendId:'ready'}]},
+      exclusions:{paused:2,total:2},quota:{planned:1},
+      warnings:expect.arrayContaining([{level:'info',message:'配信を止めている 2 人には送りません。'}])}});
   });
 
   it('一覧とKPIは担当テナントだけを集計し、statsを配信IDとして扱わない', async () => {

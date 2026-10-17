@@ -6,6 +6,7 @@ import LoadingView from './components/LoadingView.js';
 // 画面ごとに束を分ける。開いた画面のぶんだけ読む。
 const Booking = lazy(() => import('./pages/Booking.js'));
 const BookingHistory = lazy(() => import('./pages/BookingHistory.js'));
+const MyPage = lazy(() => import('./pages/MyPage.js'));
 const Event = lazy(() => import('./pages/Event.js'));
 const EventConfirm = lazy(() => import('./pages/EventConfirm.js'));
 const EventDone = lazy(() => import('./pages/EventDone.js'));
@@ -46,6 +47,10 @@ export default function App() {
     return <Navigate to={{ pathname: `/research/${encodeURIComponent(search.get('researchId')!)}`, search: location.search }} replace />;
   }
 
+  if (location.pathname === '/' && search.get('page') === 'mypage') {
+    return <Navigate to={{ pathname: '/mypage', search: location.search }} replace />;
+  }
+
   if (location.pathname === '/' && search.get('page') === 'restaurant' && search.get('token')) {
     return <Navigate to={{ pathname: `/restaurant/reserve/${encodeURIComponent(search.get('token')!)}`, search: location.search }} replace />;
   }
@@ -63,6 +68,7 @@ export default function App() {
       <Routes>
         <Route path="/booking" element={<Booking />} />
         <Route path="/booking/history" element={<BookingHistory />} />
+        <Route path="/mypage" element={<MyPage />} />
         <Route path="/events/me" element={<EventBookings />} />
         <Route path="/events/:id/confirm" element={<EventConfirm />} />
         <Route path="/events/:id/done" element={<EventDone />} />

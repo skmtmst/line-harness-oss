@@ -105,7 +105,13 @@ export interface HqRichMenuDefinition {
       areas: Array<{
         id: string; bounds: {x:number;y:number;width:number;height:number};
         actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'; actionData: Record<string,string>;
-        intent?: 'url' | 'text' | 'form' | 'booking' | 'booking_history' | 'visit_stamp' | 'template' | 'switch';
+        intent?: RichMenuAreaIntent;
+        /** Use the receiving account’s uniquely named menu. */
+        bookingMenuName?: string;
+        /** Create an account-owned measured link when distributing a URI action. */
+        useTrackedLink?: boolean;
+        /** actionData field -> common information name in each receiving account. */
+        dataBindings?: Partial<Record<'uri'|'text'|'initial'|'min'|'max',string>>;
         label?: string; tagIds?: string[]; formId?: string; templateId?: string; scenarioId?: string;
       }>;
     }>;

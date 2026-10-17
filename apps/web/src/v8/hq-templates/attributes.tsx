@@ -182,6 +182,8 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
   const folderRows: Folder[] = folders.map((folder, index) => ({ id: folder.id, name: folder.name, kind: 'friend_field', color: folder.color ?? null, parentId: null, displayOrder: index, createdAt: '', updatedAt: '' }))
   const fieldRows = entries.filter((entry): entry is Entry & { detail: Extract<HqFriendAttributeDetail, { template: { template_type: 'friend_field' } }> } => entry.detail.template.template_type === 'friend_field').map((entry) => fieldOf(entry.detail, entry.row.friend_count))
   const markRows = type === 'mark' ? entries.map((entry) => markOf(entry.detail, entry.row.friend_count)) : []
+  /* 対応マーク：受信箱の対応状況（友だち人数）と、記録に残ったマーク変更は別の数（API 組5 の stats）。取れなければ「—」。 */
+  const markStats = stats as unknown as { supportStatus?: import('@/lib/api-feature-wait').HqMarkListStats['supportStatus']; markChanges?: import('@/lib/api-feature-wait').HqMarkListStats['markChanges'] } | null
   const kpis = type === 'friend_field' ? [
     { title: '項目', icon: List, value: status === 'ready' ? stats?.totalTemplates ?? entries.length : null, unit: '件', detail: '使っている —' },
     { title: '入力済みの友だち', icon: Users, value: null, unit: '人', detail: '1つ以上入っている' },
@@ -189,9 +191,9 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     { title: '今月の変更', icon: Pencil, value: null, unit: '件', detail: '追加・名前の変更' },
   ] : [
     { title: 'マーク', icon: Flag, value: status === 'ready' ? stats?.totalTemplates ?? entries.length : null, unit: '種類', detail: entries.some((entry) => entry.row.friend_count == null) ? '使っている —' : `使っている ${entries.filter((entry) => (entry.row.friend_count ?? 0) > 0).length}` },
-    { title: '未対応', icon: CircleDot, value: null, unit: '人', detail: '受信箱の —' },
-    { title: '対応中', icon: Loader, value: null, unit: '人', detail: '担当が付いている' },
-    { title: '過去7日の変更', icon: History, value: null, unit: '回', detail: '手動・自動' },
+    { title: '未対応', icon: CircleDot, value: markStats?.supportStatus?.unhandledFriendCount ?? null, unit: '人', detail: markStats?.supportStatus ? `受信箱の ${markStats.supportStatus.unhandledPercent == null ? '—' : `${markStats.supportStatus.unhandledPercent.toFixed(1)}%`}` : '受信箱の —' },
+    { title: '対応中', icon: Loader, value: markStats?.supportStatus?.inProgressFriendCount ?? null, unit: '人', detail: '担当が付いている' },
+    { title: '過去7日の変更', icon: History, value: markStats?.markChanges?.count ?? null, unit: '回', detail: markStats?.markChanges ? '記録に残った分・手動と自動' : '手動・自動' },
   ]
   const band = <KpiBand data-design="KPIs" className={listStyles.kpis}>{kpis.map((kpi) => <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={13} />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />)}</KpiBand>
   const hostBase: Omit<AttributeListHost<FriendField>, 'items'> = {
