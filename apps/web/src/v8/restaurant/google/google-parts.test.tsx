@@ -3,8 +3,8 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ review: vi.fn(), listReviews: vi.fn(), createPost: vi.fn(), profile: vi.fn(), role: 'owner' }))
-vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { review: fixture.review, listReviews: fixture.listReviews, createPost: fixture.createPost, profile: fixture.profile } }))
+const fixture = vi.hoisted(() => ({ review: vi.fn(), publishReply: vi.fn(), listReviews: vi.fn(), createPost: vi.fn(), profile: vi.fn(), role: 'owner' }))
+vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { review: fixture.review, publishReply: fixture.publishReply, listReviews: fixture.listReviews, createPost: fixture.createPost, profile: fixture.profile } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/google', useSearchParams: () => new URLSearchParams() }))
 import { compareText } from './performance'
@@ -13,6 +13,7 @@ import { PostEditor } from './posts'
 import { ReviewDraft, ReviewsBoard } from './reviews'
 import ProfileBoard from './profile'
 import type { GoogleConnectionData } from '@/lib/restaurant-google-api'
+import { ApiError } from '@/lib/api'
 
 const review = {
   id: 'rv-2', reviewName: 'r', reviewerDisplayName: 'Kenji', starRating: 2, comment: '待ちました。', createTime: '2026-09-30T11:12:00Z', updateTime: null,
@@ -66,6 +67,32 @@ describe('返信を作る：送れない設定のときは送信へ進むボタ�
   it('送れる設定で公開の権限があれば「返信内容を確認する」を出す', async () => {
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
     expect(await screen.findByRole('button', { name: '返信内容を確認する' })).toBeTruthy()
+  })
+  it('返信済みの競合は相手の返信を表示し、再取得に失敗しても再送せず最新を確認できる', async () => {
+    const existingReply = '別の担当者による返信です。'.repeat(15)
+    fixture.publishReply.mockRejectedValue(new ApiError(409, '返信済み', 'already_replied', { existingReply }))
+    const onPublished = vi.fn()
+    render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={onPublished} />)
+    fireEvent.click(await screen.findByRole('button', { name: '返信内容を確認する' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '返信先・内容・個人情報の有無を確認しました' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この内容で返信する' }))
+    expect(await screen.findByText('別の担当者がすでに返信しています。')).toBeTruthy()
+    expect(screen.getByText(new RegExp(existingReply))).toBeTruthy()
+    const confirm = screen.getByRole('button', { name: '返信内容を確認する' }) as HTMLButtonElement
+    expect(confirm.disabled).toBe(true)
+    fireEvent.click(confirm)
+    expect(fixture.publishReply).toHaveBeenCalledTimes(1)
+
+    fixture.review.mockRejectedValueOnce(new Error('取得失敗'))
+    fireEvent.click(screen.getByRole('button', { name: '最新を読み込んで続ける' }))
+    expect(await screen.findByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
+    fixture.review.mockResolvedValue({ success: true, review: { ...review, replyStatus: 'replied', replyComment: existingReply }, store: { id: 's', name: '試験店' }, connection: {} })
+    fireEvent.click(screen.getByRole('button', { name: /もう一度/ }))
+    expect(await screen.findByText(`公開済みの返信：${existingReply}`)).toBeTruthy()
+    expect(screen.queryByText('別の担当者がすでに返信しています。')).toBeNull()
+    expect(screen.queryByRole('button', { name: '返信内容を確認する' })).toBeNull()
+    expect(fixture.publishReply).toHaveBeenCalledTimes(1)
+    expect(onPublished).not.toHaveBeenCalled()
   })
 })
 

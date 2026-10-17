@@ -1,14 +1,14 @@
 category	target	before	after	evidence	owner
 counts	B360-67 items	65/67 (78b06d5cb7)	67/67 implementation; CI status separate	B360-67.tsv; docs/qa/cleanup-u01-1018.tsv	U01
-counts	32 changed product TS/TSX/CSS files vs ff1308a85c	10821 lines / 32 files	9987 lines / 32 files	git show ff1308a85c:path vs HEAD:path; excludes tests/BEHAVIOR	U01
-counts	same 32 product files vs resume base 78b06d5cb7	9953 lines	9987 lines	latest registration flow merged; no physical product-file deletions	U01
+counts	32 changed product TS/TSX/CSS files vs ff1308a85c	10821 lines / 32 files	9989 lines / 32 files	git show ff1308a85c:path vs HEAD:path; excludes tests/BEHAVIOR	U01
+counts	same 32 product files vs resume base 78b06d5cb7	9953 lines	9989 lines	latest registration flow merged; no physical product-file deletions	U01
 scope	PLAN-COVERAGE.tsv primaryBundle=U01	0 rows	0 rows	plan ID U01 is owned by bundle U02; do not conflate IDs with bundles	U02
 scope	LONG-FILES-1018.tsv bundle=U01	0 files	0 files	no assigned >=1500 line file	U01
 guards	delivery.test.tsx source/CSS/px assertions	10 tests (ff1308a85c)	0 tests; pagination behavior added	22->13 test definitions; 10 removed +1 added; existing 12 rendered/behavior tests retained	U01
 guards	permissions/store boundary/error/confirm/reload/unknown-result	existing behavior tests	retained; full suite recorded in QA	docs/qa/cleanup-u01-1018.md; no limits or allowlist entries added	U01
 guards	card-shape-contract sumCard exception	1 obsolete entry	0 (component removed)	shared/card-shape-contract.test.ts; guard itself retained	U01
 guards	design-impact pagination consumers	old consumer list	3 additional actual consumers	orders.tsx/history.tsx/bulk.tsx; coverage maintained	U01
-deferred	B172 settings.tsx stateBadge / reviews.tsx SaveConflictBar	2 findings	2 findings handed to tool owner	U01-G01-HANDOFF.md; common components already used, no rename/permission deletion/allowlist workaround	G01
+guards	B172 settings.tsx stateBadge / reviews.tsx SaveConflictBar	2 findings; previous handoff classification corrected	0 findings / 0 allowances	canonical SaveConflictBand preserves existing reply/reload; shared Google/Instagram status table; /tmp/u01-final-pattern/pattern-audit.md	U01
 deferred	delivery apply/pickStore/disconnect/check/cancel	no API contract	common preparation state; no simulated success	B360 decisions A/B; existing Uber auth/status APIs retained	API owner / command center
 deferred	formal PR release-log number	not assigned	0000 placeholder retained	docs/release-log/unreleased/0000-kenta-cleanup-U01.md; real-number CI pending	command center
 screenshots	1152/1440 states and bottom views	0 current-run evidence	56 conditions / 56 jpg	review/masato-screens/after-1018/; standard browser CI separate	U01
@@ -24,7 +24,7 @@ test-map	apps/web/src/v8/restaurant/google/profile-busy.test.tsx	apps/web/src/v8
 test-map	apps/web/src/v8/restaurant/google/profile-confirm.test.tsx	apps/web/src/v8/restaurant/google/profile-confirm.test.tsx	apps/web/src/v8/restaurant/google/profile-confirm.test.tsx	file retained; behavior/query/text adapted to final shared UI; source-only removal detailed separately	U01
 test-map	apps/web/src/v8/restaurant/google/profile-edit.test.tsx	apps/web/src/v8/restaurant/google/profile-edit.test.tsx	apps/web/src/v8/restaurant/google/profile-edit.test.tsx	file retained; behavior/query/text adapted to final shared UI; source-only removal detailed separately	U01
 test-map	apps/web/src/v8/restaurant/google/profile-hours.test.tsx	apps/web/src/v8/restaurant/google/profile-hours.test.tsx	apps/web/src/v8/restaurant/google/profile-hours.test.tsx	file retained; behavior/query/text adapted to final shared UI; source-only removal detailed separately	U01
-test-map	apps/web/src/v8/settings/delivery/delivery.test.tsx	apps/web/src/v8/settings/delivery/delivery.test.tsx	apps/web/src/v8/settings/delivery/delivery.test.tsx	source-only 10 removed; 12 rendered/behavior retained; 1 pagination added	U01
+test-map	apps/web/src/v8/settings/delivery/delivery.test.tsx	apps/web/src/v8/settings/delivery/delivery.test.tsx	apps/web/src/v8/settings/delivery/delivery.test.tsx	file retained; 13 existing rendered/behavior tests retained, 3 renamed to B360 decision A, 1 preparation-state behavior test added; no source-only tests removed	U01
 test-map	apps/web/src/v8/settings/sns/sns.test.tsx	apps/web/src/v8/settings/sns/sns.test.tsx	apps/web/src/v8/settings/sns/sns.test.tsx	file retained; behavior/query/text adapted to final shared UI; source-only removal detailed separately	U01
 test-removed	注文一覧（kDQHr）のサービス札は1行に3つ並べる	source assertion in delivery.test.tsx	removed; no rename/other-file copy	layout/overlap retained in browser guard; 56 own screenshots; no behavior assertions removed	U01
 test-removed	3枚の中身の余白は器の任意の引数で渡す（絵 kDQHr 14/12・OzHLO 4・h7OeT 0/12）	source assertion in delivery.test.tsx	removed; no rename/other-file copy	layout/overlap retained in browser guard; 56 own screenshots; no behavior assertions removed	U01
@@ -53,3 +53,5 @@ checks	standard browser guard	previously missing V8_SPEED_ENFORCEMENT	28 success
 checks	layout guard / regression defects	base e9b423eb7c	36 overflow conditions 0; 201 comparisons new0 / allowed1 / existing9	205 negative controls pass; list132 / skeleton93 / titles192 pass	U01
 deferred	dashboard JS byte budget	limit 3710688 B	3710736 B; +48 B; budget.passed=false	55 measurements complete; target exceedances0; B288 report policy retained, limit unchanged	U01 / command center
 deferred	base-existing booking/template layout findings	same9 on base e9b423eb7c	same9; no new defects	booking/bookings 3 widths x1; templates/detail 3 widths x2; no allowances added	U07 / command center
+deferred	U01 feature BEHAVIOR documents	SNS Google disconnect / delivery show-more and old CSS/source-test instructions / Google fixed20 and old wording	implementation follows B360; stale descriptions require D02 handoff cleanup	apps/web/src/v8/settings/sns/BEHAVIOR.md Google section; restaurant/delivery/BEHAVIOR.md screen and historical measurement sections; restaurant/google/BEHAVIOR.md API/display sections; no code or tests changed	D02
+test-added	apps/web/src/v8/restaurant/google/google-parts.test.tsx	9 tests	10 tests; already-replied conflict prevents duplicate publication and supports reload failure/retry	19 related files /151 tests pass; existing permissions/write-disabled checks retained; no real requests	U01

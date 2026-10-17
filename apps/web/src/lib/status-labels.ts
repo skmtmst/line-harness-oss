@@ -17,6 +17,22 @@ export function statusLabel(status: string): string {
 
 type StatusTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
 
+/** Google と Instagram の接続状態。同じ接続を設定と SNS で別の言葉にしない。 */
+export const GOOGLE_CONNECTION_STATUS = {
+  connected: { label: '接続済み', tone: 'success' },
+  pending_location: { label: '未接続', tone: 'neutral' },
+  expired: { label: '接続の異常', tone: 'danger' },
+  no_permission: { label: '接続の異常', tone: 'danger' },
+  disconnected: { label: '未接続', tone: 'neutral' },
+} as const satisfies Record<string, { label: string; tone: StatusTone }>
+
+export const INSTAGRAM_CONNECTION_STATUS = {
+  connected: GOOGLE_CONNECTION_STATUS.connected,
+  disconnected: GOOGLE_CONNECTION_STATUS.disconnected,
+  expired: GOOGLE_CONNECTION_STATUS.expired,
+  unconfigured: { label: '未設定', tone: 'neutral' },
+} as const satisfies Record<string, { label: string; tone: StatusTone }>
+
 /** Google ビジネスの投稿の状態（API の値 → 札の言葉と色）。画面では言葉を作らず、この表だけを読む。 */
 export const GOOGLE_POST_STATUS: Record<string, { label: string; tone: StatusTone }> = {
   draft: { label: '下書き', tone: 'neutral' },

@@ -2,7 +2,7 @@
 import { notifySaved } from '@/components/shared/toast'
 import ListToolbar, { ListToolbarSort } from '@/components/shared/list-toolbar'
 import PageSizeSelect from '@/components/shared/page-size-select'
-import SaveConflictBar from '@/components/shared/save-conflict-bar'
+import { isConflictResponse, SaveConflictBand } from '@/components/shared/save-conflict'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import KpiCard from '@/components/shared/kpi-card'
 import Link from '@/components/shared/list-navigation'
@@ -238,6 +238,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       setReview(response.review)
       setText(response.review.replyDraft ?? '')
       setAiGenerated(response.review.replyDraftAiGenerated)
+      setConflict(null)
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
 
@@ -297,7 +298,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
     } catch (err) {
       const fieldFailure = saveErrors.capture(err);
 
-      if (err instanceof ApiError && err.status === 409 && err.code === 'already_replied') {
+      if (isConflictResponse(err) && err.code === 'already_replied') {
         const existing = (err.data as { existingReply?: string } | undefined)?.existingReply
         setConflict(existing ?? '（返信文を読み込めませんでした）')
         setConfirming(false)
@@ -325,7 +326,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
   const alreadyReplied = review.replyStatus === 'published' || review.replyStatus === 'replied' || Boolean(done)
   const pendingConfirm = review.replyStatus === 'pending_confirm'
   const textLength = text.trim().length
-  const canOpenConfirm = canPublish && data.writeEnabled && textLength > 0 && textLength <= 4096 && !alreadyReplied && busy === null
+  const canOpenConfirm = canPublish && data.writeEnabled && textLength > 0 && textLength <= 4096 && !alreadyReplied && conflict === null && busy === null
   const sourceUrl = data.connection.locationMapsUrl
     ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeTitle)}`
 
@@ -359,7 +360,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
   return (
     <SaveErrorScope errors={saveErrors}><>
       {done ? <Notice tone="success">Googleに返信を送信しました。反映を確認できるまで「反映確認中」と表示します。</Notice> : null}
-      {conflict !== null ? <SaveConflictBar message={`別の担当者がすでに返信しています。表示されている返信：「${conflict}」`} actionLabel="最新の内容を読み込む" onAction={() => { setConflict(null); void load() }} /> : null}
+      {conflict !== null ? <SaveConflictBand title="別の担当者がすでに返信しています。" description={`表示されている返信：「${conflict}」。重ねて送信せず、最新の内容を読み込んで確認してください。`} onReload={() => void load()} /> : null}
       {pendingConfirm && !done ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
       <div className={styles.split}>
         <div className={styles.mainColumn}>

@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
+import { GOOGLE_CONNECTION_STATUS } from '@/lib/status-labels'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { errorMessage, formatStampFull, formatYmd } from './format'
 import styles from './google.module.css'
@@ -156,9 +157,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   }
 
   /* 状態は札で出す。理由と直し方は上の帯が書いている。検証環境で外へ送らない注記は検証環境の帯（google.tsx）へ。 */
-  const stateBadge = connection.status === 'connected'
-    ? <StatusBadge tone="success" size="compact">接続済み</StatusBadge>
-    : <StatusBadge tone="danger" size="compact">接続の異常</StatusBadge>
+  const connectionState = GOOGLE_CONNECTION_STATUS[connection.status]
 
   return (
     <SaveErrorScope errors={saveErrors}><>
@@ -170,7 +169,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         <dl className={styles.facts}>
           <div className={styles.factRow}><dt className={styles.factKey}>つないでいるアカウント</dt><dd className={styles.factValue}>{connection.googleAccountEmail ?? emptyValue('unknown')}</dd></div>
           <div className={styles.factRow}><dt className={styles.factKey}>つないだ日</dt><dd className={styles.factValue}>{formatYmd(connection.connectedAt)}</dd></div>
-          <div className={styles.factRow}><dt className={styles.factKey}>状態</dt><dd className={styles.factValue}>{stateBadge}</dd></div>
+          <div className={styles.factRow}><dt className={styles.factKey}>状態</dt><dd className={styles.factValue}><StatusBadge tone={connectionState.tone} size="compact">{connectionState.label}</StatusBadge></dd></div>
         </dl>
         {canManage ? (
           <div className={styles.buttonRowEnd}>

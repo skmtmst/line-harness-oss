@@ -13,7 +13,8 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import StatusBadge from '@/components/shared/status-badge'
+import { GOOGLE_CONNECTION_STATUS, INSTAGRAM_CONNECTION_STATUS } from '@/lib/status-labels'
 import { RowActions } from '@/components/shared/row-actions'
 import { usePageTitle, usePageCrumbs, useHideSettingsNav } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -35,21 +36,6 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  */
 
 /* lucide には Instagram の印が無いので、写真の印（Camera）を使う。 */
-
-const GOOGLE_BADGE: Record<string, { label: string; tone: StatusBadgeTone }> = {
-  connected: { label: '接続済み', tone: 'success' },
-  pending_location: { label: '未接続', tone: 'neutral' },
-  expired: { label: '接続の異常', tone: 'danger' },
-  no_permission: { label: '接続の異常', tone: 'danger' },
-  disconnected: { label: '未接続', tone: 'neutral' },
-}
-
-const IG_BADGE: Record<InstagramConnectionStatus['state'], { label: string; tone: StatusBadgeTone }> = {
-  connected: { label: '接続済み', tone: 'success' },
-  disconnected: { label: '未接続', tone: 'neutral' },
-  expired: { label: '接続の異常', tone: 'danger' },
-  unconfigured: { label: '未設定', tone: 'neutral' },
-}
 
 const IG_CAPABILITIES = ['DM を受信箱で読む・返す', '投稿へのコメントに返す', '投稿を予約する', 'プロフィールのリンクを LINE の友だち追加へ向ける']
 
@@ -156,8 +142,8 @@ export default function SnsSettingsPage() {
     }
   }
 
-  const googleBadgeInfo = googleError || !google ? null : GOOGLE_BADGE[google.connection.status] ?? GOOGLE_BADGE.disconnected
-  const igStatus = igState ? IG_BADGE[igState] : null
+  const googleBadgeInfo = googleError || !google ? null : GOOGLE_CONNECTION_STATUS[google.connection.status] ?? GOOGLE_CONNECTION_STATUS.disconnected
+  const igStatus = igState ? INSTAGRAM_CONNECTION_STATUS[igState] : null
   const googleLocation = google?.connection.locationTitle ?? google?.store.name ?? null
 
   return (
