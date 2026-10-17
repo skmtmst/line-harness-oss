@@ -22,9 +22,7 @@ export function useLiveReorder<T>(items: readonly T[], idOf: (item: T) => string
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
     return next
-    // idOf は毎回作り直されても同じ意味。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, dragId, overId])
+  }, [items, idOf, dragId, overId])
   /** 行が引きずりの下に来た。自分（動かしている行）の上は無視する（行がずれて往復しない）。 */
   const enter = useCallback((id: string) => {
     if (!dragId || id === dragId) return
