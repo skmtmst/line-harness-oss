@@ -336,6 +336,10 @@ describe('B-335 safety regressions', () => {
 
 describe('HQ distribution and provenance', () => {
   test('preflight detects local edits, untouched resources update, edits wait for shop consent', async () => {
+    restaurant();
+    sql.raw.exec(`INSERT INTO rt_store_feature_flags(store_id,feature,enabled,version,created_at,updated_at)
+      VALUES('store','reservation',0,7,1,2),('store','coupon',1,3,1,2)`);
+    const storeFlags = sql.raw.prepare('SELECT * FROM rt_store_feature_flags ORDER BY feature').all();
     await setDefinition([
       template(),
       { ...template('初版'), key: 'hq-second' },
@@ -366,6 +370,7 @@ describe('HQ distribution and provenance', () => {
         })
       ).status,
     ).toBe(200);
+    expect(sql.raw.prepare('SELECT * FROM rt_store_feature_flags ORDER BY feature').all()).toEqual(storeFlags);
     expect(
       sql.raw
         .prepare('SELECT name FROM templates WHERE id=?')
