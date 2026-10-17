@@ -4,7 +4,7 @@
  * 絵の正本は司令塔の作業フォルダ（`V8_DESIGN_DIR`、既定は
  * `/Users/kentakenta/lh-work/design/v8`）にあり、リポジトリには入れない。
  * この道具は、その3つの表を読んで「板ID → 画面の場所・種類・幅」だけを
- * 抜き出した JSON を作る。JSON は版に入れる（契約試験が読む正本）。
+ * 抜き出した JSON を作る。JSON は画面を開くための案内として使い、見た目の合否には使わない。
  *
  * 使い方
  *   node scripts/visual-qa/build-v8-design-map.mjs [--out <JSON>]
@@ -19,7 +19,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BOARD_URLS } from './v8-board-urls.mjs'
-import { buildFrozenMap } from './frozen-v8-design-map.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -30,13 +29,6 @@ const outIndex = args.indexOf('--out')
 const OUT = outIndex >= 0 && args[outIndex + 1]
   ? resolve(ROOT, args[outIndex + 1])
   : join(HERE, 'v8-design-map.json')
-
-const seedPath = join(HERE, 'v8-design-map.json')
-// 固定後は古い台帳を再び重ねない。現在のURL・撮影用データを保って書き出しへ合わせる。
-if (args.includes('--frozen-exports') || (existsSync(seedPath) && JSON.parse(readFileSync(seedPath, 'utf8')).frozenAt)) {
-  buildFrozenMap(seedPath, DESIGN_DIR, OUT)
-  process.exit(0)
-}
 
 /** 表の1行を `|` で割る。見出しと区切り行は捨てる。 */
 function tableRows(text) {

@@ -56,3 +56,16 @@ test('overlapping row controls inside a modal are still detected', async () => {
     assert.equal((await page.evaluate(scanControls)).length, 0)
   } finally { await browser.close() }
 })
+
+test('independent form inputs may use any column count but cannot overlap or block each other', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main data-page-template="create"><input aria-label="名前" style="width:200px"><input aria-label="フォルダ" style="width:200px"></main>')
+    assert.deepEqual(await page.evaluate(scanControls), [])
+    await page.locator('input').last().evaluate(el=>{el.style.marginLeft='-100px'})
+    assert.ok((await page.evaluate(scanControls)).some(f=>f.kind==='control-overlap'))
+    await page.locator('input').last().evaluate(el=>{el.style.marginLeft=''})
+    assert.deepEqual(await page.evaluate(scanControls), [])
+  } finally { await browser.close() }
+})

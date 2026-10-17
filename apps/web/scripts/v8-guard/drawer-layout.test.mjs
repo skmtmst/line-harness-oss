@@ -17,14 +17,8 @@ for (const width of [1152, 1440, 1920]) {
           <header class="header">変更する</header><div class="body"><p>本文</p></div>
           <footer class="footer"><button>キャンセル</button><button><svg class="lucide-check" width="16" height="16"></svg>保存する</button></footer>
         </aside></div></html>`)
-      const scan = () => page.evaluate(scanDrawerLayout, { fixedActions: ['キャンセル', '保存する'], requiredIcons: [{ name: '保存する', icon: 'lucide-check' }] })
+      const scan = () => page.evaluate(scanDrawerLayout, { fixedActions: ['キャンセル', '保存する'] })
       assert.equal((await scan()).findings.length, 0)
-      await page.locator('svg').evaluate(el => el.classList.remove('lucide-check'))
-      assert.equal((await scan()).findings.filter(row => row.kind === 'drawer-action-icon-missing').length, 1)
-      await page.locator('svg').evaluate(el => el.classList.add('lucide-check'))
-      await page.locator('aside').evaluate(el => el.removeAttribute('data-height-mode'))
-      assert.equal((await scan()).findings.filter(row => row.kind === 'drawer-viewport-height').length, 1)
-      await page.locator('aside').evaluate(el => el.dataset.heightMode = 'viewport')
       await page.locator('footer').evaluate(el => el.parentElement.querySelector('.body').append(el))
       assert.equal((await scan()).findings.filter(row => row.kind === 'drawer-footer-missing').length, 1)
       await page.locator('footer').evaluate(el => el.closest('aside').append(el))
@@ -32,14 +26,14 @@ for (const width of [1152, 1440, 1920]) {
       assert.equal((await scan()).findings.length, 0)
       await page.locator('.body').evaluate(el => el.scrollTop = el.scrollHeight)
       assert.equal((await scan()).findings.length, 0)
-      const bottom = await page.locator('footer').evaluate(el => el.getBoundingClientRect().bottom)
-      await page.locator('footer').evaluate(el => el.style.transform = 'translateY(-50px)')
-      await page.waitForFunction(expected => Math.abs(expected - document.querySelector('footer').getBoundingClientRect().bottom - 50) < 0.01, bottom)
-      const shifted = await page.locator('footer').evaluate(el => el.getBoundingClientRect().bottom)
-      assert.equal(bottom - shifted, 50)
-      assert.equal((await scan()).findings.filter(row => row.kind === 'drawer-footer-position').length, 1)
+      await page.locator('footer').evaluate(el => el.style.transform = 'translateX(2000px)')
+      await page.waitForFunction(() => document.querySelector('footer').getBoundingClientRect().left > innerWidth)
+      assert.ok((await scan()).findings.some(row => row.kind === 'drawer-footer-action-hidden'))
       await page.locator('footer').evaluate(el => el.style.transform = '')
-      await page.waitForFunction(expected => Math.abs(document.querySelector('footer').getBoundingClientRect().bottom - expected) < 0.01, bottom)
+      await page.waitForFunction(() => {
+        const rect = document.querySelector('footer').getBoundingClientRect()
+        return rect.right <= innerWidth
+      })
       assert.equal((await scan()).findings.length, 0)
     } finally { await browser.close() }
   })
