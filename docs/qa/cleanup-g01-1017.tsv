@@ -4,9 +4,9 @@ freeze-reviewed	apps/web/scripts/v8-guard/layout-defects-allow.json	外す	G01	�
 freeze-reviewed	apps/web/scripts/v8-guard/blank-gap-allow.json	外す	G01	画面別の空白の許可を廃止	—	—
 freeze-reviewed	apps/web/design/v8-part-values.json	外す	G01	古い写しのpx/色の固定表を廃止	—	—
 freeze-reviewed	scripts/visual-qa/train16-temporary-allowances.json	外す	G01	字句別の一時例外表を廃止	—	—
-freeze-reviewed	apps/web/design/design-impact-baseline.txt	外す/一部引継	G01/U02	全利用元の完全一致と共有Button利用元の凍結行を廃止。Button/TableHeader移行試験の3分類はU02の隣接試験本体を触らず引継	apps/web/src/components/shared/{button,table-header}-migration-contract.test.ts	—
+freeze-reviewed	apps/web/design/design-impact-baseline.txt	外す/一部引継	G01/U01/U02	全利用元の完全一致と共有Button利用元の凍結行を廃止。残る3分類は隣接試験本体を触らず、ButtonをU01・TableHeaderをU02へ引継	apps/web/src/components/shared/{button,table-header}-migration-contract.test.ts	—
 freeze-reviewed	apps/web/design/card-shadow-exceptions.json	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す	—	—
-freeze-reviewed	scripts/visual-qa/frozen-v8-1011-routes.json	外す	G01	旧固定版の再生成用地図を廃止。現役のURL/状態データに全27項目が保持されていることを確認	—	—
+freeze-reviewed	scripts/visual-qa/frozen-v8-1011-routes.json	外す	G01	旧固定版の再生成用地図を廃止。現役のURL/状態データに全26項目が保持されていることを確認	—	—
 freeze-reviewed	apps/web/src/lib/screen-css-budget-baseline.json	外す	G01	画面ごとの旧CSS上限を廃止	—	—
 freeze-candidates	.github/workflows/configure-ai-loop-slack-report.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない	—	—
 freeze-candidates	.github/workflows/deploy-cloudflare-admin.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない	—	—
@@ -32,11 +32,11 @@ freeze-candidates	apps/web/scripts/load-failure-reviewed.json	残す	G01	読込�
 freeze-candidates	apps/web/scripts/raw-color-baseline.mjs	混在：固定を外し計測/動きを残す	G01	色/直書きの計測を保持し、基準再生成と固定上限への接続を廃止	—	—
 freeze-candidates	apps/web/scripts/regenerate-v8-design-values.mjs	外す	G01	古い写しの一致値を再生成する口を廃止	—	—
 freeze-candidates	apps/web/scripts/screen-css-budget.mjs	混在：固定を外し計測/動きを残す	G01	旧CSS上限と基準を書き直す口を廃止し計測だけ残す	—	—
-freeze-candidates	apps/web/scripts/v8-guard/action-row-narrow.test.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない	—	—
+freeze-candidates	apps/web/scripts/v8-guard/action-row-narrow.test.mjs	混在：固定を外し計測/動きを残す	G01	狭い時に必ず2段/縦1列/左位置一致という固定の配置を廃止。実物ActionRowの入力同士の重なり・画面の右端越えと故障/復元を保持	—	—
 freeze-candidates	apps/web/scripts/v8-guard/active-modal-audit.test.mjs	混在：固定を外し計測/動きを残す	G01	フォーム欄の列数を固定せず、実際の重なりを故障→復旧で確認	—	—
 freeze-candidates	apps/web/scripts/v8-guard/b244-rules.test.mjs	混在：固定を外し計測/動きを残す	G01	固定位置/印の試験を外し、入力エラーと危険操作の分離の対照を保持	—	—
 freeze-candidates	apps/web/scripts/v8-guard/bar-chart-layout-browser.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない	—	—
-freeze-candidates	apps/web/scripts/v8-guard/blank-gap.mjs	混在：固定を外し計測/動きを残す	G01	空白の実測閾値を保ち、画面ごとの許可表と免除を廃止	—	—
+freeze-candidates	apps/web/scripts/v8-guard/blank-gap.mjs	混在：固定を外し計測/動きを残す	G01	空白量96px/数の帯の下余り24pxだけで失敗させる合否と例外を廃止。CLIは全測定を診断として報告し、測定できなかった時だけ失敗	—	—
 freeze-candidates	apps/web/scripts/v8-guard/button-content-width.test.mjs	混在：固定を外し計測/動きを残す	G01	固定の見た目契約だけ削除。残す描画/動作の試験は継続	—	—
 freeze-candidates	apps/web/scripts/v8-guard/code-size.mjs	混在：固定を外し計測/動きを残す	G01	行数は現在値の計測だけ。初期SHA・個別凍結・400行遮断・更新口を廃止	—	—
 freeze-candidates	apps/web/scripts/v8-guard/code-size.test.mjs	混在：固定を外し計測/動きを残す	G01	固定上限の契約を外し、計測器の単体試験だけ残す	—	—
@@ -57,20 +57,20 @@ freeze-candidates	apps/web/scripts/v8-guard/form-columns.test.mjs	外す	G01	固
 freeze-candidates	apps/web/scripts/v8-guard/form-rules-browser.mjs	混在：固定を外し計測/動きを残す	G01	押せない理由・色の単一選択を保持。文字/固定寸法/札の幅/並び契約を外す	—	—
 freeze-candidates	apps/web/scripts/v8-guard/lane-f-shots.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない	—	—
 freeze-candidates	apps/web/scripts/v8-guard/layer-order.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
-freeze-candidates	apps/web/scripts/v8-guard/layout-defects-browser.mjs	混在：固定を外し計測/動きを残す	G01	短い文字の潰れ・切れ・重なりを保持し、カード間の固定8px契約を外す	—	—
-freeze-candidates	apps/web/scripts/v8-guard/layout-defects.mjs	混在：固定を外し計測/動きを残す	G01	固定許可・採取・基準版の欠陥免除を廃止。固定px/文字検査を集約から外し実際の崩れと入力契約を残す	—	—
-freeze-candidates	apps/web/scripts/v8-guard/layout-defects.test.mjs	混在：固定を外し計測/動きを残す	G01	崩れ検出・終了1・復旧0・可視性の対照を保持し、固定許可と基準版の免除契約を外す	—	—
+freeze-candidates	apps/web/scripts/v8-guard/layout-defects-browser.mjs	混在：固定を外し計測/動きを残す	G01	句読点と文字数だけで本文の折返しを止める判定を廃止し、短い名前/見出し/操作/数値の意味を持つラベルへ対象を限定。切れ/重なり/短い名前の検出閾値は不変。画面別/文言別の許可は追加しない	—	—
+freeze-candidates	apps/web/scripts/v8-guard/layout-defects.mjs	混在：固定を外し計測/動きを残す	G01	空白量だけの固定px合否を崩れの合否から廃止。実際の切れ・重なり・箱のはみ出し・操作の遮断と入力状態の矛盾は保持	—	—
+freeze-candidates	apps/web/scripts/v8-guard/layout-defects.test.mjs	混在：固定を外し計測/動きを残す	G01	固定の空白量を廃止。自然な本文折返しと、短い名前の実際の折返し故障を区別する対照を追加。切れ/重なり/遮断とCLIの正常→故障→復元を維持	—	—
 freeze-candidates	apps/web/scripts/v8-guard/list-row-height.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
 freeze-candidates	apps/web/scripts/v8-guard/list-skeleton-audit.mjs	混在：固定を外し計測/動きを残す	G01	固定行高・画像寸法・中央配置の対照と例外適用を外し、はみ出しの対照を保持	—	—
 freeze-candidates	apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs	混在：固定を外し計測/動きを残す	G01	固定の内側余白16pxの一致試験を廃止し、実際の切れ/重なり/全文/入力操作を保持	—	—
 freeze-candidates	apps/web/scripts/v8-guard/measure2-common-values.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
 freeze-candidates	apps/web/scripts/v8-guard/owner-rules-browser.mjs	混在：固定を外し計測/動きを残す	G01	色・余白・行高・drawer幅・古いnode契約を外し、実際の箱切れを保持	—	—
 freeze-candidates	apps/web/scripts/v8-guard/owner-rules.test.mjs	混在：固定を外し計測/動きを残す	G01	旧px/色/余白契約を外し、実際の箱切れの故障対照を残す	—	—
-freeze-candidates	apps/web/scripts/v8-guard/panel-blank-browser.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない	—	—
+freeze-candidates	apps/web/scripts/v8-guard/panel-blank-browser.mjs	外す	G01	下の空白64pxだけで落とす旧検出器は合否から切離し、全呼出しが0なので廃止。空白量の診断はblank-gap-browserに保持	—	—
 freeze-candidates	apps/web/scripts/v8-guard/pendec2-rules-browser.mjs	混在：固定を外し計測/動きを残す	G01	カードのはみ出し・名前なしの操作・選択状態を残し、色/影/18px/旧文言/枠の形を外す	—	—
 freeze-candidates	apps/web/scripts/v8-guard/pendec2-rules.test.mjs	混在：固定を外し計測/動きを残す	G01	旧px/色/影/文言契約を外し、カードのはみ出しと単一選択の故障対照を残す	—	—
 freeze-candidates	apps/web/scripts/v8-guard/record-columns.test.mjs	混在：固定を外し計測/動きを残す	G01	固定の見た目契約だけ削除。残す描画/動作の試験は継続	—	—
-freeze-candidates	apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
+freeze-candidates	apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs	混在：固定を外し計測/動きを残す	G01	旧px/色/文字の太さ/影の固定は廃止。実際のEntityPickerを開いて取り消しても別のField入力を保つ動作試験は残す	—	—
 freeze-candidates	apps/web/scripts/v8-guard/speed-budget.json	残す	G01	速度・測定条件・欠測/途中結果の拒否。レイアウトの固定px検査ではない。予算と回数は不変	—	—
 freeze-candidates	apps/web/scripts/v8-guard/speed-budget.mjs	残す	G01	速度・測定条件・欠測/途中結果の拒否。レイアウトの固定px検査ではない。予算と回数は不変	—	—
 freeze-candidates	apps/web/scripts/v8-guard/speed-budget.test.mjs	残す	G01	速度・測定条件・欠測/途中結果の拒否。レイアウトの固定px検査ではない。予算と回数は不変	—	—
@@ -158,7 +158,7 @@ freeze-candidates	apps/web/src/components/webinars/webinar-publish-flow-contract
 freeze-candidates	apps/web/src/lib/broadcast-template.test.ts	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持	—	converts a text template into a broadcast bubble / keeps a content template reference in the selected bubble / pins research choices and tap extras to the published version, including when a draft exists / uses raw Flex JSON as the legacy message content / rejects malformed image templates / 1つだけなら渡さない / 2つ以上なら渡す / 空でも渡さない / 位置情報は種別ごと渡す（テキストに落とさない） / スタンプは packageId / stickerId を渡す / 音声は秒をミリ秒に直す / カルーセルは控えた中身そのものを渡す（テンプレートIDではない） / 動画は種別ごと渡す / 書けていない位置情報は空を返す（保存前に画面が止める） / カルーセル素材はカルーセルの列に直す / リッチメッセージはタップ範囲を持つイメージマップに直す / クーポンは使用ボタンつきカードに直す / リサーチはLIFFで回答するボタンに直す / 選んでいない素材は選び直しを求める / 直せない素材は番号ではなく中身の直し方を返す / 直った素材は空文字（問題なし）を返す / 空の名前は番号と項目を指す / 空のURLは番号と項目を指す / https でないURLは https を求める / 2つ目以降も番号で指す / そろっていれば空文字（問題なし）を返す / 5つ目は置けない / LINEの範囲をピクセルのまま保ち、既存のリッチメッセージとして読み込む / カルーセルのボタンの動きを落とさない / 音声のミリ秒を編集用の秒へ戻し、保存時に元の長さへ戻す / LIFF の無いアカウントでは予約などを送らない / 回答フォームは選ぶまで送らない
 freeze-candidates	apps/web/src/lib/card-radius-contract.test.ts	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する	—	カードは12px / 窓は16px / 用途の名前を別のまま残す / 窓の外枠がカードの角丸を使っていない
 freeze-candidates	apps/web/src/lib/design-debt.test.ts	混在：固定を外し計測/動きを残す	G01	ファイル別宣言数の上限を廃止し、表示制御が効かない危険と解析器の試験を保持	—	—
-freeze-candidates	apps/web/src/lib/design-impact.test.ts	混在：固定を外し計測/動きを残す	G01	全利用元の固定リスト一致を廃止。import解析の基本試験を保持、隣の移行試験用データはU02へ	—	—
+freeze-candidates	apps/web/src/lib/design-impact.test.ts	混在：固定を外し計測/動きを残す	G01	全利用元/実入口/実ファイルへの固定の静的契約を廃止。ソースを読まない行の解析の既存試験だけ保持し、診断処理の本体は変更しない	—	—
 freeze-candidates	apps/web/src/lib/design-token-contract.test.ts	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する	—	文字の段は設計の10段と一致する / 角丸は設計にある値だけを使う / 役割ごとの角丸がトークンとして存在する / V6の18pxをTailwind既定の rounded-lg へ流し込まない / 同じ系統の中に、同じ値のトークンを2つ置かない / V6 の別系統トークンを残さない / 主ボタンは accent-deep の地に白文字を乗せる / 共通ボタンは現在のV8の高さ・余白・文字を使う
 freeze-candidates	apps/web/src/lib/direct-values.test.ts	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す	—	—
 freeze-candidates	apps/web/src/lib/load-failure-audit.test.ts	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持	—	an error reset does not excuse converting failure to ready / a scoped allowance cannot excuse edits or extra copies / an error state name alone cannot approve a newly introduced empty failure branch / successful empty and loading reset are not failure branches / the full app and v8 trees contain no unapproved empty failure branches
@@ -288,11 +288,11 @@ freeze-candidates	scripts/visual-qa/split-design-html.mjs	混在：固定を外�
 freeze-candidates	scripts/visual-qa/sync-v8-design-refs.mjs	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない	—	—
 freeze-candidates	scripts/visual-qa/title-audit.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持	—	—
 freeze-candidates	scripts/visual-qa/title-audit.test.ts	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持	—	—
-freeze-candidates	scripts/visual-qa/v8-design-map.json	混在：固定を外し計測/動きを残す	G01	現役の撮影URL/状態データは保持。廃止した凍結版の再生成元参照を外す（27項目は現役地図に同じ値で保持済み）	—	—
+freeze-candidates	scripts/visual-qa/v8-design-map.json	混在：固定を外し計測/動きを残す	G01	現役の撮影URL/状態データは保持。廃止した凍結版の再生成元参照を外す（26項目は現役地図に同じ値で保持済み）	—	—
 freeze-candidates	scripts/visual-qa/v8-pattern-audit.test.ts	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない	—	—
 freeze-candidates	scripts/visual-qa/v8-pattern-catalog.json	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない	—	—
 G02-diff	.github/workflows/required-pr-gate.yml:683	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	          node apps/web/scripts/v8-guard/dialog-description-band-fixture.mjs	apps/web/scripts/v8-guard/dialog-description-band-fixture.mjs
-G02-diff	.github/workflows/required-pr-gate.yml:684	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/form-columns.test.mjs apps/web/scripts/v8-guard/create-consistency.test.mjs apps/web/scripts/v8-guard/create-footer-choices.test.mjs apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs apps/web/scripts/v8-guard/create-preview-layout.test.mjs apps/web/scripts/v8-guard/affixed-input-layout.test.mjs apps/web/scripts/v8-guard/shift-entry-layout.test.mjs apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs apps/web/scripts/v8-guard/action-row-narrow.test.mjs apps/web/scripts/v8-guard/button-content-width.test.mjs apps/web/scripts/v8-guard/automation-field-error.test.mjs apps/web/scripts/v8-guard/fix-patterns.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/layer-order.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/list-row-height.test.mjs apps/web/scripts/v8-guard/dialog-layout.test.mjs apps/web/scripts/v8-guard/dialog-description-band.test.mjs apps/web/scripts/v8-guard/create-input-layout.test.mjs apps/web/scripts/v8-guard/form-badge-layout.test.mjs apps/web/scripts/v8-guard/form-card-header.test.mjs apps/web/scripts/v8-guard/table-column-alignment.test.mjs apps/web/scripts/v8-guard/visual-state.test.mjs apps/web/scripts/v8-guard/required-badge.test.mjs apps/web/scripts/v8-guard/bar-chart-layout.test.mjs apps/web/scripts/v8-guard/reservation-reading.test.mjs apps/web/scripts/v8-guard/dialog-actions.test.mjs apps/web/scripts/v8-guard/dialog-settings.test.mjs apps/web/scripts/v8-guard/dialog-content.test.mjs apps/web/scripts/v8-guard/input-retention.test.mjs apps/web/scripts/v8-guard/dialog-choice-audit.test.mjs apps/web/scripts/v8-guard/record-columns.test.mjs apps/web/scripts/v8-guard/drawer-layout.test.mjs	apps/web/scripts/v8-guard/affixed-input-layout.test.mjs,apps/web/scripts/v8-guard/shift-entry-layout.test.mjs,apps/web/scripts/v8-guard/create-consistency.test.mjs,apps/web/scripts/v8-guard/create-preview-layout.test.mjs,apps/web/scripts/v8-guard/dialog-actions.test.mjs,apps/web/scripts/v8-guard/dialog-content.test.mjs,apps/web/scripts/v8-guard/form-card-header.test.mjs,apps/web/scripts/v8-guard/form-columns.test.mjs,apps/web/scripts/v8-guard/create-input-layout.test.mjs,apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs,apps/web/scripts/v8-guard/layer-order.test.mjs,apps/web/scripts/v8-guard/list-row-height.test.mjs,apps/web/scripts/v8-guard/required-badge.test.mjs,apps/web/scripts/v8-guard/form-badge-layout.test.mjs,apps/web/scripts/v8-guard/dialog-description-band.test.mjs,apps/web/scripts/v8-guard/dialog-settings.test.mjs,apps/web/scripts/v8-guard/dialog-choice-audit.test.mjs
+G02-diff	.github/workflows/required-pr-gate.yml:684	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/form-columns.test.mjs apps/web/scripts/v8-guard/create-consistency.test.mjs apps/web/scripts/v8-guard/create-footer-choices.test.mjs apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs apps/web/scripts/v8-guard/create-preview-layout.test.mjs apps/web/scripts/v8-guard/affixed-input-layout.test.mjs apps/web/scripts/v8-guard/shift-entry-layout.test.mjs apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs apps/web/scripts/v8-guard/action-row-narrow.test.mjs apps/web/scripts/v8-guard/button-content-width.test.mjs apps/web/scripts/v8-guard/automation-field-error.test.mjs apps/web/scripts/v8-guard/fix-patterns.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/layer-order.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/list-row-height.test.mjs apps/web/scripts/v8-guard/dialog-layout.test.mjs apps/web/scripts/v8-guard/dialog-description-band.test.mjs apps/web/scripts/v8-guard/create-input-layout.test.mjs apps/web/scripts/v8-guard/form-badge-layout.test.mjs apps/web/scripts/v8-guard/form-card-header.test.mjs apps/web/scripts/v8-guard/table-column-alignment.test.mjs apps/web/scripts/v8-guard/visual-state.test.mjs apps/web/scripts/v8-guard/required-badge.test.mjs apps/web/scripts/v8-guard/bar-chart-layout.test.mjs apps/web/scripts/v8-guard/reservation-reading.test.mjs apps/web/scripts/v8-guard/dialog-actions.test.mjs apps/web/scripts/v8-guard/dialog-settings.test.mjs apps/web/scripts/v8-guard/dialog-content.test.mjs apps/web/scripts/v8-guard/input-retention.test.mjs apps/web/scripts/v8-guard/dialog-choice-audit.test.mjs apps/web/scripts/v8-guard/record-columns.test.mjs apps/web/scripts/v8-guard/drawer-layout.test.mjs	apps/web/scripts/v8-guard/shift-entry-layout.test.mjs,apps/web/scripts/v8-guard/create-consistency.test.mjs,apps/web/scripts/v8-guard/create-preview-layout.test.mjs,apps/web/scripts/v8-guard/dialog-actions.test.mjs,apps/web/scripts/v8-guard/dialog-content.test.mjs,apps/web/scripts/v8-guard/form-card-header.test.mjs,apps/web/scripts/v8-guard/form-columns.test.mjs,apps/web/scripts/v8-guard/create-input-layout.test.mjs,apps/web/scripts/v8-guard/layer-order.test.mjs,apps/web/scripts/v8-guard/list-row-height.test.mjs,apps/web/scripts/v8-guard/required-badge.test.mjs,apps/web/scripts/v8-guard/form-badge-layout.test.mjs,apps/web/scripts/v8-guard/dialog-description-band.test.mjs,apps/web/scripts/v8-guard/dialog-settings.test.mjs,apps/web/scripts/v8-guard/dialog-choice-audit.test.mjs
 G02-diff	.github/workflows/required-pr-gate.yml:705	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	        run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv	scripts/visual-qa/title-audit.mjs
 G02-diff	.github/workflows/required-pr-gate.yml:747	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	"          node apps/web/scripts/v8-guard/render-fonts.mjs < ""$RICH_MENU_FONT_INPUT"" > ""$RICH_MENU_FONT_OUTPUT"""	apps/web/scripts/v8-guard/render-fonts.mjs
 G02-diff	.github/workflows/required-pr-gate.yml:748	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	          node --test apps/web/scripts/v8-guard/rich-menu-template-fonts.test.mjs	apps/web/scripts/v8-guard/rich-menu-template-fonts.test.mjs
@@ -310,15 +310,16 @@ implementation	apps/web/scripts/raw-color-baseline.mjs	固定を外す/実測・
 implementation	apps/web/scripts/regenerate-v8-design-values.mjs	外す	G01	古い写しの一致値を再生成する口を廃止	—	—
 implementation	apps/web/scripts/screen-css-budget.mjs	固定を外す/実測・動作・純計算を保持	G01	旧CSS上限と基準を書き直す口を廃止し計測だけ残す	—	—
 implementation	apps/web/scripts/v8-card-shadow.mjs	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す	—	—
+implementation	apps/web/scripts/v8-guard/action-row-narrow.test.mjs	固定を外す/実測・動作・純計算を保持	G01	狭い時に必ず2段/縦1列/左位置一致という固定の配置を廃止。実物ActionRowの入力同士の重なり・画面の右端越えと故障/復元を保持	—	—
 implementation	apps/web/scripts/v8-guard/active-modal-audit.test.mjs	固定を外す/実測・動作・純計算を保持	G01	フォーム欄の列数を固定せず、実際の重なりを故障→復旧で確認	—	—
 implementation	apps/web/scripts/v8-guard/affixed-input-layout-browser.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続	—	—
-implementation	apps/web/scripts/v8-guard/affixed-input-layout.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続	—	—
+implementation	apps/web/scripts/v8-guard/affixed-input-layout.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定36pxの高さと旧nodeの照合を廃止。接頭辞付き欄の入力・読取専用・無効の状態の動作確認は保持	—	—
 implementation	apps/web/scripts/v8-guard/b244-rules-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	入力の必須/任意・エラー理由と危険操作の分離を保持。固定の件数位置と印を外す	—	—
 implementation	apps/web/scripts/v8-guard/b244-rules.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定位置/印の試験を外し、入力エラーと危険操作の分離の対照を保持	—	—
 implementation	apps/web/scripts/v8-guard/blank-gap-allow.json	外す	G01	画面別の空白の許可を廃止	—	—
-implementation	apps/web/scripts/v8-guard/blank-gap.README.md	固定を外す/実測・動作・純計算を保持	G01	廃止した空白許可表の案内を外す	—	—
-implementation	apps/web/scripts/v8-guard/blank-gap.mjs	固定を外す/実測・動作・純計算を保持	G01	空白の実測閾値を保ち、画面ごとの許可表と免除を廃止	—	—
-implementation	apps/web/scripts/v8-guard/blank-gap.test.mjs	固定を外す/実測・動作・純計算を保持	G01	空白実測の境界を保持し、許可で通す契約を外す	—	—
+implementation	apps/web/scripts/v8-guard/blank-gap.README.md	固定を外す/実測・動作・純計算を保持	G01	空白量は診断だけと明示し、旧固定px合否と例外運用の説明を廃止	—	—
+implementation	apps/web/scripts/v8-guard/blank-gap.mjs	固定を外す/実測・動作・純計算を保持	G01	空白量96px/数の帯の下余り24pxだけで失敗させる合否と例外を廃止。CLIは全測定を診断として報告し、測定できなかった時だけ失敗	—	—
+implementation	apps/web/scripts/v8-guard/blank-gap.test.mjs	固定を外す/実測・動作・純計算を保持	G01	空白量の固定上限を守る契約を廃止。測定結果を捨てず診断として報告する純計算だけ確認	—	—
 implementation	apps/web/scripts/v8-guard/button-content-width.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定の見た目契約だけ削除。残す描画/動作の試験は継続	—	—
 implementation	apps/web/scripts/v8-guard/code-size-baseline.json	外す	G01	個別行数の凍結表を廃止	—	—
 implementation	apps/web/scripts/v8-guard/code-size.mjs	固定を外す/実測・動作・純計算を保持	G01	行数は現在値の計測だけ。初期SHA・個別凍結・400行遮断・更新口を廃止	—	—
@@ -358,14 +359,16 @@ implementation	apps/web/scripts/v8-guard/form-card-header.test.mjs	外す	G01	�
 implementation	apps/web/scripts/v8-guard/form-columns-browser.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
 implementation	apps/web/scripts/v8-guard/form-columns.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
 implementation	apps/web/scripts/v8-guard/form-rules-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	押せない理由・色の単一選択を保持。文字/固定寸法/札の幅/並び契約を外す	—	—
+implementation	apps/web/scripts/v8-guard/form-rules.test.mjs	固定を外す/実測・動作・純計算を保持	G01	押せない理由と単一選択の実際の故障・復旧を確認。pxや色そのものを固定しない	—	—
 implementation	apps/web/scripts/v8-guard/layer-order.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
 implementation	apps/web/scripts/v8-guard/layout-defects-allow.json	外す	G01	画面・幅・文字ごとの欠陥例外を廃止	—	—
 implementation	apps/web/scripts/v8-guard/layout-defects-baseline.json	外す	G01	過去の固定欠陥データを廃止	—	—
-implementation	apps/web/scripts/v8-guard/layout-defects-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	短い文字の潰れ・切れ・重なりを保持し、カード間の固定8px契約を外す	—	—
-implementation	apps/web/scripts/v8-guard/layout-defects.README.md	固定を外す/実測・動作・純計算を保持	G01	現行の崩れ検査と廃止した固定/許可の口を記載	—	—
-implementation	apps/web/scripts/v8-guard/layout-defects.mjs	固定を外す/実測・動作・純計算を保持	G01	固定許可・採取・基準版の欠陥免除を廃止。固定px/文字検査を集約から外し実際の崩れと入力契約を残す	—	—
-implementation	apps/web/scripts/v8-guard/layout-defects.test.mjs	固定を外す/実測・動作・純計算を保持	G01	崩れ検出・終了1・復旧0・可視性の対照を保持し、固定許可と基準版の免除契約を外す	—	—
+implementation	apps/web/scripts/v8-guard/layout-defects-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	句読点と文字数だけで本文の折返しを止める判定を廃止し、短い名前/見出し/操作/数値の意味を持つラベルへ対象を限定。切れ/重なり/短い名前の検出閾値は不変。画面別/文言別の許可は追加しない	—	—
+implementation	apps/web/scripts/v8-guard/layout-defects.README.md	固定を外す/実測・動作・純計算を保持	G01	実際の崩れと、合否を持たない空白量の診断の役割を明示	—	—
+implementation	apps/web/scripts/v8-guard/layout-defects.mjs	固定を外す/実測・動作・純計算を保持	G01	空白量だけの固定px合否を崩れの合否から廃止。実際の切れ・重なり・箱のはみ出し・操作の遮断と入力状態の矛盾は保持	—	—
+implementation	apps/web/scripts/v8-guard/layout-defects.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定の空白量を廃止。自然な本文折返しと、短い名前の実際の折返し故障を区別する対照を追加。切れ/重なり/遮断とCLIの正常→故障→復元を維持	—	—
 implementation	apps/web/scripts/v8-guard/layout-overflow.mjs	固定を外す/実測・動作・純計算を保持	G01	検出条件を変えず故障対照から同じ検出器を呼べるようにする	—	—
+implementation	apps/web/scripts/v8-guard/layout-overflow.test.mjs	固定を外す/実測・動作・純計算を保持	G01	既存の検出器で横はみ出し/右端越え/省略時全文なしの故障→復旧を3幅で確認	—	—
 implementation	apps/web/scripts/v8-guard/list-row-audit.mjs	固定を外す/実測・動作・純計算を保持	G01	一覧の固定色・固定文字・丸の故障対照を外し、実際の切れと全文確認の対照を残す	—	—
 implementation	apps/web/scripts/v8-guard/list-row-height.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
 implementation	apps/web/scripts/v8-guard/list-row-scan.mjs	固定を外す/実測・動作・純計算を保持	G01	一覧の固定文言・青色・丸・列の契約を外し、切れと全文確認を残す	—	—
@@ -375,6 +378,7 @@ implementation	apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs	固定�
 implementation	apps/web/scripts/v8-guard/measure2-common-values.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
 implementation	apps/web/scripts/v8-guard/owner-rules-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	色・余白・行高・drawer幅・古いnode契約を外し、実際の箱切れを保持	—	—
 implementation	apps/web/scripts/v8-guard/owner-rules.test.mjs	固定を外す/実測・動作・純計算を保持	G01	旧px/色/余白契約を外し、実際の箱切れの故障対照を残す	—	—
+implementation	apps/web/scripts/v8-guard/panel-blank-browser.mjs	外す	G01	下の空白64pxだけで落とす旧検出器は合否から切離し、全呼出しが0なので廃止。空白量の診断はblank-gap-browserに保持	—	—
 implementation	apps/web/scripts/v8-guard/pendec2-rules-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	カードのはみ出し・名前なしの操作・選択状態を残し、色/影/18px/旧文言/枠の形を外す	—	—
 implementation	apps/web/scripts/v8-guard/pendec2-rules.test.mjs	固定を外す/実測・動作・純計算を保持	G01	旧px/色/影/文言契約を外し、カードのはみ出しと単一選択の故障対照を残す	—	—
 implementation	apps/web/scripts/v8-guard/record-columns.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定の見た目契約だけ削除。残す描画/動作の試験は継続	—	—
@@ -383,7 +387,7 @@ implementation	apps/web/scripts/v8-guard/required-badge.test.mjs	外す	G01	固�
 implementation	apps/web/scripts/v8-guard/rich-menu-browser-vitest.config.ts	外す	G01	記号の固定pxの契約を廃止。UI隣接の編集・選択の試験はU05に保持	—	—
 implementation	apps/web/scripts/v8-guard/rich-menu-template-fonts.test.mjs	外す	G01	記号の固定pxの契約を廃止。UI隣接の編集・選択の試験はU05に保持	—	—
 implementation	apps/web/scripts/v8-guard/rich-menu-template-preview.test.tsx	外す	G01	記号の固定pxの契約を廃止。UI隣接の編集・選択の試験はU05に保持	—	—
-implementation	apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
+implementation	apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs	固定を外す/実測・動作・純計算を保持	G01	旧px/色/文字の太さ/影の固定は廃止。実際のEntityPickerを開いて取り消しても別のField入力を保つ動作試験は残す	—	—
 implementation	apps/web/scripts/v8-guard/shift-entry-layout-browser.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続	—	—
 implementation	apps/web/scripts/v8-guard/shift-entry-layout.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続	—	—
 implementation	apps/web/scripts/v8-guard/status-steps-layout.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持	—	—
@@ -396,7 +400,7 @@ implementation	apps/web/scripts/verify-design-values.mjs	固定を外す/実測�
 implementation	apps/web/scripts/verify-v8-rule-values.mjs	固定を外す/実測・動作・純計算を保持	G01	固定CSS値のCLI接続を廃止。U02隣接試験の読み取り用APIは持ち主の削除待ち	—	—
 implementation	apps/web/src/lib/b244-source-rules.test.ts	固定を外す/実測・動作・純計算を保持	G01	共通ソース検査の常設案内の固定試験を廃止。入力要件の定義/フック取り違えの故障対照を保持	—	—
 implementation	apps/web/src/lib/design-debt.test.ts	固定を外す/実測・動作・純計算を保持	G01	ファイル別宣言数の上限を廃止し、表示制御が効かない危険と解析器の試験を保持	—	—
-implementation	apps/web/src/lib/design-impact.test.ts	固定を外す/実測・動作・純計算を保持	G01	全利用元の固定リスト一致を廃止。import解析の基本試験を保持、隣の移行試験用データはU02へ	—	—
+implementation	apps/web/src/lib/design-impact.test.ts	固定を外す/実測・動作・純計算を保持	G01	全利用元/実入口/実ファイルへの固定の静的契約を廃止。ソースを読まない行の解析の既存試験だけ保持し、診断処理の本体は変更しない	—	—
 implementation	apps/web/src/lib/direct-values-baseline.json	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す	—	—
 implementation	apps/web/src/lib/direct-values.test.ts	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す	—	—
 implementation	apps/web/src/lib/raw-color-baseline.json	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す	—	—
@@ -404,6 +408,7 @@ implementation	apps/web/src/lib/raw-colors.test.ts	外す	G01	全体の古い色
 implementation	apps/web/src/lib/screen-css-budget-baseline.json	外す	G01	画面ごとの旧CSS上限を廃止	—	—
 implementation	apps/web/src/lib/screen-css-budget.test.ts	外す	G01	旧CSS上限そのものの共通検査。UI隣接試験ではない	—	—
 implementation	apps/web/src/lib/v8-card-shadow-contract.test.ts	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す	—	—
+implementation	docs/release-log/unreleased/0000-kenta-cleanup-g01.md	固定を外す/実測・動作・純計算を保持	G01	G01の反映履歴（司令塔が番号差替え）	—	—
 implementation	package.json	固定を外す/実測・動作・純計算を保持	G01	旧V6画素差検査の実行コマンドを廃止	—	—
 implementation	scripts/visual-qa/README.md	固定を外す/実測・動作・純計算を保持	G01	廃止済の旧撮影/固定地図/固定px再生成の実行案内を現行入口へ更新	—	—
 implementation	scripts/visual-qa/broadcasts-capture-contract.test.ts	固定を外す/実測・動作・純計算を保持	G01	旧板IDの撮影手順を固定する契約を外し、撮影データのアカウント所属試験を残す	—	—
@@ -413,7 +418,7 @@ implementation	scripts/visual-qa/capture-screens.mjs	固定を外す/実測・�
 implementation	scripts/visual-qa/cited-shots.mjs	外す	G01	廃止した旧V6地図/撮影器を呼ぶ実行接続を削除。外部の正式台帳には触れない	—	—
 implementation	scripts/visual-qa/compare-text.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持	—	—
 implementation	scripts/visual-qa/frame-parity.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持	—	—
-implementation	scripts/visual-qa/frozen-v8-1011-routes.json	外す	G01	旧固定版の再生成用地図を廃止。現役のURL/状態データに全27項目が保持されていることを確認	—	—
+implementation	scripts/visual-qa/frozen-v8-1011-routes.json	外す	G01	旧固定版の再生成用地図を廃止。現役のURL/状態データに全26項目が保持されていることを確認	—	—
 implementation	scripts/visual-qa/frozen-v8-design-map.mjs	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持	—	—
 implementation	scripts/visual-qa/frozen-v8-design-map.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持	—	—
 implementation	scripts/visual-qa/ledger-claims.test.ts	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持	—	—
@@ -433,7 +438,7 @@ implementation	scripts/visual-qa/title-audit.test.ts	外す	G01	旧写しのpx/�
 implementation	scripts/visual-qa/train16-temporary-allowances.json	外す	G01	字句別の一時例外表を廃止	—	—
 implementation	scripts/visual-qa/v8-board-id-contract.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持	—	—
 implementation	scripts/visual-qa/v8-design-map-route-contract.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持	—	—
-implementation	scripts/visual-qa/v8-design-map.json	固定を外す/実測・動作・純計算を保持	G01	現役の撮影URL/状態データは保持。廃止した凍結版の再生成元参照を外す（27項目は現役地図に同じ値で保持済み）	—	—
+implementation	scripts/visual-qa/v8-design-map.json	固定を外す/実測・動作・純計算を保持	G01	現役の撮影URL/状態データは保持。廃止した凍結版の再生成元参照を外す（26項目は現役地図に同じ値で保持済み）	—	—
 implementation	scripts/visual-qa/v8-guard-tabfade-contract.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持	—	—
 implementation	scripts/visual-qa/v8-map-exports.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持	—	—
 implementation	scripts/visual-qa/v8-map-generation.test.ts	固定を外す/実測・動作・純計算を保持	G01	実物の旧nodeとタブの完全一致を廃止。与えたURL/queryの維持と未解決URLの拒否を模擬データで検証	—	—
@@ -447,7 +452,101 @@ validation	fault:permission	合格	G01	実際のEntityPickerのreadOnly判定を
 validation	fault:selection	合格	G01	同じ実部品の確定IDをメモリ上で誤IDにすると既存の選択操作試験が失敗(終了1)。通常/復元は合格。UIのソースと試験本体は未変更	G01-validation/fault.config.mts	G01-validation/selection-broken.log;behavior-restored.log
 validation	fault:layout	実行結果は検査記録を参照	G01	1152/1440/1920の文字切れ・ページ横越え・main右端越え、実入力同士の重なり、クリップ、状態矛盾に対し正常→故障→復元を検証	apps/web/scripts/v8-guard/{layout-overflow,active-modal-audit,owner-rules,form-rules,layout-defects}.test.mjs	—
 validation	external-locks	合格	G01	外部鍵/台帳の全332記録のSHA256を開始時と再照合し変更0。値/鍵の内容は転記しない	G01-LOCK-HASHES.tsv	—
-validation	web-tests	合格	G01	管理画面の全2304ファイル/13674試験合格（1skip・1todo）。入力定義の固定案内削除後の対象3試験も別途合格	—	/tmp/g01-web-tests.log;/tmp/g01-b244-tests-final.log
-validation	script-tests	合格	G01	113ファイル/1042試験合格	—	/tmp/g01-root-tests-final.log
-validation	browser-guards	合格	G01	現存するguard全test.mjsと友だち一覧状態をbrowser-hostで実行。116試験合格。正常/故障/復元と実画面の入力保持を含む	—	/tmp/g01-guard-tests-final.log
-validation	typecheck/build	合格	G01	web typecheck・repository scripts typecheck・web build合格。依存のshared/line-sdk/update-engine buildも合格	—	/tmp/g01-web-typecheck.log;/tmp/g01-scripts-typecheck-final.log;/tmp/g01-web-build.log
+G02-diff	.github/workflows/required-pr-gate.yml:fixture-command	接続を差し替える	G02	廃止済みのfixture呼出しを外した上で、この命令に差し替える。active-modal-auditは旧CI命令に無かったので必ず追加し、入力の重なり対照を必須にする	node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/create-footer-choices.test.mjs apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs apps/web/scripts/v8-guard/affixed-input-layout.test.mjs apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs apps/web/scripts/v8-guard/action-row-narrow.test.mjs apps/web/scripts/v8-guard/button-content-width.test.mjs apps/web/scripts/v8-guard/automation-field-error.test.mjs apps/web/scripts/v8-guard/fix-patterns.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/dialog-layout.test.mjs apps/web/scripts/v8-guard/table-column-alignment.test.mjs apps/web/scripts/v8-guard/visual-state.test.mjs apps/web/scripts/v8-guard/bar-chart-layout.test.mjs apps/web/scripts/v8-guard/reservation-reading.test.mjs apps/web/scripts/v8-guard/input-retention.test.mjs apps/web/scripts/v8-guard/record-columns.test.mjs apps/web/scripts/v8-guard/drawer-layout.test.mjs apps/web/scripts/v8-guard/layout-overflow.test.mjs apps/web/scripts/v8-guard/form-rules.test.mjs apps/web/scripts/v8-guard/active-modal-audit.test.mjs	G01-to-G02-proposed.patch
+G02-diff	G01-to-G02-proposed.patch	適用案（未適用）	G02	リポジトリの.githubは未変更。接続の削除案と残存検査への追随をレビューしてG02が適用する。必須ジョブ自体や残存の安全/崩れ/動作/速度は保持	削除済みのfixture 15 件を命令から外す	G01-to-G02-proposed.patch
+validation	B-273:fixed	合格	G01	初回の新しいソース契約103件を、実ファイルと実入口に依存する静的試験の削除で修正。許可追加なし。最終99c1fed249でCIと同じ工程が終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261018-001907-99c1fed249-42958/summary.md	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261018-001907-99c1fed249-42958/repository-checks-06.log
+validation	ci-local:final	全工程を実行（結果は各行）	G01	同じコードSHAのCI YAMLを手元で実行。速度はenforce、LIFFの任意3変数は空。上限・許可・ワークフローは変更していない	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/summary.md	2e702b4db76a8a750b9e861dc270ecf7548bfa5b
+ci-local	changes:2 Protect command-center owned documents	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/changes-02.log	0.02秒
+ci-local	changes:3 Select the required test scope	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/changes-03.log	0.06秒
+ci-local	changes:4 Reject whitespace errors in the PR diff	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/changes-04.log	0.05秒
+ci-local	changes:5 Require a release-log entry	失敗	司令塔	exit 1。指定の#0000は仮番号。PR採番後に司令塔がファイル名と本文を置換する	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/changes-05.log	0.09秒
+ci-local	changes:6 Check shell syntax	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/changes-06.log	0.05秒
+ci-local	changes:7 Check workflow YAML and run-step shell syntax	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/changes-07.log	3.22秒
+ci-local	repository-checks:4 pnpm install --frozen-lockfile	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-04.log	9.85秒
+ci-local	repository-checks:5 Guard shared pattern ownership (B-172)	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-05.log	701.39秒
+ci-local	repository-checks:6 Guard newly added source visual contracts (B-273)	失敗	G01（修正済）	exit 1。修正後99c1fed249の同工程は終了0。validation:B-273:fixedを参照	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-06.log	5.37秒
+ci-local	repository-checks:7 Build shared packages	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-07.log	12.32秒
+ci-local	repository-checks:8 pnpm --filter @line-crm/db check:bootstrap	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-08.log	8.97秒
+ci-local	repository-checks:9 Migration safety check	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-09.log	1.36秒
+ci-local	repository-checks:11 Test the self-update engine	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-11.log	27.67秒
+ci-local	repository-checks:12 Test the setup CLI	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-12.log	2.62秒
+ci-local	repository-checks:13 pnpm test:scripts	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-13.log	11.02秒
+ci-local	repository-checks:14 Typecheck repository scripts	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-14.log	2.2秒
+ci-local	repository-checks:15 Test shared	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-15.log	204.05秒
+ci-local	repository-checks:16 pnpm --filter liff typecheck	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-16.log	3.99秒
+ci-local	repository-checks:17 pnpm --filter liff test	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/repository-checks-17.log	498.56秒
+ci-local	worker-checks:4 pnpm install --frozen-lockfile	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/worker-checks-04.log	9.63秒
+ci-local	worker-checks:5 Build Worker dependencies	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/worker-checks-05.log	48.52秒
+ci-local	worker-checks:6 pnpm --filter worker typecheck	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/worker-checks-06.log	27.64秒
+ci-local	worker-checks:7 pnpm --filter worker test	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/worker-checks-07.log	723.64秒
+ci-local	worker-build:4 pnpm install --frozen-lockfile	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/worker-build-04.log	9.96秒
+ci-local	worker-build:5 Build Worker dependencies	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/worker-build-05.log	11.2秒
+ci-local	worker-build:6 Build Worker	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/worker-build-06.log	17.19秒
+ci-local	worker-build:7 Install browser for deployed LIFF entry guard	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/worker-build-07.log	24.17秒
+ci-local	worker-build:8 Guard customer waitlist entry, theme and short actions (B-247 E3)	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/worker-build-08.log	4.68秒
+ci-local	worker-build:9 Verify LIFF security headers and public SDK compatibility	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/worker-build-09.log	0.97秒
+ci-local	web-checks:4 pnpm install --frozen-lockfile	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-checks-04.log	10.26秒
+ci-local	web-checks:5 Build Admin dependencies	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-checks-05.log	623.66秒
+ci-local	web-checks:6 pnpm --filter web exec next lint --report-unused-disable-directives-severity error	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-checks-06.log	38.39秒
+ci-local	web-checks:7 node apps/web/scripts/verify-entity-pickers.mjs	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-checks-07.log	8.09秒
+ci-local	web-checks:8 Reject restored legacy admin appearance	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-checks-08.log	2.38秒
+ci-local	web-checks:9 pnpm --filter web typecheck	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-checks-09.log	34.47秒
+ci-local	web-checks:10 pnpm --filter web test	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-checks-10.log	267.97秒
+ci-local	web-checks:11 Install Chromium for the webhook runtime contract	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-checks-11.log	21.46秒
+ci-local	web-checks:12 Webhook screen runtime contract on a real browser (#704,	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-checks-12.log	41.97秒
+ci-local	mcp-checks:4 pnpm install --frozen-lockfile	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/mcp-checks-04.log	9.48秒
+ci-local	mcp-checks:5 Build MCP dependencies	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/mcp-checks-05.log	262.53秒
+ci-local	mcp-checks:6 Test the SDK	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/mcp-checks-06.log	2.05秒
+ci-local	mcp-checks:7 pnpm --filter @line-harness/mcp-server typecheck	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/mcp-checks-07.log	3.04秒
+ci-local	mcp-checks:8 pnpm --filter @line-harness/mcp-server test	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/mcp-checks-08.log	282.84秒
+ci-local	mcp-checks:9 pnpm --filter @line-harness/mcp-server build	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/mcp-checks-09.log	0.63秒
+ci-local	docs-checks:4 pnpm install --frozen-lockfile	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/docs-checks-04.log	9.92秒
+ci-local	docs-checks:5 pnpm --filter docs test	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/docs-checks-05.log	442.53秒
+ci-local	web-build:5 pnpm install --frozen-lockfile	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-05.log	9.76秒
+ci-local	web-build:6 Build Admin dependencies	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-06.log	423.4秒
+ci-local	web-build:7 pnpm --filter web build	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-07.log	87.44秒
+ci-local	web-build:8 Install Chromium for the browser behavior tests	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-08.log	21.26秒
+ci-local	web-build:9 Verify media permissions on the built admin	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-09.log	14.0秒
+ci-local	web-build:10 Verify EC import list account-switch behavior on the built admin	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-10.log	9.06秒
+ci-local	web-build:12 LINE notifications real-browser behavior (#678)	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-12.log	8.38秒
+ci-local	web-build:13 Verify archived tag edit behavior on the built admin	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-13.log	5.87秒
+ci-local	web-build:14 MFA auth input and button behavior at three widths	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-14.log	8.6秒
+ci-local	web-build:15 Verify admin security headers and auth interactions	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-15.log	1.07秒
+ci-local	web-build:17 pnpm --filter web verify:design	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-17.log	1.72秒
+ci-local	web-build:18 Install Chromium for browser checks	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-18.log	621.4秒
+ci-local	web-build:19 Admin browser behavior checks	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/web-build-19.log	17.8秒
+ci-local	v8-screen-guard:2 Decide whether to run the screen guard	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-02.log	0.04秒
+ci-local	v8-screen-guard:5 pnpm install --frozen-lockfile	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-05.log	9.98秒
+ci-local	v8-screen-guard:6 Build the PR admin against the visual-qa mock API	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-06.log	146.87秒
+ci-local	v8-screen-guard:7 Build the base admin against the same mock API	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-07.log	101.28秒
+ci-local	v8-screen-guard:8 Install Chromium for the V8 screen guard	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-08.log	21.72秒
+ci-local	v8-screen-guard:9 Start the mock API and serve the built admin	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-09.log	1.42秒
+ci-local	v8-screen-guard:10 No V8 layout breaks at 1152, 1440 and 1920	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-10.log	96.26秒
+ci-local	v8-screen-guard:11 Broken fixtures must fail the V8 layout guard	失敗	G02	exit 1。廃止済み命令の接続。G01-to-G02-proposed.patchを参照	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-11.log	0.1秒
+ci-local	v8-screen-guard:12 Narrow preview opens once and preserves form input	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-12.log	64.9秒
+ci-local	v8-screen-guard:13 Train 17 waitlist failure and inflow mouse regressions	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-13.log	13.24秒
+ci-local	v8-screen-guard:14 Booking preview date agrees through settings and preview tabs	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-14.log	8.76秒
+ci-local	v8-screen-guard:15 No new V8 layout or owner-rule defects (B-191 through B-218)	失敗	G01/該当UI束	exit 1。4件は自然な本文改行の誤判定で修正済み（実画面6条件で確認）。残る2件は初期位置のフッター被覆。スクロール後クリックは成功。例外化せずU05/U02に実測を引継	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-15.log	320.61秒
+ci-local	v8-screen-guard:16 List row rules (B-190/193/194/195/198, with negative controls)	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-16.log	591.35秒
+ci-local	v8-screen-guard:17 All admin page titles are 22px / 700 / 32px at 1440	失敗	G02	exit 1。廃止済み命令の接続。G01-to-G02-proposed.patchを参照	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-17.log	0.1秒
+ci-local	v8-screen-guard:18 Speed measurement and reference policy controls	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-18.log	2.23秒
+ci-local	v8-screen-guard:19 Common V8 speed checks (11 scenes, five medians)	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-19.log	103.37秒
+ci-local	v8-screen-guard:20 Train 17 absolute targets	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-20.log	0.22秒
+ci-local	v8-screen-guard:21 2000 friends meet absolute speed targets	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-21.log	0.1秒
+ci-local	v8-screen-guard:22 PERF-01 fixed list speed targets	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-22.log	0.27秒
+ci-local	v8-screen-guard:23 Report speed reference results (including incomplete measurements)	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-23.log	0.1秒
+ci-local	v8-screen-guard:24 Virtual table selection, keyboard and layout	成功	G01	終了0	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-24.log	14.22秒
+ci-local	v8-screen-guard:25 Rich-menu label font sizes at three widths (m22a)	失敗	G02	exit 1。廃止済み命令の接続。G01-to-G02-proposed.patchを参照	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-25.log	1.35秒
+ci-local	v8-screen-guard:26 Upload V8 screen guard results	成功	G01	ローカル成果物を保存: v8-screen-guard	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/v8-screen-guard-26.log	0.01秒
+ci-local	required-pr-gate:1 Require every selected check to pass	失敗	G02/司令塔	exit 1。失敗した接続とPR採番の後で再検証する	/Users/kentakenta/lh-work/tools/hq/ci-local/logs/20261017-230256-2e702b4db7-75260/required-pr-gate-01.log	0.03秒
+meta	changes-after-full-ci	対象を再確認	G01	CI開始後はActionRowの固定配置試験と参照元計算の静的契約を整理し、説明文を短いラベルと誤る判定を意味のあるDOM属性で修正。全ブラウザ114試験・実画面6条件・ビルドを再確認。閾値や画面別許可は追加しない	2ac20122d3cd366e01accdb32e5c862db5646243	G01-validation/browser-guards-final.log
+validation	script-tests:final	合格	G01	113ファイル/1042試験。固定検査整理後に実行。以後のブラウザ検査変更は114試験と実画面6条件で再確認	G01-validation/script-tests-final.log	—
+validation	browser-guards:final	合格	G01	114試験。残存guard全test.mjsと友だち一覧状態、実部品の入力/キャンセル、正常→故障→復元を実行	G01-validation/browser-guards-final.log	—
+validation	import-resolution:final	合格	G01	実利用元と入口のソース契約を廃止後、行解析1試験とB-273・型検査を確認	G01-validation/import-resolution-final.log	~/lh-work/tools/hq/ci-local/logs/20261018-001907-99c1fed249-42958/summary.md
+validation	prose-wrap:actual-routes	合格	G01	説明文とメッセージ本文は自然な改行を許容。1152/1440/1920の実画面6条件で誤判定0。名前・見出し・ラベルの折返し対照は落ちる	G01-validation/prose-wrap-real-routes.json	—
+UI-handoff	auto-reply-holiday-control:1440	表示領域の判断を引継	U05/U02	初期位置では祝日の扱いの中心が追従フッターに覆われる。スクロール後のクリックは成功し検出0。機能停止とは断定せずUI側で表示領域の扱いを判断。ページ別例外は追加しない。クリック結果: success	G01-validation/holiday-control-probe.json	G01-validation/holiday-control-1440-initial.png
+UI-handoff	auto-reply-holiday-control:1920	表示領域の判断を引継	U05/U02	初期位置では祝日の扱いの中心が追従フッターに覆われる。スクロール後のクリックは成功し検出0。機能停止とは断定せずUI側で表示領域の扱いを判断。ページ別例外は追加しない。クリック結果: success	G01-validation/holiday-control-probe.json	G01-validation/holiday-control-1920-initial.png
+validation	whitespace-acceptance	廃止（診断のみ）	G01	空白量だけのpx上限は固定の見た目検査と判断して廃止。測定器の閾値を上げず、測定不能は失敗のまま	apps/web/scripts/v8-guard/blank-gap.mjs	—
+validation	G02-proposal	合格	G01	適用案にgit apply --checkが通ることを確認。リポジトリの.githubは未変更	G01-to-G02-proposed.patch	—
+validation	scope	合格	G01	本体のAPI・DB・Worker・LIFF・画面・共通部品・隣接試験本体と.githubの差分0。DB適用・配備・push・PRは未実施	—	—
+meta	safe-base-ancestors	包含確認	G01	指定本線546a36de5cに安全修正3コミットを含む	a57806183e;889b698eab;3149f517cb	—
