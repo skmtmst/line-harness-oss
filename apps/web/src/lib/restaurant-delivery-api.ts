@@ -246,6 +246,17 @@ export interface UberConnectionData {
   }
 }
 
+export interface UberStoresData {
+  success: true
+  /** ログインした人が管理しているお店。`DeliveryStore` と同じ形で選び口へ渡す。 */
+  stores: Array<{ id: string; name: string; address: string }>
+}
+
+export interface UberStoreSelectData {
+  success: true
+  connection: UberConnectionData['connection']
+}
+
 export interface UberConnectStartData {
   success: true
   mode: 'connect' | 'reconnect'
@@ -424,5 +435,24 @@ export const restaurantDeliveryApi = {
       withAccount(`${BASE}/ubereats/connect/start`, accountId),
       { method: 'POST', body: '{}' },
     )
+  },
+
+  /**
+   * DL-4 `X5d8UF`「つなぐお店を選んでください」の候補。
+   * Uber へ問い合わせるので、選び口を開くときだけ呼ぶ（画面を開くたびには呼ばない）。
+   */
+  ubereatsStores(accountId: string): Promise<UberStoresData> {
+    return fetchApi<UberStoresData>(withAccount(`${BASE}/ubereats/stores`, accountId))
+  },
+
+  /**
+   * DL-4 `X5d8UF`「このお店につなぐ」。ここで Uber 側の連携が有効になる。
+   * 結果が分からないまま押し直すと連携が重なるため、自動では送り直さない。
+   */
+  ubereatsSelectStore(accountId: string, storeId: string): Promise<UberStoreSelectData> {
+    return fetchApi<UberStoreSelectData>(withAccount(`${BASE}/ubereats/stores/select`, accountId), {
+      method: 'POST',
+      body: JSON.stringify({ storeId }),
+    })
   },
 }

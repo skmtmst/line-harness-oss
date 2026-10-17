@@ -18,7 +18,7 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
  */
 import { Hono } from 'hono';
 import type { Context, MiddlewareHandler } from 'hono';
-import { CredentialEncryptionKeyError, encryptCredential } from '@line-crm/db';
+import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -30,8 +30,11 @@ import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import { randomToken } from '../services/google-business.js';
 import {
   UberEatsError,
+  activatePosIntegration as activateUberPosIntegration,
   buildAuthorizeUrl as buildUberAuthorizeUrl,
   exchangeAuthorizationCode as exchangeUberAuthorizationCode,
+  listStores as listUberStores,
+  tokenNeedsRenewal as uberTokenNeedsRenewal,
 } from '../services/uber-eats.js';
 import { UBER_PROVISIONING_SCOPES } from '../services/uber-eats-hosts.js';
 import { verifySupportRelay } from '../services/support-relay.js';
@@ -2146,6 +2149,287 @@ restaurantDelivery.get(
       console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
       return c.redirect(uberReturnUrl(c, lineAccountId, `error:${code_}`));
     }
+  },
+);
+
+/* ---------------- つなぐお店を選ぶ（設計 DL-4 / フレーム `X5d8UF`） ---------------- */
+
+/** 保存した加盟店トークンの読み戻しに失敗したときの理由。画面にはこの符号だけを渡す。 */
+type UberTokenFailure = 'not_connected' | 'auth_expired' | 'encryption_key_missing';
+
+const UBER_TOKEN_FAILURE_MESSAGES: Record<UberTokenFailure, string> = {
+  not_connected: 'まだ Uber Eats にログインしていません',
+  auth_expired: 'Uber Eats のログインの有効期限が切れました。もう一度つないでください',
+  encryption_key_missing: 'Uber Eats 接続の設定がこの環境にありません',
+};
+
+interface UberTokenRow {
+  access_token_enc: string | null;
+  access_token_expires_at: number | null;
+  status: UberConnectionRow['status'];
+}
+
+/** 失敗の理由を分類済みの符号だけで残す。必要なときは状態も進める。 */
+async function uberMarkConnectionError(
+  c: Context<Env>,
+  storeId: string,
+  code: string,
+  status?: UberConnectionRow['status'],
+): Promise<void> {
+  const db = dbFor(c.env, storeId);
+  const now = Date.now();
+  if (status) {
+    await db
+      .prepare(
+        `UPDATE rt_delivery_uber_connections
+            SET last_error = ?, status = ?, version = version + 1, updated_at = ?
+          WHERE store_id = ?`,
+      )
+      .bind(code, status, now, storeId)
+      .run();
+    return;
+  }
+  await db
+    .prepare('UPDATE rt_delivery_uber_connections SET last_error = ?, updated_at = ? WHERE store_id = ?')
+    .bind(code, now, storeId)
+    .run();
+}
+
+/**
+ * 保存した加盟店のトークン（権限は `eats.pos_provisioning`）を読み戻す。
+ *
+ * Uber は更新用トークンを返さないため、期限が近い・切れているときは裏で取り直せない。
+ * その場合は `expired` にして、画面からもう一度ログインしてもらう。
+ * 返すのは復号した値そのものだけで、呼び出し側は応答にも記録にも載せない。
+ */
+async function uberMerchantToken(
+  c: Context<Env>,
+  storeId: string,
+): Promise<{ ok: true; token: string } | { ok: false; code: UberTokenFailure }> {
+  const row = await dbFor(c.env, storeId)
+    .prepare(
+      `SELECT access_token_enc, access_token_expires_at, status
+         FROM rt_delivery_uber_connections WHERE store_id = ? LIMIT 1`,
+    )
+    .bind(storeId)
+    .first<UberTokenRow>();
+  if (!row?.access_token_enc || row.status === 'disconnected') {
+    return { ok: false, code: 'not_connected' };
+  }
+  if (uberTokenNeedsRenewal(row.access_token_expires_at, Date.now())) {
+    await uberMarkConnectionError(c, storeId, 'auth_expired', 'expired');
+    return { ok: false, code: 'auth_expired' };
+  }
+  try {
+    return {
+      ok: true,
+      token: await decryptCredential(row.access_token_enc, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY),
+    };
+  } catch {
+    // 鍵が無い・変わった。復号できない事実だけを残し、鍵も本文も出さない。
+    return { ok: false, code: 'encryption_key_missing' };
+  }
+}
+
+/** 候補の見分け用の一行。番地・市区・郵便番号だけで、人の名前や連絡先は入らない。 */
+function uberCandidateAddress(location: {
+  address: string | null;
+  city: string | null;
+  postalCode: string | null;
+} | null): string | null {
+  if (!location) return null;
+  const text = [location.postalCode, location.city, location.address]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(' ');
+  return text || null;
+}
+
+/** Uber の失敗の種類から、接続の状態を進めるべきものだけを選ぶ。 */
+function uberStatusForError(error: unknown): UberConnectionRow['status'] | undefined {
+  if (!(error instanceof UberEatsError)) return undefined;
+  if (error.kind === 'auth_expired') return 'expired';
+  if (error.kind === 'no_permission') return 'no_permission';
+  return undefined;
+}
+
+/**
+ * ログインした人が管理しているお店の一覧。
+ *
+ * 呼ぶのは「つなぐお店を選んでください」を開いたときだけ。画面の表示ごとには呼ばない。
+ * 使うのは認可画面で得た加盟店のトークンで、アプリ自身のトークンではない
+ * （権限 `eats.pos_provisioning`・services/uber-eats-hosts.ts）。
+ * 取れた候補は次の確定で突き合わせるため `rt_delivery_uber_store_candidates` に入れ替えで保存する。
+ */
+restaurantDelivery.get(
+  '/api/restaurant-test/delivery/ubereats/stores',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const client = uberOAuthClient(c.env);
+    if (!client) {
+      return fail(c, 503, 'Uber Eats 接続の設定がこの環境にありません', { code: 'oauth_not_configured' });
+    }
+    const store = await deliveryStore(c);
+    if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+
+    const token = await uberMerchantToken(c, store.id);
+    if (!token.ok) {
+      return fail(c, 409, UBER_TOKEN_FAILURE_MESSAGES[token.code], { code: token.code });
+    }
+
+    const fetchFn = fetch;
+    let stores;
+    try {
+      stores = await listUberStores({
+        fetch: fetchFn,
+        accessToken: token.token,
+        hosts: client.hosts,
+      });
+    } catch (error) {
+      // 残すのは分類済みの符号だけ。Uber から返った自由文・本文・例外は保存も表示もしない。
+      const code = error instanceof UberEatsError ? error.kind : 'store_list_failed';
+      await uberMarkConnectionError(c, store.id, code, uberStatusForError(error));
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+      return fail(c, 502, 'Uber Eats からお店の一覧を取れませんでした', { code });
+    }
+
+    const db = dbFor(c.env, store.id);
+    const now = Date.now();
+    // 前に出した候補は残さない。選べるのは今回取れたものだけにする。
+    await db.prepare('DELETE FROM rt_delivery_uber_store_candidates WHERE store_id = ?').bind(store.id).run();
+    for (const candidate of stores) {
+      await db
+        .prepare(
+          `INSERT INTO rt_delivery_uber_store_candidates
+             (id, store_id, uber_store_id, uber_store_name, external_store_id, address_text, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          randomToken(16),
+          store.id,
+          candidate.storeId,
+          candidate.name,
+          candidate.externalStoreId,
+          uberCandidateAddress(candidate.location),
+          now,
+        )
+        .run();
+    }
+
+    return c.json({
+      success: true,
+      stores: stores.map((candidate) => ({
+        id: candidate.storeId,
+        name: candidate.name,
+        address: uberCandidateAddress(candidate.location) ?? '',
+      })),
+    });
+  },
+);
+
+/**
+ * 選ばれたお店で連携を有効にする（`POST /v1/eats/stores/{id}/pos_data`）。
+ *
+ * - 画面から来たIDはそのまま送らない。直前に自分で保存した候補と一致したものだけを通す。
+ * - 連携の有効化は重ねて送ると設定が入れ替わるため、自動では再試行しない
+ *   （services/uber-eats.ts の `retry: false`）。押し直しは人の操作として扱う。
+ * - ここが通った時刻が `provisioned_at`。これが入って初めて Uber 側で連携が有効になる。
+ */
+restaurantDelivery.post(
+  '/api/restaurant-test/delivery/ubereats/stores/select',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const client = uberOAuthClient(c.env);
+    if (!client) {
+      return fail(c, 503, 'Uber Eats 接続の設定がこの環境にありません', { code: 'oauth_not_configured' });
+    }
+    const store = await deliveryStore(c);
+    if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+
+    const body = await c.req.json<{ storeId?: unknown }>().catch(() => ({}) as { storeId?: unknown });
+    const uberStoreId = typeof body.storeId === 'string' ? body.storeId.trim() : '';
+    if (!uberStoreId) return fail(c, 400, 'つなぐお店を選んでください', { code: 'store_id_required' });
+
+    const db = dbFor(c.env, store.id);
+    const candidate = await db
+      .prepare(
+        `SELECT uber_store_id, uber_store_name, external_store_id
+           FROM rt_delivery_uber_store_candidates
+          WHERE store_id = ? AND uber_store_id = ? LIMIT 1`,
+      )
+      .bind(store.id, uberStoreId)
+      .first<{ uber_store_id: string; uber_store_name: string; external_store_id: string | null }>();
+    if (!candidate) {
+      return fail(c, 404, 'そのお店は選べません。お店の一覧を取り直してください', {
+        code: 'store_not_candidate',
+      });
+    }
+
+    const token = await uberMerchantToken(c, store.id);
+    if (!token.ok) {
+      return fail(c, 409, UBER_TOKEN_FAILURE_MESSAGES[token.code], { code: token.code });
+    }
+
+    const fetchFn = fetch;
+    try {
+      await activateUberPosIntegration(
+        { fetch: fetchFn, accessToken: token.token, hosts: client.hosts },
+        candidate.uber_store_id,
+        {
+          // musubo 側の店舗ID。届いた注文をどの店舗のものとして扱うかの手掛かりになる。
+          integratorStoreId: store.id,
+          // 受付とキャンセルを musubo の画面で行うため、注文の管理役はこちら側になる。
+          isOrderManager: true,
+        },
+      );
+    } catch (error) {
+      const code = error instanceof UberEatsError ? error.kind : 'provisioning_failed';
+      await uberMarkConnectionError(c, store.id, code, uberStatusForError(error));
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+      return fail(c, 502, 'Uber Eats でお店をつなげませんでした', { code });
+    }
+
+    const now = Date.now();
+    await db
+      .prepare(
+        `UPDATE rt_delivery_uber_connections
+            SET uber_store_id = ?, uber_store_name = ?, external_store_id = ?,
+                status = 'connected', connected_at = COALESCE(connected_at, ?),
+                provisioned_at = ?, last_error = NULL,
+                version = version + 1, updated_at = ?
+          WHERE store_id = ?`,
+      )
+      .bind(
+        candidate.uber_store_id,
+        candidate.uber_store_name,
+        candidate.external_store_id,
+        now,
+        now,
+        now,
+        store.id,
+      )
+      .run();
+    // 選び終わったら候補は残さない（移行 636 の注記）。
+    await db.prepare('DELETE FROM rt_delivery_uber_store_candidates WHERE store_id = ?').bind(store.id).run();
+
+    auditLog(
+      c,
+      'restaurant.delivery.ubereats.store.select',
+      { id: store.id, kind: 'rt_store' },
+      { lineAccountId: store.lineAccountId },
+    );
+    const row = await uberConnectionFor(c, store.id);
+    return c.json({
+      success: true,
+      connection: {
+        status: row?.status ?? 'connected',
+        storeName: row?.uber_store_name ?? candidate.uber_store_name,
+        connectedAt: isoFromMs(row?.connected_at),
+        provisionedAt: isoFromMs(row?.provisioned_at),
+        checkedAt: isoFromMs(row?.updated_at),
+        lastError: row?.last_error ?? null,
+      },
+    });
   },
 );
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Check, LogIn, Plug, Send, X } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -37,8 +37,13 @@ import styles from './delivery.module.css'
  *
  * `pending_store`（ログイン済み・つなぐお店は未選択）は、まだ注文が入らないので
  * 札は「未接続」のまま、承認案 `OIY4Z` の帯（Notice）で続きを伝える。新しい状態札は増やさない。
- * つなぐお店を選ぶ段（`X5d8UF`）は Uber 側の権限が下りてから中身をつなぐため、
- * 候補（`stores`）が入っているときだけ窓を開く。
+ *
+ * つなぐお店を選ぶ段（`X5d8UF`）：
+ *  4. Uber から戻った直後（`?ubereats=pending_store`）は `GET …/ubereats/stores` で候補を取り、窓を開く。
+ *  5. ［このお店につなぐ］→ `POST …/ubereats/stores/select` → Uber 側の連携が有効になり「接続中」。
+ * 候補を取るときだけ Uber へ問い合わせる（画面を開くたびには問い合わせない）。
+ * 窓を閉じたあとは、同じボタンから選び直せる（ログインのやり直しは要らない）。
+ * 確定は結果が分からないまま送り直すと連携が重なるため、自動では再送しない。
  *
  * 出前館・ロケットナウの状態と日付は、各社の受け口が決まったあとサーバから受け取る。
  * それまでの間も画面の経路を確かめられるよう、入口の値は `services` の引数で
@@ -147,7 +152,8 @@ const UBER_DESIGN_STATUS: Record<UberConnectionStatus, DeliveryStatus> = {
 /** サーバの状態そのものを説明する帯。 */
 const UBER_STATE_NOTE: Partial<Record<UberConnectionStatus, StateNote>> = {
   pending_store: {
-    text: 'Uber Eats へのログインは受け取りました。つなぐお店を選ぶ手続きは musubo 側で続けています。選び終わると、この段が「接続中」に変わります。',
+    // 承認案 `X5d8UF` の選び口がつながったので、続きはお店自身で選べる。
+    text: 'Uber Eats へのログインは受け取りました。続けて、下のボタンから「つなぐお店」を選んでください。選び終わると、この段が「接続中」に変わります。',
     tone: 'warn',
   },
   expired: {
@@ -230,6 +236,11 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   /** つなぐお店を選ぶ窓（`X5d8UF`）。各社のログインから戻ったときに開く。 */
   const [picking, setPicking] = useState<{ service: DeliveryService; stores: DeliveryStore[] } | null>(null)
   const [pickedStoreId, setPickedStoreId] = useState('')
+  /**
+   * Uber のログインは済んでいて、つなぐお店だけ未選択（サーバの `pending_store`）。
+   * 承認済みの札は4つのままなので、この続きがあることは画面の状態では持たず別に覚える。
+   */
+  const [uberPendingStore, setUberPendingStore] = useState(false)
 
   const anyConnected = services.some((service) => service.status !== 'disconnected')
 
@@ -245,7 +256,9 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   const load = useCallback(async () => {
     if (!selectedAccountId) return
     try {
-      patch('uber', uberPatch(await restaurantDeliveryApi.ubereatsConnection(selectedAccountId), uberReturn))
+      const data = await restaurantDeliveryApi.ubereatsConnection(selectedAccountId)
+      setUberPendingStore(data.connection.status === 'pending_store')
+      patch('uber', uberPatch(data, uberReturn))
     } catch {
       // 読めなかっただけなので、出ている状態はそのまま残し、つなぐ操作も止めない。
       patch('uber', {
@@ -258,16 +271,61 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   useEffect(() => { void load() }, [load])
 
   /**
+   * つなぐお店の候補を取り、選ぶ窓（`X5d8UF`）を開く。
+   *
+   * ここだけが Uber へ問い合わせる。画面を開くたびには呼ばず、
+   * ログインから戻った直後と、お店がボタンを押したときだけ通る。
+   */
+  const openStorePicker = useCallback(async (service: DeliveryService) => {
+    if (!selectedAccountId) return
+    setBusy(service.id)
+    try {
+      const { stores } = await restaurantDeliveryApi.ubereatsStores(selectedAccountId)
+      if (stores.length === 0) {
+        patch(service.id, {
+          stateNote: `${service.name}でお店が見つかりませんでした。${service.name}でお店の管理権限があるアカウントでログインし直してください。`,
+          stateNoteTone: 'warn',
+        })
+        return
+      }
+      patch(service.id, { stores })
+      setPickedStoreId('')
+      setPicking({ service, stores })
+    } catch {
+      // 失敗の符号はサーバに残る。画面には符号を出さず、次にできることだけ伝える。
+      patch(service.id, {
+        stateNote: `${service.name}からお店の一覧を取れませんでした。少し待ってからもう一度お試しください。`,
+        stateNoteTone: 'danger',
+      })
+    } finally {
+      setBusy(null)
+    }
+  }, [patch, selectedAccountId])
+
+  /**
+   * ログインから戻った直後（`?ubereats=pending_store`）だけ、続きの選び口を自動で開く。
+   * 一度きりにして、窓を閉じたあとに開き直らないようにする（Uber への問い合わせも増やさない）。
+   */
+  const autoPickedRef = useRef(false)
+  useEffect(() => {
+    if (autoPickedRef.current) return
+    if (uberReturn !== 'pending_store' || !uberPendingStore) return
+    const uber = services.find((service) => service.id === 'uber')
+    if (!uber?.ready) return
+    autoPickedRef.current = true
+    void openStorePicker(uber)
+  }, [openStorePicker, services, uberPendingStore, uberReturn])
+
+  /**
    * つなぐボタン。
-   * login の会社は各社のログイン画面へ送り出す。許可されたお店の候補を受け取れている場合は、
-   * 先につなぐお店を選ぶ窓（`X5d8UF`）を開く。
+   * login の会社は各社のログイン画面へ送り出す。ログインが済んでいて
+   * つなぐお店だけ決まっていない場合は、ログインをやり直さず選ぶ窓（`X5d8UF`）を開く。
    * apply の会社は musubo が申し込みを代行するため、受付中の状態にする。
    */
   const connect = useCallback(async (service: DeliveryService) => {
     if (service.connect === 'login') {
-      if ((service.stores?.length ?? 0) > 0) {
-        setPickedStoreId('')
-        setPicking({ service, stores: service.stores ?? [] })
+      if (service.id === 'uber' && uberPendingStore) {
+        await openStorePicker(service)
         return
       }
       if (!selectedAccountId) return
@@ -291,24 +349,41 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       stateNote: `musubo が${service.name}へ連携の申し込みを行いました。手続きが終わるまでお待ちください。`,
       stateNoteTone: undefined,
     })
-  }, [patch, selectedAccountId])
+  }, [openStorePicker, patch, selectedAccountId, uberPendingStore])
 
-  /** 選んだお店でつなぐ（`X5d8UF` の確定）。 */
-  const pickStore = useCallback(() => {
-    if (!picking) return
-    const store = picking.stores.find((candidate) => candidate.id === pickedStoreId)
-    const now = new Date().toISOString()
-    patch(picking.service.id, {
-      status: 'connected',
-      storeName: store?.name,
-      connectedAt: now,
-      checkedAt: now,
-      stateNote: undefined,
-      stateNoteTone: undefined,
-    })
-    setPicking(null)
-    setPickedStoreId('')
-  }, [patch, picking, pickedStoreId])
+  /**
+   * 選んだお店でつなぐ（`X5d8UF` の確定）。ここで Uber 側の連携が有効になる。
+   * 結果が分からないまま送り直すと連携が重なるため、自動では送り直さない。
+   * 押し直しは、窓をもう一度開いてもらう人の操作として扱う。
+   */
+  const pickStore = useCallback(async () => {
+    if (!picking || !pickedStoreId || !selectedAccountId) return
+    const service = picking.service
+    setBusy(service.id)
+    try {
+      const { connection } = await restaurantDeliveryApi.ubereatsSelectStore(selectedAccountId, pickedStoreId)
+      const note = UBER_STATE_NOTE[connection.status]
+      patch(service.id, {
+        status: UBER_DESIGN_STATUS[connection.status],
+        storeName: connection.storeName ?? undefined,
+        connectedAt: connection.connectedAt ?? undefined,
+        checkedAt: connection.checkedAt ?? undefined,
+        stores: undefined,
+        stateNote: note?.text,
+        stateNoteTone: note?.tone,
+      })
+      setUberPendingStore(connection.status === 'pending_store')
+    } catch {
+      patch(service.id, {
+        stateNote: `${service.name}でお店をつなげませんでした。少し待ってから、もう一度お店を選んでください。`,
+        stateNoteTone: 'danger',
+      })
+    } finally {
+      setBusy(null)
+      setPicking(null)
+      setPickedStoreId('')
+    }
+  }, [patch, picking, pickedStoreId, selectedAccountId])
 
   /** 連携を解除する（`kJLks` の確定）。 */
   const disconnect = useCallback(() => {
@@ -462,7 +537,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         </p>
       </Dialog>
 
-      {/* つなぐお店を選ぶ窓（`X5d8UF`）。各社のログインから戻り、許可されたお店が2件以上あるときに開く。 */}
+      {/* つなぐお店を選ぶ窓（`X5d8UF`）。各社のログインから戻り、許可されたお店を受け取れたときに開く。 */}
       <Dialog
         open={picking !== null}
         size="small"
@@ -472,7 +547,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         description={`${picking?.service.name ?? ''}での許可をいただきました。${picking?.service.name ?? ''}に登録されているお店が${picking?.stores.length ?? 0}件見つかりました。musubo につなぐお店を選んでください。`}
         confirmLabel="このお店につなぐ"
         confirmIcon={<Check size={15} aria-hidden="true" />}
-        confirmDisabled={pickedStoreId === ''}
+        confirmDisabled={pickedStoreId === '' || busy !== null}
         onConfirm={pickStore}
         onCancel={() => { setPicking(null); setPickedStoreId('') }}
       >

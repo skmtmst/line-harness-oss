@@ -22,6 +22,8 @@ const fixture = vi.hoisted(() => ({
   accountId: { value: null as string | null },
   connection: vi.fn(),
   connectStart: vi.fn(),
+  stores: vi.fn(),
+  selectStore: vi.fn(),
 }))
 
 vi.mock('@/lib/staff-role', () => ({
@@ -43,6 +45,8 @@ vi.mock('@/lib/restaurant-delivery-api', () => ({
   restaurantDeliveryApi: {
     ubereatsConnection: fixture.connection,
     ubereatsConnectStart: fixture.connectStart,
+    ubereatsStores: fixture.stores,
+    ubereatsSelectStore: fixture.selectStore,
   },
 }))
 
@@ -271,11 +275,28 @@ describe('設定 › デリバリー連携', () => {
     expect(uberCard.queryByText('渋谷店')).toBeNull()
   })
 
-  it('DL-4：お店を選ぶまでつなげず、選ぶと接続中になる', () => {
-    render(<DeliverySettingsPage services={[uber({ stores: STORES })]} />)
+  it('DL-4：Uber から戻ると候補を取って窓が開き、選ぶと接続中になる', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=pending_store'
+    fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
+    fixture.stores.mockResolvedValue({ success: true, stores: STORES })
+    fixture.selectStore.mockResolvedValue({
+      success: true,
+      connection: {
+        status: 'connected',
+        storeName: '渋谷店',
+        connectedAt: '2026-10-17T02:30:00.000Z',
+        provisionedAt: '2026-10-17T02:30:00.000Z',
+        checkedAt: '2026-10-17T02:30:00.000Z',
+        lastError: null,
+      },
+    })
 
-    fireEvent.click(button('Uber Eats にログインしてつなぐ'))
-    expect(screen.getByText('つなぐお店を選んでください')).toBeTruthy()
+    render(<DeliverySettingsPage />)
+
+    // 戻った直後だけ Uber へ問い合わせ、続きの選び口を自動で開く。
+    expect(await screen.findByText('つなぐお店を選んでください')).toBeTruthy()
+    expect(fixture.stores).toHaveBeenCalledWith('acc-1')
     expect(button('このお店につなぐ').disabled).toBe(true)
 
     // 共通の RadioCardGroup は fieldset ＋ legend で描くので、役割は group。
@@ -285,9 +306,60 @@ describe('設定 › デリバリー連携', () => {
     expect(button('このお店につなぐ').disabled).toBe(false)
 
     fireEvent.click(button('このお店につなぐ'))
-    expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
+    // 送るのは選ばれたお店のIDだけ。つないだお店の名もサーバが返した値で出す。
+    await waitFor(() => expect(fixture.selectStore).toHaveBeenCalledWith('acc-1', 'store-1'))
+    await waitFor(() => expect(screen.queryByText('つなぐお店を選んでください')).toBeNull())
     const uberCard = card('Uber Eats')
     expect(uberCard.getByText('接続中')).toBeTruthy()
     expect(uberCard.getByText('渋谷店')).toBeTruthy()
+    expect(screen.queryByText(/Uber Eats へのログインは受け取りました/)).toBeNull()
+  })
+
+  it('DL-4：画面を開くだけでは Uber へ問い合わせず、続きはボタンから選べる', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
+    fixture.stores.mockResolvedValue({ success: true, stores: STORES })
+
+    render(<DeliverySettingsPage />)
+    await waitFor(() => expect(fixture.connection).toHaveBeenCalledWith('acc-1'))
+    expect(fixture.stores).not.toHaveBeenCalled()
+
+    // ログインは済んでいるので、押してもログインのやり直しにはならない。
+    fireEvent.click(button('Uber Eats にログインしてつなぐ'))
+    await waitFor(() => expect(fixture.stores).toHaveBeenCalledWith('acc-1'))
+    expect(await screen.findByText('つなぐお店を選んでください')).toBeTruthy()
+    expect(fixture.connectStart).not.toHaveBeenCalled()
+  })
+
+  it('DL-4：つなげるお店が無ければ窓を開かず、ログインし直す案内を出す', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=pending_store'
+    fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
+    fixture.stores.mockResolvedValue({ success: true, stores: [] })
+
+    render(<DeliverySettingsPage />)
+
+    expect(await screen.findByText(/お店が見つかりませんでした/)).toBeTruthy()
+    expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
+    expect(card('Uber Eats').getByText('未接続')).toBeTruthy()
+  })
+
+  it('DL-4：つなぐ確定が失敗したら窓を閉じて理由を出し、勝手に送り直さない', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=pending_store'
+    fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
+    fixture.stores.mockResolvedValue({ success: true, stores: STORES })
+    fixture.selectStore.mockRejectedValue(new Error('失敗'))
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText('つなぐお店を選んでください')).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('group', { name: 'つなぐお店' })).getByText('渋谷店'))
+    fireEvent.click(button('このお店につなぐ'))
+
+    expect(await screen.findByText(/お店をつなげませんでした/)).toBeTruthy()
+    expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
+    // 結果が分からないまま重ねて送ると連携が重なるため、1回だけ送る。
+    expect(fixture.selectStore).toHaveBeenCalledTimes(1)
+    expect(card('Uber Eats').getByText('未接続')).toBeTruthy()
   })
 })
