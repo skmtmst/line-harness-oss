@@ -91,7 +91,7 @@ export async function finishBookingOperation(
   await db.prepare(
     `UPDATE booking_operation_runs
         SET status = ?, completed_at = ?, result_json = ?, error_code = ?, updated_at = ?
-      WHERE id = ?`,
+      WHERE id = ? AND status NOT IN ('succeeded','cancelled')`,
   ).bind(
     input.status,
     input.completedAt,
@@ -129,6 +129,7 @@ export async function claimBookingOperationForRetry(
     `UPDATE booking_operation_runs SET opened_at = ?, updated_at = ?
       WHERE id = ? AND kind = ?
         AND status IN ('retry_wait', 'permanent_failed')
+        AND error_code IS NOT 'delivery_unknown'
         AND (opened_at IS NULL OR opened_at < ?)`,
   ).bind(nowIso, nowIso, input.id, input.kind, staleCutoff).run();
   return (claimed.meta?.changes ?? 0) > 0;

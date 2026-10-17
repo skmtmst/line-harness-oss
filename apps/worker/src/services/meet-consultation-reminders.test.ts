@@ -1,3 +1,4 @@
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
   calculateMeetReminderSchedule,
@@ -44,78 +45,27 @@ describe('renderMeetReminderText', () => {
 });
 
 describe('processDueMeetConsultationReminders', () => {
-  it('sends through the Harness proxy and marks the reminder sent', async () => {
-    const updates: unknown[][] = [];
-    const db = {
-      prepare(sql: string) {
-        return {
-          bind(...args: unknown[]) {
-            return {
-              async first() {
-                // 送信直前の再確認用。confirmed なら送る。
-                if (sql.includes('FROM meet_consultations')) return { status: 'confirmed' };
-                return null;
-              },
-              async all() {
-                if (!sql.includes('FROM meet_consultation_reminders r')) return { results: [] };
-                return {
-                  results: [{
-                    id: '6db37bc2-f0c4-4fa8-baa6-5ec7069e1165',
-                    consultation_id: 'consultation-1',
-                    kind: 'hour_before',
-                    retry_count: 0,
-                    title: 'AI導入 個別相談',
-                    starts_at: '2026-08-09T01:00:00.000Z',
-                    meet_url: 'https://meet.google.com/abc-defg-hij',
-                    line_user_id: 'U00000000000000000000000000000000',
-                    channel_access_token: 'channel-token',
-                    snapshot_booking_id: null,
-                    snapshot_booking_version: null,
-                    snapshot_friend_id: 'friend-1',
-                  }],
-                };
-              },
-              async run() {
-                updates.push(args);
-                return { success: true, meta: { changes: 1 } };
-              },
-            };
-          },
-        };
-      },
-    } as unknown as D1Database;
-
-    const dispatch = vi.fn(async (request: Request) => {
-      expect(request.url).toBe('https://proxy.example.com/line-api/v2/bot/message/push');
-      expect(request.headers.get('x-line-retry-key')).toBe(
-        '6db37bc2-f0c4-4fa8-baa6-5ec7069e1165',
-      );
-      const body = await request.json() as { to: string; messages: Array<{ text: string }> };
-      expect(body.to).toBe('U00000000000000000000000000000000');
-      expect(body.messages[0].text).toContain('Google Meet');
-      return new Response('{}', { status: 200 });
-    });
-
-    const result = await processDueMeetConsultationReminders(db, {
-      now: new Date('2026-08-09T00:00:00.000Z'),
-      proxyBaseUrl: 'https://proxy.example.com',
-      proxyDispatch: dispatch,
-    });
-
-    expect(result).toEqual({ sent: 1, failed: 0 });
-    expect(dispatch).toHaveBeenCalledOnce();
-    expect(updates).toContainEqual([
-      '2026-08-09T00:00:00.000Z',
-      '2026-08-09T00:00:00.000Z',
-      '6db37bc2-f0c4-4fa8-baa6-5ec7069e1165',
-      'consultation-1',
-      null,
-      null,
-      null,
-      null,
-      '2026-08-09T01:00:00.000Z',
-      'friend-1',
-    ]);
+  it('sends through the Harness proxy once with a saved checkpoint and marks the reminder sent', async () => {
+    const {db,raw}=createTestD1();
+    try {
+      raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','c','A','channel-token','fake');
+        INSERT INTO friends(id,line_user_id,line_account_id,is_following) VALUES('friend-1','U00000000000000000000000000000000','a',1);
+        INSERT INTO meet_consultations(id,external_event_id,friend_id,title,starts_at,ends_at,meet_url,status)
+          VALUES('consultation-1','google-event','friend-1','個別相談','2026-08-09T01:00:00.000Z','2026-08-09T02:00:00.000Z','https://meet.google.com/abc-defg-hij','confirmed');
+        INSERT INTO meet_consultation_reminders(id,consultation_id,kind,scheduled_at)
+          VALUES('6db37bc2-f0c4-4fa8-baa6-5ec7069e1165','consultation-1','hour_before','2026-08-09T00:00:00.000Z');`);
+      const dispatch=vi.fn(async(request:Request)=>{
+        expect(request.url).toBe('https://proxy.example.com/line-api/v2/bot/message/push');
+        expect(request.headers.get('x-line-retry-key')).toBe('6db37bc2-f0c4-4fa8-baa6-5ec7069e1165');
+        expect(request.headers.has('X-Line-Harness-Source')).toBe(false);
+        return new Response('{}',{status:200});
+      });
+      const options={now:new Date('2026-08-09T00:00:00.000Z'),proxyBaseUrl:'https://proxy.example.com',proxyDispatch:dispatch};
+      expect(await processDueMeetConsultationReminders(db,options)).toEqual({sent:1,failed:0});
+      expect(await processDueMeetConsultationReminders(db,options)).toEqual({sent:0,failed:0});
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(raw.prepare('SELECT status FROM meet_consultation_reminders').get()).toEqual({status:'sent'});
+    }finally{raw.close();}
   });
 
   it('取消ずみの相談は送らず、予定を止める (送信直前の再確認)', async () => {

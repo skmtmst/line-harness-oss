@@ -1303,6 +1303,8 @@ export function createEventWaitlistOfferSender(
       ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}eventWaitlistToken=${encodeURIComponent(offer.token)}`
       : null;
     await sendEventBookingNotification({
+      delivery: { db, accountId: offer.lineAccountId, operationId: `event-offer:${offer.waitlistId}:${offer.retryKey}`,
+        deadlineAt: Date.parse(offer.expiresAt) },
       channelAccessToken: accessToken,
       toLineUserId: row.line_user_id,
       kind: 'waitlist_offer',

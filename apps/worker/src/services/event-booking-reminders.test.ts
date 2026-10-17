@@ -292,7 +292,7 @@ describe('processDueEventReminders', () => {
     expect(state.rows[0].retry_count).toBe(3);
   });
 
-  test('marks failed (retryable) on first failure', async () => {
+  test('marks an uncertain first send failed_permanent without a replay', async () => {
     const state = { rows: [dueRow({ id: 'r1', retry_count: 0 })] };
     const db = dueDB(state);
     const sender = vi.fn(async () => { throw new Error('temp'); });
@@ -300,9 +300,9 @@ describe('processDueEventReminders', () => {
       now: new Date('2026-05-09T01:00:00Z'),
       sender,
     });
-    expect(state.rows[0].status).toBe('failed');
+    expect(state.rows[0].status).toBe('failed_permanent');
     expect(state.rows[0].retry_count).toBe(1);
-    expect(state.rows[0].last_error).toBe('delivery_failed');
+    expect(state.rows[0].last_error).toBe('delivery_unknown');
   });
 
   test('hours_before kind passes hoursBefore from event setting', async () => {
@@ -331,15 +331,17 @@ describe('W5 durable reminder delivery',()=>{
   expect(await processDueEventReminders(db,{now,sender})).toEqual({sent:0,failed:0});
   release();await first;expect(sender).toHaveBeenCalledTimes(1);
  });
- test('lost acknowledgement uses original text and the same retry key, and stops at the cap',async()=>{
+ test('lost acknowledgement keeps the original text and retry key, and never replays',async()=>{
   const state={rows:[dueRow()]},db=dueDB(state),item=opened.at(-1)!;
   const sender=vi.fn(async(_params:Parameters<import('./event-booking-notifier.js').EventBookingNotificationSender>[0])=>{throw new Error('secret provider body')});const base=Date.parse('2026-05-09T01:00:00Z');
   await processDueEventReminders(db,{now:new Date(base),sender});
   item.raw.prepare("UPDATE events SET name='changed'").run();
   await processDueEventReminders(db,{now:new Date(base+30_000),sender});expect(sender).toHaveBeenCalledTimes(1);
   for(let n=1;n<4;n++)await processDueEventReminders(db,{now:new Date(base+n*60_000),sender});
-  expect(sender).toHaveBeenCalledTimes(3);
-  expect(sender.mock.calls[1]![0]).toEqual(sender.mock.calls[0]![0]);
+  expect(sender).toHaveBeenCalledTimes(1);
+  expect(state.rows[0].status).toBe('failed_permanent');
+  expect(sender.mock.calls[0]![0].ctx.eventName).toBe('X');
+  expect(sender.mock.calls[0]![0].retryKey).toBeTruthy();
   expect(JSON.stringify(item.raw.prepare('SELECT input_json,error_code FROM workflow_steps').all())).not.toContain('secret provider body');
   expect(JSON.stringify(item.raw.prepare('SELECT input_json FROM workflow_steps').all())).not.toContain('tok');
  });

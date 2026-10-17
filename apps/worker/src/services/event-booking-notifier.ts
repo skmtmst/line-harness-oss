@@ -1,3 +1,8 @@
+import { currentEventNotificationSubject,type EventNotificationSubject } from './event-notification-recovery.js';
+import { activeTenantLineAccountSql, isOperationCapabilityStopped } from '@line-crm/db';
+import { lineTransport } from '../lib/external-call/line.js';
+import { deliverBookingLine } from './booking-line-delivery.js';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { LineClient } from '@line-crm/line-sdk';
 
 export type EventNotificationKind =
@@ -86,6 +91,8 @@ export function renderEventNotificationText(
 
 export interface SendEventNotificationParams {
   channelAccessToken: string;
+  signal?: AbortSignal;
+  delivery?: { db: D1Database; accountId: string; operationId: string; subject?:EventNotificationSubject; authorize?: () => Promise<boolean>; deadlineAt?: number };
   /** Fixed for one logical automatic reminder. */
   retryKey?: string;
   toLineUserId: string;
@@ -96,9 +103,25 @@ export interface SendEventNotificationParams {
 export async function sendEventBookingNotification(
   params: SendEventNotificationParams,
 ): Promise<void> {
-  const text = renderEventNotificationText(params.kind, params.ctx);
-  const client = new LineClient(params.channelAccessToken);
-  await client.pushMessage(params.toLineUserId, [{ type: 'text', text }], params.retryKey);
+  const snapshot = { to: params.toLineUserId, kind: params.kind, ctx: params.ctx,
+    messages:[{type:'text' as const,text:renderEventNotificationText(params.kind,params.ctx)}],
+    ...(params.delivery?.subject?{subject:params.delivery.subject}:{}) };
+  const send = async (signal: AbortSignal | undefined, saved: typeof snapshot, key?: string) => {
+    const client = new LineClient(params.channelAccessToken, signal ? { transport: lineTransport(signal) } : undefined);
+    await client.pushMessage(saved.to, saved.messages, key);
+  };
+  if (!params.delivery) return send(params.signal, snapshot, params.retryKey);
+  const { db, accountId, operationId } = params.delivery;
+  await deliverBookingLine(db, { accountId, operationId, snapshot, retryKey: params.retryKey,
+    deadlineAt: params.delivery.deadlineAt,
+    authorize: async saved => !!await db.prepare(`SELECT 1 ok FROM friends f WHERE f.line_account_id=? AND f.line_user_id=?
+      AND f.is_following=1 AND ${activeTenantLineAccountSql('f.line_account_id')}`).bind(accountId, saved.to).first()
+      && !await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch')
+      && await featureJobCanRun(db, { accountId, featureId: 'events', job: 'event notification' })
+      && (!saved.subject||await currentEventNotificationSubject(db,accountId,saved.subject,saved.to))
+      && (!params.delivery!.authorize || await params.delivery!.authorize()),
+    send,
+  });
 }
 
 export type EventBookingNotificationSender = (

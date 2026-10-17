@@ -1,3 +1,4 @@
+import { lineTransport } from '../lib/external-call/line.js';
 import { acquireWorkflow } from '../services/workflow-execution.js';
 import { sendRecordedNotification,NotificationDeliveryIncomplete } from '../services/recorded-notification-send.js';
 import { prepareWorkflowStep, getWorkflowStep,ensureWorkflowStep,claimWorkflowStep,finishWorkflowStep,failWorkflowStep } from '@line-crm/db';
@@ -129,7 +130,7 @@ app.post('/api/meet-callback', async (c) => {
     accountId,
     context: 'meet-callback.confirmation',
   });
-  const lineClient = new LineClient(accessToken);
+  const lineClient = new LineClient(accessToken,{transport:lineTransport(AbortSignal.timeout(10_000))});
 
   // Build Flex message with requirements doc
   const transcriptRows = body.transcripts.map((t) => ({

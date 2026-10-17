@@ -1,3 +1,4 @@
+import { deliverBookingLine } from './booking-line-delivery.js';
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import {
@@ -60,6 +61,7 @@ interface DueMeetReminderRow {
   consultation_id: string;
   kind: MeetReminderKind;
   retry_count: number;
+  last_error: string | null;
   title: string;
   starts_at: string;
   meet_url: string;
@@ -81,6 +83,7 @@ const MEET_URL_RE = /^https:\/\/meet\.google\.com\/[a-z0-9-]+(?:[/?#].*)?$/i;
 
 // 結び付き予約の生存条件 (due選択と送信直前再確認で同一にする)。
 // 版なし旧相談は従来どおり通す。日時は正規化比較する。
+
 const LINKED_BOOKING_ALIVE_SQL = `(
   c.booking_id IS NULL
   OR EXISTS (
@@ -95,6 +98,7 @@ const LINKED_BOOKING_ALIVE_SQL = `(
       AND datetime(live_booking.starts_at) = datetime(c.starts_at)
   )
 )`;
+
 
 // due読取時の候補写しと一致させる条件。相談と予約が両方新版へ進むと
 // 現在同士の一致だけでは旧行の日時・URL・宛先で送れるため、写しとの
@@ -201,9 +205,9 @@ export async function registerMeetConsultation(
   if (start.getTime() <= now.getTime()) throw new Error('startsAt must be in the future');
 
   const friend = await db
-    .prepare('SELECT id, line_account_id FROM friends WHERE id = ? AND is_following = 1')
+    .prepare('SELECT id, line_account_id,line_user_id FROM friends WHERE id = ? AND is_following = 1')
     .bind(input.friendId)
-    .first<{ id: string; line_account_id: string | null }>();
+    .first<{ id: string; line_account_id: string | null;line_user_id:string }>();
   if (!friend) throw new Error('friend not found or not following');
   // V6 登録は店舗境界の中でだけ行う。所属不明では書かずに落とす。
   if (!friend.line_account_id) throw new Error('friend line account unknown');
@@ -828,7 +832,7 @@ export async function processDueMeetConsultationReminders(
   ).bind(nowIso, nowIso).run();
   const due = await db
     .prepare(
-      `SELECT r.id, r.consultation_id, r.kind, r.retry_count,
+      `SELECT r.id, r.consultation_id, r.kind, r.retry_count, r.last_error,
               c.title, c.starts_at, c.meet_url,
               c.booking_id AS snapshot_booking_id,
               c.booking_version AS snapshot_booking_version,
@@ -902,6 +906,7 @@ export async function processDueMeetConsultationReminders(
         .run();
       continue;
     }
+    let deliveryPrepared = false;
     try {
       const text = renderMeetReminderText(row.kind, row.starts_at, row.meet_url);
       const accessToken = await resolveLineCredential(
@@ -940,15 +945,32 @@ export async function processDueMeetConsultationReminders(
           .run();
         continue;
       }
-      await pushViaHarnessProxy(
-        options.proxyBaseUrl,
-        accessToken,
-        row.line_user_id,
-        [{ type: 'text', text }],
-        row.id,
-        options.proxyDispatch,
-        'reminder_dispatch',
-      );
+      deliveryPrepared = true;
+      await deliverBookingLine(db, {
+        accountId: row.line_account_id, operationId: `meet-reminder:${row.id}`,
+        retryKey: row.id, snapshot: { to: row.line_user_id, text, startsAt: row.starts_at,
+          bookingId: row.snapshot_booking_id, version: row.snapshot_booking_version, friendId: row.snapshot_friend_id },
+        deadlineAt: Date.parse(row.starts_at), maxAttempts: MAX_RETRY, initialAttempts: row.retry_count,
+        legacyUnknown: row.retry_count > 0 && row.last_error !== 'notification_preflight_failed',
+        now: () => options.now.getTime(),
+        authorize: async saved => saved.startsAt === row.starts_at && saved.friendId === row.snapshot_friend_id
+          && !await isOperationCapabilityStopped(db,row.line_account_id,'reminder_dispatch')
+          && !!await db.prepare(`SELECT 1 ok FROM meet_consultations c WHERE c.id=? AND c.status='confirmed'
+            AND ${LINKED_BOOKING_ALIVE_SQL} ${candidateSnapshotSql()}
+            AND EXISTS(SELECT 1 FROM friends live_friend WHERE live_friend.id=c.friend_id
+              AND live_friend.line_account_id=? AND live_friend.line_user_id=? AND live_friend.is_following=1
+              AND ${activeTenantLineAccountSql('live_friend.line_account_id')})`)
+            .bind(row.consultation_id,...candidateSnapshotBinds(row),row.line_account_id,saved.to).first(),
+        send: (_signal, saved, key) => pushViaHarnessProxy(options.proxyBaseUrl, accessToken, saved.to,
+          [{ type: 'text', text: saved.text }], key, options.proxyDispatch, 'reminder_dispatch'),
+        statements: next => next.phase === 'started' ? [db.prepare(`SELECT json(CASE WHEN EXISTS(
+          SELECT 1 FROM meet_consultations c WHERE c.id=? AND c.status='confirmed'
+            AND ${LINKED_BOOKING_ALIVE_SQL} ${candidateSnapshotSql()}
+            AND EXISTS(SELECT 1 FROM friends live_friend WHERE live_friend.id=c.friend_id AND live_friend.line_account_id=?
+              AND live_friend.line_user_id=? AND live_friend.is_following=1 AND ${activeTenantLineAccountSql('live_friend.line_account_id')}))
+          THEN 'true' ELSE 'meet_reminder_obsolete' END)`)
+          .bind(row.consultation_id,...candidateSnapshotBinds(row),row.line_account_id,row.line_user_id)] : [],
+      });
       // 同時取消で止められた行を sent で上書きしない (状態だけ守る。送信数は数える)。
       // push の間に新版へ再利用された行も sent にしない (候補写しと同一文で結ぶ)。
       const marked = await db
@@ -966,7 +988,7 @@ export async function processDueMeetConsultationReminders(
         console.error(JSON.stringify({"code":"meet_reminder_sent_after_cancel"}));
       }
     } catch (error) {
-      const retryCount = row.retry_count + 1;
+      const retryCount = deliveryPrepared ? MAX_RETRY : row.retry_count + 1;
       // 失敗の確定も新版へ再利用された行に触れない (候補写しと同一文で結ぶ)。
       // 新版が勝てば 0 件になり、勝者の pending を残す。試行数は数える。
       await db
@@ -978,7 +1000,7 @@ export async function processDueMeetConsultationReminders(
         )
         .bind(
           retryCount,
-          error instanceof Error ? error.message.slice(0, 1000) : String(error).slice(0, 1000),
+          deliveryPrepared ? 'delivery_unknown' : 'notification_preflight_failed',
           nowIso,
           row.id,
           ...snapshotGuardBinds(row),

@@ -1,3 +1,5 @@
+import { recoverEventBookingNotifications } from './event-notification-recovery.js';
+import { deliverBookingLine, BookingLineDeliveryIncomplete } from './booking-line-delivery.js';
 import { reverseSourceConversions } from '@line-crm/db';
 // Event booking reminders: schedule + cron processor.
 // Phase 1 mirrors booking-reminders.ts pattern but on event_booking_reminders.
@@ -178,9 +180,10 @@ export async function processDueEventReminders(
          INNER JOIN events e ON e.id = b.event_id
          INNER JOIN event_slots s ON s.id = b.slot_id
          INNER JOIN line_accounts la ON la.id = b.line_account_id
-         INNER JOIN friends f ON f.id = b.friend_id
+         INNER JOIN friends f ON f.id = b.friend_id AND f.line_account_id=b.line_account_id
         WHERE r.status IN ('pending','failed')
           AND r.scheduled_at <= ?
+          AND f.is_following=1
           AND b.status = 'confirmed'
           AND s.starts_at > ?
           AND ${activeTenantLineAccountSql('b.line_account_id')}
@@ -241,26 +244,47 @@ export async function processDueEventReminders(
         await failWorkflowStep(db,ref,owner,{now,unknown:true,code:'delivery_unknown'});
         continue;
       }
-      const input = JSON.parse(lease.input_json!);
-      await params.sender({ ...input, channelAccessToken: accessToken, retryKey: lease.retry_key });
+      const input = JSON.parse(lease.input_json!) as Omit<Parameters<EventBookingNotificationSender>[0], 'channelAccessToken' | 'retryKey'>;
+      await deliverBookingLine(db, {
+        accountId: row.line_account_id, operationId: `event-reminder:${row.id}`, retryKey: lease.retry_key,
+        snapshot: input, deadlineAt: Date.parse(row.starts_at), maxAttempts: REMINDER_MAX_RETRY,
+        initialAttempts: lease.attempt_count - 1,
+        // 旧送信の再取得は「未実行」と証明できない。新しいcheckpointでも送らない。
+        legacyUnknown: snapshot.attempt_count > 0 && snapshot.error_code !== 'notification_preflight_failed',
+        now: () => params.now.getTime(),
+        authorize: async saved => !await isOperationCapabilityStopped(db,row.line_account_id,'reminder_dispatch')
+          && !!await db.prepare(`SELECT 1 ok FROM event_booking_reminders r JOIN event_bookings b ON b.id=r.booking_id
+            JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
+            WHERE r.id=? AND r.status IN ('pending','failed') AND b.status='confirmed'
+              AND f.is_following=1 AND f.line_user_id=? AND b.line_account_id=?
+              AND ${activeTenantLineAccountSql('b.line_account_id')}`).bind(row.id,saved.toLineUserId,row.line_account_id).first(),
+        statements: next => next.phase==='started'?[db.prepare(`SELECT json(CASE WHEN EXISTS(
+          SELECT 1 FROM event_booking_reminders r JOIN event_bookings b ON b.id=r.booking_id
+          JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
+          WHERE r.id=? AND r.status IN ('pending','failed') AND b.status='confirmed' AND b.line_account_id=?
+            AND f.is_following=1 AND f.line_user_id=? AND ${activeTenantLineAccountSql('b.line_account_id')})
+          THEN 'true' ELSE 'event_reminder_obsolete' END)`).bind(row.id,row.line_account_id,input.toLineUserId)]:[],
+        send: (signal, saved, key) => params.sender({ ...saved, channelAccessToken: accessToken, retryKey: key, signal }),
+      });
       await finishWorkflowStep(db,ref,owner,{now,result:{accepted:true},statements:[
         db.prepare(`UPDATE event_booking_reminders SET status='sent',sent_at=?,retry_count=?,last_error=NULL
           WHERE id=? AND status IN ('pending','failed')`).bind(params.now.toISOString(),lease.attempt_count,row.id),
       ]});
       sent++;
-    } catch {
-      await failWorkflowStep(db,ref,owner,{now,delayMs:60_000,code:'delivery_failed'});
+    } catch (error) {
+      await failWorkflowStep(db,ref,owner,{now,unknown: error instanceof BookingLineDeliveryIncomplete && error.kind === 'unknown',delayMs:60_000,code:error instanceof BookingLineDeliveryIncomplete ? 'delivery_unknown' : 'notification_preflight_failed'});
       // Only this owner's failure may change the reminder. Cancellation and accepted sends stay intact.
-      await db.prepare(`UPDATE event_booking_reminders SET status=?,retry_count=?,last_error='delivery_failed'
+      await db.prepare(`UPDATE event_booking_reminders SET status=?,retry_count=?,last_error='delivery_unknown'
         WHERE id=? AND status IN ('pending','failed') AND EXISTS (SELECT 1 FROM workflow_steps
           WHERE scope_id=? AND process_kind='event_reminder' AND subject_id=? AND step_key='send'
-            AND attempt_count=? AND status IN ('failed','exhausted'))`)
-        .bind(lease.attempt_count>=REMINDER_MAX_RETRY?'failed_permanent':'failed',lease.attempt_count,row.id,
+            AND attempt_count=? AND status IN ('failed','exhausted','unknown'))`)
+        .bind(error instanceof BookingLineDeliveryIncomplete && error.kind === 'unknown' || lease.attempt_count>=REMINDER_MAX_RETRY?'failed_permanent':'failed',lease.attempt_count,row.id,
           ref.scopeId,row.id,lease.attempt_count).run();
       failed++;
     }
   }
-  return { sent, failed };
+  const recovered=await recoverEventBookingNotifications(db,params.now,Math.max(0,100-(due.results??[]).length));
+  return { sent:sent+recovered.sent, failed:failed+recovered.failed };
 }
 
 export const _internals = { REMINDER_MAX_RETRY };
