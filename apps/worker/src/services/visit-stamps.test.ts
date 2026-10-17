@@ -1,3 +1,4 @@
+import {pbkdf2Sync} from 'node:crypto';
 import {beforeEach,afterEach,describe,it,expect} from 'vitest';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import type {VisitStampSettings} from '@line-crm/shared';
@@ -59,7 +60,9 @@ describe('来店スタンプの台帳',()=>{
  });
  it('PINを5回失敗するとロックし、平文を保存しない',async()=>{
   await setStampPin(fixture.db,'shop','staff','1234');
-  const stored=fixture.raw.prepare('SELECT hash FROM visit_stamp_staff_pins').get() as {hash:string};expect(stored.hash).not.toContain('1234');
+  const stored=fixture.raw.prepare('SELECT salt,hash FROM visit_stamp_staff_pins').get() as {salt:string;hash:string};
+  expect(stored.hash).toMatch(/^[a-f0-9]{64}$/);
+  expect(stored.hash).toBe(pbkdf2Sync('1234',stored.salt,100000,32,'sha256').toString('hex'));
   for(let i=0;i<5;i++)await expect(verifyStampPin(fixture.db,'shop','staff','9999')).rejects.toThrow('違い');
   await expect(verifyStampPin(fixture.db,'shop','staff','1234')).rejects.toMatchObject({status:429});
   fixture.raw.exec("UPDATE visit_stamp_staff_pins SET locked_until='2000-01-01T00:00:00Z'");await verifyStampPin(fixture.db,'shop','staff','1234');
