@@ -116,11 +116,12 @@ describe('設定 › デリバリー連携', () => {
     const login = button('Uber Eats にログインしてつなぐ')
     expect(login.disabled).toBe(false)
     expect(login.title).toBe('')
-    // 返事待ちの2社は押せないまま、待ちの案内を添える。
+    // 申し込む2社は押せる。押すと「現在準備中です」の窓を出す（受け口ができるまで。B-360）。
     const apply = screen.getAllByRole('button', { name: '連携を申し込む' }) as HTMLButtonElement[]
     expect(apply).toHaveLength(2)
-    expect(apply.every((one) => one.disabled)).toBe(true)
-    expect(apply.every((one) => one.title.includes('musubo が各デリバリーサービスへ連携のお手続きを進めています'))).toBe(true)
+    expect(apply.every((one) => !one.disabled)).toBe(true)
+    // 下の帯の［キャンセル］［保存する］は置かない（押すとすぐ反映する画面で、保存する物が無い）。
+    expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
   })
 
   it('つなぐを押すと、サーバが返した Uber のログイン画面へ移る', async () => {
@@ -184,7 +185,7 @@ describe('設定 › デリバリー連携', () => {
 
     expect(await screen.findByText('渋谷店')).toBeTruthy()
     const uberCard = card('Uber Eats')
-    expect(uberCard.getByText('接続中')).toBeTruthy()
+    expect(uberCard.getByText('接続済み')).toBeTruthy()
     expect(uberCard.getByText('つないだお店')).toBeTruthy()
   })
 
@@ -194,6 +195,7 @@ describe('設定 › デリバリー連携', () => {
 
     expect(screen.queryByRole('button', { name: 'Uber Eats にログインしてつなぐ' })).toBeNull()
     expect(screen.queryByRole('button', { name: '連携を申し込む' })).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain('閲覧のみ')
   })
 
   it('DL-2：接続中はつないだお店・つないだ日・最後に確かめた時刻が出る', () => {
@@ -209,7 +211,7 @@ describe('設定 › デリバリー連携', () => {
     )
 
     const uberCard = card('Uber Eats')
-    expect(uberCard.getByText('接続中')).toBeTruthy()
+    expect(uberCard.getByText('接続済み')).toBeTruthy()
     expect(uberCard.getByText('つないだお店')).toBeTruthy()
     expect(uberCard.getByText('渋谷店')).toBeTruthy()
     expect(uberCard.getByText('つないだ日')).toBeTruthy()
@@ -226,7 +228,7 @@ describe('設定 › デリバリー連携', () => {
     )
 
     const uberCard = card('Uber Eats')
-    expect(uberCard.getByText('接続エラー')).toBeTruthy()
+    expect(uberCard.getByText('接続の異常')).toBeTruthy()
     // 状態の注記は共通の帯（Notice）で出す。危険の帯は role="alert" で、
     // 色は共通の `.danger` が持つ（自作の data-tone は持たない／B-172 status-badge）。
     const notice = uberCard.getByText('注文を受け取れませんでした。musubo が確認しています。').closest('[data-design-part="notice"]')
@@ -245,33 +247,44 @@ describe('設定 › デリバリー連携', () => {
     expect(demaecan.getByText('申し込み受付中')).toBeTruthy()
     expect(demaecan.getByText('申し込んだ日')).toBeTruthy()
 
+    // 受け口が無いので、できたように見せず「現在準備中です」を出す。
     fireEvent.click(demaecan.getByRole('button', { name: '申し込みを取り消す' }))
-    expect(card('出前館').getByText('未接続')).toBeTruthy()
+    expect(screen.getByText('現在準備中です')).toBeTruthy()
+    expect(card('出前館').getByText('申し込み受付中')).toBeTruthy()
   })
 
-  it('申し込む会社は押すと申し込み受付中になる', () => {
+  it('申し込む会社は押すと「現在準備中です」を出し、申し込み受付中にはしない', () => {
     render(<DeliverySettingsPage services={[{ ...uber(), id: 'demaecan', name: '出前館', connect: 'apply' }]} />)
 
     fireEvent.click(button('連携を申し込む'))
+    expect(screen.getByText('現在準備中です')).toBeTruthy()
     const demaecan = card('出前館')
-    expect(demaecan.getByText('申し込み受付中')).toBeTruthy()
-    expect(demaecan.getByText('申し込んだ日')).toBeTruthy()
+    expect(demaecan.getByText('未接続')).toBeTruthy()
+    expect(demaecan.queryByText('申し込んだ日')).toBeNull()
   })
 
-  it('DL-3：連携を解除する窓から外すと未接続に戻る', () => {
+  it('DL-3：連携を解除する窓で確かめたあとは「現在準備中です」を出し、接続は変えない', () => {
     render(<DeliverySettingsPage services={[uber({ status: 'connected', storeName: '渋谷店' })]} />)
 
     fireEvent.click(button('連携を解除する'))
-    expect(screen.getByText('Uber Eatsの連携を解除しますか')).toBeTruthy()
+    expect(screen.getByText('Uber Eatsの連携を解除しますか？')).toBeTruthy()
 
     fireEvent.click(button('解除する'))
-    expect(screen.queryByText('Uber Eatsの連携を解除しますか')).toBeNull()
+    expect(screen.queryByText('Uber Eatsの連携を解除しますか？')).toBeNull()
+    expect(screen.getByText('現在準備中です')).toBeTruthy()
     const uberCard = card('Uber Eats')
-    expect(uberCard.getByText('未接続')).toBeTruthy()
-    expect(uberCard.queryByText('渋谷店')).toBeNull()
+    expect(uberCard.getByText('接続済み')).toBeTruthy()
+    expect(uberCard.getByText('渋谷店')).toBeTruthy()
   })
 
-  it('DL-4：お店を選ぶまでつなげず、選ぶと接続中になる', () => {
+  it('DL-2：接続を確かめるも、受け口が無いので「現在準備中です」を出す', () => {
+    render(<DeliverySettingsPage services={[uber({ status: 'connected', storeName: '渋谷店' })]} />)
+
+    fireEvent.click(button('接続を確かめる'))
+    expect(screen.getByText('現在準備中です')).toBeTruthy()
+  })
+
+  it('DL-4：お店を選ぶまでつなげず、選んで押すと「現在準備中です」を出す', () => {
     render(<DeliverySettingsPage services={[uber({ stores: STORES })]} />)
 
     fireEvent.click(button('Uber Eats にログインしてつなぐ'))
@@ -286,8 +299,7 @@ describe('設定 › デリバリー連携', () => {
 
     fireEvent.click(button('このお店につなぐ'))
     expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
-    const uberCard = card('Uber Eats')
-    expect(uberCard.getByText('接続中')).toBeTruthy()
-    expect(uberCard.getByText('渋谷店')).toBeTruthy()
+    expect(screen.getByText('現在準備中です')).toBeTruthy()
+    expect(card('Uber Eats').getByText('未接続')).toBeTruthy()
   })
 })
