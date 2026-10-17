@@ -123,7 +123,9 @@ describe('下部追従バーの並びを部品で固定する', () => {
     const wizard = readWithParts(path.join(SRC, 'app/accounts/new/page.tsx'))
     expect(wizard).toContain('V8_STEPS')
     expect(wizard).toContain('type="submit"')
-    expect(wizard).toContain('!rowsPassed || !manualAck || busy')
+    /* 接続確認の保存制限は v06 で手動チェックから5行の確認へ変わった。
+       文字で見張らず、描いた画面で見張る（B-273）：
+       register-v8.react.test.tsx「5行が通ってから登録でき、登録すると③Step2へ進む」。 */
     expect(wizard).toContain('api.lineAccounts.connect(')
   })
 

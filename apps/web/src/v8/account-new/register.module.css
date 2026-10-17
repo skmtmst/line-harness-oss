@@ -21,12 +21,11 @@
 .fieldset > legend { float: left; width: 100%; }
 .fieldset > legend + * { clear: both; }
 
-.aside {
-  align-self: flex-start;
-  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary);
-}
-.aside h2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
-.aside p { margin: 0; }
+/* 右の案内は共通の Card（surface="muted"）が地と角を持つ。画面CSSは置き場所だけ（★V8 §24）。 */
+.aside { align-self: flex-start; }
+/* 中の字は Card ではなく中の h2・p に直接あてる。Card へ渡す .aside には見た目を書かない。 */
+.asideH2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
+.asideP { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
 
 /* ① 用意の仕方 */
 .radios { display: flex; align-items: center; gap: var(--tpl-htn-radio-gap); }
@@ -117,13 +116,13 @@
 .errorBox {
   display: flex; flex-direction: column; gap: var(--tpl-htn6-err-gap);
   padding: var(--tpl-htn6-err-pad); border-radius: var(--tpl-htn-radius-m);
-  background: var(--color-status-danger-soft); box-shadow: inset 0 0 0 1px var(--color-danger);
+  background: var(--color-status-danger-soft); box-shadow: var(--tpl-htn-ring-danger);
 }
 .errorBox p { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink); }
 .errorBox p:first-child { font-weight: 700; color: var(--color-danger); }
 /* Webhook が「オフ」のときは失敗ではなく案内なので青で出す（絵 Lwxyh の案内の箱）。 */
-.errorBox[data-tone='info'] { background: var(--color-info-bg); box-shadow: inset 0 0 0 1px var(--color-accent-deep); }
-.errorBox[data-tone='info'] p:first-child { color: var(--color-accent-deep); }
+.errorBoxInfo { background: var(--color-info-bg); box-shadow: var(--tpl-htn-ring-info); }
+.errorBoxInfo p:first-child { color: var(--color-accent-deep); }
 
 /* ③Step1 確認の5行。行は上下中央そろえ。 */
 .checkList { margin: 0; padding: 0; list-style: none; }
@@ -164,43 +163,25 @@
 .qrSide { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-gap-s); }
 .qrWait { display: inline-flex; align-items: center; gap: var(--tpl-htn-gap-s); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
 
-/* ④ 使い方のひな型 */
-.templateGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--tpl-htn6-tpl-min), 1fr)); gap: var(--tpl-htn6-tpl-gap); }
-.templateCard {
-  display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); text-align: start;
-  padding: var(--tpl-htn6-tpl-pad); border: 0; border-radius: var(--tpl-htn-radius-m);
-  background: var(--color-surface-pearl); box-shadow: var(--tpl-htn-ring); color: var(--color-ink);
-  font: inherit; cursor: pointer;
-}
-.templateCard[aria-pressed='true'] { background: var(--tpl-htn6-tpl-sel-bg); box-shadow: var(--tpl-htn-ring-accent); }
-.templateCard:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
-.templateCard:focus-visible { outline: none; box-shadow: var(--tpl-htn-ring-focus); }
-.templateHead { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s); }
-.templateLabel { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; }
-.templateNote { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
-.templateBand {
-  padding: var(--tpl-htn-info-pad); border-radius: var(--tpl-htn-radius-m); background: var(--color-info-bg);
-  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary);
-}
-.templateBand p { margin: 0; }
+/* ④ 使い方のひな型は共通の RadioCardGroup／RadioCard・StatusBadge が持つ（★V8 §24）。
+   画面CSSは持たない。 */
 
-/* ⑤-0 引き継ぎ中 */
+/* ⑤-0 引き継ぎ中。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
 .handoverBox {
   display: flex; flex-direction: column; gap: var(--tpl-htn6-hand-gap);
-  padding: var(--tpl-htn6-hand-pad); border-radius: var(--tpl-htn-radius-m);
-  background: var(--tpl-htn-soft-bg); box-shadow: var(--tpl-htn-ring);
+  padding: var(--tpl-htn6-hand-pad);
 }
 .handoverStats { display: flex; flex-wrap: wrap; gap: var(--tpl-htn6-stat-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
 .handoverStats strong { font-weight: 700; color: var(--color-ink); }
 
 /* ⑤ 完了 */
 .doneHero { display: flex; flex-direction: column; align-items: center; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn6-done-pad); text-align: center; }
-.doneHero svg { color: var(--color-accent-deep); }
+.doneIcon { color: var(--color-accent-deep); }
 .doneTitle { margin: 0; font-size: var(--tpl-htn6-text-20); line-height: var(--tpl-htn6-lh-28); font-weight: 700; color: var(--color-ink); }
+/* ⑤ 名前の箱。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
 .accountBox {
   display: flex; align-items: center; gap: var(--tpl-htn-gap-s);
-  padding: var(--tpl-htn6-acct-pad); border-radius: var(--tpl-htn-radius-m);
-  background: var(--color-surface-pearl); box-shadow: var(--tpl-htn-ring);
+  padding: var(--tpl-htn6-acct-pad);
 }
 .accountName { font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
 .accountId { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }

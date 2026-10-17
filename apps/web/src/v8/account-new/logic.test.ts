@@ -3,7 +3,7 @@ import type { LineAccountConnectData } from '@/lib/api'
 import {
   DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, allV8RowsPassed, checkActionLabel, checkErrorText,
   checkRowText, checkStage, developerChannelUrl, formatJaDuration, handoverProgress, loginChannelErrors,
-  messagingApiErrors, nextCursor, readDraft, stepBadge, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
+  messagingApiErrors, nextCursor, readDraft, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
 } from './logic'
 import type { V06CheckRow } from './logic'
 
@@ -51,11 +51,11 @@ describe('LINEアカウントを登録（★V8）の小さな計算', () => {
 describe('v06（LINE新規追加_v06.pen・2026-10-15承認）の小さな計算', () => {
   it('②は3つ、③は2つの小さな段。札は「Step 2 / 3」の形で、段の無い画面では出さない', () => {
     expect([subTotal(1), subTotal(2), subTotal(3), subTotal(4), subTotal(5)]).toEqual([0, 3, 2, 0, 0])
-    expect(stepBadge(2, 2)).toBe('Step 2 / 3')
-    expect(stepBadge(3, 2)).toBe('Step 2 / 2')
-    expect(stepBadge(1, 1)).toBe('')
+    expect(stepLabel(2, 2)).toBe('Step 2 / 3')
+    expect(stepLabel(3, 2)).toBe('Step 2 / 2')
+    expect(stepLabel(1, 1)).toBe('')
     // 範囲の外を渡されても札は壊さない。
-    expect(stepBadge(3, 9)).toBe('Step 2 / 2')
+    expect(stepLabel(3, 9)).toBe('Step 2 / 2')
   })
 
   it('②は Messaging API の2項目と LINEログインの2項目を別々に調べる（Step1でログインの欄を責めない）', () => {

@@ -19,13 +19,15 @@ import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
   DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, checkActionLabel, checkErrorText,
   checkStage, developerChannelUrl, formatJaDuration, handoverProgress, insightDateJst, isDuplicateChannelError,
-  loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, readDraft, stepBadge, subTotal,
+  loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, readDraft, stepLabel, subTotal,
   templateOptions, toV06CheckRows,
   type DraftState, type StepNumber,
 } from './logic'
@@ -96,7 +98,7 @@ export default function AccountRegisterV8() {
   const checkRows = toV06CheckRows(connection, { running: checkRunning, cursor: checkCursor })
   const rowsOk = allV06RowsOk(checkRows)
   const checkNotice = checkErrorText(checkStage(connection, checkRunning), checkRows)
-  const badge = stepBadge(currentStep, sub)
+  const badge = stepLabel(currentStep, sub)
   const createdId = connection?.id ?? ''
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const callbackUrl = workerBase ? `${workerBase}/auth/callback` : emptyValue('unknown')
@@ -164,7 +166,7 @@ export default function AccountRegisterV8() {
     let cancelled = false
     void (async () => {
       try {
-        const dataUrl = await qrToDataURL(addFriendUrl, { width: 220, margin: 1, color: { dark: '#171717', light: '#ffffff' } })
+        const dataUrl = await qrToDataURL(addFriendUrl, { width: 220, margin: 1 })
         if (!cancelled) setQrDataUrl(dataUrl)
       } catch (saveFailure) {
         saveErrors.capture(saveFailure) /* QRが出なくてもURLから追加できる。 */ }
@@ -474,12 +476,12 @@ export default function AccountRegisterV8() {
           {currentStep === 1 && (
             <CreateStepColumns data-design-node="p6zMkA" previewTitle="この5段でやること" preview={(
                 <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="この5段でやること">
-                <h2>この5段でやること</h2>
-                <p>① 事前確認：公式アカウントと2つのチャネルを用意</p>
-                <p>② アカウント接続：チャネル ID とシークレット、LINE側の設定</p>
-                <p>③ 接続確認：5つの確認が通ってから登録し、友だち追加を試す</p>
-                <p>④ 使い方を選ぶ：いちばん近いひな形を選ぶ</p>
-                <p>⑤ 完了：いまの友だちの引き継ぎ</p>
+                <h2 className={styles.asideH2}>この5段でやること</h2>
+                <p className={styles.asideP}>① 事前確認：公式アカウントと2つのチャネルを用意</p>
+                <p className={styles.asideP}>② アカウント接続：チャネル ID とシークレット、LINE側の設定</p>
+                <p className={styles.asideP}>③ 接続確認：5つの確認が通ってから登録し、友だち追加を試す</p>
+                <p className={styles.asideP}>④ 使い方を選ぶ：いちばん近いひな形を選ぶ</p>
+                <p className={styles.asideP}>⑤ 完了：いまの友だちの引き継ぎ</p>
               </Card>
               )}>
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="アカウントの用意方法">
@@ -511,10 +513,10 @@ export default function AccountRegisterV8() {
           {currentStep === 2 && (
             <CreateStepColumns data-design-node="Fqy29" previewTitle="どこにある？" preview={(
                 <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="どこにある？">
-                <h2>どこにある？</h2>
-                <p>チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
-                <p>登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
-                <p>秘密値は保存後に画面へ表示されません。</p>
+                <h2 className={styles.asideH2}>どこにある？</h2>
+                <p className={styles.asideP}>チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
+                <p className={styles.asideP}>登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
+                <p className={styles.asideP}>秘密値は保存後に画面へ表示されません。</p>
               </Card>
               )}>
               {sub === 1 && (
@@ -599,9 +601,9 @@ export default function AccountRegisterV8() {
           {currentStep === 3 && sub === 1 && (
             <CreateStepColumns data-design-node="Lwxyh" previewTitle="ここで登録します" preview={(
                 <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ここで登録します">
-                <h2>ここで登録します</h2>
-                <p>5つの確認がすべて通るまで、アカウントは作られません。</p>
-                <p>止まった項目を直して、もう一度「もう一度確かめる」を押します。</p>
+                <h2 className={styles.asideH2}>ここで登録します</h2>
+                <p className={styles.asideP}>5つの確認がすべて通るまで、アカウントは作られません。</p>
+                <p className={styles.asideP}>止まった項目を直して、もう一度「もう一度確かめる」を押します。</p>
               </Card>
               )}>
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続確認">
@@ -622,7 +624,7 @@ export default function AccountRegisterV8() {
                   ))}
                 </ul>
                 {checkNotice && (
-                  <div className={styles.errorBox} data-tone={checkNotice.tone} role={checkNotice.tone === 'danger' ? 'alert' : undefined}>
+                  <div className={checkNotice.tone === 'info' ? `${styles.errorBox} ${styles.errorBoxInfo}` : styles.errorBox} role={checkNotice.tone === 'danger' ? 'alert' : undefined}>
                     <p>{checkNotice.title}</p>
                     <p>{checkNotice.body}</p>
                   </div>
@@ -637,9 +639,9 @@ export default function AccountRegisterV8() {
           {currentStep === 3 && sub === 2 && connection && (
             <CreateStepColumns data-design-node="Lwxyh" previewTitle="ためしに友だち追加" preview={(
                 <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ためしに友だち追加">
-                <h2>ためしに友だち追加</h2>
-                <p>自分のスマホの LINE で QR を読み取って、友だち追加してみてください。</p>
-                <p>届かなくても先へ進めます。あとから友だち一覧で確かめられます。</p>
+                <h2 className={styles.asideH2}>ためしに友だち追加</h2>
+                <p className={styles.asideP}>自分のスマホの LINE で QR を読み取って、友だち追加してみてください。</p>
+                <p className={styles.asideP}>届かなくても先へ進めます。あとから友だち一覧で確かめられます。</p>
               </Card>
               )}>
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ためしに友だち追加">
@@ -660,7 +662,7 @@ export default function AccountRegisterV8() {
                       <span className={styles.endpointValue} ><TruncatedText value={addFriendUrl || String(emptyValue('unknown'))} url /></span>
                       <CopyButton value={addFriendUrl || String(emptyValue('unknown'))} />
                     </Card>
-                    <div className={styles.errorBox} data-tone={testFollowed ? 'info' : undefined}>
+                    <div className={testFollowed ? `${styles.errorBox} ${styles.errorBoxInfo}` : styles.errorBox}>
                       <p>{testFollowed ? '友だち追加が届きました' : 'まだ届いていません'}</p>
                       <p>{testFollowed ? 'musubo の友だち一覧に入りました。次へ進んでください。' : '読み取って友だち追加すると、ここが自動で変わります。届かなくても先へ進めます。'}</p>
                     </div>
@@ -673,31 +675,24 @@ export default function AccountRegisterV8() {
           {currentStep === 4 && (
             <CreateStepColumns data-design-node="X0pGdw" previewTitle="あとから変えられます" preview={(
                 <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="あとから変えられます">
-                <h2>あとから変えられます</h2>
-                <p>選んだ使い方でダッシュボードの並びが決まります。</p>
-                <p>カードは、あとから自分で足し引きできます。</p>
+                <h2 className={styles.asideH2}>あとから変えられます</h2>
+                <p className={styles.asideP}>選んだ使い方でダッシュボードの並びが決まります。</p>
+                <p className={styles.asideP}>カードは、あとから自分で足し引きできます。</p>
               </Card>
               )}>
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="使い方を選ぶ">
                 <h2 className={styles.panelTitle}>いちばん近い使い方を選んでください</h2>
-                <div className={styles.templateGrid}>
+                <RadioCardGroup legend="いちばん近い使い方" columns={2}>
                   {templateOptions().map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      className={styles.templateCard}
-                      aria-pressed={templateKey === option.key}
-                      disabled={!option.enabled}
-                      onClick={() => { setTemplateKey(option.key); setError('') }}
-                    >
-                      <span className={styles.templateHead}>
-                        <span className={styles.templateLabel}>{option.label}</span>
-                        {!option.enabled && <span className={styles.templateBand}>準備中</span>}
-                      </span>
-                      <span className={styles.templateNote}>{option.note}</span>
-                    </button>
+                    <RadioCard
+                      key={option.key} name="template" value={option.key} title={option.label} note={option.note}
+                      checked={templateKey === option.key} disabled={!option.enabled}
+                      ariaLabel={option.enabled ? option.label : `${option.label}（順次公開）`}
+                      icon={option.enabled ? null : <StatusBadge tone="info" size="compact" dot={false}>順次公開</StatusBadge>}
+                      onChange={() => { setTemplateKey(option.key); setError('') }}
+                    />
                   ))}
-                </div>
+                </RadioCardGroup>
               </Card>
             </CreateStepColumns>
           )}
@@ -719,7 +714,7 @@ export default function AccountRegisterV8() {
                 </Card>
               </> : <>
                 <div className={styles.doneHero}>
-                  <CircleCheck size={28} aria-hidden="true" />
+                  <CircleCheck size={28} className={styles.doneIcon} aria-hidden="true" />
                   <p className={styles.doneTitle}>準備ができました</p>
                 </div>
                 <Card className={styles.accountBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">

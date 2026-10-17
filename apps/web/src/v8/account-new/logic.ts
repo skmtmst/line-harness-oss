@@ -180,8 +180,8 @@ export function subTotal(stage: StepNumber): number {
   return stage === 2 ? 3 : stage === 3 ? 2 : 0
 }
 
-/** 小さな段の札。「Step 2 / 3」。段の無い画面では空。 */
-export function stepBadge(stage: StepNumber, sub: number): string {
+/** 小さな段の見出しの字。「Step 2 / 3」。状態の札ではない。段の無い画面では空。 */
+export function stepLabel(stage: StepNumber, sub: number): string {
   const total = subTotal(stage)
   return total === 0 ? '' : `Step ${Math.min(Math.max(sub, 1), total)} / ${total}`
 }

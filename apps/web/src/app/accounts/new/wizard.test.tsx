@@ -91,7 +91,7 @@ async function saveAndFinish() {
   fireEvent.click(screen.getByRole('button', { name: '登録する' }))
   await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
   next()
-  fireEvent.click(screen.getByRole('button', { name: /飲食店向け/ }))
+  fireEvent.click(screen.getByRole('radio', { name: /飲食店向け/ }))
   next()
 }
 
