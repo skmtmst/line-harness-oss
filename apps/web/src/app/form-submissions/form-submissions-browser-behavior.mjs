@@ -772,6 +772,7 @@ try {
     assert.equal(await linkDialog.getByRole('button', { name: '保存する', exact: true }).count(), 0,
       'V8: 設定の窓に2つ目の保存を置かない')
     await page.locator('#fe-og-title').fill('ごはんの相談フォーム')
+    assert.equal(await page.locator('#fe-og-title').inputValue(), 'ごはんの相談フォーム', 'V8: 最初の入力を窓の描き直しで失わない')
     await page.locator('#fe-og-desc').fill('3分で終わります')
     // MediaSlot は「URL で入れる」を押してから入力欄を出す。
     assert.equal(await linkDialog.locator('#fe-og-image').count(), 0, 'V8: 画像URLは開く前に出さない')

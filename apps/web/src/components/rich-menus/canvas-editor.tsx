@@ -1,14 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
-import {
-  CalendarCheck, CalendarClock, ClipboardList, Copy, History, Stamp, FileText, Link2, MessageCircle, MousePointerClick, Phone, Repeat, Zap,
-  type LucideIcon,
-} from 'lucide-react'
-import Notice from '@/components/shared/notice'
 import { intentLabelOf } from '@/components/rich-menus/area-properties'
+import Notice from '@/components/shared/notice'
+import { RICH_MENU_DIMENSIONS,type RichMenuAreaIntent } from '@line-crm/shared'
+import { useEffect,useMemo,useRef,useState } from 'react'
+import { AreaIcon } from './area-icon'
 import styles from './canvas-v8.module.css'
+export { AreaIcon } from './area-icon'
+
 
 export type Area = {
   id: string
@@ -89,17 +88,6 @@ function snap(value: number, others: number[]): number {
 /** 読み上げと一覧で使う名前。未命名なら位置から通し番号を振る。 */
 export function areaDisplayName(area: Area, index: number): string {
   return area.label?.trim() || `${index + 1}番目のボタン`
-}
-
-/** 面の名前の上に置く印（動きの種類ごと）。動きが決まっていない面は「押す」の印。 */
-const INTENT_ICON: Record<RichMenuAreaIntent, LucideIcon> = {
-  url: Link2, tel: Phone, text: MessageCircle, template: FileText, form: ClipboardList,
-  switch: Repeat, postback: Zap, datetime: CalendarClock, clipboard: Copy,
-  booking: CalendarCheck, booking_history: History, visit_stamp: Stamp,
-}
-function AreaIcon({ intent }: { intent?: RichMenuAreaIntent | null }) {
-  const Icon = intent ? INTENT_ICON[intent] ?? MousePointerClick : MousePointerClick
-  return <Icon size={20} aria-hidden="true" className={styles.areaIcon} />
 }
 
 function isOverlapping(a: Area, others: Area[]): boolean {

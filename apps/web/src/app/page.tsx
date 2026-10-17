@@ -1,9 +1,9 @@
 'use client'
 
 import { Suspense } from 'react'
-import Screen from '@/v8/dashboard/dashboard'
+import Screen from '@/v8/style-dashboard/home'
 
-/** V8 の入口。URL・読み書き・権限は画面側で保つ。 */
+/** V8 の入口。使い方のスタイル（B-294）で業種ダッシュボードと標準のダッシュボードを出し分ける。 */
 export default function DashboardPage() {
   return <Suspense fallback={null}><Screen /></Suspense>
 }

@@ -80,8 +80,8 @@ describe('札の置き場所', () => {
     expect(v8).toMatch(/>生成をやめる</)
   })
 
-  it('v8 の寸法の文は `exportSizeText` から組む（決め打ちしない）', () => {
-    expect(v8).toMatch(/text=\{exportSizeText\(presets, input\.presetKey\)\}/)
+  it('v8 の寸法の文を決め打ちしない', () => {
+    // 札の文の組み方（exportSizeText・presetSizeLabel）は、lib/hq-banners.test.ts が値で守る。ここは決め打ちの文が戻らないことだけを見る。
     for (const source of [v8]) {
       expect(source).not.toMatch(/'1040 × 1040 で書き出します'/)
     }

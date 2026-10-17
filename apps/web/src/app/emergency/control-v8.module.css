@@ -59,7 +59,8 @@
 .accountRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  /* ［選んだものを止める］は欄（題の下の選ぶ欄）と同じ高さにそろえる（絵 OHwbU）。 */
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--tpl-rest3-em-row-gap);
   margin-top: var(--tpl-rest3-em-row-gap);
@@ -240,6 +241,11 @@
 .cellTruncate {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellWrapWords > span {
+  display: inline-block;
   white-space: nowrap;
 }
 

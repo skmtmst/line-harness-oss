@@ -122,6 +122,8 @@ V6の「1時間に受けられる数」は単純な全体上限にしない。�
 
 現行は日付別shiftが無いと毎週ルールへ戻るため、休業日を表現できない。明示的な `closed` 例外を追加する。
 
+- **決定 B-337（Q-29）**：休業日を入れたとき、その日の既存予約（人の予約）は取り消さず一覧を出し、店が確かめてから知らせを送る（飲食と同じ）。
+
 ### 5-3. 基本ルール
 
 - 何日先まで公開するか
@@ -548,3 +550,7 @@ V6は削除せず、そのまま要件の表現として使える。実装可能
 - 1440px・1920pxの設計画像との比較
 
 したがって機能28は「一部実装」であり、4画面完了・機能完了にはしない。
+
+## 操作と挙動（受け入れ）
+
+操作したらどう動くか・連携とエラー・日々の手順・今の作りとの食い違いは [28 操作と挙動](../v8-requirements/behavior/28-booking-settings.md) にまとめた（2026-10-16 B-333）。 お金まわり・業種のダッシュボードは [style-and-money](../v8-requirements/behavior/style-and-money.md)、外のサービスの失敗は [integration-failures](../v8-requirements/behavior/integration-failures.md)、毎日の流れは [daily-operations](../v8-requirements/behavior/daily-operations.md)。

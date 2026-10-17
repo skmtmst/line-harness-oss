@@ -461,7 +461,7 @@ export default function TemplateDetailV8() {
                       {version.status === 'in_use' ? 'いま使っている版'
                         : version.status === 'reserved' ? `予約した版（${version.effectiveFrom ? `${shortStamp(version.effectiveFrom)}から使う` : '予約中'}）` : '前の版'}
                     </p>
-                    <p className={styles.versionMeta}>{shortStamp(version.createdAt)}</p>
+                    <p className={styles.versionMeta}>{`${version.creatorName ?? '作成者不明'}・${shortStamp(version.createdAt)}`}</p>
                   </div>
                   {version.status !== 'in_use' ? (
                     <div className={styles.versionActions}>

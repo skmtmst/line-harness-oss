@@ -37,6 +37,10 @@
   flex-shrink: 0;
   align-items: center;
 }
+/* 右端の操作（…）と行き先リンクを両方持つ段は、2つを右端に並べる（間で空きを分けない）。 */
+.link + .link {
+  margin-left: 0;
+}
 :root .title { line-height: 23px; }
 /* 補足の円と当たりは HelpTip が持つ。包みの span に二重の円を描かない。 */
 

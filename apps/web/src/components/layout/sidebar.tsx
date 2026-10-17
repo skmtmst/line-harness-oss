@@ -1,33 +1,42 @@
 'use client'
 
-import { V8_NAV_ICONS } from './sidebar-icons'
 import { revealInScroller } from './sidebar-current-item'
+import { V8_NAV_ICONS } from './sidebar-icons'
 export { revealInScroller } from './sidebar-current-item'
 
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 
+import { SidebarAccountMenu } from '@/components/hq/account-menu'
+import Notice from '@/components/shared/notice'
+import { defaultTitleForPath } from '@/components/shell/app-top-bar'
+import { usePageChrome } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
+import { restaurantTestUiEnabled } from '@/lib/environment-features'
+import { SIDEBAR_TOGGLE_EVENT,UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import {
+FEATURE_SETTINGS_UPDATED_EVENT,
+SIDEBAR_FEATURE_BY_HREF,
+SPECIALIZED_FEATURE_KEYS,
+} from '@/lib/feature-settings'
+import { HQ_MENU_SECTIONS,isHqShellPath,menuOwnerForScreen,orderedMenuSections,type MenuItem,type MenuSection } from '@/lib/menu'
 import { useStaffRole } from '@/lib/staff-role'
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useBrand } from '@/lib/use-brand'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useAccount } from '@/contexts/account-context'
-import { SIDEBAR_TOGGLE_EVENT, UNANSWERED_REFRESH_EVENT } from '@/lib/events'
-import { useBrand } from '@/lib/use-brand'
-import { restaurantTestUiEnabled } from '@/lib/environment-features'
-import { HQ_MENU_SECTIONS, isHqShellPath, menuOwnerForScreen, orderedMenuSections, type MenuItem, type MenuSection } from '@/lib/menu'
-import { usePageChrome } from '@/components/shell/page-chrome'
-import { defaultTitleForPath } from '@/components/shell/app-top-bar'
-import SidebarIdentity from './sidebar-identity'
+import { useEffect,useLayoutEffect,useRef,useState } from 'react'
 import { brandInitial } from './brand-initial'
+import SidebarIdentity from './sidebar-identity'
+import { isBooleanRecord,watchNavOverflow } from './sidebar-nav-overflow'
 import SidebarVersion from './sidebar-version'
-import Notice from '@/components/shared/notice'
-import { SidebarAccountMenu } from '@/components/hq/account-menu'
-import {
-  FEATURE_SETTINGS_UPDATED_EVENT,
-  SIDEBAR_FEATURE_BY_HREF,
-  SPECIALIZED_FEATURE_KEYS,
-} from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
+
+function NavIcon({ d, className }: { d: string; className?: string }) {
+  return (
+    <svg className={className ?? "h-[18px] w-[18px]"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
+    </svg>
+  )
+}
 
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
    反映するため同型のエイリアスを使う（描画後の1回分のズレを防ぐ）。 */
@@ -49,38 +58,6 @@ export const SIDEBAR_AUTO_COLLAPSE_BELOW = 1152
 
 /** 左メニューのいちばん下の「設定」（夕41・部品 njl8e）。歯車は予約設定と同じ形。 */
 const SETTINGS_GEAR_ICON = 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31-.826 2.37-2.37 1.04-.6 2.296-.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
-
-// ─── メニュー定義 ───
-//
-// Pen.dev の V5正式共通メニュー（`J33xq`）に合わせている。
-// 区分・並び・呼び名は設計が出どころで、勝手に足したり並べ替えたりしない。
-//
-// 行き先（href）は実装側の都合で決まる。設計は画面の名前しか持たないので、
-// 「設計の名前 → 実装のルート」の対応をここで引き受けている。
-// 例: 設計の「受信箱」は実装の /chats、「タグ」は /tags。
-//
-// 設計に無い画面（重複検出、プール管理など）は、対応する画面のタブとして
-// 中に入っている。サイドバーから消しても行けなくならない。
-
-/*
- * 項目そのものは `@/lib/menu` に置いてある。機能設定と同じものを読む。
- * ここに別で並べていた頃は、メニューにしか無い項目・機能設定にしか無い
- * 項目が双方にできて、切り替えても消えない項目があった。
- */
-function NavIcon({ d, className }: { d: string; className?: string }) {
-  return (
-    <svg className={className ?? "h-[18px] w-[18px]"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
-    </svg>
-  )
-}
-
-function isBooleanRecord(value: unknown): value is Record<string, boolean> {
-  return typeof value === 'object'
-    && value !== null
-    && !Array.isArray(value)
-    && Object.values(value).every((entry) => typeof entry === 'boolean')
-}
 
 /*
  * PERF-08: バッジ件数をアカウント単位で共有する直近値。
@@ -417,6 +394,26 @@ export default function Sidebar({
    * アカウントごとの直近値をモジュールに共有しておき、表示はそれで
    * 即復帰させてから裏で取り直す。
    */
+  /* 統括の「対応が要るもの」の札（B-322）。全アカウントの件数の合計。読めないときは出さない。 */
+  const [hqAttentionCount, setHqAttentionCount] = useState(0)
+  useEffect(() => {
+    if (!isHq) return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const { hqStyleApi } = await import('@/lib/api-styles')
+        const res = await hqStyleApi.attention()
+        if (cancelled || !res.success) return
+        setHqAttentionCount(res.data.items.reduce((sum, item) => sum + Object.values(item.counts as Record<string, number>).reduce<number>((a, b) => a + (b ?? 0), 0), 0))
+      } catch {
+        // 口がまだ無い・読めない：札を出さない
+      }
+    }
+    void load()
+    const id = setInterval(load, 5 * 60_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [isHq])
+
   const photosBadgeVisible = visibleSections.some(
     (section) => section.items.some((item) => item.badge === 'photos'),
   )
@@ -550,6 +547,7 @@ export default function Sidebar({
    * 取り残される。
    */
   const badgeCount = (item: MenuItem) => {
+    if (item.badge === 'hq-attention') return hqAttentionCount
     if (item.badge === 'unanswered') return unansweredCount
     if (item.badge === 'photos') return pendingPhotoCount
     if (item.badge === 'unmatched') return unmatchedCount
@@ -713,7 +711,7 @@ export default function Sidebar({
       <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
-      <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
+      <nav ref={watchNavOverflow} className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
         {/*
           ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
           小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
@@ -847,10 +845,11 @@ export default function Sidebar({
 
       {/*
         ★V8（夕41・部品 njl8e）：左メニューのいちばん下、版の上に「設定」。
-        オーナー・管理者にだけ出す。設定の画面ではここが選ばれた形にする。
+        オーナー・管理者にだけ出す（閲覧専用のオーナー・管理者にも出す。設定は見るだけで開ける）。
+        設定の画面ではここが選ばれた形にする。
         nav は中身が多いときだけ縦に送り、この入口と版は下端に固定される。
       */}
-      {!isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
+      {!isHq && !preview && (staffReadRole === 'owner' || staffReadRole === 'admin') && (
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"

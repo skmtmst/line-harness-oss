@@ -29,6 +29,8 @@ export interface RichMenuCreateHost {
   distribute: ReactNode
   /** 選んだアカウントの数。 */
   selectedCount: number
+  /** 選んだアカウントの ID（配る前の確認の口に渡す。手順②③の右の列の数）。 */
+  selectedIds: string[]
   /** 選んだアカウントの友だちの合計（読めないときは null。③④の右の列「出る人」）。 */
   friendTotal: number | null
   busy: boolean

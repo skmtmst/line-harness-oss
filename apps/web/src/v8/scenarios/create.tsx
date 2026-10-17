@@ -30,7 +30,7 @@ import { useAccount } from '@/contexts/account-context';
 import { useStaffRole } from '@/lib/staff-role';
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
 import styles from './create.module.css'
-import DeliveryModeExample from './delivery-mode-example'
+import DeliveryModeDiagram from './delivery-mode-diagram'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
@@ -504,8 +504,11 @@ export default function ScenarioCreateV8() {
             disabled={fieldsDisabled}
             icon={<CalendarClock size={16} aria-hidden="true" />}
             title="時刻で指定"
-            note="購読開始から〇日後の〇時。メルマガ・朝夜の定期配信に"
-          />
+            note="購読開始から〇日後の〇時に届きます。決まった時刻の定期配信（メルマガ・朝の配信）に"
+          >
+            {/* G-5：2人がいつ受け取るかの図を各カードの中に（絵 cu3vm・dnzqC。下の見本の表は図に入ったので消した・R83uvQ）。 */}
+            <DeliveryModeDiagram mode="absolute_time" selected={selectedMode === 'absolute_time'} />
+          </RadioCard>
           <RadioCard
             name="delivery-mode"
             value="elapsed"
@@ -514,10 +517,11 @@ export default function ScenarioCreateV8() {
             disabled={fieldsDisabled}
             icon={<Timer size={16} aria-hidden="true" />}
             title="経過時間で指定"
-            note="購読開始から〇時間〇分後。買った直後・予約直後のフォローに"
-          />
+            note="購読開始から〇日と〇時間後に届きます。買った直後・予約直後のフォローに"
+          >
+            <DeliveryModeDiagram mode="elapsed" selected={selectedMode === 'elapsed'} />
+          </RadioCard>
         </RadioCardGroup></SaveErrorField>
-        <DeliveryModeExample mode={selectedMode} />
       </Card>
     </CreatePage></SaveErrorScope>
   )
