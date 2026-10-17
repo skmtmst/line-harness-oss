@@ -8,7 +8,7 @@ import type { LineAccountConnectData } from '@/lib/api'
 const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(),
   followerImportState: vi.fn(), stepFollowerImport: vi.fn(), followerInsight: vi.fn(),
-  staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(),
+  staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(), friendsList: vi.fn(),
 }))
 vi.mock('@/lib/api', () => ({
   api: {
@@ -21,9 +21,11 @@ vi.mock('@/lib/api', () => ({
       followerInsight: calls.followerInsight,
     },
     staff: { list: calls.staffList },
+    friends: { list: calls.friendsList },
     lineAccountTags: { list: calls.tagList, create: calls.tagCreate, setForAccount: calls.tagSet },
   },
 }))
+vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('@/components/step-up-prompt', () => ({
   default: () => null,
   isStepUpRequired: () => false,
@@ -71,109 +73,198 @@ beforeEach(() => {
   calls.staffList.mockResolvedValue({ success: true, data: [] })
   calls.tagList.mockResolvedValue({ success: true, data: [] })
   calls.followerInsight.mockResolvedValue({ success: true, data: { followers: null } })
+  calls.friendsList.mockResolvedValue({ success: true, data: { total: 0 } })
 })
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
+/** ②の中だけ進むボタンの名前が違う（v06 Fqy29）。 */
+const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
+const back = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
 
-async function enterCheckStep() {
+const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
+
+/**
+ * v06（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * 入力を変えると確認がやり直しになるので先に全部入れる。
+ */
+function enterCheckStep() {
   render(<RegisterV8 />)
   next()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  nextStep()
+  ack('Webhookの利用をONにした')
+  ack('Webhookの再送をONにした')
+  ack('エラーの統計情報をONにした')
+  nextStep()
   fill('v8-login-channel-id', '2007123456')
   fill('v8-login-channel-secret', 'synthetic-login-secret')
-  next()
-  next()
-  expect(await screen.findByRole('button', { name: '接続して設定する' })).toBeTruthy()
+  ack('友だち追加オプションで、この公式アカウントをリンクした')
+  ack('チャネルを「開発中」から「公開済み」にした')
+  nextStep()
+  expect(screen.getByRole('button', { name: '接続を確かめる' })).toBeTruthy()
+}
+
+/** 5行は1行ずつ順に出るので、すべて通って「登録する」が出るまで待つ。 */
+async function runCheck() {
+  fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '登録する' })).toBeTruthy(), { timeout: 5000 })
 }
 
 describe('V8 登録ウィザードの gated 進行', () => {
-  it('②の4項目が空では③へ進めない', async () => {
+  it('②Step1の2項目が空では次の段へ進めない', async () => {
     render(<RegisterV8 />)
     next()
-    next()
+    nextStep()
     expect(screen.getByText('チャネルIDを入力してください。')).toBeTruthy()
     const channel = document.getElementById('v8-channel-id')!
     expect(channel.getAttribute('aria-invalid')).toBe('true')
     await waitFor(() => expect(document.activeElement).toBe(channel))
     expect(screen.queryByText('入力内容を確認してください。')).toBeNull()
     expect(calls.connectCheck).not.toHaveBeenCalled()
-    expect(screen.queryByText('LINE ID')).toBeNull()
+    expect(screen.queryByText('Webhook の設定', { selector: 'h2' })).toBeNull()
   })
 
   /*
-    絵の正本ノードは、ソース文字の検索（旧 accounts-setup-visual-parity.test.ts の並び）ではなく
-    実際に描かれた印で確かめる（B-273）。xj3zz=①／JYfda=②／GwKE2=③／v2KMj=④／TvXII=⑤、
-    qw80E=結果の窓。ノードとURLの対応は scripts/visual-qa/v8-design-map-route-contract.test.ts。
+    絵の正本ノードは、ソース文字の検索ではなく実際に描かれた印で確かめる（B-273）。
+    v06（LINE新規追加_v06.pen・2026-10-15承認）: p6zMkA=①／Fqy29=②／Lwxyh=③／X0pGdw=④／Plmq1=⑤。
+    ノードとURLの対応は scripts/visual-qa/v8-design-map-route-contract.test.ts。
   */
   const shownNode = () => document.querySelector('[data-design-node]')?.getAttribute('data-design-node')
 
-  it('各段と結果の窓は絵の正本ノードを描く', async () => {
-    render(<RegisterV8 />)
-    expect(shownNode()).toBe('xj3zz')
+  it('5つの段は絵の正本ノードを描く', async () => {
+    enterCheckStep()
+    expect(shownNode()).toBe('Lwxyh')
+    await runCheck()
+    fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+    await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
+    expect(shownNode()).toBe('Lwxyh')
     next()
-    expect(shownNode()).toBe('JYfda')
-    fill('v8-channel-id', '123456789')
-    fill('v8-channel-secret', 'synthetic-secret')
-    fill('v8-login-channel-id', '2007123456')
-    fill('v8-login-channel-secret', 'synthetic-login-secret')
+    expect(shownNode()).toBe('X0pGdw')
+    fireEvent.click(screen.getByRole('radio', { name: /飲食店向け/ }))
     next()
-    expect(shownNode()).toBe('GwKE2')
-    next()
-    expect(await screen.findByRole('button', { name: '接続して設定する' })).toBeTruthy()
-    expect(shownNode()).toBe('v2KMj')
-    fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-    expect(await screen.findByText('接続を確かめた結果')).toBeTruthy()
-    expect(document.querySelector('[data-design-node="qw80E"]')).toBeTruthy()
-    fireEvent.click(screen.getByText('LINE Official Account Manager で「応答メッセージ」をオフにしたことを確かめました'))
-    fireEvent.click(screen.getByRole('button', { name: '確認コードを入れて登録する' }))
-    expect(await screen.findByText('登録が完了しました')).toBeTruthy()
-    expect(document.querySelector('[data-design-node="TvXII"]')).toBeTruthy()
+    expect(shownNode()).toBe('Plmq1')
+    expect(await screen.findByText('準備ができました')).toBeTruthy()
   })
 
-  it('④は検査前は5行とも「まだ」', async () => {
-    await enterCheckStep()
-    expect(screen.getAllByText('まだ').length).toBeGreaterThanOrEqual(5)
+  /** v06はアカウントを③で作るので、作ったあとも段の表示は⑤へ飛ばさない。 */
+  it('段の表示は今いる段を指し、登録しても先へ飛ばさない', async () => {
+    const current = () => screen.getByRole('navigation', { name: '登録の進捗' })
+      .querySelector('[aria-current="step"]')?.textContent
+    enterCheckStep()
+    expect(current()).toContain('接続確認')
+    await runCheck()
+    fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+    await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
+    expect(current()).toContain('接続確認')
+    next()
+    expect(current()).toContain('使い方を選ぶ')
+  })
+
+  it('①と②も絵の正本ノードを描く', () => {
+    render(<RegisterV8 />)
+    expect(shownNode()).toBe('p6zMkA')
+    next()
+    expect(shownNode()).toBe('Fqy29')
+  })
+
+  /*
+    手順の順番は絵の正本がすべて（利用者指示 2026-10-17）。
+    `Fqy29` の `②-1 Step1 Messaging API`／`②-2 Step2 Webhook の設定`／`②-3 Step3 LINEログインの2項目`、
+    戻るの行き先の名前（事前確認へ戻る→Messaging API へ戻る→Webhook の設定へ戻る）、
+    `Lwxyh` Step1 の「LINEログインへ戻る」を、実際のボタン操作でたどって確かめる。
+  */
+  /** 出ている段は、描かれた札（Card の aria-label）で見る。 */
+  const PANELS = ['Messaging API のチャネル', 'Webhook の設定', 'LINE Login のチャネル'] as const
+  const shownPanel = () => PANELS.find((label) => document.querySelector(`[aria-label="${label}"]`))
+  const stepBadgeText = () => screen.getByText(/^Step \d \/ 3$/).textContent
+
+  it('②は絵の正本どおり Messaging API→Webhook→LINEログイン の順に進む', () => {
+    render(<RegisterV8 />)
+    next()
+    expect(stepBadgeText()).toBe('Step 1 / 3')
+    expect(shownPanel()).toBe('Messaging API のチャネル')
+
+    fill('v8-channel-id', '123456789')
+    fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
+    expect(stepBadgeText()).toBe('Step 2 / 3')
+    expect(shownPanel()).toBe('Webhook の設定')
+    expect(document.getElementById('v8-login-channel-id')).toBeNull()
+
+    ack('Webhookの利用をONにした')
+    ack('Webhookの再送をONにした')
+    ack('エラーの統計情報をONにした')
+    nextStep()
+    expect(stepBadgeText()).toBe('Step 3 / 3')
+    expect(shownPanel()).toBe('LINE Login のチャネル')
+  })
+
+  it('②の「次のステップへ」は、その段のチェックが全部入るまで押せない', () => {
+    render(<RegisterV8 />)
+    next()
+    fill('v8-channel-id', '123456789')
+    fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
+    const button = () => screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
+    expect(button().disabled).toBe(true)
+    ack('Webhookの利用をONにした')
+    ack('Webhookの再送をONにした')
+    expect(button().disabled).toBe(true)
+    ack('エラーの統計情報をONにした')
+    expect(button().disabled).toBe(false)
+  })
+
+  it('戻るボタンは行き先の名前で、絵の正本の順に逆戻りする', () => {
+    enterCheckStep()
+    expect(shownNode()).toBe('Lwxyh')
+
+    back('LINEログインへ戻る')
+    expect(shownPanel()).toBe('LINE Login のチャネル')
+    back('Webhook の設定へ戻る')
+    expect(shownPanel()).toBe('Webhook の設定')
+    back('Messaging API へ戻る')
+    expect(shownPanel()).toBe('Messaging API のチャネル')
+    back('事前確認へ戻る')
+    expect(shownNode()).toBe('p6zMkA')
+  })
+
+  it('③は確かめる前は5行とも待ちで、勝手に問い合わせない', () => {
+    enterCheckStep()
+    expect(screen.getByText('いただいた4項目で、2つのチャネルに接続できるか試します。')).toBeTruthy()
+    expect(document.querySelectorAll('[data-phase="waiting"]').length).toBe(5)
     expect(calls.connectCheck).not.toHaveBeenCalled()
   })
 
-  it('検査が通ると結果の窓が開き、手動の1行と確認ボタンが出る', async () => {
-    await enterCheckStep()
-    fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-    expect(await screen.findByText('接続を確かめた結果')).toBeTruthy()
-    expect(screen.getByText('応答メッセージ')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '確認コードを入れて登録する' })).toBeTruthy()
-  })
-
-  it('手動のチェックが無いと登録ボタンは押せない。入れると登録して⑤へ進む', async () => {
-    await enterCheckStep()
-    fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-    const registerButton = await screen.findByRole('button', { name: '確認コードを入れて登録する' })
-    expect((registerButton as HTMLButtonElement).disabled).toBe(true)
+  it('5行が通ってから登録でき、登録すると③Step2へ進む', async () => {
+    enterCheckStep()
+    expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
     expect(calls.connect).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByText('LINE Official Account Manager で「応答メッセージ」をオフにしたことを確かめました'))
-    expect((registerButton as HTMLButtonElement).disabled).toBe(false)
-    fireEvent.click(registerButton)
+    await runCheck()
+    expect(document.querySelectorAll('[data-phase="ok"]').length).toBe(5)
+    fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await waitFor(() => expect(calls.connect).toHaveBeenCalledOnce())
-    expect(await screen.findByText('登録が完了しました')).toBeTruthy()
+    expect(await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })).toBeTruthy()
   })
 
   it('登録後は画面から取り込みの続きを進め、完了を画面へ反映する', async () => {
     calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account', followerImport: { capability: 'available', phase: 'importing_ids' } } })
     /* 読むだけ（followerImportState）では次の自動処理まで進まないので、画面は step を呼ぶ。 */
     calls.stepFollowerImport.mockResolvedValue({ success: true, data: { state: { capability: 'available', phase: 'completed', received: 10, imported: 10 }, busy: false, profilesFetched: 10 } })
-    await enterCheckStep()
-    fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-    const registerButton = await screen.findByRole('button', { name: '確認コードを入れて登録する' })
-    fireEvent.click(screen.getByText('LINE Official Account Manager で「応答メッセージ」をオフにしたことを確かめました'))
-    fireEvent.click(registerButton)
+    enterCheckStep()
+    await runCheck()
+    fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+    await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
+    next()
+    fireEvent.click(screen.getByRole('radio', { name: /飲食店向け/ }))
+    next()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledWith('new-account'))
     expect(calls.followerImportState).not.toHaveBeenCalled()
-    expect(await screen.findByText('登録が完了しました')).toBeTruthy()
+    expect(await screen.findByText('準備ができました')).toBeTruthy()
   })
 
-  it('止まった項目があると窓は開かず保存もしない', async () => {
+  it('「Webhookの利用」がオフなら、その行で止めて保存しない', async () => {
     const failedSteps = passedSteps.map((step) => ({ ...step }))
     failedSteps[2] = { ...failedSteps[2], state: 'failed', message: 'LINE Developersで「Webhookの利用」をオンにしてください' }
     calls.connectCheck.mockResolvedValue({
@@ -187,11 +278,13 @@ describe('V8 登録ウィザードの gated 進行', () => {
         },
       },
     })
-    await enterCheckStep()
-    fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-    const failedRow = (await screen.findByText('LINE Developers で「Webhook の利用」がオフです。オンにしてから押し直してください')).closest('li')
-    expect(failedRow?.getAttribute('data-state')).toBe('failed')
-    expect(screen.queryByText('接続を確かめた結果')).toBeNull()
+    enterCheckStep()
+    fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
+    // 行の文字は止まった時点で出るが、案内は5行の演出が終わってから出る。
+    expect(await screen.findByText('「Webhookの利用」をONにしてください', {}, { timeout: 5000 })).toBeTruthy()
+    const failedRow = screen.getByText('URLは登録できましたが、「Webhookの利用」がOFFのままです。上の案内のとおりONにしてください。').closest('li')
+    expect(failedRow?.getAttribute('data-phase')).toBe('error')
+    expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
     expect(calls.connect).not.toHaveBeenCalled()
   })
 })
