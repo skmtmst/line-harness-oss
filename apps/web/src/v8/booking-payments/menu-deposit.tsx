@@ -9,6 +9,7 @@ import NumberInput from '@/components/shared/number-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import SegmentedControl from '@/components/shared/segmented'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope } from '@/components/shared/save-form-errors'
 import TextLink from '@/components/shared/text-link'
 import { gapDraftApi, type DepositRule } from '@/lib/api-gap-draft'
 import type { MenuPaymentState } from './menu-payment'
@@ -54,7 +55,7 @@ const yen = (value: number) => `¥${Math.floor(value).toLocaleString('ja-JP')}`
 
 export function BookingMenuPaymentCard({ payment, deposit, price, readOnly }: { payment: MenuPaymentState; deposit: MenuDepositState; price: number | null; readOnly: boolean }) {
   const depositOn = Boolean(deposit.draft && !deposit.draft.inherit && deposit.draft.kind !== 'none')
-  const choice: Choice = depositOn ? 'deposit' : payment.value === 'online' ? 'online' : payment.value === 'onsite' || payment.value === 'none' ? 'onsite' : 'default'
+  const choice: Choice = depositOn ? 'deposit' : payment.value === 'online' ? 'online' : payment.value === 'onsite' || payment.value === 'none' || payment.value === 'customer_choice' ? 'onsite' : 'default'
   const choose = (next: Choice) => {
     if (next === 'default') payment.setValue(null)
     else payment.setValue(next === 'deposit' ? 'online' : next)
@@ -65,10 +66,11 @@ export function BookingMenuPaymentCard({ payment, deposit, price, readOnly }: { 
   const header = <CardHeader size="stacked" title="お支払い" help={<HelpTip label="お支払いの説明">いつもの方法は予約設定 › お支払いのとおりです。デポジットは予約のときに一部を先に払ってもらい、残りはお店で払います。</HelpTip>} />
   if (payment.status === 'loading') return <Card variant="form" gap="normal">{header}<p className={styles.minor}>お支払いの設定を読み込んでいます…</p></Card>
   if (!payment.connected) return <Card variant="form" gap="normal">{header}<p className={styles.sideCardLink}><CreditCard size={15} aria-hidden="true" />先払い・デポジットを受けるには<TextLink href="/booking/menus?tab=payments">お支払いをつなぐ<ArrowRight size={14} aria-hidden="true" /></TextLink></p></Card>
-  if (readOnly) return <Card variant="form" gap="normal">{header}<p className={styles.readValue}>{choice === 'deposit' ? 'デポジット（一部）' : choice === 'default' ? `いつもの方法（${MODE_LABEL[payment.defaultMode]}）` : MODE_LABEL[choice]}</p></Card>
+  if (readOnly) return <Card variant="form" gap="normal">{header}<p className={styles.readValue}>{payment.value === 'customer_choice' ? MODE_LABEL.customer_choice : choice === 'deposit' ? 'デポジット（一部）' : choice === 'default' ? `いつもの方法（${MODE_LABEL[payment.defaultMode]}）` : MODE_LABEL[choice]}</p></Card>
   return (
     <Card variant="form" gap="normal">
       {header}
+      <SaveErrorScope errors={payment.saveErrors}><SaveErrorField names={['mode', 'payment_mode', 'provider']}>
       <RadioCardGroup legend="このメニューのお支払い" className={styles.fourChoices}>
         {([
           ['default', 'いつもの方法', '予約設定のお支払いのとおり'],
@@ -76,11 +78,14 @@ export function BookingMenuPaymentCard({ payment, deposit, price, readOnly }: { 
           ['onsite', 'お店で払う', '来店のときに払う'],
           ['deposit', 'デポジット（一部）', '予約のときに一部、残りはお店で'],
         ] as const).map(([value, title, note]) => (
-          <RadioCard key={value} name="menu-payment-choice" value={value} title={title} note={note}
+          <RadioCard key={value} name="menu-payment-choice" value={value} title={value === 'onsite' && payment.value === 'customer_choice' ? MODE_LABEL.customer_choice : title} note={value === 'onsite' && payment.value === 'customer_choice' ? '先払いか、お店で払うか' : note}
             checked={choice === value} disabled={value === 'deposit' && !deposit.ready} disabledReason={value === 'deposit' && !deposit.ready ? 'データの準備が済むと選べます' : undefined}
             onChange={() => choose(value)} />
         ))}
-      </RadioCardGroup>
+      </RadioCardGroup></SaveErrorField>
+      {choice === 'onsite' ? <Checkbox checked={payment.value === 'customer_choice'} disabled={payment.status === 'not-ready'}
+        onCheckedChange={(enabled) => payment.setValue(enabled ? 'customer_choice' : 'onsite')}>お客さまが選ぶ（先払いか、お店で払うか）</Checkbox> : null}
+      </SaveErrorScope>
       {choice === 'deposit' && rule ? (
         <>
           <div className={styles.depositLine}>
