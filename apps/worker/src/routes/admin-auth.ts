@@ -1,3 +1,4 @@
+import { readCookie } from '../middleware/auth-http.js';
 import { mfaConfiguration, mfaEncryptionConfigured, MFA_KEY_NOTICE } from '../lib/mfa-config.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -19,7 +20,7 @@ import {
   expiredCookie,
   sha256Hex,
 } from '../middleware/auth.js';
-import { clientIp, issueSession, maskIpPrefix, randomToken, twoFactorLoginUrl, twoFactorSetupUrl } from '../services/admin-session.js';
+import { clientIp, issueSession, maskIpPrefix, randomToken, recordSuccessfulLoginAudit, twoFactorLoginUrl, twoFactorSetupUrl } from '../services/admin-session.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import { recordAuditEvent, recordLoginAudit } from '@line-crm/db';
 import {
@@ -204,17 +205,6 @@ function oauthCookie(name: string, value: string, maxAge = OAUTH_MAX_AGE): strin
   return `${name}=${encodeURIComponent(value)}; Path=/api/auth/line; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 }
 
-function readCookie(header: string | undefined, name: string): string | null {
-  if (!header) return null;
-  for (const part of header.split(';')) {
-    const [key, ...value] = part.trim().split('=');
-    if (key === name) {
-      try { return decodeURIComponent(value.join('=')); } catch { return null; }
-    }
-  }
-  return null;
-}
-
 function callbackUrl(c: Context<Env>): string {
   return `${new URL(c.req.url).origin}/api/auth/line/callback`;
 }
@@ -241,23 +231,12 @@ function adminLoginUrl(c: Context<Env>, error?: string, next?: string | null): s
   return `${base}${path}${error ? `?error=${encodeURIComponent(error)}` : ''}`;
 }
 
-function logAuthFailure(branch: string, error: unknown): void {
+function logAuthFailure(): void {
   console.error(JSON.stringify({"code":"routes_admin_auth_failed"}));
 }
 
-async function recordLoginAuditBestEffort(c: Context<Env>, staffId: string): Promise<void> {
-  try {
-    await recordLoginAudit(c.env.DB, {
-      adminUserId: staffId,
-      action: 'login',
-      ip: clientIp(c),
-      userAgent: c.req.header('user-agent') ?? null,
-    });
-  } catch (error) {
-    // 監査台帳の一時障害で、発行済みセッションや認証成功を失敗扱いにしない。
-    // Cookie・OAuth code・token・LINE user id はログへ出さない。
-    logAuthFailure('recordLoginAudit', error);
-  }
+function recordLoginAuditBestEffort(c: Context<Env>, staffId: string): Promise<void> {
+  return recordSuccessfulLoginAudit(c, staffId, () => logAuthFailure());
 }
 
 adminAuth.get('/api/auth/line', async (c) => {
@@ -416,7 +395,7 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     try {
       session = await issueSession(c, staff.id, config.sameSite, remember);
     } catch (error) {
-      logAuthFailure('issueSession', error);
+      logAuthFailure();
       return lineLoginFailure(c, 'line_login_failed', next);
     }
     const adminUrl = new URL(c.env.ADMIN_PUBLIC_URL!.replace(/\/+$/, ''));
@@ -430,7 +409,7 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     await recordLoginAuditBestEffort(c, staff.id);
     return c.redirect(adminUrl.toString());
   } catch (error) {
-    logAuthFailure('lineCallback', error);
+    logAuthFailure();
     return lineLoginFailure(c, 'line_login_failed', next);
   }
 });
@@ -489,7 +468,7 @@ adminAuth.post('/api/auth/two-factor/verify', inputJsonBoundary({"challengeToken
   try {
     session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1, true);
   } catch (error) {
-    logAuthFailure('issueSession', error);
+    logAuthFailure();
     return c.json({ success: false, error: 'ログイン状態を作成できませんでした。ログインからやり直してください' }, 500);
   }
   await recordLoginAuditBestEffort(c, staff.id);
@@ -642,7 +621,7 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', inputJsonBoundary({"challen
   try {
     session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1, true);
   } catch (error) {
-    logAuthFailure('issueSession', error);
+    logAuthFailure();
     return c.json({ success: false, error: 'ログイン状態を作成できませんでした。ログインからやり直してください' }, 500);
   }
   await recordLoginAuditBestEffort(c, staff.id);
@@ -914,23 +893,11 @@ adminAuth.get('/api/auth/session', async (c) => {
   });
 });
 
-/**
- * 今のリクエストを通したセッションの生token。cookie優先、無ければBearer。
- * 見つからなければ null（API key ログイン等、セッション表へ載らない経路）。
- */
-function currentSessionToken(c: Context<Env>): string | null {
-  const fromCookie = adminSessionTokenFromCookie(c);
-  if (fromCookie) return fromCookie;
-  const authorization = c.req.header('Authorization') || '';
-  const bearerPrefix = `Bearer ${ADMIN_SESSION_BEARER_PREFIX}`;
-  return authorization.startsWith(bearerPrefix) ? authorization.slice(bearerPrefix.length) : null;
-}
-
 /** GET /api/auth/sessions — 本人のアクティブなセッションだけを返す。 */
 adminAuth.get('/api/auth/sessions', async (c) => {
   const staff = c.get('staff');
   if (!staff) return c.json({ success: false, error: 'Unauthorized' }, 401);
-  const currentHash = (token => token ? sha256Hex(token) : Promise.resolve(null))(currentSessionToken(c));
+  const currentHash = adminSessionTokenHashFromRequest(c);
   const rows = await listAdminSessionsByStaff(c.env.DB, staff.id, new Date().toISOString());
   const sessions = rows.map((row) => ({
     id: row.token_hash,
@@ -956,8 +923,7 @@ adminAuth.delete('/api/auth/sessions/:tokenHash', async (c) => {
   const staff = c.get('staff');
   if (!staff) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const tokenHash = c.req.param('tokenHash');
-  const currentToken = currentSessionToken(c);
-  const currentHash = currentToken ? await sha256Hex(currentToken) : null;
+  const currentHash = await adminSessionTokenHashFromRequest(c);
   const body = await c.req.json<{ confirmCurrent?: boolean }>().catch(() => ({} as { confirmCurrent?: boolean }));
   const confirmed = body.confirmCurrent === true || c.req.query('confirmCurrent') === '1';
   if (currentHash === tokenHash && !confirmed) {
@@ -982,8 +948,7 @@ adminAuth.delete('/api/auth/sessions/:tokenHash', async (c) => {
 adminAuth.post('/api/auth/sessions/revoke-others', inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   if (!staff) return c.json({ success: false, error: 'Unauthorized' }, 401);
-  const currentToken = currentSessionToken(c);
-  const currentHash = currentToken ? await sha256Hex(currentToken) : null;
+  const currentHash = await adminSessionTokenHashFromRequest(c);
   const revoked = currentHash
     ? await deleteOtherAdminSessions(c.env.DB, staff.id, currentHash)
     : 0;
