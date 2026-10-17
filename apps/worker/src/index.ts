@@ -304,6 +304,7 @@ app.use('*', cors({
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: [...ADMIN_REQUEST_HEADERS],
+  exposeHeaders: ['Content-Disposition', 'X-Exported-By', 'X-Exported-At', 'X-Csv-Total-Count', 'X-Csv-Returned-Count', 'X-Csv-Truncated'],
   maxAge: 600,
 }));
 

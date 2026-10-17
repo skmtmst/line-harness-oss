@@ -8,6 +8,7 @@ export function dangerousOperationPurpose(method: string, path: string, format?:
   if (method === 'OPTIONS') return null;
   // These routes consume a stricter one-use grant themselves.
   if (method === 'POST' && /^\/api\/affiliate-payout-batches\/[^/]+\/export$/.test(path)) return null;
+  if (['POST','PUT'].includes(method) && /\/exports(?:\/|$)/.test(path)) return 'data.export';
   if (isOutputRequest(path, format, method)) return 'data.export';
   if (/^\/api\/ops\/impersonation\/(start|write|pii-reveal)$/.test(path) && method === 'POST') return 'ops.impersonation';
   if (/^\/api\/(?:hq\/)?broadcasts\/[^/]+\/(send|send-segment|resume|retry|retry-failed|schedule)$/.test(path) && method === 'POST') return 'broadcast.send';

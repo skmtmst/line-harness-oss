@@ -50,9 +50,9 @@ describe('train30 export audit', () => {
   });
 });
 
-it('B351 stamps the CSV itself with actor/time, preserves rows, and never adds the staff name',async()=>{
+it('B351 stamps actor/time metadata while preserving CSV bytes for reimport',async()=>{
   const res=await app('/api/booking/admin/bookings.csv','csv').request('/api/booking/admin/bookings.csv',{}, {DB:db.db} as Env['Bindings']);
-  const csv=await res.text();expect(csv).toContain('# exported_by=fixture-operator exported_at=');
+  const csv=await res.text();expect(csv).toBe('Name,Note\r\n"Fixture","a\nb"\r\n"Other","safe"\r\n');
   expect(csvRecordCount(csv)).toBe(2);expect(csv).not.toContain('# exported_by=Fixture');
   expect(res.headers.get('X-Exported-By')).toBe('fixture-operator');expect(res.headers.get('X-Exported-At')).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 });

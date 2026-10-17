@@ -18,14 +18,14 @@ APIキーだけのプログラムには確認済みセッションがないた�
 
 | 対象 | purpose | 適用 |
 | --- | --- | --- |
-| CSV、export/download、書き出し作成 | data.export | 全管理APIの共通入口、`format=csv`も含む |
-| 配信のsend/send-segment/resume/retry-failed、統括の店ごとのretry、予約を有効にする保存 | broadcast.send | 共通入口。下書きの保存は再確認なし |
+| CSV、export/download、書き出し作成/作り直し | data.export | 全管理APIの共通入口、`format=csv`も含む |
+| 配信のsend/send-segment/resume/retry-failed、統括の店ごとのretry、予約を有効にする保存 | broadcast.send | 共通入口。下書きの保存は再確認なし。既存の予約済み配信を変える口も再確認 |
 | スタッフ・運営メンバーの追加/変更/停止 | staff.permissions.change | 共通入口と既存の担当別ガード。確認票は同一リクエストで二重消費しない |
 | 代理ログインstart/write/pii-reveal | ops.impersonation | 共通入口、終了と閲覧への戻しは止めない |
 | 鍵表示・成果受信鍵の発行 | secrets.reveal | 共通入口 |
 | 配信承認、LINE接続と鍵の変更、Webhook鍵、個別API鍵、MFA、支払CSV、写真原本 | 既存の操作別purpose | 元のガードを保持。弱い共通の目的へ置き換えない |
 
-管理画面用の型は `apps/web/src/lib/api.ts` の `StepUpPurpose`。画面の接続はClaude担当。
+管理画面用の型は `apps/web/src/lib/api.ts` の `StepUpPurpose`。ファイル取得は `downloadApiFile(path, filename, {stepUpToken})` で一回票も渡せる。画面の接続はClaude担当。
 
 ## ログイン
 
@@ -83,7 +83,7 @@ GETはaccountId、PUTはaccountId/expectedVersion/policyと `privacy.retention` 
 
 1回の削除候補は全店合計20件。成功・失敗の件数だけを記録。失敗は次回へ残し、削除処理の保護を迂回しない。
 検証はcron停止中なので、WorkerのVitestの実SQLiteと架空のR2で確認する。本番/検証DBは触らない。
-CSVは末尾のコメント行に操作者IDとUTC日時を付け、氏名は追加しない。ヘッダー・BOM・行の中身を変えない。
+CSVはファイル名に操作者IDとUTC日時を付け、氏名は追加しない。既存のCSV取り込みはコメント行を受け付けないため、本文・BOM・列・行を全く変えず、取り込み直せることを試験する。ダウンロード用API関数も日本語の機能名と日本時間の日付を保って印を付ける。CORSは印の応答ヘッダーの参照だけを許可する。
 CSV以外のダウンロードには同じ情報をファイル名・応答ヘッダーへ付ける。受領済み原本の内容は変えない。
 新しく作る支払明細PDFには操作者IDと作成日時を本文にも入れる。画面側が応答のファイル名を使う接続は確認を続ける。
 

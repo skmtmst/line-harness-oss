@@ -2906,7 +2906,7 @@ export async function fetchApiBlob(path: string, init?: { method?: string; accou
  * R495: 上限で切れたCSVを見分けるため、応答の頭の件数も返す。
  * 既存の呼び出しは戻り値を使わないので、そのまま動く。
  */
-export async function downloadApiFile(path: string, fallbackFilename: string): Promise<{
+export async function downloadApiFile(path: string, fallbackFilename: string, options?: { stepUpToken?: string }): Promise<{
   totalCount: number | null
   returnedCount: number | null
   truncated: boolean
@@ -2914,7 +2914,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   const context = apiAccountContext(path)
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     credentials: 'include',
-    headers: adminSessionHeaders(),
+    headers: { ...adminSessionHeaders(), ...(options?.stepUpToken ? { 'X-Step-Up-Token': options.stepUpToken } : {}) },
   })
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
@@ -2952,7 +2952,15 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   try {
     const anchor = document.createElement('a')
     anchor.href = href
-    anchor.download = /\.csv$/i.test(fallbackFilename) ? csvFileName(fallbackFilename) : named ? decodeURIComponent(named) : fallbackFilename
+    const exportActor = res.headers.get('X-Exported-By') ?? ''
+    const exportedAt = res.headers.get('X-Exported-At') ?? ''
+    const stamped = /^[A-Za-z0-9_-]{1,100}$/.test(exportActor)
+      && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(exportedAt)
+      && Number.isFinite(Date.parse(exportedAt))
+    const csvName = csvFileName(fallbackFilename, stamped ? new Date(exportedAt) : undefined)
+    anchor.download = /\.csv$/i.test(fallbackFilename)
+      ? stamped ? `${csvName.slice(0, -4)}-by-${exportActor}-${exportedAt.replace(/[^0-9TZ]/g, '')}.csv` : csvName
+      : named ? decodeURIComponent(named) : fallbackFilename
     anchor.click()
   } finally {
     URL.revokeObjectURL(href)

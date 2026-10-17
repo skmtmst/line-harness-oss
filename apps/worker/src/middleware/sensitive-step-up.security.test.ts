@@ -1,3 +1,4 @@
+import { sensitiveStepUpSatisfied } from '../lib/step-up.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
@@ -9,7 +10,7 @@ const opened: ReturnType<typeof createTestD1>[] = [];
 afterEach(() => opened.splice(0).forEach(d => d.raw.close()));
 describe('B351 dangerous operations require reauthentication before releasing data or mutating', () => {
   it.each([
-    ['GET','/api/friends/exports/job/download'], ['GET','/api/events/e/applicants.csv'],
+    ['GET','/api/friends/exports/job/download'], ['POST','/api/common-vars/exports/job/regenerate'], ['GET','/api/events/e/applicants.csv'],
     ['POST','/api/broadcasts/b/send'], ['POST','/api/broadcasts/b/send-segment'],
     ['POST','/api/ops/impersonation/start'], ['POST','/api/ops/impersonation/pii-reveal'],
     ['PATCH','/api/staff/member'], ['POST','/api/ops/members'], ['GET','/api/line-accounts/a/credentials'],
@@ -20,7 +21,7 @@ describe('B351 dangerous operations require reauthentication before releasing da
     const purpose=dangerousOperationPurpose(method,path)!;
     const a=new Hono<Env>();let reached=0;
     a.use('*',async(c,next)=>{c.set('staff',{id:'actor',name:'Fixture',role:'owner',readOnly:false});await next();});
-    a.use('*',sensitiveOperationMiddleware);a.on(method,path,c=>{reached++;return c.text('sensitive fixture');});
+    a.use('*',sensitiveOperationMiddleware);a.on(method,path,async c=>{if(!await sensitiveStepUpSatisfied(c,purpose))return c.json({code:'STEP_UP_REQUIRED'},401);reached++;return c.text('sensitive fixture');});
     const request=(token?:string,session='fixture-session')=>a.request(path,{method,headers:{Authorization:`Bearer lh_session:${session}`,...token?{'X-Step-Up-Token':token}:{}}},{DB:db.db} as Env['Bindings']);
     expect((await request()).status).toBe(401);expect(reached).toBe(0);
     db.raw.prepare("INSERT INTO admin_sessions(token_hash,staff_id,expires_at) VALUES (?, 'actor', ?)").run(sessionHash,new Date(Date.now()+60000).toISOString());
@@ -39,13 +40,13 @@ describe('B351 dangerous operations require reauthentication before releasing da
 });
 
 it.each([
-  ['POST','/api/broadcasts/new/send'],['POST','/api/broadcasts/new/retry-failed'],
+  ['PUT','/api/broadcasts/new'], ['POST','/api/broadcasts/new/send'],['POST','/api/broadcasts/new/retry-failed'],
   ['POST','/api/hq/broadcasts/run/targets/store/retry'],['GET','/api/media/item/download'],
 ])('mounted application %s %s denies API-key-only requests before sensitive work',async(method,path)=>{
   const {app}=await import('../index.js');const db=createTestD1();opened.push(db);
   db.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES ('store','fixture-channel','Fixture','unused','unused',?)").run(DEFAULT_TENANT_ID);
-  db.raw.exec("INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id) VALUES ('new','Fixture','text','fixture','store'); INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES ('item','store','image','fixture.png','image/png',1,'media/fixture.png')");
-  const res=await app.request(path,{method,headers:{Authorization:'Bearer fixture-master','CF-Connecting-IP':'203.0.113.47'}},{DB:db.db,API_KEY:'fixture-master',DEPLOY_ENV:'test'} as Env['Bindings']);
+  db.raw.exec("INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id) VALUES ('new','Fixture','text','fixture','store'); UPDATE broadcasts SET status='scheduled' WHERE id='new'; INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES ('item','store','image','fixture.png','image/png',1,'media/fixture.png')");
+  const res=await app.request(path,{method,headers:{Authorization:'Bearer fixture-master','CF-Connecting-IP':'203.0.113.47',...method==='PUT'?{'Content-Type':'application/json'}:{}},...method==='PUT'?{body:JSON.stringify({title:'Changed fixture',expectedVersion:1})}:{}},{DB:db.db,API_KEY:'fixture-master',DEPLOY_ENV:'test'} as Env['Bindings']);
   expect(res.status).toBe(401);expect(await res.json()).toMatchObject({code:'STEP_UP_REQUIRED'});
 });
 

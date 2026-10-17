@@ -75,17 +75,7 @@ export const outputAuditMiddleware: MiddlewareHandler<Env> = async (c, next) => 
           const dot = name.lastIndexOf('.'), suffix = `-by-${actor}-${at.replace(/[^0-9TZ]/g, '')}`;
           return `filename*=UTF-8''${encodeURIComponent(dot < 0 ? name + suffix : name.slice(0,dot) + suffix + name.slice(dot))}`;
         }));
-        // Append an ASCII comment without buffering or changing the CSV's BOM,
-        // header, encoding or data rows. The audit count excludes comment rows.
-        if (csv && c.res.body) {
-          const footer = new TextEncoder().encode(`\r\n# exported_by=${actor} exported_at=${at}\r\n`);
-          const body = c.res.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-            transform(chunk, controller) { controller.enqueue(chunk); },
-            flush(controller) { controller.enqueue(footer); },
-          }));
-          const headers = new Headers(c.res.headers); headers.delete('Content-Length'); headers.delete('ETag');
-          c.res = new Response(body, { status: c.res.status, headers });
-        }
+        // Keep the bytes unchanged: CSV imports have no comment-row syntax.
       }
     }
   }
