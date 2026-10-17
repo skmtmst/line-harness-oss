@@ -4,7 +4,7 @@
  * つなぎ先の鍵は ec_connectors.inbound_secret_encrypted（AES-GCM 暗号化）。
  * 暗号化・復号は本物を使い、DB の口だけ差し替える。
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
 const mocks = vi.hoisted(() => ({
@@ -87,9 +87,10 @@ async function postEvent(
   extraHeaders: Record<string, string> = {},
   // 未設定の再現は null で渡す（undefined は既定値に置き換わるため）。
   globalSecret: string | null = GLOBAL_SECRET,
+  rawBody?: string,
 ) {
   const timestamp = String(Math.floor(Date.now() / 1000));
-  const body = JSON.stringify(event);
+  const body = rawBody ?? JSON.stringify(event);
   const accountHeader = extraHeaders['x-line-account-id'];
   const payload = accountHeader ? `${timestamp}.${accountHeader}.${body}` : `${timestamp}.${body}`;
   return app.request('/api/integrations/eccube/events', {
@@ -116,6 +117,7 @@ beforeEach(async () => {
   mocks.getAccount.mockResolvedValue({ id: 'account-1', is_active: 1, channel_access_token: 'token' });
   mocks.getFriend.mockResolvedValue(null);
 });
+afterEach(() => vi.useRealTimers());
 
 describe('EC受信：つなぎ先ごとの鍵', () => {
   it('ヘッダー有りでつなぎ先の鍵の署名を受け付ける（全体の鍵が違っても）', async () => {
@@ -147,5 +149,35 @@ describe('EC受信：つなぎ先ごとの鍵', () => {
     const { app, db } = harness();
     const response = await postEvent(app, db, 'q'.repeat(32), { 'x-line-account-id': 'account-1' });
     expect(response.status).toBe(401);
+  });
+
+  it('UTF-8本文の256KiB境界と、content-lengthによる先行拒否を保つ', async () => {
+    const { app, db } = harness();
+    const base = JSON.stringify({ ...event, note: '日本語🐾' });
+    const body = base + ' '.repeat(256 * 1024 - new TextEncoder().encode(base).length);
+    expect((await postEvent(app, db, CONNECTOR_SECRET, { 'x-line-account-id': 'account-1' }, GLOBAL_SECRET, body)).status).toBe(202);
+    const oversized = await postEvent(app, db, CONNECTOR_SECRET,
+      { 'x-line-account-id': 'account-1', 'content-length': '1' }, GLOBAL_SECRET, body + ' ');
+    expect(oversized.status).toBe(413);
+    expect(await oversized.json()).toMatchObject({ error: 'Payload too large' });
+    const declared = await postEvent(app, db, CONNECTOR_SECRET,
+      { 'x-line-account-id': 'account-1', 'content-length': String(256 * 1024 + 1) });
+    expect(declared.status).toBe(413);
+  });
+
+  it('予備鍵を読む間に時刻が進んでも、最初の期限判定を作り直さない', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_792_200_000_000);
+    const timestamp = String(1_792_200_000 - 299);
+    const body = JSON.stringify(event);
+    mocks.connectorRow.mockImplementationOnce(async () => {
+      vi.setSystemTime(1_792_200_010_000);
+      return { inbound_secret_encrypted: connectorCipher };
+    });
+    const { app, db } = harness();
+    const response = await postEvent(app, db, CONNECTOR_SECRET, {
+      'x-nen-timestamp': timestamp,
+      'x-nen-signature': await hmac(CONNECTOR_SECRET, `${timestamp}.${body}`),
+    });
+    expect(response.status).toBe(202);
   });
 });

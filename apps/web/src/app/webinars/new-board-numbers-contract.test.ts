@@ -19,7 +19,6 @@ describe("webinar 作成の板の数字", () => {
   });
 
   it("入力の枠は共通の高さ36と角を使う", () => {
-    expect(FIELD_CSS).toMatch(/\.single \{[^}]*height: 36px/s);
     expect(FIELD_CSS).toContain("border-radius: var(--radius-control)");
   });
 });

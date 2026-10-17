@@ -33,11 +33,7 @@ const ALLOWED_SAME_VALUE = [
   '--color-on-accent / --color-on-action / --color-canvas',
   // 既存の字重の別名。大きな数以外は600。
   '--font-weight-bold / --font-weight-extrabold',
-  // §6: 入力・操作10、印の小型6。役割別の入口を維持。
-  '--radius-control / --radius-tile / --radius-segment',
-  '--radius-icon / --radius-tile-sm',
-  // §6: 補足とラベル12、大きな数28。
-  '--text-caption / --text-label',
+  // §6: 大きな数。
   '--text-hero / --text-metric',
   // B-152: 補足・本文・小さい文字は現在1.5。サイズに対応する入口を維持する。
   '--text-caption--line-height / --text-body--line-height / --text-micro--line-height',

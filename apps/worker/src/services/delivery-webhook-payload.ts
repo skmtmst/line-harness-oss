@@ -6,13 +6,13 @@
  * - サービスから届いた自由文のエラー文や説明文は取り込まない。
  */
 
-export const MAX_WEBHOOK_BODY_BYTES = 128 * 1024;
-/** 署名の時刻ずれの許容。他の受信口（EC連携・成果受信）と同じ5分。 */
-export const WEBHOOK_SKEW_SECONDS = 5 * 60;
+import { NEN_WEBHOOK_SKEW_SECONDS } from '../lib/hmac.js';
+import { WEBHOOK_BODY_BYTES } from '../lib/webhook-body.js';
 
-export function utf8Length(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
-}
+export const MAX_WEBHOOK_BODY_BYTES = WEBHOOK_BODY_BYTES.delivery;
+/** 署名の時刻ずれの許容。他の受信口（EC連携・成果受信）と同じ5分。 */
+export const WEBHOOK_SKEW_SECONDS = NEN_WEBHOOK_SKEW_SECONDS;
+export { utf8Length } from '../lib/webhook-body.js';
 
 /** 文字列の必須項目。長さ上限を超えた値は受け取らない（画面の崩れとDB肥大を防ぐ）。 */
 function textField(value: unknown, max: number): string | null {

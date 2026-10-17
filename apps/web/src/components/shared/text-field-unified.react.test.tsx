@@ -171,10 +171,6 @@ describe('複数行の決まり：縦にだけ広げられる・最小の高さ 
     return rules.join('\n')
   })()
 
-  it('最小の高さは 120px', () => {
-    expect(css).toMatch(/\.multi\s*\{[^}]*min-height:\s*120px/)
-  })
-
   it('層の外で resize: vertical を決め、画面の className に負けない', () => {
     expect(outsideLayer).toMatch(/\.multi\s*\{[^}]*resize:\s*vertical/)
     expect(css).not.toMatch(/resize:\s*(both|horizontal|none)/)

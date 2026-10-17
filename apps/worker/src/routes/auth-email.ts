@@ -1,3 +1,4 @@
+import { readCookie } from '../middleware/auth-http.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -99,21 +100,6 @@ export function normalizeEmail(value: unknown): string | null {
 function adminBase(c: Context<Env>): string | null {
   const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
   return base || null;
-}
-
-function readCookie(header: string | undefined, name: string): string | null {
-  if (!header) return null;
-  for (const part of header.split(';')) {
-    const [key, ...value] = part.trim().split('=');
-    if (key === name) {
-      try {
-        return decodeURIComponent(value.join('='));
-      } catch {
-        return null;
-      }
-    }
-  }
-  return null;
 }
 
 function markerCookie(value: string, sameSite: 'Strict' | 'Lax' | 'None'): string {

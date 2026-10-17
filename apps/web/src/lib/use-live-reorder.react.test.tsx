@@ -15,6 +15,13 @@ afterEach(async () => {
 const rows = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]
 
 describe('useLiveReorder', () => {
+  it('同じ行データでも識別方法が変わったら今の識別子で並べる', () => {
+    const view = renderHook(({ upper }) => useLiveReorder(rows, (row) => upper ? row.id.toUpperCase() : row.id, 'a'), { initialProps: { upper: false } })
+    act(() => view.result.current.enter('c'))
+    expect(view.result.current.shown.map((row) => row.id).join('')).toBe('bcad')
+    view.rerender({ upper: true })
+    expect(view.result.current.shown).toBe(rows)
+  })
   it('通った行の位置へ入れ替えて見せ、離す先はその行。自分の上は無視する', () => {
     const view = renderHook(({ dragId }) => useLiveReorder(rows, (row) => row.id, dragId), { initialProps: { dragId: null as string | null } })
     expect(view.result.current.shown.map((row) => row.id).join('')).toBe('abcd')

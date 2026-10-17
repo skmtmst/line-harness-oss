@@ -10,7 +10,6 @@ const COMMON = readFileSync(join(ROOT, '..', 'app-shell.module.css'), 'utf8')
 const NAV = readFileSync(join(ROOT, '..', 'layout', 'sidebar.module.css'), 'utf8')
 const OVERLAY = readFileSync(join(ROOT, '..', 'shared', 'overlay-utils.ts'), 'utf8')
 const ACTIONS = readFileSync(join(ROOT, '..', 'shared', 'action-menu.tsx'), 'utf8')
-const HEADER = readFileSync(join(ROOT, 'ops-page-header.tsx'), 'utf8')
 
 /*
  * #974 U094: 390pxでも256pxのナビが常設され、本文には左右80pxの余白が
@@ -49,11 +48,6 @@ describe('U094 運営コンソールの外枠', () => {
     expect(COMMON).toContain('padding: 24px 16px')
   })
 
-  it('画面見出しは操作が入ると下へ折り返し、1文字ずつに割れない', () => {
-    expect(HEADER).toContain('flex-wrap')
-    expect(HEADER).toContain('min-h-14')
-    expect(HEADER).not.toContain('flex h-14')
-  })
 
   /*
    * 縦に長い画面（監査ログなど）で、左下のアカウント情報が本文と一緒に

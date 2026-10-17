@@ -57,12 +57,6 @@ export const SUPPORT_ATTACHMENT_MAX = 3
 export const SUPPORT_ATTACHMENT_BYTES_MAX = 5 * 1024 * 1024
 export const SUPPORT_ATTACHMENT_TYPES = ['image/png', 'image/jpeg'] as const
 
-export const SUPPORT_STATUS_LABELS: Record<HqSupportStatus, string> = {
-  open: '受付済み',
-  answered: '回答済み',
-  closed: '解決',
-}
-
 export interface HqSupportInput {
   kind: HqSupportKind | ''
   subject: string

@@ -39,10 +39,10 @@ const stagingConfig = readFileSync(
   new URL('../apps/worker/wrangler.staging.toml', import.meta.url),
   'utf8',
 );
-const deliveryRoute = readFileSync(
-  new URL('../apps/worker/src/routes/restaurant-delivery.ts', import.meta.url),
+const deliveryRoute = ['common', 'orders-read', 'orders-actions', 'history', 'controls'].map((part) => readFileSync(
+  new URL(`../apps/worker/src/routes/restaurant-delivery-${part}.ts`, import.meta.url),
   'utf8',
-);
+)).join('\n');
 const deliveryScreen = readFileSync(
   new URL('../apps/web/src/v8/restaurant/delivery/delivery.tsx', import.meta.url),
   'utf8',
@@ -254,7 +254,7 @@ describe('staging delivery verification safety', () => {
       '/api/restaurant-test/delivery/menu-items/bulk-sold-out',
       '/api/restaurant-test/delivery/intake/stop',
     ]) {
-      expect(deliveryRoute).toContain(`restaurantDelivery.post(\n  '${writeRoute}'`);
+      expect(deliveryRoute).toContain(`restaurantDelivery.post(\n    '${writeRoute}'`);
     }
     // 読む道は4つとも本物の路線表にある。
     for (const readRoute of [
@@ -263,7 +263,7 @@ describe('staging delivery verification safety', () => {
       '/api/restaurant-test/delivery/history',
       '/api/restaurant-test/delivery/menu-items',
     ]) {
-      expect(deliveryRoute).toContain(`restaurantDelivery.get(\n  '${readRoute}'`);
+      expect(deliveryRoute).toContain(`restaurantDelivery.get(\n    '${readRoute}'`);
     }
 
     expect(script).toContain("method: 'GET'");

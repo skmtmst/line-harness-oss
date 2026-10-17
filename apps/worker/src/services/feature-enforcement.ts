@@ -147,7 +147,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'mileage' },
     enforcement: {
       mode: 'gated',
-      sources: ['packages/db/src/mileage.ts'],
+      sources: ['packages/db/src/mileage-queue.ts'],
       markers: [
         "isAccountFeatureEnabled(db, owner.line_account_id, 'mileage')",
         // 取り出し(LIMIT前)と停滞回収の両方をSQLで止める。
@@ -361,7 +361,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'mileage' },
     enforcement: {
       mode: 'gated',
-      sources: ['packages/db/src/mileage.ts'],
+      sources: ['packages/db/src/mileage-queue.ts'],
       markers: ["accountFeatureOffExclusionSql('f.line_account_id', 'mileage')"],
     },
   },
@@ -509,7 +509,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'common_vars' },
     enforcement: {
       mode: 'gated',
-      sources: ['packages/db/src/common-vars.ts'],
+      sources: ['packages/db/src/common-vars-schedules.ts'],
       markers: ['isCommonVarsEnabled(db, current.line_account_id)'],
     },
   },
@@ -531,7 +531,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       sources: [
         'apps/worker/src/services/step-delivery.ts',
         'packages/db/src/scenario-delivery-timestamps.ts',
-        'packages/db/src/scenarios.ts',
+        'packages/db/src/scenarios-enrollment-dispatch.ts',
       ],
       markers: [
         "job: 'scenario deliveries'",
