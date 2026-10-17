@@ -88,3 +88,14 @@ zsh ~/lh-work/tools/hq/ci-local/run.sh ~/lh-work/lh-cl-a02 \
 今の進捗を全体像から整理するとこれ：A02の初期化本体と検証をコミット。店舗作成直後の実入口への接続は所有担当への引き継ぎで、未完了のまま明記した。PR情報が必要な集約も司令塔の工程へ残す。
 
 次のタスクはこれ：司令塔が店舗作成の持ち主へ同じbatchでの接続を渡し、実入口の試験を追加して取り込み・採番・通常のPRゲートへ進む。
+
+## 03:08 JST の続き：計画網羅と長いファイルの確認
+
+- 再開時 `b7084f7d10` はクリーン、doctor 合格。まとめの枝 `e9b423eb7c798f7d5a530a05a6e86a0c26dd56f9` を通常の merge で包含（merge `698cb5027f944af099f2b0ff9f16f6f678d486d8`）。競合なし。fetch 後の `origin/codex/development` も同じ `e9b423eb7c`、既に包含済み。rebase・force は使っていない。
+- `api-common.md` 末尾2節と `WORK-BUNDLES.md` の A02/「ぶつけない渡し方」を再確認。`PLAN-COVERAGE.tsv` の `primaryBundle=A02` は0件、`LONG-FILES-1018.tsv` の `bundle=A02` も0件。元計画の未処理ID・指定された分割対象はない。前回の初期化を作り直していない。
+- A02 の確認範囲は style-setup/core、starter 6本、styles route、LINE登録を含む route、新設DB補助の11ファイル・3,947行で前後同数。1,500行以上は `routes/line-accounts.ts` 2,085行のみだが、長いファイル台帳では A08 所有。A02 は登録2経路の呼出しを保ち、ファイル全体の分割は A08 へ残す。`packages/db/src/line-accounts.ts` は A09、analytics/schedule は A10 のまま。
+- この続きで製品・試験の削除/移動/改名・export/route順・応答の変更は0。見張りの削除/緩和、上限・許可一覧の追加も0。権限/別店/同時保存/CAS/原子的な巻戻し/実D1の既存試験をそのまま実行する。
+- 店舗作成直後の実入口 `routes/restaurant-test.ts` への接続は前回どおり未完了。A02の書込み所有範囲を広げず、司令塔から所有担当（A08）へ渡す。helper単体の後作成試験成功を実入口の完了と混同しない。
+- 4種類の完了記録は司令塔手元の `review/CLEANUP-1017/DONE-A02.tsv`。新 migration・外部への書込み・push/PR・DB更新・配備は実施しない。
+
+この続きの検査結果は実行完了後に追記する。過去の実行結果を今回のSHAの合格として扱わない。
