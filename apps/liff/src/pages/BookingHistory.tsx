@@ -1,4 +1,4 @@
-import BookingHistoryCancelDialog from './BookingHistory-cancel-dialog.js';
+import BookingHistoryCancelDialog from '../components/BookingHistoryCancelDialog.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, type BookingHistoryItem } from '../lib/api.js';

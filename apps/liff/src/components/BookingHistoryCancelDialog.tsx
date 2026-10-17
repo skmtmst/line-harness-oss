@@ -1,8 +1,8 @@
 import type { BookingHistoryItem } from '../lib/api.js';
 import type { PaymentView } from '../lib/booking-payment-view.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
-import Button from '../components/ui/Button.js';
-import ConfirmDialog from '../components/ui/ConfirmDialog.js';
+import Button from './ui/Button.js';
+import ConfirmDialog from './ui/ConfirmDialog.js';
 
 /** 予約の取消前に、予約の内容と支払い済みの返金を知らせる。 */
 export default function BookingHistoryCancelDialog({ booking, payment, busy, error, onConfirm, onCancel }: {
