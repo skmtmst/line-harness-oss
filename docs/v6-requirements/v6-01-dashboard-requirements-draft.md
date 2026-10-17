@@ -352,6 +352,8 @@ V6画面の「現在の対応マーク」は、02の用語では「対応状況�
 
 ### 6-2. 鮮度と `as_of`
 
+- **B-365③（2026-10-17）**：表示用の重い集計は [段2 §6 cache の契約](../v8-requirements/cleanup-stage2-contract.md#cache) に従い短く保持できる。日次集計を再利用し、下の鮮度条件を延ばさない。cache の取得時刻で元データの `as_of` を更新せず、権限縮小・店舗変更・更新時の失効と同時更新の境界を守る。
+
 - 各カードは `as_of` と `freshness` を持つ。`as_of` は取得元の最終成功時刻であり、`generatedAt`（応答生成時刻）で代用しない
 - `freshness` の判定: `fresh` = `now - as_of` が5分以内、`delayed` = 15分以内、`stale` = 32 §6-2 と同じく2周期（10分）超のcheck、または `as_of` が1時間超。`unavailable` = 取得失敗、`partial` = 複数取得元の一部失敗
 - 画面はカード右下に「更新 HH:MM」を出し、`stale` は警告色、`unavailable` と `partial` はラベルで理由を出す
