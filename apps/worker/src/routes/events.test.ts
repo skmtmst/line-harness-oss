@@ -2681,7 +2681,7 @@ describe('LIFF GET /api/liff/events/me/:bookingId', () => {
 });
 
 describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
-  test('cancels confirmed booking when within deadline', async () => {
+  test('R83: 本人取消は期限内に予約を止め、自動案内の仕事を1件積む', async () => {
     const futureMs = Date.now() + 7 * 24 * 3600_000;
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1', is_published: 1, cancel_deadline_hours_before: 24 })],
@@ -2699,6 +2699,7 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
     expect(res.status).toBe(200);
     expect(state.bookings[0].status).toBe('cancelled');
     expect(reminderMocks.cancelPendingRemindersFor).toHaveBeenCalledWith(expect.anything(), 'b1');
+    expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledTimes(1);
     expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -3069,7 +3070,7 @@ describe('admin bookings management', () => {
     expect(state.bookings[0].status).toBe('confirmed');
   });
 
-  test('POST admin cancel transitions to cancelled by admin', async () => {
+  test('R83: 管理者取消は予約を止め、自動案内の仕事を1件積む', async () => {
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
       slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: null, is_active: 1, sort_order: 0, deleted_at: null }],
@@ -3085,6 +3086,7 @@ describe('admin bookings management', () => {
     expect(state.bookings[0].status).toBe('cancelled');
     expect((state.bookings[0] as Record<string, unknown>).cancelled_by).toBe('admin');
     expect(reminderMocks.cancelPendingRemindersFor).toHaveBeenCalled();
+    expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledTimes(1);
     expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ sourceKey: 'booking:b1:cancelled', occurrenceId: 's1' }),
