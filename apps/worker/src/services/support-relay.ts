@@ -46,6 +46,8 @@ export async function sendViaXServerRelay(
   const timestamp = String(Math.floor(Date.now() / 1000));
   const response = await fetch(relayUrl, {
     method: 'POST',
+    // メール本文と署名を、設定した中継先以外へ転送しない。
+    redirect: 'manual',
     headers: {
       'content-type': 'application/json',
       'x-nen-timestamp': timestamp,
@@ -53,6 +55,11 @@ export async function sendViaXServerRelay(
     },
     body,
   });
+  if ((response.status >= 300 && response.status < 400)
+    || String(response.type) === 'opaqueredirect' || response.redirected) {
+    void response.body?.cancel().catch(() => {});
+    throw new Error(`XSERVER_RELAY_FAILED:${response.status}:redirect`);
+  }
   const result: { success?: boolean; messageId?: string; error?: string } = await response
     .json<{ success?: boolean; messageId?: string; error?: string }>()
     .catch(() => ({}));
