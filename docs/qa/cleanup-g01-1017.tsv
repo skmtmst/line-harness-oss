@@ -1,0 +1,453 @@
+source	item	decision	owner	reason	connection	evidence
+freeze-reviewed	apps/web/scripts/v8-guard/code-size-baseline.json	外す	G01	個別行数の凍結表を廃止		
+freeze-reviewed	apps/web/scripts/v8-guard/layout-defects-allow.json	外す	G01	画面・幅・文字ごとの欠陥例外を廃止		
+freeze-reviewed	apps/web/scripts/v8-guard/blank-gap-allow.json	外す	G01	画面別の空白の許可を廃止		
+freeze-reviewed	apps/web/design/v8-part-values.json	外す	G01	古い写しのpx/色の固定表を廃止		
+freeze-reviewed	scripts/visual-qa/train16-temporary-allowances.json	外す	G01	字句別の一時例外表を廃止		
+freeze-reviewed	apps/web/design/design-impact-baseline.txt	外す/一部引継	G01/U02	全利用元の完全一致と共有Button利用元の凍結行を廃止。Button/TableHeader移行試験の3分類はU02の隣接試験本体を触らず引継	apps/web/src/components/shared/{button,table-header}-migration-contract.test.ts	
+freeze-reviewed	apps/web/design/card-shadow-exceptions.json	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+freeze-reviewed	scripts/visual-qa/frozen-v8-1011-routes.json	外す	G01	旧固定版の再生成用地図を廃止。現役のURL/状態データに全27項目が保持されていることを確認		
+freeze-reviewed	apps/web/src/lib/screen-css-budget-baseline.json	外す	G01	画面ごとの旧CSS上限を廃止		
+freeze-candidates	.github/workflows/configure-ai-loop-slack-report.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない		
+freeze-candidates	.github/workflows/deploy-cloudflare-admin.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない		
+freeze-candidates	.github/workflows/deploy-cloudflare-docs.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない		
+freeze-candidates	.github/workflows/deploy-cloudflare-staging.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない		
+freeze-candidates	.github/workflows/deploy-cloudflare-worker.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない		
+freeze-candidates	.github/workflows/deploy-scripts-ci.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない		
+freeze-candidates	.github/workflows/migrate-d1.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない		
+freeze-candidates	.github/workflows/migrate-line-credentials.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない		
+freeze-candidates	.github/workflows/release.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない		
+freeze-candidates	.github/workflows/required-pr-gate.yml	G02へ引継	G02	必須ジョブ接続は本束で変更しない。廃止命令と必要な新しい故障対照はconnection行を参照		
+freeze-candidates	.github/workflows/worker-ci.yml	残す	G02	frozen-lockfile/固定した配備SHA/DB適用手順の守り。画面の寸法凍結ではない		
+freeze-candidates	apps/liff/src/components/ui/look-contract.test.ts	外す（UI持ち主が実施）	U06	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		①ナチュラル (地 #fbfaf7・面 #ffffff・主 #123d2f・しっぽり明朝・角丸 23) / ②モダン (主 #2b2d31・見出し Noto 800・角丸 10) / ③やさしい (主 #b5532f・Zen Maru Gothic・角丸 21) / ④夜は深い紺 (主は金・字は紺・黒は使わない・角丸 23) / ⑤ LINE らしいに専用の上書きは無い (今の見た目のまま) / 知らせ (注意書きの箱) はどの型でも白地のまま / 主の色の上の字は既定で白。店の色で上書きする / 見出しの書体は型・店の設定で替える / 数字の書体は型ごとに替える (liff-num) / 角丸の素は今の値が既定 (10・箱は14) / しっぽり明朝と Zen Maru Gothic を読む。数字の 300 と見出しの 800 も足す
+freeze-candidates	apps/web/design/design-parts.json	残す（案内/部品情報）	G01/U02	共通部品の所在/利用とURL・状態の資料。旧px照合のCLIを外し、固定値を合否にしない		
+freeze-candidates	apps/web/design/v8-part-values.json	外す	G01	古い写しのpx/色の固定表を廃止		
+freeze-candidates	apps/web/scripts/design-debt.mjs	混在：固定を外し計測/動きを残す	G01	固定の個別上限と更新口を外す。表示制御の無効化は引き続き遮断		
+freeze-candidates	apps/web/scripts/design-impact-baseline.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	apps/web/scripts/design-impact.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	apps/web/scripts/direct-values-baseline.mjs	混在：固定を外し計測/動きを残す	G01	色/直書きの計測を保持し、基準再生成と固定上限への接続を廃止		
+freeze-candidates	apps/web/scripts/load-failure-allowlist.json	残す	G01	読込失敗を0件や成功へ取り違えないための監査。見た目の固定ではない。指紋/許可は追加も緩和もしていない		
+freeze-candidates	apps/web/scripts/load-failure-audit.mjs	残す	G01	読込失敗を0件や成功へ取り違えないための監査。見た目の固定ではない。指紋/許可は追加も緩和もしていない		
+freeze-candidates	apps/web/scripts/load-failure-reviewed.json	残す	G01	読込失敗を0件や成功へ取り違えないための監査。見た目の固定ではない。指紋/許可は追加も緩和もしていない		
+freeze-candidates	apps/web/scripts/raw-color-baseline.mjs	混在：固定を外し計測/動きを残す	G01	色/直書きの計測を保持し、基準再生成と固定上限への接続を廃止		
+freeze-candidates	apps/web/scripts/regenerate-v8-design-values.mjs	外す	G01	古い写しの一致値を再生成する口を廃止		
+freeze-candidates	apps/web/scripts/screen-css-budget.mjs	混在：固定を外し計測/動きを残す	G01	旧CSS上限と基準を書き直す口を廃止し計測だけ残す		
+freeze-candidates	apps/web/scripts/v8-guard/action-row-narrow.test.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	apps/web/scripts/v8-guard/active-modal-audit.test.mjs	混在：固定を外し計測/動きを残す	G01	フォーム欄の列数を固定せず、実際の重なりを故障→復旧で確認		
+freeze-candidates	apps/web/scripts/v8-guard/b244-rules.test.mjs	混在：固定を外し計測/動きを残す	G01	固定位置/印の試験を外し、入力エラーと危険操作の分離の対照を保持		
+freeze-candidates	apps/web/scripts/v8-guard/bar-chart-layout-browser.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	apps/web/scripts/v8-guard/blank-gap.mjs	混在：固定を外し計測/動きを残す	G01	空白の実測閾値を保ち、画面ごとの許可表と免除を廃止		
+freeze-candidates	apps/web/scripts/v8-guard/button-content-width.test.mjs	混在：固定を外し計測/動きを残す	G01	固定の見た目契約だけ削除。残す描画/動作の試験は継続		
+freeze-candidates	apps/web/scripts/v8-guard/code-size.mjs	混在：固定を外し計測/動きを残す	G01	行数は現在値の計測だけ。初期SHA・個別凍結・400行遮断・更新口を廃止		
+freeze-candidates	apps/web/scripts/v8-guard/code-size.test.mjs	混在：固定を外し計測/動きを残す	G01	固定上限の契約を外し、計測器の単体試験だけ残す		
+freeze-candidates	apps/web/scripts/v8-guard/confirmation-defaults.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/create-consistency.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+freeze-candidates	apps/web/scripts/v8-guard/create-input-layout.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/create-preview-layout.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+freeze-candidates	apps/web/scripts/v8-guard/create-results-layout.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/dialog-actions.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+freeze-candidates	apps/web/scripts/v8-guard/dialog-content-row.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+freeze-candidates	apps/web/scripts/v8-guard/dialog-content.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+freeze-candidates	apps/web/scripts/v8-guard/dialog-description-band-fixture.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/dialog-description-band.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/dialog-layout.test.mjs	混在：固定を外し計測/動きを残す	G01	窓の指定top/固定検索高の契約を外し、低い画面・長い本文でも操作可能な検証を保持		
+freeze-candidates	apps/web/scripts/v8-guard/drawer-layout.test.mjs	混在：固定を外し計測/動きを残す	G01	故障の実描画を待ってから、画面外へ隠れた操作を検出する		
+freeze-candidates	apps/web/scripts/v8-guard/fix-patterns.test.mjs	混在：固定を外し計測/動きを残す	G01	切れ/重なり/説明操作に加え、重複した操作と閲覧のみの選択露出の既存故障対照を保持		
+freeze-candidates	apps/web/scripts/v8-guard/form-columns.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/form-rules-browser.mjs	混在：固定を外し計測/動きを残す	G01	押せない理由・色の単一選択を保持。文字/固定寸法/札の幅/並び契約を外す		
+freeze-candidates	apps/web/scripts/v8-guard/lane-f-shots.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	apps/web/scripts/v8-guard/layer-order.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/layout-defects-browser.mjs	混在：固定を外し計測/動きを残す	G01	短い文字の潰れ・切れ・重なりを保持し、カード間の固定8px契約を外す		
+freeze-candidates	apps/web/scripts/v8-guard/layout-defects.mjs	混在：固定を外し計測/動きを残す	G01	固定許可・採取・基準版の欠陥免除を廃止。固定px/文字検査を集約から外し実際の崩れと入力契約を残す		
+freeze-candidates	apps/web/scripts/v8-guard/layout-defects.test.mjs	混在：固定を外し計測/動きを残す	G01	崩れ検出・終了1・復旧0・可視性の対照を保持し、固定許可と基準版の免除契約を外す		
+freeze-candidates	apps/web/scripts/v8-guard/list-row-height.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/list-skeleton-audit.mjs	混在：固定を外し計測/動きを残す	G01	固定行高・画像寸法・中央配置の対照と例外適用を外し、はみ出しの対照を保持		
+freeze-candidates	apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs	混在：固定を外し計測/動きを残す	G01	固定の内側余白16pxの一致試験を廃止し、実際の切れ/重なり/全文/入力操作を保持		
+freeze-candidates	apps/web/scripts/v8-guard/measure2-common-values.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/owner-rules-browser.mjs	混在：固定を外し計測/動きを残す	G01	色・余白・行高・drawer幅・古いnode契約を外し、実際の箱切れを保持		
+freeze-candidates	apps/web/scripts/v8-guard/owner-rules.test.mjs	混在：固定を外し計測/動きを残す	G01	旧px/色/余白契約を外し、実際の箱切れの故障対照を残す		
+freeze-candidates	apps/web/scripts/v8-guard/panel-blank-browser.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	apps/web/scripts/v8-guard/pendec2-rules-browser.mjs	混在：固定を外し計測/動きを残す	G01	カードのはみ出し・名前なしの操作・選択状態を残し、色/影/18px/旧文言/枠の形を外す		
+freeze-candidates	apps/web/scripts/v8-guard/pendec2-rules.test.mjs	混在：固定を外し計測/動きを残す	G01	旧px/色/影/文言契約を外し、カードのはみ出しと単一選択の故障対照を残す		
+freeze-candidates	apps/web/scripts/v8-guard/record-columns.test.mjs	混在：固定を外し計測/動きを残す	G01	固定の見た目契約だけ削除。残す描画/動作の試験は継続		
+freeze-candidates	apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/speed-budget.json	残す	G01	速度・測定条件・欠測/途中結果の拒否。レイアウトの固定px検査ではない。予算と回数は不変		
+freeze-candidates	apps/web/scripts/v8-guard/speed-budget.mjs	残す	G01	速度・測定条件・欠測/途中結果の拒否。レイアウトの固定px検査ではない。予算と回数は不変		
+freeze-candidates	apps/web/scripts/v8-guard/speed-budget.test.mjs	残す	G01	速度・測定条件・欠測/途中結果の拒否。レイアウトの固定px検査ではない。予算と回数は不変		
+freeze-candidates	apps/web/scripts/v8-guard/status-steps-layout.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+freeze-candidates	apps/web/scripts/v8-guard/verification-list.test.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	apps/web/scripts/v8-guard/visual-state.test.mjs	混在：固定を外し計測/動きを残す	G01	固定の見た目契約だけ削除。残す描画/動作の試験は継続		
+freeze-candidates	apps/web/scripts/verify-design-values.mjs	混在：固定を外し計測/動きを残す	G01	解析の公開APIだけ残し、古い板の固定件数・棚卸し値・固定px照合の死んだ実装も除去		
+freeze-candidates	apps/web/scripts/verify-v8-rule-values.mjs	混在：固定を外し計測/動きを残す	G01	固定CSS値のCLI接続を廃止。U02隣接試験の読み取り用APIは持ち主の削除待ち		
+freeze-candidates	apps/web/src/app/api-error-wording-guard.test.ts	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		\n / 見張りの形が、そのまま出す書き方を拾い、弾いている書き方は拾わない / message をそのまま画面に出す箇所を増やさない（japaneseDetailOf・describeSaveFailure に寄せる） / 点検で見つけた8か所は直したまま
+freeze-candidates	apps/web/src/app/automations/new-board-numbers-contract.test.ts	外す（UI持ち主が実施）	U04	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		選ぶカードは共通のカードと現在のトークンを使う / 行の操作は共通の高さ36・丸み10のトークンを使う / 旧の高さ40へ分岐する入口を残さない
+freeze-candidates	apps/web/src/app/broadcasts/broadcast-numfix-contract.test.ts	外す（UI持ち主が実施）	U05	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		見出しは12px・500・余白13px 20px / 行は余白9px 20px / 名前は12px・黒・700（B-207）
+freeze-candidates	apps/web/src/app/common-actions/u972-header-wrap.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		見出しは共通の一覧の型へ渡す / 画面切替は共通のタブへ渡す / 表は伸びる名前列を縮めて省略する
+freeze-candidates	apps/web/src/app/contents/vars/change-impact.test.ts	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		権限が足りないときは「操作する権限がありません」と言う / 対象が見つからないときは、開き直す先を言う / 先に別の人が保存していたら、入力が残ることと上書きになることを言う（IDEA-14） / 確認のあとで使用先が変わった409は、確認を読み直したと言う / 確認なしの保存を止められた428は、読み直したと言う / サーバー側の失敗は、待って試すことと連絡先を言う / 400はWorkerが書いた日本語をそのまま出す / 内部の英文（API error: NNN）を画面へ出さない / 通信そのものが落ちたときは、接続を確かめると言う / どの理由でも「保存に失敗しました」だけでは終わらせない / 送信済みの分を「すぐ変わる」に混ぜない / 保存すると何か所が変わるかを、差し込み名つきで言う / 0か所は「どこにも差し込まれていません」。未取得と混ぜない / 送信済みは「変わりません」と必ず書く / 名前を出せない使用先も、件数と理由を隠さない / 一覧に出すのは、すぐ変わる使用先だけ / 変わる場所を、編集中・公開中・予約中などの状態別に数える / 口が知らない呼び名も、落とさず末尾へ並べる / 変わるものが無ければ内訳を出さない / 予約中があるときは「送信を始めるときの新しい値」と言う / 予約中が無ければ、次に送る・実行されるときからとだけ言う / 送信を始めた配信と送信済みは、変わらない側として数える / 変わるものも変わらないものも無ければ、何も書かない / 未接続の言い方は「まだ繋がっていません」＋取得元 / 403は「見る権限がありません」。読み込み失敗と分ける / 状態ごとの言葉を混ぜない / 保存の catch は一言で片付けず、理由を作る関数を通す / 予約の catch は生文言を出さず、予約用の変換を通す（#578 L7） / 入力を変えたら古い「保存しました。」を消す（#578 L9） / 一覧の読み込み失敗は権限なしと通信障害で分ける（#578 L8） / 影響確認の節を必ず出す。読めないときも節ごと消さない / 節の中で、変わる場所・送信済み・使用先の種類を書き分ける / 1件ずつ見る画面では、保存後の文を作れない行を空文字で埋めない / 1件ずつ見る画面では、上限を超える行の文字数を強調する / 状態の語彙は口とそろえ、編集中・公開中・予約中の内訳を保存前に出す（IDEA-14） / 競合で入力を消さない。load()ではなく版だけ取り直す（IDEA-14） / 読み込めなかったときだけ再読み込みを出す / 未取得を0か所として描かない / 0か所確定のとき「1件ずつ見る」への案内を出さない（VAR-02） / 見え方の節は、確認中・0件確定・使用先ありを分けて言う（VAR-02） / VAR-06: 保存と更新予約は新規画面と同じ型検査を通す / 止める理由は重ねず、1つずつ出す / 確かめてほしいことは、止める理由と混ぜない / 上限が無い使用先に「/ 5,000」と書かない / 文字数を数えられないときは 0 ではなく — / 変更前確認の1件だけを見分ける / 400の日本語はそのまま返す / 500の生文言は出さず予約用の定型文にする / 403は権限の文にする / 通信失敗は予約用の文にする
+freeze-candidates	apps/web/src/app/contents/vars/list-v8-board-numbers-contract.test.ts	外す（UI持ち主が実施）	U07	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		数の帯は共通の16/24・間8を使う / 数字は共通の22と行高26を使う / 見出しと行は共通の高さ・行余白に従う / 列幅は現役の186/96/106を使う / ページ送りの余白は10/20・件数は字の型に従う / 警告の余白10/14・間10、探す欄の幅200を使う
+freeze-candidates	apps/web/src/app/contents/vars/vars-overflow-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		一覧側のグリッド子は min-w-0 で縮める / 狭い幅ではフォルダを縦パネルではなく1行の選択欄にする / 検索は現役の共通道具欄に置き、はみ出す最小幅を課さない / 読み込み・空の状態は表の外へ出す
+freeze-candidates	apps/web/src/app/ec-commerce/connector-panel-numfix.contract.test.ts	外す（UI持ち主が実施）	U07	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		箱は余白16・題は16の600 / 入力は高さ36（上下6・左右12） / 選ぶ欄は2列に割らず折り返す
+freeze-candidates	apps/web/src/app/friend-add-settings/list-v8-board-numbers-contract.test.ts	外す（UI持ち主が実施）	U07	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		表の見出し・行の余白は 12/24 / 列幅は順 28・設定は伸び縮み・最初に送るもの 170・状態 80・直近7日 64・操作 28 / 探す欄の幅は 220
+freeze-candidates	apps/web/src/app/friends/detail/friend-detail-audit-1011-contract.test.ts	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		FRIEND-21: 情報欄の分類をリンクで切り替えられる / FRIEND-22: 項目名ラベルと入力欄が htmlFor/id で結び付く / FRIEND-23: 権限で隠れた項目と「項目なし」を分ける / FRIEND-24: 回答フォームは質問のlabelを見出しにする / FRIEND-25: 保存待ちの間に書き換えた欄は再取得で上書きしない / FRIEND-26: 「さらに読み込む」の失敗は末尾だけに出す / FRIEND-27: 準備中タブには利用者向けの説明と代替操作がある / FRIEND-31: 狭い画面では補助プロフィールを畳む
+freeze-candidates	apps/web/src/app/globals-token-collision-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		同じ塊の中で同じ変数を違う値で書き直していない / 見張りそのものが書き直しを見つける（対照） / 予約スタッフの題と予約からの売上の題は別の名前で、どちらもページの題の値（22px）を読む / 売上用の題だけを変更してもスタッフ画面の題へ伝わらない
+freeze-candidates	apps/web/src/app/hq/members/hq-account.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		メニューにはメンバー管理・課金プラン・お問い合わせ・ログアウトを置き、まだ無い画面（プロフィール）は出さない / ログアウトはトップバーと同じ処理を使う / Esc で閉じて押した要素へフォーカスを戻し、外側の押下は器（MenuPortal）が閉じる / 開いたメニューは最上層の器に出し、幅240で固定して行の右に説明を置かない / 頭の課金の一言は役目の札のとなりに灰色の字で1行だけ出す / 統括の情報は /hq/settings で見せる（板 yLKwV・BHEl9 にタブは無いため。旧「統括設定」の転送はやめた） / 招待は管理者と閲覧のみだけを選べる（担当者は統括の権限者にしない） / 表は共通の GridTable で、最終ログインと再送を出す / 統括名の保存ボタンはカードの中（V8 正本 K7HYu どおり。下部追従バーは使わない） @claude 2026-10-06 / 種類・件名・本文は必須、アカウントと画像は任意 / 送信は問い合わせカードの中に置き、下部追従バーは出さない（板 b8xBtZ） / 画面名はトップバーだけに出す / アカウントメニューは矢印キーで項目を移動できる
+freeze-candidates	apps/web/src/app/hq/templates/template-console.test.tsx	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		： / 参照再利用は上書きと区別し、既存を使用する選択と結果内訳を表示する / 画像登録中は保存を止め、確定した内容だけ保存できる / 作成・編集で期待版と参照先を保ち、保存結果から次へ進む / 新規作成は必須名が必要で、作成したひな形を表示する / 新規保存の応答不明は同じrequestIdと同じpayloadでだけ再送する / 結果不明後の拒否応答だけでは保存済みの可能性を解除しない / 最初の入力拒否が確定した場合は入力を直して新しいキーで保存できる / 新規保存の二重操作を1回のPOSTに抑える / 選択なしと重複未選択を止め、一括設定は許可された項目だけに適用する / 有効期限切れの確認では実行できない / 配布先が差し替わった事前確認を拒否する / 失敗アカウントだけを新しい事前確認へ戻し、成功分は再送しない / POST応答不達は既存結果をGETし、二重POSTしない / 復元も不達なら成功・失敗を断定せず、GET再確認だけを提供する / 再読み込みはURLの既存配布番号をGETで復元する / 権限不足のAPI応答後に作成・配布を許可しない / 競合した編集は入力を保持し、自動で期待版を更新・再送しない / 選んだアカウントと許可された配布方法を確認後のPOSTへ渡す / 空の確認や許可されない新規作成を実行対象にしない / 通信不明の新規依頼は再読込と認証画面往復後も固定payloadと同じキーで回収する / POSTの応答待ちにページを離れても依頼が残り、別tenantや利用者では復元しない / 表示後に所属先が変われば新規POSTを停止する / 保存場所が使えなければ新規POSTを開始しない
+freeze-candidates	apps/web/src/app/inflow-links/inflow-row-padding-contract.test.ts	外す（UI持ち主が実施）	U07	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		B-217の左右24と本文13を共通表へ渡し、画面でセルを上書きしない
+freeze-candidates	apps/web/src/app/issue-673-visual-quality-contract.test.tsx	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		カードは案Aのくっきりした2層の影と黒8%の線を使う / 浮く面はV8の8px・24pxの影 / モーダル・フォルダパネル・パネル内メニューは属性入口でトークンを読む / 主要画面の任意値 shadow をトークンへ寄せた / ボタンは motion-instant(80ms) で 0.98倍に沈む（★V7 仕上げ §2） / transition: all を使わない（#648の教訓） / 行のホバーは hover:hover かつ pointer:fine の環境に限定する / メニュー・窓は共通部品の開閉を使い、全体の旧い動きを重ねない / 動きを減らす設定で位置移動系が止まる / ダッシュボードの指標カードも骨組みの口を持つ
+freeze-candidates	apps/web/src/app/line-notifications/customer-notifications-v6-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		一覧はページ送りなしで全部出す / 絞り込み・表・数カードは共通部品を使う / タブ帯は共通部品（高さ44）を使う / 編集は専用レイアウトへ切り替え、下書き保存と公開を分ける / 編集画面でもテスト送信の結果を操作の直後に表示する / EC通知の既定設定も選択中のLINEアカウントに限定して読み書きする / 保存・公開の応答は、返った時点のアカウント世代でしか画面へ書かない / load()の再開点も、世代だけでなく選択中accountを見る（4経路で形をそろえる） / テスト送信の完了判定も、保存・公開と同じ見張り（世代とアカウント）を通す / 世代の照合はuseEffectの発火待ちに頼らない。選択中accountを描画のたびに同期させたrefでも見る / #988 NEXT-05: テスト送信は「テスト受信者に送信」と名付け、宛先を見せる確認を挟む / #988 NEXT-06: 条件説明はイベント別の文で、一斉配信と誤解する表現を置かない / #988 LAY-10拡張: つながる先はリンク色の p ではなく実リンク / 端末の控えと未保存の印は、送った文面がそのまま画面に残っているときだけ片づける
+freeze-candidates	apps/web/src/app/line-notifications/line-notifications-n678-contract.test.tsx	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		未保存の編集を公開すると、その内容で下書きを保存し、保存が返した版番号で公開する / 下書きの保存に失敗したら公開せず、端末の控えも消さない / 公開だけ失敗したときは、下書きは保存済みとして扱い、内容を失わない / 競合1: 保存を押したあとに入力を足すと、その保存では控えを消さず未保存のままにする / 競合1の対照: 保存中に入力を足さなければ、その保存で控えを消してよい / 競合1: 公開でも同じく、押したあとの入力を古い応答で消さない / 競合2: A保存中→B→A→再編集のあとに古いAの応答が返っても、控えを消さない / 競合2: Aへ戻って文面が同じままでも、世代が違えば画面へは書かない / 世代はまだ古いまま（Bのloadが一度も発火していない）でも、選択中accountが変わっていればstaleになる / 公開でも同じ隙間で、旧Aの応答からAの下書きを守る / 実物のLineNotificationsPageをmountし、layout境界（Bへコミット直後・load()のuseEffect発火前）で旧Aの応答を返しても、Aの控え・dirtyは保持されBへ漏れない / 実物のLineNotificationsPageをmountし、A送信→B切替→Bの読み直し完了→Aの遅延応答の順でも、Bの画面にお知らせが出ない / テスト送信: アカウントが替わっていれば、世代が据え置き（Bのload未発火）でも結果を画面へ入れない / テスト送信: 同じアカウント・同じ世代のままなら、結果を画面へ入れる / アカウントAの保存が、Bへ切り替えた後に返っても stale になる / 遅いアカウントAの公開応答が、先に返ったBの結果を上書きしない / 保存が失敗して返っても、切替後なら別アカウントの画面へ誤りを出さない / 切替では文面を送らないので、編集中の文面と未保存の印に触れない / 文面の保存では控えを消してよい / 定義がないお知らせ（EC既定設定）の保存も、押したあとの入力は消さない / 文面がサーバへ入っていないなら、控えは消さない / 読み直し（世代）が進んでいるなら、控えは消さない / アカウントが替わっているなら、世代がまだ古いまま（Bのload未発火）でも控えは消さない / 画面の文面が先へ進んでいるなら、控えは消さない / 編集していた行が画面から消えているなら、控えは消さない / 同じアカウントの同じ文面のままなら、控えを消してよい / 鍵にアカウントが入り、別アカウントの下書きを読み込まない / 保存済みと同じ内容の控えは復元扱いにしない / 375px級でも固定フッターの主要操作を折り返し、横へはみ出す一列にしない / 未保存の編集があることを画面に出す / 長文を入れても入力欄と見本が最小幅で潰れず、内容をそのまま描く / 定義がないお知らせには公開ボタンを出さない / 保存中は主要操作を押せなくする / 読み込み前のタブ件数は数を作らず「—」にする / 運用者件数は0件・読み込み中・取得失敗・権限なしを書き分ける / 0件: 顧客のお知らせも運用者件数も「0」であり、「—」でも「取得失敗」でもない / 担当者0人: 顧客のお知らせ自体はあっても、運用者タブの実数は0のまま出す / 今日・この30日は送信履歴の数（取り込み累計やLINE集計の合計ではない） / 403: 顧客のお知らせは「表示する権限がありません」を出し、権限変更後に読み直せる / 500: 「表示できませんでした」を出し、実物の読み直すボタンを押
+freeze-candidates	apps/web/src/app/mileage/u972-tab-overlap.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		タブは共通の型へ渡し、幅の上書きを残さない / 現役の残高は表で同じ人の数字と明細を結び付ける / 決めごとの表は共通の列の型で枠内に収める
+freeze-candidates	apps/web/src/app/reminders/edit/reminder-layout-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		狭い板は現在の型で右のスマホを畳み、本文を保つ / 送信時刻の欄は採用済みの幅を使い、行を安全に折り返す
+freeze-candidates	apps/web/src/app/reminders/reminders-v8-list.react.test.tsx	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		v8 の下では Pencil apLqS の新しい一覧に切り替わる / v8 の一覧で失敗のある行は「失敗 N」の札を出す / v8 の行の操作は見本の並びを持つ / v8 の行の「登録者を管理」「配信予定を見る」「実行結果を見る」は詳細のそのタブを開く / v8 の閲覧のみ（a5C1p）は選ぶ枠と作る・一括・変更の操作を出さず、閲覧のみの帯を出す / v8 の削除の窓（VsSyu）は危ない操作を左端に離し、動いている行には「代わりに一時停止」を出す / 下書きの削除も確認前には送信せず、元に戻すで延期しない / 停止中のリマインダーの再開は確認も延期もせず送る / リマインダーの全件選択はページ外の停止対象も確認する
+freeze-candidates	apps/web/src/app/rich-menus/edit/prepublish-check-section.react.test.tsx	混在（UI持ち主が固定行だけ外す）	U05	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		自前・LINE・実機の確認とページ数を出す / 実機で見たを押すと確認済みになる / LINEの検査を通すと結果が出る / 読めないときは読み込めなかったとだけ出す
+freeze-candidates	apps/web/src/app/rich-menus/new/create-order-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U05	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		行の間は 6、自分の行の枠は濃い緑 / 順番の数字は丸い札にせず裸の 13px 太字 / 「トークを開いたとき」の前の短い字は太字にしない
+freeze-candidates	apps/web/src/app/rich-menus/new/create-publish-check-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U05	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		行は下の薄い線・上下10・印は18 / 通った印は濃い緑・実機未確認は黄色の注意 / 「見直す」は文字だけのボタン（button役割を保つ） / 注意の帯は公開前確認の段の中にある
+freeze-candidates	apps/web/src/app/rich-menus/new/create-shape-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U05	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		案Aの面の分け方は共通部品に任せる / 画像の文の間は8・合えば濃い緑・作り方は文字だけ / 右の箱は共通部品（自前の題・行の指定は画面に置かない） / 見え方の題の行の行き先は部品に任せる（題を二重にしない）
+freeze-candidates	apps/web/src/app/speed-budget-contract.test.ts	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		目標は表示 1秒・LCP 1秒・反応 100ms・長い作業 50ms（落とさない） / 測るのは主要10画面＋2,000行の場面 / 基準は「空」か「11行そろい」かのどちらか。中途半端は許さない / 基準どおりなら通る / 基準が無い画面は飛ばす / 基準より20%を超えて悪いと落ちる / JS は1KBを超えて増えたら落ちる / 反応が測れない画面（null）は飛ばす / ぶれた1回に引っ張られない / 測れない回は除く。全部測れなければ null / JS超過を許可へ移さず、実測と上限を記録する / 時間とJSの超過を両方保持し、切り替えだけで強制判定へ戻せる / 概要は画面・項目・実測・上限・超えた量を表へ出す / 目標を超えた画面を列挙する / 目標内なら空 / 本物の1行目を写して 2,000 行にする / 壊れた答えは膨らませない（null） / 待ち受けなし方式と基準更新を読む / ふつうは配った out の住所を開く / 継続通信や負荷描画を文書移動の完了条件にしない / 文書応答の失敗は再移動で隠さない / timeoutでも測定を再移動でリセットしない
+freeze-candidates	apps/web/src/app/staff/staff-permission-clipping-contract.test.ts	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		設定と説明の2列は全幅固定ではなく、十分な幅の時だけにする / 選択列の `repeat(3, 140px)` 固定をやめ、機能ごとのカードにする / バーの左端は var(--sidebar-width) 固定ではなくビュー幅に追従する / バーの高さを固定せず、下部はキャンセルと保存に絞る / 固定の項目数・固定の人数を置かず、選択中の権限データから生成する / 取れない項目は「未確認」と出し、未保存の変更は「変更後の予定」と分かる / リンク外見の p 要素をやめ、href を持つ Link にする
+freeze-candidates	apps/web/src/app/theme-switch-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		<html> は data-theme= / このブラウザの記憶（lh-admin-theme）を読む描画前のスクリプトは無い / 設定画面に「画面の見た目」の切り替えは無い / 追加された画面にも独自の環境変数・保存済みテーマの選択口がない / 配備（検証・本番）と検証配備の手順に見た目の指定は無い / V8 の値は :root の下にある（角丸 control 10 / panel 16） / V8 で増える語彙がある（divider・table-head・chat-outgoing・board・印のタイル） / 上バーに「前の見た目に戻す」は無い（オーナー指示で廃止）
+freeze-candidates	apps/web/src/app/v8-outer-shell-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		旧テーマで出し入れする表示印を残さない / 旧テーマを選ぶTailwindの分岐と負の条件を残さない / 中身は白い板1枚（radius 16・枠・薄い影・右下左に 12px）で、v8 のときだけ / 黄色の版の帯の旧本体を外枠から外す / 左メニューは地の上に直接置き（枠・白地を外す）、幅は 240px / いまの項目は白い地＋薄い影（緑のベタ塗りではない） / 左メニューは畳める（幅 64・状態をブラウザに覚える・⌘\\ とボタンで切替） / 帯は高さ 60・地の上・下線なし。左にパンくず（アカウント › 画面名） / 帯の右は 通知・自分（探す欄は V8 で外した）。友だち一覧の ?q= 受け口は残す / 帯が混まないよう、v8 はアカウント名 128px・自分の名前 104px で「…」に収める / 1152 未満ではログアウトを印だけにする（字は消えても aria-label が残る） / v8 の帯は 1024px から出す（v7 は 1280px のまま） / 畳み・検索・通知は外枠に左メニューがあるときに出す
+freeze-candidates	apps/web/src/app/webhooks/apitokens-v8.react.test.tsx	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		v8 では ralAc の鍵の表（札・行の右端の「…」）が出る / 閲覧者には発行の案内を出さず、鍵の一覧は読める / 旧テーマ属性でも現役の鍵タブが出て ralAc が出る / v8 で行を右クリックすると「…」と同じ止めるが出る / v8 の読み込み中は鍵の表の形の骨組みが出て「読み込み中」の文字は無い / 鍵の入れ替えの競合理由は一覧を取り直したあとも残る
+freeze-candidates	apps/web/src/app/webhooks/outgoing-v8.react.test.tsx	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		v8 では ZSbFY の一覧（帯・表・動いているの札）が出る / v8 で失敗がある行は失敗ありの札と失敗の内訳が出る / v8 の左のフォルダの列（共通・種類 webhook）で絞れる。フォルダに入った送り先は名前の前にそのフォルダの色の丸（B-136） / v8 の行の名前の前にフォルダの丸が付く。フォルダに入っていない送り先は未分類の輪（閲覧のみでも出す） / v8 で何も無いときは wWrpY の「まだ無い」が出る / v8 の閲覧のみ（l5SRfT）は帯が出て、押せない作るボタン・設定は置かない / 旧テーマ属性でも現役の一覧が出て ZSbFY が出る / v8 の動かす・止めるは押した瞬間に札が変わり、失敗したら戻る / v8 で行を右クリックすると「設定」と同じ操作が押した位置に出る / v8 の読み込み中は表の形の骨組みが出て「読み込み中」の文字は無い
+freeze-candidates	apps/web/src/app/webhooks/webhooks-board-numbers-contract.test.ts	外す（UI持ち主が実施）	U07	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		作る入力段は共通の余白24（四方）。小さなカードの余白と分ける / 作るの入力の枠は h36 (NGh7b 枠)
+freeze-candidates	apps/web/src/app/webinars/edit/webinar-unsaved-flow-react.test.tsx	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		通知を直したまま一覧リンクを押すと確認が出て、閉じると入力を保ったまま残る / 「保存せずに移る」を選んだときだけ入力を捨てて一覧へ遷移する / 通知を保存してから一覧リンクを押すと確認は出ない / 未保存でも同じ画面の段への戻るは確認を出さず、戻った先の段を開く / 未保存のまま一覧など外へ戻るときは、これまで通り確認を出す / 未保存のまま別のウェビナーへ戻るときも確認を出す / 「この版を公開」のあとの画面遷移ではブラウザ標準の離脱確認を出さない / タイトルを直して「保存して動画へ」→ 保存してから動画の段へ進み、戻っても新しいタイトルのまま / 段の自由移動でも未保存の入力は残る（画面を畳まない） / 「下書き保存」はその場で保存して段を変えない / 保存に失敗したら段も入力もそのまま残す / 動画の段: 非公開ではページを開く口を隠し、理由を出す / 動画の段: 公開中なら「PCで見る」は公開URLへのリンクになる / 通知の段: 「テスト送信」は確認を挟んで実際にテスト送信の口を呼ぶ / 通知の段: 非公開ではページを開く口を隠し、理由を出す / 201人: nextCursor を辿って全頁読み、201人目まで届く（重複・欠落なし） / コメントの口が500でも参加者一覧は表示され、コメントは取りに行かない / 参加者の口が失敗しても集計側の段はそのまま、失敗部分だけ再読込できる
+freeze-candidates	apps/web/src/components/broadcasts/broadcast-pixel-parity-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U05	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		作成画面の列幅を設計にそろえ、LINEプレビューは共通部品にする / テスト送信の意味と操作名を設計にそろえる / テスト送信の説明・履歴・結果を実装と一致させる / 配信枠不足の確認は設計どおり3項目に絞る / 確認窓の位置指定を同じnode名のページ本体へ漏らさない / 撮影アカウントでは最終確認を8月キャンペーンの完成状態に固定できる
+freeze-candidates	apps/web/src/components/chats/inbox-v6-feature2-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U03	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		一覧の日時は共通の書式から時刻を出す / 取れない日時は空欄や Invalid Date ではなく — を出す / 待ち時間は分・時間で出し、負の値は出さない / V8の行は絵どおり時刻を出す / 顧客情報は開いていても閉じていても同じ1つのボタンで切り替える / 設計の文言をそのまま出す / 保存の口へつなぎ、書き換えていないうちは押せない / 開いている間は「内部メモ」ボタン自身が印になる / 設計どおり掴んで順番を変えられる / 出し入れは本物のチェックを土台にした入／切で読み上げにも伝わる / 全部隠しても戻せる道と、閉じる道を置く / 白い板の実幅が1100px以上のときだけ3列を常設する / トーク列は最低幅で固定せず、残り幅いっぱいに伸縮する / 顧客情報は狭い幅でも開ける——常時非表示にしない / ドロワーは Escape・背景・閉じるボタンで閉じられる / 開閉ボタンの文言・aria-expanded・実表示を一致させる / 固定座標ではなく、押したボタンの位置を基準に置く / 最大高さを画面内に収め、項目の並びだけをスクロールする / 開いているあいだは Escape と画面の変化に追従する / 固定の座標・幅・高さを持たない / 狭い幅では画面内側16pxの範囲へ置く / ヘッダーとフッターを固定し、条件部分だけをスクロールさせる
+freeze-candidates	apps/web/src/components/dashboard/qr-size-contract.test.tsx	残す（動作/権限/安全）	U07	QR出力のサイズ/形式がWorkerの実際の受け口を通ることを検証。画面の外観寸法ではなくAPI契約なので残す		選べる大きさが全て /api/qr の契約を通る / 選べる形式が全て /api/qr の契約を通る / 既定のダウンロード先が1024pxで、保存名まで載っている / 1200pxはWorkerが受けないので画面にも残さない（直した理由そのもの）
+freeze-candidates	apps/web/src/components/friend-fields/support-mark-v6-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		一覧は実Node、KPI、絞り込み、設計の列を持つ / 追加編集画面は本文タイトルを置かず、トップバーへ画面名を渡す / 保存と保管の失敗で内部のAPI文言をそのまま表示しない / 影響確認の版と冪等キーを使い、選んだマークへ置換して保管する / 保管確認は fy5dz の位置と幅で、置換先と対象人数に絞る / タブ行から追加画面へ進める
+freeze-candidates	apps/web/src/components/friends/bulk-run-dialog-layout-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		外側・フォーカス・画面内への収まりは共通Dialogを使う / 操作カードは最小幅で表を押し広げず、狭い幅で列を減らす
+freeze-candidates	apps/web/src/components/layout/mobile-header-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		モバイルヘッダーが現在地（画面名）を持つ / 1280px 未満では上部バーを畳み、2本のヘッダーを同時に占有させない / ヘッダー高さと本文のオフセットは1つのトークンで管理する / モバイルでもアカウント一覧の失敗帯は畳まない
+freeze-candidates	apps/web/src/components/ops/ops-shell-overflow-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		1024px未満ではナビを常設せず、本文の上に開く操作を置く / 開いたナビは画面の上に重なる開閉式で、1024px以上だけ常設に戻す / 開いたナビは暗幕・Escape・画面移動で閉じ、背面のスクロールを止める / 本文の左右の余白は狭い画面では現在の共通外枠の余白へそろえる / 画面見出しは操作が入ると下へ折り返し、1文字ずつに割れない / 外枠は画面の高さに収め、縦に流れるのは本文の中だけにする / 自分の操作と下の入口は常に見え、流れるのはメニューの部分だけ / 利用者メニューは矢印キーで項目を移動できる
+freeze-candidates	apps/web/src/components/scenarios/test-send-confirm-layout-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U04	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		左の空きはPCメニューが実在する幅だけ取る / 確認ダイアログの上余白は画面高さに連動し、下までスクロールできる / 確認画面の本文は狭い幅で1列に畳む / 見出し行は狭い幅で折り返せる
+freeze-candidates	apps/web/src/components/shared/bar-chart.test.tsx	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		日ごとの増減をそのまま写す（足し引き・丸めなし） / 目盛りは上端が最大値を包むきりの良い段 / 増えた棒は accent-deep、減った棒は ink-faint / 赤・3つ目の色を使わない / 凡例は「増えた」「減った」の文字を持つ / 凡例の文言を変えられる（d8X09：登録／ブロック） / 凡例を外へ置いても、日を選ぶ操作と読み上げる数を保つ / 1日のボタン名に数が入る / 読み上げ用の表が同じ数を持つ / 押すとその日が選ばれ、aria-pressed が立つ / キーボードのフォーカスが見える（CSSの指定） / 0 の棒を並べず、何がそろえば出るかを書く / 日ごとの増減の枠がV8のグラフへ実際の増減を渡す / 減った棒に赤を使わない / 日ごとの数は overview.days の増減をそのまま渡す / 表は読み上げに残る（隠し属性なし・見出しつき） / .srOnly は最小・最大の両方を 0 で押さえる / .tooltip は白地＋ink字（ink地にしない） / 減少を下へ指定しても日付・元の数・選択を保つ / 配信とシナリオの印を凡例と同じ役目で日付へ渡す / 追加の指定が無いグラフに基準線上下や出来事の印を足さない / 既定のダッシュボードは従来の読み上げ用見出しを保つ
+freeze-candidates	apps/web/src/components/shared/bcommon-audit.regression.test.tsx	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		WEB-046: 後から変わったタブの幅に下線を合わせる / WEB-019: マウスの移動口が無いつまみは出さない / WEB-019: 接続済みのマウスの移動口は保つ / WEB240: フォルダ候補へTabで入っても閉じない / WEB-019: 薄くする指定でも未接続のつまみは見せない / WEB-019: つまみの親でマウスのドラッグが接続されていれば上下キーも保つ
+freeze-candidates	apps/web/src/components/shared/button-migration-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U01	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		一覧に登録した画面の標準操作を共通Buttonで維持する / 共通部品が持つ見た目を画面側で重ねない / リンク先と主要な操作ハンドラを維持する
+freeze-candidates	apps/web/src/components/shared/button-press-feel-contract.test.ts	外す（UI持ち主が実施）	U01	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		B-151：主ボタンは高さ36を保ち、墨色の影・濃緑の縁・角丸8を使う / 押す暗さは乗せる暗さ（0.92）より暗い / 白地のボタンは弱い暗さ（白が灰色に沈みすぎない） / 押せるものは全部「指」の形（Tailwind の土台は button を default にする） / 左メニューの速さは共通の変数（150ms ease の直書きをやめた）
+freeze-candidates	apps/web/src/components/shared/button-width-speed.test.tsx	混在（UI持ち主が固定行だけ外す）	U01	短文/長文・busy・再描画の再測定と入力由来の幅確保は保持。固定の121pxや見た目だけの文字一致はU01で分類して外す		保存文が短→長→短に変わるたび、前の固定幅を外して全文を測る / 同じ文字でもアイコン・寸法・非表示が変わったら測り直す / 同じラベルの親の再描画では測り直さず、ラベルが変わったら幅を確保する / Promiseを返す入口はbusyLabelで初回から幅を予約し、待機・成功後も幅を変えない / 普通の同期ボタンは状態用の幅を確保しない
+freeze-candidates	apps/web/src/components/shared/card-shape-contract.test.ts	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		カードの角丸と枠を持つ規則には共通の影がある（理由つきの非カードだけ除外） / 例外にはファイル・規則・理由があり、不要になった例外を残さない / globalsの変数の連鎖・V8の上書き・フォールバックを解く（循環では止まる） / ringのみ・none・別の薄い影・分割した影の取り消しも検出する / 共通の影・その別名・カード以外の角丸・コメントは誤検知しない / Tailwindも同じ要素で判定し、条件分岐やクラスの合成で逃がさない
+freeze-candidates	apps/web/src/components/shared/confirm-dialog-design-size.test.tsx	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		designWidth・designTop を渡すと、共通の窓へそのまま届く / 渡さなければ確かめの幅480
+freeze-candidates	apps/web/src/components/shared/context-menu.test.tsx	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		右クリックした位置にメニューが出る / 項目を選ぶと id が渡り、閉じる / Esc で閉じる / 右端・下端では画面の中に収まる / itemsFor を渡すと、items が空でも押した所から作った項目で1回目から開く
+freeze-candidates	apps/web/src/components/shared/destination-guard.test.ts	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		↗はhrefで開き、複製の窓を再導入しない / 実際に古い書き方を入れると見張りが落ちる / 選ぶ窓の幅640を共通の決まりで守る / 主要な一覧の外枠を保つ / 選んだ行の詳細はURLで復元できる
+freeze-candidates	apps/web/src/components/shared/destination-policy.test.tsx	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		確認窓は480、長い本文を指定した窓は560 / 旧い指定幅も4段へそろう。引き出しは480・540 / ↗ のメニューは本物の新しいタブのリンク。内部の操作はボタン / 無効な外部リンクは開かず、理由を読める / 文字リンクとボタンも新しいタブとnoreferrerを部品が付ける / 行の余白とEnterで同じ中身を開く。子のチェックやボタンでは開かない / 行のCtrl/⌘押しは新しいタブ、名前のリンクは通常のリンクのまま / 押す中身がない行はhoverとTabの止まりを持たない / 項目の設定はその場の領域。窓や入力のコピーを増やさない / 編集をページにすると窓を描かず、作る型と保存の帯を使う / コピーは元の行のすぐ下、重複を作らず元の一覧を壊さない
+freeze-candidates	apps/web/src/components/shared/dialog-design-header.react.test.tsx	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		渡さなければ印も変数も付けない（今までどおり） / Dialog：渡すと印と変数が付く（幅と一緒でも両方残る） / ConfirmDialog も同じ口を素通しする / CSS：共通の頭の余白の後ろで、印のあるときだけ変数で上書きする
+freeze-candidates	apps/web/src/components/shared/dialog-design-size-contract.test.tsx	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		designWidth を渡すと、4段のうち入れられる幅へそろえる / 省略時も共通の560pxの段を持つ / 上からの位置は背景（overlay）で受ける
+freeze-candidates	apps/web/src/components/shared/entity-picker.test.tsx	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		単一候補の確定を止める理由を示し、選ぶだけでは反映しない / 項目名を欄に残しても窓の候補名と確定するIDは変えない / 欄は空なら［選ぶ］、選ぶと名前とフォルダ＋［変える］。窓の中で押しただけでは変わらない / キャンセルでは値を変えない。探す欄で名前を絞る / 閲覧のみでも窓は開いて見られるが［選ぶ］は出さない / 消された候補を指していたら、見つからないと出して選び直させる / フォルダの横のチェックでフォルダごと選び、一部だけなら「－」。選んだものだけ見て、確定で返す / 欄から開いた窓をキャンセルしても値は変わらず、確定すると件数と名前が出る / フォルダごとの数で「渋谷エリア 2・テスト 1」の形にし、フォルダを読めないときは名前を並べる
+freeze-candidates	apps/web/src/components/shared/focus-visible-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		押せる部品を拾えている / 自前の CSS を持つ部品は :focus-visible を持つ / フォーカスの輪郭を消さない / , / 入力欄の輪郭は青い色で2px・外側に余白 / Tailwind でもフォーカスの輪郭を消さない
+freeze-candidates	apps/web/src/components/shared/kpi-band-contract.test.tsx	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		ListKpis と FriendKpis は包み（KpiBand）で帯として出す / v8 の帯は隙間0・縦線・外側だけ角0・数22 / 数のマスは角0・影なし / v8 の単位（件・通）は 12px / 包み（KpiBand）は帯の印を持ち、並べ方は呼び出し側のまま / 帯の指定は層の外にある（ユーティリティ層の gap 等に勝つ） / 折りたたみ（KpiCollapse）とナレッジ一覧も帯として出す / 帯の題は10-11固定の絵どおり12px/500/18px / 印なしの帯（data-kpi-strip）もv8では横一列・隙間0
+freeze-candidates	apps/web/src/components/shared/line-preview-bubble.test.ts	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		; / 吹き出しは文字に合わせる：幅は決めず、いちばん広くて 210（文の幅 186＋左右の余白・絵 UTbi1） / 文字13・行の高さ1.45・内側 8/12・角丸 左上6／ほか18・改行はそのまま / 画像・カードの大きさは今のまま（cfVyj）
+freeze-candidates	apps/web/src/components/shared/menu-portal-height-contract.test.tsx	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		入る時は上限が使える高さいっぱいで、影もスクロールもない / 足りない時だけ中でスクロールし、下端に続きの影が出る / 下に場所が無ければ上へ開き、上の使える高さまで使う / 1px の誤差では影を出さない / 余白は 8px / portal の中では上限なし・スクロールなし（器が広げる） / 器を使わない置き方（inline）の上限は残す
+freeze-candidates	apps/web/src/components/shared/motion-tokens-contract.test.ts	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		4段の長さと2本の曲線が :root にある / Tailwind の ease-* を上書きしない / 動きを減らす設定では、動きと移り変わりが一瞬になる / 共通部品の CSS に ms を直接書いた所が増えていない / チェックボックスは物差しの値だけで動く
+freeze-candidates	apps/web/src/components/shared/panel-sizes.react.test.tsx	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		B-158 決まり8：実際の窓・引き出し・行の詳細が幅の表を使う
+freeze-candidates	apps/web/src/components/shared/record-table-columns.react.test.tsx	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		widthless records preserve all four header and body columns, including fragments / explicit record column allocation is preserved / ordinary native tables receive no new grid allocation / an empty spanning state remains one state, rather than synthetic columns
+freeze-candidates	apps/web/src/components/shared/select-width-text.test.tsx	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		狭い段の印だけでも名前を読み上げ、キーで同じ候補を選べる / width を渡すと箱の幅になる / 渡さないと幅の指定は付かない / icon を渡すと箱の先頭に図柄が出る（v19Ivv の栞） / icon を渡さなければ図柄は出ない / treatment= / W3: page size wording comes from the shared role while the 100 option still selects 100 / W3: a numeric value in an ordinary selector retains its authored label / W3: page-size width on a duration selector keeps days and has no page-count marker
+freeze-candidates	apps/web/src/components/shared/sticky-save-actions.test.tsx	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		明示した役目の印は通常/分割の帯とリンクで保ち、待機/完了では状態印へ替わる / 印なしと既存の保存印も1つにそろえる / 次へ・副操作・リンク・左端の操作の印はその役目を保つ / ref・submit・理由・押下は保ち、disabledとbusyでは実行しない / 保存中と完了の表示を保ち、完了後に共通の保存印へ戻る / 分割した帯も同じ印、インラインの別用途は渡された印を保つ / 明示した保存印と印なしの指定は、保存の既定より優先する
+freeze-candidates	apps/web/src/components/shared/table-body.test.tsx	残す（動作/権限/安全）	U01	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		2,000件を保持し、見える行だけを呼び出す。最後へのスクロールと選択も動く / 遠くへ送ってもフォーカス行と開いたメニューを残し、間の1,900行は描かない / 実測した59pxへ詰め物の高さを合わせる。少数・空・更新では元の表を保つ / 狭い幅で補助列を畳んだら、詰め物の列数も減らして名前の列を潰さない / 高さや窓だけが変わっても残る行を作り直さず、データ・選択の更新は描く
+freeze-candidates	apps/web/src/components/shared/table-header-migration-contract.test.ts	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		一覧に登録した画面の標準見出しを共通Thで維持する / 移行したセルに旧色・旧余白・大文字化を重ねない / 登録した詳細・V8専用テーブルだけ直書きthを許す
+freeze-candidates	apps/web/src/components/shared/table-measurement.react.test.tsx	残す（動作/権限/安全）	U01	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		reads all rows before changing any height, so one row cannot force layout for the next / coalesces repeated resize notifications and still updates after filtering or a dedicated presentation / does not write an unchanged action width and start another density measurement
+freeze-candidates	apps/web/src/components/shared/tabs-v8-indicator.react.test.tsx	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		古いDOMの値で現役の下線を止めない / v8は今のタブの下に動く印を出す / 確認待ちの件数が変わったら、下線も新しいタブの幅に合わせる
+freeze-candidates	apps/web/src/components/shared/tag-pill.test.tsx	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		名前を読み上げ、フォルダ色の点を添える。長い名前も全文を確認できる / 未分類にも点があり、表では小さい札になる / 一覧の名前を兼ねる札は、色だけでなくフォルダ名も伝える / 編集へのリンクと外すボタンは別々に操作でき、表のクリックへ伝わらない / 白地・細い枠・丸い角と、2サイズの指定を共通のCSSで保つ / 条件づくりの札は選択状態を読み上げ、押すと切り替える
+freeze-candidates	apps/web/src/components/shared/tap-area-editor.test.tsx	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		右の一覧に記号・名前・動きの要約か未設定を出し、下に選んだ面の動きの欄を置く / 画像の上の面を押しても、一覧の行を押しても同じ面を選ぶ / canvas を渡すと部品の画像の代わりにそれを左に置く（面を足す・区切り直す画像） / 面がなければ一覧の代わりに文を出す / 見た目：画像は幅 320、記号は薄い地＋灰色の字、選んだ行の記号は濃い緑・白い字、要約と未設定は 11px
+freeze-candidates	apps/web/src/components/shared/tap-target-hover-639-contract.test.tsx	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		素のボタンはベース層で 32px を下回らない（高い部品はそのまま） / 行内ボタン・チップ・ページネーションは 32px 以上を部品側で持つ / 画像タイルのお気に入り星は現役の板の24pxを使う / ベース層で素のボタンを 44px にする（スイッチは除く） / 行内操作・チップ・ページネーション・汎用アイコンは部品側で 44px / 素のボタンと文字リンクに代替の視覚反応がある / transition: all を使わない（#648の教訓） / 背景色付きの主要ボタンは自前のホバー変化を持つ / 絞り込み札は押せるボタンとして描かれる / ページ送りは nav の中に実ボタンを並べる / 行内操作の編集は「…」へ入る / タブは行き先つきリンクと操作ボタンを描き分ける
+freeze-candidates	apps/web/src/components/shared/text-field-unified.react.test.tsx	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		前後の固定文字を入力値へ混ぜず、ref・説明・必須・誤りを元の欄へ渡す / 説明を aria-describedby でつなぐ（呼ぶ側の分も残す） / 誤りの文が出ている間は aria-invalid と誤りの文の読み上げを付け、打ち直し中は外す / 必須の札があれば aria-required を付ける / htmlFor だけ渡せば欄に id を振り、ラベルとつなぐ / 文字数を欄の下に出し、読み上げにつなぎ、上限を超えたら印を付ける / Field の外では何も足さない / invalid を渡せば Field の外でも aria-invalid を付ける / 正本と同じ見た目の class を持ち、ref も届く /   /   /   /   / form-controls は入力欄の見た目を自分で持たない（v7 の差は v7 のときだけ） / 最小の高さは 120px / 層の外で resize: vertical を決め、画面の className に負けない / 画面に直接書いた textarea も v8 では縦だけが既定
+freeze-candidates	apps/web/src/components/shared/use-card-heights.test.tsx	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		縦に並ぶカードの幅・高さを内容幅に縮めない / 枠を外した入力段へ箱用の余白を追加せず、枠のある箱だけ対象にする
+freeze-candidates	apps/web/src/components/shared/v5-b3-controls-contract.test.tsx	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		入力欄はHTML属性をそのまま渡す / 検索欄は検索属性・読込中を持つ / 選択欄は閉・ページ件数・開状態を同じ部品で表す / CSSモジュールは生の色とローカル変数を持たず、フォーカス輪郭を消さない
+freeze-candidates	apps/web/src/components/shared/v8-rule-values.test.ts	混在（UI持ち主が固定行だけ外す）	U02	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		共通部品が決まりの変数を読む / 変数を無視して部品の高さが旧い31pxに戻った場合を検出する / 上書きと参照を解いた値が決まりと一致する / 別テーマ・要素限定・条件付きのrootを全画面の上書きと誤認しない / 後から別の値に上書きされた場合を検出する / 影の参照先のずれをすべて検出する / 未定義と循環参照を検出する
+freeze-candidates	apps/web/src/components/templates/page-templates-head-contract.test.ts	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		寸法は先頭の変数に1か所まとめ・値は絵どおり / 既定は変数だけを使う（題・間・説明・上余白） / compact は部品どおり（題20/27・間2・説明13/20） / regular は既定と同じ（小さい題20pxの指定を持たない） / 一覧の頭は下余白12・帯は頭の直下（頭の高さ87） / 行の高さは現在のV8の1.5に固定し、旧値を残さない / 作る型の頭は20/24/16・間8・手順は題と説明の下の行（置き場所は1つ・q1xNMz） / 一覧の頭に来た道の案内を渡したときだけ、題を全幅にして案内と操作を下の行へ並べる / 詳細の頭は20/24/16・間12・操作の間6・タブは下の行 / 作る・詳細の中身と右の列は変数だけ（左24/28・間16・右24・900の板は280） / 保存の帯は採用 A-1 の浮いた帯（下から12・左右12の余白＝絵の下の帯 left 12。オーナー 2026-10-04 採用。sticky-bar-contract が形を固定） / 設定はメニュー208・内側16/12・中身24/28・間16 / 受信箱は列372・会話・要点260・会話の頭と書く欄は変数 / large の説明に絵に無い 12/18 を使わない
+freeze-candidates	apps/web/src/components/users/users-table-padding.test.ts	外す（UI持ち主が実施）	U07	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		見出し行の左端と右端は現役の12px / 本文行の左端と右端は現役の12px
+freeze-candidates	apps/web/src/components/webinars/webinar-publish-flow-contract.test.ts	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		下書きから公開へ変えるときだけ確認を挟む / 動画・配信枠・動画時間が無い状態では公開させない / 公開APIの実際の返事に含まれるIDだけを完了画面へ渡す / 公開完了は実Nodeと実データだけを表示する / 所属アカウントのLIFFが取れたときだけ公開ページを出す / 撮影モックの公開応答は本物と同じ `{ webinar, validation }` の器で返す / 読込・失敗・公開状態不一致を完了と混ぜない
+freeze-candidates	apps/web/src/lib/broadcast-template.test.ts	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		converts a text template into a broadcast bubble / keeps a content template reference in the selected bubble / pins research choices and tap extras to the published version, including when a draft exists / uses raw Flex JSON as the legacy message content / rejects malformed image templates / 1つだけなら渡さない / 2つ以上なら渡す / 空でも渡さない / 位置情報は種別ごと渡す（テキストに落とさない） / スタンプは packageId / stickerId を渡す / 音声は秒をミリ秒に直す / カルーセルは控えた中身そのものを渡す（テンプレートIDではない） / 動画は種別ごと渡す / 書けていない位置情報は空を返す（保存前に画面が止める） / カルーセル素材はカルーセルの列に直す / リッチメッセージはタップ範囲を持つイメージマップに直す / クーポンは使用ボタンつきカードに直す / リサーチはLIFFで回答するボタンに直す / 選んでいない素材は選び直しを求める / 直せない素材は番号ではなく中身の直し方を返す / 直った素材は空文字（問題なし）を返す / 空の名前は番号と項目を指す / 空のURLは番号と項目を指す / https でないURLは https を求める / 2つ目以降も番号で指す / そろっていれば空文字（問題なし）を返す / 5つ目は置けない / LINEの範囲をピクセルのまま保ち、既存のリッチメッセージとして読み込む / カルーセルのボタンの動きを落とさない / 音声のミリ秒を編集用の秒へ戻し、保存時に元の長さへ戻す / LIFF の無いアカウントでは予約などを送らない / 回答フォームは選ぶまで送らない
+freeze-candidates	apps/web/src/lib/card-radius-contract.test.ts	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		カードは12px / 窓は16px / 用途の名前を別のまま残す / 窓の外枠がカードの角丸を使っていない
+freeze-candidates	apps/web/src/lib/design-debt.test.ts	混在：固定を外し計測/動きを残す	G01	ファイル別宣言数の上限を廃止し、表示制御が効かない危険と解析器の試験を保持		
+freeze-candidates	apps/web/src/lib/design-impact.test.ts	混在：固定を外し計測/動きを残す	G01	全利用元の固定リスト一致を廃止。import解析の基本試験を保持、隣の移行試験用データはU02へ		
+freeze-candidates	apps/web/src/lib/design-token-contract.test.ts	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		文字の段は設計の10段と一致する / 角丸は設計にある値だけを使う / 役割ごとの角丸がトークンとして存在する / V6の18pxをTailwind既定の rounded-lg へ流し込まない / 同じ系統の中に、同じ値のトークンを2つ置かない / V6 の別系統トークンを残さない / 主ボタンは accent-deep の地に白文字を乗せる / 共通ボタンは現在のV8の高さ・余白・文字を使う
+freeze-candidates	apps/web/src/lib/direct-values.test.ts	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+freeze-candidates	apps/web/src/lib/load-failure-audit.test.ts	残す（動作/権限/安全）	U02	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		an error reset does not excuse converting failure to ready / a scoped allowance cannot excuse edits or extra copies / an error state name alone cannot approve a newly introduced empty failure branch / successful empty and loading reset are not failure branches / the full app and v8 trees contain no unapproved empty failure branches
+freeze-candidates	apps/web/src/lib/raw-colors.test.ts	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+freeze-candidates	apps/web/src/lib/screen-css-budget.test.ts	外す	G01	旧CSS上限そのものの共通検査。UI隣接試験ではない		
+freeze-candidates	apps/web/src/lib/size-scale-contract.test.tsx	外す（UI持ち主が実施）	U02	旧px・色・固定の部品数/ノード/利用元の一致だけの契約。隣接試験本体は指示どおり未変更。持ち主が削除する		V8の文字の段（10/12/13/15/20/28） / V8の角丸の段（6/10/12/full） / 余白の正規5段（4/8/12/16/24）は gap-1/2/3/4/6 で読む / 補助の段もV8の写しに合わせる / 文字サイズの任意値 text-[Npx] を増やさない / 角丸の任意値 rounded-[Npx] を増やさない / 余白の任意値 gap-[Npx] を増やさない / 4の倍数でない gap 段（1.5=6px など）を増やさない / 正規クラスの綴りで描画でき、globals.css の定義と一致する
+freeze-candidates	apps/web/src/v8/autosave/use-browser-draft.test.tsx	残す	U07	下書きの基準状態/同時更新/読込失敗の監査指紋。実操作・状態・安全を保護する		
+freeze-candidates	apps/web/src/v8/autosave/use-draft-autosave.test.tsx	残す	U07	下書きの基準状態/同時更新/読込失敗の監査指紋。実操作・状態・安全を保護する		
+freeze-candidates	apps/web/src/v8/autosave/use-scenario-draft.test.tsx	残す	U04	下書きの基準状態/同時更新/読込失敗の監査指紋。実操作・状態・安全を保護する		
+freeze-candidates	apps/web/src/v8/hq-templates/console.test.tsx	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		リッチビデオの種類から店と同じ編集部品を統括で開ける / 作る画面から一覧へは、上の帯のパンくず「テンプレート」で戻る（同じ URL のまま段を替える） / 作る画面から一覧へは、下の帯の［キャンセル］でも戻る / メッセージは店の作る画面で作り、［保存する］で統括のひな形を作ってアカウントへ配るへ進む / クーポンは店のクーポンを作る画面で作り、店と同じ形の payload を統括のひな形の素材にする（店のアカウントに結びつく欄は出さない） / 質問は店の質問を作る画面で作り、質問の JSON を統括のひな形にする（押したときの動きは出さない） / カルーセルの画像は統括の口で受け取り、保存と後片付けの対象を正しく残す / カルーセルは店のカルーセルを作る画面で作り、ボタンは URL を開くだけ / 名前を押すと詳細。配った先のアカウント名と［このアカウントへ入る］・［配る］を出す / 配った先ごとの版と版の履歴を出し、前の版を比べる・この版に戻す / 名前を押すと店と同じ3つのタブの編集画面。右は「配った先」、［保存して配る］で統括のひな形を直してアカウントへ配るへ進む / ［下書きを保存］は保存して一覧へ戻り、配るへは進まない / リッチメッセージのタブから作ると店のリッチメッセージの作る画面。画像は統括の置き場へ送り、面と URL を統括のひな形の素材にする / 質問は保存してある質問文・選択肢で店の質問の画面が開き、直して保存すると同じ形で統括のひな形を更新する / リッチビデオは保存済みの動画と画像の組から開き、統括へ保存して配り先を選べる / クーポンは保存してある期間・説明で店のクーポンの画面が開き、そのまま保存しても期間を落とさない / 保存成功前には窓を出さず、「あとで」は保存を保ったまま閉じる（配布は呼ばない） / 保存を拒否されたら編集画面に残り、配る窓も確認も出さない / 配った版と上書きの注意を出し、検索で隠れた選択も確認へ引き継ぐ。保存の帯は出さない / 確認の通信失敗は窓と選択を保ち、再確認でもひな形を再保存しない / 新規の下書きは保存して一覧へ戻る。配布状況が取れなくても未配布にはしない / 全種類のフォルダ内ひな形は全選択で始まり、片方0なら配れない / すべての確認が済むまで配らず、順に配った結果を同じ窓へまとめる / 再読込後は記録した番号をGETで確認し、配り直さない / 失敗したひな形とアカウントだけ再確認し、先に成功した配布は送らない
+freeze-candidates	apps/web/src/v8/hq/members.test.tsx	混在（UI持ち主が固定行だけ外す）	U07	固定の色/幅/文字/旧nodeの一致だけ外す。入力/保存/選択/未保存/権限/全文/画面内の収まりを残す。隣接試験本体は未変更		招待は閲覧のみ・指定したアカウントだけから始め、アーカイブしたアカウントは選ばせない / B-139：招待で名前が空・担当するアカウントが0なら送らず、両方の欄に理由を出し、名前の欄へ移る / 確認の間は変更の窓を閉じ、やめたら入れた中身のまま戻り、役割を変えないときは役割を送らない / WEB216：統括（owner）の範囲だけを変えても、役割（owner→admin）を送らない / 名前の列は 160 で守り、伸び縮みするのはメールアドレスだけ
+freeze-candidates	apps/web/src/v8/login/train30-auth.spec.mjs	残す（動作/権限/安全）	U07	候補語の実体はAPIの値・本人/別店/権限・選択/入力/未保存・失敗・実測や渡された寸法の契約。旧写しの固定一致ではないので維持		
+freeze-candidates	apps/web/src/v8/settings/line-notifications/audit-web198-199.test.ts	残す	U07	下書きの基準状態/同時更新/読込失敗の監査指紋。実操作・状態・安全を保護する		
+freeze-candidates	apps/worker/src/lib/qr-matrix.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/middleware/auth.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/affiliate-payouts.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/booking-liff-self-change-http.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/contents.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/customer-data-deletion.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/ec-commerce-notification-runs.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/feature-settings-impact.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/hq-friend-attributes.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/hq-template-archive.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/hq-templates.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/mileage-admin.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/mileage-redemption-boundary-d1.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/mileage-redemption-retry-realtime-d1.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/mileage-reward-exchange-draft-r368-r377-d1.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/nen-photo-duplicate-reward-817.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/openapi-coverage.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/operations.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/recipes.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/restaurant-google-posts.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/rich-menu-history-version.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/rich-menu-manual-publish-live-route.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/rich-menu-manual-publish-route.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/routes/uid-migration-races.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/ad-conversion-d1-dual-binding.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/ad-conversion-d1-lease.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/dedup-broadcast.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/downstream-conditional-recovery.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/duplicates-stats.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/feature-off-gates-round3.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/google-business-posts.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/google-business-profile.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/google-business-retention.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/hq-broadcast-materials.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/hq-templates/form.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/hq-templates/hq-templates.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/hq-templates/rich-menu.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/hq-templates/runtime-r2.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/hq-templates/runtime.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/hq-templates/template.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/identity-merge-races.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/merged-people.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/message-types-line-contract.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/mileage-identity-limit.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/mileage-reward-delivery-d1.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	apps/worker/src/services/workflow-execution.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/src/staff-session-security.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/257_identity_candidates.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/316_onboarding_guidance_contract.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/318_affiliate_payout_operations.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/320_ec_order_action_read_models.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/322_photo_review_operations.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/347_template_published_version.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/349_affiliate_settlement_snapshot.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/352_photo_notification_delivery.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/359_ad_platform_account_required_and_dedup.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/381_hq_templates.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/382_tags_account_name_scope.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/400_rich_menu_manual_publish_idempotency.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/572_hq_template_text_overrides.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/622_hq_delivery_templates.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/affiliate-attribution.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/affiliate-payments.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/affiliate-settlement-deduction.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/affiliate-settlement-resume.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/audit2-db-recovery.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/customer-deletion-migration.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/f23_offer_reward_freeze.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/link-friend-to-user-merge.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/mileage-adjustment-lots-r359.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/mileage-audit-r359-r360-r52.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/mileage-pending-confirm-lots.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/mileage-rewards.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/v8-ad-event-mappings.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	packages/db/test/v8-identity-revenue.test.ts	残す	API各束	本人/別店/署名/排他/冪等/決済/公開境界/適用済SQLの動作試験。baseline・fingerprint・freezeは業務データ/試験時計で見た目の固定ではない		
+freeze-candidates	scripts/codex/train24-line-receipts-browser.mjs	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/deploy/apply-d1-migrations.test.ts	残す	G02/A09	DB履歴・適用順・配備版・復旧時刻・SQLの境界の検査。見た目の凍結ではない		
+freeze-candidates	scripts/deploy/d1-pending-readonly.mjs	残す	G02/A09	DB履歴・適用順・配備版・復旧時刻・SQLの境界の検査。見た目の凍結ではない		
+freeze-candidates	scripts/deploy/d1-pending-readonly.test.ts	残す	G02/A09	DB履歴・適用順・配備版・復旧時刻・SQLの境界の検査。見た目の凍結ではない		
+freeze-candidates	scripts/deploy/list-applied-d1-migrations.test.ts	残す	G02/A09	DB履歴・適用順・配備版・復旧時刻・SQLの境界の検査。見た目の凍結ではない		
+freeze-candidates	scripts/deploy/staging-actions-workflow.test.ts	残す	G02/A09	DB履歴・適用順・配備版・復旧時刻・SQLの境界の検査。見た目の凍結ではない		
+freeze-candidates	scripts/recovery/booking-hours-20260922.ts	残す	G02/A09	DB履歴・適用順・配備版・復旧時刻・SQLの境界の検査。見た目の凍結ではない		
+freeze-candidates	scripts/verify-design-values.test.ts	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	scripts/verify-no-source-visual-contracts.mjs	残す	G02	新たなソース文字列の固定検査を増やさないための解析。固定の見た目検査ではない		
+freeze-candidates	scripts/verify-no-source-visual-contracts.test.mjs	残す	G02	新たなソース文字列の固定検査を増やさないための解析。固定の見た目検査ではない		
+freeze-candidates	scripts/verify-staging-restaurant-delivery.test.ts	残す	G02	予約/受注APIの配備後動作と認証、測定用の画像幅を区別。外部サービスへの実行はしていない		
+freeze-candidates	scripts/verify-staging-restaurant-delivery.ts	残す	G02	予約/受注APIの配備後動作と認証、測定用の画像幅を区別。外部サービスへの実行はしていない		
+freeze-candidates	scripts/visual-qa/booking-mock-contract.test.ts	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/build-v8-design-map.mjs	混在：固定を外し計測/動きを残す	G01	古い固定版の自動重ね直しを外し、URL案内の生成だけ保持		
+freeze-candidates	scripts/visual-qa/busy-buttons.spec.mjs	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/capture-screens.mjs	混在：固定を外し計測/動きを残す	G01	旧V6の固定地図/画像/撮影CLIを廃止。現行V8撮影に必要なセッション初期設定だけ保持		
+freeze-candidates	scripts/visual-qa/delivery-mock-contract.test.ts	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/frame-parity.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+freeze-candidates	scripts/visual-qa/friends-table-state.test.mjs	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/friends-table.browser.mjs	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/frozen-v8-design-map.mjs	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持		
+freeze-candidates	scripts/visual-qa/frozen-v8-design-map.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持		
+freeze-candidates	scripts/visual-qa/ledger.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+freeze-candidates	scripts/visual-qa/list-boundaries-regression.mjs	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	scripts/visual-qa/measure2-board-state.test.ts	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/mock-api-method-contract.test.ts	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/mock-api.mjs	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/mock-fingerprint.mjs	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/mock-fingerprint.test.ts	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/perf3-visual.browser.mjs	残す	G01	速度・測定条件・欠測/途中結果の拒否。レイアウトの固定px検査ではない。予算と回数は不変		
+freeze-candidates	scripts/visual-qa/pixel-diff-summary.test.ts	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	scripts/visual-qa/pixel-diff.mjs	混在：固定を外し計測/動きを残す	G01	画素比較の純関数だけ保持。旧V6地図・固定画像/高さの合否・CLI・台帳を廃止		
+freeze-candidates	scripts/visual-qa/pixel-diff.test.ts	混在：固定を外し計測/動きを残す	G01	同一画像/差分の位置/高さ差の純計算を保持。固定画像の判定契約を廃止		
+freeze-candidates	scripts/visual-qa/qa-crash-shapes.test.ts	残す	G01	道具の純計算・入力/出力境界の試験。候補語は含むが画面の固定px/色/旧nodeの合否ではない		
+freeze-candidates	scripts/visual-qa/reminder-sort.test.ts	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/screens.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+freeze-candidates	scripts/visual-qa/settlement-flow.test.ts	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/split-design-html.mjs	混在：固定を外し計測/動きを残す	G01	古い撮影CLIへの実行案内を除去しHTML分割の純機能は保持		
+freeze-candidates	scripts/visual-qa/sync-v8-design-refs.mjs	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/title-audit.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+freeze-candidates	scripts/visual-qa/title-audit.test.ts	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+freeze-candidates	scripts/visual-qa/v8-design-map.json	混在：固定を外し計測/動きを残す	G01	現役の撮影URL/状態データは保持。廃止した凍結版の再生成元参照を外す（27項目は現役地図に同じ値で保持済み）		
+freeze-candidates	scripts/visual-qa/v8-pattern-audit.test.ts	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+freeze-candidates	scripts/visual-qa/v8-pattern-catalog.json	残す（動作/計測）	G01	モック応答・版違い検出・描画/操作・URL/状態案内・診断。固定画像/固定枚数/旧pxの合否には使わない		
+G02-diff	.github/workflows/required-pr-gate.yml:683	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	          node apps/web/scripts/v8-guard/dialog-description-band-fixture.mjs	apps/web/scripts/v8-guard/dialog-description-band-fixture.mjs
+G02-diff	.github/workflows/required-pr-gate.yml:684	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/form-columns.test.mjs apps/web/scripts/v8-guard/create-consistency.test.mjs apps/web/scripts/v8-guard/create-footer-choices.test.mjs apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs apps/web/scripts/v8-guard/create-preview-layout.test.mjs apps/web/scripts/v8-guard/affixed-input-layout.test.mjs apps/web/scripts/v8-guard/shift-entry-layout.test.mjs apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs apps/web/scripts/v8-guard/action-row-narrow.test.mjs apps/web/scripts/v8-guard/button-content-width.test.mjs apps/web/scripts/v8-guard/automation-field-error.test.mjs apps/web/scripts/v8-guard/fix-patterns.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/layer-order.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/list-row-height.test.mjs apps/web/scripts/v8-guard/dialog-layout.test.mjs apps/web/scripts/v8-guard/dialog-description-band.test.mjs apps/web/scripts/v8-guard/create-input-layout.test.mjs apps/web/scripts/v8-guard/form-badge-layout.test.mjs apps/web/scripts/v8-guard/form-card-header.test.mjs apps/web/scripts/v8-guard/table-column-alignment.test.mjs apps/web/scripts/v8-guard/visual-state.test.mjs apps/web/scripts/v8-guard/required-badge.test.mjs apps/web/scripts/v8-guard/bar-chart-layout.test.mjs apps/web/scripts/v8-guard/reservation-reading.test.mjs apps/web/scripts/v8-guard/dialog-actions.test.mjs apps/web/scripts/v8-guard/dialog-settings.test.mjs apps/web/scripts/v8-guard/dialog-content.test.mjs apps/web/scripts/v8-guard/input-retention.test.mjs apps/web/scripts/v8-guard/dialog-choice-audit.test.mjs apps/web/scripts/v8-guard/record-columns.test.mjs apps/web/scripts/v8-guard/drawer-layout.test.mjs	apps/web/scripts/v8-guard/affixed-input-layout.test.mjs,apps/web/scripts/v8-guard/shift-entry-layout.test.mjs,apps/web/scripts/v8-guard/create-consistency.test.mjs,apps/web/scripts/v8-guard/create-preview-layout.test.mjs,apps/web/scripts/v8-guard/dialog-actions.test.mjs,apps/web/scripts/v8-guard/dialog-content.test.mjs,apps/web/scripts/v8-guard/form-card-header.test.mjs,apps/web/scripts/v8-guard/form-columns.test.mjs,apps/web/scripts/v8-guard/create-input-layout.test.mjs,apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs,apps/web/scripts/v8-guard/layer-order.test.mjs,apps/web/scripts/v8-guard/list-row-height.test.mjs,apps/web/scripts/v8-guard/required-badge.test.mjs,apps/web/scripts/v8-guard/form-badge-layout.test.mjs,apps/web/scripts/v8-guard/dialog-description-band.test.mjs,apps/web/scripts/v8-guard/dialog-settings.test.mjs,apps/web/scripts/v8-guard/dialog-choice-audit.test.mjs
+G02-diff	.github/workflows/required-pr-gate.yml:705	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	        run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv	scripts/visual-qa/title-audit.mjs
+G02-diff	.github/workflows/required-pr-gate.yml:747	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	"          node apps/web/scripts/v8-guard/render-fonts.mjs < ""$RICH_MENU_FONT_INPUT"" > ""$RICH_MENU_FONT_OUTPUT"""	apps/web/scripts/v8-guard/render-fonts.mjs
+G02-diff	.github/workflows/required-pr-gate.yml:748	接続を外す	G02	この行の廃止済命令を外す。行全体を消して残す崩れ/操作試験も落とさない	          node --test apps/web/scripts/v8-guard/rich-menu-template-fonts.test.mjs	apps/web/scripts/v8-guard/rich-menu-template-fonts.test.mjs
+G02-diff	.github/workflows/required-pr-gate.yml:v8-screen-guard	接続を足す	G02	layout-overflow.test.mjs を browser-host の必須対照へ足す。layout-defects/owner-rules/pendec2/b244/active-modal/input-retention は残す	node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-overflow.test.mjs	
+meta	base	記録	G01	開始/試験前 fetch 後の本線SHA。列車42/安全修正を含む	546a36de5c54646091c6e102aafc6f1c05108028	
+meta	scope	記録	G01	UI製品本体・隣接試験本体・.github・DB・外部の鍵/台帳の変更なし。共通検査lib配下7試験はG01の固定検査そのものとして分類		
+implementation	apps/web/design/card-shadow-exceptions.json	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+implementation	apps/web/design/design-debt-baseline.json	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+implementation	apps/web/design/design-impact-baseline.txt	固定を外す/実測・動作・純計算を保持	G01	全利用元の凍結を廃止。UI隣接の移行試験が読む3分類だけU02の削除まで保持		
+implementation	apps/web/design/v8-part-values.json	外す	G01	古い写しのpx/色の固定表を廃止		
+implementation	apps/web/package.json	固定を外す/実測・動作・純計算を保持	G01	旧見た目の基準更新コマンドを廃止。入力契約と診断計測のコマンドを保持		
+implementation	apps/web/scripts/design-debt.mjs	固定を外す/実測・動作・純計算を保持	G01	固定の個別上限と更新口を外す。表示制御の無効化は引き続き遮断		
+implementation	apps/web/scripts/direct-values-baseline.mjs	固定を外す/実測・動作・純計算を保持	G01	色/直書きの計測を保持し、基準再生成と固定上限への接続を廃止		
+implementation	apps/web/scripts/raw-color-baseline.mjs	固定を外す/実測・動作・純計算を保持	G01	色/直書きの計測を保持し、基準再生成と固定上限への接続を廃止		
+implementation	apps/web/scripts/regenerate-v8-design-values.mjs	外す	G01	古い写しの一致値を再生成する口を廃止		
+implementation	apps/web/scripts/screen-css-budget.mjs	固定を外す/実測・動作・純計算を保持	G01	旧CSS上限と基準を書き直す口を廃止し計測だけ残す		
+implementation	apps/web/scripts/v8-card-shadow.mjs	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+implementation	apps/web/scripts/v8-guard/active-modal-audit.test.mjs	固定を外す/実測・動作・純計算を保持	G01	フォーム欄の列数を固定せず、実際の重なりを故障→復旧で確認		
+implementation	apps/web/scripts/v8-guard/affixed-input-layout-browser.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/affixed-input-layout.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/b244-rules-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	入力の必須/任意・エラー理由と危険操作の分離を保持。固定の件数位置と印を外す		
+implementation	apps/web/scripts/v8-guard/b244-rules.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定位置/印の試験を外し、入力エラーと危険操作の分離の対照を保持		
+implementation	apps/web/scripts/v8-guard/blank-gap-allow.json	外す	G01	画面別の空白の許可を廃止		
+implementation	apps/web/scripts/v8-guard/blank-gap.README.md	固定を外す/実測・動作・純計算を保持	G01	廃止した空白許可表の案内を外す		
+implementation	apps/web/scripts/v8-guard/blank-gap.mjs	固定を外す/実測・動作・純計算を保持	G01	空白の実測閾値を保ち、画面ごとの許可表と免除を廃止		
+implementation	apps/web/scripts/v8-guard/blank-gap.test.mjs	固定を外す/実測・動作・純計算を保持	G01	空白実測の境界を保持し、許可で通す契約を外す		
+implementation	apps/web/scripts/v8-guard/button-content-width.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定の見た目契約だけ削除。残す描画/動作の試験は継続		
+implementation	apps/web/scripts/v8-guard/code-size-baseline.json	外す	G01	個別行数の凍結表を廃止		
+implementation	apps/web/scripts/v8-guard/code-size.mjs	固定を外す/実測・動作・純計算を保持	G01	行数は現在値の計測だけ。初期SHA・個別凍結・400行遮断・更新口を廃止		
+implementation	apps/web/scripts/v8-guard/code-size.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定上限の契約を外し、計測器の単体試験だけ残す		
+implementation	apps/web/scripts/v8-guard/confirmation-defaults.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/control-overlap-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	固定の1列/2列を外しても、入力欄の実際の重なり・遮断は同じ検出条件で見張る		
+implementation	apps/web/scripts/v8-guard/create-consistency-browser.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/create-consistency.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/create-footer-choices.test.mjs	固定を外す/実測・動作・純計算を保持	G01	混在試験から826px/下12/2列/6印の契約だけ除き鍵盤選択・入力保持・切れを残す		
+implementation	apps/web/scripts/v8-guard/create-input-layout.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/create-preview-layout-browser.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/create-preview-layout.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/create-results-layout.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/csv-publication-layout.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/csv-publication-layout.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/dialog-actions-browser.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/dialog-actions.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/dialog-choice-audit.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/dialog-content-browser.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/dialog-content-row-browser.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/dialog-content-row.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/dialog-content.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/dialog-description-band-fixture.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/dialog-description-band.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/dialog-layout-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	窓の画面内収まりと操作のクリック可否を残し、固定幅/上位置/行高/文言/色/列数を外す		
+implementation	apps/web/scripts/v8-guard/dialog-layout.test.mjs	固定を外す/実測・動作・純計算を保持	G01	窓の指定top/固定検索高の契約を外し、低い画面・長い本文でも操作可能な検証を保持		
+implementation	apps/web/scripts/v8-guard/dialog-settings.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/drawer-layout-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	引出しの画面内収まり・操作のクリック可否を保持し、全高/下端の完全一致・印の固定を外す		
+implementation	apps/web/scripts/v8-guard/drawer-layout.test.mjs	固定を外す/実測・動作・純計算を保持	G01	故障の実描画を待ってから、画面外へ隠れた操作を検出する		
+implementation	apps/web/scripts/v8-guard/fix-pattern-counts.mjs	固定を外す/実測・動作・純計算を保持	G01	廃止した固定行高/段組/文言の分類接続も除去。実崩れの集計を保持		
+implementation	apps/web/scripts/v8-guard/fix-pattern-counts.test.mjs	固定を外す/実測・動作・純計算を保持	G01	集計の試験も固定52の行の代わりに実際の文字切れを使う		
+implementation	apps/web/scripts/v8-guard/fix-patterns-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	固定語彙/寸法/段組を外し、描画の切れ・重なりと操作の検出を保持		
+implementation	apps/web/scripts/v8-guard/fix-patterns.test.mjs	固定を外す/実測・動作・純計算を保持	G01	切れ/重なり/説明操作に加え、重複した操作と閲覧のみの選択露出の既存故障対照を保持		
+implementation	apps/web/scripts/v8-guard/form-badge-layout.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/form-card-header-browser.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/form-card-header.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/form-columns-browser.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/form-columns.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/form-rules-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	押せない理由・色の単一選択を保持。文字/固定寸法/札の幅/並び契約を外す		
+implementation	apps/web/scripts/v8-guard/layer-order.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/layout-defects-allow.json	外す	G01	画面・幅・文字ごとの欠陥例外を廃止		
+implementation	apps/web/scripts/v8-guard/layout-defects-baseline.json	外す	G01	過去の固定欠陥データを廃止		
+implementation	apps/web/scripts/v8-guard/layout-defects-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	短い文字の潰れ・切れ・重なりを保持し、カード間の固定8px契約を外す		
+implementation	apps/web/scripts/v8-guard/layout-defects.README.md	固定を外す/実測・動作・純計算を保持	G01	現行の崩れ検査と廃止した固定/許可の口を記載		
+implementation	apps/web/scripts/v8-guard/layout-defects.mjs	固定を外す/実測・動作・純計算を保持	G01	固定許可・採取・基準版の欠陥免除を廃止。固定px/文字検査を集約から外し実際の崩れと入力契約を残す		
+implementation	apps/web/scripts/v8-guard/layout-defects.test.mjs	固定を外す/実測・動作・純計算を保持	G01	崩れ検出・終了1・復旧0・可視性の対照を保持し、固定許可と基準版の免除契約を外す		
+implementation	apps/web/scripts/v8-guard/layout-overflow.mjs	固定を外す/実測・動作・純計算を保持	G01	検出条件を変えず故障対照から同じ検出器を呼べるようにする		
+implementation	apps/web/scripts/v8-guard/list-row-audit.mjs	固定を外す/実測・動作・純計算を保持	G01	一覧の固定色・固定文字・丸の故障対照を外し、実際の切れと全文確認の対照を残す		
+implementation	apps/web/scripts/v8-guard/list-row-height.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/list-row-scan.mjs	固定を外す/実測・動作・純計算を保持	G01	一覧の固定文言・青色・丸・列の契約を外し、切れと全文確認を残す		
+implementation	apps/web/scripts/v8-guard/list-skeleton-audit.mjs	固定を外す/実測・動作・純計算を保持	G01	固定行高・画像寸法・中央配置の対照と例外適用を外し、はみ出しの対照を保持		
+implementation	apps/web/scripts/v8-guard/list-skeleton-scan.mjs	固定を外す/実測・動作・純計算を保持	G01	行高/余白/画像寸法/右寄せ/狭幅固定の契約を外し、文字切れ・操作重なり・一覧はみ出しを残す		
+implementation	apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定の内側余白16pxの一致試験を廃止し、実際の切れ/重なり/全文/入力操作を保持		
+implementation	apps/web/scripts/v8-guard/measure2-common-values.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/owner-rules-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	色・余白・行高・drawer幅・古いnode契約を外し、実際の箱切れを保持		
+implementation	apps/web/scripts/v8-guard/owner-rules.test.mjs	固定を外す/実測・動作・純計算を保持	G01	旧px/色/余白契約を外し、実際の箱切れの故障対照を残す		
+implementation	apps/web/scripts/v8-guard/pendec2-rules-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	カードのはみ出し・名前なしの操作・選択状態を残し、色/影/18px/旧文言/枠の形を外す		
+implementation	apps/web/scripts/v8-guard/pendec2-rules.test.mjs	固定を外す/実測・動作・純計算を保持	G01	旧px/色/影/文言契約を外し、カードのはみ出しと単一選択の故障対照を残す		
+implementation	apps/web/scripts/v8-guard/record-columns.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定の見た目契約だけ削除。残す描画/動作の試験は継続		
+implementation	apps/web/scripts/v8-guard/render-fonts.mjs	外す	G01	記号の固定pxの契約を廃止。UI隣接の編集・選択の試験はU05に保持		
+implementation	apps/web/scripts/v8-guard/required-badge.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/rich-menu-browser-vitest.config.ts	外す	G01	記号の固定pxの契約を廃止。UI隣接の編集・選択の試験はU05に保持		
+implementation	apps/web/scripts/v8-guard/rich-menu-template-fonts.test.mjs	外す	G01	記号の固定pxの契約を廃止。UI隣接の編集・選択の試験はU05に保持		
+implementation	apps/web/scripts/v8-guard/rich-menu-template-preview.test.tsx	外す	G01	記号の固定pxの契約を廃止。UI隣接の編集・選択の試験はU05に保持		
+implementation	apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/shift-entry-layout-browser.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/shift-entry-layout.test.mjs	外す	G01	旧寸法/位置/色/文言/骨格の固定検査を廃止。実崩れ・入力・操作の検出器を継続		
+implementation	apps/web/scripts/v8-guard/status-steps-layout.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/toolbar-filter-spacing.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/toolbar-filter-spacing.test.mjs	外す	G01	固定px・色・文言・列数・印の契約を廃止。操作の試験本体は隣接UIに保持		
+implementation	apps/web/scripts/v8-guard/visual-state-browser.mjs	固定を外す/実測・動作・純計算を保持	G01	要求した状態の表示と最前面の窓の確認を残し、背景色・顔の配置の固定を廃止		
+implementation	apps/web/scripts/v8-guard/visual-state.test.mjs	固定を外す/実測・動作・純計算を保持	G01	固定の見た目契約だけ削除。残す描画/動作の試験は継続		
+implementation	apps/web/scripts/verify-b244.mjs	固定を外す/実測・動作・純計算を保持	G01	一覧の常設案内の置き方の固定だけを廃止。必須/任意の矛盾と保存検査の定義追跡は保持		
+implementation	apps/web/scripts/verify-design-values.mjs	固定を外す/実測・動作・純計算を保持	G01	解析の公開APIだけ残し、古い板の固定件数・棚卸し値・固定px照合の死んだ実装も除去		
+implementation	apps/web/scripts/verify-v8-rule-values.mjs	固定を外す/実測・動作・純計算を保持	G01	固定CSS値のCLI接続を廃止。U02隣接試験の読み取り用APIは持ち主の削除待ち		
+implementation	apps/web/src/lib/b244-source-rules.test.ts	固定を外す/実測・動作・純計算を保持	G01	共通ソース検査の常設案内の固定試験を廃止。入力要件の定義/フック取り違えの故障対照を保持		
+implementation	apps/web/src/lib/design-debt.test.ts	固定を外す/実測・動作・純計算を保持	G01	ファイル別宣言数の上限を廃止し、表示制御が効かない危険と解析器の試験を保持		
+implementation	apps/web/src/lib/design-impact.test.ts	固定を外す/実測・動作・純計算を保持	G01	全利用元の固定リスト一致を廃止。import解析の基本試験を保持、隣の移行試験用データはU02へ		
+implementation	apps/web/src/lib/direct-values-baseline.json	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+implementation	apps/web/src/lib/direct-values.test.ts	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+implementation	apps/web/src/lib/raw-color-baseline.json	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+implementation	apps/web/src/lib/raw-colors.test.ts	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+implementation	apps/web/src/lib/screen-css-budget-baseline.json	外す	G01	画面ごとの旧CSS上限を廃止		
+implementation	apps/web/src/lib/screen-css-budget.test.ts	外す	G01	旧CSS上限そのものの共通検査。UI隣接試験ではない		
+implementation	apps/web/src/lib/v8-card-shadow-contract.test.ts	外す	G01	全体の古い色/影/直書き宣言数の凍結・例外を廃止。権限と実崩れ検査は残す		
+implementation	package.json	固定を外す/実測・動作・純計算を保持	G01	旧V6画素差検査の実行コマンドを廃止		
+implementation	scripts/visual-qa/README.md	固定を外す/実測・動作・純計算を保持	G01	廃止済の旧撮影/固定地図/固定px再生成の実行案内を現行入口へ更新		
+implementation	scripts/visual-qa/broadcasts-capture-contract.test.ts	固定を外す/実測・動作・純計算を保持	G01	旧板IDの撮影手順を固定する契約を外し、撮影データのアカウント所属試験を残す		
+implementation	scripts/visual-qa/build-v8-design-map.mjs	固定を外す/実測・動作・純計算を保持	G01	古い固定版の自動重ね直しを外し、URL案内の生成だけ保持		
+implementation	scripts/visual-qa/capture-screens-variants.test.ts	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+implementation	scripts/visual-qa/capture-screens.mjs	固定を外す/実測・動作・純計算を保持	G01	旧V6の固定地図/画像/撮影CLIを廃止。現行V8撮影に必要なセッション初期設定だけ保持		
+implementation	scripts/visual-qa/cited-shots.mjs	外す	G01	廃止した旧V6地図/撮影器を呼ぶ実行接続を削除。外部の正式台帳には触れない		
+implementation	scripts/visual-qa/compare-text.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+implementation	scripts/visual-qa/frame-parity.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+implementation	scripts/visual-qa/frozen-v8-1011-routes.json	外す	G01	旧固定版の再生成用地図を廃止。現役のURL/状態データに全27項目が保持されていることを確認		
+implementation	scripts/visual-qa/frozen-v8-design-map.mjs	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持		
+implementation	scripts/visual-qa/frozen-v8-design-map.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持		
+implementation	scripts/visual-qa/ledger-claims.test.ts	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+implementation	scripts/visual-qa/ledger.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+implementation	scripts/visual-qa/pixel-diff.mjs	固定を外す/実測・動作・純計算を保持	G01	画素比較の純関数だけ保持。旧V6地図・固定画像/高さの合否・CLI・台帳を廃止		
+implementation	scripts/visual-qa/pixel-diff.test.ts	固定を外す/実測・動作・純計算を保持	G01	同一画像/差分の位置/高さ差の純計算を保持。固定画像の判定契約を廃止		
+implementation	scripts/visual-qa/redesign.sh	外す	G01	廃止した旧V6地図/撮影器を呼ぶ実行接続を削除。外部の正式台帳には触れない		
+implementation	scripts/visual-qa/redesign2.sh	外す	G01	廃止した旧V6地図/撮影器を呼ぶ実行接続を削除。外部の正式台帳には触れない		
+implementation	scripts/visual-qa/redesign3.sh	外す	G01	廃止した旧V6地図/撮影器を呼ぶ実行接続を削除。外部の正式台帳には触れない		
+implementation	scripts/visual-qa/screens.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+implementation	scripts/visual-qa/split-design-html.mjs	固定を外す/実測・動作・純計算を保持	G01	古い撮影CLIへの実行案内を除去しHTML分割の純機能は保持		
+implementation	scripts/visual-qa/temporary-allowances.mjs	固定を外す/実測・動作・純計算を保持	G01	字句別例外表の自動読込を外す。純関数の試験用APIは保持		
+implementation	scripts/visual-qa/title-audit-routes.json	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+implementation	scripts/visual-qa/title-audit.md	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+implementation	scripts/visual-qa/title-audit.mjs	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+implementation	scripts/visual-qa/title-audit.test.ts	外す	G01	旧写しのpx/固定文字/旧ノードに依存する検査・採点/台帳の実行を廃止。現行V8撮影と崩れ・動作検査は保持		
+implementation	scripts/visual-qa/train16-temporary-allowances.json	外す	G01	字句別の一時例外表を廃止		
+implementation	scripts/visual-qa/v8-board-id-contract.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持		
+implementation	scripts/visual-qa/v8-design-map-route-contract.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持		
+implementation	scripts/visual-qa/v8-design-map.json	固定を外す/実測・動作・純計算を保持	G01	現役の撮影URL/状態データは保持。廃止した凍結版の再生成元参照を外す（27項目は現役地図に同じ値で保持済み）		
+implementation	scripts/visual-qa/v8-guard-tabfade-contract.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持		
+implementation	scripts/visual-qa/v8-map-exports.test.ts	外す	G01	旧ノード・固定地図/枚数/写し完全一致の契約を廃止。現行URL/状態の地図は撮影ナビゲーションとして保持		
+implementation	scripts/visual-qa/v8-map-generation.test.ts	固定を外す/実測・動作・純計算を保持	G01	実物の旧nodeとタブの完全一致を廃止。与えたURL/queryの維持と未解決URLの拒否を模擬データで検証		
+implementation	scripts/visual-qa/v8-parity.mjs	固定を外す/実測・動作・純計算を保持	G01	現行V8撮影は共通のセッション初期設定を使い、運用向け更新告知の通信を撮影で出さない		
+implementation	scripts/visual-qa/v8-pattern-audit.mjs	固定を外す/実測・動作・純計算を保持	G01	固定例外表を読まず全指摘を保持する		
+implementation	scripts/visual-qa/v8-target-selection.test.ts	固定を外す/実測・動作・純計算を保持	G01	旧node IDの固定を廃止。模擬の板でURL/queryの維持と存在しない入口/幅なしの除外を検証		
+G02-diff	.github/workflows/required-pr-gate.yml:287-288	接続を外す	G02	code-size の行数凍結を廃止したため必須の上限検査としての実行を外す。診断時の計測は任意	node apps/web/scripts/v8-guard/code-size.mjs --base ...	
+G02-diff	.github/workflows/required-pr-gate.yml:v8-screen-guard:fixture-tests	接続を足す	G02	新しい form-rules.test.mjs と layout-overflow.test.mjs を残存fixtureと同じ browser-host 必須命令へ追加。active-modal-audit の新しい入力重なり対照を含め既存の権限・入力保持も実行	node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 ...	
+external-connection	~/lh-work/tools/hq/board-lock/guard.sh:21	司令塔へ切離しを引継	司令塔	リポジトリ内からの呼出しは0。外部の強制照合の入口は司令塔が運用から外す。外部script/key/正式台帳は未変更	"node ""$tool/lock.mjs"" check ..."	
+validation	fault:permission	合格	G01	実際のEntityPickerのreadOnly判定をメモリ上で破壊すると既存の閲覧のみ試験が失敗(終了1)。通常/復元は9試験合格(終了0)	G01-validation/fault.config.mts	G01-validation/permission-broken.log;behavior-normal.log;behavior-restored.log
+validation	fault:selection	合格	G01	同じ実部品の確定IDをメモリ上で誤IDにすると既存の選択操作試験が失敗(終了1)。通常/復元は合格。UIのソースと試験本体は未変更	G01-validation/fault.config.mts	G01-validation/selection-broken.log;behavior-restored.log
+validation	fault:layout	実行結果は検査記録を参照	G01	1152/1440/1920の文字切れ・ページ横越え・main右端越え、実入力同士の重なり、クリップ、状態矛盾に対し正常→故障→復元を検証	apps/web/scripts/v8-guard/{layout-overflow,active-modal-audit,owner-rules,form-rules,layout-defects}.test.mjs	
+validation	external-locks	合格	G01	外部鍵/台帳の全332記録のSHA256を開始時と再照合し変更0。値/鍵の内容は転記しない	G01-LOCK-HASHES.tsv	
+validation	web-tests	合格	G01	管理画面の全2304ファイル/13674試験合格（1skip・1todo）。入力定義の固定案内削除後の対象3試験も別途合格		/tmp/g01-web-tests.log;/tmp/g01-b244-tests-final.log
+validation	script-tests	合格	G01	113ファイル/1042試験合格		/tmp/g01-root-tests-final.log
+validation	browser-guards	合格	G01	現存するguard全test.mjsと友だち一覧状態をbrowser-hostで実行。116試験合格。正常/故障/復元と実画面の入力保持を含む		/tmp/g01-guard-tests-final.log
+validation	typecheck/build	合格	G01	web typecheck・repository scripts typecheck・web build合格。依存のshared/line-sdk/update-engine buildも合格		/tmp/g01-web-typecheck.log;/tmp/g01-scripts-typecheck-final.log;/tmp/g01-web-build.log
