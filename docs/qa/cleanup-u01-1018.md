@@ -63,3 +63,10 @@
 
 - 上記の再実行は通過済み工程の重複を避けるため、Worker全試験の枠待ち中に自分のrunner（PID19467）だけを停止。最新baseでのB273・共有/スクリプト/LIFF試験・Worker型は成功、B172は同じ2候補。中断した全体を合格には数えない。停止処理でrunnerの子プロセス片付けにPermissionErrorが出たため、そのログも保持する。
 - `ccdcbaeb7f..a5da208a11` の `apps/web/src` 差分は0。画面・関連試験・設定・検査器が同じため、前回のWeb全13,679試験・型・本番ビルドの成功は同一コードの証拠として保持する。追加本線のline-sdkはWebソースにimportがなく、依存パッケージとしてのビルドは今回のWorker依存工程で再確認済み。未実施だった標準実ブラウザのV8 jobを部分実行して補完する。全体CI合格とは区別する。
+
+
+### 標準実ブラウザ検査の補完（進行中）
+
+- 入力 `21500a97e30969a17b67ec79476e9279d723e4be`、base `e9b423eb7c798f7d5a530a05a6e86a0c26dd56f9`。`ci-local/run.sh ... --job v8-screen-guard --var V8_SPEED_ENFORCEMENT=report`。ログ `~/lh-work/tools/hq/ci-local/logs/20261018-004702-21500a97e3-6449/`。
+- head/baseの模擬API用ビルド成功、Chromium/模擬API/配信成功。1152/1440/1920の標準はみ出し合計0。故障対照205件成功、狭幅の入力保持・予約待ち/流入の操作・予約プレビュー日付の工程12〜14成功。後続の画面比較・一覧/見出し・速度・表などはまだ進行中。
+- 中断した重複runnerの子プロセス残り0。残った自分のWorker検査用worktreeは `git status --short` が空であることを確認して通常の `git worktree remove` で片付けた。元のログは保持。撮影用3167/8761にも待受なし。
