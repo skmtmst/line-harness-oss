@@ -4,7 +4,7 @@
 
 ## 数え方と限界
 
-WorkerのHono実登録にある管理認証の外の入口は **182経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。既存の全入口の再生成は③-2第3波の本線統合後に司令塔が起動する。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。
+WorkerのHono実登録にある管理認証の外の入口は **201経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。
 
 「全経路を列挙」と「すべての入力で安全を確認」は別。表の本人確認・期限はコードの方式で、実配備の設定や全資源ID×本人の組合せはS07/S15の未完を維持する。URLの実値・query・顧客情報は記録しない。
 
@@ -21,7 +21,7 @@ WorkerのHono実登録にある管理認証の外の入口は **182経路**（�
 
 共通の回数制限：`middleware/rate-limit.ts`。認証・upload等には `sensitive-rate-limit.ts` の共有D1枠もある。下のIPの上限は単一実行環境の1分窓（特記を除く）。IPを分散した取得を止めるものではなく、本番WAFの確認はS43。
 
-## 全182経路
+## 全201経路
 
 | メソッド・経路 | IDの形・推測への耐性 | 回数の制限 | 返す個人情報/確認する人 | 期限 | 根拠のファイル |
 | --- | --- | --- | --- | --- | --- |
@@ -200,18 +200,37 @@ WorkerのHono実登録にある管理認証の外の入口は **182経路**（�
 | `POST /webhook` | 入口IDは秘密ではない。サービス別の署名/専用鍵で確認 | IP 100/分＋サービス固有の重複/署名検証 | 署名/専用鍵を検査後に通知処理。GETの登録確認は専用確認値。顧客本文・鍵を応答/Slackへ出さない | サービス別の署名時刻/受信済み記録（全方式の期限の統一はしていない） | `apps/worker/src/routes/webhook.ts` |
 | `POST /webhooks/xserver/support-email` | 入口IDは秘密ではない。サービス別の署名/専用鍵で確認 | IP 3,000/分（単一実行環境） | 署名/専用鍵を検査後に通知処理。GETの登録確認は専用確認値。顧客本文・鍵を応答/Slackへ出さない | サービス別の署名時刻/受信済み記録（全方式の期限の統一はしていない） | `apps/worker/src/routes/support-inbox.ts` |
 | `GET /webinar-assets/:token/:slug/*` | 期限＋HMACを含むtoken、slug/パスも署名照合 | IP 3,000/分（単一実行環境） | 申込者へ配る動画。URLの再配布は防ぎ切れない | 署名時のexpまで。期限と動画公開状態を確認 | `apps/worker/src/routes/webinars.ts` |
+| `POST /api/booking/pass-payments/webhook` | Stripe試験用の専用署名。管理ログインとは別 | IP 3,000/分（単一実行環境） | 署名を検査した試験イベントだけ。livemodeと支払状態を確認し、本番決済や外部Stripe書込は行わない | 署名時刻は前後5分。イベントIDで二重適用を抑止 | `apps/worker/src/routes/booking-pass-billing.ts` |
+| `POST /api/ec/events` | 店ごとの連携鍵による本文と時刻のHMAC。対象店ヘッダーも照合 | 店ごとの直近1分の受信記録600件＋共通IP枠。本文64KB | 有効な店・契約・接続だけ受信。イベントIDの重複を抑止。秘密値を返さない | 署名時刻は前後5分。保存と再送は連携の台帳で管理 | `apps/worker/src/routes/ec-auto-line.ts` |
+| `GET /api/liff/booking/cancellation-quote` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 本人が持つ対象店の予約だけのキャンセル料見積もり。予約IDの所属も検査 | LINE本人確認と保存済みのキャンセル条件で判定 | `apps/worker/src/routes/booking-cancellation.ts` |
+| `GET /api/liff/booking/cost-estimate` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 本人と対象店のメニュー・組の費用/空き計算。入力と公開範囲を検査 | 対象メニュー・日時・人数の条件を都度検査 | `apps/worker/src/routes/booking-gap3.ts` |
+| `GET /api/liff/booking/group-availability` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 本人と対象店のメニュー・組の費用/空き計算。入力と公開範囲を検査 | 対象メニュー・日時・人数の条件を都度検査 | `apps/worker/src/routes/booking-gap3.ts` |
+| `GET /api/liff/booking/menus/:id/addons` | 店のLIFF設定とメニューの公開/対象条件。限定メニューはLINE本人の範囲も照合 | IP 3,000/分（単一実行環境） | 表示してよい追加メニューの候補だけ。停止した追加メニューを除く | 公開/対象条件と有効状態を都度検査 | `apps/worker/src/routes/booking.ts` |
+| `POST /api/liff/booking/pass-plans/:id/checkout` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 対象店の公開商品の模擬購入。二重作成防止キーを確認。実決済しない | 本人・商品状態と試験モードを都度検査 | `apps/worker/src/routes/booking-pass-billing.ts` |
+| `GET /api/liff/booking/pass-purchases/:id` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 購入ID・対象店・本人の一致した購入状態だけを返す | 本人と所属を都度検査。IDだけで取得させない | `apps/worker/src/routes/booking-pass-billing.ts` |
+| `GET /api/liff/booking/series/preview` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 対象店の公開メニューに許可された繰り返し予約の見積もり。保存/送信はしない | 許可された頻度・回数・本人の閲覧範囲を都度検査 | `apps/worker/src/routes/booking-gap3.ts` |
+| `POST /api/liff/booking/series/preview` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 対象店の公開メニューに許可された繰り返し予約の見積もり。保存/送信はしない | 許可された頻度・回数・本人の閲覧範囲を都度検査 | `apps/worker/src/routes/booking-gap3.ts` |
+| `POST /api/liff/booking/setup-intent` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 同意・メニュー・試験用接続と二重作成防止キーを確認して登録待ちを作る。自己申告では登録済みにしない | 署名済み試験Webhookで既存の登録待ちを更新 | `apps/worker/src/routes/booking-cancellation.ts` |
+| `POST /api/liff/booking/setup-webhook` | Stripe試験用の専用署名。LINE本人/管理ログインとは別 | IP 3,000/分（単一実行環境） | 署名後にlivemode・イベント種別・完了状態を検査し、既存の試験用登録待ちだけ更新 | 署名時刻は前後5分。登録待ちからの更新に限定 | `apps/worker/src/routes/booking-cancellation.ts` |
+| `POST /api/liff/events/bookings/:id/absence` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 本人の教室予約の欠席登録。二重操作防止キーと対象予約を検査 | 予約の状態と保存された欠席/振替条件を都度検査 | `apps/worker/src/routes/booking-makeup.ts` |
+| `GET /api/liff/events/makeup-credits` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 本人の振替券だけを一覧/候補表示/使用。使用時は二重操作防止キーと振替先を検査 | 券の期限・所有・対象条件・使用状態を検査 | `apps/worker/src/routes/booking-makeup.ts` |
+| `GET /api/liff/events/makeup-credits/:id/options` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 本人の振替券だけを一覧/候補表示/使用。使用時は二重操作防止キーと振替先を検査 | 券の期限・所有・対象条件・使用状態を検査 | `apps/worker/src/routes/booking-makeup.ts` |
+| `POST /api/liff/events/makeup-credits/:id/use` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 本人の振替券だけを一覧/候補表示/使用。使用時は二重操作防止キーと振替先を検査 | 券の期限・所有・対象条件・使用状態を検査 | `apps/worker/src/routes/booking-makeup.ts` |
+| `POST /api/liff/forms/:id/routing/resolve` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 対象店の公開フォームの回答から行き先を計算し、本人・版・行き先を束縛した署名を返す | 行き先署名は30分。署名と本文/版/本人の取り違えを拒否 | `apps/worker/src/routes/form-routing.ts` |
+| `GET /api/liff/member-card` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 対象店の本人の会員番号・ランク・特典だけ。有効でないランク設定は空を返す | 本人・所属・ランク設定の有効状態を都度検査 | `apps/worker/src/routes/member-ranks.ts` |
+| `POST /mcp` | 専用Bearer鍵のハッシュ・接続/鍵の期限・所有者と許可店/操作を照合 | IP 3,000/分＋接続ごと60/分をD1で同時制御。本文16KB | 集計の読取・テキスト下書き・模擬配信の承認依頼に限定。実送信しない。失効/権限不足を拒否 | 接続/鍵の有効期限と旧鍵の猶予を都度検査 | `apps/worker/src/routes/mcp-rpc.ts` |
 
 ### 認証・招待の補足
 
 ログイン前でも、有効な確認票を持つ人へメールや名前を返す口がある。票は一時的な取得権限なので、URLの流出を無害と考えない。登録は24時間、再設定は1時間（`services/auth-mail.ts`）。他の招待・OAuth・MFAは保存した期限と目的を照合する。外部のログへquery/票を写さず、票なし・期限切れ・使用済みの検査を維持する。GETの移動だけの口と、本人確認後に処理するPOSTを混同しない。
 
-## Static asset・SPA（上の173とは別）
+## Static asset・SPA（上の201とは別）
 
 | 面 | ID/回数制限 | 個人情報・期限・残る条件 |
 | --- | --- | --- |
 | 管理画面の `apps/web/out` のHTML・JS・CSS・公開画像・version.json | 固定パスとビルドのhash。静的配信の回数制限はCloudflare側、未確認 | ログイン画面の骨組みは公開。顧客データは管理APIの本人確認後。CSPは[CSP記録](CSP-REVIEW-1016.md)。ビルドへ秘密を埋めない |
 | LIFFの `apps/liff/dist` とWorkerの `dist/client`、未知の非APIパスのSPA fallback | 画面のパス、ID/slugは秘密ではない。Worker経由は共通IP枠、Pages直配信は別確認 | 予約確認/フォーム/本人履歴の骨組みは公開。個人情報の取得は表のAPIで検証。外部ログインの実試験は今回は行わない |
-| 管理専用の添付 `/api/form-files/:id/content` | 管理認証の外ではないため173に含めない。本人確認書類はowner/admin、所属と期限・検査状態を照合 | `routes/form-documents.ts`。`private/form-documents/` のR2原本は公開画像口では404。期限付きURLへ切り替えたという意味ではない |
+| 管理専用の添付 `/api/form-files/:id/content` | 管理認証の外ではないため201に含めない。本人確認書類はowner/admin、所属と期限・検査状態を照合 | `routes/form-documents.ts`。`private/form-documents/` のR2原本は公開画像口では404。期限付きURLへ切り替えたという意味ではない |
 
 ## API列車で加わった入口（全一覧の再生成ではない）
 
