@@ -54,6 +54,11 @@ export type FeatureJobMetadata = {
  * 照合するため、判定を消したり移したりすると必ずテストが落ちる。
  */
 export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
+  {
+    name: 'personal data retention',
+    classification: { kind: 'core', reason: '店が承認した保存期限に従う個人情報の削除' },
+    enforcement: { mode: 'exempt', reason: '機能の停止中も保存期限を守る。既定は無効で、店ごとの有効化と保留を削除ごとに確認する' },
+  },
   {name:'line webhook recovery',classification:{kind:'core',reason:'保存済みのLINE受信から未完の工程だけを再開する'},enforcement:{mode:'exempt',reason:'基本受信の回収は単一機能に属さない。停止した契約・アカウントを除外し、採点・マイル・自動化・配送は既存の個別停止判定に従う。返信鍵なしと送達不明は要確認に止める'}},
   {name:'durable tracked click continuation',classification:{kind:'feature',featureId:'inflow_tracking'},enforcement:{mode:'gated',sources:['apps/worker/src/services/tracked-click-steps.ts'],markers:["featureId:'inflow_tracking'","job:'durable tracked click continuation'"]}},
   {name:'durable banner generation',classification:{kind:'core',reason:'統括のバナー生成の継続'},enforcement:{mode:'exempt',reason:'店舗別機能スイッチの対象外。生成の直前に統括の契約・枚数上限・停止依頼を判定する'}},

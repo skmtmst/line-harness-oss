@@ -1,5 +1,5 @@
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import {
@@ -126,6 +126,16 @@ function crossSiteEnv(): Env['Bindings'] {
   return env({ ADMIN_ORIGIN: PAGES, ADMIN_ALLOW_CROSS_SITE: 'true' });
 }
 
+const sessionDatabases: ReturnType<typeof createTestD1>[] = [];
+afterEach(() => sessionDatabases.splice(0).forEach(db => db.raw.close()));
+/** Session creation now persists the browser marker; use its real schema. */
+function withSessionDb(bindings: Env['Bindings']): Env['Bindings'] {
+  const db = createTestD1();
+  sessionDatabases.push(db);
+  db.raw.prepare("INSERT INTO staff_members(id,name,role,api_key) VALUES ('staff-1','Fixture','admin','fixture-session-key')").run();
+  return { ...bindings, DB: db.db };
+}
+
 function app() {
   const a = new Hono<Env>();
   a.use('*', cors({
@@ -230,7 +240,7 @@ describe('admin login cookie attributes', () => {
       method: 'POST',
       body: JSON.stringify({ apiKey: 'staff-key' }),
       headers: { 'Content-Type': 'application/json' },
-    }, crossSiteEnv());
+    }, withSessionDb(crossSiteEnv()));
 
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: { id: string }; csrfToken: string };
@@ -259,7 +269,7 @@ describe('admin login cookie attributes', () => {
       method: 'POST',
       body: JSON.stringify({ apiKey: 'staff-key' }),
       headers: { 'Content-Type': 'application/json' },
-    }, env({ ADMIN_ORIGIN: 'https://admin.example.com', WORKER_URL: 'https://api.example.com' }));
+    }, withSessionDb(env({ ADMIN_ORIGIN: 'https://admin.example.com', WORKER_URL: 'https://api.example.com' })));
 
     expect(res.status).toBe(200);
     expect(cookieFor(res, 'lh_admin_session') ?? '').toContain('SameSite=Lax');
@@ -309,13 +319,15 @@ describe('LINE admin login', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ sub: 'authorized-line-user' }), { status: 200 }));
     const res = await app().request('/api/auth/line/callback?code=abc&state=expected', {
       headers: { Cookie: 'lh_line_state=expected; lh_line_nonce=nonce; lh_line_verifier=verifier' },
-    }, crossSiteEnv());
+    }, withSessionDb(crossSiteEnv()));
     expect(res.status).toBe(302);
     const redirect = new URL(res.headers.get('Location')!);
     expect(redirect.origin).toBe(PAGES);
     expect(new URLSearchParams(redirect.hash.slice(1)).get('lh_session')).toBeTruthy();
     expect(new URLSearchParams(redirect.hash.slice(1)).get('lh_csrf')).toBeTruthy();
     expect(cookieFor(res, 'lh_admin_session')).toBeTruthy();
+    expect(cookieFor(res, 'lh_login_device')).toContain('HttpOnly; Secure; SameSite=None');
+    expect(sessionDatabases[0].raw.prepare('SELECT COUNT(*) AS count FROM auth_known_devices WHERE staff_id=?').get('staff-1')).toEqual({ count: 1 });
     fetchSpy.mockRestore();
   });
 
