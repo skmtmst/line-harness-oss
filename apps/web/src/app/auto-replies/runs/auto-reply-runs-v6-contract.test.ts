@@ -7,7 +7,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(new URL('../../../v8/auto-replies/runs.tsx', import.meta.url), 'utf8')
 const worker = readFileSync(join(here, '../../../../../worker/src/routes/auto-reply-runs.ts'), 'utf8')
 const service = readFileSync(join(here, '../../../../../worker/src/services/auto-reply.ts'), 'utf8')
-const sharedTypes = readFileSync(join(here, '../../../../../../packages/shared/src/types.ts'), 'utf8')
+const sharedTypes = readFileSync(join(here, '../../../../../../packages/shared/src/types/execution-runs.ts'), 'utf8')
 
 describe('V6 自動応答・実行結果 t7UtYQ', () => {
   it('未取得と実値0を同じ表示にしない', () => {
