@@ -45,6 +45,16 @@ import styles from './delivery.module.css'
  * 窓を閉じたあとは、同じボタンから選び直せる（ログインのやり直しは要らない）。
  * 確定は結果が分からないまま送り直すと連携が重なるため、自動では再送しない。
  *
+ * 承認案と作りが食い違うところ（`docs/v8-design-rules.md` §1 正本の順位で決めた。詳しくは同じ場所の `BEHAVIOR.md`）：
+ *  - 社名のうしろの半角の空き … 絵のとおり直した（`withParticle`）。
+ *  - 窓の左のボタン … 絵は「やめる」だが、オーナーの決まり B-146（入力をやめる＝「キャンセル」、
+ *    「やめる」は使わない）が絵より上なので「キャンセル」のまま。
+ *  - 右上の×と窓の高さ … ×は共通部品が必ず出す（UI-25、`dialog-close-ui25.test.tsx` の見張り）。
+ *    絵には×がないが「見張りに反する絵は、今の作りに合わせて絵を直す」ため、×は消さない。
+ *    高さ 396 と 451 の差は、絵の余白（12/20）と間隔（12）が共通部品の値（24・16）と違うせい。
+ *    「作る画面の細かい違いは共通部品の値にそろえる」ので、ここでは数字を合わせ込まない。
+ *  → 絵の側を直すのは `デリバリー連携_v04.pen` の仕事（未承認。承認済み v03 は残す）。
+ *
  * 出前館・ロケットナウの状態と日付は、各社の受け口が決まったあとサーバから受け取る。
  * それまでの間も画面の経路を確かめられるよう、入口の値は `services` の引数で
  * 差し替えられるようにしてある（既定は下の `SERVICES`）。
@@ -87,9 +97,19 @@ export type DeliveryService = {
   stores?: DeliveryStore[]
 }
 
+/**
+ * 会社の名前のうしろに「で」「に」などを足す。
+ * 英数字で終わる名前（Uber Eats）のあとだけ半角の空きを入れ、日本語の名前（出前館）はそのまま続ける。
+ * 承認案の文（「Uber Eats での許可を…」「Uber Eats の連携を…」）と、
+ * 数字の単位の決まり（`docs/v8-design-rules.md`「単位は数字の後ろに半角の空き」）に合わせる。
+ */
+function withParticle(name: string, particle: string): string {
+  return /[0-9A-Za-z]$/.test(name) ? `${name} ${particle}` : `${name}${particle}`
+}
+
 /** つなぐボタンの名札。解除の窓の案内文でも同じ言い方を使う。 */
 function connectLabel(service: DeliveryService): string {
-  return service.connect === 'login' ? `${service.name} にログインしてつなぐ` : '連携を申し込む'
+  return service.connect === 'login' ? `${withParticle(service.name, 'に')}ログインしてつなぐ` : '連携を申し込む'
 }
 
 /**
@@ -283,7 +303,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       const { stores } = await restaurantDeliveryApi.ubereatsStores(selectedAccountId)
       if (stores.length === 0) {
         patch(service.id, {
-          stateNote: `${service.name}でお店が見つかりませんでした。${service.name}でお店の管理権限があるアカウントでログインし直してください。`,
+          stateNote: `${withParticle(service.name, 'で')}お店が見つかりませんでした。${withParticle(service.name, 'で')}お店の管理権限があるアカウントでログインし直してください。`,
           stateNoteTone: 'warn',
         })
         return
@@ -294,7 +314,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     } catch {
       // 失敗の符号はサーバに残る。画面には符号を出さず、次にできることだけ伝える。
       patch(service.id, {
-        stateNote: `${service.name}からお店の一覧を取れませんでした。少し待ってからもう一度お試しください。`,
+        stateNote: `${withParticle(service.name, 'から')}お店の一覧を取れませんでした。少し待ってからもう一度お試しください。`,
         stateNoteTone: 'danger',
       })
     } finally {
@@ -337,7 +357,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       } catch {
         setBusy(null)
         patch(service.id, {
-          stateNote: `${service.name}のログイン画面を開けませんでした。少し待ってからもう一度お試しください。`,
+          stateNote: `${withParticle(service.name, 'の')}ログイン画面を開けませんでした。少し待ってからもう一度お試しください。`,
           stateNoteTone: 'danger',
         })
       }
@@ -346,7 +366,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     patch(service.id, {
       status: 'applying',
       appliedAt: new Date().toISOString(),
-      stateNote: `musubo が${service.name}へ連携の申し込みを行いました。手続きが終わるまでお待ちください。`,
+      stateNote: `musubo が${withParticle(service.name, 'へ')}連携の申し込みを行いました。手続きが終わるまでお待ちください。`,
       stateNoteTone: undefined,
     })
   }, [openStorePicker, patch, selectedAccountId, uberPendingStore])
@@ -375,7 +395,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       setUberPendingStore(connection.status === 'pending_store')
     } catch {
       patch(service.id, {
-        stateNote: `${service.name}でお店をつなげませんでした。少し待ってから、もう一度お店を選んでください。`,
+        stateNote: `${withParticle(service.name, 'で')}お店をつなげませんでした。少し待ってから、もう一度お店を選んでください。`,
         stateNoteTone: 'danger',
       })
     } finally {
@@ -526,8 +546,8 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         confirmation
         footerDivider
         tone="destructive"
-        title={`${disconnecting?.name ?? ''}の連携を解除しますか`}
-        description={`${disconnecting?.name ?? ''}とのつなぎを外します。これから入る注文は「デリバリー受注」に届かなくなります。すでに届いている注文はそのまま残ります。`}
+        title={`${withParticle(disconnecting?.name ?? '', 'の')}連携を解除しますか`}
+        description={`${withParticle(disconnecting?.name ?? '', 'との')}つなぎを外します。これから入る注文は「デリバリー受注」に届かなくなります。すでに届いている注文はそのまま残ります。`}
         confirmLabel="解除する"
         onConfirm={disconnect}
         onCancel={() => setDisconnecting(null)}
@@ -544,7 +564,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         confirmation
         footerDivider
         title="つなぐお店を選んでください"
-        description={`${picking?.service.name ?? ''}での許可をいただきました。${picking?.service.name ?? ''}に登録されているお店が${picking?.stores.length ?? 0}件見つかりました。musubo につなぐお店を選んでください。`}
+        description={`${withParticle(picking?.service.name ?? '', 'での')}許可をいただきました。${withParticle(picking?.service.name ?? '', 'に')}登録されているお店が${picking?.stores.length ?? 0}件見つかりました。musubo につなぐお店を選んでください。`}
         confirmLabel="このお店につなぐ"
         confirmIcon={<Check size={15} aria-hidden="true" />}
         confirmDisabled={pickedStoreId === '' || busy !== null}

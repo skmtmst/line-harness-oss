@@ -260,16 +260,20 @@ describe('設定 › デリバリー連携', () => {
     const demaecan = card('出前館')
     expect(demaecan.getByText('申し込み受付中')).toBeTruthy()
     expect(demaecan.getByText('申し込んだ日')).toBeTruthy()
+    // 日本語で終わる社名のあとには空きを入れない（英字で終わる Uber Eats だけ入れる）。
+    expect(demaecan.getByText(/^musubo が出前館へ連携の申し込みを行いました。/)).toBeTruthy()
   })
 
   it('DL-3：連携を解除する窓から外すと未接続に戻る', () => {
     render(<DeliverySettingsPage services={[uber({ status: 'connected', storeName: '渋谷店' })]} />)
 
     fireEvent.click(button('連携を解除する'))
-    expect(screen.getByText('Uber Eatsの連携を解除しますか')).toBeTruthy()
+    // 承認案 `kJLks` のとおり、英字で終わる社名のあとは半角の空きを入れる。
+    expect(screen.getByText('Uber Eats の連携を解除しますか')).toBeTruthy()
+    expect(screen.getByText(/^Uber Eats とのつなぎを外します。/)).toBeTruthy()
 
     fireEvent.click(button('解除する'))
-    expect(screen.queryByText('Uber Eatsの連携を解除しますか')).toBeNull()
+    expect(screen.queryByText('Uber Eats の連携を解除しますか')).toBeNull()
     const uberCard = card('Uber Eats')
     expect(uberCard.getByText('未接続')).toBeTruthy()
     expect(uberCard.queryByText('渋谷店')).toBeNull()
@@ -296,6 +300,12 @@ describe('設定 › デリバリー連携', () => {
 
     // 戻った直後だけ Uber へ問い合わせ、続きの選び口を自動で開く。
     expect(await screen.findByText('つなぐお店を選んでください')).toBeTruthy()
+    // 承認案 `X5d8UF` の本文のとおり。社名のあとの半角の空きまで含めて合わせる。
+    expect(
+      screen.getByText(
+        'Uber Eats での許可をいただきました。Uber Eats に登録されているお店が2件見つかりました。musubo につなぐお店を選んでください。',
+      ),
+    ).toBeTruthy()
     expect(fixture.stores).toHaveBeenCalledWith('acc-1')
     expect(button('このお店につなぐ').disabled).toBe(true)
 
