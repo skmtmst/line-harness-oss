@@ -581,6 +581,17 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
     if (body.onSubmitMessageType !== undefined) updates.onSubmitMessageType = body.onSubmitMessageType;
     if (body.onSubmitMessageContent !== undefined) updates.onSubmitMessageContent = body.onSubmitMessageContent;
     if (body.onSubmitWebhookUrl !== undefined) updates.onSubmitWebhookUrl = body.onSubmitWebhookUrl;
+    if (body.onSubmitWebhookUrl !== undefined && body.onSubmitWebhookHeaders === undefined) {
+      const previous = await getFormById(c.env.DB, id);
+      if (!previous) return c.json({ success: false, error: 'Form not found' }, 404);
+      // The existing content-revision CAS fences this read with the update.
+      // An editor who cannot reveal a saved credential cannot carry it to a
+      // newly chosen origin. Explicit new credentials belong to that new origin.
+      const origin = (value: string | null): string | null => {
+        try { return value ? new URL(value).origin : null; } catch { return null; }
+      };
+      if (origin(previous.on_submit_webhook_url) !== origin(body.onSubmitWebhookUrl)) updates.onSubmitWebhookHeaders = null;
+    }
     if (body.onSubmitWebhookHeaders !== undefined) updates.onSubmitWebhookHeaders = body.onSubmitWebhookHeaders;
     if (body.onSubmitWebhookFailMessage !== undefined) updates.onSubmitWebhookFailMessage = body.onSubmitWebhookFailMessage;
     if (body.saveToMetadata !== undefined) updates.saveToMetadata = body.saveToMetadata;

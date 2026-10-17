@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   getFormVersionContentsByIds: vi.fn(),
   getFormSubmissionById: vi.fn(),
   createForm: vi.fn(),
+  updateForm: vi.fn(),
   getFormSubmissions: vi.fn(),
   getFormSubmissionsPage: vi.fn(),
   getFormSubmissionAnalytics: vi.fn(),
@@ -60,7 +61,7 @@ vi.mock('@line-crm/db', () => ({
   getFormDeleteImpact: mocks.getFormDeleteImpact,
   formBelongsToLineAccount: mocks.formBelongsToLineAccount,
   createForm: mocks.createForm,
-  updateForm: vi.fn(),
+  updateForm: mocks.updateForm,
   archiveFormAtRevision: mocks.archiveFormAtRevision,
   deleteFormAtRevision: mocks.deleteFormAtRevision,
   getFormSubmissions: mocks.getFormSubmissions,
@@ -1173,4 +1174,35 @@ vi.mock('../services/form-webhook.js', async original => {
   const actual = await original<typeof import('../services/form-webhook.js')>();
   return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>
     actual.callFormWebhook(form, answers, eventId, { lookupHost: async () => ['93.184.216.34'] }) };
+});
+
+// A URL-only edit must not carry a saved, redacted credential to another origin.
+describe('F01 saved webhook credential origin', () => {
+  test.each([
+    ['different host', 'https://other.example.com/check', null],
+    ['disabled destination', null, null],
+    ['same origin path', 'https://verify.example.test/another/check', undefined],
+  ])('%s keeps credentials bound to their existing origin', async (_label, url, expected) => {
+    mocks.updateForm.mockResolvedValue({ kind: 'updated', form: { ...baseForm, content_revision: 2 } });
+    const { bindings } = env();
+    const response = await app(true).fetch(new Request('https://worker.example.test/api/forms/form-1?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedContentRevision: 1, onSubmitWebhookUrl: url }),
+    }), bindings);
+    expect(response.status).toBe(200);
+    const updates = mocks.updateForm.mock.calls.at(-1)![2];
+    if (expected === undefined) expect(updates).not.toHaveProperty('onSubmitWebhookHeaders');
+    else expect(updates.onSubmitWebhookHeaders).toBeNull();
+  });
+  test('allows an explicit replacement credential for a new destination under the existing revision check', async () => {
+    mocks.updateForm.mockResolvedValue({ kind: 'updated', form: { ...baseForm, content_revision: 2 } });
+    const { bindings } = env();
+    const headers = JSON.stringify({ Authorization: 'Bearer new-synthetic-credential' });
+    const response = await app(true).fetch(new Request('https://worker.example.test/api/forms/form-1?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedContentRevision: 1, onSubmitWebhookUrl: 'https://other.example.com/check', onSubmitWebhookHeaders: headers }),
+    }), bindings);
+    expect(response.status).toBe(200);
+    expect(mocks.updateForm).toHaveBeenLastCalledWith(expect.anything(), 'form-1', expect.objectContaining({ onSubmitWebhookHeaders: headers }), 1, 'owner-1');
+  });
 });
