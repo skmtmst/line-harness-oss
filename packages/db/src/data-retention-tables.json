@@ -469,6 +469,15 @@
       "column": "tenant_id"
     }
   },
+  "auth_known_devices": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
+  },
   "auth_email_tokens": {
     "category": "global"
   },

@@ -9,22 +9,19 @@ export type SecurityRoute = {
 };
 
 /** Evidence of a call is a review aid, never proof that its result is enforced. */
-export function inspectRouteSource(file: string, source: string, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
-  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+export function inspectRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
+  const ast = typeof source === 'string' ? ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true) : source;
+  const imports = importedRouters(ast);
   const locals = new Map<string, ts.Node>();
   const routers = new Set<string>();
   const registrations: ts.CallExpression[] = [];
+  const honoParameter = (parameter: ts.ParameterDeclaration) => ts.isIdentifier(parameter.name)
+    && parameter.type && ts.isTypeReferenceNode(parameter.type) && parameter.type.typeName.getText(ast) === 'Hono';
   function visit(node: ts.Node): void {
-    // Imported registrars accept the mounted Hono as a parameter instead of
-    // constructing a second router. Only collect them when mounted() proves
-    // that the registrar was called with a router in the live mount tree.
-    if (ts.isFunctionDeclaration(node)) {
-      for (const parameter of node.parameters) {
-        if (ts.isIdentifier(parameter.name) && parameter.type
-          && /^Hono(?:<|$)/.test(parameter.type.getText(ast))) routers.add(parameter.name.text);
-      }
+    if (ts.isFunctionDeclaration(node) && node.name && ts.isSourceFile(node.parent)) {
+      locals.set(node.name.text, node);
+      for (const parameter of node.parameters.filter(honoParameter)) routers.add(`${node.name.text}:${parameter.name.getText(ast)}`);
     }
-    if (ts.isFunctionDeclaration(node) && node.name && ts.isSourceFile(node.parent)) locals.set(node.name.text, node);
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const topLevel = ts.isVariableDeclarationList(node.parent) && ts.isVariableStatement(node.parent.parent)
         && ts.isSourceFile(node.parent.parent.parent);
@@ -94,12 +91,21 @@ export function inspectRouteSource(file: string, source: string, importedConstan
         }
         parent = parent.parent;
       }
-      const imported = importedRouters(source).get(node.text);
+      const imported = imports.get(node.text);
       if (imported && importedConstant) return importedConstant(imported.module, imported.exported);
     }
     return [];
   }
-  const routerName = (call: ts.CallExpression) => (call.expression as ts.PropertyAccessExpression | ts.ElementAccessExpression).expression.getText(ast);
+  const routerName = (call: ts.CallExpression) => {
+    const receiver = (call.expression as ts.PropertyAccessExpression | ts.ElementAccessExpression).expression.getText(ast);
+    let parent: ts.Node | undefined = call.parent;
+    while (parent && !ts.isSourceFile(parent)) {
+      if (ts.isFunctionDeclaration(parent) && parent.name
+        && parent.parameters.some(p => honoParameter(p) && p.name.getText(ast) === receiver)) return `${parent.name.text}:${receiver}`;
+      parent = parent.parent;
+    }
+    return receiver;
+  };
   const verb = (call: ts.CallExpression) => ts.isPropertyAccessExpression(call.expression) ? call.expression.name.text : 'computed';
   const registered = registrations.filter(call => routers.has(routerName(call))).flatMap(call => {
     const on = verb(call) === 'on';
@@ -132,7 +138,21 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
     sources.set(resolve(srcDir, 'routes', file), readFileSync(join(srcDir, 'routes', file), 'utf8'));
   }
   sources.set(resolve(srcDir, 'index.ts'), readFileSync(join(srcDir, 'index.ts'), 'utf8'));
-  const routes = new Map([...sources].map(([file, source]) => [file, inspectRouteSource(file, source, (module, name) => {
+  // Each file is parsed once for mount metadata, regardless of how many routers
+  // or factories refer to it. Keep this cache within one scan so edits cannot
+  // leave the next inventory with stale registrations.
+  const metadata = new Map([...sources].map(([file, source]) => {
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    return [file, {
+      ast, imported: importedRouters(ast), exported: exportedRouters(ast),
+      mounts: registrations(ast).filter(call => call.method === 'ROUTE'),
+      invocations: ast.statements.filter(ts.isExpressionStatement)
+        .map(statement => statement.expression).filter(ts.isCallExpression),
+      factories: new Map(ast.statements.filter(ts.isFunctionDeclaration)
+        .filter(node => node.name).map(node => [node.name!.text, node])),
+    }] as const;
+  }));
+  const routes = new Map([...sources].map(([file]) => [file, inspectRouteSource(file, metadata.get(file)!.ast, (module, name) => {
     const importedSource = readFileSync(resolve(dirname(file), module.replace(/\.js$/, '.ts')), 'utf8');
     const ast = ts.createSourceFile(module, importedSource, ts.ScriptTarget.Latest, true);
     for (const statement of ast.statements) {
@@ -147,17 +167,36 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
     const key = `${file}:${router}`;
     if (ancestors.has(key)) throw new Error('Cyclic router mount');
     const nextAncestors = new Set(ancestors).add(key);
-    const source = sources.get(file);
-    if (!source) throw new Error(`Unresolved router source: ${file}`);
-    const imported = importedRouters(source);
+    const meta = metadata.get(file);
+    if (!meta) throw new Error(`Unresolved router source: ${file}`);
+    const { ast, imported } = meta;
     const own = (routes.get(file) ?? []).filter(route => route.router === router)
       .map(route => ({ ...route, file: route.file.replace(resolve(srcDir), 'apps/worker/src'),
         path: prefix + (prefix && route.path === '*' ? '/*' : route.path) }));
-    for (const mount of registrations(source).filter(call => call.router === router && call.method === 'ROUTE')) {
+    // A factory can register routes on a router argument without creating a Hono.
+    // Follow only top-level invocations on this mounted router; unused factories
+    // and similarly named parameters in other functions never become routes.
+    for (const call of meta.invocations) {
+      if (!ts.isIdentifier(call.expression)) continue;
+      const importedFactory = imported.get(call.expression.text);
+      const factoryFile = importedFactory ? resolve(dirname(file), importedFactory.module.replace(/\.js$/, '.ts')) : file;
+      const factoryMeta = metadata.get(factoryFile);
+      if (!factoryMeta) continue;
+      const factoryAst = factoryMeta.ast;
+      const name = importedFactory?.exported ?? call.expression.text;
+      const factory = factoryMeta.factories.get(name);
+      if (!factory) continue;
+      for (const [index, parameter] of factory.parameters.entries()) {
+        if (!parameter.type || !ts.isTypeReferenceNode(parameter.type) || parameter.type.typeName.getText(factoryAst) !== 'Hono'
+          || call.arguments[index]?.getText(ast) !== router) continue;
+        own.push(...mounted(factoryFile, `${name}:${parameter.name.getText(factoryAst)}`, prefix, nextAncestors));
+      }
+    }
+    for (const mount of meta.mounts.filter(call => call.router === router)) {
       const importedRouter = imported.get(mount.mountedRouter ?? '');
       const childFile = importedRouter ? resolve(dirname(file), importedRouter.module.replace(/\.js$/, '.ts')) : file;
       const childRouter = importedRouter
-        ? exportedRouters(sources.get(childFile) ?? '').get(importedRouter.exported) : mount.mountedRouter;
+        ? metadata.get(childFile)?.exported.get(importedRouter.exported) : mount.mountedRouter;
       if (!childRouter) throw new Error(`Unresolved mounted router: ${file}:${mount.mountedRouter}`);
       own.push(...mounted(childFile, childRouter, prefix + (mount.path === '/' ? '' : mount.path.replace(/\/$/, '')), nextAncestors));
     }

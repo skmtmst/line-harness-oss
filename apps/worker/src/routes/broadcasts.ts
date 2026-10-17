@@ -2,6 +2,7 @@ import {simulationContext,scheduleSimulation,processBroadcastSimulation,simulati
 import {maybeStartAb,maybeReplayAbStart} from './broadcast-ab.js';
 import {GapError} from '../services/gap-common.js';
 import { broadcastSendPreview,broadcastQuietHoursShift } from '../services/gap-send-preview.js';
+import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
@@ -1501,6 +1502,9 @@ broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"mes
       return inputError(c, { success: false, error: 'Only draft or scheduled broadcasts can be updated' }, 400, []);
     }
 
+    if (existing.status === 'scheduled' && !await sensitiveStepUpSatisfied(c, 'broadcast.send')) {
+      return stepUpRequiredResponse(c, '予約した配信を変える前に本人確認してください');
+    }
     const body = await c.req.json<{
       title?: string;
       messageType?: BroadcastMessageType;

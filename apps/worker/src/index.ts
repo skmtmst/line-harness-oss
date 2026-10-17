@@ -25,6 +25,7 @@ import { bookingCalendarSettings } from './routes/booking-calendar-settings.js';
 import { bookingCancellation } from './routes/booking-cancellation.js';
 import { inboxSla } from './routes/inbox-sla.js';
 import { lineSenders } from './routes/line-senders.js';
+import { sensitiveOperationMiddleware } from './middleware/sensitive-step-up.js';
 import type { Env } from './worker-env.js';
 export type { Env } from './worker-env.js';
 import { liffNotificationPreferences } from './routes/liff-notification-preferences.js';
@@ -96,7 +97,6 @@ import {
 import { sendBookingNotification } from './services/booking-notifier.js';
 import { DEFAULT_ACCOUNT_SETTINGS } from './services/booking-types.js';
 import { authMiddleware } from './middleware/auth.js';
-import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
 import { rateLimitMiddleware, authenticatedRateLimitMiddleware } from './middleware/rate-limit.js';
@@ -112,6 +112,7 @@ import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
 import { broadcastApprovals } from './routes/broadcast-approvals.js';
+import { customerDownloads } from './routes/customer-downloads.js';
 import { chatAttachments } from './routes/chat-attachments.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
@@ -174,7 +175,7 @@ import { autoReplies } from './routes/auto-replies.js';
 import { autoReplyRuns } from './routes/auto-reply-runs.js';
 import { adminAuth } from './routes/admin-auth.js';
 import { resolveCorsOrigin } from './middleware/admin-auth-config.js';
-import { timingMark, timingStart, type ServerTiming } from './lib/server-timing.js';
+import { timingMark, timingStart } from './lib/server-timing.js';
 import booking from './routes/booking.js';
 import { bookingEntitlements } from './routes/booking-entitlements.js';
 import { bookingPayments } from './routes/booking-payments.js';
@@ -227,7 +228,7 @@ import { restaurantGooglePerformance } from './routes/restaurant-google-performa
 import { restaurantDelivery } from './routes/restaurant-delivery.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
-import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
+import { piiMaskMiddleware } from './middleware/impersonation.js';
 import { outputAuditMiddleware } from './middleware/output-audit.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
@@ -333,6 +334,7 @@ app.use('*', cors({
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: [...ADMIN_REQUEST_HEADERS],
+  exposeHeaders: ['Content-Disposition', 'X-Exported-By', 'X-Exported-At', 'X-Csv-Total-Count', 'X-Csv-Returned-Count', 'X-Csv-Truncated'],
   maxAge: 600,
 }));
 
@@ -370,6 +372,7 @@ app.use('/api/*', timingMark('audit'));
 // manifest と実 route の全件照合を必須テストにした上で、未分類も fail closed にする。
 app.use('/api/*', featureEnforcementMiddleware);
 app.use('/api/*', timingMark('feature'));
+app.use('/api/*', sensitiveOperationMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
@@ -398,6 +401,7 @@ app.route('/', broadcastApprovals);
 app.route('/', broadcastAb);
 app.route('/', broadcastSimulation);
 app.route('/', broadcasts);
+app.route('/', customerDownloads);
 app.route('/', chatAttachments);
 app.route('/', broadcastMessageAssets);
 app.route('/', broadcastMediaDirect);
@@ -1625,6 +1629,14 @@ async function runSixHourlyHeavyJobs(
         const { refreshAllNenTags } = await import('./services/nen-tag-sync.js');
         const result = await refreshAllNenTags(env.DB, { allTenants: true }, 500, new Date());
         if (result.added + result.removed > 0) console.log(JSON.stringify({"code":"nen_tag_refresh"}));
+      },
+    },
+    {
+      name: 'personal data retention',
+      run: async () => {
+        const { processPersonalDataRetention } = await import('./services/personal-data-retention.js');
+        const result = await processPersonalDataRetention(env, new Date(event.scheduledTime));
+        if (result.failed) throw new Error('personal_data_retention_retry_required');
       },
     },
     {

@@ -303,6 +303,9 @@ const BASELINE_DOCUMENTED = new Set<string>([
   "PUT /api/me/push/preferences",
   "PUT /api/qa-entries/{id}",
 
+  'GET /api/account-settings/personal-data-retention',
+  'PUT /api/account-settings/personal-data-retention',
+  'GET /api/liff/files/{id}/download',
   'DELETE /api/dashboard/style/cards',
   'GET /api/dashboard/style',
   'GET /api/dashboard/style/analytics',
@@ -2226,7 +2229,7 @@ describe('OpenAPIと公開APIの同期', () => {
       const classification = routeClassification(entry.honoPath, method);
       const operation = spec.paths[path]?.[method.toLowerCase() as 'get'];
       // These LIFF handlers verify the account's LINE ID token themselves.
-      const verifiedLiff = ["/api/liff/booking/cost-estimate","/api/liff/booking/group-availability","/api/liff/booking/pass-purchases/:id","/api/liff/booking/series/preview","/api/liff/member-card","/api/liff/booking/pass-plans/:id/checkout","/api/liff/forms/:id/routing/resolve","/api/liff/events/bookings/:id/absence","/api/liff/events/makeup-credits","/api/liff/events/makeup-credits/:id/options","/api/liff/events/makeup-credits/:id/use","/api/liff/booking/cancellation-quote","/api/liff/booking/setup-intent",'/api/liff/notification-preferences', '/api/liff/notification-preferences/:purpose', '/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking'].includes(entry.honoPath);
+      const verifiedLiff = ['/api/liff/files/:id/download',"/api/liff/booking/cost-estimate","/api/liff/booking/group-availability","/api/liff/booking/pass-purchases/:id","/api/liff/booking/series/preview","/api/liff/member-card","/api/liff/booking/pass-plans/:id/checkout","/api/liff/forms/:id/routing/resolve","/api/liff/events/bookings/:id/absence","/api/liff/events/makeup-credits","/api/liff/events/makeup-credits/:id/options","/api/liff/events/makeup-credits/:id/use","/api/liff/booking/cancellation-quote","/api/liff/booking/setup-intent",'/api/liff/notification-preferences', '/api/liff/notification-preferences/:purpose', '/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking'].includes(entry.honoPath);
       if (verifiedLiff) {
         if (JSON.stringify(operation?.security) !== '[{"liffIdToken":[]}]') problems.push(`${key}: LINE IDトークンの表示が無い`);
       } else if (classification?.kind === 'public') {

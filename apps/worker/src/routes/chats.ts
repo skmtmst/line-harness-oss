@@ -4,6 +4,7 @@ import { refreshInboxSla } from '../services/inbox-sla.js';
 import { resolveLineSender } from '../services/line-senders.js';
 import { GapError } from '../services/gap-common.js';
 import { validateScheduledAt } from './chat-schedule-validation.js';
+import { serializeInboxSavedView } from '../services/inbox-saved-view-response.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -29,7 +30,6 @@ import {
   deleteSavedSearch,
   validateInboxSavedViewConditions,
   type InboxSavedViewConditions,
-  type SavedSearch,
   type SavedSearchAccess,
   createScheduledChatSend,
   getScheduledChatSend,
@@ -157,25 +157,6 @@ type ChatLike = {
   revision: number;
 };
 
-function serializeInboxSavedView(
-  row: SavedSearch,
-  count?: { matchCount: number; matchCountCapped: boolean },
-) {
-  return {
-    id: row.id,
-    name: row.name,
-    scope: row.scope,
-    conditions: JSON.parse(row.conditions_json) as unknown,
-    createdBy: row.created_by,
-    lineAccountId: row.line_account_id,
-    isShared: Boolean(row.is_shared),
-    displayOrder: row.display_order,
-    isFavorite: row.display_order < 0,
-    createdAt: row.created_at,
-    matchCount: count?.matchCount ?? null,
-    matchCountCapped: count?.matchCountCapped ?? false,
-  };
-}
 
 
 const EMPTY_INBOX_SAVED_VIEW_CONDITIONS: InboxSavedViewConditions = {
@@ -1691,13 +1672,15 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     const lineClient = new LineClient(accessToken);
     const messageType = body.messageType ?? 'text';
     let message: Message;
+    let renewalMessage: Message | undefined;
     try {
       const built = await buildChatMessage({
-        messageType, content: rendered.content, bucket: c.env.IMAGES,
+        messageType, content: rendered.content, bucket: c.env.IMAGES, signingSecret: c.env.API_KEY,
         owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
         origin: c.env.WORKER_URL || new URL(c.req.url).origin,
       });
       message = built.message;
+      renewalMessage = built.renewalMessage;
       rendered.content = built.content;
     } catch (error) {
       if (error instanceof ChatAttachmentError) return inputError(c, { success: false, code: error.code, error: error.message }, 400, ["attachmentIds"]);
@@ -1783,7 +1766,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     // LINE API が同一リクエストを二重配信しない。
     const outboundLeaseToken = reservation.leaseToken;
     try {
-      await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+      await lineClient.pushMessage(friend.line_user_id, [message, ...(renewalMessage ? [renewalMessage] : [])], idempotencyKey);
     } catch (error) {
       const failedAt = new Date().toISOString();
       const failure = classifyLineOutboundFailure(error, failedAt);
@@ -2425,7 +2408,7 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
     try {
       // text/Flexの差し込みは送信時に展開する。添付は予約時と送信時の両方で検証する。
       if (messageType !== 'text') {
-        validatedContent = (await buildChatMessage({ messageType, content, bucket: c.env.IMAGES,
+        validatedContent = (await buildChatMessage({ messageType, content, bucket: c.env.IMAGES, signingSecret: c.env.API_KEY,
           owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
           origin: c.env.WORKER_URL || new URL(c.req.url).origin, neededAt: Date.parse(time.scheduledAt),
         })).content;
@@ -2536,7 +2519,7 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
         const friend = await getFriendById(c.env.DB, chat.friend_id);
         if (!friend) return c.notFound();
         const built = await buildChatMessage({ messageType: existing.message_type,
-          content: updates.content ?? existing.content, bucket: c.env.IMAGES,
+          content: updates.content ?? existing.content, bucket: c.env.IMAGES, signingSecret: c.env.API_KEY,
           owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
           origin: c.env.WORKER_URL || new URL(c.req.url).origin,
           neededAt: Date.parse(updates.scheduledAt ?? existing.scheduled_at),

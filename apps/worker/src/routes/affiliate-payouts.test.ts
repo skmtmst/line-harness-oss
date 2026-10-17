@@ -190,6 +190,9 @@ describe('affiliate payout and statement API', () => {
     expect(response.status).toBe(201);
     expect(bucket.put).toHaveBeenCalledWith(expect.stringContaining('affiliate-statements/'), expect.any(Uint8Array), expect.anything());
     expect(notifier.notifyAffiliate).toHaveBeenCalledWith(env.DB, env, 'affiliate-1', expect.stringContaining('¥5,000'));
+    const notice = notifier.notifyAffiliate.mock.calls[0][3];
+    expect(notice).toContain('/liff/statements/statement-1');
+    expect(notice).not.toMatch(/signature=|lineAccessToken=/);
 
     dbMocks.getAffiliateStatementReplay.mockResolvedValueOnce({
       statement: { id: 'statement-1', version: 1 }, requestFingerprint: await import('../middleware/auth.js').then(({ sha256Hex }) => sha256Hex(JSON.stringify({

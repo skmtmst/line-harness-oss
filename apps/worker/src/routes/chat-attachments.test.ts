@@ -10,6 +10,7 @@ import { chats } from './chats.js';
 import { images } from './images.js';
 import { processDueScheduledChatSends } from '../services/scheduled-chat-sends.js';
 import { uploadKind, validateChatUpload, CHAT_UPLOAD_PREFIX } from '../services/chat-attachments.js';
+import { privateImageResponseMiddleware } from '../services/image-access.js';
 
 const signed = vi.hoisted(() => vi.fn());
 vi.mock('../services/r2-presigned-upload.js', () => ({ createR2PresignedPutUrl: signed }));
@@ -24,6 +25,7 @@ const lineFetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit
 const app = (actor = owner) => {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => { c.set('staff', actor); await next(); });
+  instance.use('*', privateImageResponseMiddleware);
   instance.route('/', chatAttachments); instance.route('/', chats); instance.route('/', images);
   return instance;
 };
@@ -77,7 +79,7 @@ beforeEach(() => {
     INSERT INTO friends(id,line_user_id,display_name,line_account_id)
     VALUES('f1','U1','利用者1','a1'),('f2','U2','利用者2','a1'),('f3','U3','別の利用者','a2');`);
   storage = attachmentBucket();
-  bindings = { DB: db.db, IMAGES: storage.bucket, WORKER_URL: 'https://worker.example', LINE_CHANNEL_ACCESS_TOKEN: 'token',
+  bindings = { DB: db.db, IMAGES: storage.bucket, WORKER_URL: 'https://worker.example', API_KEY: 'fixture-download-signing-key', LINE_CHANNEL_ACCESS_TOKEN: 'token',
     CF_ACCOUNT_ID: 'cf', MEDIA_R2_ACCESS_KEY_ID: 'id', MEDIA_R2_SECRET_ACCESS_KEY: 'secret', MEDIA_R2_BUCKET_NAME: 'images' } as Env['Bindings'];
   signed.mockResolvedValue({ url: 'https://r2.example/signed', headers: { 'Content-Type': 'video/mp4' }, expiresAt: future() });
 });
@@ -90,7 +92,7 @@ describe('受信箱の添付アップロード', () => {
     const res = await upload(bytes, `案内.${extension}`, mime);
     expect(res.status).toBe(201);
     const { data } = await res.json<TestReply>();
-    expect(data.url).not.toContain('案内'); expect(new URL(data.url).search).toBe(''); expect(new URL(data.url).pathname.split('/')).not.toContain('f1');
+    expect(data.url).not.toContain('案内'); expect(new URL(data.url).searchParams.get('signature')).toMatch(/^[a-f0-9]{64}$/); expect(new URL(data.url).pathname.split('/')).not.toContain('f1');
     expect(Date.parse(data.expiresAt!) - Date.now()).toBeCloseTo(30 * 86400000, -3);
     expect(storage.objects.get(data.key)?.meta.customMetadata?.friendId).toBe('f1');
   });
@@ -156,6 +158,7 @@ describe('受信箱の送信・期限付きリンク', () => {
   it('動画をvideoで送り、決まったPNGのプレビューを使う', async () => {
     const { attachment } = await video();
     expect((await send('video', { originalContentUrl: attachment.url })).status).toBe(200);
+    expect(payload().messages[1]).toEqual({ type: 'text', text: `後から開く場合はこちら（LINEで本人確認）\nhttps://worker.example/liff/files/${attachment.id}` });
     expect(payload().messages[0]).toEqual({ type: 'video', originalContentUrl: attachment.url, previewImageUrl: 'https://worker.example/images/chat-attachments/video-preview.png' });
     const preview = await app().request('/images/chat-attachments/video-preview.png', {}, bindings);
     expect(preview.headers.get('Content-Type')).toBe('image/png');
@@ -176,12 +179,20 @@ describe('受信箱の送信・期限付きリンク', () => {
     const file = await uploadedFile(); const k = key();
     expect((await send('file', { attachmentId: file.id, url: 'https://evil.example' }, k)).status).toBe(200);
     expect(payload().messages[0].type).toBe('text');
-    expect(payload().messages[0].text).toContain('案内.pdf'); expect(payload().messages[0].text).toContain(file.url);
+    expect(payload().messages[0].text).toContain('案内.pdf'); expect(payload().messages[0].text).toContain(`https://worker.example/liff/files/${file.id}`); expect(payload().messages[0].text).not.toContain('signature=');
     expect(payload().messages[0].text).not.toContain('evil.example');
     expect((await send('file', { attachmentId: file.id, url: 'https://evil.example' }, k)).status).toBe(200);
     expect(pushes()).toHaveLength(1);
     expect(db.raw.prepare("SELECT source,message_type FROM messages_log WHERE direction='outgoing'").get()).toEqual({ source: 'manual', message_type: 'file' });
     expect((await send('file', { attachmentId: file.id }, k)).status).toBe(409);
+  });
+  it('画像を表示するURLはLINE用のまま、本文の再取得先は署名なしのLIFF入口にする', async () => {
+    const image = (await (await upload(PNG_BYTES, 'p.png', 'image/png')).json<TestReply>()).data;
+    expect((await send('image', { originalContentUrl: image.url, previewImageUrl: image.url })).status).toBe(200);
+    expect(payload().messages).toHaveLength(2);
+    expect(payload().messages[0].originalContentUrl).toBe(image.url);
+    expect(payload().messages[1].text).toContain(`/liff/files/${image.id}`);
+    expect(payload().messages[1].text).not.toContain('signature=');
   });
   it('別の会話のファイル・外部動画・壊れたJSONはLINEを呼ばず履歴も作らない', async () => {
     const file = (await (await upload(PDF_BYTES, 'a.pdf', 'application/pdf', 'f2')).json<TestReply>()).data;
@@ -192,7 +203,7 @@ describe('受信箱の送信・期限付きリンク', () => {
     expect(pushes()).toHaveLength(0);
     expect(db.raw.prepare('SELECT * FROM messages_log').all()).toHaveLength(0);
   });
-  it('公開リンクは認証なしで開け、原本キーでは取れず、期限後は410になる', async () => {
+  it('署名リンクは認証なしで開け、原本キーでは取れず、保存期限後は410になる', async () => {
     const file = await uploadedFile();
     const download = await app().request(file.url, {}, bindings);
     expect(download.status).toBe(200); expect(download.headers.get('Content-Disposition')).toContain('attachment');
@@ -214,7 +225,79 @@ describe('受信箱の送信・期限付きリンク', () => {
   });
 });
 
+describe('B-351 短命の添付URL', () => {
+  it.each(['image', 'video', 'file'])('%sは署名なし・改ざん・期限切れで本文を渡さない', async kind => {
+    const file = kind === 'video' ? (await video()).attachment
+      : kind === 'image' ? (await (await upload(PNG_BYTES, 'a.png', 'image/png')).json<TestReply>()).data : await uploadedFile();
+    const unsigned = new URL(file.url); unsigned.search = '';
+    const forged = new URL(file.url); forged.searchParams.set('signature', '0'.repeat(64));
+    expect((await app().request(unsigned.toString(), {}, bindings)).status).toBe(303);
+    expect((await app().request(forged.toString(), {}, bindings)).status).toBe(403);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(Number(new URL(file.url).searchParams.get('expires')) * 1000);
+    try { expect((await app().request(file.url, {}, bindings)).status).toBe(403); }
+    finally { now.mockRestore(); }
+  });
+  it('署名を別の添付・別の持ち主へ移しても、鍵を変えても開けない', async () => {
+    const a = await uploadedFile(), b = await uploadedFile();
+    const swapped = new URL(a.url); swapped.pathname = new URL(b.url).pathname;
+    expect((await app().request(swapped.toString(), {}, bindings)).status).toBe(403);
+    storage.objects.get(a.key)!.meta.customMetadata!.friendId = 'f2';
+    expect((await app().request(a.url, {}, bindings)).status).toBe(403);
+    bindings.API_KEY = 'rotated-fixture-key';
+    expect((await app().request(b.url, {}, bindings)).status).toBe(403);
+  });
+  it('鍵なしでは保存せず、他の会話の添付の署名を作らない', async () => {
+    bindings.API_KEY = '';
+    expect((await upload()).status).toBe(503); expect(storage.mock.put).not.toHaveBeenCalled();
+    bindings.API_KEY = 'fixture-download-signing-key';
+    const file = (await (await upload(PNG_BYTES, 'a.png', 'image/png', 'f2')).json<TestReply>()).data;
+    expect((await send('image', { originalContentUrl: file.url, previewImageUrl: file.url })).status).toBe(400);
+    expect(pushes()).toHaveLength(0);
+  });
+  it('本人の会話を読み直すと古いURLを更新し、別の会話に埋めたURLは更新しない', async () => {
+    const file = await uploadedFile();
+    const raw = new URL(file.url); raw.search = '';
+    const scoped = new Hono<Env>();
+    scoped.use('*', async (c, next) => { c.set('staff', owner); await next(); });
+    scoped.use('*', privateImageResponseMiddleware);
+    scoped.get('/api/chats/:id/history', c => c.json({ data: { content: JSON.stringify({ url: raw.toString() }) } }));
+    const own = await scoped.request('/api/chats/f1/history', {}, bindings);
+    const foreign = await scoped.request('/api/chats/f2/history', {}, bindings);
+    const parsed = await own.json<{ data: { content: string } }>();
+    const fresh = JSON.parse(parsed.data.content).url;
+    expect(new URL(fresh).searchParams.has('signature')).toBe(true);
+    expect((await app().request(fresh, {}, bindings)).status).toBe(200);
+    expect(own.headers.get('Cache-Control')).toBe('private, no-store');
+    const other = await foreign.json<{ data: { content: string } }>();
+    expect(JSON.parse(other.data.content).url).toBe(raw.toString());
+    raw.hostname = 'old-worker.example';
+    const untrusted = await scoped.request('/api/chats/f1/history', {}, bindings);
+    expect(JSON.parse((await untrusted.json<{ data: { content: string } }>()).data.content).url).toBe(raw.toString());
+    bindings.WORKER_ALIAS_URLS = 'https://old-worker.example,invalid';
+    const aliased = await scoped.request('/api/chats/f1/history', {}, bindings);
+    const updatedAlias = JSON.parse((await aliased.json<{ data: { content: string } }>()).data.content).url;
+    expect(new URL(updatedAlias).searchParams.has('signature')).toBe(true);
+    expect((await app().request(updatedAlias, {}, bindings)).status).toBe(200);
+  });
+});
+
 describe('画像・動画・ファイルの送信予約', () => {
+  it('一時的な送信失敗の後、LIFF入口が変わらず同じ予約を再試行できる', async () => {
+    const file = await uploadedFile();
+    const { data } = await (await schedule('file', { attachmentId: file.id })).json<TestReply>();
+    db.raw.prepare('UPDATE scheduled_chat_sends SET scheduled_at=? WHERE id=?').run('2000-01-01T00:00:00Z', data.id);
+    lineFetch.mockResolvedValueOnce(new Response('{}', { status: 429 }));
+    expect((await processDueScheduledChatSends(bindings)).sent).toBe(0);
+    const first = payload().messages[0].text;
+    db.raw.prepare('UPDATE scheduled_chat_sends SET scheduled_at=? WHERE id=?').run('2000-01-01T00:00:00Z', data.id);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 5 * 60_000);
+    try {
+      expect((await processDueScheduledChatSends(bindings)).sent).toBe(1);
+      expect(payload().messages[0].text).toBe(first);
+      expect(first).toContain(`/liff/files/${file.id}`); expect(first).not.toContain('signature=');
+    } finally { now.mockRestore(); }
+    expect(new Headers(pushes().at(-1)![1]?.headers).has('X-Line-Harness-Source')).toBe(false);
+  });
   it.each(['image', 'video', 'file'])('%sを予約してcronから送り、種別と履歴を残す', async type => {
     let content: unknown;
     if (type === 'file') content = { attachmentId: (await uploadedFile()).id };
@@ -227,6 +310,7 @@ describe('画像・動画・ファイルの送信予約', () => {
     const result = await processDueScheduledChatSends(bindings);
     expect(result.sent).toBe(1);
     expect(payload().messages[0].type).toBe(type === 'file' ? 'text' : type);
+    if (type === 'video') expect(payload().messages[1].text).toContain('/liff/files/');
     expect(new Headers(pushes()[0][1]?.headers).has('X-Line-Harness-Source')).toBe(false);
     expect(db.raw.prepare("SELECT source,message_type FROM messages_log WHERE direction='outgoing'").get()).toEqual({ source: 'scheduled', message_type: type });
   });

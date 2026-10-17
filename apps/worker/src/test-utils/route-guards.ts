@@ -7,8 +7,8 @@ export type Registration = {
 const GUARDS = new Set(['requireRole', 'requirePermission', 'requireDeliveryAccess', 'requirePlatformAdminWrite', 'authMiddleware']);
 
 /** Import names alone never protect a route: only middleware arguments count. */
-export function registrations(source: string): Registration[] {
-  const file = ts.createSourceFile('routes.ts', source, ts.ScriptTarget.Latest, true);
+export function registrations(source: string | ts.SourceFile): Registration[] {
+  const file = typeof source === 'string' ? ts.createSourceFile('routes.ts', source, ts.ScriptTarget.Latest, true) : source;
   const aliases = new Map<string, ts.Expression | string>();
   const calls: ts.CallExpression[] = [];
   function visit(node: ts.Node): void {
@@ -53,8 +53,8 @@ export function hasPriorGuard(route: Registration, middleware: Registration[]): 
     && matchesMiddleware(guard.path, route.path));
 }
 
-export function exportedRouters(source: string): Map<string, string> {
-  const file = ts.createSourceFile('routes.ts', source, ts.ScriptTarget.Latest, true);
+export function exportedRouters(source: string | ts.SourceFile): Map<string, string> {
+  const file = typeof source === 'string' ? ts.createSourceFile('routes.ts', source, ts.ScriptTarget.Latest, true) : source;
   const result = new Map<string, string>();
   for (const statement of file.statements) {
     if (ts.isExportAssignment(statement) && ts.isIdentifier(statement.expression)) {
@@ -71,8 +71,8 @@ export function exportedRouters(source: string): Map<string, string> {
   return result;
 }
 
-export function importedRouters(source: string): Map<string, { module: string; exported: string }> {
-  const file = ts.createSourceFile('index.ts', source, ts.ScriptTarget.Latest, true);
+export function importedRouters(source: string | ts.SourceFile): Map<string, { module: string; exported: string }> {
+  const file = typeof source === 'string' ? ts.createSourceFile('index.ts', source, ts.ScriptTarget.Latest, true) : source;
   const result = new Map<string, { module: string; exported: string }>();
   for (const statement of file.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;

@@ -640,7 +640,8 @@
     "722_hq_comparison_exports.sql",
     "723_ec_auto_line_attribution.sql",
     "724_booking_pass_purchases.sql",
-    "725_broadcast_execution_contexts.sql"
+    "725_broadcast_execution_contexts.sql",
+    "726_auth_known_devices.sql"
   ],
-  "migrationCount": 641
+  "migrationCount": 642
 }

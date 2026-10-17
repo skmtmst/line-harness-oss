@@ -395,3 +395,13 @@ describe('パスワード再設定（36-6）', () => {
     expect((await call('POST', '/api/auth/password/forgot', { email: 'owner@example.com', turnstileToken: 'tok' })).status).toBe(400);
   });
 });
+
+describe('B351 password login robot boundary',()=>{
+  it.each(['missing_token','rejected','unavailable','not_configured'] as const)('rejects %s before password lookup or session creation',async reason=>{
+    turnstile.result={ok:false,reason};
+    const response=await call('POST','/api/auth/password/login',{email:'fixture@example.invalid',password:'fixture-password',turnstileToken:'fixture-token'});
+    expect(response.status).toBe(reason==='not_configured'?503:400);
+    expect((await json(response)).code).toBe('TURNSTILE_REQUIRED');
+    expect(testDb.raw.prepare('SELECT COUNT(*) n FROM admin_sessions').get()).toEqual({n:0});
+  });
+});

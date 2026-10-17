@@ -12,6 +12,18 @@ const responses = {
 };
 const jsonBody = (schema: Record<string, unknown>) => ({ required: true, content: { 'application/json': { schema } } });
 export const chatAttachmentPaths: Record<string, unknown> = {
+  '/api/liff/files/{id}/download': { get: {
+    tags: ['LIFF'], summary: 'LINE本人確認後にファイルの15分取得URLを発行',
+    security: [{ liffIdToken: [] }], parameters: [id],
+    description: 'BearerはLINE ID token。返したURLの取得にも同じ本人のBearerが必要。店・統括・ファイルの持ち主・期限を再確認する。',
+    responses: {
+      '200': { description: '{success:true,data:{id,url,expiresAt,filename,mimeType,size,kind}}。private,no-store' },
+      '401': { description: 'LINE_AUTH_REQUIRED: LINEでログインして、もう一度お試しください' },
+      '404': { description: 'DOWNLOAD_UNAVAILABLE: このファイルは利用できません。お店へお問い合わせください（別人・別店・削除・保存期限切れも同じ）' },
+      '502': { description: 'DOWNLOAD_RETRY: 時間をおいて再試行' },
+      '503': { description: 'DOWNLOAD_UNCONFIGURED: 取得用の鍵が未設定' },
+    },
+  } },
   '/api/chats/{id}/attachments/upload': { post: {
     tags: ['Chats'], summary: 'JPEG/PNG画像・PDF・DOCX・XLSX・PPTX・ZIPを10MBまでアップロード',
     parameters: [id, { name: 'X-Filename', in: 'header', required: true, schema: { type: 'string' }, description: 'UTF-8でpercent-encodeした元ファイル名' }],
@@ -30,7 +42,7 @@ export const chatAttachmentPaths: Record<string, unknown> = {
   } },
   '/api/chats/{id}/send': { post: {
     tags: ['Chats'], summary: 'テキスト・Flex・画像・動画・ファイルを担当者の個別返信として送信',
-    description: 'videoのcontentはJSONのoriginalContentUrlと任意のpreviewImageUrl。fileのcontentはJSONのattachmentId。ファイルは名前・大きさ・期限付きURLのテキストとして届く。',
+    description: 'videoのcontentはJSONのoriginalContentUrlと任意のpreviewImageUrl。fileのcontentはJSONのattachmentId。ファイルは名前・大きさ・本人確認するLIFF入口のテキストとして届く。画像・動画には後から開くLIFF入口も同じpushで添える。',
     parameters: [id, { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } }],
     requestBody: jsonBody({ type: 'object', required: ['content'], properties: {
       content: { type: 'string' }, messageType: { type: 'string', enum: ['text', 'flex', 'image', 'video', 'file'], default: 'text' },

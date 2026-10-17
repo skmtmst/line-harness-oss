@@ -1,6 +1,9 @@
 import type { CodexMentionQueueMessage } from './services/codex-cloud-monitor.js';
 
 export type WorkerBindings = {
+    OPERATOR_PUSH_VAPID_PUBLIC_KEY?:string;
+    OPERATOR_PUSH_VAPID_PRIVATE_KEY?:string;
+    OPERATOR_PUSH_VAPID_SUBJECT?:string;
     DB: D1Database;
     BUILD_GIT_COMMIT?: string;
     BUILD_VERSION?: string;
@@ -81,6 +84,9 @@ export type WorkerBindings = {
     ADMIN_LINE_LOGIN_CHANNEL_SECRET?: string;
     /** Stripe Webhook署名キー。未設定時はStripe受信ルートだけ503で拒否する。 */
     STRIPE_WEBHOOK_SECRET?: string;
+    BOOKING_STRIPE_TEST_SECRET_KEY?: string;
+    BOOKING_STRIPE_TEST_CLIENT_ID?: string;
+    BOOKING_STRIPE_CONNECT_REDIRECT_URI?: string;
     /** 統括のバナー生成（OpenAI 画像生成）。未設定時は生成だけ503で断る。 */
     OPENAI_API_KEY?: string;
     /** B-355: operations-only deployment flag; production is always closed. */
