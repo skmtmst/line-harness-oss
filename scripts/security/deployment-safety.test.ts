@@ -22,8 +22,8 @@ describe('deployment safety fails closed on unsafe candidate and deployed metada
   });
   it.each(['worker','staging','admin'])('runs the guard before deployment in %s workflow',name=>{
     const source=readFileSync(`.github/workflows/deploy-cloudflare-${name}.yml`,'utf8');
-    expect(source.indexOf('scripts/security/deployment-safety.ts')).toBeGreaterThan(0);
-    expect(source.indexOf('scripts/security/deployment-safety.ts')).toBeLessThan(source.indexOf(name==='admin'?'npx wrangler pages deploy':name==='worker'?'command: deploy --config':'npx wrangler deploy'));
+    expect(source.indexOf('scripts/security/run-deployment-safety.ts')).toBeGreaterThan(0);
+    expect(source.indexOf('scripts/security/run-deployment-safety.ts')).toBeLessThan(source.indexOf(name==='admin'?'npx wrangler pages deploy':name==='worker'?'command: deploy --config':'npx wrangler deploy'));
   });
 });
 
@@ -37,4 +37,13 @@ it('detects an extra public deployed bucket and a changed IMAGES binding',()=>{
  const state=snapshot();state.bindings[0].bucket_name='other-private';state.buckets.push({name:'other-private',managed:false,custom:true});
  const failures=evaluateDeploymentSafety(config,state,'production');expect(failures).toContain('bucket-drift:IMAGES');expect(failures).toContain('public-bucket:deployed-r2');
  expect(REQUIRED_SECURITY_SECRETS).not.toContain('TOTP_ENCRYPTION_KEY');
+});
+
+describe('配備の仕組みから呼ぶ入口（run-deployment-safety.ts）', () => {
+  it('配備と同じ tsx の実行で本当に動き、引数が正しくなければ失敗で止まる（黙って通らない）', async () => {
+    const { spawnSync } = await import('node:child_process');
+    const r = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/security/run-deployment-safety.ts', 'bad', 'x'], { encoding: 'utf8' });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('deployment_safety_arguments_invalid');
+  }, 30000);
 });

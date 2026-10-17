@@ -1,4 +1,3 @@
-import { pathToFileURL } from 'node:url';
 import { unstable_readConfig } from 'wrangler';
 
 export type SafetyConfig = { vars?: Record<string,unknown>; r2_buckets?: Array<{binding:string;bucket_name:string}> };
@@ -58,13 +57,4 @@ export async function inspectDeployment(configPath:string, environment:'producti
     buckets.push({name:bucketName,managed:managed.enabled,custom:custom.domains.some((d:any)=>d.enabled)});
   }
   return evaluateDeploymentSafety(config as SafetyConfig,{bindings:settings.bindings,buckets},environment);
-}
-if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
-  const environment=process.argv[2], configPath=process.argv[3];
-  if(!['production','staging'].includes(environment)||!configPath) { console.error('deployment_safety_arguments_invalid');process.exitCode=1; }
-  else try {
-    const failures=await inspectDeployment(configPath,environment as 'production'|'staging',process.env.CLOUDFLARE_API_TOKEN??'',process.env.CLOUDFLARE_ACCOUNT_ID??'');
-    console.log(JSON.stringify({check:'deployment_safety',environment,failures}));
-    if(failures.length) process.exitCode=1;
-  } catch { console.error('deployment_safety_check_failed');process.exitCode=1; }
 }
