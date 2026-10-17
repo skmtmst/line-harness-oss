@@ -41,3 +41,13 @@ push・PR・migration作成・DB更新・配備・実送信/実決済・許可�
 - 初回の最終SHAのWorker buildは `vars.VITE_LIFF_ID` 不明で未実行となり、後続のLIFFブラウザ/ヘッダー検査2件が成果物なしで失敗した。製品のビルド失敗ではない。
 - GitHub repo variablesを読み取り、VITE_LIFF_ID / VITE_BOT_BASIC_ID / VITE_CALENDAR_CONNECTION_ID / V8_SPEED_ENFORCEMENTはいずれも未設定と確認。設定自体は変更せず、手元の再実行だけ `--var NAME=` で未設定の空値を明示する。
 - 同じ製品SHAのworker-buildとv8-screen-guardを再実行し、後で結果を追記する。最初の失敗ログも保持する。
+
+- 空値を明示した再検査はworker-build全工程が成功（本体build14.9秒、LIFF実ブラウザ4.6秒、公開SDK/安全ヘッダー0.9秒）。同じ製品SHA。ログ `/tmp/a06-ci-build-recheck.log`、詳細 `~/lh-work/tools/hq/ci-local/logs/20261017-225911-fc419fc40b-65200/`。
+- v8-screen-guardの既存差分判定も成功し、今回は画面/共有型/撮影/lockfile差分がないためrun=false。検査条件や許可は変更していない。再検査の失敗0、実行不能1は正式PR情報不足だけ。
+
+- 最終製品SHAの管理画面はlint・部品選択・旧見た目の復活防止・型検査が成功。全2,308ファイル・13,684件成功、既存skip/todo各1（CI web-checks-10、枠待ち込み364.1秒）。UIコードの変更はない。
+
+### SDKの公開method互換の最終確認
+
+- 後続 `ed9bf082965cd1f892a8dfa3cf49e3e9d53e3cc8` は、受理済み409の対応API判定を保ったまま、methodが小文字postでも従来の成功経路になるよう比較1か所だけ修正。試験に同じ呼び出しを追加した。値/対象/本文/キー/予算/許可先の変更なし。
+- 関連3ファイル65件とSDK型検査成功（`/tmp/a06-case-final.log` / `/tmp/a06-sdk-final-type.log`）。この製品SHAでWorker全試験・型・ビルドを再確認する。先行fcの全体検査と混同しない。
