@@ -476,7 +476,7 @@ export default function AccountRegisterV8() {
         <div ref={stepPanelRef} tabIndex={-1} className={styles.stepBody}>
           {currentStep === 1 && (
             <CreateStepColumns data-design-node="p6zMkA" previewTitle="この5段でやること" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="この5段でやること">
+                <Card layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="この5段でやること">
                 <h2 className={styles.asideH2}>この5段でやること</h2>
                 <p className={styles.asideP}>① 事前確認：公式アカウントと2つのチャネルを用意</p>
                 <p className={styles.asideP}>② アカウント接続：チャネル ID とシークレット、LINE側の設定</p>
@@ -485,7 +485,7 @@ export default function AccountRegisterV8() {
                 <p className={styles.asideP}>⑤ 完了：いまの友だちの引き継ぎ</p>
               </Card>
               )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="アカウントの用意方法">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="アカウントの用意方法">
                 {draftRestored && (
                   <Notice tone="info" message="端末の下書きから続けます。チャネルシークレットだけ入れ直してください。" onClose={() => setDraftRestored(false)} />
                 )}
@@ -496,11 +496,11 @@ export default function AccountRegisterV8() {
                     <SaveErrorField names={["account-method-v8","accountMethod"]}><Radio name="account-method-v8" value="new" checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')}>新しく公式アカウントを作る</Radio></SaveErrorField>
                   </div>
                 </fieldset>
-                <Card className={styles.noteBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
-                  <p>{accountMethod === 'existing'
+                <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
+                  <p className={styles.noteText}>{accountMethod === 'existing'
                     ? 'LINE公式アカウントを作成してから、同じプロバイダー内に Messaging API と LINE Login のチャネルを用意します。'
                     : 'LINE公式アカウントを作成してから、同じプロバイダー内に Messaging API と LINE Login のチャネルを用意します。新しく作るときは、先に公式アカウントを作ります。'}</p>
-                  <p>・Messaging API と LINE Login は同じプロバイダーで作成してください<br />・Webhook の利用は LINE Developers でオンにしてください</p>
+                  <p className={styles.noteText}>・Messaging API と LINE Login は同じプロバイダーで作成してください<br />・Webhook の利用は LINE Developers でオンにしてください</p>
                 </Card>
                 <div className={styles.buttonRow}>
                   <Button external href="https://manager.line.biz/"  >LINE公式アカウントを作る</Button>
@@ -513,7 +513,7 @@ export default function AccountRegisterV8() {
 
           {currentStep === 2 && (
             <CreateStepColumns data-design-node="Fqy29" previewTitle="どこにある？" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="どこにある？">
+                <Card layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="どこにある？">
                 <h2 className={styles.asideH2}>どこにある？</h2>
                 <p className={styles.asideP}>チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
                 <p className={styles.asideP}>登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
@@ -521,7 +521,7 @@ export default function AccountRegisterV8() {
               </Card>
               )}>
               {sub === 1 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Messaging API のチャネル">
+                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="Messaging API のチャネル">
                   <p className={styles.subBadge}>{badge}</p>
                   <h2 className={styles.panelTitle}>Messaging API のチャネル</h2>
                   <SettingsFormRow layout="columns">
@@ -539,7 +539,7 @@ export default function AccountRegisterV8() {
                 </Card>
               )}
               {sub === 2 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook の設定">
+                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="Webhook の設定">
                   <p className={styles.subBadge}>{badge}</p>
                   <h2 className={styles.panelTitle}>Webhook の設定</h2>
                   <div className={styles.field}>
@@ -564,7 +564,7 @@ export default function AccountRegisterV8() {
                 </Card>
               )}
               {sub === 3 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="LINE Login のチャネル">
+                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="LINE Login のチャネル">
                   <p className={styles.subBadge}>{badge}</p>
                   <h2 className={styles.panelTitle}>LINE Login のチャネル</h2>
                   <SettingsFormRow layout="columns">
@@ -601,13 +601,13 @@ export default function AccountRegisterV8() {
 
           {currentStep === 3 && sub === 1 && (
             <CreateStepColumns data-design-node="Lwxyh" previewTitle="ここで登録します" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ここで登録します">
+                <Card layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ここで登録します">
                 <h2 className={styles.asideH2}>ここで登録します</h2>
                 <p className={styles.asideP}>5つの確認がすべて通るまで、アカウントは作られません。</p>
                 <p className={styles.asideP}>止まった項目を直して、もう一度「もう一度確かめる」を押します。</p>
               </Card>
               )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続確認">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="接続確認">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 className={styles.panelTitle}>接続確認</h2>
                 <ul className={styles.checkList}>
@@ -639,13 +639,13 @@ export default function AccountRegisterV8() {
 
           {currentStep === 3 && sub === 2 && connection && (
             <CreateStepColumns data-design-node="Lwxyh" previewTitle="ためしに友だち追加" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ためしに友だち追加">
+                <Card layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ためしに友だち追加">
                 <h2 className={styles.asideH2}>ためしに友だち追加</h2>
                 <p className={styles.asideP}>自分のスマホの LINE で QR を読み取って、友だち追加してみてください。</p>
                 <p className={styles.asideP}>届かなくても先へ進めます。あとから友だち一覧で確かめられます。</p>
               </Card>
               )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ためしに友だち追加">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="ためしに友だち追加">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 className={styles.panelTitle}>ためしに友だち追加してみましょう</h2>
                 <div className={styles.qrBlock}>
@@ -675,13 +675,13 @@ export default function AccountRegisterV8() {
 
           {currentStep === 4 && (
             <CreateStepColumns data-design-node="X0pGdw" previewTitle="あとから変えられます" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="あとから変えられます">
+                <Card layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="あとから変えられます">
                 <h2 className={styles.asideH2}>あとから変えられます</h2>
                 <p className={styles.asideP}>選んだ使い方でダッシュボードの並びが決まります。</p>
                 <p className={styles.asideP}>カードは、あとから自分で足し引きできます。</p>
               </Card>
               )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="使い方を選ぶ">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="使い方を選ぶ">
                 <h2 className={styles.panelTitle}>いちばん近い使い方を選んでください</h2>
                 <RadioCardGroup legend="いちばん近い使い方" columns={2}>
                   {templateOptions().map((option) => (
@@ -699,10 +699,10 @@ export default function AccountRegisterV8() {
           )}
 
           {currentStep === 5 && connection && (
-            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label={importRunning ? 'いまの友だちを引き継いでいます' : '登録完了'} data-design-node="Plmq1">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label={importRunning ? 'いまの友だちを引き継いでいます' : '登録完了'} data-design-node="Plmq1">
               {importRunning && form.importFriends ? <>
                 <h2 className={styles.panelTitle}>いまの友だちを引き継いでいます</h2>
-                <Card className={styles.handoverBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
+                <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn6-hand-pad)" gap="var(--tpl-htn6-hand-gap)">
                   <div className={styles.handoverStats}>
                     <strong>{`${polishFormatNumber(handover.imported)} 人`}</strong>
                     <strong>{handover.total !== null ? `${polishFormatNumber(handover.total)} 人` : '確認中'}</strong>
@@ -716,9 +716,11 @@ export default function AccountRegisterV8() {
                   <CircleCheck size={28} className={styles.doneIcon} aria-hidden="true" />
                   <p className={styles.doneTitle}>準備ができました</p>
                 </div>
-                <Card className={styles.accountBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
+                <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn6-acct-pad)" gap="var(--tpl-htn-gap-s)">
+                  <div className={styles.accountDetails}>
                   <span className={styles.accountName}>{(connection.displayName ?? form.name.trim()) || 'LINEアカウント'}</span>
                   <span className={styles.accountId}>{connection.basicId || String(emptyValue('none'))}</span>
+                  </div>
                 </Card>
                 <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
                   {form.importFriends
@@ -727,9 +729,9 @@ export default function AccountRegisterV8() {
                   <p className={styles.progressNote}>LINE の都合で引き継げないアカウントでは、友だちが話しかけた順に登録されます。</p>
                 </Card>
                 {connection.remainingActions.length > 0 && (
-                  <Card className={styles.noteBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
-                    <p><strong>残りの手作業</strong></p>
-                    <ul>{connection.remainingActions.map((item) => <li key={item}>{item}</li>)}</ul>
+                  <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
+                    <p className={styles.noteText}><strong>残りの手作業</strong></p>
+                    <ul className={styles.noteText}>{connection.remainingActions.map((item) => <li key={item}>{item}</li>)}</ul>
                   </Card>
                 )}
                 <p className={styles.groupLabel}>次にすること</p>

@@ -10,10 +10,6 @@
 :global(html:root) .stepBody:focus-visible { outline: none; }
 .column { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-panel-gap); }
 
-.panel {
-  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
-
-}
 .panelTitle {
   margin: 0; padding: 0; font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink);
 }
@@ -21,18 +17,16 @@
 .fieldset > legend { float: left; width: 100%; }
 .fieldset > legend + * { clear: both; }
 
-/* 右の案内は共通の Card（surface="muted"）が地と角を持つ。画面CSSは置き場所だけ（★V8 §24）。 */
-.aside { align-self: flex-start; }
-/* 中の字は Card ではなく中の h2・p に直接あてる。Card へ渡す .aside には見た目を書かない。 */
+/* カードの面・余白は共通 Card の口へ渡す。字は中身へ直接あてる。 */
 .asideH2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
 .asideP { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
 
 /* ① 用意の仕方 */
 .radios { display: flex; align-items: center; gap: var(--tpl-htn-radio-gap); }
-.noteBox {
+.noteText {
+  margin: 0;
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary);
 }
-.noteBox p, .noteBox ul { margin: 0; }
 .buttonRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-gap-s); }
 
 /* ② チャネル設定 */
@@ -156,10 +150,6 @@
    画面CSSは持たない。 */
 
 /* ⑤-0 引き継ぎ中。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
-.handoverBox {
-  display: flex; flex-direction: column; gap: var(--tpl-htn6-hand-gap);
-  padding: var(--tpl-htn6-hand-pad);
-}
 .handoverStats { display: flex; flex-wrap: wrap; gap: var(--tpl-htn6-stat-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
 .handoverStats strong { font-weight: 700; color: var(--color-ink); }
 
@@ -168,9 +158,8 @@
 .doneIcon { color: var(--color-accent-deep); }
 .doneTitle { margin: 0; font-size: var(--tpl-htn6-text-20); line-height: var(--tpl-htn6-lh-28); font-weight: 700; color: var(--color-ink); }
 /* ⑤ 名前の箱。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
-.accountBox {
-  display: flex; align-items: center; gap: var(--tpl-htn-gap-s);
-  padding: var(--tpl-htn6-acct-pad);
+.accountDetails {
+  display: flex; flex-direction: column; align-items: center; gap: var(--tpl-htn-gap-s);
 }
 .accountName { font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
 .accountId { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
