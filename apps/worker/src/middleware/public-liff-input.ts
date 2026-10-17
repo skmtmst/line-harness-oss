@@ -32,7 +32,8 @@ export async function boundPublicLiffInput(c: Context<Env>): Promise<Response | 
         : 1024 * 1024;
   const bytes = await readBoundedBytes(c.req.raw, maxBytes);
   if (bytes === null) return c.json({ success: false, code: 'liff_body_too_large', error: '送信内容が大きすぎます' }, 413);
-  c.req.raw = new Request(c.req.raw, { body: bytes.byteLength ? bytes : null });
+  // Preserve a present-but-empty body so the downstream JSON guard still rejects it.
+  c.req.raw = new Request(c.req.raw, { body: bytes });
   const { liffId, accountId } = publicLiffQuerySelector(c.req.url);
   if (liffId || accountId) return;
   // Multipart and binary uploads cannot contain a selector object. Avoid a

@@ -124,11 +124,15 @@ describe('F03 public selector input is bounded before parsing or tenant lookup',
     }, target.env);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ body: JSON.parse(raw), validated: JSON.parse(raw), raw });
-    const malformed = await target.hono.request('/api/liff/test-body', {
-      method: 'POST', body: '{broken', headers: { 'Content-Type': 'application/json' },
-    }, target.env);
-    expect(malformed.status).toBe(400);
-    expect(await malformed.json()).toMatchObject({ code: 'INVALID_JSON' });
+    for (const path of ['/api/liff/test-body', '/api/liff/test-body?liffId=fixture']) {
+      for (const body of ['', '{broken']) {
+        const malformed = await target.hono.request(path, {
+          method: 'POST', body, headers: { 'Content-Type': 'application/json' },
+        }, target.env);
+        expect(malformed.status).toBe(400);
+        expect(await malformed.json()).toMatchObject({ code: 'INVALID_JSON' });
+      }
+    }
   });
   it.each([
     ['/api/liff/nen/pets', Math.ceil(1_500_000 / 3) * 4 + 4096],
