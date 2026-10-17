@@ -5,6 +5,25 @@ import { join } from 'node:path';
 import { collectSecurityRoutes, inspectRouteSource } from './route-security-inventory.js';
 
 describe('security route inventory', () => {
+  it('retains every mount of a shared router factory and rereads changed source', () => {
+    const root = mkdtempSync(join(tmpdir(), 'security-shared-mount-'));
+    try {
+      mkdirSync(join(root, 'routes'));
+      writeFileSync(join(root, 'index.ts'), `import { router } from './routes/shared.js';
+        const app = new Hono(); app.route('/api/store', router); app.route('/api/hq', router);`);
+      const source = `export const router = new Hono();
+        function register(app: Hono<Env>) { app.get('/items', c => c.json({})); }
+        register(router);`;
+      const file = join(root, 'routes/shared.ts');
+      writeFileSync(file, source);
+      expect(collectSecurityRoutes(root).map(r => `${r.method} ${r.path}`)).toEqual([
+        'GET /api/hq/items', 'GET /api/store/items',
+      ]);
+      writeFileSync(file, source.replace("app.get('/items', c => c.json({}));", ''));
+      expect(collectSecurityRoutes(root)).toEqual([]);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   it('follows invoked router factories and excludes unused factories sharing a parameter name', () => {
     const root = mkdtempSync(join(tmpdir(), 'security-factory-'));
     try {
