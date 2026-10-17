@@ -19,10 +19,11 @@ for (const width of [1152, 1440, 1920]) {
     const browser = await connectGuardBrowser()
     try {
       const page = await browser.newPage({ viewport: { width, height: 700 }, reducedMotion: 'reduce' })
+      // 狭い窓の故障対照は340pxに固定。製品の窓の既定の高さに左右されない見本にする。
       await page.setContent(`<html><head><style>${globals}</style><style>${dialog}\n${picker}\n${search}\n${shell.replace(/\.(panel|overlay|header|footer|heading)(?=[^\w-]|$)/g, '.source$1')}</style></head><body>
         <div class="overlay"><div class="panel standardPanel" data-m1-scope data-design-width data-design-content-padding style="--dialog-design-width:640px;--dialog-design-content-padding:0">
           <div class="headerRow"><h2>テンプレートを選ぶ</h2></div>
-          <div class="content" data-content-layout="form"><div class="body tpBody"><section class="tpList"><div class="search"><input class="input" type="search" aria-label="名前で探す" /></div><div style="height:1600px;flex-shrink:0">候補と見え方</div></section></div></div>
+          <div class="content" data-content-layout="form"><div class="body tpBody" style="--tpl-source-picker-body-h:340px"><section class="tpList"><div class="search"><input class="input" type="search" aria-label="名前で探す" /></div><div style="height:1600px;flex-shrink:0">候補と見え方</div></section></div></div>
           <div class="footer"><div class="tpFoot"><button>キャンセル</button><button>このテンプレートを使う</button></div></div>
         </div></div></body></html>`)
       const options = { fixedActions: ['キャンセル', 'このテンプレートを使う'], pickerControls: true }

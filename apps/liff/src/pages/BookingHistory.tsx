@@ -1,67 +1,24 @@
-import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { api, type BookingHistoryItem } from '../lib/api.js';
-import { addDays, slotStartsAtIso, jstToday, formatMd, formatWeekday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
-import ConfirmDialog from '../components/ui/ConfirmDialog.js';
-import { logFailure } from '../lib/user-message.js';
+import liff from '@line/liff';
+import { useEffect,useState } from 'react';
+import { useLocation,useNavigate } from 'react-router-dom';
+import HistoryCard from '../components/HistoryCard.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
-import HistoryCard from '../components/HistoryCard.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import StatusView from '../components/ui/StatusView.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
+import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import Icon from '../components/ui/Icon.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
+import StatusView from '../components/ui/StatusView.js';
+import { api,type BookingHistoryItem } from '../lib/api.js';
+import { loadPaymentViews,type PaymentView } from '../lib/booking-payment-view.js';
+import { addDays,formatMd,formatWeekday,jstToday,slotStartsAtIso,utcToJstHm,utcToJstMd } from '../lib/datetime.js';
+import { logFailure } from '../lib/user-message.js';
+import { CHANGE_RANGE_DAYS,CHANGE_SLOT_LIMIT,cancelFailureMessage,changeFailureMessage,errorCode,type ChangeSlot } from './BookingHistory-messages';
 
-/** 日時を変える窓で、今日から何日先までの空きを出すか（空きの口は28日までまとめて読める）。 */
-const CHANGE_RANGE_DAYS = 14;
-/** 窓に並べる空きの数の上限（多すぎると選べない）。 */
-const CHANGE_SLOT_LIMIT = 24;
 
-type ChangeSlot = { date: string; start: string; startUtc?: string };
-
-/** 取消の失敗を、お客さまが次に何をすればよいかの1文にする。 */
-function cancelFailureMessage(code: string | undefined): string {
-  switch (code) {
-    case 'self_deadline_passed': return 'キャンセルの期限を過ぎています。トークでご連絡ください。';
-    case 'version_conflict':
-    case 'not_editable':
-    case 'booking_not_found': return '予約の内容が変わっていました。一覧を読み直しました。';
-    case 'send_in_flight_retry': return 'お知らせを送っている途中でした。少し待ってから、もう一度お試しください。';
-    default: return 'キャンセルできませんでした。電波のよいところで、もう一度お試しください。';
-  }
-}
-
-/** 日時変更の失敗の1文。 */
-function changeFailureMessage(code: string | undefined): string {
-  switch (code) {
-    case 'slot_not_available':
-    case 'slot_conflict': return '選んだ日時は埋まりました。別の日時を選んでください。';
-    case 'self_deadline_passed': return '変更の期限を過ぎています。トークでご連絡ください。';
-    case 'past_cutoff':
-    case 'past_datetime':
-    case 'invalid_starts_at': return '選んだ日時は受付を終えています。別の日時を選んでください。';
-    case 'version_conflict':
-    case 'not_editable':
-    case 'booking_not_found': return '予約の内容が変わっていました。一覧を読み直してから、もう一度お試しください。';
-    case 'send_in_flight_retry': return 'お知らせを送っている途中でした。少し待ってから、もう一度お試しください。';
-    default: return '日時を変えられませんでした。電波のよいところで、もう一度お試しください。';
-  }
-}
-
-function errorCode(err: unknown): string | undefined {
-  const body = (err as { body?: { error?: unknown } } | null)?.body;
-  return typeof body?.error === 'string' ? body.error : undefined;
-}
-
-/**
- * 予約の履歴 (★V8・YvTJ3)。「これから／これまで」の切り替え。
- * これからの予約のカードに「日時を変える／キャンセル」(F-6 本人の変更・取消)。
- * 送るには予約の版 (lock_version) が要るので、履歴の口が返した予約にだけ出す
- * (日時を変えるはメニューと担当も要る)。返さない予約には出さず、下の文で「トークでご連絡ください」と案内する。
- * 進む操作は下の帯の「新しく予約する」。
- */
+/** 予約履歴と本人の変更・取消。版が返る予約に操作を出し、支払いの状態と領収書も表示する。 */
 export default function BookingHistory() {
   const [data, setData] = useState<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] } | null>(
     null,
@@ -82,6 +39,10 @@ export default function BookingHistory() {
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  /* 予約ごとの支払いの札（nWby5）。読めない予約は札なし＝予約の状態の札を出す。 */
+  const [payments, setPayments] = useState<Record<string, PaymentView | null>>({});
+  const [paymentKey, setPaymentKey] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setFailed(false);
@@ -94,6 +55,55 @@ export default function BookingHistory() {
       });
   }, [reloadKey]);
 
+  // 開いているタブの予約だけ支払いを読む。Stripe から戻ったとき（画面が見えたとき）も読み直す。
+  useEffect(() => {
+    if (!data) return;
+    let alive = true;
+    void loadPaymentViews(tab === 'upcoming' ? data.upcoming : data.past).then((views) => {
+      if (alive) setPayments((prev) => ({ ...prev, ...views }));
+    });
+    return () => { alive = false; };
+  }, [data, tab, paymentKey]);
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') setPaymentKey((k) => k + 1); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
+  /** 未払いの先払いを Stripe の支払いページで払う（予約の 5 段目と同じ口。同じ申込は同じページが返る）。 */
+  async function runPay(booking: BookingHistoryItem) {
+    if (busy) return;
+    setBusy(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const res = await api.startBookingPayment(booking.id);
+      if (!res.checkoutUrl) {
+        setActionError('お支払いを始められませんでした。時間をおいて再度お試しください。');
+        return;
+      }
+      // 決済画面は外のブラウザで開く (店内の WebView では 3D セキュア等が動かないことがある)。
+      liff.openWindow({ url: res.checkoutUrl, external: true });
+      setNotice('お支払いのページを開きました。終わったらこの画面に戻ると、状態が変わります。');
+    } catch (err) {
+      logFailure('booking-history-pay', err);
+      setActionError('お支払いを始められませんでした。時間をおいて再度お試しください。');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openReceipt(view: PaymentView) {
+    setActionError(null);
+    if (!view.receiptUrl) {
+      // 領収書の URL を返す口は組1 に依頼中（B-314：入口は置き、押すと準備中の案内）。
+      setNotice('領収書は現在準備中です。必要なときはトークでお店にご連絡ください。');
+      return;
+    }
+    setNotice(null);
+    liff.openWindow({ url: view.receiptUrl, external: true });
+  }
+
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   const withinDeadline = (b: BookingHistoryItem, at: number) => !b.cancel_deadline_at || at <= Date.parse(b.cancel_deadline_at);
@@ -101,6 +111,8 @@ export default function BookingHistory() {
     && withinDeadline(b, now);
   const canChange = (b: BookingHistoryItem) =>
     canCancel(b) && typeof b.menu_id === 'string' && typeof b.staff_id === 'string';
+
+  const paidCancel = pendingCancel && payments[pendingCancel.id]?.kind === 'paid' ? payments[pendingCancel.id] : null;
 
   async function runCancel() {
     const target = pendingCancel;
@@ -190,7 +202,7 @@ export default function BookingHistory() {
     <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="予約の履歴" />
       <div
-        data-design-node="YvTJ3"
+        data-design-node="nWby5"
         className="mx-auto w-full max-w-md space-y-3.5 px-4 pt-3 pb-40"
       >
         <h1 className="text-xl font-bold text-ink">予約の履歴</h1>
@@ -225,6 +237,9 @@ export default function BookingHistory() {
             {actionError && (
               <p role="alert" className="text-[13px] leading-5 text-danger">{actionError}</p>
             )}
+            {notice && (
+              <p role="status" className="text-[13px] leading-5 text-ink-secondary">{notice}</p>
+            )}
             {list.length === 0 ? (
               tab === 'upcoming' ? (
                 <StatusView
@@ -237,22 +252,28 @@ export default function BookingHistory() {
               )
             ) : (
               <ul className="space-y-3.5">
-                {list.map((b) => (
+                {list.map((b) => {
+                  const pay = payments[b.id] ?? null;
+                  return (
                   <HistoryCard
                     key={b.id}
                     booking={b}
+                    payment={pay}
+                    onPay={pay?.kind === 'unpaid' && tab === 'upcoming' ? () => void runPay(b) : undefined}
+                    onReceipt={pay && (pay.kind === 'paid' || pay.kind === 'refunded') ? () => openReceipt(pay) : undefined}
                     disabled={busy}
                     onChange={canChange(b) ? () => void openChange(b) : undefined}
                     onCancel={canCancel(b) ? () => { setActionError(null); setPendingCancel(b); } : undefined}
                   />
-                ))}
+                  );
+                })}
               </ul>
             )}
             <p className="flex gap-1.5 text-[11.5px] leading-[17px] text-liff-sub">
               <Icon name="message-circle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 {anySelfChange
-                  ? 'キャンセルの期限を過ぎた予約の変更は、トークでご連絡ください。'
+                  ? '期限を過ぎた予約の変更は、トークでご連絡ください。'
                   : '予定の変更・キャンセルは、お店に LINE でご連絡ください。'}
               </span>
             </p>
@@ -271,22 +292,42 @@ export default function BookingHistory() {
       )}
       <ConfirmDialog
         open={pendingCancel !== null}
+        surface={paidCancel ? 'sheet' : 'dialog'}
         title={
-          pendingCancel
-            ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)} の${pendingCancel.menu_name}をキャンセルしますか`
-            : ''
+          paidCancel
+            ? 'この予約をキャンセルしますか？'
+            : pendingCancel
+              ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)} の${pendingCancel.menu_name}をキャンセルしますか`
+              : ''
         }
-        description="キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。"
+        description={paidCancel && pendingCancel
+          ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)}・${pendingCancel.menu_name}・${pendingCancel.staff_name}`
+          : 'キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。'}
         error={actionError ?? undefined}
         confirmLabel="キャンセルする"
         cancelLabel="閉じる"
         destructive
         busy={busy}
+        footer={paidCancel ? (
+          <div className="flex flex-col gap-2.5">
+            <Button variant="danger" disabled={busy} onClick={() => void runCancel()}>キャンセルして返金を受ける</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => setPendingCancel(null)}>やめる</Button>
+          </div>
+        ) : undefined}
         onCancel={() => {
           if (!busy) setPendingCancel(null);
         }}
         onConfirm={() => void runCancel()}
-      />
+      >
+        {/* 払い済みの予約のキャンセル（hOILq・B-338）：期限内は全額返金を先に知らせる。 */}
+        {paidCancel ? (
+          <div className="flex flex-col gap-1 rounded-(--liff-radius) bg-liff-ok-bg px-3.5 py-3" data-refund-note>
+            <p className="text-[14px] leading-[20px] font-bold text-liff-ok-ink">{`お支払い済みの ¥${Math.round(paidCancel.amount ?? 0).toLocaleString('ja-JP')} は全額返金します`}</p>
+            <p className="text-[12px] leading-[18px] text-ink">カードへの反映まで 5〜10 日かかることがあります。</p>
+          </div>
+        ) : null}
+        {paidCancel ? <p className="text-[12px] leading-[18px] text-liff-sub">{pendingCancel?.cancel_deadline_at ? `キャンセルの期限：${utcToJstMd(pendingCancel.cancel_deadline_at)} ${utcToJstHm(pendingCancel.cancel_deadline_at)} まで。過ぎると返金はありません。` : 'キャンセルの期限を過ぎると返金はありません。'}</p> : null}
+      </ConfirmDialog>
       <ConfirmDialog
         open={pendingChange !== null}
         title={pendingChange ? `「${pendingChange.booking.menu_name}」の日時を変えますか` : ''}

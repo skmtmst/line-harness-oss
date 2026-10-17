@@ -175,13 +175,13 @@ describe('アカウント切替でも今のアカウントの集計を保つ（R
     mocks.accountId = 'acc-2'
     view.rerender(<EcIdentityCandidatesPage />)
     expect(await screen.findByText('Current B candidate')).toBeTruthy()
-    expect(await screen.findByText('人が決める（つき合わせ 222 のうち）')).toBeTruthy()
+    expect(await screen.findByText('人が決める（222 件のうち）')).toBeTruthy()
 
     await act(async () => { finishPageA(opsWithUnmatched(111)); await pendingPageA })
 
     expect(screen.queryByText('Current A candidate')).toBeNull()
-    expect(screen.queryByText('人が決める（つき合わせ 111 のうち）')).toBeNull()
-    expect(screen.getByText('人が決める（つき合わせ 222 のうち）')).toBeTruthy()
+    expect(screen.queryByText('人が決める（111 件のうち）')).toBeNull()
+    expect(screen.getByText('人が決める（222 件のうち）')).toBeTruthy()
   })
 
   test('A→B→Aと戻っても最初のAの遅延成功が今のAを上書きしない', async () => {
@@ -208,18 +208,18 @@ describe('アカウント切替でも今のアカウントの集計を保つ（R
     mocks.accountId = 'acc-2'
     view.rerender(<EcIdentityCandidatesPage />)
     expect(await screen.findByText('Current B candidate')).toBeTruthy()
-    expect(await screen.findByText('人が決める（つき合わせ 222 のうち）')).toBeTruthy()
+    expect(await screen.findByText('人が決める（222 件のうち）')).toBeTruthy()
 
     mocks.accountId = 'acc-1'
     view.rerender(<EcIdentityCandidatesPage />)
     expect(await screen.findByText('Current A candidate')).toBeTruthy()
-    expect(await screen.findByText('人が決める（つき合わせ 333 のうち）')).toBeTruthy()
+    expect(await screen.findByText('人が決める（333 件のうち）')).toBeTruthy()
 
     await act(async () => { finishFirstPageA(opsWithUnmatched(111)); await pendingFirstPageA })
 
     expect(screen.getByText('Current A candidate')).toBeTruthy()
-    expect(screen.queryByText('人が決める（つき合わせ 111 のうち）')).toBeNull()
-    expect(screen.getByText('人が決める（つき合わせ 333 のうち）')).toBeTruthy()
+    expect(screen.queryByText('人が決める（111 件のうち）')).toBeNull()
+    expect(screen.getByText('人が決める（333 件のうち）')).toBeTruthy()
   })
 
   test('遅れて届いたAの失敗がBの確定集計を壊さない', async () => {
@@ -245,7 +245,7 @@ describe('アカウント切替でも今のアカウントの集計を保つ（R
     mocks.accountId = 'acc-2'
     view.rerender(<EcIdentityCandidatesPage />)
     expect(await screen.findByText('Current B candidate')).toBeTruthy()
-    expect(await screen.findByText('人が決める（つき合わせ 222 のうち）')).toBeTruthy()
+    expect(await screen.findByText('人が決める（222 件のうち）')).toBeTruthy()
 
     await act(async () => {
       failPageA(new ApiError(503))
@@ -253,7 +253,7 @@ describe('アカウント切替でも今のアカウントの集計を保つ（R
     })
 
     expect(screen.getByText('Current B candidate')).toBeTruthy()
-    expect(screen.getByText('人が決める（つき合わせ 222 のうち）')).toBeTruthy()
+    expect(screen.getByText('人が決める（222 件のうち）')).toBeTruthy()
     expect(screen.queryByText('読み込めませんでした')).toBeNull()
   })
 })

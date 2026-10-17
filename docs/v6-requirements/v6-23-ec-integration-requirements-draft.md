@@ -83,6 +83,8 @@ V6が上回る条件:
 
 Shopify・EC-CUBEはprovider adapterにする。platform固有API、scope、webhook topic、検証方法を共通画面から隠しすぎず、接続詳細で表示する。
 
+- **決定 B-337（Q-58）**：鍵の差し替えでは、古い鍵・合言葉を 24 時間受け付ける（今のまま）。
+
 ## 5. event受信・正規化
 
 状態:
@@ -152,6 +154,9 @@ received → verified → normalized → identity_pending/ready
 
 名前だけ、名前＋曖昧住所、AI類似度だけの自動連結は禁止する。
 
+- **決定 B-337（Q-13）**：「会員の確認待ち」を後で結んだとき、成果・マイル・タグは遡って付け、お客さまへの LINE は今から送らない。
+- **決定 B-337（Q-12）**：停止中にたまった出来事は一気に送らない。予定から 3 時間以上遅れたお知らせは「遅れたので送らなかった」で閉じ、一覧から人が送れる。
+
 ## 8. member・注文・定期便モデル
 
 現行`nen_ec_member_snapshots`はorders/subscriptionをJSONで最大50/20件へ上書きする。表示cacheとしては使えるが、監査・集計の正本にはしない。
@@ -171,7 +176,7 @@ received → verified → normalized → identity_pending/ready
 V6の「止めそう」は予測であり、事実ではない。
 
 - 初期はrule-based riskに限定
-- 根拠例: payment failed、pause履歴、次回変更期限、問い合わせtag、tracked link反応低下、配送間隔異常
+- 根拠例: payment failed、pause履歴、次回変更期限、問い合わせtag、tracked link反応低下、配送間隔異常 → 決定 B-337 Q-72 で「最初の版は支払いの失敗だけ（今のまま）」に変更。
 - LINE個人開封は使わない。V6の「3回開いていません」は取得できるtracked link/記事反応へ変更
 - score、根拠、計算時刻、rule versionを表示
 - 正解label（継続/停止）を蓄積し、precision/recallと期間を管理
@@ -180,6 +185,8 @@ V6の「止めそう」は予測であり、事実ではない。
 - 健康・相談内容を使う場合は目的同意と機微情報権限を要求
 
 「止めた理由」はEC解約アンケート等の明示eventだけ。受信箱本文から勝手に確定しない。
+
+- **決定 B-337（Q-72）**：「止めそう」の規則は、最初の版は支払いの失敗だけ（今のまま）。
 
 ## 10. actionと分散整合
 
@@ -232,6 +239,8 @@ event処理済みとLINE送信成功を同じstatusにしない。V6一覧の「
 - empty/loading/error/permission/feature off
 
 V6の「ふつうは1分以内」はSLOとして定義し、例: 95%を5分以内など実測で表示する。最後に届いた時刻と最後に正常処理した時刻を分ける。
+
+- **決定 B-337（Q-35）**：「最後に届いた日時」が 6 時間止まったら異常として知らせる。
 
 ## 14. 既存移行
 
@@ -297,3 +306,7 @@ V6の「ふつうは1分以内」はSLOとして定義し、例: 95%を5分以�
 - V6で「会員の確認待ち」を0件と混同せず表示する
 
 まだ完了ではない。connector別secret、Queueとaction ledger、email/電話候補、注文・定期便の正規化、V6 4画面、画像比較は後続実装とする。本変更では本番DB更新・配備を行わない。
+
+## 操作と挙動（受け入れ）
+
+操作したらどう動くか・連携とエラー・日々の手順・今の作りとの食い違いは [23 操作と挙動](../v8-requirements/behavior/23-ec-integration.md) にまとめた（2026-10-16 B-333）。

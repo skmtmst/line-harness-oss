@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname,join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe,expect,it } from 'vitest';
 
 /**
  * P（回答フォームの公開前の試し・LIFF）。
@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
  */
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FORM = readFileSync(join(HERE, 'Form.tsx'), 'utf8');
-const API = readFileSync(join(HERE, '..', 'lib', 'api.ts'), 'utf8');
+const API = readFileSync(join(HERE, '..', 'lib', 'api.ts'), 'utf8') + readFileSync(new URL('../lib/api-types.ts', import.meta.url), 'utf8');
 
 describe('試し合言葉の動線', () => {
   it('取得・送信・添付に合言葉を添えられる', () => {

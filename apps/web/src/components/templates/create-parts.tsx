@@ -8,7 +8,8 @@ import styles from './create-parts.module.css'
  * 寸法は globals.css の --tpl-side-* / --tpl-text-sm-lh だけを読む（画面の CSS に数字を書かない）。
  */
 
-export type SummaryRow = { label: ReactNode; value: ReactNode; key?: string }
+/** wrap：値が長いとき語の切れ目（空白）で折り返す。既定は1行＋省略＋title。 */
+export type SummaryRow = { label: ReactNode; value: ReactNode; key?: string; wrap?: boolean }
 
 /** 完了の印と題は中央、結果の説明は段落として読む。 */
 export function CreateCompletionHeading({ icon, title, children }: { icon: ReactNode; title: ReactNode; children: ReactNode }) {
@@ -41,7 +42,7 @@ export function CreateSummaryCard({ title = '設定内容', rows, children, lead
         {rows.map((row, i) => (
           <div key={row.key ?? i} className={styles.row}>
             <dt className={styles.rowLabel}>{row.label}</dt>
-            <dd className={styles.rowValue}>{row.value}</dd>
+            <dd className={styles.rowValue} data-wrap={row.wrap ? '' : undefined} title={typeof row.value === 'string' ? row.value : undefined}>{row.value}</dd>
           </div>
         ))}
       </dl> : null}

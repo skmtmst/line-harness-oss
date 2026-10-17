@@ -1,0 +1,28 @@
+/* メニュー管理 › コースの編集（★V8 修正案 f4bLF の mauOC）。値は変数だけ。 */
+
+.title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--tpl-bm-8);
+  min-width: 0;
+}
+
+.titleParent {
+  flex: none;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-13);
+  font-weight: 400;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-16);
+}
+
+.note {
+  margin: var(--polish-space-none);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}

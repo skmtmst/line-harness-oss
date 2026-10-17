@@ -23,6 +23,7 @@ const fixture = vi.hoisted(() => ({
   availabilityBatch: vi.fn(),
   availability: vi.fn(),
   getBooking: vi.fn(),
+  getBreaks: vi.fn(),
   decideRequest: vi.fn(),
   downloadLedgerCsv: vi.fn(),
 }))
@@ -60,6 +61,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       getAvailabilityBatch: fixture.availabilityBatch,
       getAvailability: fixture.availability,
       getBooking: fixture.getBooking,
+      getBreaks: fixture.getBreaks,
       decideRequest: fixture.decideRequest,
       downloadLedgerCsv: fixture.downloadLedgerCsv,
     },
@@ -89,6 +91,7 @@ beforeEach(() => {
   fixture.listStaff.mockResolvedValue({ staff: [staff] })
   fixture.availabilityBatch.mockResolvedValue({ by_menu: [] })
   fixture.getToday.mockResolvedValue({ bookings: [] })
+  fixture.getBreaks.mockResolvedValue({ breaks: [] })
 })
 
 afterEach(cleanup)

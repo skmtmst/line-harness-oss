@@ -227,9 +227,10 @@
 .sideNote {
   margin: 0;
   color: var(--color-ink-secondary);
-  font-size: var(--tpl-tg2-safety-body-size);
+  font-size: var(--polish-text-support);
   line-height: var(--tpl-cn-main-lh);
   word-break: normal;
+  text-wrap: pretty;
 }
 
 .sideLink {

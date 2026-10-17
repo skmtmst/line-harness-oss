@@ -12,8 +12,10 @@ vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 import Tables from '@/v8/restaurant/tables/tables'
 import Menu from '@/v8/restaurant/menu/menu'
 import Organization from '@/v8/restaurant/organization/organization'
-function RestaurantScreen({ view }: { view: string }) { return view === 'tables' ? <Tables/> : view === 'menu' ? <Menu/> : <Organization/> }
-vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+import MenuEdit from '@/v8/restaurant/menu/edit'
+function RestaurantScreen({ view }: { view: string }) { return view === 'tables' ? <Tables/> : view === 'menu' ? <Menu/> : view === 'menu-edit' ? <MenuEdit/> : <Organization/> }
+const nav = vi.hoisted(() => ({ params: new URLSearchParams('id=menu-1') }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => nav.params }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/lib/staff-role', () => ({useStaffRole: () => 'owner',canManageRole: () => true}))
 vi.mock('@/lib/api-reservation-board', () => ({reservationBoardApi:{floors:async () => ({success:true,data:[]})}}))
@@ -55,14 +57,13 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
   })
 
   it('メニューを編集し、保管の確認を経て変更APIへ渡す', async () => {
-    render(<RestaurantScreen view="menu" />)
-    await screen.findByText('メニュー一覧')
-    fireEvent.click(screen.getByRole('button',{name:'メニュー「ランチ」の操作'}))
-    fireEvent.click(screen.getByRole('menuitem',{name:'変更'}))
-    fireEvent.change(screen.getByDisplayValue('ランチ'), { target: { value: '夜コース' } })
+    const edit = render(<RestaurantScreen view="menu-edit" />)
+    fireEvent.change(await screen.findByDisplayValue('ランチ'), { target: { value: '夜コース' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', expect.objectContaining({ name: '夜コース' })))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    edit.unmount()
+    render(<RestaurantScreen view="menu" />)
+    await screen.findByText('メニュー一覧')
     fireEvent.click(screen.getByRole('button',{name:'メニュー「ランチ」の操作'}))
     fireEvent.click(screen.getByRole('menuitem',{name:'停止'}))
     fireEvent.click(screen.getByRole('button', { name: '停止する' }))
@@ -88,10 +89,8 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
 
   it('昼・夜の両方を提供する既存メニューは、編集しても両方を残す', async () => {
     fixture.snapshot.mockResolvedValue({ data: { ...data, menuItems: [{ ...data.menuItems[0], service_periods_json: '["lunch","dinner"]' }] } })
-    render(<RestaurantScreen view="menu" />)
-    await screen.findByText('メニュー一覧')
-    fireEvent.click(screen.getByRole('button',{name:'メニュー「ランチ」の操作'}))
-    fireEvent.click(screen.getByRole('menuitem',{name:'変更'}))
+    render(<RestaurantScreen view="menu-edit" />)
+    await screen.findByDisplayValue('ランチ')
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', expect.objectContaining({ servicePeriods: ['lunch', 'dinner'] })))
   })

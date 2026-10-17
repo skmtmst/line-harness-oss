@@ -21,7 +21,7 @@ export default function Button({
   ref,
   ...rest
 }: {
-  variant?: 'counter' | 'compact-secondary' | 'stamp-primary' | 'stamp-choice' | 'stamp-reward' | 'inline-action' | 'inline-danger' | 'notify-text' | 'restaurant-select' | 'restaurant-date' | 'restaurant-primary' | 'restaurant-control' | 'restaurant-time' | 'choice' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'night-cta' | 'night-text' | 'sound' | 'send' | 'slot-row' | 'reward-row' | 'overlay-bell' | 'segment' | 'primary' | 'secondary' | 'danger' | 'text' | 'icon' | 'arrow' | 'notify' | 'chip' | 'tab' | 'option' | 'optionRow' | 'day' | 'time' | 'calendarDay' | 'overlay' | 'nightAction' | 'nightText' | 'nightSound' | 'nightSend';
+  variant?: 'counter' | 'compact-secondary' | 'stamp-primary' | 'stamp-choice' | 'stamp-reward' | 'inline-action' | 'inline-danger' | 'notify-text' | 'restaurant-select' | 'restaurant-date' | 'restaurant-primary' | 'restaurant-control' | 'restaurant-time' | 'choice' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'night-cta' | 'night-text' | 'sound' | 'send' | 'slot-row' | 'reward-row' | 'overlay-bell' | 'segment' | 'primary' | 'secondary' | 'danger' | 'text' | 'icon' | 'arrow' | 'notify' | 'chip' | 'tab' | 'option' | 'optionRow' | 'day' | 'time' | 'calendarDay' | 'overlay' | 'nightAction' | 'nightText' | 'nightSound' | 'nightSend' | 'switch' | 'menuRow' | 'link';
   selected?: boolean;
   unavailable?: boolean;
   waitlisted?: boolean;
@@ -76,10 +76,16 @@ export default function Button({
     nightAction: `${action} min-h-12 bg-night-cta text-[15px] text-white`,
     nightText: 'liff-hit inline-flex items-center text-xs text-night-mine',
     nightSound: 'liff-hit pointer-events-auto inline-flex items-center gap-1 rounded-full bg-night-panel px-2.5 py-1 text-xs font-semibold text-white',
+    /** 入り／切り（role="switch" と aria-checked を呼び側で付ける）。つまみは Button が描く。 */
+    switch: `liff-hit relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 ${selected ? 'bg-liff-primary' : 'bg-liff-idle'}`,
+    /** カードの中の 1 行（印・名前・数・＞）。マイページの一覧。 */
+    menuRow: 'liff-hit flex min-h-[46px] w-full items-center gap-3 px-3.5 text-left text-sm text-ink disabled:opacity-100',
+    /** 文中のリンク（領収書を見る など）。ボタンの形にしない。 */
+    link: 'liff-hit inline-flex min-h-5 items-center gap-1 text-[13px] font-bold whitespace-nowrap text-info-link',
     nightSend: 'liff-hit flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-liff-primary text-white',
   };
   const skin = tone === 'nightAction' ? `${styles.skin} ${styles.nightAction}` : styles.skin;
-  const content = tone === 'nightSend' && typeof children === 'string' ? <><Icon name="send" className="h-[18px] w-[18px]" /><span className="sr-only">{children}</span></> : children;
+  const content = tone === 'switch' ? <><span aria-hidden="true" className={`block h-4 w-4 rounded-full bg-canvas shadow transition-transform ${selected ? 'translate-x-4' : 'translate-x-0'}`} />{children}</> : tone === 'nightSend' && typeof children === 'string' ? <><Icon name="send" className="h-[18px] w-[18px]" /><span className="sr-only">{children}</span></> : children;
   if (href !== undefined) {
     return <a href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} className={`${base} ${tones[tone]} ${skin} ${className}`} style={rest.style}>{content}</a>;
   }

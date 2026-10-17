@@ -11,7 +11,7 @@ import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
 import LoadingView from '../components/LoadingView.js';
 import LoadErrorView from '../components/LoadErrorView.js';
-import StatusView from '../components/ui/StatusView.js';
+import PreparingView from '../components/PreparingView.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
 import Badge from '../components/ui/Badge.js';
@@ -188,11 +188,11 @@ export default function VisitStamps() {
 
   if (state === 'loading') return <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas"><LiffHeader title="来店スタンプ" /><LoadingView /></LiffLookScope>;
   if (state === 'error') return <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas"><LiffHeader title="来店スタンプ" /><LoadErrorView note="スタンプはなくなっていません。" onRetry={() => void load()} /></LiffLookScope>;
+  /* B-313 追記：お店がまだカード（決まり）を入れていないときは、リッチメニューから押されても準備中の画面（K9HMJp）。 */
   if (state === 'empty' || !entry || !info) {
     return (
       <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas">
-        <LiffHeader title="来店スタンプ" />
-        <StatusView icon="gift" title="スタンプカードはまだありません" body="お店がカードを始めると、ここにたまったスタンプが出ます。" />
+        <PreparingView title="来店スタンプ" feature="来店スタンプ" />
       </LiffLookScope>
     );
   }

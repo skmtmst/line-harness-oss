@@ -12,10 +12,9 @@ import Select from '@/components/shared/select'
 import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
-import StatusBadge from '@/components/shared/status-badge'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import CheckCard from '@/components/shared/check-card'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { MenuPaymentFields, useMenuPayment } from '../booking-payments/menu-payment'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -442,7 +441,9 @@ export default function MenuFormV8() {
     askQuestion, intakeQuestion, autoTagId,
     [...assigned].sort().join(','), resourceSignature(resourceIds, resourceQuantities), noAssign,
   ])
-  const dirty = baselineRef.current !== '' && baselineRef.current !== currentSignature ||
+  /* お支払い（いつもの方法／このメニューだけ変える）。メニューを保存したあとに口へ書く。 */
+  const payment = useMenuPayment('booking', selectedAccountId, editTarget?.id ?? null)
+  const dirty = payment.dirty || baselineRef.current !== '' && baselineRef.current !== currentSignature ||
     (baselineRef.current === '' && Boolean(
       name || effectiveCategory || description || durationMinutes !== '60' ||
       bufferAfterMinutes !== '0' || basePrice || concurrentCapacity !== '1' ||
@@ -790,6 +791,12 @@ export default function MenuFormV8() {
       if (failedStaff.length > 0 || resourcesPending) {
         setCreatedMenuNeedingFollowUp({ menuId, remainingStaffIds: failedStaff, resourcesPending })
         throw new Error('メニューは保存されましたが、一部の担当・設備を保存できませんでした。もう一度押すと残りだけをやり直します。')
+      }
+      try {
+        await payment.save(menuId)
+      } catch (paymentFailure) {
+        saveErrors.capture(paymentFailure)
+        throw new Error('メニューは保存されましたが、お支払いの方法を保存できませんでした。もう一度押してください。')
       }
       setCreatedMenuNeedingFollowUp(null)
       notifySaved(editTarget ? 'メニューを保存しました' : publish ? 'メニューを公開しました' : '下書きを保存しました')
@@ -1264,15 +1271,9 @@ export default function MenuFormV8() {
               {resourceMessage && <p role="status" className="text-ink-secondary text-sm">{resourceMessage}</p>}
             </Card>
 
-            {/* 絵 v5L19Z・QqER7：題の横に「準備中」、説明、3つの選ぶ箱（お店で払うだけ選べる）。 */}
-            <CardHeader size="stacked" title={<span className={styles.titleWithMark}>お支払い<StatusBadge tone="warning" size="compact">未接続</StatusBadge></span>} meta={<span id="menu-payment-note">決済サービスをつなぐと選べるようになります。いまは「お店で払う」だけです。</span>} />
-            <RadioCardGroup legend="お支払い方法" aria-describedby="menu-payment-note" className={styles.paymentChoices}>
-              {PAYMENT_CHOICES.map((choice) => (
-                <RadioCard key={choice.value} variant="form" name="menu-payment" value={choice.value} title={choice.label}
-                  checked={choice.value === 'store'} disabled={choice.value !== 'store'}
-                  onChange={() => {}} />
-              ))}
-            </RadioCardGroup>
+            {/* 絵 QqER7・mauOC：いつもの方法を使う／このメニューだけ変える（B-305）。決済をつないでいない店は 1 行の案内。 */}
+            <CardHeader size="stacked" title="お支払い" />
+            <MenuPaymentFields state={payment} name="menu" price={basePrice.trim() === '' ? null : Number(basePrice) || 0} readOnly={Boolean(editTarget && !canEdit)} />
           </Card>
 
           {saveError && (
@@ -1301,12 +1302,6 @@ export default function MenuFormV8() {
   )
 }
 
-/** お支払いの選び方。決済サービスをつなぐまでは「お店で払う」だけ。 */
-const PAYMENT_CHOICES = [
-  { value: 'store', label: 'お店で払う' },
-  { value: 'online', label: 'オンラインで先払い' },
-  { value: 'either', label: 'どちらでも' },
-] as const
 
 function bookingErrorText(error: unknown, action: '読み込み' | '保存'): string {
   if (error instanceof ApiError) {
