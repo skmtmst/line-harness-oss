@@ -52,10 +52,10 @@ Workerの設定参照とR2の参照権限が必要。権限不足ならオーナ
 - 試験用の旗：本番のTEST/MOCK/DEMO/SANDBOX/BYPASSを検出。
 - CORS：本番はadmin/api.musubo.jp、検証はstg-admin/stg-apiと検証Pagesの明示したホストだけ。
 - R2：r2.devと独自ドメインの両方で非公開。IMAGESだけでなく全バインド先を確認。
-- 必須secret：API_KEY、LINE_CREDENTIAL_ENCRYPTION_KEY、TURNSTILE_SECRET_KEY、GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY。値は取得しない。TOTPの鍵の必須化は保留B-351/7に従い追加しない（平文で置いた場合の検出はする）。
+- 必須secret：API_KEY、LINE_CREDENTIAL_ENCRYPTION_KEY、TURNSTILE_SECRET_KEY、GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY。名前と型だけを判定に使い、値は出力・保存しない。TOTPの鍵の必須化は保留B-351/7に従い追加しない（平文で置いた場合の検出はする）。
 - 候補の設定と配備済みの設定を両方確認。不安全な配備先の修復が必要なら、オーナーが承認した修復の後に再実行。
 
-CloudflareのAPI仕様：[R2の公開ドメイン](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/domains/)。
+CloudflareのAPI仕様は、[Workerと版の設定](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/script_and_version_settings/methods/get/)、[R2のr2.dev公開設定](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/domains/subresources/managed/methods/list/)、[R2の独自ドメイン](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/domains/subresources/custom/methods/list/)で照合した。
 手元では実際の検証用設定と架空のAPI応答で合格を確認する。配備先の照会には専用の読み取り権限が必要。
 本番設定に残るRESTAURANT_TEST_ENABLED=trueとAdminビルドの同等の旗は点検で停止する。
 この作業で本番設定を変更せず、オーナーが止める手順を決める。実際の検証環境での合格は未確認。
@@ -79,6 +79,7 @@ GETはaccountId、PUTはaccountId/expectedVersion/policyと `privacy.retention` 
 | 本人確認書類 | 店設定、既定90日 | 既存の期限と削除処理を維持。短い専用期限を一般期限で延ばさない |
 | 退会した統括の顧客情報 | 既存の退会後90日 | 既存の子から順の削除を維持 |
 | Googleの受信コピー | 既存28日 | 既存の専用処理を維持 |
+| スタッフの端末ハッシュ履歴 | 最後の利用から365日を案とする | スタッフ削除時は一緒に消す。日数による自動削除は未実装。新端末を見分ける比較元でもあるため、保持期間と消し方はオーナーの決定が残る |
 | 会計・監査・審査等の保護対象 | 保管目的ごとに別途決定 | 履歴は勝手に物理削除しない。個人情報の残存範囲は個別確認が残る |
 
 1回の削除候補は全店合計20件。成功・失敗の件数だけを記録。失敗は次回へ残し、削除処理の保護を迂回しない。
@@ -118,7 +119,11 @@ Cloudflareへの通信だけを架空の応答へ置き換える。期待する�
 | scripts全試験・型 | 1,086件成功・既存の1件skip、型検査成功。対象からの追加除外なし |
 | 共通型・LIFF | 共通型385件、LIFF501件と型検査が成功 |
 | Web全試験・型・Webhook画面 | 2,277ファイル・13,528件成功、既存skip 1件・todo 1件。型・lint・実ブラウザのWebhook契約も成功 |
+| SDK・MCP・文書 | SDK53件、MCP68件、文書6件成功。MCPの型・ビルドも成功 |
 | Workerビルド・配信LIFFの実ブラウザ | 通し実行で成功。入口・テーマ・CSP・SDK互換性を確認 |
+| 最終Workerビルド | 分類の分離後の `07b9828e9e` でも成功。`20261017-131137-07b9828e9e-56687` |
+| 管理画面ビルド・実ブラウザ | ビルド・設計検査・MFA入力・CSP/認証・通知・権限・ECの店切替・タグ操作が成功 |
+| V8のCI見張り | 1152/1440/1920の崩れ0、詳細な画面巡回・一覧の行・見出し・入力保持・操作・速度・仮想表・文字サイズと故障対照が成功 |
 | 全パッケージの型・追加のビルド | 型検査成功。LIFF・文書サイト・セットアップCLI・プラグインのビルド成功 |
 | ソース契約・コード量 | 修正後の `3149f517cb` で工程6成功。`20261017-122953-3149f517cb-18800`。最終の `c1ee0a8ca1` 相当の作業ツリーでもAST違反0・コード量違反0（2,922対象・437既存上限） |
 
@@ -126,6 +131,10 @@ Cloudflareへの通信だけを架空の応答へ置き換える。期待する�
 Gitツリーが一致することを確認した。Workerは修正後の全試験を改めて実行した。
 保存期限の分類を専用ファイルへ移した `c1ee0a8ca1` は、全67ジョブの分類と順序が
 `5c205a0c75` と完全に同じであることを照合した。関連12件とWorkerの型も成功。
-SDK・MCP・文書・管理画面ビルド・V8等の残る工程は終了後に結果を追記する。
+通し実行は旧スナップショットの2工程の失敗を含むため、集約の`required-pr-gate`も失敗し、終了1だった。
+上の修正後の再検査は成功しているが、単一の通し実行がすべて成功した記録には読み替えない。
 新しいPRの番号・タイトルがないため、PR情報を使う反映履歴の判定は手元では実行できない。
 履歴の `#PR番号` は司令塔が実際の採番後に埋める。過去の `#1760` は消さない。
+
+検査中に本線へ #1761（`05b243b13d`）の登録画面の更新が入った。
+API・DB・共通型・scriptsの変更はない。取り込み後にWeb・V8とソース検査を改めて確認し、結果を記録する。
