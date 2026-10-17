@@ -67,4 +67,3 @@ export function styleSetupWrite(method, pathname) {
   if (method === 'PUT' && /^\/api\/hq\/style-starter-sets\/[^/]+$/.test(pathname)) return { id: 'starter-set-restaurant', version: 3, autoInsert: true }
   return null
 }
-
