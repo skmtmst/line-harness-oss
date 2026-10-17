@@ -114,4 +114,3 @@ export function isTenantSuspensionExemptPath(method: string, path: string): bool
     // 各 route の requirePlatformAdmin が引き続き担う。
     || path.startsWith('/api/ops/');
 }
-

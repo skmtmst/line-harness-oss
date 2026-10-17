@@ -19,4 +19,3 @@ export function dangerousOperationPurpose(method: string, path: string, format?:
   if (method === 'GET' && /\/(credentials|secret|api-token|tokens)(?:\/[^/]+)?$/.test(path)) return 'secrets.reveal';
   return null;
 }
-

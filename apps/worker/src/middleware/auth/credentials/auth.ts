@@ -81,4 +81,3 @@ export async function sha256Hex(value: string): Promise<string> {
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 }
-

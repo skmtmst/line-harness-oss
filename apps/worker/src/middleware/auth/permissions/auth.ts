@@ -343,4 +343,3 @@ export function isStaffExplicitAllow(method: string, path: string): boolean {
   if (STAFF_EXPLICIT_ALLOW.some(([m, p]) => m === normalizedMethod && p === path)) return true;
   return STAFF_EXPLICIT_ALLOW_PATTERNS.some(([m, pattern]) => m === normalizedMethod && pattern.test(path));
 }
-
