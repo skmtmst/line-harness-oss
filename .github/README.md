@@ -13,7 +13,7 @@ YAML・シェル構文の工程では、直接書いたスクリプトの接続�
 手元では、PyYAMLのあるPythonで次をリポジトリ直下から実行できます。
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/security -p 'test_workflow_commands.py'
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_workflow_commands.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/check_workflow_commands.py
 ```
 

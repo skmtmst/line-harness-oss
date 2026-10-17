@@ -25,6 +25,11 @@ class WorkflowCommandsTest(unittest.TestCase):
             with self.subTest(prefix=prefix):
                 self.assertEqual(missing_scripts(f'{prefix} scripts/deleted.mjs', self.root), ['scripts/deleted.mjs'])
 
+    def test_environment_assignment_does_not_hide_deleted_python_entry(self):
+        self.assertEqual(missing_scripts(
+            'PYTHONDONTWRITEBYTECODE=1 python3 scripts/deleted.py', self.root,
+        ), ['scripts/deleted.py'])
+
     def test_deleted_file_after_browser_host_fails(self):
         self.assertEqual(missing_scripts(
             'node scripts/kept.mjs --test --test-concurrency=1 scripts/kept.mjs scripts/deleted.mjs',

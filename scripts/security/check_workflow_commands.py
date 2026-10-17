@@ -15,7 +15,8 @@ import yaml
 
 
 COMMAND = re.compile(
-    r"^\s*(?:(?:pnpm|npx)\s+(?:--silent\s+)?(?:exec\s+)?)?"
+    r"^\s*(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)*"
+    r"(?:(?:pnpm|npx)\s+(?:--silent\s+)?(?:exec\s+)?)?"
     r"(?:node|tsx|bash|sh|python3)\s+"
 )
 SOURCE_SCRIPT = re.compile(
