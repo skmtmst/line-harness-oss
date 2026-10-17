@@ -290,6 +290,26 @@
     "reason": "表・一覧の行。外側のカードと影を重ねない。"
   },
   {
+    "file": "v8/account-new/register.module.css",
+    "selector": ".subBadge",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/account-new/register.module.css",
+    "selector": ".qrFrame",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/account-new/register.module.css",
+    "selector": ".errorBox",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
+    "file": "v8/account-new/register.module.css",
+    "selector": ".errorBoxInfo",
+    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
+  },
+  {
     "file": "v8/inflow-links/qr-dialog.module.css",
     "selector": ".qr",
     "reason": "札・印・画像・端末の見本。カードの影を付けない。"
