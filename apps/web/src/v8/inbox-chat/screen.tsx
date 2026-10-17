@@ -47,6 +47,7 @@ import { useAccount } from '@/contexts/account-context'
 import TemplatePicker from '@/components/chats/template-picker'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
+import FriendInfoSidebarBoundary from '@/components/chats/friend-info-sidebar-boundary'
 import ChatThreadWindow from '@/components/chats/chat-thread-window'
 import ChatSearchBar from '@/v8/inbox-search/chat-search-bar'
 import { useChatSearch } from '@/v8/inbox-search/use-chat-search'
@@ -4062,6 +4063,8 @@ tabIndex={-1}>
                 )
               })()
             ) : (
+            // 右の列が落ちても、会話と一覧は使えるままにする。
+            <FriendInfoSidebarBoundary resetKey={activeFriendId}>
             <FriendInfoSidebar
               lastContactAt={chatDetail && chatDetail.id === selectedChatId ? chatDetail.lastMessageAt : null}
               friendId={activeFriendId}
@@ -4085,6 +4088,7 @@ tabIndex={-1}>
                   : undefined
               }
             />
+            </FriendInfoSidebarBoundary>
             )}
             </InboxSummaryPane>
           </>
