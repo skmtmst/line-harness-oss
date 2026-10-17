@@ -37,7 +37,7 @@ export async function inspectDeployment(configPath:string, environment:'producti
   const config=unstable_readConfig({config:configPath});
   const get=async(path:string):Promise<any>=>{
     const res=await fetchImpl(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/${path}`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(15000)});
-    if(!res.ok) throw new Error('deployment_safety_metadata_unavailable');
+    if(!res.ok) throw new Error(`deployment_safety_metadata_unavailable:${res.status}:${path.split('/')[0].replace(/[^a-z0-9_-]/gi,'')}`);
     const body=await res.json() as {success:boolean;result:unknown};
     if(body.success!==true || !body.result) throw new Error('deployment_safety_metadata_invalid');
     return body.result;
