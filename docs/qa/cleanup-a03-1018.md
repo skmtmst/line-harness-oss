@@ -1,5 +1,7 @@
 # A03：通知の署名確認と本文上限の共通化
 
+> 検査した製品SHA：`4ba17e925ce6c35b7c9f01bd9e15d062146ac89b`。Worker全12,974件・管理画面13,684件・両方の型/ビルド・実ブラウザが成功。ci-localの製品失敗0、正式PR番号による反映履歴照合だけ採番待ち。
+
 ## 範囲と開始版
 
 - 作業場所 `~/lh-work/lh-cl-a03`、枝 `codex/kenta-train-cleanup-a03-1018`。
@@ -50,4 +52,26 @@ ECはヘッダー有りでconnector鍵→全体鍵、無しで全体鍵→既存
 
 最初の受信試験の構文誤りは修正し、失敗ログ `/tmp/a03-new-targeted.log` も保持。初回の比較コピーはDB bootstrapの参照位置を再現できず失敗し、配置を直して再実行した（`/tmp/a03-mutations.log`）。この環境準備失敗を製品失敗や故障の検出に数えない。
 
-重い関連検査の待機は未開始のまま終了し、コミット済みの同じ版でci-localへ進む。最終の型・build・全体検査の結果とSHAは後続の記録に追記する。
+重い関連検査の待機は未開始のまま終了し、コミット済みの同じ版でci-localの全工程を実行した。初期の待機を検査成功へ数えていない。
+
+## 最終の確認
+
+| 検査 | 結果 |
+|---|---|
+| 最終のWorker型 | 終了0。直接の型検査 `/tmp/a03-type-final.log`、ci-localでも成功 |
+| Worker全試験 | 1,096ファイル・12,974件成功、終了0 |
+| Worker本体build | 成功、後続のLIFF実ブラウザ/安全ヘッダー/公開SDK互換も成功 |
+| 管理画面 | lint・型・全2,308ファイル13,684件・本番build・実ブラウザ成功。既存のskip/todo各1 |
+| その他 | 共有型・共有試験（UTC/Asia Bangkokで各385件）・LIFF型/531件・SDK53件・MCP型/68件/build・文書6件・リポジトリの各検査が成功 |
+| 同じHMACを使う他の受信口 | Meet callback/recovery、Codex/AI内部連携、support-inbox、conversions、webhooksの14ファイル193件成功（`/tmp/a03-all-hmac-callers.log`） |
+| V8の差分判定 | 成功、既存の条件でrun=false。画面/共有型/撮影/lockfileの変更がないため後続は省略。検査の許可/上限/条件の変更なし |
+
+ci-localは `~/lh-work/tools/hq/ci-local/run.sh <作業場所>` の全工程を実行。最終114工程は **成功59 / 省略54 / 集計失敗1**。省略54の内訳は通常の条件/actionの53と、正式PR番号不明の反映履歴照合1。**製品検査の失敗は0**。changesのPR番号が未入力のため反映履歴工程は手元では実行不能となり、その未完了を受けてrequired-pr-gateが終了1になった。正式なPRゲート合格とは扱わない。
+
+PRの題名と本文にはA03・司令塔指定の仮番号#0000を明示したが、番号は仮造しない。`[skip release-log]` や許可の追加も使わない。司令塔の採番後、ファイル名/本文の#0000を実番号へ置き換え、通常のPR照合を実行する。
+
+実際のリポジトリ変数一覧を読み、VITE_LIFF_ID / VITE_BOT_BASIC_ID / VITE_CALENDAR_CONNECTION_ID / V8_SPEED_ENFORCEMENTが未設定と確認。手元でこの4つの空値を明示した。設定自体の変更やトークン値の取得はしていない。
+
+主ログは `/tmp/a03-ci-local.log`、各工程とmanifest/results/summaryは `~/lh-work/tools/hq/ci-local/logs/20261018-000510-4ba17e925c-5438/`。採番待ちによる元の失敗ログも保持した。故障対照の手順・集計・各ログは永続の `~/lh-work/design/v8/review/CLEANUP-1017/A03-EVIDENCE/` にも保存した。
+
+反映履歴は `docs/release-log/unreleased/0000-kenta-cleanup-a03.md`（##変更、@kenta、#0000、日本時間）。製品入力は上記SHAで固定し、最後の追記はこの検査記録だけ。全製品ファイルのGit差分がないことと作業木の清潔さを確認してコミットまでで引き継ぐ。push/PR/DB更新/配備/実送信/決済なし。
