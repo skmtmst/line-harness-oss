@@ -87,7 +87,7 @@ export class LineClient {
     // already accepted. For a caller retrying the exact same operation this
     // is a successful idempotent outcome, not a delivery failure.
     if (res.status === 409 && new Headers(requestHeaders).get('X-Line-Retry-Key')?.trim()
-      && method === 'POST' && /^\/v2\/bot\/message\/(push|multicast|broadcast|narrowcast)$/.test(path)) {
+      && method.toUpperCase() === 'POST' && /^\/v2\/bot\/message\/(push|multicast|broadcast|narrowcast)$/.test(path)) {
       void res.body?.cancel().catch(() => {});
       return { data: { retryAccepted: true }, headers: res.headers };
     }

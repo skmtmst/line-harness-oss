@@ -29,6 +29,7 @@ test('LINE documented retry endpoints accept 409; arbitrary endpoint / keyless 4
   await expect(client.request('POST', '/v2/bot/richmenu', {}, { 'X-Line-Retry-Key': 'retry-key' })).rejects.toMatchObject({ status: 409 });
   await expect(client.pushMessage('U1', [])).rejects.toMatchObject({ status: 409 });
   expect(await client.request('POST', '/v2/bot/message/push', {}, { 'x-line-retry-key': 'retry-key' })).toMatchObject({ data: { retryAccepted: true } });
+  expect(await client.request('post', '/v2/bot/message/push', {}, { 'X-Line-Retry-Key': 'retry-key' })).toMatchObject({ data: { retryAccepted: true } });
 });
 
 test('404 default rich menu stays null; empty 200 and binary upload stay compatible', async () => {
