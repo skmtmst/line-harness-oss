@@ -1,4 +1,3 @@
-import type { WorkerBindings } from './worker-bindings.js';
 import type { AuthenticatedStaff } from './middleware/auth.js';
 import { type ServerTiming } from './lib/server-timing.js';
 import { type ImpersonationContext } from './middleware/impersonation.js';

@@ -9,7 +9,7 @@ export type SecurityRoute = {
 };
 
 /** Evidence of a call is a review aid, never proof that its result is enforced. */
-export function inspectRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
+function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
   const ast = typeof source === 'string' ? ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true) : source;
   const imports = importedRouters(ast);
   const locals = new Map<string, ts.Node>();
@@ -132,6 +132,13 @@ export function inspectRouteSource(file: string, source: string | ts.SourceFile,
   });
 }
 
+
+/** Keep the reported router name stable while matching registrations by their lexical scope. */
+export function inspectRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
+  return inspectScopedRouteSource(file, source, importedConstant)
+    .map(route => ({ ...route, router: route.router.split(':').pop()! }));
+}
+
 export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
   const sources = new Map<string, string>();
   for (const file of readdirSync(join(srcDir, 'routes')).filter(file => file.endsWith('.ts') && !file.includes('.test.'))) {
@@ -152,7 +159,7 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
         .filter(node => node.name).map(node => [node.name!.text, node])),
     }] as const;
   }));
-  const routes = new Map([...sources].map(([file]) => [file, inspectRouteSource(file, metadata.get(file)!.ast, (module, name) => {
+  const routes = new Map([...sources].map(([file]) => [file, inspectScopedRouteSource(file, metadata.get(file)!.ast, (module, name) => {
     const importedSource = readFileSync(resolve(dirname(file), module.replace(/\.js$/, '.ts')), 'utf8');
     const ast = ts.createSourceFile(module, importedSource, ts.ScriptTarget.Latest, true);
     for (const statement of ast.statements) {
@@ -199,23 +206,6 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
         ? metadata.get(childFile)?.exported.get(importedRouter.exported) : mount.mountedRouter;
       if (!childRouter) throw new Error(`Unresolved mounted router: ${file}:${mount.mountedRouter}`);
       own.push(...mounted(childFile, childRouter, prefix + (mount.path === '/' ? '' : mount.path.replace(/\/$/, '')), nextAncestors));
-    }
-    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-    for (const statement of ast.statements) {
-      if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression)) continue;
-      const call = statement.expression;
-      if (!ts.isIdentifier(call.expression) || call.arguments[0]?.getText(ast) !== router) continue;
-      const registrar = imported.get(call.expression.text);
-      if (!registrar) continue;
-      const childFile = resolve(dirname(file), registrar.module.replace(/\.js$/, '.ts'));
-      const childSource = sources.get(childFile);
-      if (!childSource) continue;
-      const childAst = ts.createSourceFile(childFile, childSource, ts.ScriptTarget.Latest, true);
-      const fn = childAst.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === registrar.exported);
-      if (!fn || !ts.isFunctionDeclaration(fn)) continue;
-      const parameter = fn.parameters[0];
-      if (!parameter?.type || !/^Hono(?:<|$)/.test(parameter.type.getText(childAst))) continue;
-      own.push(...mounted(childFile, parameter.name.getText(childAst), prefix, nextAncestors));
     }
     return own;
   }
