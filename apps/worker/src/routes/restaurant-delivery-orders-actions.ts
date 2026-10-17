@@ -1,16 +1,16 @@
-import { orderFor } from './common.js';
+import { orderFor } from './restaurant-delivery-common.js';
 import type { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Env } from '../../index.js';
-import { requireIrreversibleConfirmation, requireRole } from '../../middleware/role-guard.js';
-import { auditLog } from '../../lib/audit-log.js';
-import type { AuditAction } from '../../lib/audit-log.js';
-import { dbFor } from '../../services/db-router.js';
-import { fail } from '../restaurant-google.js';
+import type { Env } from '../index.js';
+import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
+import { auditLog } from '../lib/audit-log.js';
+import type { AuditAction } from '../lib/audit-log.js';
+import { dbFor } from '../services/db-router.js';
+import { fail } from './restaurant-google.js';
 
-import { canTransitionOrder, nowSec } from '../../services/restaurant-delivery.js';
-import type { DeliveryAction, DeliveryOrderStatus } from '../../services/restaurant-delivery.js';
-import { CANCEL_CONFIRM_TOKEN, ORDER_STATUS_LABELS, isoOrNull, deliveryStore, sendWithLedger, dispatchFailure } from './common.js';
+import { canTransitionOrder, nowSec } from '../services/restaurant-delivery.js';
+import type { DeliveryAction, DeliveryOrderStatus } from '../services/restaurant-delivery.js';
+import { CANCEL_CONFIRM_TOKEN, ORDER_STATUS_LABELS, isoOrNull, deliveryStore, sendWithLedger, dispatchFailure } from './restaurant-delivery-common.js';
 
 export function registerDeliveryOrderActions(restaurantDelivery: Hono<Env>): void {
   // ---------- D-2/D-3 注文の操作（受注→調理中→準備完了→受け渡し済み／拒否／キャンセル） ----------

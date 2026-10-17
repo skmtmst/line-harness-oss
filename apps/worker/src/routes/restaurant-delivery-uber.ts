@@ -1,19 +1,19 @@
 import type { Hono } from 'hono';
 import type { Context } from 'hono';
 import { CredentialEncryptionKeyError, encryptCredential } from '@line-crm/db';
-import type { Env } from '../../index.js';
-import { requireRole } from '../../middleware/role-guard.js';
-import { auditLog } from '../../lib/audit-log.js';
-import { restaurantTestEnabled } from '../../lib/environment-features.js';
-import { dbFor } from '../../services/db-router.js';
-import { randomToken } from '../../services/google-business.js';
-import { UberEatsError, buildAuthorizeUrl as buildUberAuthorizeUrl, exchangeAuthorizationCode as exchangeUberAuthorizationCode } from '../../services/uber-eats.js';
-import { UBER_PROVISIONING_SCOPES } from '../../services/uber-eats-hosts.js';
-import { verifySupportRelay } from '../../services/support-relay.js';
-import { UBER_PROBE_CHECK_BODY, platformCooldownStore, probeUberSandboxToken, uberProbeReadiness, uberProbeSecret } from '../../services/ubereats-token-probe.js';
-import { fail, staffTenantId } from '../restaurant-google.js';
-import { UBER_OAUTH_CALLBACK_PATH, uberOAuthClient } from '../../services/restaurant-delivery.js';
-import { isoFromMs, deliveryStore } from './common.js';
+import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { auditLog } from '../lib/audit-log.js';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
+import { dbFor } from '../services/db-router.js';
+import { randomToken } from '../services/google-business.js';
+import { UberEatsError, buildAuthorizeUrl as buildUberAuthorizeUrl, exchangeAuthorizationCode as exchangeUberAuthorizationCode } from '../services/uber-eats.js';
+import { UBER_PROVISIONING_SCOPES } from '../services/uber-eats-hosts.js';
+import { verifySupportRelay } from '../services/support-relay.js';
+import { UBER_PROBE_CHECK_BODY, platformCooldownStore, probeUberSandboxToken, uberProbeReadiness, uberProbeSecret } from '../services/ubereats-token-probe.js';
+import { fail, staffTenantId } from './restaurant-google.js';
+import { UBER_OAUTH_CALLBACK_PATH, uberOAuthClient } from '../services/restaurant-delivery.js';
+import { isoFromMs, deliveryStore } from './restaurant-delivery-common.js';
 
 export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
   // ---------- Uber Eats のログイン連携（店舗が自分でつなぐ経路） ----------

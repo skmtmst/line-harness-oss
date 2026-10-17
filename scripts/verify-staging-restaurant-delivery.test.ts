@@ -40,7 +40,7 @@ const stagingConfig = readFileSync(
   'utf8',
 );
 const deliveryRoute = ['common', 'orders-read', 'orders-actions', 'history', 'controls'].map((part) => readFileSync(
-  new URL(`../apps/worker/src/routes/restaurant-delivery/${part}.ts`, import.meta.url),
+  new URL(`../apps/worker/src/routes/restaurant-delivery-${part}.ts`, import.meta.url),
   'utf8',
 )).join('\n');
 const deliveryScreen = readFileSync(

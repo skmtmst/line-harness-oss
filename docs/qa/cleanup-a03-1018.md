@@ -93,3 +93,12 @@ PRの題名と本文にはA03・司令塔指定の仮番号#0000を明示した�
 
 
 最終構成での関連試験は9ファイル184件、確認用スクリプトは14件、Node22のWorker型検査はすべて終了0。初期の失敗ログは別途保持している。
+
+
+### 安全検査が分割先を見失った点の修正
+
+最初のci-local（製品 `1286476bc0`）のWorker全試験は13,049成功/5失敗だった。失敗はroute-guard-coverageの4件とpublic-entrypoints.securityの1件で、実登録されている18経路が静的な検査から落ちた。検査器は `routes` 直下のファイルを集め、そこで見つかった登録関数を追うため、下位フォルダへ移した関数は拾えなかった。
+
+A01の検査器・認証・許可一覧・snapshot・公開経路の文書は変更せず、分割した8ファイルを `routes/restaurant-delivery-<役割>.ts` へ移した。mainの公開口と19個の登録順、全74文の比較結果（不足0/追加0）は同じ。静的検査が実登録と再び一致し、失敗した5件を含む127件と型が成功した。`scripts/verify-staging-restaurant-delivery.test.ts` の参照先も同じ移動へ追随する。元の5失敗ログを保持し、残す安全検査が経路を見失う故障を検出した証拠とする。
+
+`routes/restaurant-delivery.ts` が入口、直下の `restaurant-delivery-types.ts` / `restaurant-delivery-common.ts` / `restaurant-delivery-orders-read.ts` / `restaurant-delivery-orders-actions.ts` / `restaurant-delivery-history.ts` / `restaurant-delivery-controls.ts` / `restaurant-delivery-webhooks.ts` / `restaurant-delivery-uber.ts` が最終の移動先。下位フォルダ版は残さない。

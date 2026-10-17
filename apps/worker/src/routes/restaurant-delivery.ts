@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
-import { deliveryAccessGuard } from './restaurant-delivery/common.js';
-import { registerDeliveryOrderReads } from './restaurant-delivery/orders-read.js';
-import { registerDeliveryOrderActions } from './restaurant-delivery/orders-actions.js';
-import { registerDeliveryHistory } from './restaurant-delivery/history.js';
-import { registerDeliveryControls } from './restaurant-delivery/controls.js';
-import { registerDeliveryWebhooks } from './restaurant-delivery/webhooks.js';
-import { registerDeliveryUber } from './restaurant-delivery/uber.js';
+import { deliveryAccessGuard } from './restaurant-delivery-common.js';
+import { registerDeliveryOrderReads } from './restaurant-delivery-orders-read.js';
+import { registerDeliveryOrderActions } from './restaurant-delivery-orders-actions.js';
+import { registerDeliveryHistory } from './restaurant-delivery-history.js';
+import { registerDeliveryControls } from './restaurant-delivery-controls.js';
+import { registerDeliveryWebhooks } from './restaurant-delivery-webhooks.js';
+import { registerDeliveryUber } from './restaurant-delivery-uber.js';
 
 /**
  * 飲食店向け（テスト）「デリバリー受注」。
@@ -26,8 +26,8 @@ import { registerDeliveryUber } from './restaurant-delivery/uber.js';
  * - 急ぎ度はバックエンドだけで判定し、画面には結果と理由の文だけを出す（仕組みの名称は出さない）。
  */
 
-export { deliveryAccessGuard } from './restaurant-delivery/common.js';
-export type { DeliveryOrderRow, DeliveryOrderItemRow, DeliveryServiceStateRow, DeliveryMenuItemRow } from './restaurant-delivery/types.js';
+export { deliveryAccessGuard } from './restaurant-delivery-common.js';
+export type { DeliveryOrderRow, DeliveryOrderItemRow, DeliveryServiceStateRow, DeliveryMenuItemRow } from './restaurant-delivery-types.js';
 
 export const restaurantDelivery = new Hono<Env>();
 restaurantDelivery.use('/api/restaurant-test/delivery/*', deliveryAccessGuard);

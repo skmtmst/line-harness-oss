@@ -1,17 +1,17 @@
-import type { DeliveryMenuItemRow } from './types.js';
+import type { DeliveryMenuItemRow } from './restaurant-delivery-types.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import type { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Env } from '../../index.js';
-import { requireIrreversibleConfirmation, requireRole } from '../../middleware/role-guard.js';
-import { auditLog } from '../../lib/audit-log.js';
-import type { AuditAction } from '../../lib/audit-log.js';
-import { dbFor } from '../../services/db-router.js';
-import { fail } from '../restaurant-google.js';
-import type { StoreContext } from '../restaurant-google.js';
-import { DELIVERY_SERVICES, DELIVERY_SERVICE_LABELS, isDeliveryService, isIntakeStopPreset, intakeStopUntil, nowSec } from '../../services/restaurant-delivery.js';
-import type { DeliveryAction, DeliveryDispatchResult, DeliveryService } from '../../services/restaurant-delivery.js';
-import { upsertIntake, INTAKE_STOP_CONFIRM_TOKEN, isoOrNull, deliveryStore, sendWithLedger } from './common.js';
+import type { Env } from '../index.js';
+import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
+import { auditLog } from '../lib/audit-log.js';
+import type { AuditAction } from '../lib/audit-log.js';
+import { dbFor } from '../services/db-router.js';
+import { fail } from './restaurant-google.js';
+import type { StoreContext } from './restaurant-google.js';
+import { DELIVERY_SERVICES, DELIVERY_SERVICE_LABELS, isDeliveryService, isIntakeStopPreset, intakeStopUntil, nowSec } from '../services/restaurant-delivery.js';
+import type { DeliveryAction, DeliveryDispatchResult, DeliveryService } from '../services/restaurant-delivery.js';
+import { upsertIntake, INTAKE_STOP_CONFIRM_TOKEN, isoOrNull, deliveryStore, sendWithLedger } from './restaurant-delivery-common.js';
 
 export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
   // ---------- D-5 `h7OeT` 商品と品切れ一括 ----------

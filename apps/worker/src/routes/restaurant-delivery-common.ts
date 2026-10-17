@@ -1,16 +1,16 @@
-import type { DeliveryOrderRow, DeliveryOrderItemRow, DeliveryServiceStateRow } from './types.js';
+import type { DeliveryOrderRow, DeliveryOrderItemRow, DeliveryServiceStateRow } from './restaurant-delivery-types.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import type { Context, MiddlewareHandler } from 'hono';
-import type { Env } from '../../index.js';
-import { auditLog } from '../../lib/audit-log.js';
-import { restaurantTestEnabled } from '../../lib/environment-features.js';
-import { getVisibleLineAccountScope } from '../../services/account-access.js';
-import { dbFor } from '../../services/db-router.js';
-import { tenantHasFeaturePack } from '../../services/tenant-features.js';
-import { accountId, fail, staffTenantId, storeFor } from '../restaurant-google.js';
-import type { StoreContext } from '../restaurant-google.js';
-import { DELIVERY_SERVICES, dispatchToDeliveryService } from '../../services/restaurant-delivery.js';
-import type { DeliveryAction, DeliveryDispatchResult, DeliveryOrderStatus, DeliveryService } from '../../services/restaurant-delivery.js';
+import type { Env } from '../index.js';
+import { auditLog } from '../lib/audit-log.js';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { dbFor } from '../services/db-router.js';
+import { tenantHasFeaturePack } from '../services/tenant-features.js';
+import { accountId, fail, staffTenantId, storeFor } from './restaurant-google.js';
+import type { StoreContext } from './restaurant-google.js';
+import { DELIVERY_SERVICES, dispatchToDeliveryService } from '../services/restaurant-delivery.js';
+import type { DeliveryAction, DeliveryDispatchResult, DeliveryOrderStatus, DeliveryService } from '../services/restaurant-delivery.js';
 
 /** 署名で守る外部受信の入口。管理画面の認証・統括ゲートは通さない。 */
 export const WEBHOOK_PREFIX = '/api/restaurant-test/delivery/webhooks/';

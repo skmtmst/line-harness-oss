@@ -1,4 +1,4 @@
-import type { DeliveryOrderStatus, DeliveryService } from '../../services/restaurant-delivery.js';
+import type { DeliveryOrderStatus, DeliveryService } from '../services/restaurant-delivery.js';
 
 // ---------- 行の形 ----------
 
