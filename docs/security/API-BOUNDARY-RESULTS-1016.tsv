@@ -907,6 +907,8 @@ GET	/api/events/admin/events/:id/bookings/summary	401	403	403	403
 POST	/api/events/admin/events/:id/bookings/:bookingId/decide	401	403	403	403
 POST	/api/events/admin/events/:id/bookings/:bookingId/cancel	401	403	403	403
 PUT	/api/events/admin/events/:id/bookings/:bookingId	401	403	403	403
+GET	/api/account-settings/personal-data-retention	401	403	403	403
+PUT	/api/account-settings/personal-data-retention	401	403	403	403
 PUT	/api/account-settings/customer-look	401	403	403	403
 GET	/api/account-settings/customer-look	401	403	403	403
 GET	/api/account-settings/allergy-options	401	403	403	403

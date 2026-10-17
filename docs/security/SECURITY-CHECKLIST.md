@@ -21,6 +21,8 @@ B-343の追加では開発基点`b4adb688bd42c359d1539dbf802b5ad888a9e647`を通
 
 B-351の追加は[公開入口](PUBLIC-ENTRYPOINTS.md)・[CSPの記録](CSP-REVIEW-1016.md)・[作業と検査](SECURITY-B351-1016.md)。本線 `af8e504d75` の取り込み済みを再確認し、公開リンクの回数制限と期限なし明細の拒否を追加。追加対応で静的配信のCSPを強制用へ変更し、添付・明細を最長15分の署名へ変更した。[追加対応](SECURITY-B351-CONTINUATION.md)と[URLの契約](SIGNED-DOWNLOADS.md)。LINE内の未検証操作・Worker HTML・本番実効値などを残し、S41〜S49を推測で済にしていない。
 
+B-361の残り5・8・11・12・13のコードと手元試験は[追加記録](SECURITY-B351-REMAINDER.md)。実地/設定/画面の残条件があるため、この5行を推測で「済」にしない。集計49項目（済21・未16・分からない12）は変わらない。
+
 表のパスはリポジトリのルートから。命令は原則として読むだけ。「検証で確認」は、別途用意した架空データの環境で担当者が行う次の作業。実際のお客さまへ試し送信しない。
 
 ## ログインと権限
@@ -33,7 +35,7 @@ B-351の追加は[公開入口](PUBLIC-ENTRYPOINTS.md)・[CSPの記録](CSP-REVI
 | S04 | 統括・店・別アカウントの境界・高 | `tenant-scope.ts`、各APIの所属確認と境界試験を読む。画面の「統括／店」と内部のowner/admin/staffを同じ意味と考えない | 済：共通の所属範囲検査とAPI別の制限がある。全経路の実動作はS07 | `apps/worker/src/middleware/tenant-scope.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/calendar.security.test.ts` |
 | S05 | 閲覧のみでは変更・鍵取得ができない・高 | `auth.ts` の安全なHTTPメソッド以外の拒否、`denyReadOnly` を読む | 済：更新の一律拒否と、鍵情報などを読むこと自体の拒否がある。続きでCSV・export・downloadの拒否も追加し、機能ごとの閲覧権限からの書出しも止める | `apps/worker/src/middleware/auth.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/staff-api-key.security.test.ts` |
 | S06 | 代理ログインは範囲・理由・履歴で制限する・高 | `resolveImpersonation`、伏せ字、書き出し拒否、理由付き表示、禁止操作を読む | 済：セッションに結び付き、既定は閲覧のみ。個人情報は既定で伏せ、解約等を禁止する | `apps/worker/src/middleware/impersonation.ts`、`apps/worker/src/routes/ops.ts`、`apps/worker/src/middleware/train30-impersonation.test.ts` |
-| S07 | 全APIの権限の抜けを実際のリクエストで点検する・高 | 開発担当がOpenAPIと経路一覧を突合し、未ログイン・統括・店・閲覧のみ・代理ログインで別の店のIDを指定する。GET・書き出し・更新・削除を含め、401/403/情報を返さない404を確認 | 未：実登録と照合した[全1,762経路の一覧](API-ROUTE-INVENTORY-1016.tsv)と[管理1,580経路の共通境界](API-BOUNDARY-RESULTS-1016.tsv)。一覧・履歴・集計・Google連携・旧共通資源・閲覧のみのCSV書出しの抜けを修正し、実データ付きの拒否試験を追加（[修正と残条件](API-ROUTE-REVIEW-1016.md)）。他店資源ID単独・代理ログインの全組合せの個別証拠は未完。旧スコア5経路はbehaviorfixと同じ410停止を維持 | `apps/worker/src/middleware/route-guard-coverage.test.ts`、`routes/security-scope-inventory.test.ts`、`test-utils/route-security-inventory.ts` |
+| S07 | 全APIの権限の抜けを実際のリクエストで点検する・高 | 開発担当がOpenAPIと経路一覧を突合し、未ログイン・統括・店・閲覧のみ・代理ログインで別の店のIDを指定する。GET・書き出し・更新・削除を含め、401/403/情報を返さない404を確認 | 未：実登録と照合した[全1,764経路の一覧](API-ROUTE-INVENTORY-1016.tsv)と[管理1,582経路の共通境界](API-BOUNDARY-RESULTS-1016.tsv)。一覧・履歴・集計・Google連携・旧共通資源・閲覧のみのCSV書出しの抜けを修正し、実データ付きの拒否試験を追加（[修正と残条件](API-ROUTE-REVIEW-1016.md)）。他店資源ID単独・代理ログインの全組合せの個別証拠は未完。旧スコア5経路はbehaviorfixと同じ410停止を維持 | `apps/worker/src/middleware/route-guard-coverage.test.ts`、`routes/security-scope-inventory.test.ts`、`test-utils/route-security-inventory.ts` |
 | S08 | 2人と不要アカウントの実際の権限・高 | 各サービスのメンバー画面とmusuboのユーザー管理を2人で確認し、[権限表](TWO-FACTOR-SETUP.md#誰に何の権限があるか)へ名前・役割だけ記録 | 分からない：アカウントの実際の割り当ては取得していない | `docs/brain/Memory.md`、`apps/worker/src/routes/staff.ts` |
 | S09 | 二段階認証と回復手段・高 | [設定手順](TWO-FACTOR-SETUP.md)で各自の設定を確認。musubo側も二段階認証の設定と暗号化用secretの有無を担当者と確認 | 分からない：登録・必須化のコードはあるが、2人の設定と本番の鍵は未確認 | `apps/worker/src/routes/admin-auth.ts`、`apps/worker/src/lib/mfa-config.ts`、`apps/worker/src/routes/admin-auth-mfa-enforcement.test.ts` |
 
@@ -109,14 +111,14 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 | ID | 点検・危なさ | 確かめ方（命令・画面） | 今の状態 | 根拠のファイル |
 | --- | --- | --- | --- | --- |
 | S41 | B-351/4 ログイン不要の入口・高 | [公開入口](PUBLIC-ENTRYPOINTS.md)を実登録と照合。別人・別店・期限切れ・連続取得を架空データで拒否する | 未：全入口を一覧化。短縮リンクの無制限取得を修正。添付画像/動画を含め署名は最長15分へ、明細は認証ヘッダー＋署名へ修正。本人用の取り直しAPI・古いリンクのLIFF案内・送信本文の入口を追加し、別人/別店/削除を拒否する試験を追加。取り直し画面の接続、LINE内表示用URLの期限内の転送、全入口の個別組合せ・公開素材の誤配置は残る（[契約と試験](SIGNED-DOWNLOADS.md)） | `apps/worker/src/middleware/public-referral-rate-limit.security.test.ts`、`routes/public-entrypoints.security.test.ts`、`services/image-access.ts` |
-| S42 | B-351/5 ログイン失敗・新しい端末・ロボット避け・高 | 同一メールへの失敗を別IPから繰り返す。架空の新端末で監査・通知を確認。全ログイン方法でロボット避けの適用を照合 | 未：メール/アカウント単位の15分制限、新端末の監査とメールはある。Turnstileは登録と再設定にあり、パスワードログイン自体では検証していない。全方法の適用は後続 | `apps/worker/src/routes/auth-email.ts`、`middleware/sensitive-rate-limit.ts`、`services/admin-session.ts`、`services/turnstile.ts` |
+| S42 | B-351/5 ログイン失敗・新しい端末・ロボット避け・高 | 同一メールへの失敗を別IPから繰り返す。架空の新端末で監査・通知を確認。全ログイン方法でロボット避けの適用を照合 | 未：コード対応は済。同一メールの10回/15分制限を維持し、パスワードログインにもTurnstile検証を追加。726の端末ハッシュでログアウト後も新端末を検知し、検証では模擬通知だけ。拒否と再通知の実SQLite試験・故障対照を実施。画面のTurnstile接続・実メール到達・実配備の確認は残る | `routes/auth-email.test.ts`、`services/login-device.security.test.ts`、`packages/db/migrations/726_auth_known_devices.sql` |
 | S43 | B-351/6 WAF・ボット対策・請求急増の知らせ・高 | オーナーがCloudflareのSecurityとNotifications/Billingで対象ホスト・通知先・条件・適用範囲を照合。架空の連続アクセスと通知の試験 | 分からない：配備先の設定・プラン・通知の到達は未確認。オーナー作業欄へ手順を追加 | `apps/worker/src/middleware/rate-limit.ts`、`docs/security/DETECTION.md`、この文書のオーナー手順 |
-| S44 | B-351/8 危ない操作の直前の本人確認・高 | 削除・権限・鍵再発行・停止・書き出しごとに確認票の欠落/期限切れ/別セッション/再使用を拒否。全危険操作の一覧を照合 | 未：一回限りで目的とセッションに結び付く確認票がある。全危険操作へ適用した証拠はまだない | `apps/worker/src/lib/step-up.ts`、`routes/admin-auth-step-up-grant-binding.test.ts`、`routes/account-handovers.ts`、`routes/staff-step-up.test.ts` |
+| S44 | B-351/8 危ない操作の直前の本人確認・高 | 削除・権限・鍵再発行・停止・書き出しごとに確認票の欠落/期限切れ/別セッション/再使用を拒否。全危険操作の一覧を照合 | 未：コード対応は済。書き出し・配信/予約/再送・権限変更・代理ログインに共通の再確認を追加し、既存の鍵/MFA/承認の強い確認を維持。未確認/失効/別セッション/再使用と実アプリでの拒否・故障対照を実施。画面全体の再確認の接続と実地確認は残る | `middleware/sensitive-step-up.ts`、`middleware/sensitive-step-up.security.test.ts`、`lib/step-up.ts`、[今回の契約](SECURITY-B351-REMAINDER.md) |
 | S45 | B-351/10 本番のCSP・高 | web/LIFFを通常ビルドし、出力の_headersをHTTP応答へ付けてPlaywrightで実行。強制用ヘッダーで通常表示の違反0と、故意のinline/未知スクリプトの拒否を分けて確認する | 未：静的配信用の強制コードを実装。起動の外部化・動画Worker・実PDFの紙面と文字を実ブラウザで確認。[CSP記録](CSP-REVIEW-1016.md)のLINE内の追加窓・Worker HTML・既存のスタイル許可・本番実効値は残る。本番へは未配備 | `apps/web/public/_headers`、`apps/liff/public/_headers`、`scripts/security/csp-policy.test.ts`、`scripts/security/csp-browser.mjs` |
 | S46 | B-351/9 不要アカウント・権限の毎月の見直し・高 | オーナー2人が毎月、実際のサービスのメンバーと担当表を照合。退職/不要/過大権限を止め、既存セッションと鍵も失効したことを確認 | 分からない：アプリの削除/失効の口はあるが、実際の全アカウント・毎月の実施記録は未確認。オーナー作業欄へ手順を追加 | `apps/worker/src/routes/staff.ts`、`docs/security/TWO-FACTOR-SETUP.md`、この文書のオーナー手順 |
-| S47 | B-351/11 配備のたびの本番設定の機械点検・高 | 配備前の設定と配備後の実効値を照合。試験用フラグ・公開接続先・secretの型/存在・CSP・署名検証を確認。故意の設定違いで配備判定が失敗すること | 未：preflightと公開SHA照合、本番の試験機能停止はある。全安全設定の配備ごとの照合は未完成 | `scripts/deploy/preflight.ts`、`scripts/deploy/verify-public-build.mjs`、`apps/worker/src/lib/environment-features.ts` |
-| S48 | B-351/12 個人情報の期限・自動削除・書き出しの印・高 | 情報の種類ごとに期限と例外を決め、期限前/後と失敗時の再実行を確認。書き出しの操作者・日時の印がファイルから分かるか確認 | 未：本人確認書類・統括削除等の自動処理と書き出し監査はある。全個人情報の保存期限と出力ファイルへの印の網羅は未完 | `apps/worker/src/services/form-documents.ts`、`services/customer-data-deletion.ts`、`services/tenant-data-purge.ts`、`middleware/output-audit.ts` |
-| S49 | B-351/13 鍵の入れ替えの練習・高 | 検証の架空鍵を使い、旧鍵停止→新鍵登録→署名/暗号化と通知確認→旧鍵の拒否を練習。復号用の旧鍵を消す前に既存分の移行を確認 | 未：[事故手順](INCIDENT-RUNBOOK.md)に鍵の交換手順がある。検証での実地練習と復号継続の証拠は未実施 | `docs/security/INCIDENT-RUNBOOK.md`、`docs/line-credential-encryption.md`、この文書のS21 |
+| S47 | B-351/11 配備のたびの本番設定の機械点検・高 | 配備前の設定と配備後の実効値を照合。試験用フラグ・公開接続先・secretの型/存在・CSP・署名検証を確認。故意の設定違いで配備判定が失敗すること | 未：配備前に試験用の旗・明示したCORS・全R2の公開設定・必須secretの名前/型を照合する台本をWorker/Admin/検証のworkflowへ追加。実際の検証用設定＋架空の応答で成功、不安全/不明/権限不足で失敗。実配備先の照会と、本番に残る試験用の旗の是正はオーナー作業として残る | `scripts/security/deployment-safety.ts`、`scripts/security/deployment-safety.test.ts`、`.github/workflows/deploy-cloudflare-{worker,admin,staging}.yml` |
+| S48 | B-351/12 個人情報の期限・自動削除・書き出しの印・高 | 情報の種類ごとに期限と例外を決め、期限前/後と失敗時の再実行を確認。書き出しの操作者・日時の印がファイルから分かるか確認 | 未：店ごとの期限/保留/版付き設定APIと6時間ごとの回答/ブロック済み顧客の削除を追加。既定は無効、日数は案。期限境界/別店/保留/失敗後の再試行と監査失敗の巻き戻しを試験。CSV本文・ファイル名・新規明細PDFへ操作者と日時の印。保護履歴の個人情報の残存範囲・期限の決定・画面接続と有効化は残る | `routes/personal-data-retention.ts`、`services/personal-data-retention.ts`、`middleware/output-audit.ts`、[保存対象と期限案](SECURITY-B351-REMAINDER.md) |
+| S49 | B-351/13 鍵の入れ替えの練習・高 | 検証の架空鍵を使い、旧鍵停止→新鍵登録→署名/暗号化と通知確認→旧鍵の拒否を練習。復号用の旧鍵を消す前に既存分の移行を確認 | 未：専用の[鍵交換と検証の練習手順](KEY-ROTATION.md)を作成。製品の署名URLとAES-GCMを使う架空鍵の練習で新鍵成功/旧鍵拒否/移行後の復号を確認。検証Workerへのsecret登録と実地練習は未実施 | `docs/security/KEY-ROTATION.md`、`services/key-rotation-drill.test.ts` |
 
 ## 依存検査の記録
 
@@ -182,3 +184,12 @@ S07・S15・S22・S24・S28の「試験が本当の故障を見付けるか」�
 - [ ] オーナーが通知先と担当の連絡網、基準値を確認する。架空記録で警告→Slack→受領→解消→新しい操作で再発を確認し、既存の古い記録だけでは再発しないことも確認する。
 - [ ] オーナーがCloudflare側の監視停止・全HTTPの急増・署名失敗、GitHubの秘密混入、外部サービスの鍵変更を見張る。今回の監査集計外の項目は[DETECTION](DETECTION.md)に沿って担当と確認時刻を決める。
 - [ ] 「わな」の値は検証だけの案。採用する場合は実在の権限や友だちを使わず、1回の接触で必ず通知し、値を出さず、本番で有効化できないことを先に確認する。
+
+## B-361で残るオーナー作業
+
+- 726の番号とSQLを確認し、通常のバックアップ・承認・dry-runを経て検証へ適用する。この組は適用しない。
+- 検証の配備資格情報にWorker設定とR2の読取権限があるか確かめ、`deployment-safety.ts staging apps/worker/wrangler.staging.toml` を値を出さずに実行する。手元はAPI token未設定のため未実施。
+- 本番に残るWorkerとAdminの試験用フラグは新しい点検で停止対象。設定を変える判断と反映はオーナー。今回のコードで点検を迂回しない。
+- 店ごとに保存期限の案・保留対象・会計等に残る個人情報を確認し、設定APIの版と本人確認を使って有効化する。既定は無効。
+- Claude担当がTurnstile・追加の本人確認・保存期限の画面を契約どおりにつなぎ、架空データで確認する。
+- [鍵交換の練習](KEY-ROTATION.md)を検証環境で担当2人が実施し、旧鍵拒否・復号・通知の結果だけ記録する。本番の鍵には触らない。
