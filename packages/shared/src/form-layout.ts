@@ -5,7 +5,7 @@ export type { FormBookingConfig, FormBookingValue } from './form-booking-types.j
 import { isCalendarDateString } from './form-calendar-date.js'
 export { isCalendarDateString } from './form-calendar-date.js'
 import type { TapExtras } from './tap-extras.js';
-import type { ResearchAnswerAction, ResearchGate } from './research-form.js';
+import type { ResearchAnswerAction, ResearchGate } from './types/research.js';
 import { FIXED_FRIEND_FIELDS, ageFromBirthday, validateAllergyValues, type FixedFriendFieldKey } from "./fixed-friend-fields.js";
 
 /**

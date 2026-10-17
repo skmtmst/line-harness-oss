@@ -1,5 +1,5 @@
 import type { TapExtras } from './tap-extras.js';
-import type { ResearchAnswerAction } from './research-form.js';
+import type { ResearchAnswerAction } from './types/research.js';
 
 /**
  * 選択肢1つ。
