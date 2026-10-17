@@ -108,7 +108,7 @@ export function UrgencyMark({ urgency }: { urgency: DeliveryUrgency }) {
   const Icon = URGENCY_ICONS[urgency]
   return (
     <StatusBadge tone={URGENCY_TONES[urgency]} size="delivery" dot={false}>
-      {Icon ? <Icon size={12} aria-hidden="true" /> : null}
+      {Icon ? <Icon size={16} aria-hidden="true" /> : null}
       {urgencyLabel(urgency)}
     </StatusBadge>
   )

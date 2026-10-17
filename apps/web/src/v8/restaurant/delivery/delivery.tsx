@@ -42,7 +42,7 @@ import {
   type DeliveryOrdersData,
   type DeliveryService,
 } from '@/lib/restaurant-delivery-api'
-import { BoundaryBanner, RestaurantPage, STORE_PICKER_WIDTH } from '../common-a/frame'
+import { BoundaryBanner, RestaurantPage } from '../common-a/frame'
 import OrdersBoard from './orders'
 import { CancelOrderDialog, OrderDetailDialog } from './order-detail'
 import HistoryBoard from './history'
@@ -572,7 +572,6 @@ function DeliveryInner() {
     <EntitySelect
       aria-label="店舗"
       noun="店舗"
-      width={STORE_PICKER_WIDTH}
       value={currentStoreId}
       onChange={(value) => {
         const next = stores.find((item) => item.id === value)
