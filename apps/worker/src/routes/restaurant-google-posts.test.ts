@@ -286,7 +286,7 @@ beforeEach(async () => {
     RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     AI: { run: vi.fn(async () => ({ response: '' })) } as unknown as Ai,
-    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', GOOGLE_BUSINESS_ENABLED: 'true',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',

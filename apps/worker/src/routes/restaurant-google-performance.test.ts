@@ -150,7 +150,7 @@ beforeEach(() => {
   env = {
     DB: testDb.db,
     API_KEY: 'owner-key',
-    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', GOOGLE_BUSINESS_ENABLED: 'true',
     WORKER_URL: 'https://worker.example.test',
     LINE_CREDENTIAL_ENCRYPTION_KEY: ENC_KEY,
     GOOGLE_BUSINESS_OAUTH_CLIENT_ID: 'client-id',

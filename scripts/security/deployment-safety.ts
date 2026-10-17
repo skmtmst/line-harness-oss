@@ -15,6 +15,10 @@ export function evaluateDeploymentSafety(config: SafetyConfig, snapshot: SafetyS
       if(secretName.test(name)) failures.push(`${source}:plaintext:${name}`);
       if(environment==='production' && ((/(?:TEST|MOCK|DEMO|SANDBOX|BYPASS)/.test(name) && !['','false','0','off','disabled'].includes(String(value).toLowerCase())) || (/(?:ENVIRONMENT|MODE)$/.test(name) && /^(?:test|mock|demo|sandbox)$/.test(String(value).toLowerCase())))) failures.push(`${source}:test-flag:${name}`);
     }
+    for (const name of ['RESTAURANT_TEST_ENABLED', 'GOOGLE_BUSINESS_ENABLED']) {
+      const publicName = `NEXT_PUBLIC_${name}`;
+      if (publicName in vars && vars[publicName] !== vars[name]) failures.push(`${source}:feature-flag-mismatch:${name}`);
+    }
     const origins=typeof vars.ADMIN_ORIGIN==='string'?vars.ADMIN_ORIGIN.split(',').map(s=>s.trim()):[];
     // Resolve the same public admin default as the runtime when ADMIN_ORIGIN is absent.
     if(!origins.length && typeof vars.ADMIN_PUBLIC_URL==='string') origins.push(vars.ADMIN_PUBLIC_URL);
@@ -42,7 +46,10 @@ export async function inspectDeployment(configPath:string, environment:'producti
     if(body.success!==true || !body.result) throw new Error('deployment_safety_metadata_invalid');
     return body.result;
   };
-  if (process.env.SECURITY_ADMIN_TEST_ENABLED) config.vars.NEXT_PUBLIC_RESTAURANT_TEST_ENABLED = process.env.SECURITY_ADMIN_TEST_ENABLED;
+  // 管理画面の実際のbuild変数も評価する。別名の試験旗で上書きしない。
+  for (const name of ['NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED']) {
+    if (process.env[name] !== undefined) config.vars[name] = process.env[name];
+  }
   const name=process.env.SECURITY_WORKER_NAME || config.name;
   const settings=await get(`workers/scripts/${encodeURIComponent(name)}/settings`);
   if(!Array.isArray(settings.bindings)) throw new Error('deployment_safety_bindings_unknown');
