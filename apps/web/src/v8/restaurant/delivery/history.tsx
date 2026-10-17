@@ -20,7 +20,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -283,7 +283,7 @@ export default function HistoryBoard({
                 page={currentPage}
                 pageCount={pageCount}
                 onPageChange={onPage}
-                summary={`${prefix}${orders.length}件中 ${firstIndex + 1}〜${firstIndex + visible.length}件を表示`}
+                summary={`${prefix}${paginationSummary(orders.length, firstIndex + 1, firstIndex + visible.length)}`}
               />
             </>
           ) : null}

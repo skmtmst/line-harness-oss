@@ -21,6 +21,7 @@ import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import { DEFAULT_PAGE_SIZE } from '@/components/shared/page-size-select'
 import ListState from '@/components/shared/list-state'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
@@ -70,9 +71,6 @@ const VIEW_HEAD: Record<DeliveryView, { titleSize?: 'sub' }> = {
 }
 
 const TABS: DeliveryOrderTab[] = ['all', 'new', 'cooking', 'handed_over']
-
-/** 1ページの件数の初め（10・20・50から選べる）。 */
-const DEFAULT_PER_PAGE = 20
 
 /** 自動で読み直す間（絵の「30秒ごとに自動更新」）。予約一覧と同じ間にする。 */
 const REFRESH_MS = 30_000
@@ -125,7 +123,7 @@ function DeliveryInner() {
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [notice, setNotice] = useState<{ tone: NoticeTone; text: string } | null>(null)
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE)
+  const [perPage, setPerPage] = useState(DEFAULT_PAGE_SIZE)
   const [selected, setSelected] = useState<string[]>([])
   const [busyOrderId, setBusyOrderId] = useState<string | null>(null)
   const [busyService, setBusyService] = useState<DeliveryService | null>(null)
@@ -148,7 +146,7 @@ function DeliveryInner() {
   const [historyDate, setHistoryDate] = useState(() => storeToday())
   const [historyService, setHistoryService] = useState<DeliveryService | ''>('')
   const [historyPage, setHistoryPage] = useState(1)
-  const [historyPerPage, setHistoryPerPage] = useState(DEFAULT_PER_PAGE)
+  const [historyPerPage, setHistoryPerPage] = useState(DEFAULT_PAGE_SIZE)
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvNote, setCsvNote] = useState<string | null>(null)
 
@@ -160,7 +158,7 @@ function DeliveryInner() {
   const [soldOutOnly, setSoldOutOnly] = useState(false)
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [itemsPage, setItemsPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_PER_PAGE)
+  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_PAGE_SIZE)
   const [soldOutBusy, setSoldOutBusy] = useState(false)
   const [busyItemId, setBusyItemId] = useState<string | null>(null)
 

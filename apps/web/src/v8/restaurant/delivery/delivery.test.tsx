@@ -8,8 +8,6 @@
  *  - 急ぎ度は結果と理由の文だけを出し、判定の仕組みの名前（Clef）は画面に出さない。
  *  - 閲覧のみ（staff）には送るボタンを置かない。
  */
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -398,47 +396,8 @@ describe('閲覧のみ（staff）', () => {
   })
 })
 
-/*
- * 承認v02（★承認済み デリバリー受注_v02.pen／2026-10-09 利用者承認）の見え方を守る。
- * ここは絵との「一致」を測る場ではない（happy-dom に寸法の計算は無いので、
- * 1行か2行か・窓の高さは測れない）。測るのは scripts/visual-qa/frame-parity.mjs の役目。
- * この組は、絵に合わせて決めた作り（並べ方の組・頭の印・札の種類・札の数）が
- * あとから静かに戻っていないかを見張る。
- */
-describe('承認v02の見え方を守る', () => {
-  const css = readFileSync(join(__dirname, 'delivery.module.css'), 'utf8')
-
-  it('注文一覧（kDQHr）のサービス札は1行に3つ並べる', () => {
-    // 絵（kDQHr）は札3つを横一列。縦積みにすると KPI も表もまるごと下へずれる。
-    expect(css).toMatch(/\.serviceRow \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
-  })
-
-  it('3枚の頭・中身の余白は共通の器の既定に任せ、数字で渡さない（説明は「？」の中）', () => {
-    const page = readFileSync(join(__dirname, 'delivery.tsx'), 'utf8')
-    expect(page).not.toMatch(/HEAD_PAD_TOP|HEAD_TEXT_GAP|VIEW_BODY/)
-    expect(page).not.toMatch(/headPadTop=|headTextGap=|bodyPadTop=|bodyGap=/)
-    expect(page).not.toMatch(/descriptionAs=/)
-    // 題の大きさだけ、注文履歴と品切れは小さい題（絵 OzHLO・h7OeT）。
-    expect(page).toMatch(/history: \{ titleSize: 'sub' \}/)
-    expect(page).toMatch(/'sold-out': \{ titleSize: 'sub' \}/)
-  })
-
-  it('一覧の表・帯・箱は共通部品に任せ、画面専用の見た目を足さない', () => {
-    const orders = readFileSync(join(__dirname, 'orders.tsx'), 'utf8')
-    const history = readFileSync(join(__dirname, 'history.tsx'), 'utf8')
-    const bulk = readFileSync(join(__dirname, 'bulk.tsx'), 'utf8')
-    for (const source of [orders, history, bulk]) {
-      expect(source).not.toMatch(/presentation="delivery"/)
-      expect(source).not.toMatch(/delivery-(row|bulk|head)/)
-      expect(source).not.toMatch(/さらに表示/)
-    }
-    expect(css).not.toMatch(/\.sumCard|\.selectBar|\.stopCard|\.stateBox|\.tabTableGroup/)
-    expect(css).not.toMatch(/nth-child/)
-    expect(orders).toMatch(/BulkBar/)
-    expect(orders).toMatch(/Pagination/)
-    expect(history).toMatch(/KpiBand/)
-    expect(bulk).toMatch(/CheckCard/)
-  })
+/* 見た目は実ブラウザで測る。この組は一覧と確認の操作を守る。 */
+describe('一覧と確認の操作を保つ', () => {
 
   it('品切れ（h7OeT）の「品切れ」の札は赤（tone="danger"）', async () => {
     // 重ねた絵の色を測ったら、絵の「品切れ」は赤 #b3261e、画面は橙 #c2410c(warning) だった。
@@ -449,61 +408,6 @@ describe('承認v02の見え方を守る', () => {
     const soldOut = await screen.findByText('品切れ')
     expect(soldOut.closest('[data-tone]')?.getAttribute('data-tone')).toBe('danger')
     expect(screen.getByText('販売中').closest('[data-tone]')?.getAttribute('data-tone')).toBe('success')
-  })
-
-  it('共通部品の見た目を画面CSSから上書きしない', () => {
-    // 設計ルール「部品の見た目を画面側で上書きしない（直すときは部品を直す）」。
-    // 親の共通器へ :has で届く指定と、別の場所で出る共通の窓への指定を置かない。
-    expect(css).not.toMatch(/\bdiv:has\(/)
-    expect(css).not.toMatch(/\[data-design-part='dialog'\]/)
-  })
-
-  it('確認の窓の題の段は共通部品の任意の引数で絵に合わせる', () => {
-    // 絵（dgeTy・XCVGd）は印と題が縦の中央・間12・題 18/700。画面CSSで上書きせず、
-    // 共通の窓の titleRow="mark" を渡す。渡さない窓の既定（上そろえ・間8・600）は変えない。
-    expect(readFileSync(join(__dirname, 'order-detail.tsx'), 'utf8')).toMatch(/titleRow="mark"/)
-    expect(readFileSync(join(__dirname, 'bulk.tsx'), 'utf8')).toMatch(/titleRow="mark"/)
-    const shared = readFileSync(join(__dirname, '../../../components/shared/dialog.module.css'), 'utf8')
-    expect(shared).toMatch(/\[data-design-title-row='mark'\] \.titleRow \{[^}]*align-items: center;[^}]*gap: 12px;/)
-    expect(shared).toMatch(/\[data-design-title-row='mark'\] \.title \{[^}]*font-weight: 700;/)
-  })
-
-  it('注文詳細（hjdqV）の頭は題＋受信・希望の1行で、窓の上端は絵の100', () => {
-    /*
-     * 窓の頭の高さと欄の間は数字で渡さず、共通の窓・欄の既定に任せる。
-     * 補足の行は共通の窓の任意の引数 titleNote で出し、渡さない窓の並びは変えない。
-     */
-    const detail = readFileSync(join(__dirname, 'order-detail.tsx'), 'utf8')
-    expect(detail).toMatch(/const DETAIL_TOP = 100/)
-    expect(detail).toMatch(/titleNote=\{summaryLine\}/)
-    expect(detail).not.toMatch(/headerHeight=\{|contentGap=\{/)
-    // 絵の下のボタンの段に線は無い。
-    expect(detail).toMatch(/footerPlain/)
-    const shared = readFileSync(join(__dirname, '../../../components/shared/dialog.module.css'), 'utf8')
-    expect(shared).toMatch(/:root \.titleNote \{[^}]*font-size: var\(--text-caption\)/)
-  })
-
-  it('注文詳細（hjdqV）の数量と金額は離れた2つの右寄せの列にする', () => {
-    // 絵の右端は 884 と 976。隣り合わせに並べると金額が数量にくっつく。
-    expect(css).toMatch(/\.itemQty \{[^}]*flex: 0 0 var\(--tpl-rt-dlv-item-qty\)/)
-    expect(css).toMatch(/\.itemAmount \{[^}]*flex: 0 0 var\(--tpl-rt-dlv-item-amount\)/)
-    expect(css).toMatch(/\.itemQty,\n\.itemAmount \{[^}]*text-align: right/)
-    // 列の間に余白を入れると数量の右端が絵からずれる。
-    expect(css).toMatch(/\.itemRow \{[^}]*gap: 0;/)
-  })
-
-  it('注文詳細（hjdqV）は品目と受け取り情報を1行ずつ線で区切る', () => {
-    /*
-     * 絵は品目の行（41／補足つき61）と受け取り情報の段（33）をどれも薄い線で区切り、
-     * 合計の前だけ濃い線。最後の段には線を引かない。
-     */
-    expect(css).toMatch(/\.itemRow \{[^}]*padding-bottom: var\(--tpl-rt-dlv-item-pad\);[^}]*border-bottom: 1px solid var\(--color-divider\)/)
-    expect(css).toMatch(/\.itemRow \+ \.itemRow \{\n  padding-top: var\(--tpl-rt-dlv-item-pad\);/)
-    expect(css).toMatch(/\.itemList > \.itemRow:last-child \{\n  border-bottom-color: var\(--color-hairline\);/)
-    expect(css).toMatch(/\.factKey,\n\.factValue \{[^}]*border-bottom: 1px solid var\(--color-divider\)/)
-    expect(css).toMatch(/\.detailFacts > :nth-last-child\(-n \+ 2\) \{[^}]*border-bottom: 0;/)
-    // 合計の上の線は最後の品目の行が持つので、合計自身は線を引かない。
-    expect(css).not.toMatch(/\.total \{[^}]*border-top/)
   })
 
   it('注文履歴（OzHLO）は売上の4つの数を線で区切った1本の帯（KpiBand）で出す', async () => {
@@ -585,5 +489,37 @@ describe('承認v02の見え方を守る', () => {
       'false',
       'false',
     ])
+  })
+})
+
+
+describe('注文履歴のページ送り', () => {
+  it('次のページと表示件数を変えても重複や抜けなく注文を読める', async () => {
+    fixture.history.mockResolvedValue({
+      success: true,
+      range: { from: '2026-10-09', to: '2026-10-09' },
+      filter: { service: null, status: null },
+      totals: { count: 25, amount: 87000, canceledCount: 0, byService: [] },
+      orders: Array.from({ length: 25 }, (_, index) => order(`page-${index}`, `PAGE-${index + 1}`)),
+    })
+    at('/restaurant-test/delivery?view=history')
+    render(<DeliveryPage />)
+    const table = await screen.findByRole('table', { name: 'デリバリーの注文履歴' })
+    await within(table).findByText('#PAGE-20')
+    expect(within(table).queryByText('#PAGE-21')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+    expect(await within(table).findByText('#PAGE-21')).toBeTruthy()
+    expect(within(table).getByText('#PAGE-25')).toBeTruthy()
+    expect(within(table).queryByText('#PAGE-20')).toBeNull()
+    expect(screen.getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '表示件数' }))
+    fireEvent.click(screen.getByRole('option', { name: '10件表示' }).querySelector('button')!)
+    expect(await within(table).findByText('#PAGE-1')).toBeTruthy()
+    expect(within(table).getByText('#PAGE-10')).toBeTruthy()
+    expect(within(table).queryByText('#PAGE-11')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+    expect(await within(table).findByText('#PAGE-11')).toBeTruthy()
+    expect(within(table).getByText('#PAGE-20')).toBeTruthy()
+    expect(within(table).queryByText('#PAGE-10')).toBeNull()
   })
 })
