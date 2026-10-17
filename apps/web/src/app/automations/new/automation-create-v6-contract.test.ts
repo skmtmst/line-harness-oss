@@ -25,7 +25,7 @@ const PAGE = readFileSync(join(REPO, 'apps/web/src/v8/automations/create/create.
  * 生のソースを見ると自分の注釈に当たる。画面に出る文字だけを見る。
  */
 const PAGE_CODE = PAGE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-const TYPES = readFileSync(join(REPO, 'packages', 'shared', 'src', 'types.ts'), 'utf8')
+const TYPES = readFileSync(join(REPO, 'packages', 'shared', 'src', 'types', 'automations.ts'), 'utf8')
 
 /**
  * 画面が並べているきっかけの値。

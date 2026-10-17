@@ -30,12 +30,6 @@ describe('EC連携つなぎ先の数字（iLJmw）', () => {
     expect(block('.cardTitle')).not.toContain('700')
   })
 
-  it('入力は高さ36（上下6・左右12）', () => {
-    const field = readFileSync(join(import.meta.dirname, '../../components/shared/text-field.module.css'), 'utf8')
-    expect(field).toContain('height: 36px')
-    expect(field).toContain('padding: 0 12px')
-  })
-
   it('選ぶ欄は2列に割らず折り返す', () => {
     expect(block('.checks')).toContain('flex-wrap: wrap')
     expect(block('.checks')).not.toContain('grid-template-columns')

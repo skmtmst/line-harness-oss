@@ -1,5 +1,5 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { parseExecutionDateRange } from '@line-crm/shared';
+import { parseExecutionDateRange, type ExecutionRunStatus } from '@line-crm/shared';
 import { Hono } from 'hono';
 import {
   getAutoReplies,
@@ -18,15 +18,6 @@ import {
 } from '../services/auto-reply.js';
 
 const autoReplyRuns = new Hono<Env>();
-
-type ExecutionRunStatus =
-  | 'queued'
-  | 'claimed'
-  | 'succeeded'
-  | 'skipped'
-  | 'retry_wait'
-  | 'permanent_failed'
-  | 'cancelled';
 
 interface AutoReplyRun {
   id: string;

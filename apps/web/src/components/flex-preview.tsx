@@ -42,8 +42,13 @@ interface FlexNode {
   position?: string
   borderWidth?: string
   borderColor?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any
+  hero?: FlexNode
+  header?: FlexNode
+  body?: FlexNode
+  footer?: FlexNode
+  justifyContent?: string
+  // 未知のLINE属性は受け入れるが、描画前に既知の型へ絞る。
+  [key: string]: unknown
 }
 
 const sizeMap: Record<string, string> = {
@@ -217,30 +222,30 @@ function FlexBubble({ bubble, maxWidth }: { bubble: FlexNode; maxWidth?: number 
       {bubble.hero && <FlexNodeRenderer node={bubble.hero} />}
       {bubble.header && (
         <div style={{
-          backgroundColor: (bubble.header as FlexNode).backgroundColor || 'transparent',
-          padding: (bubble.header as FlexNode).paddingAll || '16px',
+          backgroundColor: bubble.header.backgroundColor || 'transparent',
+          padding: bubble.header.paddingAll || '16px',
         }}>
-          {((bubble.header as FlexNode).contents || []).map((child: FlexNode, i: number) => (
+          {(bubble.header.contents || []).map((child: FlexNode, i: number) => (
             <FlexNodeRenderer key={i} node={child} />
           ))}
         </div>
       )}
       {bubble.body && (
         <div style={{
-          backgroundColor: (bubble.body as FlexNode).backgroundColor || 'transparent',
-          padding: (bubble.body as FlexNode).paddingAll || '16px',
+          backgroundColor: bubble.body.backgroundColor || 'transparent',
+          padding: bubble.body.paddingAll || '16px',
         }}>
-          {((bubble.body as FlexNode).contents || []).map((child: FlexNode, i: number) => (
+          {(bubble.body.contents || []).map((child: FlexNode, i: number) => (
             <FlexNodeRenderer key={i} node={child} />
           ))}
         </div>
       )}
       {bubble.footer && (
         <div style={{
-          backgroundColor: (bubble.footer as FlexNode).backgroundColor || 'transparent',
-          padding: (bubble.footer as FlexNode).paddingAll || '16px',
+          backgroundColor: bubble.footer.backgroundColor || 'transparent',
+          padding: bubble.footer.paddingAll || '16px',
         }}>
-          {((bubble.footer as FlexNode).contents || []).map((child: FlexNode, i: number) => (
+          {(bubble.footer.contents || []).map((child: FlexNode, i: number) => (
             <FlexNodeRenderer key={i} node={child} />
           ))}
         </div>

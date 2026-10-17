@@ -69,7 +69,7 @@
   --color-action: var(--color-accent-deep);
   --color-action-hover: var(--color-accent);
   --color-action-soft: var(--color-accent-soft);
-  --color-focus-ring: #2563eb;
+  --color-focus-ring: var(--polish-focus);
   --color-on-action: #ffffff;
 
   /*
@@ -235,10 +235,10 @@
    * トークンが2つあることを機械で見つけられない（`radius-v6-control` が
    * 8px で別名のまま残っていたのがそれ）。
    */
-  --radius-control: 10px;
+  --radius-control: var(--polish-radius-control);
   /* ★V7 の 12px 段（カード・ダイアログ・知らせ）。card と同値なのは意図。 */
-  --radius-panel: 16px;
-  --radius-icon: 6px;
+  --radius-panel: var(--polish-radius-dialog);
+  --radius-icon: var(--polish-radius-small);
   --radius-none: 0;
   --radius-chart-dot: 2px;
   --radius-chart-bar: 4px;
@@ -248,7 +248,7 @@
   --radius-tile-sm: 6px;
   --radius-tile: 10px;
   /* Pencil ★V8 切り替えの項目（dtJVi）。器は $radius-control、中の項目は 8。 */
-  --radius-segment: 10px;
+  --radius-segment: var(--polish-radius-control);
   /* Pencil ★V8 の時刻の欄（提案 YCOoR）。入力欄の角丸 10。 */
   --radius-field: var(--polish-radius-control);
   /* Pencil `$radius-lg`(18px)。`PhxG6` の友だちアバター(40x40)と
@@ -286,10 +286,10 @@
    *
    * 行の高さは Tailwind v4 の `--text-*--line-height` 同伴変数で持つ。
    * `text-body` などを書くだけで物差しの行の高さが付く。 */
-  --text-caption: 12px;
+  --text-caption: var(--polish-text-support);
   --text-caption--line-height: 1.5;
-  --text-label: 12px;
-  --text-body: 13px;
+  --text-label: var(--polish-text-support);
+  --text-body: var(--polish-text-body);
   --text-body--line-height: 1.5;
   --text-lead: 15px;
   --text-lead--line-height: 1.4;
@@ -322,7 +322,7 @@
   --font-weight-extrabold: 600;
   --text-display: 22px;
   --text-metric: 28px;
-  --text-micro: 11px;
+  --text-micro: var(--polish-text-note);
   --text-micro--line-height: 1.5;
   --text-nano: 10px;
 
@@ -496,7 +496,7 @@
   --radius-button-primary: 8px;
   --color-hover: #1d1d1f0a;
   --color-press: #1d1d1f14;
-  --focus-ring: 2px solid #2563eb;
+  --focus-ring: var(--polish-focus-width) solid var(--polish-focus);
   --shadow-toggle-knob: 0 1px 2px #1d1d1f29;
 
   --polish-tooltip-width: 288px;
@@ -586,13 +586,11 @@
 
 :root {
   --color-slot-bg: #f7f8fa;           /* 薄い灰の地（#f7f8fa） */
-  --tpl-slot-h: 260px;                /* ふだんの高さ（絵の 380×260） */
-  --tpl-slot-h-compact: 140px;        /* 小さい所（カルーセルのカード 180×140） */
+  --tpl-slot-h: 260px;                /* ふだんの高さ（絵の 380×260） */        /* 小さい所（カルーセルのカード 180×140） */
   --tpl-rt-post-image-w: 320px;
   --tpl-slot-w-compact: 180px;        /* 小さい所を横に並べるときの幅 */
   --tpl-slot-row-gap: 12px;           /* 枠を横に並べるときの間 */
   --tpl-slot-pad: 20px;               /* 枠の内側 */
-  --tpl-slot-pad-compact: 10px;
   --tpl-slot-gap: 4px;                /* 題・説明・制限の間 */
   --tpl-slot-icon: 34px;              /* ファイルの印 */
   --tpl-slot-icon-compact: 22px;
@@ -805,7 +803,6 @@
   --text-lh: 1.5;
   --color-control-border: #1d1d1f1f;
   --control-shadow: 0 1px 2px rgba(29, 29, 31, 0.06);
-  --color-choice-border: #c9ced6;
   --color-toggle-locked: #dadde2;
   --color-status-warn-soft: #f973161a;
   --color-track: #1d1d1f0a;
@@ -1017,7 +1014,7 @@
   --tpl-hql-form-storage-w: 136px; --tpl-hql-form-state-w: 96px; --tpl-hql-form-dest-w: 290px; --tpl-hql-form-actions-w: 148px;
   /* 統括のメンバー・アカウントの残り（作業役 hq） */ --tpl-hq-mem-radio-gap: 20px; --tpl-hq-mem-check-pad: 12px; --tpl-hq-mem-check-gap: 6px; --tpl-hq-mem-confirm-row-h: 35.5px; --tpl-hq-mem-confirm-label-w: 200px; --tpl-hq-home-account-h: 240px; --tpl-hq-home-warn-pad-end: 0px; --tpl-hq-home-warn-pull: -10px;
   --tpl-an-tabs-gap: 24px; --tpl-an-tab-pad-bottom: 8px; --tpl-an-tab-line: 2px; --tpl-an-tab-lh: 19px; --tpl-an-ro-margin: 12px 0 13px; --tpl-an-kpi-menu: 24px; --tpl-an-actions-extra: 4px;
-  --tpl-an-body-pad: 14px 24px 24px; --tpl-an-split-gap: 16px; --tpl-an-side-gap: 12px; --tpl-an-side-w: 320px; --tpl-an-history-w: 460px; --tpl-an-card-pad: var(--polish-space-card); --tpl-an-card-gap: var(--polish-space-row); --tpl-an-routes-gap: 12px; --tpl-an-removed-gap: 10px; --tpl-an-head-gap: 6px;
+  --tpl-an-body-pad: 14px 24px 24px; --tpl-an-split-gap: 16px; --tpl-an-side-gap: 12px; --tpl-an-side-w: 320px; --tpl-an-card-pad: var(--polish-space-card); --tpl-an-card-gap: var(--polish-space-row); --tpl-an-routes-gap: 12px; --tpl-an-removed-gap: 10px; --tpl-an-head-gap: 6px;
   /* ★V8 編集・詳細の画面（リッチメニューの編集・テンプレートの詳細・タグの編集）。 */
   --tpl-eds-back-gap: 4px; --tpl-eds-aside-w: 380px; --tpl-eds-aside-pad: var(--polish-space-card); --tpl-eds-aside-gap: 14px;
   --tpl-eds-content-pad: 24px 28px; --tpl-eds-content-gap: 16px; --tpl-eds-card-pad: var(--polish-space-section); --tpl-eds-card-gap: var(--polish-space-row);
@@ -1372,7 +1369,7 @@
   --tpl-scn-col-select: 40px; --tpl-scn-col-grip: 30px; --tpl-scn-col-name: 608px; --tpl-scn-col-count: 146px; --tpl-scn-col-state: 96px; --tpl-scn-col-menu: 60px;
   --tpl-scn-row-h: var(--polish-table-row); --tpl-scn-saved-w: 160px; --tpl-scn-saved-icon-w: 48px; --tpl-scn-folder-w: 150px; --tpl-scn-skeleton-gap: 4px; --tpl-scn-sub-gap: 2px; --tpl-scn-count-gap: 1px; --tpl-scn-narrow-head-h: 34px;
   --tpl-scn-dup-gap: 14px; --tpl-scn-dup-field-gap: var(--polish-space-field); --tpl-scn-dup-box-pad: 12px; --tpl-scn-dup-box-gap: 4px; --tpl-scn-dup-note-pad: 10px 14px; --tpl-scn-dup-note-gap: 10px;
-  --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
+  --tpl-row-pad-block: 12px; --tpl-sub-gap: 4px;
   /* 共通情報の一覧（FM94M・XIzkJ・OxSw8・Hhl9M・xxKtW）。 */
   --tpl-cv-gap-s: 8px; --tpl-cv-export-w: 320px; --tpl-cv-band-gap: 10px; --tpl-cv-band-after: 8px; --tpl-cv-band-pad: 10px 14px; --tpl-cv-band-lh: 20px; --tpl-cv-fix-gap: 4px; --tpl-cv-note-lh: 17px;
   --tpl-cv-alert-after: 6px; --tpl-cv-alert-gap: 10px; --tpl-cv-alert-pad: 10px 14px; --tpl-cv-alert-lh: 17px;
@@ -1921,7 +1918,7 @@
 /*
  * ★V8 受信箱の左の列の頭（M0393「1. ふだん」XqSvX の「上」）。
  * 列の幅・頭の余白と段の間・札・選ぶ欄・状態の切り替えの実寸。
- * 画面側（chats/inbox-v8.module.css）は var() で読む。v7 には効かない。
+ * 現役の受信箱（v8/inbox-chat）は共通の値を var() で読む。
  */
 :root {
   --tpl-inbox-list-w: 372px;              /* 一覧の列の幅（絵の 1440 の幅） */
@@ -2915,8 +2912,8 @@ select:not([multiple]):not(.appearance-none) {
 
 /* B-152：V8の本文。数字の大きさ・数の帯は別の値を保つ。 */
 :root {
-  --text-caption: 12px;
-  --text-micro: 11px;
+  --text-caption: var(--polish-text-support);
+  --text-micro: var(--polish-text-note);
   --text-lead: 15px;
   --text-heading: var(--polish-text-section);
 }
@@ -2956,11 +2953,11 @@ html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'],
 /* B-152・仕上げ9。旧テーマの角丸は維持する。 */
 :root {
   --radius-mini: var(--polish-radius-small);
-  --radius-icon: 6px;
-  --radius-control: 10px;
+  --radius-icon: var(--polish-radius-small);
+  --radius-control: var(--polish-radius-control);
   --radius-field: var(--polish-radius-control);
   --radius-card: var(--polish-radius-card);
-  --radius-panel: 16px;
+  --radius-panel: var(--polish-radius-dialog);
   --radius-large: var(--polish-radius-dialog);
   --radius-pill: var(--polish-radius-pill);
 }
@@ -2981,22 +2978,22 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
 
 /* B-159 / B-161 / B-180：採用済みの値。部品ごとの写しよりこの値を優先する。 */
 :root {
-  --text-body: 13px;
-  --text-label: 12px;
-  --radius-segment: 10px;
+  --text-body: var(--polish-text-body);
+  --text-label: var(--polish-text-support);
+  --radius-segment: var(--polish-radius-control);
   --color-table-head: #f7f8fa;
-  --color-focus-ring: #2563eb;
+  --color-focus-ring: var(--polish-focus);
   --shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12);
   --shadow-float: var(--shadow-controls-pop);
   --shadow-overlay: var(--shadow-controls-pop);
   --select-menu-shadow: var(--shadow-controls-pop);
   --v8-parts-dialog-shadow: var(--shadow-controls-pop);
   --shadow-controls-toggle: 0 1px 2px rgba(29, 29, 31, 0.16);
-  --color-badge-neutral-bg: #94a3b81a; --color-badge-neutral: #475569;
-  --color-badge-success-bg: #16a34a1a; --color-badge-success: #087a3e;
-  --color-badge-warning-bg: #f973161a; --color-badge-warning: #c2410c;
-  --color-badge-danger-bg: #ef44441a; --color-badge-danger: #b91c1c;
-  --color-badge-info-bg: #2563eb1a; --color-badge-info: #1d4ed8;
+  --color-badge-neutral-bg: var(--polish-status-neutral-bg); --color-badge-neutral: var(--polish-status-neutral-ink);
+  --color-badge-success-bg: var(--polish-status-success-bg); --color-badge-success: var(--polish-status-success-ink);
+  --color-badge-warning-bg: var(--polish-status-warning-bg); --color-badge-warning: var(--polish-status-warning-ink);
+  --color-badge-danger-bg: var(--polish-status-danger-bg); --color-badge-danger: var(--polish-status-danger-ink);
+  --color-badge-info-bg: var(--polish-status-info-bg); --color-badge-info: var(--polish-status-info-ink);
   --tpl-folder-create-h: 36px;
   --tpl-folder-create-pad: 0 16px;
   --tpl-button-weight: 600;
@@ -3013,13 +3010,20 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --tpl-tag-pill-h: 24px;
   --tpl-section-title-size: 15px;
   --tpl-section-title-weight: 700;
+  /* 共通入力欄の実寸。1行と1行分の複数行で同じ値を使う。 */
+  --tpl-field-h: 36px;
+  --tpl-field-lh: 21px;
+  --tpl-field-pad-x: var(--polish-space-field);
+  --tpl-field-pad-y: calc((var(--tpl-field-h) - var(--tpl-field-lh)) / 2);
+  --tpl-textarea-min-h: 120px;
+  --tpl-textarea-pad: 14px;
+  --tpl-textarea-lh: 1.7;
   --tpl-field-label-size: 12px;
   --tpl-field-label-weight: 500;
   --tpl-field-label-lh: 18px;
   --tpl-field-badge-lh: 14px;
   --tpl-card-pad: 16px;
   --tpl-notice-pad: 12px 16px;
-  --tpl-thead-pad-side: 16px;
 }
 
 /* B-178：一覧の骨組み（v19Ivv）。画面の寸法ではなく部品の値。 */

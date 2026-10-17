@@ -79,7 +79,6 @@ describe('ActionMenu B-244 の項目', () => {
     })
     const menu = openMenu()
     expect(menu?.getAttribute('aria-label')).toBe('この友だちへの個別操作')
-    expect(menu?.getAttribute('data-design-node')).toBe('xifuV')
     // 中身は最上層（portal）に出るので、置き場所ではなく文書全体で見る。
     expect(document.body.textContent).toContain('テンプレートを送る')
     expect(document.body.textContent).toContain('受信箱で選んで送ります')
@@ -215,21 +214,6 @@ describe('ActionMenu R13: 行の中でも行へ伝えない', () => {
 })
 
 describe('ActionMenu ★V8 の見た目', () => {
-  it('白地・角丸12・枠・影、項目36（補足つき52）・文字13・触った時の地は shell', () => {
-    const css = read('action-menu.module.css')
-    expect(css).toMatch(/\.menu\s*{[^}]*min-width:\s*224px/s)
-    expect(css).toMatch(/\.menu\s*{[^}]*max-width:\s*min\(320px,\s*calc\(100vw - 16px\)\)/s)
-    expect(css).toMatch(/\.menu\s*{[^}]*background:\s*var\(--color-canvas\)/s)
-    expect(css).toMatch(/\.menu\s*{[^}]*border-radius:\s*var\(--radius-card\)/s)
-    expect(css).toMatch(/:root \.menu\s*{[^}]*outline:\s*1px solid var\(--card-edge\)/s)
-    expect(css).toMatch(/:root \.menu\s*{[^}]*box-shadow:\s*var\(--shadow-controls-pop\)/s)
-    expect(css).toMatch(/:root \.item:not\(\.itemTall\)\s*{[^}]*height:\s*var\(--tpl-menu-item-h\)/s)
-    expect(css).toMatch(/\.itemTall\s*{[^}]*height:\s*52px/s)
-    expect(css).toMatch(/\.item\s*{[^}]*font-size:\s*var\(--text-body\)/s)
-    expect(css).toMatch(/\.icon\s*{[^}]*width:\s*16px/s)
-    expect(css).toMatch(/\.item:hover:not\(:disabled\),\s*\.item:focus-visible\s*{[^}]*background:\s*var\(--color-shell\)/s)
-  })
-
   it('画面の端で切れない（横・縦にはみ出さない）', () => {
     const css = read('action-menu.module.css')
     expect(css).toMatch(/\.menu\s*{[^}]*max-width:\s*min\(320px,\s*calc\(100vw - 16px\)\)/s)

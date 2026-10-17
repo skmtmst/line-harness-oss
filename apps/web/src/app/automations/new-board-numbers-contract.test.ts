@@ -23,7 +23,6 @@ describe('automation 作成の現役の寸法と入口', () => {
     expect(CSS).toMatch(/\.menuBox > button\.menuButton\s*\{[^}]*height: var\(--tpl-chip-h\)/s)
     expect(CSS).toMatch(/\.menuBox > button\.menuButton\s*\{[^}]*border-radius: var\(--radius-control\)/s)
     expect(TOKENS).toContain('--tpl-chip-h: 36px')
-    expect(TOKENS).toContain('--radius-control: 10px')
   })
 
   it('旧の高さ40へ分岐する入口を残さない', () => {

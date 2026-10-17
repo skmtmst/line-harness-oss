@@ -1423,99 +1423,6 @@
         }
       ]
     },
-    "page-header": {
-      "name": "V5 共通ページヘッダー",
-      "pencilNodes": [
-        "RWNQP"
-      ],
-      "role": "sample",
-      "status": "active",
-      "reviewStatus": "confirmed",
-      "code": "src/components/layout/header.tsx",
-      "cssModule": "src/components/layout/header.module.css",
-      "components": [
-        "Header"
-      ],
-      "cssPrefix": "header",
-      "pencilUsage": "画面内配置のためref参照なし",
-      "lastCheckedAt": "2026-10-09",
-      "note": "ダッシュボードV5のHeader RWNQPから共通化。長い題と複数操作は折り返し、機能を削らない。",
-      "routes": {
-        "pilot": [
-          "/",
-          "/chats",
-          "/friends",
-          "/tags"
-        ],
-        "impact": "Headerを使う管理画面"
-      },
-      "visualVerification": {
-        "status": "unverified",
-        "requiredViewports": [
-          1440,
-          1920
-        ],
-        "reason": "4画面の同一状態画像は実証ゲートで取得する。"
-      },
-      "declarations": [
-        {
-          "pencil": "RWNQP height: 76",
-          "class": "root",
-          "prop": "min-height",
-          "source": "76px",
-          "resolved": "76px"
-        },
-        {
-          "pencil": "RWNQP alignItems: center",
-          "class": "root",
-          "prop": "align-items",
-          "source": "center",
-          "resolved": "center"
-        },
-        {
-          "pencil": "RWNQP justifyContent: space_between",
-          "class": "root",
-          "prop": "justify-content",
-          "source": "space-between",
-          "resolved": "space-between"
-        },
-        {
-          "pencil": "RWNQP title fill: $ink",
-          "class": "title",
-          "prop": "color",
-          "source": "var(--color-ink)",
-          "resolved": "#1d1d1f"
-        },
-        {
-          "pencil": "RWNQP title fontSize: $size-display → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 ページの題 22/700・EnlYo（旧 30px）",
-          "class": "title",
-          "prop": "font-size",
-          "source": "22px",
-          "resolved": "22px"
-        },
-        {
-          "pencil": "RWNQP title fontWeight: 600 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 ページの題 22/700・EnlYo（旧 600）",
-          "class": "title",
-          "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
-        },
-        {
-          "pencil": "V5 description fill: $ink-secondary",
-          "class": "description",
-          "prop": "color",
-          "source": "var(--color-ink-secondary)",
-          "resolved": "#4a5565"
-        },
-        {
-          "pencil": "V5 description fontSize: $size-body → 2026-10-09 V8（Pen 決まり B-146〜B-161）: EnlYo 説明 13（旧 14px）",
-          "class": "description",
-          "prop": "font-size",
-          "source": "13px",
-          "resolved": "13px"
-        }
-      ]
-    },
     "breadcrumb": {
       "name": "V5 共通パンくず",
       "pencilNodes": [
@@ -3176,35 +3083,6 @@
           "resolved": "36px"
         }
       ]
-    },
-    "slide-panel": {
-      "name": "V8 手順・タブの中身の移り変わり",
-      "pencilNodes": [],
-      "role": "canonical",
-      "status": "active",
-      "reviewStatus": "confirmed",
-      "code": "src/components/shared/slide-panel.tsx",
-      "cssModule": "src/components/shared/slide-panel.module.css",
-      "components": [
-        "SlidePanel"
-      ],
-      "cssPrefix": "slide-panel",
-      "pencilUsage": "手順・タブの切り替えの中身",
-      "lastCheckedAt": "2026-10-04",
-      "note": "次へは右から24px＋薄く、戻るは逆（240ms glide）。V8 のときだけ。",
-      "routes": {
-        "active": [],
-        "impact": "手順・タブのある管理画面"
-      },
-      "visualVerification": {
-        "status": "unverified",
-        "requiredViewports": [
-          1440,
-          1152
-        ],
-        "reason": "司令塔が録画で確かめる。"
-      },
-      "declarations": []
     },
     "notice": {
       "name": "★V7 共通の帯（Notice）",

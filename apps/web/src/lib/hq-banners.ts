@@ -419,13 +419,6 @@ export function relativeUpdated(iso: string, now = new Date()): string {
   return formatRelative(date, now)
 }
 
-/** 「412KB」「1.2MB」 */
-export function fileSizeLabel(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
-}
-
 /** 「JPEG」「PNG」 */
 export function formatLabel(mimeType: string): string {
   const sub = mimeType.split('/')[1] ?? mimeType
@@ -564,11 +557,6 @@ export function inputFromGeneration(g: BannerGeneration): BannerGenerationInput 
     count: 1,
     references: (g.references ?? []).map((reference) => ({ ...reference })),
   }
-}
-
-/** 生成中の札の文。「0/2枚 生成中」 */
-export function progressBadgeText(g: BannerGeneration): string {
-  return `${g.doneCount}/${g.requestedCount}枚 生成中`
 }
 
 /** いま動いている生成（queued / running）。無ければ null。 */

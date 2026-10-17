@@ -1,4 +1,5 @@
-import type { Broadcast, LineMessageType } from './types.js';
+import type { Broadcast } from './types/broadcasts.js';
+import type { LineMessageType } from './types/messages.js';
 export interface SegmentRule {
   /** 有効な種類と値の組み合わせは、保存時に条件ビルダーで検証する。 */
   type: string;

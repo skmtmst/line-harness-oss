@@ -232,9 +232,9 @@
 :global(:root) .frame[data-has-footer] > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
 :global(:root) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { align-self: flex-start; }
 :global(:root) .footer { flex-shrink: 0; }
-/* 本文末尾の余白へ浮かせる。カード内の下余白と本文の下余白を重ねて使う。 */
+/* 帯の位置は保ち、入力のスクロール領域は帯の上までに収める。 */
 :global(:root) .footer[data-footer-placement='floating'] {
-  margin-top: calc(-1 * (var(--polish-space-section) + var(--polish-space-row)));
+  margin-top: 0;
 }
 
 /* 入力と見え方は別々に送る。本文全体のスクロールバーで左右の列幅を削らない。 */

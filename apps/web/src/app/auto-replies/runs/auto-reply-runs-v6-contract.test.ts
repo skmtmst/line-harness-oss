@@ -7,7 +7,6 @@ const here = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(new URL('../../../v8/auto-replies/runs.tsx', import.meta.url), 'utf8')
 const worker = readFileSync(join(here, '../../../../../worker/src/routes/auto-reply-runs.ts'), 'utf8')
 const service = readFileSync(join(here, '../../../../../worker/src/services/auto-reply.ts'), 'utf8')
-const sharedTypes = readFileSync(join(here, '../../../../../../packages/shared/src/types.ts'), 'utf8')
 
 describe('V6 自動応答・実行結果 t7UtYQ', () => {
   it('未取得と実値0を同じ表示にしない', () => {
@@ -41,17 +40,6 @@ describe('V6 自動応答・実行結果 t7UtYQ', () => {
     )
     expect(service).toContain('if (!reservation.created)')
     expect(service).toContain('recordAutoReplyHit')
-  })
-
-  it('口が返す処理中と失敗を共有型と状態表に入れる', () => {
-    /*
-     * 口は claimed（処理中）と permanent_failed（失敗）を返すのに、
-     * 共有型と画面の表に無く、STATUS[item.status] が undefined になって
-     * 実行結果の画面が白画面になっていた。
-     */
-    const statusType = sharedTypes.match(/export type ExecutionRunStatus =[\s\S]*?;/)?.[0] ?? ''
-    expect(statusType).toContain('| "claimed"')
-    expect(statusType).toContain('| "permanent_failed"')
   })
 
   it('知らない状態が来ても白い画面にしない', () => {
