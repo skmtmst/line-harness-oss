@@ -1,3 +1,4 @@
+import { withDisplayReadCache } from '@line-crm/db/src/display-read-cache.js';
 import { restaurantCivilTime } from './restaurant-booking.js';
 import { styleDashboardSidebar } from './style-dashboard-sidebar.js';
 import { StyleError } from './style-setup.js';
@@ -61,6 +62,7 @@ export async function styleSnapshot(
     analytics: Record<string, unknown>;
   }
 > {
+  return withDisplayReadCache(db, async db => {
   if (
     query.compare &&
     !['previous', 'last_week', 'last_year'].includes(query.compare)
@@ -334,4 +336,5 @@ export async function styleSnapshot(
     people: personMetrics(rows, from, to, now, settings).people,
     analytics,
   };
+  });
 }
