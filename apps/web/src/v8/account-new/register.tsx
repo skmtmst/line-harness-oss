@@ -38,24 +38,9 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 /*
  * ★v06 LINEアカウントを登録（板 ①p6zMkA ②Fqy29 ③Lwxyh ④X0pGdw ⑤Plmq1）。
- * 利用者承認済みの LINE新規追加_v06.pen（2026-10-15 承認）どおりに書き換えた。
- *
- * V8-B（①xj3zz〜⑤TvXII・結果の窓 qw80E）との違い：
- * ・5段の中身を「事前確認／アカウント接続／接続確認／使い方を選ぶ／完了」に変えた。
- * ・②は小さな段が3つ（Messaging API → LINE Login → Webhook）。LINE Developers 側で
- *   やることはチェックで確かめてから次へ進む。
- * ・③は小さな段が2つ。1つめで5行を1行ずつ確かめ、通ったら「次へ」で登録する（ここで
- *   アカウントが作られる）。2つめで自分のスマホから友だち追加して届くかを見る。
- * ・結果の窓（qw80E）はやめて、③の画面に行を出す。
- * ・④は使い方（ひな形）を選ぶ。いまは飲食店向けだけ開いている。
- * ・⑤は友だちの引き継ぎの進み具合を出して、終わったら完了にする。
- *
- * 使う口は今までと同じ（api.lineAccounts.connectCheck / connect / stepFollowerImport /
- * followerImportState / followerInsight、api.lineAccounts.list、api.friends.list）。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- *
- * 取り込みの進捗は followerImportState を読むだけでは次の cron（5 分ごと）まで動かないので、
- * 画面を開いている間は stepFollowerImport で続きを進める。閉じたあとは cron が拾う。
+ * 絵の正本は利用者承認済みの LINE新規追加_v06.pen（2026-10-15 承認）。
+ * ②の小さな段は正本どおり Messaging API → Webhook の設定 → LINE Login の順。
+ * 段の中身・使う口・端末の下書きなど、動きの一覧は同じ場所の BEHAVIOR.md。
  */
 
 const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string; lead: string }> = [
@@ -205,10 +190,8 @@ export default function AccountRegisterV8() {
     return () => { active = false; if (timer) clearTimeout(timer) }
   }, [currentStep, sub, createdId, testFollowed, saveErrors])
 
-  /* ⑤：画面を開いている間は続きを進める。読み取りだけだと次の cron（5 分ごと）まで
-   * 進まないので、1 回ぶんが終わったらすぐ次を呼ぶ。1 回ぶんは Worker 側の予算で
-   * 区切られ、カーソルは D1 に残る。画面を閉じても cron と「入る」が続きを拾う。
-   * 同じアカウントを別の経路が握っているときは busy が返るだけで壊れない。 */
+  /* ⑤：読み取りだけだと次の cron（5分ごと）まで進まないので、画面を開いている間は
+   * 1 回ぶんが終わるたびに次を呼ぶ。閉じたあとは cron と「入る」が続きを拾う。 */
   useEffect(() => {
     if (!createdId || !importRunning || !form.importFriends) return
     let active = true
@@ -228,7 +211,6 @@ export default function AccountRegisterV8() {
       }
     }
     void advance()
-
     return () => { active = false; if (timer) clearTimeout(timer) }
   }, [createdId, importRunning, form.importFriends, saveErrors])
 
@@ -243,7 +225,6 @@ export default function AccountRegisterV8() {
       } catch (saveFailure) {
         saveErrors.capture(saveFailure) /* 総数が出なくても引き継いだ数は出す。 */ }
     })()
-
     return () => { active = false }
   }, [currentStep, createdId, insightTotal, saveErrors])
 
@@ -300,7 +281,6 @@ export default function AccountRegisterV8() {
       return matchRegisteredAccountId(list.data, channelId)
     } catch (saveFailure) {
       saveErrors.capture(saveFailure)
-
       return null
     }
   }
@@ -336,10 +316,7 @@ export default function AccountRegisterV8() {
     } catch (saveFailure) {
       setCheckRunning(false)
       const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-
-      setError('LINEに接続できませんでした。時間をおいて、もう一度お試しください。') }
+      if (!fieldFailure) setError('LINEに接続できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -386,12 +363,10 @@ export default function AccountRegisterV8() {
       const recovered = await findRegisteredAccountId(form.channelId)
       if (recovered) {
         setRecoveredAccountId(recovered)
-        { if (!fieldFailure)
-        setError('保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。') }
+        if (!fieldFailure) setError('保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。')
         return
       }
-      { if (!fieldFailure)
-      setError('登録できませんでした。時間をおいて、もう一度お試しください。') }
+      if (!fieldFailure) setError('登録できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -409,13 +384,13 @@ export default function AccountRegisterV8() {
         return
       }
       if (sub === 2) {
-        const nextErrors = loginChannelErrors(form)
-        if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); return }
-        if (!allAcked(LOGIN_ACKS, acks)) return
+        if (!allAcked(WEBHOOK_ACKS, acks)) return
         setSub(3)
         return
       }
-      if (!allAcked(WEBHOOK_ACKS, acks)) return
+      const loginErrors = loginChannelErrors(form)
+      if (Object.keys(loginErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...loginErrors })); return }
+      if (!allAcked(LOGIN_ACKS, acks)) return
       setCurrentStep(3)
       setSub(1)
       return
@@ -462,10 +437,15 @@ export default function AccountRegisterV8() {
   const busy = Boolean(busyAction)
   // 登録したあとは戻らない（③の2つめから先）。
   const canBack = !createdId && (currentStep > 1 || sub > 1)
-  const nextBlocked = (currentStep === 2 && sub === 2 && !allAcked(LOGIN_ACKS, acks))
-    || (currentStep === 2 && sub === 3 && !allAcked(WEBHOOK_ACKS, acks))
+  const nextBlocked = (currentStep === 2 && sub === 2 && !allAcked(WEBHOOK_ACKS, acks))
+    || (currentStep === 2 && sub === 3 && !allAcked(LOGIN_ACKS, acks))
     || (currentStep === 3 && sub === 1 && !rowsOk)
     || (currentStep === 4 && !templateKey)
+  // v06 Fqy29／Lwxyh：②の中だけ「次のステップへ」と行き先を名前で書いた「戻る」。ほかの段は「次へ」「戻る」。
+  const backLabel = currentStep === 3 && sub === 1 ? 'LINEログインへ戻る'
+    : currentStep !== 2 ? '戻る'
+    : sub === 1 ? '事前確認へ戻る' : sub === 2 ? 'Messaging API へ戻る' : 'Webhook の設定へ戻る'
+  const nextLabel = currentStep === 3 && sub === 1 ? '登録する' : currentStep === 2 ? '次のステップへ' : '次へ'
 
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="wizard" boardId={shownStep.node}>
@@ -556,6 +536,31 @@ export default function AccountRegisterV8() {
                 </Card>
               )}
               {sub === 2 && (
+                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook の設定">
+                  <p className={styles.subBadge}>{badge}</p>
+                  <h2 className={styles.panelTitle}>Webhook の設定</h2>
+                  <div className={styles.field}>
+                    <span className={styles.groupLabel}>Webhook URL</span>
+                    <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--space-8) var(--space-8) var(--space-8) var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
+                      <span className={styles.endpointValue} ><TruncatedText value={String(webhookUrl ?? '')} url /></span>
+                      <CopyButton value={webhookUrl} />
+                    </Card>
+                  </div>
+                  <div className={styles.ackList}>
+                    {WEBHOOK_ACKS.map((ack) => (
+                      <div key={ack.key}>
+                        <SaveErrorField names={[ack.key]}><Checkbox checked={Boolean(acks[ack.key])} onCheckedChange={(next) => toggleAck(ack.key, next)}>{ack.label}</Checkbox></SaveErrorField>
+                        <p className={styles.ackNote}>{ack.note}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={styles.buttonRow}>
+                    <Button external href={developerChannelUrl(form.channelId)}  >LINE Developersでこのチャネルを開く</Button>
+                    <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />設定の場所を見る</Button>
+                  </div>
+                </Card>
+              )}
+              {sub === 3 && (
                 <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="LINE Login のチャネル">
                   <p className={styles.subBadge}>{badge}</p>
                   <h2 className={styles.panelTitle}>LINE Login のチャネル</h2>
@@ -585,31 +590,6 @@ export default function AccountRegisterV8() {
                   </div>
                   <div className={styles.buttonRow}>
                     <Button external href={developerChannelUrl(form.loginChannelId)}  >LINE Developersでこのチャネルを開く</Button>
-                  </div>
-                </Card>
-              )}
-              {sub === 3 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook の設定">
-                  <p className={styles.subBadge}>{badge}</p>
-                  <h2 className={styles.panelTitle}>Webhook の設定</h2>
-                  <div className={styles.field}>
-                    <span className={styles.groupLabel}>Webhook URL</span>
-                    <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--space-8) var(--space-8) var(--space-8) var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
-                      <span className={styles.endpointValue} ><TruncatedText value={String(webhookUrl ?? '')} url /></span>
-                      <CopyButton value={webhookUrl} />
-                    </Card>
-                  </div>
-                  <div className={styles.ackList}>
-                    {WEBHOOK_ACKS.map((ack) => (
-                      <div key={ack.key}>
-                        <SaveErrorField names={[ack.key]}><Checkbox checked={Boolean(acks[ack.key])} onCheckedChange={(next) => toggleAck(ack.key, next)}>{ack.label}</Checkbox></SaveErrorField>
-                        <p className={styles.ackNote}>{ack.note}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className={styles.buttonRow}>
-                    <Button external href={developerChannelUrl(form.channelId)}  >LINE Developersでこのチャネルを開く</Button>
-                    <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />設定の場所を見る</Button>
                   </div>
                 </Card>
               )}
@@ -783,13 +763,13 @@ export default function AccountRegisterV8() {
         <StickyBar presentation="account-registration" actions={currentStep === 5 ? (
             <Button href="/hq" variant="primary"><ArrowLeft size={15} aria-hidden="true" />統括コンソールへ戻る</Button>
           ) : currentStep === 3 && sub === 1 && !rowsOk ? <>
-            <Button type="button" disabled={busy || !canBack} onClick={moveBack}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
+            <Button type="button" disabled={busy || !canBack} onClick={moveBack}><ArrowLeft size={15} aria-hidden="true" />{backLabel}</Button>
             <Button type="button" variant="primary" disabled={busy || checkRunning} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={15} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>
           </> : <>
             {canBack
-              ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
+              ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={15} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
-            <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save'} busyLabel="登録しています…"><ArrowRight size={15} aria-hidden="true" />{currentStep === 3 && sub === 1 ? '登録する' : '次へ'}</Button>
+            <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save'} busyLabel="登録しています…"><ArrowRight size={15} aria-hidden="true" />{nextLabel}</Button>
           </>} />
       </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />

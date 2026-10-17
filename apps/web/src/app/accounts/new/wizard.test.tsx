@@ -54,24 +54,29 @@ beforeEach(() => {
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
+/** ②の中だけ進むボタンの名前が違う（v06 Fqy29）。 */
+const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
 
-/** ①から②の3段を通って③Step1まで進む。入力を変えると確認がやり直しになるので、先に全部入れる。 */
+/**
+ * v06（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * 入力を変えると確認がやり直しになるので、先に全部入れる。
+ */
 function enterCheckStep() {
   render(<NewLineAccountPage />)
   next()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
-  next()
+  nextStep()
+  ack('Webhookの利用をONにした')
+  ack('Webhookの再送をONにした')
+  ack('エラーの統計情報をONにした')
+  nextStep()
   fill('v8-login-channel-id', '2007123456')
   fill('v8-login-channel-secret', 'synthetic-login-secret')
   ack('友だち追加オプションで、この公式アカウントをリンクした')
   ack('チャネルを「開発中」から「公開済み」にした')
-  next()
-  ack('Webhookの利用をONにした')
-  ack('Webhookの再送をONにした')
-  ack('エラーの統計情報をONにした')
-  next()
+  nextStep()
   expect(screen.getByRole('button', { name: '接続を確かめる' })).toBeTruthy()
 }
 
@@ -99,15 +104,14 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.getByText('Step 1 / 3')).toBeTruthy()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
-    next()
-    expect(screen.getByText('LINE Login のチャネル', { selector: 'h2' })).toBeTruthy()
-    expect(screen.getByText('Step 2 / 3')).toBeTruthy()
-    fill('v8-login-channel-id', '2007123456')
-    fill('v8-login-channel-secret', 'synthetic-login-secret')
-    ack('友だち追加オプションで、この公式アカウントをリンクした')
-    ack('チャネルを「開発中」から「公開済み」にした')
-    next()
+    nextStep()
     expect(screen.getByText('Webhook の設定', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Step 2 / 3')).toBeTruthy()
+    ack('Webhookの利用をONにした')
+    ack('Webhookの再送をONにした')
+    ack('エラーの統計情報をONにした')
+    nextStep()
+    expect(screen.getByText('LINE Login のチャネル', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 3 / 3')).toBeTruthy()
   })
 
@@ -116,14 +120,19 @@ describe('LINEアカウント作成ウィザード', () => {
     next()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
-    next()
+    nextStep()
+    ack('Webhookの利用をONにした')
+    ack('Webhookの再送をONにした')
+    ack('エラーの統計情報をONにした')
+    nextStep()
     fill('v8-login-channel-id', '2007123456')
     fill('v8-login-channel-secret', 'synthetic-login-secret')
-    expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
+    const step = () => screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
+    expect(step().disabled).toBe(true)
     ack('友だち追加オプションで、この公式アカウントをリンクした')
-    expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(step().disabled).toBe(true)
     ack('チャネルを「開発中」から「公開済み」にした')
-    expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(step().disabled).toBe(false)
   })
 
   it('用意方法を切り替えても公式アカウント作成リンクを別タブで開ける', () => {

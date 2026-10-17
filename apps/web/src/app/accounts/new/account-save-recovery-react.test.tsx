@@ -53,24 +53,29 @@ beforeEach(() => {
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
+/** ②の中だけ進むボタンの名前が違う（v06 Fqy29）。 */
+const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
 
-/** v06: ①→②の3段→③Step1。5行の確認が全部通ると「登録する」が出る（5行 × 420ms）。 */
+/**
+ * v06（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * 5行の確認が全部通ると「登録する」が出る（5行 × 420ms）。
+ */
 async function enterSaveStep() {
   render(<NewLineAccountPage />)
   next()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
-  next()
+  nextStep()
+  ack('Webhookの利用をONにした')
+  ack('Webhookの再送をONにした')
+  ack('エラーの統計情報をONにした')
+  nextStep()
   fill('v8-login-channel-id', '2007123456')
   fill('v8-login-channel-secret', 'synthetic-login-secret')
   ack('友だち追加オプションで、この公式アカウントをリンクした')
   ack('チャネルを「開発中」から「公開済み」にした')
-  next()
-  ack('Webhookの利用をONにした')
-  ack('Webhookの再送をONにした')
-  ack('エラーの統計情報をONにした')
-  next()
+  nextStep()
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '登録する' })).toBeTruthy(), { timeout: 5000 })
 }

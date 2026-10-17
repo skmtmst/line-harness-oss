@@ -31,7 +31,7 @@ describe('アカウント登録のV8の手順表示（#975 U050）', () => {
   it('進み具合を5段の同じ手順で示し、済んだ段へ入力を残して戻れる', () => {
     expect(PAGE).toContain('label="登録の進捗"')
     // v06では③で登録するので、登録済みでも段の表示は先に進めない（完了へ飛ばさない）。
-    expect(PAGE).toContain('currentKey={String(currentStep)}')
+    // 描かれた側の確認は register-v8.react.test.tsx「段の表示は今いる段を指し、登録しても先へ飛ばさない」。
     expect(PAGE).toContain('steps={V8_STEPS.map')
     expect(PAGE).toContain('onSelect: !createdId && currentStep > step.number')
     expect(CSS).toContain('flex-wrap: nowrap')
