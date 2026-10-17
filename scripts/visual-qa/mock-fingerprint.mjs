@@ -1,3 +1,4 @@
+import { readApiSources } from '../../apps/web/scripts/test-api-source.mjs'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, relative } from 'node:path'
@@ -20,7 +21,7 @@ export function mockFingerprint(entry = new URL('./mock-api.mjs', import.meta.ur
   // api-shapes は import ではなくファイルを読むので、その入力も含める。
   for (const url of inputs) {
     const path = fileURLToPath(url)
-    files.set(path, readFileSync(path, 'utf8'))
+    for (const [sourcePath, source] of readApiSources(path)) files.set(sourcePath, source)
   }
   const root = dirname(fileURLToPath(entry))
   const hash = createHash('sha256')

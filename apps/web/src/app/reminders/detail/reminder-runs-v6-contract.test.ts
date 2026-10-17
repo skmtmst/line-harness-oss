@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../../scripts/test-api-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -6,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(new URL('../../../v8/reminders/detail.tsx', import.meta.url), 'utf8')
 /* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
 const LIST_PAGE = fs.readFileSync(path.join(__dirname, '..', 'list-v8.tsx'), 'utf8')
-const API = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(path.join(__dirname, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V6 7-1-H リマインダ実行結果', () => {
   it('一覧から予定と履歴を選べ、予定は公開APIのplannedで絞る', () => {

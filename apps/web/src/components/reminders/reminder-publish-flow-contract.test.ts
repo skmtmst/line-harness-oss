@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -8,7 +9,7 @@ const NEW_PAGE = readFileSync(join(ROOT, 'src/app/reminders/new/new-v8.tsx'), 'u
 const STEP_EDITOR = readFileSync(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
 const DETAIL_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/detail.tsx'), 'utf8')
-const API = readFileSync(join(ROOT, 'src/lib/api.ts'), 'utf8')
+const API = readApiSource(join(ROOT, 'src/lib/api.ts'), 'utf8')
 const WORKER_ROUTE = readFileSync(join(ROOT, '../worker/src/routes/reminders.ts'), 'utf8')
 
 describe('リマインダの公開フロー', () => {

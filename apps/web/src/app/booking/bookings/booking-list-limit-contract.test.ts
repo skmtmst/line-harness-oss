@@ -1,9 +1,10 @@
+import { readApiSource } from '../../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const LIST = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const DETAIL = readFileSync(new URL('./detail/page.tsx', import.meta.url), 'utf8')
-const API = readFileSync(new URL('../../../lib/api.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('予約管理の一覧上限', () => {
   it('一覧を表示ページだけ取得し、総件数でページ数を決める', () => {
