@@ -11,8 +11,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
-import { restaurantTestApi, type RestaurantStore } from '@/lib/restaurant-test-api'
-import { restaurantGoogleApi, type GoogleConnectionData, type GooglePostKind } from '@/lib/restaurant-google-api'
+import { restaurantGoogleApi, type GoogleConnectionData, type GoogleBusinessStore, type GooglePostKind } from '@/lib/restaurant-google-api'
 import { BoundaryBanner, RestaurantPage, STORE_PICKER_WIDTH } from '../common-a/frame'
 import { errorMessage } from './format'
 import { ReviewDraft, ReviewsBoard } from './reviews'
@@ -68,7 +67,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const searchParams = useSearchParams()
   const { selectedAccountId, setSelectedAccountId, accounts, loading: accountLoading } = useAccount()
   const [data, setData] = useState<GoogleConnectionData | null>(null)
-  const [stores, setStores] = useState<RestaurantStore[]>([])
+  const [stores, setStores] = useState<GoogleBusinessStore[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [banner, setBanner] = useState<{ tone: 'info' | 'warn' | 'danger'; text: string } | null>(null)
@@ -78,12 +77,9 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     setLoading(true)
     setError('')
     try {
-      const [connection, snapshot] = await Promise.all([
-        restaurantGoogleApi.connection(selectedAccountId),
-        restaurantTestApi.snapshot(selectedAccountId).catch(() => null),
-      ])
+      const connection = await restaurantGoogleApi.connection(selectedAccountId)
       setData(connection)
-      setStores(snapshot?.data.stores ?? [])
+      setStores(connection.stores ?? [{ id: connection.store.id, name: connection.store.name, line_account_id: connection.store.lineAccountId }])
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
       setData(null)

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { restaurantTestUiEnabled } from './environment-features'
+import { environmentFeatureUiEnabled, googleBusinessUiEnabled, restaurantTestUiEnabled } from './environment-features'
 
 describe('管理画面の環境限定機能', () => {
   afterEach(() => vi.unstubAllEnvs())
@@ -16,5 +16,24 @@ describe('管理画面の環境限定機能', () => {
 
   it.each(['true', 'TRUE', ' true '])('明示的なtrueだけ表示する: %s', (value) => {
     expect(restaurantTestUiEnabled(value)).toBe(true)
+  })
+})
+
+
+describe('B-368 Google ビジネスの旗', () => {
+  afterEach(() => vi.unstubAllEnvs())
+  it.each(['', 'false', 'yes'])('明示的なtrue以外では閉じる: %s', value => expect(googleBusinessUiEnabled(value)).toBe(false))
+  it('2つの旗を独立して読む', () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'false')
+    expect(environmentFeatureUiEnabled('/restaurant-test/google')).toBe(true)
+    expect(environmentFeatureUiEnabled('/restaurant-test/google/photos')).toBe(true)
+    expect(environmentFeatureUiEnabled('/restaurant-test/google-other')).toBe(false)
+    expect(environmentFeatureUiEnabled('/restaurant-test/delivery')).toBe(false)
+    expect(environmentFeatureUiEnabled('/settings/delivery')).toBe(false)
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'false')
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true')
+    expect(environmentFeatureUiEnabled('/restaurant-test/google')).toBe(false)
+    expect(environmentFeatureUiEnabled('/restaurant-test/delivery')).toBe(true)
   })
 })

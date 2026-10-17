@@ -255,7 +255,7 @@ import {
 import { safeRedirectTarget } from './lib/safe-redirect.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
-import { restaurantTestEnabled } from './lib/environment-features.js';
+import { googleBusinessEnabled, restaurantTestEnabled } from './lib/environment-features.js';
 import {
   resolveOgForEvent,
   resolveOgForForm,
@@ -1603,6 +1603,8 @@ async function runFrequentHeavyJobs(
         await applyDueRestaurantMenuPrices(dbFor(env));
       },
     });
+  }
+  if (googleBusinessEnabled(env)) {
     jobs.push({
       // Googleビジネス第4段: 口コミ・投稿の再同期。重い処理用レーン（`1-56/5`。
       // 通知レーンと1分ずらした5分間隔）で動くが、接続ごとの55分ゲートで実質1時間ごと。
@@ -1845,6 +1847,8 @@ async function runSixHourlyHeavyJobs(
         }
       },
     });
+  }
+  if (googleBusinessEnabled(env)) {
     jobs.push({
       // Googleビジネス第4段: パフォーマンス指標の取り込み。JST日付でゲートし、
       // 6時間tickのうち当日未実行の最初の1回（通常は深夜）だけ実際に回る。

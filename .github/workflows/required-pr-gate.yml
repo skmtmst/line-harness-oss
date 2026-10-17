@@ -595,6 +595,7 @@ jobs:
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8788
       NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
+      NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED: 'true'
       V8_SPEED_ENFORCEMENT: ${{ vars.V8_SPEED_ENFORCEMENT }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

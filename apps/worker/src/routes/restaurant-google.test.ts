@@ -64,6 +64,11 @@ vi.mock('@line-crm/db', async () => {
 
 const { authMiddleware, ADMIN_SESSION_BEARER_PREFIX } = await import('../middleware/auth.js');
 const { restaurantGoogle } = await import('./restaurant-google.js');
+const { restaurantTest } = await import('./restaurant-test.js');
+const { restaurantDelivery } = await import('./restaurant-delivery.js');
+const { restaurantGoogleProfile } = await import('./restaurant-google-profile.js');
+const { restaurantGooglePosts } = await import('./restaurant-google-posts.js');
+const { restaurantGooglePerformance } = await import('./restaurant-google-performance.js');
 const { decryptCredential, encryptCredential } = await import('@line-crm/db');
 type Env = import('../index.js').Env;
 
@@ -112,7 +117,12 @@ async function seedConnection(overrides: Partial<{ status: string; location_name
 function app() {
   const instance = new Hono<Env>();
   instance.use('*', authMiddleware);
+  instance.route('/', restaurantTest);
   instance.route('/', restaurantGoogle);
+  instance.route('/', restaurantGoogleProfile);
+  instance.route('/', restaurantGooglePosts);
+  instance.route('/', restaurantGooglePerformance);
+  instance.route('/', restaurantDelivery);
   return instance;
 }
 
@@ -186,7 +196,7 @@ beforeEach(() => {
     IMAGES: {} as R2Bucket,
     RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
-    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', GOOGLE_BUSINESS_ENABLED: 'true',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
@@ -826,4 +836,51 @@ describe('Googleビジネス：口コミ', () => {
     expect(await (await call(`/api/restaurant-test/google/reviews/${id}/reply?account_id=account-2`, { body: { confirmed: true, comment: 'x' }, token: 'admin-session' })).json()).toMatchObject({ code: 'write_disabled' });
     expect((await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {}, token: 'admin-session' })).status).toBe(200);
   });
+});
+
+describe('B-368 実際の本番・検証設定を組み合わせたルート', () => {
+  it.each(['production', 'staging'] as const)('%s のGoogle接続は開き、飲食店だけ独立して閉じる', async environment => {
+    const { unstable_readConfig } = await import('wrangler');
+    const config = unstable_readConfig({ config: new URL(environment === 'production' ? '../../wrangler.toml' : '../../wrangler.staging.toml', import.meta.url).pathname });
+    Object.assign(env, config.vars);
+    seedStore();
+    const google = await call('/api/restaurant-test/google/connection?account_id=account-2');
+    expect(google.status).toBe(200);
+    const body = await google.json() as { stores: { id: string; line_account_id: string }[] };
+    expect(body.stores).toContainEqual({ id: 'store-shibuya', name: 'こもれび食堂 渋谷店', line_account_id: 'account-2' });
+    for (const [endpoint, status] of [['reviews', 200], ['profile', 409], ['photos', 409], ['posts', 200], ['performance', 200]] as const) {
+      const response = await call(`/api/restaurant-test/google/${endpoint}?account_id=account-2`);
+      expect(response.status, endpoint).toBe(status); // 各画面のデータかGoogle未接続の案内まで到達する。
+    }
+    expect(googleCalls).toHaveLength(0);
+    const restaurant = await call('/api/restaurant-test/stores?account_id=account-2');
+    expect(restaurant.status).toBe(environment === 'production' ? 404 : 200);
+    if (environment === 'production') expect(await restaurant.json()).toEqual({ success: false, error: 'Not found' });
+    env.GOOGLE_BUSINESS_ENABLED = 'false';
+    const prepare = vi.spyOn(env.DB, 'prepare');
+    for (const endpoint of ['connection', 'reviews', 'profile', 'photos', 'posts', 'performance']) {
+      expect((await call(`/api/restaurant-test/google/${endpoint}?account_id=account-2`)).status).toBe(404);
+    }
+    // 共通のログイン確認はDBを読む。機能のデータには到達させない。
+    expect(prepare.mock.calls.map(([sql]) => sql).filter(sql => /\brt_/.test(sql))).toEqual([]);
+    prepare.mockRestore();
+    expect((await call('/api/restaurant-test/stores?account_id=account-2')).status).toBe(environment === 'production' ? 404 : 200);
+    expect(googleCalls.filter(call => call.url.includes('googleapis.com'))).toHaveLength(0);
+  });
+});
+
+
+it('B-368 Googleの店舗選択は同じ統括かつ担当範囲だけを返す', async () => {
+  seedStore();
+  testDb.raw.prepare("INSERT INTO rt_stores (id,organization_id,name,code,line_account_id) VALUES ('sibling','org-1','同じ統括の店','SIBLING','account-1')").run();
+  testDb.raw.prepare("INSERT INTO tenants (id,name) VALUES ('b368-other','別の統括')").run();
+  testDb.raw.prepare("INSERT INTO rt_organizations (id,account_id,tenant_id,name) VALUES ('other-org','account-9','b368-other','別の組織')").run();
+  testDb.raw.prepare("INSERT INTO rt_stores (id,organization_id,name,code,line_account_id) VALUES ('other-store','other-org','別の統括の店','OTHER','account-9')").run();
+  const owner = await call('/api/restaurant-test/google/connection?account_id=account-2');
+  expect((await owner.json() as { stores: { id: string }[] }).stores.map(store => store.id).sort()).toEqual(['sibling', 'store-shibuya']);
+  useStaffRole('admin', 'accounts', false);
+  testDb.raw.prepare("INSERT INTO staff_account_scopes (staff_id,line_account_id,created_at) VALUES ('admin-1','account-2','2026-10-17 00:00:00')").run();
+  const admin = await call('/api/restaurant-test/google/connection?account_id=account-2', { token: 'admin-session' });
+  expect(admin.status).toBe(200);
+  expect((await admin.json() as { stores: { id: string }[] }).stores.map(store => store.id)).toEqual(['store-shibuya']);
 });

@@ -14,7 +14,7 @@ import type { StaffMember } from '@line-crm/shared'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MENU_SECTIONS } from '@/lib/menu'
@@ -305,5 +305,26 @@ describe('統括の左メニューを出す住所', () => {
     expect(isHqShellPath('/accounts')).toBe(false)
     expect(isHqShellPath('/hqx')).toBe(false)
     expect(isHqShellPath(null)).toBe(false)
+  })
+})
+
+
+describe('B-368 本番の入口', () => {
+  afterEach(() => vi.unstubAllEnvs())
+  it('Google と飲食店の入口を残し、飲食店を押すと共通の窓を出す', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'false')
+    fixture.pathname = '/restaurant-test/google'
+    clearFeatureVisibilityCache()
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
+    fixture.visibility.mockResolvedValue({ success: true, data: { features: { ...ALL_FEATURES_ON, restaurant_test: false } } })
+    fixture.get.mockResolvedValue({ success: true, data: { sidebarOrder: [], sidebarItemOrder: {} } })
+    const view = await renderSidebar()
+    expect(view.getAllByRole('link', { name: 'Googleビジネス' })[0].getAttribute('href')).toBe('/restaurant-test/google')
+    const delivery = view.getAllByRole('link', { name: 'デリバリー受注' })[0]
+    expect(fireEvent.click(delivery)).toBe(false)
+    expect(view.getByRole('dialog', { name: '現在準備中です' })).toBeTruthy()
+    fireEvent.click(view.getAllByRole('button', { name: '閉じる' }).at(-1)!)
+    expect(view.queryByRole('dialog')).toBeNull()
   })
 })
