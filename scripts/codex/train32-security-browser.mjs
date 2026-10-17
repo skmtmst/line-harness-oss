@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { existsSync, readFileSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, extname, join } from 'node:path';
 import { chromium, expect } from '@playwright/test';
+import { assertEnforcedPolicy } from '../security/csp-policy.mjs';
 
 const target = process.argv[2] ?? 'web';
 assert.ok(['web', 'worker'].includes(target));
@@ -18,7 +19,8 @@ for (const line of readFileSync(join(root, '_headers'), 'utf8').split('\n')) {
 assert.equal(headers['x-content-type-options'], 'nosniff');
 assert.equal(headers['referrer-policy'], 'no-referrer');
 assert.ok(headers['content-security-policy'].includes('frame-ancestors'));
-assert.ok(headers['content-security-policy-report-only'].includes('script-src'));
+if (target === 'web') assertEnforcedPolicy(headers, 'web');
+else assert.ok(headers['content-security-policy-report-only'].includes('script-src'));
 
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1sAAAAASUVORK5CYII=', 'base64');
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
@@ -26,7 +28,7 @@ function server(strict = false) {
   return createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
     const policy = { ...headers };
-    if (strict) policy['content-security-policy'] = policy['content-security-policy-report-only'];
+    if (strict && policy['content-security-policy-report-only']) policy['content-security-policy'] = policy['content-security-policy-report-only'];
     if (url.pathname === '/__mime-probe.js') {
       res.writeHead(200, { ...policy, 'content-type': 'text/plain' }); return res.end('window.__badMimeExecuted=true');
     }
@@ -66,20 +68,25 @@ async function setup(context) {
   await context.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
     if (url.pathname.startsWith('/api/')) {
+      const headers = { 'access-control-allow-origin': request.headers().origin ?? base,
+        'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'Content-Type, Authorization',
+        'access-control-allow-methods': 'GET, POST, OPTIONS' };
+      const reply = value => route.fulfill({ headers, ...value });
+      if (request.method() === 'OPTIONS') return reply({ status: 204 });
       let data;
-      if (url.pathname === '/api/auth/two-factor/verify') return route.fulfill({ status: 400, json: { success: false, error: 'コードが違います' } });
+      if (url.pathname === '/api/auth/two-factor/verify') return reply({ status: 400, json: { success: false, error: 'コードが違います' } });
       if (url.pathname === '/api/liff/config') data = { accountName: 'Synthetic', botBasicId: '@synthetic', customerLook: { preset: 'line' } };
       else if (url.pathname === '/api/liff/customer-look') data = { settings: { liff_theme: 'line' } };
       else if (url.pathname === '/api/uuid') data = { uuid: 'synthetic-uuid' };
       else if (url.pathname === '/api/liff/link') data = {};
-      else if (url.pathname.endsWith('/settings')) return route.fulfill({ json: { liff_calendar_mode: 'week-first', booking_window_days: 60 } });
-      else if (url.pathname.endsWith('/menus')) return route.fulfill({ json: { menus: [{ id: 'm', name: 'Synthetic', duration_minutes: 30, base_price: 1000 }] } });
-      else if (url.pathname.endsWith('/staff')) return route.fulfill({ json: { staff: [{ id: 's', display_name: 'Synthetic', price: 1000, duration_minutes: 30 }] } });
-      else if (url.pathname.endsWith('/last-booking')) return route.fulfill({ json: { available: false } });
-      else if (url.pathname.endsWith('/waitlist')) return route.fulfill({ json: { waitlist: [{ id: 'w', menu_id: 'm', staff_id: 's', menu_name: 'Synthetic', staff_name: 'Synthetic', status: 'invited', starts_at: '2099-10-11T01:00:00.000Z', hold_minutes: 30, hold_expires_at: '2099-10-11T00:30:00Z' }] } });
-      else if (url.pathname.endsWith('/requests')) return route.fulfill({ json: { booking_id: 'b', status: 'confirmed' } });
+      else if (url.pathname.endsWith('/settings')) return reply({ json: { liff_calendar_mode: 'week-first', booking_window_days: 60 } });
+      else if (url.pathname.endsWith('/menus')) return reply({ json: { menus: [{ id: 'm', name: 'Synthetic', duration_minutes: 30, base_price: 1000 }] } });
+      else if (url.pathname.endsWith('/staff')) return reply({ json: { staff: [{ id: 's', display_name: 'Synthetic', price: 1000, duration_minutes: 30 }] } });
+      else if (url.pathname.endsWith('/last-booking')) return reply({ json: { available: false } });
+      else if (url.pathname.endsWith('/waitlist')) return reply({ json: { waitlist: [{ id: 'w', menu_id: 'm', staff_id: 's', menu_name: 'Synthetic', staff_name: 'Synthetic', status: 'invited', starts_at: '2099-10-11T01:00:00.000Z', hold_minutes: 30, hold_expires_at: '2099-10-11T00:30:00Z' }] } });
+      else if (url.pathname.endsWith('/requests')) return reply({ json: { booking_id: 'b', status: 'confirmed' } });
       else data = {};
-      return route.fulfill({ json: { success: true, data } });
+      return reply({ json: { success: true, data } });
     }
     if (url.origin === base || url.origin === strictBase || url.origin === parentBase) return route.continue();
     if (!external.has(url.hostname)) return route.abort();
@@ -108,16 +115,23 @@ try {
     await expect(page.getByRole('alert').filter({ hasText: 'コードが違います。もう一度入れてください' })).toBeVisible();
     const violations = await page.evaluate(() => globalThis.__securityViolations);
     results.inlineReports = violations.filter(value => value.kind === 'inline').length;
-    assert.ok(results.inlineReports > 0, 'Next bootstrap reports must justify report-only script policy');
+    assert.equal(results.inlineReports, 0, 'externalized Next bootstrap must work under enforced CSP');
+    assert.deepEqual(violations.filter(value => value.directive.startsWith('script-src')), []);
     const control = await context.newPage(); await control.goto(`${strictBase}/login`);
-    const enforced = await control.evaluate(() => globalThis.__securityViolations);
-    assert.ok(enforced.some(value => value.disposition === 'enforce' && value.directive.startsWith('script-src')));
-    const interactive = await control.evaluate(() => {
-      document.querySelector('[aria-label="パスワードを表示する"]')?.click();
-      return document.querySelector('#login-password')?.getAttribute('type') === 'text';
+    await control.getByRole('button', { name: 'パスワードを表示する' }).click();
+    await expect(control.locator('#login-password')).toHaveAttribute('type', 'text');
+    await control.evaluate(() => {
+      const inline = document.createElement('script');
+      inline.textContent = 'globalThis.__badInlineExecuted = true';
+      document.head.append(inline);
+      const foreign = document.createElement('script');
+      foreign.src = 'https://untrusted.invalid/hostile.js';
+      document.head.append(foreign);
     });
-    assert.equal(interactive, false);
-    results.strictScriptControl = 'hydration_blocked'; await control.close();
+    await expect.poll(() => control.evaluate(() => globalThis.__securityViolations.filter(value =>
+      value.disposition === 'enforce' && value.directive.startsWith('script-src')).length)).toBe(2);
+    assert.equal(await control.evaluate(() => globalThis.__badInlineExecuted === true), false);
+    results.strictScriptControl = 'inline_and_untrusted_blocked'; await control.close();
   } else {
     await page.clock.install({ time: new Date('2026-10-11T00:00:00Z') });
     await page.goto(`${base}/booking?liffId=synthetic&waitlist=w`);

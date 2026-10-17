@@ -34,7 +34,7 @@ beforeEach(()=>{
  INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','UID','友だち');
  INSERT INTO rt_organizations(id,account_id,name) VALUES('o','a','組織');
  INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('s','o','店舗','S','a');`);
- env={DB:t.db,RESTAURANT_TEST_ENABLED:'true',WORKER_PUBLIC_URL:'https://worker.invalid'} as Env['Bindings'];
+ env={DB:t.db,DEPLOY_ENV:'test',RESTAURANT_TEST_ENABLED:'true',WORKER_PUBLIC_URL:'https://worker.invalid'} as Env['Bindings'];
 });
 afterEach(()=>{vi.useRealTimers();t.raw.close();});
 describe('飲食3・承認した共通版と予約ごとの送り方',()=>{

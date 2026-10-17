@@ -1,3 +1,4 @@
+import { sensitiveOperationMiddleware } from './middleware/sensitive-step-up.js';
 import type { Env } from './worker-env.js';
 export type { Env } from './worker-env.js';
 import { liffNotificationPreferences } from './routes/liff-notification-preferences.js';
@@ -68,7 +69,6 @@ import {
 import { sendBookingNotification } from './services/booking-notifier.js';
 import { DEFAULT_ACCOUNT_SETTINGS } from './services/booking-types.js';
 import { authMiddleware } from './middleware/auth.js';
-import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
 import { rateLimitMiddleware, authenticatedRateLimitMiddleware } from './middleware/rate-limit.js';
@@ -84,6 +84,7 @@ import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
 import { broadcastApprovals } from './routes/broadcast-approvals.js';
+import { customerDownloads } from './routes/customer-downloads.js';
 import { chatAttachments } from './routes/chat-attachments.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
@@ -146,7 +147,7 @@ import { autoReplies } from './routes/auto-replies.js';
 import { autoReplyRuns } from './routes/auto-reply-runs.js';
 import { adminAuth } from './routes/admin-auth.js';
 import { resolveCorsOrigin } from './middleware/admin-auth-config.js';
-import { timingMark, timingStart, type ServerTiming } from './lib/server-timing.js';
+import { timingMark, timingStart } from './lib/server-timing.js';
 import booking from './routes/booking.js';
 import { bookingEntitlements } from './routes/booking-entitlements.js';
 import { bookingPayments } from './routes/booking-payments.js';
@@ -199,7 +200,7 @@ import { restaurantGooglePerformance } from './routes/restaurant-google-performa
 import { restaurantDelivery } from './routes/restaurant-delivery.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
-import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
+import { piiMaskMiddleware } from './middleware/impersonation.js';
 import { outputAuditMiddleware } from './middleware/output-audit.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
@@ -217,6 +218,7 @@ import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
+import { securityAlerts } from './routes/security-alerts.js';
 import { runScheduledOperationHealthChecks } from './services/operations-health.js';
 import { observeOperationDispatcher } from './services/operation-dispatch-health.js';
 import { processOperationNotificationOutbox } from './services/operation-notifications.js';
@@ -302,6 +304,7 @@ app.use('*', cors({
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: [...ADMIN_REQUEST_HEADERS],
+  exposeHeaders: ['Content-Disposition', 'X-Exported-By', 'X-Exported-At', 'X-Csv-Total-Count', 'X-Csv-Returned-Count', 'X-Csv-Truncated'],
   maxAge: 600,
 }));
 
@@ -314,6 +317,7 @@ app.use('*', timingMark('rate'));
 // LIFF/public routes skip staff auth. Apply their tenant wall before auth and
 // before any route handler can persist a form/booking/member write.
 app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
+app.use('/api/events/liff/*', tenantPublicBoundaryMiddleware);
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
@@ -338,6 +342,7 @@ app.use('/api/*', timingMark('audit'));
 // manifest と実 route の全件照合を必須テストにした上で、未分類も fail closed にする。
 app.use('/api/*', featureEnforcementMiddleware);
 app.use('/api/*', timingMark('feature'));
+app.use('/api/*', sensitiveOperationMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
@@ -364,6 +369,7 @@ app.route('/', scenarioDrafts);
 // broadcasts の PUT /:id が先だと approval-threshold を id と読んで404になる。
 app.route('/', broadcastApprovals);
 app.route('/', broadcasts);
+app.route('/', customerDownloads);
 app.route('/', chatAttachments);
 app.route('/', broadcastMessageAssets);
 app.route('/', broadcastMediaDirect);
@@ -498,6 +504,7 @@ app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);
 app.route('/', operations);
+app.route('/', securityAlerts);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -1668,6 +1675,14 @@ async function runSixHourlyHeavyJobs(
       },
     },
     {
+      name: 'personal data retention',
+      run: async () => {
+        const { processPersonalDataRetention } = await import('./services/personal-data-retention.js');
+        const result = await processPersonalDataRetention(env, new Date(event.scheduledTime));
+        if (result.failed) throw new Error('personal_data_retention_retry_required');
+      },
+    },
+    {
       name: 'analytics retention purge',
       run: async () => {
         const { purgeExpiredAnalyticsReadData } = await import('@line-crm/db');
@@ -1891,7 +1906,7 @@ async function scheduled(
   try {
     await runScheduledOperationHealthChecks(env.DB, {
       r2: env.IMAGES,
-      queue: env.CODEX_MENTION_QUEUE,
+      queue: env.CODEX_MENTION_QUEUE, security: env,
     });
   } catch (error) {
     console.error(JSON.stringify({"code":"src_index_failed"}));

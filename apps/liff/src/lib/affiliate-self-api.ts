@@ -33,9 +33,10 @@ export class SelfApiError extends Error {
 async function request<T>(path: string, method = 'GET', body?: object, key?: string): Promise<T> {
   const accessToken = token();
   const url = new URL(`${BASE}/api/liff/${path}`, window.location.origin);
-  if (method === 'GET') url.searchParams.set('lineAccessToken', accessToken);
+  const statement = path.startsWith('affiliate/statements');
+  if (method === 'GET' && !statement) url.searchParams.set('lineAccessToken', accessToken);
   const response = await fetch(url, {
-    method, headers: { 'Content-Type': 'application/json', ...(key ? { 'Idempotency-Key': key } : {}) },
+    method, headers: { 'Content-Type': 'application/json', ...(statement ? { Authorization: `Bearer ${accessToken}` } : {}), ...(key ? { 'Idempotency-Key': key } : {}) },
     ...(body ? { body: JSON.stringify({ ...body, lineAccessToken: accessToken }) } : {}),
   });
   const result = await response.json();
@@ -52,8 +53,14 @@ export const affiliateSelfApi = {
   statements: () => request<{ data: Statement[] }>('affiliate/statements').then(r => r.data),
   download: async (id: string) => {
     const url = new URL(`${BASE}/api/liff/affiliate/statements/${encodeURIComponent(id)}/download`, window.location.origin);
-    url.searchParams.set('lineAccessToken', token());
-    const response = await fetch(url);
+    url.searchParams.set('issue', '1');
+    const headers = { Authorization: `Bearer ${token()}` };
+    const issued = await fetch(url, { headers, cache: 'no-store', referrerPolicy: 'no-referrer' });
+    if (!issued.ok) throw new Error('支払明細を取得できませんでした。もう一度お試しください。');
+    const result = await issued.json() as { data: { url: string } };
+    const signed = new URL(result.data.url);
+    if (signed.origin !== url.origin || signed.pathname !== url.pathname || signed.searchParams.has('lineAccessToken')) throw new Error('取得用URLが無効です');
+    const response = await fetch(signed, { headers, cache: 'no-store', referrerPolicy: 'no-referrer' });
     if (!response.ok) throw new Error('支払明細を取得できませんでした。もう一度お試しください。');
     const blobUrl = URL.createObjectURL(await response.blob());
     const link = document.createElement('a');

@@ -174,6 +174,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/health', 'system', '稼働確認'),
   exempt('/api/qr', 'public', '公開QR生成'),
   exempt('/api/liff', 'public', 'LIFF内で個別認証する公開経路'),
+  exempt('/liff', 'public', '本人確認するLIFFへ案内する入口。ファイル本文は返さない'),
   exempt('/api/public', 'public', '公開表示専用経路'),
   exempt('/api/integrations', 'system', '署名検証する外部受信経路'),
   exempt('/api/internal', 'system', '内部サービス間経路'),
@@ -495,6 +496,16 @@ async function resourceOwnerAccountId(c: Context<Env>): Promise<string | null> {
 }
 
 async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; accountMismatch: boolean }> {
+  // Customer booking changes use a compatibility URL outside /api/liff. Keep
+  // the normal event feature gate, but resolve its owner from the stored LIFF
+  // mapping rather than an untrusted account parameter or an admin session.
+  if (c.req.method === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(c.req.path)) {
+    const liffId = c.req.query('liffId');
+    const account = liffId ? await dbFor(c.env).prepare(
+      'SELECT id FROM line_accounts WHERE liff_id = ? AND is_active = 1',
+    ).bind(liffId).first<{ id: string }>() : null;
+    return { ids: account ? [account.id] : [], accountMismatch: false };
+  }
   /*
    * R423/R426/R428: 公開受信口は受信口IDから所属を確定する。
    * 画面のコピーURL（queryなし）でも通り、外部指定の account は使わない。

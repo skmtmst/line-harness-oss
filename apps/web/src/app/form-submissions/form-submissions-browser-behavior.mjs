@@ -15,6 +15,7 @@ import { createServer } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { chromium } from '@playwright/test'
+import { waitForOverlayLayout } from '../../../../../scripts/codex/overlay-ready.mjs'
 
 /*
  * #1060: 一覧の絞り込み・並び替えは Worker が済ませて1ページ分だけ返す。
@@ -94,6 +95,7 @@ const sortFormListItems = (forms, sort) => {
 }
 
 let lastHarness
+
 
 const outDir = join(process.cwd(), 'apps/web/out')
 
@@ -721,7 +723,7 @@ try {
     }
     await kinds.getByRole('menuitem', { name: 'タグを付ける・外す', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'タグを選ぶ', exact: true })
-    await dialog.waitFor()
+    await waitForOverlayLayout(dialog)
     const box = await dialog.boundingBox()
     assert.ok(box && box.height <= 844, 'R26: 窓の高さが画面に収まる')
     await dialog.getByRole('checkbox', { name: '回答済み', exact: true }).check()
@@ -742,6 +744,7 @@ try {
     await action.getByRole('button', { name: '1つ目の行うことのその他操作', exact: true }).click()
     await page.getByRole('menuitem', { name: '削除する', exact: true }).click()
     const removeDialog = page.getByRole('dialog', { name: '「行うこと」を削除しますか？', exact: true })
+    await waitForOverlayLayout(removeDialog)
     const remove = await removeDialog.getByRole('button', { name: '削除する', exact: true }).boundingBox()
     assert.ok(remove && remove.x + remove.width <= 390, 'R26: 動作の削除が画面に収まる')
     await removeDialog.getByRole('button', { name: '削除する', exact: true }).click()
@@ -765,7 +768,7 @@ try {
     // カードの3欄は「リンクの見え方」の窓の中。利用者と同じ順（開く → 打つ → 閉じる → 保存）でたどる。
     await page.getByRole('button', { name: /^リンクの見え方：/ }).click()
     const linkDialog = page.getByRole('dialog', { name: 'リンクの見え方' })
-    await linkDialog.waitFor({ timeout: 15_000 })
+    await waitForOverlayLayout(linkDialog)
     assert.equal(await linkDialog.getByRole('button', { name: '保存する', exact: true }).count(), 0,
       'V8: 設定の窓に2つ目の保存を置かない')
     await page.locator('#fe-og-title').fill('ごはんの相談フォーム')
@@ -795,7 +798,7 @@ try {
       sent.name, { timeout: 15_000 },
     )
     await page.getByRole('button', { name: /^リンクの見え方：/ }).click()
-    await linkDialog.waitFor({ timeout: 15_000 })
+    await waitForOverlayLayout(linkDialog)
     assert.equal(await linkDialog.locator('#fe-og-title').inputValue(), sent.ogTitle, 'V8: 再読込で見出しが残る')
     assert.equal(await linkDialog.locator('#fe-og-desc').inputValue(), sent.ogDescription, 'V8: 再読込で説明が残る')
     // 保存済みの MediaSlot は URL の入口でなく画像の見本を出す。

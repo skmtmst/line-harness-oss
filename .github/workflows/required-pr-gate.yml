@@ -428,9 +428,20 @@ jobs:
       - name: Install Chromium for the webhook runtime contract
         run: pnpm exec playwright install --with-deps chromium
       - name: Webhook screen runtime contract on a real browser (#704, #705)
-        run: >-
-          pnpm exec playwright test
-          --config apps/web/src/app/webhooks/webhook-runtime.config.mjs
+        run: |
+          webhook_ports="$(node --input-type=module -e '
+            import { createServer } from "node:net";
+            const servers = [createServer(), createServer()];
+            await Promise.all(servers.map(server => new Promise((resolve, reject) => {
+              server.once("error", reject);
+              server.listen(0, "127.0.0.1", resolve);
+            })));
+            console.log(servers.map(server => server.address().port).join(" "));
+            await Promise.all(servers.map(server => new Promise(resolve => server.close(resolve))));
+          ')"
+          read -r webhook_api_port webhook_web_port <<< "$webhook_ports"
+          WEBHOOK_RUNTIME_API_PORT="$webhook_api_port" WEBHOOK_RUNTIME_PORT="$webhook_web_port" \
+            pnpm exec playwright test --config apps/web/src/app/webhooks/webhook-runtime.config.mjs
       # 失敗したときのDOMを残す。#705 は「吹き出しが次の行のボタンを覆う」という
       # 見た目の重なりで、後から読めないと原因に辿り着けない種類の失敗だった。
       - name: Upload webhook runtime contract failure context
@@ -535,7 +546,7 @@ jobs:
       - name: Verify EC import list account-switch behavior on the built admin
         run: >-
           pnpm exec playwright test
-          --config apps/web/src/app/ec-commerce/ec-commerce-issue-685.config.mjs
+          --config scripts/codex/ec-commerce-isolated.config.mjs
       # 間欠的な失敗(#685)の原因切り分け用。失敗時のDOM(error-context.md)を
       # artifactとして残し、CIでしか再現しない症状を後から読めるようにする。
       - name: Upload EC import list failure context
@@ -556,7 +567,7 @@ jobs:
           pnpm exec playwright test
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
       - name: MFA auth input and button behavior at three widths
-        run: pnpm exec playwright test --config apps/web/src/v8/login/train30-auth.config.mjs
+        run: pnpm exec playwright test --config scripts/codex/train30-auth-isolated.config.mjs
       - name: Verify admin security headers and auth interactions
         run: node scripts/codex/train32-security-browser.mjs web
       - name: Upload MFA browser failure context

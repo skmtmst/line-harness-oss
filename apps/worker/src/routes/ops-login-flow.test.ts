@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
@@ -8,6 +8,17 @@ import type { Env } from '../index.js';
 import { authEmail } from './auth-email.js';
 import { adminAuth } from './admin-auth.js';
 import { ops } from './ops.js';
+
+// Keep real token/config validation; simulate only Cloudflare's network response.
+vi.mock('../services/turnstile.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../services/turnstile.js')>();
+  const verify: typeof actual.verifyTurnstile = (environment, token, ip) => actual.verifyTurnstile(environment, token, ip, async (url, init) => {
+    const sent = new URLSearchParams(String(init?.body ?? ''));
+    return Response.json({ success: String(url) === 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+      && init?.method === 'POST' && sent.get('secret') === 'fixture-turnstile-secret' && sent.get('response') === 'fixture-login-robot' });
+  });
+  return { ...actual, verifyTurnstile: verify };
+});
 
 const PAGES = 'https://nen-line-stg-admin.pages.dev';
 const WORKER = 'https://nen-line-stg.example.workers.dev';
@@ -19,6 +30,7 @@ let testDb: SqliteD1;
 function environment(): Env['Bindings'] {
   return {
     DB: testDb.db,
+    TURNSTILE_SECRET_KEY: 'fixture-turnstile-secret',
     ADMIN_ORIGIN: PAGES,
     ADMIN_PUBLIC_URL: PAGES,
     WORKER_URL: WORKER,
@@ -56,7 +68,7 @@ describe('運営コンソールのメールログイン', () => {
     const login = await app().request(`${WORKER}/api/auth/password/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: PAGES },
-      body: JSON.stringify({ email: 'ops-e2e@example.com', password: 'Abcdefg1', next: 'ops' }),
+      body: JSON.stringify({ email: 'ops-e2e@example.com', password: 'Abcdefg1', next: 'ops', turnstileToken: 'fixture-login-robot' }),
     }, environment());
     expect(login.status, await login.clone().text()).toBe(200);
     const challenge = await login.json() as { data: { twoFactor: boolean; challengeToken: string } };

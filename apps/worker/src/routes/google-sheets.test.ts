@@ -179,6 +179,19 @@ describe('connection・runs の応答の形', () => {
 });
 
 describe('oauth/callback', () => {
+  it('S07 rejects a store removed from the caller scope after OAuth started', async () => {
+    firstQueue.push({ state: 's1', line_account_id: 'acc-1', staff_id: 'owner-1', mode: 'connect',
+      code_verifier_enc: await encryptCredential('fixture-verifier', ENCRYPTION_KEY),
+      expires_at: '2999-01-01T00:00:00Z', used_at: null });
+    firstQueue.push({ id: 'acc-1' });
+    accountAccess.getVisibleLineAccountScope.mockResolvedValue({ ids: ['other'], accounts: [] });
+    const response = await appFor().fetch(new Request(
+      'https://worker.example.com/api/integrations/google-sheets/oauth/callback?state=s1&code=fixture',
+    ), env);
+    expect(response.headers.get('location')).toContain('sheets=error%3Aaccount_missing');
+    expect(googleBusiness.exchangeAuthorizationCode).not.toHaveBeenCalled();
+    expect(statements.some(statement => statement.sql.includes('INSERT INTO google_sheets_integrations'))).toBe(false);
+  });
   it('stateが無効なら管理画面へerror:invalid_stateで戻す', async () => {
     firstQueue.push(null); // stateなし
     const response = await appFor().fetch(

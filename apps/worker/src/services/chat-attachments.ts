@@ -1,3 +1,5 @@
+import { customerDownloadEntry } from './download-entrypoints.js';
+import { signDownload } from './download-capability.js';
 import {
   CHAT_FILE_MAX_BYTES, CHAT_FILE_TYPES, CHAT_IMAGE_MAX_BYTES, CHAT_PREVIEW_MAX_BYTES,
   CHAT_VIDEO_MAX_BYTES, type ChatAttachment,
@@ -19,6 +21,12 @@ export function attachmentUrl(origin: string, id: string): string {
 }
 export function videoPreviewUrl(origin: string): string {
   return `${origin.replace(/\/$/, '')}/images/chat-attachments/video-preview.png`;
+}
+
+export async function signedAttachment(attachment: ChatAttachment, owner: AttachmentOwner, secret: string | undefined): Promise<ChatAttachment> {
+  if (!secret) throw new ChatAttachmentError('取得用の鍵が未設定です', 'CHAT_ATTACHMENT_SIGNING_UNCONFIGURED');
+  return { ...attachment, url: await signDownload(new URL(attachment.url), secret, 'chat-attachment', attachment.id,
+    JSON.stringify([owner.lineAccountId ?? '', owner.friendId]), attachment.expiresAt ? Date.parse(attachment.expiresAt) : undefined) };
 }
 
 export function uploadKind(mimeType: string, filename: string, size: number): ChatAttachment['kind'] {
@@ -132,15 +140,15 @@ function idFromUrl(value: unknown, origin: string): string {
   if (!httpsUrl(value)) throw new ChatAttachmentError('添付URLはHTTPSで指定してください');
   const url = new URL(value);
   const id = url.pathname.slice('/images/chat-attachments/'.length);
-  if ((origin && value !== attachmentUrl(origin, id)) || !url.pathname.startsWith('/images/chat-attachments/') || !CHAT_ATTACHMENT_ID.test(id)) throw new ChatAttachmentError('この受信箱でアップロードした動画・画像を選んでください');
+  if ((origin && url.origin !== new URL(origin).origin) || !url.pathname.startsWith('/images/chat-attachments/') || !CHAT_ATTACHMENT_ID.test(id)) throw new ChatAttachmentError('この受信箱でアップロードした動画・画像を選んでください');
   return id;
 }
 
 /** すぐ送る口・予約する口・cronで共通。送信前に保存物の所有と期限も確認。 */
 export async function buildChatMessage(input: {
   messageType: string; content: string; owner: AttachmentOwner;
-  bucket?: R2Bucket; origin: string; neededAt?: number;
-}): Promise<{ message: Message; content: string }> {
+  bucket?: R2Bucket; origin: string; neededAt?: number; signingSecret?: string;
+}): Promise<{ message: Message; content: string; renewalMessage?: Message }> {
   const { messageType, content, owner, bucket, origin, neededAt } = input;
   if (messageType === 'text') {
     if (content.length > 5000) throw new ChatAttachmentError('メッセージは5000文字以内で入力してください', 'content_too_long');
@@ -154,29 +162,40 @@ export async function buildChatMessage(input: {
   if (messageType === 'image') {
     const parsed = parseContent(content);
     if (!httpsUrl(parsed.originalContentUrl) || !httpsUrl(parsed.previewImageUrl)) throw new ChatAttachmentError('画像URLはHTTPSで指定してください');
-    return { message: { type: 'image', originalContentUrl: parsed.originalContentUrl, previewImageUrl: parsed.previewImageUrl }, content };
+    let privateFile: ChatAttachment | undefined;
+    async function imageUrl(value: string) {
+      if (!new URL(value).pathname.startsWith('/images/chat-attachments/')) return value;
+      const file = await ownedAttachment(bucket, idFromUrl(value, origin), owner, origin, neededAt);
+      if (file.kind !== 'image') throw new ChatAttachmentError('画像を選んでください');
+      privateFile ??= file;
+      return (await signedAttachment(file, owner, input.signingSecret)).url;
+    }
+    const message: Message = { type: 'image', originalContentUrl: await imageUrl(parsed.originalContentUrl), previewImageUrl: await imageUrl(parsed.previewImageUrl) };
+    return { message, content, renewalMessage: privateFile ? renewalMessage(privateFile) : undefined };
   }
   if (messageType === 'video') {
     const parsed = parseContent(content);
     const video = await ownedAttachment(bucket, idFromUrl(parsed.originalContentUrl, origin), owner, origin, neededAt);
-    if (parsed.originalContentUrl !== video.url) throw new ChatAttachmentError('この受信箱でアップロードした動画を選んでください');
     if (video.kind !== 'video') throw new ChatAttachmentError('MP4動画を選んでください');
     let preview = videoPreviewUrl(new URL(video.url).origin);
     if (parsed.previewImageUrl !== undefined && parsed.previewImageUrl !== preview) {
       const image = await ownedAttachment(bucket, idFromUrl(parsed.previewImageUrl, origin), owner, origin, neededAt);
-      if (parsed.previewImageUrl !== image.url || image.kind !== 'image' || image.size > CHAT_PREVIEW_MAX_BYTES) throw new ChatAttachmentError('プレビューはJPEG/PNG・1MBまでです');
-      preview = image.url;
+      if (image.kind !== 'image' || image.size > CHAT_PREVIEW_MAX_BYTES) throw new ChatAttachmentError('プレビューはJPEG/PNG・1MBまでです');
+      preview = (await signedAttachment(image, owner, input.signingSecret)).url;
     }
-    const payload = { originalContentUrl: video.url, previewImageUrl: preview };
-    return { message: { type: 'video', ...payload }, content: JSON.stringify(payload) };
+    const payload = { originalContentUrl: (await signedAttachment(video, owner, input.signingSecret)).url, previewImageUrl: preview };
+    return { message: { type: 'video', ...payload }, content: JSON.stringify(payload), renewalMessage: renewalMessage(video) };
   }
   if (messageType === 'file') {
     const parsed = parseContent(content);
     const file = await ownedAttachment(bucket, parsed.attachmentId, owner, origin, neededAt);
     if (file.kind !== 'file') throw new ChatAttachmentError('ファイルを選んでください');
-    const expiresLabel = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(file.expiresAt!));
-    const text = `${file.filename}\n${Math.max(0.01, file.size / 1024 / 1024).toFixed(2)} MB\n${file.url}\nダウンロード期限: ${expiresLabel}（日本時間）`;
+    const text = `${file.filename}\n${Math.max(0.01, file.size / 1024 / 1024).toFixed(2)} MB\n${customerDownloadEntry(new URL(file.url).origin, 'files', file.id)}\nLINEで本人確認して取得してください。取得URLは15分間有効です。`;
     return { message: { type: 'text', text }, content: JSON.stringify({ attachmentId: file.id, ...file }) };
   }
   throw new ChatAttachmentError('messageType is not supported');
+}
+
+function renewalMessage(file: ChatAttachment): Message {
+  return { type: 'text', text: `後から開く場合はこちら（LINEで本人確認）\n${customerDownloadEntry(new URL(file.url).origin, 'files', file.id)}` };
 }

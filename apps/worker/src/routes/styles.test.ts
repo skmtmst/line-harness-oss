@@ -1125,7 +1125,7 @@ test('restaurant counts include guests, staff assignment and real closure-aware 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ expectedVersion: 1, staffId: null }),
     },
-    { DB: db, RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'],
+    { DB: db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'],
   );
   expect(r.status).toBe(200);
   expect((await styleSnapshot(db, 'a', 'restaurant', {}, 's')).items).toEqual(

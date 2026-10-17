@@ -3,6 +3,8 @@ import type { Env } from '../index.js';
 import { getVisibleLineAccountScope } from './account-access.js';
 import { verifyCallerLineIdentity } from './liff-auth.js';
 import { hasStaffPermission } from '../middleware/role-guard.js';
+import { getChatById, getFriendById } from '@line-crm/db';
+import { attachmentFromObject, CHAT_ATTACHMENT_ID, CHAT_ATTACHMENT_PREFIX, signedAttachment } from './chat-attachments.js';
 
 export const PRIVATE_IMAGE_TTL_SECONDS = 300;
 export function privateImageKey(key: string): boolean {
@@ -89,14 +91,49 @@ export const privateImageResponseMiddleware: MiddlewareHandler<Env> = async (c, 
   await next();
   if (c.res.status >= 400 || !c.res.headers.get('Content-Type')?.includes('application/json')) return;
   const body = await c.res.clone().text();
-  if (!/\/images\/(?:nen-pets|nen-pet-profiles|nen-photo-review|form-uploads)\//.test(body)) return;
+  if (!/\/images\/(?:nen-pets|nen-pet-profiles|nen-photo-review|form-uploads|chat-attachments)\//.test(body)) return;
   const configuredOrigins = [c.env.WORKER_PUBLIC_URL, c.env.WORKER_URL].filter(Boolean) as string[];
   const origins = new Set((configuredOrigins.length ? configuredOrigins : [c.req.url]).map(value => new URL(value).origin));
+  const chatOrigins = new Set(origins);
+  for (const alias of (c.env.WORKER_ALIAS_URLS ?? '').split(',')) {
+    try {
+      const url = new URL(alias.trim());
+      if (url.protocol === 'https:' && !url.username && !url.password) chatOrigins.add(url.origin);
+    } catch { /* Ignore invalid configured aliases; never trust response-provided hosts. */ }
+  }
   const cache = new Map<string, Promise<string>>();
   async function walk(value: unknown, field = '', answers = false): Promise<unknown> {
     if (typeof value === 'string') {
+      // Message content is stored as JSON text. Refresh links only inside the
+      // already-authorized conversation response, never arbitrary plain text.
+      if (value.includes('/images/chat-attachments/') && /^[\s]*[\[{]/.test(value)) {
+        try { return JSON.stringify(await walk(JSON.parse(value), field, answers)); } catch { return value; }
+      }
       let url: URL;
       try { url = new URL(value); } catch { return value; }
+      if (chatOrigins.has(url.origin) && url.pathname.startsWith('/images/chat-attachments/')) {
+        const id = url.pathname.slice('/images/chat-attachments/'.length);
+        const conversation = /^\/api\/chats\/([^/]+)(?:\/|$)/.exec(c.req.path)?.[1];
+        const staff = c.get('staff');
+        if (!CHAT_ATTACHMENT_ID.test(id) || !conversation || !staff || !hasStaffPermission(c, '/chats')) return value;
+        let pending = cache.get(url.pathname);
+        if (!pending) {
+          pending = (async () => {
+            const chat = await getChatById(c.env.DB, conversation);
+            const friend = await getFriendById(c.env.DB, chat?.friend_id ?? conversation);
+            const object = await c.env.IMAGES.head(`${CHAT_ATTACHMENT_PREFIX}${id}`);
+            if (!friend || !object || object.customMetadata?.friendId !== friend.id
+              || object.customMetadata?.lineAccountId !== (friend.line_account_id ?? '')
+              || !(await getVisibleLineAccountScope(c.env.DB, staff)).ids.includes(friend.line_account_id ?? '')
+              || !c.env.API_KEY) return value;
+            const attachment = attachmentFromObject(id, object, url.origin);
+            if (attachment.expiresAt && (!Number.isFinite(Date.parse(attachment.expiresAt)) || Date.parse(attachment.expiresAt) <= Date.now())) return value;
+            return (await signedAttachment(attachment, { friendId: friend.id, lineAccountId: friend.line_account_id }, c.env.API_KEY)).url;
+          })();
+          cache.set(url.pathname, pending);
+        }
+        return pending;
+      }
       const key = url.pathname.slice('/images/'.length);
       const imageField = field === 'url' || /(?:image|photo|review|preview|avatar).*url/i.test(field);
       if ((!imageField && !(answers && key.startsWith('form-uploads/')))

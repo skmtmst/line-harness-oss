@@ -25,6 +25,8 @@ let db: D1Database;
 beforeEach(() => {
   sqlite = new Database(':memory:');
   sqlite.exec(`
+    CREATE TABLE line_accounts(id TEXT PRIMARY KEY, tenant_id TEXT);
+    INSERT INTO line_accounts(id,tenant_id) VALUES ('account-a',NULL),('account-b',NULL);
     CREATE TABLE friends (
       id TEXT PRIMARY KEY,
       line_user_id TEXT NOT NULL,
@@ -78,11 +80,17 @@ describe('getFriendByLineUserIdForAccount', () => {
   });
 
   test('未割当 (line_account_id IS NULL) の行は指定アカウントの解決に含める', async () => {
-    // 未割当行は「どのアカウントのものでもない」ため、アカウントスコープの
-    // 解決対象に含める。引き当てるかは呼出側の判断（webhook は受信時に引き当てる）。
+    // 未割当は従来の既定統括の行。既定統括のアカウントだけが引き当てる。
     const friend = await getFriendByLineUserIdForAccount(db, 'U-free', 'account-a');
 
     expect(friend?.id).toBe('friend-u');
+  });
+  test('S15 another tenant cannot adopt an unassigned legacy friend or its private data', async () => {
+    sqlite.prepare("UPDATE line_accounts SET tenant_id='foreign-tenant' WHERE id='account-b'").run();
+    expect(await getFriendByLineUserIdForAccount(db, 'U-free', 'account-b')).toBeNull();
+    expect((await getFriendByLineUserIdForAccount(db, 'U-free', 'account-a'))?.id).toBe('friend-u');
+    expect((await getFriendByLineUserIdForAccount(db, 'U-shared', 'account-b'))?.id).toBe('friend-b');
+    expect(await getFriendByLineUserIdForAccount(db, 'U-free', 'unknown-account')).toBeNull();
   });
 
   test('SEC-04 lineAccountId 未指定では他店の行を返さない', async () => {

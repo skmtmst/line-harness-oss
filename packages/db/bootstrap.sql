@@ -1027,7 +1027,7 @@ CREATE TABLE audit_events (
                      CHECK (risk_level IN ('normal', 'suspicious', 'high')),
   retention_class    TEXT NOT NULL DEFAULT 'general'
                      CHECK (retention_class IN ('general', 'security', 'personal_data')),
-  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), security_created_at_jd REAL,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id) ON DELETE SET NULL,
   UNIQUE (source_kind, source_id)
 );
@@ -1043,6 +1043,14 @@ CREATE TABLE auth_email_tokens (
   expires_at     TEXT NOT NULL,
   consumed_at    TEXT,
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE auth_known_devices (
+  staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  device_hash TEXT NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  PRIMARY KEY (staff_id, device_hash)
 );
 
 CREATE TABLE auth_step_up_attempts (
@@ -6008,7 +6016,7 @@ CREATE TABLE platform_audit_logs (
   ip                 TEXT,
   visible_to_tenant  INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, security_created_at_jd REAL);
 
 CREATE TABLE platform_counters (
   name   TEXT PRIMARY KEY,
@@ -7743,6 +7751,38 @@ CREATE TABLE scoring_rules (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE security_alerts (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  line_account_id TEXT,
+  scope_key TEXT NOT NULL,
+  rule_key TEXT NOT NULL,
+  observed_count INTEGER NOT NULL CHECK (observed_count >= 0),
+  threshold_count INTEGER NOT NULL CHECK (threshold_count > 0),
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'acknowledged', 'resolved')),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  first_detected_at TEXT NOT NULL,
+  last_detected_at TEXT NOT NULL,
+  latest_event_at REAL NOT NULL,
+  reviewed_at TEXT,
+  slack_sent_version INTEGER NOT NULL DEFAULT 0,
+  notification_id TEXT NOT NULL,
+  slack_lease_until TEXT,
+  slack_lease_token TEXT,
+  slack_last_error TEXT,
+  UNIQUE (scope_key, rule_key)
+);
+
+CREATE TABLE security_monitor_state (
+  id TEXT PRIMARY KEY CHECK (id = 'security'),
+  lease_until TEXT NOT NULL,
+  lease_token TEXT NOT NULL,
+  last_started_at TEXT NOT NULL,
+  window_started_at TEXT NOT NULL,
+  last_completed_at TEXT,
+  last_error TEXT
+);
+
 CREATE TABLE site_consent_days (
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   day             TEXT NOT NULL,
@@ -9071,6 +9111,8 @@ CREATE INDEX idx_audit_events_action_created
 CREATE INDEX idx_audit_events_actor_created
   ON audit_events (actor_principal_id, created_at DESC);
 
+CREATE INDEX idx_audit_events_security_utc ON audit_events (security_created_at_jd);
+
 CREATE INDEX idx_audit_events_tenant_created
   ON audit_events (tenant_id, created_at DESC);
 
@@ -9079,6 +9121,8 @@ CREATE INDEX idx_auth_email_tokens_email
 
 CREATE INDEX idx_auth_email_tokens_ip
   ON auth_email_tokens(purpose, ip_hash, created_at DESC);
+
+CREATE INDEX idx_auth_known_devices_last_seen ON auth_known_devices(last_seen_at);
 
 CREATE INDEX idx_auth_step_up_grants_staff_expiry
   ON auth_step_up_grants(staff_id, expires_at);
@@ -10397,6 +10441,8 @@ CREATE INDEX idx_platform_audit_logs_action
 CREATE INDEX idx_platform_audit_logs_created
   ON platform_audit_logs(created_at DESC);
 
+CREATE INDEX idx_platform_audit_logs_security_utc ON platform_audit_logs (security_created_at_jd);
+
 CREATE INDEX idx_platform_audit_logs_tenant
   ON platform_audit_logs(tenant_id, created_at DESC);
 
@@ -10685,6 +10731,10 @@ CREATE INDEX idx_scheduled_chat_sends_friend
 
 CREATE INDEX idx_scheduled_chat_sends_lease
   ON scheduled_chat_sends (status, lease_expires_at);
+
+CREATE INDEX idx_security_alerts_pending ON security_alerts(slack_sent_version, version);
+
+CREATE INDEX idx_security_alerts_scope ON security_alerts(tenant_id, line_account_id, status);
 
 CREATE INDEX idx_shifts_staff_date ON staff_shifts (staff_id, work_date);
 
@@ -11111,6 +11161,12 @@ CREATE TRIGGER affiliates_folder_update BEFORE UPDATE OF folder_id,line_account_
 CREATE TRIGGER analytics_projection_friend_stage_count
 AFTER INSERT ON analytics_projection_friend_stage
 BEGIN UPDATE analytics_projection_metric_stage SET unique_friend_count = unique_friend_count + 1 WHERE line_account_id = NEW.line_account_id AND cycle_id = NEW.cycle_id AND metric_date = NEW.metric_date AND event_type = NEW.event_type; END;
+
+CREATE TRIGGER audit_events_security_time_insert AFTER INSERT ON audit_events
+BEGIN UPDATE audit_events SET security_created_at_jd = julianday(CASE WHEN substr(NEW.created_at, 20) NOT GLOB '*[Z+-]*' THEN NEW.created_at || '+09:00' ELSE NEW.created_at END) WHERE rowid = NEW.rowid; END;
+
+CREATE TRIGGER audit_events_security_time_update AFTER UPDATE OF created_at ON audit_events
+BEGIN UPDATE audit_events SET security_created_at_jd = julianday(CASE WHEN substr(NEW.created_at, 20) NOT GLOB '*[Z+-]*' THEN NEW.created_at || '+09:00' ELSE NEW.created_at END) WHERE rowid = NEW.rowid; END;
 
 CREATE TRIGGER automation_definitions_folder_delete AFTER DELETE ON folders
 BEGIN UPDATE automation_definitions SET folder_id = NULL WHERE folder_id = OLD.id; END;
@@ -11586,6 +11642,12 @@ CREATE TRIGGER outgoing_webhooks_folder_update BEFORE UPDATE OF folder_id, line_
 WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
 ) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER platform_audit_logs_security_time_insert AFTER INSERT ON platform_audit_logs
+BEGIN UPDATE platform_audit_logs SET security_created_at_jd = julianday(CASE WHEN substr(NEW.created_at, 20) NOT GLOB '*[Z+-]*' THEN NEW.created_at || '+09:00' ELSE NEW.created_at END) WHERE rowid = NEW.rowid; END;
+
+CREATE TRIGGER platform_audit_logs_security_time_update AFTER UPDATE OF created_at ON platform_audit_logs
+BEGIN UPDATE platform_audit_logs SET security_created_at_jd = julianday(CASE WHEN substr(NEW.created_at, 20) NOT GLOB '*[Z+-]*' THEN NEW.created_at || '+09:00' ELSE NEW.created_at END) WHERE rowid = NEW.rowid; END;
 
 CREATE TRIGGER restaurant_course_payment_scope_insert BEFORE INSERT ON restaurant_course_payment_settings
 WHEN NOT EXISTS(SELECT 1 FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id

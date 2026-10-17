@@ -22,6 +22,7 @@ import { renderChatMessageContent } from './manual-send-interpolation.js';
 // idempotency_keyを渡す(retry-key)。送信結果がunknownのときは自動再送しない。
 
 type ScheduleDispatchEnv = {
+  API_KEY?: string;
   DB: D1Database;
   LINE_CHANNEL_ACCESS_TOKEN: string;
   IMAGES?: R2Bucket;
@@ -139,12 +140,14 @@ async function dispatchOne(
   }
 
   let message: Message;
+  let renewalMessage: Message | undefined;
   try {
     const built = await buildChatMessage({ messageType: row.message_type, content: rendered.content,
-      bucket: env.IMAGES, origin: env.WORKER_URL ?? '',
+      bucket: env.IMAGES, signingSecret: env.API_KEY, origin: env.WORKER_URL ?? '',
       owner: { friendId: target.friend.id, lineAccountId: target.friend.line_account_id ?? null },
     });
     message = built.message;
+    renewalMessage = built.renewalMessage;
     rendered.content = built.content;
   } catch (error) {
     if (!(error instanceof ChatAttachmentError)) throw error;
@@ -157,10 +160,14 @@ async function dispatchOne(
   if (quoteToken) message.quoteToken = quoteToken;
   const { LineClient } = await import('@line-crm/line-sdk');
   const lineClient = new LineClient(target.accessToken);
+  const hasSignedAttachment = row.message_type === 'file' || row.message_type === 'video'
+    || (row.message_type === 'image' && row.content.includes('/images/chat-attachments/'));
 
   const reservation = await reserveOutboundSend(env.DB, {
     key:row.idempotency_key,channel:'line',resourceId:`scheduled-chat:${row.id}`,
-    payloadHash:await hashOutboundPayload(JSON.stringify(message)),lineAccountId:row.line_account_id,
+    // Signed download URLs change on retry; compare the durable send intent.
+    payloadHash:await hashOutboundPayload(JSON.stringify(hasSignedAttachment
+      ? { messageType: row.message_type, content: row.content, quoteToken: quoteToken ?? null } : message)),lineAccountId:row.line_account_id,
     retryInProgress:true,now:nowIso,
   });
   if (reservation.kind !== 'acquired' && reservation.kind !== 'retry' && reservation.kind !== 'replay') {
@@ -170,7 +177,7 @@ async function dispatchOne(
     return;
   }
   try {
-    if (reservation.kind !== 'replay') await lineClient.pushMessage(target.friend.line_user_id, [message], row.idempotency_key);
+    if (reservation.kind !== 'replay') await lineClient.pushMessage(target.friend.line_user_id, [message, ...(renewalMessage ? [renewalMessage] : [])], row.idempotency_key);
   } catch (error) {
     const failure = classifyLineOutboundFailure(error, nowIso);
     // unknown(送達可否が分からない)は自動再送すると二重送信になり得るため

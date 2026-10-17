@@ -11,6 +11,17 @@ import { staff } from './staff.js';
 import { createStepUpGrant } from '@line-crm/db';
 import { mfaPolicyKey } from '../services/login-mfa.js';
 
+// Keep real token/config validation; simulate only Cloudflare's network response.
+vi.mock('../services/turnstile.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../services/turnstile.js')>();
+  const verify: typeof actual.verifyTurnstile = (environment, token, ip) => actual.verifyTurnstile(environment, token, ip, async (url, init) => {
+    const sent = new URLSearchParams(String(init?.body ?? ''));
+    return Response.json({ success: String(url) === 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+      && init?.method === 'POST' && sent.get('secret') === 'fixture-turnstile-secret' && sent.get('response') === 'fixture-login-robot' });
+  });
+  return { ...actual, verifyTurnstile: verify };
+});
+
 const key = 'test-encryption-key-at-least-thirty-two-characters';
 const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 let db: SqliteD1;
@@ -24,7 +35,7 @@ function request(path: string, body?: unknown, token?: string, method = body ? '
   return app().request(`https://api.example.com${path}`, { method,
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer lh_session:${token}` } : {}) },
     body: body ? JSON.stringify(body) : undefined,
-  }, { DB: db.db, TOTP_ENCRYPTION_KEY: key, ADMIN_ORIGIN: 'https://admin.example.com', ADMIN_PUBLIC_URL: 'https://admin.example.com', ...overrides } as Env['Bindings']);
+  }, { DB: db.db, TURNSTILE_SECRET_KEY: 'fixture-turnstile-secret', TOTP_ENCRYPTION_KEY: key, ADMIN_ORIGIN: 'https://admin.example.com', ADMIN_PUBLIC_URL: 'https://admin.example.com', ...overrides } as Env['Bindings']);
 }
 async function seed(id = 'owner', role = 'owner', tenantId: string | null = null) {
   db.raw.prepare('INSERT INTO staff_members(id,name,email,role,api_key,is_active,password_hash,tenant_id) VALUES (?,?,?,?,?,1,?,?)')
@@ -32,7 +43,7 @@ async function seed(id = 'owner', role = 'owner', tenantId: string | null = null
 }
 function off(tenantId?: string) { db.raw.prepare('INSERT OR REPLACE INTO platform_settings(key,value) VALUES (?,?)').run(mfaPolicyKey(tenantId), 'false'); }
 async function login(id = 'owner') {
-  return request('/api/auth/password/login', { email: `${id}@example.com`, password: 'Fixture-pass123' });
+  return request('/api/auth/password/login', { email: `${id}@example.com`, password: 'Fixture-pass123', turnstileToken: 'fixture-login-robot' });
 }
 async function session(id = 'owner') {
   const token = `session-fixture-${id}`;
@@ -169,7 +180,7 @@ describe('train30 MFA policy and recovery', () => {
   it.each([undefined, 'short', ' '.repeat(32)])('missing or short key %s permits an unenrolled primary login and usable session', async missing => {
     await seed(); const log = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const overrides = { TOTP_ENCRYPTION_KEY: missing };
-    const res = await request('/api/auth/password/login', { email: 'owner@example.com', password: 'Fixture-pass123' }, undefined, 'POST', overrides);
+    const res = await request('/api/auth/password/login', { email: 'owner@example.com', password: 'Fixture-pass123', turnstileToken: 'fixture-login-robot' }, undefined, 'POST', overrides);
     expect(res.status).toBe(200); expect((await json(res)).data.twoFactorSetup).toBeUndefined();
     expect(db.raw.prepare('SELECT COUNT(*) n FROM admin_sessions').get()).toEqual({ n: 1 });
     const token = await session();
@@ -180,7 +191,7 @@ describe('train30 MFA policy and recovery', () => {
   });
   it('a missing key does not bypass an existing personal enrollment', async () => {
     await seed(); await enroll();
-    const res = await request('/api/auth/password/login', { email: 'owner@example.com', password: 'Fixture-pass123' }, undefined, 'POST', { TOTP_ENCRYPTION_KEY: undefined });
+    const res = await request('/api/auth/password/login', { email: 'owner@example.com', password: 'Fixture-pass123', turnstileToken: 'fixture-login-robot' }, undefined, 'POST', { TOTP_ENCRYPTION_KEY: undefined });
     expect(res.status).toBe(500); expect(res.headers.get('set-cookie')).toBeNull();
   });
   it('regeneration needs a one-use self confirmation, invalidates all old codes and returns only counts afterwards', async () => {

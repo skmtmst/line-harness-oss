@@ -109,6 +109,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Check deployment security settings (read only)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec tsx scripts/security/deployment-safety.ts staging apps/worker/wrangler.staging.toml
+
       - name: Verify staging boundary and deploy lock
         run: |
           test "$GITHUB_REF" = "refs/heads/codex/development"

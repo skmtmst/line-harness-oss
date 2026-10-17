@@ -34,7 +34,7 @@ function app(staff: AuthenticatedStaff = operator) {
 }
 
 function environment(): Env['Bindings'] {
-  return { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
+  return { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
 }
 
 function insertAccount(id: string, tenantId: string): void {

@@ -7,7 +7,7 @@ import { signSupportRelay } from '../services/support-relay.js';
 const pushMessage = vi.hoisted(() => vi.fn(async () => ({ requestId: 'request-1' })));
 
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage })),
+  LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage }); }),
 }));
 
 vi.mock('@line-crm/db', async (original) => ({

@@ -604,7 +604,9 @@
     "669_restaurant_anniversary_followup.sql",
     "681_style_setup_selection_and_auto_insert.sql",
     "682_booking_stripe_connect_states.sql",
-    "683_restaurant_delivery_phase2_slots.sql"
+    "683_restaurant_delivery_phase2_slots.sql",
+    "691_security_monitor.sql",
+    "726_auth_known_devices.sql"
   ],
-  "migrationCount": 605
+  "migrationCount": 607
 }

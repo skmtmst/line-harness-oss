@@ -11,6 +11,11 @@ import {
   type FeatureId,
 } from '@line-crm/shared';
 import { featureContractIsAvailable, resolveEntitlements } from './billing-plans.js';
+import {
+  PERSONAL_DATA_RETENTION_JOB,
+  TENANT_DATA_RETENTION_JOB,
+  GOOGLE_CONTENT_RETENTION_JOB,
+} from './retention-job-manifest.js';
 
 const FEATURE_SETTINGS_BUNDLE_KEY = 'feature.settings_bundle_v1';
 
@@ -54,6 +59,7 @@ export type FeatureJobMetadata = {
  * 照合するため、判定を消したり移したりすると必ずテストが落ちる。
  */
 export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
+  PERSONAL_DATA_RETENTION_JOB,
   {name:'line webhook recovery',classification:{kind:'core',reason:'保存済みのLINE受信から未完の工程だけを再開する'},enforcement:{mode:'exempt',reason:'基本受信の回収は単一機能に属さない。停止した契約・アカウントを除外し、採点・マイル・自動化・配送は既存の個別停止判定に従う。返信鍵なしと送達不明は要確認に止める'}},
   {name:'durable tracked click continuation',classification:{kind:'feature',featureId:'inflow_tracking'},enforcement:{mode:'gated',sources:['apps/worker/src/services/tracked-click-steps.ts'],markers:["featureId:'inflow_tracking'","job:'durable tracked click continuation'"]}},
   {name:'durable banner generation',classification:{kind:'core',reason:'統括のバナー生成の継続'},enforcement:{mode:'exempt',reason:'店舗別機能スイッチの対象外。生成の直前に統括の契約・枚数上限・停止依頼を判定する'}},
@@ -371,14 +377,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       markers: ["job: 'event booking expirer'"],
     },
   },
-  {
-    name: 'tenant data retention purge',
-    classification: { kind: 'core', reason: '退会後の顧客データ保存期限（★V6 36-2）' },
-    enforcement: {
-      mode: 'exempt',
-      reason: '契約が終わった統括のデータ削除で、機能スイッチのon/offに関係なく実行する',
-    },
-  },
+  TENANT_DATA_RETENTION_JOB,
   {
     name: 'restaurant raw mail retention',
     classification: { kind: 'feature', featureId: 'restaurant_test' },
@@ -414,15 +413,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       reason: '機能offの間もトークンを生かし続けるのが目的で、offで止めると放置失効して再接続が必要になる',
     },
   },
-  {
-    name: 'google business content retention',
-    classification: { kind: 'core', reason: 'Googleから受け取った内容の保存期限（暦日30日）' },
-    enforcement: {
-      mode: 'exempt',
-      reason:
-        'Googleの利用者データポリシーで決まった保存期限の掃除で、機能をoffにした店舗の古いコピーが残り続けるほうが違反になる',
-    },
-  },
+  GOOGLE_CONTENT_RETENTION_JOB,
   {
     name: 'automation deliveries',
     dispatchLane: 'delivery',

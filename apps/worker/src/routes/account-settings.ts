@@ -1,3 +1,4 @@
+import { personalDataRetention } from './personal-data-retention.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -18,6 +19,7 @@ import { validateAllergyValues } from '@line-crm/shared';
 import { ALLERGY_OPTIONS_KEY, accountAllergyOptions } from '../services/allergy-options.js';
 
 const accountSettings = new Hono<Env>();
+accountSettings.route('/', personalDataRetention);
 accountSettings.put('/api/account-settings/customer-look',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
  const body=await c.req.json<{accountId?:unknown;expectedVersion?:unknown;look?:unknown}>();
  if (typeof body.accountId !== 'string' || !body.accountId || typeof body.expectedVersion !== 'number' || !Number.isInteger(body.expectedVersion) || body.expectedVersion < 0) return c.json({success:false,error:'店と確認した版を指定してください'},422);

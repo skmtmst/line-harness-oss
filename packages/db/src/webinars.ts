@@ -511,9 +511,7 @@ export async function getWebinarById(db: D1Database, id: string): Promise<Webina
   return db.prepare('SELECT * FROM webinars WHERE id = ?').bind(id).first<Webinar>();
 }
 
-export async function getWebinarBySlug(db: D1Database, slug: string): Promise<Webinar | null> {
-  return db.prepare('SELECT * FROM webinars WHERE slug = ?').bind(slug).first<Webinar>();
-}
+export { getWebinarBySlug } from './webinar-lookup.js';
 
 export async function createWebinar(db: D1Database, input: WebinarCreateInput): Promise<Webinar> {
   const id = crypto.randomUUID();
