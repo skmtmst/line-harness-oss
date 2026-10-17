@@ -14,7 +14,7 @@
 
 - `booking` → `reservation`、`coupons` → `coupon` のみ。`configured` の JSON boolean だけを使う。
 - 未回答・`manual`・`later`・文字の `true` は設定行を作らず、後から明示回答できる。
-- 行の存在が初期化済みの印。オフも含め、既存行の値・版・設定・担当・日時を変更しない。
+- 行の存在が初期化済みの印。オフも含め、既存行の値・版・設定・担当・日時を変更しない。設定をオフにする利用側も行を消さず `enabled=0` を保存し、この印を残す。
 - 回答の版確認が負けた場合も後続が失敗した場合も、回答と店舗設定は同時に巻き戻る。
 - 同じ LINE アカウントに明確に結び付く1店舗だけ。現在の店舗・組織・アカウントの所属と稼働状態を SQL 実行時にも確認する。組織の旧形式は組織が当該アカウントを明示している場合だけ許す。
 - DB 補助は `packages/db/src/store-feature-initialization.ts` の `storeFeatureInitialization(db, accountId, tenantId, actorId, nowMilliseconds, storeId?)`。実行せず prepared statement を返す。呼び出し元は保存/作成と同じ batch に入れる。共有の index や型へ export を追加していない。
@@ -44,4 +44,47 @@
 - Miniflare の実 D1 でも1件合格：WITH/INSERT SELECT/ON CONFLICT の実行、CAS 不一致・後続失敗で全巻き戻し、同じ版の再実行、明示オフの保持を確認。
 - `pnpm --filter @line-crm/db typecheck`、`pnpm --filter worker typecheck`、`pnpm --filter worker build` は Node22 と heavy の共通枠で実行し、すべて終了0。ビルドの既存の大きいチャンク警告は上限変更せず保持。
 - `git diff --check` 成功。生成物の追跡差分なし。
-- ci-local の最終結果は検査終了後に追記する。
+
+## ci-local の最終結果
+
+検査対象は `573ea8c59b35313a2c221394f758c3aec1e8c1a3`、比較先は開始時の本線 `ff1308a85c7178787fc5d9bbfce4c431a92b07d7`。Node 22.23.3 / pnpm 9.15.4。各仕事は新しい作業ツリー、重い検査は既存の heavy 枠で実行した。待機時間を検査の実行時間や SQL の性能として扱わない。
+
+| 検査 | 結果 |
+|---|---|
+| Worker 全体 | 1,096ファイル・12,947件成功、型検査成功 |
+| DB 全体 | 392ファイル・2,292件成功、生成定義の一致・migration安全検査成功 |
+| 管理画面全体 | 2,308ファイル・13,684件成功、既存 skip/todo 各1。lint・型・部品選択・V8固定成功 |
+| 共有 / LIFF | 385件 / 531件成功、共有の型も成功 |
+| リポジトリ用スクリプト | 1,091件成功・既存 skip 1、型検査成功 |
+| 更新 / セットアップ | 160件 / 52件成功 |
+| SDK / MCP | 53件 / 68件成功、MCPの型・ビルド成功 |
+| 文書 | 6件成功、型・ビルド成功 |
+| 管理画面ビルドと実ブラウザ | ビルド・Webhook画面・メディア権限・EC店切替・LINE通知・タグ編集・MFA 3幅・セキュリティ・設計値・保存/公開/競合の動作が成功 |
+| Worker ビルドと実ブラウザ | 下記の補足実行で、ビルド・待機列の入口・セキュリティをすべて成功 |
+| V8全画面の検査 | 補足実行の正規の差分判定で `run=false`。画面/共有型/視覚検査/lockfileの変更がないため対象外。見た目の新規合格とは数えない |
+
+主実行：`zsh ~/lh-work/tools/hq/ci-local/run.sh ~/lh-work/lh-cl-a02`。114工程＝成功56・失敗3・省略55、うち手元で実行不能28、終了1。**集約は未合格**。PR作成前のためPR題名/番号が不明、さらにCI変数を引数で渡していないため、WorkerビルドとV8の判定が実行不能になった。ビルドしなかったWorkerのブラウザ2工程は、配信用ファイル/ヘッダーがないため失敗。残る失敗1件はその集約である。元ログを消したり、合格へ読み替えたりしていない。
+
+リポジトリのGitHub Actions変数を読み取り、`VITE_LIFF_ID` / `VITE_BOT_BASIC_ID` / `VITE_CALENDAR_CONNECTION_ID` / `V8_SPEED_ENFORCEMENT` が未設定であることを確認した（値や設定は変更していない）。その空値を明示し、同じSHAで次を補足実行：
+
+```sh
+zsh ~/lh-work/tools/hq/ci-local/run.sh ~/lh-work/lh-cl-a02 \
+  --job worker-build --job v8-screen-guard \
+  --var VITE_LIFF_ID= --var VITE_BOT_BASIC_ID= \
+  --var VITE_CALENDAR_CONNECTION_ID= --var V8_SPEED_ENFORCEMENT=
+```
+
+補足は43工程＝成功12・失敗0・省略31、うち実行不能1（PR情報だけ）、終了2。Workerビルドと両ブラウザ工程は成功、V8差分判定は成功して通常の `run=false` になった。速度検査は既存の既定値へ任せ、制限・許可・必須チェック・CIそのものは変更していない。実際のPRは作っておらず、仮の題名/番号で集約の合格を作っていない。司令塔はPR採番後に `#0000` とファイル名を実番号へ替え、通常のPRゲートを確認する。
+
+記録：主 `/tmp/a02-ci-local.log` と `~/lh-work/tools/hq/ci-local/logs/20261017-235337-573ea8c59b-84059/`、補足 `/tmp/a02-ci-supplement.log` と `20261018-000215-573ea8c59b-94326/`。ローカルの型・ビルドは `/tmp/a02-types-build.log`。省略は実行済みの検査に数えない。
+
+## コミットと引き継ぎ
+
+- `20220b280b`：初期化本体・回帰試験・仮番号の反映履歴。
+- `573ea8c59b`：所有範囲・店舗作成担当への接続・検証記録。この版で上記のci-localを実行した。
+- 最後の追記はこの検証記録だけ。製品・試験・型・ビルドの入力には追加変更なし。最終SHAは完了報告と `~/lh-work/design/v8/review/API-CONTRACT-A02.md` に記す。
+- push・PR作成・DB更新・配備・実送信・決済・Slack投稿なし。新migration、親ECの変更、上限・許可一覧の変更もなし。
+
+今の進捗を全体像から整理するとこれ：A02の初期化本体と検証をコミット。店舗作成直後の実入口への接続は所有担当への引き継ぎで、未完了のまま明記した。PR情報が必要な集約も司令塔の工程へ残す。
+
+次のタスクはこれ：司令塔が店舗作成の持ち主へ同じbatchでの接続を渡し、実入口の試験を追加して取り込み・採番・通常のPRゲートへ進む。
