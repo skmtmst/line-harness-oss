@@ -13,6 +13,11 @@ import {
   type FeatureId,
 } from '@line-crm/shared';
 import { featureContractIsAvailable, resolveEntitlements } from './billing-plans.js';
+import {
+  PERSONAL_DATA_RETENTION_JOB,
+  TENANT_DATA_RETENTION_JOB,
+  GOOGLE_CONTENT_RETENTION_JOB,
+} from './retention-job-manifest.js';
 
 const FEATURE_SETTINGS_BUNDLE_KEY = 'feature.settings_bundle_v1';
 
@@ -60,23 +65,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   {name:'makeup credit expiry',classification:{kind:'core',reason:'保存済みの振替券の期限の後始末'},enforcement:{mode:'exempt',reason:'送信や新規予約を行わず、予約機能の停止中も保存済みの期限を守る'}},
   {name:'AB test decisions (test transport)',classification:{kind:'feature',featureId:'broadcasts'},enforcement:{mode:'gated',sources:['apps/worker/src/services/broadcast-ab.ts'],markers:["gate.canRun(db,t.line_account_id,'broadcasts','AB test decisions (test transport)')"]}},
   {name:'calendar busy cache and switch jobs',classification:{kind:'feature',featureId:'booking'},enforcement:{mode:'gated',sources:['apps/worker/src/services/booking-calendar-settings.ts'],markers:["gate.canRun(db,j.line_account_id,'booking','calendar busy cache and switch jobs')","gate.canRun(db,r.line_account_id,'booking','calendar busy cache and switch jobs')"]}},
+  PERSONAL_DATA_RETENTION_JOB,
   {name:'line webhook recovery',classification:{kind:'core',reason:'保存済みのLINE受信から未完の工程だけを再開する'},enforcement:{mode:'exempt',reason:'基本受信の回収は単一機能に属さない。停止した契約・アカウントを除外し、採点・マイル・自動化・配送は既存の個別停止判定に従う。返信鍵なしと送達不明は要確認に止める'}},
   {name:'durable tracked click continuation',classification:{kind:'feature',featureId:'inflow_tracking'},enforcement:{mode:'gated',sources:['apps/worker/src/services/tracked-click-steps.ts'],markers:["featureId:'inflow_tracking'","job:'durable tracked click continuation'"]}},
   {name:'durable banner generation',classification:{kind:'core',reason:'統括のバナー生成の継続'},enforcement:{mode:'exempt',reason:'店舗別機能スイッチの対象外。生成の直前に統括の契約・枚数上限・停止依頼を判定する'}},
   { name: 'form document retention', classification: { kind: 'core', reason: '本人確認書類の保存期限と未送信添付の後始末' }, enforcement: { mode: 'exempt', reason: '送信・公開をせず、フォーム機能の停止中も保存期限を守る' } },
-  {
-    name: 'personal data retention',
-    classification: { kind: 'core', reason: '店舗の保存期限と保留設定に従う個人情報の後始末' },
-    enforcement: {
-      mode: 'gated',
-      sources: ['apps/worker/src/services/personal-data-retention.ts'],
-      markers: [
-        'if (!policy.enabled) continue;',
-        'if (policy.hold) { held++; continue; }',
-        'if (JSON.stringify(current)!==JSON.stringify(policy)) { held++; continue accounts; }',
-      ],
-    },
-  },
   {name:'API draft and integration retention',classification:{kind:'core',reason:'保存期限を過ぎた下書きと連携の一時情報の消去'},enforcement:{mode:'exempt',reason:'外部送信をせず、機能の有効・無効にかかわらず保存期限を守る'}},
   {name:'restaurant followup jobs',classification:{kind:'feature',featureId:'restaurant_test'},enforcement:{mode:'gated',sources:['apps/worker/src/services/scenario-source-jobs.ts'],markers:["featureId: 'restaurant_test'",'featureJobCanRun(db,']}},
   {name:'restaurant events',classification:{kind:'core',reason:'保存済みの飲食のできごとの再配送'},enforcement:{mode:'exempt',reason:'店舗の検証スイッチを確認し、スタンプ・マイル・オートメーションの可否は受取先の停止判定に従う。外向きWebhookは配送しない'}},
@@ -390,14 +383,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       markers: ["job: 'event booking expirer'"],
     },
   },
-  {
-    name: 'tenant data retention purge',
-    classification: { kind: 'core', reason: '退会後の顧客データ保存期限（★V6 36-2）' },
-    enforcement: {
-      mode: 'exempt',
-      reason: '契約が終わった統括のデータ削除で、機能スイッチのon/offに関係なく実行する',
-    },
-  },
+  TENANT_DATA_RETENTION_JOB,
   {
     name: 'restaurant raw mail retention',
     classification: { kind: 'feature', featureId: 'restaurant_test' },
@@ -433,15 +419,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       reason: '機能offの間もトークンを生かし続けるのが目的で、offで止めると放置失効して再接続が必要になる',
     },
   },
-  {
-    name: 'google business content retention',
-    classification: { kind: 'core', reason: 'Googleから受け取った内容の保存期限（暦日30日）' },
-    enforcement: {
-      mode: 'exempt',
-      reason:
-        'Googleの利用者データポリシーで決まった保存期限の掃除で、機能をoffにした店舗の古いコピーが残り続けるほうが違反になる',
-    },
-  },
+  GOOGLE_CONTENT_RETENTION_JOB,
   {
     name: 'automation deliveries',
     dispatchLane: 'delivery',

@@ -328,6 +328,8 @@ describe('LINE admin login', () => {
     expect(new URLSearchParams(redirect.hash.slice(1)).get('lh_session')).toBeTruthy();
     expect(new URLSearchParams(redirect.hash.slice(1)).get('lh_csrf')).toBeTruthy();
     expect(cookieFor(res, 'lh_admin_session')).toBeTruthy();
+    expect(cookieFor(res, 'lh_login_device')).toContain('HttpOnly; Secure; SameSite=None');
+    expect(sessionDatabases[0].raw.prepare('SELECT COUNT(*) AS count FROM auth_known_devices WHERE staff_id=?').get('staff-1')).toEqual({ count: 1 });
     fetchSpy.mockRestore();
   });
 

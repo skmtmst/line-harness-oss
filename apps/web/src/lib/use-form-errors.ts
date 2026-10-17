@@ -91,6 +91,7 @@ export function focusFieldById(id: string) {
  */
 export function useFormErrors() {
   const [, bump] = useState(0)
+  const focusAfterCommit = useRef(false)
   /** blur か送信で「見せてよい」になった欄 */
   const touchedRef = useRef(new Set<string>())
   /** 欄の定義（描画順＝まとめの並び順） */
@@ -144,7 +145,6 @@ export function useFormErrors() {
   const listenersRef = useRef(new WeakMap<HTMLElement, () => void>())
   /** 送信ボタンが押されたか。押すまでは上のまとめを出さない。 */
   const [submitted, setSubmitted] = useState(false)
-  const focusPending = useRef(false)
 
   /**
    * 欄の検査を登録する。描画のたびに全欄ぶん呼ぶ。順序がまとめの並びになる。
@@ -267,13 +267,6 @@ export function useFormErrors() {
     }
   }
 
-  // 送信中のdisabled解除や欄の再描画が確定してから移る。
-  useLayoutEffect(() => {
-    if (!focusPending.current) return
-    focusPending.current = false
-    focusFirst()
-  })
-
   /**
    * 送信前の総点検。全欄を「見せてよい」にして検査し、落ちた欄を返す。
    * 空なら保存へ進んでよい。落ちがあれば1つ目の欄へ移る。
@@ -287,7 +280,7 @@ export function useFormErrors() {
       touchedRef.current.add(key)
       if (def.check()) problems.push({ key, label: def.label })
     }
-    focusPending.current = problems.length > 0
+    focusAfterCommit.current = problems.length > 0
     setSubmitted(true)
     bump((v) => v + 1)
     return problems
@@ -311,7 +304,7 @@ export function useFormErrors() {
       if (!inDialog.length) definitions().get(key)?.reveal?.()
       shown += 1
     }
-    focusPending.current = shown > 0
+    focusAfterCommit.current = shown > 0
     setSubmitted(true)
     bump((v) => v + 1)
     return shown
@@ -329,12 +322,20 @@ export function useFormErrors() {
 
   /** 開き直した窓・空に戻した入力で、触れた印・まとめ・サーバーの誤りを消す。 */
   const reset = () => {
+    focusAfterCommit.current = false
     touchedRef.current.clear()
     serverRef.current.clear()
     serverTargets.current.clear()
     setSubmitted(false)
     bump((v) => v + 1)
   }
+
+  // Queue field focus only after React has committed errors and cleared saving.
+  useLayoutEffect(() => {
+    if (!focusAfterCommit.current) return
+    focusAfterCommit.current = false
+    requestAnimationFrame(focusFirst)
+  })
 
   const requirement = (key: string) => ({ required: Boolean(defsRef.current.get(key)?.required) })
   return { register, registerReveal, define, requirement, error, errorFor, invalid, touch, bind, listProblems, countIn, focusFirst, submit, setServerErrors, fail, clear, reset }
