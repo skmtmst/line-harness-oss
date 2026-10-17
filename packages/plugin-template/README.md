@@ -15,6 +15,14 @@ Use this as a starting point when building a plugin for services like MedicalFor
 | `mcp-server/index.ts` | MCP server for AI agent integration |
 | `mcp-server/tools/example-tool.ts` | Example MCP tools combining external API + LINE Harness |
 
+## Webhook implementation status
+
+`POST /webhook` returns **501 Not Implemented** until the provider's signature
+verification and event processing are implemented. It does not read or log the
+request body, acknowledge delivery, or call external services. Implement and test
+the provider contract before enabling webhook delivery; the health endpoint alone
+does not mean webhook processing is ready.
+
 ## Getting Started
 
 1. **Copy this template** into a new directory:

@@ -8,6 +8,7 @@
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
+    "test": "vitest run",
     "build:mcp": "tsup mcp-server/index.ts --format esm --out-dir dist-mcp",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",

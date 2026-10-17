@@ -505,7 +505,7 @@ async function loadTagImportPlan(
   lineAccountId: string,
 ): Promise<PlannedTagImportRow[]> {
   const [allTags, groups] = await Promise.all([
-    getTags(db),
+    getTags(db, { allowedAccountIds: [lineAccountId], canSeeUnassigned: true }),
     getTagGroups(db, { allowedAccountIds: [lineAccountId], canSeeUnassigned: false }),
   ]);
   // 同名の衝突先は作り先所属と所属なし(全体一意のため)だけを見る。
@@ -681,9 +681,13 @@ tags.get('/api/tags', async (c) => {
       return c.json({ success: false, error: '対象のLINE公式アカウントが見つかりません' }, 404);
     }
     const withCounts = c.req.query('withCounts') === '1';
+    const readScope = {
+      allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
+      canSeeUnassigned: !requestedAccountId && scope.canSeeUnassigned,
+    };
     const items = withCounts
-      ? await getTagsWithUsage(c.env.DB)
-      : await getTags(c.env.DB);
+      ? await getTagsWithUsage(c.env.DB, readScope)
+      : await getTags(c.env.DB, readScope);
     const allowedIds = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
     const visibleItems = items.filter((item) => item.line_account_id == null
       ? !requestedAccountId && scope.canSeeUnassigned

@@ -444,8 +444,7 @@ export async function getMileageFriendsV6(
                 AND (lf.line_account_id IN (SELECT value FROM json_each(?))
                   OR (ml.beneficiary_friend_id IS NULL AND ml.beneficiary_user_id IS NOT NULL AND EXISTS(
                     SELECT 1 FROM friends vf WHERE vf.user_id=ml.beneficiary_user_id AND vf.line_account_id IN (SELECT value FROM json_each(?)))))
-              ORDER BY datetime(ml.occurred_at) DESC,datetime(ml.created_at) DESC,ml.id DESC LIMIT 1) AS last_action_json,
-            COUNT(*) OVER() AS filtered_count
+              ORDER BY datetime(ml.occurred_at) DESC,datetime(ml.created_at) DESC,ml.id DESC LIMIT 1) AS last_action_json
        FROM selected s LEFT JOIN ledger l ON l.beneficiary_key = s.beneficiary_key
        LEFT JOIN expiring e ON e.beneficiary_key = s.beneficiary_key
       WHERE (? = '' OR s.display_name LIKE '%' || ? || '%')
@@ -460,6 +459,9 @@ export async function getMileageFriendsV6(
   const summary = await db.prepare(
     `${ctes}
      SELECT (SELECT COUNT(*) FROM selected) AS total_members,
+            (SELECT COUNT(*) FROM selected s
+              WHERE (? = '' OR s.display_name LIKE '%' || ? || '%')
+                AND (? = '' OR s.friend_id = ?)) AS filtered_members,
             (SELECT COUNT(*) FROM ledger WHERE available > 0 OR pending > 0) AS with_balance_count,
             (SELECT COALESCE(SUM(available), 0) FROM ledger) AS available,
             (SELECT COALESCE(SUM(pending), 0) FROM ledger) AS pending,
@@ -467,19 +469,19 @@ export async function getMileageFriendsV6(
             (SELECT COALESCE(SUM(amount), 0) FROM expiring) AS expiring_amount,
             (SELECT COALESCE(SUM(lot_count), 0) FROM expiring) AS expiring_lot_count,
             (SELECT MIN(next_expires_at) FROM expiring) AS next_expires_at`,
-  ).bind(...binds).first<Record<string, unknown>>();
+  ).bind(...binds, input.search, input.search, input.friendId ?? '', input.friendId ?? '').first<Record<string, unknown>>();
   const rankPopulation = await db.prepare(
     `${ctes}
-     SELECT COALESCE(l.available, 0) AS available,
-            COALESCE(l.month_change, 0) AS month_change
-       FROM ledger l`,
-  ).bind(...binds).all<{ available: number; month_change: number }>();
+     SELECT COALESCE(l.available, 0) AS available, COUNT(*) AS friend_count
+       FROM ledger l GROUP BY COALESCE(l.available, 0)`,
+  ).bind(...binds).all<{ available: number; friend_count: number }>();
   const rankFor = (available: number) => [...ranks].reverse().find((rank) => available >= rank.threshold) ?? null;
   const rankCounts = ranks.map((rank) => ({
     rewardId: rank.id,
     rankName: rank.name,
     requiredMiles: rank.threshold,
-    friendCount: rankPopulation.results.filter((friend) => rankFor(Number(friend.available))?.id === rank.id).length,
+    friendCount: rankPopulation.results.reduce((count, group) =>
+      count + (rankFor(Number(group.available))?.id === rank.id ? Number(group.friend_count) : 0), 0),
   }));
   return {
     summary: {
@@ -526,7 +528,7 @@ export async function getMileageFriendsV6(
       lineAccount: { id: row.line_account_id, name: row.line_account_name },
     })}),
     pagination: {
-      total: Number(rows.results[0]?.filtered_count ?? 0), limit: input.limit, offset: input.offset,
+      total: Number(summary?.filtered_members ?? 0), limit: input.limit, offset: input.offset,
     },
     measuredAt: new Date().toISOString(),
   };

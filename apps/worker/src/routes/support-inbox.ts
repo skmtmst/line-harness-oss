@@ -5,7 +5,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { computeUnansweredInbox, countUnanswered } from '../services/unanswered-inbox.js';
 import { sendSupportEmailReply, storeSupportEmail } from '../services/support-email.js';
-import { verifySupportRelay } from '../services/support-relay.js';
+import { SUPPORT_EMAIL_RAW_MAX_CHARACTERS, verifySupportRelay } from '../services/support-relay.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { markInboxConversationRead } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -71,7 +71,7 @@ supportInbox.post('/webhooks/xserver/support-email', inputJsonBoundary(), async 
   } catch {
     return inputError(c, { success: false, error: 'Invalid JSON' }, 400, []);
   }
-  if (!payload.raw || payload.raw.length > 14 * 1024 * 1024) {
+  if (!payload.raw || payload.raw.length > SUPPORT_EMAIL_RAW_MAX_CHARACTERS) {
     return inputError(c, { success: false, error: 'Invalid email payload' }, 400, ["raw"]);
   }
   const binary = atob(payload.raw);
