@@ -7,12 +7,6 @@
   padding: var(--tpl-e1-sns-body-pad);
 }
 
-/* カードは1列で横幅いっぱい。箱（線・影・角丸）は共通の Card、ここは中の間と余白だけ。 */
-.card {
-  gap: var(--tpl-e1-sns-gap-2);
-  padding: var(--tpl-e1-sns-padding-3);
-}
-
 /* 段の頭：頭文字の四角・題・（余白）・状態の札・「…」の横並び */
 .cardHead {
   display: flex;
@@ -72,3 +66,6 @@
 
 .link { display: inline-flex; align-items: center; gap: var(--tpl-e1-sns-gap-7); color: var(--color-action); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-e1-sns-row-lh); text-decoration: none; }
 .link:hover { text-decoration: underline; }
+
+/* 段の頭：題と札の間をあけて札を右へ寄せる。 */
+.rowSpacer { flex: 1 1 0; min-width: 0; }

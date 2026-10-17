@@ -81,6 +81,21 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ filter: 'unreplied' })))
   })
 
+  it('選択肢に「状態：」の頭は付けず、閉じた欄の頭で出し、表示件数（10・20・50）を切り替えられる', async () => {
+    render(<GoogleV8 />)
+    await screen.findByPlaceholderText('口コミを探す')
+    await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ perPage: 20 })))
+    expect(screen.getByRole('button', { name: '状態で絞り込み' }).textContent).toMatch(/^状態：/)
+    fireEvent.click(screen.getByRole('button', { name: '状態で絞り込み' }))
+    expect(screen.queryByRole('option', { name: '状態：未返信' })).toBeNull()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+
+    fireEvent.click(screen.getByRole('button', { name: '表示件数' }))
+    const ten = await screen.findByRole('option', { name: '10件表示' })
+    fireEvent.click(ten.querySelector('button')!)
+    await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ perPage: 10, page: 1 })))
+  })
+
   it('受信列は編集後の日時を表示する（投稿2023年・編集2026年9月の口コミで2023年と出さない）', async () => {
     fixture.listReviews.mockResolvedValue({
       success: true,

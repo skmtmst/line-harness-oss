@@ -176,7 +176,7 @@ export default function SnsSettingsPage() {
         ) : null}
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
 
-        <Card appearance="outlined" layout="vertical" className={styles.card} aria-labelledby="sns-google-title">
+        <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="sns-google-title">
           <div className={styles.cardHead}>
             <span className={styles.mark} aria-hidden>G</span>
             <h2 id="sns-google-title" className={styles.cardTitle}>Google ビジネス</h2>
@@ -208,7 +208,7 @@ export default function SnsSettingsPage() {
           )}
         </Card>
 
-        <Card appearance="outlined" layout="vertical" className={styles.card} aria-labelledby="sns-instagram-title">
+        <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="sns-instagram-title">
           <div className={styles.cardHead}>
             <span className={styles.mark} aria-hidden>IG</span>
             <h2 id="sns-instagram-title" className={styles.cardTitle}>Instagram</h2>
