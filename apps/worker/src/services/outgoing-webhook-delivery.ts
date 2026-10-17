@@ -1091,6 +1091,7 @@ const OUTGOING_DELIVERY_FAILURE_TEXT: Record<string, string> = {
   secret_unavailable: '署名に使うsecretを確認できませんでした。設定を保存し直してください。',
   rejected_4xx: '送り先が内容を受け取りませんでした。URLと受け手の設定を確認してください。',
   retry_exhausted: '自動での送り直しが上限に達しました。連携先を確認して、必要なら管理画面から再送してください。',
+  retry_after_exceeds_budget: '連携先の待ち時間が自動再送の上限を超えました。連携先を確認して、必要なら管理画面から再送してください。',
   retry_window_expired: '24時間の再送期間を過ぎました。連携先を確認して、必要なら管理画面から再送してください。',
   webhook_not_found: '送信Webhookが削除されたため送りませんでした。',
   webhook_inactive: '送信Webhookが停止中のため送りませんでした。',
@@ -1177,7 +1178,10 @@ export async function finishOutgoingDelivery(
     responseStatus = attempt.responseStatus;
     if (retryAt === null) {
       status = 'failed';
-      errorCode = attemptsDone >= delivery.max_attempts ? 'retry_exhausted' : 'retry_window_expired';
+      errorCode = attemptsDone >= delivery.max_attempts ? 'retry_exhausted'
+        : attempt.responseStatus === 429 && typeof attempt.retryAfterMs === 'number'
+          && attempt.retryAfterMs > EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000
+          ? 'retry_after_exceeds_budget' : 'retry_window_expired';
       errorMessage = outgoingDeliverySafeMessage(errorCode);
     } else {
       status = 'retry_wait';
