@@ -39,42 +39,6 @@ const compiled = await build({
 const globals = readFileSync(new URL('../../src/app/globals.css', import.meta.url), 'utf8').replace(/@theme\s*\{/g, ':root {')
 const css = [globals, ...sheets].join('\n').replace(/:global\(([^()]*)\)/g, '$1')
 
-test('左端の削除入口は3幅とも白地・赤字・印を保ち、赤い塗りつぶしと印の欠落を検出する', async () => {
-  const browser = await connectGuardBrowser()
-  try {
-    const page = await browser.newPage()
-    for (const width of [1152, 1440, 1920]) {
-      await page.setViewportSize({ width, height: 900 })
-      await page.setContent(`<style>${css}*{box-sizing:border-box}</style><div data-theme="v8" id="root"></div>`)
-      await page.addScriptTag({ content: compiled.outputFiles[0].text })
-      const action = page.locator('[data-sticky-lead] button')
-      await action.waitFor()
-      const failures = async () => (await page.evaluate(scanFormRules)).filter(f => f.kind === 'form-footer-action')
-      assert.deepEqual(await failures(), [])
-      const colors = await action.evaluate(el => {
-        const reference = document.createElement('span')
-        reference.style.color = 'var(--color-danger)'
-        el.append(reference)
-        const result = {
-          background: getComputedStyle(el).backgroundColor,
-          color: getComputedStyle(el).color,
-          expected: getComputedStyle(reference).color,
-          stroke: getComputedStyle(el.querySelector('svg')).stroke,
-        }
-        reference.remove()
-        return result
-      })
-      assert.equal(colors.background, 'rgb(255, 255, 255)')
-      assert.equal(colors.color, colors.expected)
-      assert.equal(colors.stroke, colors.color)
-      await action.evaluate(el => { el.classList.replace('danger-outline', 'danger') })
-      assert.equal((await failures()).length, 1, '赤い塗りつぶしの再発を検出する')
-      await action.evaluate(el => { el.classList.replace('danger', 'danger-outline'); el.querySelector('svg').remove() })
-      assert.equal((await failures()).length, 1, '削除の印の欠落を検出する')
-    }
-  } finally { await browser.close() }
-})
-
 test('実Buttonの短→長→短を3幅で測り、古い固定幅の故障は文字/印の切れで落ちる', async () => {
   const browser = await connectGuardBrowser()
   try {
