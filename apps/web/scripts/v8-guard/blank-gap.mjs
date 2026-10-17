@@ -11,8 +11,6 @@ import { chromium } from '@playwright/test'
 import { ROUTES, openPage } from './browser-env.mjs'
 import scanBlankGap from './blank-gap-browser.mjs'
 
-const allow = JSON.parse(readFileSync(new URL('./blank-gap-allow.json', import.meta.url), 'utf8'))
-if (!Array.isArray(allow) || allow.some(a => !a.route || !a.owner || !a.reason?.trim() || ![1152,1440].includes(a.width) || !Number.isFinite(a.maxExcess))) throw new Error('空白の許容表には画面・幅・持ち主・上限・理由が必要です')
 export const GAP_ROUTES = {
   ...Object.fromEntries(Object.entries(ROUTES).filter(([name]) => name !== 'login')),
   // B-187 で空白が報告された52画面。手元の報告ファイルには依存しない。
@@ -74,13 +72,12 @@ export const GAP_ROUTES = {
 
 // CSS Modules のビルドごとに変わる hash を許容表の識別子にしない。
 export const ownerOf = finding => (finding.container?.sel ?? finding.edge?.sel ?? '').split(' > ').at(-1).replace(/__[\w-]+/g, '')
-export function assess(result, route, width, allowances = allow) {
+export function assess(result) {
   const failures = [], warnings = [], excluded = [], allowed = []
   for (const f of result.findings) {
     if (f.excluded || f.where === 'page-bottom') { excluded.push(f); continue }
     if (f.excess < 96) { if (f.excess >= 48) warnings.push(f); continue }
-    const exemption = allowances.find(a => a.route === route && a.width === width && a.owner === ownerOf(f) && f.excess <= a.maxExcess)
-    if (exemption) allowed.push({ ...f, reason: exemption.reason }); else failures.push(f)
+    failures.push(f)
   }
   for (const b of result.bands) {
     if (b.excluded) { excluded.push(b); continue }

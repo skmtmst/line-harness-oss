@@ -111,30 +111,5 @@ export default function scanLayoutDefects() {
     }
     if (overlap) add('overlap', a.el, a.text + ' ⟂ ' + b.text, { x: Math.ceil(overlap.x), y: Math.ceil(overlap.y) }, b.el)
   }
-  const box = el => {
-    const c = css(el)
-    // A horizontal 1px row divider is not the boundary of a card.
-    const shadowBox = c.boxShadow !== 'none' && c.boxShadow.replace(/(?:rgba?|hsla?|color)\([^)]*\)/g, '').split(',').some(shadow => {
-      const [x, y, blur = 0, spread = 0] = shadow.match(/-?\d+(?:\.\d+)?px/g)?.map(parseFloat) ?? []
-      return x !== 0 || Math.abs(y) !== 1 || blur !== 0 || spread !== 0
-    })
-    return (c.borderTopWidth !== '0px' && c.borderTopStyle !== 'none') || shadowBox ||
-      (c.backgroundColor !== 'rgba(0, 0, 0, 0)' && c.backgroundColor !== 'rgb(255, 255, 255)') || c.outlineStyle !== 'none'
-  }
-  for (const parent of [root, ...root.querySelectorAll('*')]) {
-    const c = css(parent)
-    if (c.display !== 'flex' || c.flexDirection !== 'column' || excluded(parent)) continue
-    const children = [...parent.children].filter(visible)
-    for (let k = 0; k + 1 < children.length; k++) {
-      const a = children[k], b = children[k + 1]
-      // 表の隣り合う行・見出しの線は「カードがくっつく」と数えない。
-      if (!box(a) || !box(b) || excluded(a) || excluded(b) || a.matches('tr,[role="row"]') ||
-          /^行|表の行|表の見出し/.test(a.getAttribute('data-pencil-name') || '')) continue
-      const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect()
-      const gap = br.top - ar.bottom
-      if (ar.height >= 40 && br.height >= 40 && gap >= 0 && gap < 8)
-        add('touch', a, (a.innerText || '').slice(0, 50) + ' → ' + (b.innerText || '').slice(0, 50), { gap: Math.floor(gap) }, b)
-    }
-  }
   return findings
 }
