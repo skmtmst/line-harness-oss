@@ -209,7 +209,7 @@ export const api = {
       { bookingId },
     ),
   bookingPaymentStatus: (bookingId: string) =>
-    get<{ payment: BookingPayment | null }>(
+    get<{ payment: BookingPayment | null; operation_status?: 'unknown'; action_required?: boolean }>(
       `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
     ),
   me: () => get<BookingHistoryResponse>('/api/liff/booking/me'),

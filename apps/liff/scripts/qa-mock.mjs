@@ -623,6 +623,23 @@ const server = createServer(async (req, res) => {
       return;
     }
   }
+  // 現行の確認画面は、費用見積もりの正常応答が読めるまで送信しない。
+  if (method === 'GET' && pathname === '/api/liff/booking/cost-estimate') {
+    const menuId = url.searchParams.get('menu_id');
+    const base = menuId === 'qa-menu-2' ? 12600 : menuId === 'qa-menu-3' ? 4200 : menuId === 'qa-menu-4' ? 0 : 8400;
+    const price = base + (url.searchParams.get('staff_id') === 'qa-staff-1' ? 500 : 0);
+    const enabled = state.features.includes('cancellation');
+    const startsAt = Date.parse(url.searchParams.get('starts_at') ?? '');
+    if (!Number.isFinite(startsAt)) { json(res, 400, { error: 'invalid_starts_at' }); return; }
+    json(res, 200, { success: true, data: {
+      cancellation: { enabled, version: 1, price, cardRequired: true,
+        tiers: [{ beforeHours: 24, percent: 0 }, { beforeHours: 0, percent: 50 }], noShowPercent: 100,
+        freeUntil: enabled ? new Date(startsAt - 86400000).toISOString() : null,
+        feeNow: enabled ? Math.floor(price / 2) : 0, feeNoShow: enabled ? price : 0, policyAcceptedRequired: enabled },
+      deposit: { amount: 0, testMode: true, paymentCollectionAvailable: false },
+    } });
+    return;
+  }
   if (method === 'GET' && pathname === '/api/liff/booking/settings') {
     json(res, 200, { liff_date_view: 'list', booking_window_days: 60 });
     return;
@@ -1043,6 +1060,13 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (method === 'GET' && pathname === '/api/liff/affiliate/statements/qa-statement-1/download') {
+    if (url.searchParams.get('issue') === '1') {
+      const issued = new URL(pathname, `http://${req.headers.host}`);
+      issued.searchParams.set('expires', String(Math.floor(Date.now() / 1000) + 900));
+      issued.searchParams.set('signature', 'qa-fixture-only');
+      json(res, 200, { success: true, data: { url: issued.href, expiresAt: new Date(Date.now() + 900000).toISOString() } });
+      return;
+    }
     const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
       '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>', '<< /Length 0 >>\nstream\n\nendstream'];
     let pdf = '%PDF-1.4\n'; const offsets = [0];

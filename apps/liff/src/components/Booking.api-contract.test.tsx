@@ -48,7 +48,7 @@ it('実際のAPI関数で費用見積もりを読み、同意・版・登録ID�
   const box = await screen.findByRole('checkbox', { name: 'キャンセル料の決まりを確認しました' });
   expect((box as HTMLInputElement).checked).toBe(false);
   fireEvent.click(box);
-  fireEvent.click(screen.getByRole('button', { name: 'カードを登録して予約する' }));
+  fireEvent.click(screen.getByRole('button', { name: '試験のカードを登録して予約する' }));
   await waitFor(() => expect(submitted).toHaveBeenCalledWith(expect.objectContaining({ bookingId: 'b1' })));
   expect(writes).toEqual([{ path: '/api/liff/booking/requests', body: {
     menu_id: 'menu', staff_id: 'bs', starts_at: '2099-01-02T01:00:00.000Z', policyAccepted: true, policyVersion: 2, setupIntentId: 'seti_test_1',
@@ -65,13 +65,13 @@ it('読み込み失敗時は確認で止まり、もう一度で回復してか�
   failEstimate = false;
   fireEvent.click(screen.getByRole('button', { name: 'もう一度' }));
   expect(await screen.findByRole('checkbox')).toBeTruthy();
-  expect((screen.getByRole('button', { name: 'カードを登録して予約する' }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole('button', { name: '試験のカードを登録して予約する' }) as HTMLButtonElement).disabled).toBe(true);
 });
 it('版が変わった後の再読み込み失敗でも、決まりなしで再送しない', async () => {
   confirm();
   fireEvent.click(await screen.findByRole('checkbox'));
   failRequestPolicy = true; failEstimate = true;
-  fireEvent.click(screen.getByRole('button', { name: 'カードを登録して予約する' }));
+  fireEvent.click(screen.getByRole('button', { name: '試験のカードを登録して予約する' }));
   await screen.findByText('キャンセル料の決まりを読み込めませんでした。');
   expect(writes).toHaveLength(1);
   expect((screen.getByRole('button', { name: 'この内容で予約を確定する' }) as HTMLButtonElement).disabled).toBe(true);
@@ -106,7 +106,7 @@ it('店頭払いでは全額返金の約束や返金を受ける操作を出さ�
   render(<BookingHistoryCancelDialog booking={{ starts_at: '2099-01-02T01:00:00Z', menu_name: '相談', staff_name: '担当' } as BookingHistoryItem}
     payment={{ kind: 'onsite', label: 'お店で払う', tone: 'neutral', amount: 8400, receiptUrl: null, holdUntil: null }} busy={false} error={null} onConfirm={() => {}} onCancel={() => {}} />);
   expect(screen.queryByText(/全額返金/)).toBeNull();
-  expect(screen.queryByRole('button', { name: 'キャンセルして返金を受ける' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'キャンセルする（試験返金）' })).toBeNull();
   expect(screen.getByRole('button', { name: 'キャンセルする' })).toBeTruthy();
 });
 
@@ -114,7 +114,7 @@ it('キャンセル料が掛かる支払い済み予約では、自動の全額�
   render(<BookingHistoryCancelDialog booking={{ starts_at: '2099-01-02T01:00:00Z', menu_name: '相談', staff_name: '担当', cancellationQuote: { feeNow: 4200 } } as BookingHistoryItem}
     payment={{ kind: 'paid', label: '支払い済み', tone: 'confirmed', amount: 8400, receiptUrl: null, holdUntil: null }} busy={false} error={null} onConfirm={() => {}} onCancel={() => {}} />);
   expect(screen.queryByText(/全額返金/)).toBeNull();
-  expect(screen.getByText('返金はお店からご連絡します。')).toBeTruthy();
+  expect(screen.getByText('返金についてはトークで担当者へご確認ください。')).toBeTruthy();
 });
 
 it('キャンセル料が3段の店は、見積もりの段を省かず同意の前に表示する', async () => {
@@ -125,4 +125,21 @@ it('キャンセル料が3段の店は、見積もりの段を省かず同意の
   expect(await screen.findByText('開始の12時間前まで')).toBeTruthy();
   expect(screen.getByText('料金の 25%（¥2,100）')).toBeTruthy();
   expect(screen.getByText('料金の 50%（¥4,200）')).toBeTruthy();
+});
+
+
+it('返金額が未取得の試験記録を0円と表示しない', () => {
+  render(<BookingHistoryCancelDialog booking={{ starts_at: '2099-01-02T01:00:00Z', menu_name: '相談', staff_name: '担当' } as BookingHistoryItem}
+    payment={{ kind: 'paid', label: '支払い済み', tone: 'confirmed', amount: null, receiptUrl: null, holdUntil: null }} busy={false} error={null} onConfirm={() => {}} onCancel={() => {}} />);
+  expect(screen.getByText('試験の全額返金を記録します（金額は未取得です）')).toBeTruthy();
+  expect(screen.queryByText(/¥0/)).toBeNull();
+});
+
+
+it('回数券の回数が未取得なら確認画面でも0回にしない', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => String(input).includes('/cost-estimate')
+    ? json(estimate(false)) : json({ success: true, data: [{ id: 'pass', name: '人工の回数券', kind: 'ticket', usable: true, remaining: null }] })));
+  confirm();
+  expect(await screen.findByText('残り — 回')).toBeTruthy();
+  expect(screen.queryByText('残り 0 回')).toBeNull();
 });

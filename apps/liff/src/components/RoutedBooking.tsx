@@ -1,3 +1,4 @@
+import { CUSTOMER_WORDS } from '../lib/customer-words.js';
 import type { RoutedTarget } from '../lib/api.js';
 import { bookingPriceText } from '../lib/booking-price.js';
 import Card from './ui/Card.js';
@@ -8,7 +9,7 @@ import Icon from './ui/Icon.js';
  * 行き先は答えで決まっていて、お客さまが書き換えることはできない。
  */
 export function RoutedBanner({ target }: { target: RoutedTarget }) {
-  const mode = target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : target.meetingMode === 'in_person' ? 'お店で' : null;
+  const mode = target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : target.meetingMode === 'in_person' ? 'ご利用先で' : null;
   const meta = [target.staffName ? `担当：${target.staffName}` : null, mode, bookingPriceText(target.price, target.price > 0 ? 'fixed' : 'free')].filter(Boolean).join(' ・ ');
   return (
     <section data-routed-banner aria-label="ご案内" className="space-y-2 rounded-(--liff-radius-lg) bg-liff-soft p-3.5 outline-2 -outline-offset-1 outline-liff-primary">
@@ -21,13 +22,13 @@ export function RoutedBanner({ target }: { target: RoutedTarget }) {
   );
 }
 
-/** 行き先に空きが無いとき（R02q7）。白い画面にせず、お店へ問い合わせる道を出す。 */
+/** 行き先に空きが無いとき（R02q7）。白い画面にせず、ご利用先へ問い合わせる道を出す。 */
 export function NoRoutedSlots({ target, days }: { target: RoutedTarget; days: number }) {
   return (
     <Card className="flex flex-col items-center gap-2 px-5 py-8 text-center">
       <Icon name="calendar-x" className="h-8 w-8 text-liff-sub" />
       <p className="text-[15px] font-bold text-ink">ご案内できる日時がありません</p>
-      <p className="text-xs leading-[18px] text-liff-sub">{`${Math.ceil(days / 7)} 週間先まで、${target.menuName}の空きがありません。お店にご相談ください。`}</p>
+      <p className="text-xs leading-[18px] text-liff-sub">{`${Math.ceil(days / 7)} 週間先まで、${target.menuName}の空きがありません。ご利用先にご相談ください。`}</p>
     </Card>
   );
 }
@@ -35,10 +36,10 @@ export function NoRoutedSlots({ target, days }: { target: RoutedTarget; days: nu
 /** 確認の段（手順の帯の 3 つ目）。ここで内容を見てもらってから、ボタンで送る。 */
 export function RoutedConfirm({ target, whenText }: { target: RoutedTarget; whenText: string }) {
   const rows: Array<[string, string]> = [
-    ['メニュー', target.menuName],
+    [CUSTOMER_WORDS.bookingContent, target.menuName],
     ['日時', whenText],
     ...(target.staffName ? [['担当', target.staffName] as [string, string]] : []),
-    ...(target.meetingMode ? [['形式', target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : 'お店で'] as [string, string]] : []),
+    ...(target.meetingMode ? [['形式', target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : 'ご利用先で'] as [string, string]] : []),
     ['料金', bookingPriceText(target.price, target.price > 0 ? 'fixed' : 'free')],
   ];
   return (

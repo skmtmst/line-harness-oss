@@ -149,6 +149,14 @@ const ALLOWLIST_MAX = 769;
  */
 const BASELINE_DOCUMENTED = new Set<string>([
   "GET /api/booking/admin/bookings/{id}",
+  'GET /api/ops/staging-qa/safety',
+  'GET /api/ops/staging-qa/runs',
+  'POST /api/ops/staging-qa/runs',
+  'GET /api/ops/staging-qa/runs/{id}',
+  'DELETE /api/ops/staging-qa/runs/{id}',
+  'POST /api/ops/staging-qa/runs/{id}/friends',
+  'POST /api/ops/staging-qa/runs/{id}/session',
+  'POST /api/ops/staging-qa/runs/{id}/cron',
   "GET /api/ai-answer-logs",
   "GET /api/ai-answer-logs/{id}",
   "GET /api/ai-features",

@@ -13,15 +13,15 @@
  *
  * 375×812 と 414×896 で、通常・読み込み中・失敗(API 500) を撮る。
  */
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium } from '/Users/kentakenta/lh-work/m7h/node_modules/.pnpm/playwright@1.62.1/node_modules/playwright/index.mjs';
+import { chromium } from '@playwright/test';
 
 const BASE = process.env.QA_BASE_URL ?? 'http://localhost:3002';
 const MOCK = process.env.QA_MOCK_URL ?? 'http://localhost:8790';
 const OUT = process.argv[2] ?? 'apps/liff/scripts/qa-shots-out';
 
-const VIEWPORTS = [
+const VIEWPORTS = process.env.QA_WIDTHS ? process.env.QA_WIDTHS.split(',').map(Number).map(width => ({ name: `${width}x896`, width, height: 896 })) : [
   { name: '375x812', width: 375, height: 812 },
   { name: '414x896', width: 414, height: 896 },
 ];
@@ -72,7 +72,30 @@ async function shot(page, viewport, name, url, opts = {}) {
     await page.goto(`${BASE}${url}`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(opts.waitMs ?? 1500);
     if (opts.after) await opts.after(page);
-    await page.screenshot({ path: join(OUT, viewport.name, `${name}.png`), fullPage: true });
+    if (name === 'booking-done') await page.getByRole('button', { name: '予約の履歴を見る', exact: true }).waitFor();
+    if (name === 'booking-confirm') {
+      const submit = page.getByRole('button', { name: 'この内容で予約をリクエストする', exact: true });
+      await submit.waitFor();
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'この内容で予約をリクエストする' && !button.disabled));
+    }
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await Promise.all(document.getAnimations().filter(animation => animation.effect?.getTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => undefined)));
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    const overflow = await page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - innerWidth));
+    measurements.push({ width: viewport.width, name, overflow });
+    // 固定帯を長い全体画像へ合成せず、実際の表示範囲の上端/下端で確認する。
+    await page.screenshot({ path: join(OUT, viewport.name, `${name}.png`), fullPage: false });
+    const hasLowerContent = await page.evaluate(() => scrollY + innerHeight < document.documentElement.scrollHeight - 1);
+    if (hasLowerContent) {
+      await page.evaluate(async () => {
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
+      await page.screenshot({ path: join(OUT, viewport.name, `${name}-bottom.png`), fullPage: false });
+    }
+    if (overflow !== 0) throw new Error(`横はみ出し ${overflow}px`);
     console.log(`ok ${viewport.name}/${name}`);
   } catch (err) {
     failures.push(`${viewport.name}/${name}: ${err.message}`);
@@ -82,6 +105,7 @@ async function shot(page, viewport, name, url, opts = {}) {
   }
 }
 
+const measurements = [];
 const browser = await chromium.launch();
 try {
   for (const viewport of VIEWPORTS) {
@@ -91,6 +115,17 @@ try {
       deviceScaleFactor: 2,
     });
 
+    await page.addInitScript(() => {
+      const RealDate = Date;
+      window.Date = class extends RealDate { constructor(...args) { super(...(args.length ? args : ['2026-10-07T09:00:00+09:00'])); } static now() { return new RealDate('2026-10-07T09:00:00+09:00').getTime(); } };
+    });
+    await page.route('**/*', route => {
+      const u = new URL(route.request().url());
+      if (u.pathname === '/api/liff/files/11111111-1111-4111-8111-111111111111/download') return route.fulfill({ headers: { 'Access-Control-Allow-Origin': '*' }, json: { success: true, data: { id: '11111111-1111-4111-8111-111111111111', url: `${u.origin}/images/chat-attachments/11111111-1111-4111-8111-111111111111?expires=1&signature=fixture`, expiresAt: '2099-01-01T00:00:00Z', filename: '人工の添付.png', mimeType: 'image/png', size: 100, kind: 'image' } } });
+      if (u.pathname === '/api/liff/affiliate/statements/qa-statement-1/download' && u.searchParams.get('issue') === '1') return route.fulfill({ headers: { 'Access-Control-Allow-Origin': '*' }, json: { success: true, data: { url: `${u.origin}${u.pathname}?expires=1&signature=fixture`, expiresAt: '2099-01-01T00:00:00Z' } } });
+      return ['localhost', '127.0.0.1', 'fonts.googleapis.com', 'fonts.gstatic.com'].includes(u.hostname) || ['data:', 'blob:'].includes(u.protocol) ? route.continue() : route.abort();
+    });
+    page.on('pageerror', e => failures.push(`${viewport.name}/runtime: ${e.message}`));
     // 予約 (メニュー→担当→日時→確認→完了まで進める)
     await shot(page, viewport, 'booking', '/booking?liffId=qa', { waitMs: 2000 });
     await shot(page, viewport, 'booking-staff', '/booking?liffId=qa', {
@@ -131,7 +166,7 @@ try {
         // 2番目に早い空き日を選び、その日の時刻を選んだ状態で撮る。
         await pickOpenDay(p);
         await p.getByRole('button', { name: 'この日の時間を選ぶ' }).click();
-        await p.getByRole('button', { name: '11:00' }).click();
+        await p.getByRole('button', { name: '13:00', exact: true }).first().click();
       },
     });
     await shot(page, viewport, 'booking-loading', '/booking?liffId=qa', {
@@ -149,8 +184,27 @@ try {
         await p.getByRole('button', { name: '担当を選ぶ' }).click();
         await p.getByRole('button', { name: /指名なし/ }).click();
         await p.getByRole('button', { name: '日時を選ぶ' }).click();
-        await p.getByRole('button', { name: '10:00' }).click();
+        await p.getByRole('button', { name: '13:00', exact: true }).first().click();
         await p.getByRole('button', { name: '内容を確かめる' }).click();
+      },
+    });
+    await shot(page, viewport, 'booking-card-policy', '/booking?liffId=qa', {
+      mock: { features: ['cancellation'] }, waitMs: 2000,
+      after: async p => {
+        await p.getByRole('button', { name: /トリミング（小型犬）/ }).click();
+        await p.getByRole('button', { name: '担当を選ぶ', exact: true }).click();
+        await p.getByRole('button', { name: /指名なし/ }).click();
+        await p.getByRole('button', { name: '日時を選ぶ', exact: true }).click();
+        await p.getByRole('button', { name: '13:00', exact: true }).first().click();
+        await p.getByRole('button', { name: '内容を確かめる', exact: true }).click();
+        const consent = p.getByRole('checkbox', { name: 'キャンセル料の決まりを確認しました' });
+        await consent.waitFor();
+        const submit = p.getByRole('button', { name: '試験のカードを登録して予約する', exact: true });
+        if (!(await submit.isDisabled())) throw new Error('未同意では送信しない');
+        await consent.click();
+        if (await submit.isDisabled()) throw new Error('同意したら試験の予約を選べる');
+        await consent.click();
+        if (!(await submit.isDisabled())) throw new Error('同意を外したら送信しない');
       },
     });
     await shot(page, viewport, 'booking-done', '/booking?liffId=qa', {
@@ -160,7 +214,7 @@ try {
         await p.getByRole('button', { name: '担当を選ぶ' }).click();
         await p.getByRole('button', { name: /指名なし/ }).click();
         await p.getByRole('button', { name: '日時を選ぶ' }).click();
-        await p.getByRole('button', { name: '10:00' }).click();
+        await p.getByRole('button', { name: '13:00', exact: true }).first().click();
         await p.getByRole('button', { name: '内容を確かめる' }).click();
         await p.getByRole('button', { name: 'この内容で予約をリクエスト' }).click();
         await p.waitForTimeout(1500);
@@ -176,6 +230,15 @@ try {
     await shot(page, viewport, 'booking-history-error', '/booking/history?liffId=qa', {
       mock: { fail: 'all' },
       waitMs: 2000,
+    });
+
+    await shot(page, viewport, 'booking-paid-cancel', '/booking/history?liffId=qa', {
+      waitMs: 2000,
+      after: async p => {
+        await p.getByRole('button', { name: 'キャンセル', exact: true }).first().click();
+        await p.getByRole('alertdialog').waitFor();
+        await p.getByRole('button', { name: 'キャンセルする（試験返金）', exact: true }).waitFor();
+      },
     });
 
     // イベント一覧 (自分のイベント予約)
@@ -268,6 +331,22 @@ try {
       waitMs: 2000,
     });
 
+    for (const [name, url] of [
+      ['mypage', '/mypage'], ['affiliate', '/affiliate'], ['stamps', '/visit-stamps'],
+      ['file', '/files/11111111-1111-4111-8111-111111111111'],
+      ['statement', '/statements/qa-statement-1'], ['webinar', '/webinars/qa-webinar'],
+    ]) await shot(page, viewport, name, `${url}?liffId=qa`, { waitMs: 2000, after: async p => {
+      if (name === 'file') await p.getByRole('button', { name: 'ファイルを開く', exact: true }).waitFor();
+      if (name === 'statement') await p.getByRole('button', { name: '明細を開く', exact: true }).waitFor();
+      if (name === 'affiliate') await p.getByRole('region', { name: '会員証' }).waitFor();
+      if (name === 'mypage') await p.getByText('お知らせの受け取り', { exact: true }).waitFor();
+      if (name === 'stamps') await p.getByRole('button', { name: '店員に見せる', exact: true }).waitFor();
+    } });
+    await shot(page, viewport, 'mypage-tickets', '/mypage?liffId=qa', { waitMs: 2000, after: async p => { await p.getByRole('button', { name: /回数券/ }).click(); await p.getByText('10回券', { exact: true }).waitFor();
+      const detail = p.getByText('残り 9 回・2027/4/1 まで', { exact: true });
+      const fits = await detail.evaluate(el => { const range = document.createRange(); range.selectNodeContents(el); return new Set([...range.getClientRects()].map(rect => Math.round(rect.y))).size === 1 && el.scrollWidth <= el.clientWidth + 1; });
+      if (!fits) throw new Error('回数券の期限を枠内の1行で読める');
+    } });
     await page.close();
   }
 } finally {
@@ -275,6 +354,7 @@ try {
   await resetMock().catch(() => undefined);
 }
 
+writeFileSync(join(OUT, 'layout.json'), JSON.stringify({ measurements, failures }, null, 2));
 if (failures.length > 0) {
   console.error(`\n${failures.length} shots failed:`);
   for (const f of failures) console.error(`- ${f}`);

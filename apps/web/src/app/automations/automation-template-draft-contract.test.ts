@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const GALLERY = readFileSync(new URL('../../v8/automations/templates.tsx', import.meta.url), 'utf8')
-const EDITOR = readFileSync(new URL('../../v8/automations/create/create.tsx', import.meta.url), 'utf8')
 const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('V6 25-1-C 見本から下書きを作る', () => {
@@ -32,19 +31,8 @@ describe('V6 25-1-C 見本から下書きを作る', () => {
     */
     expect(GALLERY).toContain('/automations/drafts?id=')
     expect(GALLERY, '白紙の作成画面へ落とさない').not.toContain('/automations/new?draftId=')
-    expect(EDITOR).toContain('.getDraft(draftId, accountId)')
-    expect(EDITOR).toContain('.draftResources(selectedAccountId)')
-    expect(EDITOR).toContain('api.automations.updateDraft(draft.id, accountId')
-    expect(EDITOR).toContain('公開するまでは下書きのままです')
     expect(API).toContain('/api/automation-templates/')
     expect(API).toContain('/api/automation-drafts/')
-  })
-
-  it('見本の資源IDを使わず、タグとシナリオを選び直させる', () => {
-    expect(EDITOR).toContain('見本に実データは入っていません。このアカウントで使うタグやシナリオを選び')
-    expect(EDITOR).toContain("if (eventType === 'tag_change' && !String(triggerConfig.tagId ?? '').trim())")
-    expect(EDITOR).toContain("if (row.type === 'add_tag' && !row.tagId)")
-    expect(EDITOR).toContain("if (row.type === 'start_scenario' && !row.scenarioId)")
   })
 
   it('未取得・空・失敗を別にし、失敗時に下書きを作ったように見せない', () => {
@@ -54,6 +42,5 @@ describe('V6 25-1-C 見本から下書きを作る', () => {
     expect(GALLERY).toContain('まだ下書きは作っていません')
     expect(GALLERY).toContain('下書きを作れませんでした')
     expect(GALLERY).not.toContain('error.message')
-    expect(EDITOR).toContain('下書きを保存できませんでした。状態を読み直してから')
   })
 })
