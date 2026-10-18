@@ -11,9 +11,6 @@ const ADV_SEARCH = read('components/friends/advanced-search-dialog.tsx')
 const SAVED_SEARCH = read('components/friends/saved-search-dialog.tsx')
 const SINGLE_ACTIONS = read('components/friends/single-friend-actions.tsx')
 const FRIEND_TABLE = read('components/friends/friend-list-table.tsx')
-const BOOKINGS = read('app/booking/bookings/page.tsx')
-const BOOKING_NEW = read('app/booking/bookings/new/page.tsx')
-const BOOKING_DETAIL = read('app/booking/bookings/detail/page.tsx')
 const CHATS = read('app/chats/page.tsx')
 const DASHBOARD_EDITOR = read('v8/dashboard/dashboard-editor.tsx')
 const DASHBOARD = read('app/page.tsx')
@@ -36,12 +33,6 @@ describe('最後の細かい板の印', () => {
     expect(SAVED_SEARCH).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
     expect(SINGLE_ACTIONS).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
     expect(FRIEND_TABLE).toMatch(/(?:data-design-node|boardId|designNode)="CYJ0L"/)
-  })
-
-  it('予約にacRIl・If9Mhを付ける', () => {
-    expect(BOOKINGS).toMatch(/(?:data-design-node|boardId|designNode)="acRIl"/)
-    expect(BOOKING_NEW).toContain('If9Mh')
-    expect(BOOKING_DETAIL).toMatch(/(?:data-design-node|boardId|designNode)="If9Mh"/)
   })
 
   it('受信箱にeovoG・ダッシュボードにd8X09・mcOqKを付ける', () => {

@@ -236,10 +236,13 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
       return found
     }
     await act(async () => { byText('button', '予約内容を確認する').click() })
+    expect(api.createCustomer).not.toHaveBeenCalled()
+    expect(api.createProxyBooking).not.toHaveBeenCalled()
     await act(async () => { byText('button', 'この内容で予約を入れる').click() })
     await settle()
 
     expect(api.createProxyBooking).toHaveBeenCalledTimes(1)
+    expect(api.createProxyBooking.mock.calls[0][2]).toMatch(/^[0-9a-f-]{36}$/i)
     expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull()
   })
 
@@ -389,6 +392,16 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     accountId.value = 'account-ny'
   })
 
+  it('桁不足の電話番号では確認に進まず、客も予約も作らない', async () => {
+    seedDraft({ customerPhone: '123' })
+    await mount(); await flush()
+    const confirm = all('button').find(b => b.textContent?.includes('予約内容を確認する'))! as HTMLButtonElement
+    await act(async () => { confirm.click() }); await flush()
+    expect(all('button').some(b => b.textContent?.includes('この内容で予約を入れる'))).toBe(false)
+    expect(container.textContent).toContain('電話番号は数字7〜15桁で入力してください')
+    expect(api.createCustomer).not.toHaveBeenCalled()
+    expect(api.createProxyBooking).not.toHaveBeenCalled()
+  })
 })
 
 // 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。

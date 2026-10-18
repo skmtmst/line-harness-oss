@@ -1,4 +1,6 @@
 'use client'
+import { useStaffRole } from '@/lib/staff-role'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { notifySaved } from '@/components/shared/toast'
 import ListToolbar, { ListToolbarSort } from '@/components/shared/list-toolbar'
 import PageSizeSelect from '@/components/shared/page-size-select'
@@ -66,6 +68,8 @@ const RATING_OPTIONS: Array<{ value: string; label: string }> = [
 ]
 
 export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: string; data: GoogleConnectionData; go: GoogleNav; onSynced: () => void }) {
+  const role = useStaffRole()
+  const canEdit = role !== null && role !== 'viewer'
   const [filter, setFilter] = useListUrlValue<GoogleReviewFilter>('filter', 'all')
   const [rating, setRating] = useState('')
   const [order, setOrder] = useListUrlValue<GoogleReviewOrder>('order', 'newest')
@@ -101,7 +105,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
   }, [search])
 
   const sync = useCallback(async () => {
-    if (syncing) return
+    if (!canEdit || syncing) return
     setSyncing(true)
     setSyncError('')
     try {
@@ -113,14 +117,14 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
     } finally {
       setSyncing(false)
     }
-  }, [accountId, load, onSynced, syncing])
+  }, [accountId, canEdit, load, onSynced, syncing])
 
   // 画面を開いたとき、最終同期が古ければ裏で1回だけ同期する（前回の一覧はそのまま見せる）。
   useEffect(() => {
-    if (syncedOnce || connection.status !== 'connected' || !data.summary.syncStale) return
+    if (!canEdit || syncedOnce || connection.status !== 'connected' || !data.summary.syncStale) return
     setSyncedOnce(true)
     void sync()
-  }, [connection.status, data.summary.syncStale, sync, syncedOnce])
+  }, [canEdit, connection.status, data.summary.syncStale, sync, syncedOnce])
 
   const pageCount = list ? Math.max(1, Math.ceil(list.total / list.perPage)) : 1
   const average = connection.averageRating
@@ -128,6 +132,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
 
   return (
     <>
+      {!canEdit ? <ReadOnlyNotice /> : null}
       <StatRow>
         <KpiCard density="compact" title="未返信" valueText={`${data.summary.unrepliedCount}`} detail="返信を待っている口コミ" valueTone={data.summary.unrepliedCount > 0 ? 'warning' : 'default'} icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
         <KpiCard density="compact" title="平均の評価" valueText={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} detail={`総合・${reviewTotal}件`} icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
@@ -142,21 +147,21 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
           <Select label="状態" aria-label="状態で絞り込み" value={filter} onChange={(value) => { setFilter(value as GoogleReviewFilter); setPage(1) }} options={STATE_OPTIONS} />
         </>}
         trailing={<>
-          <IconButton
+          {canEdit ? <IconButton
             aria-label={syncing ? 'Googleから取得中…' : 'Googleから同期する'}
             onClick={() => void sync()}
             disabled={syncing || connection.status !== 'connected'}
             title={syncing ? '口コミを取得しています' : connection.status !== 'connected' ? 'Googleとの接続を確認してください' : undefined}
           >
             <RefreshCw aria-hidden className={`${styles.icon16} ${syncing ? styles.spin : ''}`} />
-          </IconButton>
+          </IconButton> : null}
           <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); setPage(1) }} />
           <ListToolbarSort aria-label="並び順" value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
         </>}
       />
       {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
       {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認する</Link>}>この店舗を操作する権限がありません。</Notice> : null}
-      {syncError ? <Notice tone="warn" action={<Button variant="text" onClick={() => sync()} busy={syncing} busyLabel="取得中…">もう一度</Button>}>{syncError}</Notice> : null}
+      {syncError ? <Notice tone="warn" action={canEdit ? <Button variant="text" onClick={() => sync()} busy={syncing} busyLabel="取得中…">もう一度</Button> : undefined}>{syncError}</Notice> : null}
       {syncing && (list?.total ?? 0) === 0 ? <Notice tone="info">口コミを取得中… すべてのページを取得してから表示します。</Notice> : null}
       {listLoading && !list ? <div className={styles.stateBox}><ListState kind="loading" title="口コミを読み込んでいます" /></div> : null}
       {listError ? <div className={styles.stateBox}><ListState kind="error" title="口コミを表示できませんでした" description={listError} onRetry={() => void load()} /></div> : null}
@@ -195,7 +200,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
                 <Td>{formatShortStamp(reviewReceivedAt(review))}</Td>
                 <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
                 <ActionCell>
-                  <Button onClick={() => go({ tab: 'reviews', view: 'draft', id: review.id })}>{actionable ? '下書きを作る' : '返信を見る'}</Button>
+                  {canEdit || !actionable || review.replyDraft ? <Button onClick={() => go({ tab: 'reviews', view: 'draft', id: review.id })}>{canEdit && actionable ? '下書きを作る' : '返信を見る'}</Button> : null}
                 </ActionCell>
               </Tr>
             )
@@ -211,6 +216,8 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
 
 /** 返信を作る（x9HIR）＋公開の確認（xSudF）。 */
 export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { accountId: string; reviewId: string; data: GoogleConnectionData; go: GoogleNav; onPublished: () => void }) {
+  const role = useStaffRole()
+  const canEdit = role !== null && role !== 'viewer'
   const saveErrors = useSaveFormErrors()
 
   const canPublish = data.permissions.canPublishReply
@@ -227,7 +234,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
   const [conflict, setConflict] = useState<string | null>(null)
   const [done, setDone] = useState<{ comment: string } | null>(null)
   // 未保存の下書きがあるまま一覧や他画面へ移ろうとしたら止める（今の画面と同じ）。
-  const dirty = review !== null && done === null && review.replyStatus !== 'published' && review.replyStatus !== 'replied' && text !== (review.replyDraft ?? '')
+  const dirty = canEdit && review !== null && done === null && review.replyStatus !== 'published' && review.replyStatus !== 'replied' && text !== (review.replyDraft ?? '')
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: busy !== null })
 
   const load = useCallback(async () => {
@@ -252,6 +259,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
   useEffect(() => { void load() }, [load])
 
   const generate = async () => {
+    if (!canEdit) return
     setBusy('generate')
     setActionError('')
     setSaved('')
@@ -270,6 +278,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
   }
 
   const save = async () => {
+    if (!canEdit) return
     setBusy('save')
     setActionError('')
     try {
@@ -288,6 +297,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
   }
 
   const publish = async () => {
+    if (!canEdit || !canPublish || !data.writeEnabled) return
     setBusy('publish')
     setActionError('')
     try {
@@ -326,11 +336,11 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
   const alreadyReplied = review.replyStatus === 'published' || review.replyStatus === 'replied' || Boolean(done)
   const pendingConfirm = review.replyStatus === 'pending_confirm'
   const textLength = text.trim().length
-  const canOpenConfirm = canPublish && data.writeEnabled && textLength > 0 && textLength <= 4096 && !alreadyReplied && conflict === null && busy === null
+  const canOpenConfirm = canEdit && canPublish && data.writeEnabled && textLength > 0 && textLength <= 4096 && !alreadyReplied && conflict === null && busy === null
   const sourceUrl = data.connection.locationMapsUrl
     ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeTitle)}`
 
-  if (confirming) {
+  if (confirming && canEdit && canPublish && data.writeEnabled) {
     return (
       <SaveErrorScope errors={saveErrors}><div className={styles.split} data-design-node="xSudF">
         <div className={styles.mainColumn}>
@@ -359,9 +369,11 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
 
   return (
     <SaveErrorScope errors={saveErrors}><>
+      {!canEdit ? <ReadOnlyNotice /> : null}
+      {!canEdit && actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       {done ? <Notice tone="success">Googleに返信を送信しました。反映を確認できるまで「反映確認中」と表示します。</Notice> : null}
       {conflict !== null ? <SaveConflictBand title="別の担当者がすでに返信しています。" description={`表示されている返信：「${conflict}」。重ねて送信せず、最新の内容を読み込んで確認してください。`} onReload={() => void load()} /> : null}
-      {pendingConfirm && !done ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
+      {pendingConfirm && !done ? <Notice tone="warn">{canEdit ? '前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。' : '前回の送信結果を確認できていません。オーナーか管理者にGoogle側の状態の確認を頼んでください。'}</Notice> : null}
       <div className={styles.split}>
         <div className={styles.mainColumn}>
           <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
@@ -377,7 +389,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
               <p className={styles.repliedBox}>{`公開済みの返信：${done?.comment ?? review.replyComment}`}</p>
             ) : null}
           </Card>
-          {!alreadyReplied ? (
+          {!canEdit && !alreadyReplied ? <Card appearance="outlined" layout="vertical" padding="default" gap="normal"><SectionHeader size="small" title={review.replyDraftAiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'} /><p className={styles.preText}>{review.replyDraft || '下書きはまだありません。'}</p></Card> : !alreadyReplied ? (
             <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
               <SectionHeader size="small" title={<>{aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}</>} />
               <SaveErrorField names={["text"]}><TextArea
@@ -410,7 +422,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
               ? '検証環境では Google へは送りません。下書きと承認まで。'
               : canPublish ? '確認してから Google へ公開します。' : 'Googleへの公開は店舗管理者以上が行います。下書きを保存しておくと、管理者が確認して公開できます。'}
           </p>
-          {!alreadyReplied ? (
+          {canEdit && !alreadyReplied ? (
             <>
               <Button onClick={() => void save()} disabled={busy !== null || textLength === 0 || textLength > 4096} busy={busy === 'save'} className={styles.fullButton}>下書きを保存する</Button>
               {canPublish && data.writeEnabled ? (
