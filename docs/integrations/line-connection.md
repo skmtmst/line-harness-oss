@@ -569,7 +569,7 @@ PR #1751 は必須CIをすべて通過して**マージ済み**（マージSHA `
 - 画面に出す URL の形は `apps/worker/src/lib/webhook-endpoint.ts` の `expectedWebhookUrl(workerUrl)` ＝ `{WorkerのURL}/webhook`。**アカウントごとではなく共通の1本**（`apps/worker/src/routes/webhook.ts` の `POST /webhook`）。検証環境は `https://nen-line-stg.skmtmst.workers.dev/webhook`。
 - デザイン：`/Users/masatosakamoto/Documents/LINE-Harness-Design/新規デザイン/2026-10-12_LINE追加画面のアップデート_LINE新規追加/LINE新規追加_v07.pen`（v06 は承認済みの版として未変更で保持）。段2 `Fqy29` の Step2 `f4AgA` に、Webhook URL の読み取り専用欄＋「コピー」ボタンのカード `Ds3E2` と、確認チェック `dqe2M`（3つ→4つ）を追加。Step1/2/3 の「musubo が自動で行うこと」から「Webhook URL の登録／」を削除。
 - **状態＝未承認。** 利用者へ提示済み・回答待ち。承認を受けるまで `apps/web/src/v8/account-new/` の実装・PR・配備は行わない。
-- 対象外として残した点：段3 `Lwxyh` の「musubo が自動で行う5つのこと」には「Webhook URL の登録」が残っている。③の接続チェックでは実際に API で上書きするため今も正しい可能性があり、今回の指示に含まれないので変更していない。
+- 段3 `Lwxyh` の「musubo が自動で行う5つのこと」に残る「Webhook URL の登録」は**正しいので変更しない**。③の接続チェックは `apps/worker/src/services/line-account-connect.ts:163-166` で `PUT /v2/bot/channel/webhook/endpoint` を実際に呼び、`:170-178` で読み直して一致と `active === true` を確かめている。つまり「Step2 では利用者が貼り付ける／③では musubo が登録し直す」の両方が同時に成り立つ。
 
 ## 4. 気づいた不具合
 
