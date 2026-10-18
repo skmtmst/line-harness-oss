@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { BookingRequest } from '@/lib/api'
-import { useBookingLedger } from './use-ledger'
+import type { BookingLedgerModel } from './page'
 import Page from './page'
 
-const m = vi.hoisted(() => ({ account: 'A', liff: 'liff-a', query: 'view=list&status=confirmed', list: vi.fn(), summary: vi.fn(), menus: vi.fn(), staff: vi.fn(), me: vi.fn(), decide: vi.fn(), csv: vi.fn(), get: vi.fn(), replace: vi.fn() }))
+const m = vi.hoisted(() => ({ latest: null as unknown as BookingLedgerModel, realView: false, account: 'A', liff: 'liff-a', query: 'view=list&status=confirmed', list: vi.fn(), summary: vi.fn(), menus: vi.fn(), staff: vi.fn(), me: vi.fn(), decide: vi.fn(), csv: vi.fn(), get: vi.fn(), replace: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: m.account, selectedAccount: { id: m.account, name: m.account, liffId: m.liff } }) }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => new URLSearchParams(m.query), useRouter: () => ({ replace: m.replace, push: vi.fn() }) }))
 vi.mock('@/lib/api', async original => {
@@ -15,11 +15,19 @@ vi.mock('@/lib/api', async original => {
 })
 vi.mock('@/lib/api-booking-advanced', () => ({ bookingAdvancedApi: { card: async () => ({ success: true, data: null }), group: async () => ({ success: true, data: null }) } }))
 vi.mock('@/lib/api-gap1', () => ({ bookingCancellationApi: { charges: async () => ({ success: true, data: { charges: [], quote: { eligible: false }, testMode: true } }) } }))
+vi.mock('./ledger-screen', async original => {
+  const Actual = (await original<typeof import('./ledger-screen')>()).default
+  return { default: ({ model }: { model: BookingLedgerModel }) => { m.latest = model; return m.realView ? <Actual model={model} /> : null } }
+})
+function mountController() {
+  const view = render(<Page />)
+  return { result: { get current() { return m.latest } }, rerender: () => view.rerender(<Page />) }
+}
 const counts = { total: 51, requested: 1, monthTotal: 1, monthConfirmed: 1, monthCancelled: 0, lastMonthTotal: 0, todayTotal: 1, weekTotal: 1, byMenu: [] }
 const row = (id: string): BookingRequest => ({ id, starts_at: '2026-10-18T01:00:00Z', ends_at: '2026-10-18T02:00:00Z', status: 'confirmed', friend_id: null, friend_name: id, booking_customer_id: null, menu_name: 'カット', staff_name: '担当', staff_id: 'staff', requested_at: '2026-10-17T00:00:00Z', decided_at: null, customer_note: null, internal_note: null, price_at_booking: 5000, external_event_id: null, source: 'phone' })
 const defer = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r }); return { promise, resolve } }
 beforeEach(() => {
-  vi.resetAllMocks(); window.sessionStorage.clear(); window.history.replaceState(null, '', '/booking/bookings'); m.account = 'A'; m.liff = 'liff-a'; m.query = 'view=list&status=confirmed'
+  vi.resetAllMocks(); m.realView = false; window.sessionStorage.clear(); window.history.replaceState(null, '', '/booking/bookings'); m.account = 'A'; m.liff = 'liff-a'; m.query = 'view=list&status=confirmed'
   m.me.mockResolvedValue({ success: true, data: { role: 'owner', permissionKeys: [] } })
   m.list.mockResolvedValue({ requests: [row('current')], total: 51 }); m.summary.mockResolvedValue(counts)
   m.menus.mockResolvedValue({ menus: [] }); m.staff.mockResolvedValue({ staff: [] }); m.csv.mockResolvedValue(undefined)
@@ -27,7 +35,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 it('ページ分だけ取得して総数でページを決め、一覧とCSVに同じ絞り込みを渡す', async () => {
-  const h = renderHook(useBookingLedger)
+  const h = mountController()
   await waitFor(() => expect(h.result.current.total).toBe(51))
   expect(h.result.current.pageCount).toBe(3)
   act(() => { h.result.current.setStaffFilter('staff-2'); h.result.current.setSourceFilter('phone'); h.result.current.setQuery('花子') })
@@ -43,7 +51,7 @@ it('アカウント切替前の一覧・集計・候補の遅い返事を新し�
   const oldList = defer<{ requests: BookingRequest[]; total: number }>(); const oldSummary = defer<typeof counts>()
   m.list.mockImplementation((account: string) => account === 'A' ? oldList.promise : Promise.resolve({ requests: [row('Bの予約')], total: 1 }))
   m.summary.mockImplementation((account: string) => account === 'A' ? oldSummary.promise : Promise.resolve({ ...counts, total: 1 }))
-  const h = renderHook(useBookingLedger)
+  const h = mountController()
   act(() => h.result.current.handleDecide('old', 'cancel'))
   m.account = 'B'; h.rerender()
   await waitFor(() => expect(h.result.current.items[0]?.id).toBe('Bの予約'))
@@ -56,7 +64,7 @@ it('アカウント切替前の一覧・集計・候補の遅い返事を新し�
 })
 it('Aの確定処理が切替後に戻ってもBを消さず、Aの再取得を始めない', async () => {
   const done = defer<object>(); m.decide.mockReturnValue(done.promise)
-  const h = renderHook(useBookingLedger)
+  const h = mountController()
   await waitFor(() => expect(h.result.current.loading).toBe(false))
   let pending!: Promise<void>
   act(() => { pending = h.result.current.runDecide('old', 'cancel') })
@@ -70,7 +78,7 @@ it('Aの確定処理が切替後に戻ってもBを消さず、Aの再取得を�
 })
 it('権限を取得する前と閲覧のみには状態変更を出さず、未連携の行に会話を出さない', async () => {
   const role = defer<object>(); m.me.mockReturnValue(role.promise)
-  const h = renderHook(useBookingLedger)
+  const h = mountController()
   expect(h.result.current.canOperate).toBe(false)
   expect(h.result.current.bookingContextItems(row('phone')).map(x => x.id)).toEqual(['open'])
   await act(async () => role.resolve({ success: true, data: { role: 'viewer', permissionKeys: [] } }))
@@ -80,7 +88,7 @@ it('権限を取得する前と閲覧のみには状態変更を出さず、未�
 it('履歴URLは対象のLIFFと履歴指定を含み、コピー失敗と未設定を区別する', async () => {
   const writeText = vi.fn().mockRejectedValue(new Error('clipboard denied'))
   vi.spyOn(navigator, 'clipboard', 'get').mockReturnValue({ writeText } as unknown as Clipboard)
-  const h = renderHook(useBookingLedger)
+  const h = mountController()
   expect(new URL(h.result.current.historyUrl!).searchParams.get('liffId')).toBe('liff-a')
   expect(new URL(h.result.current.historyUrl!).searchParams.get('view')).toBe('history')
   await act(async () => h.result.current.copyUrl(h.result.current.historyUrl))
@@ -90,7 +98,7 @@ it('履歴URLは対象のLIFFと履歴指定を含み、コピー失敗と未設
   vi.restoreAllMocks()
 })
 it('実物の一覧行から同じ予約の詳細パネルを開き、詳細ページへ進める', async () => {
-  render(<Page />)
+  m.realView = true; render(<Page />)
   const cell = await screen.findByText('current')
   fireEvent.click(cell.closest('tr')!)
   const dialog = await screen.findByRole('dialog')
@@ -102,7 +110,7 @@ it('カレンダーの先頭ページ取得中に別店へ替えたら後続ペ�
   m.query = 'view=day'
   const old = defer<{ requests: BookingRequest[]; total: number }>()
   m.list.mockImplementation((account: string, _status: string, options: { limit: number }) => account === 'A' && options.limit === 100 ? old.promise : Promise.resolve({ requests: [], total: 0 }))
-  const h = renderHook(useBookingLedger)
+  const h = mountController()
   await waitFor(() => expect(m.list.mock.calls.some(c => c[0] === 'A' && c[2].limit === 100)).toBe(true))
   m.account = 'B'; h.rerender()
   await waitFor(() => expect(h.result.current.calendarStatus).toBe('ready'))
@@ -112,7 +120,7 @@ it('カレンダーの先頭ページ取得中に別店へ替えたら後続ペ�
 })
 it('閲覧のみの一覧・詳細パネルには作成と状態変更の操作を出さない', async () => {
   m.me.mockResolvedValue({ success: true, data: { role: 'viewer', permissionKeys: [] } })
-  render(<Page />)
+  m.realView = true; render(<Page />)
   fireEvent.click((await screen.findByText('current')).closest('tr')!)
   await screen.findByRole('dialog')
   expect(screen.queryByRole('link', { name: '電話の予約を入れる' })).toBeNull()

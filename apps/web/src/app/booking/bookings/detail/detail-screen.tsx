@@ -5,7 +5,6 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 
 import { PageHeading } from '@/components/templates/page-frame'
 
-import { Suspense } from 'react'
 
 import Link from 'next/link'
 
@@ -31,16 +30,14 @@ import TargetMissing from '@/components/shared/target-missing'
 
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 import { formatNumber } from '@/lib/format'
 
 import { ACTION_LABELS, STATUS_LABELS, STATUS_BADGE, OPERATION_STATUS_LABELS, POLICY_FIELD_LABELS, notificationOpLine, decideDescription, jpDateTime, jpTime, jpStamp, jstDate, jstHHMM, bookingNumber, approvedText, auditLine } from './detail-model'
 
-import { useBookingDetail } from './use-detail'
+import type { BookingDetailModel } from './page'
 
-export default function BookingDetailPage() { return <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}><BookingDetailInner /></Suspense> }
-function BookingDetailInner() {
+export default function BookingDetailScreen({ model }: { model: BookingDetailModel }) {
   const {
     id,
     loading,
@@ -79,9 +76,6 @@ function BookingDetailInner() {
     editReason,
     setEditReason,
     saving,
-    leaveTarget,
-    confirmLeave,
-    cancelLeave,
     retrying,
     auditLoading,
     auditError,
@@ -107,7 +101,7 @@ function BookingDetailInner() {
     saveEdit,
     retryCalendar,
     retryNotification,
-  } = useBookingDetail()
+  } = model
 
   if (!id) {
     return (
@@ -734,7 +728,6 @@ function BookingDetailInner() {
         </div>
       )}
 
-      <UnsavedLeaveDialog open={leaveTarget !== null} subject="予約の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       {/* DEEP-18: 対象の詳細が確定していない間は確認窓を開かない。
           DEEP-20: 説明は操作と通知方針ごとの実処理に合わせる。 */}
       <ConfirmDialog

@@ -89,9 +89,9 @@ import { DetailRow, ActionButtons } from "./page-gap-parts"
 
 import { STATUS_TABS, SOURCE_FILTERS, statusBadgeColor, sourceLabel, formatLedgerDateTime, statusLabel, actionLabel, PAGE_SIZE, formatJpDateTime, formatJpTime, formatJpDay, jstDay } from './ledger-model'
 
-import { useBookingLedger } from './use-ledger'
+import type { BookingLedgerModel } from './page'
 
-export default function BookingsPage() {
+export default function BookingLedgerScreen({ model }: { model: BookingLedgerModel }) {
   const {
     selectedAccountId,
     selectedAccount,
@@ -176,7 +176,7 @@ export default function BookingsPage() {
     todayCount,
     weekCount,
     monthCount,
-  } = useBookingLedger()
+  } = model
 
   const headingActions = (
     <>
