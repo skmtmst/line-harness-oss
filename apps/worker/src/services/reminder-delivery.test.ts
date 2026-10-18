@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { LineClient } from '@line-crm/line-sdk'
 import {
@@ -62,6 +62,30 @@ function makeClient(
 const noPause = async () => undefined
 
 describe('リマインダ配信の実行記録', () => {
+  it.each(['disconnect','saved_result_failure'])('unknown reminder is held across cron and manual retry: %s',async failure=>{
+    const {db,raw}=createTestD1();seedReminder(raw);let sends=0;
+    const client=makeClient(async()=>{sends++;if(failure==='disconnect')throw new Error('lost response');return {requestId:'accepted-request'};});
+    if(failure==='saved_result_failure')raw.exec("CREATE TRIGGER fail_reminder_result BEFORE INSERT ON messages_log BEGIN SELECT RAISE(ABORT,'injected'); END");
+    await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:00:00Z'),pause:noPause,resolveClient:async()=>client});
+    await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:10:00Z'),pause:noPause,resolveClient:async()=>client});
+    expect(sends).toBe(1);
+    const run=raw.prepare('SELECT id,status,last_error_code,next_retry_at,line_request_id FROM reminder_delivery_runs').get() as {id:string};
+    expect(run).toMatchObject({status:'permanent_failed',last_error_code:'delivery_unknown',next_retry_at:null});
+    if(failure==='saved_result_failure')expect(run).toMatchObject({line_request_id:'accepted-request'});
+    expect((await retryReminderDeliveryRun(db,{id:run.id,requestKey:'new-request',now:'2026-08-28T09:11:00Z'}))?.kind).toBe('conflict');
+    raw.close();
+  });
+  it('does not reclaim a started reminder when its lease expires before completion',async()=>{
+    const {db,raw}=createTestD1();seedReminder(raw);let sends=0;let resolve!:()=>void;
+    const client=makeClient(async()=>{sends++;await new Promise<void>(done=>{resolve=done});return {requestId:'accepted'};});
+    const first=processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:00:00Z'),pause:noPause,resolveClient:async()=>client});
+    await vi.waitFor(()=>expect(sends).toBe(1));
+    await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:10:00Z'),pause:noPause,resolveClient:async()=>client});
+    expect(sends).toBe(1);resolve();await first;
+    expect(raw.prepare('SELECT status,last_error_code FROM reminder_delivery_runs').get()).toEqual({status:'permanent_failed',last_error_code:'delivery_unknown'});
+    raw.close();
+  });
+
   it('同意不明の明示台帳があれば送らず、実行記録に理由を残す',async()=>{
     const {db,raw}=createTestD1();seedReminder(raw);
     raw.exec("INSERT INTO friend_delivery_consents(line_account_id,friend_id,purpose,state,reason,source) VALUES('account-1','friend-1','marketing','unknown','同意未確認','manual')");
@@ -184,7 +208,7 @@ describe('リマインダ配信の実行記録', () => {
     const client = makeClient(async (_userId, retryKey) => {
       retryKeys.push(retryKey ?? '')
       attempts++
-      if (attempts === 1) throw new Error('LINE API error: 500')
+      if (attempts === 1) throw new Error('LINE API error: 429')
       return { requestId: 'line-request-after-retry' }
     })
 
@@ -280,7 +304,7 @@ describe('リマインダ配信の実行記録', () => {
     const { db, raw } = createTestD1()
     seedReminder(raw)
     const client = makeClient(async () => {
-      throw new Error('LINE API error: 500 body=secret')
+      throw new Error('LINE API error: 429 body=secret')
     })
     const times = [
       '2026-08-28T09:00:00.000Z',
@@ -673,7 +697,7 @@ describe('監査の直し (R337・R339・R340・R341・R342・R344)', () => {
     ).run()
     // 新しい予定の送信が1回失敗しても、登録は active のまま残る。
     const failing = makeClient(async () => {
-      throw Object.assign(new Error('temporary'), { status: 503, retryable: true })
+      throw Object.assign(new Error('temporary'), { status: 429, retryable: true })
     })
     const failed = await processReminderDeliveries(db, failing, {
       now: new Date('2026-08-28T09:00:00.000Z'),
@@ -975,7 +999,7 @@ describe('監査の直し (R337・R339・R340・R341・R342・R344)', () => {
       seenKeys.push(retryKey)
       if (first) {
         first = false
-        throw Object.assign(new Error('temporary'), { status: 503, retryable: true })
+        throw Object.assign(new Error('temporary'), { status: 429, retryable: true })
       }
       return { requestId: 'req-1' }
     })

@@ -45,6 +45,7 @@ import { resolveSendInterpolationExtra, resolveInterpolationExtra } from './inte
 import { resolveReminderSendAt } from '@line-crm/shared';
 import {
   classifyExternalDeliveryError,
+  externalDeliveryStatus,
   externalDeliveryRetryAt,
   type SafeExternalDeliveryError,
 } from './external-delivery-retry.js';
@@ -546,6 +547,8 @@ export async function processReminderDeliveries(
         continue;
       }
 
+      let sendStarted=false,accepted=false;
+      let lineRequestId:string|null=null;
       try {
         const deliveryClient = await (options.resolveClient
           ? options.resolveClient(accountId, lineClient)
@@ -643,12 +646,18 @@ export async function processReminderDeliveries(
             continue enrollmentLoop;
           }
         }
+        const marker=await db.prepare(`UPDATE reminder_delivery_runs SET last_error_code='delivery_started',updated_at=?
+          WHERE id=? AND status='claimed' AND lease_expires_at IN (${ownedLeases.map(()=>'?').join(',')})`)
+          .bind(nowIso,run.id,...ownedLeases).run();
+        if(marker.meta.changes!==1)continue;
+        sendStarted=true;
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,
           [built.message],
           run.line_retry_key,
         );
 
+        accepted=true;lineRequestId=response.requestId;
         const deliveredId = crypto.randomUUID();
         const logId = crypto.randomUUID();
         const completed = await db.batch([
@@ -687,7 +696,10 @@ export async function processReminderDeliveries(
           console.error(JSON.stringify({"code":"reminder_delivery_completed_after_cancel"}));
         }
       } catch (error) {
-        const safe = classifyReminderDeliveryError(error);
+        const status=externalDeliveryStatus(error);
+        const rejected=!accepted&&status>=400&&status<500&&status!==408;
+        const unknown=sendStarted&&!rejected;
+        const safe = unknown?{code:'delivery_unknown',message:'送信結果を確認できません。LINEの送信履歴を照合するまで再送しません。',retryable:false}:classifyReminderDeliveryError(error);
         const retryAt = externalDeliveryRetryAt(
           error,
           run.retry_cycle_attempt_count,
@@ -699,6 +711,7 @@ export async function processReminderDeliveries(
         // 新しい持ち主が結果を記録するため、ここでは数えない。
         const recorded = await failReminderDeliveryRun(db, {
           id: run.id,
+          lineRequestId,
           code: exhausted ? 'retry_exhausted' : safe.code,
           message: exhausted
             ? '自動再試行の上限に達しました。LINE連携を確認し、必要なら手動で再試行してください。'

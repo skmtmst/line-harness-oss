@@ -99,7 +99,8 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
           status: commonRunStatus(row.status),
           detail: row.last_error_message ?? `${Number(row.step_number)}通目`,
           durationMs: runDurationMs(row.started_at, row.completed_at),
-          canRetry: row.status === 'retry_wait' || row.status === 'permanent_failed',
+          canRetry: (row.status === 'retry_wait' || row.status === 'permanent_failed')
+            && !['delivery_started','delivery_unknown'].includes(row.last_error_code ?? ''),
           reminderId: row.reminder_id,
           friendReminderId: row.friend_reminder_id,
           friendId: row.friend_id,
@@ -547,6 +548,9 @@ export const post__api_reminder_runs_runId_retry_15 = async (c: Context<Env, "/a
     });
     if (!retried) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
     if (retried.kind === 'conflict') {
+      if (['delivery_started','delivery_unknown'].includes(retried.run.last_error_code ?? '')) {
+        return c.json({success:false,code:'delivery_unknown',error:'送信結果を確認できないため再送できません。LINEの送信履歴を確認してください。'},409);
+      }
       return c.json({ success: false, error: 'この実行は再試行できる状態ではありません' }, 409);
     }
     return c.json({

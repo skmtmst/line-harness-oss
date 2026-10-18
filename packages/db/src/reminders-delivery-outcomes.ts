@@ -69,6 +69,7 @@ export async function failReminderDeliveryRun(
     id: string;
     code: string;
     message: string;
+    lineRequestId?: string | null;
     retryAt: string | null;
     now: string;
     /** R340: 自分が今の持ち主のときだけ失敗にする。書けたら true。 */
@@ -84,7 +85,7 @@ export async function failReminderDeliveryRun(
   const recorded = await db.prepare(
     `UPDATE reminder_delivery_runs
         SET status = ?, last_error_code = ?, last_error_message = ?,
-            next_retry_at = ?, lease_expires_at = NULL,
+            line_request_id=COALESCE(?,line_request_id),next_retry_at = ?, lease_expires_at = NULL,
             completed_at = CASE WHEN ? = 'permanent_failed' THEN ? ELSE NULL END,
             updated_at = ?
       WHERE id = ? AND status = 'claimed' AND ${owner.sql}`,
@@ -92,6 +93,7 @@ export async function failReminderDeliveryRun(
     status,
     input.code,
     input.message,
+    input.lineRequestId ?? null,
     input.retryAt,
     status,
     input.now,
@@ -186,6 +188,7 @@ export async function retryReminderDeliveryRun(
 ): Promise<RetryReminderDeliveryRunResult | null> {
   const row = await getReminderDeliveryRunById(db, input.id);
   if (!row) return null;
+  if (['delivery_started','delivery_unknown'].includes(row.last_error_code ?? '')) return {kind:'conflict',run:row};
   if (row.manual_retry_key === input.requestKey) return { kind: 'replay', run: row };
 
   const enrollment = await db.prepare(
@@ -212,14 +215,15 @@ export async function retryReminderDeliveryRun(
               next_retry_at = NULL, lease_expires_at = NULL,
               completed_at = NULL, manual_retry_key = ?,
               updated_at = ?
-        WHERE id = ? AND status IN ('retry_wait', 'permanent_failed')`,
+        WHERE id = ? AND status IN ('retry_wait', 'permanent_failed')
+          AND COALESCE(last_error_code,'') NOT IN ('delivery_started','delivery_unknown')`,
     ).bind(input.requestKey, input.now, row.id),
     // permanent_failed で全通が終端になった登録は completed になる。
     // 手動再試行をcronが拾えるよう、この1件だけ同じbatchでactiveへ戻す。
     db.prepare(
       `UPDATE friend_reminders
           SET status = 'active', updated_at = ?
-        WHERE id = ? AND status = 'completed'`,
+        WHERE id = ? AND status = 'completed' AND changes()=1`,
     ).bind(input.now, row.friend_reminder_id),
   ]);
   if ((changed.meta?.changes ?? 0) !== 1) {

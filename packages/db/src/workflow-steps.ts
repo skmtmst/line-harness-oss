@@ -41,7 +41,7 @@ export function prepareWorkflowStep(db:D1Database,ref:WorkflowStepRef,
   return db.prepare(`INSERT OR IGNORE INTO workflow_steps
     (scope_id,process_kind,subject_id,step_key,retry_key,input_json,max_attempts,status,created_at,updated_at,attempt_count)
     VALUES (?,?,?,?,?,?,?,?,?,?,?)`).bind(...workflowBindings(ref), options.retryKey ?? crypto.randomUUID(),
-      options.input === undefined ? null : workflowJson(options.input), options.maxAttempts ?? 5,
+      options.input === undefined ? null : workflowJson(options.input), options.maxAttempts ?? 4,
       options.status ?? 'pending', now, now,options.initialAttempts ?? 0);
 }
 export async function getWorkflowStep(db: D1Database, ref: WorkflowStepRef): Promise<WorkflowStepRow | null> {

@@ -1,3 +1,4 @@
+import { EXTERNAL_DELIVERY_MAX_ATTEMPTS, externalDeliveryRetryAt } from './external-delivery-retry.js';
 // ウェビナーの予約前から個別相談予約まで、途中離脱した人へ自動追客する。
 // 対象ウェビナーは webinar_followup_configs で明示的に有効化し、enabled_at
 // より前の過去リードを一斉送信しない。LINE送信は必ずHarnessプロキシ経由。
@@ -443,6 +444,7 @@ export async function processWebinarFollowups(
     }
     const ref={scopeId:`line:${candidate.account_id ?? 'default'}`,processKind:'webinar_followup',subjectId:followup.id,stepKey:'send'};
     let owner: string | null=null;
+    let started=false,accepted=false;
     try {
       const delivery=await deliveryConfig(db,candidate.account_id,options);
       if(!delivery.liffId) throw new Error('configuration_missing');
@@ -450,7 +452,7 @@ export async function processWebinarFollowups(
         ? buildJourneyFollowupText(kind as WebinarJourneyFollowupKind,(candidate as JourneyCandidate).title,
             webinarPickerUrl(delivery.liffId,candidate.slug),(candidate as JourneyCandidate).booking_url)
         : buildCtaFollowupText(kind as FollowupKind,formUrl(delivery.liffId,(candidate as Candidate).form_id));
-      const snapshot=await ensureWorkflowStep(db,ref,{input:{to:friend.line_user_id,text},retryKey:followup.retry_key,maxAttempts:5});
+      const snapshot=await ensureWorkflowStep(db,ref,{input:{to:friend.line_user_id,text},retryKey:followup.retry_key,maxAttempts:EXTERNAL_DELIVERY_MAX_ATTEMPTS});
       // Configuration failures have no wire request yet. Freeze it before the first external call.
       await db.prepare(`UPDATE workflow_steps SET input_json=? WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?
         AND input_json IS NULL AND status IN ('pending','failed')`).bind(JSON.stringify({to:friend.line_user_id,text}),ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey).run();
@@ -458,6 +460,9 @@ export async function processWebinarFollowups(
         await db.prepare(`UPDATE ${table} SET status='sent',sent_at=?,last_error=NULL,updated_at=? WHERE id=? AND status IN ('pending','failed')`)
           .bind(jstNow(),jstNow(),followup.id).run();return;
       }
+      if(snapshot.status==='unknown'||snapshot.status==='running')return;
+      await db.prepare(`UPDATE workflow_steps SET max_attempts=MIN(max_attempts,?) WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?`)
+        .bind(EXTERNAL_DELIVERY_MAX_ATTEMPTS,ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey).run();
       const lease=await claimWorkflowStep(db,ref);
       if(!lease) return;
       owner=lease.lease_owner!;
@@ -468,9 +473,14 @@ export async function processWebinarFollowups(
         await failWorkflowStep(db,ref,owner,{unknown:true,code:'delivery_unknown'});return;
       }
       const input=JSON.parse(lease.input_json!);
-      await pushViaHarnessProxy(options.proxyBaseUrl,delivery.accessToken,input.to,[{type:'text',text:input.text}],
+      const marked=await db.prepare(`UPDATE workflow_steps SET error_code='delivery_started' WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=? AND status='running' AND lease_owner=? AND lease_expires_at>?`)
+        .bind(ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey,owner,Date.now()).run();
+      if(marked.meta.changes!==1)return;
+      started=true;
+      const result=await pushViaHarnessProxy(options.proxyBaseUrl,delivery.accessToken,input.to,[{type:'text',text:input.text}],
         lease.retry_key,options.proxyDispatch,'reminder_dispatch');
-      await finishWorkflowStep(db,ref,owner,{result:{accepted:true},statements:[
+      accepted=true;
+      await finishWorkflowStep(db,ref,owner,{result:{accepted:true,requestId:result.requestId},statements:[
         db.prepare(`UPDATE ${table} SET status='sent',sent_at=?,last_error=NULL,updated_at=? WHERE id=? AND status IN ('pending','failed')`)
           .bind(jstNow(),jstNow(),followup.id),
       ]});
@@ -478,19 +488,22 @@ export async function processWebinarFollowups(
     } catch(err) {
       // Configuration failures also use the same bounded schedule, without persisting exception bodies.
       if(!owner) {
-        await ensureWorkflowStep(db,ref,{retryKey:followup.retry_key,maxAttempts:5});
+        await ensureWorkflowStep(db,ref,{retryKey:followup.retry_key,maxAttempts:EXTERNAL_DELIVERY_MAX_ATTEMPTS});
         owner=(await claimWorkflowStep(db,ref))?.lease_owner ?? null;
       }
       if(!owner) return;
       const status=(err as {status?:number})?.status;
       const lease=await db.prepare(`SELECT attempt_count FROM workflow_steps WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=? AND lease_owner=?`)
         .bind(ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey,owner).first<{attempt_count:number}>();
-      await failWorkflowStep(db,ref,owner,{code:'delivery_failed',permanent:!!status && status>=400 && status<500 && status!==429,
-        delayMs:Math.min(3600_000,60_000*2**Math.max(0,(lease?.attempt_count ?? 1)-1))});
-      await db.prepare(`UPDATE ${table} SET status='failed',last_error='delivery_failed',updated_at=? WHERE id=? AND status!='sent'
+      const rejected=!accepted&&!!status&&status>=400&&status<500&&status!==408;
+      const unknown=started&&!rejected;
+      const next=status===429?externalDeliveryRetryAt(err,lease?.attempt_count ?? 1,new Date(),true):null;
+      await failWorkflowStep(db,ref,owner,{unknown,code:unknown?'delivery_unknown':'delivery_failed',permanent:rejected&&!next,
+        delayMs:next?Math.max(0,next.getTime()-Date.now()):60_000});
+      await db.prepare(`UPDATE ${table} SET status='failed',last_error=?,updated_at=? WHERE id=? AND status!='sent'
         AND EXISTS(SELECT 1 FROM workflow_steps WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?
-          AND attempt_count=? AND status IN ('failed','exhausted'))`)
-        .bind(jstNow(),followup.id,ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey,lease?.attempt_count ?? -1).run();
+          AND attempt_count=? AND status IN ('failed','exhausted','unknown'))`)
+        .bind(unknown?'delivery_unknown':'delivery_failed',jstNow(),followup.id,ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey,lease?.attempt_count ?? -1).run();
       failed++;
     }
   };

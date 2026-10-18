@@ -16,7 +16,7 @@ export type SafeExternalDeliveryError = {
   retryable: boolean;
 };
 
-function statusOf(error: unknown): number {
+export function externalDeliveryStatus(error: unknown): number {
   const structured = Number((error as { status?: unknown } | null)?.status ?? 0);
   if (structured) return structured;
   const raw = error instanceof Error ? error.message : String(error);
@@ -38,7 +38,7 @@ export function classifyExternalDeliveryError(
       retryable: false,
     };
   }
-  const status = statusOf(error);
+  const status = externalDeliveryStatus(error);
   if (status === 429) {
     return {
       code: 'line_rate_limited',
@@ -82,7 +82,7 @@ export function externalDeliveryRetryAt(
   retryable: boolean,
 ): Date | null {
   if (!retryable || completedAttempts >= EXTERNAL_DELIVERY_MAX_ATTEMPTS) return null;
-  const status = statusOf(error);
+  const status = externalDeliveryStatus(error);
   const retryAfter = (error as { retryAfter?: unknown } | null)?.retryAfter;
   if (status === 429 && typeof retryAfter === 'string' && retryAfter.trim()) {
     const at = parseRetryAfter(retryAfter, now.getTime());
