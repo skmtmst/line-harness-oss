@@ -191,7 +191,7 @@ describe('N-374: Retry-After を再送スケジュールでも尊重する', () 
     });
     expect(respected!.getTime() - NOW.getTime()).toBe(20 * 60_000);
 
-    // 上限のない指定は30分へクランプする。
+    // 30分を超える指定は短縮せず、自動再送を止める。
     const clamped = outgoingDeliveryNextRetryAt({
       attemptsDone: 1, maxAttempts: 8, queuedAt, now: NOW,
       responseStatus: 429, retryAfterMs: 6 * 60 * 60_000, jitterKey: 'd:1',
@@ -395,8 +395,14 @@ it('stops an over-budget provider wait without claiming that the 24-hour window 
       errorCode: 'response_429', errorMessage: 'busy',
     }, NOW)).toBe('failed');
     expect(deliveryRow(testDb, queued.id)).toMatchObject({
-      status: 'failed', attempts: 1, next_retry_at: null, error_code: 'retry_after_exceeds_budget',
+      status: 'failed', attempts: 1, next_retry_at: '2026-11-02T04:00:00.000Z', error_code: 'retry_after_exceeds_budget',
       error_message_safe: expect.stringContaining('待ち時間'),
     });
+    const held = deliveryRow(testDb, queued.id);
+    expect(await claimOutgoingDelivery(testDb.db, held, new Date('2026-11-02T03:59:59Z'))).toBeNull();
+    expect(deliveryRow(testDb, queued.id)).toMatchObject({
+      status: 'failed', attempts: 1, idempotency_key: 'retry-after-over-budget',
+    });
+    expect(await claimOutgoingDelivery(testDb.db, held, new Date('2026-11-02T04:00:00Z'))).toBeTruthy();
   } finally { testDb.raw.close(); }
 });

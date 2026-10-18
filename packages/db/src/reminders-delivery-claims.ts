@@ -62,7 +62,7 @@ export async function claimReminderDeliveryRun(
   await db.prepare(`UPDATE reminder_delivery_runs SET status='permanent_failed',
     last_error_code='delivery_unknown',last_error_message='送信結果の照合が必要です。自動では再送しません。',
     lease_expires_at=NULL,next_retry_at=NULL,completed_at=?,updated_at=?
-    WHERE id=? AND status='claimed' AND lease_expires_at<=? AND last_error_code='delivery_started'`)
+    WHERE id=? AND status='claimed' AND lease_expires_at<=? AND (last_error_code='delivery_started' OR sent_message_content IS NOT NULL)`)
     .bind(input.now,input.now,row.id,input.now).run();
 
   // 登録・基準日変更・再開より前に過ぎた通は、遡って送らず記録を残す。

@@ -113,6 +113,17 @@ describe('Webhookの安全な送り直し', () => {
     vi.mocked(finishOutgoingDelivery).mockResolvedValue('delivered');
   });
 
+  it.each(['future', 'legacy_missing_deadline'])('blocks manual sends while the provider wait is unresolved: %s', async mode => {
+    vi.mocked(findOutgoingDeliveryByKey).mockResolvedValue(deliveryRow({
+      status:'failed',error_code:'retry_after_exceeds_budget',
+      next_retry_at:mode==='future'?new Date(Date.now()+3600_000).toISOString():null,
+    }));
+    await expect(retryWebhookInteraction({} as D1Database,original)).rejects.toThrow('retry_after_pending');
+    expect(claimOutgoingDelivery).not.toHaveBeenCalled();
+    expect(claimWebhookInteractionRetryAndInsert).not.toHaveBeenCalled();
+    expect(deliverOnce).not.toHaveBeenCalled();
+  });
+
   it('初回と同じ配送IDを使い、成功を新しい記録へ残す', async () => {
     vi.mocked(deliverOnce).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 });
     const db = {} as D1Database;

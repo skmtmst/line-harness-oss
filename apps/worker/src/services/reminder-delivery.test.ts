@@ -62,6 +62,30 @@ function makeClient(
 const noPause = async () => undefined
 
 describe('リマインダ配信の実行記録', () => {
+
+  it.each(['cron','manual','queued','expired_manual','exhausted_manual'])('holds an ambiguous historical reminder via %s without another request',async mode=>{
+    const {db,raw}=createTestD1();seedReminder(raw);let sends=0;
+    const client=makeClient(async()=>{sends++;throw Object.assign(new Error('rejected'),{status:429});});
+    await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:00:00Z'),pause:noPause,resolveClient:async()=>client});
+    raw.exec("UPDATE reminder_delivery_runs SET last_error_code='line_temporary_failure'");
+    const before=raw.prepare('SELECT id,line_retry_key,attempt_count FROM reminder_delivery_runs').get() as {id:string};
+    if(mode==='expired_manual')raw.exec("UPDATE reminder_delivery_runs SET last_error_code='retry_key_expired',next_retry_at=NULL");
+    if(mode==='exhausted_manual')raw.exec("UPDATE reminder_delivery_runs SET status='permanent_failed',last_error_code='retry_exhausted',next_retry_at=NULL");
+    if(mode==='queued')raw.exec("UPDATE reminder_delivery_runs SET status='queued',retry_cycle_attempt_count=0");
+    if(!mode.includes('manual'))await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:10:00Z'),pause:noPause,resolveClient:async()=>client});
+    else expect((await retryReminderDeliveryRun(db,{id:before.id,requestKey:'new-request',now:'2026-08-28T09:10:00Z'}))?.kind).toBe('conflict');
+    expect(sends).toBe(1);expect(raw.prepare('SELECT id,line_retry_key,attempt_count FROM reminder_delivery_runs').get()).toEqual(before);
+    expect(raw.prepare('SELECT status,last_error_code FROM reminder_delivery_runs').get()).toEqual({status:'permanent_failed',last_error_code:'delivery_unknown'});raw.close();
+  });
+
+  it('holds an expired legacy claim with a frozen payload even if it predates the started marker',async()=>{
+    const {db,raw}=createTestD1();seedReminder(raw);
+    const input={lineAccountId:'account-1',reminderId:'reminder-1',friendReminderId:'enrollment-1',friendId:'friend-1',reminderStepId:'step-1',scheduledAt:'2026-08-28T09:00:00Z',now:'2026-08-28T09:00:00Z',leaseExpiresAt:'2026-08-28T09:05:00Z'};
+    const first=await claimReminderDeliveryRun(db,input);expect(first).toBeTruthy();
+    raw.prepare("UPDATE reminder_delivery_runs SET sent_message_content='frozen payload',last_error_code=NULL WHERE id=?").run(first!.id);
+    expect(await claimReminderDeliveryRun(db,{...input,now:'2026-08-28T09:10:00Z',leaseExpiresAt:'2026-08-28T09:15:00Z'})).toBeNull();
+    expect(raw.prepare('SELECT status,last_error_code,attempt_count,line_retry_key FROM reminder_delivery_runs').get()).toMatchObject({status:'permanent_failed',last_error_code:'delivery_unknown',attempt_count:1,line_retry_key:first!.line_retry_key});raw.close();
+  });
   it.each(['disconnect','saved_result_failure'])('unknown reminder is held across cron and manual retry: %s',async failure=>{
     const {db,raw}=createTestD1();seedReminder(raw);let sends=0;
     const client=makeClient(async()=>{sends++;if(failure==='disconnect')throw new Error('lost response');return {requestId:'accepted-request'};});
@@ -329,7 +353,7 @@ describe('リマインダ配信の実行記録', () => {
       status: 'permanent_failed',
       attempt_count: 4,
       retry_cycle_attempt_count: 4,
-      last_error_code: 'retry_exhausted',
+      last_error_code: 'line_rate_limited_exhausted',
       last_error_message: '自動再試行の上限に達しました。LINE連携を確認し、必要なら手動で再試行してください。',
       next_retry_at: null,
     })
@@ -934,7 +958,7 @@ describe('監査の直し (R337・R339・R340・R341・R342・R344)', () => {
     expect(retried && 'run' in retried && retried.run.line_retry_key).toBe(keyBefore)
   })
 
-  it('R344: 24時間を過ぎた結果不明は自動で送らず、要確認として残る', async () => {
+  it('R344: 未送信と確認できる行も期限後の自動送信を止め、手動だけを許可する', async () => {
     const { db, raw } = createTestD1()
     seedReminder(raw)
     const run = await claimReminderDeliveryRun(db, {
@@ -974,7 +998,8 @@ describe('監査の直し (R337・R339・R340・R341・R342・R344)', () => {
     })
     expect(pushes).toEqual([])
     expect(result).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 })
-    // 人が確かめた手動再試行は送れる。
+    // このfixtureは本文の凍結前に失敗し、LINE要求を始めていない。
+    // 未送信と確認できる場合だけ、手動の再試行を許可する。
     const retried = await retryReminderDeliveryRun(db, {
       id: run!.id,
       requestKey: 'manual-1',
@@ -1317,4 +1342,32 @@ it('B-333 古いJST形式の登録日時でも未来だった通を誤って捨�
   await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:01:00Z'),pause:noPause,resolveClient:async()=>client});
   expect(pushes).toBe(1);
   raw.close();
+});
+
+
+it('preserves an over-budget provider deadline and blocks both cron and manual retry', async () => {
+  const {db,raw}=createTestD1(); seedReminder(raw);
+  try {
+    let sends=0;
+    const client=makeClient(async()=>{sends++;throw Object.assign(new Error('rejected'),{status:429,retryAfter:'7200'});});
+    await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:00:00Z'),pause:noPause,resolveClient:async()=>client});
+    const run=raw.prepare('SELECT * FROM reminder_delivery_runs').get() as {id:string,line_retry_key:string,attempt_count:number};
+    expect(run).toMatchObject({status:'permanent_failed',last_error_code:'retry_after_exceeds_budget',next_retry_at:'2026-08-28T11:00:00.000Z',attempt_count:1});
+    const retry=await retryReminderDeliveryRun(db,{id:run.id,requestKey:crypto.randomUUID(),now:'2026-08-28T09:30:00Z'});
+    expect(retry?.kind).toBe('conflict');
+    await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:30:00Z'),pause:noPause,resolveClient:async()=>client});
+    expect(sends).toBe(1);
+    expect(raw.prepare('SELECT line_retry_key,attempt_count FROM reminder_delivery_runs').get()).toEqual({line_retry_key:run.line_retry_key,attempt_count:1});
+  } finally {raw.close();}
+});
+
+it('does not let manual retry bypass a normal provider deadline',async()=>{
+  const {db,raw}=createTestD1();seedReminder(raw);
+  try {
+    const client=makeClient(async()=>{throw Object.assign(new Error('rejected'),{status:429,retryAfter:'120'});});
+    await processReminderDeliveries(db,client,{now:new Date('2026-08-28T09:00:00Z'),pause:noPause,resolveClient:async()=>client});
+    const run=raw.prepare('SELECT id FROM reminder_delivery_runs').get() as {id:string};
+    expect((await retryReminderDeliveryRun(db,{id:run.id,requestKey:crypto.randomUUID(),now:'2026-08-28T09:01:00Z'}))?.kind).toBe('conflict');
+    expect((await retryReminderDeliveryRun(db,{id:run.id,requestKey:crypto.randomUUID(),now:'2026-08-28T09:02:00Z'}))?.kind).toBe('scheduled');
+  }finally{raw.close();}
 });

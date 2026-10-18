@@ -46,6 +46,8 @@ import { resolveReminderSendAt } from '@line-crm/shared';
 import {
   classifyExternalDeliveryError,
   externalDeliveryStatus,
+  externalDeliveryNotBefore,
+  EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES,
   externalDeliveryRetryAt,
   type SafeExternalDeliveryError,
 } from './external-delivery-retry.js';
@@ -706,17 +708,22 @@ export async function processReminderDeliveries(
           now,
           safe.retryable,
         )?.toISOString() ?? null;
+        const notBefore=unknown?undefined:externalDeliveryNotBefore(error,now);
+        const providerDate=new Date(notBefore ?? Number.NaN);
+        const notBeforeAt=Number.isFinite(providerDate.getTime())?providerDate.toISOString():null;
+        const overWait=notBefore!==undefined&&notBefore-now.getTime()>EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES*60_000;
         const exhausted = safe.retryable && !retryAt;
         // R340: 持ち主が移っているときは書けず false になる。
         // 新しい持ち主が結果を記録するため、ここでは数えない。
         const recorded = await failReminderDeliveryRun(db, {
           id: run.id,
           lineRequestId,
-          code: exhausted ? 'retry_exhausted' : safe.code,
-          message: exhausted
+          code: !sendStarted && safe.retryable ? 'delivery_not_started' : overWait ? 'retry_after_exceeds_budget' : exhausted && status===429 ? 'line_rate_limited_exhausted' : exhausted ? 'retry_exhausted' : safe.code,
+          message: overWait?'連携先の待機期限が再試行の予算を超えたため、自動・手動の再送を止めています。連携先の状態を確認してください。':exhausted
             ? '自動再試行の上限に達しました。LINE連携を確認し、必要なら手動で再試行してください。'
             : safe.message,
           retryAt,
+          notBeforeAt,
           now: nowIso,
           expectedLeaseExpiresAt: ownedLeases,
         });

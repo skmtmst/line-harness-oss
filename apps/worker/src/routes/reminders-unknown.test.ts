@@ -16,14 +16,15 @@ beforeEach(()=>{
  INSERT INTO friend_reminders(id,friend_id,reminder_id,target_date,status,created_at,updated_at) VALUES('en','f','r','2026-10-18T00:00:00Z','active','2026-10-01','2026-10-01');`);
 });
 afterEach(()=>item.raw.close());
-it('hides retry capability for an unknown send and rejects a direct retry with a useful reason',async()=>{
+it.each(['delivery_unknown','line_temporary_failure','retry_key_expired','retry_exhausted'])('hides retry capability for %s and rejects a direct retry with a useful reason',async code=>{
  const run=await claimReminderDeliveryRun(item.db,{lineAccountId:'a',reminderId:'r',friendReminderId:'en',friendId:'f',reminderStepId:'s',scheduledAt:'2026-10-18T00:00:00Z',now:'2026-10-18T00:00:00Z',leaseExpiresAt:'2026-10-18T00:05:00Z'});
  expect(run).toBeTruthy();
- await failReminderDeliveryRun(item.db,{id:run!.id,code:'delivery_unknown',message:'送信結果の照合が必要です',retryAt:null,now:'2026-10-18T00:00:01Z',expectedLeaseExpiresAt:run!.lease_expires_at!});
+ await failReminderDeliveryRun(item.db,{id:run!.id,code,message:'送信結果の照合が必要です',retryAt:null,now:'2026-10-18T00:00:01Z',expectedLeaseExpiresAt:run!.lease_expires_at!});
+ item.raw.prepare("UPDATE reminder_delivery_runs SET sent_message_content='frozen message' WHERE id=?").run(run!.id);
  const app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',{id:'owner',name:'owner',role:'owner',readOnly:false,tenantId:DEFAULT_TENANT_ID});await next()});app.route('/',reminders);
  const env={DB:item.db} as Env['Bindings'];
  const list=await app.request('/api/reminders/r/runs',{},env);expect(list.status).toBe(200);
- expect((await list.json<{data:{items:Array<{canRetry:boolean,lastErrorCode:string}>}}>()).data.items[0]).toMatchObject({canRetry:false,lastErrorCode:'delivery_unknown'});
+ expect((await list.json<{data:{items:Array<{canRetry:boolean,lastErrorCode:string}>}}>()).data.items[0]).toMatchObject({canRetry:false,lastErrorCode:code});
  const response=await app.request(`/api/reminder-runs/${run!.id}/retry`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:'{}'},env);
  expect(response.status).toBe(409);expect(await response.json()).toMatchObject({code:'delivery_unknown'});
 });
