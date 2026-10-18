@@ -4,6 +4,7 @@ import {
   EXTERNAL_DELIVERY_MAX_ATTEMPTS,
   EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES,
   externalDeliveryRetryAt,
+  externalDeliveryNotBefore,
 } from './external-delivery-retry.js';
 
 /** line-proxy-send と同じ形の 429 エラー。 */
@@ -22,10 +23,12 @@ describe('429 の次回実行（N-374）', () => {
     expect(EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES).toBe(30);
   });
 
-  it('秒数形式の Retry-After どおりに決める', () => {
+  it('短いRetry-Afterでも既存の固定待ちを短縮しない', () => {
     const now = new Date('2026-09-08T12:00:00.000Z');
     const at = externalDeliveryRetryAt(rateLimited('45'), 1, now, true);
-    expect(at?.getTime()).toBe(now.getTime() + 45_000);
+    expect(at?.getTime()).toBe(now.getTime() + 60_000);
+    expect(externalDeliveryRetryAt(rateLimited('45'), 2, now, true)?.getTime()).toBe(now.getTime() + 300_000);
+    expect(externalDeliveryRetryAt(rateLimited('45'), 3, now, true)?.getTime()).toBe(now.getTime() + 1800_000);
   });
 
   it('HTTP-date 形式の Retry-After どおりに決める', () => {
@@ -45,9 +48,10 @@ describe('429 の次回実行（N-374）', () => {
     const now = new Date('2026-09-08T12:00:00.000Z');
     expect(externalDeliveryRetryAt(rateLimited('60'), 1, now, true)?.getTime())
       .toBe(now.getTime() + 60_000);
-    // 3600秒（60分）は上限30分を超えるため、安全上限を次回時刻にする。
+    // 自動再試行を止めても、指定された待機期限そのものは別に保存する。
     expect(externalDeliveryRetryAt(rateLimited('3600'), 1, now, true)).toBeNull();
-    // 2時間後の日付も同じく30分上限になる。
+    expect(externalDeliveryNotBefore(rateLimited('3600'), now)).toBe(now.getTime() + 3600_000);
+    // 2時間後の日付でも短縮せず停止する。
     expect(
       externalDeliveryRetryAt(
         rateLimited(new Date(now.getTime() + 2 * 3_600_000).toUTCString()),

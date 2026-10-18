@@ -1,3 +1,4 @@
+import { previewBookingConfirmation } from './booking-notification.js';
 import { listBookingOperations, type BookingOperationRun } from './booking-operation-runs.js';
 import { listBookingAuditLogs } from '@line-crm/db';
 
@@ -263,7 +264,7 @@ export async function getBookingAdminDetail(
       WHERE b.id = ? AND b.line_account_id = ?`,
   ).bind(input.id, input.lineAccountId).first<BookingDetailRow>();
   if (!row) return null;
-  const [profile, history, historyTotal, handover, reminders, operations, auditLogs, auditTotalRow] = await Promise.all([
+  const [profile, history, historyTotal, handover, reminders, operations, auditLogs, auditTotalRow, confirmationPreviewText] = await Promise.all([
     friendProfile(db, row.friend_id),
     historyForCustomer(db, {
       lineAccountId: input.lineAccountId,
@@ -298,6 +299,7 @@ export async function getBookingAdminDetail(
       `SELECT COUNT(*) AS total FROM booking_audit_logs
         WHERE booking_id = ? AND line_account_id = ?`,
     ).bind(row.id, input.lineAccountId).first<{ total: number }>(),
+    row.friend_id ? previewBookingConfirmation(db,row.id,input.lineAccountId) : Promise.resolve(null),
   ]);
   let notificationPolicy: Record<string, boolean> = {
     send_line_confirmation: true,
@@ -372,6 +374,7 @@ export async function getBookingAdminDetail(
     createdByStaffId: row.created_by_staff_id,
     calendarSync,
     notificationPolicy,
+    confirmationPreviewText,
     menuName: menuSnapshot?.name || row.menu_name,
     staffName: row.staff_name,
     customer: {

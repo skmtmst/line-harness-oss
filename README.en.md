@@ -92,7 +92,7 @@ Takes about 5 minutes. Once done, the dashboard at `https://<your-name>-admin.pa
 - **Timeline tracking** — records click → friend-add → conversion in sequence, attribution via last-touch
 - **Approval workflow** — approve/reject attributed conversions to finalize rewards, with duplicate-account flags to surface potential fraud
 - **LINE push notifications** — automatic push to the affiliate when a conversion is confirmed
-- Details: [docs/wiki/27-Affiliate-ASP.md](docs/wiki/27-Affiliate-ASP.md)
+- Details: [docs/v6-requirements/v6-16-affiliate-requirements-draft.md](docs/v6-requirements/v6-16-affiliate-requirements-draft.md)
 
 ### Automation
 - **IF-THEN rules** — 7 trigger types × 6 action types

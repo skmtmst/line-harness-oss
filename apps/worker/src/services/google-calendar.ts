@@ -1,4 +1,5 @@
 import { API_RETRY_WAIT, createCallState, createExternalCall, type CallScope, type CircuitStore } from '../lib/external-call/index.js';
+import { boundedHttpRequest } from '../lib/external-call/bounded-http.js';
 // Google Calendar API client
 
 const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
@@ -44,11 +45,9 @@ export class GoogleCalendarClient {
   /** 単発の通信。本文の読取りまで同じ期限とsignalを使い、SDK内では再試行しない。 */
   private async request<T>(url: string, init: RequestInit, read: (response: Response) => Promise<T>, signal?: AbortSignal, effect: 'read'|'write' = 'read'): Promise<T> {
     const perform=async(deadlineSignal?:AbortSignal)=>{
-      const controller=new AbortController(),cancel=()=>controller.abort();
-      deadlineSignal?.addEventListener('abort',cancel,{once:true});
-      const timer=setTimeout(cancel,10_000);
-      try {deadlineSignal?.throwIfAborted();const response=await (this.config.transport??fetch)(url,{...init,signal:controller.signal,redirect:'manual'});return await read(response);}
-      finally{clearTimeout(timer);deadlineSignal?.removeEventListener('abort',cancel);}
+      const response=await boundedHttpRequest(url,{...init,signal:deadlineSignal},
+        {timeoutMs:10_000,maxResponseBytes:1024*1024,fetch:this.config.transport??fetch});
+      return await read(response);
     };
     if(effect==='write'||!this.config.external)return perform(signal);
     // 読取りだけの単発予算。業務の書込みは呼出し側の永続journalを通す。

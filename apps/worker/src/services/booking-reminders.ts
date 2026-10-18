@@ -1,3 +1,4 @@
+import type { AccountStyle } from '@line-crm/shared';
 import { runBookingExternalStep } from './booking-external-step.js';
 import { API_RETRY_WAIT, lineFailure } from '../lib/external-call/index.js';
 import {bookingCancellationQuote} from './booking-cancellation.js';
@@ -36,6 +37,7 @@ interface DueRow {
   line_user_id: string;
   /** 店舗のタイムゾーン。文面の日時と「本日/明日」の判定に使う。 */
   timezone: string | null;
+  notification_style: AccountStyle | null;
 }
 
 interface ReminderRequestSnapshot {
@@ -91,7 +93,7 @@ export async function processDueReminders(
               la.channel_access_token,
               la.channel_access_token_encrypted,
               f.line_user_id,
-              bs.timezone
+              bs.timezone, ast.style AS notification_style
          FROM booking_reminders r
          INNER JOIN bookings b ON b.id = r.booking_id
          INNER JOIN menus m ON m.id = b.menu_id
@@ -99,6 +101,7 @@ export async function processDueReminders(
          INNER JOIN line_accounts la ON la.id = b.line_account_id
          INNER JOIN friends f ON f.id = b.friend_id AND f.line_account_id=b.line_account_id
           LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
+         LEFT JOIN account_styles ast ON ast.line_account_id=b.line_account_id AND ast.selection_mode='configured'
         WHERE r.status IN ('pending','failed')
           AND r.retry_count < 3
           AND r.scheduled_at <= ?
@@ -148,6 +151,7 @@ export async function processDueReminders(
       // 再送では本文を再描画しない。ctx は既存の sender の契約として残す。
       const timeZone = row.timezone ?? 'Asia/Tokyo';
       const ctx = {
+        style:row.notification_style??'standard',
         meetingMode:row.meeting_mode,meetingUrl:row.meeting_url,
         ...(row.policy_snapshot_json?{cancellationText:(await bookingCancellationQuote(db,row.booking_id,row.line_account_id)).text}:{}),
         menuName: row.menu_name,

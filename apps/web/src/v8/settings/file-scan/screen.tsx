@@ -1,28 +1,28 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
-import { RotateCcw, ShieldCheck, SlidersHorizontal, Trash2 } from 'lucide-react'
-import Button from '@/components/shared/button'
-import FormDocumentRetention from '@/components/shared/form-document-retention'
-import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
+
 import type { ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import ListToolbar from '@/components/shared/list-toolbar'
-import Card, { CardHeader } from '@/components/shared/card'
-import FilterChip from '@/components/shared/filter-chip'
-import Notice from '@/components/shared/notice'
-import { Field } from '@/components/shared/form-controls'
+import Button from '@/components/shared/button'
+import Card,{ CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
-import { TextField, TextArea } from '@/components/shared/text-field'
-import ListRange from '@/components/ui/list-range'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import type { FileScanItem } from '@/lib/api'
-import { SbSettingsScreen } from '../sb-frame/settings-screen'
-import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
-import styles from './screen.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import FilterChip from '@/components/shared/filter-chip'
+import { Field } from '@/components/shared/form-controls'
+import { GridCell,GridHeadRow,GridRow,GridTable } from '@/components/shared/grid-table'
+import ListState from '@/components/shared/list-state'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
+import { RowMenu } from '@/components/shared/row-actions'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextArea,TextField } from '@/components/shared/text-field'
+import ListRange from '@/components/ui/list-range'
+import type { FileScanItem } from '@/lib/api'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { RotateCcw,ShieldCheck,SlidersHorizontal,Trash2 } from 'lucide-react'
+import { useEffect,useRef,useState } from 'react'
+import { SbSettingsScreen } from '../sb-frame/settings-screen'
+import styles from './screen.module.css'
+import { FILE_SCAN_PAGE_SIZE,useFileScan } from './use-file-scan'
 
 
 /*
@@ -335,7 +335,6 @@ export default function FileScanScreen() {
         ) : null}
       </Card>
 
-      {selectedAccountId ? <FormDocumentRetention key={selectedAccountId} accountId={selectedAccountId} /> : null}
       {dialogs}
     </SbSettingsScreen>
   )

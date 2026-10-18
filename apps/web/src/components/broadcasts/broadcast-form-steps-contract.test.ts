@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,7 +14,7 @@ import { describe, expect, it } from 'vitest'
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const FORM = readFileSync(join(HERE, 'broadcast-form.tsx'), 'utf8')
+const FORM = readUiSource(join(HERE, 'broadcast-form.tsx'), 'utf8')
 const STEPS = readFileSync(join(HERE, 'broadcast-steps.ts'), 'utf8')
 
 /** `start` から、対応する `)` までを切り出す。 */

@@ -1,3 +1,4 @@
+import type { AccountStyle } from '@line-crm/shared';
 // Cron handler: expire 24h-old request bookings + purge idempotency rows.
 
 import { recoverExpiredBookingPayments, recoverPaidBookingPayments, recoverOrphanedOnlineBookings } from './booking-payment-recovery.js';
@@ -23,6 +24,7 @@ interface StaleRow {
   line_user_id: string;
   /** 店舗のタイムゾーン。文面の日時に使う (R332)。 */
   timezone: string | null;
+  notification_style: AccountStyle | null;
 }
 
 export interface RunExpirerParams {
@@ -53,13 +55,14 @@ export async function runExpirer(
               la.channel_access_token,
               la.channel_access_token_encrypted,
               f.line_user_id,
-              bs.timezone
+              bs.timezone, ast.style AS notification_style
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
          INNER JOIN line_accounts la ON la.id = b.line_account_id
          INNER JOIN friends f ON f.id = b.friend_id
           LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
+         LEFT JOIN account_styles ast ON ast.line_account_id=b.line_account_id AND ast.selection_mode='configured'
         WHERE b.status = 'requested'
           AND b.requested_at < ? AND b.id > ?
           AND NOT EXISTS (SELECT 1 FROM booking_payments p
@@ -153,6 +156,7 @@ export async function runExpirer(
         toLineUserId: row.line_user_id,
         kind: 'expired',
         ctx: {
+          style:row.notification_style??'standard',
           menuName: row.menu_name,
           staffName: row.staff_name,
           startsAt: formatStartsAtForStore(row.starts_at, timeZone),

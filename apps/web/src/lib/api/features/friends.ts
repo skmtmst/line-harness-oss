@@ -27,6 +27,8 @@ export const friendsMethods = {
   friends: {
     list: (params?: FriendListParams) => {
       const query: Record<string, string> = {}
+      if (params?.pagination) query.pagination = params.pagination
+      if (params?.cursor) query.cursor = params.cursor
       if (params?.offset) query.offset = String(params.offset)
       if (params?.limit) query.limit = String(params.limit)
       if (params?.tagId) query.tagId = params.tagId
@@ -58,7 +60,7 @@ export const friendsMethods = {
       for (const [k, v] of Object.entries(params?.metadataNot ?? {})) {
         if (k && v) query[`metadataNot.${k}`] = v
       }
-      return fetchApi<ApiResponse<PaginatedResponse<FriendListItem>>>(
+      return fetchApi<ApiResponse<PaginatedResponse<FriendListItem> & { nextCursor?: string | null }>>(
         '/api/friends?' + new URLSearchParams(query)
       )
     },

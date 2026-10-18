@@ -3,7 +3,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { reconcileLateBookingPayment } from './booking-late-payment.js';
 const mocks=vi.hoisted(()=>({busy:vi.fn(),notify:vi.fn()}));
 vi.mock('./booking-calendar-sync.js',async original=>({...await original<typeof import('./booking-calendar-sync.js')>(),getStaffGoogleBusy:mocks.busy}));
-vi.mock('./booking-notification.js',()=>({notifyForBooking:mocks.notify}));
+vi.mock('./booking-notification.js',async original=>({...await original<typeof import('./booking-notification.js')>(),notifyForBooking:mocks.notify}));
 vi.mock('./availability.js',async original=>({...await original<typeof import('./availability.js')>(),getAvailability:async()=>({by_staff:[{staff_id:'s',slots:[{startUtc:'2030-01-01T03:00:00Z'}]}],closed_dates:[]})}));
 let f:SqliteD1;
 const now=new Date('2026-10-18T01:00:00Z');

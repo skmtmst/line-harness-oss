@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 
 /**
  * テンプレート一覧（設計 `W7LBc` 11-1）の、状態と押し口。

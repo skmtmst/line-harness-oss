@@ -1150,3 +1150,18 @@ describe('Codex Slack relay', () => {
     expect(errorParent.text).toContain('状態：:eyes: 確認待ち');
   });
 });
+
+test('Worker trace UUID reaches notification while free-form incident fields are excluded',async()=>{
+ const fetcher=vi.fn<typeof fetch>(async input=>{
+  if(String(input).includes('getPermalink'))return slackResponse({permalink:'https://slack.example/error'});
+  if(String(input).includes('history')||String(input).includes('replies'))return slackResponse({messages:[]});
+  return slackResponse({ts:'1787327000.000001'});
+ });
+ const config={SLACK_BOT_TOKEN:'fixture-bot',SLACK_ERROR_CHANNEL_ID:'C-ERROR',SLACK_TASK_CHANNEL_ID:'C-TASK'};
+ const incidentId='9bc3b7b4-0e5b-4b76-b9b8-51e385ba64ce';
+ await reportHarnessErrorToSlack(config,{source:'worker',message:'unhandled_worker_error',incidentId},fetcher);
+ expect(fetcher.mock.calls.map(([,init])=>String(init?.body)).join('\n')).toContain(incidentId);
+ fetcher.mockClear();
+ await reportHarnessErrorToSlack(config,{source:'worker',message:'unhandled_worker_error',incidentId:'private-customer secret-token'},fetcher);
+ expect(fetcher.mock.calls.map(([,init])=>String(init?.body)).join('\n')).not.toMatch(/private-customer|secret-token/);
+});

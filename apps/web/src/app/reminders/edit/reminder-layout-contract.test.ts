@@ -1,9 +1,10 @@
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const EDIT = readFileSync(join(process.cwd(), 'src/v8/reminders/edit.tsx'), 'utf8')
-const CSS = readFileSync(join(process.cwd(), 'src/v8/reminders/edit.module.css'), 'utf8')
+const EDIT = readUiSource(join(process.cwd(), 'src/v8/reminders/edit.tsx'), 'utf8')
+const CSS = readUiSource(join(process.cwd(), 'src/v8/reminders/edit.module.css'), 'utf8')
 const FRAME = readFileSync(join(process.cwd(), 'src/components/templates/page-templates.module.css'), 'utf8')
 const TOKENS = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8')
 
