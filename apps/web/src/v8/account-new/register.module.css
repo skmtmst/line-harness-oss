@@ -256,7 +256,7 @@
 /* ② 左の細い列「AC左 操作ステップ」（正本 v06 Fqy29 の g48QV）。
    いまどこを触っているかと、musubo が自動でやることを、3つの段で見せる。 */
 .outlineCard {
-  flex: 1 1 auto;
+  flex: 1 1 auto; display: flex; flex-direction: column;
 }
 .outlineTitle { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
 .outlineCount { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }

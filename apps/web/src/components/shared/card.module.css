@@ -217,7 +217,7 @@ html:root .headerContent .meta { display: flex; flex-direction: column; align-it
 
 /* B-187・208：枠から中身は最低16。段の間は spacing・gap・variant の指定を使う。 */
 /* 固定HTMLの枠は内側のoutline。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
-html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']) {
+html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']):where(:not([data-card-frame='ring'])) {
   border: 0;
   outline: 1px solid var(--card-edge);
   outline-offset: -0.5px;
@@ -248,3 +248,8 @@ html:root .headerStacked { padding: 0; }
 html:root .card[data-card-surface='muted'] { border: 0; outline: revert; box-shadow: none; background: var(--color-surface-pearl); }
 
 html:root .card[data-card-selected] { --card-edge: var(--color-accent-deep); background: var(--color-accent-soft); }
+
+/* 内側の線だけの面。外枠・影で本文の寸法を増やさず、既存のカードは変えない。 */
+html:root .card[data-card-frame='ring'] {
+  border: 0; outline: none; box-shadow: var(--tpl-sa-ring);
+}

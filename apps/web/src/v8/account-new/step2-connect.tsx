@@ -26,7 +26,7 @@ const AC_OUTLINE: ReadonlyArray<{ title: string; note: string }> = [
 
 function AcOutline({ sub }: { sub: number }) {
   return (
-    <Card className={styles.outlineCard} surface="inset" layout="vertical" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-gap-xs)" data-design-node="g48QV">
+    <Card className={styles.outlineCard} frame="ring" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-gap-xs)" data-design-node="g48QV">
       <p className={styles.outlineTitle}>操作ステップ</p>
       <p className={styles.outlineCount}>全{AC_OUTLINE.length}ステップ</p>
       <div className={styles.outlineGap} aria-hidden="true" />
