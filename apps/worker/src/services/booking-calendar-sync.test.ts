@@ -14,10 +14,28 @@ import {
   runBookingGoogleSync,
   runCalendarDeleteOperation,
   syncConfirmedBookingToGoogle,
+  verifyStaffCalendarConnection,
 } from './booking-calendar-sync.js';
+import { BookingExternalCircuits } from './booking-external-circuits.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 
 const ACCOUNT = 'cal-account-1';
+
+it('接続確認の読取りも同じ店/接続先の共有遮断を通す', async () => {
+  const {db,raw}=createTestD1();
+  try {
+    const circuit=new BookingExternalCircuits(db),now=Date.now();
+    const scope={accountId:ACCOUNT,storeId:ACCOUNT,destination:'google_calendar',connectionId:'connection'};
+    for(let n=0;n<5;n++){const admission=await circuit.acquire(scope,now);if(admission.allowed)await circuit.settle(admission.lease,'failure',now);}
+    const fetchMock=vi.fn(async()=>new Response(JSON.stringify({calendars:{calendar:{busy:[]}}}),{status:200}));
+    vi.stubGlobal('fetch',fetchMock);
+    const connection={id:'connection',calendar_id:'calendar',auth_type:'oauth',access_token:'fixture-token'};
+    await expect(verifyStaffCalendarConnection(connection,{}, {db,accountId:ACCOUNT})).rejects.toThrow('calendar_read_failed');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(verifyStaffCalendarConnection(connection,{}, {db,accountId:'other'})).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  } finally {raw.close();}
+});
 
 function seed(raw: import('better-sqlite3').Database, bookingId: string, externalEventId: string | null): void {
   raw.prepare(
@@ -241,47 +259,42 @@ afterEach(() => {
 });
 
 describe('R327: 同時再試行で Google 予定を二重に作らない', () => {
-  it('REV-H1: Google予定IDだけ確保して中断した行は、未作成を完了扱いにせず回収する', async () => {
-    const { db, raw } = createTestD1();
-    seedConfirmedWithConnection(raw, 'cal-interrupted', { externalEventId: 'lh0123456789abcdef' });
-    const { created } = stubGoogleFetch();
-    await expect(syncConfirmedBookingToGoogle(db, CREDS, 'cal-interrupted', 'lh0123456789abcdef')).resolves.toMatchObject({ synced: true });
-    expect(created).toHaveLength(1);
-    raw.close();
+  it('REV-H1: 旧版の予定ID確保後の中断は未実行と断定せず、GETだけで確認する',async()=>{
+    const {db,raw}=createTestD1();seedConfirmedWithConnection(raw,'cal-interrupted',{externalEventId:'lh0123456789abcdef'});
+    const transport=vi.fn(async(_url:unknown,init?:RequestInit)=>{expect(init?.method??'GET').toBe('GET');return new Response('{}',{status:404});});
+    vi.stubGlobal('fetch',transport);
+    await expect(syncConfirmedBookingToGoogle(db,CREDS,'cal-interrupted','lh0123456789abcdef')).rejects.toThrow('delivery_unknown');
+    expect(transport).toHaveBeenCalledTimes(1);raw.close();
   });
-  it('REV-H1: Google受理後の応答消失でも回収は同じ予定IDを再利用して1件に保つ', async () => {
-    const { db, raw } = createTestD1();
-    seedConfirmedWithConnection(raw, 'cal-recovery');
-    const ids = new Set<string>();
-    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const { id } = JSON.parse(String(init?.body));
-      if (ids.has(id)) return new Response('', { status: 409 });
-      ids.add(id); throw new Error('accepted response lost');
+  it('REV-H1: Google受理後の応答消失はGETだけで照合し、POSTは一度だけ', async () => {
+    const {db,raw}=createTestD1();seedConfirmedWithConnection(raw,'cal-recovery');
+    let accepted:Record<string,unknown>|null=null,posts=0,reads=0;
+    vi.stubGlobal('fetch',vi.fn(async(_url:RequestInfo|URL,init?:RequestInit)=>{
+      if(init?.method==='POST'){posts++;accepted=JSON.parse(String(init.body));throw new Error('accepted response lost');}
+      reads++;return new Response(JSON.stringify(accepted),{status:200});
     }));
-    await expect(syncConfirmedBookingToGoogle(db, CREDS, 'cal-recovery', 'lh0123456789abcdef')).rejects.toThrow('accepted response lost');
-    await expect(syncConfirmedBookingToGoogle(db, CREDS, 'cal-recovery', 'lh0123456789abcdef')).resolves.toMatchObject({ synced: true });
-    expect(ids.size).toBe(1);
-    raw.close();
+    await expect(syncConfirmedBookingToGoogle(db,CREDS,'cal-recovery','lh0123456789abcdef')).rejects.toThrow('delivery_unknown');
+    await expect(syncConfirmedBookingToGoogle(db,CREDS,'cal-recovery','lh0123456789abcdef')).resolves.toMatchObject({synced:true,eventId:'lh0123456789abcdef'});
+    expect(posts).toBe(1);expect(reads).toBe(1);raw.close();
   });
   it('同時に2本走っても外部作成は1件、予約と2つの結果の ID が一致する', async () => {
     const { db, raw } = createTestD1();
     seedConfirmedWithConnection(raw, 'cal-sync-1');
     const { created } = stubGoogleFetch();
 
-    const [a, b] = await Promise.all([
+    const outcomes = await Promise.allSettled([
       syncConfirmedBookingToGoogle(db, CREDS, 'cal-sync-1'),
       syncConfirmedBookingToGoogle(db, CREDS, 'cal-sync-1'),
     ]);
-
     expect(created).toHaveLength(1);
-    expect(a.synced).toBe(true);
-    expect(b.synced).toBe(true);
-    const booking = raw
-      .prepare(`SELECT external_event_id, external_calendar_id FROM bookings WHERE id = 'cal-sync-1'`)
-      .get() as { external_event_id: string; external_calendar_id: string };
-    expect(a.eventId).toBe(booking.external_event_id);
-    expect(b.eventId).toBe(booking.external_event_id);
-    expect(booking.external_calendar_id).toBe('cal-1');
+    const successes=outcomes.filter((o):o is PromiseFulfilledResult<{synced:boolean;eventId?:string}>=>o.status==='fulfilled');
+    expect(successes.some(result=>result.value.synced)).toBe(true);
+    // 敗者を受理済みと偽らず、次の読込みで成功済みのcheckpointを返す。
+    const final=await syncConfirmedBookingToGoogle(db,CREDS,'cal-sync-1');
+    expect(final.synced).toBe(true);expect(created).toHaveLength(1);
+    const booking=raw.prepare("SELECT external_event_id,external_calendar_id FROM bookings WHERE id='cal-sync-1'")
+      .get() as {external_event_id:string;external_calendar_id:string};
+    expect(final.eventId).toBe(booking.external_event_id);expect(booking.external_calendar_id).toBe('cal-1');
   });
 });
 

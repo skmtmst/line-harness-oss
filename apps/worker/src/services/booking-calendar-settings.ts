@@ -1,3 +1,4 @@
+import { deleteBookingCalendarEvent } from './booking-calendar-sync.js';
 import type {GoogleServiceAccountCredentials} from './google-service-account.js';
 import {clientForConnection,getStaffCalendarConnection,runBookingGoogleSync} from './booking-calendar-sync.js';
 import {GoogleCalendarReadError,type BusyInterval} from './google-calendar.js';
@@ -21,7 +22,7 @@ export async function readCalendarBusy(db:D1Database,credentials:GoogleServiceAc
  const usable=cache&&Date.parse(cache.last_read_at)>Date.now()-15*60000&&Date.parse(cache.time_min)<=Date.parse(input.timeMin)&&Date.parse(cache.time_max)>=Date.parse(input.timeMax);
  if(!input.fresh&&usable)return JSON.parse(cache.busy_json);
  try {
-  const client=await clientForConnection(conn,credentials),busy=await client.getTimedBusy(input.timeMin,input.timeMax);
+  const client=await clientForConnection(conn,credentials,{db,accountId:input.lineAccountId}),busy=await client.getTimedBusy(input.timeMin,input.timeMax);
   const own=new Set((await db.prepare('SELECT external_event_id FROM bookings WHERE line_account_id=? AND external_calendar_id=? AND external_event_id IS NOT NULL').bind(input.lineAccountId,conn.calendar_id).all<{external_event_id:string}>()).results.map(r=>r.external_event_id));
   const intervals=busy.filter(r=>!own.has(r.id)).map(({start,end})=>({start,end}));
   await db.prepare(`INSERT INTO booking_calendar_busy_cache(line_account_id,staff_id,connection_id,calendar_id,time_min,time_max,busy_json,last_read_at)
@@ -48,12 +49,14 @@ export async function processCalendarSwitchJobs(db:D1Database,credentials:Google
   if(s.version!==j.switch_version||(j.action==='delete'?s.writeEnabled:!s.writeEnabled)) {await db.prepare("UPDATE booking_calendar_switch_jobs SET status='cancelled' WHERE id=?").bind(j.id).run();continue;}
   try{
    if(j.action==='delete'){
-    const b=await db.prepare('SELECT starts_at FROM bookings WHERE id=?').bind(j.booking_id).first<{starts_at:string}>();
+    const b=await db.prepare('SELECT starts_at,external_event_id,external_calendar_id,lock_version FROM bookings WHERE id=?').bind(j.booking_id).first<{starts_at:string;external_event_id:string|null;external_calendar_id:string|null;lock_version:number}>();
     if(b&&Date.parse(b.starts_at)>now.getTime()&&j.external_event_id&&j.calendar_id){
      const conn=await db.prepare('SELECT id,calendar_id,auth_type,access_token FROM google_calendar_connections WHERE line_account_id=? AND staff_id=? AND calendar_id=? AND is_active=1').bind(j.line_account_id,j.staff_id,j.calendar_id).first<import('./booking-calendar-sync.js').StaffCalendarConnection>();
      if(!conn)throw new Error('calendar_disconnected');
-     await (await clientForConnection(conn,credentials)).deleteEvent(j.external_event_id);
-     await db.prepare('UPDATE bookings SET external_event_id=NULL,external_calendar_id=NULL WHERE id=? AND external_event_id=?').bind(j.booking_id,j.external_event_id).run();
+     if(b.external_event_id!==j.external_event_id||b.external_calendar_id!==j.calendar_id){await db.prepare("UPDATE booking_calendar_switch_jobs SET status='cancelled' WHERE id=?").bind(j.id).run();continue;}
+     const client=await clientForConnection(conn,credentials,{db,accountId:j.line_account_id});
+     await deleteBookingCalendarEvent(db,{bookingId:j.booking_id,lineAccountId:j.line_account_id,calendarId:j.calendar_id,eventId:j.external_event_id,connectionId:conn.id,client});
+     await db.prepare('UPDATE bookings SET external_event_id=NULL,external_calendar_id=NULL WHERE id=? AND external_event_id=? AND lock_version=?').bind(j.booking_id,j.external_event_id,b.lock_version).run();
     }
    } else {const result=await runBookingGoogleSync(db,{bookingId:j.booking_id,lineAccountId:j.line_account_id,credentials,now});if(result==='retry_wait')throw new Error('calendar_write_failed');}
    await db.prepare("UPDATE booking_calendar_switch_jobs SET status='done',attempts=attempts+1,error_code=NULL WHERE id=?").bind(j.id).run();

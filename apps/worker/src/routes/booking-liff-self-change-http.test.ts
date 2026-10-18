@@ -173,10 +173,12 @@ async function drainWaits() {
 /** 送信は mock 受信側で見る。fetch へ出た物はすべて記録する。 */
 let fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
 let googleFailCreate = 0;
+const googleEvents = new Map<string,Record<string,unknown>>();
 
 function mockFetch() {
   fetchCalls = [];
   googleFailCreate = 0;
+  googleEvents.clear();
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
     if (url.includes('api.line.me/oauth2/v2.1/verify')) {
@@ -192,8 +194,10 @@ function mockFetch() {
           return new Response('provider error', { status: 500 });
         }
         const body = JSON.parse(String(init?.body ?? '{}')) as { id?: string };
+        googleEvents.set(body.id ?? 'evt-new',body);
         return new Response(JSON.stringify({ id: body.id ?? 'evt-new' }), { status: 200 });
       }
+      if(method==='GET'&&url.includes('/events/'))return new Response(JSON.stringify(googleEvents.get(decodeURIComponent(url.split('/events/')[1]))??{}),{status:googleEvents.has(decodeURIComponent(url.split('/events/')[1]))?200:404});
       return new Response(JSON.stringify({ items: [] }), { status: 200 });
     }
     fetchCalls.push({ url, init });
@@ -742,7 +746,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(res.status).toBe(409);
   });
 
-  test('実runner結合: provider有限失敗→同日時再送で回復（台帳1行・重複0）', async () => {
+  test('実runner結合: provider結果不明→同日時再送はGET照合だけ（台帳保持・重複0）', async () => {
     useRealGoogleRunner();
     linkCalendar();
     mockSlots([D11, D12]);
@@ -754,7 +758,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     });
     expect(first.status).toBe(200);
     expect((await first.json<Record<string, unknown>>()).calendar_sync).toBe('failed');
-    expect(bookingRow(id).external_event_id).toBeNull();
+    expect(bookingRow(id).external_event_id).toMatch(/^lh/);
     // 失敗時は delete＋create の2回だけ外部へ出る。
     expect(googleCallCount() - createdCalls).toBe(2);
     const replay = await selfPost(`/api/liff/booking/${id}/reschedule`, {
@@ -763,10 +767,10 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(replay.status).toBe(200);
     const body = await replay.json<Record<string, unknown>>();
     expect(body.changed).toBe(false);
-    expect(body.calendar_sync).toBe('synced');
+    expect(body.calendar_sync).toBe('failed');
     const evt = bookingRow(id).external_event_id as string;
     expect(evt).toMatch(/^lh/);
-    // 回復の再送は create の1回だけ外部へ出る。
+    // 結果不明の再開はGETの1回だけ。404でも新しいPOSTは出さない。
     expect(googleCallCount() - createdCalls).toBe(3);
     // 版ごとの冪等キーで台帳は2行（作成v0・変更v1）。v1行は成功で閉じる。
     const calOps = sqlite.prepare(
@@ -774,7 +778,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     ).all(id) as Array<{ idempotency_key: string; status: string }>;
     expect(calOps.length).toBe(2);
     expect(new Set(calOps.map((op) => op.idempotency_key)).size).toBe(2);
-    expect(calOps[1].status).toBe('succeeded');
+    expect(calOps[1].status).toBe('retry_wait');
     // 通知は初回だけ、予定の重複なし。
     const notices = sqlite.prepare(
       "SELECT COUNT(*) AS n FROM booking_operation_runs WHERE booking_id = ? AND kind = 'confirmation_line'",

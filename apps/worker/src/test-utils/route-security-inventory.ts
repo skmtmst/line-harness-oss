@@ -5,8 +5,15 @@ import { exportedRouters, importedRouters, matchesMiddleware, registrations } fr
 
 export type SecurityRoute = {
   file: string; line: number; router: string; method: string; path: string;
-  calls: string[]; evidence: string[];
+  calls: string[]; evidence: string[]; position: number; guarded: boolean;
 };
+
+/** Include feature directories; splitting a router must never remove it from the security scan. */
+export function routeSourceFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => entry.isDirectory()
+    ? routeSourceFiles(join(directory, entry.name))
+    : entry.name.endsWith('.ts') && !entry.name.includes('.test.') ? [join(directory, entry.name)] : []);
+}
 
 /** Evidence of a call is a review aid, never proof that its result is enforced. */
 function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
@@ -14,7 +21,8 @@ function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, 
   const imports = importedRouters(ast);
   const locals = new Map<string, ts.Node>();
   const routers = new Set<string>();
-  const registrations: ts.CallExpression[] = [];
+  const registrationCalls: ts.CallExpression[] = [];
+  const guarded = new Map(registrations(ast).map(route => [route.position, route.guarded]));
   const honoParameter = (parameter: ts.ParameterDeclaration) => ts.isIdentifier(parameter.name)
     && parameter.type && ts.isTypeReferenceNode(parameter.type) && parameter.type.typeName.getText(ast) === 'Hono';
   function visit(node: ts.Node): void {
@@ -34,7 +42,7 @@ function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, 
       || (ts.isPropertyAccessExpression(node.expression)
       && ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'all', 'use', 'on'].includes(node.expression.name.text)))
       && node.arguments[0]) {
-      registrations.push(node);
+      registrationCalls.push(node);
     }
     ts.forEachChild(node, visit);
   }
@@ -107,7 +115,7 @@ function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, 
     return receiver;
   };
   const verb = (call: ts.CallExpression) => ts.isPropertyAccessExpression(call.expression) ? call.expression.name.text : 'computed';
-  const registered = registrations.flatMap(call => {
+  const registered = registrationCalls.flatMap(call => {
     const router = routerName(call);
     if (!routers.has(router)) return [];
     const on = verb(call) === 'on';
@@ -134,7 +142,7 @@ function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, 
     argumentCalls.set(argument, result);
     return result;
   };
-  return registered.filter(route => route.method !== 'USE').map(route => {
+  return registered.map(route => {
     const inherited = (middleware.get(route.router) ?? []).filter(prior => prior.position < route.position
       && matchesMiddleware(prior.path, route.path));
     const reachable = new Set<string>();
@@ -145,6 +153,7 @@ function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, 
     }
     const names = [...reachable].sort();
     return { file, line: ast.getLineAndCharacterOfPosition(route.position).line + 1,
+      position: route.position, guarded: guarded.get(route.position) === true || inherited.some(prior => guarded.get(prior.position)),
       router: route.router, method: route.method, path: route.path, calls: names,
       evidence: names.filter(name => /canAccess|[Ss]cope|[Vv]isible|verifyCallerLineIdentity|resolveFriendFromLineToken/.test(name)) };
   });
@@ -154,13 +163,14 @@ function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, 
 /** Keep the reported router name stable while matching registrations by their lexical scope. */
 export function inspectRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
   return inspectScopedRouteSource(file, source, importedConstant)
+    .filter(route => route.method !== 'USE')
     .map(route => ({ ...route, router: route.router.split(':').pop()! }));
 }
 
 export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
   const sources = new Map<string, string>();
-  for (const file of readdirSync(join(srcDir, 'routes')).filter(file => file.endsWith('.ts') && !file.includes('.test.'))) {
-    sources.set(resolve(srcDir, 'routes', file), readFileSync(join(srcDir, 'routes', file), 'utf8'));
+  for (const file of routeSourceFiles(join(srcDir, 'routes'))) {
+    sources.set(resolve(file), readFileSync(file, 'utf8'));
   }
   sources.set(resolve(srcDir, 'index.ts'), readFileSync(join(srcDir, 'index.ts'), 'utf8'));
   // Each file is parsed once for mount metadata, regardless of how many routers
@@ -188,20 +198,29 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
     }
     return [];
   })]));
-  function mounted(file: string, router: string, prefix = '', ancestors = new Set<string>()): SecurityRoute[] {
+  function mounted(file: string, router: string, prefix = '', ancestors = new Set<string>(), inherited: SecurityRoute[] = []): SecurityRoute[] {
     const key = `${file}:${router}`;
     if (ancestors.has(key)) throw new Error('Cyclic router mount');
     const nextAncestors = new Set(ancestors).add(key);
     const meta = metadata.get(file);
     if (!meta) throw new Error(`Unresolved router source: ${file}`);
     const { ast, imported } = meta;
-    const own = (routes.get(file) ?? []).filter(route => route.router === router)
+    const registered = (routes.get(file) ?? []).filter(route => route.router === router);
+    const middleware = registered.filter(route => route.method === 'USE');
+    const inheritAt = (position: number) => [...inherited, ...middleware.filter(route => route.position < position)
+      .map(route => ({ ...route, path: prefix + (prefix && route.path === '*' ? '/*' : route.path) }))];
+    const own = registered.filter(route => route.method !== 'USE')
       .map(route => ({ ...route, file: route.file.replace(resolve(srcDir), 'apps/worker/src'),
         path: prefix + (prefix && route.path === '*' ? '/*' : route.path) }));
     // A factory can register routes on a router argument without creating a Hono.
     // Follow only top-level invocations on this mounted router; unused factories
     // and similarly named parameters in other functions never become routes.
-    for (const call of meta.invocations) {
+    const factoryName = router.includes(':') ? router.slice(0, router.indexOf(':')) : undefined;
+    const receiver = router.split(':').pop()!;
+    const body = factoryName ? meta.factories.get(factoryName)?.body : undefined;
+    const invocations = body ? body.statements.filter(ts.isExpressionStatement)
+      .map(statement => statement.expression).filter(ts.isCallExpression) : meta.invocations;
+    for (const call of invocations) {
       if (!ts.isIdentifier(call.expression)) continue;
       const importedFactory = imported.get(call.expression.text);
       const factoryFile = importedFactory ? resolve(dirname(file), importedFactory.module.replace(/\.js$/, '.ts')) : file;
@@ -213,8 +232,8 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
       if (!factory) continue;
       for (const [index, parameter] of factory.parameters.entries()) {
         if (!parameter.type || !ts.isTypeReferenceNode(parameter.type) || parameter.type.typeName.getText(factoryAst) !== 'Hono'
-          || call.arguments[index]?.getText(ast) !== router) continue;
-        own.push(...mounted(factoryFile, `${name}:${parameter.name.getText(factoryAst)}`, prefix, nextAncestors));
+          || call.arguments[index]?.getText(ast) !== receiver) continue;
+        own.push(...mounted(factoryFile, `${name}:${parameter.name.getText(factoryAst)}`, prefix, nextAncestors, inheritAt(call.getStart(ast))));
       }
     }
     for (const mount of meta.mounts.filter(call => call.router === router)) {
@@ -223,9 +242,14 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
       const childRouter = importedRouter
         ? metadata.get(childFile)?.exported.get(importedRouter.exported) : mount.mountedRouter;
       if (!childRouter) throw new Error(`Unresolved mounted router: ${file}:${mount.mountedRouter}`);
-      own.push(...mounted(childFile, childRouter, prefix + (mount.path === '/' ? '' : mount.path.replace(/\/$/, '')), nextAncestors));
+      own.push(...mounted(childFile, childRouter, prefix + (mount.path === '/' ? '' : mount.path.replace(/\/$/, '')), nextAncestors, inheritAt(mount.position)));
     }
-    return own;
+    return own.map(route => {
+      const prior = inherited.filter(middleware => matchesMiddleware(middleware.path, route.path));
+      const names = [...new Set([...route.calls, ...prior.flatMap(middleware => middleware.calls)])].sort();
+      return { ...route, guarded: route.guarded || prior.some(middleware => middleware.guarded), calls: names,
+        evidence: names.filter(name => /canAccess|[Ss]cope|[Vv]isible|verifyCallerLineIdentity|resolveFriendFromLineToken/.test(name)) };
+    });
   }
   return mounted(resolve(srcDir, 'index.ts'), 'app')
     .sort((a, b) => a.path.localeCompare(b.path) || a.method.localeCompare(b.method));

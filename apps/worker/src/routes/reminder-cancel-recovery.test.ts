@@ -1591,44 +1591,46 @@ describe('旧表の取消後送信 (自主検証)', () => {
     }
   });
 
-  it('イベント: 送信の失敗で retry_count を二重に数えない', async () => {
+  it('イベント: 結果不明は1回だけ数え、次の巡回で再送しない', async () => {
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
       dual.raw1.prepare(
         `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
       ).run();
+      const sender = vi.fn(async () => { throw new Error('line down'); });
       const result = await processDueEventReminders(dual.db1, {
         now: new Date('2099-05-31T12:00:00.000Z'),
-        sender: async () => {
-          throw new Error('line down');
-        },
+        sender,
       });
       expect(result).toEqual({ sent: 0, failed: 1 });
       // fence の claim で1回だけ加算する (失敗記録で二重に足さない)。
       expect(dual.raw1.prepare(
         `SELECT status, retry_count FROM event_booking_reminders WHERE id = 'LEG-l1'`,
-      ).get()).toEqual({ status: 'failed', retry_count: 1 });
+      ).get()).toEqual({ status: 'failed_permanent', retry_count: 1 });
+      expect(await processDueEventReminders(dual.db1, { now: new Date('2099-05-31T12:01:00.000Z'), sender })).toEqual({ sent: 0, failed: 0 });
+      expect(sender).toHaveBeenCalledTimes(1);
     } finally {
       dual.cleanup();
     }
   });
 
-  it('予約: 送信の失敗で retry_count を二重に数えない', async () => {
+  it('予約: 結果不明は1回だけ数え、次の巡回で再送しない', async () => {
     const dual = openDualDb();
     try {
       seedBookingCancelTarget(dual.raw1);
       seedLegacyBookingReminder(dual.raw1);
+      const sender = vi.fn(async () => { throw new Error('line down'); });
       const result = await processDueReminders(dual.db1, {
         now: LEGACY_NOW,
-        sender: async () => {
-          throw new Error('line down');
-        },
+        sender,
       });
       expect(result).toEqual({ sent: 0, failed: 1 });
       expect(dual.raw1.prepare(
         `SELECT status, retry_count FROM booking_reminders WHERE id = 'LEG-b1'`,
-      ).get()).toEqual({ status: 'failed', retry_count: 1 });
+      ).get()).toEqual({ status: 'failed_permanent', retry_count: 1 });
+      expect(await processDueReminders(dual.db1, { now: new Date(LEGACY_NOW.getTime() + 60_000), sender })).toEqual({ sent: 0, failed: 0 });
+      expect(sender).toHaveBeenCalledTimes(1);
     } finally {
       dual.cleanup();
     }

@@ -49,7 +49,7 @@ export async function stripeRequest<T>(
   method: 'GET' | 'POST',
   path: string,
   body?: Record<string, FormValue>,
-  options: { idempotencyKey?: string; fetchImpl?: typeof fetch } = {},
+  options: { idempotencyKey?: string; fetchImpl?: typeof fetch; signal?: AbortSignal } = {},
 ): Promise<T> {
   if (!env.STRIPE_SECRET_KEY) throw new StripeApiError(503, 'Stripe の接続設定がまだありません', 'not_configured');
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -74,7 +74,7 @@ export async function stripeRequest<T>(
    */
   let res: Response;
   try {
-    res = await boundedHttpRequest(url, { method, headers, body: payload }, { timeoutMs: 10_000, maxResponseBytes: 1024 * 1024, fetch: fetchImpl });
+    res = await boundedHttpRequest(url, { method, headers, body: payload, signal: options.signal }, { timeoutMs: 10_000, maxResponseBytes: 1024 * 1024, fetch: fetchImpl });
   } catch {
     throw new StripeApiError(502, '決済サービスにつながりませんでした', 'network_unreachable', method === 'POST');
   }

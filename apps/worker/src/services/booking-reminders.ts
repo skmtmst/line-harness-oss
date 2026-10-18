@@ -1,3 +1,5 @@
+import { runBookingExternalStep } from './booking-external-step.js';
+import { API_RETRY_WAIT, lineFailure } from '../lib/external-call/index.js';
 import {bookingCancellationQuote} from './booking-cancellation.js';
 // Cron handler: send due booking reminders.
 // Joined with bookings/menus/staff/line_accounts/friends for everything
@@ -21,6 +23,7 @@ interface DueRow {
   line_account_id: string;
   kind: 'day_before' | 'hours_before';
   retry_count: number;
+  last_error: string | null;
   retry_key: string | null;
   recipient_line_user_id: string | null;
   messages_json: string | null;
@@ -80,7 +83,7 @@ export async function processDueReminders(
   // 'failed_permanent' / 'sent' / 'cancelled' は再送対象外。
   const due = await db
     .prepare(
-      `SELECT r.id, r.booking_id, r.kind, r.retry_count,
+      `SELECT r.id, r.booking_id, r.kind, r.retry_count, r.last_error,
               r.retry_key, r.recipient_line_user_id, r.messages_json,
               b.line_account_id, b.starts_at, b.meeting_mode, b.meeting_url,b.policy_snapshot_json,
               m.name AS menu_name,
@@ -94,10 +97,12 @@ export async function processDueReminders(
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
          INNER JOIN line_accounts la ON la.id = b.line_account_id
-         INNER JOIN friends f ON f.id = b.friend_id
+         INNER JOIN friends f ON f.id = b.friend_id AND f.line_account_id=b.line_account_id
           LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
         WHERE r.status IN ('pending','failed')
+          AND r.retry_count < 3
           AND r.scheduled_at <= ?
+          AND f.is_following=1
           AND b.status = 'confirmed'
           AND b.starts_at > ?       -- 開始時刻を過ぎた予約のリマインダは送らない
           AND (r.sent_at IS NULL OR r.sent_at < ?)  -- R330: 貸出中の行は拾わない
@@ -205,26 +210,66 @@ export async function processDueReminders(
 
       // RETURNING で実際に保存した要求を使う。停止で貸出を戻した直後に
       // 古い SELECT を持つ別 cron が claim しても、保存ずみの値を変えない。
-      await params.sender({
-        channelAccessToken: accessToken,
-        toLineUserId: claim.recipient_line_user_id,
-        kind,
-        ctx,
-        messages: JSON.parse(claim.messages_json) as Message[],
-        retryKey: claim.retry_key,
+      const snapshot = { to: claim.recipient_line_user_id, kind, ctx,
+        messages: JSON.parse(claim.messages_json) as Message[] };
+      const outcome = await runBookingExternalStep(db, {
+        ref: { scopeId: `line:${row.line_account_id}`, processKind: 'booking_reminder', subjectId: row.id, stepKey: 'send' },
+        identity: { scope: { accountId: row.line_account_id, storeId: row.line_account_id,
+          destination: 'line', connectionId: row.line_account_id }, operationId: row.id,
+          idempotencyKey: claim.retry_key, snapshotId: row.id, effect: 'write' },
+        policy: { category: 'api', maxAttempts: REMINDER_MAX_RETRY, timeoutMs: 10_000,
+          deadlineAt: Date.parse(row.starts_at), wait: API_RETRY_WAIT },
+        initialAttempts: priorRetry, legacyUnknown: priorRetry > 0 && row.last_error !== 'notification_preflight_failed', snapshot, now: () => params.now.getTime(),
+        authorize: async () => !await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')
+          && await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'booking reminders' }),
+        execute: async (signal, saved, identity) => {
+          try {
+            await params.sender({ channelAccessToken: accessToken, toLineUserId: saved.to,
+              kind: saved.kind, ctx: saved.ctx, messages: saved.messages, retryKey: identity.idempotencyKey, signal });
+            return { kind: 'success', value: { accepted: true } };
+          } catch (error) { return lineFailure(error, identity, params.now.getTime()); }
+        },
+        statements: next => {
+          if (next.phase === 'started') return [
+            db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM booking_reminders r JOIN bookings b ON b.id=r.booking_id
+              WHERE r.id=? AND r.status IN ('pending','failed') AND r.retry_count=? AND r.sent_at=?
+                AND b.status='confirmed' AND b.starts_at>?
+                AND EXISTS(SELECT 1 FROM friends live_friend WHERE live_friend.id=b.friend_id
+                  AND live_friend.line_account_id=b.line_account_id AND live_friend.is_following=1 AND live_friend.line_user_id=?)
+                AND ${activeTenantLineAccountSql('b.line_account_id')}
+                AND CASE r.kind WHEN 'day_before' THEN json_extract(b.notification_policy_snapshot,'$.day_before')
+                  ELSE json_extract(b.notification_policy_snapshot,'$.hours_before') END IS NOT 0)
+              THEN 'true' ELSE 'booking_reminder_obsolete' END)`)
+              .bind(row.id, attemptedRetry, params.now.toISOString(), params.now.toISOString(), claim.recipient_line_user_id),
+            db.prepare(`UPDATE booking_reminders
+            SET status='failed_permanent',last_error='delivery_unknown'
+            WHERE id=? AND status IN ('pending','failed') AND retry_count=? AND sent_at=?`)
+              .bind(row.id, attemptedRetry, params.now.toISOString())];
+          return [db.prepare(`UPDATE booking_reminders SET status=?,sent_at=?,last_error=?
+            WHERE id=? AND status='failed_permanent' AND last_error='delivery_unknown'
+              AND retry_count=? AND sent_at=?`)
+            .bind(next.phase === 'succeeded' ? 'sent' : 'failed_permanent', params.now.toISOString(),
+              next.phase === 'succeeded' ? null : next.phase === 'unknown' ? 'delivery_unknown' : 'delivery_rejected',
+              row.id, attemptedRetry, params.now.toISOString())];
+        },
       });
-      // R331: 書込時も「まだ未送信」を確かめる。貸出中に取消・方針OFFで
-      // 行が止まっていたら 0 件になり、取消ずみを復活させない。
-      // 期限切れで別 cron に引き継いだ試行の結果も上書きしない。
-      const completed = await db
-        .prepare(
-          `UPDATE booking_reminders SET status='sent', sent_at = ?
-            WHERE id = ? AND status IN ('pending','failed')
-              AND retry_count = ? AND sent_at = ?`,
-        )
-        .bind(params.now.toISOString(), row.id, attemptedRetry, params.now.toISOString())
-        .run();
-      if ((completed.meta?.changes ?? 0) > 0) sent++;
+      if (outcome.kind === 'success' || outcome.kind === 'succeeded') {
+        const completed = await db.prepare("SELECT status FROM booking_reminders WHERE id=?").bind(row.id).first<{ status: string }>();
+        if (completed?.status === 'sent') sent++;
+      } else {
+        if (outcome.kind === 'unknown' || outcome.kind === 'stopped' && outcome.state.phase === 'stopped') {
+          await db.prepare(`UPDATE booking_reminders SET status='failed_permanent',last_error=?
+            WHERE id=? AND status IN ('pending','failed') AND retry_count=? AND sent_at=?`)
+            .bind(outcome.kind === 'unknown' ? 'delivery_unknown' : 'delivery_rejected', row.id, attemptedRetry, params.now.toISOString()).run();
+        } else if (outcome.state.phase === 'ready') {
+          // 遮断・停止・送信前保存の競合で0要求なら、外側の準備用の貸出を戻す。
+          await db.prepare(`UPDATE booking_reminders SET retry_count=retry_count-1,sent_at=NULL
+            WHERE id=? AND status IN ('pending','failed') AND retry_count=? AND sent_at=?`)
+            .bind(row.id,attemptedRetry,params.now.toISOString()).run();
+        }
+        const completed = await db.prepare("SELECT status FROM booking_reminders WHERE id=?").bind(row.id).first<{ status: string }>();
+        if (completed?.status === 'failed_permanent') failed++;
+      }
     } catch (e) {
       // fence で握れていれば DB 上も同じ値まで進んでいる (二重に数えない)。
       // R331: ここでも取消ずみの行は触らない。貸出印は消して次回に備える。
@@ -239,7 +284,7 @@ export async function processDueReminders(
               AND retry_count = ?
               AND ${claimed ? 'sent_at = ?' : '(sent_at IS NULL OR sent_at < ?)'}`,
         )
-        .bind(newStatus, attemptedRetry, e instanceof Error ? e.message : String(e), row.id,
+        .bind(newStatus, attemptedRetry, 'notification_preflight_failed', row.id,
           claimed ? attemptedRetry : priorRetry,
           claimed ? params.now.toISOString() : claimCutoffIso(params.now))
         .run();
