@@ -25,6 +25,7 @@ import BottomBar from '../components/ui/BottomBar.js';
 import PrivacyNote from '../components/ui/PrivacyNote.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
+import FieldError from '../components/ui/FieldError.js';
 import { DateYmdField, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../components/forms/controls';
 import { type AddressDraft, AddressFields } from "../components/form-address-fields.js"
 /**
@@ -951,7 +952,7 @@ function PeopleBookingSlotPicker({
             }
           }} />{mode === 'online' ? 'オンライン' : '対面'}
         </FormChoiceRow>)}
-      </fieldset> : style === 'consult' && !meetingMode ? <p role="alert" className="text-sm text-danger">会い方を読み込めませんでした。時間をおいて開き直してください。</p>
+      </fieldset> : style === 'consult' && !meetingMode ? <FieldError>会い方を読み込めませんでした。時間をおいて開き直してください。</FieldError>
         : meetingMode && !target && (style === 'consult' || meetingMode === 'online') ? <p className="text-xs text-liff-sub">会い方：{meetingMode === 'online' ? 'オンライン' : '対面'}</p> : null}
       {target && !emptyRouted ? <h2 className="pt-1 text-xl font-bold text-ink">日時を選んでください</h2> : null}
       {!target && !fixedStaffId && staffList.length > 1 && (
