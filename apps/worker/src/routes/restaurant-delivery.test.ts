@@ -1607,6 +1607,354 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       expect(JSON.stringify(await res.json())).not.toContain('access_token');
     });
   });
+
+  /* ------------------- つなぐお店を選ぶ（フレーム X5d8UF） ------------------- */
+
+  describe('つなぐお店を選ぶ（受入条件1・2・3）', () => {
+    const STORES_PATH = '/api/restaurant-test/delivery/ubereats/stores';
+    const SELECT_PATH = '/api/restaurant-test/delivery/ubereats/stores/select';
+    /** 設定が無ければ本番側のホストになる。この試験環境は環境名を置いていない。 */
+    const API_BASE = 'https://api.uber.com';
+    const UBER_STORE_ID = 'ue-store-1';
+
+    /** Uber が返す店舗1件分の作り。 */
+    function uberStore(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+      return {
+        store_id: UBER_STORE_ID,
+        name: '渋谷店',
+        external_store_id: 'EXT-1',
+        location: {
+          address: '道玄坂1-2-3',
+          city: '渋谷区',
+          postal_code: '150-0043',
+          country: 'JP',
+        },
+        ...overrides,
+      };
+    }
+
+    /**
+     * ログイン済みの接続を置く。トークンは本物の暗号化で入れる。
+     * 復号の経路まで通したいので、ここだけは作り物の文字列を入れない。
+     */
+    async function seedLoggedIn(
+      overrides: { status?: string; expiresAt?: number; connected_at?: number | null } = {},
+    ): Promise<void> {
+      const { encryptCredential } = await import('@line-crm/db');
+      seedConnection({
+        status: overrides.status ?? 'pending_store',
+        connected_at: overrides.connected_at ?? null,
+      });
+      testDb.raw
+        .prepare(
+          `UPDATE rt_delivery_uber_connections
+              SET access_token_enc = ?, access_token_expires_at = ?
+            WHERE store_id = 'store-shibuya'`,
+        )
+        .run(
+          await encryptCredential(FAKE_ACCESS_TOKEN, ENC_KEY),
+          // 既定は取得直後の30日。3日前を切ると取り直しの扱いになる。
+          overrides.expiresAt ?? NOW.getTime() + 2_592_000 * 1000,
+        );
+    }
+
+    function candidateRows(): Array<Record<string, unknown>> {
+      return testDb.raw
+        .prepare('SELECT * FROM rt_delivery_uber_store_candidates ORDER BY uber_store_id')
+        .all() as Array<Record<string, unknown>>;
+    }
+
+    function seedCandidate(overrides: Record<string, unknown> = {}): void {
+      const row = {
+        id: 'cand-old',
+        store_id: 'store-shibuya',
+        uber_store_id: 'ue-old',
+        uber_store_name: '前回の候補',
+        external_store_id: null,
+        address_text: null,
+        ...overrides,
+      };
+      testDb.raw
+        .prepare(
+          `INSERT INTO rt_delivery_uber_store_candidates
+             (id, store_id, uber_store_id, uber_store_name, external_store_id, address_text, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          row.id,
+          row.store_id,
+          row.uber_store_id,
+          row.uber_store_name,
+          row.external_store_id,
+          row.address_text,
+          NOW.getTime(),
+        );
+    }
+
+    /**
+     * Uber の口の作り物。一覧と連携の有効化だけを受ける。
+     * beforeEach の既定の受け口を置き換えるので、呼び先と回数をここで数える。
+     */
+    function stubUberApi(
+      options: {
+        stores?: Array<Record<string, unknown>>;
+        listStatus?: number;
+        posStatus?: number;
+      } = {},
+    ): Array<{ url: string; method: string; body: string }> {
+      const calls: Array<{ url: string; method: string; body: string }> = [];
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = typeof input === 'string' ? input : String(input);
+          calls.push({
+            url,
+            method: (init?.method ?? 'GET').toUpperCase(),
+            body: typeof init?.body === 'string' ? init.body : '',
+          });
+          const headers = { 'content-type': 'application/json' };
+          if (url.endsWith('/pos_data')) {
+            const status = options.posStatus ?? 200;
+            if (status === 200) return new Response(null, { status: 204 });
+            // 失敗の本文に業者の生文が混ざっていても、こちらへは残らないこと。
+            return new Response(JSON.stringify({ message: PROVIDER_FREE_TEXT }), { status, headers });
+          }
+          const status = options.listStatus ?? 200;
+          if (status !== 200) {
+            return new Response(JSON.stringify({ message: PROVIDER_FREE_TEXT }), { status, headers });
+          }
+          return new Response(JSON.stringify({ stores: options.stores ?? [uberStore()] }), {
+            status: 200,
+            headers,
+          });
+        }),
+      );
+      return calls;
+    }
+
+    it('候補は加盟店のトークンで取り、選べるように控える', async () => {
+      await seedLoggedIn();
+      const calls = stubUberApi({
+        stores: [uberStore(), uberStore({ store_id: 'ue-store-2', name: '新宿店', location: null })],
+      });
+
+      const res = await call(STORES_PATH);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        success: true,
+        stores: [
+          { id: UBER_STORE_ID, name: '渋谷店', address: '150-0043 渋谷区 道玄坂1-2-3' },
+          { id: 'ue-store-2', name: '新宿店', address: '' },
+        ],
+      });
+
+      // 店舗の代理で使うトークンで、一覧の口だけを1回呼ぶ。
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toMatchObject({ url: `${API_BASE}/v1/eats/stores`, method: 'GET' });
+
+      // あとで「選べるお店」を照合するため、サーバ側に控えが残る。
+      const rows = candidateRows();
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toMatchObject({
+        store_id: 'store-shibuya',
+        uber_store_id: UBER_STORE_ID,
+        uber_store_name: '渋谷店',
+        external_store_id: 'EXT-1',
+        address_text: '150-0043 渋谷区 道玄坂1-2-3',
+      });
+      expect(JSON.stringify(rows)).not.toContain(FAKE_ACCESS_TOKEN);
+    });
+
+    it('店舗IDが無い行は候補にしない', async () => {
+      await seedLoggedIn();
+      stubUberApi({ stores: [{ name: 'IDの無いお店' }, uberStore()] });
+
+      const res = await call(STORES_PATH);
+      expect((await res.json()) as unknown).toMatchObject({
+        stores: [{ id: UBER_STORE_ID }],
+      });
+      expect(candidateRows()).toHaveLength(1);
+    });
+
+    it('取り直すと前回の候補は残らない', async () => {
+      await seedLoggedIn();
+      seedCandidate();
+      stubUberApi();
+
+      await call(STORES_PATH);
+
+      const rows = candidateRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].uber_store_id).toBe(UBER_STORE_ID);
+    });
+
+    it('まだログインしていない店舗には一覧を出さない', async () => {
+      seedConnection({ status: 'disconnected' });
+      const calls = stubUberApi();
+
+      const res = await call(STORES_PATH);
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({ code: 'not_connected' });
+      expect(calls).toHaveLength(0);
+    });
+
+    it('期限が近いトークンは使わず、つなぎ直しを促して状態も入れ替える', async () => {
+      // 30日のうち残り1日。取り直しの境目（3日）を切っている。
+      await seedLoggedIn({ status: 'connected', expiresAt: NOW.getTime() + 86_400_000 });
+      const calls = stubUberApi();
+
+      const res = await call(STORES_PATH);
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({ code: 'auth_expired' });
+      expect(calls).toHaveLength(0);
+
+      const rows = connectionRows();
+      expect(rows[0]).toMatchObject({ status: 'expired', last_error: 'auth_expired', version: 2 });
+    });
+
+    it('鍵が無い環境では、復号できないことだけを伝える', async () => {
+      await seedLoggedIn();
+      // 置いたあとで鍵を外す。鍵が変わった場合も同じ道を通る。
+      delete (env as Record<string, unknown>).LINE_CREDENTIAL_ENCRYPTION_KEY;
+      const calls = stubUberApi();
+
+      const res = await call(STORES_PATH);
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({ code: 'encryption_key_missing' });
+      expect(calls).toHaveLength(0);
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(ENC_KEY);
+    });
+
+    it('一覧が取れないときは分類済みの符号だけを残す', async () => {
+      await seedLoggedIn({ status: 'connected' });
+      // 401は再試行しない相手の拒否。権限切れとして扱う。
+      stubUberApi({ listStatus: 401 });
+
+      const res = await call(STORES_PATH);
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toMatchObject({ code: 'auth_expired' });
+      expect(JSON.stringify(body)).not.toContain(PROVIDER_FREE_TEXT);
+
+      const rows = connectionRows();
+      expect(rows[0]).toMatchObject({ status: 'expired', last_error: 'auth_expired' });
+      expect(JSON.stringify(rows)).not.toContain(PROVIDER_FREE_TEXT);
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);
+      // 取れなかったときに古い候補を消したままにしない（画面が空にならないこと）。
+      expect(candidateRows()).toHaveLength(0);
+    });
+
+    it('IDとSecretが無い環境では一覧も確定も止める', async () => {
+      await seedLoggedIn();
+      delete (env as Record<string, unknown>).RT_DELIVERY_UBEREATS_CLIENT_ID;
+      delete (env as Record<string, unknown>).RT_DELIVERY_UBEREATS_CLIENT_SECRET;
+      const calls = stubUberApi();
+
+      const list = await call(STORES_PATH);
+      expect(list.status).toBe(503);
+      expect(await list.json()).toMatchObject({ code: 'oauth_not_configured' });
+
+      const select = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(select.status).toBe(503);
+      expect(calls).toHaveLength(0);
+    });
+
+    it('控えていないお店は Uber へ送らない', async () => {
+      await seedLoggedIn();
+      seedCandidate({ uber_store_id: 'ue-other' });
+      const calls = stubUberApi();
+
+      const res = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toMatchObject({ code: 'store_not_candidate' });
+      // 画面から来たIDをそのまま相手へ渡さない。
+      expect(calls).toHaveLength(0);
+      expect(connectionRows()[0]).toMatchObject({ status: 'pending_store', provisioned_at: null });
+    });
+
+    it('お店を選ばずに確定しようとしたら止める', async () => {
+      await seedLoggedIn();
+      const calls = stubUberApi();
+
+      const res = await call(SELECT_PATH, { body: { storeId: '  ' } });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: 'store_id_required' });
+      expect(calls).toHaveLength(0);
+    });
+
+    it('確定すると Uber 側の連携を有効にし、接続中として残して候補を消す', async () => {
+      const connectedAt = NOW.getTime() - 60_000;
+      await seedLoggedIn({ status: 'pending_store', connected_at: connectedAt });
+      const calls = stubUberApi();
+      await call(STORES_PATH);
+
+      const res = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        success: true,
+        connection: {
+          status: 'connected',
+          storeName: '渋谷店',
+          provisionedAt: NOW.toISOString(),
+          lastError: null,
+        },
+      });
+
+      // 一覧の1回と、連携の有効化の1回だけ。重ねて送らない。
+      const posCalls = calls.filter((entry) => entry.url.endsWith('/pos_data'));
+      expect(posCalls).toHaveLength(1);
+      expect(posCalls[0]).toMatchObject({
+        url: `${API_BASE}/v1/eats/stores/${UBER_STORE_ID}/pos_data`,
+        method: 'POST',
+      });
+      expect(JSON.parse(posCalls[0].body)).toEqual({
+        integrator_store_id: 'store-shibuya',
+        is_order_manager: true,
+      });
+
+      const rows = connectionRows();
+      expect(rows[0]).toMatchObject({
+        uber_store_id: UBER_STORE_ID,
+        uber_store_name: '渋谷店',
+        external_store_id: 'EXT-1',
+        status: 'connected',
+        // ログインした時刻は上書きしない。
+        connected_at: connectedAt,
+        provisioned_at: NOW.getTime(),
+        last_error: null,
+        version: 2,
+      });
+      // 選び終わった候補は残さない。
+      expect(candidateRows()).toHaveLength(0);
+      expect(JSON.stringify(rows)).not.toContain(FAKE_ACCESS_TOKEN);
+    });
+
+    it('連携の有効化が失敗したら理由の符号だけを残し、接続中にしない', async () => {
+      await seedLoggedIn();
+      const calls = stubUberApi({ posStatus: 503 });
+      await call(STORES_PATH);
+
+      const res = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toMatchObject({ code: 'unavailable' });
+      expect(JSON.stringify(body)).not.toContain(PROVIDER_FREE_TEXT);
+
+      // 二重に送ると連携が重なるので、失敗しても自動で送り直さない。
+      expect(calls.filter((entry) => entry.url.endsWith('/pos_data'))).toHaveLength(1);
+
+      const rows = connectionRows();
+      expect(rows[0]).toMatchObject({
+        status: 'pending_store',
+        provisioned_at: null,
+        last_error: 'unavailable',
+      });
+      expect(JSON.stringify(rows)).not.toContain(PROVIDER_FREE_TEXT);
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);
+      // 取り直さずに選び直せるよう、候補は残す。
+      expect(candidateRows()).toHaveLength(1);
+    });
+  });
 });
 
 /* ====================== 受信口の応答時間（出前館QA#10） ====================== */

@@ -44,6 +44,7 @@ import {
 } from '../services/ubereats-token-probe.js';
 import { accountId, fail, staffTenantId, storeFor } from './restaurant-google.js';
 import type { StoreContext } from './restaurant-google.js';
+import { registerUberStoreRoutes } from './restaurant-delivery-ubereats-stores.js';
 import {
   deliveryWebhookIpAllowlist,
   isDeliveryWebhookIpAllowed,
@@ -2148,6 +2149,14 @@ restaurantDelivery.get(
     }
   },
 );
+
+/* ---------------- つなぐお店を選ぶ（設計 DL-4 / フレーム `X5d8UF`） ---------------- */
+
+/**
+ * 中身は `routes/restaurant-delivery-ubereats-stores.ts` にある。1ファイルの行数を抑えるために
+ * 移しただけで、入口の並び（お店の一覧 → 確定）も中身も変えていない。生やす位置も元のままにしている。
+ */
+registerUberStoreRoutes(restaurantDelivery, { deliveryStore, uberConnectionFor, isoFromMs });
 
 /**
  * Uber Eats Sandbox への最小の実接続（トークン1回）を配備先の中から行う口。画面は持たない。
