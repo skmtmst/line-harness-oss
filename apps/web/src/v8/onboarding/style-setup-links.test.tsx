@@ -29,6 +29,13 @@ it('標準とECの質問に来店の文面を代用しない', () => {
   for (const style of ['standard', 'ec'] as const) expect(questionsFor(style).find(q => q.key === 'content')?.description).not.toMatch(/予約の確認|来店/)
 })
 
+it('支払いの札は共通辞書を使い、面談の担当を支払う場所に置き換えない', () => {
+  const consult = questionsFor('consult').find(q => q.key === 'payment')!
+  expect(consult.choices.find(choice => choice.value === 'store')?.label).toBe('当日払う')
+  expect(consult.choices.map(choice => choice.note).join(' ')).not.toContain('担当で払')
+  expect(questionsFor('lesson').find(q => q.key === 'payment')?.choices[0].label).toBe('お店で払う')
+})
+
 it('同じ保存用APIの解決済みボタンを使い、行き先なしを静的な6ボタンで補わない', async () => {
   net.starterSet.mockResolvedValueOnce({ success: true, data: { definition: { items: [] } } }).mockResolvedValueOnce({ success: true, data: { preview: [{ key: 'menu', buttons: [{ label: 'お問い合わせ', feature: 'contact', actionType: 'message', actionData: 'お問い合わせ' }] }] } })
   const view = renderHook(() => useStarterMenu('a', 'ec'))

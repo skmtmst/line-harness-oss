@@ -108,11 +108,11 @@ export const LOOK_CHOICES: ReadonlyArray<{ value: 'keep' | 'change' | 'existing'
 
 export function questionsFor(style: AccountStyle): Question[] {
   const host = bookingHost(style)
-  const words = (value: string) => value.replaceAll('お店', host).replaceAll('お客さま', styleTerm(style, 'V12').split('（')[0])
+  const words = (value: string) => value.split('お店で払う').map(part => part.replaceAll('お店', host).replaceAll('お客さま', styleTerm(style, 'V12').split('（')[0])).join(styleTerm(style, 'V25'))
   return BY_STYLE[style].map((key) => {
     const question = Q[key]
     if (key === 'content' && (style === 'standard' || style === 'ec')) return { ...question, description: style === 'ec' ? 'ごあいさつ・商品のお知らせ・購入へのお礼・再入荷の見本を入れます。自動のLINEは止めた状態です。' : 'ごあいさつ・ご案内・お問い合わせの見本を入れます。' }
-    return { ...question, title: words(question.title), description: words(question.description), info: question.info ? words(question.info) : undefined, manualNote: words(question.manualNote), todo: { ...question.todo, title: words(question.todo.title), note: words(question.todo.note) }, choices: question.choices.map((choice) => ({ ...choice, label: words(choice.label), note: words(choice.note) })) }
+    return { ...question, title: words(question.title), description: words(question.description), info: question.info ? words(question.info) : undefined, manualNote: words(question.manualNote), todo: { ...question.todo, title: words(question.todo.title), note: words(question.todo.note) }, choices: question.choices.map((choice) => ({ ...choice, label: words(choice.label), note: key === 'payment' && choice.value === 'store' && style === 'consult' ? '面談の当日に払います。' : words(choice.note) })) }
   })
 }
 
