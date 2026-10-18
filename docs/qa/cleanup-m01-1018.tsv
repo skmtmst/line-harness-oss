@@ -1,0 +1,9 @@
+category	target	before	after	reason_or_evidence	owner
+b389-5-1	入力エラー	U01の共通Field	保持（#1772も同じField）	aria-invalid・エラー文と入力の関連付けは実際の入力支援。v06と競合なし	M01
+b389-5-2	Cardの画面class	U01で削除	#1772へ譲る	v06の配置・文字・案内の形を優先。共通Card自体とU02は変更しない	M01
+b389-5-3	下の操作帯	U01のPageFooter	#1772のStickyBarへ戻す	v06は本文直下・長い時だけ追従。フォーム内送信を保持	M01
+b389-5-4	ボタンとコピーの読み上げ名	U01の語尾統一	#1772の表示と読み上げ名を採用	実際の操作を失う不具合ではないためv06を優先	M01
+b389-5-5	友だち取り込みの進捗	U01の共通ProgressBar	#1772の進捗表示へ戻す	v06の高さ6・色・形を保持。aria-valuenow/min/maxと取り込み処理は保持	M01
+b389-5-6	アイコン	U01の16px統一	#1772の15pxを採用	見た目の統一を理由に承認済みv06を変えない	M01
+scope	ほかの4画面61項目	23a72a6772	変更0	git diff 23a72a6772 -- settings/delivery settings/sns restaurant/delivery restaurant/google = empty	U01
+guards	共通radio-card・globals.css	U02 + #1772	両方保持	radio-cardは本線と同じ。globalsはU02の既存値に本線の事前確認用変数を追加済み	M01/U02

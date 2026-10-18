@@ -10,6 +10,10 @@
 :global(html:root) .stepBody:focus-visible { outline: none; }
 .column { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-panel-gap); }
 
+.panel {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+
+}
 .panelTitle {
   margin: 0; padding: 0; font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink);
 }
@@ -20,16 +24,17 @@
 .asideP { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
 
 /* 案内の一文を囲む箱と、横並びのボタン（②③で使う） */
-.noteText {
-  margin: 0;
+.noteBox {
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary);
 }
+.noteBox p, .noteBox ul { margin: 0; }
 .buttonRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-gap-s); }
 
 /* ② チャネル設定 */
 .groupLabel { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink-secondary); }
 .field { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); min-width: 0; }
 .label { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 600; color: var(--color-ink); }
+.fieldError { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-danger); }
 .help { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 .secretRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-panel-gap); }
 .secretNote {
@@ -60,8 +65,12 @@
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink);
 }
 .progressHead strong { font-weight: 700; }
+.progressTrack { height: var(--tpl-htn-progress-h); border-radius: var(--tpl-htn-radius-pill); background: var(--color-hairline); overflow: hidden; }
+.progressFill { display: block; height: 100%; border-radius: var(--tpl-htn-radius-pill); background: var(--color-accent-deep); }
 .progressWarn { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-status-warn-deep); }
 .progressNote { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
+
+/* 下の帯：本文のすぐ下に置き、長いときは画面の下に追従する。ボタンは中央。 */
 
 /* 結果の窓（qw80E） */
 .result {
@@ -217,6 +226,10 @@
    画面CSSは持たない。 */
 
 /* ⑤-0 引き継ぎ中。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
+.handoverBox {
+  display: flex; flex-direction: column; gap: var(--tpl-htn6-hand-gap);
+  padding: var(--tpl-htn6-hand-pad);
+}
 .handoverStats { display: flex; flex-wrap: wrap; gap: var(--tpl-htn6-stat-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
 .handoverStats strong { font-weight: 700; color: var(--color-ink); }
 
@@ -225,8 +238,9 @@
 .doneIcon { color: var(--color-accent-deep); }
 .doneTitle { margin: 0; font-size: var(--tpl-htn6-text-20); line-height: var(--tpl-htn6-lh-28); font-weight: 700; color: var(--color-ink); }
 /* ⑤ 名前の箱。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
-.accountDetails {
-  display: flex; flex-direction: column; align-items: center; gap: var(--tpl-htn-gap-s);
+.accountBox {
+  display: flex; align-items: center; gap: var(--tpl-htn-gap-s);
+  padding: var(--tpl-htn6-acct-pad);
 }
 .accountName { font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
 .accountId { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
