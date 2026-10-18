@@ -6,6 +6,7 @@ import type { styleApi } from '@/lib/api-styles'
 
 export const ACCOUNT_STYLE_UPDATED = 'musubo:account-style-updated'
 export function accountStyleUpdated(accountId: string) {
+  pending.delete(accountId)
   window.dispatchEvent(new CustomEvent(ACCOUNT_STYLE_UPDATED, { detail: { accountId } }))
 }
 

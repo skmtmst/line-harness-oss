@@ -44,3 +44,17 @@ it('本文で読み直すと、同じアカウントの左メニューも一緒�
   expect(view.result.current.body.data?.style).toBe('lesson')
   expect(net.get).toHaveBeenCalledTimes(2)
 })
+
+it('保存前に始めた遅い読み取りを切り離し、保存後の業種を本文とメニューで共有する', async () => {
+  let resolveOld!: (value: unknown) => void
+  net.get.mockReset().mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve })).mockResolvedValue(ok('consult'))
+  const view = renderHook(() => ({ menu: useAccountStyle('saving'), body: useAccountStyle('saving') }))
+  await waitFor(() => expect(net.get).toHaveBeenCalledTimes(1))
+  act(() => accountStyleUpdated('saving'))
+  await waitFor(() => expect(view.result.current.menu.data?.style).toBe('consult'))
+  expect(view.result.current.body.data?.style).toBe('consult')
+  expect(net.get).toHaveBeenCalledTimes(2)
+  await act(async () => resolveOld(ok('restaurant')))
+  expect(view.result.current.menu.data?.style).toBe('consult')
+  expect(view.result.current.body.data?.style).toBe('consult')
+})
