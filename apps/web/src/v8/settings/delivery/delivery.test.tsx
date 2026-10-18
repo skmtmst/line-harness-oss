@@ -22,6 +22,8 @@ const fixture = vi.hoisted(() => ({
   accountId: { value: null as string | null },
   connection: vi.fn(),
   connectStart: vi.fn(),
+  stores: vi.fn(),
+  selectStore: vi.fn(),
 }))
 
 vi.mock('@/lib/staff-role', () => ({
@@ -43,6 +45,8 @@ vi.mock('@/lib/restaurant-delivery-api', () => ({
   restaurantDeliveryApi: {
     ubereatsConnection: fixture.connection,
     ubereatsConnectStart: fixture.connectStart,
+    ubereatsStores: fixture.stores,
+    ubereatsSelectStore: fixture.selectStore,
   },
 }))
 
@@ -116,11 +120,10 @@ describe('設定 › デリバリー連携', () => {
     const login = button('Uber Eats にログインしてつなぐ')
     expect(login.disabled).toBe(false)
     expect(login.title).toBe('')
-    // 申し込む2社は押せる。押すと「現在準備中です」の窓を出す（受け口ができるまで。B-360）。
+    // 未接続の会社は準備中の案内を開き、申込済みと偽らない。
     const apply = screen.getAllByRole('button', { name: '連携を申し込む' }) as HTMLButtonElement[]
     expect(apply).toHaveLength(2)
     expect(apply.every((one) => !one.disabled)).toBe(true)
-    // 下の帯の［キャンセル］［保存する］は置かない（押すとすぐ反映する画面で、保存する物が無い）。
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
   })
 
@@ -185,7 +188,7 @@ describe('設定 › デリバリー連携', () => {
 
     expect(await screen.findByText('渋谷店')).toBeTruthy()
     const uberCard = card('Uber Eats')
-    expect(uberCard.getByText('接続済み')).toBeTruthy()
+    expect(uberCard.getByText('接続中')).toBeTruthy()
     expect(uberCard.getByText('つないだお店')).toBeTruthy()
   })
 
@@ -195,7 +198,7 @@ describe('設定 › デリバリー連携', () => {
 
     expect(screen.queryByRole('button', { name: 'Uber Eats にログインしてつなぐ' })).toBeNull()
     expect(screen.queryByRole('button', { name: '連携を申し込む' })).toBeNull()
-    expect(screen.getByRole('status').textContent).toContain('閲覧のみ')
+    expect(screen.getByText(/閲覧のみ/)).toBeTruthy()
   })
 
   it('DL-2：接続中はつないだお店・つないだ日・最後に確かめた時刻が出る', () => {
@@ -211,7 +214,7 @@ describe('設定 › デリバリー連携', () => {
     )
 
     const uberCard = card('Uber Eats')
-    expect(uberCard.getByText('接続済み')).toBeTruthy()
+    expect(uberCard.getByText('接続中')).toBeTruthy()
     expect(uberCard.getByText('つないだお店')).toBeTruthy()
     expect(uberCard.getByText('渋谷店')).toBeTruthy()
     expect(uberCard.getByText('つないだ日')).toBeTruthy()
@@ -228,7 +231,7 @@ describe('設定 › デリバリー連携', () => {
     )
 
     const uberCard = card('Uber Eats')
-    expect(uberCard.getByText('接続の異常')).toBeTruthy()
+    expect(uberCard.getByText('接続エラー')).toBeTruthy()
     // 状態の注記は共通の帯（Notice）で出す。危険の帯は role="alert" で、
     // 色は共通の `.danger` が持つ（自作の data-tone は持たない／B-172 status-badge）。
     const notice = uberCard.getByText('注文を受け取れませんでした。musubo が確認しています。').closest('[data-design-part="notice"]')
@@ -247,48 +250,63 @@ describe('設定 › デリバリー連携', () => {
     expect(demaecan.getByText('申し込み受付中')).toBeTruthy()
     expect(demaecan.getByText('申し込んだ日')).toBeTruthy()
 
-    // 受け口が無いので、できたように見せず「現在準備中です」を出す。
     fireEvent.click(demaecan.getByRole('button', { name: '申し込みを取り消す' }))
     expect(screen.getByText('現在準備中です')).toBeTruthy()
     expect(card('出前館').getByText('申し込み受付中')).toBeTruthy()
   })
 
-  it('申し込む会社は押すと「現在準備中です」を出し、申し込み受付中にはしない', () => {
+  it('未接続の会社への申し込みは準備中を示し、接続や日付を作らない', () => {
     render(<DeliverySettingsPage services={[{ ...uber(), id: 'demaecan', name: '出前館', connect: 'apply' }]} />)
-
     fireEvent.click(button('連携を申し込む'))
     expect(screen.getByText('現在準備中です')).toBeTruthy()
-    const demaecan = card('出前館')
-    expect(demaecan.getByText('未接続')).toBeTruthy()
-    expect(demaecan.queryByText('申し込んだ日')).toBeNull()
+    expect(card('出前館').getByText('未接続')).toBeTruthy()
+    expect(card('出前館').queryByText('申し込んだ日')).toBeNull()
   })
 
-  it('DL-3：連携を解除する窓で確かめたあとは「現在準備中です」を出し、接続は変えない', () => {
+  it('DL-3：承認済みの窓を保ち、受け口のない解除で接続を変えない', () => {
     render(<DeliverySettingsPage services={[uber({ status: 'connected', storeName: '渋谷店' })]} />)
 
     fireEvent.click(button('連携を解除する'))
-    expect(screen.getByText('Uber Eatsの連携を解除しますか？')).toBeTruthy()
+    // 承認案 `kJLks` のとおり、英字で終わる社名のあとは半角の空きを入れる。
+    expect(screen.getByText('Uber Eats の連携を解除しますか')).toBeTruthy()
+    expect(screen.getByText(/^Uber Eats とのつなぎを外します。/)).toBeTruthy()
 
     fireEvent.click(button('解除する'))
-    expect(screen.queryByText('Uber Eatsの連携を解除しますか？')).toBeNull()
-    expect(screen.getByText('現在準備中です')).toBeTruthy()
+    expect(screen.queryByText('Uber Eats の連携を解除しますか')).toBeNull()
     const uberCard = card('Uber Eats')
-    expect(uberCard.getByText('接続済み')).toBeTruthy()
+    expect(screen.getByText('現在準備中です')).toBeTruthy()
+    expect(uberCard.getByText('接続中')).toBeTruthy()
     expect(uberCard.getByText('渋谷店')).toBeTruthy()
   })
 
-  it('DL-2：接続を確かめるも、受け口が無いので「現在準備中です」を出す', () => {
-    render(<DeliverySettingsPage services={[uber({ status: 'connected', storeName: '渋谷店' })]} />)
+  it('DL-4：Uber から戻ると候補を取って窓が開き、選ぶと接続中になる', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=pending_store'
+    fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
+    fixture.stores.mockResolvedValue({ success: true, stores: STORES })
+    fixture.selectStore.mockResolvedValue({
+      success: true,
+      connection: {
+        status: 'connected',
+        storeName: '渋谷店',
+        connectedAt: '2026-10-17T02:30:00.000Z',
+        provisionedAt: '2026-10-17T02:30:00.000Z',
+        checkedAt: '2026-10-17T02:30:00.000Z',
+        lastError: null,
+      },
+    })
 
-    fireEvent.click(button('接続を確かめる'))
-    expect(screen.getByText('現在準備中です')).toBeTruthy()
-  })
+    render(<DeliverySettingsPage />)
 
-  it('DL-4：お店を選ぶまでつなげず、選んで押すと「現在準備中です」を出す', () => {
-    render(<DeliverySettingsPage services={[uber({ stores: STORES })]} />)
-
-    fireEvent.click(button('Uber Eats にログインしてつなぐ'))
-    expect(screen.getByText('つなぐお店を選んでください')).toBeTruthy()
+    // 戻った直後だけ Uber へ問い合わせ、続きの選び口を自動で開く。
+    expect(await screen.findByText('つなぐお店を選んでください')).toBeTruthy()
+    // 承認案 `X5d8UF` の本文のとおり。社名のあとの半角の空きまで含めて合わせる。
+    expect(
+      screen.getByText(
+        'Uber Eats での許可をいただきました。Uber Eats に登録されているお店が2件見つかりました。musubo につなぐお店を選んでください。',
+      ),
+    ).toBeTruthy()
+    expect(fixture.stores).toHaveBeenCalledWith('acc-1')
     expect(button('このお店につなぐ').disabled).toBe(true)
 
     // 共通の RadioCardGroup は fieldset ＋ legend で描くので、役割は group。
@@ -298,8 +316,82 @@ describe('設定 › デリバリー連携', () => {
     expect(button('このお店につなぐ').disabled).toBe(false)
 
     fireEvent.click(button('このお店につなぐ'))
+    // 送るのは選ばれたお店のIDだけ。つないだお店の名もサーバが返した値で出す。
+    await waitFor(() => expect(fixture.selectStore).toHaveBeenCalledWith('acc-1', 'store-1'))
+    await waitFor(() => expect(screen.queryByText('つなぐお店を選んでください')).toBeNull())
+    const uberCard = card('Uber Eats')
+    expect(uberCard.getByText('接続中')).toBeTruthy()
+    expect(uberCard.getByText('渋谷店')).toBeTruthy()
+    expect(screen.queryByText(/Uber Eats へのログインは受け取りました/)).toBeNull()
+  })
+
+  it('DL-4：画面を開くだけでは Uber へ問い合わせず、続きはボタンから選べる', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
+    fixture.stores.mockResolvedValue({ success: true, stores: STORES })
+
+    render(<DeliverySettingsPage />)
+    await waitFor(() => expect(fixture.connection).toHaveBeenCalledWith('acc-1'))
+    expect(fixture.stores).not.toHaveBeenCalled()
+
+    // ログインは済んでいるので、押してもログインのやり直しにはならない。
+    fireEvent.click(button('Uber Eats にログインしてつなぐ'))
+    await waitFor(() => expect(fixture.stores).toHaveBeenCalledWith('acc-1'))
+    expect(await screen.findByText('つなぐお店を選んでください')).toBeTruthy()
+    expect(fixture.connectStart).not.toHaveBeenCalled()
+  })
+
+  it('DL-4：つなげるお店が無ければ窓を開かず、ログインし直す案内を出す', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=pending_store'
+    fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
+    fixture.stores.mockResolvedValue({ success: true, stores: [] })
+
+    render(<DeliverySettingsPage />)
+
+    expect(await screen.findByText(/お店が見つかりませんでした/)).toBeTruthy()
     expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
-    expect(screen.getByText('現在準備中です')).toBeTruthy()
     expect(card('Uber Eats').getByText('未接続')).toBeTruthy()
   })
+
+  it('DL-4：つなぐ確定が失敗したら窓を閉じて理由を出し、勝手に送り直さない', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=pending_store'
+    fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
+    fixture.stores.mockResolvedValue({ success: true, stores: STORES })
+    fixture.selectStore.mockRejectedValue(new Error('失敗'))
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText('つなぐお店を選んでください')).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('group', { name: 'つなぐお店' })).getByText('渋谷店'))
+    fireEvent.click(button('このお店につなぐ'))
+
+    expect(await screen.findByText(/お店をつなげませんでした/)).toBeTruthy()
+    expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
+    // 結果が分からないまま重ねて送ると連携が重なるため、1回だけ送る。
+    expect(fixture.selectStore).toHaveBeenCalledTimes(1)
+    expect(card('Uber Eats').getByText('未接続')).toBeTruthy()
+  })
+  it('接続の確認は未接続の口なので、現在時刻を成功日時にしない', () => {
+    render(<DeliverySettingsPage services={[uber({ status: 'connected', checkedAt: '2026-10-12T01:00:00.000Z' })]} />)
+    const before = card('Uber Eats').getByText('最後に確かめた時刻').nextElementSibling?.textContent
+    fireEvent.click(button('接続を確かめる'))
+    expect(screen.getByText('現在準備中です')).toBeTruthy()
+    expect(card('Uber Eats').getByText('最後に確かめた時刻').nextElementSibling?.textContent).toBe(before)
+  })
+
+  it('閲覧のみでOAuthから戻っても、候補の取得や変更窓を自動で開かない', async () => {
+    fixture.role.value = 'staff'
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=pending_store'
+    fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
+    fixture.stores.mockResolvedValue({ success: true, stores: STORES })
+    render(<DeliverySettingsPage />)
+    await waitFor(() => expect(fixture.connection).toHaveBeenCalledWith('acc-1'))
+    expect(screen.getByText(/閲覧のみ/)).toBeTruthy()
+    expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
+    expect(fixture.stores).not.toHaveBeenCalled()
+    expect(fixture.selectStore).not.toHaveBeenCalled()
+  })
+
 })

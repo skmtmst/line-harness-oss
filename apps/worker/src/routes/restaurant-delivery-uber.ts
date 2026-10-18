@@ -14,6 +14,7 @@ import { UBER_PROBE_CHECK_BODY, platformCooldownStore, probeUberSandboxToken, ub
 import { fail, staffTenantId } from './restaurant-google.js';
 import { UBER_OAUTH_CALLBACK_PATH, uberOAuthClient } from '../services/restaurant-delivery.js';
 import { isoFromMs, deliveryStore } from './restaurant-delivery-common.js';
+import { registerUberStoreRoutes } from './restaurant-delivery-ubereats-stores.js';
 
 export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
   // ---------- Uber Eats のログイン連携（店舗が自分でつなぐ経路） ----------
@@ -327,6 +328,8 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
       }
     },
   );
+
+  registerUberStoreRoutes(restaurantDelivery, { deliveryStore, uberConnectionFor, isoFromMs });
 
   /**
    * Uber Eats Sandbox への最小の実接続（トークン1回）を配備先の中から行う口。画面は持たない。
