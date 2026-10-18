@@ -17,11 +17,14 @@
 .panelTitle {
   margin: 0; padding: 0; font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink);
 }
-/* 右の案内は共通の Card（surface="muted"）が地と角を持つ。画面CSSは置き場所だけ（★V8 §24）。 */
+/* 右の案内は共通の Card が地と角を持つ。画面CSSは置き場所だけ（★V8 §24）。 */
 .aside { align-self: flex-start; }
 /* 中の字は Card ではなく中の h2・p に直接あてる。Card へ渡す .aside には見た目を書かない。 */
 .asideH2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
 .asideP { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
+/* 正本 v06 ②の右の列（RtWJZ）の小さな題（右題3）と、その上の細い区切り（sKgxt／D4k4qv）。 */
+.asideH3 { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
+.asideLine { height: 1px; background: var(--color-hairline); }
 
 /* 案内の一文を囲む箱と、横並びのボタン（②③で使う） */
 .noteBox {

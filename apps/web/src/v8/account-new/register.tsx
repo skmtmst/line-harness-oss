@@ -3,8 +3,8 @@
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
-  Activity, ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CircleDashed,
-  Copy, Lock, CircleHelp, Plug, QrCode, Users,
+  Activity, ArrowLeft, ArrowRight, BookOpen, Check, CircleAlert, CircleCheck, CircleDashed,
+  Copy, LifeBuoy, Lock, CircleHelp, Plug, QrCode, Save, Users,
 } from 'lucide-react'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -522,15 +522,18 @@ export default function AccountRegisterV8() {
             />
           )}
 
+          {/* 正本 v06 ②の右の列（Step1 msf5n／Step2 RtWJZ／Step3 J84XB は同じ中身）。
+              白い板の中に、マニュアル → 区切り → 途中保存して閉じる → 区切り → うまくいかないとき → サポートに聞く。 */}
           {currentStep === 2 && (
-            <CreateStepColumns data-design-node="Fqy29" previewTitle="どこにある？" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="どこにある？">
-                <h2 className={styles.asideH2}>どこにある？</h2>
-                <p className={styles.asideP}>チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
-                <p className={styles.asideP}>登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
-                <p className={styles.asideP}>秘密値は保存後に画面へ表示されません。</p>
-                {/* v06 ②の右の列（RtWJZ）はマニュアルの入口を持つ。カード内には置かない。 */}
-                <Button external href={`${MANUAL}#m1`}><CircleHelp size={15} aria-hidden="true" />マニュアルを開く</Button>
+            <CreateStepColumns data-design-node="Fqy29" previewTitle="マニュアル" preview={(
+              <Card className={styles.aside} layout="vertical" surface="standard" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="マニュアル">
+                <Button external href={MANUAL} icon={<BookOpen size={16} aria-hidden="true" />}>マニュアルを開く</Button>
+                <div className={styles.asideLine} aria-hidden="true" />
+                {/* 下書きは入力のたびに端末へ残るので、閉じるだけでよい（行き先は下の「キャンセル」と同じ）。 */}
+                <Button href="/hq" icon={<Save size={16} aria-hidden="true" />}>途中保存して閉じる</Button>
+                <div className={styles.asideLine} aria-hidden="true" />
+                <h2 className={styles.asideH3}>うまくいかないとき</h2>
+                <Button href="/hq/support" icon={<LifeBuoy size={16} aria-hidden="true" />}>サポートに聞く</Button>
               </Card>
               )}>
               {sub === 1 && (
