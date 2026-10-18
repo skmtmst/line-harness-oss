@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { FormLayout } from '@line-crm/shared';
 import Form from './Form.js';
+import { CustomerStyleContext } from '../components/CustomerStyleScope.js';
 
 /**
  * 「予約を入れる」ブロック（g9osGN）。
@@ -160,7 +161,7 @@ describe('予約を入れる', () => {
     expect(frame?.textContent).toContain('トリミング（小型犬）');
   });
 
-  it('★V8 g9osGN：満席の日も灰色で並べて押せなくし、送った後は予約の日時と確認待ちを出す', async () => {
+  it.each([['standard', 'お店の確認待ち'], ['ec', 'お店の確認待ち'], ['restaurant', 'お店の確認待ち'], ['salon', 'お店の確認待ち'], ['consult', '確認待ち'], ['lesson', '確認待ち']] as const)('%s: 満席の日は押せず、回答後に本人の予約日時と業種の確認待ちを出す', async (style, pending) => {
     getForm.mockResolvedValue({
       id: 'f1', name: '来店アンケート', description: '', layout: layout(), isActive: true,
     });
@@ -183,11 +184,11 @@ describe('予約を入れる', () => {
       }],
     });
     render(
-      <MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
+      <CustomerStyleContext.Provider value={style}><MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
         <Routes>
           <Route path="/forms/:id" element={<Form />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter></CustomerStyleContext.Provider>,
     );
     const fullLabel = `${Number(full.slice(5, 7))}月${Number(full.slice(8, 10))}日 空きなし`;
     const fullDay = (await screen.findByRole('button', { name: fullLabel })) as HTMLButtonElement;
@@ -198,7 +199,7 @@ describe('予約を入れる', () => {
     fireEvent.click(screen.getByRole('button', { name: '送信する' }));
     const md = `${Number(open.slice(5, 7))}月${Number(open.slice(8, 10))}日 13:00`;
     expect(
-      await screen.findByText(`次回のご予約（${md}）はお店の確認待ちです。決まったらLINEでお知らせします。`),
+      await screen.findByText(`次回のご予約（${md}）は${pending}です。決まったらLINEでお知らせします。`),
     ).toBeTruthy();
   });
 });

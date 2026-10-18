@@ -1,3 +1,4 @@
+import { useCustomerWords } from '../components/CustomerStyleScope.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import SeatBookingBlock from '../components/SeatBookingBlock.js';
 import { restaurantBookingApi } from '../lib/api.js';
@@ -92,6 +93,7 @@ function OtherTextInput({
 }
 
 export default function Form() {
+  const words = useCustomerWords();
   const route = useParams<{ id: string }>();
   const [search] = useSearchParams();
   const id = route.id ?? search.get('id') ?? undefined;
@@ -534,7 +536,7 @@ export default function Form() {
         const when = `${m}月${d}日 ${utcToJstHm(b.startsAt)}`;
         return b.status === 'confirmed'
           ? `次回のご予約（${when}）が決まりました。`
-          : `次回のご予約（${when}）はお店の確認待ちです。決まったらLINEでお知らせします。`;
+          : `次回のご予約（${when}）は${words.approvalPending}です。決まったらLINEでお知らせします。`;
       })
       .join('\n');
     return (
@@ -712,7 +714,7 @@ export default function Form() {
           disabled={sending || Object.values(uploading).some(Boolean) || (routedPage && routedNeedsPick)}
           style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
         >
-          {sending ? '送信中...' : routedPage && routedEmpty ? 'お店に問い合わせる' : routedPage && routedNeedsPick ? '日時を選んでください' : routedPage && routedPicked && routedConfirm ? 'この内容で送る' : routedPage && routedPicked ? `${utcToJstMd(routedPicked)}（${formatWeekday(new Date(new Date(routedPicked).getTime() + 9 * 3_600_000).toISOString().slice(0, 10))}）${utcToJstHm(routedPicked)} で進む` : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+          {sending ? '送信中...' : routedPage && routedEmpty ? `${words.contact}に問い合わせる` : routedPage && routedNeedsPick ? '日時を選んでください' : routedPage && routedPicked && routedConfirm ? 'この内容で送る' : routedPage && routedPicked ? `${utcToJstMd(routedPicked)}（${formatWeekday(new Date(new Date(routedPicked).getTime() + 9 * 3_600_000).toISOString().slice(0, 10))}）${utcToJstHm(routedPicked)} で進む` : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
         </Button>
 
       </BottomBar>
@@ -782,6 +784,7 @@ function PeopleBookingSlotPicker({
   routed?: RoutedState;
   onRoutedEmpty?: (empty: boolean) => void;
 }) {
+  const words = useCustomerWords();
   /* 答えで行き先が決まったら、フォームで決めたメニュー・担当より答えの行き先が先（担当は選ばせない）。 */
   const target = routed?.status === 'ready' ? routed.target : null;
   const menuId = target?.menuId ?? block.booking?.menuId ?? '';
@@ -891,7 +894,7 @@ function PeopleBookingSlotPicker({
     );
   }
   if (!menuId) {
-    return <p className="text-sm text-ink-secondary">予約のメニューが決まっていません。お店に確認してください。</p>;
+    return <p className="text-sm text-ink-secondary">{`予約のメニューが決まっていません。${words.contact}に確認してください。`}</p>;
   }
   if (loading && Object.keys(byDate).length === 0) {
     return <p className="text-sm text-ink-faint">空き枠を読み込んでいます...</p>;

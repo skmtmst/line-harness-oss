@@ -81,7 +81,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
               icon="calendar"
               tone="success"
               title="予約が確定しました"
-              body="キャンセル待ちの席を予約しました。詳しい内容は自分のイベントで確認できます。"
+              body={`キャンセル待ちの席を予約しました。詳しい内容は${words.myEvents}で確認できます。`}
             />
             <Button variant="secondary" onClick={goMine}>
               <Icon name="list" className="h-4 w-4" />

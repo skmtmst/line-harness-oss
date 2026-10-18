@@ -157,14 +157,14 @@ export default function EventBookings() {
       const msg = (() => {
         switch (e.body?.error) {
           case 'slot_full': return '選んだ時間は満席になりました。別の時間を選んでください。';
-          case 'change_deadline_passed': return '変更期限を過ぎています。LINE で運営にご連絡ください。';
-          case 'change_not_allowed': return 'このイベントは LIFF からの変更に対応していません。LINE で運営にご連絡ください。';
+          case 'change_deadline_passed': return `変更期限を過ぎています。LINE で${words.contact}にご連絡ください。`;
+          case 'change_not_allowed': return `この${words.event}は LIFF からの変更に対応していません。LINE で${words.contact}にご連絡ください。`;
           case 'slot_inactive':
           case 'slot_started':
           case 'entry_closed': return '選んだ時間は受付を終えています。別の時間を選んでください。';
           case 'same_slot': return '今と同じ時間です。別の時間を選んでください。';
           case 'over_friend_limit':
-          case 'duplicate_friend_booking': return '申込の上限に達しているため変えられません。LINE で運営にご連絡ください。';
+          case 'duplicate_friend_booking': return `申込の上限に達しているため変えられません。LINE で${words.contact}にご連絡ください。`;
           case 'invalid_state': return 'この予約は既に変更・キャンセル済みのため変えられません。一覧を開き直してください。';
           case 'send_in_flight_retry': return '送信の直前でした。少し待ってから、もう一度お試しください。';
           default: return '変えられませんでした。時間をおいて、もう一度お試しください。';
@@ -204,7 +204,7 @@ export default function EventBookings() {
       const msg = (() => {
         switch (e.body?.error) {
           case 'cancel_deadline_passed': return 'キャンセル期限を過ぎています。';
-          case 'cancel_not_allowed': return 'このイベントは LIFF からのキャンセルに対応していません。LINE で運営にご連絡ください。';
+          case 'cancel_not_allowed': return `この${words.event}は LIFF からのキャンセルに対応していません。LINE で${words.contact}にご連絡ください。`;
           case 'invalid_state': return 'この予約は既にキャンセル済 / 確定外のためキャンセルできません。';
           default: return canLeaveWaitlist(b) ? 'キャンセル待ちをやめられませんでした。時間をおいて、もう一度お試しください。' : 'キャンセルできませんでした。時間をおいて、もう一度お試しください。';
         }
@@ -229,7 +229,7 @@ export default function EventBookings() {
             <div
               className="flex rounded-(--liff-radius) bg-liff-chip p-[3px]"
               role="tablist"
-              aria-label="イベントの期間"
+              aria-label={`${words.event}の期間`}
             >
               {(
                 [
