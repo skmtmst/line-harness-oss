@@ -113,13 +113,22 @@
 .precheckQuestion { display: flex; flex-direction: column; gap: var(--tpl-htn6-pre-group-gap); }
 .precheckQuestionTitle { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
 
-/* 選択肢の下の案内。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
-.precheckNote { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink); }
+/* 選択肢の下の案内。v06 は白地の案内（SwjOv・細枠あり）と砂色の注意（Z0v3c・枠なし）で地が違う。 */
+.precheckNote {
+  display: flex; flex-direction: column; border-radius: var(--radius-control);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink);
+}
 .precheckNote p { margin: 0; min-width: 0; }
-.precheckNoteInfo { background: var(--color-info-bg); box-shadow: var(--tpl-htn-ring-info); }
+.precheckNoteInfo {
+  padding: var(--tpl-htn-note-pad); gap: var(--tpl-htn6-pre-note-gap);
+  background: var(--color-canvas); border: 1px solid var(--color-hairline);
+}
 .precheckNoteInfo .precheckNoteTitle { color: var(--color-accent-deep); }
-.precheckNoteWarn { background: var(--color-status-danger-soft); box-shadow: var(--tpl-htn-ring-danger); }
-.precheckNoteWarn .precheckNoteTitle { color: var(--color-danger); }
+.precheckNoteWarn {
+  padding: var(--tpl-htn6-pre-note-pad); gap: var(--tpl-htn6-pre-row-gap);
+  background: var(--color-caution-band);
+}
+.precheckNoteWarn .precheckNoteTitle { color: var(--color-warning); }
 .precheckNoteTitle { margin: 0; font-weight: 700; }
 .precheckNoteLink { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-htn6-pre-link-gap); }
 .precheckAck { padding: var(--tpl-htn-ack-pad); }
@@ -129,8 +138,7 @@
 .precheckUpcomingTitle { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink-secondary); }
 .precheckUpcomingItem { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-faint); }
 
-/* チェック結果（eOQAo）。印の箱と文を横に並べる。 */
-.precheckResult { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink); }
+/* チェック結果（eOQAo）。印の箱と文を横に並べる。字と色は行ごとに持つ。 */
 .precheckResultHeading { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
 .precheckResultItem { display: flex; align-items: flex-start; gap: var(--tpl-htn6-pre-mark-gap); }
 .precheckResultMark {

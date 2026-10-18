@@ -26,7 +26,7 @@ import {
   checkStage, developerChannelUrl, formatJaDuration, handoverProgress, insightDateJst, isDuplicateChannelError,
   loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, readDraft, stepLabel, subTotal,
   toV06CheckRows,
-  precheckBack, precheckBadge, precheckBlocked, precheckNext, precheckNote, precheckSummary, precheckUpcoming,
+  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
   type DraftState, type PrecheckAnswers, type PrecheckAt, type PrecheckKey, type StepNumber,
 } from './logic'
 import Step1Precheck from './step1-precheck'
@@ -100,7 +100,7 @@ export default function AccountRegisterV8() {
   const checkRows = toV06CheckRows(connection, { running: checkRunning, cursor: checkCursor })
   const rowsOk = allV06RowsOk(checkRows)
   const checkNotice = checkErrorText(checkStage(connection, checkRunning), checkRows)
-  const badge = currentStep === 1 ? precheckBadge(precheckAt) : stepLabel(currentStep, sub)
+  const badge = currentStep === 1 ? precheckStateLabel(precheckAt) : stepLabel(currentStep, sub)
   // 「公式アカウントをこれから作る人」は Q1=いいえ の人。下書きの持ち方は v05 までと同じにしておく。
   const accountMethod: 'existing' | 'new' = precheck.q1 === 'no' ? 'new' : 'existing'
   const precheckRows = precheckSummary(precheckAt, precheck)

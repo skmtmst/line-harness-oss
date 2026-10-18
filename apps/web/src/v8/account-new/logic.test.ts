@@ -4,7 +4,7 @@ import {
   DRAFT_KEY, LOGIN_ACKS, PRECHECK_RESULT, PRECHECK_VERIFIED_ACK, WEBHOOK_ACKS, allAcked, allV06RowsOk,
   allV8RowsPassed, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl,
   formatJaDuration, handoverProgress, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked,
-  precheckBack, precheckBadge, precheckBlocked, precheckNext, precheckNote, precheckSummary, precheckUpcoming,
+  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
   readDraft, readPrecheckAnswers, readPrecheckAt, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
 } from './logic'
 import type { V06CheckRow } from './logic'
@@ -144,9 +144,9 @@ describe('①事前確認（v06 p6zMkA）の出しわけ', () => {
   })
 
   it('札は「質問 n」。最後だけ「チェック完了」で、結果は4項目', () => {
-    expect(precheckBadge('q1')).toBe('質問 1')
-    expect(precheckBadge('q5')).toBe('質問 5')
-    expect(precheckBadge('done')).toBe('チェック完了')
+    expect(precheckStateLabel('q1')).toBe('質問 1')
+    expect(precheckStateLabel('q5')).toBe('質問 5')
+    expect(precheckStateLabel('done')).toBe('チェック完了')
     expect(PRECHECK_RESULT.map((item) => item.title)).toEqual(['用意するもの', '接続後に変わること', '作り直すもの', 'かかる時間'])
     for (const item of PRECHECK_RESULT) expect(item.body.length).toBeGreaterThan(0)
   })

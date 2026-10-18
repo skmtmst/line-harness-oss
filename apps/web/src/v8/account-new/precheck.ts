@@ -65,7 +65,7 @@ const PRECHECK_SUMMARY_VALUES: Record<PrecheckKey, Record<string, string>> = {
 }
 
 /** ①の札。「質問 1」〜「質問 5」と「チェック完了」。②③の `stepLabel` は①では空を返す。 */
-export function precheckBadge(at: PrecheckAt): string {
+export function precheckStateLabel(at: PrecheckAt): string {
   return at === 'done' ? 'チェック完了' : `質問 ${PRECHECK_ORDER.indexOf(at) + 1}`
 }
 

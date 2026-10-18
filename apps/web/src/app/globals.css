@@ -1107,7 +1107,10 @@
   --tpl-htn6-qr: 180px; --tpl-htn6-qr-pad: 16px; --tpl-htn6-qr-gap: 12px;
   --tpl-htn6-text-20: 20px; --tpl-htn6-lh-28: 28px; --tpl-htn6-hero: 48px; --tpl-htn6-done-pad: 24px 0 8px; --tpl-htn6-acct-pad: 14px 16px; --tpl-htn6-hand-pad: 16px; --tpl-htn6-hand-gap: 10px; --tpl-htn6-stat-gap: 16px;
   /* ①事前確認（p6zMkA）。カードの頭・答えの一覧・いまの質問・このあとの質問・チェック結果。 */
-  --tpl-htn6-pre-head-gap: 8px; --tpl-htn6-pre-group-gap: 12px; --tpl-htn6-pre-row-gap: 6px; --tpl-htn6-pre-row-pad: 8px 12px; --tpl-htn6-pre-mark: 20px; --tpl-htn6-pre-mark-gap: 10px; --tpl-htn6-pre-link-gap: 6px;  --tpl-an-notes-pad: 12px 14px; --tpl-an-notes-gap: 6px; --tpl-an-notes-radius: var(--polish-radius-control); --tpl-an-note-dot-gap: 8px; --tpl-an-route-bar-gap: 4px; --tpl-an-track-h: 6px;
+  --tpl-htn6-pre-head-gap: 8px; --tpl-htn6-pre-group-gap: 12px; --tpl-htn6-pre-row-gap: 6px; --tpl-htn6-pre-row-pad: 8px 12px; --tpl-htn6-pre-mark: 20px; --tpl-htn6-pre-mark-gap: 10px; --tpl-htn6-pre-link-gap: 6px;
+  /* 選択肢の下の案内。白地の案内（SwjOv）と注意（Z0v3c）で地・枠・間が違う。 */
+  --tpl-htn6-pre-note-gap: 10px; --tpl-htn6-pre-note-pad: 12px 14px;
+--tpl-an-notes-pad: 12px 14px; --tpl-an-notes-gap: 6px; --tpl-an-notes-radius: var(--polish-radius-control); --tpl-an-note-dot-gap: 8px; --tpl-an-route-bar-gap: 4px; --tpl-an-track-h: 6px;
   --tpl-an-tab-gap: 14px; --tpl-an-tab-pad: 14px 24px 24px; --tpl-an-toolbar-gap: 8px; --tpl-an-col-gap: 16px; --tpl-an-thead-pad: 9px 16px; --tpl-an-row-pad: 10px 16px; --tpl-an-row-two-h: 55px; --tpl-an-row-one-h: 37px; --tpl-an-cell-gap: 2px; --tpl-an-num-pad-end: 12px; --tpl-an-col-type: 150px;
   --tpl-an-col-58: 58px; --tpl-an-col-70: 70px; --tpl-an-col-80: 80px; --tpl-an-col-88: 88px; --tpl-an-col-100: 100px; --tpl-an-col-116: 116px;
   /* 予約設定・予約台帳の残り（bk2）。板 x1OZS6 ほか：中身が短くても下の帯を板の下に置く（上の帯 60・板の下 12・枠 2）。 */

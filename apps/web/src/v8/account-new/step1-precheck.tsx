@@ -89,7 +89,7 @@ export default function Step1Precheck({
               ))}
             </RadioCardGroup>
             {guide && (
-              <Card className={[styles.precheckNote, guide.tone === 'warn' ? styles.precheckNoteWarn : styles.precheckNoteInfo].join(' ')} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
+              <div className={[styles.precheckNote, guide.tone === 'warn' ? styles.precheckNoteWarn : styles.precheckNoteInfo].join(' ')}>
                 {guide.title && <p className={styles.precheckNoteTitle}>{guide.title}</p>}
                 <p>{guide.body}</p>
                 {guide.link && (
@@ -98,7 +98,7 @@ export default function Step1Precheck({
                     <p className={styles.help}>{guide.link.note}</p>
                   </div>
                 )}
-              </Card>
+              </div>
             )}
             {ack && (
               <Card className={styles.precheckAck} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
@@ -116,7 +116,7 @@ export default function Step1Precheck({
           </div>
         )}
         {precheckAt === 'done' && (
-          <Card className={styles.precheckResult} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn6-ack-gap)">
+          <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn6-ack-gap)">
             <p className={styles.precheckResultHeading}>あなたの接続前チェック結果</p>
             {PRECHECK_RESULT.map((item) => (
               <div key={item.title} className={styles.precheckResultItem}>
