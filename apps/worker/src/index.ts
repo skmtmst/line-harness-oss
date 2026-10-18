@@ -202,7 +202,7 @@ import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
 import { securityAlerts } from './routes/security-alerts.js';
 
-import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
+import { unhandledWorkerError } from './lib/unhandled-error.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
 
 import { classifyCodexMonitorError, markCodexMentionFailed, processCodexMentionMessage, shouldStopCodexQueueRetry, type CodexMentionQueueMessage } from './services/codex-cloud-monitor.js';
@@ -1116,25 +1116,7 @@ export async function notFoundHandler(
   }
   return assetRes;
 }
-app.onError((error, c) => {
-  const incidentId = crypto.randomUUID();
-  const method = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(c.req.method) ? c.req.method : 'OTHER';
-  const route = `${method} ${c.req.routePath || '(unmatched)'}`;
-  console.error(JSON.stringify({ code: 'unhandled_worker_error', route }));
-  const reportPromise = reportHarnessErrorToSlack(c.env, {
-    source: 'worker',
-    message: 'unhandled_worker_error',
-    path: route,
-  }).catch(() => {
-    console.error(JSON.stringify({"code":"unhandled_worker_error_slack_report_failed"}));
-  });
-  try {
-    c.executionCtx.waitUntil(reportPromise);
-  } catch {
-    void reportPromise;
-  }
-  return c.json({ success: false, error: 'Internal Server Error', incidentId }, 500);
-});
+app.onError(unhandledWorkerError);
 
 app.notFound(notFoundHandler);
 
