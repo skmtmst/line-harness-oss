@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 /**
  * つなぐお店を選ぶ（設計 DL-4 / フレーム `X5d8UF`）。
  *
@@ -10,6 +9,7 @@ import { logger } from '@line-crm/shared/server';
  */
 import type { Context, Hono } from 'hono';
 import { decryptCredential } from '@line-crm/db';
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
