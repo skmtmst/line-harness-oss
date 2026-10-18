@@ -1,3 +1,5 @@
+import type { AccountStyle } from '@line-crm/shared';
+import { notificationWords } from './notification-words.js';
 import { lineTransport } from '../lib/external-call/line.js';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
@@ -14,6 +16,9 @@ export type NotificationKind =
   | 'waitlist_invite';
 
 export interface NotificationContext {
+  style?: AccountStyle;
+  /** Prepared from the same menu/store deadline and real LIFF history link. */
+  selfManagement?: { historyUrl: string; deadlineLabel: string };
   meetingUrl?:string|null;
   meetingMode?:string|null;
   cancellationText?:string;
@@ -64,15 +69,19 @@ export function renderNotificationText(
   ctx: NotificationContext,
 ): string {
   const meeting=ctx.meetingMode==='online'?`\n${ctx.meetingUrl?`会議の URL: ${ctx.meetingUrl}`:'会議の URL は前日までにお送りします'}`:'';
-  const detail = `\nメニュー: ${ctx.menuName}\n担当: ${ctx.staffName}\n日時: ${ctx.startsAt}${meeting}${ctx.cancellationText?`\n${ctx.cancellationText}`:''}`;
+  const words = notificationWords(ctx.style);
+  const management = ctx.selfManagement
+    ? `${ctx.selfManagement.deadlineLabel}まで、変更・キャンセルは予約の履歴からお手続きいただけます。\n${ctx.selfManagement.historyUrl}\n期限後は${words.contact}にLINEでご連絡ください。`
+    : `変更・キャンセルは${words.contact}にLINEでご連絡ください。`;
+  const detail = `\n${words.menu}: ${ctx.menuName}\n${words.staff}: ${ctx.staffName}\n日時: ${ctx.startsAt}${meeting}${ctx.cancellationText?`\n${ctx.cancellationText}`:''}`;
   // 「本日」「明日」は店舗暦日での実際のずれ。2日以上離れている・遅れて
   // 当日を過ぎた場合は曖昧な言い方を避け、日時欄だけで伝える (R333)。
   const relDay = ctx.daysUntil === 0 ? '本日' : ctx.daysUntil === 1 ? '明日' : null;
   switch (kind) {
     case 'requested':
-      return `予約リクエストを受け付けました。${detail}\n\nお店からの返信をお待ちください。`;
+      return `ご予約のお申し込みを受け付けました。${detail}\n\n${words.contact}からの連絡をお待ちください。`;
     case 'approved':
-      return `予約が確定しました。${detail}\n\n変更・キャンセルはお店に直接ご連絡ください。`;
+      return `ご予約が確定しました。${detail}\n\n${management}`;
     case 'rejected':
       return `申し訳ありません、ご希望の枠でお取りできませんでした。\n別の日時で再度お試しください。`;
     case 'expired':

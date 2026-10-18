@@ -33,16 +33,16 @@ test('スタッフ変更の自動LINE通知はmanualを付けず変更後の担�
 describe('renderNotificationText', () => {
   test('受付', () => {
     const text = renderNotificationText('requested', ctx);
-    expect(text).toContain('予約リクエストを受け付けました');
+    expect(text).toContain('ご予約のお申し込みを受け付けました');
     expect(text).toContain('カット');
     expect(text).toContain('山田');
     expect(text).toContain('2026-05-10 14:00');
-    expect(text).toContain('お店からの返信をお待ちください');
+    expect(text).toContain('お店からの連絡をお待ちください');
   });
   test('承認', () => {
     const text = renderNotificationText('approved', ctx);
     expect(text).toContain('予約が確定しました');
-    expect(text).toContain('変更・キャンセルはお店に直接ご連絡ください');
+    expect(text).toContain('変更・キャンセルはお店にLINEでご連絡ください');
   });
   test('拒否', () => {
     expect(renderNotificationText('rejected', ctx)).toContain('お取りできませんでした');
@@ -124,4 +124,15 @@ describe('notificationTiming', () => {
     const now = new Date('2026-05-10T04:40:00Z');
     expect(notificationTiming('2026-05-10T05:00:00Z', 'Asia/Tokyo', now).hoursUntil).toBe(1);
   });
+});
+
+
+test.each([
+ ['standard','メニュー','担当','お店'],['ec','メニュー','担当','お店'],
+ ['restaurant','コース','担当','お店'],['salon','メニュー','担当','お店'],
+ ['consult','面談の種類','担当','担当'],['lesson','クラス','講師','教室'],
+] as const)('保存された%sの言葉で内容と確認先を伝える', (style,menu,staff,contact)=>{
+ const text=renderNotificationText('requested',{...ctx,style});
+ expect(text).toContain(`${menu}: ${ctx.menuName}`);expect(text).toContain(`${staff}: ${ctx.staffName}`);
+ expect(text).toContain(`${contact}からの連絡`);
 });

@@ -137,7 +137,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 770;
+const ALLOWLIST_MAX = 769;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -148,6 +148,7 @@ const ALLOWLIST_MAX = 770;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  "GET /api/booking/admin/bookings/{id}",
   "GET /api/ai-answer-logs",
   "GET /api/ai-answer-logs/{id}",
   "GET /api/ai-features",
@@ -1198,7 +1199,6 @@ const ALLOWLIST = new Set<string>([
   'DELETE /api/meet-consultations/{externalEventId}',
   'GET /api/booking/admin/alternatives',
   'GET /api/booking/admin/availability',
-  'GET /api/booking/admin/bookings/{id}',
   'GET /api/booking/admin/customer-context',
   'GET /api/booking/admin/customers',
   'GET /api/booking/admin/customers/{id}',

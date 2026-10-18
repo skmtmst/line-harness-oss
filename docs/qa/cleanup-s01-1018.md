@@ -1,5 +1,7 @@
 # S01：250観点の不足への対応
 
+現況（2026-10-18）：A07入りまとめe9a7308419を6f55bb7cb4で取込み済み。下記の「A07待ち」は作業中の履歴で、現在の未完了理由ではない。最新本線1bd9569e61との47競合は司令塔へ、画面の確定文同期はClaudeへ引継ぐ。
+
 2026-10-18。指定枝codex/kenta-train-cleanup-s01-1018、土台7fe9fe7cac。手元doctor合格、開始時clean。本線e9b423eb7cはfetchして包含を確認。親ECはe3bbbfb019のcleanを読み取り確認し、変更0。push/PR・DB適用・配備・実送信・決済・外部投稿なし。
 
 課金通知は既存のbilling_eventsのsummaryで受信中と完了を分け、請求書・契約・返金の更新と完了を同じD1 batchにした。業務の途中と完了印の保存のどちらが失敗してもrollbackし、同じevent IDで再開する。古い契約ID/顧客ID・古いprovider時刻・取消済みの状態で契約を戻さず、保存期限の起点も守る。
@@ -50,3 +52,13 @@ Retry-Afterのdelta秒は実運用の応答時刻から計算する。通常remi
 
 
 全Worker試験の3件目はsecurity-console-contract.test.tsが新しいincidentIdを拒否したもの。ファイルの例外一覧は追加せず、同じ字句スコープのconstがglobal crypto.randomUUID()を呼んだ根拠をASTで確認する規則へ接続。自由文・利用者ID・固定UUIDの貼り付け・let・同名引数/catch/分割代入・偽crypto/namespaceは拒否する。既存の固定code/route・query/例外/展開の拒否を保持。helperと応答/ログ/通知の一致検査を合わせ4件成功（incident-log-guard-final.log）、Worker/DB型も成功。事故ID以外のログ値やファイル単位の免除を増やしていない。
+
+
+## 最終の予約接続（A07取込み後）
+GoogleはA07のjournal・遮断・呼出しsignalを保持して、本文読取りまで10秒/1MiBに制限した。旧版で応答量の対照1件が失敗、修正後のGoogle/予約関連48件成功。まとめ取込み時のStripe競合も、小さい呼出しsignalとS01の期限/応答量を両方保った。
+
+イベント変更の確認は、100枠の同一データ/同一結果でSQL読取り401回を2回へ削減。未確定/確定席、待機/仮押さえ、未送信リマインド、別店/別イベント/削除済み枠の境界を保持。旧版の追加対照は読取り数で1件失敗、修正後の関連38件成功。同一結果hashを保存した手元SQLite測定の平均4.150→0.265msは実D1の性能保証ではない。
+
+確定LINEは本人操作と同じメニュー優先/店の期限・有料取消方針を使い、有効なLIFF/版/期限内だけ本物の履歴URLと期限を案内。期限後/不正設定/旧不正版は連絡案内。6業種の送信語を正本に合わせ、保存済み本文/キーは設定変更後も固定し、不明結果は再送しない。既存GET /api/booking/admin/bookings/{id}へ任意confirmationPreviewTextを追加し、同じrenderer/contextで読むだけにした。送信/台帳作成0、別店は取得不可、秘密値を返さず、旧方針破損ではnullで詳細閲覧を継続。OpenAPIの未記載例外を1件削減し、許可数を増やしていない。
+
+画面製品コードはS01差分0。既存booking詳細画面には古い固定文が残るため、Webの同期契約試験が1件失敗する。この実際の差を隠すために試験を弱めず、S01-UI-FOLLOWUP.mdでClaudeへAPI接続を渡す。UI修正後に1152/1440の撮影・動作試験が必要。最終CIの結果・検査SHAは外部S01-EVIDENCE/ci-run.jsonとDONE-S01.tsvを正とし、古い版の全体結果を流用しない。
