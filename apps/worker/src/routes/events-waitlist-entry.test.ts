@@ -150,13 +150,12 @@ function pauseBefore(db: D1Database, matches: (sql: string) => boolean, method: 
         ...statement,
         bind(...args: unknown[]) {
           const bound = bind(...args);
-          const proxy = {
-            ...bound,
+          const proxy = Object.assign(Object.create(bound) as D1PreparedStatement, {
             async [method]() {
               await pause();
               return bound[method]();
             },
-          };
+          });
           originals.set(proxy,bound);targets.add(proxy);
           return proxy;
         },
