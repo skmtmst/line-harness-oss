@@ -1,6 +1,6 @@
 'use client'
 
-import { Component, Fragment, type ErrorInfo, type ReactNode } from 'react'
+import { Component, Fragment, type ReactNode } from 'react'
 import ListState from '@/components/shared/list-state'
 
 interface Props {
@@ -36,9 +36,9 @@ export default class FriendInfoSidebarBoundary extends Component<Props, State> {
     return { failed: false, resetKey: props.resetKey }
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    // 原因を追えるよう開発者向けには残す。画面には内部の文言を出さない。
-    console.error('inbox customer panel crashed', error, info.componentStack)
+  componentDidCatch() {
+    // 起きたことだけを決まった印で残す。例外の中身（顧客の情報が混ざりうる）は書かない。
+    console.error(JSON.stringify({ code: 'inbox_customer_panel_failed', route: '/chats' }))
   }
 
   private retry = () => {
