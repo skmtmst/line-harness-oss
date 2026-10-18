@@ -73,7 +73,7 @@ describe('予約の履歴：本人の日時変更・キャンセル（F-6）', (
     await screen.findByText('トリミング（小型犬）');
     expect(screen.queryByRole('button', { name: 'キャンセル' })).toBeNull();
     expect(screen.queryByRole('button', { name: '日時を変える' })).toBeNull();
-    expect(screen.getByText('予定の変更・キャンセルは、お店に LINE でご連絡ください。')).toBeTruthy();
+    expect(screen.getByText('予定の変更・キャンセルは、ご利用先に LINE でご連絡ください。')).toBeTruthy();
   });
 
   it('キャンセルは確認してから版を添えて送り、一覧を読み直す', async () => {
@@ -140,4 +140,31 @@ it('確認窓を開いた後に期限を過ぎたら送信を止め、理由を�
     const dialog = screen.getByRole('alertdialog');
     expect(dialog.textContent).toContain('キャンセルの期限を過ぎています');
   } finally { clock.mockRestore(); }
+});
+
+
+it.each(['cancelled', 'completed', 'expired', 'rejected', 'no_show'])('SELL-05: %s の予約は版があっても本人操作を出さない', async (status) => {
+  setup([item({ status })]);
+  await screen.findByText('トリミング（小型犬）');
+  expect(screen.queryByRole('button', { name: 'キャンセル' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '日時を変える' })).toBeNull();
+});
+it.each([{ starts_at: '2020-01-01T00:00:00Z' }, { cancel_deadline_at: 'invalid' }])('SELL-05: 開始後・期限不明は安全側で連絡を案内する', async (over) => {
+  setup([item(over)]);
+  await screen.findByText('トリミング（小型犬）');
+  expect(screen.queryByRole('button', { name: 'キャンセル' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '日時を変える' })).toBeNull();
+});
+it('SELL-05: 本人操作があるときは、この画面で変更・取消できると案内する', async () => {
+  setup([item()]);
+  expect(await screen.findByText(/期限内の予約は、各予約のボタンから日時の変更・キャンセルができます/)).toBeTruthy();
+});
+it('別人等で拒否された取消は、成功や一覧の削除にしない', async () => {
+  cancelMyBooking.mockRejectedValue(Object.assign(new Error('forbidden'), { status: 403 }));
+  setup([item()]);
+  fireEvent.click(await screen.findByRole('button', { name: 'キャンセル' }));
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセルする' }));
+  expect(await screen.findByText(/キャンセルできませんでした/)).toBeTruthy();
+  expect(me).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('トリミング（小型犬）')).toBeTruthy();
 });

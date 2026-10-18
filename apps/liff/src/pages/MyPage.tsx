@@ -1,3 +1,5 @@
+import PaymentPreparingNote from '../components/PaymentPreparingNote.js';
+import { CUSTOMER_WORDS, PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 import PageHeading from '../components/ui/PageHeading.js';
 import FieldError from '../components/ui/FieldError.js';
 import { useEffect, useState } from 'react';
@@ -38,6 +40,7 @@ const COMING_SOON = '現在準備中です';
 type RowState =
   | { kind: 'loading' }
   | { kind: 'hidden' }
+  | { kind: 'error' }
   | { kind: 'soon' }
   | { kind: 'value'; text: string };
 
@@ -48,8 +51,8 @@ export function entitlementSummary(items: BookingEntitlement[]): string | null {
   const usable = items.filter((e) => e.usable);
   const first = usable[0] ?? items[0];
   if (!first) return null;
-  if (first.kind === 'monthly') return `今月 あと ${first.monthRemaining ?? 0} 回`;
-  return `残り ${first.remaining ?? 0} 回`;
+  if (first.kind === 'monthly') return `今月 あと ${first.monthRemaining ?? '—'} 回`;
+  return `残り ${first.remaining ?? '—'} 回`;
 }
 
 function ymd(iso: string | null): string | null {
@@ -64,8 +67,8 @@ function ymd(iso: string | null): string | null {
 export function entitlementDetail(e: BookingEntitlement): string {
   const until = ymd(e.expiresAt);
   const head = e.kind === 'monthly'
-    ? `今月 ${e.monthUsed ?? 0}／${e.monthAllowance ?? e.monthlyLimit ?? 0} 回 利用`
-    : `残り ${e.remaining ?? 0} 回`;
+    ? `今月 ${e.monthUsed ?? '—'}／${e.monthAllowance ?? e.monthlyLimit ?? '—'} 回 利用`
+    : `残り ${e.remaining ?? '—'} 回`;
   const tail = !e.usable ? '（使えません）' : until ? `・${until} まで` : '';
   return `${head}${tail}`;
 }
@@ -95,7 +98,7 @@ export default function MyPage() {
   const [stamps, setStamps] = useState<RowState>(LOADING);
   const [miles, setMiles] = useState<RowState>(LOADING);
   const [accountId, setAccountId] = useState<string | null>(null);
-  const [prefs, setPrefs] = useState<NotificationPreferences | 'soon' | null>(null);
+  const [prefs, setPrefs] = useState<NotificationPreferences | 'soon' | 'failed' | null>(null);
   const [prefBusy, setPrefBusy] = useState(false);
   const [prefError, setPrefError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -111,7 +114,7 @@ export default function MyPage() {
       const next = r.upcoming[0];
       if (next) void loadPaymentViews(r.upcoming).then((views) => {
         setNextPayment(views[next.id] ?? null);
-        const first = r.upcoming.find((b) => views[b.id]?.kind === 'unpaid');
+        const first = r.upcoming.find((b) => views[b.id]?.kind === 'unpaid' && !views[b.id]?.actionRequired);
         setUnpaid(first ? { booking: first, payment: views[first.id]! } : null);
       });
     }).catch((e) => {
@@ -127,11 +130,11 @@ export default function MyPage() {
       setWaitlist(count > 0 ? { kind: 'value', text: `${count} 件` } : { kind: 'hidden' });
     }).catch((e) => {
       logFailure('mypage-waitlist', e);
-      setWaitlist({ kind: 'hidden' });
+      setWaitlist({ kind: 'error' });
     });
   }, [reloadKey]);
 
-  // 回数券・月謝（組3）。口が無い間は準備中。
+  // 回数券・月謝は本人用APIから取得する。501のときだけ準備中。
   useEffect(() => {
     api.entitlements().then((items) => {
       setTicketItems(items);
@@ -140,7 +143,7 @@ export default function MyPage() {
     }).catch((e) => {
       if (isNotReadyYet(e)) { setTickets({ kind: 'soon' }); return; }
       logFailure('mypage-entitlements', e);
-      setTickets({ kind: 'hidden' });
+      setTickets({ kind: 'error' });
     });
   }, [reloadKey]);
 
@@ -150,7 +153,7 @@ export default function MyPage() {
       setMiles({ kind: 'value', text: r.availableMiles.toLocaleString('ja-JP') });
     }).catch((e) => {
       logFailure('mypage-miles', e);
-      setMiles({ kind: 'hidden' });
+      setMiles({ kind: 'error' });
     });
   }, [reloadKey]);
 
@@ -160,11 +163,11 @@ export default function MyPage() {
       logFailure('mypage-config', e);
       setAccountId('');
     });
-  }, []);
+  }, [reloadKey]);
 
   useEffect(() => {
     if (accountId === null) return;
-    if (!accountId) { setStamps({ kind: 'hidden' }); setPrefs('soon'); return; }
+    if (!accountId) { setStamps({ kind: 'error' }); setPrefs('failed'); return; }
     visitStampsApi.cards(accountId).then((r) => {
       const entry = r.data.find((c) => c.card.active) ?? r.data[0];
       if (!entry) { setStamps({ kind: 'hidden' }); return; }
@@ -173,19 +176,19 @@ export default function MyPage() {
       setStamps({ kind: 'value', text: next ? `あと ${next - balance} 個` : `${balance} 個` });
     }).catch((e) => {
       logFailure('mypage-stamps', e);
-      setStamps({ kind: 'hidden' });
+      setStamps({ kind: 'error' });
     });
     api.notificationPreferences(accountId).then((r) => {
       // 送る側が目的ごとに止められるまでは「宣伝だけ止める」を出さない（組1 の 16）。
       setPrefs(r.purposeSpecificEnforcement === true ? r : 'soon');
     }).catch((e) => {
       if (!isNotReadyYet(e)) logFailure('mypage-notification-preferences', e);
-      setPrefs('soon');
+      setPrefs(isNotReadyYet(e) ? 'soon' : 'failed');
     });
   }, [accountId, reloadKey]);
 
   async function togglePref(item: NotificationPreferenceItem) {
-    if (prefBusy || !accountId || prefs === null || prefs === 'soon') return;
+    if (prefBusy || !accountId || prefs === null || prefs === 'soon' || prefs === 'failed') return;
     const nextEnabled = !(item.enabled ?? false);
     setPrefBusy(true);
     setPrefError(null);
@@ -194,7 +197,7 @@ export default function MyPage() {
     setPrefs({ ...prefs, items: prefs.items.map((p) => (p.purpose === item.purpose ? { ...p, enabled: nextEnabled } : p)) });
     try {
       const saved = await api.updateNotificationPreference(accountId, item.purpose, nextEnabled, item.version);
-      setPrefs({ ...before, ...saved, purposeSpecificEnforcement: saved.purposeSpecificEnforcement ?? before.purposeSpecificEnforcement });
+      setPrefs(saved.purposeSpecificEnforcement === false ? 'soon' : { ...before, ...saved, purposeSpecificEnforcement: saved.purposeSpecificEnforcement ?? before.purposeSpecificEnforcement });
     } catch (e) {
       logFailure('mypage-notification-update', e);
       setPrefs(before);
@@ -213,16 +216,19 @@ export default function MyPage() {
   /** ［お支払いへ進む］：予約の 5 段目と同じ口（同じ申込は同じページ）。支払いのページは外のブラウザで開く。 */
   async function runPay(booking: BookingHistoryItem) {
     if (payBusy) return;
+    if (nextPayment?.actionRequired) { setNotice(PAYMENT_UNKNOWN); return; }
     setPayBusy(true);
     setNotice(null);
     try {
       const res = await api.startBookingPayment(booking.id);
-      if (!res.checkoutUrl) { setNotice('お支払いを始められませんでした。時間をおいて再度お試しください。'); return; }
+      if (!res.checkoutUrl) { setNotice(PAYMENT_UNKNOWN); return; }
       liff.openWindow({ url: res.checkoutUrl, external: true });
       setNotice('お支払いのページを開きました。終わったらこの画面に戻ると、状態が変わります。');
     } catch (e) {
       logFailure('mypage-pay', e);
-      setNotice('お支払いを始められませんでした。時間をおいて再度お試しください。');
+      setUnpaid(null);
+      setNextPayment((prev) => prev ? { ...prev, actionRequired: true } : null);
+      setNotice(PAYMENT_UNKNOWN);
     } finally {
       setPayBusy(false);
     }
@@ -239,6 +245,7 @@ export default function MyPage() {
           <LoadingView />
         ) : (
           <>
+            {unpaid || (nextPayment && nextPayment.kind !== 'onsite') ? <PaymentPreparingNote /> : null}
             {unpaid ? <UnpaidCard booking={unpaid.booking} payment={unpaid.payment} busy={payBusy} onPay={() => void runPay(unpaid.booking)} /> : null}
             {next ? (
               <NextBookingCard booking={next} payment={nextPayment} onChange={() => go('/booking/history')} onDetail={() => go('/booking/history')} />
@@ -252,23 +259,23 @@ export default function MyPage() {
             <Card className="py-0.5">
               <ul>
                 <MenuRow icon="hourglass" label="キャンセル待ち" state={waitlist}
-                  onPress={() => setNotice('キャンセル待ちの一覧は現在準備中です。空きが出たら LINE でお知らせします。')} />
+                  onPress={() => waitlist.kind === 'error' ? setReloadKey((k) => k + 1) : go('/booking/history')} />
                 <MenuRow icon="ticket" label="回数券" state={tickets} expanded={tickets.kind === 'value' ? ticketsOpen : undefined}
-                  onPress={() => (tickets.kind === 'value' ? setTicketsOpen((v) => !v) : setNotice(`回数券は${COMING_SOON}。`))} />
+                  onPress={() => tickets.kind === 'error' ? setReloadKey((k) => k + 1) : (tickets.kind === 'value' ? setTicketsOpen((v) => !v) : setNotice(`回数券は${COMING_SOON}。`))} />
                 {tickets.kind === 'value' && ticketsOpen && (
                   <li>
                     <ul className="mx-3.5 mb-2 space-y-1.5 rounded-(--liff-radius) bg-liff-off-bg p-3">
                       {ticketItems.map((e) => (
-                        <li key={e.id} className="flex items-center justify-between gap-3 text-[13px]">
-                          <span className="truncate font-semibold text-ink" title={e.name}>{e.name}</span>
-                          <span className="shrink-0 whitespace-nowrap text-liff-sub">{entitlementDetail(e)}</span>
+                        <li key={e.id} className="flex min-w-0 flex-col gap-0.5 text-[13px]">
+                          <span className="min-w-0 truncate font-semibold text-ink" title={e.name}>{e.name}</span>
+                          <span className="min-w-0 truncate text-liff-sub" title={entitlementDetail(e)}>{entitlementDetail(e)}</span>
                         </li>
                       ))}
                     </ul>
                   </li>
                 )}
-                <MenuRow icon="stamp" label="スタンプ" state={stamps} onPress={() => go('/visit-stamps')} />
-                <MenuRow icon="gem" label="マイル" state={miles} onPress={() => go('/affiliate')} />
+                <MenuRow icon="stamp" label="スタンプ" state={stamps} onPress={() => stamps.kind === 'error' ? setReloadKey((k) => k + 1) : go('/visit-stamps')} />
+                <MenuRow icon="gem" label="マイル" state={miles} onPress={() => miles.kind === 'error' ? setReloadKey((k) => k + 1) : go('/affiliate')} />
                 <MenuRow icon="tag" label="クーポン" state={{ kind: 'soon' }} onPress={() => setNotice(`クーポンの一覧は${COMING_SOON}。`)} />
               </ul>
             </Card>
@@ -278,6 +285,8 @@ export default function MyPage() {
               <h2 className="text-sm font-bold text-ink">お知らせの受け取り</h2>
               {prefs === null ? (
                 <p className="text-[13px] text-liff-sub">読み込んでいます…</p>
+              ) : prefs === 'failed' ? (
+                <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />
               ) : prefs === 'soon' ? (
                 <p className="text-[13px] leading-5 text-liff-sub">{`お知らせごとの受け取りの設定は${COMING_SOON}。`}</p>
               ) : (
@@ -323,6 +332,11 @@ function NextBookingCard({ booking, payment, onChange, onDetail }: {
   onDetail: () => void;
 }) {
   const title = booking.staff_name ? `${booking.menu_name}・${booking.staff_name}` : booking.menu_name;
+  const canChange = (booking.status === 'requested' || booking.status === 'confirmed')
+    && typeof booking.lock_version === 'number' && Number.isInteger(booking.lock_version) && booking.lock_version >= 0
+    && typeof booking.menu_id === 'string' && typeof booking.staff_id === 'string'
+    && Date.now() < Date.parse(booking.starts_at)
+    && (!booking.cancel_deadline_at || Date.now() <= Date.parse(booking.cancel_deadline_at));
   return (
     <section aria-label="次の予約" className="space-y-3 rounded-(--liff-radius-lg) border border-liff-ok-bg bg-liff-soft p-3.5">
       <div className="flex items-center gap-3">
@@ -333,15 +347,15 @@ function NextBookingCard({ booking, payment, onChange, onDetail }: {
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="liff-num text-xs text-liff-sub">{`次の予約 ${utcToJstHm(booking.starts_at)}`}</p>
           <p className="truncate text-[15px] font-bold text-ink" title={title}>{title}</p>
-          {payment ? (
+          {payment?.actionRequired ? <p role="status" className="text-xs text-liff-sub">{PAYMENT_UNKNOWN}</p> : payment ? (
             <p className={`liff-num text-xs font-bold ${paymentInk(payment.tone)}`}>{paymentText(payment)}</p>
           ) : booking.status === 'requested' ? (
-            <p className="text-xs font-bold text-liff-wait-ink">お店の確認待ち</p>
+            <p className="text-xs font-bold text-liff-wait-ink">{CUSTOMER_WORDS.approvalPending}</p>
           ) : null}
         </div>
       </div>
       <div className="flex gap-2">
-        <Button variant="secondary" className="flex-1" onClick={onChange}>日時を変える</Button>
+        {canChange ? <Button variant="secondary" className="flex-1" onClick={onChange}>日時を変える</Button> : null}
         <Button variant="secondary" className="flex-1" onClick={onDetail}>予約の詳細</Button>
       </div>
     </section>
@@ -356,7 +370,7 @@ function MenuRow({ icon, label, state, onPress, expanded }: {
   expanded?: boolean;
 }) {
   if (state.kind === 'hidden') return null;
-  const value = state.kind === 'value' ? state.text : state.kind === 'soon' ? '準備中' : '…';
+  const value = state.kind === 'value' ? state.text : state.kind === 'soon' ? '準備中' : state.kind === 'error' ? 'もう一度読み込む' : '…';
   return (
     <li>
       <Button variant="menuRow" onClick={onPress} disabled={state.kind === 'loading'} aria-expanded={expanded}>
@@ -371,7 +385,7 @@ function MenuRow({ icon, label, state, onPress, expanded }: {
 
 const PREF_HINT: Record<string, string> = {
   booking_reminders: '前日・当日の連絡は止められません',
-  marketing: '新しいメニューやクーポンのお知らせ',
+  marketing: '新しいサービスやクーポンのお知らせ',
 };
 
 /**
