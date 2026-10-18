@@ -140,6 +140,10 @@ describe('N-426: 二段階認証の初回設定へ進む', () => {
     const params = new URLSearchParams(window.location.hash.slice(1))
     expect(params.get('lh_2fa')).toBe('verify-tok-1')
     expect(params.get('lh_method')).toBe('password')
+    expect(params.get('lh_nonce')).toMatch(/^[0-9a-f-]{36}$/)
+    expect(JSON.parse(sessionStorage.getItem('lh_login_handoff')!)).toMatchObject({
+      nonce: params.get('lh_nonce'), kind: 'challenge', path: '/login/two-factor',
+    })
   })
 
   it('twoFactorSetup 応答なら /login/two-factor/setup へ合言葉付きで進む', async () => {

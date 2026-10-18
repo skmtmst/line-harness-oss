@@ -77,3 +77,21 @@ it('F22: a folder created from a shared dialog belongs to the selected account',
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '追加する' })) })
   expect(api.folders.create).toHaveBeenCalledWith(expect.objectContaining({ kind: 'scenario', accountId: 'selected-account' }))
 })
+
+it('N-147: 同じ窓で名前と色を更新し、フォルダの所属をAPIへ渡してから閉じる', async () => {
+  const folder = { id: 'existing-folder', kind: 'template', name: 'Before', parentId: null, displayOrder: 1,
+    color: '#3b82f6', createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z' }
+  const updated = { ...folder, name: 'After', color: '#ef4444' }
+  vi.mocked(api.folders.update).mockResolvedValue({ success: true, data: updated })
+  const onAdded = vi.fn(), onClose = vi.fn()
+  render(<FolderAddDialog kind="template" folder={folder} accountId="a-1" onAdded={onAdded} onClose={onClose} />)
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: ' After ' } })
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' }))
+  fireEvent.click(screen.getByRole('radio', { name: '赤' }))
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
+  expect(api.folders.create).not.toHaveBeenCalled()
+  expect(api.folders.update).toHaveBeenCalledWith(folder.id, { name: 'After', color: '#ef4444' }, 'a-1')
+  expect(onAdded).toHaveBeenCalledWith(updated)
+  expect(onClose).toHaveBeenCalledTimes(1)
+})

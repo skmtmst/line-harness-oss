@@ -13,7 +13,6 @@ const withoutComments = (src: string) =>
 const PANEL = read('../../components/shared/folder-panel.tsx')
 const PANEL_CODE = withoutComments(PANEL)
 const ROW_ACTIONS = read('../../components/shared/folder-row-actions.tsx')
-const DIALOG = read('../../components/shared/folder-add-dialog.tsx')
 
 /**
  * テンプレートのフォルダ操作（設計 `CzndJ` ★V6 11-1-H）。
@@ -82,14 +81,7 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     expect(ROW_ACTIONS).toContain('description={deleteFolderDescription(itemLabel, deletingCount)}')
   })
 
-  it('名前と色を直す窓は、追加と同じ窓を使う', () => {
-    // 窓を2つ作ると、文言や色の並びがまたずれる。
-    expect(DIALOG).toContain('folder?: Folder')
-    // N-147: 追加も更新もフォルダの持ち主アカウントをAPIへ渡す。
-    expect(DIALOG).toContain('api.folders.update(folder.id, folderUpdates, accountId ?? undefined)')
-    expect(DIALOG).toContain('api.folders.create({ kind, name: trimmed, color, accountId })')
-    expect(DIALOG).toContain("{folder ? 'フォルダを直す' : 'フォルダを追加'}")
-  })
+  // 名前・色・所属の作成/更新は folder-editor-dialog.react.test.tsx で実操作する。
 
   /*
     2026-09-04（台帳 #124）: 置き場を書く口ができたので、断りを消して

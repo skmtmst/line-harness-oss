@@ -48,8 +48,8 @@ export interface FolderAddDialogProps {
    */
   folder?: Folder
   /**
-   * フォルダの持ち主のLINE公式アカウント。アカウント単位の kind
-   * （template など）では必ず渡す。渡さないと共有（未所属）のフォルダになる。
+   * フォルダの持ち主のLINE公式アカウント。明示指定を優先する。
+   * 作成時の未指定は現在の選択アカウントを使い、共通操作の権限はAPIで確認する。
    */
   accountId?: string | null
   /** 窓の下に出す一言。「消しても中身は未分類に残る」など。 */
