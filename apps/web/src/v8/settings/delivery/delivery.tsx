@@ -95,7 +95,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   /** 解除を確かめる窓（`kJLks`）で外そうとしている会社 */
   const [disconnecting, setDisconnecting] = useState<DeliveryService | null>(null)
   /** つなぐお店を選ぶ窓（`X5d8UF`）。各社のログインから戻ったときに開く。 */
-  const [picking, setPicking] = useState<{ service: DeliveryService; stores: DeliveryStore[] } | null>(null)
+  const [picking, setPicking] = useState<{ service: DeliveryService; stores: DeliveryStore[]; accountId: string } | null>(null)
   const [pickedStoreId, setPickedStoreId] = useState('')
   const preparing = usePreparingDialog()
   /**
@@ -152,7 +152,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       }
       patch(service.id, { stores })
       setPickedStoreId('')
-      setPicking({ service, stores })
+      setPicking({ service, stores, accountId: selectedAccountId })
     } catch {
       // 失敗の符号はサーバに残る。画面には符号を出さず、次にできることだけ伝える。
       patch(service.id, {
@@ -215,7 +215,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
    * 押し直しは、窓をもう一度開いてもらう人の操作として扱う。
    */
   const pickStore = useCallback(async () => {
-    if (!canManage || !picking || !pickedStoreId || !selectedAccountId || busy !== null) return
+    if (!canManage || !picking || !pickedStoreId || !selectedAccountId || picking.accountId !== selectedAccountId || busy !== null) return
     const service = picking.service
     setBusy(service.id)
     try {
@@ -233,7 +233,8 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       setUberPendingStore(connection.status === 'pending_store')
     } catch {
       patch(service.id, {
-        stateNote: `${withParticle(service.name, 'で')}お店をつなげませんでした。少し待ってから、もう一度お店を選んでください。`,
+        ready: false,
+        stateNote: `${withParticle(service.name, 'で')}お店をつなげませんでした。結果を確認する必要があります。送り直さず musubo へお知らせください。`,
         stateNoteTone: 'danger',
       })
     } finally {

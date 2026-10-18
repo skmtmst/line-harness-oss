@@ -394,4 +394,17 @@ describe('設定 › デリバリー連携', () => {
     expect(fixture.selectStore).not.toHaveBeenCalled()
   })
 
+  it.each(['pos_activation_started', 'pos_activation_unknown'])('結果の照合が必要な%sは再表示しても再送の窓を開かない', async (lastError) => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=pending_store'
+    const data = connection({ status: 'pending_store', storeName: '渋谷店' })
+    fixture.connection.mockResolvedValue({ ...data, connection: { ...data.connection, lastError } })
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText(/送り直さず musubo へお知らせください/)).toBeTruthy()
+    expect(card('Uber Eats').getByText('接続エラー')).toBeTruthy()
+    expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
+    expect(fixture.stores).not.toHaveBeenCalled()
+    expect(fixture.selectStore).not.toHaveBeenCalled()
+  })
+
 })

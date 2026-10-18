@@ -163,6 +163,17 @@ function uberReturnNote(flash: string): StateNote | undefined {
 /** サーバから読んだ接続の状態を、画面の1段ぶんの書き換えへ直す。 */
 export function uberPatch(data: UberConnectionData, flash: string): Partial<DeliveryService> {
   const { connection } = data
+  if (connection.lastError === 'pos_activation_started' || connection.lastError === 'pos_activation_unknown') {
+    return {
+      ready: false,
+      status: 'error',
+      storeName: connection.storeName ?? undefined,
+      connectedAt: connection.connectedAt ?? undefined,
+      checkedAt: connection.checkedAt ?? undefined,
+      stateNote: 'お店をつないだ結果を確認する必要があります。送り直さず musubo へお知らせください。',
+      stateNoteTone: 'danger',
+    }
+  }
   const note = uberReturnNote(flash) ?? UBER_STATE_NOTE[connection.status]
   return {
     // この環境に接続の設定が無ければ押させない。
