@@ -206,7 +206,8 @@ describe('受信箱の右の列のエラー境界', () => {
     fixture.mileageData = { ...goodMileage, history: null }
     await openChatAndCustomerInfo(root)
 
-    await eventually(() => expect(host.textContent).toContain('タグなし'))
+    // 右の列が描き終わった印。マイル履歴が null でも「まだありません」と空で出る。
+    await eventually(() => expect(host.textContent).toContain('まだマイル履歴はありません'))
     // フォーム回答は「顧客情報をすべて表示」を押すと出る。押せるボタンであることも見る。
     const showAll = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '顧客情報をすべて表示')
     expect(showAll, '顧客情報をすべて表示').toBeTruthy()
