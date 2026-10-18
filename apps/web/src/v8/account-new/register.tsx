@@ -4,7 +4,7 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   Activity, ArrowLeft, ArrowRight, BookOpen, Check, CircleAlert, CircleCheck, CircleDashed,
-  Copy, LifeBuoy, Lock, CircleHelp, Plug, QrCode, Save, Users,
+  Copy, Info, LifeBuoy, Lock, CircleHelp, Plug, QrCode, Save, Users,
 } from 'lucide-react'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -14,7 +14,6 @@ import { Steps } from '@/components/templates/steps'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
@@ -37,6 +36,7 @@ import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { describeActionFailure } from '@/lib/use-action-error'
 
 /*
  * ★v06 LINEアカウントを登録（板 ①p6zMkA ②Fqy29 ③Lwxyh ④X0pGdw ⑤Plmq1）。
@@ -54,6 +54,41 @@ const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string;
 ]
 
 const MANUAL = '/manuals/line-connect/index.html'
+
+/* 正本 v06 ②の左の細い列「AC左 操作ステップ」（g48QV）。いまどこを触っているかを3段で見せる。 */
+const AC_OUTLINE: ReadonlyArray<{ title: string; note: string }> = [
+  { title: 'Messaging API の2項目', note: 'LINE Developers からコピー' },
+  { title: 'Webhook の設定', note: 'LINE Developers で3つをONに' },
+  { title: 'LINEログインの2項目', note: '同じプロバイダーの中に作る' },
+]
+
+function AcOutline({ sub }: { sub: number }) {
+  return (
+    <div className={styles.outlineCard} data-design-node="g48QV">
+      <p className={styles.outlineTitle}>操作ステップ</p>
+      <p className={styles.outlineCount}>全{AC_OUTLINE.length}ステップ</p>
+      <div className={styles.outlineGap} aria-hidden="true" />
+      {AC_OUTLINE.map((row, index) => {
+        const number = index + 1
+        const state = number < sub ? styles.outlineDone : number === sub ? styles.outlineCurrent : styles.outlineFuture
+        return (
+          <div key={row.title} className={`${styles.outlineRow} ${state}`} aria-current={number === sub ? 'step' : undefined}>
+            <span className={styles.outlineNum} aria-hidden="true">{number}</span>
+            <div className={styles.outlineText}>
+              <p className={styles.outlineRowTitle}>{row.title}</p>
+              <p className={styles.outlineRowNote}>{row.note}</p>
+            </div>
+          </div>
+        )
+      })}
+      <div className={styles.outlineSpacer} aria-hidden="true" />
+      <div className={styles.outlineAuto}>
+        <p className={styles.outlineAutoTitle}>musubo が自動で行うこと</p>
+        <p className={styles.outlineAutoBody}>Webhook URL の登録／アカウント名・@ID・アイコンの取り込み／LIFF（友だち追加）の作成。入力は不要です。</p>
+      </div>
+    </div>
+  )
+}
 
 type BusyAction = 'check' | 'save' | null
 interface FormState {
@@ -112,9 +147,8 @@ export default function AccountRegisterV8() {
     setError('')
   }
   const createdId = connection?.id ?? ''
-  const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : emptyValue('unknown')
-  /* Webhook URL は musubo が自動で登録するので画面に出さない（正本 v06 ②-2 の gcbIm）。 */
+  /* Webhook URL も Callback URL も musubo が自動で登録するので画面に出さない
+     （正本 v06 ②-2 の gcbIm、②-3 の CE8q1 には控えの欄が無い）。 */
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
   const importRunning = importPhase === 'importing_ids' || importPhase === 'hydrating_profiles'
   const basicId = connection?.basicId ?? ''
@@ -332,7 +366,9 @@ export default function AccountRegisterV8() {
     } catch (saveFailure) {
       setCheckRunning(false)
       const fieldFailure = saveErrors.capture(saveFailure)
-      if (!fieldFailure) setError('LINEに接続できませんでした。時間をおいて、もう一度お試しください。')
+      /* 「時間をおいて」の一文に畳むと、権限不足の人が待ち続け、混み合いの人が連打する。
+         403・404・429・入力の直しは原因どおりに言い分ける（共通の describeActionFailure）。 */
+      if (!fieldFailure) setError(describeActionFailure(saveFailure, '接続の確認'))
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -525,7 +561,7 @@ export default function AccountRegisterV8() {
           {/* 正本 v06 ②の右の列（Step1 msf5n／Step2 RtWJZ／Step3 J84XB は同じ中身）。
               白い板の中に、マニュアル → 区切り → 途中保存して閉じる → 区切り → うまくいかないとき → サポートに聞く。 */}
           {currentStep === 2 && (
-            <CreateStepColumns data-design-node="Fqy29" previewTitle="マニュアル" preview={(
+            <CreateStepColumns data-design-node="Fqy29" outlineTitle="操作ステップ" outline={<AcOutline sub={sub} />} previewTitle="マニュアル" preview={(
               <Card className={styles.aside} layout="vertical" surface="standard" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="マニュアル">
                 <Button external href={MANUAL} icon={<BookOpen size={16} aria-hidden="true" />}>マニュアルを開く</Button>
                 <div className={styles.asideLine} aria-hidden="true" />
@@ -537,21 +573,37 @@ export default function AccountRegisterV8() {
               </Card>
               )}>
               {sub === 1 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Messaging API のチャネル">
+                /* 正本 v06 Fqy29 → ②-1（msf5n）の A2cEg1。入力は縦に2つだけで、
+                   ほかの項目は musubo が自動で設定するので欄も控えも置かない。 */
+                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Messaging API の情報を入れる">
                   <p className={styles.subBadge}>{badge}</p>
-                  <h2 className={styles.panelTitle}>Messaging API のチャネル</h2>
-                  <SettingsFormRow layout="columns">
-                    <Field htmlFor="v8-channel-id" label="チャネルID" error={fieldErrors.channelId}>
-                      <SaveErrorField names={["channelId","form.channelId","channel_id","form.channel_id"]}><TextField id="v8-channel-id" value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} /></SaveErrorField>
-                    </Field>
-                    <Field htmlFor="v8-channel-secret" label="チャネルシークレット" error={fieldErrors.channelSecret}>
-                      <SaveErrorField names={["channelSecret","form.channelSecret","channel_secret","form.channel_secret"]}><TextField id="v8-channel-secret" type="password" autoComplete="new-password" value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} required aria-invalid={fieldErrors.channelSecret ? true : undefined} /></SaveErrorField>
-                    </Field>
-                  </SettingsFormRow>
-                  <div className={styles.secretRow}>
-                    <span className={styles.secretNote}><Lock size={14} aria-hidden="true" />秘密値は保存後に画面へ表示されません。</span>
-                    <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />取得方法を見る</Button>
+                  <div className={styles.precheckHead}>
+                    <h2 className={styles.panelTitle}>Messaging API の情報を入れる</h2>
+                    <span className={styles.precheckHelpMark} title="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。" aria-label="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。"><CircleHelp size={14} aria-hidden="true" /></span>
                   </div>
+                  <p className={styles.precheckLead}>LINE公式アカウントと musubo をつなぐための2項目です。ほかの項目は musubo が自動で設定するので入力はいりません。</p>
+                  <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
+                    <p className={styles.precheckNoteTitle}>LINE Developers を開いてください</p>
+                    <p>Messaging API チャネルの「チャネル基本設定」に、チャネルID とチャネルシークレットがあります。</p>
+                    <div className={styles.precheckNoteLink}>
+                      <Button variant="primary" external href={developerChannelUrl(form.channelId)}>LINE Developers を開く</Button>
+                    </div>
+                  </div>
+                  <div className={styles.acInputs}>
+                    <div className={styles.acField}>
+                      <Field htmlFor="v8-channel-id" label="チャネルID" error={fieldErrors.channelId}>
+                        <SaveErrorField names={["channelId","form.channelId","channel_id","form.channel_id"]}><TextField id="v8-channel-id" value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.channelId ? true : undefined} /></SaveErrorField>
+                      </Field>
+                      <p className={styles.help}>Messaging API チャネルの「チャネル基本設定」にある数字です。</p>
+                    </div>
+                    <div className={styles.acField}>
+                      <Field htmlFor="v8-channel-secret" label="チャネルシークレット" error={fieldErrors.channelSecret}>
+                        <SaveErrorField names={["channelSecret","form.channelSecret","channel_secret","form.channel_secret"]}><TextField id="v8-channel-secret" type="password" autoComplete="new-password" value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} placeholder="例：abc123def456ghi789…" required aria-invalid={fieldErrors.channelSecret ? true : undefined} /></SaveErrorField>
+                      </Field>
+                      <p className={styles.help}>同じ画面の「チャネルシークレット」です。</p>
+                    </div>
+                  </div>
+                  <span className={styles.secretNote}><Lock size={14} aria-hidden="true" />シークレットは保存したあと画面には出ません。あとから入れ替えはできます。</span>
                 </Card>
               )}
               {sub === 2 && (
@@ -592,25 +644,41 @@ export default function AccountRegisterV8() {
                 </Card>
               )}
               {sub === 3 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="LINE Login のチャネル">
+                /* 正本 v06 Fqy29 → ②-3（J84XB）の wI40b。Callback URL は musubo が自動で登録するので
+                   控えの欄を置かない。開くボタンは、ステップ1のチャネルIDから同じプロバイダーをたどる。 */
+                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="LINEログインの情報を入れる">
                   <p className={styles.subBadge}>{badge}</p>
-                  <h2 className={styles.panelTitle}>LINE Login のチャネル</h2>
-                  <SettingsFormRow layout="columns">
-                    <Field htmlFor="v8-login-channel-id" label="LoginチャネルID" error={fieldErrors.loginChannelId}>
-                      <SaveErrorField names={["loginChannelId","form.loginChannelId","login_channel_id","form.login_channel_id"]}><TextField id="v8-login-channel-id" value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} /></SaveErrorField>
-                    </Field>
-                    <Field htmlFor="v8-login-channel-secret" label="Loginチャネルシークレット" error={fieldErrors.loginChannelSecret}>
-                      <SaveErrorField names={["loginChannelSecret","form.loginChannelSecret","login_channel_secret","form.login_channel_secret"]}><TextField id="v8-login-channel-secret" type="password" autoComplete="new-password" value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} /></SaveErrorField>
-                    </Field>
-                  </SettingsFormRow>
-                  <div className={styles.field}>
-                    <span className={styles.groupLabel}>Callback URL</span>
-                    <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--space-8) var(--space-8) var(--space-8) var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
-                      <span className={styles.endpointValue} ><TruncatedText value={String(callbackUrl ?? '')} url /></span>
-                      <CopyButton value={callbackUrl} />
-                    </Card>
+                  <div className={styles.precheckHead}>
+                    <h2 className={styles.panelTitle}>LINEログインの情報を入れる</h2>
+                    <span className={styles.precheckHelpMark} title="友だち追加の窓口（LIFF）を musubo が自動で作るために使います。" aria-label="友だち追加の窓口（LIFF）を musubo が自動で作るために使います。"><CircleHelp size={14} aria-hidden="true" /></span>
                   </div>
-                  <p className={styles.groupLabel}>LINE Developers でやること</p>
+                  <p className={styles.precheckLead}>友だち追加の窓口（LIFF）を musubo が自動で作るために使います。入れていただくのはこの2項目だけです。</p>
+                  <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
+                    <p className={styles.precheckNoteTitle}>LINE Developers で「LINEログイン」チャネルを開いてください</p>
+                    <p>ステップ1で入れたチャネルIDから、Messaging API と同じプロバイダーの画面を直接開きます。その中で「LINEログイン」チャネルを作り、下の2項目をコピーしてください。プロバイダーやチャネルを探し直す必要はありません。</p>
+                    <div className={styles.precheckNoteLink}>
+                      <Button variant="primary" external href={developerChannelUrl(form.channelId)}>LINE Developers を開く</Button>
+                      <p className={styles.help}>必ずこのボタンから操作してください</p>
+                    </div>
+                  </div>
+                  <div className={styles.acInputs}>
+                    <div className={styles.acField}>
+                      <Field htmlFor="v8-login-channel-id" label="チャネルID（LINEログイン）" error={fieldErrors.loginChannelId}>
+                        <SaveErrorField names={["loginChannelId","form.loginChannelId","login_channel_id","form.login_channel_id"]}><TextField id="v8-login-channel-id" value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} /></SaveErrorField>
+                      </Field>
+                      <p className={styles.help}>LINEログインチャネルの「チャネル基本設定」にあります。Messaging API のIDとは違う番号です。</p>
+                    </div>
+                    <div className={styles.acField}>
+                      <Field htmlFor="v8-login-channel-secret" label="チャネルシークレット（LINEログイン）" error={fieldErrors.loginChannelSecret}>
+                        <SaveErrorField names={["loginChannelSecret","form.loginChannelSecret","login_channel_secret","form.login_channel_secret"]}><TextField id="v8-login-channel-secret" type="password" autoComplete="new-password" value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} placeholder="例：abc123def456ghi789…" required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} /></SaveErrorField>
+                      </Field>
+                      <p className={styles.help}>同じ画面の「チャネルシークレット」です。</p>
+                    </div>
+                  </div>
+                  <div className={styles.field}>
+                    <p className={styles.groupLabel}>設定手順の確認</p>
+                    <p className={styles.help}>「LINEログイン」チャネルの画面で設定したら、下のチェックを入れてください。</p>
+                  </div>
                   <div className={styles.ackList}>
                     {LOGIN_ACKS.map((ack) => (
                       <div key={ack.key}>
@@ -619,9 +687,7 @@ export default function AccountRegisterV8() {
                       </div>
                     ))}
                   </div>
-                  <div className={styles.buttonRow}>
-                    <Button external href={developerChannelUrl(form.loginChannelId)}  >LINE Developersでこのチャネルを開く</Button>
-                  </div>
+                  <span className={styles.secretNote}><Info size={14} aria-hidden="true" />2つともチェックを入れると「次のステップへ」が押せるようになります。</span>
                 </Card>
               )}
             </CreateStepColumns>

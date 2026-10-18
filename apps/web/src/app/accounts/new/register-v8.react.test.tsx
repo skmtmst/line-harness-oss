@@ -191,7 +191,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     `Lwxyh` Step1 の「LINEログインへ戻る」を、実際のボタン操作でたどって確かめる。
   */
   /** 出ている段は、描かれた札（Card の aria-label）で見る。 */
-  const PANELS = ['Messaging API のチャネル', 'Webhook（受信のつなぎ）を設定する', 'LINE Login のチャネル'] as const
+  const PANELS = ['Messaging API の情報を入れる', 'Webhook（受信のつなぎ）を設定する', 'LINEログインの情報を入れる'] as const
   const shownPanel = () => PANELS.find((label) => document.querySelector(`[aria-label="${label}"]`))
   const stepBadgeText = () => screen.getByText(/^Step \d \/ 3$/).textContent
 
@@ -199,7 +199,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     render(<RegisterV8 />)
     clearPrecheck()
     expect(stepBadgeText()).toBe('Step 1 / 3')
-    expect(shownPanel()).toBe('Messaging API のチャネル')
+    expect(shownPanel()).toBe('Messaging API の情報を入れる')
 
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
@@ -213,7 +213,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     ack('エラーの統計情報をONにした')
     nextStep()
     expect(stepBadgeText()).toBe('Step 3 / 3')
-    expect(shownPanel()).toBe('LINE Login のチャネル')
+    expect(shownPanel()).toBe('LINEログインの情報を入れる')
   })
 
   it('②の「次のステップへ」は、その段のチェックが全部入るまで押せない', () => {
@@ -236,11 +236,11 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(shownNode()).toBe('Lwxyh')
 
     back('LINEログインへ戻る')
-    expect(shownPanel()).toBe('LINE Login のチャネル')
+    expect(shownPanel()).toBe('LINEログインの情報を入れる')
     back('Webhook の設定へ戻る')
     expect(shownPanel()).toBe('Webhook（受信のつなぎ）を設定する')
     back('Messaging API へ戻る')
-    expect(shownPanel()).toBe('Messaging API のチャネル')
+    expect(shownPanel()).toBe('Messaging API の情報を入れる')
     back('事前確認へ戻る')
     expect(shownNode()).toBe('p6zMkA')
   })
