@@ -3,7 +3,7 @@
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
-  Activity, ArrowLeft, ArrowRight, BookOpen, Check, CircleAlert, CircleCheck, CircleDashed,
+  Activity, ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CircleDashed,
   Copy, Lock, CircleHelp, Plug, QrCode, Users,
 } from 'lucide-react'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
@@ -18,9 +18,6 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
-import Radio from '@/components/shared/radio'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
@@ -28,9 +25,12 @@ import {
   DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, checkActionLabel, checkErrorText,
   checkStage, developerChannelUrl, formatJaDuration, handoverProgress, insightDateJst, isDuplicateChannelError,
   loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, readDraft, stepLabel, subTotal,
-  templateOptions, toV06CheckRows,
-  type DraftState, type StepNumber,
+  toV06CheckRows,
+  precheckBack, precheckBadge, precheckBlocked, precheckNext, precheckNote, precheckSummary, precheckUpcoming,
+  type DraftState, type PrecheckAnswers, type PrecheckAt, type PrecheckKey, type StepNumber,
 } from './logic'
+import Step1Precheck from './step1-precheck'
+import Step4Template from './step4-template'
 import styles from './register.module.css'
 import { qrToDataURL } from '@/lib/qr-image'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
@@ -70,7 +70,9 @@ export default function AccountRegisterV8() {
   usePageTitle('LINEアカウントを登録')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'アカウント', href: '/hq' }])
 
-  const [accountMethod, setAccountMethod] = useState<'existing' | 'new'>('existing')
+  // ①事前確認（v06 p6zMkA）。答えと、いま出している面。
+  const [precheck, setPrecheck] = useState<PrecheckAnswers>({})
+  const [precheckAt, setPrecheckAt] = useState<PrecheckAt>('q1')
   const [currentStep, setCurrentStep] = useState<StepNumber>(1)
   const [sub, setSub] = useState(1)
   const [form, setForm] = useState<FormState>(emptyForm)
@@ -98,7 +100,17 @@ export default function AccountRegisterV8() {
   const checkRows = toV06CheckRows(connection, { running: checkRunning, cursor: checkCursor })
   const rowsOk = allV06RowsOk(checkRows)
   const checkNotice = checkErrorText(checkStage(connection, checkRunning), checkRows)
-  const badge = stepLabel(currentStep, sub)
+  const badge = currentStep === 1 ? precheckBadge(precheckAt) : stepLabel(currentStep, sub)
+  // 「公式アカウントをこれから作る人」は Q1=いいえ の人。下書きの持ち方は v05 までと同じにしておく。
+  const accountMethod: 'existing' | 'new' = precheck.q1 === 'no' ? 'new' : 'existing'
+  const precheckRows = precheckSummary(precheckAt, precheck)
+  const precheckAhead = precheckUpcoming(precheckAt, precheck)
+  const precheckGuide = precheckNote(precheckAt, precheck)
+  // 答えを1つ入れ替える。キーは PrecheckKey なので、まとめて組み直してから渡す。
+  const answerPrecheck = (key: PrecheckKey, value: string) => {
+    setPrecheck((current) => ({ ...current, [key]: value }) as PrecheckAnswers)
+    setError('')
+  }
   const createdId = connection?.id ?? ''
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const callbackUrl = workerBase ? `${workerBase}/auth/callback` : emptyValue('unknown')
@@ -109,7 +121,7 @@ export default function AccountRegisterV8() {
   const addFriendUrl = basicId ? `https://line.me/R/ti/p/${encodeURIComponent(basicId.startsWith('@') ? basicId : `@${basicId}`)}` : ''
   const shownStep = V8_STEPS[currentStep - 1]
 
-  useEffect(() => { stepPanelRef.current?.focus() }, [currentStep, sub])
+  useEffect(() => { stepPanelRef.current?.focus() }, [currentStep, sub, precheckAt])
   useEffect(() => {
     if (!Object.keys(fieldErrors).length) return
     const invalid = stepPanelRef.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')
@@ -124,7 +136,8 @@ export default function AccountRegisterV8() {
       return null } })()
 
     if (!draft) return
-    setAccountMethod(draft.accountMethod)
+    setPrecheck(draft.precheck)
+    setPrecheckAt(draft.precheckAt)
     setCurrentStep(draft.step)
     setSub(draft.sub)
     setForm((current) => ({
@@ -142,13 +155,14 @@ export default function AccountRegisterV8() {
       return
     }
     const draft: DraftState = {
-      step: currentStep, sub, accountMethod, name: form.name, channelId: form.channelId, loginChannelId: form.loginChannelId,
+      step: currentStep, sub, accountMethod, precheck, precheckAt,
+      name: form.name, channelId: form.channelId, loginChannelId: form.loginChannelId,
       lineId: form.lineId, tagIds: form.tagIds, parentId: form.parentId, staffIds: form.staffIds, liffId: form.liffId,
       importFriends: form.importFriends,
     }
     try { window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)) } catch (saveFailure) {
       saveErrors.capture(saveFailure) /* 書けなくても入力は続ける。 */ }
-  }, [createdId, currentStep, sub, accountMethod, form.name, form.channelId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, saveErrors])
+  }, [createdId, currentStep, sub, accountMethod, precheck, precheckAt, form.name, form.channelId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, saveErrors])
 
   /* ③-1：応答が返ったあと、5行を1行ずつ送る。止まった行（error）が出たらそこで終わる。 */
   useEffect(() => {
@@ -377,7 +391,18 @@ export default function AccountRegisterV8() {
 
   const moveNext = () => {
     setError('')
-    if (currentStep === 1) { setCurrentStep(2); setSub(1); return }
+    if (currentStep === 1) {
+      // ①は質問を1つずつ出す。最後の「チェック結果」まで来てから②へ渡す（v06 p6zMkA）。
+      if (precheckAt !== 'done') {
+        const nextAt = precheckNext(precheckAt, precheck)
+        if (!nextAt) return
+        setPrecheckAt(nextAt)
+        return
+      }
+      setCurrentStep(2)
+      setSub(1)
+      return
+    }
     if (currentStep === 2) {
       if (sub === 1) {
         const nextErrors = messagingApiErrors(form)
@@ -416,6 +441,12 @@ export default function AccountRegisterV8() {
 
   const moveBack = () => {
     setError('')
+    if (currentStep === 1) {
+      // ①の中は答えた質問をさかのぼる。先頭の質問より手前には戻らない。
+      const backAt = precheckBack(precheckAt, precheck)
+      if (backAt) setPrecheckAt(backAt)
+      return
+    }
     if (sub > 1) { setSub(sub - 1); return }
     if (currentStep > 1) {
       const previous = (currentStep - 1) as StepNumber
@@ -438,8 +469,9 @@ export default function AccountRegisterV8() {
   const remainText = handover.remainingSeconds ? `残り およそ ${formatJaDuration(handover.remainingSeconds)}` : '残り時間を計算しています'
   const busy = Boolean(busyAction)
   // 登録したあとは戻らない（③の2つめから先）。
-  const canBack = !createdId && (currentStep > 1 || sub > 1)
-  const nextBlocked = (currentStep === 2 && sub === 2 && !allAcked(WEBHOOK_ACKS, acks))
+  const canBack = !createdId && (currentStep > 1 || sub > 1 || (currentStep === 1 && precheckBack(precheckAt, precheck) !== null))
+  const nextBlocked = (currentStep === 1 && precheckBlocked(precheckAt, precheck, acks))
+    || (currentStep === 2 && sub === 2 && !allAcked(WEBHOOK_ACKS, acks))
     || (currentStep === 2 && sub === 3 && !allAcked(LOGIN_ACKS, acks))
     || (currentStep === 3 && sub === 1 && !rowsOk)
     || (currentStep === 4 && !templateKey)
@@ -474,40 +506,20 @@ export default function AccountRegisterV8() {
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
         <div ref={stepPanelRef} tabIndex={-1} className={styles.stepBody}>
           {currentStep === 1 && (
-            <CreateStepColumns data-design-node="p6zMkA" previewTitle="この5段でやること" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="この5段でやること">
-                <h2 className={styles.asideH2}>この5段でやること</h2>
-                <p className={styles.asideP}>① 事前確認：公式アカウントと2つのチャネルを用意</p>
-                <p className={styles.asideP}>② アカウント接続：チャネル ID とシークレット、LINE側の設定</p>
-                <p className={styles.asideP}>③ 接続確認：5つの確認が通ってから登録し、友だち追加を試す</p>
-                <p className={styles.asideP}>④ 使い方を選ぶ：いちばん近いひな形を選ぶ</p>
-                <p className={styles.asideP}>⑤ 完了：いまの友だちの引き継ぎ</p>
-              </Card>
-              )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="アカウントの用意方法">
-                {draftRestored && (
-                  <Notice tone="info" message="端末の下書きから続けます。チャネルシークレットだけ入れ直してください。" onClose={() => setDraftRestored(false)} />
-                )}
-                <fieldset className={styles.fieldset}>
-                  <legend className={styles.panelTitle}>アカウントの用意方法</legend>
-                  <div className={styles.radios}>
-                    <SaveErrorField names={["account-method-v8","accountMethod"]}><Radio name="account-method-v8" value="existing" checked={accountMethod === 'existing'} onChange={() => setAccountMethod('existing')}>既存の公式アカウントを使う</Radio></SaveErrorField>
-                    <SaveErrorField names={["account-method-v8","accountMethod"]}><Radio name="account-method-v8" value="new" checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')}>新しく公式アカウントを作成</Radio></SaveErrorField>
-                  </div>
-                </fieldset>
-                <Card className={styles.noteBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
-                  <p>{accountMethod === 'existing'
-                    ? 'LINE公式アカウントを作成してから、同じプロバイダー内に Messaging API と LINE Login のチャネルを用意します。'
-                    : 'LINE公式アカウントを作成してから、同じプロバイダー内に Messaging API と LINE Login のチャネルを用意します。新しく作るときは、先に公式アカウントを作ります。'}</p>
-                  <p>・Messaging API と LINE Login は同じプロバイダーで作成してください<br />・Webhook の利用は LINE Developers でオンにしてください</p>
-                </Card>
-                <div className={styles.buttonRow}>
-                  <Button external href="https://manager.line.biz/"  >LINE公式アカウントを作る</Button>
-                  <Button external href="https://developers.line.biz/console/"  >LINE Developersを開く</Button>
-                  <Button external href={`${MANUAL}#m1`}  ><BookOpen size={15} aria-hidden="true" />全手順を見る</Button>
-                </div>
-              </Card>
-            </CreateStepColumns>
+            <Step1Precheck
+              badge={badge}
+              draftRestored={draftRestored}
+              onCloseDraftNotice={() => setDraftRestored(false)}
+              precheckAt={precheckAt}
+              onJumpTo={(key) => { setPrecheckAt(key); setError('') }}
+              precheck={precheck}
+              onAnswer={answerPrecheck}
+              rows={precheckRows}
+              guide={precheckGuide}
+              ahead={precheckAhead}
+              acks={acks}
+              onToggleAck={toggleAck}
+            />
           )}
 
           {currentStep === 2 && (
@@ -673,28 +685,7 @@ export default function AccountRegisterV8() {
           )}
 
           {currentStep === 4 && (
-            <CreateStepColumns data-design-node="X0pGdw" previewTitle="あとから変えられます" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="あとから変えられます">
-                <h2 className={styles.asideH2}>あとから変えられます</h2>
-                <p className={styles.asideP}>選んだ使い方でダッシュボードの並びが決まります。</p>
-                <p className={styles.asideP}>カードは、あとから自分で足し引きできます。</p>
-              </Card>
-              )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="使い方を選ぶ">
-                <h2 className={styles.panelTitle}>いちばん近い使い方を選んでください</h2>
-                <RadioCardGroup legend="いちばん近い使い方" columns={2}>
-                  {templateOptions().map((option) => (
-                    <RadioCard
-                      key={option.key} name="template" value={option.key} title={option.label} note={option.note}
-                      checked={templateKey === option.key} disabled={!option.enabled}
-                      ariaLabel={option.enabled ? option.label : `${option.label}（順次公開）`}
-                      icon={option.enabled ? null : <StatusBadge tone="info" size="compact" dot={false}>順次公開</StatusBadge>}
-                      onChange={() => { setTemplateKey(option.key); setError('') }}
-                    />
-                  ))}
-                </RadioCardGroup>
-              </Card>
-            </CreateStepColumns>
+            <Step4Template templateKey={templateKey} onPick={(key) => { setTemplateKey(key); setError('') }} />
           )}
 
           {currentStep === 5 && connection && (

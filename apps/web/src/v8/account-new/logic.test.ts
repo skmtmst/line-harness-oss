@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { LineAccountConnectData } from '@/lib/api'
 import {
-  DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, allV8RowsPassed, checkActionLabel, checkErrorText,
-  checkRowText, checkStage, developerChannelUrl, formatJaDuration, handoverProgress, loginChannelErrors,
-  messagingApiErrors, nextCursor, readDraft, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
+  DRAFT_KEY, LOGIN_ACKS, PRECHECK_RESULT, PRECHECK_VERIFIED_ACK, WEBHOOK_ACKS, allAcked, allV06RowsOk,
+  allV8RowsPassed, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl,
+  formatJaDuration, handoverProgress, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked,
+  precheckBack, precheckBadge, precheckBlocked, precheckNext, precheckNote, precheckSummary, precheckUpcoming,
+  readDraft, readPrecheckAnswers, readPrecheckAt, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
 } from './logic'
 import type { V06CheckRow } from './logic'
 
@@ -23,7 +25,9 @@ describe('LINEアカウントを登録（★V8）の小さな計算', () => {
     const draft = readDraft(storage({ step: 2, accountMethod: 'existing', name: '', channelId: '2001', channelSecret: 'secret', loginChannelId: '', lineId: '', tagIds: [], parentId: '', staffIds: [], liffId: '', importFriends: true }))
     expect(draft).toMatchObject({ step: 2, channelId: '2001' })
     expect(draft && 'channelSecret' in draft).toBe(false)
-    expect(readDraft(storage({ step: 1, accountMethod: 'new' }))).toMatchObject({ accountMethod: 'new' })
+    // ①の答えだけでも「中身のある下書き」。何も答えていなければ手順1は戻さない。
+    expect(readDraft(storage({ step: 1, precheck: { q1: 'yes' }, precheckAt: 'q2' }))).toMatchObject({ step: 1, precheckAt: 'q2', precheck: { q1: 'yes' } })
+    expect(readDraft(storage({ step: 1, accountMethod: 'new' }))).toBeNull()
   })
 
   it('④の5行：検査前はすべて「まだ」、Webhook が止まれば4・5行目は「まだ」のまま、全部通れば保存できる', () => {
@@ -45,6 +49,116 @@ describe('LINEアカウントを登録（★V8）の小さな計算', () => {
     const noDetail = toV8CheckRows({ ...connection('failed'), verification: undefined })
     expect(checkRowText(noDetail[2])).toBe('受け口へ届きませんでした（段3）')
     expect(checkRowText(stopped[0])).toBe('Messaging API・LINE Login とも認証済み')
+  })
+})
+
+describe('①事前確認（v06 p6zMkA）の出しわけ', () => {
+  it('Q3はQ2=はいのときだけ、Q5はQ4=はいのときだけ尋ねる', () => {
+    expect(precheckAsked('q1', {})).toBe(true)
+    expect(precheckAsked('q2', {})).toBe(true)
+    expect(precheckAsked('q4', {})).toBe(true)
+    expect(precheckAsked('q3', {})).toBe(false)
+    expect(precheckAsked('q3', { q2: 'no' })).toBe(false)
+    expect(precheckAsked('q3', { q2: 'yes' })).toBe(true)
+    expect(precheckAsked('q5', {})).toBe(false)
+    expect(precheckAsked('q5', { q4: 'no' })).toBe(false)
+    expect(precheckAsked('q5', { q4: 'yes' })).toBe(true)
+  })
+
+  it('最短の道は Q1→Q2→Q4→チェック結果。尋ねない質問は飛ばす', () => {
+    expect(precheckNext('q1', { q1: 'yes' })).toBe('q2')
+    expect(precheckNext('q2', { q1: 'yes', q2: 'no' })).toBe('q4')
+    expect(precheckNext('q4', { q1: 'yes', q2: 'no', q4: 'no' })).toBe('done')
+    // 引き継ぐ・ほかのツールを使う、と答えたときは Q3・Q5 も尋ねる。
+    expect(precheckNext('q2', { q2: 'yes' })).toBe('q3')
+    expect(precheckNext('q3', { q2: 'yes', q3: 'no' })).toBe('q4')
+    expect(precheckNext('q4', { q4: 'yes' })).toBe('q5')
+    expect(precheckNext('q5', { q4: 'yes', q5: 'both' })).toBe('done')
+  })
+
+  it('答えていない・行き止まり（Q1いいえ・Q3はい）では次の面を返さない＝先へ進めない', () => {
+    expect(precheckNext('q1', {})).toBeNull()
+    expect(precheckNext('q2', { q1: 'yes' })).toBeNull()
+    expect(precheckNext('q1', { q1: 'no' })).toBeNull()
+    expect(precheckNext('q3', { q2: 'yes', q3: 'yes' })).toBeNull()
+    expect(precheckNext('done', { q1: 'yes' })).toBeNull()
+    expect(precheckBlocked('q1', {}, {})).toBe(true)
+    expect(precheckBlocked('q1', { q1: 'no' }, {})).toBe(true)
+    expect(precheckBlocked('q3', { q2: 'yes', q3: 'yes' }, {})).toBe(true)
+    expect(precheckBlocked('q1', { q1: 'yes' }, {})).toBe(false)
+    expect(precheckBlocked('done', { q1: 'yes' }, {})).toBe(false)
+  })
+
+  it('Q2=はいは、認証済みアカウントの印にチェックするまで進めない（①-9）', () => {
+    const note = precheckNote('q2', { q2: 'yes' })
+    expect(note?.tone).toBe('warn')
+    expect(note?.ack).toEqual({ key: PRECHECK_VERIFIED_ACK, label: '認証済みアカウントであることを確認した' })
+    expect(precheckBlocked('q2', { q2: 'yes' }, {})).toBe(true)
+    expect(precheckBlocked('q2', { q2: 'yes' }, { [PRECHECK_VERIFIED_ACK]: true })).toBe(false)
+    // 引き継がないなら印も案内も出さない。
+    expect(precheckNote('q2', { q2: 'no' })).toBeNull()
+    expect(precheckBlocked('q2', { q2: 'no' }, {})).toBe(false)
+  })
+
+  it('案内のリンクは、外のページだけ別タブ。相談は管理画面の中の画面へ', () => {
+    expect(precheckNote('q1', { q1: 'no' })?.link).toMatchObject({ href: 'https://manager.line.biz/', external: true })
+    expect(precheckNote('q2', { q2: 'yes' })?.link).toMatchObject({ href: 'https://www.lycbiz.com/jp/service/line-official-account/account-type/', external: true })
+    const support = precheckNote('q3', { q2: 'yes', q3: 'yes' })?.link
+    expect(support?.href).toBe('/hq/support')
+    expect(support?.external).toBeUndefined()
+    // Q5は案内だけでリンクを持たない（3つとも文を出す）。
+    for (const answer of ['both', 'switch', 'try'] as const) {
+      const note = precheckNote('q5', { q4: 'yes', q5: answer })
+      expect(note?.link).toBeUndefined()
+      expect(note?.title.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('「戻る」はひとつ前に尋ねた質問へ。①の先頭からは戻らない', () => {
+    const answers = { q1: 'yes', q2: 'no', q4: 'no' } as const
+    expect(precheckBack('q1', answers)).toBeNull()
+    expect(precheckBack('q2', answers)).toBe('q1')
+    expect(precheckBack('q4', answers)).toBe('q2')
+    expect(precheckBack('done', answers)).toBe('q4')
+    // Q3を尋ねた道では、Q4の前はQ3。
+    expect(precheckBack('q4', { q2: 'yes', q3: 'no' })).toBe('q3')
+  })
+
+  it('答えの一覧は答えた質問だけ、「このあとの質問」は尋ねないと決まった質問を外す', () => {
+    expect(precheckSummary('q2', { q1: 'yes', q2: 'no' })).toEqual([
+      { key: 'q1', label: 'Q1. LINE公式アカウント', value: 'あります' },
+      { key: 'q2', label: 'Q2. 友だちの引き継ぎ', value: 'いいえ、引き継ぎません' },
+    ])
+    expect(precheckSummary('done', { q1: 'yes', q2: 'no', q4: 'no' }).map((row) => row.key)).toEqual(['q1', 'q2', 'q4'])
+    expect(precheckSummary('q1', {})).toEqual([])
+    // 未定のあいだは括弧の注記を付け、尋ねないと決まったら一覧から消す。
+    expect(precheckUpcoming('q1', {}).map((row) => row.text)).toEqual([
+      'Q2. いまの友だちを引き継ぎますか？',
+      'Q3. 友だちの数は50万人を超えていますか？（引き継ぐときだけ）',
+      'Q4. ほかのLINE配信ツールを使っていますか？',
+      'Q5. そのツールを、これからどうしますか？（使っているときだけ）',
+    ])
+    expect(precheckUpcoming('q2', { q1: 'yes', q2: 'no' }).map((row) => row.key)).toEqual(['q4', 'q5'])
+    expect(precheckUpcoming('q4', { q1: 'yes', q2: 'no', q4: 'no' })).toEqual([])
+    expect(precheckUpcoming('done', { q1: 'yes' })).toEqual([])
+  })
+
+  it('札は「質問 n」。最後だけ「チェック完了」で、結果は4項目', () => {
+    expect(precheckBadge('q1')).toBe('質問 1')
+    expect(precheckBadge('q5')).toBe('質問 5')
+    expect(precheckBadge('done')).toBe('チェック完了')
+    expect(PRECHECK_RESULT.map((item) => item.title)).toEqual(['用意するもの', '接続後に変わること', '作り直すもの', 'かかる時間'])
+    for (const item of PRECHECK_RESULT) expect(item.body.length).toBeGreaterThan(0)
+  })
+
+  it('下書きから戻すとき、知らない答えは捨て、尋ねない質問を指していたら先頭へ戻す', () => {
+    expect(readPrecheckAnswers({ q1: 'yes', q2: 'maybe', q4: 'yes', q5: 'switch' })).toEqual({ q1: 'yes', q4: 'yes', q5: 'switch' })
+    expect(readPrecheckAnswers({ q5: 'zzz' })).toEqual({})
+    expect(readPrecheckAnswers(null)).toEqual({})
+    expect(readPrecheckAt('q3', {})).toBe('q1')
+    expect(readPrecheckAt('q3', { q2: 'yes' })).toBe('q3')
+    expect(readPrecheckAt('done', {})).toBe('done')
+    expect(readPrecheckAt('zzz', {})).toBe('q1')
   })
 })
 
