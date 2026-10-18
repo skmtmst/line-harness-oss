@@ -19,12 +19,13 @@ import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
 import { SetupCard,SetupWarningBands,setupSummary } from '@/v8/onboarding/setup-card'
+import ListState from '@/components/shared/list-state'
 import { useStyleSetup } from '@/v8/onboarding/use-style-setup'
 import type { DashboardCardId } from '@line-crm/shared'
 import { Calendar,Image as ImageIcon,Inbox,Package,Plus,SlidersHorizontal } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
-import { Fragment,useEffect,useState,type ReactNode } from 'react'
+import { Fragment,useEffect,useRef,useState,type ReactNode } from 'react'
 import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
 import { FirstStepsCard,useFirstSteps } from './first-steps'
@@ -72,6 +73,8 @@ export default function DashboardV8() {
   const setupRest = setupSummary(setup.data)
   const params = useSearchParams()
   const setupParam = params.get('setup')
+  const qrRequested = params.has('qr')
+  const closedWizardAccount = useRef<string | null>(null)
   const [wizardStep, setWizardStep] = useState<number | 'summary' | null>(null)
   useEffect(() => {
     if (setupParam === 'summary') setWizardStep('summary')
@@ -81,16 +84,18 @@ export default function DashboardV8() {
   useEffect(() => {
     const state = setup.data?.state
     /* 「あとで」「手動」は口の styleMode に残る（別の人・別の端末でも自動では開かない）。 */
-    if (!state || !canManage || state.styleSelected || !d.selectedAccountId) return
+    if (!state || !canManage || state.styleSelected || !d.selectedAccountId || qrRequested || closedWizardAccount.current === d.selectedAccountId) return
     if (state.styleMode === 'later' || state.styleMode === 'manual') return
     setWizardStep((current) => current ?? 0)
-  }, [setup.data, canManage, d.selectedAccountId])
+  }, [setup.data, canManage, d.selectedAccountId, qrRequested])
   const openSetupStep = (step: string | number) => {
     if (typeof step === 'number') { setWizardStep(step); return }
     const names = setup.data ? ['style', 'image'] : []
     setWizardStep(step === 'summary' ? 'summary' : Math.max(0, names.indexOf(step)))
   }
   const closeWizard = (changed: boolean) => {
+    // 読み直しても未選択の状態は変えず、この画面で閉じた窓を自動では開き直さない。
+    closedWizardAccount.current = d.selectedAccountId
     setWizardStep(null)
     if (setupParam !== null) router.replace('/')
     if (changed) setup.reload()
@@ -331,13 +336,14 @@ export default function DashboardV8() {
   ])
   const looseFailures = partialFailuresWithoutCard(data?.partialFailures ?? [], shownCardIds)
   const setupBands = setup.data && canManage ? <SetupWarningBands data={setup.data} /> : null
-  const notice = start.summary || setupRest || setup.data?.warnings.length || viewer || d.error || looseFailures.length ? (
+  const notice = start.error || setup.error || start.summary || setupRest || setup.data?.warnings.length || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <ReadOnlyNotice />
       ) : null}
       {setupBands}
-      {setupRest && canManage ? <SetupCard summary={setupRest} onOpenStep={openSetupStep} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
+      {start.error && canManage ? <ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={start.error} onRetry={start.reload} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
+      {setup.error && canManage ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : setupRest && canManage ? <SetupCard summary={setupRest} onOpenStep={openSetupStep} /> : null}
       {d.error ? (
         <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}>{d.error}</Notice>
       ) : null}

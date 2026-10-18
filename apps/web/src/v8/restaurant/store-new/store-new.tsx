@@ -26,6 +26,7 @@ import Checkbox from '@/components/shared/checkbox'
 import { Field as SharedField } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import TermsBody from './terms-body'
+import { LEGAL_LINKS } from '@/lib/auth-email'
 import { canSubmitTerms, formatAgreedAt, hasReadTerms, initialWizardStep, STEP } from './terms-state'
 import styles from './store-new.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -283,7 +284,7 @@ export default function StoreNewV8() {
                 <div className={styles.termsRow}>
                   {disabledReason ? <p className={styles.reason}>{disabledReason}</p> : null}
                   <span className={styles.spacer} aria-hidden="true" />
-                  <Button external href="/restaurant-test/terms">利用規約を別画面で読む</Button>
+                  <Button external href={LEGAL_LINKS.terms ?? undefined}>正式サイトの利用規約を読む</Button>
                 </div>
                 <SaveErrorField names={["termsChecked"]}><Checkbox checked={termsChecked} disabled={!readToEnd || agreeing} onCheckedChange={setTermsChecked}>上記の利用規約および個人情報の取扱いに同意します</Checkbox></SaveErrorField>
                 {agreeError ? <Notice tone="danger" >{agreeError}</Notice> : null}

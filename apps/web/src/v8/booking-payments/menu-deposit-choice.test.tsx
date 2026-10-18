@@ -18,7 +18,7 @@ vi.mock('@/lib/api-booking-payment-admin', async (load) => {
     menuOverrides: async () => ({ success: true, data: { menus: [{ menuId: 'm1', mode: net.mode }] } }),
   } }
 })
-vi.mock('@/lib/api-gap-draft', () => ({ gapDraftApi: {
+vi.mock('@/lib/api-booking-advanced', () => ({ bookingAdvancedApi: {
   menuDeposit: async () => ({ data: { kind: 'none', value: null, inherit: true, conditions: { always: true, minPeople: null, weekdays: null, timeBand: null }, version: 1 } }),
 } }))
 const { BookingMenuPaymentCard, useMenuDeposit } = await import('./menu-deposit')
