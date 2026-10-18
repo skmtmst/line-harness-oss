@@ -458,3 +458,53 @@ it('行うことの共通部品への設定だけを区別し、隣やeditor内�
   expect(scan(shared.replace("enabled: false", "editor: <button>タグを付ける</button>, enabled: false"))).toHaveLength(1)
   expect(scan(shared.replace("@/components/shared/fixed-action-list", './fake'))).toHaveLength(1)
 })
+
+
+describe('F01: 分割した宣言も一対一で元の形と照合する', () => {
+  it('件数の宣言を移しただけなら同じ候補、複製・値変更は新しい候補', () => {
+    const { root, pen } = fixture()
+    const old = 'apps/web/src/v8/guard/screen.tsx', next = 'apps/web/src/v8/guard/model.tsx'
+    put(root, old, 'const PHOTO_PAGE_SIZE = 200; export function Screen(){return <div>一覧</div>}')
+    const before = run({ code: root, pen })
+    put(root, old, 'export function Screen(){return <div>一覧</div>}')
+    put(root, next, 'export const PHOTO_PAGE_SIZE = 200;')
+    expect(newCodeFindings(before, run({ code: root, pen }))).toEqual([])
+    put(root, old, 'const PHOTO_PAGE_SIZE = 200; export function Screen(){return <div>一覧</div>}')
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'pagination')).toHaveLength(1)
+    put(root, old, 'export function Screen(){return <div>一覧</div>}')
+    put(root, next, 'export const PHOTO_PAGE_SIZE = 201;')
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'pagination')).toHaveLength(1)
+  })
+  it('見本の式を名前付き関数へ移しても同じ形、本文変更・複製は新規', () => {
+    const { root, pen } = fixture()
+    const old = 'apps/web/src/v8/guard/screen.tsx', next = 'apps/web/src/v8/guard/preview.tsx'
+    const body = '<><div className="phone"><p>変えずに渡す見本の本文と操作。元の機能と内容を長い状態でも保って、既存の見本として移動を照合する。</p><button>確かめる</button></div></>'
+    put(root, old, `const renderPreview = () => (${body});`)
+    const before = run({ code: root, pen })
+    put(root, old, 'export const value = 1')
+    put(root, next, `export function renderOtherPreview(){return (${body})}`)
+    expect(newCodeFindings(before, run({ code: root, pen }))).toEqual([])
+    put(root, old, `const renderPreview = () => (${body});`)
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'phone-preview')).toHaveLength(1)
+    put(root, old, 'export const value = 1')
+    put(root, next, `export function renderOtherPreview(){return (${body.replace('確かめる','新しい操作')})}`)
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'phone-preview')).toHaveLength(1)
+  })
+})
+
+
+it('名前と属性が同じパネルの移動は保持し、コピー・見た目変更は検出する', () => {
+  const { root, pen } = fixture()
+  const old = 'apps/web/src/v8/guard/one.tsx', next = 'apps/web/src/v8/guard/two.tsx'
+  put(root, old, 'export function Screen(){return <aside aria-label="見本" className={styles.rail}><button>古い切替</button></aside>}')
+  const before = run({ code: root, pen })
+  put(root, old, 'export const empty = true')
+  const moved = 'export function Rail(){return <aside aria-label="見本" className={styles.rail}><SharedSwitch /></aside>}'
+  put(root, next, moved)
+  expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'detail-panel')).toEqual([])
+  put(root, old, moved)
+  expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'detail-panel')).toHaveLength(1)
+  put(root, old, 'export const empty = true')
+  put(root, next, moved.replace('styles.rail', 'styles.changed'))
+  expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'detail-panel')).toHaveLength(1)
+})
