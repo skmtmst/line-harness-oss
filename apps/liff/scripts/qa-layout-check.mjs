@@ -168,5 +168,5 @@ try {
     await context.close();
   }
   writeFileSync(`${output}/results.json`, JSON.stringify(results, null, 2));
-  console.log(`LIFF layout: ${results.length}場面・故障対照24件・イベント変更の入口3幅 成功`);
+  console.log(`LIFF layout: ${results.length}場面・${new Set(results.map(result => result.width)).size}幅の表示と故障検知が成功`);
 } finally { await browser.close(); await fetch(`${api}/__qa/reset`, { method: 'POST' }); }
