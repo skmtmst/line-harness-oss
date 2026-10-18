@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { refFromOutboxSnapshot } from './ad-conversion-snapshot.js';
 class AdConversionHttpError extends Error {
   constructor(public readonly status: number, message: string) { super(message); }

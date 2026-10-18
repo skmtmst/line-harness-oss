@@ -1,3 +1,4 @@
+import { responseLiffError } from './api-error.js';
 import liff from '@line/liff';
 import { fetchAffiliateSelf } from './affiliate-self-fetch.js';
 const BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -107,8 +108,7 @@ export async function fetchMe(): Promise<
   const res = await fetchAffiliateSelf('affiliate/me', token);
   if (res.status === 404) return { registered: false };
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw await responseLiffError(res);
   }
   const data = (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
   return { registered: true, affiliate: data.affiliate, links: data.links };
@@ -122,8 +122,7 @@ export async function postRegister(): Promise<{ affiliate: AffiliateData; links:
     body: JSON.stringify({ lineAccessToken: token }),
   });
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw await responseLiffError(res);
   }
   return (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
 }
@@ -136,8 +135,7 @@ export async function postAddLink(label: string | null, offerId: string | null):
     body: JSON.stringify({ lineAccessToken: token, label: label || null, offerId: offerId || null }),
   });
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw await responseLiffError(res);
   }
   const data = (await res.json()) as { link: AffiliateLinkData };
   return data.link;
@@ -155,8 +153,7 @@ export async function fetchMileage(): Promise<MileageWalletData> {
   const token = await getAccessToken();
   const res = await fetchAffiliateSelf('mileage/me?limit=20', token);
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw await responseLiffError(res);
   }
   return (await res.json()) as MileageWalletData;
 }
@@ -169,8 +166,7 @@ export async function postEnrollOffer(offerId: string): Promise<AffiliateLinkDat
     body: JSON.stringify({ lineAccessToken: token }),
   });
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw await responseLiffError(res);
   }
   const data = (await res.json()) as { link: AffiliateLinkData };
   return data.link;

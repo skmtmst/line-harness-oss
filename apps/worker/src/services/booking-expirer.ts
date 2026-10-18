@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { AccountStyle } from '@line-crm/shared';
 // Cron handler: expire 24h-old request bookings + purge idempotency rows.
 
@@ -121,7 +122,7 @@ export async function runExpirer(
       reason: 'request_ttl_expired',
       actorType: 'system',
       occurredAt: params.now.toISOString(),
-    }).catch((error) => console.error(JSON.stringify({"code":"services_booking_expirer_failed"})));
+    }).catch((error) => logger.error("services_booking_expirer_failed"));
     await db
       .prepare(
         `UPDATE booking_reminders SET status='cancelled' WHERE booking_id = ? AND status IN ('pending','failed')`,
@@ -141,7 +142,7 @@ export async function runExpirer(
         cancelReason: `booking_expired:${row.id}:by:system`,
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"services_booking_expirer_failed"}));
+      logger.error("services_booking_expirer_failed");
     }
     try {
       const accessToken = await resolveLineCredential(
@@ -201,11 +202,11 @@ export async function runExpirer(
           allowLegacyFallback: false,
         });
       } catch (error) {
-        console.error(JSON.stringify({"code":"services_booking_expirer_failed"}));
+        logger.error("services_booking_expirer_failed");
       }
     }
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_booking_expirer_failed"}));
+    logger.error("services_booking_expirer_failed");
   }
 
   const idempotencyPurged = await purgeExpiredIdempotency(db, params.now);

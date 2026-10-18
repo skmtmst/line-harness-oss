@@ -1,3 +1,5 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * #838 第2段: Google Sheets への直接書き出し（OAuth + Sheets API）。
@@ -195,7 +197,7 @@ function sheetsErrorResponse(c: Context<Env>, error: unknown) {
         return fail(c, 502, 'Googleとの通信に失敗しました', { code: error.kind });
     }
   }
-  console.error(JSON.stringify({"code":"routes_google_sheets_failed"}));
+  logger.error("routes_google_sheets_failed");
   return fail(c, 500, '予期しないエラーが発生しました');
 }
 
@@ -423,7 +425,7 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
     return c.redirect(adminReturnUrl(c, lineAccountId, stateRow.mode === 'reconnect' ? 'reconnected' : 'connected'));
   } catch (error) {
     const code = error instanceof GoogleBusinessError ? error.kind : error instanceof CredentialEncryptionKeyError ? 'encryption_key_missing' : 'unknown';
-    console.error(JSON.stringify({"code":"routes_google_sheets_failed","route":"GET /api/integrations/google-sheets/oauth/callback"}));
+    logger.error("routes_google_sheets_failed");
     return c.redirect(adminReturnUrl(c, lineAccountId, `error:${code}`));
   }
 });

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { simulationContext } from '../services/broadcast-simulation.js';
 import { broadcastSendPreview } from '../services/gap-send-preview.js';
 import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
@@ -83,7 +84,7 @@ export const get__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">) 
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -101,7 +102,7 @@ export const get__api_broadcasts_stats_3 = async (c: Context<Env, "/api/broadcas
       data: await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/stats"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false as const, error: '配信の集計を取得できませんでした' }, 500);
   }
 };
@@ -172,7 +173,7 @@ export const get__api_broadcasts_saved_views_6 = async (c: Context<Env, "/api/br
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/saved-views"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: '保存した検索を取得できませんでした' }, 500);
   }
 };
@@ -214,7 +215,7 @@ export const post__api_broadcasts_saved_views_7 = async (c: Context<Env, "/api/b
       data: { id, name, filters: body.filters, sortKey, pageSize, createdBy: c.get('staff')!.id, createdAt: now, updatedAt: now, version: 1 },
     }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/saved-views"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: '保存した検索を保存できませんでした' }, 500);
   }
 };
@@ -242,7 +243,7 @@ export const get__api_broadcasts_id_8 = async (c: Context<Env, "/api/broadcasts/
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -342,7 +343,7 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/recipients"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -363,7 +364,7 @@ export const get__api_broadcasts_id_activity_10 = async (c: Context<Env, "/api/b
       pagination: { limit, cursor, nextCursor },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/activity"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -450,7 +451,7 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
       } catch (segmentError) {
         // 条件が壊れているときは 0 を返す。ここで500にすると、下書きの一覧
         // そのものが開かなくなる。送信を押した時点で理由付きで止まる。
-        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/preview-count"}));
+        logger.error("routes_broadcasts_failed");
       }
     } else if (broadcast.target_type === 'all') {
       const accountId = (raw.line_account_id as string | null) || null;
@@ -464,7 +465,7 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
 
     return c.json({ success: true, data: { count, perAccount } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/preview-count"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -539,7 +540,7 @@ export const get__api_broadcasts_id_per_account_stats_13 = async (c: Context<Env
               uniqueClick: (overview.uniqueClick as number) ?? null,
             });
           } catch (err) {
-            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/per-account-stats"}));
+            logger.error("routes_broadcasts_failed");
           }
         }),
       );
@@ -555,7 +556,7 @@ export const get__api_broadcasts_id_per_account_stats_13 = async (c: Context<Env
 
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/per-account-stats"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

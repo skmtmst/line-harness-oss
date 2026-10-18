@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono, type MiddlewareHandler } from 'hono';
 import type { Env } from '../index.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -14,7 +15,7 @@ bookingPaymentAdmin.onError((error,c)=>{
   const code=!missing?'payment_admin_unavailable':missing==='booking_payment_connections'?'payment_connection_storage_not_ready'
     :missing==='booking_stripe_connect_states'?'stripe_connect_storage_not_ready'
     :['booking_payment_events','booking_payment_event_replays'].includes(missing)?'payment_events_storage_not_ready':'payment_storage_not_ready';
-  console.error(JSON.stringify({code}));
+  logger.error(code);
   return c.json({success:false,error:code,code},503);
 });
 

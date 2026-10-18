@@ -26,7 +26,8 @@ import { RowMenu } from '@/components/shared/row-actions'
 import { Field } from '@/components/shared/form-controls'
 import { ApiError } from '@/lib/api'
 import { bookingCancellationApi } from '@/lib/api-gap1'
-import { gapDraftApi, type CancellationOptions, type DepositRule } from '@/lib/api-gap-draft'
+import { bookingAdvancedApi } from '@/lib/api-booking-advanced'
+import type { CancellationOptions, DepositRule } from '@line-crm/shared'
 import { isNotReadyError } from '@/lib/api-booking-payment-admin'
 import settings from '../booking-menus/settings.module.css'
 import styles from './cancellation.module.css'
@@ -34,7 +35,7 @@ import styles from './cancellation.module.css'
 /*
  * 予約設定 › お支払いの「キャンセル料」と「デポジット（一部前払い）」（B1・絵 FcGmv／つなぐ前は i2iv4g）。
  * キャンセル料の段・無断の率は gap1 の口（bookingCancellationApi・版つき）。
- * カードを登録してもらう条件・請求の仕方・デポジットは口の案（api-gap-draft：口が要る）。無い間は共通の案内の窓で出す。
+ * カード条件・請求方法・デポジットは版付きの実APIで読み書きする。
  * 物差しは「予約の開始の何時間前か」1 つだけ（時刻の物差しは使わない）。段の穴・重なり・100% 超は Worker が断る。
  */
 
@@ -85,8 +86,8 @@ export function useCancellationSettings(accountId: string) {
         .catch((cause) => { if (alive) { set({ state: isNotReadyError(cause) ? 'not-ready' : 'error' }); setDraftValue(null) } })
     setPolicy({ state: 'loading' }); setOptions({ state: 'loading' }); setDeposit({ state: 'loading' })
     void read(() => bookingCancellationApi.getPolicy(accountId), setPolicy, setDraft)
-    void read(() => gapDraftApi.cancellationOptions(accountId), setOptions, setOptionsDraft)
-    void read(() => gapDraftApi.depositRule(accountId), setDeposit, setDepositDraft)
+    void read(() => bookingAdvancedApi.cancellationOptions(accountId), setOptions, setOptionsDraft)
+    void read(() => bookingAdvancedApi.depositRule(accountId), setDeposit, setDepositDraft)
     return () => { alive = false }
   }, [accountId, reloadSeq])
 
@@ -104,12 +105,12 @@ export function useCancellationSettings(accountId: string) {
     }
     if (options.state === 'ready' && optionsDraft && !same(optionsDraft, options.value)) {
       const { version, ...body } = optionsDraft
-      const response = await gapDraftApi.saveCancellationOptions(accountId, { ...body, expectedVersion: version })
+      const response = await bookingAdvancedApi.saveCancellationOptions(accountId, { ...body, expectedVersion: version })
       setOptions({ state: 'ready', value: response.data }); setOptionsDraft(response.data)
     }
     if (deposit.state === 'ready' && depositDraft && !same(depositDraft, deposit.value)) {
       const { version, ...body } = depositDraft
-      const response = await gapDraftApi.saveDepositRule(accountId, { ...body, expectedVersion: version })
+      const response = await bookingAdvancedApi.saveDepositRule(accountId, { ...body, expectedVersion: version })
       setDeposit({ state: 'ready', value: response.data }); setDepositDraft(response.data)
     }
   }, [accountId, policy, draft, options, optionsDraft, deposit, depositDraft])
@@ -246,7 +247,7 @@ function TierDialog({ editing, tiers, noShowPercent, onClose, onApply }: { editi
   )
 }
 
-/** デポジットの区画（FcGmv の下）。口の案（口が要る）。 */
+/** デポジットの区画（FcGmv の下）。 */
 export function DepositSection({ state, connected, canEdit }: { state: CancellationSettings; connected: boolean; canEdit: boolean }) {
   const head = (
     <div className={styles.head}>

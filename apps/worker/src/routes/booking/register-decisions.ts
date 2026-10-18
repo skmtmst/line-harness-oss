@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { notifyForBooking } from '../../services/booking-notification.js';
@@ -121,7 +122,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
           staffId: row.staff_id,
           startsAt: row.starts_at,
         },
-      }, accountId).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"PATCH /api/booking/admin/requests/:id"}))),
+      }, accountId).catch((err) => logger.error("routes_booking_failed")),
     );
   } else if (next === 'rejected') {
     // N-065: 却下でも V6 の未送信予定は止める (通知だけでは送り続ける)。
@@ -159,7 +160,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     await cancelObsoleteConfirmationRuns(c.env.DB, id, accountId);
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, id, 'rejected').catch((err) =>
-        console.error(JSON.stringify({"code":"routes_booking_failed","route":"PATCH /api/booking/admin/requests/:id"})),
+        logger.error("routes_booking_failed"),
       ),
     );
   } else if (next === 'cancelled' || next === 'expired') {
@@ -209,7 +210,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         bookingId: id,
         lineAccountId: accountId,
         remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id),
-      }).catch((error) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"PATCH /api/booking/admin/requests/:id"}))),
+      }).catch((error) => logger.error("routes_booking_failed")),
     );
     // キャンセル待ち：空いた枠を登録の早い順で1人に知らせる。
     // 知らせの失敗で取り消し自体を失敗させない。
@@ -220,7 +221,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         startsAt: row.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"PATCH /api/booking/admin/requests/:id"}));
+      logger.error("booking_waitlist_promote_failed");
     }
   }
 

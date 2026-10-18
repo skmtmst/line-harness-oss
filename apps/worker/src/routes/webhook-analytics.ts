@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { WebhookEvent } from '@line-crm/line-sdk';
 import { recordAnalyticsEvent } from '@line-crm/db';
 
@@ -7,7 +8,7 @@ export function logWebhookStepFailure(
   lineAccountId: string | null,
   event?: WebhookEvent,
 ): void {
-  console.error(JSON.stringify({"code":"line_webhook_step_failed"}));
+  logger.error("line_webhook_step_failed");
 }
 
 export async function recordWebhookAnalyticsEvent(

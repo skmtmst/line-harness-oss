@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 // LIFF id_token verification.
 // Mirrors the helper in routes/booking.ts but lives in services/ so that new
 // route modules (e.g. events.ts) can import & share it. booking.ts keeps its

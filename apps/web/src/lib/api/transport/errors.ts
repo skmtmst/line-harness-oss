@@ -1,3 +1,4 @@
+import { readApiError } from '@line-crm/shared'
 import type { ApiFieldErrors } from '@line-crm/shared'
 
 /**
@@ -18,6 +19,7 @@ export class ApiError extends Error {
    * 画面は「（追跡番号 …）」として添える（要件 v6-34 §9-1）。
    */
   readonly trackingId: string | undefined
+  readonly requestId: string | undefined
   /**
    * 429などでサーバーが返す待ち秒数（`Retry-After` 応答ヘッダ由来）。
    * 無い応答では `undefined`——画面は秒数なしの待ち案内にするだけ。
@@ -32,6 +34,7 @@ export class ApiError extends Error {
     this.code = code
     this.data = data
     this.trackingId = trackingId
+    this.requestId = trackingId
     this.retryAfterSeconds = retryAfterSeconds
   }
 }
@@ -160,8 +163,8 @@ function safeOperatorMessage(value: unknown): string {
 export function extractApiErrorMessage(raw: string, status: number): string {
   if (!raw || !BODY_MESSAGE_STATUSES.has(status)) return ''
   try {
-    const body = JSON.parse(raw) as { error?: unknown; message?: unknown }
-    return safeOperatorMessage(body.error) || safeOperatorMessage(body.message)
+    const payload = JSON.parse(raw) as { message?: unknown }
+    return safeOperatorMessage(readApiError(payload).message) || safeOperatorMessage(payload?.message)
   } catch {
     // Not JSON — fall through to the status-only message.
   }
@@ -172,10 +175,7 @@ export function extractApiErrorMessage(raw: string, status: number): string {
 export function extractApiFieldErrors(raw: string, status: number): ApiFieldErrors {
   if (status !== 400 && status !== 422) return {}
   try {
-    const payload: unknown = JSON.parse(raw)
-    if (!payload || typeof payload !== 'object' || !('fields' in payload)) return {}
-    const fields = payload.fields
-    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return {}
+    const fields = readApiError(JSON.parse(raw)).fields
     return Object.fromEntries(Object.entries(fields).flatMap(([key, reason]) => {
       const message = safeOperatorMessage(reason)
       return key.length > 0 && message ? [[key, message]] : []
@@ -186,6 +186,12 @@ export function extractApiFieldErrors(raw: string, status: number): ApiFieldErro
 /** 保存の catch からフォームへ渡す。ネットワークエラーなどには欄の理由はない。 */
 export function getApiFieldErrors(error: unknown): ApiFieldErrors {
   return error instanceof ApiError ? error.fields : {}
+}
+
+/** 共通ApiErrorと、移行前のbody.error分岐を同じ読み取り口にする。 */
+export function getApiErrorCode(error: unknown): string | undefined {
+  const legacy = error !== null && typeof error === 'object' && 'body' in error ? error.body : undefined
+  return readApiError(error).code ?? readApiError(legacy).code
 }
 
 /**
@@ -199,11 +205,7 @@ export function getApiFieldErrors(error: unknown): ApiFieldErrors {
 export function extractApiErrorCode(raw: string): string | undefined {
   if (!raw) return undefined
   try {
-    const body = JSON.parse(raw) as { code?: unknown; error?: unknown }
-    const candidate = typeof body.code === 'string' ? body.code : body.error
-    if (typeof candidate === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(candidate)) {
-      return candidate
-    }
+    return readApiError(JSON.parse(raw)).code
   } catch {
     // JSONでなければ機械コードも無い。
   }
@@ -221,10 +223,7 @@ export function extractApiErrorCode(raw: string): string | undefined {
 export function extractApiErrorTrackingId(raw: string): string | undefined {
   if (!raw) return undefined
   try {
-    const body = JSON.parse(raw) as { incidentId?: unknown; requestId?: unknown }
-    if (typeof body.incidentId === 'string' && body.incidentId) return body.incidentId
-    if (typeof body.requestId === 'string' && body.requestId) return body.requestId
-    return undefined
+    return readApiError(JSON.parse(raw)).requestId
   } catch {
     return undefined
   }
@@ -248,14 +247,15 @@ export function extractApiErrorData(raw: string): unknown {
 }
 
 /** HTTP応答から公開エラーを作る。本文の採用とdataの公開範囲は呼出元が決める。 */
-export function responseApiError(response: Response, raw: string, code: string | undefined, data?: unknown): ApiError {
+export function responseApiError(response: Response, raw: string, code: string | undefined = extractApiErrorCode(raw), data?: unknown,
+  options: { fallbackMessage?: string; retryAfterSeconds?: number; preserveBodyMessage?: boolean } = {}): ApiError {
   return new ApiError(
     response.status,
-    extractApiErrorMessage(raw, response.status),
+    extractApiErrorMessage(raw, options.preserveBodyMessage ? 400 : response.status) || options.fallbackMessage,
     code,
     data,
-    extractApiErrorTrackingId(raw),
-    parseRetryAfterSeconds(response.headers.get('Retry-After')),
+    extractApiErrorTrackingId(raw) ?? response.headers.get('X-Request-ID') ?? undefined,
+    options.retryAfterSeconds ?? parseRetryAfterSeconds(response.headers.get('Retry-After')),
     extractApiFieldErrors(raw, response.status),
   )
 }

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { prepareConfirmedEventBooking } from '../../services/event-notification-plan.js';
@@ -161,7 +162,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         sourceEventId: booking.id,
         eventId: booking.event_id,
         lineAccountId: booking.line_account_id,
-      }).catch((err) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/bookings/:bookingId/decide"})));
+      }).catch((err) => logger.error("routes_events_failed"));
     }
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
@@ -174,7 +175,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
           eventId: booking.event_id, slotId: booking.slot_id,
         },
       })
-        .catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/bookings/:bookingId/decide"}))),
+        .catch((error) => logger.error("routes_events_failed")),
     );
   }
   if (action === 'reject') {

@@ -1,4 +1,5 @@
 import { persistMeetGeneration } from './meet-notification-generations.js';
+import { logger } from '@line-crm/shared/server';
 import { deliverBookingLine, BookingLineDeliveryIncomplete } from './booking-line-delivery.js';
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
@@ -324,7 +325,8 @@ export async function registerMeetConsultation(
       writeGuard: v6Guard,
     }).catch((error) => {
       if (error instanceof Error && error.message === 'V6_WRITE_GUARDED') return;
-      console.error(JSON.stringify({"code":"services_meet_consultation_notification_runs_failed"}));
+
+      logger.error("services_meet_consultation_reminders_failed");
     });
   }
   // V6 phase の後の最終確認。共有呼出しの間に勝者が動いていたら stale。
@@ -877,7 +879,7 @@ export async function processDueMeetConsultationReminders(
         // 共通checkpointと同じ取引ですでにsentなら通常の完了。
         const saved = await db.prepare('SELECT status FROM meet_consultation_notification_runs WHERE id=?')
           .bind(row.id).first<{status:string}>();
-        if (saved?.status !== 'sent') console.error(JSON.stringify({"code":"meet_reminder_sent_after_cancel"}));
+        if (saved?.status !== 'sent') logger.error("meet_reminder_sent_after_cancel");
       }
     } catch (error) {
       // 送信前に遮断された分を結果不明や上限到達にしない。次のcronで同じ段を拾う。

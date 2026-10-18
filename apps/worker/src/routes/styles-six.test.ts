@@ -1,3 +1,4 @@
+import { apiContractMiddleware } from '../middleware/api-contract.js';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { ACCOUNT_STYLES, DEFAULT_TENANT_ID, type SetupAnswer } from '@line-crm/shared';
@@ -20,6 +21,7 @@ beforeEach(() => {
   f.raw.prepare("INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('owner','担当','owner','key',?)").run(DEFAULT_TENANT_ID);
   role = 'owner'; readOnly = false; permissions = [];
   app = new Hono<Env>();
+  app.use('*',apiContractMiddleware);
   app.use('*', async (c, next) => { c.set('staff', { id: 'owner', name: '担当', tenantId: DEFAULT_TENANT_ID, role, readOnly, permissionKeys: permissions }); await next(); });
   app.route('/', styles); app.route('/', liffRoutes);
 });
@@ -150,4 +152,13 @@ test('EC summary distinguishes missing and zero data, uses the account period an
   role='owner';
   await saveProfile(f.db,'a',DEFAULT_TENANT_ID,'owner',{expectedVersion:1,style:'standard'});
   expect((await request(path)).status).toBe(404);
+});
+
+test('S03 normalizes new EC failures and preserves the same server request ID without leaking account data',async()=>{
+ const response=await request('/api/dashboard/style/ec-summary?account_id=b');
+ expect(response.status).toBe(404);
+ const body=await response.json() as {error:{code:string;requestId:string;message:string;fieldErrors:unknown[]}};
+ expect(body.error).toMatchObject({code:'not_found',requestId:response.headers.get('X-Request-ID'),fieldErrors:[]});
+ expect(body.error.requestId).toMatch(/^[0-9a-f-]{36}$/);
+ expect(JSON.stringify(body)).not.toMatch(/secret-token|answers_json|settings_json/);
 });

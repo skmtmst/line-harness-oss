@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {appendFeatureScopeMeta} from './feature-scope-response.js';
 import { ACCOUNT_KEYS, bodyAccountIds } from './feature-body-accounts.js';
 import type { Context, MiddlewareHandler } from 'hono';
@@ -788,7 +789,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
     classification = { kind: 'feature', featureId: 'forms' };
   }
   if (!classification) {
-    console.error(JSON.stringify({"code":"route.feature.unclassified"}));
+    logger.error("route.feature.unclassified");
     return c.json({
       success: false,
       error: 'APIの機能分類が未設定です',

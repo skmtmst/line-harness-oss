@@ -1,3 +1,4 @@
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 /**
  * Token auto-refresh — proactively renew LINE channel access tokens before expiry.
  *
@@ -124,9 +125,9 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
         });
         accessToken = token.access_token;
 
-        console.log(JSON.stringify({"code":"services_token_refresh_log"}));
+        logger.log("services_token_refresh_log");
       } catch (err) {
-        console.error(JSON.stringify({"code":"services_token_refresh_failed"}));
+        logger.error("services_token_refresh_failed");
       }
     }
 
@@ -142,7 +143,7 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
           });
         }
       } catch (err) {
-        console.error(JSON.stringify({"code":"services_token_refresh_failed"}));
+        logger.error("services_token_refresh_failed");
       }
     }
   }

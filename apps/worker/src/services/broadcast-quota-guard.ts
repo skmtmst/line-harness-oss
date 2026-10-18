@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * 予約配信を送る直前に、残りの送信枠を確かめる。
  *

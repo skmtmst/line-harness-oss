@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { depositEstimate, cancellationCardRequired } from '../../services/booking-deposit.js';
@@ -439,7 +440,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       sourceEventId: bookingId,
       subjectKey: body.menu_id,
       occurredAt: nowIso,
-    }).catch((error) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
+    }).catch((error) => logger.error("routes_booking_failed")),
   );
 
   // 予約をきっかけにするリマインダへ登録する。通知やタグ付与と同じく
@@ -453,7 +454,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       sourceId: bookingId,
       sourceEventId: bookingId,
       lineAccountId: accountId,
-    }).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
+    }).catch((err) => logger.error("routes_booking_failed")),
   );
 
   if (autoConfirm) {
@@ -462,13 +463,13 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     try {
       await runConfirmedBookingSideEffects(c.env.DB, bookingId, { credentials: googleCredentials(c.env) });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}));
+      logger.error("routes_booking_failed");
     }
   } else {
     // Fire-and-forget notification — failures must not roll back the booking.
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, bookingId, 'requested').catch((err) =>
-        console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"})),
+        logger.error("routes_booking_failed"),
       ),
     );
   }
@@ -483,7 +484,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       sourceEventId: bookingId,
       message: '新しい予約が入りました',
       executionMode: 'automatic',
-    }).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
+    }).catch((err) => logger.error("routes_booking_failed")),
   );
 
   // R150: 「予約が入ったとき」を購読する送信Webhookへも届ける。
@@ -501,7 +502,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         staffId: body.staff_id,
         startsAt: startsAt.toISOString(),
       },
-    }, accountId).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
+    }, accountId).catch((err) => logger.error("routes_booking_failed")),
   );
 
   // notifyForBooking と同じく fire-and-forget。タグ付与失敗は予約成功扱い。
@@ -518,14 +519,14 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     c.executionCtx.waitUntil(
       (async () => {
         if (!(await isAssignableAutoTag(c.env.DB, tagId, accountId))) {
-          console.warn(JSON.stringify({"code":"booking_auto_tag_skipped","route":"POST /api/liff/booking/requests"}));
+          logger.warn("booking_auto_tag_skipped");
           return;
         }
         await attachTagAndFireSideEffects(c.env.DB, friendId, tagId, {
           defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
           workerUrl: c.env.WORKER_URL,
         });
-      })().catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
+      })().catch((err) => logger.error("routes_booking_failed")),
     );
   }
 
@@ -536,7 +537,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       c.env.DB, accountId, await decidePrepayOnly(c.env.DB, accountId, friendId),
     );
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}));
+    logger.error("routes_booking_failed");
   }
 
   const responseBody = {

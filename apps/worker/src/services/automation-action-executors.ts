@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { classifyLinePushError } from './automation-line-errors.js';
 import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
 import { patchFriendMetadata } from './friend-metadata.js';

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -44,7 +45,7 @@ export const get__api_friends_saved_views_2 = async (c: Context<Env, "/api/frien
     const items = await Promise.all(rows.map((row) => serializeFriendSavedView(c.env.DB, row)));
     return c.json({ success: true, data: { items, total: items.length } });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/saved-views"}));
+    logger.error("routes_friends_failed");
     return c.json({ success: false, error: '保存した検索を読み込めませんでした' }, 500);
   }
 };
@@ -102,7 +103,7 @@ export const post__api_friends_saved_views_3 = async (c: Context<Env, "/api/frie
     if (error instanceof SyntaxError) {
       return inputError(c, { success: false, error: '送信内容のJSONが正しくありません' }, 400, []);
     }
-    console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/saved-views"}));
+    logger.error("routes_friends_failed");
     return c.json({ success: false, error: '保存した検索を作成できませんでした' }, 500);
   }
 };

@@ -1,3 +1,4 @@
+import { tracedFetch as fetch, traceRequestInit } from '@line-crm/shared/server';
 /** One physical HTTP request, with its entire response body inside the same budget.
  * This transport has no retry loop or journal: its caller owns the durable operation.
  */
@@ -22,7 +23,7 @@ export async function boundedHttpRequest(
   });
   const work = async () => {
     controller.signal.throwIfAborted();
-    const response = await (options.fetch ?? fetch)(url, { ...init, signal: controller.signal, redirect: 'manual' });
+    const response = await (options.fetch ?? fetch)(url, traceRequestInit(url, { ...init, signal: controller.signal, redirect: 'manual' }));
     if (controller.signal.aborted) { void response.body?.cancel().catch(() => {}); throw new Error('external_request_interrupted'); }
     if (!response.body) return response;
     reader = response.body.getReader();

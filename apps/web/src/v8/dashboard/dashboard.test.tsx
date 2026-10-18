@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { canEditDashboardLayout, greeting, headline } from './dashboard'
-import { FIRST_STEPS, shouldShowFirstSteps, summarizeFirstSteps, type FirstStepFacts } from './first-steps'
+import { shouldShowFirstSteps, summarizeFirstSteps } from './first-steps'
+import { buildStepsFromApi } from '@/v8/settings/getting-started/steps'
 import { trendDay, trendRangeNote } from './trend'
 
 /*
@@ -24,18 +25,18 @@ describe('V8 ダッシュボードの言葉', () => {
     expect(headline(undefined, null)).toBe('動きを確かめています')
   })
 
-  it('はじめにやることは6つの判定を数える。1つでも判定できなければ出さない', () => {
-    const facts: FirstStepFacts = { connect: true, greeting: true, richMenu: true, broadcast: false, scenario: false, invite: false }
-    const summary = summarizeFirstSteps(facts)
-    expect(summary).toMatchObject({ done: 3, total: 6 })
-    expect(summary?.steps.map((step) => step.label)).toEqual(FIRST_STEPS.map((step) => step.label))
-    expect(summary?.steps.filter((step) => !step.done).map((step) => step.link)).toEqual(['作る →', '作る →', '招待する →'])
-    expect(summarizeFirstSteps({ ...facts, richMenu: null })).toBeNull()
+  it('はじめにやることは設定画面と同じ段を数え、未確認は済みにしない', () => {
+    const steps = buildStepsFromApi([{ key: 'accounts', state: 'done', href: '/accounts', reason: null }, { key: 'featureSet', state: 'done', href: '/settings', reason: null }])
+    const summary = summarizeFirstSteps(steps)
+    expect(summary).toMatchObject({ done: 2, total: 6 })
+    expect(summary.steps.map((step) => step.label)).toEqual(steps.map((step) => step.title))
+    expect(summary.steps.find((step) => step.key === 'firstMessage')).toMatchObject({ done: false, href: null })
+    expect(summary.steps.some((step) => step.key === 'invite')).toBe(false)
   })
 
   it('はじめにやることはオーナー・管理者だけ、全部済んだら出さない（畳んでいても出す）', () => {
-    const some = summarizeFirstSteps({ connect: true, greeting: false, richMenu: false, broadcast: false, scenario: false, invite: false })
-    const all = summarizeFirstSteps({ connect: true, greeting: true, richMenu: true, broadcast: true, scenario: true, invite: true })
+    const some = summarizeFirstSteps(buildStepsFromApi([]))
+    const all = summarizeFirstSteps(buildStepsFromApi([]).map((step) => ({ ...step, state: 'done' })))
     expect(shouldShowFirstSteps('owner', some)).toBe(true)
     expect(shouldShowFirstSteps('admin', some)).toBe(true)
     expect(shouldShowFirstSteps('staff', some)).toBe(false)

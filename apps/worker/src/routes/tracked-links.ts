@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { extrasFromTrackedLink } from '../services/tap-extras.js';
@@ -128,7 +129,7 @@ trackedLinks.get('/api/tracked-links', async (c) => {
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: items.map((item) => serializeTrackedLink(item, base)) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"GET /api/tracked-links"}));
+    logger.error("routes_tracked_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -156,7 +157,7 @@ trackedLinks.get('/api/tracked-links/:id', requireVisibleTrackedLink, async (c) 
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"GET /api/tracked-links/:id"}));
+    logger.error("routes_tracked_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -200,7 +201,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), inputJson
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: serializeTrackedLink(link, base) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"POST /api/tracked-links"}));
+    logger.error("routes_tracked_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -234,7 +235,7 @@ trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requ
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: serializeTrackedLink(link, base) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"PATCH /api/tracked-links/:id"}));
+    logger.error("routes_tracked_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -250,7 +251,7 @@ trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), req
     await deleteTrackedLink(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"DELETE /api/tracked-links/:id"}));
+    logger.error("routes_tracked_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -394,7 +395,7 @@ trackedLinks.get('/t/:linkId', async (c) => {
   const click=await recordTrackedClick(c.env.DB,{linkId:link.id,friendId,accountId,tagId:link.tag_id,scenarioId:link.scenario_id,
     linkName:link.name,conversionPointIds:points.map(point=>point.id),tapExtras:extrasFromTrackedLink(link)});
   c.executionCtx.waitUntil(processTrackedClick(c.env,click.id,click.plan).catch(()=>{
-    console.error('tracked_click_work_pending');
+    logger.error("tracked_click_work_pending");
   }));
 
   // App-link domains: return HTML with JS redirect for Universal Link support

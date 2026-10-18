@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 
@@ -215,7 +216,7 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
         return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました', code: 'VERSION_CONFLICT' }, 409);
       }
     }
-    console.error(JSON.stringify({"code":"routes_nen_members_failed","route":"PUT /api/nen-members/photos/:id/review"}));
+    logger.error("routes_nen_members_failed");
     return c.json({ success: false, code: 'REVIEW_SAVE_FAILED', error: '保存できませんでした。もう一度お試しください' }, 500);
   }
   await syncNenPhotoTags(c.env.DB, String(photo.friend_id));
@@ -240,7 +241,7 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
         finalPointSync = 'synced';
       }
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_members_failed","route":"PUT /api/nen-members/photos/:id/review"}));
+      logger.error("routes_nen_members_failed");
     }
   }
   const delivery = await deliverPhotoReviewNotification(c.env.DB, c, photo, {

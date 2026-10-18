@@ -1,3 +1,4 @@
+import { PRODUCT_SCOPE } from '@/lib/product-scope'
 import { formatNumber } from '@/lib/format'
 /**
  * 統括の課金（★V6 36-2）の型と小さな計算。API の形は `apps/worker/src/routes/hq-billing.ts` が正本。
@@ -95,7 +96,7 @@ export function billingBanner(summary: BillingSummary): { tone: 'info' | 'warn' 
       return {
         tone: 'warn',
         title: `無料トライアル中（${summary.trialEndsLabel ?? '—'} まで・残り${summary.trialDaysLeft ?? '—'}日）`,
-        body: `トライアル中はすべての機能を使えます。期限までにプランを選ぶと、そのまま使い続けられます。選ばなかった場合は配信と生成が止まり、${keep}`,
+        body: `${PRODUCT_SCOPE.trial} ${PRODUCT_SCOPE.boundaries} 期限までにプランを選ぶと、そのまま使い続けられます。選ばなかった場合は配信と生成が止まり、${keep}`,
       }
     case 'active':
       return {

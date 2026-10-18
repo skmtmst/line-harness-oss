@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { isWebinarMissedInWindow, getWebinarWatchedSeconds } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 
@@ -49,7 +50,7 @@ export const get__api_liff_webinars_slug_1 = async (c: Context<Env, "/api/liff/w
         c.executionCtx.waitUntil(
           Promise.resolve(
             attachTagAndFireSideEffects(c.env.DB, auth.friendId, webinar.tag_on_attend),
-          ).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/liff/webinars/:slug"}))),
+          ).catch((err) => logger.error("routes_webinars_failed")),
         );
       }
       const exp = now + webinar.duration_seconds + TOKEN_GRACE_SECONDS;
@@ -123,7 +124,7 @@ export const get__api_liff_webinars_slug_1 = async (c: Context<Env, "/api/liff/w
         c.executionCtx.waitUntil(
           Promise.resolve(
             attachTagAndFireSideEffects(c.env.DB, auth.friendId, webinar.tag_on_attend),
-          ).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/liff/webinars/:slug"}))),
+          ).catch((err) => logger.error("routes_webinars_failed")),
         );
       }
 
@@ -236,7 +237,7 @@ export const get__api_liff_webinars_slug_1 = async (c: Context<Env, "/api/liff/w
       c.executionCtx.waitUntil(
         Promise.resolve(
           attachTagAndFireSideEffects(c.env.DB, auth.friendId, webinar.tag_on_attend),
-        ).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/liff/webinars/:slug"}))),
+        ).catch((err) => logger.error("routes_webinars_failed")),
       );
     }
 
@@ -276,7 +277,7 @@ export const get__api_liff_webinars_slug_1 = async (c: Context<Env, "/api/liff/w
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/liff/webinars/:slug"}));
+    logger.error("routes_webinars_failed");
     return c.json({ error: 'internal_error' }, 500);
   }
 };
@@ -382,7 +383,7 @@ export const post__api_liff_webinars_slug_heartbeat_3 = async (c: Context<Env, "
         friendId: auth.friendId,
         sourceEventId: `${loaded.webinar.id}:${auth.friendId}:complete`,
         metadata: { webinarId: loaded.webinar.id, sessionStartAt },
-      }).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/heartbeat"}))));
+      }).catch((err) => logger.error("routes_webinars_failed")));
       // R97: 保存した視聴後アクション（完了のきっかけ）を実行口へ接続する。
       // 同じ視聴の再送は実行記録の冪等キーで1件にまとまる。
       c.executionCtx.waitUntil(runWebinarTriggerActions(c.env.DB, {
@@ -391,11 +392,11 @@ export const post__api_liff_webinars_slug_heartbeat_3 = async (c: Context<Env, "
         sessionStartAt,
         trigger: 'completed',
         executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY, operatorMailEnv: c.env },
-      }).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/heartbeat"}))));
+      }).catch((err) => logger.error("routes_webinars_failed")));
     }
     return c.json({ ok: true });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/heartbeat"}));
+    logger.error("routes_webinars_failed");
     return c.json({ error: 'internal_error' }, 500);
   }
 };
@@ -458,7 +459,7 @@ export const post__api_liff_webinars_slug_comments_4 = async (c: Context<Env, "/
     });
     return c.json({ ok: true });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/comments"}));
+    logger.error("routes_webinars_failed");
     return c.json({ error: 'internal_error' }, 500);
   }
 };
@@ -560,7 +561,7 @@ export const post__api_liff_webinars_slug_register_5 = async (c: Context<Env, "/
       confirmationQueued: registered.created && (notificationSettings?.registrationEnabled ?? true),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/register"}));
+    logger.error("routes_webinars_failed");
     return c.json({ error: 'internal_error' }, 500);
   }
 };
@@ -603,7 +604,7 @@ export const post__api_liff_webinars_slug_cta_click_6 = async (c: Context<Env, "
           attachTagAndFireSideEffects(
             c.env.DB, auth.friendId, loaded.webinar.tag_on_cta_click,
           ),
-        ).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/cta-click"}))),
+        ).catch((err) => logger.error("routes_webinars_failed")),
       );
     }
     // R97: 保存した視聴後アクション（CTAクリックのきっかけ）を実行口へ接続する。
@@ -613,10 +614,10 @@ export const post__api_liff_webinars_slug_cta_click_6 = async (c: Context<Env, "
       sessionStartAt,
       trigger: 'cta_clicked',
       executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY, operatorMailEnv: c.env },
-    }).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/cta-click"}))));
+    }).catch((err) => logger.error("routes_webinars_failed")));
     return c.json({ ok: true });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/cta-click"}));
+    logger.error("routes_webinars_failed");
     return c.json({ error: 'internal_error' }, 500);
   }
 };

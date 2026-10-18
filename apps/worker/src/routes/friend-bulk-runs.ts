@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
@@ -30,7 +31,7 @@ function errorResponse(c: Context<Env>, error: unknown) {
   if (error instanceof FriendBulkRunError) {
     return inputError(c, { success: false, error: error.message, code: error.code }, error.status as ContentfulStatusCode, bulkErrorFields(error.code));
   }
-  console.error(JSON.stringify({"code":"routes_friend_bulk_runs_failed"}));
+  logger.error("routes_friend_bulk_runs_failed");
   return c.json({ success: false, error: '一括操作を処理できませんでした' }, 500);
 }
 
@@ -46,7 +47,7 @@ function keepRunning(c: { executionCtx: ExecutionContext }, promise: Promise<unk
   try {
     c.executionCtx.waitUntil(promise);
   } catch {
-    void promise.catch((error) => console.error(JSON.stringify({"code":"routes_friend_bulk_runs_failed"})));
+    void promise.catch((error) => logger.error("routes_friend_bulk_runs_failed"));
   }
 }
 

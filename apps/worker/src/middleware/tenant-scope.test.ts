@@ -132,7 +132,7 @@ describe('tenantScopeMiddleware', () => {
       '/api/friends?account_id=tenant-b-account', {}, environment(),
     );
 
-    expect(warn).toHaveBeenCalledWith(JSON.stringify({ code: 'tenant_boundary_denied' }));
+    expect(warn.mock.calls.map((args: unknown[]) => JSON.parse(String(args[0])))).toContainEqual({ code: 'tenant_boundary_denied', timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background' });
     const serialized = JSON.stringify(warn.mock.calls);
     expect(serialized).not.toContain('staff-default');
     expect(serialized).not.toContain('tenant-b-account');

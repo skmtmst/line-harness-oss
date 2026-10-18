@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { readCappedBodyText } from './webhook-receive-envelope.js';
 import { encryptCredential } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
@@ -72,7 +73,7 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
         return c.json({ success: false, error: 'Invalid signature' }, 401);
       }
       expected = previousExpected;
-      console.log(JSON.stringify({"code":"incoming_webhook_previous_secret_used","route":"POST /api/webhooks/incoming/:id/receive"}));
+      logger.log("incoming_webhook_previous_secret_used");
     }
 
     /*
@@ -135,7 +136,7 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
       return c.json({ success: false, error: 'Webhook processing in progress' }, 503);
     }
     if (reserved.kind === 'completed') {
-      console.log(JSON.stringify({"code":"incoming_webhook_duplicate_signature","route":"POST /api/webhooks/incoming/:id/receive"}));
+      logger.log("incoming_webhook_duplicate_signature");
       return c.json({
         success: true,
         data: { received: true, duplicate: true, source: wh.source_type },
@@ -161,7 +162,7 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
     if (execution) {
       try { await execution.fail(); } catch { /* The lease lets a later retry recover even during a DB outage. */ }
     }
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -181,7 +182,7 @@ export const get__api_webhooks_api_tokens_2 = async (c: Context<Env, "/api/webho
     const items = await listIntegrationApiTokens(c.env.DB, lineAccountId, { includeRevoked });
     return c.json({ success: true, data: items.map(serializeApiToken) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"GET /api/webhooks/api-tokens"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -226,7 +227,7 @@ export const post__api_webhooks_api_tokens_3 = async (c: Context<Env, "/api/webh
       },
     }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/api-tokens"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -248,7 +249,7 @@ export const post__api_webhooks_api_tokens_id_revoke_4 = async (c: Context<Env, 
     auditLog(c, 'webhook.api_token.revoke', { kind: 'integration_api_token', id }, { lineAccountId });
     return c.json({ success: true, data: { id } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/api-tokens/:id/revoke"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -276,7 +277,7 @@ export const post__api_webhooks_api_tokens_id_reactivate_5 = async (c: Context<E
     const row = await getIntegrationApiTokenById(c.env.DB, id, lineAccountId);
     return c.json({ success: true, data: serializeApiToken(row!) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/api-tokens/:id/reactivate"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -318,7 +319,7 @@ export const post__api_webhooks_api_tokens_id_rotate_6 = async (c: Context<Env, 
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/api-tokens/:id/rotate"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

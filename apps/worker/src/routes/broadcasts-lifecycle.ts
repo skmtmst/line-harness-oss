@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { simulationContext } from '../services/broadcast-simulation.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
@@ -244,7 +245,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
             .bind(confirmed, id).run();
         }
       } catch (gateError) {
-        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"PUT /api/broadcasts/:id"}));
+        logger.error("routes_broadcasts_failed");
         return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
       }
     }
@@ -308,7 +309,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
           await approval.recordBroadcastApprovalEvent(c.env.DB, id, c.get('staff')?.id ?? '', 'cancelled', '内容の変更');
         }
       } catch (approvalError) {
-        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"PUT /api/broadcasts/:id"}));
+        logger.error("routes_broadcasts_failed");
       }
     }
 
@@ -347,7 +348,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     );
     return c.json({ success: true, data: updated ? serializeBroadcast(updated) : null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"PUT /api/broadcasts/:id"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -381,7 +382,7 @@ export const post__api_broadcasts_id_cancel_2 = async (c: Context<Env, "/api/bro
     await recordLifecycle(c.env.DB, id, c.get('staff')?.id, 'cancelled');
     return c.json({ success: true, data: serializeBroadcast(updated) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/cancel"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -495,7 +496,7 @@ export const post__api_broadcasts_id_stop_3 = async (c: Context<Env, "/api/broad
       stoppedUnknownCount: closed.unknown,
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/stop"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -547,7 +548,7 @@ export const post__api_broadcasts_id_resume_4 = async (c: Context<Env, "/api/bro
     kickQueueProcessing(c, 'resume');
     return c.json({ success: true, data: { ...serializeBroadcast(updated ?? existing), ledger } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/resume"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -633,7 +634,7 @@ export const post__api_broadcasts_id_retry_failed_5 = async (c: Context<Env, "/a
         retryTargets: reopened,
       }, 202);
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/retry-failed"}));
+      logger.error("routes_broadcasts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   };

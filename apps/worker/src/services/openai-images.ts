@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * OpenAI の画像生成API（gpt-image 系）を呼ぶ薄い層。
  *

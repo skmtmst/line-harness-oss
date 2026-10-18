@@ -25,7 +25,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
 vi.mock('@/lib/api', async () => ({
-  ApiError: class extends Error {},
+  ApiError: (await import('@/lib/api/transport/errors')).ApiError,
   api: { staff: { me: async () => ({ success: true, data: { role: 'owner' } }) } },
   bookingApi: {
     ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
@@ -262,4 +262,22 @@ it('WEB300：保存を待つ間は予約の追加編集を止め、失敗後に�
   reject(new Error('down'))
   await waitFor(() => expect(reason.matches(':disabled')).toBe(false))
   expect(reason.value).toBe('変更の理由')
+})
+
+// 取得失敗の文と再試行は実際のAPIエラーから決める。
+it.each([403, 503])('詳細の%sは原因を言い分け、手動の読み直しは同じ対象を取る', async status => {
+  const { ApiError } = await import('@/lib/api')
+  m.get.mockRejectedValueOnce(new ApiError(status)).mockResolvedValue({ booking: booking('回復') })
+  render(<Page />)
+  if (status === 403) {
+    await screen.findByText('予約を見る権限がありません')
+    expect(screen.queryByText('回復メニュー')).toBeNull()
+    expect(screen.queryByRole('button', { name: /承認する/ })).toBeNull()
+    expect(m.get).toHaveBeenCalledTimes(1)
+  }
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度読み込む' }))
+  await screen.findByText('回復メニュー')
+  expect(m.get).toHaveBeenLastCalledWith('A', 'one')
+  expect(m.get).toHaveBeenCalledTimes(2)
+  expect(m.update).not.toHaveBeenCalled()
 })

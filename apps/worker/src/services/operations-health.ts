@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   completeOperationHealthRun,
   enqueuePendingOperationAlertNotifications,
@@ -531,7 +532,7 @@ export async function runScheduledOperationHealthChecks(
 ): Promise<void> {
   if (deps.security) {
     try { await runSecurityMonitor(deps.security); }
-    catch { console.error(JSON.stringify({ code: 'security_monitor_failed' })); }
+    catch { logger.error("security_monitor_failed"); }
   }
   const rows = await db.prepare('SELECT id FROM line_accounts WHERE is_active = 1 ORDER BY id')
     .all<{ id: string }>();

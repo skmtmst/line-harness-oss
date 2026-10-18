@@ -1,3 +1,4 @@
+import { readApiError } from '@line-crm/shared'
 import type { RichMenuGroupListOptions, ApiResponse } from '@line-crm/shared'
 import { fetchApi } from '../transport/request'
 import type {
@@ -17,7 +18,7 @@ import type {
   RichMenuTestApplyUserMenuAction,
 } from '../types/publication'
 import { API_URL, getCsrfToken } from '../transport/session'
-import { fetchWithNetworkMessage } from '../transport/errors'
+import { extractApiErrorCode, fetchWithNetworkMessage, responseApiError } from '../transport/errors'
 
 export const richMenusMethods = {
   richMenuGroups: {
@@ -424,13 +425,15 @@ export const richMenusMethods = {
           body: file,
         },
       );
-      const body = (await res.json()) as ApiResponse<{
+      const raw = await res.text();
+      if (!res.ok) throw responseApiError(res, raw, extractApiErrorCode(raw));
+      const body = JSON.parse(raw) as ApiResponse<{
         imageR2Key: string;
         imageContentType: string;
         size: 'large' | 'compact';
       }>;
       if (!body.success) {
-        throw new Error(body.error ?? `upload failed: ${res.status}`);
+        throw new Error(readApiError(body).message ?? `upload failed: ${res.status}`);
       }
       return body;
     },

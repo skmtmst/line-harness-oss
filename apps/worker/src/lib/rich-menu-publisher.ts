@@ -1,3 +1,4 @@
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 // Rich menu publish flow — D1 ドラフトを LINE Messaging API に冪等に反映する。
 //
 // LINE API は richmenu の更新ができず、作成のみ。なので alias を経由して
@@ -884,7 +885,7 @@ export async function switchRichMenuLive(
         }
       }
     } catch (e) {
-      console.warn(JSON.stringify({"code":"lib_rich_menu_publisher_warn"}));
+      logger.warn("lib_rich_menu_publisher_warn");
     }
   }
 }
@@ -910,7 +911,7 @@ export async function restorePreSwitchLive(
         await line.deleteRichMenuAlias(aliasId);
       }
     } catch (e) {
-      console.warn(JSON.stringify({"code":"lib_rich_menu_publisher_warn"}));
+      logger.warn("lib_rich_menu_publisher_warn");
       unrestored.add(old.pageId);
     }
   }
@@ -949,7 +950,7 @@ export async function restorePreSwitchDefault(
   } catch (e) {
     // 読めない = 新メニューを指したままかもしれない。どれかも分からないので、
     // 新メニューは1つも消さない(消すと default がリンク切れになる)。
-    console.warn(JSON.stringify({"code":"lib_rich_menu_publisher_warn"}));
+    logger.warn("lib_rich_menu_publisher_warn");
     return { state: 'failed', retainedId: null };
   }
   if (!current || !newIds.includes(current)) return { state: 'untouched' };
@@ -961,7 +962,7 @@ export async function restorePreSwitchDefault(
     }
     return { state: 'restored' };
   } catch (e) {
-    console.warn(JSON.stringify({"code":"lib_rich_menu_publisher_warn"}));
+    logger.warn("lib_rich_menu_publisher_warn");
     return { state: 'failed', retainedId: current };
   }
 }

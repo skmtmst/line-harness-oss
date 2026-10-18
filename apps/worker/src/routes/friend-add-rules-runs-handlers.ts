@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { deleteFriendAddRuleFolder, ensureFriendAddFallbackRules, listFriendAddRuleOrderIds, listFriendAddRulesPage, reorderFriendAddRulePriorities, reorderFriendAddRulePrioritiesCAS, type FriendAddRuleKind, type FriendAddRuleRow } from '@line-crm/db';
@@ -179,7 +180,7 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"GET /api/friend-add-runs"}));
+    logger.error("routes_friend_add_rules_failed");
     return c.json({ success: false, error: '実行結果を取得できませんでした' }, 500);
   }
 };
@@ -260,7 +261,7 @@ export const get__api_friend_add_runs_id_2 = async (c: Context<Env, "/api/friend
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"GET /api/friend-add-runs/:id"}));
+    logger.error("routes_friend_add_rules_failed");
     return c.json({ success: false, error: '実行結果の詳細を取得できませんでした' }, 500);
   }
 };
@@ -285,7 +286,7 @@ export const post__api_friend_add_runs_id_retry_3 = async (c: Context<Env, "/api
       data: { status: result.status, retried: result.retried ?? 0 },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"POST /api/friend-add-runs/:id/retry"}));
+    logger.error("routes_friend_add_rules_failed");
     return c.json({ success: false, error: '失敗した処理を再試行できませんでした' }, 500);
   }
 };
@@ -329,7 +330,7 @@ export const post__api_friend_add_rules_folders_4 = async (c: Context<Env, "/api
     if (error instanceof Error && /unique/i.test(error.message)) {
       return c.json({ success: false, code: 'DUPLICATE_FOLDER_NAME', error: '同じ名前のフォルダがあります' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"POST /api/friend-add-rules/folders"}));
+    logger.error("routes_friend_add_rules_failed");
     return c.json({ success: false, error: 'フォルダを作成できませんでした' }, 500);
   }
 };
@@ -376,7 +377,7 @@ export const delete__api_friend_add_rules_folders_id_6 = async (c: Context<Env, 
     if (result === 'conflict') return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'フォルダが更新されました。読み直してください' }, 409);
     return c.json({ success: true, data: { id, deleted: true } satisfies import('@line-crm/shared').FriendAddRuleFolderDeleteResult });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"DELETE /api/friend-add-rules/folders/:id"}));
+    logger.error("routes_friend_add_rules_failed");
     return c.json({ success: false, error: 'フォルダを削除できませんでした' }, 500);
   }
 };
@@ -475,7 +476,7 @@ export const get__api_friend_add_rules_7 = async (c: Context<Env, "/api/friend-a
     if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_CURSOR_INVALID') {
       return c.json({ success: false, error: 'cursor が正しくありません' }, 400);
     }
-    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"GET /api/friend-add-rules"}));
+    logger.error("routes_friend_add_rules_failed");
     return c.json({ success: false, error: '友だち追加時の配信を取得できませんでした' }, 500);
   }
 };
@@ -502,7 +503,7 @@ export const patch__api_friend_add_rules_reorder_8 = async (c: Context<Env, "/ap
     await reorderFriendAddRulePriorities(c.env.DB, { lineAccountId: accountId, friendKind: kind, ids });
     return c.json({ success: true, data: { updated: ids.length } });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"PATCH /api/friend-add-rules/reorder"}));
+    logger.error("routes_friend_add_rules_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -568,7 +569,7 @@ export const put__api_friend_add_rules_order_9 = async (c: Context<Env, "/api/fr
     const orderVersion = await getFriendAddOrderVersion(c.env.DB, accountId, kind);
     return c.json({ success: true, data: { updated: ids.length, orderVersion } });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"PUT /api/friend-add-rules/order"}));
+    logger.error("routes_friend_add_rules_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

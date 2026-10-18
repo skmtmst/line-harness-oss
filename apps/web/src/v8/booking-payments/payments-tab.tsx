@@ -28,7 +28,7 @@ import styles from './payments.module.css'
 /*
  * 予約設定 › お支払い（B-305・B-308 追記 3 の案A：お支払いの設定はこのタブ 1 つ）。
  * 絵：T91bV（つないだ後・試験モード）・UteeA（つなぐ前の状態と Stripe から届いた知らせ）・FY8HC（お支払いの記録）。
- * 読む：今ある口 getPaymentConfig／savePaymentConfig。つなぎの状態・記録・知らせは口待ち（無ければ共通の案内の窓）。
+ * 読む：getPaymentConfig／savePaymentConfig。つなぎの状態・記録・知らせも実APIで読み、未適用は準備中へ分ける。
  * 受け付ける指定：?tab=payments&view=records|events。
  */
 

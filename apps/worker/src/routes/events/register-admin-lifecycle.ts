@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
@@ -274,12 +275,12 @@ events.post(
               });
               notified += 1;
             } catch (error) {
-              console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/change-review/apply"}));
+              logger.error("routes_events_failed");
             }
           }
         }
       } catch (error) {
-        console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/change-review/apply"}));
+        logger.error("routes_events_failed");
       }
       await markChangeLogNotified(c.env.DB, result.logId, notified);
     }

@@ -1,7 +1,7 @@
 import { sensitiveStepUpSatisfied } from '../lib/step-up.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import { app, type Env } from '../index.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { sensitiveOperationMiddleware, dangerousOperationPurpose } from './sensitive-step-up.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -43,11 +43,11 @@ it.each([
   ['PUT','/api/broadcasts/new'], ['POST','/api/broadcasts/new/send'],['POST','/api/broadcasts/new/retry-failed'],
   ['POST','/api/hq/broadcasts/run/targets/store/retry'],['GET','/api/media/item/download'],
 ])('mounted application %s %s denies API-key-only requests before sensitive work',async(method,path)=>{
-  const {app}=await import('../index.js');const db=createTestD1();opened.push(db);
+  const db=createTestD1();opened.push(db);
   db.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES ('store','fixture-channel','Fixture','unused','unused',?)").run(DEFAULT_TENANT_ID);
   db.raw.exec("INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id) VALUES ('new','Fixture','text','fixture','store'); UPDATE broadcasts SET status='scheduled' WHERE id='new'; INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES ('item','store','image','fixture.png','image/png',1,'media/fixture.png')");
   const res=await app.request(path,{method,headers:{Authorization:'Bearer fixture-master','CF-Connecting-IP':'203.0.113.47',...method==='PUT'?{'Content-Type':'application/json'}:{}},...method==='PUT'?{body:JSON.stringify({title:'Changed fixture',expectedVersion:1})}:{}},{DB:db.db,API_KEY:'fixture-master',DEPLOY_ENV:'test'} as Env['Bindings']);
-  expect(res.status).toBe(401);expect(await res.json()).toMatchObject({code:'STEP_UP_REQUIRED'});
+  expect(res.status).toBe(401);expect(await res.json()).toMatchObject({success:false,error:{code:'STEP_UP_REQUIRED'}});
 });
 
 it.each(['POST','PUT'])('scheduled broadcast %s cannot bypass the guard via create/update',async method=>{

@@ -3,6 +3,21 @@ import { api9Schemas } from '../api9-openapi.js';
 // Definitions only. Runtime handlers remain in their feature routes.
 export const schemas = {
   ...api9Schemas,
+  ApiErrorDetail: {
+    type: 'object', required: ['code', 'message', 'requestId', 'fieldErrors'],
+    properties: {
+      code: { type: 'string', description: 'docs/error-codes.md の機械コード。大文字・小文字を保持します。' },
+      message: { type: 'string', description: '利用者向けの理由と次の行動。内部例外・秘密値は含みません。' },
+      requestId: { type: 'string', format: 'uuid' },
+      fieldErrors: { type: 'array', items: { type: 'object', required: ['field', 'message'], properties: {
+        field: { type: 'string' }, message: { type: 'string' },
+      } } },
+    },
+  },
+  ApiErrorResponse: {
+    type: 'object', required: ['success', 'error'], additionalProperties: true,
+    properties: { success: { type: 'boolean', const: false }, error: { $ref: '#/components/schemas/ApiErrorDetail' } },
+  },
   BookingSyncRules: {
     type: 'object',
     required: ['lineAccountId', 'excludeCalendarBusy', 'writeLineBookingsToCalendar', 'autoAssign', 'notifyConflicts', 'notifyCalendarDisconnected', 'notifyDailyLimit', 'dailyLimit', 'nearLimitRemaining', 'version'],

@@ -1,3 +1,4 @@
+import { liffErrorMessage } from '../../../../liff/src/lib/api-error.js';
 // main.tsx — Affiliate self-serve React entry. Loaded via dynamic import from
 // the LIFF orchestrator (apps/worker/src/client/main.ts) on ?page=affiliate.
 // Caller passes an already-initialized LIFF context; the LINE access token
@@ -133,7 +134,7 @@ async function fetchMe(
   if (res.status === 404) return { registered: false };
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
   return { registered: true, affiliate: data.affiliate, links: data.links };
@@ -154,7 +155,7 @@ async function fetchMileage(
   const res = await fetch(url);
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   return (await res.json()) as MileageWalletData;
 }
@@ -167,7 +168,7 @@ async function postEnrollOffer(token: string, offerId: string): Promise<Affiliat
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { link: AffiliateLinkData };
   return data.link;
@@ -183,7 +184,7 @@ async function postRegister(
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   return (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
 }
@@ -200,7 +201,7 @@ async function postAddLink(
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { link: AffiliateLinkData };
   return data.link;

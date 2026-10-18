@@ -30,7 +30,7 @@ import TestModeNote from '@/components/shared/test-mode-note'
 import { RefundDialog, type RefundInput } from '@/components/shared/booking-confirm-dialogs'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 
-/** 口の案：記録に「操作した人・理由」（返金・手で直した人と理由）。今の口には無い（口が要る）。 */
+/** 読み取りAPIが返す操作した人と理由。未取得は値を作らずに表示する。 */
 type PaymentRecordWithActor = PaymentRecord & { actorLabel?: string | null }
 import styles from './payments.module.css'
 

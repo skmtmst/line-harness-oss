@@ -1,3 +1,4 @@
+import { apiContractMiddleware } from '../middleware/api-contract.js';
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 
@@ -1848,9 +1849,10 @@ describe('selected registration style', () => {
     dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
     lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});
     styleMocks.initializeAccountStyle.mockRejectedValueOnce(new Error('db failure'));
-    const res=await setupApp('owner').request('/api/line-accounts/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...autoConnectBody,style:'consult'})});
+    const app=new Hono<TestEnv>();app.use('*',apiContractMiddleware);app.route('/',setupApp('owner'));
+    const res=await app.request('/api/line-accounts/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...autoConnectBody,style:'consult'})});
     expect(res.status).toBe(502);
-    expect(await res.json()).toMatchObject({success:false,error:'style_save_failed',data:{accountId:'created-account',style:'consult',styleSaved:false,retryAt:'/api/dashboard/style?account_id=created-account'}});
+    expect(await res.json()).toMatchObject({success:false,error:{code:'style_save_failed',requestId:res.headers.get('X-Request-ID'),fieldErrors:[]},data:{accountId:'created-account',style:'consult',styleSaved:false,retryAt:'/api/dashboard/style?account_id=created-account'}});
     expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();expect(dbMocks.deleteUncommittedLineAccount).not.toHaveBeenCalled();
   });
 });

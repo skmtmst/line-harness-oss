@@ -8,7 +8,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FirstStepsCard, firstStepsLegacyDismissedKey, firstStepsStorageKey, readFirstStepsFolded, summarizeFirstSteps } from './first-steps'
 
-const summary = summarizeFirstSteps({ connect: false, greeting: true, richMenu: false, broadcast: false, scenario: false, invite: true })!
+import { buildStepsFromApi } from '@/v8/settings/getting-started/steps'
+const summary = summarizeFirstSteps(buildStepsFromApi([{ key: 'accounts', state: 'done', href: '/accounts', reason: null }, { key: 'featureSet', state: 'done', href: '/settings', reason: null }]))
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -36,7 +37,7 @@ describe('はじめにやることを畳む', () => {
     expect(screen.queryByRole('button', { name: '閉じる' })).toBeNull()
     const fold = screen.getByRole('button', { name: '畳む' })
     expect(fold.getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByText('LINE 公式アカウントをつなぐ')).toBeTruthy()
+    expect(screen.getByText('LINE アカウントをつなぐ')).toBeTruthy()
     await act(async () => { fireEvent.click(fold) })
     const open = screen.getByRole('button', { name: '開く' })
     expect(open.getAttribute('aria-expanded')).toBe('false')

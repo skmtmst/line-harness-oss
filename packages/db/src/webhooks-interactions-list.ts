@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { toJstString } from './utils.js';
 import { type WebhookInteractionDirection, type WebhookInteractionListRow, type WebhookInteractionSummary } from './webhooks-types.js';
 import { markStalePendingWebhookInteractions } from './webhooks-interactions-claims.js';
@@ -36,7 +37,7 @@ export async function listWebhookInteractions(
     await markStalePendingWebhookInteractions(db, input.lineAccountId);
   } catch (error) {
     // 回収だけの失敗で一覧そのものを止めない。
-    console.error(JSON.stringify({"code":"src_webhooks_failed"}));
+    logger.error("src_webhooks_failed");
   }
   const clauses = ['l.line_account_id=?', 'l.created_at>=?', "l.status!='retried'"];
   const binds: unknown[] = [input.lineAccountId, cutoff];

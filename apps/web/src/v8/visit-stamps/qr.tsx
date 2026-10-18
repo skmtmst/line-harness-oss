@@ -1,4 +1,5 @@
 'use client'
+import { ApiError } from '@/lib/api'
 
 import {useCallback,useEffect,useRef,useState} from 'react'
 import {ArrowRight,Check,Minus,Plus,QrCode,RefreshCw} from 'lucide-react'
@@ -17,7 +18,7 @@ import {visitStampsApi} from '@/lib/visit-stamps-api'
 import styles from './qr.module.css'
 
 const requestId=()=>crypto.randomUUID()
-const reason=(e:unknown)=>{const text=(e as {body?:{error?:string}})?.body?.error;return text&&/[ぁ-んァ-ン一-龥]/.test(text)?text:'QRを確認できませんでした。もう一度試してください。'}
+const reason=(e:unknown)=>{const text=e instanceof ApiError?e.message:(e as {body?:{error?:string}})?.body?.error;return text&&/[ぁ-んァ-ン一-龥]/.test(text)?text:'QRを確認できませんでした。もう一度試してください。'}
 function useQrImage(url:string|undefined,width:number) {
   const [image,setImage]=useState<{url:string;src:string}|null>(null)
   const [error,setError]=useState('')

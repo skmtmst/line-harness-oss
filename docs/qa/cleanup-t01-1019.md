@@ -21,3 +21,9 @@ APIの入出力・関数・権限・試験は司令塔の `review/CLEANUP-1017/A
 写真は検証できた旧URLだけキーを埋める。解釈できない旧URLの従来照合は、機能と安全を保つため残す。カード実決済・実返金・会議URL自動発行・本当のG6送信を有効化しない。既存の有料取消は、履歴のcancellationQuoteとlock_versionを読み、feeAccepted:true/expectedFeeAmountを既存取消APIへ送る契約をT03へ渡す。
 
 本線取得SHAは`905d0a4fab760c2a425796664be1e3bdee0b0d5a`。指定まとめ枝が出発点であり、本線への統合・正式PR番号/題名の照合・DB適用は司令塔の工程。開始時の別の共通作業ツリーにある.nodetermの2ファイルとworkspaceファイルは変更しない。
+
+## S03を含むまとめ枝の取り込み
+
+依頼の後続条件に従い、7b42fc5e44（S03の共通エラー・記録と、それまでのまとめ）をローカルでmerge。競合5ファイルは追加importと共通loggerを両方残し、券の拒否/世代CAS/公開style/不明時の停止を保持した。共通の最外周がerror.code/message/requestId/fieldErrorsへそろえ、style保存失敗のdata.accountId/retryAtも保持する。新しいエラーコードの一覧を正規の生成手順で更新した。依存リンクをfrozen installで更新し、関連298件・Worker型が成功。最初の共有server読み込み失敗のログも残す。
+
+以後の全体CIは取り込み後の同一SHAで行う。取り込み前の試験を取り込み後の全体合格として使わない。正式PRの採番・題名と本線統合、未承認732等は引き続き司令塔の工程。

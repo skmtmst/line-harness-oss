@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import PostalMime from 'postal-mime';
@@ -166,7 +167,7 @@ supportInbox.get('/api/support/summary', async (c) => {
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"support_summary_failed","route":"GET /api/support/summary"}));
+    logger.error("support_summary_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -353,7 +354,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"support_inbox_failed","route":"GET /api/support/inbox"}));
+    logger.error("support_inbox_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -768,7 +769,7 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
     if (error instanceof Error && error.message === 'IDEMPOTENCY_IN_PROGRESS') {
       return c.json({ success: false, error: '前回の送信結果を確認中です。再送せず受信履歴を確認してください' }, 409);
     }
-    console.error(JSON.stringify({"code":"support_email_reply_failed","route":"POST /api/support/email/threads/:id/reply"}));
+    logger.error("support_email_reply_failed");
     return c.json({ success: false, error: 'メール送信に失敗しました' }, 502);
   } finally {
     if (leaseAcquired) {

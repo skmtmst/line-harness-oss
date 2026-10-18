@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   getRichMenuAreaTapTarget,
   getTemplateById,
@@ -56,14 +57,14 @@ export async function handleRichMenuTap(
       lineAccountId,
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_rich_menu_tap_failed"}));
+    logger.error("services_rich_menu_tap_failed");
   }
 
   for (const tagId of target.tagIds) {
     try {
       await attachTagAndFireSideEffects(db, friend.id, tagId);
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_rich_menu_tap_failed"}));
+      logger.error("services_rich_menu_tap_failed");
     }
   }
 
@@ -77,7 +78,7 @@ export async function handleRichMenuTap(
           ? JSON.stringify(['rich-menu-tap', options.sourceEventId, areaId]) : undefined,
       });
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_rich_menu_tap_failed"}));
+      logger.error("services_rich_menu_tap_failed");
     }
   }
 
@@ -85,7 +86,7 @@ export async function handleRichMenuTap(
     try {
       await enrollFriendInScenario(db, friend.id, target.scenarioId);
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_rich_menu_tap_failed"}));
+      logger.error("services_rich_menu_tap_failed");
     }
   }
 
@@ -117,7 +118,7 @@ export async function handleRichMenuTap(
             replyTokenConsumed = true;
           } catch (err) {
             // reply は 1 回きり・有効期限つき。失敗したら push で送り直す。
-            console.warn(JSON.stringify({"code":"services_rich_menu_tap_warn"}));
+            logger.warn("services_rich_menu_tap_warn");
             await lineClient.pushMessage(friend.line_user_id, [message]);
           }
         } else {
@@ -132,12 +133,12 @@ export async function handleRichMenuTap(
           lineAccountId,
         });
       } else if (!tpl) {
-        console.warn(JSON.stringify({"code":"services_rich_menu_tap_warn"}));
+        logger.warn("services_rich_menu_tap_warn");
       } else {
-        console.warn(JSON.stringify({"code":"services_rich_menu_tap_warn"}));
+        logger.warn("services_rich_menu_tap_warn");
       }
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_rich_menu_tap_failed"}));
+      logger.error("services_rich_menu_tap_failed");
     }
   }
 

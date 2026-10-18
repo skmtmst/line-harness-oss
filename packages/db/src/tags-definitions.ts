@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { type CreateTagInput, type Tag, type CreateTagsBulkInput, type CreateTagsBulkResult, type TagGroup } from './tags-types.js';
@@ -113,7 +114,7 @@ export async function createTagsBulk(
           : { status: 'skipped' };
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"src_tags_failed"}));
+      logger.error("src_tags_failed");
       prepared.forEach((row, index) => {
         if (legacyNullNames.has(row.normalizedName)) return;
         results[offset + index] = { status: 'failed' };

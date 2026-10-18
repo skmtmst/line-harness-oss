@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   finishOperationDispatcherHeartbeat,
   listOperationDispatcherHeartbeats,
@@ -499,7 +500,7 @@ async function safeHeartbeat(write: () => Promise<void>, jobName: string, phase:
   try {
     await write();
   } catch (error) {
-    console.error(JSON.stringify({"code":"operation_dispatcher_heartbeat_write_failed"}));
+    logger.error("operation_dispatcher_heartbeat_write_failed");
   }
 }
 

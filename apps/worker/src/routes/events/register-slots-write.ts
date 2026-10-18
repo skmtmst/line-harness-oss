@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
@@ -78,7 +79,7 @@ events.post(
       }
       return c.json({ success: true, data: { broadcastId: broadcast.id, recipientCount: friendIds.length } }, 201);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/occurrences/:id/applicant-broadcasts/preview"}));
+      logger.error("routes_events_failed");
       return c.json({ error: 'applicant_broadcast_preview_failed' }, 500);
     }
   },
@@ -131,7 +132,7 @@ events.post(
       }
       return c.json({ success: true, data: result });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/occurrences/:id/waitlist/promote"}));
+      logger.error("routes_events_failed");
       return c.json({ error: 'waitlist_notification_failed' }, 503);
     }
   },
@@ -383,7 +384,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
               startsAtIso: oldStartsAt,
             });
           } catch (compensationError) {
-            console.error(JSON.stringify({"code":"routes_events_failed","route":"PUT /api/events/admin/events/:id/slots/:slotId"}));
+            logger.error("routes_events_failed");
           }
         }
         throw error;
