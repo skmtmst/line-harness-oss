@@ -108,9 +108,11 @@ export interface RadioCardProps {
   /**
    * 箱（card）の高さ。既定は絵の「選ぶカード」の 98。
    * `'short'` は高さ 90 の箱（★V8 E-3 ウォークインの卓のカード PUWyq：上に印・右上に丸・題・説明）。
+   * `'fit'` は中身なりの高さ（LINE新規追加 v06 ①事前確認 GLA3C 52・f7UGE 78：
+   * 題だけの選択肢を 98 の箱に入れると下が大きく空くため、最低高さだけ外す）。
    * 渡したときだけ効き、既定の見た目は変えない。
    */
-  height?: 'default' | 'short'
+  height?: 'default' | 'short' | 'fit'
   /** 横並びの小さい箱（j8p3yj）。既定のカード・行・v7 の寸法は変えない。 */
   size?: 'default' | 'small'
   /** 図・本文を右上の丸の下へ置く箱。本文の右側を丸用に狭めない。 */
@@ -152,6 +154,7 @@ export default function RadioCard({
         variant === 'compact' ? styles.compact : null,
         variant === 'form' ? styles.form : null,
         variant === 'card' && height === 'short' ? styles.short : null,
+        variant === 'card' && height === 'fit' ? styles.fit : null,
         variant === 'card' && size === 'small' ? styles.small : null,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,

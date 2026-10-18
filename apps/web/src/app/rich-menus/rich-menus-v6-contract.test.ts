@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,7 +8,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 // 「LINE上にあるメニュー」の取り込み画面は external-import.tsx（★V7・★V8 で共有）。
 const PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
   + readFileSync(join(HERE, '../../v8/rich-menus/external-import.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
+const EDIT_PAGE = readUiSource(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const PUBLISHER = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'lib', 'rich-menu-publisher.ts'),
   'utf8',

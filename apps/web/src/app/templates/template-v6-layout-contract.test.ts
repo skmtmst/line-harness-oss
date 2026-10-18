@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 // @vitest-environment happy-dom
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -13,7 +14,7 @@ const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 afterEach(cleanup)
 
 describe('テンプレート一覧のV8削除動作', () => {
-  const page = read('../../v8/templates/list.tsx') + read('../../v8/templates/words.ts')
+  const page = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8') + read('../../v8/templates/words.ts')
   const detail = read('../../v8/template-detail/detail.tsx')
 
   it('参照中は強制削除せず、使用先を確認させる', () => {

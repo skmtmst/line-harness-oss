@@ -56,6 +56,21 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }
 /** ②の中だけ進むボタンの名前が違う（v06 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
+const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name }))
+
+/**
+ * ①事前確認（v06 p6zMkA）を抜ける。Q1=ある／Q2=引き継がない／Q4=使っていない を選ぶと
+ * Q3・Q5は尋ねないので、3問＋チェック結果の「次へ」で②-1 Messaging API に入る。
+ */
+function clearPrecheck() {
+  pick('はい、あります')
+  next()
+  pick('いいえ、引き継ぎません')
+  next()
+  pick('使っていません')
+  next()
+  next()
+}
 
 /**
  * v06（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
@@ -63,7 +78,7 @@ const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { nam
  */
 async function enterSaveStep() {
   render(<NewLineAccountPage />)
-  next()
+  clearPrecheck()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
   nextStep()

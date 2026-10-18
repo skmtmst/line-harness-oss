@@ -1,8 +1,0 @@
-board	change	code	widths	validation
-GtI4Y	same-account QR route picker	6d9d097e3e	1152,1440,1920	F1=1/width; layout=0; route picker=visible
-wVSxu	QR route picker and stopped-state guard	6d9d097e3e	1152,1440,1920	F1-F10/layout/overflow/errors/writes=0
-nAesv	viewport height and navigation footer	37fefc3896	1152,1440,1920	F1-F10/layout/overflow/errors/writes=0
-oqSJP	viewport height and save Check	37fefc3896	1152,1440,1920	F1-F10/layout/overflow/errors/writes=0
-tnTn9	viewport height and Copy/Pencil	37fefc3896	1152,1440,1920	F1-F10/layout/overflow/errors/writes=0
-ZFskf	viewport height and submit footer	37fefc3896	1152,1440,1920	F1-F10/layout/overflow/errors/writes=0
-jZ4Bh	viewport height and decision footer	37fefc3896	1152,1440,1920	F2=2/width; wrap=2/width; drawer audit=0

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -12,7 +12,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 describe('共通情報編集の言葉（AYc6O）', () => {
   it('社内メモの説明が板どおり', () => {
     // 入口は src/v8/common-vars-edit/edit.tsx（古い edit-v8.tsx はもう描かれない）。
-    const source = readFileSync(join(SRC, '../../v8/common-vars-edit/edit.tsx'), 'utf8')
+    const source = readUiSource(join(SRC, '../../v8/common-vars-edit/edit.tsx'), 'utf8')
     expect(source).toContain('メモ（お客さまには出ません）')
     expect(source).not.toContain('お客さまには出せません')
   })
