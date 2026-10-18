@@ -97,4 +97,38 @@ describe('PKG67 shared workflow recovery',()=>{
   expect(await acquireWorkflow(item.db,ref,{maxAttempts:2})).toBeNull();
   expect((await getWorkflowStep(item.db,{...ref,stepKey:'__run'}))!.status).toBe('exhausted');
  });
+ it.each(['delivery_failed','processing_failed'])('holds ambiguous historical LINE failure %s without allocating a new key',async code=>{
+  const one=(await acquireWorkflow(item.db,ref))!;const send=vi.fn().mockResolvedValue({requestId:'accepted'});
+  const options={stepKey:'legacy_notification'};
+  await workflowLineClient({pushMessage:send} as unknown as LineClient,one,options).pushMessage('U1',[{type:'text',text:'original'}]);
+  item.raw.prepare("UPDATE workflow_steps SET status='failed',error_code=?,result_json=NULL,max_attempts=5 WHERE step_key='legacy_notification'").run(code);
+  const key=item.raw.prepare("SELECT retry_key FROM workflow_steps WHERE step_key='legacy_notification'").get();
+  await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one,options).pushMessage('U1',[{type:'text',text:'changed'}])).rejects.toThrow('delivery_unknown');
+  expect(send).toHaveBeenCalledOnce();expect(item.raw.prepare("SELECT retry_key FROM workflow_steps WHERE step_key='legacy_notification'").get()).toEqual(key);
+  expect(item.raw.prepare("SELECT status,error_code,attempt_count FROM workflow_steps WHERE step_key='legacy_notification'").get()).toEqual({status:'unknown',error_code:'delivery_unknown',attempt_count:1});
+ });
+
+});
+
+it('preserves the full provider deadline even when the LINE step exhausts its wait budget',async()=>{
+ const one=(await acquireWorkflow(item.db,ref))!;
+ const before=Date.now();
+ const send=vi.fn().mockRejectedValue(Object.assign(new Error('not accepted'),{status:429,retryAfter:'7200'}));
+ await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'original'}])).rejects.toThrow();
+ const row=item.raw.prepare("SELECT status,error_code,next_attempt_at FROM workflow_steps WHERE step_key LIKE 'line:%'").get() as {next_attempt_at:number};
+ expect(row).toMatchObject({status:'exhausted',error_code:'retry_after_exceeds_budget'});
+ expect(row.next_attempt_at).toBeGreaterThanOrEqual(before+7200_000);
+ await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'original'}])).rejects.toThrow();
+ expect(send).toHaveBeenCalledOnce();
+});
+
+it('preserves the stricter EC retry-key age fence without another wire request',async()=>{
+ const one=(await acquireWorkflow(item.db,ref))!;
+ const send=vi.fn().mockRejectedValue(Object.assign(new Error('not accepted'),{status:429}));
+ const options={stepKey:'customer_notification',retryKeyValidityMs:23*3600_000};
+ await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one,options).pushMessage('U1',[{type:'text',text:'original'}])).rejects.toThrow();
+ item.raw.prepare("UPDATE workflow_steps SET next_attempt_at=0,first_attempt_at=? WHERE step_key='customer_notification'").run(Date.now()-23*3600_000);
+ await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one,options).pushMessage('U1',[{type:'text',text:'changed'}])).rejects.toThrow('delivery_unknown');
+ expect(send).toHaveBeenCalledOnce();
+ expect(item.raw.prepare("SELECT status,error_code FROM workflow_steps WHERE step_key='customer_notification'").get()).toEqual({status:'unknown',error_code:'delivery_unknown'});
 });

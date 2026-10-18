@@ -51,4 +51,22 @@ describe('W9 bounded automatic followup recovery',()=>{
   expect(item.raw.prepare('SELECT status,error_code FROM workflow_steps').get()).toEqual({status:'unknown',error_code:'delivery_unknown'});
  });
 
+ it('holds an ambiguous historical followup failure without resetting attempts or its key',async()=>{
+  const dispatch=vi.fn(async()=>new Response('{}',{status:429}));await processWebinarFollowups(item.db,options(dispatch));
+  item.raw.exec("UPDATE workflow_steps SET error_code='delivery_failed',max_attempts=5");
+  const before=item.raw.prepare('SELECT retry_key,attempt_count FROM workflow_steps').get();
+  vi.advanceTimersByTime(3600_000);await processWebinarFollowups(item.db,options(dispatch));
+  expect(dispatch).toHaveBeenCalledOnce();expect(item.raw.prepare('SELECT retry_key,attempt_count FROM workflow_steps').get()).toEqual(before);
+  expect(item.raw.prepare('SELECT status,error_code FROM workflow_steps').get()).toEqual({status:'unknown',error_code:'delivery_unknown'});
+ });
+
+});
+
+it('stores an over-budget Retry-After without shortening it or sending again',async()=>{
+ const now=Date.now();
+ const dispatch=vi.fn(async()=>new Response('{}',{status:429,headers:{'Retry-After':'7200'}}));
+ await processWebinarFollowups(item.db,options(dispatch));
+ expect(item.raw.prepare('SELECT status,error_code,next_attempt_at FROM workflow_steps').get()).toEqual({status:'exhausted',error_code:'retry_after_exceeds_budget',next_attempt_at:now+7200_000});
+ vi.advanceTimersByTime(3600_000);await processWebinarFollowups(item.db,options(dispatch));
+ expect(dispatch).toHaveBeenCalledOnce();
 });

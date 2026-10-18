@@ -1,4 +1,5 @@
-import { EXTERNAL_DELIVERY_MAX_ATTEMPTS, externalDeliveryRetryAt } from './external-delivery-retry.js';
+import { holdUncertainLineStep } from './workflow-line-client.js';
+import { EXTERNAL_DELIVERY_MAX_ATTEMPTS, externalDeliveryRetryAt, externalDeliveryNotBefore, EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES } from './external-delivery-retry.js';
 // ウェビナーの予約前から個別相談予約まで、途中離脱した人へ自動追客する。
 // 対象ウェビナーは webinar_followup_configs で明示的に有効化し、enabled_at
 // より前の過去リードを一斉送信しない。LINE送信は必ずHarnessプロキシ経由。
@@ -460,7 +461,11 @@ export async function processWebinarFollowups(
         await db.prepare(`UPDATE ${table} SET status='sent',sent_at=?,last_error=NULL,updated_at=? WHERE id=? AND status IN ('pending','failed')`)
           .bind(jstNow(),jstNow(),followup.id).run();return;
       }
-      if(snapshot.status==='unknown'||snapshot.status==='running')return;
+      if(await holdUncertainLineStep(db,ref,snapshot)){
+        await db.prepare(`UPDATE ${table} SET status='failed',last_error='delivery_unknown',updated_at=? WHERE id=? AND status!='sent'`)
+          .bind(jstNow(),followup.id).run();return;
+      }
+      if(snapshot.status==='running')return;
       await db.prepare(`UPDATE workflow_steps SET max_attempts=MIN(max_attempts,?) WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?`)
         .bind(EXTERNAL_DELIVERY_MAX_ATTEMPTS,ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey).run();
       const lease=await claimWorkflowStep(db,ref);
@@ -497,9 +502,12 @@ export async function processWebinarFollowups(
         .bind(ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey,owner).first<{attempt_count:number}>();
       const rejected=!accepted&&!!status&&status>=400&&status<500&&status!==408;
       const unknown=started&&!rejected;
-      const next=status===429?externalDeliveryRetryAt(err,lease?.attempt_count ?? 1,new Date(),true):null;
-      await failWorkflowStep(db,ref,owner,{unknown,code:unknown?'delivery_unknown':'delivery_failed',permanent:rejected&&!next,
-        delayMs:next?Math.max(0,next.getTime()-Date.now()):60_000});
+      const failureNow = new Date();
+      const next=status===429?externalDeliveryRetryAt(err,lease?.attempt_count ?? 1,failureNow,true):null;
+      const notBefore = rejected ? externalDeliveryNotBefore(err, failureNow) : undefined;
+      const overWait = notBefore !== undefined && notBefore - failureNow.getTime() > EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000;
+      await failWorkflowStep(db,ref,owner,{now:failureNow.getTime(),unknown,code:unknown?'delivery_unknown':!started?'delivery_not_started':overWait?'retry_after_exceeds_budget':next?'line_rate_limited':'line_rejected',permanent:rejected&&!next,
+        delayMs:Math.max(0,(next?.getTime() ?? notBefore ?? failureNow.getTime()+60_000)-failureNow.getTime())});
       await db.prepare(`UPDATE ${table} SET status='failed',last_error=?,updated_at=? WHERE id=? AND status!='sent'
         AND EXISTS(SELECT 1 FROM workflow_steps WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?
           AND attempt_count=? AND status IN ('failed','exhausted','unknown'))`)
