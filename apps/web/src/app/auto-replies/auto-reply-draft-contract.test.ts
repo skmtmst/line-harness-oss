@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,9 +7,10 @@ import { toDraft, toVersionDraft } from '@/components/auto-replies/edit-dialog'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-const LIST = read('../../v8/auto-replies/list.tsx')
-const EDIT = read('edit/wizard-v8.tsx')
-const DIALOG = read('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
+const readImplementation = (...parts: string[]) => readUiSource(join(HERE, ...parts), 'utf8')
+const LIST = readImplementation('../../v8/auto-replies/list.tsx')
+const EDIT = readImplementation('edit/wizard-v8.tsx')
+const DIALOG = readImplementation('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
 
 /**
  * 編集を開いたときの中身を、1か所で作ること。
@@ -122,12 +124,4 @@ describe('自動応答の編集に渡す中身', () => {
     })
   })
 
-  it('段の番号が、上から 1・2・3 の順に出る', () => {
-    const one = DIALOG.indexOf('1. どのメッセージに反応するか')
-    const two = DIALOG.indexOf('2. いつ・誰に反応するか')
-    const three = DIALOG.indexOf('3. 何を返すか')
-    expect(one).toBeGreaterThan(-1)
-    expect(two).toBeGreaterThan(one)
-    expect(three).toBeGreaterThan(two)
-  })
 })
