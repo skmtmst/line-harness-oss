@@ -1,5 +1,7 @@
 'use client'
 
+import { useMenuMediaScope } from './use-menu-media-scope'
+
 import { useMenuShapeDraft } from './use-menu-shape-draft'
 
 import { publishMenuNow } from './create-publish-actions'
@@ -225,16 +227,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const accountId = selectedAccount?.id ?? null
   useEffect(() => { setPublishConfirmOpen(false); setPriorityOpen(false) }, [accountId, group?.id])
   candidateAccountRef.current = accountId
-  const pendingMediaAccountRef = useRef(accountId)
-  useEffect(() => {
-    if (host || pendingMediaAccountRef.current === accountId) return
-    pendingMediaAccountRef.current = accountId
-    setPendingImages((previous) => {
-      for (const image of previous) if (image?.url) URL.revokeObjectURL(image.url)
-      return []
-    })
-    setMediaPickerOpen(false)
-  }, [accountId, host, setPendingImages])
+  useMenuMediaScope(accountId, Boolean(host), setPendingImages, setMediaPickerOpen)
   const aggregateOnly = staffRole === 'staff' || staffRole === 'viewer'
   const storeCanOperate = useFeatureAccess('richMenus')
   const canOperate = host ? host.canOperate : storeCanOperate

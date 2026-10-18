@@ -69,6 +69,24 @@ describe('分割したリッチメニューの失敗処理', () => {
     expect(state.setConflict).not.toHaveBeenCalled()
   })
 
+  it('新規作成の409は存在しないメニューを取り直さず、失敗と入力を保持する', async () => {
+    const state: Parameters<typeof saveMenuDraft>[0] = {
+      createDraft: vi.fn(async () => { throw new ApiError(409, 'API error: 409') }), group: null, host: undefined,
+      persistDraft: vi.fn(async () => {}), reloadGroup: vi.fn(async () => {}),
+      saveErrors: { capture: vi.fn(() => false) }, saving: false,
+      setCompareOpen: vi.fn(), setConflict: vi.fn(), setConflictLatest: vi.fn(),
+      setError: vi.fn(), setNotice: vi.fn(), setSaving: vi.fn(), validateBasics: () => true,
+    }
+    expect(await saveMenuDraft(state)).toBe(false)
+    expect(state.setConflict).not.toHaveBeenCalled()
+    expect(state.setConflictLatest).not.toHaveBeenCalled()
+    expect(api.richMenuGroups.get).not.toHaveBeenCalled()
+    expect(state.persistDraft).not.toHaveBeenCalled()
+    expect(state.reloadGroup).not.toHaveBeenCalled()
+    expect(state.setError).toHaveBeenLastCalledWith(expect.any(String))
+    expect(state.setSaving).toHaveBeenLastCalledWith(false)
+  })
+
   it('409では入力を書き換えず、競合の帯と比較用の最新データを用意する', async () => {
     const latest = { ...group, version: 2 }
     vi.mocked(api.richMenuGroups.get).mockResolvedValue({ success: true, data: latest })

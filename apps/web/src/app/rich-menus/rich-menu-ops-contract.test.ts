@@ -59,12 +59,6 @@ describe('作成画面の登録メディア選択', () => {
     }
   })
 
-  it('アカウントを切り替えたら前のアカウントの選択を持ち込まない', () => {
-    expect(NEW_PAGE).toContain('pendingMediaAccountRef.current === accountId')
-    expect(NEW_PAGE).toMatch(/setPendingImages\(\(previous\) => \{[\s\S]*?return \[\]/)
-    expect(NEW_PAGE).toContain('[accountId, host, setPendingImages]')
-  })
-
   it('選んだメディアも未保存の入力として数える', () => {
     expect(NEW_PAGE).toContain('images: pendingImages.map((image) =>')
     expect(NEW_PAGE).toContain('image.media?.id')

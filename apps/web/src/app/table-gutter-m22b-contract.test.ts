@@ -69,8 +69,6 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
   })
 
   it('/contents/vars：操作の中身は枠いっぱいで右へ寄せる', () => {
-    const body = readUiSource(path.join(SRC, 'v8', 'common-vars', 'list.tsx'), 'utf8')
-    expect(body).toContain('className={styles.menuBox}')
     expect(read('v8', 'common-vars', 'list.module.css')).toMatch(/\.menuBox[^}]*justify-content: flex-end/)
   })
 

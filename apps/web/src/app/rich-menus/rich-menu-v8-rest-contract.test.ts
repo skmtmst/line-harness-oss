@@ -35,11 +35,6 @@ describe('リッチメニューの残り板', () => {
     expect(CREATE).toContain('最新を読み込んで続ける')
   })
 
-  it('競合は409のときだけ帯にする（入力は残す）', () => {
-    expect(CREATE).toContain('isSaveConflict(e) && group')
-    expect(CREATE).toContain('setConflict(true)')
-  })
-
   it('1152（Y9ASp・kmTab）は板1100px未満で畳む', () => {
     // 新しい一覧は CSS の @container ではなく狭い板の判定（narrow）で、フォルダの列を道具の段へ畳む。
     expect(LIST).toContain('folders={narrow ? undefined : folderPanel}')
