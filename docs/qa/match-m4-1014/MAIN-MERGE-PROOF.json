@@ -1,9 +1,0 @@
-{
-  "measuredSha": "75b234490a6c522c24021cebff225a0bb2cd1132",
-  "mergedSha": "3e50a413db0327746063519750480a3d206639c5",
-  "mainSha": "e0b86e4588dd1e736c3500e636844df35f388e47",
-  "measuredTree": "640d1fb67a45c7399c3f9b6aa9110454e136f2c0",
-  "mergedTree": "640d1fb67a45c7399c3f9b6aa9110454e136f2c0",
-  "changes": "",
-  "reason": "PR #1730 merge commit only; train35 code already merged before tests."
-}

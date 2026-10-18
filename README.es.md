@@ -92,7 +92,7 @@ Tarda unos 5 minutos. Al finalizar, el panel en `https://<your-name>-admin.pages
 - **Tracking cronológico** — registra clic → alta como contacto → conversión en orden, atribución last-touch
 - **Flujo de aprobación** — aprueba o rechaza las conversiones atribuidas para confirmar la comisión, con marcas de cuentas duplicadas para detectar posible fraude
 - **Notificaciones push por LINE** — push automático al afiliado cuando se confirma la conversión
-- Detalles: [docs/wiki/27-Affiliate-ASP.md](docs/wiki/27-Affiliate-ASP.md)
+- Detalles: [docs/v6-requirements/v6-16-affiliate-requirements-draft.md](docs/v6-requirements/v6-16-affiliate-requirements-draft.md)
 
 ### Automatización
 - **Reglas IF-THEN** — 7 tipos de triggers × 6 tipos de acciones
