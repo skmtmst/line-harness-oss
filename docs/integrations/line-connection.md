@@ -571,6 +571,25 @@ PR #1751 は必須CIをすべて通過して**マージ済み**（マージSHA `
 - **状態＝未承認。** 利用者へ提示済み・回答待ち。承認を受けるまで `apps/web/src/v8/account-new/` の実装・PR・配備は行わない。
 - 段3 `Lwxyh` の「musubo が自動で行う5つのこと」に残る「Webhook URL の登録」は**正しいので変更しない**。③の接続チェックは `apps/worker/src/services/line-account-connect.ts:163-166` で `PUT /v2/bot/channel/webhook/endpoint` を実際に呼び、`:170-178` で読み直して一致と `active === true` を確かめている。つまり「Step2 では利用者が貼り付ける／③では musubo が登録し直す」の両方が同時に成り立つ。
 
+### 2026-10-19 v07 を実装するときに触る場所（承認待ちのあいだに読み取りで特定）
+
+承認前なのでコードは1文字も変えていない。承認後にすぐ入れるよう、対象と既存の先例だけ先に調べた。
+
+**①URLの出どころ**：画面側に Webhook URL を作る処理はまだ無い。先例は `apps/web/src/v8/settings/pools/create.tsx:108` の `` `${process.env.NEXT_PUBLIC_API_URL ?? ''}/pool/...` `` で、同じ形で `` `${process.env.NEXT_PUBLIC_API_URL ?? ''}/webhook` `` を作れる。Worker 側の正解の形 `apps/worker/src/lib/webhook-endpoint.ts` の `expectedWebhookUrl()`（末尾スラッシュを落として `/webhook` を足す）と一致する。アカウント単位ではなく全社で1つの受け口。
+
+**②コピーボタン**：新しく作らない。共通部品 `apps/web/src/components/shared/copy-text-button.tsx`（`components/ui/copy-text-button.tsx` から再輸出）がそのまま使える。`variant="secondary"` で共通Buttonの形になり、コピーできない環境では読み取り専用の欄へ自動で切り替わる。`step2-connect.tsx` は `design-impact-baseline.txt` に既にあるので一覧の追記は不要。
+
+**③直す文言と件数**
+- `apps/web/src/v8/account-new/step2-connect.tsx:133` のリード文「Webhook URL（受信先のアドレス）は musubo が自動で登録します。入力は要りません。」＝利用者が1枚目で指摘した文。ここを直す。
+- `step2-connect.tsx:125-126` の同じ趣旨のコメント。
+- `step2-connect.tsx:158`「3つすべてにチェック」→ 4つ。
+- `apps/web/src/v8/account-new/logic.ts:204-207` の `WEBHOOK_ACKS` は3件。先頭に貼り付け確認の1件を足して4件にする。
+- `apps/web/src/v8/account-new/logic.test.ts:185,189,194` が3件・3ラベルを検査しているので同時に直す。
+
+**④変えないところ**：`check-rows.ts:19`・`logic.ts:21` の「Webhook URL の登録」は段3（接続確認）の行で、③が実際に API で登録し直すので正しい（上の節の根拠）。
+
+**⑤次に利用者へ確認すること（1回にまとめる）**：`apps/web/src/v8/account-new/precheck.ts:138` の①事前確認「用意するもの」に「Webhook URL やプロバイダーIDの入力はいりません」が残る。②Step2 で貼り付けが要るようになると①の案内と食い違うが、①は今回の v07 の対象フレームではない。①も直すかどうかは承認の返事と合わせて1回で聞く。
+
 ## 4. 気づいた不具合
 
 ### 4-1・4-2 は修正済み（2026-10-16・Claude）
