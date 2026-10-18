@@ -50,6 +50,7 @@ export default function EventBookings() {
   const style = useCustomerStyle();
   const [absence, setAbsence] = useState<EventBookingMine | null>(null);
   const [lessonRevision, setLessonRevision] = useState(0);
+  const [pickingMakeup, setPickingMakeup] = useState(false);
   const navigate = useNavigate();
   // ?liffId=... を引き継ぐ (再読み込みで失わない)。
   const { search } = useLocation();
@@ -218,7 +219,7 @@ export default function EventBookings() {
   return (
     <LiffLookScope className="min-h-screen bg-canvas" designNode="y1bs9A">
       <LiffHeader title={words.myEvents} />
-      <div className="mx-auto flex w-full max-w-md flex-col gap-3.5 p-4 pb-10">
+      <div className={`mx-auto flex w-full max-w-md flex-col gap-3.5 p-4 ${pickingMakeup ? 'pb-40' : 'pb-10'}`}>
         <h1 className="text-xl font-bold text-ink">{words.myEvents}</h1>
         {loading ? (
           <LoadingView />
@@ -255,10 +256,10 @@ export default function EventBookings() {
             )}
             {style === 'lesson' && tab === 'upcoming' ? <>
               <Button variant="secondary" onClick={() => navigate({ pathname: '/mypage', search })}>回数券と月謝を見る</Button>
-              <LessonHistorySection key={lessonRevision} creditsOnly onLater={() => navigate({ pathname: '/mypage', search })} />
+              <LessonHistorySection key={lessonRevision} creditsOnly onPicking={setPickingMakeup} onLater={() => navigate({ pathname: '/mypage', search })} />
             </> : null}
             {items.length === 0 ? (
-              tab === 'upcoming' ? (
+              tab === 'upcoming' && pickingMakeup ? null : tab === 'upcoming' ? (
                 <StatusView icon="calendar" title={`これからの${words.event}はありません`} />
               ) : (
                 <StatusView icon="calendar" title={`これまでの${words.event}はありません`} />

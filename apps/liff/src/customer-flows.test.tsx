@@ -144,10 +144,26 @@ it('サロンの指名と指名料を保持し、選んだ担当だけで次へ�
 it('振替先はあとで選ぶとマイページへ戻り、振替を消費せず本人の一覧から再開できる', async () => {
   vi.mocked(api.makeupCredits).mockResolvedValue({ credits: [{ id: 'credit', status: 'open', expires_at: '2099-12-31T00:00:00Z' }] } as never);
   mount('lesson');
-  fireEvent.click(await screen.findByRole('button', { name: '振替先はあとで選ぶ' }));
+  const later = await screen.findByRole('button', { name: '振替先はあとで選ぶ' });
+  expect(screen.getByRole('button', { name: /^キャンセルする$/ })).toBeTruthy();
+  fireEvent.click(later);
   await screen.findByRole('button', { name: /予約の確認・振替/ });
   expect(screen.getByTestId('location').textContent).toBe('/mypage?liffId=fixture');
   expect(api.useMakeup).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: /予約の確認・振替/ }));
   expect(await screen.findByRole('button', { name: '振替先はあとで選ぶ' })).toBeTruthy();
+});
+
+it.each([false, true])('通常の申込が空でも、振替の選択中=%sでは空表示と選択画面を重ねない', async (hasCredit) => {
+  vi.mocked(api.myEventBookings).mockResolvedValue({ items: [] });
+  vi.mocked(api.makeupCredits).mockResolvedValue({ credits: hasCredit
+    ? [{ id: 'credit', status: 'open', expires_at: '2099-12-31T00:00:00Z' }] : [] } as never);
+  mount('lesson');
+  if (hasCredit) {
+    await screen.findByRole('heading', { name: '振替先を選ぶ' });
+    await vi.waitFor(() => expect(screen.queryByText('これからのクラスはありません')).toBeNull());
+    expect(api.useMakeup).not.toHaveBeenCalled();
+  } else {
+    expect(await screen.findByText('これからのクラスはありません')).toBeTruthy();
+  }
 });
