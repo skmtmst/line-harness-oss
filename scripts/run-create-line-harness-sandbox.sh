@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 usage() {
   cat <<'EOF'
@@ -45,6 +46,8 @@ copy_dir_if_present() {
   mkdir -p "$(dirname "$dest")"
   rm -rf "$dest"
   cp -R "$src" "$dest"
+  if [[ -n "$(find "$dest" -type l -print -quit)" ]]; then die "symlink in copied auth"; fi
+  chmod -R go-rwx "$dest"
 }
 
 REAL_HOME="${HOME:-}"
@@ -98,10 +101,31 @@ if [[ -z "$SAFE_NAME" ]]; then
 fi
 
 if [[ -z "$SANDBOX_ROOT" ]]; then
-  SANDBOX_ROOT="/private/tmp/line-harness-sandboxes/$SAFE_NAME"
+  SANDBOX_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/line-harness-${SAFE_NAME}.XXXXXXXX")"
 fi
 
 SANDBOX_ROOT="${SANDBOX_ROOT%/}"
+# Validate before either reusing or deleting a caller-supplied root. Never follow links.
+node --input-type=module - "$SANDBOX_ROOT" <<'NODE'
+import { lstatSync, readdirSync, realpathSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
+const root = resolve(process.argv[2]);
+function check(path) {
+  const stat = lstatSync(path);
+  if (stat.isSymbolicLink() || stat.uid !== process.getuid() || (stat.mode & 0o077)) throw new Error('Unsafe sandbox path');
+  if (stat.isDirectory()) for (const name of readdirSync(path)) check(join(path, name));
+}
+try { check(root); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+// A hostile non-sticky parent can rename a private root to replace it.
+let parent = dirname(root);
+while (true) {
+  const stat = lstatSync(realpathSync(parent));
+  if (stat.uid !== process.getuid() && stat.uid !== 0 || ((stat.mode & 0o022) && !(stat.mode & 0o1000))) throw new Error('Unsafe sandbox parent');
+  if (parent === dirname(parent)) break;
+  parent = dirname(parent);
+}
+NODE
+
 SANDBOX_HOME="$SANDBOX_ROOT/home"
 SANDBOX_WORK="$SANDBOX_ROOT/work"
 SANDBOX_XDG_CONFIG="$SANDBOX_ROOT/xdg/config"
