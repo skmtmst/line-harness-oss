@@ -519,7 +519,7 @@ export default function BookingsPage() {
                         <Td>
                           {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
                           <ContextMenu label={`予約「${b.friend_name ?? 'お客様'}」の操作`} items={bookingContextItems(b)}>
-                            <span className={ledgerStyles.name} title={b.friend_name ?? undefined}>
+                            <span className={ledgerStyles.name} title={b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}>
                               {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
                             </span>
                           </ContextMenu>
