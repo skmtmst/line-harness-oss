@@ -185,15 +185,21 @@ test('git renames consume identical assertions once; a copied or changed asserti
 
 test('adopting the split-file reader retains old assertions and detects new strings, copies and roots', () => {
   const helper = 'apps/web/src/helper.mjs'
-  const run = (body, path = 'apps/web/src/example.tsx') => analyzeSourceTests(new Map([
+  const helperSource = `import{readFileSync}from'node:fs';export function readUiSource(path){return readFileSync(path,'utf8')}`
+  const run = (body, path = 'apps/web/src/example.tsx', reader = helperSource) => analyzeSourceTests(new Map([
     [entry, `import {readUiSource} from './helper.mjs';import {it,expect}from'vitest';const src=readUiSource('${path}');it('case',()=>{${body}})`],
-    [helper, `import{readFileSync}from'node:fs';export function readUiSource(path){return readFileSync(path,'utf8')}`],
+    [helper, reader],
   ]))
-  const before = analyze(`expect(src).toContain('styles.row')`)
-  assert.equal(newSourceAssertions(before, run(`expect(src).toContain('styles.row')`)).length, 0)
-  assert.equal(newSourceAssertions(before, run(`expect(src).toContain('styles.row');expect(src).toContain('styles.new')`)).length, 1)
-  assert.equal(newSourceAssertions(before, run(`expect(src).toContain('styles.row');expect(src).toContain('styles.row')`)).length, 1)
-  assert.equal(newSourceAssertions(before, run(`expect(src).toContain('styles.row')`, 'different.tsx')).length, 1)
+  const direct = analyze(`expect(src).toContain('styles.row')`)
+  const established = run(`expect(src).toContain('styles.established')`, 'established.tsx')
+  const before = [...direct, ...established]
+  const compare = current => newSourceAssertions(before, [...current, ...established])
+  assert.equal(compare(run(`expect(src).toContain('styles.row')`)).length, 0)
+  assert.equal(compare(run(`expect(src).toContain('styles.row');expect(src).toContain('styles.new')`)).length, 1)
+  assert.equal(compare(run(`expect(src).toContain('styles.row');expect(src).toContain('styles.row')`)).length, 1)
+  assert.equal(compare(run(`expect(src).toContain('styles.row')`, 'different.tsx')).length, 1)
+  assert.equal(newSourceAssertions(direct, run(`expect(src).toContain('styles.row')`)).length, 1)
+  assert.equal(compare(run(`expect(src).toContain('styles.row')`, 'apps/web/src/example.tsx', helperSource.replace("readFileSync(path,'utf8')", "readFileSync(path,'utf8')+'styles.row'"))).length, 1)
 })
 
 

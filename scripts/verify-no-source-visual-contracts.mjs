@@ -332,6 +332,7 @@ export function newSourceAssertions(before, after, moves = new Map()) {
     return JSON.stringify(parts)
   }
   const remaining = new Map()
+  const baselineReaders = new Set(before.flatMap(hit => hit.reads.flatMap(path => path.match(/\|helper:([a-f0-9]+)$/)?.slice(1) ?? [])))
   for (const hit of before) {
     const key = identity(hit)
     const list = remaining.get(key) ?? []
@@ -347,8 +348,10 @@ export function newSourceAssertions(before, after, moves = new Map()) {
   })
   return unmatched.filter(hit => {
     if (!hit.reads.some(path => /\|helper:/.test(path))) return true
+    if (hit.reads.some(path => /\|helper:/.test(path) && !baselineReaders.has(path.match(/\|helper:([a-f0-9]+)$/)?.[1]))) return true
     // readUiSource preserves the requested root while following its split files.
-    // Changing an existing helper, a read root, a test or an assertion still fails.
+    // Only a reader already observed in the base qualifies. A new or changed
+    // helper, a read root, a test or an assertion still fails.
     const plain = identity(hit, true, false)
     for (const list of remaining.values()) {
       const index = list.findIndex(old => old.reads.every(path => !/\|helper:/.test(path)) && identity(old, true) === plain)
