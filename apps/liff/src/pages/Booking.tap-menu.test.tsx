@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import Booking from './Booking.js';
 import type { MenuItem } from '../lib/api.js';
 
-vi.mock('../lib/api.js', () => ({ api: { menus: vi.fn(), bookingSettings: vi.fn().mockResolvedValue({ approval_mode: 'manual' }) } }));
+vi.mock('../lib/api.js', () => ({ api: { menus: vi.fn(), bookingSettings: vi.fn().mockResolvedValue({ approval_mode: 'manual' }), storePhotos: vi.fn().mockResolvedValue([]) } }));
 vi.mock('../components/MenuList.js', () => ({ default: ({ onSelect }: { onSelect: (m: MenuItem) => void }) => <button onClick={() => onSelect({ id: 'manual', name: '自分で選んだ' } as MenuItem)}>メニュー一覧</button> }));
 vi.mock('../components/StaffList.js', () => ({ default: ({ menu }: { menu: MenuItem }) => <div>担当選択:{menu.name}</div> }));
 vi.mock('../components/RepeatCard.js', () => ({ default: () => null }));
