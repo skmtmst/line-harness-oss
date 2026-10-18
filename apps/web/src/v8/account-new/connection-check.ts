@@ -86,4 +86,3 @@ export function checkRowText(row: V8CheckRow): string {
 export function allV8RowsPassed(rows: V8CheckRow[]): boolean {
   return rows.every((row) => row.state === 'passed')
 }
-
