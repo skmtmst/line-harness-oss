@@ -297,6 +297,10 @@ test.each(['schedule', 'push', 'workflow_dispatch', 'pull_request'])('F17/F18: %
     const url = String(input);
     if (url.includes('/pulls?state=open')) return jsonResponse([fork]);
     if (url.includes('/pulls?state=closed')) return jsonResponse([{ ...fork, state: 'closed' }]);
+    if (url.includes('/files?')) return jsonResponse([]);
+    if (url.includes('/check-runs?')) return jsonResponse({ check_runs: [] });
+    if (url.includes('/pulls/276')) return jsonResponse(fork);
+    if (url === 'https://relay.test') return jsonResponse({ success: true });
     throw new Error('UNEXPECTED_REQUEST: ' + url);
   });
   expect(await syncGitHubPullRequests({ repository: 'skmtmst/line-harness-oss', githubToken: 'test', relayUrl: 'https://relay.test', relaySecret: 'test', eventName, event: { pull_request: fork }, minPrNumber: 1, closedLookbackHours: 72, now: new Date('2026-08-23T03:00:00Z'), fetcher })).toEqual({ sent: 0, reconciled: 0 });

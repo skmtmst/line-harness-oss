@@ -61,7 +61,7 @@ describe('OAuth and cross-account navigation', () => {
     expect(await changed.json()).toMatchObject({ data: { redirectTarget: null } });
   });
   async function link(token: string, cookie = 'browser-secret', confirmed = true) {
-    return instance.request('/api/liff/link', { method: 'POST', headers: { 'content-type': 'application/json', Cookie: `lh_cross_account=${cookie}` }, body: JSON.stringify({ idToken: 'mock', crossAccountToken: token, confirmCrossAccountLink: confirmed }) }, env);
+    return instance.request('/api/liff/link', { method: 'POST', headers: { 'content-type': 'application/json', Cookie: `__Host-lh_cross_account=${cookie}` }, body: JSON.stringify({ idToken: 'mock', crossAccountToken: token, confirmCrossAccountLink: confirmed }) }, env);
   }
   it('F8: forwarded tokens, absent confirmation and changing an existing identity are rejected', async () => {
     const token = await signCrossAccountToken('secret', { userId: 'source', targetAccountId: 'a', browserNonce: 'browser-secret' });

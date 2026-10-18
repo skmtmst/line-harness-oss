@@ -532,6 +532,11 @@ describe('protected API access', () => {
 
 describe('staff feature permissions', () => {
   const bearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
+  test.each(['/api/friends/friend-1/%6Dessages', '/api/friends/friend-1/me%73sages'])(
+    'F16: encoded chat path %s cannot use friend-only permission', async path => {
+      expect((await app().request(path, bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+    },
+  );
 
   test.each(['/api/support', '/api/operators', '/api/friends/friend-1/messages', '/api/friends/friend-1/%6Dessages', '/api/friends/friend-1/me%73sages'])(
     'chat permission protects %s',

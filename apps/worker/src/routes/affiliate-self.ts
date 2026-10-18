@@ -125,8 +125,8 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
       getMileageSelfInsights(c.env.DB, resolved.friend.id),
       getMileageEarningOpportunitiesForFriend(c.env.DB, resolved.friend.id),
     ]);
-    const browserNonce = getCookie(c, 'lh_cross_account') || crypto.randomUUID();
-    setCookie(c, 'lh_cross_account', browserNonce, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/api/liff', maxAge: 15 * 60 });
+    const browserNonce = getCookie(c, '__Host-lh_cross_account') || crypto.randomUUID();
+    setCookie(c, '__Host-lh_cross_account', browserNonce, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 15 * 60 });
     const opportunities = await Promise.all(rawOpportunities.map(async (opportunity) => {
       if (opportunity.type !== 'friend_add'
           || opportunity.completed

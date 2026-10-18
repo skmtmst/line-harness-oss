@@ -200,7 +200,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
         body.crossAccountToken,
       );
       if (!crossAccount || !matchedAccount || crossAccount.targetAccountId !== matchedAccount.id
-        || !crossAccount.browserNonce || getCookie(c, 'lh_cross_account') !== crossAccount.browserNonce
+        || !crossAccount.browserNonce || getCookie(c, '__Host-lh_cross_account') !== crossAccount.browserNonce
         || body.confirmCrossAccountLink !== true || (linkedUserId && linkedUserId !== crossAccount.userId)) {
         return inputError(c, { success: false, error: 'Invalid cross-account token' }, 400, ["crossAccountToken"]);
       }

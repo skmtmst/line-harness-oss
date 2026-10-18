@@ -551,7 +551,7 @@ async function processSingleDelivery(
   };
 
   // Expand template variables ({{name}}, {{uid}}, {{auth_url:CHANNEL_ID}}, {{metadata.KEY}}, etc.)
-  const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
+  const resolvedMeta = await resolveMetadata(db, friend);
   const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
   // 質問の前文・選択肢文にも expandVariables が効くので、共通情報の
   // 厳格スキャンは本文と質問JSONを合わせた全体で行う。

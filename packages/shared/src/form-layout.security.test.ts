@@ -4,6 +4,7 @@ import { normalizeRatingValue, trimAsciiSpaces, validateAnswer, type FormInputBl
 describe('public form input CPU bounds', () => {
   it('F14: rejects oversized and ambiguous email input before expensive parsing', () => {
     const block: FormInputBlock = { id: 'mail', kind: 'input', type: 'text', name: 'mail', label: 'Email', limit: { format: 'email' } };
+    expect(validateAnswer(block, `${'a'.repeat(250)}@example.com`)).toBeTruthy();
     const start = performance.now();
     expect(validateAnswer(block, `a@${'.'.repeat(100_000)} `)).toBeTruthy();
     expect(performance.now() - start).toBeLessThan(500);

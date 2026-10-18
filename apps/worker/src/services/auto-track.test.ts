@@ -245,6 +245,7 @@ describe('decorateForFriendPush — shared cron/instant pipeline', () => {
 
 
 test('F27: customer-inserted URLs never become first-party tracked links', async () => {
+  dbMocks.getOrCreateAutoTrackedLink.mockResolvedValue({ id: 'injected', short_code: 'BAD' });
   const result = await decorateForFriendPush(DB, 'text', 'https://evil.example/ さん、ようこそ', WORKER, {
     lineAccountId: 'a', friendId: FRIEND, sourceContent: '{{name}} さん、ようこそ',
   });

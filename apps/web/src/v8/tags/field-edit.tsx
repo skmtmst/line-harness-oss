@@ -268,7 +268,7 @@ export default function FieldEdit() {
       foldersReloading={foldersReloading}
       onRetryFolders={() => void loadFolders()}
       onCreateFolder={canCreateFolder
-        ? folderCreator((name, color) => api.folders.create({ kind: 'friend_field', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+        ? folderCreator((name, color) => api.folders.create({ kind: 'friend_field', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
         : undefined}
       siblings={siblings}
       siblingsReady

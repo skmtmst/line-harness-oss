@@ -135,7 +135,7 @@ function TagFolderPage() {
           : await api.tagGroups.create({ name: name.trim(), color, accountId: selectedAccountId })
         if (!result.success) throw new Error('save_failed')
       } else {
-        const result = await api.folders.create({ kind: 'friend_field', name: name.trim(), color })
+        const result = await api.folders.create({ kind: 'friend_field', name: name.trim(), color, accountId: selectedAccountId })
         if (!result.success) throw new Error('save_failed')
       }
       if (!sameRequest(activeRef.current, request)) return
