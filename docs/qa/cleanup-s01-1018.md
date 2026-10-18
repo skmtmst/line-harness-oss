@@ -47,3 +47,6 @@ Retry-Afterのdelta秒は実運用の応答時刻から計算する。通常remi
 
 
 全Worker試験の旧再送期待はreminder-delivery-r345-r346.test.tsにも1件あり、本文固定を確認する例は明確な429拒否へ変更して既存の本文/キー/履歴の一致を保持。さらに、受理後の保存失敗を想定した旧last_error_code=NULL・本文ありのretry_wait/permanent_failedと、試行済みqueuedを照合待ちへ止める（未試行queuedは保持）。初回本文と元キー・回数を残し、再送して履歴を作り直さない。UIのcanRetryと手動APIも同じ条件。旧版は追加2例で失敗（null-legacy-before.log）、修正後は関連6ファイル100件成功（null-legacy-and-log-final.log）。予約系route/service/DBは引き続き未変更。
+
+
+全Worker試験の3件目はsecurity-console-contract.test.tsが新しいincidentIdを拒否したもの。ファイルの例外一覧は追加せず、同じ字句スコープのconstがglobal crypto.randomUUID()を呼んだ根拠をASTで確認する規則へ接続。自由文・利用者ID・固定UUIDの貼り付け・let・同名引数/catch/分割代入・偽crypto/namespaceは拒否する。既存の固定code/route・query/例外/展開の拒否を保持。helperと応答/ログ/通知の一致検査を合わせ4件成功（incident-log-guard-final.log）、Worker/DB型も成功。事故ID以外のログ値やファイル単位の免除を増やしていない。
