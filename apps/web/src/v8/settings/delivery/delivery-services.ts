@@ -167,8 +167,9 @@ export function uberPatch(data: UberConnectionData, flash: string): Partial<Deli
     return {
       ready: false,
       status: 'error',
-      storeName: connection.storeName ?? undefined,
-      connectedAt: connection.connectedAt ?? undefined,
+      // The saved target is a request snapshot, not a confirmed connection.
+      storeName: undefined,
+      connectedAt: undefined,
       checkedAt: connection.checkedAt ?? undefined,
       stateNote: 'お店をつないだ結果を確認する必要があります。送り直さず musubo へお知らせください。',
       stateNoteTone: 'danger',
