@@ -253,7 +253,7 @@ export default function BookingHistory() {
             {actionError && !pendingCancel && !pendingChange && (
               <p role="alert" className="text-[13px] leading-5 text-danger">{actionError}</p>
             )}
-            {tab === 'upcoming' ? <LessonHistorySection onPicking={setPicking} /> : null}
+            {tab === 'upcoming' ? <LessonHistorySection onPicking={setPicking} onLater={() => navigate({ pathname: '/mypage', search })} /> : null}
             {tab === 'upcoming' ? <WaitlistSection upcomingHeading={list.length > 0} onChanged={() => setReloadKey((k) => k + 1)} /> : null}
             {Object.values(payments).some((view) => view && view.kind !== 'onsite') ? <PaymentPreparingNote /> : null}
             {notice && (

@@ -11,7 +11,7 @@ import LoadErrorView from './LoadErrorView.js';
  * 予約の履歴に並ぶ教室の予約（B3・rx3FL・kzE16）。振替を使うクラスの行に［欠席する］、
  * 残っている振替があれば「振替先を選ぶ」。欠席の確定と振替先の選択は別の操作。
  */
-export default function LessonHistorySection({ onPicking, creditsOnly = false }: { onPicking?: (picking: boolean) => void; creditsOnly?: boolean }) {
+export default function LessonHistorySection({ onPicking, onLater, creditsOnly = false }: { onPicking?: (picking: boolean) => void; onLater?: () => void; creditsOnly?: boolean }) {
   const [items, setItems] = useState<EventBookingMine[]>([]);
   const [credits, setCredits] = useState<MakeupCredit[]>([]);
   const [target, setTarget] = useState<EventBookingMine | null>(null);
@@ -33,7 +33,7 @@ export default function LessonHistorySection({ onPicking, creditsOnly = false }:
   if ((creditsOnly || items.length === 0) && credits.length === 0 && !target) return null;
   return (
     <section className="space-y-3.5" aria-label="教室の予約">
-      {credits[0] ? <MakeupPicker key={credits[0].id} credit={credits[0]} source={sourceOf(credits[0])} onUsed={() => { setJustAbsent(null); load(); }} onLater={() => setJustAbsent(null)} /> : null}
+      {credits[0] ? <MakeupPicker key={credits[0].id} credit={credits[0]} source={sourceOf(credits[0])} onUsed={() => { setJustAbsent(null); load(); }} onLater={() => { setJustAbsent(null); onLater?.(); }} /> : null}
       {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
       <ul className="space-y-3.5">
         {(creditsOnly ? [] : items).map((b) => (

@@ -128,3 +128,14 @@ it('サロンの指名と指名料を保持し、選んだ担当だけで次へ�
   expect(screen.getByText('¥6,000')).toBeTruthy();
   expect((screen.getByRole('button', { name: '日時を選ぶ' }) as HTMLButtonElement).disabled).toBe(false);
 });
+
+it('振替先はあとで選ぶとマイページへ戻り、振替を消費せず本人の一覧から再開できる', async () => {
+  vi.mocked(api.makeupCredits).mockResolvedValue({ credits: [{ id: 'credit', status: 'open', expires_at: '2099-12-31T00:00:00Z' }] } as never);
+  mount('lesson');
+  fireEvent.click(await screen.findByRole('button', { name: '振替先はあとで選ぶ' }));
+  await screen.findByRole('button', { name: /予約の確認・振替/ });
+  expect(screen.getByTestId('location').textContent).toBe('/mypage?liffId=fixture');
+  expect(api.useMakeup).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: /予約の確認・振替/ }));
+  expect(await screen.findByRole('button', { name: '振替先はあとで選ぶ' })).toBeTruthy();
+});
