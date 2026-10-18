@@ -250,6 +250,8 @@ describe('V6 event waitlist and applicants', () => {
     });
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM event_bookings`).get())
       .toEqual({ count: 1 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM workflow_steps WHERE process_kind='booking_line_delivery'
+      AND subject_id='event-waitlist-accept:event-waitlist:wait-a'`).get()).toEqual({count:1});
   });
 
   test('移行済み待機者はイベントと枠の編集後に繰り上げても旧snapshotで案内・予約する', async () => {

@@ -1,3 +1,5 @@
+import { lineTransport } from '../lib/external-call/line.js';
+import { BookingLineDeliveryIncomplete, deliverBookingLine } from './booking-line-delivery.js';
 import { getBookingSyncRules } from '@line-crm/db';
 import { activeTenantLineAccountSql, isOperationCapabilityStopped, resolveLineCredential } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -78,7 +80,7 @@ export async function getBookingChannels(db: D1Database, accountId: string, cred
     let readError: string | null = null;
     if (row.id) {
       try {
-        const client = await clientForConnection(row, credentials);
+        const client = await clientForConnection(row, credentials,{db,accountId});
         const ids = await client.listEventIds(bounds.weekFrom, bounds.weekTo);
         // 自社から書き出した予約は「外の予定」に含めない。
         const internal = await db.prepare('SELECT external_event_id FROM bookings WHERE line_account_id = ? AND external_calendar_id = ? AND external_event_id IS NOT NULL').bind(accountId, row.calendar_id).all<{ external_event_id: string }>();
@@ -176,8 +178,9 @@ export async function notifyBookingConflicts(db: D1Database, accountId: string):
     let retryKey = crypto.randomUUID();
     if (stored) {
       try {
-        const previous = JSON.parse(stored.value) as { status: string; retryKey: string; claimedAt: number };
-        if (previous.status === 'sent' || (previous.status === 'sending' && previous.claimedAt > now - 300000)) continue;
+        const previous = JSON.parse(stored.value) as { status: string; retryKey: string; claimedAt: number; safeToRetry?: boolean };
+        if (previous.status === 'sent' || previous.status === 'sending' || previous.status === 'unknown'
+          || previous.status === 'retry_wait' && previous.safeToRetry !== true) continue;
         if (!previous.retryKey) continue;
         retryKey = previous.retryKey;
       } catch { continue; }
@@ -187,9 +190,10 @@ export async function notifyBookingConflicts(db: D1Database, accountId: string):
       ? await db.prepare('UPDATE account_settings SET value=? WHERE line_account_id=? AND key=? AND value=?').bind(claimedValue,accountId,key,stored.value).run()
       : await db.prepare('INSERT OR IGNORE INTO account_settings (id,line_account_id,key,value) VALUES (?,?,?,?)').bind(crypto.randomUUID(),accountId,key,claimedValue).run();
     if (!claim.meta.changes) continue;
-    const finish = async (status: 'sent' | 'retry_wait') => {
+    let sendStarted=false;
+    const finish = async (status: 'sent' | 'retry_wait' | 'unknown') => {
       await db.prepare('UPDATE account_settings SET value=? WHERE line_account_id=? AND key=? AND value=?')
-        .bind(JSON.stringify({ status,retryKey,claimedAt:now }),accountId,key,claimedValue).run();
+        .bind(JSON.stringify({ status,retryKey,claimedAt:now,safeToRetry:!sendStarted }),accountId,key,claimedValue).run();
     };
     try {
       const token = await resolveLineCredential(recipient.channel_access_token_encrypted,recipient.channel_access_token,{ lineAccountId: accountId, field: 'channel_access_token' });
@@ -198,10 +202,20 @@ export async function notifyBookingConflicts(db: D1Database, accountId: string):
         await finish('retry_wait');
         continue;
       }
-      await new LineClient(token).pushMessage(recipient.line_user_id,[{ type: 'text', text: `${conflict.staffName}さんの予約が重なっています。予約管理で別のスタッフへの変更を確認してください。` }],retryKey);
+      sendStarted=true;
+      await deliverBookingLine(db,{accountId,operationId:key,retryKey,
+        snapshot:{to:recipient.line_user_id,text:`${conflict.staffName}さんの予約が重なっています。予約管理で別のスタッフへの変更を確認してください。`},
+        authorize:async()=>await bookingAutomaticNotificationAllowed(db,accountId)&&!!await db.prepare(`SELECT 1 ok FROM bookings a JOIN bookings b ON b.line_account_id=a.line_account_id
+          WHERE a.id=? AND b.id=? AND a.line_account_id=? AND a.lock_version=? AND b.lock_version=?
+            AND a.status IN ('requested','confirmed') AND b.status IN ('requested','confirmed')
+            AND julianday(a.starts_at)<julianday(b.ends_at) AND julianday(b.starts_at)<julianday(a.ends_at)`)
+          .bind(conflict.bookingId,conflict.otherBookingId,accountId,conflict.version,conflict.otherVersion).first(),
+        send:(signal,saved,key)=>new LineClient(token,{transport:lineTransport(signal)}).pushMessage(saved.to,[{type:'text',text:saved.text}],key),
+      });
       await finish('sent');
-    } catch {
-      await finish('retry_wait');
+    } catch(error) {
+      if(error instanceof BookingLineDeliveryIncomplete&&error.beforeSend)sendStarted=false;
+      await finish(sendStarted?'unknown':'retry_wait');
       throw new Error('booking_conflict_notification_failed');
     }
   }

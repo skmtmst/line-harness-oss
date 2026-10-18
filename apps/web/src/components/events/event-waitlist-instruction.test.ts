@@ -14,7 +14,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const FORM = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'edit-form.tsx'), 'utf8')
 const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
 const BOOKINGS = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'bookings.tsx'), 'utf8')
-const ROUTES = readFileSync(join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'events.ts'), 'utf8')
+// 取消→自動案内の配線はWorkerのevents.test.tsで実HTTP経路から検証する。
 
 describe('R83 キャンセル待ちの説明は自動案内にそろえる', () => {
   it('公開設定は自動案内と本人承諾を説明し、手動だけの説明をしない', () => {
@@ -29,7 +29,4 @@ describe('R83 キャンセル待ちの説明は自動案内にそろえる', () 
     expect(BOOKINGS).toContain('空きが出たら先頭の方へ期限つきの案内を送ります')
   })
 
-  it('裏側は取消で自動案内の仕事を積む', () => {
-    expect(ROUTES).toContain('enqueueEventWaitlistPromotion')
-  })
 })
