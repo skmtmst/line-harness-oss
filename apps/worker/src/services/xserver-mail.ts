@@ -1,4 +1,5 @@
 import { connect } from 'cloudflare:sockets';
+import { assertQaOutboundAllowed } from './staging-qa-safety.js';
 import PostalMime, { type Address } from 'postal-mime';
 import { NEN_FROM_NAME } from './mail-from-name.js';
 import { storeSupportEmail } from './support-email.js';
@@ -156,6 +157,7 @@ class ImapClient {
 }
 
 async function connectImapStartTls(host: string): Promise<MailSocket> {
+  assertQaOutboundAllowed();
   const plain = new MailSocket(connect(
     { hostname: host, port: 143 },
     { secureTransport: 'starttls', allowHalfOpen: false },
@@ -296,6 +298,7 @@ async function smtpCommand(transport: MailSocket, command: string, expected: num
 }
 
 export async function sendXServerMail(env: XServerMailEnv, input: SendMailInput): Promise<string> {
+  assertQaOutboundAllowed();
   const config = requireConfig(env);
   const plain = new MailSocket(connect(
     { hostname: config.host, port: 587 },
