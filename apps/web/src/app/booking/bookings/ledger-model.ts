@@ -76,7 +76,7 @@ export const actionLabel: Record<string, string> = {
 }
 
 /** 1ページに出す件数。設計の「表示 20件」に合わせる。 */
-export const PAGE_SIZE = 20
+export { DEFAULT_PAGE_SIZE as PAGE_SIZE } from '@/components/shared/page-size-options'
 
 export function formatJpDateTime(iso: string): string {
   // 不正な日時が来たら Invalid Date を出さず「—」に逃がす(点検#516軽6)。
