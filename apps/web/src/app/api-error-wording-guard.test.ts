@@ -137,7 +137,6 @@ const BASELINE: Record<string, number> = {
   'v8/restaurant/front-desk/walk-in-dialog.tsx': 1,
   'v8/restaurant/inventory/channels.tsx': 1,
   'v8/restaurant/store-new/store-new.tsx': 3,
-  'v8/scenario-detail/detail.tsx': 3,
   'v8/scenario-first-step/first-step.tsx': 1,
   'v8/scenarios/list.tsx': 1,
   'v8/settings/staff/staff.tsx': 1,

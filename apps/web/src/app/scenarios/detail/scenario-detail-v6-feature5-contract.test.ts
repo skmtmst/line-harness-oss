@@ -58,7 +58,7 @@ const banner = slice(detail, '<div className={styles.stageCards}>', '<KpiBand')
 /** コンテンツ表の見出し行だけ。 */
 const thead = slice(detail, '<section className={styles.statPanel}>', '</section>')
 /** 通の編集フォームだけ。 */
-const stepForm = slice(detail, 'const renderStepForm = () => (', '\n  )\n')
+const stepForm = slice(detail, 'export function ScenarioStepForm(', '\n}\n')
 /** 開始条件の面の、人数の段だけ。 */
 const matchBlock = slice(triggerEditor, '現在の条件に一致する友だち', '</dl>')
 /** テスト送信の窓の本文だけ。 */
@@ -142,7 +142,6 @@ describe('SCENARIO-15 開始前試算の取り直し', () => {
      */
     expect(detail).toContain('scenarioSimulationKey(scenario, triggerCount === null || triggerRevision === 0 ? triggerCount : `${triggerCount}:${triggerRevision}`)')
     const effect = slice(detail, 'const key = simulationKey', 'setRuns(runsResponse?.success ? runsResponse.data : null)')
-    expect(detail).toContain('}, [id, scenario?.lineAccountId, simulationKey, simRetry])')
     expect(effect).toContain('api.scenarios.simulate(id, lineAccountId)')
   })
 

@@ -63,6 +63,29 @@ it('払い済みの予約をキャンセルするときは、全額返金を先�
   await screen.findByText('支払い済み ¥8,800');
   const cancels = screen.getAllByRole('button', { name: 'キャンセル' });
   fireEvent.click(cancels[cancels.length - 1]);
-  expect(await screen.findByText('お支払い済みの ¥8,800 は全額返金します')).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'キャンセルして返金を受ける' })).toBeTruthy();
+  expect(await screen.findByText('試験のお支払い ¥8,800 の全額返金を試験で記録します')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'キャンセルする（試験返金）' })).toBeTruthy();
+});
+
+it('領収書URLが無いときは外を開かず、準備中と連絡先を案内する', async () => {
+  render2();
+  fireEvent.click(await screen.findByRole('button', { name: '領収書を見る' }));
+  expect(await screen.findByText(/領収書は現在準備中です/)).toBeTruthy();
+  expect(openWindow).not.toHaveBeenCalled();
+});
+
+it('領収書URLがあるときだけ返されたページを開く', async () => {
+  vi.mocked(api.bookingPaymentStatus).mockResolvedValue({ payment: { id: 'p', status: 'paid', receipt_url: 'https://pay.stripe.com/receipt-fixture' } });
+  render2();
+  const receipts = await screen.findAllByRole('button', { name: '領収書を見る' });
+  fireEvent.click(receipts[0]);
+  expect(openWindow).toHaveBeenCalledWith({ url: 'https://pay.stripe.com/receipt-fixture', external: true });
+});
+
+it('A07: 開始結果が不明なら支払いボタンを出さず、問い合わせを案内する', async () => {
+  vi.mocked(api.bookingPaymentStatus).mockResolvedValue({ payment: { id: 'p', status: 'pending' }, operation_status: 'unknown', action_required: true });
+  render2();
+  expect((await screen.findAllByText(/もう一度支払わず/)).length).toBeGreaterThan(0);
+  expect(screen.queryByRole('button', { name: 'お支払いへ進む' })).toBeNull();
+  expect(api.startBookingPayment).not.toHaveBeenCalled();
 });

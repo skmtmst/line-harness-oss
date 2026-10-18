@@ -1,3 +1,4 @@
+import { stagingQaPaths } from './staging-qa-paths.js';
 import { broadcastUploadPaths } from './broadcast-upload-paths.js';
 import { mileageFolderPaths } from './mileage-folders-paths.js';
 import { customerLookPaths } from './customer-look-paths.js';
@@ -79,6 +80,7 @@ import { webinarsPaths } from './webinars-paths.js';
 
 // Keep spread precedence and insertion order: later feature definitions may override earlier ones.
 export const paths = {
+  ...stagingQaPaths,
   ...api1AuthoringPaths,
   ...bookingAssignmentPaths,
   ...bookingPaymentAdminPaths,

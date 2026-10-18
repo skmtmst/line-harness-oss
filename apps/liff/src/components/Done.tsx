@@ -1,3 +1,5 @@
+import PaymentPreparingNote from './PaymentPreparingNote.js';
+import { PAYMENT_UNKNOWN, CUSTOMER_WORDS } from '../lib/customer-words.js';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import liff from '@line/liff';
@@ -42,7 +44,7 @@ export default function Done({
   const [payState, setPayState] = useState<'idle' | 'starting' | 'phone' | 'failed'>('idle');
 
   async function startPayment() {
-    if (!bookingId || payState === 'starting') return;
+    if (!bookingId || (payState === 'starting' || payState === 'failed')) return;
     setPayState('starting');
     try {
       const res = await api.startBookingPayment(bookingId);
@@ -80,7 +82,7 @@ export default function Done({
             </>
           ) : (
             <>
-              お店が確かめたら、LINE でお知らせします。
+              ご利用先が確かめたら、LINE でお知らせします。
               <br />
               この画面は閉じてかまいません。
             </>
@@ -96,7 +98,7 @@ export default function Done({
           </dd>
         </div>
         <div className="flex h-10 items-start gap-2 py-2.5">
-          <dt className="w-18 shrink-0 text-xs text-liff-sub">メニュー</dt>
+          <dt className="w-18 shrink-0 text-xs text-liff-sub">{CUSTOMER_WORDS.bookingContent}</dt>
           <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={menuName}>
             {menuName}
           </dd>
@@ -104,11 +106,12 @@ export default function Done({
         <div className="flex h-10 items-start gap-2 py-2.5">
           <dt className="w-18 shrink-0 text-xs text-liff-sub">状態</dt>
           <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">
-            {status === 'confirmed' ? '確定' : 'お店の確認待ち'}
+            {status === 'confirmed' ? '確定' : CUSTOMER_WORDS.approvalPending}
           </dd>
         </div>
       </dl>
       <OnlineMeetingCard bookingId={bookingId} status={status} />
+      {prepayNotice ? <PaymentPreparingNote /> : null}
       {prepayNotice && (
         <section
           aria-label="事前のお支払いのお願い"
@@ -116,9 +119,9 @@ export default function Done({
         >
           <p className="text-[15px] font-bold text-ink">事前のお支払いをお願いしています</p>
           <p className="mt-1 text-[13px] leading-6 text-liff-sub">{prepayNotice}</p>
-          {payState === 'phone' ? (
+          {payState === 'phone' || payState === 'failed' ? (
             <p className="mt-2 text-[13px] leading-6 text-ink" role="status">
-              このお店ではアプリでのお支払いができません。お手数ですが、お店に電話で確認してください。
+              {payState === 'failed' ? PAYMENT_UNKNOWN : 'アプリでのお支払いは準備中です。支払い方法はご利用先に電話で確認してください。'}
             </p>
           ) : (
             <Button
@@ -130,11 +133,7 @@ export default function Done({
               {payState === 'starting' ? 'お支払いへ進んでいます…' : 'お支払いへ進む'}
             </Button>
           )}
-          {payState === 'failed' && (
-            <p className="mt-2 text-[13px] leading-6 text-danger" role="alert">
-              お支払いの用意に失敗しました。電波の良い所でもう一度押してください。
-            </p>
-          )}
+
         </section>
       )}
       <div className="pb-40" aria-hidden="true" />

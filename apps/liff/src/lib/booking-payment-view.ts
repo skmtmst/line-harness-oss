@@ -1,6 +1,7 @@
+import { CUSTOMER_WORDS } from './customer-words.js';
 import { api, type BookingHistoryItem, type BookingPayment, type MenuItem } from './api.js';
 import { logFailure } from './user-message.js';
-import { PAYMENT_METHOD_ONSITE, PAYMENT_STATUS, type PaymentTone } from '@line-crm/shared';
+import { PAYMENT_STATUS, type PaymentTone } from '@line-crm/shared';
 
 /**
  * 予約の支払いの状態を、お客さまに見せる札にする（★V8・nWby5 / L5g75）。
@@ -20,6 +21,7 @@ export interface PaymentView {
   receiptUrl: string | null;
   /** 未払いの払う期限（これを過ぎると仮の予約は取り消される）。 */
   holdUntil: string | null;
+  actionRequired?: boolean;
 }
 
 /** 共通の色の名前 → LIFF の札の色。 */
@@ -29,7 +31,7 @@ const LABELS: Record<PaymentKind, { label: string; tone: PaymentView['tone'] }> 
   paid: { label: PAYMENT_STATUS.paid.label, tone: TONE[PAYMENT_STATUS.paid.tone] },
   refunded: { label: PAYMENT_STATUS.refunded.label, tone: TONE[PAYMENT_STATUS.refunded.tone] },
   expired: { label: PAYMENT_STATUS.expired.label, tone: TONE[PAYMENT_STATUS.expired.tone] },
-  onsite: { label: PAYMENT_METHOD_ONSITE.label, tone: TONE[PAYMENT_METHOD_ONSITE.tone] },
+  onsite: { label: CUSTOMER_WORDS.payOnsite, tone: TONE.info },
 };
 
 export function yen(amount: number): string {
@@ -91,7 +93,9 @@ export async function loadPaymentViews(items: BookingHistoryItem[]): Promise<Rec
   const entries = await Promise.all(targets.map(async (b) => {
     try {
       const res = await api.bookingPaymentStatus(b.id);
-      return [b.id, paymentView(res.payment ?? null, byId.get(b.menu_id))] as const;
+      const view = paymentView(res.payment ?? null, byId.get(b.menu_id));
+      if (res.operation_status === 'unknown' || res.action_required) return [b.id, { ...(view ?? { kind: 'unpaid', amount: null, receiptUrl: null, holdUntil: null }), label: '要確認', tone: 'pending', actionRequired: true } satisfies PaymentView] as const;
+      return [b.id, view] as const;
     } catch (e) {
       logFailure('payment-view-status', e);
       return [b.id, null] as const;

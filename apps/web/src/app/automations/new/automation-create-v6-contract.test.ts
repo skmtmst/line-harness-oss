@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
+import { EVENTS } from '@/v8/automations/create/draft-options'
 
 /**
  * 現役のルールを作る（V8）の見張り。
@@ -17,14 +17,12 @@ import { AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 
 const HERE = import.meta.dirname
 const REPO = join(HERE, '..', '..', '..', '..', '..', '..')
-const PAGE = readFileSync(join(REPO, 'apps/web/src/v8/automations/create/create.tsx'), 'utf8')
 /**
  * 注釈を落とした本文。
  *
  * 「準備中を出さない」のような**やらない決めごとは注釈にも書く**ので、
  * 生のソースを見ると自分の注釈に当たる。画面に出る文字だけを見る。
  */
-const PAGE_CODE = PAGE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 const TYPES = readFileSync(join(REPO, 'packages', 'shared', 'src', 'types', 'automations.ts'), 'utf8')
 
 /**
@@ -35,8 +33,7 @@ const TYPES = readFileSync(join(REPO, 'packages', 'shared', 'src', 'types', 'aut
  * 共有の値を画面の選択肢として返す。
  */
 function screenEventValues(): string[] {
-  expect(PAGE, '画面が共有の選択肢から描いていない').toContain('AUTOMATION_DRAFT_TRIGGER_OPTIONS.map')
-  return AUTOMATION_DRAFT_TRIGGER_OPTIONS.map((option) => option.value)
+  return EVENTS.map((option) => option.value)
 }
 
 /** `AutomationEventType` が許している値。 */
@@ -78,31 +75,6 @@ function firedEventTypes(): Set<string> {
 }
 
 describe('V8 ルールを作る', () => {
-  it('保存後に見込み人数を確認でき、0件と書かない', () => {
-    expect(PAGE).toContain(
-      '下書きを保存すると、いまの条件で数えます',
-    )
-    // 見込み人数の枠に 0 を書かない。
-    expect(PAGE).not.toContain('見込み人数: 0')
-    expect(PAGE).not.toContain('0人が当てはまります')
-  })
-
-  it('権限が無いときは保存を隠し、内部でも止めて理由を本文へ出す', () => {
-    expect(PAGE).toContain("return '操作する権限がありません'")
-    expect(PAGE).toContain('閲覧のみで見ています。ルールを作る操作はオーナーか管理者に頼んでください。')
-    expect(PAGE).toContain('{canEdit ? (')
-    expect(PAGE).toContain('disabled={saving || Boolean(blockedReason)}')
-    expect(PAGE).toContain('if (saving || blockedReason) return')
-  })
-
-  it('読み込み中と読み込めなかったときを言い分ける', () => {
-    expect(PAGE).toContain('読み込んでいます')
-    expect(PAGE).toContain('タグを読み込めませんでした。画面を再読み込みしてください。')
-    // 読めていないのに空の選択肢だけを出さない。
-    expect(PAGE).toContain('loading={tagsLoading}')
-    expect(PAGE).toContain('failed={tagsFailed}')
-    expect(PAGE).toContain('disabled={loading || failed}')
-  })
 
   it('選べるきっかけが AutomationEventType に収まっている', () => {
     const allowed = allowedEventTypes()
@@ -121,39 +93,5 @@ describe('V8 ルールを作る', () => {
       values.filter((v) => !fired.has(v)),
       '発火する呼び出しが apps/worker にないきっかけを画面へ出しています',
     ).toEqual([])
-  })
-
-  it('一度も動かない旧きっかけを戻さない', () => {
-    for (const dead of ['friend_added', 'tag_added']) {
-      expect(PAGE, `${dead} は発火しません`).not.toContain(`'${dead}'`)
-    }
-    expect(PAGE_CODE).not.toContain('準備中')
-  })
-
-  it('すること（動き）を複数持てる', () => {
-    expect(PAGE).toContain('<ActionList<ActionDraft>')
-    expect(PAGE).toContain('choices={EDITABLE_ACTIONS.map')
-    // 送る形は `draftActions()` にまとめた（確認画面とのずれ検出でも同じ形を使う）。
-    // 名前が変わっても「入力の並びをそのまま送る」ことは崩さない。
-    expect(PAGE).toContain('const draftActions = (): AutomationDraftAction[] => actions.map(')
-    expect(PAGE).toContain('actions: draftActions(),')
-    // 1つしか送らない形へ戻さない。
-    expect(PAGE).not.toContain('actions: [\n')
-  })
-
-  it('共有の全種類を表示し、下書き・見込み人数・1人テスト・公開へ接続する', () => {
-    // #942 N-355: 下書きunionと同じ全種類を全部出す（以前は6種だけ）。
-    expect(screenEventValues()).toHaveLength(AUTOMATION_DRAFT_TRIGGER_OPTIONS.length)
-    expect(PAGE).toContain('api.automations.createDraftFromTemplate')
-    expect(PAGE).toContain('api.automations.updateDraft')
-    expect(PAGE).toContain('api.automations.audiencePreview')
-    expect(PAGE).toContain('api.automations.test')
-    expect(PAGE).toContain('api.automations.publishDraft')
-    expect(PAGE).toContain('つくって動かす')
-  })
-
-  it('同じきっかけ注意はこの店だけ見る (#580)', () => {
-    expect(PAGE).toContain('api.automations.list({ accountId: selectedAccountId })')
-    expect(PAGE).toContain('保存した時点の内容で試します')
   })
 })

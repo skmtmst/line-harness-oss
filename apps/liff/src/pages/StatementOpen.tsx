@@ -40,6 +40,7 @@ export default function StatementOpen() {
 
   const load = useCallback(async () => {
     const mine = ++generation.current;
+    if (blobUrl.current) { URL.revokeObjectURL(blobUrl.current); blobUrl.current = null; }
     setState({ name: 'loading' });
     try {
       const issued = await issueStatement(id);
@@ -57,17 +58,21 @@ export default function StatementOpen() {
   useEffect(() => () => { if (blobUrl.current) URL.revokeObjectURL(blobUrl.current); }, []);
 
   const open = async (issued: IssuedStatement) => {
-    if (Date.parse(issued.expiresAt) <= Date.now()) {
+    if (!Number.isFinite(Date.parse(issued.expiresAt)) || Date.parse(issued.expiresAt) <= Date.now()) {
       setState({ name: 'failed', kind: 'expired' });
       return;
     }
+    const mine = generation.current;
     setState({ name: 'fetching', issued });
     try {
-      const url = URL.createObjectURL(await fetchStatementBlob(id, issued));
+      const blob = await fetchStatementBlob(id, issued);
+      if (mine !== generation.current) return;
+      const url = URL.createObjectURL(blob);
       blobUrl.current = url;
       setState({ name: 'opened', blobUrl: url });
       window.location.assign(url);
     } catch (err) {
+      if (mine !== generation.current) return;
       logFailure('statement-fetch', err);
       fail(err);
     }

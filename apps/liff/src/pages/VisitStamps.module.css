@@ -5,7 +5,7 @@
 .balance { color: var(--color-liff-primary); }
 .instructions { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-xs); line-height: var(--text-xs--line-height); }
 .expiry { font-size: var(--text-xs); line-height: var(--text-xs--line-height); }
-.slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--liff-space-3, 12px); }
 .slot { display: flex; width: 100%; max-width: var(--liff-stamp-slot-max); aspect-ratio: 1; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; background: var(--color-canvas); color: var(--color-ink-secondary); box-shadow: var(--liff-stamp-ring-geometry) var(--color-liff-line); }
 .reward { color: var(--color-liff-primary); box-shadow: var(--liff-stamp-ring-geometry) var(--color-liff-primary); }
 .done { background: var(--color-liff-primary); color: var(--liff-on-primary); }
