@@ -49,7 +49,7 @@ import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame'
 
 import BookingLedgerBody from '@/v8/booking-bookings/ledger-body'
 
-import LedgerMonthNavigation, { monthKey, monthLabel } from '@/v8/booking-bookings/month-navigation'
+import { monthKey, monthLabel } from '@/v8/booking-bookings/month-navigation'
 
 import FilterChip from '@/components/shared/filter-chip'
 
@@ -274,7 +274,6 @@ export default function BookingsPage() {
     <BookingLedgerFrame view={view}>
       {pageHead}
       <BookingLedgerBody view={view} readOnly={!canOperate}
-        navigation={<LedgerMonthNavigation anchor={calendarAnchor} onChange={(date) => { setCalendarAnchor(date); setRange('all'); setPage(1) }} shareUrl={shareUrl ?? ''} historyUrl={historyUrl ?? ''} />}
         stats={<>
           {summaryError && (
             // 集計の失敗でも一覧は使える。

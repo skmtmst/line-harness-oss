@@ -1,14 +1,13 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { ListPageBody, ListPageSection, type ListFolderNav } from '@/components/templates/list-page'
+import { ListPageBody, type ListFolderNav } from '@/components/templates/list-page'
 import { ListToolbarFrame } from '@/components/shared/list-toolbar'
 
-export default function BookingLedgerBody({ view, readOnly, stats, navigation, folders, folderNav, toolbar, pagination, children }: {
+export default function BookingLedgerBody({ view, readOnly, stats, folders, folderNav, toolbar, pagination, children }: {
   view: string
   readOnly: boolean
   stats: ReactNode
-  navigation?: ReactNode
   folders: ReactNode
   folderNav: ListFolderNav
   toolbar: ReactNode
@@ -22,7 +21,7 @@ export default function BookingLedgerBody({ view, readOnly, stats, navigation, f
   </ListPageBody>
 
   return <ListPageBody skeleton readOnly={readOnly} stats={stats}
-    folders={folders} folderNav={folderNav} toolbar={<ListToolbarFrame layout="stacked">{toolbar}</ListToolbarFrame>} pagination={pagination}>
+    folders={folders} folderNav={folderNav} toolbar={toolbar} pagination={pagination}>
     {children}
   </ListPageBody>
 }
