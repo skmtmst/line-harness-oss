@@ -1079,14 +1079,14 @@ describe('取消後に外部送信が走らない (自主検証)', () => {
 });
 
 describe('部分失敗の再実行で二重送信にならない (自主検証)', () => {
-  it('送達不明の自動再試行は同じ再送キーで送り、実行行も配信済みも1件のまま', async () => {
+  it('確認済み429の自動再試行は同じ再送キーで送り、実行行も配信済みも1件のまま', async () => {
     const dual = openDualDb();
     try {
       seedBookingCancelTarget(dual.raw1);
       seedBookingReminderPair(dual.raw1);
-      // 1回目は送達不明 (タイムアウト)。外部に届いたかは分からない。
+      // 1回目は未受理を確認できる429。待機後だけ同じキーで再試行する。
       const { pushes, client } = makePushRecorder((call) => {
-        if (call === 1) throw new Error('network timeout');
+        if (call === 1) throw Object.assign(new Error('not accepted'), { status: 429 });
         return { requestId: 'REQ-2' };
       });
 
@@ -1129,6 +1129,22 @@ describe('部分失敗の再実行で二重送信にならない (自主検証)'
     } finally {
       dual.cleanup();
     }
+  });
+
+  it('送達不明は別の実行者でも再送せず、元の行とキーを照合待ちに保つ',async()=>{
+    const dual=openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);seedBookingReminderPair(dual.raw1);
+      const {pushes,client}=makePushRecorder(()=>{throw new Error('network timeout');});
+      const first=await processReminderDeliveries(dual.db1,client,{now:SEND_AT_PASSED,pause:noPause,resolveClient:async()=>client});
+      expect(first).toEqual({succeeded:0,skipped:0,retrying:0,failed:1,held:0});
+      const before=dual.raw1.prepare("SELECT id,line_retry_key,attempt_count,status,last_error_code FROM reminder_delivery_runs WHERE friend_reminder_id='FR-d1'").get();
+      expect(before).toMatchObject({status:'permanent_failed',last_error_code:'delivery_unknown',attempt_count:1});
+      await processReminderDeliveries(dual.db2,client,{now:new Date(SEND_AT_PASSED.getTime()+30*60_000),pause:noPause,resolveClient:async()=>client});
+      expect(pushes).toHaveLength(1);
+      expect(dual.raw1.prepare("SELECT id,line_retry_key,attempt_count,status,last_error_code FROM reminder_delivery_runs WHERE friend_reminder_id='FR-d1'").get()).toEqual(before);
+      expect(dual.raw1.prepare("SELECT COUNT(*) AS c FROM friend_reminder_deliveries WHERE friend_reminder_id='FR-d1'").get()).toEqual({c:0});
+    }finally{dual.cleanup();}
   });
 
   it('push後・確定前の取消は成功にせず、自動再送可能な状態にも混ぜない', async () => {

@@ -41,3 +41,6 @@ Retry-Afterは30分超でも絶対時刻を既存の次回欄へ保存し、予�
 
 
 Retry-Afterのdelta秒は実運用の応答時刻から計算する。通常reminder/送信Webhookのcron開始時刻を使い続けると、走査や通信が長い分だけ再送が早まるため、応答を受けた時点の時計へ変更。固定nowは既存の架空試験の注入口として保持。本番cronの呼出しには固定nowを渡していない。模擬時計の対照はddce3eb9a0で2失敗/59成功、修正後2ファイル61成功。3回目の全体CI（20261018-155737-ddce3eb9a0）はこの補正のため共通検査の枠待ちで明示停止し、原ログ/manifest/resultsをci-response-clock-interrupted*へ保存。今回も終了プロセス0と自分の一時worktreeのcleanを確認して、その1件だけ整理した。最終版で全体CIを取り直す。
+
+
+全Worker試験でreminder-cancel-recovery.test.tsの「送達不明でも自動再送する」旧期待が1件失敗。通常reminderのこの1例だけを、未受理を確認できる429の同じキー/待機/履歴1件の既存検査として保持し、通信切断は別実行者でも同じ行/キー/試行回数で照合待ちに止める例を追加。2接続の実SQLiteで40件すべて成功（reminder-recovery-final.log）。予約取消/Google/eventのroute/service/DBや、その動きを守る他の期待は変更0。試験ファイル/試験を削除していない。全体CIは67cfb734f6のコピー上で続行し、ほかの失敗も確認する。修正後の版は改めて必要な検査へ通す。
