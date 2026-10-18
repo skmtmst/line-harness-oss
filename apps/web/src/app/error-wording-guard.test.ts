@@ -52,7 +52,6 @@ const KNOWN_FILES: string[] = [
   // 2026-10-04 完全切り替え：v7 page を捨て、V8 の list-v8 にしたので外す。
   // ★V8 版も同じ持ち越し文言を使う（直すときは page.tsx と一緒に直す）
   'app/updates/page.tsx',
-  'components/chats/friend-info-sidebar.tsx',
   'components/scenarios/scenario-dialogs.tsx',
   'components/shared/list-kpis.tsx',
   'components/staff/login-audit.tsx',
