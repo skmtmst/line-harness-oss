@@ -44,3 +44,6 @@ Retry-Afterのdelta秒は実運用の応答時刻から計算する。通常remi
 
 
 全Worker試験でreminder-cancel-recovery.test.tsの「送達不明でも自動再送する」旧期待が1件失敗。通常reminderのこの1例だけを、未受理を確認できる429の同じキー/待機/履歴1件の既存検査として保持し、通信切断は別実行者でも同じ行/キー/試行回数で照合待ちに止める例を追加。2接続の実SQLiteで40件すべて成功（reminder-recovery-final.log）。予約取消/Google/eventのroute/service/DBや、その動きを守る他の期待は変更0。試験ファイル/試験を削除していない。全体CIは67cfb734f6のコピー上で続行し、ほかの失敗も確認する。修正後の版は改めて必要な検査へ通す。
+
+
+全Worker試験の旧再送期待はreminder-delivery-r345-r346.test.tsにも1件あり、本文固定を確認する例は明確な429拒否へ変更して既存の本文/キー/履歴の一致を保持。さらに、受理後の保存失敗を想定した旧last_error_code=NULL・本文ありのretry_wait/permanent_failedと、試行済みqueuedを照合待ちへ止める（未試行queuedは保持）。初回本文と元キー・回数を残し、再送して履歴を作り直さない。UIのcanRetryと手動APIも同じ条件。旧版は追加2例で失敗（null-legacy-before.log）、修正後は関連6ファイル100件成功（null-legacy-and-log-final.log）。予約系route/service/DBは引き続き未変更。

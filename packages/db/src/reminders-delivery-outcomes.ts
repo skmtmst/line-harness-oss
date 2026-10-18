@@ -189,10 +189,12 @@ export async function retryReminderDeliveryRun(
 ): Promise<RetryReminderDeliveryRunResult | null> {
   let row = await getReminderDeliveryRunById(db, input.id);
   if (!row) return null;
-  if (['line_temporary_failure','delivery_failed','retry_key_expired','retry_exhausted'].includes(row.last_error_code ?? '') && row.sent_message_content!==null) {
+  if ((['line_temporary_failure','delivery_failed','retry_key_expired','retry_exhausted'].includes(row.last_error_code ?? '')
+    || row.last_error_code===null && (['retry_wait','permanent_failed'].includes(row.status)||row.status==='queued'&&row.attempt_count>0)) && row.sent_message_content!==null) {
     await db.prepare(`UPDATE reminder_delivery_runs SET status='permanent_failed',last_error_code='delivery_unknown',
       last_error_message='以前の送信結果を照合するまで再送しません。',next_retry_at=NULL,lease_expires_at=NULL,completed_at=?,updated_at=?
-      WHERE id=? AND status IN ('queued','retry_wait','permanent_failed') AND last_error_code IN ('line_temporary_failure','delivery_failed','retry_key_expired','retry_exhausted')`)
+      WHERE id=? AND status IN ('queued','retry_wait','permanent_failed') AND (last_error_code IN ('line_temporary_failure','delivery_failed','retry_key_expired','retry_exhausted')
+        OR (last_error_code IS NULL AND (status IN ('retry_wait','permanent_failed') OR (status='queued' AND attempt_count>0))))`)
       .bind(input.now,input.now,row.id).run();
     row=(await getReminderDeliveryRunById(db,input.id))!;
   }

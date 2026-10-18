@@ -102,7 +102,8 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
           canRetry: (row.status === 'retry_wait' || row.status === 'permanent_failed')
             && !['delivery_started','delivery_unknown','retry_after_exceeds_budget'].includes(row.last_error_code ?? '')
             && (!row.next_retry_at || Date.parse(row.next_retry_at)<=Date.now())
-            && !(['line_temporary_failure','delivery_failed','retry_key_expired','retry_exhausted'].includes(row.last_error_code ?? '') && row.sent_message_content!==null),
+            && !((['line_temporary_failure','delivery_failed','retry_key_expired','retry_exhausted'].includes(row.last_error_code ?? '')
+              || row.last_error_code===null) && row.sent_message_content!==null),
           reminderId: row.reminder_id,
           friendReminderId: row.friend_reminder_id,
           friendId: row.friend_id,
