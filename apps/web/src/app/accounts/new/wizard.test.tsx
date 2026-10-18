@@ -122,7 +122,7 @@ describe('LINEアカウント作成ウィザード', () => {
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
     nextStep()
-    expect(screen.getByText('Webhook の設定', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 2 / 3')).toBeTruthy()
     ack('Webhookの利用をONにした')
     ack('Webhookの再送をONにした')

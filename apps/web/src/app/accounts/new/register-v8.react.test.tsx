@@ -138,7 +138,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     await waitFor(() => expect(document.activeElement).toBe(channel))
     expect(screen.queryByText('入力内容を確認してください。')).toBeNull()
     expect(calls.connectCheck).not.toHaveBeenCalled()
-    expect(screen.queryByText('Webhook の設定', { selector: 'h2' })).toBeNull()
+    expect(screen.queryByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeNull()
   })
 
   /*
@@ -191,7 +191,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     `Lwxyh` Step1 の「LINEログインへ戻る」を、実際のボタン操作でたどって確かめる。
   */
   /** 出ている段は、描かれた札（Card の aria-label）で見る。 */
-  const PANELS = ['Messaging API のチャネル', 'Webhook の設定', 'LINE Login のチャネル'] as const
+  const PANELS = ['Messaging API のチャネル', 'Webhook（受信のつなぎ）を設定する', 'LINE Login のチャネル'] as const
   const shownPanel = () => PANELS.find((label) => document.querySelector(`[aria-label="${label}"]`))
   const stepBadgeText = () => screen.getByText(/^Step \d \/ 3$/).textContent
 
@@ -205,7 +205,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     fill('v8-channel-secret', 'synthetic-secret')
     nextStep()
     expect(stepBadgeText()).toBe('Step 2 / 3')
-    expect(shownPanel()).toBe('Webhook の設定')
+    expect(shownPanel()).toBe('Webhook（受信のつなぎ）を設定する')
     expect(document.getElementById('v8-login-channel-id')).toBeNull()
 
     ack('Webhookの利用をONにした')
@@ -238,7 +238,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     back('LINEログインへ戻る')
     expect(shownPanel()).toBe('LINE Login のチャネル')
     back('Webhook の設定へ戻る')
-    expect(shownPanel()).toBe('Webhook の設定')
+    expect(shownPanel()).toBe('Webhook（受信のつなぎ）を設定する')
     back('Messaging API へ戻る')
     expect(shownPanel()).toBe('Messaging API のチャネル')
     back('事前確認へ戻る')

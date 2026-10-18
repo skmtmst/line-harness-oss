@@ -114,7 +114,7 @@ export default function AccountRegisterV8() {
   const createdId = connection?.id ?? ''
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const callbackUrl = workerBase ? `${workerBase}/auth/callback` : emptyValue('unknown')
-  const webhookUrl = workerBase && form.channelId.trim() ? `${workerBase}/webhook/${form.channelId.trim()}` : emptyValue('unknown')
+  /* Webhook URL は musubo が自動で登録するので画面に出さない（正本 v06 ②-2 の gcbIm）。 */
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
   const importRunning = importPhase === 'importing_ids' || importPhase === 'hydrating_profiles'
   const basicId = connection?.basicId ?? ''
@@ -529,6 +529,8 @@ export default function AccountRegisterV8() {
                 <p className={styles.asideP}>チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
                 <p className={styles.asideP}>登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
                 <p className={styles.asideP}>秘密値は保存後に画面へ表示されません。</p>
+                {/* v06 ②の右の列（RtWJZ）はマニュアルの入口を持つ。カード内には置かない。 */}
+                <Button external href={`${MANUAL}#m1`}><CircleHelp size={15} aria-hidden="true" />マニュアルを開く</Button>
               </Card>
               )}>
               {sub === 1 && (
@@ -550,15 +552,30 @@ export default function AccountRegisterV8() {
                 </Card>
               )}
               {sub === 2 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook の設定">
+                /* 正本 v06 Fqy29 → ②-2（f4AgA）の S1KaUa。Webhook URL は musubo が自動で登録するので
+                   入力欄も控えも置かない。利用者がやるのは LINE Developers の3つのスイッチだけ。 */
+                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook（受信のつなぎ）を設定する">
                   <p className={styles.subBadge}>{badge}</p>
-                  <h2 className={styles.panelTitle}>Webhook の設定</h2>
+                  <div className={styles.precheckHead}>
+                    <h2 className={styles.panelTitle}>Webhook（受信のつなぎ）を設定する</h2>
+                    <span className={styles.precheckHelpMark} title="LINE からのメッセージを musubo が受け取るための通り道です。" aria-label="LINE からのメッセージを musubo が受け取るための通り道です。"><CircleHelp size={14} aria-hidden="true" /></span>
+                  </div>
+                  <p className={styles.precheckLead}>Webhook URL（受信先のアドレス）は musubo が自動で登録します。入力は要りません。ここでは LINE Developers の画面にある3つのスイッチだけ、ご自身でONにしてください。</p>
+                  <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
+                    <p className={styles.precheckNoteTitle}>LINE Developers の Webhook 設定を開いてください</p>
+                    <p>ステップ1で入れたチャネルIDを使って、このチャネルの「Messaging API設定」を直接開きます。プロバイダーやチャネルを選び直す必要はありません。</p>
+                    <div className={styles.precheckNoteLink}>
+                      <Button variant="primary" external href={developerChannelUrl(form.channelId)}>LINE Developers を開く</Button>
+                      <p className={styles.help}>必ずこのボタンから操作してください</p>
+                    </div>
+                  </div>
+                  <div className={`${styles.precheckNote} ${styles.precheckNoteWarn}`}>
+                    <p className={styles.precheckNoteTitle}>すでにほかのツールのURLが入っているとき</p>
+                    <p>Webhook URL の欄に別の配信ツールのURLが入っている場合、あとの「接続チェック」で musubo のURLに書きかわり、そのツールの受信は止まります。使い続けたいときは、ここで「途中保存して閉じる」を押して、既存のWebhook URLを別途保存してから進めてください。</p>
+                  </div>
                   <div className={styles.field}>
-                    <span className={styles.groupLabel}>Webhook URL</span>
-                    <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--space-8) var(--space-8) var(--space-8) var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
-                      <span className={styles.endpointValue} ><TruncatedText value={String(webhookUrl ?? '')} url /></span>
-                      <CopyButton value={webhookUrl} />
-                    </Card>
+                    <p className={styles.groupLabel}>設定手順の確認</p>
+                    <p className={styles.help}>「Messaging API設定」の画面でONにしたら、下のチェックを入れてください。</p>
                   </div>
                   <div className={styles.ackList}>
                     {WEBHOOK_ACKS.map((ack) => (
@@ -568,10 +585,7 @@ export default function AccountRegisterV8() {
                       </div>
                     ))}
                   </div>
-                  <div className={styles.buttonRow}>
-                    <Button external href={developerChannelUrl(form.channelId)}  >LINE Developersでこのチャネルを開く</Button>
-                    <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />設定の場所を見る</Button>
-                  </div>
+                  <p className={styles.help}>3つすべてにチェックを入れると「次のステップへ」が押せるようになります。</p>
                 </Card>
               )}
               {sub === 3 && (
