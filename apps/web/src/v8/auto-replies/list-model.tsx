@@ -1,10 +1,9 @@
 'use client'
-import { pageSizeOptions } from '@/components/shared/page-size-options'
+export { LARGE_PAGE_SIZE_SELECT_OPTIONS as PAGE_SIZE_OPTIONS } from '@/components/shared/page-size-options'
 
 import { actionShortWord } from './words'
 
 
-export const PAGE_SIZE_OPTIONS = pageSizeOptions([20, 50, 100])
 
 /*
  * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：

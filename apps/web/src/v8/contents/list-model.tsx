@@ -1,5 +1,5 @@
 'use client'
-import { pageSizeOptions } from '@/components/shared/page-size-options'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 import type { MediaItem } from '@line-crm/shared'
 import { formatMediaSize } from './media-usage-display'
@@ -25,7 +25,7 @@ export const SORT_OPTIONS: Array<{ value: MediaSort; label: string }> = [
   { value: 'usage', label: '使われている順' },
 ]
 
-export const PAGE_SIZE_OPTIONS = pageSizeOptions([10, 20, 50])
+export const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /**
  * 絞り込みの種別。保存できる kind は image / video / audio / file の4つ。
