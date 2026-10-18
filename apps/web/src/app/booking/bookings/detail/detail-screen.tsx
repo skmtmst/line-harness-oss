@@ -133,11 +133,8 @@ function BookingDetailInner() {
     )
   }
 
-  /*
-   * R533: 403・429だけ共通文へ切り替える（権限・混雑の案内。再試行の
-   * 有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま
-   * （`isForbiddenOrRateLimited` の目安どおり。DEEP-18の画面固有見出しを保つ）。
-   */
+  // 権限・混雑は共通の案内にする。手動の読み直しはTargetMissingの契約に従い、
+  // 取得し直すまで前の予約内容や変更操作を出さない。
   const detailFailure = loadError ? loadFailureCopy(loadError, '予約') : null
   const useCommonCopy = loadError ? isForbiddenOrRateLimited(loadError) : false
   if (!loading && error && !detail) {

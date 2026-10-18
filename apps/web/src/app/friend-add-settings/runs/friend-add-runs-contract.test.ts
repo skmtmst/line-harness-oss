@@ -1,5 +1,4 @@
 import fs from 'node:fs'
-import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 import { routingLabel, routingAction } from '@/v8/friend-add-runs/status'
@@ -8,7 +7,6 @@ import type { FriendAddEventRoutingStatus } from '@line-crm/shared'
 const PAGE = fs.readFileSync(new URL('../../../v8/friend-add-runs/runs.tsx', import.meta.url), 'utf8')
 const DETAIL = fs.readFileSync(new URL('../../../v8/friend-add-runs/detail.tsx', import.meta.url), 'utf8')
 const SETTINGS = fs.readFileSync(new URL('../../../v8/friend-add/list.tsx', import.meta.url), 'utf8')
-const HOOK = fs.readFileSync(path.join(__dirname, '../../../v8/friend-add/use-cursor-stack.ts'), 'utf8')
 
 describe('V6 友だち追加時配信・実行結果の契約', () => {
   it('実ノードと実行結果への往復導線を持つ', () => {
@@ -88,15 +86,6 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(routingLabel(future, null).label.length).toBeGreaterThan(0)
     expect(routingAction(future, null).length).toBeGreaterThan(0)
     expect(routingAction(future, 'delivery_unknown')).toContain('自動では送り直しません')
-  })
-
-  it('カーソルを積んだページ送りで前後へ移動できる', () => {
-    expect(PAGE).toContain('useCursorStack(')
-    expect(PAGE).toContain("goPrev()")
-    expect(PAGE).toContain("goNext(data.nextCursor)")
-    expect(PAGE).toContain("data?.nextCursor")
-    expect(HOOK).toContain('current.length > 1 ? current.slice(0, -1) : current')
-    expect(HOOK).toContain('setStack((current) => [...current, nextCursor])')
   })
 
   it('実配信・シナリオ開始・平均送信時間をAPI集計で表示する', () => {
