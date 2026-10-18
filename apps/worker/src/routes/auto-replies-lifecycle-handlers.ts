@@ -54,7 +54,7 @@ export const post__api_auto_replies_1 = async (c: Context<Env, "/api/auto-replie
     }
     // m26c R562: 全アカウント共通の作成は統括だけ。本文が null でも検査を飛ばさない。
     if (body.lineAccountId === null || body.lineAccountId === undefined) {
-      const ownerCheck = requireCommonRuleOwner(c.get('staff'));
+      const ownerCheck = await requireCommonRuleOwner(c.env.DB, c.get('staff'));
       if (!ownerCheck.ok) {
         return c.json({ success: false, error: ownerCheck.error }, 403);
       }
@@ -341,7 +341,7 @@ export const put__api_auto_replies_id_2 = async (c: Context<Env, "/api/auto-repl
       && (input.lineAccountId === null || input.lineAccountId === undefined);
     // m26c R562: 共通化・共通ルールの内容変更は統括だけ。
     if (wantsCommon || (existing.line_account_id === null && contentChanged)) {
-      const ownerCheck = requireCommonRuleOwner(c.get('staff'));
+      const ownerCheck = await requireCommonRuleOwner(c.env.DB, c.get('staff'));
       if (!ownerCheck.ok) {
         return c.json({ success: false, error: ownerCheck.error }, 403);
       }
