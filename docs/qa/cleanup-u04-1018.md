@@ -26,18 +26,22 @@
 
 ## 検証の版と結果
 
-関連107ファイル695試験は成功。手元の共有SQLite部品はNode 26のABIなので、この対象試験は既存のNode 26で実行した。共有依存を勝手に再構築していない。型検査・lintはNode 22で成功（lintエラー0、変更ファイルの既存の警告3）。全体ci-localは製品版92398bfd9dを専用の新しい作業ツリーとNode 22で最後まで実行した。
+製品の最後の変更は `92398bfd9dd9c30031dfa7e4777232863c74f961`。補足CIの版 `b771a7d4a1` は検査結果の文書だけを追加した版で、apps/packages/scripts/.githubの差は0。以後も検証記録だけを変更する。
 
-初回ci-localは製品版f381ed1663で実行。DB2309試験、スクリプト1047試験、Worker13156試験、管理画面全体のlint/型/V8固定検査は成功。LIFF工程はexit1後に一時ファイルpath-17欠落で元ログが失われた。同じ製品版を独立して再検査し、LIFF92ファイル531試験は成功（liff-recheck.log）。Worker本体はvars.VITE_LIFF_IDが不明で未実行、その後の画面サーバーとヘッダー成果物の2検査も失敗した。値を推測して合格にしていない。
+関連107ファイル695試験は成功。手元の共有SQLite部品はNode 26のABIなので、この対象試験は既存のNode 26で実行し、共有依存を勝手に再構築していない。型検査・lintはNode 22で成功（lintエラー0、変更ファイルの既存の警告3）。全体ci-localは新しい作業ツリーとNode 22で最後まで実行し、DB2309、LIFF531、Worker13156、管理画面2301ファイル13630試験が成功した（管理画面の既存skip1/todo1）。SDK/MCPの試験・型・build、文書6試験、管理画面全体のlint/型/旧画面再混入検査、CI側の管理画面build・verify:design・ビルド後ブラウザ操作も成功。
 
-管理画面の全体試験は、分割先の読込・保存エラーの持ち主・未保存の持ち主など7ファイル9試験が失敗。今回の修正版で全て再確認した。古い版を最終結果に使わず、初回を中断して修正版で全体をやり直す。初回の片付けにOSのPermissionErrorが出たことも原本へ保持し、その実行の生きたプロセスと登録済み作業ツリーが残っていないことを確認した。検査環境の再確認はG01/司令塔へ渡す。元結果は改変しない。初回の原本は `tools/hq/ci-local/logs/20261018-075258-f381ed1663-54651`、控えはU04-EVIDENCE/attempts/ci-1。
+引数なしの全体CIは成功56・失敗3・skip53でexit1。Workerのビルド変数が不明でbuildが未実行となり、成果物を使う後続2検査と総合判定が失敗した。skip53のうち26は値不明による手元未対応（PR情報、Workerの値、V8_SPEED_ENFORCEMENTと後続scope）。この実行ではV8全体の崩れ/速度は未実行。原本は `20261018-122954-92398bfd9d-8512`、保存先はU04-EVIDENCE/ci-full-923とci-full-923-summary.json。
 
-再実行92398bfd9dではDB2309、LIFF531、Worker13156、管理画面2301ファイル13630試験が成功（既存skip1/todo1）。全体のlint・型・旧画面再混入検査も成功し、初回の7ファイル9件の失敗は解消した。Workerビルドは再びvars.VITE_LIFF_ID不明で未実行、後続の画面サーバー/ヘッダー成果物の2検査は失敗した。SDK/MCPの試験・型・build、文書6試験、CI側の管理画面build・verify:design・ビルド後ブラウザ操作も成功。全体は成功56・失敗3・skip53でexit1。失敗3は上記2つと総合判定。skip53のうち26は値不明で手元未対応（PR情報、Workerの値、V8_SPEED_ENFORCEMENTと後続scope）。V8全体の崩れ/速度は実行されていない。原本は20261018-122954-92398bfd9d-8512。
+続いてGitHubのorigin（skmtmst/line-harness-oss、個人所有・jobに環境指定なし）の4変数VITE_LIFF_ID・VITE_BOT_BASIC_ID・VITE_CALENDAR_CONNECTION_ID・V8_SPEED_ENFORCEMENTを読み取り、全て未設定と確認した。設定を変更せず、GitHub Actionsと同じ空値を明示してworker-build/v8-screen-guardだけを補足検査した。PR情報や設定値は作っていない。根拠はci-repository-variables.json。実行器のクリーン必須ゲートのため、検査記録をb771a7d4a1で先にコミットした。
 
-製品版92398bfd9dの本番形式build/verify:designは成功（208静的ページ、外出し639スクリプト、違反0）。通知を閉じた1152/1440/1920の各10場面、合計30場面の撮影も成功し、崩れ/横はみ出し/例外/未到達は0。公開確認の長文は既存ConfirmDialogのcontentLayoutとTruncatedTextを使い、3幅で全文の焦点表示とEscape後も窓を保持することを確認した。CSSと配置の値は変更していない。補助画像を含む33枚中24枚はf381の画像と同一ハッシュ、残り9枚は各1〜4画素だけの差で、構成と文字の位置は維持した。差のある9枚も目視した。build-product-inputs.jsonに版と入力ハッシュ、scenario-image-comparison.jsonに画像別の比較を残す。Pencilの正式な90%合格記録は付けていない。全体ci-localの未実行を、この個別30場面の成功で置き換えない。
+補足CIは成功32・失敗0・skip9でexit2。未対応は正式なPRのtitleが必要な反映履歴検査1件だけで、#0000の正式採番は司令塔へ渡す。Worker buildと後続2検査、V8の36場面/3幅の崩れ0、201場面の共通ルールの新規/許可0、一覧3幅と3種類の故障検出、狭い幅の入力保持、予約/流入の操作、仮想表の選択/キーボードまで成功した。共通11場面・5回の中央値、Train17、2000人、PERF-01の速度検査も成功し、速度の予算超過/絶対目標超過は0。速度はworkflowの未設定時と同じreport、既存CI profile（sampleCount5/timeFactor1.3）を変更していない。部分検査を全体CIの合格と読み替えない。原本は `20261018-145752-b771a7d4a1-22574`、保存先はU04-EVIDENCE/ci-supplement-b771（artifactsも保存）とci-supplement-summary.json。
 
-環境不足の確認：GitHubのorigin（skmtmst/line-harness-oss、個人所有・環境指定なし）の4変数VITE_LIFF_ID・VITE_BOT_BASIC_ID・VITE_CALENDAR_CONNECTION_ID・V8_SPEED_ENFORCEMENTは、読み取りで全て未設定と確認した。設定を変更せず、GitHub Actionsと同じ空値を明示してworker-build/v8-screen-guardを補足検査する。未確認の値やPR番号を作っていない。根拠はci-repository-variables.json。補足は全体CI合格を意味しない。実行器のクリーン必須ゲートに従い、この記録を先にコミットする。
+製品版92398bfd9dの個別build/verify:designも成功（208静的ページ、外出し639スクリプト、違反0）。通知を閉じた1152/1440/1920の各10場面、合計30場面の撮影は崩れ/横はみ出し/例外/未到達0。公開確認の長文は既存ConfirmDialogのcontentLayoutとTruncatedTextを使い、3幅で全文の焦点表示とEscape後も窓を保持することを確認した。CSSと配置の値は変更していない。補助画像を含む33枚中24枚はf381の画像と同一ハッシュ、残り9枚は各1〜4画素だけの差で、構成と文字の位置は維持した。差のある9枚も目視した。build-product-inputs.jsonに版と入力ハッシュ、scenario-image-comparison.jsonに画像別の比較を残す。Pencilの正式な90%合格記録は付けていない。
 
-通知が消える前の1152幅では、自動化の競合後に通知が「…」へ重なる既存1件を検出。指定土台とU04を同じ条件で再現し、同じ位置で同じ1件、通知を閉じると双方0（toast-comparison.jsonと前後画像）。共通通知はU02の所有なので変更せず、未解消として渡す。通知を閉じた安定状態の30場面は崩れ/横はみ出し0、例外0/未到達0。全場面が無条件0とは主張しない。失敗記録はattempts/browser-1・browser-2へ保持する。
+## 残りと過去の失敗記録
 
-push/PR/統合、DB更新、配備、実送信、実決済、外部サービスへの書込みは行わない。新migrationと採番案は不要。
+通知が消える前の1152幅では、自動化の競合後に通知が「…」へ重なる既存1件を検出。指定土台とU04を同じ条件で再現し、同じ位置で同じ1件、通知を閉じると双方0（toast-comparison.jsonと前後画像）。共通通知はU02の所有なので変更せず、未解消として渡す。全場面が無条件0とは主張しない。失敗記録はattempts/browser-1・browser-2へ保持する。
+
+初回ci-local（製品f381、20261018-075258-f381ed1663-54651）は分割追従など管理画面7ファイル9試験が失敗した。923で修正後、関連試験と管理画面全体で全て成功した。LIFFはexit1後のtmp/path-17欠落で元ログが失われたが、独立再検査531試験と最終全体CIの531試験で成功。初回中断時の片付けにOSのPermissionErrorが出たことも原本へ保持し、その実行の生きたプロセスと登録済み作業ツリーが残っていないことを確認した。後の全体CIと補足CIは終了し、専用のプロセス/登録済み作業ツリーも残っていない。初回の原本は上記ログ、控えはattempts/ci-1。元結果は改変していない。
+
+司令塔は#0000の正式採番とPR情報を入れ、正式なCI判定と統合を行う。手元の再検査では、確認済み未設定の4変数を空値として明示する手順をG01へ渡す。push/PR/統合、DB更新、配備、実送信、実決済、外部サービスへの書込みは行っていない。新migrationと採番案、A04へのAPI改名依頼は不要。
