@@ -21,7 +21,7 @@ type publishMenuNowContext = {
   publishAttempt: RefObject<ManualPublishAttempt>
   publishing: boolean
   reloadGroup: (groupId: string) => Promise<void>
-  saveErrors: ReturnType<typeof useSaveFormErrors>
+  saveErrors: Pick<ReturnType<typeof useSaveFormErrors>, 'capture'>
   saving: boolean
   setDone: Dispatch<SetStateAction<"scheduled" | "published" | null>>
   setError: Dispatch<SetStateAction<string | null>>
@@ -64,7 +64,7 @@ export async function publishMenuNow({ audience, group, loadChecks, persistDraft
     } catch (e) {
       const fieldFailure = saveErrors.capture(e);
 
-      const raw = e instanceof Error ? e.message : ''
+      const raw = e instanceof Error && !/^API error: /.test(e.message) ? e.message : ''
       const isValidationMessage = /[ぁ-んァ-ヶ一-龠]/u.test(raw) && raw !== 'publish failed'
       { if (!fieldFailure)
 

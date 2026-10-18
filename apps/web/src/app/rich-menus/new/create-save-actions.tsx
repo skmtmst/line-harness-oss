@@ -2,7 +2,8 @@
 
 import { createAreaDrafts } from '@/components/rich-menus/action-drafts'
 import {
-describeApiFailure
+describeApiFailure,
+isSaveConflict
 } from '@/components/shared/api-error-message'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifyToast } from '@/components/shared/toast'
@@ -35,7 +36,7 @@ type createMenuDraftContext = {
   name: string
   pendingImages: (PendingImage | null)[]
   reloadGroup: (groupId: string) => Promise<void>
-  saveErrors: ReturnType<typeof useSaveFormErrors>
+  saveErrors: Pick<ReturnType<typeof useSaveFormErrors>, 'capture'>
   setError: Dispatch<SetStateAction<string | null>>
   setPendingImages: Dispatch<SetStateAction<(PendingImage | null)[]>>
   size: "large" | "compact"
@@ -161,7 +162,7 @@ type saveMenuDraftContext = {
   host: RichMenuCreateHost | undefined
   persistDraft: () => Promise<void>
   reloadGroup: (groupId: string) => Promise<void>
-  saveErrors: ReturnType<typeof useSaveFormErrors>
+  saveErrors: Pick<ReturnType<typeof useSaveFormErrors>, 'capture'>
   saving: boolean
   setCompareOpen: Dispatch<SetStateAction<boolean>>
   setConflict: Dispatch<SetStateAction<boolean>>
@@ -195,7 +196,7 @@ export async function saveMenuDraft({ createDraft, group, host, persistDraft, re
       const fieldFailure = saveErrors.capture(e)
       // ★V8 `r8dGXT`：ほかの人が先に保存した（409）。入力は残したまま、
       // 帯を出して最新を取り直す。比べる文に使う。
-      if (e instanceof ApiError && e.status === 409 && group) {
+      if (isSaveConflict(e) && group) {
         setConflict(true)
         setCompareOpen(false)
         try {
@@ -207,7 +208,7 @@ export async function saveMenuDraft({ createDraft, group, host, persistDraft, re
         }
         return false
       }
-      const raw = e instanceof Error ? e.message : ''
+      const raw = e instanceof Error && !/^API error: /.test(e.message) ? e.message : ''
       { if (!fieldFailure)
 
       setError(

@@ -173,7 +173,7 @@ export function DetailV8({
       const fieldFailure = saveErrors.capture(error)
 
       { if (!fieldFailure)
-      setNotice(error instanceof Error ? error.message : '写真の向きを保存できませんでした。') }
+      setNotice(photoNoticeFor(error, '写真の向きを保存できませんでした。')) }
     } finally {
       setRotationSaving(false)
     }
@@ -232,7 +232,7 @@ export function DetailV8({
       const fieldFailure = saveErrors.capture(error)
 
       { if (!fieldFailure)
-      setNotice(error instanceof Error ? error.message : '審査用画像を作り直せませんでした。') }
+      setNotice(photoNoticeFor(error, '審査用画像を作り直せませんでした。')) }
     } finally {
       setAssetProcessing(false)
     }

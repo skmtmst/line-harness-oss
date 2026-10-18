@@ -40,7 +40,7 @@ export function viewsText(value: unknown): string {
 
 /**
  * 公式サイト掲載（SyQA1）。列：写真・ペット・どこで使っているか・
- * この30日に見た・公開の同意・掲載先から外す。右に出すときの決めごと。
+ * 過去30日に見た・公開の同意・掲載先から外す。右に出すときの決めごと。
  * 30日集計は日別の記録から表示し、記録がなければ「—」。掲載先の編集・撤回の整理・外した履歴を保つ。
  */
 export function PublicationsV8({
@@ -227,7 +227,7 @@ export function PublicationsV8({
                     <Th>写真</Th>
                     <Th grow>ペット</Th>
                     <Th help="この写真を使っている掲載先です。複数の場所は行にまとめて表示します。">掲載先</Th>
-                    <Th align="right"><span title="30日間の集計は未接続です。累計の回数には置き換えません">この30日に見た</span></Th>
+                    <Th align="right"><span title="30日間の集計は未接続です。累計の回数には置き換えません">過去30日に見た</span></Th>
                     <Th>公開の同意</Th>
                     <Th align="right">操作</Th>
                   </TableHeadRow>
