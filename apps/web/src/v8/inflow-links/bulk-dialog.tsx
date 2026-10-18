@@ -1,4 +1,5 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
 import { useState } from 'react'
 import { ApiError, api } from '@/lib/api'
 import type { EntryRoute } from '@line-crm/shared'
@@ -6,7 +7,6 @@ import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -197,15 +197,12 @@ export default function BulkRoutesDialog({
             })}
           </RadioCardGroup></SaveErrorField>
           {action === 'move' ? (
-            <SaveErrorField names={["genre"]}><Select
+            <SaveErrorField names={["genre"]}><FolderSelect
               aria-label="移動先のフォルダ"
               value={genre}
               size="full"
               onChange={setGenre}
-              options={[
-                { value: '', label: '未分類' },
-                ...genreOptions.map((name) => ({ value: name, label: name })),
-              ]}
+              folders={genreOptions.map((name) => ({ value: name, label: name }))}
               className="mt-2"
             /></SaveErrorField>
           ) : null}

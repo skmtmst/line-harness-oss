@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
 import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
@@ -115,9 +114,7 @@ export default function MembersListV8({
 
   return (
     <div className={styles.listBody}>
-      <NoteBar tone="info" help="ランクは通年の購入額で決まり、翌年の12月末まで維持されます" helpLabel="ランクの決まり">
-        会員はネットショップで登録した人です。LINE と結びつくと、ランクやペットに合わせた配信ができます。
-      </NoteBar>
+
 
       <ListToolbarRow>
         <ListToolbarSearchSlot>
@@ -216,9 +213,7 @@ export default function MembersListV8({
                 first={data.total === 0 ? 0 : (data.page - 1) * data.pageSize + 1}
                 last={Math.min(data.total, data.page * data.pageSize)}
               />
-              {data.total > data.pageSize ? (
-                <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} />
-              ) : null}
+              <Pagination page={data.page} pageCount={Math.max(1, Math.ceil(data.total / data.pageSize))} onPageChange={setPage} />
             </ListPager>
             <p className={styles.listHint}>行の「…」から 会員の詳細・友だちを開く・ECで開く。</p>
           </>
@@ -238,7 +233,7 @@ function MemberRow({
   const friendDetail = `/friends/detail?id=${encodeURIComponent(member.friendId)}`
   return (
     <GridRow className={styles.mRow} data-row-id={member.friendId}>
-      <GridNameCell name={
+      <GridNameCell folder={false} name={
         <span className={styles.memberName} title={`${member.name || '（名前なし）'} ／ ${member.customerId ? `EC会員 ${member.customerId}` : 'EC未連携'}`}>{member.name || '（名前なし）'}</span>}/>
       <span role="cell"><RankChip name={member.rankName} /></span>
       <span role="cell"><span className={styles.numStrong}>{yen(member.annualMilesYen)}</span></span>

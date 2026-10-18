@@ -80,6 +80,35 @@ function seedReservation(id: string, status = 'confirmed', tableId: string | nul
   ).run(id, SLOT, SLOT_END, tableId, status);
 }
 
+test('媒体作業は予約経路で絞り、開けた印はその世代だけに保存する',async()=>{
+ seedReservation('line-r');seedReservation('phone-r','confirmed','table-2');
+ testDb.raw.exec(`UPDATE rt_reservations SET source='line' WHERE id='line-r';UPDATE rt_reservations SET source='phone' WHERE id='phone-r';
+ INSERT INTO rt_reservation_close_tasks(id,store_id,reservation_id,channel,starts_at,status) VALUES
+ ('line-task','store-s','line-r','hotpepper','${SLOT}','reopen'),('phone-task','store-s','phone-r','tabelog','${SLOT}','close');
+ INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity) VALUES('notice-slot','store-s','${SLOT}',8);
+ INSERT INTO rt_channel_close_tasks(id,store_id,slot_id,channel,status,reason,remaining_seats) VALUES('slot-task','store-s','notice-slot','tabelog','reopen','limited',1);`);
+ const line=await get('/api/restaurant-test/channel-close-tasks?storeId=store-s&source=line');
+ expect(await line.json()).toMatchObject({data:[{id:'line-task',source:'line',generation:1,opened:false}]});
+ expect(await (await get('/api/restaurant-test/channel-close-tasks?storeId=store-s&source=phone&channel=hotpepper')).json()).toMatchObject({data:[]});
+ expect((await post('/api/restaurant-test/channel-close-tasks/phone-task/opened',{expectedGeneration:1})).status).toBe(409);
+ expect((await post('/api/restaurant-test/channel-close-tasks/line-task/opened',{})).status).toBe(400);
+ for(const id of ['line-task','slot-task']) {
+  expect((await post(`/api/restaurant-test/channel-close-tasks/${id}/opened`,{expectedGeneration:1})).status).toBe(200);
+  expect((await post(`/api/restaurant-test/channel-close-tasks/${id}/opened`,{expectedGeneration:1})).status).toBe(200);
+ }
+ expect(await (await get('/api/restaurant-test/channel-close-tasks?storeId=store-s&source=line')).json()).toMatchObject({data:[{id:'line-task',opened:true}]});
+ testDb.raw.exec("UPDATE rt_reservation_close_tasks SET generation=2 WHERE id='line-task'");
+ expect((await post('/api/restaurant-test/channel-close-tasks/line-task/opened',{expectedGeneration:1})).status).toBe(409);
+ expect(await (await get('/api/restaurant-test/channel-close-tasks?storeId=store-s&source=line')).json()).toMatchObject({data:[{opened:false,generation:2}]});
+ expect((await post('/api/restaurant-test/channel-close-tasks/missing/opened',{expectedGeneration:1})).status).toBe(404);
+ authMocks.getStaffByApiKey.mockResolvedValue({id:'staff',role:'staff',name:'担当',permission_keys:'[]',tenant_id:TENANT} as never);
+ const headers={Authorization:'Bearer staff-key','Content-Type':'application/json'};
+ const acknowledge=()=>app().request('/api/restaurant-test/channel-close-tasks/line-task/opened?account_id=account-1',{method:'POST',headers,body:JSON.stringify({expectedGeneration:2})},env);
+ expect((await acknowledge()).status).toBe(200);
+ authMocks.getStaffByApiKey.mockResolvedValue({id:'staff',role:'staff',name:'担当',access_level:'read_only',permission_keys:'[]',tenant_id:TENANT} as never);
+ expect((await acknowledge()).status).toBe(403);
+});
+
 function app() {
   const instance = new Hono<Env>();
   instance.use('*', authMiddleware);
@@ -127,7 +156,7 @@ beforeEach(() => {
   authMocks.getStaffByAdminSession.mockResolvedValue(null);
   authMocks.lineAccounts = [
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
-    { id: 'account-9', name: 'S店', is_active: 1, channel_access_token: 'token-s' },
+    { id: 'account-9', login_channel_id: 'login-seat', name: 'S店', is_active: 1, channel_access_token: 'token-s' },
   ];
   testDb = createTestD1({ loginPolicy: 'off' });
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
@@ -141,7 +170,7 @@ beforeEach(() => {
     RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     RESTAURANT_INTAKE_DOMAIN: 'intake.example.test',
-    RESTAURANT_TEST_ENABLED: 'true',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://liff.line.me/test123', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
@@ -226,6 +255,9 @@ describe('日付で席予約を閉じる',()=>{
   expect((await post('/api/restaurant-test/channel-close-tasks/'+rows[0].id+'/done',{})).status).toBe(200);
   expect((await request('DELETE',closurePath+'/'+id,{expectedVersion:1})).status).toBe(200);
   expect(testDb.raw.prepare('SELECT channel,status FROM rt_closure_close_tasks ORDER BY channel').all()).toEqual([{channel:'media1',status:'reopen'},{channel:'media2',status:'reopen'}]);
+  const reopened=(await (await get('/api/restaurant-test/channel-close-tasks?storeId=store-s')).json() as {data:Array<{id:string;generation:number}>}).data;
+  expect((await post('/api/restaurant-test/channel-close-tasks/'+reopened[0].id+'/opened',{expectedGeneration:reopened[0].generation})).status).toBe(200);
+  expect((await (await get('/api/restaurant-test/channel-close-tasks?storeId=store-s')).json() as {data:Array<{opened:boolean}>}).data.filter(row=>row.opened)).toHaveLength(1);
   expect(testDb.raw.prepare('SELECT archived_at FROM rt_closures WHERE id=?').get(id)).toMatchObject({archived_at:expect.any(String)});
   expect((await (await get(closurePath+'?storeId=store-s')).json() as any).data).toEqual([]);
  });
@@ -246,7 +278,7 @@ describe('日付で席予約を閉じる',()=>{
 });
 
 async function seatLiffRequest(path:string,body?:unknown,token='test-id-token') {
- testDb.raw.exec(`UPDATE line_accounts SET liff_id='liff-seat' WHERE id='account-9'; INSERT OR IGNORE INTO friends(id,line_user_id,display_name,line_account_id,is_following) VALUES('liff-friend','liff-user','本人','account-9',1);`);
+ testDb.raw.exec(`UPDATE line_accounts SET liff_id='liff-seat',login_channel_id='login-seat' WHERE id='account-9'; INSERT OR IGNORE INTO friends(id,line_user_id,display_name,line_account_id,is_following) VALUES('liff-friend','liff-user','本人','account-9',1);`);
  vi.stubGlobal('fetch',vi.fn(async(url:unknown)=>String(url).includes('oauth2/v2.1/verify')?new Response(JSON.stringify({sub:'liff-user'}),{status:200}):new Response('{}',{status:404})));
  const {default:booking}=await import('./booking.js');const app=new Hono<Env>();app.route('/',booking);
  return app.request(path+(path.includes('?')?'&':'?')+'liffId=liff-seat',{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json', 'Idempotency-Key':'test-key'},body:body===undefined?undefined:JSON.stringify(body)},env);

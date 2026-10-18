@@ -1,57 +1,40 @@
 'use client'
 
-import { FolderDotName } from '@/components/shared/folder-dot'
-import CopyTextButton from '@/components/shared/copy-text-button'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Copy, KeyRound, LayoutTemplate, Plus, RefreshCw } from 'lucide-react'
-import { api, ApiError, type IntegrationApiTokenInfo } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { useActionError } from '@/lib/use-action-error'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
-import { describeApiFailure } from '@/components/shared/api-error-message'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import StatusBadge from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { TextField } from '@/components/shared/text-field'
-import { Field } from '@/components/shared/form-controls'
-import EmptyList from '@/components/shared/empty-list'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ContextMenu from '@/components/shared/context-menu'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import Dialog from '@/components/shared/dialog'
+import EmptyList from '@/components/shared/empty-list'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { RowMenu } from '@/components/shared/row-actions'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
-import {
-  ViewerBand,
-  WEBHOOKS_DESCRIPTION,
-  WebhookBand,
-  WebhookTabs,
-  overviewBandCells,
-  useWebhookOverview,
-} from './shell'
-import styles from './api-tokens.module.css'
+import { SaveErrorField,SaveErrorScope } from '@/components/shared/save-form-errors'
+import { DelayedSkeleton,Skeleton } from '@/components/shared/skeleton'
+import StatusBadge from '@/components/shared/status-badge'
+import TruncatedText from '@/components/shared/truncated-text'
+import { ActionCell,DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
+import { TextField } from '@/components/shared/text-field'
+import StepUpPrompt from '@/components/step-up-prompt'
+import { ListPage } from '@/components/templates'
+import { Check,Coins,Gift,Wallet,KeyRound,LayoutTemplate,Plus } from 'lucide-react'
+import { SCOPES } from './api-token-words'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import styles from './api-tokens.module.css'
+import {
+ViewerBand,
+WEBHOOKS_DESCRIPTION,
+WebhookBand,
+WebhookTabs,
+overviewBandCells
+} from './shell'
+import { useApiTokens } from './use-api-tokens'
+import McpConnectionsSection from '@/v8/mcp-connect/section'
 
-/*
- * ★V8 外部連携「API 接続」タブ（Pencil `ralAc`）と、発行した直後の窓（`UkZLi`「鍵を発行しました」）。
- *
- * 今までの V8（app/webhooks/apitokens-v8.tsx）の動きを写して、外枠（題・タブ・数の帯）は
- * ほかのタブと同じ shell.tsx で一から書いた。データの口・本人確認・失敗の文は今と同じ。
- * - 鍵の発行は「API 接続の鍵を発行する」→ 発行の窓（名前・できること）→ 発行した鍵の窓（`UkZLi`）。
- * - 平文の鍵は発行・入れ替えの返事にだけ1回乗る。窓を閉じたら二度と出さない。
- * - 止めた鍵は一覧の口が返さないので、「止めている」行と「動かす」は出ない（動かす口も無い）。
- * - 発行・入れ替え・停止は統括だけ（R32）。閲覧のみの人には押せないボタンを置かず、場所だけ空ける。
- */
 
-type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
-
-/** 読み込み中の骨組みの1行（表と同じ列の幅）。 */
 function SkeletonCells({ height, width }: { height: number; width: string }) {
   return (
     <>
@@ -64,7 +47,6 @@ function SkeletonCells({ height, width }: { height: number; width: string }) {
   )
 }
 
-const SCOPES = ['tags:read', 'tags:write'] as const
 const SCOPE_LABELS: Record<string, string> = {
   'tags:read': 'タグを見る',
   'tags:write': 'タグを付ける',
@@ -83,252 +65,12 @@ export function tokenUsedAt(value: string | null): string {
   return polishFormatDate(value, { style: 'list', fallback: value ? '—' : 'まだ使っていません' })
 }
 
+
 export default function WebhooksApiTokensV8() {
-  const saveErrors = useSaveFormErrors()
-  usePageTitle('外部連携')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }])
-  const staffRole = useStaffRole()
-  const canManage = staffRole === 'owner'
-  const overview = useWebhookOverview()
-  const { selectedAccountId } = useAccount()
-  const selectedAccountIdRef = useRef(selectedAccountId)
-  selectedAccountIdRef.current = selectedAccountId
-  const loadGenerationRef = useRef(0)
-
-  const [tokens, setTokens] = useState<IntegrationApiTokenInfo[]>([])
-  const [status, setStatus] = useState<LoadStatus>('loading')
-  const [loadError, setLoadError] = useState('')
-  const { error: actionError, setError: setActionError } = useActionError(selectedAccountId ?? '')
-  const [createOpen, setCreateOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [nameError, setNameError] = useState('')
-  const [scopesError, setScopesError] = useState('')
-  const [scopes, setScopes] = useState<string[]>([...SCOPES])
-  const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState('')
-  const [issued, setIssued] = useState<{ name: string; token: string; scopes: string[] } | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [rotateTarget, setRotateTarget] = useState<IntegrationApiTokenInfo | null>(null)
-  const [revokeTarget, setRevokeTarget] = useState<IntegrationApiTokenInfo | null>(null)
-  const [mutating, setMutating] = useState(false)
-  const [dialogError, setDialogError] = useState('')
-  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
-  const [menuId, setMenuId] = useState<string | null>(null)
-  // 右クリックされた行。まだ無ければ先頭の行（Shift+F10 の押し口）。
-  const [ctxId, setCtxId] = useState<string | null>(null)
-  const ctxToken = tokens.find((token) => token.id === ctxId) ?? tokens[0] ?? null
-
-  // 行の「…」と同じ中身（右クリックでも出す）。止める口しか無いので、名前・できることを変えるは置かない。
-  const revokeMenuItemsFor = (token: IntegrationApiTokenInfo): ContextMenuItem[] => [{
-    id: 'revoke',
-    label: '止める',
-    danger: true,
-    onSelect: () => {
-      setDialogError('')
-      setRevokeTarget(token)
-    },
-  }]
-
-  const load = useCallback(async () => {
-    const requestGeneration = ++loadGenerationRef.current
-    const requestAccountId = selectedAccountId
-    if (!requestAccountId) {
-      setTokens([])
-      setStatus('ready')
-      return
-    }
-    setStatus('loading')
-    setLoadError('')
-    try {
-      const res = await api.webhooks.apiTokens.list(requestAccountId)
-      if (loadGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) {
-        setStatus('error')
-        setLoadError(res.error)
-        return
-      }
-      // 止めた鍵は「使っている」と出さない（一覧の口は止めた鍵を返さない決まりだが、混ざっても出さない）。
-      setTokens(res.data.filter((item) => !item.revokedAt))
-      setStatus('ready')
-    } catch (caught) {
-      if (loadGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
-      const fieldFailure = saveErrors.capture(caught);
-
-      if (caught instanceof ApiError && caught.code === 'FEATURE_DISABLED') {
-        setTokens([]);
-
-        setStatus('disabled');
-
-        return
-      }
-      if (caught instanceof ApiError && (caught.status === 403 || caught.status === 404)) {
-        setTokens([])
-        setStatus('forbidden')
-        return
-      }
-      setStatus('error')
-      { if (!fieldFailure)
-      setLoadError(describeApiFailure(caught, '読み込み'))
-    }
-  }
-  }, [selectedAccountId, saveErrors])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  // アカウントを替えたら、前のアカウントの鍵は見せない。
-  useEffect(() => {
-    setIssued(null)
-    setCopied(false)
-  }, [selectedAccountId])
-
-  const toggleScope = (scope: string) => {
-    setScopes((prev) => (prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]))
-  }
-
-  const openCreate = () => {
-    setName('')
-    setNameError('')
-    setCreateError('')
-    setScopesError('')
-    setScopes([...SCOPES])
-    setCreateOpen(true)
-  }
-
-  const handleCreate = async (stepUpToken?: string) => {
-    setCreateError('')
-    setNameError('')
-    setScopesError('')
-    const requestAccountId = selectedAccountId
-    if (!requestAccountId) return
-    const trimmed = name.trim()
-    if (!trimmed) {
-      setNameError('名前を入力してください')
-      requestAnimationFrame(() => { const field = document.getElementById('wh-token-name'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
-      return
-    }
-    if (scopes.length === 0) {
-      setScopesError('できることを1つ以上選んでください')
-      requestAnimationFrame(() => { const field = document.getElementById('wh-token-scopes'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
-      return
-    }
-    setCreating(true)
-    try {
-      const res = await api.webhooks.apiTokens.create(requestAccountId, { name: trimmed, scopes }, stepUpToken)
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) {
-        setCreateError(res.error)
-        return
-      }
-      setIssued({ name: res.data.name, token: res.data.token, scopes: res.data.scopes ?? scopes })
-      setCopied(false)
-      setCreateOpen(false)
-      setName('')
-      await load()
-    } catch (caught) {
-      const fieldFailure = saveErrors.capture(caught);
-
-      if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: (token) => handleCreate(token) });
-
-        return
-      }
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      { if (!fieldFailure)
-      setCreateError(describeApiFailure(caught, '発行', {
-        scope: 'store',
-      })) }
-    } finally {
-      if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
-    }
-  }
-
-  const handleRotate = async (stepUpToken?: string) => {
-    setActionError('')
-    setDialogError('')
-    const requestAccountId = selectedAccountId
-    if (!requestAccountId || !rotateTarget) return
-    setMutating(true)
-    try {
-      const res = await api.webhooks.apiTokens.rotate(rotateTarget.id, requestAccountId, stepUpToken)
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) {
-        setDialogError(res.error)
-        return
-      }
-      setIssued({ name: res.data.name, token: res.data.token, scopes: res.data.scopes ?? rotateTarget.scopes })
-      setCopied(false)
-      setRotateTarget(null)
-      await load()
-    } catch (caught) {
-      const fieldFailure = saveErrors.capture(caught);
-
-      if (!stepUpToken && isStepUpRequired(caught)) {
-        const target = rotateTarget
-        setStepUp({
-          purpose: 'webhook.api_token',
-          action: `「${target?.name ?? ''}」の鍵を入れ替える`,
-          retry: (token) => handleRotate(token),
-        })
-        return
-      }
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      if (caught instanceof ApiError && caught.code === 'TOKEN_ROTATE_CONFLICT') {
-        setRotateTarget(null)
-        { if (!fieldFailure)
-        setActionError('ほかの操作が先にこの鍵を更新しました。一覧を読み直しました。最新の状態からもう一度お試しください') }
-        await load()
-        return
-      }
-      { if (!fieldFailure)
-      setDialogError(describeApiFailure(caught, '入れ替え', {
-        scope: 'store',
-      })) }
-    } finally {
-      if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
-    }
-  }
-
-  const handleRevoke = async (stepUpToken?: string) => {
-    setDialogError('')
-    const requestAccountId = selectedAccountId
-    if (!requestAccountId || !revokeTarget) return
-    setMutating(true)
-    try {
-      const res = await api.webhooks.apiTokens.revoke(revokeTarget.id, requestAccountId, stepUpToken)
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) {
-        setDialogError(res.error)
-        return
-      }
-      setRevokeTarget(null)
-      await load()
-    } catch (caught) {
-      const fieldFailure = saveErrors.capture(caught);
-
-      if (!stepUpToken && isStepUpRequired(caught)) {
-        const target = revokeTarget
-        setStepUp({
-          purpose: 'webhook.api_token',
-          action: `「${target?.name ?? ''}」の鍵を止める`,
-          retry: (token) => handleRevoke(token),
-        })
-        return
-      }
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      { if (!fieldFailure)
-      setDialogError(describeApiFailure(caught, '停止', {
-        scope: 'store',
-      })) }
-    } finally {
-      if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
-    }
-  }
-
+  const { saveErrors, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke } = useApiTokens()
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
-      help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」から止める。止めても、すでに付けたタグは残ります。"}</>}
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」から入れ替える・止める。止めても、すでに付けたタグは残ります。"}</>}
       boardId="ralAc"
       headingSize="regular"
       title="外部連携"
@@ -342,7 +84,12 @@ export default function WebhooksApiTokensV8() {
             outgoing: overview.outgoingCount === null ? null : overview.outgoing,
             incomingCount: overview.incomingCount,
             summary: overview.summary,
-          })}
+          }).map(cell => ({
+            ...cell,
+            icon: cell.key === 'sent' ? <Coins aria-hidden="true" />
+              : cell.key === 'failed' ? <Gift aria-hidden="true" />
+                : cell.key === 'incoming' ? <Wallet aria-hidden="true" /> : cell.icon,
+          }))}
         />
       </>}
       overlays={<>
@@ -457,10 +204,7 @@ export default function WebhooksApiTokensV8() {
           <p className={styles.createRule}>鍵の発行・入れ替え・停止は統括だけができます</p>
         </div>
 
-        <div className={styles.infoBand} role="note">
-          <KeyRound size={16} aria-hidden="true" />
-          <p>鍵は発行したときに1回だけ表示されます。外の仕組みに書き写してから閉じてください。入れ替えると、今の鍵はすぐ使えなくなります。</p>
-        </div>
+        {canManage ? <Notice tone="info" icon={<KeyRound size={16} aria-hidden="true" />}>鍵は発行したときに1回だけ表示されます。外の仕組みに書き写してから閉じてください。入れ替えると、今の鍵はすぐ使えなくなります。</Notice> : null}
 
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
 
@@ -528,59 +272,58 @@ export default function WebhooksApiTokensV8() {
                 return true
               }}
             >
-              <DataTable aria-label="API 接続の鍵" columnLayout={{ headHeight: 'auto', rowHeight: 'var(--tpl-ms-key-row-h)', gap: 'var(--tpl-ms-key-col-gap)', padding: 'var(--tpl-ms-key-row-pad)', headPadding: 'var(--tpl-ms-key-head-row-pad)', headRadius: 'var(--tpl-ms-key-box-radius)', headTextSize: 'var(--text-micro)', bodyTextSize: 'var(--text-caption)' }}>
+              <DataTable aria-label="API 接続の鍵" columnSizing="content">
                 <thead>
-                  <TableHeadRow data-table-layout="columns">
-                  <Th className={styles.colName}>名前</Th>
-                  <Th className={styles.colScopes}>できること</Th>
-                  <Th className={styles.colCreated}>作った日</Th>
-                  <Th className={styles.colUsed}>最後に使った</Th>
-                  <Th className={styles.colState}>状態</Th>
-                  <Th className={styles.colOps}><span className={styles.srOnly}>操作</span></Th>
+                  <TableHeadRow>
+                  <Th grow>名前</Th>
+                  <Th>できること</Th>
+                  <Th>作った日</Th>
+                  <Th>最後に使った</Th>
+                  <Th>状態</Th>
+                  <Th><span className={styles.srOnly}>操作</span></Th>
                 </TableHeadRow>
                 </thead>
                 <tbody>
                 {tokens.map((token) => {
                   const scopeText = token.scopes.map(scopeLabel).join('・')
                   return (
-                    <Tr data-row-id={token.id} key={token.id} data-table-layout="columns" data-ctx-row={token.id}>
-                      <Td className={styles.colName} title={token.name}><FolderDotName>{token.name}</FolderDotName></Td>
-                      <Td className={styles.colScopes} title={scopeText}>{scopeText}</Td>
-                      <Td className={styles.colCreated}>{tokenDate(token.createdAt)}</Td>
-                      <Td className={styles.colUsed}>{tokenUsedAt(token.lastUsedAt)}</Td>
-                      <Td className={styles.colState}>
+                    <Tr data-row-id={token.id} key={token.id} data-ctx-row={token.id}>
+                      <Td grow title={token.name}><FolderDotName>{token.name}</FolderDotName></Td>
+                      <Td title={scopeText}><TruncatedText value={scopeText} /></Td>
+                      <Td>{tokenDate(token.createdAt)}</Td>
+                      <Td>{tokenUsedAt(token.lastUsedAt)}</Td>
+                      <Td>
                         <StatusBadge tone="success">使っている</StatusBadge>
                       </Td>
-                      <Td className={styles.colOps}>
+                      {/* 行の右端は「…」1つ（B-253・絵 ralAc）。入れ替える・止めるはその中。 */}
+                      <ActionCell>
                         {canManage ? (
-                          <span className={styles.menuBox}>
-                            <Button
-                              onClick={() => {
+                          <RowMenu
+                            appearance="plain"
+                            label={`「${token.name}」の操作`}
+                            open={menuId === token.id}
+                            onOpenChange={(next) => setMenuId(next ? token.id : null)}
+                            items={[{
+                              id: 'rotate',
+                              label: '入れ替える',
+                              onSelect: () => {
+                                setMenuId(null)
                                 setDialogError('')
                                 setRotateTarget(token)
-                              }}
-                            >
-                              <RefreshCw size={15} aria-hidden="true" />入れ替える
-                            </Button>
-                            <RowMenu
-                              className={styles.moreButton}
-                              label={`「${token.name}」の操作`}
-                              open={menuId === token.id}
-                              onOpenChange={(next) => setMenuId(next ? token.id : null)}
-                              items={[{
-                                id: 'revoke',
-                                label: '止める',
-                                tone: 'danger',
-                                onSelect: () => {
-                                  setMenuId(null)
-                                  setDialogError('')
-                                  setRevokeTarget(token)
-                                },
-                              }]}
-                            />
-                          </span>
+                              },
+                            }, {
+                              id: 'revoke',
+                              label: '止める',
+                              tone: 'danger',
+                              onSelect: () => {
+                                setMenuId(null)
+                                setDialogError('')
+                                setRevokeTarget(token)
+                              },
+                            }]}
+                          />
                         ) : null}
-                      </Td>
+                      </ActionCell>
                     </Tr>
                   )
                 })}
@@ -589,6 +332,8 @@ export default function WebhooksApiTokensV8() {
             </ContextMenu>
           </>
         ) : null}
+        {/* G9：AI とつなぐ（MCP）の区画（板 Xb0yc）。スタッフには出さない。 */}
+        <McpConnectionsSection />
       </div>
     </ListPage></SaveErrorScope>
   )

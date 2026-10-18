@@ -20,7 +20,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { ArrowRight } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { RowMenu } from '@/components/shared/row-actions'
 import TargetMissing from '@/components/shared/target-missing'
@@ -184,11 +184,11 @@ function EditInner() {
     setVisited((prev) => (prev.has(next) ? prev : new Set(prev).add(next)))
     setPane(next)
     try {
-      window.history?.pushState?.(null, '', `?id=${encodeURIComponent(id ?? '')}&pane=${next}`)
+      window.history?.[((DETAIL_KEYS as readonly string[]).includes(next) || (DETAIL_KEYS as readonly string[]).includes(pane)) ? 'replaceState' : 'pushState']?.(null, '', `?id=${encodeURIComponent(id ?? '')}&pane=${next}`)
     } catch {
       /* 履歴を持たない環境（試験用の簡易DOM）では画面内の状態だけで動く。 */
     }
-  }, [id])
+  }, [id, pane])
 
   useEffect(() => {
     const onPop = () => {
@@ -432,7 +432,7 @@ function EditInner() {
       {pane === 'analytics' ? <AnalyticsPane ctx={ctx} chrome={detailChrome} /> : null}
       {keep('comments', <CommentsPane ctx={ctx} chrome={detailChrome} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} />)}
       {leaveDialog}
-      <ConfirmDialog open={pauseVersion !== null} title="ウェビナーを停止しますか？" description="新しい視聴を受け付けなくなります。" confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => pause()} onCancel={() => { if (!pausing) setPauseVersion(null) }} />
+      <Dialog open={pauseVersion !== null} title={`「${webinar.title}」を停止しますか？`} description={`公開中の版 ${pauseVersion ?? editor.version} を止めます。公開ページでの申し込みと視聴ができなくなります。あとで公開し直せます。`} tone="destructive" confirmation confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => void pause()} onCancel={() => { if (!pausing) setPauseVersion(null) }} />
     </div></SaveErrorScope>
   )
 }

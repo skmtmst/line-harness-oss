@@ -1,6 +1,9 @@
 'use client'
 import { useUrlTab } from '@/lib/use-url-tab'
-import { ChevronLeft, LogIn } from 'lucide-react'
+import type { FormRequirement } from '@/lib/form-requirement'
+import { LogIn, Wallet, Store, Users, Inbox } from 'lucide-react'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type OpsTenantDetail } from '@/lib/api'
@@ -17,6 +20,10 @@ import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { OpsHead } from './shell'
+import { PageFrame } from '@/components/templates/page-frame'
+import { DashboardColumns } from '@/components/templates/dashboard-page'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenant-detail.module.css'
@@ -26,6 +33,8 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
+import TenantOverviewStats from './tenant-overview-stats'
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -109,22 +118,22 @@ function DetailContent() {
 
   if (!id) {
     return (
-      <div data-design-node="Oub6x">
+      <PageFrame kind="detail" boardId="Oub6x" standalone>
         <TargetMissing kind="unspecified" title="見る契約先が指定されていません" description="契約先アカウントの一覧から、見る契約先を選び直してください。" backHref="/ops/tenants" backLabel="契約先の一覧へ戻る" />
-      </div>
+      </PageFrame>
     )
   }
 
   if (!detail) {
     return (
-      <div data-design-node="Oub6x">
-        <OpsHead title="契約先アカウント" environment={environment} actions={<BackToList />} />
+      <PageFrame kind="detail" boardId="Oub6x" standalone>
+        <OpsHead title="契約先アカウント" environment={environment} />
         <div className={parts.panel}>
           {error
             ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
             : <DetailLoading label="契約先を読み込んでいます" />}
         </div>
-      </div>
+      </PageFrame>
     )
   }
 
@@ -136,14 +145,14 @@ function DetailContent() {
     : `${PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status}${tenant.current_period_ends_at ? `・次回 ${formatDate(tenant.current_period_ends_at)}` : ''}`
 
   return (
-    <div data-design-node="Oub6x">
+    <PageFrame kind="detail" boardId="Oub6x" standalone>
       <OpsHead
         title={tenant.name}
         description={`${planLabel(tenant.plan_key)}・${PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status}・${formatDate(tenant.created_at).replace(/-/g, '/')} から`}
         environment={environment}
+        band={<TenantOverviewStats detail={detail} />}
         actions={(
           <>
-            <BackToList />
             {!readOnly && tenant.status === 'active' ? <Button onClick={() => setStatusDialog('archived')}>アーカイブ</Button> : null}
             <Button onClick={() => setImpersonateConfirm(true)} disabled={busy || tenant.status === 'archived'}><LogIn aria-hidden="true" />代理ログイン（閲覧のみ）</Button>
             {readOnly ? null : tenant.status === 'active'
@@ -166,18 +175,18 @@ function DetailContent() {
         </div>
 
         {tab === 'overview' ? (
-          <div className={parts.row}>
-            <section className={parts.panel} aria-label="契約先の情報">
-              <h3 className={parts.panelTitle}>契約先の情報</h3>
+          <DashboardColumns layout="cards">{[
+            <Card key="information" aria-label="契約先の情報" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+              <SectionHeader title="契約先の情報" />
               <dl className={styles.kvs}>
                 <Kv k="統括名" v={tenant.name} />
                 <Kv k="メール" v={owner ? `${owner.email}（${ROLE_LABEL[owner.role] ?? owner.role}）` : emptyValue('unknown')} />
                 <Kv k="登録日" v={formatDate(tenant.created_at)} />
                 <Kv k="最終ログイン" v={formatDateTime(tenant.last_login_at)} />
               </dl>
-            </section>
-            <section className={parts.panel} aria-label="契約の状況">
-              <h3 className={parts.panelTitle}>契約の状況</h3>
+            </Card>,
+            <Card key="subscription" aria-label="契約の状況" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+              <SectionHeader title="契約の状況" />
               <dl className={styles.kvs}>
                 <Kv k="プラン" v={planLabel(tenant.plan_key)} />
                 <Kv k="請求" v={<span title={`次回の請求日 ${formatDate(tenant.current_period_ends_at)}・トライアル ${tenant.trial_ends_at ? `${formatDate(tenant.trial_ends_at)} まで` : emptyValue('none')}`}>{billing}</span>} />
@@ -192,88 +201,88 @@ function DetailContent() {
                   )}
                 />
               </dl>
-            </section>
-          </div>
+            </Card>
+          ]}</DashboardColumns>
         ) : null}
 
         {tab === 'accounts' || tab === 'overview' ? (
-          <section className={parts.panel} aria-label="店舗（LINE公式アカウント）">
-            <h3 className={parts.panelTitle}>店舗（LINE公式アカウント）</h3>
+          <Card  aria-label="店舗（LINE公式アカウント）" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <SectionHeader title="店舗（LINE公式アカウント）" />
             {accounts.length === 0 ? (
               <ListState permissionScope="hq" kind="empty" title="店舗がありません" description="この契約先にはまだ LINE 公式アカウントがつながっていません。" />
             ) : (
-              <div className={parts.mini} role="table" aria-label="店舗">
-                <div className={parts.miniHead} role="row">
-                  <span className={parts.grow} role="columnheader">名前</span>
-                  <span className={`${parts.fixed} ${styles.col90}`} role="columnheader">接続状態</span>
-                  <span className={`${parts.num} ${styles.col80}`} role="columnheader">友だち数</span>
-                  <span className={`${parts.fixed} ${styles.col80}`} role="columnheader">状態</span>
-                </div>
+              <GridTable label="店舗" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-rt-col-130) var(--tpl-op-ann-state-w) var(--tpl-rt-col-130)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
+                <GridHeadRow>
+                  <GridCell role="columnheader">名前</GridCell>
+                  <GridCell role="columnheader">接続状態</GridCell>
+                  <GridCell role="columnheader" align="right">友だち数</GridCell>
+                  <GridCell role="columnheader">状態</GridCell>
+                </GridHeadRow>
                 {accounts.map((a) => (
-                  <div key={a.id} className={`${parts.miniRow} ${styles.accountRow}`} role="row">
-                    <span className={parts.grow} role="cell" ><TruncatedText value={String(a.name ?? '')} /></span>
-                    <span className={`${parts.fixed} ${styles.col90}`} role="cell">{a.archived_at || !a.is_active ? <StatusBadge tone="neutral">止めている</StatusBadge> : <StatusBadge tone="success">接続中</StatusBadge>}</span>
-                    <span className={`${parts.num} ${styles.col80}`} role="cell">{a.archived_at ? '—' : formatNumber(a.friend_count)}</span>
-                    <span className={`${parts.fixed} ${styles.col80}`} role="cell">{a.archived_at ? <StatusBadge tone="neutral">アーカイブ</StatusBadge> : a.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止</StatusBadge>}</span>
-                  </div>
+                  <GridRow key={a.id}>
+                    <GridNameCell folder={false} name={<TruncatedText value={String(a.name ?? '')} />} />
+                    <GridCell>{a.archived_at || !a.is_active ? <StatusBadge tone="neutral">止めている</StatusBadge> : <StatusBadge tone="success">接続中</StatusBadge>}</GridCell>
+                    <GridCell align="right">{a.archived_at ? '—' : formatNumber(a.friend_count)}</GridCell>
+                    <GridCell>{a.archived_at ? <StatusBadge tone="neutral">アーカイブ</StatusBadge> : a.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止中</StatusBadge>}</GridCell>
+                  </GridRow>
                 ))}
-              </div>
+              </GridTable>
             )}
-          </section>
+          </Card>
         ) : null}
 
         {tab === 'members' ? (
-          <section className={parts.panel} aria-label="権限者">
-            <h3 className={parts.panelTitle}>権限者</h3>
+          <Card  aria-label="権限者" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <SectionHeader title="権限者" />
             {members.length === 0 ? (
               <ListState permissionScope="hq" kind="empty" title="権限者がいません" description="この契約先にはまだ権限者が登録されていません。" />
             ) : (
-              <div className={parts.mini} role="table" aria-label="権限者">
-                <div className={parts.miniHead} role="row">
-                  <span className={parts.grow} role="columnheader">名前</span>
-                  <span className={`${parts.fixed} ${styles.colMail}`} role="columnheader">メール</span>
-                  <span className={`${parts.fixed} ${styles.col90}`} role="columnheader">役割</span>
-                  <span className={`${parts.fixed} ${styles.col80}`} role="columnheader">状態</span>
-                  <span className={`${parts.fixed} ${styles.colAt}`} role="columnheader">最終ログイン</span>
-                </div>
+              <GridTable label="権限者" framed={false} design={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-rt-col-130) var(--tpl-op-mem-state-w) var(--tpl-op-dt-at-w)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
+                <GridHeadRow>
+                  <GridCell role="columnheader">名前</GridCell>
+                  <GridCell role="columnheader">メール</GridCell>
+                  <GridCell role="columnheader">役割</GridCell>
+                  <GridCell role="columnheader">状態</GridCell>
+                  <GridCell role="columnheader">最終ログイン</GridCell>
+                </GridHeadRow>
                 {members.map((m) => (
-                  <div key={m.id} className={parts.miniRow} role="row">
-                    <span className={parts.grow} role="cell" ><TruncatedText value={String(m.name ?? '')} /></span>
-                    <span className={`${parts.fixed} ${styles.colMail}`} role="cell" title={m.email ?? ''}>{m.email ?? '—'}</span>
-                    <span className={`${parts.fixed} ${styles.col90}`} role="cell">{ROLE_LABEL[m.role] ?? m.role}{m.access_level === 'read_only' ? '（閲覧）' : ''}</span>
-                    <span className={`${parts.fixed} ${styles.col80}`} role="cell">{m.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止</StatusBadge>}</span>
-                    <span className={`${parts.fixed} ${styles.colAt}`} role="cell">{shortDateTime(m.last_login_at)}</span>
-                  </div>
+                  <GridRow key={m.id}>
+                    <GridNameCell folder={false} name={<TruncatedText value={String(m.name ?? '')} />} />
+                    <GridCell><TruncatedText value={m.email ?? '—'} /></GridCell>
+                    <GridCell><span className={styles.shortText}>{ROLE_LABEL[m.role] ?? m.role}{m.access_level === 'read_only' ? '（閲覧）' : ''}</span></GridCell>
+                    <GridCell>{m.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止中</StatusBadge>}</GridCell>
+                    <GridCell><span className={styles.shortText}>{shortDateTime(m.last_login_at)}</span></GridCell>
+                  </GridRow>
                 ))}
-              </div>
+              </GridTable>
             )}
-          </section>
+          </Card>
         ) : null}
 
         {tab === 'audit' || tab === 'overview' ? (
-          <section className={parts.panel} aria-label="運営の操作（監査）">
-            <h3 className={parts.panelTitle}>運営の操作（監査）</h3>
+          <Card  aria-label="運営の操作（監査）" contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
+            <SectionHeader title="運営の操作（監査）" />
             {audit.length === 0 ? (
               <ListState permissionScope="hq" kind="empty" title="運営の操作はまだありません" description="運営がこの契約先に対して行った操作が、ここに残ります。" />
             ) : (
-              <div className={parts.mini} role="table" aria-label="運営の操作">
-                <div className={parts.miniHead} role="row">
-                  <span className={`${parts.fixed} ${styles.colAt}`} role="columnheader">日時</span>
-                  <span className={`${parts.fixed} ${styles.col80}`} role="columnheader">運営者</span>
-                  <span className={`${parts.fixed} ${styles.colWhat}`} role="columnheader">操作</span>
-                  <span className={parts.grow} role="columnheader">理由</span>
-                </div>
+              <GridTable label="運営の操作" framed={false} design={{ columns: 'var(--tpl-op-dt-at-w) var(--tpl-op-ann-state-w) calc(var(--tpl-op-dt-what-w) + 64px) minmax(0, 1fr)', gap: 'var(--polish-space-card)', rowPadding: '0', fontSize: 'var(--polish-text-body)' }}>
+                <GridHeadRow>
+                  <GridCell role="columnheader">日時</GridCell>
+                  <GridCell role="columnheader">運営者</GridCell>
+                  <GridCell role="columnheader">操作</GridCell>
+                  <GridCell role="columnheader">理由</GridCell>
+                </GridHeadRow>
                 {audit.map((row) => (
-                  <div key={row.id} className={parts.miniRow} role="row">
-                    <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
-                    <span className={`${parts.fixed} ${styles.col80}`} role="cell" ><TruncatedText value={String(row.staff_name ?? '')} /></span>
-                    <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{AUDIT_WORD[row.action] ?? AUDIT_ACTION_LABEL[row.action]?.label ?? row.action}</span>
-                    <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? emptyValue('unknown')}</span>
-                  </div>
+                  <GridRow key={row.id}>
+                    <GridCell><span className={styles.shortText} title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span></GridCell>
+                    <GridCell><TruncatedText value={String(row.staff_name ?? '')} /></GridCell>
+                    <GridCell><TruncatedText value={AUDIT_WORD[row.action] ?? AUDIT_ACTION_LABEL[row.action]?.label ?? row.action} /></GridCell>
+                    <GridCell><TruncatedText value={row.reason ?? emptyValue('unknown')} /></GridCell>
+                  </GridRow>
                 ))}
-              </div>
+              </GridTable>
             )}
-          </section>
+          </Card>
         ) : null}
       </div>
 
@@ -298,15 +307,7 @@ function DetailContent() {
           onCancel={() => { if (!busy) setImpersonateConfirm(false) }}
         />
       ) : null}
-    </div>
-  )
-}
-
-function BackToList() {
-  return (
-    <Button href="/ops/tenants">
-      <ChevronLeft aria-hidden="true" />一覧へ
-    </Button>
+    </PageFrame>
   )
 }
 
@@ -327,12 +328,14 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
   const [error, setError] = useState('')
   const label = target === 'suspended' ? '停止する' : target === 'archived' ? 'アーカイブする' : '再開する'
   const needsName = target !== 'active'
-  const ready = reason.trim().length >= 4 && (!needsName || confirmName === tenantName)
+  const nameRequirement: FormRequirement = { required: needsName, check: value => !needsName || value === tenantName ? null : '契約先の名前をそのまま入力してください' }
+  const reasonRequirement: FormRequirement = { required: true, check: value => value.trim().length >= 4 ? null : '理由を4文字以上で入力してください' }
+  const problem = nameRequirement.check(confirmName) ?? reasonRequirement.check(reason)
 
   const submit = async () => {
     if (busy) return
-    if (!ready) {
-      setError(needsName && confirmName !== tenantName ? '契約先の名前をそのまま入力してください' : '理由を4文字以上で入力してください')
+    if (problem) {
+      setError(problem)
       return
     }
     setBusy(true)
@@ -367,9 +370,9 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
               : '再開すると、権限者がまたログインできるようになります。'}
         </p>
         {needsName ? (
-          <Field label="確認のため、契約先の名前をそのまま入力"><SaveErrorField names={["confirmName","confirm_name"]}><TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} /></SaveErrorField></Field>
+          <Field label="確認のため、契約先の名前をそのまま入力" requirement={nameRequirement}><SaveErrorField names={["confirmName","confirm_name"]}><TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} /></SaveErrorField></Field>
         ) : null}
-        <Field label="理由（4文字以上）" required><SaveErrorField names={["reason"]}><TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" required /></SaveErrorField></Field>
+        <Field label="理由（4文字以上）" requirement={reasonRequirement}><SaveErrorField names={["reason"]}><TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" /></SaveErrorField></Field>
       </div>
     </Dialog>
   )

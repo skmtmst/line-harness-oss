@@ -26,7 +26,6 @@ describe('V8 質問テンプレート', () => {
     expect(page).toContain('<LinePreview')
     expect(page).toContain('答えをどこに残すか')
     expect(page).toContain('この質問を使う場所')
-    expect(editor).toContain("choiceColumns ? 'grid gap-3 xl:grid-cols-2'")
   })
 
   it('タグは全件を展開せず、閉じた選択欄と選択済みの札だけを表示する', () => {

@@ -1,3 +1,4 @@
+import { safeReceiptUrl } from './booking-payment-history.js';
 import { verifyStripeSignature } from './stripe-signature.js';
 import type { BookingPaymentStatus } from '@line-crm/db';
 
@@ -25,7 +26,8 @@ export interface PaymentStartResult {
 }
 
 export type WebhookOutcome =
-  | { providerPaymentId: string; status: 'paid' | 'failed' }
+  | { providerPaymentId: string; status: 'paid' | 'failed' | 'refunded' | 'expired';
+      providerEventId?: string; amount?: number; currency?: string; receiptUrl?: string; refundedAmount?: number }
   | null;
 
 export interface PaymentProvider {
@@ -97,7 +99,9 @@ export interface StripeTestSecrets {
 interface StripeTestEvent {
   id?: unknown;
   type?: unknown;
-  data?: { object?: { id?: unknown } };
+  livemode?: unknown;
+  data?: { object?: { id?: unknown; payment_intent?: unknown; amount?: unknown; amount_refunded?: unknown;
+    currency?: unknown; receipt_url?: unknown } };
 }
 
 /**
@@ -136,14 +140,29 @@ export function createStripeTestProvider(secrets: StripeTestSecrets): PaymentPro
       } catch {
         return null;
       }
-      const providerPaymentId = String(event?.data?.object?.id ?? '');
-      if (!providerPaymentId) return null;
-      if (event.type === 'payment_intent.succeeded') {
-        return { providerPaymentId, status: 'paid' };
+      if (event.livemode !== undefined && event.livemode !== false) return null;
+      const object = event?.data?.object;
+      const providerPaymentId = event.type === 'charge.refunded' || event.type === 'charge.succeeded' || event.type === 'checkout.session.expired'
+        ? object?.payment_intent : object?.id;
+      if (typeof providerPaymentId !== 'string' || !providerPaymentId || providerPaymentId.length > 255) return null;
+      if (event.id !== undefined && (typeof event.id !== 'string' || !event.id || event.id.length > 255)) return null;
+      if (object?.amount !== undefined && (!Number.isSafeInteger(object.amount) || (object.amount as number) < 0)) return null;
+      if (object?.currency !== undefined && (typeof object.currency !== 'string' || !/^[a-z]{3}$/i.test(object.currency))) return null;
+      const metadata = { providerEventId: event.id as string | undefined, amount: object?.amount as number | undefined,
+        currency: object?.currency as string | undefined, receiptUrl: safeReceiptUrl(typeof object?.receipt_url==='string' ? object.receipt_url : null) ?? undefined };
+      if ((event.type === 'payment_intent.succeeded' || event.type === 'charge.succeeded')) {
+        return { providerPaymentId, status: 'paid', ...metadata };
       }
       if (event.type === 'payment_intent.payment_failed') {
-        return { providerPaymentId, status: 'failed' };
+        return { providerPaymentId, status: 'failed', ...metadata };
       }
+      // Stripeの返金通知は返金の累計額。順不同・再送でも二重に減らさない。
+      if (event.type === 'charge.refunded' && typeof object?.amount === 'number'
+        && Number.isSafeInteger(object.amount_refunded) && Number(object.amount_refunded)>0 && Number(object.amount_refunded)<=object.amount) {
+        const receiptUrl = metadata.receiptUrl;
+        return { providerPaymentId, status: 'refunded', ...metadata, receiptUrl, refundedAmount: object.amount_refunded as number };
+      }
+      if (event.type === 'checkout.session.expired') return { providerPaymentId, status: 'expired', ...metadata };
       return null;
     },
   };

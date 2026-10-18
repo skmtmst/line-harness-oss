@@ -1,81 +1,14 @@
+import { serializeMark } from './../services/support-mark-display.js';
+import { parseSupportMarkLocations } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
-import {
-  restoreSupportMark,
-  ArchiveRestoreError,
-  getSupportMarksWithUsage,
-  getSupportMarkArchiveImpact,
-  getSupportMarkById,
-  createSupportMarkIdempotent,
-  SupportMarkCreateError,
-  updateSupportMark,
-  reorderSupportMarks,
-  replaceAndArchiveSupportMark,
-  archiveSupportMarkWithReplacement,
-  SupportMarkArchiveError,
-  getDefaultSupportMark,
-  setFriendSupportMark,
-  setFriendSupportMarkBulk,
-  getSavedSearches,
-  getSavedSearchById,
-  createSavedSearch,
-  reorderSavedSearches,
-  updateSavedSearchWithRevision,
-  deleteSavedSearch,
-  countSavedSearches,
-  getSavedSearchReferences,
-  getSavedSearchUsageCounts,
-  getSavedSearchReferenceUsageCounts,
-  jstNow,
-  validateSearchConditions,
-  validateSavedSegmentConditions,
-  SAVED_SEARCH_LIMIT,
-  getLoginAudit,
-  getStaffMembers,
-  LOGIN_AUDIT_ACTIONS,
-  type LoginAuditRow,
-  type LoginAuditAction,
-  getFolders,
-  getFolderItemCounts,
-  getFolderById,
-  createFolder,
-  updateFolder,
-  swapFolderOrder,
-  FolderConflictError,
-  deleteFolder,
-  isFolderKind,
-  getWebinarFolderCounts,
-  type SupportMark,
-  type SupportMarkWithUsage,
-  type SupportMarkScope,
-  type SavedSearch,
-  type SavedSearchAccess,
-  type SavedSearchConditionFormat,
-  type SavedSearchReference,
-  type Folder,
-} from '@line-crm/db';
+import { restoreSupportMark, ArchiveRestoreError, getSupportMarksWithUsage, getSupportMarkArchiveImpact, getSupportMarkById, createSupportMarkIdempotent, SupportMarkCreateError, updateSupportMark, reorderSupportMarks, replaceAndArchiveSupportMark, archiveSupportMarkWithReplacement, SupportMarkArchiveError, getDefaultSupportMark, setFriendSupportMark, setFriendSupportMarkBulk, getSavedSearches, getSavedSearchById, createSavedSearch, reorderSavedSearches, updateSavedSearchWithRevision, deleteSavedSearch, countSavedSearches, getSavedSearchReferences, getSavedSearchUsageCounts, getSavedSearchReferenceUsageCounts, jstNow, validateSearchConditions, validateSavedSegmentConditions, SAVED_SEARCH_LIMIT, getLoginAudit, getStaffMembers, LOGIN_AUDIT_ACTIONS, type LoginAuditRow, type LoginAuditAction, getFolders, getFolderItemCounts, getFolderById, createFolder, updateFolder, swapFolderOrder, FolderConflictError, deleteFolder, isFolderKind, getWebinarFolderCounts, type SupportMarkWithUsage, type SupportMarkScope, type SavedSearch, type SavedSearchAccess, type SavedSearchConditionFormat, type SavedSearchReference, type Folder } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import {
-  getSavedSearchMatchInsights,
-  getSavedSearchMatchPreview,
-  type SavedSearchMatchInsight,
-  type SavedSearchMatchPreview,
-} from '../services/saved-search-insights.js';
-import {
-  archiveSupportMarkAutomationRule,
-  createSupportMarkAutomationRuleIdempotent,
-  listSupportMarkAutomationRules,
-  listSupportMarkAutomationRulesForAccount,
-  SUPPORT_MARK_RULE_EVENTS,
-  SupportMarkRuleCreateError,
-  updateSupportMarkAutomationRule,
-  validateSupportMarkAutomationRuleInput,
-  type SaveSupportMarkAutomationRule,
-  type SupportMarkRuleEvent,
-} from '../services/support-mark-automation.js';
+import { getSavedSearchMatchInsights, getSavedSearchMatchPreview, type SavedSearchMatchInsight, type SavedSearchMatchPreview } from '../services/saved-search-insights.js';
+import { archiveSupportMarkAutomationRule, createSupportMarkAutomationRuleIdempotent, listSupportMarkAutomationRules, listSupportMarkAutomationRulesForAccount, SUPPORT_MARK_RULE_EVENTS, SupportMarkRuleCreateError, updateSupportMarkAutomationRule, validateSupportMarkAutomationRuleInput, type SaveSupportMarkAutomationRule, type SupportMarkRuleEvent } from '../services/support-mark-automation.js';
 import { buildSegmentWhere, type SegmentCondition } from '../services/segment-query.js';
 
 /**
@@ -85,29 +18,6 @@ import { buildSegmentWhere, type SegmentCondition } from '../services/segment-qu
  * どれも小さく、別ファイルに散らすと登録漏れの方が起きやすい。
  */
 const friendAttributes = new Hono<Env>();
-
-const SUPPORT_MARK_DISPLAY_TARGETS = ['inbox', 'friend_list', 'friend_detail'] as const;
-
-function serializeMark(
-  row: SupportMark,
-  automationRules: Awaited<ReturnType<typeof listSupportMarkAutomationRulesForAccount>> = [],
-) {
-  return {
-    id: row.id,
-    name: row.name,
-    color: row.color,
-    isDefault: Boolean(row.is_default),
-    autoOnInbound: Boolean(row.auto_on_inbound),
-    displayOrder: row.display_order,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at ?? row.created_at,
-    version: Number(row.version ?? 1),
-    isInherited: Boolean(row.is_inherited),
-    archivedAt: row.archived_at,
-    automationRules,
-    displayTargets: SUPPORT_MARK_DISPLAY_TARGETS,
-  };
-}
 
 function serializeMarkImpact(row: SupportMarkWithUsage) {
   return {
@@ -426,7 +336,7 @@ friendAttributes.get('/api/support-marks', async (c) => {
       }));
     return c.json({ success: true, data: withCounts });
   } catch (err) {
-    console.error('GET /api/support-marks error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"GET /api/support-marks"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -443,7 +353,7 @@ friendAttributes.post('/api/support-marks/:id/restore', requireRole('owner', 'ad
     return c.json({ success: true, data: await restoreSupportMark(c.env.DB, scope, { id: c.req.param('id'), expectedVersion, actorId: c.get('staff').id }) });
   } catch (error) {
     if (error instanceof ArchiveRestoreError) return c.json({ success: false, code: error.code, error: error.code === 'not_found' ? '対象が見つかりません' : '状態が変わりました。もう一度読み込んでください' }, error.code === 'not_found' ? 404 : 409);
-    console.error('POST /api/support-marks/:id/restore error:', error);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/support-marks/:id/restore"}));
     return c.json({ success: false, error: '保管から戻せませんでした' }, 500);
   }
 });
@@ -507,7 +417,7 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), input
     try {
       createdRules = await listSupportMarkAutomationRules(c.env.DB, scope, mark.id) ?? [];
     } catch (err) {
-      console.error('POST /api/support-marks rules reload failed, returning mark only:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/support-marks"}));
     }
     // 再送で保存済みを返したときは200、新しく作ったときは201。
     return c.json({ success: true, data: serializeMark(mark, createdRules) }, replayed ? 200 : 201);
@@ -515,7 +425,7 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), input
     if (err instanceof SupportMarkCreateError) {
       return c.json({ success: false, code: err.code, error: err.message }, 409);
     }
-    console.error('POST /api/support-marks error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/support-marks"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -544,7 +454,7 @@ friendAttributes.patch('/api/support-marks/reorder', requireRole('owner', 'admin
     await reorderSupportMarks(c.env.DB, scope, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
-    console.error('PATCH /api/support-marks/reorder error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/support-marks/reorder"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -588,6 +498,12 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
      * R513: 読んだときの版を送り、変わっていたら409で止める。
      * 版が無い古い呼び出しは従来どおり上書きする（後方互換）。
      */
+    let displayLocations;
+    if (body.displayLocations !== undefined) {
+      try { displayLocations = parseSupportMarkLocations(body.displayLocations); }
+      catch { return inputError(c, {success:false,error:'表示する場所を選び直してください'},422,['displayLocations']); }
+      if (!Number.isSafeInteger(body.expectedVersion)) return inputError(c,{success:false,error:'最新の版を指定してください'},422,['expectedVersion']);
+    }
     let expectedVersion: number | undefined;
     if (body.expectedVersion !== undefined) {
       expectedVersion = Number(body.expectedVersion);
@@ -627,6 +543,7 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
       isDefault: body.isDefault === undefined ? undefined : body.isDefault === true,
       autoOnInbound: body.autoOnInbound === undefined ? undefined : body.autoOnInbound === true,
       displayOrder,
+      displayLocations,
       actorId: c.get('staff').id,
       expectedVersion,
     });
@@ -641,7 +558,7 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
     }
     return c.json({ success: true, data: serializeMark(mark!) });
   } catch (err) {
-    console.error('PATCH /api/support-marks/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/support-marks/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -657,7 +574,7 @@ friendAttributes.get(
       if (!rules) return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
       return c.json({ success: true, data: rules });
     } catch (err) {
-      console.error('GET /api/support-marks/:id/automation-rules error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"GET /api/support-marks/:id/automation-rules"}));
       return c.json({ success: false, error: '自動変更ルールを読み込めませんでした' }, 500);
     }
   },
@@ -695,7 +612,7 @@ friendAttributes.post(
       if (reason.startsWith('rule_') || reason === 'manual_protection_invalid') {
         return inputError(c, { success: false, error: '自動変更ルールの入力が正しくありません' }, 422, ["event","priority","manualProtectionMinutes","name","condition","isActive"]);
       }
-      console.error('POST /api/support-marks/:id/automation-rules error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/support-marks/:id/automation-rules"}));
       return c.json({ success: false, error: '自動変更ルールを保存できませんでした' }, 500);
     }
   },
@@ -729,7 +646,7 @@ friendAttributes.patch(
       if (reason.startsWith('rule_') || reason === 'manual_protection_invalid') {
         return inputError(c, { success: false, error: '自動変更ルールの入力が正しくありません' }, 422, ["event","priority","manualProtectionMinutes","name","condition","isActive"]);
       }
-      console.error('PATCH /api/support-mark-rules/:ruleId error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/support-mark-rules/:ruleId"}));
       return c.json({ success: false, error: '自動変更ルールを保存できませんでした' }, 500);
     }
   },
@@ -763,7 +680,7 @@ friendAttributes.delete(
       }, 409);
       return c.json({ success: true, data: null });
     } catch (err) {
-      console.error('DELETE /api/support-mark-rules/:ruleId error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"DELETE /api/support-mark-rules/:ruleId"}));
       return c.json({ success: false, error: '自動変更ルールを停止できませんでした' }, 500);
     }
   },
@@ -788,7 +705,7 @@ friendAttributes.get(
           mark: serializeMark(impact.mark, rules ?? []),
           ...serializeMarkImpact(impact.mark),
           automationRules: rules ?? [],
-          displayTargets: SUPPORT_MARK_DISPLAY_TARGETS,
+          displayTargets: parseSupportMarkLocations(JSON.parse(impact.mark.display_locations_json)).map(location=>location==='friends'?'friend_list':location),
           replacementOptions: marks
             .filter((mark) => mark.id !== impact.mark.id && mark.is_inherited !== 1)
             .map((mark) => serializeMark(mark)),
@@ -799,7 +716,7 @@ friendAttributes.get(
         },
       });
     } catch (err) {
-      console.error('GET /api/support-marks/:id/archive-impact error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"GET /api/support-marks/:id/archive-impact"}));
       return c.json({ success: false, error: '保管の影響を確認できませんでした' }, 500);
     }
   },
@@ -857,7 +774,7 @@ friendAttributes.post(
         const status = err.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, code: err.code, error: err.message }, status, []);
       }
-      console.error('POST /api/support-marks/:id/archive error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/support-marks/:id/archive"}));
       return c.json({ success: false, error: '対応マークを保管できませんでした' }, 500);
     }
   },
@@ -966,7 +883,7 @@ friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'),
       },
     });
   } catch (err) {
-    console.error('DELETE /api/support-marks/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"DELETE /api/support-marks/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -997,7 +914,7 @@ friendAttributes.patch(
       if (!updated) return c.json({ success: false, error: '友だちが見つかりません' }, 404);
       return c.json({ success: true, data: null });
     } catch (err) {
-      console.error('PATCH /api/friends/:id/support-mark error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/friends/:id/support-mark"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1028,7 +945,7 @@ friendAttributes.post(
       const updated = await setFriendSupportMarkBulk(c.env.DB, friendIds, markId, scope);
       return c.json({ success: true, data: { updated } });
     } catch (err) {
-      console.error('POST /api/friends/support-mark/bulk error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/friends/support-mark/bulk"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1116,7 +1033,7 @@ friendAttributes.get('/api/saved-searches', requireRole('owner', 'admin', 'staff
       pagination,
     });
   } catch (err) {
-    console.error('GET /api/saved-searches error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"GET /api/saved-searches"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1150,7 +1067,7 @@ friendAttributes.get(
         ),
       });
     } catch (err) {
-      console.error('GET /api/saved-searches/:id error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"GET /api/saved-searches/:id"}));
       return c.json({ success: false, error: '保存した検索を読み込めませんでした' }, 500);
     }
   },
@@ -1237,7 +1154,7 @@ friendAttributes.post(
         },
       });
     } catch (err) {
-      console.error('POST /api/saved-searches/preview error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/saved-searches/preview"}));
       return c.json({ success: false, error: '該当人数を確認できませんでした' }, 500);
     }
   },
@@ -1296,7 +1213,7 @@ friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staf
       data: serializeSearch(saved, insights.get(saved.id), []),
     }, 201);
   } catch (err) {
-    console.error('POST /api/saved-searches error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/saved-searches"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1328,7 +1245,7 @@ friendAttributes.patch(
       await reorderSavedSearches(c.env.DB, access, body.ids as string[]);
       return c.json({ success: true, data: { updated: body.ids.length } });
     } catch (err) {
-      console.error('PATCH /api/saved-searches/reorder error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/saved-searches/reorder"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1424,7 +1341,7 @@ friendAttributes.patch(
         ),
       });
     } catch (err) {
-      console.error('PATCH /api/saved-searches/:id error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/saved-searches/:id"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1462,7 +1379,7 @@ friendAttributes.delete(
       if (err instanceof Error && /foreign key constraint/i.test(err.message)) {
         return c.json({ success: false, error: 'この検索は使用中のため削除できません' }, 409);
       }
-      console.error('DELETE /api/saved-searches/:id error:', err);
+      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"DELETE /api/saved-searches/:id"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1512,7 +1429,7 @@ friendAttributes.get('/api/login-audit', requireRole('owner', 'admin'), async (c
       })),
     });
   } catch (err) {
-    console.error('GET /api/login-audit error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"GET /api/login-audit"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1595,7 +1512,7 @@ friendAttributes.get('/api/folders', async (c) => {
       ...(itemCounts === undefined ? {} : { unfiledCount: itemCounts.unfiled }),
     });
   } catch (err) {
-    console.error('GET /api/folders error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"GET /api/folders"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1664,7 +1581,7 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), inputJsonBo
     return c.json({ success: true, data: serializeFolder(folder) }, 201);
   } catch (err) {
     if (err instanceof FolderConflictError) return c.json({success:false,error:'同じ名前のフォルダがあります'},409);
-    console.error('POST /api/folders error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/folders"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1733,7 +1650,7 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), inputJ
     return c.json({ success: true, data: serializeFolder(folder!) });
   } catch (err) {
     if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
-    console.error('PATCH /api/folders/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/folders/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1777,7 +1694,7 @@ friendAttributes.post('/api/folders/:id/swap-order', requireRole('owner', 'admin
     return c.json({ success: true, data: { swapped: [id, withId] } });
   } catch (err) {
     if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
-    console.error('POST /api/folders/:id/swap-order error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/folders/:id/swap-order"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1806,7 +1723,7 @@ friendAttributes.delete('/api/folders/:id', requireRole('owner', 'admin'), async
     return c.json({ success: true, data: null });
   } catch (err) {
     if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
-    console.error('DELETE /api/folders/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"DELETE /api/folders/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

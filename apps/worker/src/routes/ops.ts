@@ -1,5 +1,7 @@
+import type { TenantStatus, TenantListRow } from './ops-tenant-types.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { opsTenantMetrics } from '../services/ops-tenant-metrics.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -43,25 +45,7 @@ import { parseFeaturePacks } from './tenants.js';
 export const ops = new Hono<Env>();
 
 ops.use('/api/ops/*', requirePlatformAdmin());
-
-type TenantStatus = 'active' | 'suspended' | 'archived';
 const TENANT_STATUSES = new Set<TenantStatus>(['active', 'suspended', 'archived']);
-
-type TenantListRow = {
-  id: string;
-  name: string;
-  status: TenantStatus;
-  feature_packs: string;
-  plan_key: string | null;
-  plan_status: string;
-  trial_ends_at: string | null;
-  current_period_ends_at: string | null;
-  created_at: string;
-  updated_at: string;
-  account_count: number;
-  staff_count: number;
-  last_login_at: string | null;
-};
 
 function reasonFrom(body: unknown): string | null {
   const reason = (body as { reason?: unknown } | null)?.reason;
@@ -196,6 +180,7 @@ ops.get('/api/ops/tenants/:id', async (c) => {
       accounts: accounts.results ?? [],
       members: members.results ?? [],
       audit: audit.rows,
+      metrics: await opsTenantMetrics(db,tenant.id),
     },
   });
 });
@@ -538,7 +523,7 @@ ops.post('/api/ops/members', requirePlatformAdminWrite(), inputJsonBoundary(), a
       existingAccount: Boolean(inDefault),
     });
   } catch (error) {
-    console.error('POST /api/ops/members invite mail error:', error);
+    console.error(JSON.stringify({"code":"routes_ops_failed","route":"POST /api/ops/members"}));
     return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
   }
   await recordPlatformAudit(db, {
@@ -568,7 +553,7 @@ ops.post('/api/ops/members/:staffId/resend-invite', requirePlatformAdminWrite(),
       existingAccount: Boolean(target.password_hash),
     });
   } catch (error) {
-    console.error('POST /api/ops/members/:staffId/resend-invite mail error:', error);
+    console.error(JSON.stringify({"code":"routes_ops_failed","route":"POST /api/ops/members/:staffId/resend-invite"}));
     return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
   }
   return c.json({ success: true, data: { staffId: targetId, activationState: 'invited' } });

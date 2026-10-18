@@ -1,0 +1,147 @@
+/* はじめにやること（Bdfxm）：余白 20・間 14・角丸 12・影のカード。行は高さ 56・間 12。 */
+.card {
+  --sc-pad: 20px;
+  --sc-gap: 14px;
+  --sc-row-h: 56px;
+  --sc-title-lh: 24px;
+  --sc-body-lh: 20px;
+  --sc-caption-lh: 18px;
+  --sc-track-h: 6px;
+  --sc-small-icon: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sc-gap);
+  padding: var(--sc-pad);
+  border-radius: var(--polish-radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.title {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+  line-height: var(--sc-title-lh);
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.count {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--sc-caption-lh);
+  white-space: nowrap;
+}
+
+.track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: var(--sc-track-h);
+  overflow: hidden;
+  border-radius: var(--polish-radius-pill);
+  background: var(--polish-hover);
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--polish-radius-pill);
+  background: var(--color-accent);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sc-gap);
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  min-height: var(--sc-row-h);
+  align-items: center;
+  gap: var(--polish-space-field);
+}
+
+.rowIcon {
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+  flex: none;
+  color: var(--color-ink-faint);
+}
+
+.row[data-alert] .rowIcon {
+  color: var(--color-status-warn-deep);
+}
+
+.rowText {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.rowTitle {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--sc-body-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowNote {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--sc-caption-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.done {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.doneIcon {
+  width: var(--sc-small-icon);
+  height: var(--sc-small-icon);
+  flex: none;
+  color: var(--color-accent-deep);
+}
+
+.doneText {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--sc-caption-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--color-status-info);
+  font: inherit;
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--sc-body-lh);
+  cursor: pointer;
+  white-space: nowrap;
+}

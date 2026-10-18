@@ -25,7 +25,7 @@ import { useFriendDetailPermissions } from './permissions'
 import { useScenarioPicker, useSupportEditor } from './dialogs'
 import { inboxHrefForFriend } from './timeline'
 import { SUPPORT_LABELS, SUPPORT_TONES } from './support'
-import OverviewTab from './overview-tab'
+import OverviewTab, { FriendSummaryRail } from './overview-tab'
 import HistoryTab from './history-tab'
 import InfoTab, { ALL_GROUP } from './info-tab'
 import FormsTab from './forms-tab'
@@ -160,7 +160,6 @@ function FriendDetailV8Inner() {
         titleAccessory={status ? <StatusBadge tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusBadge> : friend ? <span className={styles.faint}>やり取りなし</span> : null}
         actions={<><span className={styles.menuAnchor}>
           <RowMenu
-            className={styles.square}
             label="その他の操作"
             menuLabel="関連する画面を開く"
             items={secondaryActions}
@@ -222,13 +221,19 @@ function FriendDetailV8Inner() {
       ) : tab === 'history' ? (
         <HistoryTab friend={friend} friendId={friendId} data={data} />
       ) : tab === 'info' ? (
-        fieldsEnabled ? <InfoTab friendId={friendId} group={group} data={data} perms={perms} /> : <FeatureDisabledScreen featureId="friend_fields" />
+        fieldsEnabled ? (
+          /* vX3wQ：情報欄タブも左に概要と同じ要点（顧客情報・対応・タグ・マイル・メモ）を置く。 */
+          <div className={styles.overview}>
+            <FriendSummaryRail friend={friend} friendId={friendId} data={data} perms={perms} fields={data.fields} values={data.values} realName={realName} onEditSupport={() => void support.openEditor()} />
+            <InfoTab friendId={friendId} group={group} data={data} perms={perms} />
+          </div>
+        ) : <FeatureDisabledScreen featureId="friend_fields" />
       ) : tab === 'forms' ? (
         <FormsTab data={data} />
       ) : tab === 'scenario' ? (
         <ScenarioTab canEnroll={perms.manage} onEnroll={() => void scenario.openPicker()} />
       ) : tab === 'orders' ? (
-        <BookingsTab />
+        <BookingsTab accountId={selectedAccountId} friendId={friendId} friendName={realName || friend?.displayName || ''} canEdit={perms.manage} />
       ) : tab === 'reminders' ? (
         <RemindersTab friendId={friendId} />
       ) : tab === 'actions' ? (

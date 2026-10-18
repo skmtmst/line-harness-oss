@@ -112,7 +112,7 @@ describe('担当まとめ（V8）の読み込みと保存', () => {
 
     // 升を1つ受けに変えると保存帯が出る。
     fireEvent.click(screen.getByRole('checkbox', { name: 'カット を 担当A が受ける' }))
-    const saveButton = screen.getByRole('button', { name: '保存' })
+    const saveButton = screen.getByRole('button', { name: '保存する', exact: true })
 
     const gate = deferred<unknown>()
     fixture.putBulk = vi.fn(() => gate.promise)
@@ -124,7 +124,7 @@ describe('担当まとめ（V8）の読み込みと保存', () => {
     await act(async () => { gate.resolve({ ok: true }) })
     // 完了（✓：ボタンと知らせ）がでて、知らせに「元に戻す」が付く。
     await waitFor(() => { expect(screen.getByRole('status', { name: '知らせ' }).textContent).toContain('保存しました') })
-    expect(screen.getByRole('button', { name: '保存' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '保存する', exact: true })).toBeTruthy()
     const firstCall = (fixture.putBulk as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]
     expect(JSON.stringify(firstCall)).toContain('"is_offered":true')
 

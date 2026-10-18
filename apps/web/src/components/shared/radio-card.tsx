@@ -1,5 +1,6 @@
-import type { FormEventHandler, KeyboardEventHandler, Ref, ReactNode } from 'react'
+import { useId, type CSSProperties, type FormEventHandler, type KeyboardEventHandler, type Ref, type ReactNode } from 'react'
 import styles from './radio-card.module.css'
+import { CircleCheck } from 'lucide-react'
 import { joinDescribedBy, useFieldContext } from './field-context'
 
 /**
@@ -35,6 +36,7 @@ export function RadioCardGroup({
   'aria-describedby': describedBy,
   onInput,
   legendVisible = false,
+  columns,
   className,
   children,
 }: {
@@ -46,13 +48,15 @@ export function RadioCardGroup({
   legend: string
   /** true にすると群名を見出しとして表示する。既定は読み上げ専用。 */
   legendVisible?: boolean
+  /** 窓内のカードを本文幅に等分する。省略時は既存の並びを保つ。 */
+  columns?: 2 | 3
   className?: string
   children: ReactNode
 }) {
   return (
     <fieldset id={id} className={styles.group} aria-invalid={invalid || undefined} aria-describedby={describedBy} onInput={onInput}>
       <legend className={legendVisible ? styles.legend : 'sr-only'}>{legend}</legend>
-      <div className={[styles.items, className].filter(Boolean).join(' ')}>{children}</div>
+      <div className={[styles.items, className].filter(Boolean).join(' ')} data-choice-columns={columns} style={columns ? { '--choice-columns': columns } as CSSProperties : undefined}>{children}</div>
     </fieldset>
   )
 }
@@ -104,13 +108,17 @@ export interface RadioCardProps {
   /**
    * 箱（card）の高さ。既定は絵の「選ぶカード」の 98。
    * `'short'` は高さ 90 の箱（★V8 E-3 ウォークインの卓のカード PUWyq：上に印・右上に丸・題・説明）。
+   * `'fit'` は中身なりの高さ（LINE新規追加 v06 ①事前確認 GLA3C 52・f7UGE 78：
+   * 題だけの選択肢を 98 の箱に入れると下が大きく空くため、最低高さだけ外す）。
    * 渡したときだけ効き、既定の見た目は変えない。
    */
-  height?: 'default' | 'short'
+  height?: 'default' | 'short' | 'fit'
   /** 横並びの小さい箱（j8p3yj）。既定のカード・行・v7 の寸法は変えない。 */
   size?: 'default' | 'small'
   /** 図・本文を右上の丸の下へ置く箱。本文の右側を丸用に狭めない。 */
   contentPlacement?: 'standard' | 'below-indicator'
+  /** 面のタイルは選択枠と題の印で示し、入力自体は読み上げとキー操作に残す。 */
+  indicator?: 'radio' | 'check'
 }
 
 export default function RadioCard({
@@ -134,8 +142,10 @@ export default function RadioCard({
   height = 'default',
   size = 'default',
   contentPlacement = 'standard',
+  indicator = 'radio',
 }: RadioCardProps) {
   const field = useFieldContext()
+  const disabledReasonId = useId()
   invalid = invalid || Boolean(field?.invalid)
   return (
     <label
@@ -144,6 +154,7 @@ export default function RadioCard({
         variant === 'compact' ? styles.compact : null,
         variant === 'form' ? styles.form : null,
         variant === 'card' && height === 'short' ? styles.short : null,
+        variant === 'card' && height === 'fit' ? styles.fit : null,
         variant === 'card' && size === 'small' ? styles.small : null,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
@@ -153,6 +164,7 @@ export default function RadioCard({
       data-choice-card={variant !== 'row' || undefined}
       data-variant={variant}
       data-content-placement={contentPlacement}
+      data-choice-indicator={indicator === 'check' ? indicator : undefined}
       data-compact-typography={variant === 'compact' ? compactTypography : undefined}
       onClick={disabled ? undefined : onClick}
     >
@@ -170,13 +182,13 @@ export default function RadioCard({
         checked={checked}
         disabled={disabled}
         aria-invalid={invalid || undefined}
-        aria-describedby={joinDescribedBy(field?.describedBy)}
+        aria-describedby={joinDescribedBy(field?.describedBy, disabled && disabledReason ? disabledReasonId : undefined)}
         onChange={() => onChange(value)}
       />
       <span className={styles.body}>
-        <strong className={styles.title} title={title}>{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
+        <strong className={styles.title} title={title}>{indicator === 'check' && checked && !disabled ? <CircleCheck className={styles.check} data-choice-check aria-hidden="true" /> : null}{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
         {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
-        {disabled && disabledReason ? <small className={styles.reason}>{disabledReason}</small> : null}
+        {disabled && disabledReason ? <small id={disabledReasonId} className={styles.reason}>{disabledReason}</small> : null}
       </span>
       {children}
     </label>

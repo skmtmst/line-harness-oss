@@ -19,7 +19,7 @@ export interface MenuItem {
   /** V8 だけ違う形にするときの path（lucide の形）。無ければ icon を使う。 */
   iconV8?: string
   /** 出す数の種類（仕様 §5）。無ければバッジを出さない。 */
-  badge?: 'unanswered' | 'photos' | 'unmatched' | 'operations'
+  badge?: 'unanswered' | 'photos' | 'unmatched' | 'operations' | 'hq-attention'
   /** 機能設定に出す一行説明。 */
   note: string
   /**
@@ -56,7 +56,8 @@ export interface MenuSection {
 /** 統括の外側（左メニュー・上の帯）を出す住所（/hq の下と、統括から開く LINEアカウントの登録）。 */
 export function isHqShellPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false
-  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new'
+  // 統括の「アカウント」から開く登録の画面（LINEアカウントを登録・飲食店の店舗を追加とその利用規約）も統括の外側（絵 xj3zz・faGn4・VdKOK）。
+  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new' || pathname === '/restaurant-test/stores/new' || pathname === '/restaurant-test/terms'
 }
 
 export const HQ_MENU_SECTIONS: MenuSection[] = [
@@ -65,7 +66,11 @@ export const HQ_MENU_SECTIONS: MenuSection[] = [
     label: null,
     title: '統括コンソール',
     items: [
+      /* B-312・B-322（2026-10-16 司令塔）：統括の一番上に「対応が要るもの」（Kyf8U）。札は全アカウントの件数の合計。印は lucide の circle-alert。 */
+      { href: '/hq/attention', label: '対応が要るもの', icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8v4M12 16h.01', badge: 'hq-attention', id: 'hq-attention', note: '各アカウントの未対応のトーク・承認待ちの予約などをまとめて見ます', required: true },
       { href: '/hq', label: 'アカウント', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', iconV8: 'M10 12h4M10 8h4M14 21v-3a2 2 0 0 0-4 0v3M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
+      /* 店の比較（G7-1 W4fI7A）。アカウントの下・統括で唯一の新しい左メニュー。V8 の印は lucide の chart-column。 */
+      { href: '/hq/store-comparison', label: '店の比較', icon: 'M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3', iconV8: 'M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3', id: 'hq-store-compare', note: '店ごとに友だち・予約・来店・返事の速さを並べて見ます', required: true },
       { href: '/hq/friend-attributes', label: 'タグ', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', id: 'hq-tags', note: 'タグのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', id: 'hq-templates', note: 'メッセージのひな形を作成し、アカウントへ配布します', required: true },
       { href: '/hq/rich-menus', label: 'リッチメニュー', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z', id: 'hq-rich-menus', note: 'リッチメニューのひな形を作成し、アカウントへ配布します', required: true },
@@ -242,6 +247,15 @@ export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [sectio
 export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
   // LINEアカウントの登録は統括の「アカウント」から開く（左メニューは統括のまま・絵 xj3zz）。
   '/accounts/new': 'hq-stores',
+  // 飲食店の店舗を追加（ao15G・faGn4）も統括の「アカウント」から開く。左メニューは「アカウント」を選んだ形。
+  '/restaurant-test/stores/new': 'hq-stores',
+  // 店舗を追加の「利用規約を別画面で読む」（VdKOK）も統括の「アカウント」の中。
+  '/restaurant-test/terms': 'hq-stores',
+  // 共通アクション（一覧・作る・編集・版と使われている場所 ziSgL）はオートメーションの中。左メニューは自動化の組を開いて「オートメーション」を選んだ形。
+  '/common-actions': 'automations',
+  '/common-actions/new': 'automations',
+  '/common-actions/edit': 'automations',
+  '/common-actions/versions': 'automations',
   '/accounts?tab=migration': 'friends',
   /*
    * /conversions の1画面に「成果とアフィリエイト」と「コンバージョン」の
@@ -263,6 +277,21 @@ export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
    * 管理者は予約設定を選ぶ。
    */
   '/booking/staff/shifts': ['booking-own-shifts', 'booking-menus'],
+  /*
+   * 左メニューの項目と別の URL に置いた画面（2026-10-15 判定役 Eo56k・YMVFD）。
+   * 宣言が無いと、どの項目も選ばれず、属する組も閉じたままになっていた。
+   * 成果とアフィリエイトの各タブ（/affiliates?tab=…）は「成果とアフィリエイト」、
+   * 担当スタッフの一覧・追加は「予約設定」の担当スタッフタブ、
+   * 重複の確認は友だちの主タブの1枚、枠を閉じる知らせは店舗ダッシュボードから開く。
+   */
+  '/affiliates': 'affiliates',
+  '/affiliates/new': 'affiliates',
+  '/affiliate-offers': 'affiliates',
+  '/affiliate-offers/new': 'affiliates',
+  '/booking/staff': 'booking-menus',
+  '/booking/staff/new': 'booking-menus',
+  '/duplicates': 'friends',
+  '/restaurant-test/close-tasks': 'restaurant-dashboard',
 }
 
 /**

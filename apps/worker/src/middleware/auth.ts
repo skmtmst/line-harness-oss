@@ -1,9 +1,12 @@
+import { parseCookieHeader, bearerToken } from './auth-http.js';
+import { isPublicApiBoundary } from './public-api-boundary.js';
 import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
 import { DELIVERY_API_PERMISSIONS, effectiveStaffEditKeys } from '@line-crm/shared';
 import type { Context, Next } from 'hono';
 import { deleteAdminSession, getPlatformSetting, getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { isForbiddenWhileImpersonating, resolveImpersonation } from './impersonation.js';
+import { isOutputRequest } from './output-audit.js';
 
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
@@ -26,36 +29,6 @@ export const SESSION_REMEMBER_MAX_AGE = 7 * 24 * 60 * 60;
 export const SESSION_MAX_AGE = SESSION_REMEMBER_MAX_AGE;
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-
-/**
- * decodeURIComponent throws on malformed percent escapes (e.g. `%`). Cookie
- * headers are client-controlled, so fall back to the raw value rather than
- * letting the exception turn a request into a 500.
- */
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-function parseCookieHeader(cookieHeader: string | undefined): Record<string, string> {
-  if (!cookieHeader) return {};
-  const cookies: Record<string, string> = {};
-  for (const part of cookieHeader.split(';')) {
-    const [rawName, ...rawValue] = part.trim().split('=');
-    if (!rawName) continue;
-    cookies[rawName] = safeDecode(rawValue.join('=') || '');
-  }
-  return cookies;
-}
-
-function bearerToken(c: Context<Env>): string | null {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  return authHeader.slice('Bearer '.length);
-}
 
 /**
  * Return the hash key of the existing opaque admin session for server-side
@@ -163,7 +136,7 @@ export type AuthenticatedStaff = {
   credential?: 'session' | 'api-key';
 };
 
-function toAuthenticatedStaff(staff: {
+export function toAuthenticatedStaff(staff: {
   id: string;
   name: string;
   role: StaffRole;
@@ -270,6 +243,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/restaurant-test/close-notification-settings', '/restaurant-test/inventory'],
   ['/api/restaurant-test/inventory-rules', '/restaurant-test/inventory'],
   ['/api/restaurant-test/channel-close-tasks', '/restaurant-test/inventory'],
+  ['/api/restaurant-test/assignment-settings', 'booking.settings'],
 ];
 
 /**
@@ -278,10 +252,11 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
  * cannot inherit chat or friend-attribute access from the friends permission.
  */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  [/^\/api\/dashboard\/style\/template-samples$/, '/templates'],
   // 予約の細かい権限（N-411）。広い '/api/booking' → '/booking/bookings' より先に評価する。
   // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
   [/^\/api\/booking\/admin\/staff\/me(?:\/|$)/, 'booking.staff.own'],
-  [/^\/api\/booking\/admin\/staff\/[^/]+\/(?:availability-rules|breaks|break-dates|shifts|google-calendar)(?:\/|$)/, 'booking.staff.own'],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/(?:availability-rules|breaks|break-dates|shifts|google-calendar|calendar-sync|meeting-url)(?:\/|$)/, 'booking.staff.own'],
     // メニューと担当割当は「予約メニュー」の鍵。
   [/^\/api\/booking\/admin\/staff-menus(?:\/|$)/, '/booking/menus'],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/menus(?:\/|$)/, '/booking/menus'],
@@ -314,7 +289,19 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
 ];
 
+export function gap2ReadOperation(method:string,path:string){return method==='POST'&&(/^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)||/^\/api\/chats\/[^/]+\/ai\/summary$/.test(path)||path==='/api/booking/admin/series/preview'||path==='/api/member-ranks/preview'||path==='/api/hq/store-comparison/export'||path==='/api/delivery-purposes/preview'||/^\/api\/booking\/admin\/series\/[^/]+\/impact$/.test(path));}
+function gap2SelfPreference(method:string,path:string){return (method==='POST'&&/^\/api\/me\/push\/(subscriptions|test)$/.test(path))||(method==='PUT'&&path==='/api/me/push/preferences')||(method==='DELETE'&&/^\/api\/me\/push\/subscriptions\/[^/]+$/.test(path));}
 export function permissionForApiPath(path: string): string | null {
+  if(/^\/api\/friends\/[^/]+\/member-rank$/.test(path))return '/mileage';
+  if(path.startsWith('/api/analytics/customer-segments'))return '/analytics';
+  if(path.startsWith('/api/inbox/routing'))return '/chats';
+  if(path.startsWith('/api/delivery-purposes'))return '/broadcasts';
+  if(path.startsWith('/api/member-ranks'))return '/mileage';
+  if(path.startsWith('/api/ec/auto-line'))return '/ec-commerce';
+  if(path.startsWith('/api/ai-answer-logs'))return '/auto-replies';
+  if(path.startsWith('/api/ai-features'))return '/settings';
+  if(path.startsWith('/api/qa-entries')||path.startsWith('/api/ai-settings'))return '/auto-replies';
+  if (/^\/api\/line-accounts\/[^/]+\/(?:senders|sender-icons)(?:\/|$)/.test(path)) return '/chats';
   const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
   if (override) return override[1];
   return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
@@ -329,7 +316,12 @@ export function permissionForApiPath(path: string): string | null {
  * 新しい口は fail-closed (staff 403) に倒す。
  */
 const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
+  // Self-service handlers require a real session and derive the only target from it.
+  ['GET', '/api/auth/api-key'],
+  ['POST', '/api/auth/api-key'],
+  ['DELETE', '/api/auth/api-key'],
   ['GET', '/api/auth/session'],
+  ['PUT', '/api/me/presence'],
   // These routes derive the target exclusively from the authenticated principal.
   ['GET', '/api/auth/two-factor/self'],
   ['POST', '/api/auth/two-factor/recovery'],
@@ -341,6 +333,7 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['GET', '/api/tenants/me'],
   // 自社の表示設定だけ読む。PUTは会社全体のowner/adminに限定する。
   ['GET', '/api/settings/company'],
+  ['GET', '/api/hq/support/summary'],
   ['POST', '/api/client-errors'],
   ['GET', '/api/capabilities'],
   ['GET', '/api/line-accounts'],
@@ -371,6 +364,7 @@ const STAFF_SELF_ROUTE_TEMPLATES: Array<[method: string, path: string]> = [
 
 export function isStaffSelfRouteTemplate(method: string, path: string): boolean {
   const normalizedMethod = method.toUpperCase();
+  if((normalizedMethod==='GET'&&path==='/api/me/push')||gap2SelfPreference(normalizedMethod,path))return true;
   if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
   return STAFF_SELF_ROUTE_TEMPLATES.some(([m, p]) => m === normalizedMethod && p === path);
 }
@@ -500,7 +494,7 @@ const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = 
   ['DELETE', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
   ['PATCH', /^\/api\/restaurant-test\/closures\/[^/]+$/],
   ['DELETE', /^\/api\/restaurant-test\/closures\/[^/]+$/],
-  ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/done$/],
+  ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/(?:done|opened)$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],
@@ -523,87 +517,7 @@ export function isStaffExplicitAllow(method: string, path: string): boolean {
   return STAFF_EXPLICIT_ALLOW_PATTERNS.some(([m, pattern]) => m === normalizedMethod && pattern.test(path));
 }
 
-/**
- * 管理者認証より手前へ通す公開境界。authMiddleware の skip 判定と
- * 同じ意味で、method を区別する口もここで扱う。
- */
-export function isPublicApiBoundary(method: string, path: string): boolean {
-  const normalizedMethod = method.toUpperCase();
-  // フォーム定義の GET は LIFF が認証なしで読む。PUT/DELETE は管理 API。
-  if (normalizedMethod === 'GET' && /^\/api\/forms\/[^/]+$/.test(path)) return true;
-  // LIFF の回答・開封・途中保存は route 側で LINE 署名を見る。
-  if (
-    normalizedMethod === 'POST' &&
-    (/^\/api\/forms\/[^/]+\/submit$/.test(path) ||
-      /^\/api\/forms\/[^/]+\/opened$/.test(path) ||
-      /^\/api\/forms\/[^/]+\/partial$/.test(path) ||
-      /^\/api\/forms\/[^/]+\/files$/.test(path))
-  ) {
-    return true;
-  }
-  return (
-    path === '/webhook' ||
-    path === '/docs' ||
-    path === '/openapi.json' ||
-    path === '/api/affiliates/click' ||
-    path === '/webhooks/xserver/support-email' ||
-    path === '/api/public/nen/adopted-photos' ||
-    path === '/api/public/nen/gallery-preview' ||
-    path === '/api/site/collect' ||
-    path === '/api/site/script.js' ||
-    // #819: 計測タグからの成果受信。サイトIDと許可ドメインで検証する
-    // 公開口で、管理画面の認証は通さない(OPTIONSの事前確認も含む)。
-    path === '/api/public/web-conversions' ||
-    path.startsWith('/t/') ||
-    path.startsWith('/r/') ||
-    path.startsWith('/pool/') ||
-    path.startsWith('/images/') ||
-    path.startsWith('/api/liff/') ||
-    path === '/api/auth/login' ||
-    path === '/api/auth/logout' ||
-    path === '/api/auth/line' ||
-    path === '/api/auth/line/callback' ||
-    path === '/api/auth/two-factor/verify' ||
-    // TOTP未登録の管理者の初回設定。合言葉で本人確認する公開経路（N-426）。
-    path === '/api/auth/two-factor/setup' ||
-    path === '/api/auth/two-factor/setup/confirm' ||
-    // 会員登録・メールログイン・パスワード再設定。Turnstile と回数制限で守る。
-    /^\/api\/auth\/(register|password|ops-invite)\//.test(path) ||
-    /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
-    // N-433: メール変更の確定。トークン自体が資格情報で、ログイン状態に依らない。
-    path === '/api/staff/email-change/confirm' ||
-    path.startsWith('/auth/') ||
-    path === '/setup' ||
-    path === '/api/integrations/stripe/webhook' ||
-    path === '/api/instagram/webhook' ||
-    // 課金の Stripe Webhook は route 内で署名検証する。
-    path === '/api/hq/billing/webhook' ||
-    path === '/api/integrations/eccube/events' ||
-    path === '/api/integrations/eccube/columns' ||
-    // ECから届く誕生日クーポンの利用記録。route 内で同じHMAC署名を確かめる。
-    path === '/api/integrations/eccube/coupon-usages' ||
-    path === '/api/internal/deployments/events' ||
-    path === '/api/integrations/codex-slack/events' ||
-    path === '/api/integrations/ai-loop/reports' ||
-    path === '/api/integrations/slack/actions' ||
-    path === '/api/integrations/slack/events' ||
-    /^\/api\/webhooks\/incoming\/[^/]+\/receive$/.test(path) ||
-    // N-270: 外部システムからの成果受信。route 内で地点ごとの
-    // 受信鍵をHMAC-SHA256で照合する。管理画面の認証は通さない。
-    (normalizedMethod === 'POST' && /^\/api\/conversions\/ingest\/[^/]+$/.test(path)) ||
-    // デリバリー受注の通知受け口。route 内でサービスごとの合言葉を
-    // HMAC-SHA256で照合し、受信台帳で重複を排除する。管理画面の認証は通さない。
-    (normalizedMethod === 'POST' &&
-      /^\/api\/restaurant-test\/delivery\/webhooks\/[^/]+$/.test(path)) ||
-    // #939 N-380: 外部システム向け公開API。route 内で integration_api_tokens
-    // の Bearer トークンを照合する。管理画面の認証は通さない。
-    path.startsWith('/api/public/v1/') ||
-    path === '/api/meet-callback' ||
-    path === '/api/qr' ||
-    path === '/api/public/brand' ||
-    path === '/api/health'
-  );
-}
+export { isPublicApiBoundary } from './public-api-boundary.js';
 
 export async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -768,8 +682,13 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     return c.json({ success: false, code: TENANT_SUSPENDED_CODE, error: TENANT_SUSPENDED_ERROR }, 403);
   }
 
-  if (staff.readOnly && !SAFE_METHODS.has(method)) {
+  if (staff.readOnly && !SAFE_METHODS.has(method) && !gap2ReadOperation(method,path) && !gap2SelfPreference(method,path)) {
     return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
+  }
+
+  const outputRequest = isOutputRequest(path, c.req.query('format'), method);
+  if (staff.readOnly && outputRequest && !(path==='/api/hq/store-comparison/export'||/^\/api\/hq\/store-comparison\/exports\/[^/]+\/download$/.test(path))) {
+    return c.json({ success: false, error: '閲覧のみの権限では書き出しを実行できません' }, 403);
   }
 
   // N-423 (#670): staff は deny-by-default。権限表に無い管理 API は
@@ -787,7 +706,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     // N-424: 「見えるだけ」の key は GET系だけを許可する。変更系は edit の key が要る。
     const granted = requiredPermission
       && (staff.permissionKeys?.includes(requiredPermission)
-        || (SAFE_METHODS.has(method) && staff.viewPermissionKeys?.includes(requiredPermission)));
+        || ((SAFE_METHODS.has(method)||gap2ReadOperation(method,path)) && !outputRequest && staff.viewPermissionKeys?.includes(requiredPermission)));
     if (!requiredPermission || !granted) {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }

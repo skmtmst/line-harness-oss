@@ -1,96 +1,51 @@
 'use client'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { CircleDot, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ListPage } from '@/components/templates'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import Button from '@/components/shared/button'
-import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
-import { brandInitial } from '@/components/layout/brand-initial'
-import EmptyList from '@/components/shared/empty-list'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
-import SegmentedControl from '@/components/shared/segmented'
-import Select from '@/components/shared/select'
-import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import { classifyApiFailure, loadFailureNotice } from '@/components/shared/api-error-message'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import AccountEditModal from '@/components/accounts/account-edit-modal'
-import PlatformNotices from '@/components/hq/platform-notices'
-import { api, fetchApi } from '@/lib/api'
-import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared'
-import { resolveStoreReturnPath } from '@/lib/hq-navigation'
-import { formatNumber } from '@/lib/format'
-import { useStaffRole } from '@/lib/staff-role'
-import { readSessionSnapshot } from '@/lib/session-snapshot'
-import { useAccount, type AccountWithStats } from '@/contexts/account-context'
-import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs'
-import { connectionReasonLine } from './connection-reasons'
-import styles from './home.module.css'
-import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
-import StatusPill from '@/components/shared/status-pill'
-import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
-/*
- * ★V8 統括のアカウント（ホーム）（Pencil `JKjsE`。カードの「設定」で開く窓が `HMpVx`）。
- *
- * v7 の画面（app/hq/page.tsx と account-browser-v8.tsx）と読み書きの口・失敗時の扱いは同じ。
- * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左のフォルダの列（型のフォルダの列＋共通 FolderPanel。2026-10-08 タグ→フォルダ・API-17）・
- * 数のカード4枚・探す欄と状態の札・カード／表の切り替え・並び・件数・アカウントのカード・件数と注。
- */
-
-type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
-type View = 'cards' | 'table'
-
-/** 「未分類」を表す印。空文字は「すべて」なので別の値にする。 */
-const UNFILED = '__none__'
-const ALL = '__all__'
-
-const STATUS_FILTERS: { value: StatusFilter; label: string; icon: React.ReactNode }[] = [
-  { value: 'all', label: 'すべて', icon: <CircleDot size={14} aria-hidden="true" /> },
-  { value: 'ok', label: '正常', icon: <Star size={14} aria-hidden="true" /> },
-  { value: 'warn', label: '要確認', icon: <Star size={14} aria-hidden="true" /> },
-  { value: 'archived', label: 'アーカイブ', icon: <Star size={14} aria-hidden="true" /> },
-]
-
-const SORT_OPTIONS = [
-  { value: 'friends', label: '並び：友だち順' },
-  { value: 'name', label: '並び：名前順' },
-  { value: 'display', label: '並び：登録順' },
-]
-
-const PAGE_SIZES = STANDARD_PAGE_SIZES
-
-function isArchived(account: AccountWithStats) {
-  return Boolean(account.archivedAt)
-}
-
-function matchesStatus(account: AccountWithStats, filter: StatusFilter) {
-  if (filter === 'all') return true
-  if (filter === 'archived') return isArchived(account)
-  if (isArchived(account)) return false
-  if (filter === 'ok') return account.isActive && account.connection?.status === 'ok'
-  return account.isActive && account.connection?.status !== 'ok'
-}
-
-function statusOf(account: AccountWithStats): { label: string; tone: 'ok' | 'warn' | 'idle' } {
-  if (isArchived(account)) return { label: 'アーカイブ', tone: 'idle' }
-  if (!account.isActive) return { label: '停止中', tone: 'idle' }
-  if (account.connection?.status === 'ok') return { label: '正常', tone: 'ok' }
-  if (account.connection?.status === 'warn') return { label: '要確認', tone: 'warn' }
-  return { label: '未確認', tone: 'idle' }
-}
-
+import { DataTable, Tr, Th, Td, TableHeadRow } from '@/components/shared/table';
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { ListPage } from '@/components/templates';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd } from '@/components/shared/list-toolbar';
+import KpiBand from '@/components/shared/kpi-band';
+import KpiCard from '@/components/shared/kpi-card';
+import Button from '@/components/shared/button';
+import { RowMenu } from '@/components/shared/row-actions';
+import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
+import { brandInitial } from '@/components/layout/brand-initial';
+import EmptyList from '@/components/shared/empty-list';
+import ConfirmDialog from '@/components/shared/confirm-dialog';
+import FilterChip from '@/components/shared/filter-chip';
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import ListState from '@/components/shared/list-state';
+import Notice from '@/components/shared/notice';
+import Pagination from '@/components/shared/pagination';
+import SearchField from '@/components/shared/search-field';
+import SegmentedControl from '@/components/shared/segmented';
+import Select from '@/components/shared/select';
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog';
+import { classifyApiFailure, loadFailureNotice } from '@/components/shared/api-error-message';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import AccountEditModal from '@/components/accounts/account-edit-modal';
+import PlatformNotices from '@/components/hq/platform-notices';
+import { api, bookingApi, fetchApi } from '@/lib/api';
+import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared';
+import { resolveStoreReturnPath } from '@/lib/hq-navigation';
+import { formatNumber } from '@/lib/format';
+import { useStaffRole } from '@/lib/staff-role';
+import { readSessionSnapshot } from '@/lib/session-snapshot';
+import { useAccount, type AccountWithStats } from '@/contexts/account-context';
+import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs';
+import { connectionReasonLine } from './connection-reasons';
+import styles from './home.module.css';
+import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors';
+import StatusBadge from '@/components/shared/status-badge';
+import TagPill from '@/components/shared/tag-pill';
+import TagOverflow from '@/components/shared/tag-overflow';
+import TruncatedText from '@/components/shared/truncated-text';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { type StatusFilter, type View, UNFILED, ALL, STATUS_FILTERS, SORT_OPTIONS, PAGE_SIZES, isArchived, matchesStatus, statusOf, accountMeta } from "./home-gap-parts"
 export default function HqHomeV8() {
   const saveErrors = useSaveFormErrors()
   // 左のメニューと同じ名前を見出しにする（バナー生成・課金プランなどと同じ書き方）。
@@ -219,9 +174,7 @@ export default function HqHomeV8() {
         : `${succeeded} 件を更新し、${failed} 件は更新できませんでした。`)
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-      setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`) }
+      if (!fieldFailure) setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`)
     } finally {
       setConnectionProgress('')
       setCheckingConnections(false)
@@ -230,6 +183,8 @@ export default function HqHomeV8() {
 
   const login = (accountId: string) => {
     setSelectedAccountId(accountId)
+    /* 引き継ぎが途中なら続きから動かす。見た目は変えず、答えも待たない（cron でも進む）。 */
+    if (canManage) void api.lineAccounts.stepFollowerImport(accountId).catch(() => undefined)
     // 店舗未選択ゲートから来たときは、元いた画面へ戻す（`return` はアプリ内の店舗画面パスだけ：NEXT-07）。
     const back = resolveStoreReturnPath(new URLSearchParams(window.location.search).get('return'))
     router.push(back ?? '/')
@@ -275,6 +230,23 @@ export default function HqHomeV8() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / size))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * size, current * size)
+  /* ★V8 oFq4S：表の「接続」（お支払いのつなぎ：つながっている／試験モード／つなぐ前）。表の行だけ、店ごとに読む。 */
+  const [payState, setPayState] = useState<Record<string, 'live' | 'test' | 'none' | 'unknown'>>({})
+  const shownIds = shown.map((account) => account.id).join(',')
+  useEffect(() => {
+    if (view !== 'table' || !shownIds) return
+    let alive = true
+    void Promise.allSettled(shownIds.split(',').map((id) => bookingApi.getPaymentConfig(id).then((response) => [id, response.data] as const))).then((results) => {
+      if (!alive) return
+      const next: Record<string, 'live' | 'test' | 'none' | 'unknown'> = {}
+      results.forEach((result, index) => {
+        const id = shownIds.split(',')[index]
+        next[id] = result.status === 'fulfilled' ? (result.value[1].keyConfigured ? (result.value[1].testMode ? 'test' : 'live') : 'none') : 'unknown'
+      })
+      setPayState((current) => ({ ...current, ...next }))
+    })
+    return () => { alive = false }
+  }, [view, shownIds])
   const resetPage = () => setPage(1)
   const statusCount = (filter: StatusFilter) => accounts.filter((account) => matchesStatus(account, filter)).length
   const nameOf = (id: string | null | undefined) => {
@@ -373,7 +345,7 @@ export default function HqHomeV8() {
   ]
 
   const createAccount = canManage ? (
-    <Button href="/accounts/new" variant="primary" className={styles.createButton}>
+    <Button href="/accounts/new" variant="primary">
       <Plus aria-hidden="true" className={styles.buttonIcon} />アカウントを登録
     </Button>
   ) : null
@@ -381,7 +353,7 @@ export default function HqHomeV8() {
   const folderColumn = (
     <div className={styles.folderBox}>
       <FolderPanel
-        /* 閲覧のみで登録ボタンを隠したときも、その場所は空けておく（下のフォルダの列が上へ詰まらない。絵 VtJQ6）。 */
+        reserveCreateSpace={canManage}
         createAction={createAccount}
         heading="フォルダ"
         rows={folderRows}
@@ -416,7 +388,7 @@ export default function HqHomeV8() {
         <Button className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`}>
           <LogIn aria-hidden="true" className={styles.buttonIcon} />入る
         </Button>
-        {canManage && (account.role == null || account.role === 'owner' || account.role === 'admin') ? (
+        {canManage ? (
           <Button onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`}>
             <Settings aria-hidden="true" className={styles.buttonIcon} />設定
           </Button>
@@ -425,16 +397,75 @@ export default function HqHomeV8() {
     )
   }
 
+  /* ★V8 oFq4S：表の行末は「…」1つ（行の操作は中に）。 */
+  const tableMenu = (account: AccountWithStats) => {
+    const name = account.displayName || account.name
+    const items = isArchived(account)
+      ? [
+          { id: 'detail', label: '詳細', onSelect: () => setEditingAccount(account) },
+          ...(isOwner ? [{ id: 'restore', label: '戻す', onSelect: () => setArchiveTarget({ account, mode: 'restore' as const }) }] : []),
+        ]
+      : [
+          ...(isOwner ? [{ id: 'billing', label: 'お支払いの設定を開く', onSelect: () => router.push('/hq/billing') }] : []),
+          { id: 'login', label: 'このアカウントに切り替える', onSelect: () => login(account.id) },
+          ...(canManage ? [{ id: 'settings', label: '設定', onSelect: () => setSettingsAccount(account) }] : []),
+        ]
+    return <RowMenu label={`${name}の操作`} items={items} />
+  }
+
   const folderDotOf = (account: AccountWithStats) => {
     const id = folderOf(account)
     const found = id ? folders.find((item) => item.id === id) ?? (account as { folder?: Folder | null }).folder ?? null : null
     return found ? { name: found.name, color: found.color } : null
   }
 
-  const metaOf = (account: AccountWithStats) => {
-    const parent = nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId)
-    return [accountHandle(account), parent ? `親：${parent}` : null, `権限者 ${formatNumber(account.stats?.staffCount ?? 0)} 人`].filter(Boolean).join(' ・ ')
-  }
+
+  const toolbar = loadError || loading || accounts.length === 0 ? null : <>
+      <PlatformNotices />
+      <KpiBand className={styles.full} data-design="KPIs">
+        <KpiCard title="アカウント" value={accounts.length} unit="件" detail={null} />
+        <KpiCard title="友だち合計" value={totals.friends} unit="人" detail={null} help="全アカウントの合計" />
+        <KpiCard title="今月の配信" value={totals.messages} unit="通" detail={null} />
+        <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone="warning" />
+      </KpiBand>
+
+      <ListToolbarFrame layout="stacked">
+        <ListToolbarRow><div className={styles.searchBox}>
+          <SearchField
+            aria-label="名前・LINE ID・フォルダで探す"
+            placeholder="名前・LINE ID・フォルダで探す"
+            value={query}
+            onChange={(value) => { setQuery(value); resetPage() }}
+            onClear={() => { setQuery(''); resetPage() }}
+          />
+        </div></ListToolbarRow>
+        <ListToolbarRow>
+          <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
+            {STATUS_FILTERS.map((item) => (
+              <FilterChip key={item.value} selected={status === item.value} icon={item.icon} onChange={() => { setStatus(item.value); resetPage() }}>
+                {`${item.label} ${statusCount(item.value)}`}
+              </FilterChip>
+            ))}
+          </div>
+          <ListToolbarEnd>
+          <SaveErrorField names={["view"]}><SegmentedControl<View>
+            aria-label="表示の切り替え"
+            value={view}
+            onChange={setView}
+            options={[{ value: 'cards', label: <LayoutGrid className={styles.buttonIcon} aria-hidden="true" />, ariaLabel: 'カード' }, { value: 'table', label: <List className={styles.buttonIcon} aria-hidden="true" />, ariaLabel: '表' }]}
+          /></SaveErrorField>
+          <SaveErrorField names={["sort"]}><Select label="並び" aria-label="アカウントの並び順" value={sort} size="content" onChange={(value) => { setSort(value); resetPage() }} options={SORT_OPTIONS} /></SaveErrorField>
+          <SaveErrorField names={["size"]}><Select
+            aria-label="アカウントの表示件数"
+            value={String(size)}
+            width={110}
+            onChange={(value) => { setSize(Number(value)); resetPage() }}
+            options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value} 件表示` }))}
+          /></SaveErrorField>
+          </ListToolbarEnd>
+        </ListToolbarRow>
+      </ListToolbarFrame>
+  </>
 
   const body = loadError ? (
     <Notice
@@ -447,7 +478,6 @@ export default function HqHomeV8() {
   ) : loading ? (
     <ListState permissionScope="hq" kind="loading" loadingShape={view === 'cards' ? 'cards' : 'list'} title="アカウントを読み込んでいます" />
   ) : accounts.length === 0 ? (
-    /* 修正案 D-2：空の一覧。 */
     <EmptyList
       icon={<MessageCircle aria-hidden="true" />}
       title="まだ LINE 公式アカウントがありません"
@@ -457,49 +487,6 @@ export default function HqHomeV8() {
     />
   ) : (
     <>
-      <KpiBand data-design="KPIs">
-        <KpiCard title="アカウント" value={accounts.length} unit="件" detail={null} />
-        <KpiCard title="友だち合計" value={totals.friends} unit="人" detail={null} help="全アカウントの合計" />
-        <KpiCard title="今月の配信" value={totals.messages} unit="通" detail={null} />
-        <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone="warning" />
-      </KpiBand>
-
-      <div className={styles.tools}>
-        <div className={styles.searchBox}>
-          <SearchField
-            aria-label="名前・LINE ID・フォルダで探す"
-            placeholder="名前・LINE ID・フォルダで探す"
-            value={query}
-            onChange={(value) => { setQuery(value); resetPage() }}
-            onClear={() => { setQuery(''); resetPage() }}
-          />
-        </div>
-        <div className={styles.toolRow}>
-          <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
-            {STATUS_FILTERS.map((item) => (
-              <FilterChip key={item.value} selected={status === item.value} icon={item.icon} onChange={() => { setStatus(item.value); resetPage() }}>
-                {`${item.label} ${statusCount(item.value)}`}
-              </FilterChip>
-            ))}
-          </div>
-          <span className={styles.spacer} />
-          <SaveErrorField names={["view"]}><SegmentedControl<View>
-            aria-label="表示の切り替え"
-            value={view}
-            onChange={setView}
-            options={[{ value: 'cards', label: 'カード' }, { value: 'table', label: '表' }]}
-          /></SaveErrorField>
-          <SaveErrorField names={["sort"]}><Select aria-label="アカウントの並び順" value={sort} width={134} onChange={(value) => { setSort(value); resetPage() }} options={SORT_OPTIONS} /></SaveErrorField>
-          <SaveErrorField names={["size"]}><Select
-            aria-label="アカウントの表示件数"
-            value={String(size)}
-            width={110}
-            onChange={(value) => { setSize(Number(value)); resetPage() }}
-            options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value} 件表示` }))}
-          /></SaveErrorField>
-        </div>
-      </div>
-
       {connectionProgress ? <p className={styles.progress} role="status">{connectionProgress}</p> : null}
       {connectionResult ? <Notice tone="info" message={connectionResult} /> : null}
       {reloadFailed ? (
@@ -526,7 +513,7 @@ export default function HqHomeV8() {
             const warned = state.tone === 'warn'
             const name = account.displayName || account.name
             return (
-              <article key={account.id} className={warned ? `${styles.card} ${styles.cardWarn}` : styles.card} aria-label={name}>
+              <article key={account.id} className={styles.card} aria-label={name}>
                 <div className={styles.cardHead}>
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <div className={styles.cardName}>
@@ -535,10 +522,14 @@ export default function HqHomeV8() {
                       <FolderDotName folder={folderDotOf(account)}>{name}</FolderDotName>
                     </p>
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
-                    <p className={styles.meta} title={metaOf(account)}>{metaOf(account)}</p>
+                    <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
                   </div>
-                  <StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill>
+                  <StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusBadge>
                 </div>
+                <TagOverflow label={`${name}の分類`}>
+                  {folderDotOf(account) ? <TagPill name={folderDotOf(account)!.name} color={folderDotOf(account)!.color} aria-label={`フォルダ：${folderDotOf(account)!.name}`} /> : null}
+                  {(account.tags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
+                </TagOverflow>
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>
@@ -563,41 +554,48 @@ export default function HqHomeV8() {
           })}
         </div>
       ) : (
-        <div className={styles.table} role="table" aria-label="アカウントの一覧">
-          <div className={styles.head} role="row">
-            <span role="columnheader">アカウント</span>
-            <span role="columnheader">状態</span>
-            <span role="columnheader" className={styles.num}>友だち</span>
-            <span role="columnheader" className={styles.num}>今月の配信</span>
-            <span role="columnheader">操作</span>
-          </div>
+        <DataTable aria-label="アカウントの一覧">
+          <thead><TableHeadRow>
+            <Th>アカウント</Th>
+            <Th>接続</Th>
+            <Th>対応が要る</Th>
+            <Th>友だち</Th>
+            <Th>今月の配信</Th>
+            <Th className="sr-only">操作</Th>
+          </TableHeadRow></thead><tbody>
           {shown.map((account) => {
             const state = statusOf(account)
             const name = account.displayName || account.name
             return (
-              <div key={account.id} className={styles.row} role="row">
-                <span role="cell" className={styles.rowName}>
+              <Tr key={account.id}>
+                <Td>
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <span className={styles.cardName}>
                     <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
-                    <span className={styles.meta}>{metaOf(account)}</span>
+                    <span className={styles.meta}><TruncatedText value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} /></span>
                   </span>
-                </span>
-                <span role="cell"><StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill></span>
-                <span role="cell" className={styles.num}>{formatNumber(account.stats?.friendCount ?? 0)}</span>
-                <span role="cell" className={styles.num}>{formatNumber(account.stats?.messagesThisMonth ?? 0)}</span>
-                <span role="cell">{cardActions(account)}</span>
-              </div>
+                  <StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusBadge>
+                </Td>
+                <Td>{(() => {
+                  const pay = payState[account.id]
+                  if (!pay || pay === 'unknown') return emptyValue('unknown')
+                  return <StatusBadge tone={pay === 'live' ? 'success' : pay === 'test' ? 'warning' : 'neutral'}>{pay === 'live' ? 'つながっている' : pay === 'test' ? '試験モード' : 'つなぐ前'}</StatusBadge>
+                })()}</Td>
+                <Td>{state.tone === 'warn' ? `${Math.max(1, account.connection?.issues?.length ?? 0)} 件` : <span>—</span>}</Td>
+                <Td>{formatNumber(account.stats?.friendCount ?? 0)}</Td>
+                <Td>{formatNumber(account.stats?.messagesThisMonth ?? 0)}</Td>
+                <Td>{tableMenu(account)}</Td>
+              </Tr>
             )
           })}
-        </div>
+        </tbody></DataTable>
       )}
 
       <div className={styles.footer}>
         <span className={styles.range}>
           {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)} 件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)} 件`}
         </span>
-
+        <p className={styles.footNote}>カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます</p>
         {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="アカウントのページ送り" /> : null}
       </div>
     </>
@@ -610,12 +608,12 @@ export default function HqHomeV8() {
       help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{"カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"}</>}
 
       folders={folderColumn}
-      folderInset
+      folderInset toolbar={toolbar} toolbarSpacing="section" toolbarRowGap="card"
       folderWidth={200}
       folderNav={{ rows: folderRows, activeId: folder, onSelect: selectFolder, createAction: createAccount, label: 'フォルダ' }}
     >
       <div className={styles.body}>
-        <PlatformNotices />
+        {toolbar ? null : <PlatformNotices />}
         {body}
       </div>
 

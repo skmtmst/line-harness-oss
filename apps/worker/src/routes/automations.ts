@@ -1,3 +1,5 @@
+import {defaultWindow} from './automation-execution-window.js';
+import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { automationTabCounts } from '../services/tab-counts.js';
 import { Hono } from 'hono';
@@ -126,11 +128,7 @@ async function definitionEndpoint<T>(c: Context<Env>, run: () => Promise<T>): Pr
     return c.json({ success: true, data: await run() });
   } catch (error) {
     if (error instanceof AutomationDefinitionError) return definitionErrorResponse(c, error);
-    console.error(JSON.stringify({
-      event: 'automation_definition_api_failed',
-      path: c.req.path,
-      reason: error instanceof Error ? error.message : String(error),
-    }));
+    console.error(JSON.stringify({"code":"automation_definition_api_failed"}));
     return c.json({ success: false, error: 'オートメーションを処理できませんでした' }, 500);
   }
 }
@@ -144,11 +142,7 @@ async function draftEndpoint<T>(
     return c.json({ success: true, data: await run() }, successStatus as 200);
   } catch (error) {
     if (error instanceof AutomationDraftError) return draftErrorResponse(c, error);
-    console.error(JSON.stringify({
-      event: 'automation_draft_api_failed',
-      path: c.req.path,
-      reason: error instanceof Error ? error.message : String(error),
-    }));
+    console.error(JSON.stringify({"code":"automation_draft_api_failed"}));
     return c.json({ success: false, error: 'オートメーションの下書きを処理できませんでした' }, 500);
   }
 }
@@ -259,11 +253,6 @@ function safeFailureReason(code: string | null, failedAction: string | null): st
   return `${failedAction ?? '登録した処理'}を完了できませんでした`;
 }
 
-function defaultWindow() {
-  const to = new Date();
-  const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1_000);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
 
 /**
  * まだ終わっていない実行が「運用停止」「機能無効」で claim できないとき、
@@ -580,7 +569,7 @@ automations.put(
 automations.post(
   '/api/automation-drafts/:id/publish',
   requireAutomationPermission,
-  requireRole('owner', 'admin', 'staff'),
+  requireRole('owner', 'admin'),
   inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
@@ -602,7 +591,7 @@ automations.get('/api/automations/counts', requireAutomationViewPermission, asyn
   try {
     return c.json({ success: true, data: await automationTabCounts(c.env.DB, accountId) });
   } catch (err) {
-    console.error('GET /api/automations/counts error:', err);
+    console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automations/counts"}));
     return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
   }
 });
@@ -634,7 +623,7 @@ automations.get(
     );
     return c.json({
       success: true,
-      data: result.items,
+      data: await withStyleSampleMetadata(c.env.DB,result.items,'automation'),
       summary: result.summary,
       freshness: result.freshness,
       pagination: {
@@ -644,7 +633,7 @@ automations.get(
       },
     });
   } catch (err) {
-    console.error('GET /api/automations error:', err);
+    console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automations"}));
     return c.json({ success: false, error: 'オートメーションを表示できませんでした' }, 500);
   }
 });
@@ -784,7 +773,7 @@ automations.get(
     };
     return c.json({ success: true, data: body });
   } catch (err) {
-    console.error('GET /api/automation-runs error:', err);
+    console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automation-runs"}));
     return c.json({ success: false, error: '実行記録を読み込めませんでした' }, 500);
   }
 });
@@ -816,11 +805,7 @@ automations.post(
         const status = error.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, error: error.message, code: error.code }, status, []);
       }
-      console.error(JSON.stringify({
-        event: 'automation_run_retry_failed',
-        path: c.req.path,
-        reason: error instanceof Error ? error.message : String(error),
-      }));
+      console.error(JSON.stringify({"code":"automation_run_retry_failed","route":"POST /api/automation-runs/:id/retry"}));
       return c.json({ success: false, error: '失敗した処理を再実行できませんでした' }, 500);
     }
   },
@@ -868,7 +853,7 @@ automations.get(
         },
       });
     } catch (err) {
-      console.error('GET /api/automation-runs/:id error:', err);
+      console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automation-runs/:id"}));
       return c.json({ success: false, error: '実行記録を読み込めませんでした' }, 500);
     }
   },
@@ -899,11 +884,7 @@ automations.post(
         const status = error.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, error: error.message, code: error.code }, status, []);
       }
-      console.error(JSON.stringify({
-        event: 'automation_run_cancel_failed',
-        path: c.req.path,
-        reason: error instanceof Error ? error.message : String(error),
-      }));
+      console.error(JSON.stringify({"code":"automation_run_cancel_failed","route":"POST /api/automation-runs/:id/cancel"}));
       return c.json({ success: false, error: '実行を取りやめられませんでした' }, 500);
     }
   },
@@ -964,7 +945,7 @@ automations.post(
 automations.post(
   '/api/automations/:id/status',
   requireAutomationPermission,
-  requireRole('owner', 'admin', 'staff'),
+  requireRole('owner', 'admin'),
   inputJsonBoundary(), async (c) => {
     const accountId = await definitionAccountId(c);
     if (typeof accountId !== 'string') return accountId;
@@ -1032,7 +1013,7 @@ automations.get(
       },
     });
   } catch (err) {
-    console.error('GET /api/automations/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automations/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1087,7 +1068,7 @@ automations.put('/api/automations/:id', requireRole('owner', 'admin'), inputJson
       },
     });
   } catch (err) {
-    console.error('PUT /api/automations/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_automations_failed","route":"PUT /api/automations/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1097,7 +1078,7 @@ automations.delete('/api/automations/:id', requireRole('owner', 'admin'), async 
     await deleteAutomation(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/automations/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_automations_failed","route":"DELETE /api/automations/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1126,7 +1107,7 @@ automations.get(
       })),
     });
   } catch (err) {
-    console.error('GET /api/automations/:id/logs error:', err);
+    console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automations/:id/logs"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

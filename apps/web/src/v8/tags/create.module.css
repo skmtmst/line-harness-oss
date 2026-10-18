@@ -197,21 +197,8 @@ a.way:hover {
   gap: var(--tpl-tg2-key-gap);
 }
 
-.keyBrace {
-  color: var(--color-ink);
-  font-size: var(--text-label);
-}
 
-.keyInput {
-  width: var(--tpl-tg2-key-w);
-  font-size: var(--text-label);
-}
 
-.keyFixed {
-  display: inline-flex;
-  align-items: center;
-  background: var(--color-canvas-sunken);
-}
 
 .keyNote {
   margin: 0;
@@ -260,49 +247,17 @@ a.way:hover {
   line-height: var(--tpl-tg2-chip-lh);
 }
 
-.chipColumn {
+ .chipColumn {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--tpl-tg2-option-gap);
+  gap: var(--space-8);
 }
 
-.typeChip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-tg2-pill-gap);
-  height: var(--tpl-tg2-chip-h);
-  padding: var(--tpl-tg2-chip-pad);
-  border: 0;
-  border-radius: var(--radius-pill);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  line-height: var(--tpl-tg2-chip-lh);
-  cursor: pointer;
-}
 
-.typeChip[aria-checked='true'] {
-  outline: var(--tpl-tg2-ring-thin) solid var(--color-accent-deep);
-  background: var(--color-accent-soft);
-}
 
-.typeChip:disabled {
-  cursor: not-allowed;
-}
 
-.typeChip:disabled:not([aria-checked='true']) {
-  color: var(--color-ink-faint);
-}
 
-.typeChipIcon {
-  width: var(--tpl-tg2-chip-icon);
-  height: var(--tpl-tg2-chip-icon);
-  color: var(--color-ink-secondary);
-}
 
 .optionStack {
   display: flex;
@@ -349,27 +304,8 @@ a.way:hover {
   min-width: 0;
 }
 
-.colorRow {
-  display: flex;
-  align-items: center;
-  height: var(--tpl-tg2-swatch);
-  gap: var(--tpl-tg2-swatch-gap);
-}
 
-.colorSwatch {
-  width: var(--tpl-tg2-swatch);
-  height: var(--tpl-tg2-swatch);
-  min-height: 0; /* 全体のボタンの最小の高さ（32）で縦に伸びて楕円になっていた */
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
 
-.colorSwatch[aria-pressed='true'] {
-  outline: var(--tpl-tg2-swatch-ring) solid var(--color-ink);
-  outline-offset: var(--tpl-tg2-swatch-ring);
-}
 
 .infoNote {
   display: flex;
@@ -453,57 +389,6 @@ a.way:hover {
   display: flex;
   flex-direction: column;
   gap: var(--tpl-cn-card-gap);
-}
-
-/* ★友だち情報欄の移行（GobMd）：見本の表（枠1・角10、頭は薄い灰、行は上に線・余白 10/14・間16）。 */
-.sampleTable {
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  overflow: hidden;
-}
-
-.sampleHead,
-.sampleRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(var(--tpl-tg2-sample-count-w), max-content);
-  gap: var(--tpl-cn-col-gap);
-  padding: var(--tpl-tg2-sample-pad);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-cn-main-lh);
-}
-
-.sampleHead {
-  background: var(--color-table-head);
-  color: var(--color-ink);
-  font-weight: 600;
-}
-
-.sampleRow {
-  padding-bottom: var(--tpl-tg2-sample-row-pad-bottom);
-  border-top: 1px solid var(--color-hairline);
-  color: var(--color-ink);
-}
-
-.sampleRow > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sampleCount {
-  text-align: right;
-}
-
-.sampleNote {
-  margin: 0;
-  padding: var(--tpl-tg2-sample-pad);
-  border-top: 1px solid var(--color-hairline);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
 }
 
 .twoCols {

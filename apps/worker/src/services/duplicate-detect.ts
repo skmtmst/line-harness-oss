@@ -113,7 +113,7 @@ export async function processDuplicateDetection(db: D1Database): Promise<void> {
   const newFriends = candidates.results.filter(f => f.url_token);
   if (newFriends.length === 0) return;
 
-  console.log(`[duplicate-detect] Processing ${newFriends.length} new/updated friends`);
+  console.log(JSON.stringify({"code":"services_duplicate_detect_log"}));
 
   // For each new friend, find matches in other accounts
   let taggedCount = 0;
@@ -162,6 +162,6 @@ export async function processDuplicateDetection(db: D1Database): Promise<void> {
   ).bind(crypto.randomUUID(), now, now, now, now, now).run();
 
   if (taggedCount > 0) {
-    console.log(`[duplicate-detect] Tagged ${taggedCount} duplicate pairs`);
+    console.log(JSON.stringify({"code":"services_duplicate_detect_log"}));
   }
 }

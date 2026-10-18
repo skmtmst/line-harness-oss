@@ -6,6 +6,7 @@ import LoadingView from './components/LoadingView.js';
 // 画面ごとに束を分ける。開いた画面のぶんだけ読む。
 const Booking = lazy(() => import('./pages/Booking.js'));
 const BookingHistory = lazy(() => import('./pages/BookingHistory.js'));
+const MyPage = lazy(() => import('./pages/MyPage.js'));
 const Event = lazy(() => import('./pages/Event.js'));
 const EventConfirm = lazy(() => import('./pages/EventConfirm.js'));
 const EventDone = lazy(() => import('./pages/EventDone.js'));
@@ -19,6 +20,8 @@ const VisitStampQr = lazy(() => import('./pages/VisitStampQr.js'));
 const VisitStamps = lazy(() => import('./pages/VisitStamps.js'));
 const SeatReserve = lazy(() => import('./pages/seat/SeatReserve.js'));
 const EntryRouteCoupon = lazy(() => import('./pages/EntryRouteCoupon.js'));
+const FileOpen = lazy(() => import('./pages/FileOpen.js'));
+const StatementOpen = lazy(() => import('./pages/StatementOpen.js'));
 const NotFound = lazy(() => import('./pages/NotFound.js'));
 
 function Loading() {
@@ -46,6 +49,10 @@ export default function App() {
     return <Navigate to={{ pathname: `/research/${encodeURIComponent(search.get('researchId')!)}`, search: location.search }} replace />;
   }
 
+  if (location.pathname === '/' && search.get('page') === 'mypage') {
+    return <Navigate to={{ pathname: '/mypage', search: location.search }} replace />;
+  }
+
   if (location.pathname === '/' && search.get('page') === 'restaurant' && search.get('token')) {
     return <Navigate to={{ pathname: `/restaurant/reserve/${encodeURIComponent(search.get('token')!)}`, search: location.search }} replace />;
   }
@@ -63,6 +70,7 @@ export default function App() {
       <Routes>
         <Route path="/booking" element={<Booking />} />
         <Route path="/booking/history" element={<BookingHistory />} />
+        <Route path="/mypage" element={<MyPage />} />
         <Route path="/events/me" element={<EventBookings />} />
         <Route path="/events/:id/confirm" element={<EventConfirm />} />
         <Route path="/events/:id/done" element={<EventDone />} />
@@ -72,6 +80,10 @@ export default function App() {
         <Route path="/visit-stamps" element={<VisitStamps />} />
         <Route path="/webinar/:slug" element={<Webinar />} />
         <Route path="/research/:id" element={<Research />} />
+        <Route path="/files/:id" element={<FileOpen />} />
+        <Route path="/files" element={<FileOpen />} />
+        <Route path="/statements/:id" element={<StatementOpen />} />
+        <Route path="/statements" element={<StatementOpen />} />
         <Route path="/forms/:id" element={<Form />} />
         <Route path="/restaurant/reserve/:token" element={<SeatReserve />} />
         <Route path="/" element={<Navigate to={{ pathname: '/booking', search: location.search }} replace />} />

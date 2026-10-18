@@ -42,7 +42,7 @@ test('CI実測84ms・63msは補正後に通るが、2倍は全時間指標で落
   assert.deepEqual(judge([{ ...sample, pressMs: 84 }], { inbox: base }, ci), [])
   assert.ok(judge([{ ...sample, pressMs: 84 }], { inbox: base }, speedPolicy('local')).length)
   assert.equal(assertStressTargets({ complete: true, measured: [stress] }, ci), stress)
-  assert.throws(() => assertStressTargets({ complete: true, measured: [stress] }), /上限 50ms/)
+  assert.throws(() => assertStressTargets({ complete: true, measured: [stress] }), /上限\s*50ms/)
   for (const metric of ['showMs', 'lcpMs', 'pressMs', 'longTaskMs']) {
     assert.equal(judge([{ ...sample, [metric]: base[metric] * 2 }], { inbox: base }, ci).length, 1, metric)
   }
@@ -85,7 +85,7 @@ test('CLIの測定不能は終了1・complete=false。報告は明示した警�
     assert.ok(recorded.error)
     const env = { ...process.env, GITHUB_STEP_SUMMARY: summary, SPEED_BUDGET_OUTCOME: 'failure', STRESS_SPEED_OUTCOME: 'failure' }
     const report = spawnSync(process.execPath, ['apps/web/scripts/v8-guard/speed-report.mjs', result], { encoding: 'utf8', env })
-    assert.equal(report.status, 0)
+    assert.equal(report.status, 1)
     assert.match(report.stdout, /::warning::速度検査: 測定未完了/)
     assert.match(readFileSync(summary, 'utf8'), /測定未完了/)
     writeFileSync(result, '{broken')
@@ -100,6 +100,7 @@ test('速度だけ参考にし、必須レイアウトと生outcomeの警告を�
   const workflow = parse(readFileSync(new URL('../../../../.github/workflows/required-pr-gate.yml', import.meta.url), 'utf8'))
   const guard = workflow.jobs['v8-screen-guard']
   assert.ok(!guard['continue-on-error'])
+  assert.equal(guard.env.V8_SPEED_ENFORCEMENT, '${{ vars.V8_SPEED_ENFORCEMENT }}')
   assert.ok(workflow.jobs['required-pr-gate'].needs.includes('v8-screen-guard'))
   for (const script of ['layout-overflow.mjs', 'layout-defects.mjs', 'friends-table.browser.mjs']) {
     const step = guard.steps.find(s => s.run?.includes(script))
@@ -108,9 +109,11 @@ test('速度だけ参考にし、必須レイアウトと生outcomeの警告を�
   }
   for (const id of ['speed_budget', 'stress_speed']) {
     const step = guard.steps.find(s => s.id === id)
-    assert.equal(step['continue-on-error'], true)
+    assert.ok(!step['continue-on-error'])
     assert.equal(step.env.V8_SPEED_PROFILE, 'ci')
   }
+  assert.ok(!guard.steps.find(s => s.run?.includes('stgfix17-targets.mjs'))['continue-on-error'])
+  assert.ok(!guard.steps.find(s => s.id === 'speed_budget').run.includes('ALLOW_JS_BASELINE_UPDATE'))
   const report = guard.steps.find(s => s.run?.includes('speed-report.mjs'))
   assert.match(guard.steps.find(s => s.id === 'speed_budget').if, /!cancelled\(\)/, '画面の崩れで速度測定まで消さない')
   assert.match(guard.steps.find(s => s.run?.includes('speed-budget.test.mjs')).if, /!cancelled\(\)/)
@@ -118,7 +121,7 @@ test('速度だけ参考にし、必須レイアウトと生outcomeの警告を�
   assert.match(report.env.SPEED_BUDGET_OUTCOME, /speed_budget.outcome/)
   assert.match(report.env.STRESS_SPEED_OUTCOME, /stress_speed.outcome/)
   const perf3 = guard.steps.find(s => s.id === 'perf3_targets')
-  assert.equal(perf3['continue-on-error'], true)
+  assert.ok(!perf3['continue-on-error'])
   assert.match(perf3.run, /perf3-targets.mjs/)
   assert.match(report.env.PERF3_TARGETS_OUTCOME, /perf3_targets.outcome/)
   const upload = guard.steps.find(s => s.name === 'Upload V8 screen guard results')
@@ -138,4 +141,31 @@ test('local-stubはAPI外のバージョン確認もCIと同じ固定応答に�
   assert.equal(fulfilled.status, 200)
   assert.equal(JSON.parse(fulfilled.body).version, '2.6.4')
   assert.equal(fulfilled.headers['Access-Control-Allow-Origin'], 'http://127.0.0.1:4393')
+})
+
+test('超過を数値の表へ残して終了0、enforceへ戻すと終了1。欠測はどちらも終了1', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'speed-enforcement-'))
+  try {
+    const fixture = join(dir, 'fixture.json'), summary = join(dir, 'summary.md')
+    const script = join(dir, 'check.mjs')
+    const budgetUrl = new URL('./speed-budget.mjs', import.meta.url).href
+    const outcomeUrl = new URL('./speed-outcome.mjs', import.meta.url).href
+    writeFileSync(script, `import {readFileSync} from 'node:fs'; import {budgetExceedances} from ${JSON.stringify(budgetUrl)}; import {finishSpeedCheck} from ${JSON.stringify(outcomeUrl)};
+      const result=JSON.parse(readFileSync(process.argv[2],'utf8'));
+      if(!result.complete || result.error || !Number.isFinite(result.measured[0].showMs)) throw new Error('測定が未完了');
+      process.exitCode=finishSpeedCheck(budgetExceedances(result.measured,result.baselines));`)
+    const slow = { complete: true, measured: [{ name: 'dashboard', ...base, showMs: 2000, jsBytes: base.jsBytes + 1025 }], baselines: { dashboard: base } }
+    const run = mode => spawnSync(process.execPath, [script, fixture], { encoding: 'utf8', env: { ...process.env, V8_SPEED_ENFORCEMENT: mode, GITHUB_STEP_SUMMARY: summary } })
+    writeFileSync(fixture, JSON.stringify(slow))
+    assert.equal(run('report').status, 0)
+    const table = readFileSync(summary, 'utf8')
+    assert.match(table, /速さの上限を超えた物/)
+    assert.match(table, /dashboard \| showMs \| 2000ms \| 1200ms \| \+800ms/)
+    assert.match(table, /dashboard \| jsBytes \| 11025B \| 11024B \| \+1B/)
+    assert.equal(run('enforce').status, 1)
+    for (const corrupt of [{ ...slow, complete: false }, { ...slow, error: '画面が開かない' }, { ...slow, measured: [{ name: 'dashboard', showMs: null }] }]) {
+      writeFileSync(fixture, JSON.stringify(corrupt))
+      for (const mode of ['report', 'enforce']) assert.equal(run(mode).status, 1)
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })

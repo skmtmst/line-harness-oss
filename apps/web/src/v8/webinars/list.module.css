@@ -176,8 +176,6 @@
 
 
 /* 道具の段の右：並び・よく使う絞り込み（左に印）。 */
-.sortBox { width: var(--tpl-wb-sort-w); }
-.sortBox :global(*) { max-width: 100%; }
 .savedBox { position: relative; width: var(--tpl-wb-saved-w); }
 .savedBox :global(*) { max-width: 100%; }
 .savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 9); }

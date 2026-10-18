@@ -25,6 +25,15 @@ describe('V8 のタグ札', () => {
     expect(pill.querySelector<HTMLElement>('[aria-hidden="true"]')?.style.backgroundColor).toBe('')
   })
 
+  it('一覧の名前を兼ねる札は、色だけでなくフォルダ名も伝える', () => {
+    const { rerender } = render(<TagPill name="VIP" color="#228855" folderName="会員" />)
+    const dot = screen.getByRole('img', { name: 'フォルダ：会員' })
+    expect(dot.getAttribute('data-folder-dot')).toBe('filed')
+    expect(screen.getAllByRole('img')).toHaveLength(1)
+    rerender(<TagPill name="VIP" folderName="未分類" />)
+    expect(screen.getByRole('img', { name: 'フォルダ：未分類' }).getAttribute('data-folder-dot')).toBe('unfiled')
+  })
+
   it('編集へのリンクと外すボタンは別々に操作でき、表のクリックへ伝わらない', () => {
     const onRemove = vi.fn()
     const onRowClick = vi.fn()

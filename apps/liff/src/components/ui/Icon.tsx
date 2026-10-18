@@ -1,8 +1,16 @@
+import styles from './Icon.module.css';
 // Lucide (ISC License, https://lucide.dev) の線アイコンを写した小さな部品。
 // 使う分だけ path を持つ。依存は増やさない (package.json・lockfile 不変)。
 // 見た目は 24x24・線・角丸 (lucide の決まり) でそろえる。絵文字は使わない。
 
 const PATHS = {
+  /** 振替・繰り返し */
+  repeat: [
+    <path key="a" d="m17 2 4 4-4 4" />,
+    <path key="b" d="M3 11v-1a4 4 0 0 1 4-4h14" />,
+    <path key="c" d="m7 22-4-4 4-4" />,
+    <path key="d" d="M21 13v1a4 4 0 0 1-4 4H3" />,
+  ],
   'qr-code': [
     <rect key="a" width="5" height="5" x="3" y="3" rx="1" />,
     <rect key="b" width="5" height="5" x="16" y="3" rx="1" />,
@@ -16,12 +24,19 @@ const PATHS = {
     <path key="c" d="M8 12h4" />,
     <path key="d" d="m2 2 20 20" />,
   ],
+  /** 準備中（B-314 の準備中の画面 K9HMJp） */
+  hammer: [
+    <path key="a" d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9" />,
+    <path key="b" d="m18 15 4-4" />,
+    <path key="c" d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172V7l-2.26-2.26a6 6 0 0 0-4.202-1.756L9 2.96l.92.82A6.18 6.18 0 0 1 12 8.4V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5" />,
+  ],
   /** 済み・選択中 */
   check: [<path key="c" d="M20 6 9 17l-5-5" />],
   /** 戻る */
   'chevron-left': [<path key="c" d="m15 18-6-6 6-6" />],
   /** 次へ */
   'chevron-right': [<path key="c" d="m9 18 6-6-6-6" />],
+  'arrow-right': [<path key="a" d="M5 12h14m-6-6 6 6-6 6" />],
   /** 日付・空き */
   calendar: [
     <rect key="r" width="18" height="18" x="3" y="4" rx="2" />,
@@ -69,6 +84,11 @@ const PATHS = {
     <path key="p" d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />,
   ],
   /** 場所 (イベント詳細) */
+  /** オンラインの会議 */
+  video: [
+    <path key="a" d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" />,
+    <rect key="r" x="2" y="6" width="14" height="12" rx="2" />,
+  ],
   'map-pin': [
     <path key="p" d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />,
     <circle key="c" cx="12" cy="10" r="3" />,
@@ -233,11 +253,47 @@ const PATHS = {
     <path key="a" d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />,
     <circle key="c" cx="12" cy="13" r="3" />,
   ],
+  /** マイページの回数券（lucide ticket と同じ線） */
+  ticket: [
+    <path key="a" d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />,
+    <path key="b" d="M13 5v2" />,
+    <path key="c" d="M13 17v2" />,
+    <path key="d" d="M13 11v2" />,
+  ],
+  /** マイページのスタンプ（lucide stamp と同じ線） */
+  stamp: [
+    <path key="a" d="M5 22h14" />,
+    <path key="b" d="M19.27 13.73A2.5 2.5 0 0 0 17.5 13h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1.5c0-.66-.26-1.3-.73-1.77Z" />,
+    <path key="c" d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-3-3c-1.66 0-3 1-3 3s1 2 1 3.5V13" />,
+  ],
+  /** マイページのマイル（lucide gem と同じ線） */
+  gem: [
+    <path key="a" d="M6 3h12l4 6-10 13L2 9Z" />,
+    <path key="b" d="M11 3 8 9l4 13 4-13-3-6" />,
+    <path key="c" d="M2 9h20" />,
+  ],
+  /** マイページのクーポン（lucide tag と同じ線） */
+  tag: [
+    <path key="a" d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />,
+    <circle key="c" cx="7.5" cy="7.5" r=".5" />,
+  ],
+  /** 予約の履歴の領収書（lucide receipt と同じ線） */
+  receipt: [
+    <path key="a" d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />,
+    <path key="b" d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />,
+    <path key="c" d="M12 17.5v-11" />,
+  ],
+  /** 外のページが開く（lucide external-link と同じ線） */
+  'external-link': [
+    <path key="a" d="M15 3h6v6" />,
+    <path key="b" d="M10 14 21 3" />,
+    <path key="c" d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />,
+  ],
 } as const;
 
 export type IconName = keyof typeof PATHS;
 
-export default function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
+export default function Icon({ name, className = 'h-5 w-5', tone }: { name: IconName; className?: string; tone?: 'info' | 'booking-info' }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -246,7 +302,9 @@ export default function Icon({ name, className = 'h-5 w-5' }: { name: IconName; 
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
+      className={`${className} ${tone === 'info' ? styles.info : tone === 'booking-info' ? styles.bookingInfo : ''}`}
+      data-liff-icon={name}
+      data-liff-icon-tone={tone}
       aria-hidden="true"
     >
       {PATHS[name]}

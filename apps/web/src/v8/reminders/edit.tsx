@@ -53,6 +53,8 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
+import Card, { CardHeader } from '@/components/shared/card'
+import { CreateCompletionHeading } from '@/components/templates/create-parts'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -800,7 +802,7 @@ function BasicsStageV8({
 
   return (
     <CreatePage
-      {...frame}
+      {...frame} previewLabel="設定内容を見る" previewTitle="設定内容"
       preview={(
         <>
           <SummaryCardV8
@@ -1040,7 +1042,7 @@ export function TargetStageV8({
           >
             <RefreshCw size={15} aria-hidden="true" />数え直す
           </Button>
-          <span className={styles.countNote}>数秒〜1分（1,000人ごとに約10秒）</span>
+          <span className={styles.countNote} title="数え直しにかかる時間：数秒〜1分（1,000人ごとに約10秒）">数秒〜1分</span>
         </div>
         {recountError ? <p className={styles.fieldNote}>対象者を数え直せませんでした。保存済みの人数を表示しています。</p> : null}
         {validationFailed ? <p className={styles.fieldNote}>公開前チェックを実行できませんでした。人数は未取得のままです。</p> : null}
@@ -1288,10 +1290,10 @@ function MessagesStageV8({
                     {stepShortTiming(step, settings.deliveryMode)}
                   </button>
                   <span className={styles.spacer} aria-hidden="true" />
-                  <Button type="button" variant="text" disabled={!stepOrder.canMoveBy(step.stableStepId, -1)} onClick={() => stepOrder.moveBy(step.stableStepId, -1, 'menu')}>
+                  <Button type="button" variant="text" title={stepOrder.moveReason(step.stableStepId, -1) ?? undefined} disabled={!stepOrder.canMoveBy(step.stableStepId, -1)} onClick={() => stepOrder.moveBy(step.stableStepId, -1, 'menu')}>
                     <ArrowUp size={15} aria-hidden="true" />前へ
                   </Button>
-                  <Button type="button" variant="text" disabled={!stepOrder.canMoveBy(step.stableStepId, 1)} onClick={() => stepOrder.moveBy(step.stableStepId, 1, 'menu')}>
+                  <Button type="button" variant="text" title={stepOrder.moveReason(step.stableStepId, 1) ?? undefined} disabled={!stepOrder.canMoveBy(step.stableStepId, 1)} onClick={() => stepOrder.moveBy(step.stableStepId, 1, 'menu')}>
                     <ArrowDown size={15} aria-hidden="true" />後ろへ
                   </Button>
                   <Button type="button" variant="text" disabled={settings.steps.length <= 1} onClick={() => removeStep(step.stableStepId)}>
@@ -1836,14 +1838,10 @@ export function DoneStageV8({
     <PageFrame kind="create" boardId={boardId}>
       <PageHeading {...heading} />
       <div className={styles.doneBody}>
-        <div className={styles.doneCard}>
-          <span className={styles.doneIcon}>
-            <Check size={24} aria-hidden="true" />
-          </span>
-          <h2 className={styles.doneTitle}>「{settings.name}」を有効にしました</h2>
-          <p className={styles.doneNote}>
+        <Card variant="form" className={styles.doneCard}>
+          <CreateCompletionHeading icon={<Check />} title={`「${settings.name}」を有効にしました`}>
             これから{settings.triggerType === 'friend_field' ? '基準日が入った人' : '予約が入った人'}にも、自動で予定が作られます。止めたいときは、詳細の「一時停止する」から止められます。
-          </p>
+          </CreateCompletionHeading>
           <dl className={styles.doneFacts}>
             <div className={styles.doneFact}>
               <dt>最初に送る</dt>
@@ -1863,7 +1861,7 @@ export function DoneStageV8({
               <ArrowRight size={15} aria-hidden="true" />詳細を見る
             </Button>
           </div>
-        </div>
+        </Card>
       </div>
     </PageFrame>
   )

@@ -8,6 +8,7 @@ import { CONFIRM_WIDTH } from './destination-policy'
 
 interface ConfirmDialogProps {
   open: boolean
+  contentLayout?: 'form'
   title: string
   /** 削除の対象名。削除の題と実行ボタンの文言は共通部品が持つ。 */
   deleteName?: string
@@ -38,7 +39,7 @@ interface ConfirmDialogProps {
    */
   children?: ReactNode
   /** 見出しの左に置く絵。危険な操作は警告、と一目で分かるようにする。 */
-  titleIcon?: ReactNode
+  titleIcon?: ReactNode | false
   /** 実行ボタンの中、文字の左に置く絵。 */
   confirmIcon?: ReactNode
   /** この確認画面に対応するPencilの実Node。 */
@@ -50,6 +51,8 @@ interface ConfirmDialogProps {
   /** ★V8：絵の窓の幅 px（Dialog の designWidth と同じ）。 */
   designLayout?: 'stacked'
   footerAlign?: 'center' | 'start'
+  /** 下の帯の左に置く一言（例「閉じても送りません」）。 */
+  footerLead?: ReactNode
   /** 絵で操作の間隔が指定されている窓だけに使う。 */
   designFooterGap?: number
   confirmFirst?: boolean
@@ -70,6 +73,9 @@ interface ConfirmDialogProps {
   onConfirm?: () => void
   /** 実行ボタンを押せない形で出す（WEB228：確かめのチェックが入るまで）。 */
   confirmDisabled?: boolean
+  confirmDisabledReason?: string
+  actionWidthReserve?: 'states' | 'idle'
+  confirmPlacement?: 'start'
   onCancel: () => void
 }
 
@@ -78,6 +84,7 @@ export { deleteConfirmationTitle, normalizeDeleteTitle } from './delete-confirma
 /** ブラウザ標準 confirm の代わりに使う、管理画面共通の確認ダイアログ。 */
 export default function ConfirmDialog({
   open,
+  contentLayout,
   title,
   deleteName,
   description,
@@ -99,12 +106,16 @@ export default function ConfirmDialog({
   size,
   designLayout,
   footerAlign,
+  footerLead,
   designFooterGap,
   confirmFirst,
   designTop,
   primaryAction = 'confirm',
   onConfirm,
   confirmDisabled = false,
+  confirmDisabledReason,
+  actionWidthReserve,
+  confirmPlacement,
   onCancel,
 }: ConfirmDialogProps) {
   const [executing, setExecuting] = useState(false)
@@ -133,7 +144,7 @@ export default function ConfirmDialog({
    * 「完了・成功」の意味なので、まだ何も済んでいない窓には出さない。
    * 危険な操作の警告印は従来どおり残す。
    */
-  const shownTitleIcon = titleIcon ?? (primaryAction === 'cancel'
+  const shownTitleIcon = titleIcon === false ? undefined : titleIcon ?? (primaryAction === 'cancel'
     ? undefined
     : destructive
       ? <TriangleAlert size={22} />
@@ -143,6 +154,7 @@ export default function ConfirmDialog({
   return (
     <Dialog
       open={open}
+      contentLayout={contentLayout}
       title={deleteName !== undefined ? deleteConfirmationTitle(deleteName) : isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}
       description={description}
       tone={destructive ? 'destructive' : 'default'}
@@ -152,6 +164,9 @@ export default function ConfirmDialog({
       cancelLabel={cancelLabel}
       busy={busy || executing}
       confirmDisabled={confirmDisabled}
+      confirmDisabledReason={confirmDisabledReason}
+      actionWidthReserve={actionWidthReserve}
+      confirmPlacement={confirmPlacement}
       error={error || executionError}
       primaryAction={primaryAction}
       titleIcon={shownTitleIcon}
@@ -163,6 +178,7 @@ export default function ConfirmDialog({
       designWidth={designWidth ?? (size ? undefined : CONFIRM_WIDTH)}
       designLayout={designLayout}
       footerAlign={footerAlign}
+      footerLead={footerLead}
       designFooterGap={designFooterGap}
       confirmFirst={confirmFirst}
       designTop={designTop}

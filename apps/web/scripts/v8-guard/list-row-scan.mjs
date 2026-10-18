@@ -17,7 +17,13 @@ export function scanListRows() {
     }
     for (const name of row.querySelectorAll('[data-list-name]')) {
       if (!visible(name)) continue
-      if (name.querySelectorAll('[data-folder-dot]').length !== 1) failures.push('B-194 名前の丸なし')
+      // X2: capability survives a collapsed folder column; a folderless list
+      // must not invent an unclassified folder. Unknown scopes retain B-194.
+      const folderScope = name.closest('[data-list-folders]')
+      const dotCount = name.querySelectorAll('[data-folder-dot]').length
+      if (folderScope?.dataset.listFolders === 'false') {
+        if (dotCount !== 0) failures.push('X2 フォルダ機能なしの丸')
+      } else if (dotCount !== 1) failures.push('B-194 名前の丸なし')
       const cell = name.closest('td, [role="cell"]')
       if (cell?.querySelector('[data-design-node="xRvDB"], [data-status-pill]')) failures.push('B-194 名前の中の状態')
       if (cell) {

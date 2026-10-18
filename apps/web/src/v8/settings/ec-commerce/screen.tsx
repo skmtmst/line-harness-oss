@@ -1,11 +1,12 @@
 'use client'
+import { ACTION_STATUS, FAILURE_KIND_LABEL } from './execution-status'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { notifySaved } from '@/components/shared/toast'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { CircleDot, Plug, Star } from 'lucide-react'
+import { CircleDot, Plug, Star, CircleCheck, Clock, CircleSlash, TriangleAlert } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
@@ -14,10 +15,10 @@ import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import TruncatedText from '@/components/shared/truncated-text'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -28,7 +29,6 @@ import {
   type EcActionExecutionList,
   type EcActionExecutionStatus,
   type EcCommerceOverview,
-  type EcFailureKind,
   type EcOrder,
 } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -36,8 +36,9 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import EcConnector from './connector'
 import EcSubscriptions from './subscriptions'
+import EcAutoLine from '../../ec-auto-line/auto-line'
 import { Tabs } from '@/components/shared/tabs'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
@@ -46,45 +47,18 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
-/*
- * ★V8 EC連携（Pencil `GmVR5`。つなぎ先は `iLJmw`、定期便は `wqC8x`）。
- *
- * 取り込みの記録（出来事ごとの処理）の動きは今までの画面（app/ec-commerce/page.tsx の EventsPanel）と同じ：
- * アカウントと一体で持つ値（#685）・サーバ側の絞り込みとページ送り・検索の遅らせ・もう一度やる（409 の読み直し）・
- * 注文の状況のパネル。処理はここへ写した（src/v8 は @/app を読めない）。
- * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
+/** 出来事ごとの取り込みを表示し、再実行時も版と対象アカウントを保持する。 */
 
-export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
+export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'auto-line' | 'connector'
 
 const TABS: ReadonlyArray<{ key: EcTabKey; label: string; href: string }> = [
   { key: 'events', label: '取り込みの記録', href: '/ec-commerce' },
   { key: 'identity', label: '会員のつき合わせ', href: '/ec-commerce/identity-candidates' },
   { key: 'subscriptions', label: '定期便', href: '/ec-commerce?tab=subscriptions' },
+  { key: 'auto-line', label: '自動の LINE', href: '/ec-commerce?tab=auto-line' },
   { key: 'connector', label: 'つなぎ先', href: '/ec-commerce?tab=connector' },
 ]
 
-/* 失敗・見送りの分類（app/ec-commerce/ec-failure.ts の写し。表示語だけ）。 */
-const FAILURE_KIND_LABEL: Record<EcFailureKind, string> = {
-  unlinked: '未連携',
-  not_following: 'フォロー外',
-  permission: '権限・認証',
-  communication: '通信の失敗',
-  rejected: '送信の拒否',
-  by_setting: '設定で停止',
-  internal: '処理の失敗',
-}
-
-type StatusTone = StatusBadgeTone
-const ACTION_STATUS: Record<EcActionExecutionStatus, { label: string; tone: StatusTone }> = {
-  pending: { label: '処理中', tone: 'info' },
-  processing: { label: '処理中', tone: 'info' },
-  succeeded: { label: '処理完了', tone: 'success' },
-  skipped: { label: '送信なし', tone: 'neutral' },
-  retryable_failed: { label: '失敗', tone: 'danger' },
-  permanent_failed: { label: '失敗', tone: 'danger' },
-}
 
 /* 「したこと」列。worker が実際に行う処理を運用の言葉で書く（今の画面と同じ）。 */
 const ACTION_LABEL: Record<string, string> = {
@@ -353,10 +327,10 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
   return (
     <>
       <KpiBand presentation="band">
-        <KpiCard presentation="band" icon={null} title="処理完了" value={listedSummary?.succeeded ?? null} unit="" detail="件" loading={listState === 'loading'} />
-        <KpiCard presentation="band" icon={null} title="処理中" value={processingCount ?? null} unit="" detail="件" loading={listState === 'loading'} />
-        <KpiCard presentation="band" icon={null} title="送信なし" value={listedSummary?.skipped ?? null} unit="" detail="件・送る設定がない" loading={listState === 'loading'} />
-        <KpiCard presentation="band" icon={null} title="失敗" value={failedCount ?? null} unit="" detail="件" valueTone={failedCount ? 'warning' : 'default'} loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<CircleCheck size={14} aria-hidden="true" />} title="処理完了" value={listedSummary?.succeeded ?? null} unit="件" detail={null} loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<Clock size={14} aria-hidden="true" />} title="処理中" value={processingCount ?? null} unit="件" detail={null} loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<CircleSlash size={14} aria-hidden="true" />} title="送信なし" value={listedSummary?.skipped ?? null} unit="件" detail="送る設定がない" loading={listState === 'loading'} />
+        <KpiCard presentation="band" icon={<TriangleAlert size={14} aria-hidden="true" />} title="失敗" value={failedCount ?? null} unit="件" detail={null} valueTone={failedCount ? 'warning' : 'default'} loading={listState === 'loading'} />
       </KpiBand>
       {kpiDetailMissing ? (
         <p className={styles.minor} role="status">
@@ -461,7 +435,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
                   <Td><span className={styles.text} title={amount ? `${contents}・${amount}` : contents}>
                     {amount ? `${contents}・${amount}` : contents}
                   </span></Td>
-                  <Td><span className={styles.done}>{actionDone(action)}</span></Td>
+                  <Td><TruncatedText value={actionDone(action)} /></Td>
                   <Td><span className={styles.stack}>
                     <StatusBadge tone={statusInfo.tone} size="compact">{actionStatusLabel(action)}</StatusBadge>
                     {action.failureKind && action.status !== 'succeeded'
@@ -496,7 +470,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
             <ListRange label="取り込みの記録" total={actionTotal} first={(page - 1) * ACTION_PAGE_SIZE + 1} last={(page - 1) * ACTION_PAGE_SIZE + actions.length} />
             {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : emptyValue('unknown')}件。注文の本文や接続用の秘密値は表示しません。`}
           </span>
-          {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
+          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       ) : null}
       {/* ★V8-B nAesv：注文の状況の引き出し（同じ場所の order-drawer.tsx）。 */}
@@ -536,7 +510,7 @@ export function EcTabsV8({ accountId, active, actions }: { accountId: string | n
   }, [accountId])
   return (
     <Tabs size="settings" actions={actions} label="EC連携の中の切り替え" items={TABS.map((tab) => {
-      const count = tab.key === 'connector' || tab.key === 'subscriptions' ? undefined : counts[tab.key]
+      const count = tab.key === 'connector' || tab.key === 'subscriptions' || tab.key === 'auto-line' ? undefined : counts[tab.key]
       return { label: count === undefined ? tab.label : `${tab.label} ${formatNumber(count)}`, href: tab.href, current: active === tab.key }
     })} />
   )
@@ -555,8 +529,9 @@ export default function EcCommerceScreen({
   const actions = <Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={styles.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>
   return (
     <SbSettingsScreen
-      boardId={tab === 'subscriptions' ? 'wqC8x' : tab === 'connector' ? 'iLJmw' : 'GmVR5'}
+      boardId={tab === 'subscriptions' ? 'wqC8x' : tab === 'connector' ? 'iLJmw' : tab === 'auto-line' ? 'TSRlY' : 'GmVR5'}
       layout="narrow-nav"
+      contentLayout="wide"
       title="EC連携"
       help="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
       actions={actions}
@@ -564,6 +539,7 @@ export default function EcCommerceScreen({
       <EcTabsV8 accountId={selectedAccountId} active={tab} />
       {tab === 'events' ? <EventsPanel accountId={selectedAccountId} canEdit={canEdit} /> : null}
       {tab === 'subscriptions' ? <EcSubscriptions accountId={selectedAccountId} canEdit={canEdit} /> : null}
+      {tab === 'auto-line' ? <EcAutoLine accountId={selectedAccountId} canEdit={canEdit} /> : null}
       {tab === 'connector' ? (renderConnector ? renderConnector(selectedAccountId, canEdit) : <EcConnector accountId={selectedAccountId} canEdit={canEdit} />) : null}
     </SbSettingsScreen>
   )

@@ -43,10 +43,15 @@ function setup() {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
   db.exec(legacy);
+  // 652 は 382 より後。SQLのCASEとENDを切らず、後年の4つの参照元だけを外す。
+  for (const trigger of ['style_bookings_stage','style_meet_consultations_stage','style_membership_insert','style_membership_update'])
+    db.exec(`DROP TRIGGER ${trigger}`);
   // 541 が 382 より後に tag_update_requests（tags への外部キー付き）を作った。
   // 移行前の姿を再現するこの器には含めない。残すと 382 自身の番兵
   // （参照数=14・未知の参照があれば中止）が正しく止めてしまう。
   db.exec('DROP TABLE IF EXISTS tag_update_requests');
+  // 717/721 are later than 382; their rank-to-tag reference must not enter the historical 14-reference fixture.
+  db.exec('DROP TABLE member_rank_notices; DROP TABLE member_ranks; DROP TABLE member_rank_tiers');
   for (let i = 1; i <= 3; i++) insert(db, 'line_accounts', {
     id: `account-${i}`, channel_id: `fixture-channel-${i}`, name: `店舗${i}`,
     channel_access_token: 'fixture', channel_secret: 'fixture',

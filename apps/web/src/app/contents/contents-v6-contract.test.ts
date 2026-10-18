@@ -74,7 +74,8 @@ describe('V8 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('aria-label="並べ方"')
     expect(PAGE).toContain('格子で並べる')
     expect(PAGE).toContain('一覧で並べる')
-    expect(PAGE).toContain('aria-pressed={view === value}')
+    expect(PAGE).toContain('<SegmentedControl<MediaView>')
+    expect(PAGE).toContain('value={view} onChange={setView}')
   })
 
   it('フォルダを取得し、未分類と分けて一覧を絞り込む', () => {

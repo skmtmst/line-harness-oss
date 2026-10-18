@@ -61,6 +61,94 @@ Sandbox のテスト店舗は自分で作れず、Integration Tech Support へ�
 テスト用アプリの作成と権限付与は自分でできます。
 出典：https://developer.uber.com/docs/eats/guides/sandbox
 
+## 4-2. 弊社の本番 Uber アカウント（店舗）をテストに使えるか（2026-10-16 判定）
+
+利用者からの問い：**「本番アカウントに繋げられるのか。店舗IDがあれば問題ないのか」**
+
+**答え：店舗IDだけでは繋がりません。足りないのは店舗側の情報ではなく、弊社アプリ側の資格です。**
+壁は2つあり、どちらも店舗IDでは越えられません。
+
+### 壁1：弊社アプリがまだ本番側の登録簿にいない
+
+| 根拠 | 出典 |
+| --- | --- |
+| 弊社アプリ `musubo POS Integration` は開発者画面の表示が **TEST APP**。`Create Prod App` は押せない | §5-2 |
+| 本番の権限（`eats.pos_provisioning`）は「Uber の個別審査が先」 | §5-2・§3 |
+| 開発者画面の **Integration Verification Result が未完了** | §7 |
+| 実機で本番側 `auth.uber.com` へ繋いだ結果は `invalid_client`（＝本番の登録簿から弊社の `client_id` を引けない） | §7-2 |
+
+**つまり本番の店舗IDを持っていても、いまのアプリでは認可画面すら出ません。**
+これは設定の不足ではなく、審査前という状態そのものによる仕様どおりの結果です（§5-2 の訂正）。
+
+### 壁2：Sandbox と本番は別の世界で、店舗IDは行き来しない
+
+接続先が認証・API ともホスト単位で分かれており（§5-2）、
+**本番に登録された店舗は Sandbox の `test-api.uber.com` 側には存在しません。**
+Sandbox で `GET /v1/eats/stores` に出るのは Uber が払い出すテスト店舗だけです（§4）。
+本番の店舗IDを Sandbox 設定（`RT_DELIVERY_UBEREATS_ENVIRONMENT=sandbox`）のまま渡しても、
+相手側に該当する店舗が無いため照合できません。
+
+### 仮に本番側へ向けた場合に起きること（だから今はやりません）
+
+- 本番で繋ぐには §3 の手続きが順に必要です。Integration Verification（Uber 立ち会いの通し試験）
+  → 本番アプリ作成 → Scope Whitelisting → パイロット店舗で最低3日・注文投入成功率 98% 以上。
+- `POST /pos_data` で有効化した本番店舗には、**実際のお客様の注文が musubo へ流れ始めます**（§5）。
+  試験のために本番店舗を繋ぐのは、実注文を試験に巻き込むことになります。
+- したがって `RT_DELIVERY_UBEREATS_ENVIRONMENT` を本番へ切り替える作業は、
+  審査が通るまで行いません。
+
+### 本番アカウントが要るのはこの後の工程
+
+無駄にはなりません。**Integration Verification の通し試験とパイロット店舗の3日稼働**で、
+弊社の本番 Uber アカウントと実店舗が必要になります。
+いまの段階で使う先が無いだけで、順番が後ろにあるという関係です。
+
+### 結論と待ち物
+
+テスト接続の待ち物は **Sandbox のテスト店舗の払い出し（Uber からの返信）1つ**で、
+本番アカウントで代替することはできません（§8 項目6）。利用者の操作は不要です。
+
+## 4-3. Uber の連絡先（2026-10-16 調査・出典の有無で分けた）
+
+利用者からの問い：**「問い合わせ先がフォームしかない。開発のメール窓口はないか」**
+
+**Uber は開発者向けのメールアドレスを公開していません。** 公式ページが示す人への経路は
+**フォーム**と**パートナー担当者**の2つだけです。
+
+### Uber 自身のページで確認できたもの
+
+| 窓口 | 値 | 出典 |
+| --- | --- | --- |
+| Integration Tech Support フォーム | `http://t.uber.com/integration-support` | https://developer.uber.com/docs/eats/guides/getting-started（「Technical questions and issues」） |
+| Uber Eats パートナー担当者 | 個別（弊社の担当者） | 同上。`Partner Approval` の前提として「Speak with your Uber Eats partner manager」 |
+| Uber Eats Japan 代表メール | `uber.japan@uber.com` | 特定商取引法に基づく表示（help.uber.com）。会員・一般窓口で開発用ではない |
+| Uber Eats Japan 代表電話 | `03-4588-5452`（10:00–19:00） | 同上。総務／Eats JP 共通と記載 |
+
+developer.uber.com の該当ページには**メールアドレス・電話番号・Slack 等は一切載っていません**。
+加盟店向けの POS 連携のヘルプ記事（help.uber.com）も、連絡手段はフォームだけでした。
+
+### 検索では出るが Uber の公式ページで裏が取れなかったもの（使用前に要確認）
+
+`eats-partner-tech-support@uber.com` ／ `r.jp@uber.com` ／ `restaurants@uber.com`。
+いずれも第三者サイトや検索結果の要約にのみ現れ、Uber 自身のページでは確認できませんでした。
+**実在・現役である保証がないため、重要な依頼の唯一の宛先にはしません。**
+
+### フォームより確実な経路（弊社の状況に固有）
+
+§3 の事前手続きには「**Uber Eats のパートナー担当者の承認**」が含まれ、これは
+フォームではなく**担当者を通す工程**です。弊社はすでに本番の Uber Eats 加盟店アカウントを
+持っているため（§4-2）、**その加盟店に付いているアカウント担当者が、そのまま開発側の
+取次ぎ役になり得ます。**
+
+依頼する内容は次の2点で、フォームへ送った内容（§7-2 の控え）と同じです。
+
+1. Sandbox のテスト店舗の払い出し
+2. Integration Verification と本番アプリの権限開放（Scope Whitelisting）の進め方
+
+担当者が分からない場合の確認先は、Uber Eats Manager（加盟店管理画面）のヘルプ、
+または上記の代表窓口です。**フォームの返信を待ちながら並行して当たれます**（二重依頼には
+ならない。フォームは技術窓口、担当者は営業・契約窓口）。
+
 ## 5. 公式仕様の要点（実装の根拠）
 
 出典：https://developer.uber.com/docs/eats/guides/authentication ／
@@ -69,9 +157,7 @@ https://developer.uber.com/docs/eats/api/webhooks
 
 | 項目 | 仕様 |
 | --- | --- |
-| 認可画面 | `https://auth.uber.com/oauth/v2/authorize` |
-| トークンの口 | `https://auth.uber.com/oauth/v2/token` |
-| API の土台 | `https://api.uber.com` |
+| 接続先 | **アプリの種類で分かれる**（下の §5-2） |
 | 権限（店舗の認可） | `eats.pos_provisioning`（店舗一覧の取得と連携の有効化だけ） |
 | 権限（日々の運用） | `eats.store`／`eats.store.status.write`／`eats.order`／`eats.store.orders.read` |
 | 2種の認可 | `authorization_code`（店舗の認可）と `client_credentials`（運用）。**権限を混ぜて要求できない** |
@@ -83,13 +169,46 @@ https://developer.uber.com/docs/eats/api/webhooks
 | 店舗一覧 | `GET /v1/eats/stores`（外部店舗IDは変わりうるので単独の照合キーにしない） |
 | 連携の操作 | `POST`（有効化・本文なしの200）／`GET`（状態）／`PATCH`（一時停止）／`DELETE`（解除）`/v1/eats/stores/{store_id}/pos_data` |
 
-### 以前の未確認2点（2026-10-13 解決・Uber への問い合わせは不要）
+## 5-2. 接続先は「アプリの種類」で分かれる（2026-10-15 判明）
 
-1. **認可画面のURLは `auth.uber.com` です。** 公式の OAuth 資料がこちらで、
-   `login.uber.com` は乗り手側の案内に出てくる別のホストでした。
-   実装 `apps/worker/src/services/uber-eats.ts` はすでに `auth.uber.com` を使っており、
-   **コードの変更は不要**です。問い合わせも立てていません。
-2. **戻り先URL（`redirect_uri`）は Uber の開発者画面に自分で登録します。** 申請は不要でした。
+出典：https://developer.uber.com/docs/eats/guides/sandbox
+
+Uber は審査前の **TEST APP（Sandbox）** と審査後の **PRODUCTION APP** で接続先そのものを分けています。
+
+| | TEST APP（Sandbox） | PRODUCTION APP |
+| --- | --- | --- |
+| 認証 | `https://sandbox-login.uber.com` | `https://auth.uber.com` |
+| API | `https://test-api.uber.com` | `https://api.uber.com` |
+| 権限 | Sandbox のホストに限り**自動で付く** | Uber の個別審査が必要 |
+
+公式の注意書き：
+
+- 「トークンを取る先」と「APIを呼ぶ先」は必ず同じ側に揃える。混ぜると認証が落ちる。
+- TEST APP は Sandbox のホストを使わなければならない。
+- Sandbox が通っても本番が通るとは限らない。
+
+公式の切り分け表は、誤った組み合わせの例として
+**「テスト用アプリで `auth.uber.com` を使う」**を名指ししています。
+
+弊社のアプリ（`musubo POS Integration`）は開発者画面の表示が **TEST APP** で、
+`Sandbox Access Granted` は済み、`Create Prod App` は押せません。
+つまり**いま使える側は Sandbox だけ**です。
+
+### 以前の「解決済み」の訂正
+
+2026-10-13 に「認可画面のURLは `auth.uber.com`、**コードの変更は不要**」と記録しましたが、
+**これは誤りでした。** TEST APP と PRODUCTION APP でホストが分かれることを見落としており、
+`auth.uber.com` と `api.uber.com` は**本番側の値**です。審査前の弊社アプリから本番側のホストを
+呼んでいたため、認証が通らないのは仕様どおりの結果でした（§7-2 のエラーもこれで説明が付きます）。
+
+なお `login.uber.com` が乗り手側の別ホストであることは変わりません。
+Sandbox 側の**認可画面**のURLは公式の手引きに載っていないため、認証ホストから組んだ
+推定値を使っており、まだ実際には確かめていません（`uber-eats-hosts.ts` の説明書きに明記）。
+最初の接続確認は `client_credentials`（トークンの口だけ）で行うため、そこでは推定値を踏みません。
+
+### 以前の未確認点（2026-10-13 解決・Uber への問い合わせは不要）
+
+1. **戻り先URL（`redirect_uri`）は Uber の開発者画面に自分で登録します。** 申請は不要でした。
    利用者が開発者画面で該当欄を見つけて設定済みです（2026-10-13）。
    登録した文字列は上の組み立て結果と同じ
    `https://stg-api.musubo.jp/api/restaurant-test/delivery/ubereats/oauth/callback` のため、
@@ -111,7 +230,18 @@ https://developer.uber.com/docs/eats/api/webhooks
   | `RT_DELIVERY_UBEREATS_CLIENT_ID` | Uber の開発者画面の Application ID |
   | `RT_DELIVERY_UBEREATS_CLIENT_SECRET` | 同じアプリの Client Secret（受信の署名の鍵も兼ねる） |
 
-  **入れるのはこの2つだけです。** 戻り先URLは配備の設定 `WORKER_PUBLIC_URL` と決まった道
+  これに加えて、接続先を選ぶ**秘密でない**設定が1つあります（§5-2）。
+
+  | 変数名 | 入れるもの |
+  | --- | --- |
+  | `RT_DELIVERY_UBEREATS_ENVIRONMENT` | `sandbox` のときだけ TEST APP 側へ向ける。未設定・`production` は本番側 |
+
+  検証環境（`nen-line-stg`）は弊社アプリが TEST APP のため **`sandbox`** を入れます。
+  想定外の文字列（`stg`・`test` など書き間違い）は本番側へ落とさず「連携の設定ができていない」
+  として扱い、連携の口を開けません。黙って本番の店舗へ出てしまうより、つながらないことで
+  配備の誤りに気づける方を選んでいます。
+
+  **秘密設定として入れるのは上の2つだけです。** 戻り先URLは配備の設定 `WORKER_PUBLIC_URL` と決まった道
   `/api/restaurant-test/delivery/ubereats/oauth/callback` から組み立てます（Google 接続と同じ考え方で、
   呼び出し元のホストからは作りません。入口と戻り先が1文字でも違うと Uber 側ではじかれるためです）。
   検証環境では `https://stg-api.musubo.jp/api/restaurant-test/delivery/ubereats/oauth/callback` になります。
@@ -215,59 +345,74 @@ Cloudflare の `RT_DELIVERY_UBEREATS_CLIENT_ID` へ入れた値は、Uber 開発
 **`Client ID` という欄**からコピーしたものでした（値は確認していません）。
 したがって候補 A（別欄の取り違え）は後退し、**候補 B が残ります**。
 
-### 結論と次の1手
+### 結論（2026-10-13 時点・この後 2026-10-15 に訂正）
 
-**musubo 側に直す箇所はありません。** Uber の認可サーバがこのアプリの `client_id` を
-まだ受け付けていない状態で、§7 の **Integration Verification Result 未完了**
-＝ `eats.pos_provisioning` の Scope Whitelisting が済んでいないことが原因と判断します。
+当時は「**musubo 側に直す箇所はありません**。Scope Whitelisting 未了が原因」と判断し、
+Integration Tech Support への依頼を次の1手としていました。
 
-次は利用者が Integration Tech Support Form（`http://t.uber.com/integration-support`）へ
-下の下書きを出し、(1) Integration Verification の実施、(2) `client_id` の Scope Whitelisting、
-(3) Sandbox のテスト店舗（§4）をまとめて依頼します。
+### 原因の訂正（2026-10-15）
 
-> 残り3.5%の確認（任意）：コピーの途中切れでも同じエラーになります。
-> 画面の `Client ID` の**文字数**と、Cloudflare に入れた値の**文字数**が同じかだけ見ておくと確実です。
-> 値そのものは見せないでください。
+**上の結論は誤りでした。musubo 側に直す箇所がありました。**
 
-### Integration Tech Support への依頼文（下書き・`<>` は利用者が埋める）
+公式の Sandbox の手引き（§5-2）に、審査前の TEST APP は Sandbox のホストを使わねばならず、
+**テスト用アプリで `auth.uber.com` を使うのは誤った組み合わせ**だと明記されています。
+弊社アプリは TEST APP で `Sandbox Access Granted` が済んでいるため、認可を受けられない状態
+ではなく、**向ける先が本番側だったために本番の登録簿から引けなかった**と読むのが筋が通ります。
+
+当時の切り分けで見落としたのは次の2点です。
+
+- 候補を A（値の取り違え）と B（Uber 側の未承認）の2つに絞り、
+  **C：アプリの種類と接続先の不一致**を立てていなかった。
+- 開発者画面に `Client ID` という欄は無く、あるのは `Application ID` と `Client Secret` です。
+  §7-2 の「利用者の確認結果」が指す `Client ID` の欄は実在しないため、候補 A の後退も
+  根拠が弱いままでした（なお `client_id` に Application ID を入れる前提自体は変えていません）。
+
+したがって Integration Tech Support への依頼（下の下書き）は、**まず Sandbox で接続を試す前の
+必須ではなくなりました**。残る用途は §4 の **Sandbox のテスト店舗の払い出し依頼**だけです。
+
+次の1手は `RT_DELIVERY_UBEREATS_ENVIRONMENT=sandbox` を検証環境へ入れ、
+`client_credentials` で Sandbox のトークンを1回取ることです（§8）。
+
+### Integration Tech Support への依頼文（送信済み・以下は送った内容の記録）
+
+> **この依頼は送信済みです。** 利用者が Integration Tech Support Form から送信しており、
+> **2026-10-16 現在 Uber からの返信はありません**（送信日の記録は台帳に残していません）。
+> 以下は送った内容の控えで、**これから送るための下書きではありません。再送は不要です。**
+
+2026-10-13 版の下書きは「権限の許可（whitelisting）と Integration Verification を依頼する」
+内容でしたが、原因が接続先の不一致だと分かったため**用途を1つに絞りました**。
+いま頼むことは §4 の **Sandbox のテスト店舗の払い出し**だけです。
+`Client ID` の欄は開発者画面に存在しないため、`Application ID` と書き換えています。
+この依頼は Sandbox の接続確認（§8-6）より先に出す必要がなく、実際に §6-4 の
+トークン1回の確認はこの返信を待たずに成功しています。
 
 ```
-Subject: POS integration verification & eats.pos_provisioning whitelisting request
+Subject: Request to provision a Sandbox test store
 
 Company / Integrator: musubo (<legal entity name>)
 Integration name: musubo POS Integration
 App name in Developer Dashboard: <app name> (TEST APP)
-Client ID: <paste from Developer Dashboard>
+Application ID: <paste from Developer Dashboard>
 Region / Market: Japan
 Contact: <email>
 
-What we have completed
+Current status
 - API Suite: Eats Marketplace selected
 - App registered, authentication method: Client Secret
-- 5 of the 6 onboarding steps are green; "Integration Verification Result" is the only
-  remaining item
+- Sandbox Access Granted
 - OAuth redirect URI registered:
   https://stg-api.musubo.jp/api/restaurant-test/delivery/ubereats/oauth/callback
 - Implemented and unit-tested on our side: authorization-code flow (authorize URL,
   callback, token exchange, 30-day re-acquisition), GET /v1/eats/stores,
   POST/GET/PATCH/DELETE /v1/eats/stores/{store_id}/pos_data,
   webhook signature verification (X-Uber-Signature, HMAC-SHA256)
+- Our client now targets the sandbox domains (sandbox-login.uber.com /
+  test-api.uber.com) for this testing application.
 
-Problem we are blocked on
-When a merchant starts the flow from our settings screen, the browser reaches
-https://auth.uber.com/oauth/v2/authorize with
-  client_id=<our client id>&response_type=code
-  &redirect_uri=https://stg-api.musubo.jp/api/restaurant-test/delivery/ubereats/oauth/callback
-  &scope=eats.pos_provisioning&state=<random>
-and Uber returns:
-  https://auth.uber.com/oauth/errors?error=invalid_client
-  &error_description=we were unable to fetch client metadata
-We believe our client is not yet whitelisted for eats.pos_provisioning.
-
-Requests
-1. Please schedule / proceed with Integration Verification for this app.
-2. Please whitelist the above Client ID for the eats.pos_provisioning scope.
-3. Please provision a Sandbox test store so we can complete end-to-end testing.
+Request
+Please provision a Sandbox test store for this application so that we can complete
+end-to-end testing (store listing, POS data activation, and order webhooks) before
+requesting production access.
 ```
 
 ## 8. 残件と次の1手
@@ -275,9 +420,16 @@ Requests
 1. ~~利用者が設計案（v03）を承認する。~~ → 2026-10-12 承認済み。設定画面も実装済み。
 2. 開発者アカウント登録・NDA・API 利用契約・パートナー担当者の承認（利用者の署名が必要）。
    → ダッシュボード上は 6手順のうち5つが完了。残るのは Integration Verification Result。
-   依頼の口は Integration Tech Support Form（`http://t.uber.com/integration-support`）で、
+   **これは本番アカウント（PRODUCTION APP）を開くための手順で、Sandbox の接続確認の
+   前提ではありません**（§5-2）。`Sandbox Access Granted` は済んでいます。依頼の口は
+   Integration Tech Support Form（`http://t.uber.com/integration-support`）で、
    Uber 立ち会いの通し試験を経て本番アカウントが開きます。
-3. Sandbox のテスト店舗を Integration Tech Support へ依頼。
+3. Sandbox のテスト店舗を Integration Tech Support へ依頼（上の下書き）。
+   店舗一覧・`POST /pos_data`・注文の通知まで通すときに必要になります。
+   トークンを1回取るだけの確認（下の 6）には要りません。
+   → **送信済み**。2026-10-13 ごろのやりとりで利用者が Integration Tech Support Form から
+   送信しており、**2026-10-16 現在 Uber からの返信はありません**（送信日の記録は残していません）。
+   **再送・利用者への再依頼は不要**です。返信が来たら店舗IDを受け取って先へ進みます。
 4. ログイン連携の裏側（認可画面への受け渡し、戻り先の受け口、トークンの保存と30日ごとの更新、
    店舗一覧の取得、`POST /pos_data`）を実装。
    → **通信の層・設定の受け口・接続の保存先・認可の入口と戻り先まで実装済み**（上の 6 節）。
@@ -285,11 +437,11 @@ Requests
    トークン・期限・権限・Uber の店舗ID・状態・版。更新用トークンの欄は作らない）→ **済み**。
    (b) 1回使い切り・10分で切れる `state` の置き場 → **済み**。
    (c) 認可の入口と戻り先の受け口 → **済み**。
-   (d) 受信の署名を Uber の方式へ差し替え（`verifyWebhookSignature` を
-   `routes/restaurant-delivery.ts` の受信口に `ubereats` だけ適用する。他社の
-   `x-nen-*` 方式は変えない）→ **残り。1操作ずつの原則に従い、実接続のあとで行う**。
+   (d) 受信の署名を Uber の方式へ差し替え
+   → **済み（2026-10-16）。検証環境への配備と配備後確認まで完了**。詳しくは §8-4(d) と §6-5。
    さらに先は、つなぐ店舗を選ぶ画面（`GET /v1/eats/stores` の一覧→選択→`POST /pos_data`）と、
-   30日で切れるトークンの取り直し。
+   30日で切れるトークンの取り直し。店舗を選ぶ画面は新規UIなので、先に新しい Pencil
+   ファイルを作って利用者の承認を得る。
 5. ~~利用者が Cloudflare の画面で秘密設定**2件**を自分で登録する~~ → **済み**。
    `nen-line-stg` の Settings → Variables and Secrets に **Encrypted** で2件登録済み
    （値はエージェントを通していません。暗号化で入れているので再配備で消えません）。
@@ -298,5 +450,278 @@ Requests
 6. 最小の実接続（トークンを1回取得する）→ アプリ連携 → 異常系 → 検証環境での配備後確認、
    の順に1操作ずつ確認する。
 
-**まだ実際の接続は1回も成功していません。** 上の試験77件（通信の層16件＋設定の読み取り6件＋
-受け口55件）はすべて作り物の応答に対するもので、接続の成功を示すものではありません。
+   `RT_DELIVERY_UBEREATS_ENVIRONMENT=sandbox` の検証環境への配備は
+   **済み**（Worker Version `d74cf03c-0062-4a60-90b5-aa6074ac32aa`）。
+
+   進み具合（2026-10-16 時点）。
+   最小の実接続（トークン1回）→ **済み**（§6-4）。
+   受信の確かめ方の差し替えと検証環境での配備後確認 → **済み**（§8-4(d)・§6-5）。
+
+   上の 3（Sandbox テスト店舗の払い出し依頼）は**送信済みで、Uber の返信待ち**。
+   テスト店舗が用意されると、店舗一覧（`GET /v1/eats/stores`）・`POST /pos_data`・
+   実物の注文通知の受信まで通せる。**利用者の操作は不要**（再送もしない）。
+
+   異常系の確認（503・403・413）→ **済み**（§8-5）。
+
+   返信を待つ間に進められる作業（これが次の1手）。
+
+   - 出前館 手順2（連携希望の連絡）。Uber の返信とは独立に進められる。
+   - 30日で切れるトークンの取り直し。§6-4 のトークンは 2026-10-16 取得・
+     有効 2,592,000 秒なので**期限は 2026-11-15 ごろ**。いま急ぐ必要はない。
+
+   ### 6-1. 接続確認（トークン1回）の口
+
+   Application ID と Client Secret は Cloudflare の暗号化された秘密設定で読み戻せないため、
+   外から `curl` で叩くには秘密値を取り出すことになる。取り出さずに
+   **「配備先の中から1回だけ送る」** ための口を用意した。画面は持たない。
+
+   - 宛先: `POST /internal/ubereats/sandbox-token-probe`
+   - 守り: 合言葉 `RT_DELIVERY_UBEREATS_PROBE_SECRET`（32文字以上）の HMAC-SHA256 署名。
+     見出しは `x-nen-timestamp`（通算秒10桁）と `x-nen-signature`（`${timestamp}.${body}` の16進）。
+     合言葉が使えないときは 503、署名違い・時刻が5分以上ずれていれば 401 で、送らない。
+   - 合言葉が使えない理由は 2026-10-16 に分けた（§6-3）。`probe_secret_missing` は
+     その要求を受けた配備先に値が届いていない、`probe_secret_too_short` は値はあるが
+     32文字未満。**長さも値も返さない**（この分岐は署名の確認より前に通るため）。
+   - 本文が `{"mode":"check"}` のときは**下見**。署名を確かめたあと、Uber へは送らずに
+     接続先（`sandbox` / `other` / `unknown`）と OAuth の設定が揃っているかだけを返す。
+     トークンの口の回数も冷却時間も使わないので、合言葉と署名の確認を何度でも行える。
+   - 接続先が Sandbox でないときは 403 で止める。**本番の Uber へは送らない。**
+   - 冷却時間10分。送る**前**に時刻を残すので、途中で落ちても1回分として数える
+     （Uber のトークンの口は1時間100回まで）。
+   - 返すのは `success` / `environment` / `scope` / 残り秒だけ。失敗時はHTTP状態と
+     分類済みの符号だけ。**トークンの値と Client Secret は返さない・記録しない。**
+   - 実装: `apps/worker/src/services/ubereats-token-probe.ts`、
+     口は `apps/worker/src/routes/restaurant-delivery.ts`。
+
+   ### 6-2. 検証環境で1回実行した結果（2026-10-16 00:21 JST）
+
+   PR #1736 をマージし、Git SHA
+   `008063dac1d9fb1c8ed8969f565291b8b7cd7072` を Worker と管理画面へ配備した。
+   配備 run は `38758489168` で成功し、両方の公開SHAも一致した。
+
+   検証Workerに32バイトの乱数から作った
+   `RT_DELIVERY_UBEREATS_PROBE_SECRET` を暗号化した秘密設定として登録した。
+   値は表示・記録していない。登録で作られた Worker Version
+   `1e9c043e-7976-4545-a29a-e6b7378a0049` は100%配備中で、読み取り確認では次が揃っていた。
+
+   - 上の Git SHA
+   - `RT_DELIVERY_UBEREATS_ENVIRONMENT=sandbox`
+   - 既存の Application ID / Client Secret と、新しい probe secret の**名前**
+
+   その直後、本文を `{}` の2文字にし、現在時刻と
+   `${timestamp}.{}` の HMAC-SHA256 署名を付けて**1回だけ** POST した。
+   応答は次のとおりだった。
+
+   ```json
+   {"httpStatus":503,"success":false,"code":"probe_not_configured"}
+   ```
+
+   この符号は、署名の検査や Uber への送信より前の「probe secret を使えない」分岐で返る。
+   そのため、**Uber のトークン取得口へは到達しておらず、`scope` も未確認**。
+   停止条件に従って再送は行っていない。トークン、Client Secret、
+   probe secret の値は応答・ログ・リポジトリのどこにも残していない。
+
+   **次の1手**：100%配備中の版に秘密設定の名前がある一方、
+   登録直後の実要求だけが未設定応答になった原因を切り分ける。
+   原因を確定してから、別の明示的な再検証として次の1回を行う。
+   この失敗記録に対して盲目的に再送しない。
+
+   ### 6-3. `probe_not_configured` の切り分け（2026-10-16）
+
+   **コード側は原因ではない**（読み取りで確定）。
+
+   - この符号は `routes/restaurant-delivery.ts` の合言葉の分岐だけが返す
+     （文字列はこの口とその試験にしか無い）。したがって要求は新しい束を積んだ
+     Worker に届き、飲食店向け（テスト）の判定も通り、合言葉だけが読めなかった。
+   - 「`src/index.ts` の環境変数の型に `RT_DELIVERY_UBEREATS_PROBE_SECRET` を
+     書き忘れたせいで値が隠れた」という見立ては**外れ**。`src/index.ts` の既定の書き出しは
+     `fetch: app.fetch` で、環境をそのまま渡しており絞り込みも作り直しもしていない。
+     型の宣言は動くときの振る舞いに影響しない。
+   - 残る候補は配備側で、こちらからは読めない。(a) POST の宛先ホストを受けている Worker が
+     秘密設定を入れた Worker と別、(b) `wrangler secret put` の直後で版の入れ替わりが
+     間に合わず前の版が応答した、(c) 作った値が符号化・空白落としのあと32文字未満、
+     (d) 名前の綴り違い。
+
+   **直した内容**：どれが起きているかを応答そのものから分かるようにした。
+
+   1. 503 を `probe_secret_missing`（値が届いていない）と
+      `probe_secret_too_short`（32文字未満）に分けた。長さと値は返さない。
+   2. 下見の本文 `{"mode":"check"}` を足した。署名を確かめたあと **Uber へは送らず**、
+      冷却時間も使わずに接続先と設定の有無だけを返す。これで
+      「合言葉と署名は通るのか」を、Uber の1時間100回の口を使わずに確かめられる。
+
+   **次の1回の手順**（Codex 担当・この順で）。
+
+   1. POST と**同じホスト**へ `GET /api/health`。どの Worker が応答しているかを突き合わせる。
+   2. `RT_DELIVERY_UBEREATS_PROBE_SECRET`（32文字以上）を入れ直し、版が入れ替わるのを待つ。
+   3. 本文 `{"mode":"check"}` で署名付き POST。Uber へは送られず冷却時間も使わない。
+      `probe_secret_missing` / `probe_secret_too_short` が返れば上の候補が絞れる。
+   4. 3 が `success: true` で `environment: "sandbox"` のときだけ、本文 `{}` で実のトークン取得を1回。
+      失敗したら再送せず、HTTP状態と `code` / `uberCode` / `status` を返す。
+
+   ### 6-4. Sandbox の実トークン取得に成功（2026-10-16 01:43 JST）
+
+   PR #1739 をマージし、Git SHA
+   `af2c2bf0e6ab339e4722fc8607b5a4d3ecf4b08b` を Worker と管理画面へ配備した。
+   配備 run `38770186820` は成功し、両方の公開SHAも一致した。
+   Worker Version は `95e674a7-e188-4ed4-8e9d-2bc81ab057d0`。
+
+   指定順で次を確かめた。
+
+   1. POST と同じ `https://stg-api.musubo.jp` の `GET /api/health` は HTTP 200 で、
+      `git_commit` は上のマージSHAと一致した。
+   2. 32バイトの乱数から probe secret をメモリ内で作り直し、
+      検証Workerの暗号化された秘密設定へ登録した。値は表示・保存していない。
+      登録で作られた Version `d5c4f5be-0e81-42ca-9ad5-69049b2e49df` が100%になり、
+      マージSHA、`sandbox` 設定、3つのUber関連secretの名前が揃っていることを確かめた。
+   3. 本文 `{"mode":"check"}` の署名付きPOSTは HTTP 200 で次を返した。
+      この下見は Uber へ送らず、冷却時間も使っていない。
+
+      ```json
+      {"success":true,"mode":"check","environment":"sandbox","oauthConfigured":true}
+      ```
+
+   4. 下見の成功後だけ、本文 `{}` で実のトークン取得を**1回だけ**実行した。
+      HTTP 200、`success: true`、`environment: "sandbox"`、
+      `scope: ["eats.order"]`、`expiresInSec: 2592000` だった。
+      トークン値、Client Secret、probe secret、署名値は会話・ログ・Gitへ残していない。
+      再送も行っていない。
+
+**Sandbox の `client_credentials` による最小の実接続は成功しました。**
+利用者のログインを伴う認可画面と、実際の注文API操作は別工程であり、今回は実行していません。
+
+### 8-4(d). 受信の署名を Uber の方式へ差し替えた（2026-10-16）
+
+Uber から届く注文の通知を「本物か」確かめる方法が、これまで自社の方式のままだった。
+公式仕様と違うので、実物の通知は**すべて 401 で落ちる**。これを Uber の方式へ合わせた。
+画面は作っていない（受け口の中だけの変更）ので、新しい Pencil の承認は要らない。
+
+**Uber の方式**（公式仕様）。
+
+- 見出しは `x-uber-signature`。
+- 署名は**本文だけ**の HMAC-SHA256（小文字16進）。自社方式のように時刻を混ぜない。
+- 鍵は同じアプリの **Client Secret**。静的なトークン用の合言葉
+  `RT_DELIVERY_UBEREATS_WEBHOOK_SECRET` は Uber では**使わない**（設定しても無視される）。
+- Uber は時刻の見出しを送らないので、**時刻のずれ（±5分）は見ない**。
+  見てしまうと本物の通知を落とすため、この確認は Uber だけ外した。
+
+**変えていないところ。**
+
+- 出前館・ロケットナウは自社の方式（`x-nen-timestamp` と `x-nen-signature`、
+  `${通算秒}.${本文}` の署名、±5分のずれ確認）をそのまま使う。
+- 送信元IPの許可確認は、鍵を読む前・署名を確かめる前のままにした。
+- 接続確認の口 `POST /internal/ubereats/sandbox-token-probe`（§6-1）は
+  Uber からの通知ではなく自社からの呼び出しなので、`x-nen-*` の方式を変えていない。
+
+**実装**。サービスごとの違いを1か所に閉じるため、受け口の外へ切り出した。
+
+- 新規: `apps/worker/src/services/delivery-webhook-auth.ts`
+  （`deliveryWebhookSigningSecret` で鍵を選び、`verifyDeliveryWebhook` で確かめる）
+- 受け口: `apps/worker/src/routes/restaurant-delivery.ts` はこの2つを呼ぶだけになった
+- 署名の計算そのものは既存の `apps/worker/src/services/uber-eats.ts`
+  （`UBER_SIGNATURE_HEADER` / `verifyWebhookSignature`）を使う
+
+**確かめた範囲**（ローカル試験）。Uber の本文だけの署名を受け取ること、時刻の見出しが
+古くても落とさないこと、鍵違い・本文改変・自社方式の見出しだけでは受け取らないこと、
+出前館・ロケットナウの受け取り方が変わっていないこと。
+
+**まだ済んでいないこと**。Uber から**実物の通知を受け取る**確認は、Uber 側の
+Sandbox テスト店舗（上の 3）が用意されてからになる。それまでは試験までの確認に留まる。
+
+**配備**。PR #1741 が必須CI全緑でマージされ、検証環境へ配備済み
+（Worker Version `9881e594-c509-4ea7-943c-3b9911e64b4a`、100%）。
+配備後の確認で分かったことは次の 6-5 に書いた。
+
+### 6-5. 接続確認の口の合言葉は、呼ぶたびにその場で作り直す（2026-10-16）
+
+上の配備のあと下見（`{"mode":"check"}`、§6-1）を実行したら
+HTTP 401 / `probe_unauthorized` が返った。**これはコードの不具合ではない。**
+
+- 401 は「合言葉は届いているが、呼ぶ側の署名が合わない」ときの答え。
+  合言葉が配備先に無い・短いときは、署名を確かめる前の分岐で
+  503（`probe_secret_missing` / `probe_secret_too_short`）が返る（§6-3）。
+  401 が返ったことは、**合言葉が配備先にちゃんと入っている**証拠でもある。
+- 合わなかったのは呼ぶ側の署名。§6-4 の 2 の通り、この合言葉は
+  32バイトの乱数からその場で作り、**表示も保存もしていない**。
+  だから後の別の作業から呼ぶとき、呼ぶ側は正しい署名を作れない。これは設計どおり。
+- 直し方は「保存した値を探す」ではなく「その場で作り直して使い捨てる」。
+  この口を使うときは**ひとつの作業の中で**、(a) 新しい合言葉を作る →
+  (b) 配備先の秘密設定へ登録し、版が100%になるのを待つ → (c) 署名して呼ぶ →
+  (d) 値は残さない、の順で行う。値を人やエージェントの間で受け渡さない。
+  §6-4 の実トークン取得が成功したときも、この順で行っている。
+- なお 8-4(d) で差し替えたのは Uber からの**受信**の確かめ方で、
+  この口が使う確かめ方（`x-nen-*`）とは別のしくみ。401 と 8-4(d) は関係がない。
+
+**合言葉を使わずに 8-4(d) の配備を確かめる方法**（下見より先にこちらを使う）。
+受信口は「鍵が読めない → 503、読めて署名が違う → 401」の順に答える
+（`apps/worker/src/routes/restaurant-delivery.ts` の受け口）。
+`ubereats` の鍵は同じアプリの Client Secret から取るので、
+**署名を付けずに** `POST /api/restaurant-test/delivery/webhooks/ubereats` を叩くと、
+
+- **401 `Invalid signature`** → Uber の連携設定（Client ID・Client Secret・
+  `https://` の戻り先）が読めていて、差し替えた確かめ方が動いている。
+  下見の `oauthConfigured: true` と同じことが分かる。**これが期待する答え。**
+- 503 `Integration is not configured` → 上の設定のどれかが足りない。
+- 403 `Forbidden` → 送信元IPの許可一覧が設定されている（IPの確認が先に動いた）。
+
+この確認は合言葉が要らず、Uber へも何も送らず、注文台帳にも何も残らない
+（署名が合わないので本文を読む前に止まる）。
+`demaecan` で 503 が返るのは合言葉が検証環境に無いだけで、今回の変更とは関係ない。
+
+**実行した結果（2026-10-16）。期待どおり 401 だった。**
+
+- 記録を取り込んだ PR #1742 が必須CI全緑でマージ。マージSHA `b4adb688bd42c359d1539dbf802b5ad888a9e647`
+- 検証環境へ配備（run `38791222280`、成功）。Worker・管理画面の公開SHAがマージSHAと一致。
+  `GET /api/health` は HTTP 200 / `status: ok`
+- 署名の見出しを付けず本文 `{}` で
+  `POST /api/restaurant-test/delivery/webhooks/ubereats` を**1回だけ**実行
+  → **HTTP 401 / `{"success":false,"error":"Invalid signature"}`**
+- つまり Uber の連携設定が読めていて、8-4(d) の確かめ方が検証環境で動いている。
+  合言葉の作り直し・実トークンの取り直しは行っていない。
+
+これで 8-4(d) は「実装 → ローカル試験 → 配備 → 配備後確認」まで揃った。
+残るのは Uber から**実物の通知**を1件受け取る確認で、これは Uber 側の
+Sandbox テスト店舗（§8 の 3）が用意されてからになる。
+
+### 8-5. 異常系（503・403・413）の確認（2026-10-16）
+
+共通ルールの「必要な異常系」にあたる確認。**検証環境へは何も書かず、ローカル試験だけ**で
+確かめた。受け口は `POST /api/restaurant-test/delivery/webhooks/:service`。
+
+**断る順番**（`apps/worker/src/routes/restaurant-delivery.ts` の受け口。先に当たった方が返る）。
+
+| 順 | 条件 | 答え |
+| --- | --- | --- |
+| 1 | 知らないサービス名 | 404 `Unknown service` |
+| 2 | 送信元IPの許可一覧があり、その外から届いた | 403 `Forbidden` |
+| 3 | そのサービスの署名の鍵が無い・短い | 503 `Integration is not configured` |
+| 4 | 本文が上限（128KiB）を超えている | 413 `Payload too large` |
+| 5 | 署名が合わない（自社方式は時刻ずれも） | 401 `Invalid signature` / `Expired request` |
+
+どれで断っても**本文の取り込みと受信台帳 `rt_delivery_events` への記録は行わない**。
+403 のときは本文を読む前に止まる。
+
+**確かめた結果。**
+
+- **503**（設定不足）。既存の試験で合格済み。
+  「鍵が設定されていないサービスは503で断り、署名の判定へ進まない」。
+  正しい署名を付けても鍵が無ければ 503 になり、台帳は0件。
+- **403**（送信元IP不許可）。既存の試験で合格済み。許可外のIP・送信元が分からない通知・
+  まとまり指定（`/24`）の外・サービスごとの指定が共通指定より先に効くこと、
+  さらに「鍵が無くてもIPの確認が先なので 403 になる」ことまで含む。
+- **413**（本文が大きすぎる）。**試験が無かったので今回5件足した**
+  （`apps/worker/src/routes/restaurant-delivery.test.ts` の
+  「受信口の本文の大きさの上限（413）」）。受け口の動きは元から正しく、
+  足したのは**動きを固定するための確認の試験だけ**。コードは変えていない。
+  - 申告（`content-length`）が上限超えなら、本文を読まずに 413
+  - 申告が無くても、実測が上限超えなら 413（台帳は0件）
+  - 上限ちょうどは大きさでは断らない（200 で受け取る）
+  - 署名が違っても、大きすぎれば先に 413
+  - 鍵が無いときは大きさより先に 503（上の順番どおり）
+
+**記録**。Worker 全試験 **988ファイル / 11,806件 合格**、`tsc --noEmit` 合格、
+コード量の検査 `2674 body files, 437 frozen, 0 violations`。
+上限の値 128KiB は `apps/worker/src/services/delivery-webhook-payload.ts` の
+`MAX_WEBHOOK_BODY_BYTES` を試験からも読んでいるので、値を変えても食い違わない。
+
+**この確認に Uber の返信は要らない。** 配備も不要（試験1ファイルの追加のみ）。

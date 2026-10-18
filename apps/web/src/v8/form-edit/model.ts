@@ -212,7 +212,7 @@ export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
   ] },
   { title: '書いてもらう', cards: [
     { key: 'text', label: '1行で書く', hint: '名前・会員番号など', make: input('text') },
-    { key: 'textarea', label: '自由に書く', hint: '複数行のフリーテキスト', make: input('textarea') },
+    { key: 'textarea', label: '自由に書く', hint: '長い文を書く', make: input('textarea') },
     // メールと電話は分ける（オーナー 2026-10-08：「メールアドレスと電話番号を分けよう」）。
     { key: 'contact', label: 'メール', hint: 'メールの形をチェック', make: input('text', { label: 'メールアドレス', fixedField: 'email', placeholder: '例：sample@example.com', limit: { format: 'email' } }) },
     { key: 'tel', label: '電話', hint: '番号の形をチェック', make: input('text', { label: '電話番号', fixedField: 'tel', placeholder: '例：090-1234-5678', limit: { format: 'tel' } }) },
@@ -229,6 +229,8 @@ export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
     { key: 'time', label: '時刻', hint: '時計で選ぶ', make: input('text', { label: '時刻', limit: { format: 'time' } }) },
     { key: 'booking', label: '予約を入れる', hint: '空いている枠から選ぶ', fresh: true, make: input('booking', { booking: null }) },
     { key: 'file', label: 'ファイル', hint: '写真・書類を送る', make: input('file', { label: 'ファイル' }) },
+    // 絵 m1cWEy：本人確認書類は表と裏の2枚を受けるファイルの欄として足す。
+    { key: 'identity', label: '本人確認書類', hint: '免許証などの表と裏', make: input('file', { label: '本人確認書類', fileKinds: ['identity'], fileBothSides: true }) },
   ] },
   { title: '飾り', cards: [
     { key: 'image', label: '画像', hint: 'ロゴ・写真', make: () => makeFormBlock('image') },
@@ -310,4 +312,8 @@ export function readPage(value: string | null, count: number): number {
 /** ページを開いたときに設定を開いておくブロック（最初の質問。無ければ閉じたまま）。 */
 export function firstInputBlockId(blocks: FormBlock[]): string | null {
   return blocks.find((b) => b.kind === 'input')?.id ?? null
+}
+
+export function blockTitleKind(block: FormBlock): string {
+  return { image: '画像', heading: '見出し', text: 'テキスト', button: 'ボタン', input: '入力' }[block.kind]
 }

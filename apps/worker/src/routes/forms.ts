@@ -1,8 +1,16 @@
+import {validateLayoutRouting} from '../services/form-routing.js';
+import {GapError} from '../services/gap-common.js';
+import { normalizeLayoutInput } from './form-layout-input.js';
+import { canonicalizeIdempotencyInput } from './form-idempotency.js';
+import { hasDeliveryAccess } from '@line-crm/shared';
+import { auditLog } from '../lib/audit-log.js';
+import { type FormFieldDef, parseFormFields } from './form-field-definition.js'
+import { reportPeriod, type ReportPeriodInput } from '@line-crm/shared';
 import { callFormWebhook } from '../services/form-webhook.js';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
-import { inputError, inputJsonBoundary, validatedInputBody } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, readBoundedBytes, validatedInputBody } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
 import { hydrateDocumentAnswers, validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
 import { formAvailability } from '../services/form-availability.js';
@@ -16,6 +24,7 @@ import {
   getFormsWithStats,
   FORM_SUBMIT_CLAIM_STALE_MS,
   getFormById,
+  getFormLatestEdit,
   type FormSubmitClaim,
   type FormSubmitClaimScope,
   getFormAccountIds,
@@ -241,32 +250,6 @@ function validFormListSort(value: string | undefined): FormListSort {
   return value === 'answers' || value === 'updated' || value === 'name' ? value : 'latest-answer';
 }
 
-/** フォームの項目定義。forms.fields は JSON の配列で持っている。 */
-interface FormFieldDef {
-  id?: string;
-  name?: string;
-  label?: string;
-  type?: string;
-  /** 回答の登録先。友だち情報欄の項目ID。未設定なら情報欄には書かない */
-  friendFieldId?: string | null;
-}
-
-/**
- * forms.fields を読む。
- *
- * 壊れていても空配列を返す。ここで例外を投げると、項目定義が1つ壊れた
- * だけでフォームの送信そのものが失敗する。
- */
-function parseFormFields(raw: string | null | undefined): FormFieldDef[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? (parsed as FormFieldDef[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 function optionalExecutionCtx(c: Context<Env>): ExecutionContext | undefined {
   try {
     return c.executionCtx;
@@ -305,6 +288,7 @@ function serializeForm(
 ) {
   const redactSecrets = opts?.redactSecrets === true;
   return {
+    warnings: (() => { const warning = formThemeContrastError(resolveCustomerFormTheme(parseLayout(row.layout, row.fields).options)); return warning ? [{ code: 'LOW_CONTRAST', message: warning }] : []; })(),
     id: row.id,
     name: row.name,
     description: row.description,
@@ -610,22 +594,6 @@ async function describePostActionsForSubmissions(
   return map;
 }
 
-/**
- * 回答内容を決まった形の文にする。再送の照合に使い、キーの順番が違っても
- * 同じ回答は同じ文になる。
- */
-function canonicalizeIdempotencyInput(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(canonicalizeIdempotencyInput).join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalizeIdempotencyInput(entry)}`).join(',')}}`;
-  }
-  return JSON.stringify(value) ?? 'null';
-}
-
 /** 回答内容のハッシュ。同じキーの再送が同じ回答かを照合する。 */
 async function hashIdempotentSubmission(canonical: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
@@ -747,7 +715,7 @@ async function writeLegacyFriendFields(
       const checked = validateFriendFieldValue(target, rawForCheck);
       if (!checked.ok) {
         result.failed += 1;
-        console.error('form -> friend_fields invalid:', checked.error);
+        console.error(JSON.stringify({"code":"routes_forms_failed"}));
         continue;
       }
       await setFriendFieldValue(db, {
@@ -760,34 +728,10 @@ async function writeLegacyFriendFields(
       result.succeeded += 1;
     } catch (error) {
       result.failed += 1;
-      console.error('form -> friend_fields failed:', error);
+      console.error(JSON.stringify({"code":"routes_forms_failed"}));
     }
   }
   return result;
-}
-
-/**
- * 受け取った layout を、保存できる形にそろえる。
- *
- * 外から来た JSON をそのまま入れない。形を正した上で、互換用の `fields`
- * も同時に作り直す。`fields` はいまも送信時の必須チェックと回答一覧の
- * 見出しが読んでいて、layout だけ更新すると両者がずれる。
- */
-function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } | { error: string } | null {
-  const typeError = formBlockTypeError(raw);
-  if (typeError) return { error: typeError };
-  const layout = normalizeLayout(raw);
-  if (!layout) return null;
-  // 保存できる定義かをここで止める。画面側と同じ `validateFormDefinition`
-  // を使うので、「画面では通ったのに保存で弾かれる」にならない。
-  // 分岐の循環や設定途中の動作は下書きとして残せるため、ここでは見ず
-  // 公開の直前（publish）で止める。
-  const invalid = validateFormDefinition(layout);
-  if (invalid) return { error: invalid };
-  return {
-    layout: JSON.stringify(layout),
-    fields: JSON.stringify(layoutToFields(layout)),
-  };
 }
 
 // GET /api/forms — list all forms (with submission stats + delivering accounts)
@@ -867,7 +811,7 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
     }
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/forms error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -912,7 +856,7 @@ forms.get('/api/forms/unassigned', requireRole('owner', 'admin'), async (c) => {
     );
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/forms/unassigned error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/unassigned"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -976,20 +920,20 @@ forms.get('/api/forms/:id', async (c) => {
       layout = {...layout, options: {...layout.options, theme: resolveCustomerFormTheme(layout.options, look)}};
     }
     const data = adminView
-      ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
+      ? {...serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' }),latestEdit:await getFormLatestEdit(c.env.DB,id,form.content_revision)}
       : { ...serializePublicForm(form, layout), availability: await formAvailability({
         db: c.env.DB, formId: id, layout, active: !!form.is_active,
         submitCount: form.submit_count ?? 0, friendId,
       }) };
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/forms/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
 // POST /api/forms/:id/publish — 保存済みの編集内容を不変版にして公開する。
-forms.post('/api/forms/:id/publish', inputJsonBoundary(), async (c) => {
+forms.post('/api/forms/:id/publish', requireDeliveryAccess('forms', 'publish'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const manageGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
@@ -1042,7 +986,7 @@ forms.post('/api/forms/:id/publish', inputJsonBoundary(), async (c) => {
       },
     });
   } catch (err) {
-    console.error('POST /api/forms/:id/publish error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/publish"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1086,7 +1030,7 @@ forms.post('/api/forms/:id/test-token', inputJsonBoundary(), async (c) => {
     // 生の合言葉はこの応答でしか返さない。台帳からは読み出せない。
     return c.json({ success: true, data: { token, expiresAt } });
   } catch (err) {
-    console.error('POST /api/forms/:id/test-token error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/test-token"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1136,19 +1080,14 @@ forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["nu
     if (body.layout !== undefined && !normalized) {
       return inputError(c, { success: false, error: 'layout の形が正しくありません' }, 400, ["layout"]);
     }
-    // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは作れない。
     if (normalized && !('error' in normalized) && normalized.layout) {
-      const createdLayout = JSON.parse(normalized.layout) as FormLayout;
-      const createContrastError = formThemeContrastError(
-        resolveCustomerFormTheme(createdLayout.options),
-      );
-      if (createContrastError) {
-        return inputError(c, { success: false, error: createContrastError }, 422, ["layout"]);
-      }
+      try { await validateLayoutRouting(c.env.DB, body.accountId, JSON.parse(normalized.layout)); }
+      catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
     }
 
     const form = await createForm(c.env.DB, {
       name: body.name,
+      isActive: hasDeliveryAccess(c.get('staff'), 'forms', 'publish'),
       description: body.description ?? null,
       fields: normalized ? normalized.fields : JSON.stringify(body.fields ?? []),
       layout: normalized ? normalized.layout : null,
@@ -1168,7 +1107,7 @@ forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["nu
 
     return c.json({ success: true, data: serializeForm(form) }, 201);
   } catch (err) {
-    console.error('POST /api/forms error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1195,7 +1134,7 @@ forms.post('/api/forms/drafts', inputJsonBoundary({"name":["string"],"accountId"
     });
     return c.json({ success: true, data: serializeForm(form) }, 201);
   } catch (err) {
-    console.error('POST /api/forms/drafts error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/drafts"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1259,7 +1198,7 @@ forms.post('/api/forms/:id/duplicate', inputJsonBoundary(), async (c) => {
     const withFolder = source.folder_id ? await getFormById(c.env.DB, copy.id) : copy;
     return c.json({ success: true, data: serializeForm(withFolder ?? copy) }, 201);
   } catch (err) {
-    console.error('POST /api/forms/:id/duplicate error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/duplicate"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1293,6 +1232,8 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
       ogImageUrl?: string | null;
       expectedContentRevision?: unknown;
     }>();
+
+    if (body.isActive !== undefined && !hasDeliveryAccess(c.get('staff'), 'forms', 'publish')) return c.json({ success: false, error: '公開・停止には管理者権限が必要です' }, 403);
 
     /*
      * #723: 確認した編集の版を必ず受け取る。
@@ -1368,14 +1309,8 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
       if ('error' in normalized) {
         return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
       }
-      // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
-      const savedLayout = JSON.parse(normalized.layout) as FormLayout;
-      const contrastError = formThemeContrastError(
-        resolveCustomerFormTheme(savedLayout.options),
-      );
-      if (contrastError) {
-        return inputError(c, { success: false, error: contrastError }, 422, ["layout"]);
-      }
+      try { for(const account of await getFormAccountIds(c.env.DB,id)) await validateLayoutRouting(c.env.DB,account,JSON.parse(normalized.layout)); }
+      catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
       updates.layout = normalized.layout;
       updates.fields = normalized.fields;
     }
@@ -1392,7 +1327,7 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
     if (body.ogDescription !== undefined) updates.ogDescription = body.ogDescription;
     if (body.ogImageUrl !== undefined) updates.ogImageUrl = body.ogImageUrl;
 
-    const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision);
+    const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision,c.get('staff')?.id);
 
     if (updated.kind === 'not_found') {
       return c.json({ success: false, error: 'Form not found' }, 404);
@@ -1407,13 +1342,14 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
         data: {
           contentRevision: updated.form.content_revision,
           updatedAt: updated.form.updated_at,
+          latestEdit:await getFormLatestEdit(c.env.DB,id,updated.form.content_revision),
         },
       }, 409);
     }
 
-    return c.json({ success: true, data: serializeForm(updated.form) });
+    return c.json({ success: true, data: {...serializeForm(updated.form),latestEdit:await getFormLatestEdit(c.env.DB,id,updated.form.content_revision)} });
   } catch (err) {
-    console.error('PUT /api/forms/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"PUT /api/forms/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1432,13 +1368,14 @@ forms.get('/api/forms/:id/delete-impact', requireDeliveryAccess('forms'), async 
     }
     return c.json({ success: true, data: authorized.impact });
   } catch (error) {
-    console.error('GET /api/forms/:id/delete-impact error:', error);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id/delete-impact"}));
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 });
 
 /** 本文の解析より前に保管・保管解除の管理権限を確認する。 */
 const requireArchiveManage: MiddlewareHandler<Env> = async (c, next) => {
+  if (!hasDeliveryAccess(c.get('staff'), 'forms', 'archive')) return c.json({ success: false, error: '保管には管理者権限が必要です' }, 403);
   try {
     if (!c.req.query('account_id')?.trim()) return inputError(c, { success: false, error: 'account_id is required' }, 400, ['account_id']);
     const accountIds = await getFormAccountIds(c.env.DB, c.req.param('id')!);
@@ -1452,7 +1389,7 @@ const requireArchiveManage: MiddlewareHandler<Env> = async (c, next) => {
     }
     await next();
   } catch (error) {
-    console.error('form archive permission error:', error);
+    console.error(JSON.stringify({"code":"routes_forms_failed"}));
     return c.json({ success: false, error: '回答フォームの権限を確認できませんでした' }, 503);
   }
 };
@@ -1516,7 +1453,7 @@ forms.post('/api/forms/:id/archive', requireArchiveManage, inputJsonBoundary({},
       },
     });
   } catch (error) {
-    console.error('POST /api/forms/:id/archive error:', error);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/archive"}));
     return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
   }
 });
@@ -1579,13 +1516,13 @@ forms.post('/api/forms/:id/unarchive', requireArchiveManage, inputJsonBoundary({
       },
     });
   } catch (error) {
-    console.error('POST /api/forms/:id/unarchive error:', error);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/unarchive"}));
     return c.json({ success: false, error: '回答フォームを元に戻せませんでした' }, 503);
   }
 });
 
 // DELETE /api/forms/:id — 影響0件・非公開・同じ版のときだけ物理削除する。
-forms.delete('/api/forms/:id', async (c) => {
+forms.delete('/api/forms/:id', requireDeliveryAccess('forms', 'archive'), async (c) => {
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('account_id')?.trim();
@@ -1630,7 +1567,7 @@ forms.delete('/api/forms/:id', async (c) => {
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/forms/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"DELETE /api/forms/:id"}));
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 });
@@ -1658,6 +1595,39 @@ forms.delete('/api/forms/:id/submissions/:submissionId', requireRole('owner', 'a
   }
 });
 
+// CSV は回答閲覧と分離し、明示的な書き出し権限で確認する。
+forms.post('/api/forms/:id/exports', requireDeliveryAccess('forms', 'export'), async (c) => {
+  const id = c.req.param('id');
+  const accountId = c.req.query('account_id');
+  if (!await canUseFormFromAccount(c, id, accountId)) return c.json({ success: false, error: 'Form not found' }, 404);
+  const form = await getFormById(c.env.DB, id);
+  if (!form) return c.json({ success: false, error: 'Form not found' }, 404);
+  const fields = JSON.parse(form.fields || '[]') as Array<{ id?: string; name: string; label?: string }>;
+  const cell = (value: unknown) => {
+    let text = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
+    if (/^[=+@\-\t\r]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  };
+  const rows: string[] = [['回答ID', '回答日時', ...fields.map(f => f.label ?? f.name ?? f.id ?? '')].map(cell).join(',')];
+  let page = 1;
+  let total = 0;
+  do {
+    const result = await getFormSubmissionsPage(c.env.DB, id, { page, limit: 200, lineAccountId: accountId!, search: c.req.query('q')?.trim().slice(0, 200) || undefined });
+    total = result.total;
+    for (const row of result.items) {
+      const data = JSON.parse(row.data) as Record<string, unknown>;
+      rows.push([row.id, row.created_at, ...fields.map(f => data[f.name ?? f.id ?? ''])].map(cell).join(','));
+    }
+    if (result.items.length === 0) break;
+    page++;
+  } while ((page - 1) * 200 < total);
+  auditLog(c, 'form.submission.export', { id, kind: 'form' }, { lineAccountId: accountId! });
+  return new Response('\uFEFF' + rows.join('\r\n') + '\r\n', { headers: {
+    'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="form-responses.csv"',
+    'Cache-Control': 'no-store',
+  } });
+});
+
 // GET /api/forms/:id/submissions — list submissions
 forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
@@ -1669,6 +1639,9 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
+    let period: ReturnType<typeof reportPeriod>;
+    try { period = reportPeriod({from:c.req.query('from'),to:c.req.query('to'),period:c.req.query('period') as ReportPeriodInput['period']}); }
+    catch { return c.json({success:false,error:'期間は正しい日付（YYYY-MM-DD）、または this_month・last_month・all で指定してください'},400); }
     const hasPagination = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
     if (!hasPagination) {
       // SDKなど既存利用先との互換性を保つ。V6管理画面だけが明示的にページ分けを要求する。
@@ -1680,7 +1653,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
        * 残る（実際、逆変異で確かめた: DB 側を 500 にしても slice があると
        * 試験が緑のままだった）。数も切る場所も1か所にする。
        */
-      const submissions = await getFormSubmissions(c.env.DB, id, NON_PAGINATED_SUBMISSIONS_MAX);
+      const submissions = await getFormSubmissions(c.env.DB, id, NON_PAGINATED_SUBMISSIONS_MAX, {...period,lineAccountId:c.req.query('account_id')});
       // Header 値は ASCII のみ。日本語の案内は PR と票に残す。
       // 数は直書きしない。名乗りと実際がずれると、取り落としに気づけない。
       c.header(
@@ -1698,13 +1671,14 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     // N-171/N-179: 一覧・件数・CSV が同じ検索条件になるよう、検索語をページング前に渡す。
     const search = (c.req.query('q') ?? '').trim().slice(0, 200) || undefined;
     const [submissions, summary] = await Promise.all([
-      getFormSubmissionsPage(c.env.DB, id, { page, limit, lineAccountId: c.req.query('account_id')!, search }),
+      getFormSubmissionsPage(c.env.DB, id, { ...period, page, limit, lineAccountId: c.req.query('account_id')!, search }),
       getFormSubmissionAnalytics(
         c.env.DB,
         id,
         c.req.query('account_id')!,
         dateFieldsOfForm(form),
         ratingFieldsOfForm(form),
+        period,
       ),
     ]);
     // N-168: 後処理の未完を運用者へ見せる。予約(claim)の工程記録と
@@ -1718,10 +1692,11 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
         page: submissions.page,
         limit: submissions.limit,
         summary,
+        period,
       },
     });
   } catch (err) {
-    console.error('GET /api/forms/:id/submissions error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id/submissions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1848,7 +1823,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBo
             await failFormSubmitClaim(c.env.DB, scope, owner, taken.version);
           }
         } catch (error) {
-          console.error('form submit claim finalize failed:', error);
+          console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
         }
         return missing;
       },
@@ -1937,7 +1912,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBo
           } catch (error) {
             if (error instanceof ClaimOwnershipLost) throw error;
             // 届かなくても残りの記録へ進む。未完のまま残して次の再実行に託す。
-            console.error('Failed to send webhook fail message:', error);
+            console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
           }
         }
         // 回答行はある(この口は回答idから入る)。記録だけ揃える。
@@ -1965,7 +1940,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBo
             submission.destination_write_failed = 0;
             recorded = true;
           } catch (error) {
-            console.error('form destination write result failed:', error);
+            console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
           }
           if (recorded) await claimHandle.checkpoint('destination_status');
         }
@@ -2039,7 +2014,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBo
       throw err;
     }
   } catch (err) {
-    console.error('POST /api/forms/:id/submissions/:submissionId/retry-effects error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2137,7 +2112,7 @@ forms.post('/api/forms/:id/opened', inputJsonBoundary(), async (c) => {
 
     return c.json({ success: true });
   } catch (err) {
-    console.error('POST /api/forms/:id/opened error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/opened"}));
     return c.json({ success: true }); // non-blocking, always succeed
   }
 });
@@ -2212,7 +2187,7 @@ forms.post('/api/forms/:id/partial', inputJsonBoundary({"data":["object"]}), asy
 
     return c.json({ success: true });
   } catch (err) {
-    console.error('POST /api/forms/:id/partial error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/partial"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2305,7 +2280,8 @@ forms.post('/api/forms/:id/files', inputJsonBoundary(), async (c) => {
       return inputError(c, { success: false, error: '画像は10MBまでです' }, 400, []);
     }
 
-    const data = await c.req.arrayBuffer();
+    const data = await readBoundedBytes(c.req.raw, FORM_UPLOAD_MAX_BYTES);
+    if (data === null) return inputError(c, { success: false, error: '画像は10MBまでです' }, 400, []);
     if (data.byteLength === 0) {
       return inputError(c, { success: false, error: 'ファイルが空です' }, 400, []);
     }
@@ -2347,7 +2323,7 @@ forms.post('/api/forms/:id/files', inputJsonBoundary(), async (c) => {
       mimeType,
       sizeBytes: formBytes.byteLength,
     }).then((scan) => markFileScanClean(c.env.DB, scan.id))
-      .catch((err) => console.error('form file scan record error:', key, err));
+      .catch((err) => console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/files"})));
 
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
     return c.json(
@@ -2355,7 +2331,7 @@ forms.post('/api/forms/:id/files', inputJsonBoundary(), async (c) => {
       201,
     );
   } catch (err) {
-    console.error('POST /api/forms/:id/files error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/files"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2412,7 +2388,7 @@ forms.get('/api/forms/:id/my-latest', async (c) => {
     }
     return c.json({ success: true, data: { answers, createdAt: latest.created_at } });
   } catch (err) {
-    console.error('GET /api/forms/:id/my-latest error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id/my-latest"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2836,7 +2812,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
           await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner, claimCtx.version);
         }
       } catch (error) {
-        console.error('form submit claim finalize failed:', error);
+        console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
       }
       return missing;
     };
@@ -2984,7 +2960,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
         submission.destination_write_failed = result.failed;
       } catch (error) {
         // 回答自体は保存済み。記録失敗を回答失敗へ見せず、再開時に残す。
-        console.error('form destination write result failed:', error);
+        console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
         return;
       }
       if (claimCtx) {
@@ -3127,7 +3103,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
             } catch (error) {
               if (error instanceof ClaimOwnershipLost) throw error;
               // 届かなくても回答の保存へ進む。再開時に送り直す。
-              console.error('Failed to send webhook fail message:', error);
+              console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
             }
           }
           // Still save the submission for records
@@ -3174,7 +3150,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
       sourceEventId: submission.id,
       metadata: { formId, submissionId: submission.id },
     }).catch((error) => {
-      console.error('form conversion record failed:', error);
+      console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
       return null;
     });
     if (executionCtx) executionCtx.waitUntil(recordFormConversion());
@@ -3213,7 +3189,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
         }),
       ]).then((results) => {
         for (const result of results) {
-          if (result.status === 'rejected') console.error('form action event failed:', result.reason);
+          if (result.status === 'rejected') console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
         }
       }),
     );
@@ -3254,7 +3230,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     if (err instanceof Error && ['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'].includes(err.message)) {
       return c.json({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' }, 409);
     }
-    console.error('POST /api/forms/:id/submit error:', err);
+    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -3339,7 +3315,7 @@ async function runFormPostEffects(input: {
       });
       awarded = true;
     } catch (error) {
-      console.error('form_submitted mileage failed:', error);
+      console.error(JSON.stringify({"code":"routes_forms_failed"}));
     }
     if (awarded && claim) await claim.checkpoint('mileage');
   }
@@ -3713,7 +3689,7 @@ async function runFormPostEffects(input: {
     } catch (error) {
       if (error instanceof ClaimOwnershipLost) throw error;
       if (['metadata','layout_effects','legacy_fields'].includes(effect.step)) registrationsReady = false;
-      console.error('Form side-effect failed:', error);
+      console.error(JSON.stringify({"code":"routes_forms_failed"}));
       continue;
     }
     if (claim) await claim.checkpoint(effect.step);
@@ -3733,7 +3709,7 @@ async function runFormPostEffects(input: {
       submission.destination_write_failed = destinationWriteResult.failed;
     } catch (error) {
       // 回答自体は保存済み。記録失敗を回答失敗へ見せず、再開・再実行時に残す。
-      console.error('form destination write result failed:', error);
+      console.error(JSON.stringify({"code":"routes_forms_failed"}));
       return;
     }
     if (claim) await claim.checkpoint('destination_status');

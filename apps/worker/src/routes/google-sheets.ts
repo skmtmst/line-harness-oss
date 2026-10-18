@@ -19,7 +19,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { visibleAccount } from '../services/google-sheets-account.js';
 import { dbFor } from '../services/db-router.js';
 import {
   GoogleBusinessError,
@@ -118,14 +118,6 @@ const requireIntegrationManager: MiddlewareHandler<Env> = async (c, next) => {
   return next();
 };
 
-/** account_id が担当者の可視範囲にあるか（restaurant の googleAccessGuard と同じ確認）。 */
-async function visibleAccount(c: Context<Env>): Promise<string | null> {
-  const selected = accountId(c);
-  if (!selected) return null;
-  const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
-  return scope.ids.includes(selected) ? selected : null;
-}
-
 function oauthClientFor(c: Context<Env>): GoogleOAuthClient | null {
   return sheetsOauthClient(c.env, `${new URL(c.req.url).origin}${CALLBACK_PATH}`);
 }
@@ -203,7 +195,7 @@ function sheetsErrorResponse(c: Context<Env>, error: unknown) {
         return fail(c, 502, 'Googleとの通信に失敗しました', { code: error.kind });
     }
   }
-  console.error('[google-sheets] unexpected failure', { name: error instanceof Error ? error.name : 'UnknownError' });
+  console.error(JSON.stringify({"code":"routes_google_sheets_failed"}));
   return fail(c, 500, '予期しないエラーが発生しました');
 }
 
@@ -272,8 +264,7 @@ googleSheets.post('/api/integrations/google-sheets/connect/start', requireIntegr
   const body = await c.req.json<{ accountId?: string }>().catch(() => ({}) as { accountId?: string });
   const selected = body.accountId?.trim() || accountId(c);
   if (!selected) return fail(c, 400, 'LINEアカウントを指定してください', {}, ["accountId"]);
-  const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
-  if (!scope.ids.includes(selected)) return fail(c, 404, 'Not found');
+  if (!await visibleAccount(c, selected)) return fail(c, 404, 'Not found');
   const existing = await integrationFor(c, selected);
   const mode = existing && existing.status !== 'pending_target' ? 'reconnect' : 'connect';
 
@@ -371,7 +362,7 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
     )
     .bind(lineAccountId, DEFAULT_TENANT_ID, staffTenantId(c))
     .first<{ id: string }>();
-  if (!account) return c.redirect(adminReturnUrl(c, lineAccountId, 'error:account_missing'));
+  if (!account || !await visibleAccount(c, lineAccountId)) return c.redirect(adminReturnUrl(c, lineAccountId, 'error:account_missing'));
 
   const client = oauthClientFor(c);
   if (!client) return c.redirect(adminReturnUrl(c, lineAccountId, 'error:oauth_not_configured'));
@@ -432,7 +423,7 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
     return c.redirect(adminReturnUrl(c, lineAccountId, stateRow.mode === 'reconnect' ? 'reconnected' : 'connected'));
   } catch (error) {
     const code = error instanceof GoogleBusinessError ? error.kind : error instanceof CredentialEncryptionKeyError ? 'encryption_key_missing' : 'unknown';
-    console.error('[google-sheets] oauth callback failed', { code });
+    console.error(JSON.stringify({"code":"routes_google_sheets_failed","route":"GET /api/integrations/google-sheets/oauth/callback"}));
     return c.redirect(adminReturnUrl(c, lineAccountId, `error:${code}`));
   }
 });
@@ -442,6 +433,7 @@ googleSheets.post('/api/integrations/google-sheets/disconnect', requireIntegrati
   if (body.confirmed !== true) return fail(c, 400, '確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   const selected = body.accountId?.trim() || accountId(c);
   if (!selected) return fail(c, 400, 'LINEアカウントを指定してください', {}, ["accountId"]);
+  if (!await visibleAccount(c, selected)) return fail(c, 403, 'このLINEアカウントを操作する権限がありません');
   const integration = await integrationFor(c, selected);
   if (!integration) return fail(c, 409, '接続されていません', { code: 'not_connected' });
   let revoked = false;
@@ -475,6 +467,7 @@ googleSheets.put('/api/integrations/google-sheets/target', requireIntegrationMan
   const body = await c.req.json<{ accountId?: string; spreadsheet?: string }>().catch(() => ({}) as { accountId?: string; spreadsheet?: string });
   const selected = body.accountId?.trim() || accountId(c);
   if (!selected) return fail(c, 400, 'LINEアカウントを指定してください', {}, ["accountId"]);
+  if (!await visibleAccount(c, selected)) return fail(c, 403, 'このLINEアカウントを操作する権限がありません');
   const spreadsheetId = parseSpreadsheetId(body.spreadsheet ?? '');
   if (!spreadsheetId) {
     return fail(c, 400, 'スプレッドシートのURLまたはIDの形が違います', { code: 'invalid_spreadsheet' }, ["spreadsheet"]);
@@ -511,6 +504,7 @@ googleSheets.post('/api/integrations/google-sheets/sync', requireIntegrationMana
   const body = await c.req.json<{ accountId?: string }>().catch(() => ({}) as { accountId?: string });
   const selected = body.accountId?.trim() || accountId(c);
   if (!selected) return fail(c, 400, 'LINEアカウントを指定してください', {}, ["accountId"]);
+  if (!await visibleAccount(c, selected)) return fail(c, 403, 'このLINEアカウントを操作する権限がありません');
   const integration = await integrationFor(c, selected);
   if (!integration || !integration.spreadsheet_id) {
     return fail(c, 409, 'Googleアカウントまたは出力先が設定されていません', { code: 'not_ready' });

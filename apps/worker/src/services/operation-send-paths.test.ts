@@ -70,3 +70,7 @@ describe('送信経路の台帳 (#1050)', () => {
     expect(OPERATION_PROXY_CAPABILITY_HEADER).toBe('X-Line-Harness-Capability');
   });
 });
+
+it('運用者向けの説明は送信待ち・停止・再開の言葉で返す',()=>{
+ for(const path of OPERATION_SEND_PATHS)expect([path.label,path.note,path.excludedReason].filter(Boolean).join(' '),path.id).not.toMatch(/cron|manual 指定|X-Line-Harness|claim|pending|queued|retry_wait|processAutomationRun|replyToken|outbox|sweep|tick/);
+});

@@ -122,6 +122,8 @@
 | 新版公開後の既存利用先 | [横断レビュー §2](./v6-32-feature-cross-review.md) | 参照型 / スナップショット型の2分類だけ |
 | 権限モデル | [30 ログインユーザー §7〜§8](./v6-30-login-users-requirements-draft.md) | `edit` / `view` / `none` ＋ 重要操作permission(`domain.resource.action`)＋項目マスク。役割表は既定bundle |
 | 再試行の既定 | [共通基盤 §6-2](./v6-shared-platform-requirements.md) | 外部API 3回、送信Webhook 8回・24時間(例外)、内部処理は再試行なし |
+| 外部呼出し・結果不明・サガ・cache | [段2の共通契約 §3〜§6](../v8-requirements/cleanup-stage2-contract.md#retry)・[共通基盤 §6-2・§6-4・§9-1](./v6-shared-platform-requirements.md) | B-365。既定の回数を増やさず共通化、結果不明は照合、各段を記録→実行→結果で更新、表示用集計だけ短い cache |
+| 店舗の予約・クーポンの設定 | [段2の共通契約 §2](../v8-requirements/cleanup-stage2-contract.md#store-flags) | B-358。店舗の設定を正本にし、はじめの質問は初期値だけを1回書く |
 | 未取得の表示文言 | [共通基盤 §9](./v6-shared-platform-requirements.md) | 値は `—`、ラベルは 未取得 / 取得失敗 / 権限不足 / 未接続 |
 | 画像比較 | [共通基盤 §10 工程ゲート](./v6-shared-platform-requirements.md) | 要件の完了条件から外し、PRの工程条件で担保 |
 | Pencilへの修正依頼 | [横断レビュー §7](./v6-32-feature-cross-review.md) | 02/03/04/09/10/13/16 に散在していた依頼を1表に集約 |

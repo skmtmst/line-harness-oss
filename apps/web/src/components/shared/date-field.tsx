@@ -27,6 +27,8 @@ export default function DateField({
   disabled = false,
   invalid = false,
   size = 'standard',
+  displayFormat = 'full',
+  clearable = true,
   placeholder = '日付を選ぶ',
   id,
   name,
@@ -42,6 +44,10 @@ export default function DateField({
   disabled?: boolean
   invalid?: boolean
   size?: 'standard' | 'compact'
+  /** 狭い道具欄では月日だけを表示。年を含む全文はtitleと暦に残す。 */
+  displayFormat?: 'full' | 'short' | 'day'
+  /** false で「日付を消す」の×を出さない（日付が必ず要る欄。業種ダッシュボードの日付の段）。既定は出す。 */
+  clearable?: boolean
   placeholder?: string
   id?: string
   name?: string
@@ -182,9 +188,9 @@ export default function DateField({
         }}
       >
         <Calendar aria-hidden="true" className={styles.icon} />
-        <span className={selected ? styles.value : styles.placeholder}>{selected ? formatLabel(selected) : placeholder}</span>
+        <span className={selected ? styles.value : styles.placeholder}>{selected ? displayFormat === 'short' ? `${selected.getMonth() + 1}/${selected.getDate()}（${WEEKDAYS[selected.getDay()]}）` : displayFormat === 'day' ? `${selected.getMonth() + 1}月${selected.getDate()}日（${WEEKDAYS[selected.getDay()]}）` : formatLabel(selected) : placeholder}</span>
       </button>
-      {selected && !disabled ? (
+      {selected && !disabled && clearable ? (
         <button type="button" className={styles.clear} aria-label="日付を消す" onClick={() => onChange('')}>
           <X aria-hidden="true" />
         </button>

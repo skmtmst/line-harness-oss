@@ -311,7 +311,7 @@ describe('N-025 引用返信と送信予約', () => {
       expect(row?.textContent).toContain('明日の朝に送ります')
     })
 
-    const cancelButton = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === '取消')!
+    const cancelButton = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === '予約を取り消す')!
     await act(async () => { cancelButton.click() })
     await eventually(() => {
       expect(fixture.scheduled).toHaveLength(0)

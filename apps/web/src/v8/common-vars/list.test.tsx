@@ -2,7 +2,7 @@
 /*
  * V8 共通情報の一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
  * 行が出る・札で絞れる・行の「…」から止める窓と削除の窓が開く（板 Hhl9M・xxKtW）・
- * 閲覧のみでは帯が出て作るボタンを出さない・空のまま使われている帯の「直す」で絞れる。
+ * 閲覧のみでは帯が出て作るボタンを出さない・空のまま使われている帯の「編集する」で絞れる。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -142,6 +142,27 @@ function buttonByText(text: string): HTMLElement {
 }
 
 describe('V8 共通情報の一覧（src/v8）の動き', () => {
+  it('未入力と取得できない数を分け、実値の0を残す', async () => {
+    // 使用先の列が出る1440相当。狭い板ではこの列を詳細へ畳む。
+    const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+      matches:false, media:query, onchange:null,
+      addEventListener:vi.fn(), removeEventListener:vi.fn(),
+      addListener:vi.fn(), removeListener:vi.fn(), dispatchEvent:vi.fn(()=>true),
+    }))
+    try {
+      listVars.mockResolvedValue({success:true,data:[{...company,usageCount:undefined},contact,{...notice,value:'0'}]})
+      act(() => { root.render(<CommonVarsListV8 />) })
+      await flush()
+      const rows = [...host.querySelectorAll('tbody tr')]
+      const companyRow = rows.find(row=>row.textContent?.includes('会社名'))!
+      expect(companyRow.querySelector('[title="使われている場所を取得できていません"]')?.textContent).toBe('—')
+      expect(rows.find(row=>row.textContent?.includes('問い合わせ先'))?.textContent).toContain('未設定')
+      const zeroRow = rows.find(row=>row.textContent?.includes('臨時のお知らせ'))!
+      expect([...zeroRow.querySelectorAll('td')].some(cell=>cell.textContent==='0')).toBe(true)
+      expect(zeroRow.textContent).toContain('なし')
+      expect(host.textContent).not.toContain('—（未取得）')
+    } finally { media.mockRestore() }
+  })
   it('行が出て、数の帯と空のままの帯が出る', async () => {
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
@@ -164,11 +185,11 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     expect(host.textContent).toContain('株式会社NEN')
   })
 
-  it('空のままの帯の「直す」で、空のものだけに絞る', async () => {
+  it('空のままの帯の「編集する」で、空のものだけに絞る', async () => {
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
-    const fix = [...host.querySelectorAll('[role="status"] button')].find((b) => b.textContent === '直す') as HTMLButtonElement
-    expect(fix, '帯の「直す」がありません').toBeTruthy()
+    const fix = [...host.querySelectorAll('[role="status"] button')].find((b) => b.textContent === '編集する') as HTMLButtonElement
+    expect(fix, '帯の「編集する」がありません').toBeTruthy()
     act(() => { fix.click() })
     await flush()
     expect(host.textContent).not.toContain('株式会社NEN')
@@ -201,6 +222,10 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     await flush()
     expect(document.body.textContent).toContain('「会社名」はまだ消せません')
     expect(document.body.textContent).toContain('どうしますか')
+    const reason = document.querySelector<HTMLInputElement>('input[aria-label="消した理由・止める理由（記録に残ります）"]')
+    expect(reason).toBeTruthy()
+    expect(reason?.closest('[class*="footer"]')).toBeNull()
+    expect(document.querySelector('button[aria-label="確認した範囲の説明"]')).toBeNull()
     expect(document.body.textContent).toContain('消さずに止める')
     expect(document.body.textContent).toContain('送信済みの配信はこれから変わりません')
     expect(document.body.textContent).toContain('送信済みのお知らせ')

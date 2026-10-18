@@ -22,7 +22,7 @@ vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: access.canAccess,
 }));
 
-const ENV = { RESTAURANT_TEST_ENABLED: 'true' } as Record<string, string>;
+const ENV = { DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Record<string, string>;
 const CATALOG_KEY = 'feature.specialized.catalog';
 const BUNDLE_KEY = 'feature.settings_bundle_v1';
 

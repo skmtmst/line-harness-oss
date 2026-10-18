@@ -1,8 +1,11 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
+
+import ListDateTime from '@/components/shared/list-date-time'
 import { useDeferredDelete } from '@/lib/use-deferred-delete';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { RowMenu } from '@/components/shared/row-actions';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -11,7 +14,7 @@ import { RowNameLink } from '@/components/shared/table';
 
 
 import { permissionDeniedMessage } from '@/components/shared/api-error-message';
-import { formatDate as polishFormatDate, formatNumber } from '@/lib/format';
+import { formatListTimestamp, formatNumber } from '@/lib/format';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
@@ -36,7 +39,7 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
@@ -44,8 +47,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
-import { ListPager } from '@/components/templates/list-page'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import { ListPagePagination } from '@/components/templates/list-page'
+import Pagination from '@/components/shared/pagination'
 import SheetDialog from '@/v8/reminders/sheet-dialog'
 import { DelayedSkeleton } from '@/components/shared/skeleton';
 import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table';
@@ -153,11 +156,9 @@ function rowView(reminder: ReminderRow) {
   return { status: statusKeyOf(reminder), subtitle: `${base}・${timing}` }
 }
 
-const NEXT_SEND_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
-
-/** 「次に送る」の表示（板 `apLqS`：`10/1（水）18:00`）。店舗時間帯（JST）で出す。 */
+/** 次に送る日時は、別年でも時刻を残す。 */
 function formatNextSend(iso: string | null | undefined): string {
-  return polishFormatDate(iso, { style: 'list' })
+  return formatListTimestamp(iso)
 }
 
 /** 閲覧のみでも出す行の「…」の項目（見るだけのもの）。 */
@@ -773,7 +774,7 @@ export default function RemindersListV8() {
       ...reorder.menuItems(row.id, () => setOpenMenuId(null)),
       {
         id: 'delete',
-        label: '削除',
+        label: '削除する',
         icon: <Trash2 size={15} aria-hidden="true" />,
         tone: 'danger',
         dividerBefore: true,
@@ -882,7 +883,7 @@ export default function RemindersListV8() {
                       aria-label="このページのリマインダをすべて選択"
                     /></SaveErrorField>
                   </Th>
-                ) : <Th className={styles.selectCell}><span className="sr-only">選択できません</span></Th>}
+                ) : <Th className={styles.selectCell}><UnavailableSelection label="このページのリマインダをすべて選択" /></Th>}
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
@@ -896,7 +897,7 @@ export default function RemindersListV8() {
                       ? emptyValue('unknown')
                       : `${formatNumber(row.plannedDeliveries)}通`
                 const nextSend =
-                  view.status === 'active' ? formatNextSend(row.nextScheduledAt) : emptyValue('unknown')
+                  view.status === 'active' ? <ListDateTime value={row.nextScheduledAt} /> : emptyValue('unknown')
                 return (
                   <Tr interactive
                     highlighted={duplicateFeedback.highlightedId === row.id}
@@ -921,7 +922,7 @@ export default function RemindersListV8() {
                           aria-label={`${row.name}を選択`}
                         /></SaveErrorField>
                       </Td>
-                    ) : <Td className={styles.selectCell} />}
+                     ) : <Td className={styles.selectCell}><UnavailableSelection label={`${row.name}を選択`} /></Td>}
                     <Td
                       className={styles.gripCell}
                       onClick={(event) => event.stopPropagation()}
@@ -1111,10 +1112,10 @@ export default function RemindersListV8() {
           </BulkBar>
         ) : null}
 
-        <ListPager>
+        <ListPagePagination>
           <Pagination page={reminderList.page} pageCount={reminderList.pageCount} onPageChange={reminderList.setPage}
-            summary={paginationSummary(reminderList.total, (reminderList.page - 1) * reminderList.limit + 1, Math.min(reminderList.page * reminderList.limit, reminderList.total))} />
-        </ListPager>
+            range={{ total: reminderList.total, first: (reminderList.page - 1) * reminderList.limit + 1, last: Math.min(reminderList.page * reminderList.limit, reminderList.total) }} />
+        </ListPagePagination>
       </>
     )
 
@@ -1156,9 +1157,9 @@ export default function RemindersListV8() {
       )}
 
       {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
-      {!friendId ? <KpiBand data-design="KPIs">
+      {!friendId ? <KpiBand border="dividers" data-design="KPIs">
         {kpis.map((kpi) => (
-          <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? kpi.link : undefined} retryLabel="失敗を見る →" />
+          <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} action={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? { label: '失敗を見る', onClick: kpi.link } : undefined} />
         ))}
       </KpiBand> : null}
 
@@ -1177,7 +1178,7 @@ export default function RemindersListV8() {
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
         open={pauseTarget !== null}
-        designNode="RwVo5"
+        designNode="RwVo5" designWidth={480} footerAlign="center" actionWidthReserve="idle"
         title={pauseTarget ? `「${pauseTarget.name}」を一時停止する` : ''}
         description="再開するまで、このリマインダの通知は送られません。"
         confirmLabel="一時停止する"
@@ -1196,13 +1197,13 @@ export default function RemindersListV8() {
         )}
       </ConfirmDialog>
 
-      {/* 削除の窓（★V8 `VsSyu`）：幅600・上から260。危ない操作は左端、取消と「代わりに一時停止」は真ん中。 */}
+      {/* 削除の窓（★V8 `VsSyu`）。 */}
       <SheetDialog
         open={deleteTarget !== null}
-        designNode="VsSyu"
+        designNode="VsSyu" designWidth={480}
         title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
         description="通知の予定と登録者がすべて消えます。すでに送ったメッセージは友だちのトークに残ります。"
-        band="削除は元に戻せません。しばらく使わないだけなら「一時停止する」を使ってください。"
+        band={deleteTarget && statusKeyOf(deleteTarget) === 'active' ? '削除は元に戻せません。しばらく使わないだけなら「一時停止する」を使ってください。' : '削除は元に戻せません。'}
         bandTone="danger"
         busy={deleting}
         error={deleteError || (deleteTarget && !deleteStillListed ? 'このリマインダが一覧から外れました。この窓を閉じて、いまの一覧から選び直してください。' : undefined)}
@@ -1212,7 +1213,7 @@ export default function RemindersListV8() {
           setDeleteError('')
         }}
         destructive={(
-          <Button variant="danger" onClick={() => void runDelete()} disabled={deleting || !deleteStillListed} busy={deleting} busyLabel="削除しています…">
+          <Button variant="danger" widthReserve="idle" onClick={() => void runDelete()} disabled={deleting || !deleteStillListed} busy={deleting} busyLabel="削除しています…">
             削除する
           </Button>
         )}
@@ -1261,15 +1262,12 @@ export default function RemindersListV8() {
         }}
       >
         <div className={styles.moveBody}>
-          <Field label={<><span className={styles.moveLabel}>移動先のフォルダ</span></>}><SaveErrorField names={["moveDraft","move_draft"]}><Select
+          <Field label={<><span className={styles.moveLabel}>移動先のフォルダ</span></>}><SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
               aria-label="移動先のフォルダ"
               size="full"
               value={moveDraft}
               onChange={(value) => setMoveDraft(value)}
-              options={[
-                { value: '', label: '未分類' },
-                ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-              ]}
+              folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
             /></SaveErrorField></Field>
         </div>
       </ConfirmDialog>

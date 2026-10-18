@@ -129,10 +129,19 @@ export async function getStaffByApiKey(
   db: D1Database,
   apiKey: string,
 ): Promise<StaffMember | null> {
-  return db
-    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.api_key = ? AND sm.is_active = 1`)
+  const staff = await db
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.api_key = ? AND sm.is_active = 1
+      AND NOT EXISTS(SELECT 1 FROM platform_settings WHERE key='auth.staff_api_key.revoked_at:'||sm.id)`)
     .bind(...tenantStatusBindings(), apiKey)
     .first<StaffMember>();
+  if (!staff || staff.tenant_status !== 'active') return null;
+  // Guard the metadata write against a concurrent rotation or revocation.
+  const used = await db.prepare(`INSERT INTO platform_settings(key,value,updated_by,updated_at)
+    SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM staff_members sm WHERE sm.id=? AND sm.api_key=? AND sm.is_active=1
+      AND NOT EXISTS(SELECT 1 FROM platform_settings WHERE key='auth.staff_api_key.revoked_at:'||sm.id))
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at RETURNING key`)
+    .bind(`auth.staff_api_key.last_used_at:${staff.id}`, new Date().toISOString(), staff.id, jstNow(), staff.id, apiKey).first();
+  return used ? staff : null;
 }
 
 export async function getStaffByLineUserId(

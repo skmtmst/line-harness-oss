@@ -104,6 +104,7 @@
 /* B-159 / B-180：小さい注記も状態なら同じ22px・12/600。 */
 :root .badge {
   box-sizing: border-box;
+  width: fit-content;
   height: var(--tpl-badge-h);
   font-size: var(--text-caption); font-weight: 600; line-height: 18px;
 }

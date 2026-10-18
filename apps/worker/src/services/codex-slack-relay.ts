@@ -1,3 +1,4 @@
+import { normalizedHarnessErrorPath, harnessErrorCode, harnessErrorIncidentKey, type HarnessErrorReport } from './slack-error-summary.js';
 export type CodexSlackCategory = 'error' | 'idea' | 'fix' | 'decision';
 export type SlackTaskStatus = 'working' | 'review' | 'done';
 
@@ -438,12 +439,7 @@ async function ensureSlackChannelMembers(
       // channel from being used or block invitations for the remaining
       // operators. Keep the failure visible in Worker logs and retry it on
       // the next PR event.
-      console.warn(JSON.stringify({
-        event: 'slack_pr_channel_member_invite_failed',
-        channel,
-        member,
-        error: message,
-      }));
+      console.warn(JSON.stringify({"code":"slack_pr_channel_member_invite_failed"}));
     }
   }
 }
@@ -528,12 +524,7 @@ async function ensureUpcomingPrRangeChannelWithoutBlocking(
     // Preparing the next 100-PR channel is preventive maintenance. A missing
     // Slack scope or a temporary API failure must never suppress the current
     // PR report. Every event from #x90 through #x00 retries the preparation.
-    console.warn(JSON.stringify({
-      event: 'slack_upcoming_pr_range_prepare_failed',
-      prNumber,
-      nextRangeStart: nextPrRangeStartToPrepare(prNumber),
-      error: String(error),
-    }));
+    console.warn(JSON.stringify({"code":"slack_upcoming_pr_range_prepare_failed"}));
   }
 }
 
@@ -600,13 +591,7 @@ async function updateTrackedParentStatus(
       },
     }, fetcher);
   } catch (error) {
-    console.warn(JSON.stringify({
-      event: 'slack_parent_status_update_failed',
-      channel,
-      threadTs,
-      status,
-      error: String(error),
-    }));
+    console.warn(JSON.stringify({"code":"slack_parent_status_update_failed"}));
     if (strict) throw error;
   }
 }
@@ -978,7 +963,7 @@ async function refreshSlackCommandCenter(
       }, fetcher);
     }
   } catch (error) {
-    console.warn(JSON.stringify({ event: 'slack_command_center_refresh_failed', error: String(error) }));
+    console.warn(JSON.stringify({"code":"slack_command_center_refresh_failed"}));
     if (strict) throw error;
   }
 }
@@ -1084,12 +1069,7 @@ async function ensureOpenTask(
     }, fetcher);
     permalink = permalinkResult.permalink || permalink;
   } catch (error) {
-    console.warn(JSON.stringify({
-      event: 'slack_permalink_fallback',
-      sourceChannel,
-      sourceThreadTs,
-      error: String(error),
-    }));
+    console.warn(JSON.stringify({"code":"slack_permalink_fallback"}));
   }
   await slackApi(token, 'chat.postMessage', {
     channel: taskChannel,
@@ -1221,30 +1201,8 @@ export async function handleSlackTaskAction(
   return { status: value.status };
 }
 
-export type HarnessErrorReport = {
-  source: 'worker' | 'admin';
-  message: string;
-  path?: string;
-  stack?: string;
-  occurredAt?: string;
-};
-
-function normalizedHarnessErrorPath(value: string | undefined): string {
-  const raw = singleLine(value || 'unknown');
-  try {
-    const url = new URL(raw);
-    return `${url.origin}${url.pathname}`;
-  } catch {
-    return raw.replace(/[?#].*$/, '');
-  }
-}
-
-export function harnessErrorIncidentKey(report: HarnessErrorReport): string {
-  const path = normalizedHarnessErrorPath(report.path);
-  const httpStatus = report.message.match(/(?:api|http)(?:\s+error)?\s*:?\s*([45]\d{2})/i)?.[1];
-  if (httpStatus) return `${report.source}:${path}:http:${httpStatus}`;
-  return `${report.source}:${path}:${singleLine(report.message).toLowerCase()}`;
-}
+export { harnessErrorIncidentKey } from './slack-error-summary.js';
+export type { HarnessErrorReport } from './slack-error-summary.js';
 
 export async function reportHarnessErrorToSlack(
   config: CodexSlackRelayConfig,
@@ -1252,9 +1210,10 @@ export async function reportHarnessErrorToSlack(
   fetcher: typeof fetch = fetch,
 ): Promise<boolean> {
   if (!config.SLACK_BOT_TOKEN || !config.SLACK_ERROR_CHANNEL_ID) return false;
-  const message = sanitizeSlackContent(singleLine(report.message)).slice(0, 500) || '不明なエラー';
-  const path = sanitizeSlackContent(singleLine(report.path || '')).slice(0, 300);
-  const stack = sanitizeSlackContent(report.stack || '').split('\n').slice(0, 8).join('\n').slice(0, 1_200);
+  // Error input is untrusted. Regex redaction cannot recognize arbitrary names or
+  // secrets: only fixed codes/areas go to Slack, including its task metadata.
+  const message = harnessErrorCode(report);
+  const path = normalizedHarnessErrorPath(report.path);
   const fingerprint = taskIdForKey(harnessErrorIncidentKey(report)).slice(5);
   const runtimeSessionId = `runtime-${fingerprint}`;
   const taskId = taskIdForKey(`session:${runtimeSessionId}`);
@@ -1263,7 +1222,6 @@ export async function reportHarnessErrorToSlack(
     `発生元：${report.source === 'worker' ? 'Worker' : '管理画面'}`,
     path ? `場所：${path}` : '',
     `内容：${message}`,
-    stack ? `スタック：\n${stack}` : '',
     `エラーID：ERR-${fingerprint}`,
     `TASK-ID：${taskId}`,
   ].filter(Boolean).join('\n');
@@ -1274,7 +1232,8 @@ export async function reportHarnessErrorToSlack(
     sessionId: runtimeSessionId,
     operator: 'codex',
     content,
-    occurredAt: report.occurredAt || new Date().toISOString(),
+    occurredAt: report.occurredAt && Number.isFinite(Date.parse(report.occurredAt))
+      ? new Date(report.occurredAt).toISOString() : new Date().toISOString(),
     explicitCategory: 'error',
   }, fetcher);
   return true;

@@ -67,7 +67,7 @@ export async function dispatchWaitlistInvites(env: Env['Bindings'], accountId?: 
         const decline = table === 'booking_waitlist' ? waitlistDeclineUrl(liffBaseUrl, row.id) : `${book}&action=decline`;
         const sent = await sendAutomaticBookingLine(env, { accountId: row.account_id, to: row.line_user_id, text: `${formatSlotHeadline(row.starts_at, row.timezone ?? 'Asia/Tokyo')} に空きが出ました。\n${row.detail}\n${new Date(row.hold_expires_at).toLocaleTimeString('ja-JP', { timeZone: row.timezone ?? 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}まで仮押さえしています。\nこの時間で予約する：${book}\n今回は見送る：${decline}`, retryKey: row.notification_retry_key, featureId });
         if (sent) await db.prepare(`UPDATE ${table} SET notified_at=? WHERE id=? AND status='invited'`).bind(now, row.id).run();
-      } catch { console.error(JSON.stringify({ event: 'waitlist_invite_send_failed', kind: featureId })); }
+      } catch { console.error(JSON.stringify({"code":"waitlist_invite_send_failed"})); }
     }
   }
 }

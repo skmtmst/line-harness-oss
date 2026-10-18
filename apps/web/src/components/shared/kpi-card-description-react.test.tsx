@@ -42,6 +42,7 @@ describe('KpiCardの説明ポップオーバー', () => {
 
   it('閉じている間は短い状態だけ、開くと全文が読める', async () => {
     await render()
+    expect(host.querySelector('[data-kpi-label]')?.textContent).toBe('視聴')
     expect(host.textContent).toContain('未取得')
     expect(host.textContent).not.toContain('実際に見た区間の記録をまだ集計できないため')
 
@@ -52,6 +53,49 @@ describe('KpiCardの説明ポップオーバー', () => {
     await act(async () => { button!.click(); await Promise.resolve() })
     expect(button?.getAttribute('aria-expanded')).toBe('true')
     expect(host.textContent).toContain('実際に見た区間の記録をまだ集計できないため')
+  })
+
+  it('省略する補足の全文をtitleへ残し、文中の数と要素も失わない', async () => {
+    await render({ detail: <>タグ・<strong>シナリオ</strong>・対応マークなど {12}件</> })
+    const note = host.querySelector('[data-kpi-detail] [role="note"]')!
+    expect(note.textContent).toBe('タグ・シナリオ・対応マークなど 12件')
+    expect(note.getAttribute('title')).toBe(note.textContent)
+    expect(note.querySelector('strong')?.textContent).toBe('シナリオ')
+  })
+
+  it('括弧の前で補足を2行に分け、全文と行き先と再試行を保つ', async () => {
+    const retry = vi.fn(), action = vi.fn()
+    await render({ detail: '購読の数（再参加を含む）', detailLayout: 'qualifier', onRetry: retry, action: { label: '一覧を見る', onClick: action } })
+    const note = host.querySelector('[data-kpi-detail] [role="note"]')!
+    expect(note.textContent).toBe('購読の数\n（再参加を含む）')
+    expect(note.getAttribute('title')).toBe('購読の数（再参加を含む）')
+    const buttons = host.querySelectorAll<HTMLButtonElement>('[data-kpi-detail] button')
+    await act(async () => {
+      buttons[0].click()
+      buttons[1].click()
+    })
+    expect(retry).toHaveBeenCalledOnce()
+    expect(action).toHaveBeenCalledOnce()
+  })
+
+  it('絵に？がある題の指定だけ、説明の印を追加する', async () => {
+    await render({ helpDisplay: 'question' })
+    expect(host.querySelector('[data-kpi-label]')?.textContent).toBe('視聴?')
+    const button = host.querySelector('button[aria-label="視聴の説明"]') as HTMLButtonElement
+    await act(async () => { button.click() })
+    expect(host.textContent).toContain('実際に見た区間の記録をまだ集計できないため')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+    expect(document.activeElement).toBe(button)
+  })
+
+  it('印のない題も、題から説明と詳しい行き先を読める', async () => {
+    await render({ icon: null, helpHref: '/analytics', helpHrefLabel: '計算方法' })
+    expect(host.querySelector('[data-kpi-icon]')).toBeNull()
+    expect(host.querySelector('[data-kpi-label]')?.textContent).toBe('視聴')
+    const button = host.querySelector('button[aria-label="視聴の説明"]') as HTMLButtonElement
+    await act(async () => { button.click() })
+    expect(host.querySelector('a')?.getAttribute('href')).toBe('/analytics')
+    expect(host.querySelector('a')?.textContent).toBe('計算方法')
   })
 
   it('Escで閉じて説明アイコンへ戻る', async () => {

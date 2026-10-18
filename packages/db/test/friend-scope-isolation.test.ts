@@ -62,7 +62,9 @@ function makeDb(opts: { globalUniqueLineUserId: boolean }) {
   const lineUserIdColumn = opts.globalUniqueLineUserId
     ? 'line_user_id TEXT NOT NULL UNIQUE'
     : 'line_user_id TEXT NOT NULL';
-  sqlite.exec(`CREATE TABLE friends (${lineUserIdColumn}, ${FRIENDS_COLUMNS});`);
+  sqlite.exec(`CREATE TABLE line_accounts(id TEXT PRIMARY KEY, tenant_id TEXT);
+    INSERT INTO line_accounts(id,tenant_id) VALUES ('account-a',NULL),('account-b',NULL),('account-c',NULL);
+    CREATE TABLE friends (${lineUserIdColumn}, ${FRIENDS_COLUMNS});`);
   return { sqlite, db: asD1(sqlite) };
 }
 

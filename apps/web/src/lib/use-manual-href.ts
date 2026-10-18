@@ -31,3 +31,19 @@ export function useManualHref(pathname?: string): string | null {
   }, [path])
   return href
 }
+
+/**
+ * 手順（task）のガイドURLを正本表から引く（API 組2：keyKind=task）。
+ * 未設定・未確認・開けないときは null。受け側はボタンを出さない。
+ */
+export function useTaskManualHref(key: string): string | null {
+  const [href, setHref] = useState<string | null>(null)
+  useEffect(() => {
+    let live = true
+    api.manualLinks.lookup(key, 'task')
+      .then((res) => { if (live) setHref(res.success ? res.data.url : null) })
+      .catch(() => { if (live) setHref(null) })
+    return () => { live = false }
+  }, [key])
+  return href
+}

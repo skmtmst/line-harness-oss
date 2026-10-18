@@ -1,0 +1,217 @@
+/* G1 A/B テスト（QOdsh・cM35y・a5r5Wg・n4kwM・Eoi7q）。 */
+.tabsCard,
+.settingsCard,
+.resultCard {
+  --ab-pad: 20px;
+  --ab-bar-h: 26px;
+  --ab-variant-pad: 20px;
+  --ab-metric-size: 20px;
+  --ab-outline-offset: -2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-card);
+  padding: var(--ab-pad) var(--polish-space-section);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--polish-radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.tabsCard {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--polish-space-row);
+  padding: var(--polish-space-row) var(--polish-space-field);
+  border-color: var(--color-accent);
+}
+
+.settingsCard[data-on],
+.resultCard {
+  border-color: var(--color-accent);
+}
+
+.onlyA {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.note {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.settingsHead {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.title {
+  color: var(--color-ink);
+  font-size: var(--text-section);
+  font-weight: 700;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--polish-space-section);
+}
+
+.column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.ratioBar {
+  display: flex;
+  height: var(--ab-bar-h);
+  overflow: hidden;
+  border-radius: var(--polish-radius-small);
+  background: var(--color-surface-pearl);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+
+.ratioA,
+.ratioB {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding-inline: var(--polish-space-row);
+  color: var(--color-canvas);
+  white-space: nowrap;
+}
+
+.ratioA {
+  background: var(--color-accent);
+}
+
+.ratioB {
+  background: var(--color-status-info);
+}
+
+.ratioRest {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  padding-inline: var(--polish-space-row);
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metricRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--polish-space-card);
+}
+
+.info,
+.doneBand,
+.chooseBand {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+  padding: var(--polish-space-field) var(--polish-space-card);
+  border-radius: var(--polish-radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+
+.doneBand {
+  background: var(--color-accent-soft);
+}
+
+.chooseBand {
+  background: var(--color-warning-bg);
+}
+
+.chooseText {
+  min-width: 0;
+  flex: 1;
+}
+
+.infoIcon {
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+  flex: none;
+  color: var(--color-status-info);
+}
+
+.doneBand .infoIcon {
+  color: var(--color-accent-deep);
+}
+
+.variants {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--polish-space-card);
+}
+
+.variant {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+  padding: var(--ab-variant-pad);
+  /* カードの中の小箱（カードではない）：角丸は部品の丸み。影は重ねない。 */
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-control);
+}
+
+.variant[data-winner] {
+  border-color: var(--color-accent);
+  outline: 1px solid var(--color-accent);
+  outline-offset: var(--ab-outline-offset);
+}
+
+.variantHead {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.variantTitle {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--polish-space-field);
+}
+
+.metrics dt {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.metrics dd {
+  color: var(--color-ink);
+  font-size: var(--ab-metric-size);
+  font-weight: 600;
+  white-space: nowrap;
+}

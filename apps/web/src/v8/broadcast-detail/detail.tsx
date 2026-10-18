@@ -1,12 +1,12 @@
 'use client'
 
+import BroadcastAbResult, { abStatusDefinition, useAbResult } from '@/v8/broadcast-ab/result'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useState, type ReactNode, type RefObject } from 'react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import Link from '@/components/shared/list-navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,6 +20,7 @@ import {
   Send,
   Stamp,
   Trash2,
+  Undo2,
 } from 'lucide-react'
 import { notifyToast } from '@/components/shared/toast'
 import {
@@ -31,14 +32,17 @@ import {
 } from '@/lib/api'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
+import { DetailColumns } from '@/components/templates/detail-columns'
+import { ListPageSection } from '@/components/templates/list-page'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Progress from '@/components/shared/progress'
+import Notice from '@/components/shared/notice'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
 import { ApprovalRequestFields } from '@/components/broadcasts/broadcast-approval'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { formatNumber } from '@/lib/format'
@@ -54,24 +58,10 @@ import {
 } from './display'
 import styles from './detail.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
-/*
- * ★V8 一斉配信の詳細（2026-10-06 一から書き直し）。
- * 絵：下書き `cgiGB`（再撮 `dK1aE`）・承認待ち `pNiUk`（`wfHIE`）・送った後 `F3X1Mo`（`tPm3e`）・
- * ほかの人が更新した `Q28Gb`・予約の取り消しの窓 `BeNtj`。
- *
- * 白い板いっぱいに 板の頭（題＋札・1行の説明・進みの帯／右に操作）→（競合の帯）→ タブ →
- * 左の本文（余白 20・28、段の間 22）と右の欄（幅 380、配信した設定 → メッセージのスマホ）。
- * カードで囲まず、線で分ける（絵 `cgiGB` ほか）。
- *
- * 読み込み・承認・集計・競合の見張りは入口（app/broadcasts/detail/page.tsx）が持ち、
- * ここは見せ方と、この画面だけの操作（テスト送信・削除・予約の取り消し）を持つ。
- * 宛先・記録のタブの中身は入口から差し込む（古い画面の部品を import しないため）。
- */
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
@@ -170,11 +160,17 @@ export default function BroadcastDetail({
   const canTestSend = useFeatureAccess('broadcasts', 'test')
   const canExport = useFeatureAccess('broadcasts', 'export')
   const router = useRouter()
-  const { status: displayStatus, label: statusLabel } = displayStatusOf(broadcast)
+  const { status: displayStatus, label: baseStatusLabel } = displayStatusOf(broadcast)
+  /* G1：A/B の配信は状態を分けて札に出す（試し中・選んでください・残りへ送信中・送信済み）。 */
+  const abResult = useAbResult(broadcast.status === 'draft' ? null : broadcast.id)
+  const abStatus = abStatusDefinition(abResult.result)
+  const statusLabel = abStatus?.label ?? baseStatusLabel
+  const badgeTone = abStatus ? (abStatus.tone === 'neutral' ? 'info' : abStatus.tone) : BADGE_TONE[displayStatus]
   const isDraft = broadcast.status === 'draft'
   const isSent = broadcast.status === 'sent'
   const isScheduled = broadcast.status === 'scheduled'
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [asideExpanded, setAsideExpanded] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -280,15 +276,14 @@ export default function BroadcastDetail({
         crumbs={<><p className={styles.meta}>{metaLine(broadcast, audienceLabel)}</p></>}
         steps={<>{isDraft
             ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
-            : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} />}</>}
-        titleAccessory={<><span className={styles.badge} data-tone={BADGE_TONE[displayStatus]}>
+            : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} abWaiting={abResult.result?.status === 'undecided' || abResult.result?.status === 'testing'} />}</>}
+        titleAccessory={<><span className={styles.badge} data-tone={badgeTone}>
               <span className={styles.dot} aria-hidden="true" />
               {statusLabel}
             </span></>}
         actions={<>{canEdit ? (
             <>
               <RowMenu
-                className={styles.iconButton}
                 label={`配信「${broadcast.title}」の操作`}
                 items={menuItems}
               />
@@ -346,25 +341,8 @@ export default function BroadcastDetail({
         />
       </div>
 
-      <div className={styles.split}>
-        <div className={styles.main}>
-          {tab === 'recipients' ? recipients : tab === 'activity' ? activity : (
-            <Overview
-              broadcast={broadcast}
-              insight={insight}
-              insightState={insightState}
-              approval={approval}
-              canEdit={canEdit}
-              messageText={messageText}
-              scheduledLabel={scheduledLabel}
-              resumeLabel={`${resumeStep.order} ${resumeStep.label}から続ける`}
-              onReload={onReload}
-              onChase={() => router.push(chaseHref(broadcast.id))}
-            />
-          )}
-        </div>
+      <ListPageSection><DetailColumns presentation="notification" asideLabel="配信した設定とメッセージ" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<>
 
-        <aside className={styles.side} aria-label="配信した設定とメッセージ">
           <h3 className={styles.secTitle}>配信した設定</h3>
           <dl className={styles.rows}>
             <Row label="対象" value={`${audienceLabel} ${formatNumber(total)} 人`} />
@@ -399,8 +377,26 @@ export default function BroadcastDetail({
               time={timeOf(isSent ? broadcast.sentAt : broadcast.scheduledAt)}
             />
           </div>
-        </aside>
-      </div>
+
+</>}>
+<div className={styles.main}>
+          {tab === 'recipients' ? recipients : tab === 'activity' ? activity : (<>
+            <BroadcastAbResult broadcastId={broadcast.id} ab={abResult} canSend={canEdit} />
+            <Overview
+              broadcast={broadcast}
+              insight={insight}
+              insightState={insightState}
+              approval={approval}
+              canEdit={canEdit}
+              messageText={messageText}
+              scheduledLabel={scheduledLabel}
+              resumeLabel={`${resumeStep.order} ${resumeStep.label}から続ける`}
+              onReload={onReload}
+              onChase={() => router.push(chaseHref(broadcast.id))}
+            />
+          </>)}
+        </div>
+</DetailColumns></ListPageSection>
 
       <ConfirmDialog
         open={deleteOpen}
@@ -544,8 +540,10 @@ function DraftStepRail({ broadcastId, draftStep, canEdit }: { broadcastId: strin
  * 送るまでの6段階（絵 `F3X1Mo`・`pNiUk`）。承認が絡まない・予約しない
  * 配信はその段を省く。分かれ道（失敗・停止・期限切れ）は札で添える。
  */
-function DeliveryRail({ broadcast, approvalInvolved: withApproval }: { broadcast: ApiBroadcast; approvalInvolved: boolean }) {
-  const { status: displayStatus } = displayStatusOf(broadcast)
+/* abWaiting：A/B で残りの人への送信がまだ（選んでください・試し中）。段は「送信中」にとどめ、送信済みへ進めない。 */
+function DeliveryRail({ broadcast, approvalInvolved: withApproval, abWaiting = false }: { broadcast: ApiBroadcast; approvalInvolved: boolean; abWaiting?: boolean }) {
+  const { status: baseStatus } = displayStatusOf(broadcast)
+  const displayStatus = abWaiting && baseStatus === 'sent' ? 'sending' : baseStatus
   const scheduled = broadcast.status === 'scheduled' || broadcast.scheduledAt != null
   const steps = DELIVERY_STEPS.filter((step) => {
     if (step.key === 'pending_approval') return withApproval
@@ -564,10 +562,10 @@ function DeliveryRail({ broadcast, approvalInvolved: withApproval }: { broadcast
         const finished = displayStatus === 'sent' && index === currentIndex
         const state = index < currentIndex || finished ? 'done' : index === currentIndex ? 'current' : 'todo'
         return (
-          <li key={step.key} className={styles.railItem} data-state={state} data-finished={finished || undefined} data-kind="delivery">
+          <li key={step.key} className={`${styles.railItem} ${styles.railDelivery}`} data-delivery-stage={state} data-finished={finished || undefined} data-kind="delivery">
             {index > 0 ? <span className={styles.railLine} data-done={index <= currentIndex || undefined} aria-hidden="true" /> : null}
             <span className={styles.railStep}>
-              <span className={styles.railMark} aria-hidden="true">{state === 'done' ? <Check size={11} strokeWidth={3} /> : null}</span>
+              <span className={styles.railMark} aria-hidden="true">{state === 'done' && !finished ? <Check size={11} strokeWidth={3} /> : null}</span>
               <span className={styles.railLabel} aria-current={state === 'current' ? 'step' : undefined}>{step.label}</span>
             </span>
           </li>
@@ -643,9 +641,9 @@ function Overview({
         />
       ) : null}
       {state?.approval.status === 'pending' ? (
-        <p className={styles.deadline}>
+        <Notice tone="warn" appearance="soft" className={styles.deadline}>
           承認されないまま {scheduledLabel ?? '送る時刻'} を過ぎると、送らずに期限切れになります。
-        </p>
+        </Notice>
       ) : null}
 
       {canEdit && approval.canReRequest && state ? (
@@ -681,25 +679,25 @@ function Overview({
           countText={`${formatNumber(broadcast.successCount)} / ${formatNumber(total)} 件`}
         />
       ) : null}
-      <KpiBand density="compact">
+      <KpiBand>
         {isSent ? (
           <>
-            <KpiCard title="届いた" value={delivered} unit="人" detail={`送信成功 ${rateText(total > 0 ? delivered / total : null)}`} icon={null} presentation="band" />
-            <KpiCard title="開いた" value={insightReady ? opened : null} unit="人" detail={waiting ?? `開封 ${rateText(openRate)}`} icon={null} presentation="band" />
-            <KpiCard title="押した" value={insightReady ? insight?.uniqueClick ?? null : null} unit="人" detail={waiting ?? `クリック ${rateText(insight?.clickRate)}`} icon={null} presentation="band" />
+            <KpiCard title="届いた" value={delivered} unit="人" detail={`送信成功 ${rateText(total > 0 ? delivered / total : null)}`} presentation="band" />
+            <KpiCard title="開いた" value={insightReady ? opened : null} unit="人" detail={waiting ?? `開封 ${rateText(openRate)}`} presentation="band" />
+            <KpiCard title="押した" value={insightReady ? insight?.uniqueClick ?? null : null} unit="人" detail={waiting ?? `クリック ${rateText(insight?.clickRate)}`} presentation="band" />
             {/* ブロックは単独では取れない。届かなかった数（送信失敗を含む）を出し、内訳は下の「エラー」に書く。 */}
-            <KpiCard title="ブロック" value={failedCount} unit="人" detail={rateText(total > 0 ? failedCount / total : null)} icon={null} presentation="band" />
+            <KpiCard title="ブロック" value={failedCount} unit="人" detail={rateText(total > 0 ? failedCount / total : null)} presentation="band" />
           </>
         ) : (
           <>
             <KpiCard title="送信"
               value={broadcast.successCount}
               unit="件"
-              detail={scheduledLabel ? `${scheduledLabel} に送り始めます` : 'まだ送っていません'} icon={null} presentation="band"
+              detail={scheduledLabel ? `${scheduledLabel} に送り始めます` : 'まだ送っていません'} presentation="band"
             />
-            <KpiCard title="届いた" value={broadcast.successCount} unit="人" detail="送る前のため、まだありません" icon={null} presentation="band" />
-            <KpiCard title="開いた" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} icon={null} presentation="band" />
-            <KpiCard title="押した" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} icon={null} presentation="band" />
+            <KpiCard title="届いた" value={broadcast.successCount} unit="人" detail="送る前のため、まだありません" presentation="band" />
+            <KpiCard title="開いた" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} presentation="band" />
+            <KpiCard title="押した" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} presentation="band" />
           </>
         )}
       </KpiBand>
@@ -850,7 +848,7 @@ function ApprovalBox({
       </dl>
       {mine ? (
         <>
-          <div className={styles.field}><Field label="差し戻すときの理由" htmlFor="approval-reject-reason"><SaveErrorField names={["reason"]}><TextField
+          <div className={styles.field}><Field label="差し戻すときの理由" htmlFor="approval-reject-reason" required><SaveErrorField names={["reason"]}><TextField
               id="approval-reject-reason"
               maxLength={1000}
               value={reason}
@@ -864,7 +862,7 @@ function ApprovalBox({
               disabled={approval.busy || reason.trim() === ''}
               title={reason.trim() === '' ? '差し戻すときは理由が要ります' : undefined}
             >
-              <ArrowLeft aria-hidden="true" />
+              <Undo2 aria-hidden="true" />
               差し戻す
             </Button>
             <Button variant="primary" onClick={approval.onApprove} disabled={approval.busy}>

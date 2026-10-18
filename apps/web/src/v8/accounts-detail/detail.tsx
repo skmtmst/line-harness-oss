@@ -9,51 +9,30 @@
  * 編集 n9Z2P）は dialogs.tsx。データの口は今の画面（app/accounts/detail）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import Link from '@/components/shared/list-navigation'
-import { useSearchParams } from 'next/navigation'
-import { ArchiveRestore, ArrowLeftRight, Pause, Pencil, Play, QrCode } from 'lucide-react'
-import type { LineAccount } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import { formatDateTime } from '@/lib/format'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { SettingsPage } from '@/components/templates'
-import SettingsInnerNav from '@/components/layout/settings-inner-nav'
-import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-
-
-import StatusBadge from '@/components/shared/status-badge'
-import TargetMissing from '@/components/shared/target-missing'
-import {
-  ArchiveDialog,
-  CredentialsDialog,
-  EditDialog,
-  RestoreDialog,
-  StopDialog,
-  TestRecipientsDialog,
-  type CredentialKind,
-} from './dialogs'
-import {
-  archiveBlockedReason,
-  capacityDetails,
-  credentialLine,
-  friendsLine,
-  shortDateTime,
-  skippedKindLabel,
-  stateBadge,
-  summaryLine,
-  webhookMatch,
-  webhookUse,
-  type AccountDetailView,
-} from './view'
-import styles from './detail.module.css'
-
-import { emptyValue } from '@/components/shared/empty-value'
-import { DetailLoading } from '@/components/templates/detail-page'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
-
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ArchiveRestore, ArrowLeftRight, Pause, Pencil, Play, QrCode } from 'lucide-react';
+import type { LineAccount } from '@line-crm/shared';
+import { api, ApiError } from '@/lib/api';
+import { formatDateTime } from '@/lib/format';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { SettingsPage } from '@/components/templates';
+import SettingsInnerNav from '@/components/layout/settings-inner-nav';
+import Button from '@/components/shared/button';
+import SendersCard from './senders-card';
+import Card, { CardHeader } from '@/components/shared/card';
+import TruncatedText from '@/components/shared/truncated-text';
+import TextLink from '@/components/shared/text-link';
+import StatusBadge from '@/components/shared/status-badge';
+import TargetMissing from '@/components/shared/target-missing';
+import { ArchiveDialog, CredentialsDialog, EditDialog, RestoreDialog, StopDialog, TestRecipientsDialog, type CredentialKind } from './dialogs';
+import { archiveBlockedReason, capacityDetails, credentialLine, friendsLine, shortDateTime, skippedKindLabel, stateBadge, summaryLine, webhookMatch, webhookUse, type AccountDetailView } from './view';
+import styles from './detail.module.css';
+import { emptyValue } from '@/components/shared/empty-value';
+import { DetailLoading } from '@/components/templates/detail-page';
+import ReadOnlyNotice from '@/components/shared/read-only-notice';
+import { Row, Pair, ActionValue } from "./detail-gap-parts"
 type Skipped = Array<{ id: string; kind: string; title: string | null; skippedAt: string }>
 
 const CAN_DO = ['・友だち追加URLとQRはここに出ます', '・人ごとの既定のアカウントはここで決めます', '・接続の異常や停止は、ここで見張ります'].join('\n')
@@ -66,6 +45,7 @@ const LINKS = [
 ] as const
 
 export default function AccountDetailV8() {
+  const archiveReasonId = useId()
   const search = useSearchParams()
   const id = search?.get('id') ?? ''
   const role = useStaffRole()
@@ -271,8 +251,8 @@ export default function AccountDetailV8() {
         ) : null}
         <div className={styles.columns}>
           <div className={styles.main}>
-            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-basic">
-              <div className={styles.cardHead}><h3 id="acd-basic" className={styles.cardTitle}>登録の内容</h3></div>
+            <Card variant="form" aria-labelledby="acd-basic">
+              <CardHeader size="stacked" headingLevel={3} titleId="acd-basic" title="登録の内容" />
               <Row label="表示名">{account.name}</Row>
               <Row label="チャネルID">{account.channelId}</Row>
               <Row label="親アカウント">
@@ -285,27 +265,20 @@ export default function AccountDetailV8() {
               </Row>
               <Row label="タイムゾーン">{account.timezone ?? 'Asia/Tokyo'}</Row>
               <Row label="テスト送信先">
-                <span className={styles.inline}>
-                  <span className={styles.truncate} title={recipientValue}>{recipientValue}</span>
-                  {canManage ? (
-                    <Button type="button" variant="text" presentation="account-inline" onClick={() => setRecipientsOpen(true)}>変える</Button>
-                  ) : null}
-                </span>
+                <ActionValue value={recipientValue} action={canManage ? <Button type="button" variant="text" presentation="account-inline" onClick={() => setRecipientsOpen(true)}>変える</Button> : null} />
               </Row>
             </Card>
 
-            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-credentials">
-              <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-inner-pad)" gap="var(--tpl-acd-card-gap)" className={styles.inner}>
-                <h3 className={styles.cardTitle}>登録の内容（つづき）</h3>
+            <SendersCard accountId={account.id} accountName={account.name} />
+            <Card variant="form" aria-labelledby="acd-credentials">
+              <Card surface="inset" layout="vertical" padding="compact" gap="var(--polish-space-row)">
+                <CardHeader size="stacked" headingLevel={3} title="登録の内容（つづき）" />
                 <Pair label="友だち数"><span title={capacityDetails(account)}>{friendsLine(account)}</span></Pair>
                 <Pair label="状態"><span className={styles.end}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span></Pair>
                 <Pair label="国・地域">{account.country ?? emptyValue('unconfigured')}</Pair>
-                <Pair label="役割メモ">{account.role ?? emptyValue('unconfigured')}</Pair>
+                <Pair label="役割メモ"><TruncatedText value={account.role ?? emptyValue('unconfigured')} /></Pair>
               </Card>
-              <div className={styles.cardHead} id="acd-credentials-head">
-                <h3 id="acd-credentials" className={styles.cardTitle}>資格情報</h3>
-                <p className={styles.cardSub}>秘密値そのものは表示しません。差し替えるときは、新しい値を入れて保存し直します。</p>
-              </div>
+              <CardHeader size="stacked" headingLevel={3} titleId="acd-credentials" title="資格情報" meta="秘密値そのものは表示しません。差し替えるときは、新しい値を入れて保存し直します。" />
               <Row label="チャネルシークレット">
                 <ActionValue
                   value={credentialLine({ configured: account.channelSecretConfigured, last4: account.channelSecretLast4, updatedAt: null, checkedAt: account.connection?.lastTestAt ?? null })}
@@ -343,9 +316,9 @@ export default function AccountDetailV8() {
             </Card>
 
             {!account.isActive && !account.archivedAt ? (
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-skipped">
+              <Card variant="form" aria-labelledby="acd-skipped">
                 <div className={styles.cardHead}>
-                  <h3 id="acd-skipped" className={styles.cardTitle}>止まっている間に送らなかったもの</h3>
+                  <CardHeader size="stacked" headingLevel={3} titleId="acd-skipped" title="止まっている間に送らなかったもの" />
                   {account.inactivatedAt ? (
                     <p className={styles.cardSub}>
                       {formatDateTime(account.inactivatedAt)} から止まっています{account.inactiveReasonDetail ? `（理由: ${account.inactiveReasonDetail}）` : ''}
@@ -374,20 +347,20 @@ export default function AccountDetailV8() {
           </div>
 
           <aside className={styles.side}>
-            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-cando">
-              <div className={styles.cardHead}><h3 id="acd-cando" className={styles.cardTitle}>このアカウントでできること</h3></div>
+            <Card variant="aside" aria-labelledby="acd-cando">
+              <CardHeader size="stacked" headingLevel={3} titleId="acd-cando" title="このアカウントでできること" />
               <p className={styles.bullets}>{CAN_DO}</p>
               <Button href="/?qr=base" className={styles.fit}><QrCode size={14} aria-hidden="true" />友だち追加URLとQRを見る</Button>
             </Card>
-            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-careful">
-              <div className={styles.cardHead}><h3 id="acd-careful" className={styles.cardTitle}>気をつけること</h3></div>
+            <Card variant="aside" aria-labelledby="acd-careful">
+              <CardHeader size="stacked" headingLevel={3} titleId="acd-careful" title="気をつけること" />
               <p className={styles.bullets}>{CAREFUL}</p>
             </Card>
-            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-links">
-              <div className={styles.cardHead}><h3 id="acd-links" className={styles.cardTitle}>つながる先</h3></div>
+            <Card variant="aside" aria-labelledby="acd-links">
+              <CardHeader size="stacked" headingLevel={3} titleId="acd-links" title="つながる先" />
               <p className={styles.links}>
                 {LINKS.map((link, index) => (
-                  <span key={link.href}>{index > 0 ? '　' : ''}<Link href={link.href}>→ {link.label}</Link></span>
+                  <span key={link.href}>{index > 0 ? '　' : ''}<TextLink href={link.href}>{link.label}</TextLink></span>
                 ))}
               </p>
             </Card>
@@ -403,10 +376,10 @@ export default function AccountDetailV8() {
                       {account.isActive ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
                       {account.isActive ? '送受信を止める' : '送受信を再開する'}
                     </Button>
-                    <Button type="button" variant="danger" disabled={blocked !== null} onClick={() => setArchiveTarget(account)}>
+                    <Button type="button" variant="danger" disabled={blocked !== null} title={blocked ?? undefined} aria-describedby={blocked ? archiveReasonId : undefined} onClick={() => setArchiveTarget(account)}>
                       アーカイブする
                     </Button>
-                    {blocked ? <p className={styles.note}>{blocked}</p> : null}
+                    {blocked ? <p id={archiveReasonId} className={styles.note}>{blocked}</p> : null}
                   </>
                 )}
               </div>
@@ -422,36 +395,5 @@ export default function AccountDetailV8() {
       <CredentialsDialog account={credentials ? account : null} kind={credentials ?? 'messaging'} onClose={() => setCredentials(null)} onSaved={() => void load()} />
       <TestRecipientsDialog accountId={account.id} open={recipientsOpen} onClose={() => { setRecipientsOpen(false); void loadRecipients() }} />
     </div>
-  )
-}
-
-/** 札（幅150）と値の1行。上に線。 */
-function Row({ label, id, children }: { label: string; id?: string; children: ReactNode }) {
-  return (
-    <div className={styles.row} id={id}>
-      <span className={styles.rowLabel}>{label}</span>
-      <span className={styles.rowValue}>{children}</span>
-    </div>
-  )
-}
-
-/** つづきの段の1行。札と値を半分ずつ。下に線。 */
-function Pair({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className={styles.pair}>
-      <span className={styles.pairLabel}>{label}</span>
-      <span className={styles.pairValue}>{children}</span>
-    </div>
-  )
-}
-
-/** 値と、右端の操作。 */
-function ActionValue({ value, action }: { value: string; action: ReactNode }) {
-  return (
-    <span className={styles.actionValue}>
-      <span className={styles.muted} title={value}>{value}</span>
-      <span className={styles.spacer} />
-      {action}
-    </span>
   )
 }

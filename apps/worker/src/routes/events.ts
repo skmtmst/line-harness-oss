@@ -1,3 +1,8 @@
+import { normalizeEventQuestions, validateEventInput } from './event-input.js';
+import type { EventQuestion } from './event-input.js';
+export type { EventQuestion } from './event-input.js';
+import { eventModeRemaining } from '../services/event-mode-capacity.js';
+import { bad } from '../services/event-input-error.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { EventApplicationPreview } from '@line-crm/shared';
@@ -12,41 +17,50 @@ import type { EventApplicationPreview } from '@line-crm/shared';
 //
 // See: docs/superpowers/specs/2026-05-09-event-booking-design.md
 
+// Event booking feature HTTP routes.
+//
+// LIFF endpoints:    /api/liff/events/*           (account resolved from liffId)
+// Admin endpoints:   /api/events/admin/events/*   (account_id query param)
+//
+// All UUIDs via crypto.randomUUID(). Time columns (starts_at / ends_at /
+// requested_at / scheduled_at / decided_at / cancelled_at / expires_at) are
+// written by the Worker as UTC ISO8601 (Z-suffixed).
+//
+// See: docs/superpowers/specs/2026-05-09-event-booking-design.md
+// Event booking feature HTTP routes.
+//
+// LIFF endpoints:    /api/liff/events/*           (account resolved from liffId)
+// Admin endpoints:   /api/events/admin/events/*   (account_id query param)
+//
+// All UUIDs via crypto.randomUUID(). Time columns (starts_at / ends_at /
+// requested_at / scheduled_at / decided_at / cancelled_at / expires_at) are
+// written by the Worker as UTC ISO8601 (Z-suffixed).
+//
+// See: docs/superpowers/specs/2026-05-09-event-booking-design.md
+// Event booking feature HTTP routes.
+//
+// LIFF endpoints:    /api/liff/events/*           (account resolved from liffId)
+// Admin endpoints:   /api/events/admin/events/*   (account_id query param)
+//
+// All UUIDs via crypto.randomUUID(). Time columns (starts_at / ends_at /
+// requested_at / scheduled_at / decided_at / cancelled_at / expires_at) are
+// written by the Worker as UTC ISO8601 (Z-suffixed).
+//
+// See: docs/superpowers/specs/2026-05-09-event-booking-design.md
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt, rescheduleByTrigger } from '../services/reminder-trigger.js';
-import {
-  EVENT_NAME_MAX,
-  EVENT_DESCRIPTION_MAX,
-  CUSTOMER_NOTE_MAX,
-  EVENT_IDEMPOTENCY_TTL_MINUTES,
-  EVENT_APPROVAL_DEADLINE_HOURS,
-  type EventTargetType,
-} from '../services/event-booking-types.js';
+import { CUSTOMER_NOTE_MAX, EVENT_IDEMPOTENCY_TTL_MINUTES, type EventTargetType } from '../services/event-booking-types.js';
 import { getSlotsWithRemaining } from '../services/event-availability.js';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { computeIdentityKey } from '../lib/identity-key.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
-import {
-  reserveEventIdempotency,
-  finalizeEventIdempotencyResponse,
-} from '../services/event-booking-idempotency.js';
-import {
-  computeRemindersForBooking,
-  insertRemindersForBooking,
-  cancelPendingRemindersFor,
-} from '../services/event-booking-reminders.js';
-import {
-  sendEventBookingNotification,
-  type EventNotificationKind,
-} from '../services/event-booking-notifier.js';
-import {
-  canTransition,
-  nextStatus,
-  type EventBookingAction,
-} from '../services/event-booking-state.js';
+import { reserveEventIdempotency, finalizeEventIdempotencyResponse } from '../services/event-booking-idempotency.js';
+import { computeRemindersForBooking, insertRemindersForBooking, cancelPendingRemindersFor } from '../services/event-booking-reminders.js';
+import { sendEventBookingNotification, type EventNotificationKind } from '../services/event-booking-notifier.js';
+import { canTransition, nextStatus, type EventBookingAction } from '../services/event-booking-state.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
@@ -56,6 +70,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   acceptEventWaitlistOffer,
   getEventWaitlistOffer,
+  getEventWaitlistOfferAccountId,
   getMyEventWaitlist,
   cancelMyEventWaitlist,
   createEventWaitlistOfferSender,
@@ -95,17 +110,6 @@ function optionalExecutionCtx(c: Context<Env>): ExecutionContext | undefined {
 
 // ----------------------------------------------------------------
 // Helpers
-
-function bad(c: Context<Env>, code: string, status = 422, fieldKeys: readonly string[] = []): Response {
-  const simpleFields = new Set(['name', 'description', 'venue_name', 'venue_address', 'venue_url', 'image_url', 'og_image_url',
-    'confirmation_message_extra', 'reminder_message_extra', 'cancel_deadline_hours_before', 'reminder_hours_before',
-    'max_bookings_per_friend', 'entry_cutoff_hours_before', 'sort_order', 'approval_deadline_hours', 'target_type',
-    'account_ids', 'dedup_priority', 'questions', 'starts_at', 'ends_at', 'capacity', 'is_active', 'client_key']);
-  const field = code.replace(/^invalid_/, '').replace(/_required$/, '');
-  const special: Record<string, string[]> = { waitlist_reason_required: ['reason'], expected_version_required: ['expectedVersion'], account_id_required: ['account_id'] };
-  const exact = special[code] ?? (simpleFields.has(field) ? [field] : code === 'invalid_slot_range' ? ['starts_at', 'ends_at'] : fieldKeys);
-  return inputError(c, { error: code }, status as 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429, exact);
-}
 
 // account_id is supplied by the admin client, so validate it once at the
 // route boundary before any event or booking data is read or changed.
@@ -227,68 +231,6 @@ function serializeAnswerSnapshot(value: unknown): { ok: true; json: string | nul
   }
 }
 
-// ----------------------------------------------------------------
-// 申込時のカスタム質問 (#841)
-// events.questions_json に定義、event_bookings.answer_snapshot_json に
-// {質問id: 回答} として保存する。id が変わると過去の回答と紐付かなくなるので、
-// 画面が送ってきた id はそのまま採用し、無い分だけ連番で補う。
-// ----------------------------------------------------------------
-
-const EVENT_QUESTION_TYPES = new Set(['text', 'textarea', 'radio', 'checkbox']);
-const EVENT_QUESTIONS_MAX = 10;
-const EVENT_QUESTION_LABEL_MAX = 100;
-const EVENT_QUESTION_OPTIONS_MAX = 20;
-const EVENT_QUESTION_OPTION_MAX = 100;
-
-export interface EventQuestion {
-  id: string;
-  label: string;
-  type: 'text' | 'textarea' | 'radio' | 'checkbox';
-  required: boolean;
-  options: string[] | null;
-}
-
-function normalizeEventQuestions(
-  value: unknown,
-): { ok: true; questions: EventQuestion[] } | { ok: false; code: string } {
-  if (value == null) return { ok: true, questions: [] };
-  if (!Array.isArray(value) || value.length > EVENT_QUESTIONS_MAX) {
-    return { ok: false, code: 'invalid_questions' };
-  }
-  const used = new Set<string>();
-  const out: EventQuestion[] = [];
-  for (const [i, raw] of value.entries()) {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      return { ok: false, code: 'invalid_questions' };
-    }
-    const q = raw as Record<string, unknown>;
-    const label = typeof q.label === 'string' ? q.label.trim() : '';
-    if (!label || label.length > EVENT_QUESTION_LABEL_MAX) {
-      return { ok: false, code: 'invalid_questions' };
-    }
-    const type = String(q.type ?? '');
-    if (!EVENT_QUESTION_TYPES.has(type)) {
-      return { ok: false, code: 'invalid_questions' };
-    }
-    let options: string[] | null = null;
-    if (type === 'radio' || type === 'checkbox') {
-      if (!Array.isArray(q.options) || q.options.length === 0
-          || q.options.length > EVENT_QUESTION_OPTIONS_MAX
-          || !q.options.every((o) => typeof o === 'string' && o.trim().length > 0 && o.length <= EVENT_QUESTION_OPTION_MAX)) {
-        return { ok: false, code: 'invalid_questions' };
-      }
-      options = (q.options as string[]).map((o) => o.trim());
-    }
-    const id = typeof q.id === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(q.id)
-      ? q.id
-      : `q${i + 1}`;
-    if (used.has(id)) return { ok: false, code: 'invalid_questions' };
-    used.add(id);
-    out.push({ id, label, type: type as EventQuestion['type'], required: q.required === true, options });
-  }
-  return { ok: true, questions: out };
-}
-
 function parseEventQuestions(json: unknown): EventQuestion[] {
   if (typeof json !== 'string' || !json) return [];
   try {
@@ -359,103 +301,6 @@ interface EventInput {
   sort_order?: number;
   confirmation_message_extra?: string | null;
   reminder_message_extra?: string | null;
-}
-
-function validateEventInput(
-  body: Record<string, unknown>,
-  isCreate: boolean,
-): { ok: true } | { ok: false; code: string } {
-  const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
-  if (isCreate || has('name')) {
-    const name = body.name;
-    // 空白だけの名前は通さない(点検#520軽14)。画面はtrim検査済みだがAPIは未検査だった。
-    if (typeof name !== 'string' || name.trim().length === 0 || name.length > EVENT_NAME_MAX) {
-      return { ok: false, code: 'invalid_name' };
-    }
-  }
-  if (has('description') && body.description != null) {
-    const d = body.description;
-    if (typeof d !== 'string' || d.length > EVENT_DESCRIPTION_MAX) {
-      return { ok: false, code: 'invalid_description' };
-    }
-  }
-  if (has('venue_name') && body.venue_name != null && (typeof body.venue_name !== 'string' || body.venue_name.length > 255)) return { ok: false, code: 'invalid_venue_name' };
-  if (has('venue_address') && body.venue_address != null && (typeof body.venue_address !== 'string' || body.venue_address.length > 1000)) return { ok: false, code: 'invalid_venue_address' };
-  // LIFF側はURLをそのまま出している。空は許すが、中身があるときは
-  // http(s)だけにする。javascript: などが保存されると友だち側で
-  // 想定外の動きになる。LIFF側の表示がわりは別票の範囲。
-  for (const key of ['venue_url', 'image_url', 'og_image_url'] as const) {
-    if (has(key) && body[key] != null && body[key] !== '') {
-      const v = body[key];
-      if (typeof v !== 'string' || !/^https?:\/\//i.test(v)) {
-        return { ok: false, code: `invalid_${key}` };
-      }
-    }
-  }
-  for (const key of ['confirmation_message_extra', 'reminder_message_extra'] as const) {
-    if (has(key) && body[key] != null) {
-      const v = body[key];
-      if (typeof v !== 'string' || v.length > 2000) {
-        return { ok: false, code: `invalid_${key}` };
-      }
-    }
-  }
-  for (const key of [
-    'cancel_deadline_hours_before',
-    'reminder_hours_before',
-    'max_bookings_per_friend',
-    'entry_cutoff_hours_before',
-  ] as const) {
-    if (has(key) && body[key] != null) {
-      const v = body[key];
-      if (!Number.isInteger(v) || (v as number) < 0) {
-        return { ok: false, code: `invalid_${key}` };
-      }
-    }
-  }
-  // waitlist_enabled は画面が `=== 1` で読むので2等を保存させない(点検#520軽14)。
-  for (const key of ['description_centered', 'requires_approval', 'reminder_day_before_enabled', 'is_published', 'waitlist_enabled'] as const) {
-    if (has(key) && body[key] != null) {
-      const v = body[key];
-      if (v !== 0 && v !== 1) return { ok: false, code: `invalid_${key}` };
-    }
-  }
-  if (has('sort_order') && body.sort_order != null) {
-    if (!Number.isInteger(body.sort_order) || (body.sort_order as number) < 0) {
-      return { ok: false, code: 'invalid_sort_order' };
-    }
-  }
-  if (has('approval_deadline_hours')) {
-    const hours = body.approval_deadline_hours;
-    if (!EVENT_APPROVAL_DEADLINE_HOURS.includes(hours as 2 | 24 | 72)) {
-      return { ok: false, code: 'invalid_approval_deadline_hours' };
-    }
-  }
-  if (has('target_type') && body.target_type != null) {
-    if (body.target_type !== 'single' && body.target_type !== 'multi-account-dedup') {
-      return { ok: false, code: 'invalid_target_type' };
-    }
-  }
-  if (body.target_type === 'multi-account-dedup') {
-    const ids = body.account_ids;
-    if (!Array.isArray(ids) || ids.length === 0 || !ids.every((x) => typeof x === 'string' && x.length > 0)) {
-      return { ok: false, code: 'invalid_account_ids' };
-    }
-    if (body.dedup_priority != null) {
-      if (!Array.isArray(body.dedup_priority) || !body.dedup_priority.every((x) => typeof x === 'string')) {
-        return { ok: false, code: 'invalid_dedup_priority' };
-      }
-      const idSet = new Set(ids as string[]);
-      if (!(body.dedup_priority as string[]).every((x) => idSet.has(x))) {
-        return { ok: false, code: 'dedup_priority_not_subset' };
-      }
-    }
-  }
-  if (has('questions') && body.questions != null) {
-    const q = normalizeEventQuestions(body.questions);
-    if (!q.ok) return { ok: false, code: q.code };
-  }
-  return { ok: true };
 }
 
 // ============================================================
@@ -1448,12 +1293,12 @@ events.post(
               });
               notified += 1;
             } catch (error) {
-              console.error('[event-change] notify failed:', error);
+              console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/change-review/apply"}));
             }
           }
         }
       } catch (error) {
-        console.error('[event-change] notify setup failed:', error);
+        console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/change-review/apply"}));
       }
       await markChangeLogNotified(c.env.DB, result.logId, notified);
     }
@@ -1758,7 +1603,7 @@ events.get(
         },
       });
     } catch (error) {
-      console.error('GET /api/events/admin/occurrences/:id/applicants.csv error:', error);
+      console.error(JSON.stringify({"code":"routes_events_failed","route":"GET /api/events/admin/occurrences/:id/applicants.csv"}));
       return c.json({ error: 'applicants_export_failed' }, 500);
     }
   },
@@ -1829,7 +1674,7 @@ events.post(
       }
       return c.json({ success: true, data: { broadcastId: broadcast.id, recipientCount: friendIds.length } }, 201);
     } catch (error) {
-      console.error('POST /api/events/admin/occurrences/:id/applicant-broadcasts/preview error:', error);
+      console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/occurrences/:id/applicant-broadcasts/preview"}));
       return c.json({ error: 'applicant_broadcast_preview_failed' }, 500);
     }
   },
@@ -1882,7 +1727,7 @@ events.post(
       }
       return c.json({ success: true, data: result });
     } catch (error) {
-      console.error('[event-waitlist] manual promotion failed', error);
+      console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/occurrences/:id/waitlist/promote"}));
       return c.json({ error: 'waitlist_notification_failed' }, 503);
     }
   },
@@ -2134,7 +1979,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
               startsAtIso: oldStartsAt,
             });
           } catch (compensationError) {
-            console.error('slot reminder compensation failed:', compensationError);
+            console.error(JSON.stringify({"code":"routes_events_failed","route":"PUT /api/events/admin/events/:id/slots/:slotId"}));
           }
         }
         throw error;
@@ -2183,7 +2028,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
 events.get('/api/liff/events/me', async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const friend = await c.env.DB
     .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
@@ -2250,7 +2095,7 @@ events.get('/api/liff/events/me', async (c) => {
 async function eventWaitlistCaller(c: Context<Env>) {
   const lineAccountId = await resolveAccountIdFromLiff(c);
   if (!lineAccountId) return bad(c, 'liff_account_resolution_failed', 400, []);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, lineAccountId);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   return { lineAccountId, callerLineUserId };
 }
@@ -2282,7 +2127,7 @@ events.post('/api/liff/events/me/waitlist/:waitlistId/cancel', inputJsonBoundary
 events.get('/api/liff/events/me/:bookingId', async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const friend = await c.env.DB
     .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
@@ -2319,7 +2164,7 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
 events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const friend = await c.env.DB
     .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
@@ -2444,7 +2289,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
   const idemKey = c.req.header('Idempotency-Key');
   if (!idemKey) return bad(c, 'idempotency_key_required', 400, []);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const friend = await c.env.DB
     .prepare(
@@ -2484,7 +2329,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
   try {
     return await runChangeFlow();
   } catch (e) {
-    console.error('[event-booking] change flow threw', e);
+    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/liff/bookings/:id/change"}));
     return finalize(500, { error: 'internal_error' });
   }
 
@@ -2676,7 +2521,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
         sourceEventId: newId,
         eventId: event.id,
         lineAccountId: account_id,
-      }).catch((err) => console.error('reminder enroll (event change) failed:', err));
+      }).catch((err) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/liff/bookings/:id/change"})));
     }
     // 空いた旧回の席を待ちへ回す（取消と同じ1回だけの起動）。
     await enqueueEventWaitlistPromotion(c.env.DB, {
@@ -2730,7 +2575,7 @@ events.get('/api/liff/events/:id', async (c) => {
     | null = null;
   let caller: string | null = null;
   try {
-    caller = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+    caller = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   } catch {
     caller = null;
   }
@@ -2857,6 +2702,9 @@ function startsAtJst(utcIso: string): string {
 events.get('/api/liff/events/waitlist/:token', async (c) => {
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  const offerAccountId = await getEventWaitlistOfferAccountId(c.env.DB, c.req.param('token'));
+  if (!offerAccountId) return bad(c, 'waitlist_offer_not_found', 404);
+  if (!await verifyCallerLineUserId(c.req.header('Authorization'), c.env, offerAccountId)) return bad(c, 'unauthorized', 401);
   const data = await getEventWaitlistOffer(c.env.DB, { token: c.req.param('token'), callerLineUserId });
   if (!data) return bad(c, 'waitlist_offer_not_found', 404);
   return c.json({ success: true, data });
@@ -2865,6 +2713,9 @@ events.get('/api/liff/events/waitlist/:token', async (c) => {
 events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), async (c) => {
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  const offerAccountId = await getEventWaitlistOfferAccountId(c.env.DB, c.req.param('token'));
+  if (!offerAccountId) return bad(c, 'waitlist_offer_not_found', 404);
+  if (!await verifyCallerLineUserId(c.req.header('Authorization'), c.env, offerAccountId)) return bad(c, 'unauthorized', 401);
   const result = await acceptEventWaitlistOffer(c.env.DB, {
     token: c.req.param('token'),
     callerLineUserId,
@@ -2880,7 +2731,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     reminder_hours_before: result.reminderHoursBefore,
   });
   await insertRemindersForBooking(c.env.DB, result.bookingId, reminders)
-    .catch((error) => console.error('waitlist acceptance reminder creation failed', error));
+    .catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
   await enrollByTrigger(c.env.DB, {
     triggerType: 'event',
     friendId: result.friendId,
@@ -2889,7 +2740,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     sourceEventId: result.bookingId,
     eventId: result.eventId,
     lineAccountId: result.lineAccountId,
-  }).catch((error) => console.error('waitlist acceptance reminder enroll failed', error));
+  }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
   await awardActivityMileage(c.env.DB, {
     eventType: 'booking_created',
     source: 'event_booking',
@@ -2900,7 +2751,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
       eventId: result.eventId, slotId: result.occurrenceId,
     },
     occurredAt: new Date().toISOString(),
-  }).catch((error) => console.error('waitlist acceptance mileage failed', error));
+  }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
   await applyActionScoreEvent(c.env.DB, {
     lineAccountId: result.lineAccountId,
     friendId: result.friendId,
@@ -2909,7 +2760,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     sourceEventId: result.bookingId,
     subjectKey: result.eventId,
     occurredAt: new Date().toISOString(),
-  }).catch((error) => console.error('waitlist acceptance action score failed', error));
+  }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
 
   if (result.newlyConverted) {
     const automation = dispatchAutomationEventWithLogging(c.env.DB, {
@@ -2921,7 +2772,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
         bookingType: 'event', bookingId: result.bookingId,
         eventId: result.eventId, slotId: result.occurrenceId,
       },
-    }).catch((error) => console.error('waitlist acceptance automation failed', error));
+    }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
     const executionCtx = optionalExecutionCtx(c);
     if (executionCtx) executionCtx.waitUntil(automation);
     else await automation;
@@ -2954,7 +2805,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
         });
       }
     } catch (error) {
-      console.error('waitlist acceptance notification failed', error);
+      console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"}));
     }
   }
 
@@ -2973,7 +2824,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
   const idemKey = c.req.header('Idempotency-Key');
   if (!idemKey) return bad(c, 'idempotency_key_required', 400, []);
-  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
 
   // is_following=1 必須: フォロー解除した友だちは push が届かない。
@@ -3024,7 +2875,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   try {
     return await runBookingFlow();
   } catch (e) {
-    console.error('[event-booking] booking flow threw', e);
+    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}));
     return finalize(500, { error: 'internal_error' });
   }
 
@@ -3061,6 +2912,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     slot_id?: string;
     customer_note?: string | null;
     party_size?: unknown;
+    participation_mode?: unknown;
     answers?: unknown;
   };
   if (typeof body.slot_id !== 'string' || body.slot_id.length === 0) {
@@ -3076,6 +2928,8 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     return finalize(422, { error: 'invalid_party_size' });
   }
   const partySize = requestedPartySize as number;
+  const participationMode=body.participation_mode??'classroom';
+  if(participationMode!=='classroom'&&participationMode!=='online')return finalize(422,{error:'invalid_participation_mode'});
   const answerSnapshot = serializeAnswerSnapshot(body.answers);
   if (!answerSnapshot.ok) return finalize(422, { error: 'invalid_answers' });
   // 必須の質問に答えていない申込は受け付けない。定義に無いidへの回答は
@@ -3150,8 +3004,8 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
            (id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
             party_size, answer_snapshot_json, first_participation,
             first_participation_attended_count, first_participation_checked_at,
-            event_version_id, event_snapshot_json, created_at, updated_at)
-         SELECT ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?
+            event_version_id, event_snapshot_json, created_at, updated_at, participation_mode)
+         SELECT ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           WHERE NOT EXISTS (
             SELECT 1 FROM event_bookings
              WHERE event_id = ? AND slot_id = ? AND identity_key = ?
@@ -3179,6 +3033,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
         bookingSnapshotJson,
         firstParticipationCheckedAt,
         firstParticipationCheckedAt,
+        participationMode,
         event.id, slot.id, identityKey,
         event.max_bookings_per_friend, event.id, identityKey, event.max_bookings_per_friend,
       )
@@ -3235,6 +3090,9 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     }
   }
 
+  const modeRemaining=await eventModeRemaining(c.env.DB,slot.id,participationMode);
+  if(modeRemaining!==null&&partySize>modeRemaining){if(event.waitlist_enabled===1)return enterWaitlist();return finalize(409,{error:'slot_full'});}
+
   // 同一人物 (cross-account) の active 予約数を identity_key ベースでカウント。
   // 重複制限ロジック:
   //   - max=null: 制限なし (admin UI の「制限なし」と整合)、チェックスキップ
@@ -3287,8 +3145,8 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
           requested_at, identity_key, party_size, answer_snapshot_json,
           first_participation, first_participation_attended_count,
           first_participation_checked_at, event_version_id, event_snapshot_json,
-          approval_expires_at)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          approval_expires_at, participation_mode)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         WHERE NOT EXISTS (
           SELECT 1 FROM event_waitlist
            WHERE event_id = ? AND slot_id = ? AND identity_key = ?
@@ -3306,13 +3164,15 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       body.customer_note ?? null, nowIso, identityKey, partySize,
       answerSnapshot.json, firstParticipationIsFirst, priorAttendedCount,
       firstParticipationCheckedAt,
-      event.current_published_version_id, bookingSnapshotJson, approvalExpiresAt,
+      event.current_published_version_id, bookingSnapshotJson, approvalExpiresAt, participationMode,
       event.id, slot.id, identityKey,
       event.max_bookings_per_friend, event.id, identityKey,
       event.id, identityKey, event.max_bookings_per_friend,
     )
     .run();
   if ((bookingInserted.meta?.changes ?? 0) === 0) {
+    const remaining=await eventModeRemaining(c.env.DB,slot.id,participationMode);
+    if(remaining!==null&&remaining<partySize){if(event.waitlist_enabled===1)return enterWaitlist();return finalize(409,{error:'slot_full'});}
     // 同じ回の待ちが先に成立した場合は、その順番・人数・回答を維持する。
     // 別の回のwaitingは予約上限を消費せず、席を保留したoffered/acceptedだけ数える。
     const waiting = await c.env.DB
@@ -3410,7 +3270,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     occurredAt: nowIso,
   }).catch((error) => {
     // 予約成立後の派生処理なので、スコア側の障害で予約を失敗扱いにしない。
-    console.error('event booking action score failed:', error);
+    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}));
   });
   const actionScoreExecutionCtx = optionalExecutionCtx(c);
   if (actionScoreExecutionCtx) actionScoreExecutionCtx.waitUntil(actionScorePromise);
@@ -3436,7 +3296,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       sourceEventId: id,
       eventId: event.id,
       lineAccountId: account_id,
-    }).catch((err) => console.error('reminder enroll (event) failed:', err));
+    }).catch((err) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"})));
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
         lineAccountId: account_id,
@@ -3447,7 +3307,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
           bookingType: 'event', bookingId: id, eventId: event.id, slotId: slot.id,
         },
       })
-        .catch((error) => console.error('event booking automation event failed:', error)),
+        .catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}))),
     );
   }
 
@@ -3485,13 +3345,12 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       });
     }
   } catch (e) {
-    console.error('[event-booking] notify failed', e);
+    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}));
   }
 
   return finalize(201, { id, status });
   } // close runBookingFlow
 });
-
 
 events.delete('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
@@ -3777,7 +3636,7 @@ async function notifyBookingFriend(
       },
     });
   } catch (e) {
-    console.error('[event-booking] notify failed', e);
+    console.error(JSON.stringify({"code":"routes_events_failed"}));
   }
 }
 
@@ -3951,7 +3810,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         sourceEventId: booking.id,
         eventId: booking.event_id,
         lineAccountId: booking.line_account_id,
-      }).catch((err) => console.error('reminder enroll (event decide) failed:', err));
+      }).catch((err) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/bookings/:bookingId/decide"})));
     }
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
@@ -3964,7 +3823,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
           eventId: booking.event_id, slotId: booking.slot_id,
         },
       })
-        .catch((error) => console.error('event booking automation event failed:', error)),
+        .catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/admin/events/:id/bookings/:bookingId/decide"}))),
     );
   }
   if (action === 'reject') {

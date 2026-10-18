@@ -47,6 +47,7 @@ export interface TopBarProps {
   /** 統括配下ではアカウントを切り替えないため非表示にする。 */
   showAccountSwitcher?: boolean
   roleLabel: string
+  accountScopeLabel?: string
   /**
    * 権限バッジを押したときの行き先。渡さなければ押せない印のまま。
    * 統括は、ここから店舗の一覧へ戻る（本文に別のボタンを置かない）。
@@ -123,6 +124,7 @@ export default function TopBar({
   onAccountChange,
   showAccountSwitcher = true,
   roleLabel,
+  accountScopeLabel,
   onRoleClick,
   userName,
   onLogout,
@@ -217,7 +219,8 @@ export default function TopBar({
               先頭の「ホーム」は重ねない（`ホーム › ホーム › 画面名` になる）。
               何も渡さない画面はアカウント名を出さず題だけにする（絵の指示）。
             */}
-            {(crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').map((crumb) => (
+            {/* 題がまだ無い（対象が見つからない画面など）ときは、最後の段を今の場所にして空の「›」を残さない（tSgl6）。 */}
+            {(crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').filter((_crumb, index, list) => title || index < list.length - 1).map((crumb) => (
               <span key={crumb.label} className={styles.crumbFromWrap}>
                 {crumb.onSelect ? (
                   /*
@@ -234,7 +237,8 @@ export default function TopBar({
                 <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
               </span>
             ))}
-            <h1 className={styles.crumbCurrent} title={title}>{titleHref ? <Link href={titleHref} className={styles.crumbCurrentLink}>{title}</Link> : title}</h1>
+            {title ? <h1 className={styles.crumbCurrent} title={title}>{titleHref ? <Link href={titleHref} className={styles.crumbCurrentLink}>{title}</Link> : title}</h1>
+              : (() => { const last = (crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').at(-1); return last ? <h1 className={styles.crumbCurrent} title={last.label}>{last.href ? <Link href={last.href} className={styles.crumbCurrentLink}>{last.label}</Link> : last.label}</h1> : null })()}
           </nav>
         </div>
       ) : null}
@@ -279,11 +283,7 @@ export default function TopBar({
             */}
             {roleLabel ? (
               <span className={styles.pillText}>
-                {/*
-                  札の中の小さい字は「LINEアカウント」で固定（絵の指示）。
-                  の行なので v7 の札は変わらない。
-                */}
-                <span className={`${styles.pillRole}`}>{hq ? '統括' : 'LINEアカウント'}</span>
+                <span className={`${styles.pillRole}`}>{accountScopeLabel ?? (hq ? '統括' : 'LINEアカウント')}</span>
                 {/* ★V8 統括の画面：札は統括にいることを示す（絵 `V8-B/JKjsE`）。v7 は今までどおり。 */}
                 {hq ? (
                   <>

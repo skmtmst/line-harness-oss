@@ -60,12 +60,11 @@ export function useAttributeTab(path: string): { tab: AttributeTabKey; select: (
 
 export function AttributeTabs({ tab, onSelect }: { tab: AttributeTabKey; onSelect: (key: AttributeTabKey) => void }) {
   return (
-    <div className={styles.tabsBox}>
       <Tabs
+        size="compact"
         label="タグの種類"
         items={ATTRIBUTE_TABS.map(([key, label]) => ({ label, current: tab === key, onClick: () => onSelect(key) }))}
       />
-    </div>
   )
 }
 
@@ -117,6 +116,13 @@ export function cleanupTagCount(rows: Pick<HqTemplate, 'friend_count' | 'name'>[
   const seen = new Map<string, number>()
   for (const row of rows) seen.set(nameKey(row.name), (seen.get(nameKey(row.name)) ?? 0) + 1)
   return rows.filter((row) => row.friend_count === 0 || (seen.get(nameKey(row.name)) ?? 0) > 1).length
+}
+
+/** 整理の候補のタグの id（未使用か、ほかのタグと名前が重なっている）。人数を数えていない行は入れない。 */
+export function cleanupTagIds(rows: Pick<HqTemplate, 'id' | 'friend_count' | 'name'>[]): Set<string> {
+  const seen = new Map<string, number>()
+  for (const row of rows) seen.set(nameKey(row.name), (seen.get(nameKey(row.name)) ?? 0) + 1)
+  return new Set(rows.filter((row) => row.friend_count === 0 || (seen.get(nameKey(row.name)) ?? 0) > 1).map((row) => row.id))
 }
 
 /** 付け方の絞り込みの選択肢（一覧にある付け方だけ）。 */

@@ -1,23 +1,39 @@
+import { gap1Paths } from './gap1-openapi.js';
+import { gap3Paths } from './gap3-openapi.js';
+import { gap2Paths } from './gap2-openapi.js';
+import { STEP_UP_PURPOSES } from '../lib/step-up.js';
+import { personalDataRetentionPaths } from './personal-data-retention-openapi.js';
+import { stylePaths } from './styles-openapi.js';
+import { hqTemplateListPaths } from './hq-template-list-openapi.js';
+import { hqTemplateMediaPaths } from './hq-template-media-openapi.js';
+import { api5Paths } from './api5-openapi.js';
+import { behaviorFixPaths } from './behavior-fix-openapi.js';
 import { restaurantRest4Paths } from './restaurant-rest4-openapi.js';
+import { api1AuthoringPaths } from './api1-authoring-openapi.js';
+import { api2FollowupPaths } from './api2-followups-openapi.js';
 import { restaurantFollowupPaths } from './restaurant-followup-openapi.js';
 import { reservationBoardPaths } from './reservation-board-openapi.js';
 import { archiveRestorePaths } from './archive-restore-openapi.js';
 import { formDocumentPaths } from './form-documents-openapi.js';
 import { pagesParityPaths } from './pages-parity-openapi.js';
 import { folderUpgradePaths } from './folder-upgrade-openapi.js';
-import {auditstepsPaths} from './auditsteps-openapi.js';
+import { auditstepsPaths } from './auditsteps-openapi.js';
+import { auditPaths } from './openapi-audit-paths.js';
 import { tabCountPaths } from './tab-counts-openapi.js';
-import { audit3Paths } from './audit3-openapi.js';
 import { api18Paths } from './api18-openapi.js';
 import { chatAttachmentPaths } from './chat-attachments-openapi.js';
-import { api17Paths, api17TemplateKind } from './api17-openapi.js';
+import { api17Paths } from './api17-openapi.js';
 import { api9Paths, api9Schemas } from './api9-openapi.js';
 import { restaurantClosurePaths } from './restaurant-closures-openapi.js';
-import { stampPaths,hqBroadcastPaths } from './proposal-e-openapi.js';
+import { stampPaths, hqBroadcastPaths } from './proposal-e-openapi.js';
 import { Hono } from 'hono';
 import { trafficPoolSavePaths } from './traffic-pools-save-openapi.js';
 import { tenantCompanyContactPaths } from './tenant-company-contact-openapi.js';
 import type { Env } from '../index.js';
+
+import { bookingEntitlementPaths } from './booking-entitlements-openapi.js';
+import { bookingAssignmentPaths } from './booking-assignment-openapi.js';
+import { bookingPaymentAdminPaths } from './booking-payment-admin-openapi.js';
 
 const openapi = new Hono<Env>();
 
@@ -409,6 +425,14 @@ const spec = {
     },
   },
   paths: {
+    ...api1AuthoringPaths,
+    ...bookingAssignmentPaths,
+    ...bookingPaymentAdminPaths,
+    ...gap1Paths,
+    ...gap2Paths,
+    ...gap3Paths,
+    ...bookingEntitlementPaths,
+    ...behaviorFixPaths,
     '/api/account-settings/customer-look': {
       get: { tags:['Account Settings'], summary:'店のお客さまのデザインを読む', parameters:[{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'保存した版とデザイン'},'403':{description:'担当外'}} },
       put: { tags:['Account Settings'], summary:'店のお客さまのデザインを保存（オーナー・管理者）', requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['accountId','expectedVersion','look'],properties:{accountId:{type:'string'},expectedVersion:{type:'integer',minimum:0},look:{type:'object'}}}}}}, responses:{'200':{description:'保存した版とデザイン'},'403':{description:'変更権限なし・担当外'},'409':{description:'保存の版が競合'},'422':{description:'色・型・書体が不正'}} },
@@ -446,9 +470,11 @@ const spec = {
     '/api/broadcast-message-assets/upload-sessions/{id}/complete': {
       post:{tags:['Broadcasts'],summary:'容量・形式・所属・ETagを検査して配信用URLを返す',parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}}],requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['etag'],properties:{etag:{type:'string'}}}}}},responses:{'201':{description:'安全性の検査対象として登録し、配信用URLを発行'},'200':{description:'確定済みの再要求'},'409':{description:'期限切れまたは内容不一致'},'422':{description:'ファイルの形式が不正'}}},
     },
-    ...audit3Paths,
-    ...auditstepsPaths,
+    ...personalDataRetentionPaths,
+    ...api5Paths,
+    ...auditPaths,
     ...api18Paths,
+    ...api2FollowupPaths,
     ...api17Paths,
     ...api9Paths,
     ...restaurantRest4Paths,
@@ -457,6 +483,14 @@ const spec = {
     ...hqBroadcastPaths,
 
     // V8 API integration: authenticated endpoints, with account scope and revision checks.
+  '/api/hq/templates/saved-views': {
+    get: {tags:['HQ Templates'],summary:'統括テンプレートの保存した絞り込みを取得',responses:{200:{description:'個人と統括で共有された条件'},403:{description:'統括の閲覧権限が必要'}}},
+    post: {tags:['HQ Templates'],summary:'テンプレートの絞り込みを保存',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['name','filters'],properties:{name:{type:'string',maxLength:100},scope:{type:'string',enum:['personal','tenant'],default:'personal'},filters:{type:'object',description:'kind・messageCount・hasInterpolations・undistributed・search・folderIdだけを許可'}}}}}},responses:{201:{description:'保存済みの条件とrevision'},403:{description:'統括の編集権限が必要'},422:{description:'条件または分類が不正'}}},
+  },
+  '/api/hq/templates/saved-views/{viewId}': {
+    patch:{parameters:[{name:'viewId',in:'path',required:true,schema:{type:'string'}}],tags:['HQ Templates'],summary:'保存した絞り込みを変更',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['name','filters','expectedRevision'],properties:{name:{type:'string',maxLength:100},filters:{type:'object'},scope:{type:'string',enum:['personal','tenant']},expectedRevision:{type:'integer',minimum:1}}}}}},responses:{200:{description:'更新後のrevisionと条件'},403:{description:'統括の編集権限が必要'},404:{description:'見える条件がありません'},409:{description:'版が変更されました'},422:{description:'入力が不正'}}},
+    delete:{parameters:[{name:'viewId',in:'path',required:true,schema:{type:'string'}}],tags:['HQ Templates'],summary:'保存した絞り込みを保管',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['expectedRevision'],properties:{expectedRevision:{type:'integer',minimum:1}}}}}},responses:{200:{description:'保管済み'},403:{description:'統括の編集権限が必要'},404:{description:'見える条件がありません'},409:{description:'版が変更されました'}}},
+  },
   "/api/hq/templates/folders": {
     "get": {
       "tags": [
@@ -647,36 +681,6 @@ const spec = {
               ]
             }
           }
-        }
-      }
-    }
-  },
-  "/api/hq/templates/message-references": {
-    "get": {
-      "tags": [
-        "HQ Templates"
-      ],
-      "summary": "配布先の回答フォーム・シナリオの候補を取得",
-      "parameters": [],
-      "responses": {
-        "200": {
-          "description": "成功",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiResponse"
-              }
-            }
-          }
-        },
-        "403": {
-          "description": "権限がありません"
-        },
-        "409": {
-          "description": "確認した版や対象が変わりました"
-        },
-        "422": {
-          "description": "入力を確認してください"
         }
       }
     }
@@ -1455,8 +1459,8 @@ const spec = {
     '/api/auth/password/login': {
       post: {
         tags: ['Auth'], summary: 'メールアドレスとパスワードでログイン', security: [],
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'password'], properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' } } } } } },
-        responses: { '200': { description: 'Session issued' }, '401': { description: 'Invalid credentials' }, '429': { description: 'Rate limit exceeded' } },
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'password', 'turnstileToken'], properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' }, turnstileToken: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Session issued' }, '400': { description: 'Robot verification required' }, '503': { description: 'Robot verification unavailable' }, '401': { description: 'Invalid credentials' }, '429': { description: 'Rate limit exceeded' } },
       },
     },
     '/api/auth/password/forgot': {
@@ -1486,6 +1490,11 @@ const spec = {
         parameters: [{ name: 'X-Step-Up-Token', in: 'header', schema: { type: 'string' }, description: 'Offにする時の本人確認。セッションに結び付く1回限りの票' }],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['required'], properties: { required: { type: 'boolean' } } } } } },
         responses: { '200': { description: '監査へ保存。Onへの変更時は既存セッションを失効' }, '401': { description: '再確認が必要' }, '400': { description: '鍵が未設定のため必須にできない' }, '403': { description: '変更権限なし' }, '409': { description: '他の操作と競合' } } },
+    },
+    '/api/auth/api-key': {
+      get: { summary: '本人のAPI鍵の発行・最終利用・失効日時（秘密値なし）', tags: ['Auth'], responses: { '200': { description: '日時のみ' }, '403': { description: '本人セッションが必要' } } },
+      post: { summary: '本人確認後に鍵を交換し、この応答で一度だけ表示', tags: ['Auth'], parameters: [{ name: 'X-Step-Up-Token', in: 'header', required: true, schema: { type: 'string' }, description: 'auth.api_key用の一回限りの確認票' }], responses: { '200': { description: '新しい鍵。古い鍵と本人の全セッションは失効。再ログインが必要' }, '401': { description: '再確認が必要' }, '403': { description: '本人操作不可' }, '409': { description: '同時更新' } } },
+      delete: { summary: '本人確認後にAPI鍵と本人の全セッションを失効', tags: ['Auth'], parameters: [{ name: 'X-Step-Up-Token', in: 'header', required: true, schema: { type: 'string' }, description: 'auth.api_key用の一回限りの確認票' }], responses: { '200': { description: '失効済み。秘密値は返さない' }, '401': { description: '再確認が必要' }, '403': { description: '本人操作不可' }, '409': { description: '同時更新' } } },
     },
     '/api/auth/two-factor/self': {
       get: { summary: '本人の認証アプリ登録日と回復コードの残数', tags: ['Auth'],
@@ -1547,7 +1556,7 @@ const spec = {
     '/api/auth/step-up': {
       post: {
         tags: ['Auth'], summary: '高危険操作用の5分・1回限り再認証grantを発行（V: パスワード経路あり）',
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['purpose'], properties: { code: { type: 'string', description: '6桁コード（2段階認証の設定がある人）' }, password: { type: 'string', description: 'パスワード（2段階認証の設定が無い人）' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove', 'line_account.connect', 'line_account.credentials', 'line_account.archive', 'broadcast.approval', 'webhook.api_token', 'webhook.secret', 'auth.mfa.policy', 'auth.mfa.recovery', 'auth.mfa.reenroll'] } } } } } },
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['purpose'], properties: { code: { type: 'string', description: '6桁コード（2段階認証の設定がある人）' }, password: { type: 'string', description: 'パスワード（2段階認証の設定が無い人）' }, purpose: { type: 'string', enum: [...STEP_UP_PURPOSES] } } } } } },
         responses: { '201': { description: 'Step-up grant issued' }, '400': { description: 'Invalid or wrong credential' }, '401': { description: 'Not authenticated (STEP_UP_UNAUTHORIZED)' }, '403': { description: 'Neither TOTP nor password configured' }, '409': { description: 'Code already used' }, '429': { description: 'Attempt limit exceeded' } },
       },
     },
@@ -2149,26 +2158,7 @@ const spec = {
         responses: { '200': { description: 'セッションを失効し、未完了のファイルを削除' }, '403': { description: '統括全体の編集権限がない' }, '404': { description: '利用者・統括に属するセッションがない' }, '409': { description: '完了済みのファイルは取り消せない' } },
       },
     },
-    '/api/hq/templates/media': {
-      post: {
-        tags: ['HQ Templates'], summary: '統括ひな形のPNG/JPEG画像を登録',
-        parameters: [
-          { name: 'purpose', in: 'query', required: true, schema: { type: 'string', enum: ['message', 'rich_menu', 'rich_message', 'rich_video_preview'] } },
-          { name: 'filename', in: 'query', required: true, schema: { type: 'string', minLength: 1, maxLength: 200 } },
-          { name: 'width', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる幅。画像が違う寸法なら登録せず422' },
-          { name: 'height', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる高さ。画像が違う寸法なら登録せず422' },
-        ],
-        requestBody: { required: true, content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } } } },
-        responses: { '201': { description: '統括の画像。rich_message・rich_video_previewは原本と5サイズのmediaとbaseUrl/baseSizeを返す。message/rich_menuの同一再送は既存画像を再利用する' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '422': { description: 'Invalid image, dimensions, size or unconfirmed upload' } },
-      },
-      delete: {
-        tags: ['HQ Templates'], summary: '採用されなかった統括ひな形の画像を回収（所有確認つき）',
-        parameters: [
-          { name: 'r2Key', in: 'query', required: true, schema: { type: 'string' } },
-        ],
-        responses: { '200': { description: 'Deleted flag; missing objects are a no-op' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '404': { description: 'Outside the caller tenant ownership' }, '422': { description: 'Invalid image key' } },
-      },
-    },
+    ...hqTemplateMediaPaths,
     '/api/hq/templates/accounts': {
       get: {
         tags: ['HQ Templates'],
@@ -2176,27 +2166,8 @@ const spec = {
         responses: { '200': { description: 'Tenant-scoped account list' }, '403': { description: 'Owner or admin role required' } },
       },
     },
-    '/api/hq/templates': {
-      get: {
-        tags: ['HQ Templates'],
-        summary: '統括ひな形一覧を取得',
-        parameters: [{name:'kind',in:'query',schema:{type:'string',enum:[...api17TemplateKind.enum,'tag']},description:'メッセージの6種類またはtagで絞る。type=templateと併用可能。応答のkind_countsは絞り込み前の件数。'},{ name: 'type', in: 'query', schema: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] } }],
-        responses: { '200': { description: 'Tenant-scoped template list' }, '400': { description: 'Invalid template type' }, '403': { description: 'Owner or admin role required' } },
-      },
-      post: {
-        tags: ['HQ Templates'],
-        summary: '統括ひな形を作成',
-        parameters: [{ name: 'Idempotency-Key', in: 'header', schema: { type: 'string' }, description: '再送時も同じ値を使用する作成依頼ID。省略時はbody.requestIdが必須' }],
-        requestBody: {
-          required: true,
-          content: { 'application/json': { schema: { type: 'object', required: ['type', 'name', 'definition'], properties: {
-            requestId: { type: 'string' }, type: { type: 'string', enum: ['tag', 'rich_menu', 'template', 'form'] },
-            name: { type: 'string', minLength: 1 }, description: { type: 'string' }, definition: { type: 'object' },
-          } } } },
-        },
-        responses: { '201': { description: 'Created, or the same idempotent result' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '409': { description: 'Idempotency conflict' } },
-      },
-    },
+    ...hqTemplateListPaths,
+    ...stylePaths,
     '/api/hq/templates/{id}': {
       get: {
         tags: ['HQ Templates'], summary: '統括ひな形の詳細を取得',
@@ -2212,7 +2183,7 @@ const spec = {
         responses: { '200': { description: 'Updated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
       },
       delete: {
-        tags: ['HQ Templates'], summary: '統括ひな形を削除',
+        tags: ['HQ Templates'], summary: '統括ひな形を保管（店の配布済みコピーは保持）',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision'], properties: { expectedRevision: { type: 'integer', minimum: 1 } } } } } },
         responses: { '200': { description: 'Deleted' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Revision conflict' } },
@@ -5899,7 +5870,7 @@ const spec = {
       post: {
         tags: ['Conversions'],
         summary: '外部システムからの成果受信(公開口・HMAC署名)',
-        description: '管理認証を通さない公開口。X-Conversion-Signature ヘッダに'
+        description: '本文のtimestamp（UNIX秒、前後300秒以内）とnonce（英数字・_・-の16〜128字）も署名の対象。nonceは地点ごとに1回だけ。正規再試行は新nonceと同じsourceEventId。管理認証を通さない公開口。X-Conversion-Signature ヘッダに'
           + '本文のHMAC-SHA256(hex)を、X-Conversion-Event-Id または本文の sourceEventId に'
           + '再送を捌くイベントIDを入れる。成否は受信履歴に残る。',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
@@ -5909,7 +5880,10 @@ const spec = {
             'application/json': {
               schema: {
                 type: 'object',
+                required: ['timestamp','nonce'],
                 properties: {
+                  timestamp: { type: 'integer', description: '署名した送信時刻（UNIX秒）' },
+                  nonce: { type: 'string', minLength: 16, maxLength: 128 },
                   sourceEventId: { type: 'string', description: 'ヘッダの代わりに本文で渡せる' },
                   friendId: { type: 'string' },
                   lineUserId: { type: 'string' },
@@ -6317,7 +6291,7 @@ const spec = {
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],
         responses: {
-          '200': { description: '版の一覧 { versionNumber・status・messageType・messageContent・effectiveFrom・createdAt }' },
+          '200': { description: '版の一覧 { versionNumber・status・messageType・messageContent・effectiveFrom・createdAt・createdByStaffId・creatorName・creatorNameSource }。creatorNameは同じ組織の現在の名簿名（source=current_staff_profile）。旧版・不明・別組織はnull。公開時の名前の写しではない。' },
           '404': { description: 'Not found in account scope' },
         },
       },
@@ -7495,7 +7469,7 @@ const spec = {
                 type: 'object',
                 required: ['mode', 'provider', 'holdMinutes'],
                 properties: {
-                  mode: { type: 'string', enum: ['none', 'onsite', 'online'] },
+                  mode: { type: 'string', enum: ['none', 'onsite', 'online', 'customer_choice'] },
                   provider: { type: 'string', enum: ['none', 'onsite', 'stripe'] },
                   holdMinutes: { type: 'integer', minimum: 5, maximum: 1440 },
                 },
@@ -7526,7 +7500,7 @@ const spec = {
                 type: 'object',
                 required: ['mode', 'provider'],
                 properties: {
-                  mode: { type: 'string', enum: ['none', 'onsite', 'online'] },
+                  mode: { type: 'string', enum: ['none', 'onsite', 'online', 'customer_choice'] },
                   provider: { type: 'string', enum: ['none', 'onsite', 'stripe'] },
                 },
               },
@@ -7595,7 +7569,11 @@ const spec = {
     '/api/booking/payments/{id}/refund': {
       post: {
         tags: ['Booking'],
-        summary: '支払い済みを返金する',
+        summary: '試験用の支払いを一部または全額返金する',
+        description: 'owner/admin、閲覧のみ不可。697が必要。試験用Stripe IDとJPYだけ。amount省略は残額全部。同じidempotencyKeyは1回だけ、本文違い409。data:{payment,refund,duplicate,simulation:true,sent:false}。LINE希望は保存するが送信しない。',
+        requestBody: {required:true,content:{'application/json':{schema:{type:'object',required:['reason','idempotencyKey'],properties:{
+          amount:{type:'integer',minimum:1},reason:{type:'string',minLength:1,maxLength:500},notifyLine:{type:'boolean',default:false},idempotencyKey:{type:'string',minLength:1,maxLength:200}
+        }}}}},
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],

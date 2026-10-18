@@ -1,3 +1,5 @@
+import type { FormGateInput, FormAnswers } from './form-gate-types.js';
+export type { FormAnswers, FormGateInput } from './form-gate-types.js';
 import { writeFormDestinationsOnce } from './form-destination-workflow.js';
 import { applyTapExtras } from './tap-extras.js';
 import { runScenarioOp } from './scenario-actions.js';
@@ -47,29 +49,6 @@ import {
 } from '@line-crm/db';
 import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
 import { buildMessage } from './line-message.js';
-
-/** 回答1件。キーは入力ブロックの name。 */
-export type FormAnswers = Record<string, unknown>;
-
-export interface FormGateInput {
-  db: D1Database;
-  formId: string;
-  layout: FormLayout;
-  friendId: string;
-  /** forms.submit_count。総数制限の判定に使う */
-  submitCount: number;
-  answers: FormAnswers;
-  /** 判定の基準時刻。テストから固定できるようにしてある */
-  now?: Date;
-  /**
-   * P（試し回答）：true のとき、1人1回・全体上限・選択肢定員を見ない。
-   * 試しは本物の枠を消費せず、本物の回答歴にも数えない。入力の形と
-   * 回答期限は本物と同じに見る。
-   */
-  isTest?: boolean;
-  /** 同じキー・本文・本人で照合できた保存済み回答の後処理再開。 */
-  resumeSavedAnswer?: boolean;
-}
 
 /**
  * 受け付けてよいかを見る。断る理由があれば、利用者に見せる文言を返す。
@@ -397,13 +376,13 @@ async function runEffectStep(
     await run();
   } catch (err) {
     failed.push(effectId);
-    console.error(`form effect (${effectId}) failed:`, err);
+    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
     return;
   }
   if (failed.length > beforeInnerFailed || stats.failed > beforeFailed) {
     // 内側の動作が欠けたまま終わった。再開時に補完するため未完に残す。
     if (!failed.includes(effectId)) failed.push(effectId);
-    console.error(`form effect (${effectId}) partial failure`);
+    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
     return;
   }
   await input.onEffectComplete?.(effectId, {
@@ -418,7 +397,7 @@ async function runTracked(failed: string[], label: string, run: () => Promise<un
     await run();
   } catch (err) {
     failed.push(label);
-    console.error(`form effect (${label}) failed:`, err);
+    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
   }
 }
 
@@ -560,7 +539,7 @@ async function trackDestinationWrite(
     else stats.failed += count;
   } catch (error) {
     stats.failed += count;
-    console.error('form destination write failed:', error);
+    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
   }
 }
 
@@ -679,6 +658,7 @@ export async function runFormAction(
         if (action.actionType !== 'reminder' && !input.pushText) throw new Error('回答後の送信を利用できません');
         if (action.actionType === 'send_template') {
           const template = await getTemplateById(db, String(action.config.templateId));
+          if(template?.message_bubbles_json) throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
           if (!template || !template.published_version) throw new Error('公開済みのテンプレートを選んでください');
           const { expandSendCommonVars } = await import('./interpolation-context.js');
           const content = await expandSendCommonVars(db, template.message_content, { kind: 'form_reply', id: input.formId ?? friendId }, { friendId, messageType: template.message_type });

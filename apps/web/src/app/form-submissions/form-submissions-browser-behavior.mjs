@@ -15,6 +15,7 @@ import { createServer } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { chromium } from '@playwright/test'
+import { waitForOverlayLayout } from '../../../../../scripts/codex/overlay-ready.mjs'
 
 /*
  * #1060: 一覧の絞り込み・並び替えは Worker が済ませて1ページ分だけ返す。
@@ -94,6 +95,7 @@ const sortFormListItems = (forms, sort) => {
 }
 
 let lastHarness
+
 
 const outDir = join(process.cwd(), 'apps/web/out')
 
@@ -488,13 +490,13 @@ try {
     assert.equal((await rows(page).first().innerText()).includes('フォーム03'), true, '2ページ目の先頭が変わらない')
 
     await page.getByRole('button', { name: '表示件数' }).click()
-    await page.getByRole('option', { name: '50 件表示', exact: true }).click()
+    await page.getByRole('option', { name: '50件表示', exact: true }).click()
     await waitForQuery(page, 'limit', '50')
     await waitForRowCount(page, 23)
     assert.equal(/page=2/.test(page.url()), false, '件数を増やしたら1ページ目へ戻る')
     await reloadList(page)
     assert.equal(await rows(page).count(), 23, '再読み込みしても50件表示のまま')
-    assert.equal((await page.getByRole('button', { name: '表示件数' }).innerText()).includes('50 件表示'), true)
+    assert.equal((await page.getByRole('button', { name: '表示件数' }).innerText()).includes('50件表示'), true)
     await context.close()
   }
 
@@ -528,7 +530,7 @@ try {
       '取れていない月次集計を0と表示しない')
     // R27: 行の「編集」は質問の編集へ。「…」内の操作から対象を引き継ぐ。
     await newRow.getByRole('button', { name: /その他の操作/ }).click()
-    await page.getByRole('menuitem', { name: '編集', exact: true }).click()
+    await page.getByRole('menuitem', { name: '編集する', exact: true }).click()
     await page.waitForURL((url) => url.pathname === '/form-submissions/edit'
       && url.searchParams.get('id') === 'sales-new' && url.searchParams.get('tab') === 'basic')
     const editDestination = new URL(page.url())
@@ -721,14 +723,14 @@ try {
     }
     await kinds.getByRole('menuitem', { name: 'タグを付ける・外す', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'タグを選ぶ', exact: true })
-    await dialog.waitFor()
+    await waitForOverlayLayout(dialog)
     const box = await dialog.boundingBox()
     assert.ok(box && box.height <= 844, 'R26: 窓の高さが画面に収まる')
     await dialog.getByRole('checkbox', { name: '回答済み', exact: true }).check()
     for (const right of await dialog.locator('button').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().right))) {
       assert.ok(right <= 390, `R26: 動作の操作が画面に収まる（右端 ${Math.round(right)}px）`)
     }
-    await dialog.getByRole('button', { name: 'この 1件にする', exact: true }).click()
+    await dialog.getByRole('button', { name: '選ぶ（1件）', exact: true }).click()
     await dialog.waitFor({ state: 'detached' })
     const action = page.locator('[data-action-row]')
     assert.equal(await action.count(), 1, '対象を確定した行だけ追加する')
@@ -742,6 +744,7 @@ try {
     await action.getByRole('button', { name: '1つ目の行うことのその他操作', exact: true }).click()
     await page.getByRole('menuitem', { name: '削除する', exact: true }).click()
     const removeDialog = page.getByRole('dialog', { name: '「行うこと」を削除しますか？', exact: true })
+    await waitForOverlayLayout(removeDialog)
     const remove = await removeDialog.getByRole('button', { name: '削除する', exact: true }).boundingBox()
     assert.ok(remove && remove.x + remove.width <= 390, 'R26: 動作の削除が画面に収まる')
     await removeDialog.getByRole('button', { name: '削除する', exact: true }).click()
@@ -765,10 +768,11 @@ try {
     // カードの3欄は「リンクの見え方」の窓の中。利用者と同じ順（開く → 打つ → 閉じる → 保存）でたどる。
     await page.getByRole('button', { name: /^リンクの見え方：/ }).click()
     const linkDialog = page.getByRole('dialog', { name: 'リンクの見え方' })
-    await linkDialog.waitFor({ timeout: 15_000 })
+    await waitForOverlayLayout(linkDialog)
     assert.equal(await linkDialog.getByRole('button', { name: '保存する', exact: true }).count(), 0,
       'V8: 設定の窓に2つ目の保存を置かない')
     await page.locator('#fe-og-title').fill('ごはんの相談フォーム')
+    assert.equal(await page.locator('#fe-og-title').inputValue(), 'ごはんの相談フォーム', 'V8: 最初の入力を窓の描き直しで失わない')
     await page.locator('#fe-og-desc').fill('3分で終わります')
     // MediaSlot は「URL で入れる」を押してから入力欄を出す。
     assert.equal(await linkDialog.locator('#fe-og-image').count(), 0, 'V8: 画像URLは開く前に出さない')
@@ -794,7 +798,7 @@ try {
       sent.name, { timeout: 15_000 },
     )
     await page.getByRole('button', { name: /^リンクの見え方：/ }).click()
-    await linkDialog.waitFor({ timeout: 15_000 })
+    await waitForOverlayLayout(linkDialog)
     assert.equal(await linkDialog.locator('#fe-og-title').inputValue(), sent.ogTitle, 'V8: 再読込で見出しが残る')
     assert.equal(await linkDialog.locator('#fe-og-desc').inputValue(), sent.ogDescription, 'V8: 再読込で説明が残る')
     // 保存済みの MediaSlot は URL の入口でなく画像の見本を出す。

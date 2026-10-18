@@ -13,6 +13,23 @@ vi.mock('@/lib/api', async (original) => {
 import { TagEditForm } from './edit-form'
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
+test('ひな形の空名は押せない理由を出し、入力したら外す', () => {
+  const save = vi.fn()
+  render(<TagEditForm tag={{ id: 't1', name: '', status: 'active' } as Tag} groups={[]} dependencies={null} accountId="" readOnly={false} conflict={false} compareBusy={false} onCompare={vi.fn()} onReloadLatest={vi.fn()} retroactiveReference={false} initialActions={[]} saving={false} error="" onCancel={vi.fn()} onSave={save} onDelete={vi.fn()}
+    host={{ title: 'タグのひな形を作る', saveLabel: '保存する', description: '', preview: () => null, allowedActionTypes: [], onSaveAnother: vi.fn(), onSaveDraft: vi.fn(), initialValues: { name: '', groupId: '', isStarred: false, linked: false, rewardMiles: 0, referralRewardMiles: 0, multiplierBps: null, multiplierPriority: 0, applyToExisting: false, reapplyPolicy: 'first_only', actions: [] } }} />)
+  for (const name of ['下書きを保存', '保存する']) {
+    const button = screen.getByRole('button', { name }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    expect(button.getAttribute('aria-description')).toBe('タグの名前を入れてください')
+  }
+  fireEvent.change(screen.getByLabelText('タグ名'), { target: { value: '会員' } })
+  for (const name of ['下書きを保存', '保存する']) {
+    const button = screen.getByRole('button', { name }) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    expect(button.hasAttribute('aria-description')).toBe(false)
+  }
+})
+
 test('タグ編集の未入力は名前欄へ移動し、保存も上の重複通知も出さない', () => {
   const save = vi.fn()
   const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => undefined)
@@ -43,9 +60,31 @@ test('選んだアクションの前へ実際に差し込み、保存順にも�
   ]} saving={false} error="" onCancel={vi.fn()} onSave={save} onDelete={vi.fn()} />)
   fireEvent.click(within(screen.getByRole('region', { name: 'タグ連動' })).getByRole('button', { name: '開く' }))
   fireEvent.click(screen.getByRole('button', { name: '行うことを足す' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'テキスト送信' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'テキストを送る' }))
   fireEvent.change(screen.getByRole('textbox', { name: '送る本文' }), { target: { value: 'ご登録ありがとうございます。' } })
   fireEvent.keyDown(screen.getByRole('button', { name: '3つ目の行うことを並べ替える' }), { key: 'ArrowUp' })
   fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))
   expect(save.mock.calls[0][0].actions.map((action: { label: string }) => action.label)).toEqual(['一通目', 'ご登録ありがとうございます。', '二通目'])
+})
+
+test('閲覧のみでも連動とマイルの明細を開閉でき、変更の操作は出さない', () => {
+  const save = vi.fn(), remove = vi.fn()
+  render(<TagEditForm tag={{ id: 't1', name: 'VIP', status: 'active', linkedEnabled: true, mileageReward: 500 } as Tag} groups={[]} dependencies={null} accountId="a1" readOnly conflict={false} compareBusy={false} onCompare={vi.fn()} onReloadLatest={vi.fn()} retroactiveReference={false} initialActions={[]} saving={false} error="" onCancel={vi.fn()} onSave={save} onDelete={remove} />)
+  const linked = within(screen.getByRole('region', { name: 'タグ連動' }))
+  const open = linked.getByRole('button', { name: '開く' })
+  expect((open as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.click(open)
+  expect(linked.getByRole('button', { name: '閉じる' })).toBeTruthy()
+  const mileage = within(screen.getByRole('region', { name: 'マイル' }))
+  fireEvent.click(mileage.getByRole('button', { name: '開く' }))
+  /* ★V8 zOc7f：付いたときに積むマイルは、別の箱「このタグが付いたらマイル」。 */
+  const grant = within(screen.getByRole('region', { name: 'このタグが付いたらマイル' }))
+  expect(grant.getByText('本人へのマイル付与')).toBeTruthy()
+  expect(grant.getByText('500')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'タグを保存する' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'タグを削除する' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '複製して作る' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '行うことを足す' })).toBeNull()
+  expect(screen.queryByRole('textbox')).toBeNull()
+  expect(save).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenCalled()
 })

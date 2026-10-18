@@ -14,6 +14,7 @@ import {
   getFriendById,
   type CalendarAccountScope,
   toJstString,
+  decryptCredential,
 } from '@line-crm/db';
 import { GoogleCalendarClient } from '../services/google-calendar.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -55,7 +56,7 @@ calendar.get('/api/integrations/google-calendar', requireRole('owner', 'admin'),
       })),
     });
   } catch (err) {
-    console.error('GET /api/integrations/google-calendar error:', err);
+    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"GET /api/integrations/google-calendar"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -77,14 +78,14 @@ calendar.post('/api/integrations/google-calendar/connect', requireRole('owner', 
       accessToken: body.accessToken,
       refreshToken: body.refreshToken,
       apiKey: body.apiKey,
-    }, scope);
+    }, scope, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY);
     if (!conn) return c.json({ success: false, error: 'Forbidden account' }, 403);
     return c.json({
       success: true,
       data: { id: conn.id, calendarId: conn.calendar_id, authType: conn.auth_type, isActive: Boolean(conn.is_active), createdAt: conn.created_at },
     }, 201);
   } catch (err) {
-    console.error('POST /api/integrations/google-calendar/connect error:', err);
+    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"POST /api/integrations/google-calendar/connect"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -96,7 +97,7 @@ calendar.delete('/api/integrations/google-calendar/:id', requireRole('owner', 'a
     if (!deleted) return c.json({ success: false, error: 'Calendar connection not found' }, 404);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/integrations/google-calendar/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"DELETE /api/integrations/google-calendar/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -130,10 +131,11 @@ calendar.get('/api/integrations/google-calendar/slots', requireRole('owner', 'ad
     // Google FreeBusy API から busy 区間を取得（access_token がある場合のみ）
     let googleBusyIntervals: { start: string; end: string }[] = [];
     if (conn.access_token) {
+      const accessToken = await decryptCredential(conn.access_token, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY);
       try {
         const gcal = new GoogleCalendarClient({
           calendarId: conn.calendar_id,
-          accessToken: conn.access_token,
+          accessToken,
         });
         // タイムゾーンオフセットを付けて ISO 形式で渡す（Asia/Tokyo = +09:00）
         const timeMin = `${date}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
@@ -141,7 +143,7 @@ calendar.get('/api/integrations/google-calendar/slots', requireRole('owner', 'ad
         googleBusyIntervals = await gcal.getFreeBusy(timeMin, timeMax);
       } catch (err) {
         // Google API 失敗はベストエフォート — D1 のみでフォールバック
-        console.warn('Google FreeBusy API error (falling back to D1 only):', err);
+        console.warn(JSON.stringify({"code":"routes_calendar_warn","route":"GET /api/integrations/google-calendar/slots"}));
       }
     }
 
@@ -177,7 +179,7 @@ calendar.get('/api/integrations/google-calendar/slots', requireRole('owner', 'ad
 
     return c.json({ success: true, data: slots });
   } catch (err) {
-    console.error('GET /api/integrations/google-calendar/slots error:', err);
+    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"GET /api/integrations/google-calendar/slots"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -219,7 +221,7 @@ calendar.get('/api/integrations/google-calendar/bookings', requireRole('owner', 
       })),
     });
   } catch (err) {
-    console.error('GET /api/integrations/google-calendar/bookings error:', err);
+    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"GET /api/integrations/google-calendar/bookings"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -234,6 +236,9 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
     const scope = await resolveCalendarScope(c);
     const conn = await getCalendarConnectionById(c.env.DB, body.connectionId, scope);
     if (!conn) return c.json({ success: false, error: 'Calendar connection not found' }, 404);
+    // Resolve before writing a booking; bad keys/legacy plaintext must not create partial work.
+    const accessToken = conn.access_token
+      ? await decryptCredential(conn.access_token, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY) : null;
 
     if (body.friendId) {
       const friend = await getFriendById(c.env.DB, body.friendId);
@@ -250,11 +255,11 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
     if (!booking) return c.json({ success: false, error: 'Calendar connection not found' }, 404);
 
     // Google Calendar にイベントを作成（access_token がある場合のみ、ベストエフォート）
-    if (conn.access_token) {
+    if (accessToken) {
       try {
         const gcal = new GoogleCalendarClient({
           calendarId: conn.calendar_id,
-          accessToken: conn.access_token,
+          accessToken,
         });
         const { eventId } = await gcal.createEvent({
           summary: body.title,
@@ -268,14 +273,14 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
           try {
             await gcal.deleteEvent(eventId);
           } catch (cleanupError) {
-            console.warn('Google Calendar orphan event cleanup error:', cleanupError);
+            console.warn(JSON.stringify({"code":"routes_calendar_warn","route":"POST /api/integrations/google-calendar/book"}));
           }
           return c.json({ success: false, error: 'Calendar booking changed during sync' }, 409);
         }
         booking.event_id = eventId;
       } catch (err) {
         // Google API 失敗はベストエフォート — D1 予約は維持する
-        console.warn('Google Calendar createEvent error (booking still created in D1):', err);
+        console.warn(JSON.stringify({"code":"routes_calendar_warn","route":"POST /api/integrations/google-calendar/book"}));
       }
     }
 
@@ -294,7 +299,7 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
       },
     }, 201);
   } catch (err) {
-    console.error('POST /api/integrations/google-calendar/book error:', err);
+    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"POST /api/integrations/google-calendar/book"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -307,22 +312,26 @@ calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRol
     const booking = await getCalendarBookingById(c.env.DB, id, scope);
     if (!booking) return c.json({ success: false, error: 'Calendar booking not found' }, 404);
 
+    const conn = status === 'cancelled' && booking.event_id && booking.connection_id
+      ? await getCalendarConnectionById(c.env.DB, booking.connection_id, scope) : null;
+    const accessToken = conn?.access_token
+      ? await decryptCredential(conn.access_token, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY) : null;
+
     const updated = await updateCalendarBookingStatus(c.env.DB, id, status, scope);
     if (!updated) return c.json({ success: false, error: 'Calendar booking not found' }, 404);
 
     // DB更新後に、Google Calendar のイベントも削除する（ベストエフォート）
     if (status === 'cancelled') {
       if (booking.event_id && booking.connection_id) {
-        const conn = await getCalendarConnectionById(c.env.DB, booking.connection_id, scope);
-        if (conn?.access_token) {
+        if (conn && accessToken) {
           try {
             const gcal = new GoogleCalendarClient({
               calendarId: conn.calendar_id,
-              accessToken: conn.access_token,
+              accessToken,
             });
             await gcal.deleteEvent(booking.event_id);
           } catch (err) {
-            console.warn('Google Calendar deleteEvent error (status still updated in D1):', err);
+            console.warn(JSON.stringify({"code":"routes_calendar_warn","route":"PUT /api/integrations/google-calendar/bookings/:id/status"}));
           }
         }
       }
@@ -330,7 +339,7 @@ calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRol
 
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('PUT /api/integrations/google-calendar/bookings/:id/status error:', err);
+    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"PUT /api/integrations/google-calendar/bookings/:id/status"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

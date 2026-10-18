@@ -1,18 +1,23 @@
+import { safeReceiptUrl } from '../services/booking-payment-history.js';
+import { expireBookingPaymentIfHeld } from './booking-payment-expiration.js';
+export { expireBookingPaymentIfHeld } from './booking-payment-expiration.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   createBookingPayment,
   getBookingPaymentByBooking,
   getBookingPaymentConfig,
-  markBookingPayment,
   resolveBookingPaymentConfig,
+  resolveBookingPaymentForBooking,
   saveBookingPaymentConfig,
   saveBookingPaymentMenuSetting,
+  type BookingPaymentRecord,
   type BookingPaymentMode,
   type BookingPaymentProviderName,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { PaymentActionError, linkPaymentBooking, parseRefundInput, refundHistory, simulatePaymentRefund } from '../services/booking-payment-refunds.js';
+import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   resolveAccountIdFromLiff,
@@ -26,6 +31,7 @@ import {
   type PaymentProvider,
 } from '../services/payment-providers.js';
 import { reconcileExpiredBookingPayment, reconcilePaidBookingPayment } from '../services/booking-payment-recovery.js';
+import { receivePaymentEvent } from '../services/booking-payment-events.js';
 
 /**
  * 予約の支払い（決済サービスを差し替えられる作り）。
@@ -53,7 +59,7 @@ export function registerTestPaymentProvider(provider: PaymentProvider): void {
 }
 
 function validMode(value: unknown): BookingPaymentMode | null {
-  return value === 'none' || value === 'onsite' || value === 'online' ? value : null;
+  return value === 'none' || value === 'onsite' || value === 'online' || value === 'customer_choice' ? value : null;
 }
 
 function validProvider(value: unknown): BookingPaymentProviderName | null {
@@ -106,10 +112,10 @@ bookingPayments.put(
     if (!Number.isInteger(holdMinutes) || holdMinutes < 5 || holdMinutes > 1440) {
       return inputError(c, { success: false, error: 'holdMinutes は 5〜1440 の整数で指定してください' }, 400, ["holdMinutes"]);
     }
-    if (mode === 'online' && provider !== 'stripe') {
+    if ((mode === 'online' || mode === 'customer_choice') && provider !== 'stripe') {
       return inputError(c, { success: false, error: 'online の provider は stripe を指定してください' }, 400, ["mode","provider"]);
     }
-    if (mode !== 'online' && provider === 'stripe') {
+    if (mode !== 'online' && mode !== 'customer_choice' && provider === 'stripe') {
       return inputError(c, { success: false, error: 'stripe を使うときは mode を online にしてください' }, 400, ["mode","provider"]);
     }
     const saved = await saveBookingPaymentConfig(c.env.DB, accountId, { mode, provider, holdMinutes });
@@ -138,6 +144,10 @@ bookingPayments.put(
     if (!mode || !provider) {
       return inputError(c, { success: false, error: 'mode と provider を指定してください' }, 400, ["mode","provider"]);
     }
+    if (((mode === 'online' || mode === 'customer_choice') && provider !== 'stripe')
+      || (mode !== 'online' && mode !== 'customer_choice' && provider === 'stripe')) {
+      return inputError(c, {success:false,error:'invalid_payment_provider'},400,['mode','provider']);
+    }
     await saveBookingPaymentMenuSetting(c.env.DB, accountId, menuId, { mode, provider });
     const effective = await resolveBookingPaymentConfig(c.env.DB, accountId, menuId);
     return c.json({ success: true, data: effective });
@@ -165,7 +175,7 @@ interface StartBookingRow {
  * 支払いを始める中身。担当者用とお客さま用で共用する。
  * 同じ予約の送り直しは作り直さず、今の記録を返す。
  */
-async function startBookingPayment(
+export async function startBookingPayment(
   db: D1Database,
   env: Env['Bindings'],
   booking: StartBookingRow,
@@ -180,8 +190,8 @@ async function startBookingPayment(
   const bookingMenu = await db.prepare(
     `SELECT menu_id FROM bookings WHERE id = ?`,
   ).bind(booking.id).first<{ menu_id: string }>();
-  const config = await resolveBookingPaymentConfig(
-    db, booking.line_account_id, bookingMenu?.menu_id ?? '',
+  const config = await resolveBookingPaymentForBooking(
+    db, booking.line_account_id, booking.id, bookingMenu?.menu_id ?? '',
   );
   if (config.mode !== 'online') {
     return { ok: false, error: 'この予約はオンライン支払いの対象ではありません', status: 409 };
@@ -238,7 +248,12 @@ async function bookingPaymentStatusPayload(
   bookingId: string,
 ) {
   const record = await expireBookingPaymentIfHeld(db, lineAccountId, bookingId);
-  return { payment: record };
+  return { payment: customerPaymentRecord(record) };
+}
+
+function customerPaymentRecord(record: BookingPaymentRecord | null) {
+  return record ? {id:record.id,status:record.status,amount:record.amount,currency:record.currency,
+    hold_until:record.hold_until,refunded_amount:record.refunded_amount ?? 0,receipt_url:safeReceiptUrl(record.receipt_url)} : null;
 }
 
 // POST /api/booking/payments/start — 支払いを始める（担当者用）
@@ -290,7 +305,7 @@ bookingPayments.post('/api/liff/booking/payments/start', inputJsonBoundary(), as
   if (!result.ok) return inputError(c, { error: result.error }, result.status, []);
   const current = await getBookingPaymentByBooking(c.env.DB, accountId, bookingId);
   return c.json(
-    { payment: current, checkoutUrl: result.checkoutUrl },
+    { payment: customerPaymentRecord(current), checkoutUrl: result.checkoutUrl },
     result.created ? 201 : 200,
   );
 });
@@ -333,50 +348,44 @@ bookingPayments.get(
   },
 );
 
-/** 状態の読込で旧版の分割更新も補完する。定期回収と同じ条件付き更新。 */
-export async function expireBookingPaymentIfHeld(
-  db: D1Database,
-  lineAccountId: string,
-  bookingId: string,
-) {
-  const record = await getBookingPaymentByBooking(db, lineAccountId, bookingId);
-  if (!record) return null;
-  if (record.status === 'paid') await reconcilePaidBookingPayment(db, record.id);
-  else await reconcileExpiredBookingPayment(db, record.id);
-  return getBookingPaymentByBooking(db, lineAccountId, bookingId);
+// 支払いを扱う操作は所属と閲覧のみを個別にも確認する。
+async function accessiblePayment(c: import('hono').Context<Env>) {
+  const record = await c.env.DB.prepare('SELECT * FROM booking_payments WHERE id=?')
+    .bind(c.req.param('id')).first<BookingPaymentRecord>();
+  return record && await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[record.line_account_id]) ? record : null;
 }
-
-// POST /api/booking/payments/:id/refund — 返金する
-bookingPayments.post(
-  '/api/booking/payments/:id/refund',
-  requireRole('owner', 'admin'),
-  inputJsonBoundary(), async (c) => {
-    const paymentId = c.req.param('id');
-    const record = await c.env.DB.prepare(
-      `SELECT * FROM booking_payments WHERE id = ?`,
-    ).bind(paymentId).first<{
-      id: string; line_account_id: string; status: string;
-      provider: string; provider_payment_id: string | null;
-    }>();
-    if (!record
-      || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [record.line_account_id])) {
-      return c.json({ success: false, error: '対象が見つかりません' }, 404);
-    }
-    if (record.status !== 'paid') {
-      return c.json({ success: false, error: '支払い済みだけ返金できます' }, 409);
-    }
-    const provider = providerFor(c.env, record.provider);
-    if (!provider || !record.provider_payment_id) {
-      return c.json({ success: false, error: 'この支払いは返金できません' }, 409);
-    }
-    const ok = await provider.refund(record.provider_payment_id);
-    if (!ok) return c.json({ success: false, error: '返金できませんでした' }, 502);
-    const updated = await markBookingPayment(c.env.DB, {
-      lineAccountId: record.line_account_id, paymentId: record.id, status: 'refunded',
-    });
-    return c.json({ success: true, data: { payment: updated } });
-  },
-);
+bookingPayments.onError((error,c) => {
+  if (error instanceof PaymentActionError) return c.json({success:false,error:error.code,code:error.code},error.status);
+  const missing = /no such (table|column).*?(booking_payment_refunds|booking_payment_booking_links|refunded_amount|actor_label)/.test(String(error));
+  const code = missing ? 'payment_refund_storage_not_ready' : 'payment_action_unavailable';
+  console.error(JSON.stringify({code}));
+  return c.json({success:false,error:code,code}, /\/(refund|refunds|booking)$/.test(c.req.path) ? 503 : 500);
+});
+bookingPayments.post('/api/booking/payments/:id/refund',requireRole('owner','admin'),denyReadOnly(),inputJsonBoundary(),async c => {
+  c.header('Cache-Control','no-store');
+  const payment = await accessiblePayment(c);
+  if (!payment) return c.json({success:false,error:'not_found'},404);
+  const input = parseRefundInput(await c.req.json().catch(()=>null));
+  if (!input) return inputError(c,{success:false,error:'invalid_refund'},400,['amount','reason','notifyLine','idempotencyKey']);
+  return c.json({success:true,data:await simulatePaymentRefund(c.env.DB,payment,input,c.get('staff'))});
+});
+bookingPayments.get('/api/booking/payments/:id/refunds',requireRole('owner','admin','staff'),async c => {
+  c.header('Cache-Control','no-store');
+  const payment = await accessiblePayment(c);
+  if (!payment) return c.json({success:false,error:'not_found'},404);
+  return c.json({success:true,data:{items:await refundHistory(c.env.DB,payment.line_account_id,payment.id)}});
+});
+bookingPayments.post('/api/booking/payments/:id/booking',requireRole('owner','admin'),denyReadOnly(),inputJsonBoundary(),async c => {
+  c.header('Cache-Control','no-store');
+  const payment = await accessiblePayment(c);
+  if (!payment) return c.json({success:false,error:'not_found'},404);
+  const body = await c.req.json<{bookingId?:unknown;reason?:unknown}>().catch(()=>null);
+  if (typeof body?.bookingId!=='string' || !body.bookingId || body.bookingId.length>200
+    || typeof body?.reason!=='string' || !body.reason.trim() || body.reason.trim().length>500) {
+    return inputError(c,{success:false,error:'invalid_payment_link'},400,['bookingId','reason']);
+  }
+  return c.json({success:true,data:await linkPaymentBooking(c.env.DB,payment,body.bookingId,body.reason.trim(),c.get('staff'))});
+});
 
 // POST /api/booking/payments/webhook/:provider — 支払い済みの知らせ
 bookingPayments.post(
@@ -392,32 +401,20 @@ bookingPayments.post(
     if (!provider) return c.json({ success: false, error: 'unknown provider' }, 404);
     const outcome = await provider.verifyWebhook(rawBody, signature);
     if (!outcome) return c.json({ success: false, error: 'Invalid signature' }, 401);
-    if (outcome.status !== 'paid') {
-      await markUnpaidBookingPaymentByProviderId(c.env.DB, outcome.providerPaymentId, 'failed');
-      return c.json({ success: true, status: 'failed' });
+    const result = await receivePaymentEvent(c.env.DB, providerName, outcome, rawBody);
+    if (['event_conflict','busy_or_missing'].includes(result.status) || result.result==='failed') {
+      return c.json({success:false,error:'payment_event_unavailable',code:'payment_event_unavailable'},503);
     }
-    const applied = await applyPaidBookingPayment(c.env.DB, outcome.providerPaymentId, {
-      email: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-    });
-    if (!applied) return c.json({ success: true, status: 'unknown_payment' });
-    return c.json({ success: true, status: applied.duplicate ? 'duplicate' : 'paid' });
+    if (outcome.status==='paid' && ['paid','duplicate'].includes(result.status)) {
+      const payment=await c.env.DB.prepare('SELECT id FROM booking_payments WHERE provider=? AND provider_payment_id=?')
+        .bind(providerName,outcome.providerPaymentId).first<{id:string}>();
+      if (payment) await reconcilePaidBookingPayment(c.env.DB,payment.id,new Date(),false,{
+        email:c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+      });
+    }
+    return c.json({ success: true, status: result.status });
   },
 );
-
-async function markUnpaidBookingPaymentByProviderId(
-  db: D1Database,
-  providerPaymentId: string,
-  status: 'failed',
-): Promise<void> {
-  const row = await db.prepare(
-    `SELECT id, line_account_id FROM booking_payments
-      WHERE provider_payment_id = ? AND status IN ('unpaid', 'pending')`,
-  ).bind(providerPaymentId).first<{ id: string; line_account_id: string }>();
-  if (!row) return;
-  await db.prepare(`UPDATE booking_payments SET status = ?, updated_at = ?
-    WHERE id = ? AND line_account_id = ? AND status IN ('unpaid', 'pending')`)
-    .bind(status, new Date().toISOString(), row.id, row.line_account_id).run();
-}
 
 /**
  * 支払い済みを予約へ反映する。二重の知らせは2回目を受け付け済みで返す。

@@ -121,7 +121,7 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
         })
       }}>
       <div className={styles.dialogBody}>
-        <Field label="名前（任意）"><SaveErrorField names={["label","name"]}><TextField value={label} onChange={(e) => setLabel(e.target.value)} maxLength={100} placeholder="例：火曜の夕方 2倍デー" /></SaveErrorField></Field>
+        <Field label="名前"><SaveErrorField names={["label","name"]}><TextField value={label} onChange={(e) => setLabel(e.target.value)} maxLength={100} placeholder="例：火曜の夕方 2倍デー" /></SaveErrorField></Field>
         <CheckedField id="vs-mul-rate" label="倍率" fields={fields} name="rate"><SaveErrorField names={["rate"]}><TextField {...checkedProps(fields, 'rate', 'vs-mul-rate')} value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" /></SaveErrorField></CheckedField>
         <div className={styles.field}>
           <span className={styles.label}>曜日（選ばなければ毎日）</span>
@@ -136,8 +136,8 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
           <CheckedField id="vs-mul-end" label="時間の終わり" fields={fields} name="end"><div {...fields.bind('end')}><SaveErrorField names={["end"]}><Select id="vs-mul-end" aria-label="時間の終わり" size="full" value={end} error={fields.error('end') ?? undefined} onChange={(v) => { fields.clear('end'); setEnd(v) }} options={endOptions} /></SaveErrorField></div></CheckedField>
         </div>
         <div className={styles.row2}>
-          <Field label="期間の始まり（任意）"><SaveErrorField names={["from"]}><DateField value={from} onChange={setFrom} /></SaveErrorField></Field>
-          <CheckedField id="vs-mul-to" label="期間の終わり（任意）" fields={fields} name="to"><SaveErrorField names={["to"]}><DateField {...checkedProps(fields, 'to', 'vs-mul-to')} value={to} onChange={setTo} /></SaveErrorField></CheckedField>
+          <Field label="期間の始まり"><SaveErrorField names={["from"]}><DateField value={from} onChange={setFrom} /></SaveErrorField></Field>
+          <CheckedField id="vs-mul-to" label="期間の終わり" fields={fields} name="to"><SaveErrorField names={["to"]}><DateField {...checkedProps(fields, 'to', 'vs-mul-to')} value={to} onChange={setTo} /></SaveErrorField></CheckedField>
         </div>
       </div>
     </EditorSurface>

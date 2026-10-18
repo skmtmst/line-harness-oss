@@ -45,9 +45,7 @@ export async function pickMenuForFriend(
   for (const candidate of candidates) {
     const condition = parseCondition(candidate.condition);
     if (!condition) {
-      console.warn(
-        `[richMenuTargeting] menu ${candidate.groupId} has an unreadable condition; skipped`,
-      );
+      console.warn(JSON.stringify({"code":"services_rich_menu_targeting_warn"}));
       continue;
     }
     if (await matchesCondition(db, friendId, condition)) return candidate;

@@ -1,22 +1,44 @@
 'use client'
 
+import { blockIcon, ADD_CARD_ICONS, AddGrid } from './content-add-grid'
+
 import Card from '@/components/shared/card'
 import {japaneseDetailOf} from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 
 import { Field } from '@/components/shared/form-controls'
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
-import Link from '@/components/shared/list-navigation'
 import {
+  AlarmClock,
   AlignLeft,
+  Armchair,
+  Cake,
+  Calendar,
   CalendarCheck,
-  ExternalLink,
+  ChevronDown,
+  CircleDot,
+  Gift,
   Heading,
   HelpCircle,
   Image as ImageIcon,
   MousePointerClick,
+  Hash,
+  IdCard,
+  Languages,
+  Mail,
+  MapPin,
+  Minus,
+  Paperclip,
+  Phone,
+  Pilcrow,
+  ShieldAlert,
+  SquareCheck,
+  Star,
+  Type,
+  User,
+  ExternalLink,
   Plus,
   X,
 } from 'lucide-react'
@@ -32,13 +54,15 @@ import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { SettingCheckbox } from '@/components/shared/checkbox'
-import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
+import { ADD_GROUPS, blockKindLine, blockTitleKind, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile, uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import UriTapActionField from '@/components/shared/uri-tap-action-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormEditAttempted } from './field-issues'
+import RoutingSection from './routing-section'
+import type { FormRouting } from './routing-model'
 import styles from './edit.module.css'
 import TextLink from '@/components/shared/text-link'
 import { SaveErrorScope, useSaveFormErrors, SaveErrorField } from '@/components/shared/save-form-errors'
@@ -74,6 +98,9 @@ type Props = {
   onMoveBlock: (id: string, to: number) => void
   onDuplicateBlock: (id: string) => void
   onRemoveBlock: (id: string) => void
+  /** 答えで予約の行き先を分ける（B6）。決まりは回答フォームの版に含める。 */
+  routing?: FormRouting
+  onChangeRouting?: (next: FormRouting) => void
 }
 
 export function ContentTab(props: Props) {
@@ -128,6 +155,8 @@ export function ContentTab(props: Props) {
         </div>
       </Card>
 
+      {props.onChangeRouting ? <RoutingSection blocks={layout.sections.flatMap((s) => s.blocks)} refs={props.refs} routing={props.routing} readOnly={props.readOnly} onChange={props.onChangeRouting} /> : null}
+
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>
           <h2 id="fe-blocks-title" className={styles.cardTitle}>{`ページ${page + 1} のブロック`}</h2>
@@ -151,7 +180,7 @@ export function ContentTab(props: Props) {
             ),
           )
         )}
-        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
+        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} note={props.portable ? '本人確認書類の保存日数は、配った先の各アカウントの設定で決まります' : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
       </Card>
 
       <RenameDialog
@@ -196,16 +225,6 @@ function RenameDialog({ value, onCancel, onSave }: { value: string | null; onCan
 /* ---------------- ブロックの行 ---------------- */
 
 type RowProps = Props & { block: FormBlock; index: number }
-
-function blockIcon(block: FormBlock): ReactNode {
-  switch (block.kind) {
-    case 'image': return <ImageIcon size={15} aria-hidden="true" />
-    case 'heading': return <Heading size={15} aria-hidden="true" />
-    case 'text': return <AlignLeft size={15} aria-hidden="true" />
-    case 'button': return <MousePointerClick size={15} aria-hidden="true" />
-    default: return block.type === 'booking' ? <CalendarCheck size={15} aria-hidden="true" /> : <HelpCircle size={15} aria-hidden="true" />
-  }
-}
 
 /** つまみ：矢印キーで上下へ、つかんで落とす先の行へ。 */
 function useRowDrag(props: RowProps) {
@@ -300,7 +319,7 @@ function OpenBlock(props: RowProps) {
         ) : null}
         <RowActions className={styles.more} subjectName={`「${blockTitleLine(block)}」`} menuItems={menuItems} destructiveItem={menu.destructiveItem} />
       </div>
-      {input ? <InputFields block={input} refs={refs} patch={patch} accountId={props.accountId} /> : <DecoFields block={block} patch={patch} accountId={props.accountId} />}
+      {input ? <InputFields block={input} refs={refs} patch={patch} accountId={props.accountId} portable={props.portable} /> : <DecoFields block={block} patch={patch} accountId={props.accountId} />}
       {input ? (
         <InlineSettings open={detailOpen} title={`「${blockTitleLine(block)}」の詳しい設定`} onClose={() => setDetailOpen(false)}>
           <BlockEditor block={block} index={props.index} sections={props.layout.sections} refs={refs} selected onSelect={() => {}} onChange={patch} />
@@ -310,22 +329,18 @@ function OpenBlock(props: RowProps) {
   )
 }
 
-function blockTitleKind(block: FormBlock): string {
-  return { image: '画像', heading: '見出し', text: 'テキスト', button: 'ボタン', input: '入力' }[block.kind]
+function Labeled({ label, htmlFor, required, children }: { label: string; htmlFor?: string; required?: boolean; children: ReactNode }) {
+  return <Field label={label} htmlFor={htmlFor} required={required}>{children}</Field>
 }
 
-function Labeled({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
-  return <Field label={label} htmlFor={htmlFor}>{children}</Field>
-}
-
-function InputFields({ block, refs, patch, accountId }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void; accountId: string | null }) {
+function InputFields({ block, refs, patch, accountId, portable = false }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void; accountId: string | null; portable?: boolean }) {
   const set = (next: Partial<FormInputBlock>) => patch(next as Partial<FormBlock>)
   const labelId = `fe-q-${block.id}`
   /* 保存を押したあと、質問文が空なら欄を赤くして真下に理由を出す（B-139）。 */
   const labelError = useFormEditAttempted() && !block.label.trim() ? '質問文を入れてください' : null
   return (
     <>
-      <Labeled label="質問文" htmlFor={labelId}>
+      <Labeled label="質問文" htmlFor={labelId} required>
         <SaveErrorField names={["label","block.label"]}><TextField id={labelId} value={block.label} placeholder="質問の文" invalid={Boolean(labelError)} aria-describedby={labelError ? `${labelId}-error` : undefined} onChange={(e) => set({ label: e.target.value })} /></SaveErrorField>
         <FieldError id={`${labelId}-error`}>{labelError}</FieldError>
       </Labeled>
@@ -337,7 +352,7 @@ function InputFields({ block, refs, patch, accountId }: { block: FormInputBlock;
       {block.type === 'file' ? <FormFileSettings block={block} onChange={set} /> : null}
       {isChoiceType(block.type) ? <ChoiceFields block={block} set={set} /> : null}
       {block.fixedField === 'allergy' && accountId ? <AllergyOptionsSave accountId={accountId} block={block} set={set} /> : null}
-      {block.type === 'booking' ? <BookingFields block={block} refs={refs} set={set} /> : <SaveTo block={block} refs={refs} set={set} />}
+      {block.type === 'booking' ? <BookingFields block={block} refs={refs} set={set} portable={portable} /> : <SaveTo block={block} refs={refs} set={set} />}
     </>
   )
 }
@@ -422,6 +437,7 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
             className={styles.choiceRemove}
             aria-label={`選択肢「${choice.label}」を消す`}
             disabled={choices.length <= 1 || (block.fixedField === 'allergy' && choice.isOther)}
+            title={block.fixedField === 'allergy' && choice.isOther ? '自由に書く選択肢は、アレルギーの書き足しに使うため消せません' : choices.length <= 1 ? '選択肢を1つ以上残してください' : undefined}
             onClick={() => set({ choices: choices.filter((_, i) => i !== index) })}
           >
             <X size={15} aria-hidden="true" />
@@ -441,10 +457,16 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
 /** 答えを保存する先（友だち情報の項目）。本名・表示名・メモへの保存は「詳しい設定」。 */
 function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void }) {
   const fixedKey = block.fixedField ?? (block.destinations?.realName ? undefined : fixedFieldForBlock(block))
-  if (fixedKey) return <div className={styles.saveTo}>
-    <span className={styles.fieldLabel}>答えを保存する先</span>
-    <span className={styles.cardNote}>{FIXED_FRIEND_FIELDS.find(f => f.key === fixedKey)?.label}（決まった欄）</span>
-  </div>
+  // 決まった欄は変えられない。ほかの保存先と同じ欄の形で、読むだけで出す（絵 SwGrd）。
+  if (fixedKey) {
+    const fixedLabel = `${FIXED_FRIEND_FIELDS.find(f => f.key === fixedKey)?.label ?? ''}（決まった欄）`
+    return <div className={styles.saveTo}>
+      <span className={styles.fieldLabel}>答えを保存する先</span>
+      <span className={styles.saveSelect}>
+        <EntitySelect aria-label="答えを保存する先" size="full" readOnly actionHidden value={fixedKey} onChange={() => {}} options={[{ value: fixedKey, label: fixedLabel }]} />
+      </span>
+    </div>
+  }
   const current = block.destinations?.friendFieldIds?.[0] ?? ''
   const options = [
     { value: '', label: '保存しない' },
@@ -457,7 +479,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
       <span className={styles.saveSelect}>
         <SaveErrorField names={["current"]}><EntitySelect
           aria-label="答えを保存する先"
-          compact
+          size="full"
           value={current}
           onChange={(value) => {
             const rest = (block.destinations?.friendFieldIds ?? []).slice(1)
@@ -471,30 +493,33 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
 }
 
 const DAYS_AHEAD = [7, 14, 30, 60]
+const noMeta = () => undefined
 
-function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void }) {
+function BookingFields({ block, refs, set, portable = false }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void; portable?: boolean }) {
   const booking = block.booking ?? null
   const menus = refs.bookingMenus ?? []
   const staff = booking?.menuId ? (refs.bookingMenuStaff?.[booking.menuId] ?? []) : []
   const days = booking?.daysAhead ?? 14
+  const menuOptions = useMemo(() => menus.map((menu) => ({ ...menu, name: `${menu.name}・${menu.durationMinutes}分` })), [menus])
   const setBooking = (next: Partial<NonNullable<FormInputBlock['booking']>>) =>
     set({ booking: { menuId: booking?.menuId ?? '', staffId: booking?.staffId ?? null, daysAhead: days, ...next } })
   return (
     <>
       <div className={styles.bookingRow}>
         <Labeled label="メニュー">
+          {/* 統括のひな形（N4T9mO）：メニューは店ごとにあり、統括の口には一覧が無い（機能待ち）。読み込み中で止めず、押せない形で決まりを書く。 */}
+          {portable ? <EntityKindField kind="booking_menu" label="メニュー" options={[]} value="" onChange={() => {}} disabled disabledReason="配った先の店のメニューから選びます" placeholder="配った先の店のメニューから選びます" meta={noMeta} /> :
           <SaveErrorField names={["menuId","booking?.menuId","booking"]}><EntityKindField
             kind="booking_menu"
             label="メニュー"
-            options={menus}
+            /* 絵 ijxur：欄は「名前・かかる時間」の1つの札（横の補足は出さず、狭い列でも名前を残す）。 */
+            options={menuOptions}
             value={booking?.menuId ?? ''}
             onChange={(menuId) => setBooking({ menuId, staffId: null })}
             placeholder={menus.length ? '（メニューを選ぶ）' : '（メニューがありません）'}
-            meta={(row) => {
-              const menu = menus.find((m) => m.id === row.id)
-              return menu ? `${menu.durationMinutes}分` : undefined
-            }}
-          /></SaveErrorField>
+            meta={noMeta}
+            actionHidden="label"
+          /></SaveErrorField>}
         </Labeled>
         <Labeled label="担当">
           <SaveErrorField names={["staffId","booking?.staffId","booking"]}><EntityKindField
@@ -614,32 +639,5 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
   }
 }
 
-/* ---------------- ブロックを足す ---------------- */
-
 /** 統括も画像を追加できる。固有の参照は保存前に別途確認する。 */
 const PORTABLE_HIDDEN_CARDS: ReadonlySet<string> = new Set()
-
-function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) => void; hide?: ReadonlySet<string> }) {
-  return (
-    <div className={styles.addBox}>
-      <p className={styles.addTitle}>ブロックを足す</p>
-      {ADD_GROUPS.map((group) => (
-        <div key={group.title} className={styles.addGroup}>
-          <p className={styles.addGroupTitle}>{group.title}</p>
-          <div className={styles.addCards} data-writing={group.title === '書いてもらう' || undefined}>
-            {group.cards.filter((card) => !hide?.has(card.key)).map((card) => (
-              <button key={card.key} type="button" className={styles.addCard} data-fresh={card.fresh || undefined} onClick={() => onAdd(card.make)}>
-                <span className={styles.addCardTop}>
-                  <Plus size={15} aria-hidden="true" />
-                  <span className={styles.addCardLabel}>{card.label}</span>
-                  {card.fresh ? <span className={styles.newBadge}>新</span> : null}
-                </span>
-                <span className={styles.addCardHint} title={card.hint}>{card.hint}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}

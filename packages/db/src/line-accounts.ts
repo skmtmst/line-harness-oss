@@ -171,12 +171,7 @@ function warnPlaintextCredentialFallback(
   error: unknown,
 ): void {
   // Credential values and thrown error messages are deliberately excluded.
-  console.warn({
-    event: 'line_credential_plaintext_fallback',
-    line_account_id: context.lineAccountId,
-    field: context.field,
-    reason: classifyCredentialFailure(error),
-  });
+  console.warn(JSON.stringify({"code":"line_credential_plaintext_fallback"}));
 }
 
 export interface CreateLineAccountInput {
@@ -1037,23 +1032,6 @@ export async function updateLineAccount(
     .run();
 
   return getLineAccountById(db, id, encryptionKey);
-}
-
-/**
- * 作成途中のロールバック専用。永続化済みアカウントは archiveLineAccount を使う。
- * 接続フローはアカウント作成後に capability 判定などを子表へ書くため、
- * 親行だけでなく子行も同じ batch で消す。D1 は外部キーをあてにできない。
- */
-export async function deleteUncommittedLineAccount(
-  db: D1Database,
-  id: string,
-): Promise<void> {
-  await db.batch([
-    db.prepare(`DELETE FROM account_settings WHERE line_account_id = ?`).bind(id),
-    db.prepare(`DELETE FROM line_account_tag_links WHERE line_account_id = ?`).bind(id),
-    db.prepare(`DELETE FROM line_account_connection_checks WHERE line_account_id = ?`).bind(id),
-    db.prepare(`DELETE FROM line_accounts WHERE id = ?`).bind(id),
-  ]);
 }
 
 export type LineAccountArchiveBlocker =

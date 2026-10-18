@@ -21,6 +21,12 @@ export const STEP_UP_WINDOW_MS = 10 * 60 * 1000;
 
 /** POST /api/auth/step-up が受け付ける目的。ここに無い文字列は発行しない。 */
 export const STEP_UP_PURPOSES = [
+  'privacy.retention',
+  'data.export',
+  'broadcast.send',
+  'ops.impersonation',
+  'secrets.reveal',
+  'auth.api_key',
   'auth.mfa.policy',
   'auth.mfa.recovery',
   'auth.mfa.reenroll',
@@ -36,6 +42,8 @@ export const STEP_UP_PURPOSES = [
   'broadcast.approval',
   'webhook.api_token',
   'webhook.secret',
+  'ai.settings',
+  'mcp.connection',
 ] as const;
 export type StepUpPurpose = (typeof STEP_UP_PURPOSES)[number];
 
@@ -70,7 +78,7 @@ export async function consumeStepUpToken(
  * このリクエストが再確認済みか。通せるなら true、止めるなら false。
  * 止める側は 401 + code 'STEP_UP_REQUIRED' で応答を返す。
  */
-export async function sensitiveStepUpSatisfied(
+async function checkSensitiveStepUp(
   c: Context<Env>,
   purpose: StepUpPurpose,
 ): Promise<boolean> {
@@ -98,4 +106,14 @@ export async function sensitiveStepUpSatisfied(
 /** 再確認が要るときの統一応答。 */
 export function stepUpRequiredResponse(c: Context<Env>, detail: string): Response {
   return c.json({ success: false, error: detail, code: 'STEP_UP_REQUIRED' }, 401);
+}
+
+// A request may pass the shared guard and a route guard. Consume its grant once.
+const verifiedInRequest = new WeakMap<object, Set<StepUpPurpose>>();
+export async function sensitiveStepUpSatisfied(c: Context<Env>, purpose: StepUpPurpose): Promise<boolean> {
+  if (verifiedInRequest.get(c)?.has(purpose)) return true;
+  if (!await checkSensitiveStepUp(c, purpose)) return false;
+  const purposes = verifiedInRequest.get(c) ?? new Set<StepUpPurpose>();
+  purposes.add(purpose); verifiedInRequest.set(c, purposes);
+  return true;
 }

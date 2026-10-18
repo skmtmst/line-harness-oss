@@ -1,3 +1,10 @@
+import {countInboxSavedViewMatches} from './inbox-saved-view-matches.js';
+import { slaChatList, enrichSlaChats } from '../services/inbox-sla-list.js';
+import { refreshInboxSla } from '../services/inbox-sla.js';
+import { resolveLineSender } from '../services/line-senders.js';
+import { GapError } from '../services/gap-common.js';
+import { validateScheduledAt } from './chat-schedule-validation.js';
+import { serializeInboxSavedView } from '../services/inbox-saved-view-response.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -23,7 +30,6 @@ import {
   deleteSavedSearch,
   validateInboxSavedViewConditions,
   type InboxSavedViewConditions,
-  type SavedSearch,
   type SavedSearchAccess,
   createScheduledChatSend,
   getScheduledChatSend,
@@ -151,195 +157,7 @@ type ChatLike = {
   revision: number;
 };
 
-function serializeInboxSavedView(
-  row: SavedSearch,
-  count?: { matchCount: number; matchCountCapped: boolean },
-) {
-  return {
-    id: row.id,
-    name: row.name,
-    scope: row.scope,
-    conditions: JSON.parse(row.conditions_json) as unknown,
-    createdBy: row.created_by,
-    lineAccountId: row.line_account_id,
-    isShared: Boolean(row.is_shared),
-    displayOrder: row.display_order,
-    isFavorite: row.display_order < 0,
-    createdAt: row.created_at,
-    matchCount: count?.matchCount ?? null,
-    matchCountCapped: count?.matchCountCapped ?? false,
-  };
-}
 
-async function countInboxSavedViewMatches(
-  db: D1Database,
-  input: {
-    lineAccountId: string;
-    staffId: string;
-    canSeeUnassigned: boolean;
-    conditions: InboxSavedViewConditions;
-  },
-): Promise<{ matchCount: number; matchCountCapped: boolean }> {
-  const where: string[] = [
-    'f.line_account_id = ?',
-    `(c.id IS NOT NULL OR EXISTS (
-      SELECT 1 FROM messages_log existing
-       WHERE existing.friend_id = f.id
-         AND (existing.delivery_type IS NULL OR existing.delivery_type != 'test')
-    ))`,
-  ];
-  const bindings: unknown[] = [input.lineAccountId];
-  const conditions = input.conditions;
-
-  if (conditions.statuses.length < 4) {
-    where.push(`COALESCE(c.status, 'resolved') IN (${conditions.statuses.map(() => '?').join(', ')})`);
-    bindings.push(...conditions.statuses);
-  }
-  if (conditions.assignees.length > 0) {
-    const named = conditions.assignees.filter((id) => id !== 'unassigned');
-    const clauses: string[] = [];
-    if (conditions.assignees.includes('unassigned')) clauses.push('c.operator_id IS NULL');
-    if (named.length > 0) {
-      clauses.push(`c.operator_id IN (${sqlIdSet(named).sql})`);
-      bindings.push(...(named.length ? sqlIdSet(named).binds : []));
-    }
-    where.push(`(${clauses.join(' OR ')})`);
-  }
-  if (conditions.query) {
-    /*
-     * #625: LIKE ではなく instr() で部分一致する。
-     * D1 の LIKE/GLOB パターンは最大50バイトのため、長い検索語で500になっていた。
-     */
-    where.push(`(instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
-      SELECT 1 FROM messages_log searched
-       WHERE searched.friend_id = f.id
-         AND (searched.delivery_type IS NULL OR searched.delivery_type != 'test')
-         AND instr(lower(searched.content), lower(?)) > 0
-    ))`);
-    bindings.push(conditions.query, conditions.query);
-  }
-  if (conditions.unread === 'mine') {
-    where.push(`EXISTS (
-      SELECT 1 FROM messages_log incoming
-       WHERE incoming.friend_id = f.id AND incoming.direction = 'incoming'
-         AND (incoming.delivery_type IS NULL OR incoming.delivery_type != 'test')
-         AND (sr.last_read_at IS NULL OR incoming.created_at > sr.last_read_at)
-    )`);
-  }
-  if (conditions.messageTypes.length > 0) {
-    where.push(`(
-      SELECT latest.message_type FROM messages_log latest
-       WHERE latest.friend_id = f.id
-         AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
-       ORDER BY latest.created_at DESC LIMIT 1
-    ) IN (${conditions.messageTypes.map(() => '?').join(', ')})`);
-    bindings.push(...conditions.messageTypes);
-  }
-  if (conditions.receivedFrom) {
-    where.push(`EXISTS (
-      SELECT 1 FROM messages_log received
-       WHERE received.friend_id = f.id AND received.direction = 'incoming'
-         AND received.created_at >= ?
-         AND (received.delivery_type IS NULL OR received.delivery_type != 'test')
-    )`);
-    bindings.push(conditions.receivedFrom);
-  }
-  if (conditions.receivedTo) {
-    where.push(`EXISTS (
-      SELECT 1 FROM messages_log received
-       WHERE received.friend_id = f.id AND received.direction = 'incoming'
-         AND received.created_at <= ?
-         AND (received.delivery_type IS NULL OR received.delivery_type != 'test')
-    )`);
-    bindings.push(conditions.receivedTo);
-  }
-  // 「要返信」は一覧APIの quickFilter=reply と同じく対応状況=未対応で数える。
-  if (conditions.quickFilter === 'reply') {
-    where.push(`COALESCE(c.status, 'resolved') = 'unread'`);
-  }
-  // quickFilter=overdue と due=overdue は同じ条件。古い行は due だけを持つ。
-  if (conditions.due === 'overdue' || conditions.quickFilter === 'overdue') {
-    where.push(`COALESCE(c.status, 'resolved') = 'unread'`);
-    where.push(`COALESCE(c.last_customer_message_at, c.last_message_at) < datetime('now', '-1 hour')`);
-  }
-
-  const lineRow = input.conditions.channels.includes('line') ? await db.prepare(
-    `SELECT COUNT(*) AS count FROM (
-       SELECT f.id
-         FROM friends f
-         LEFT JOIN chats c ON c.id = (
-           SELECT id FROM chats WHERE friend_id = f.id ORDER BY created_at DESC LIMIT 1
-         )
-         LEFT JOIN inbox_staff_reads sr
-           ON sr.channel = 'line' AND sr.conversation_id = f.id AND sr.staff_id = ?
-        WHERE ${where.join(' AND ')}
-        LIMIT 1001
-     )`,
-  ).bind(input.staffId, ...bindings).first<{ count: number }>() : null;
-
-  const emailWhere: string[] = [];
-  const emailBindings: unknown[] = [];
-  if (conditions.statuses.length < 4) {
-    emailWhere.push(`t.status IN (${conditions.statuses.map(() => '?').join(', ')})`);
-    emailBindings.push(...conditions.statuses);
-  }
-  if (conditions.assignees.length > 0) {
-    const named = conditions.assignees.filter((id) => id !== 'unassigned');
-    const clauses: string[] = [];
-    if (conditions.assignees.includes('unassigned')) clauses.push('t.assigned_staff_id IS NULL');
-    if (named.length > 0) {
-      clauses.push(`t.assigned_staff_id IN (${sqlIdSet(named).sql})`);
-      emailBindings.push(...(named.length ? sqlIdSet(named).binds : []));
-    }
-    emailWhere.push(`(${clauses.join(' OR ')})`);
-  }
-  if (conditions.query) {
-    // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
-    emailWhere.push(`(instr(lower(t.customer_email), lower(?)) > 0
-      OR instr(lower(t.customer_name), lower(?)) > 0
-      OR instr(lower(t.subject), lower(?)) > 0
-      OR EXISTS (
-      SELECT 1 FROM support_email_messages searched
-       WHERE searched.thread_id = t.id AND instr(lower(searched.body_text), lower(?)) > 0
-    ))`);
-    emailBindings.push(conditions.query, conditions.query, conditions.query, conditions.query);
-  }
-  if (conditions.unread === 'mine') {
-    emailWhere.push('(sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at)');
-  }
-  if (conditions.messageTypes.length > 0 && !conditions.messageTypes.includes('text')) {
-    emailWhere.push('0=1');
-  }
-  if (conditions.receivedFrom) {
-    emailWhere.push('t.last_incoming_at >= ?');
-    emailBindings.push(conditions.receivedFrom);
-  }
-  if (conditions.receivedTo) {
-    emailWhere.push('t.last_incoming_at <= ?');
-    emailBindings.push(conditions.receivedTo);
-  }
-  if (conditions.quickFilter === 'reply') {
-    emailWhere.push(`t.status = 'unread'`);
-  }
-  if (conditions.due === 'overdue' || conditions.quickFilter === 'overdue') {
-    emailWhere.push(`t.status = 'unread'`);
-    emailWhere.push(`t.last_incoming_at < datetime('now', '-1 hour')`);
-  }
-  const emailRow = input.conditions.channels.includes('email') && input.canSeeUnassigned
-    ? await db.prepare(
-      `SELECT COUNT(*) AS count FROM (
-         SELECT t.id
-           FROM support_email_threads t
-           LEFT JOIN inbox_staff_reads sr
-             ON sr.channel = 'email' AND sr.conversation_id = t.id AND sr.staff_id = ?
-          ${emailWhere.length > 0 ? `WHERE ${emailWhere.join(' AND ')}` : ''}
-          LIMIT 1001
-       )`,
-    ).bind(input.staffId, ...emailBindings).first<{ count: number }>()
-    : null;
-  const rawCount = Number(lineRow?.count ?? 0) + Number(emailRow?.count ?? 0);
-  return { matchCount: Math.min(rawCount, 1000), matchCountCapped: rawCount > 1000 };
-}
 
 const EMPTY_INBOX_SAVED_VIEW_CONDITIONS: InboxSavedViewConditions = {
   version: 1,
@@ -489,7 +307,7 @@ chats.get('/api/operators', requireRole('owner', 'admin', 'staff'), async (c) =>
       })),
     });
   } catch (err) {
-    console.error('GET /api/operators error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/operators"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -501,7 +319,7 @@ chats.post('/api/operators', requireRole('owner', 'admin'), inputJsonBoundary({"
     const item = await createOperator(c.env.DB, body);
     return c.json({ success: true, data: { id: item.id, name: item.name, email: item.email, role: item.role } }, 201);
   } catch (err) {
-    console.error('POST /api/operators error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/operators"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -515,7 +333,7 @@ chats.put('/api/operators/:id', requireRole('owner', 'admin'), inputJsonBoundary
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: { id: updated.id, name: updated.name, email: updated.email, role: updated.role, isActive: Boolean(updated.is_active) } });
   } catch (err) {
-    console.error('PUT /api/operators/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"PUT /api/operators/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -525,7 +343,7 @@ chats.delete('/api/operators/:id', requireRole('owner', 'admin'), async (c) => {
     await deleteOperator(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/operators/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"DELETE /api/operators/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -549,7 +367,7 @@ chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), async (c) 
     });
     return c.json({ success: true as const, data: stats });
   } catch (err) {
-    console.error('GET /api/chats/stats error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/stats"}));
     return c.json({ success: false as const, error: '受信箱の集計を取得できませんでした' }, 500);
   }
 });
@@ -598,7 +416,7 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
     if (channel !== 'email') {
       // ── LINE 側。一覧クエリと同じ候補集合（messages_log ∪ chats）を
       // 同じ条件で数える。preview 用の集約は不要なので CTE 2本だけ。 ──
-      const accountFilterBindings: string[] = [];
+    const accountFilterBindings: string[] = [];
       let accountFilterSql: string;
       if (lineAccountId) {
         accountFilterSql = `friend_id IN (SELECT id FROM friends WHERE line_account_id = ?)`;
@@ -776,7 +594,7 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
       },
     });
   } catch (err) {
-    console.error('GET /api/chats/quick-counts error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/quick-counts"}));
     return c.json({ success: false as const, error: '件数を取得できませんでした' }, 500);
   }
 });
@@ -797,12 +615,13 @@ chats.get('/api/chats/outbound-failures', requireRole('owner', 'admin', 'staff')
     });
     return c.json({ success: true, data: failures });
   } catch (err) {
-    console.error('GET /api/chats/outbound-failures error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/outbound-failures"}));
     return c.json({ success: false, error: '送信失敗履歴を取得できませんでした' }, 500);
   }
 });
 
 chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if(c.req.query('sort')==='sla_due'||['overdue','soon'].includes(c.req.query('slaState')??'')) return slaChatList(c);
   try {
     const staff = c.get('staff');
     const status = c.req.query('status') ?? undefined;
@@ -905,6 +724,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     //   - content は text のみ先頭 200 文字まで切り詰めて返す (flex/image など raw JSON を
     //     返すと broadcast 後の rows で multi-MB レスポンスになる)。
     //   - lineAccountId 指定時は messages_log スキャンを対象アカの friend に絞る。
+    for(const account of visibleScope.allowedAccountIds) await refreshInboxSla(c.env.DB,account);
     const accountFilterBindings: string[] = [];
     let accountFilterSql: string;
     if (lineAccountId) {
@@ -1168,9 +988,9 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       updatedAt: ch.updated_at,
     }));
 
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: await enrichSlaChats(c.env.DB,data) });
   } catch (err) {
-    console.error('GET /api/chats error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1253,6 +1073,9 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
                   JOIN scenarios s ON s.id = ss.scenario_id
                   WHERE ss.id = messages_log.scenario_step_id) AS scenario_name,
                 messages_log.quoted_message_id,
+                messages_log.correction_of_message_id, messages_log.sender_id, messages_log.sender_snapshot_json,
+                (SELECT json_group_array(json_object('id', corr.id, 'createdAt', corr.created_at, 'staffId', corr.sent_by_staff_id))
+                 FROM messages_log corr WHERE corr.correction_of_message_id=messages_log.id) AS corrections_json,
                 q.direction AS quoted_direction,
                 q.message_type AS quoted_message_type,
                 CASE WHEN q.unsent_at IS NOT NULL THEN '' ELSE q.content END AS quoted_content,
@@ -1304,6 +1127,10 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
           sentByStaffId: m.sent_by_staff_id || null,
           sentByStaffName: m.sent_by_staff_name || null,
           scenarioName: m.scenario_name || null,
+          senderId: m.sender_id ?? null,
+          sender: m.sender_snapshot_json ? JSON.parse(String(m.sender_snapshot_json)) : null,
+          correctionOfMessageId: m.correction_of_message_id ?? null,
+          corrections: JSON.parse(String(m.corrections_json ?? '[]')),
           quoted: m.quoted_message_id
             ? {
                 id: m.quoted_message_id,
@@ -1320,7 +1147,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/chats/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1349,7 +1176,7 @@ chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), requir
     }
     return c.json({ success: true, data: { isUnread: false } });
   } catch (err) {
-    console.error('POST /api/chats/:id/read error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/read"}));
     return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
   }
 });
@@ -1385,7 +1212,7 @@ chats.post('/api/chats/read-all', requireRole('owner', 'admin', 'staff'), inputJ
       .run();
     return c.json({ success: true, data: { marked: true } });
   } catch (err) {
-    console.error('POST /api/chats/read-all error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/read-all"}));
     return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
   }
 });
@@ -1554,7 +1381,7 @@ chats.post('/api/chats', requireRole('owner', 'admin', 'staff'), inputJsonBounda
     }
     return c.json({ success: true, data: { id: item.id, friendId: item.friend_id, status: item.status } }, 201);
   } catch (err) {
-    console.error('POST /api/chats error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1670,7 +1497,7 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisib
           friendId: resolved.friend_id,
           eventData: { staffId: body.operatorId },
         }, undefined, assignedFriend?.line_account_id).catch((error) => {
-          console.error('staff_assigned automation error:', error);
+          console.error(JSON.stringify({"code":"routes_chats_failed","route":"PUT /api/chats/:id"}));
         });
       }
     }
@@ -1689,7 +1516,7 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisib
       },
     });
   } catch (err) {
-    console.error('PUT /api/chats/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"PUT /api/chats/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1726,7 +1553,7 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), req
 
     return c.json({ success: true, data: { started: true, loadingSeconds } });
   } catch (err) {
-    console.error('POST /api/chats/:id/loading error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/loading"}));
     const message = err instanceof Error ? err.message : 'Internal server error';
     return c.json({ success: false, error: message }, 500);
   }
@@ -1734,6 +1561,8 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), req
 
 // オペレーターからメッセージ送信
 chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary({"messageType":["string"],"content":["string"],"revision":["number"],"quotedMessageId":["string"]}), async (c) => {
+  if (c.get('impersonation')) return c.json({ success: false, code: 'IMPERSONATION_SEND_BLOCKED', error: '代理ログイン中は送れません' }, 403);
+  if (c.get('staff').readOnly) return c.json({ success: false, error: 'forbidden' }, 403);
   let leasedConversationId: string | null = null;
   try {
     const chatId = c.req.param('id');
@@ -1745,9 +1574,9 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
     // 壊れたJSONは外側catchの500に落とさない。運用者が原因を判別できるよう400で返す。
-    let body: { messageType?: string; content: string; revision?: number; quotedMessageId?: string };
+    let body: { messageType?: string; content: string; revision?: number; quotedMessageId?: string; correctionOfMessageId?: string; senderId?: string };
     try {
-      body = await c.req.json<{ messageType?: string; content: string; revision?: number; quotedMessageId?: string }>();
+      body = await c.req.json<{ messageType?: string; content: string; revision?: number; quotedMessageId?: string; correctionOfMessageId?: string; senderId?: string }>();
     } catch {
       return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     }
@@ -1768,6 +1597,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       'chats.manual-send',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
 
     if (!await canAccessAllLineAccounts(
       c.env.DB,
@@ -1775,6 +1605,22 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       [friend.line_account_id ?? null],
     )) {
       return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
+
+    if (body.correctionOfMessageId !== undefined) {
+      if (typeof body.correctionOfMessageId !== 'string' || !await c.env.DB.prepare(
+        `SELECT id FROM messages_log WHERE id=? AND friend_id=? AND line_account_id IS ? AND direction='outgoing'
+         AND unsent_at IS NULL AND (delivery_type IS NULL OR delivery_type!='test')`,
+      ).bind(body.correctionOfMessageId, friend.id, friend.line_account_id ?? null).first()) {
+        return c.json({ success: false, error: 'correction_source_not_found' }, 404);
+      }
+    }
+
+    let sender: Awaited<ReturnType<typeof resolveLineSender>> | null = null;
+    if (body.senderId !== undefined) {
+      if (typeof body.senderId !== 'string' || !friend.line_account_id) return c.json({success:false,error:'invalid_sender'},400);
+      try { sender = await resolveLineSender(c.env.DB,friend.line_account_id,c.get('staff'),body.senderId); }
+      catch(e) { if(e instanceof GapError) return c.json({success:false,error:e.code},e.status); throw e; }
     }
 
     // N-026: 差し込みは一斉配信と同じ解決器で置き換える。解決しきれない
@@ -1826,13 +1672,15 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     const lineClient = new LineClient(accessToken);
     const messageType = body.messageType ?? 'text';
     let message: Message;
+    let renewalMessage: Message | undefined;
     try {
       const built = await buildChatMessage({
-        messageType, content: rendered.content, bucket: c.env.IMAGES,
+        messageType, content: rendered.content, bucket: c.env.IMAGES, signingSecret: c.env.API_KEY,
         owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
         origin: c.env.WORKER_URL || new URL(c.req.url).origin,
       });
       message = built.message;
+      renewalMessage = built.renewalMessage;
       rendered.content = built.content;
     } catch (error) {
       if (error instanceof ChatAttachmentError) return inputError(c, { success: false, code: error.code, error: error.message }, 400, ["attachmentIds"]);
@@ -1841,6 +1689,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
 
     // 引用元にLINEのquoteTokenが残っていれば、顧客側にも引用表示として届く。
     if (quoted?.quote_token) message.quoteToken = quoted.quote_token;
+    if (sender) Object.assign(message, {sender});
 
     const payloadHash = await hashOutboundPayload(
       JSON.stringify({
@@ -1849,6 +1698,9 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         messageType,
         content: body.content,
         quotedMessageId: quoted?.id ?? null,
+        correctionOfMessageId: body.correctionOfMessageId ?? null,
+        senderId: body.senderId ?? null,
+        sender,
       }),
     );
     const reservation = await reserveOutboundSend(c.env.DB, {
@@ -1914,7 +1766,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     // LINE API が同一リクエストを二重配信しない。
     const outboundLeaseToken = reservation.leaseToken;
     try {
-      await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+      await lineClient.pushMessage(friend.line_user_id, [message, ...(renewalMessage ? [renewalMessage] : [])], idempotencyKey);
     } catch (error) {
       const failedAt = new Date().toISOString();
       const failure = classifyLineOutboundFailure(error, failedAt);
@@ -1933,7 +1785,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       leasedConversationId = null;
       return inputError(c, {
         success: false,
-        error: failure.status === 'unknown'
+        error: sender && (error as {status?:number})?.status===400 ? '送り手の名前かアイコンを確認してください。送り手なしで送ることもできます' : failure.status === 'unknown'
           ? 'LINEへの送達結果を確認できないため、自動再送を停止しました'
           : 'LINEへ送信できませんでした',
         code: failure.code,
@@ -1949,8 +1801,8 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         c.env.DB
           .prepare(`INSERT OR IGNORE INTO messages_log
             (id, friend_id, direction, message_type, content, source, line_account_id,
-             sent_by_staff_id, created_at, quoted_message_id)
-            VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?)`)
+             sent_by_staff_id, created_at, quoted_message_id, correction_of_message_id, sender_id, sender_snapshot_json)
+            VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?)`)
           .bind(
             logId,
             friend.id,
@@ -1960,6 +1812,9 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
             c.get('staff').id,
             sentAt,
             quoted?.id ?? null,
+            body.correctionOfMessageId ?? null,
+            body.senderId ?? null,
+            sender ? JSON.stringify(sender) : null,
           ),
         completeOutboundSendStatement(c.env.DB, {
           key: idempotencyKey,
@@ -2021,7 +1876,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         .bind(jstNow(), chat.id)
         .run();
     } catch (e) {
-      console.error('first_replied_at update error:', e);
+      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send"}));
     }
 
     await fireEvent(c.env.DB, 'manual_reply_sent', {
@@ -2031,7 +1886,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       friendId: friend.id,
       eventData: { staffId: c.get('staff').id },
     }, undefined, friend.line_account_id).catch((error) => {
-      console.error('manual_reply_sent automation error:', error);
+      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send"}));
     });
 
     await releaseInboxReplyLease(c.env.DB, {
@@ -2054,7 +1909,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
       }).catch(() => undefined);
     }
-    console.error('POST /api/chats/:id/send error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2100,7 +1955,7 @@ chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff
       data: { content: rendered.content, unresolved: rendered.unresolved },
     });
   } catch (err) {
-    console.error('POST /api/chats/:id/render-preview error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/render-preview"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2114,6 +1969,7 @@ chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff
  * LINE呼び出し0回・保存0件。冪等予約は単体口と共用する。
  */
 chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), async (c) => {
+  if(c.get('impersonation')) return c.json({success:false,code:'IMPERSONATION_SEND_BLOCKED',error:'代理ログイン中は送れません'},403);
   let leasedConversationId: string | null = null;
   try {
     const chatId = c.req.param('id');
@@ -2124,7 +1980,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
-    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; texts?: unknown; revision?: number; quotedMessageId?: string };
+    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; texts?: unknown; revision?: number; quotedMessageId?: string; correctionOfMessageId?: string; senderId?: string };
     try {
       body = await c.req.json();
     } catch {
@@ -2158,6 +2014,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       'chats.manual-send',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
 
     if (!await canAccessAllLineAccounts(
       c.env.DB,
@@ -2218,6 +2075,16 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       messages[0].quoteToken = quoted.quote_token;
     }
 
+    if (body.correctionOfMessageId !== undefined && (typeof body.correctionOfMessageId!=='string' || !await c.env.DB.prepare(
+      "SELECT id FROM messages_log WHERE id=? AND friend_id=? AND line_account_id IS ? AND direction='outgoing' AND unsent_at IS NULL AND (delivery_type IS NULL OR delivery_type!='test')"
+    ).bind(body.correctionOfMessageId,friend.id,friend.line_account_id??null).first())) return c.json({success:false,error:'correction_source_not_found'},404);
+    let sender: Awaited<ReturnType<typeof resolveLineSender>> | null=null;
+    if(body.senderId!==undefined){
+      if(typeof body.senderId!=='string'||!friend.line_account_id)return c.json({success:false,error:'invalid_sender'},400);
+      try{sender=await resolveLineSender(c.env.DB,friend.line_account_id,c.get('staff'),body.senderId);}
+      catch(e){if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e;}
+      for(const m of messages)Object.assign(m,{sender});
+    }
     const leaseNow = new Date();
     const lease = await acquireInboxReplyLease(c.env.DB, {
       channel: 'line',
@@ -2245,6 +2112,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         image: imagePart,
         texts: textParts,
         quotedMessageId: quoted?.id ?? null,
+        correctionOfMessageId:body.correctionOfMessageId??null,senderId:body.senderId??null,sender,
       }),
     );
     const reservation = await reserveOutboundSend(c.env.DB, {
@@ -2357,8 +2225,8 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
           c.env.DB
             .prepare(`INSERT OR IGNORE INTO messages_log
               (id, friend_id, direction, message_type, content, source, line_account_id,
-               sent_by_staff_id, created_at, quoted_message_id)
-              VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?)`)
+               sent_by_staff_id, created_at, quoted_message_id,correction_of_message_id,sender_id,sender_snapshot_json)
+              VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?, ?,?,?,?)`)
             .bind(
               row.id,
               friend.id,
@@ -2369,6 +2237,8 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
               sentAt,
               // 引用は先頭メッセージに付けたので、記録も先頭行にだけ持たせる。
               index === 0 ? quoted?.id ?? null : null,
+              index === 0 ? body.correctionOfMessageId??null : null,
+              body.senderId??null,sender?JSON.stringify(sender):null,
             ),
         ),
         completeOutboundSendStatement(c.env.DB, {
@@ -2423,7 +2293,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         .bind(jstNow(), chat.id)
         .run();
     } catch (e) {
-      console.error('first_replied_at update error:', e);
+      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send-combined"}));
     }
 
     await fireEvent(c.env.DB, 'manual_reply_sent', {
@@ -2433,7 +2303,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       friendId: friend.id,
       eventData: { staffId: c.get('staff').id },
     }, undefined, friend.line_account_id).catch((error) => {
-      console.error('manual_reply_sent automation error:', error);
+      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send-combined"}));
     });
 
     await releaseInboxReplyLease(c.env.DB, {
@@ -2457,26 +2327,10 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
       }).catch(() => undefined);
     }
-    console.error('POST /api/chats/:id/send-combined error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send-combined"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
-
-// ========== 送信予約(N-025) ==========
-
-// 予約時刻は「いまより先」だけを受け付ける。画面のdatetime-localはJSTで
-// 入力されるが、保存はUTCへ正規化するため境界ずれは起きない。
-function validateScheduledAt(raw: unknown): { ok: true; scheduledAt: string } | { ok: false } {
-  if (typeof raw !== 'string' || !raw) return { ok: false };
-  let scheduledAt: string;
-  try {
-    scheduledAt = normalizeScheduledAt(raw);
-  } catch {
-    return { ok: false };
-  }
-  if (Date.parse(scheduledAt) <= Date.now()) return { ok: false };
-  return { ok: true, scheduledAt };
-}
 
 /**
  * POST /api/chats/:id/schedule — 返信の予約作成。
@@ -2486,6 +2340,7 @@ function validateScheduledAt(raw: unknown): { ok: true; scheduledAt: string } | 
  * 区別せず、画面は返された予約1件だけを表示すればよい。
  */
 chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), async (c) => {
+  if(c.get('impersonation')) return c.json({success:false,code:'IMPERSONATION_SEND_BLOCKED',error:'代理ログイン中は送れません'},403);
   try {
     const chatId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
@@ -2526,6 +2381,7 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
       'chats.schedule-send',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
     if (!await canAccessAllLineAccounts(
       c.env.DB,
       c.get('staff'),
@@ -2552,7 +2408,7 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
     try {
       // text/Flexの差し込みは送信時に展開する。添付は予約時と送信時の両方で検証する。
       if (messageType !== 'text') {
-        validatedContent = (await buildChatMessage({ messageType, content, bucket: c.env.IMAGES,
+        validatedContent = (await buildChatMessage({ messageType, content, bucket: c.env.IMAGES, signingSecret: c.env.API_KEY,
           owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
           origin: c.env.WORKER_URL || new URL(c.req.url).origin, neededAt: Date.parse(time.scheduledAt),
         })).content;
@@ -2587,7 +2443,7 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
       data: { ...scheduledSendResponse(row), replayed: !created },
     });
   } catch (err) {
-    console.error('POST /api/chats/:id/schedule error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/schedule"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2605,7 +2461,7 @@ chats.get('/api/chats/:id/scheduled', requireRole('owner', 'admin', 'staff'), re
       data: { scheduled: rows.map(scheduledSendResponse) },
     });
   } catch (err) {
-    console.error('GET /api/chats/:id/scheduled error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/:id/scheduled"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2663,7 +2519,7 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
         const friend = await getFriendById(c.env.DB, chat.friend_id);
         if (!friend) return c.notFound();
         const built = await buildChatMessage({ messageType: existing.message_type,
-          content: updates.content ?? existing.content, bucket: c.env.IMAGES,
+          content: updates.content ?? existing.content, bucket: c.env.IMAGES, signingSecret: c.env.API_KEY,
           owner: { friendId: friend.id, lineAccountId: friend.line_account_id ?? null },
           origin: c.env.WORKER_URL || new URL(c.req.url).origin,
           neededAt: Date.parse(updates.scheduledAt ?? existing.scheduled_at),
@@ -2694,7 +2550,7 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
     }
     return c.json({ success: true, data: { updated: true } });
   } catch (err) {
-    console.error('PATCH /api/chats/:id/scheduled/:scheduleId error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"PATCH /api/chats/:id/scheduled/:scheduleId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2708,12 +2564,19 @@ chats.delete('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin
       ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
+    if (c.get('staff').readOnly || c.get('impersonation')?.mode === 'read') return c.json({success:false,error:'forbidden'},403);
+    let reason = c.get('impersonation') ? c.req.header('X-Impersonation-Reason')?.trim() : undefined;
+    if(reason) {try{reason=decodeURIComponent(reason);}catch{return c.json({success:false,error:'invalid_reason'},400);}}
+    if(reason && reason.length>500)return c.json({success:false,error:'invalid_reason'},400);
+    if (c.get('impersonation') && !reason) return c.json({success:false,error:'reason_required'},400);
     const result = await cancelScheduledChatSend(c.env.DB, {
       id: scheduleId,
       friendId: chat.friend_id,
       staffId: c.get('staff').id,
+      reason,
       now: new Date().toISOString(),
     });
+    if (result === 'too_late') return c.json({success:false, code:'SCHEDULE_TOO_LATE',error:'まもなく送ります。取り消せません'},409);
     if (result === 'not_found') {
       return c.json({ success: false, error: '予約が見つかりません' }, 404);
     }
@@ -2726,7 +2589,7 @@ chats.delete('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin
     }
     return c.json({ success: true, data: { cancelled: true } });
   } catch (err) {
-    console.error('DELETE /api/chats/:id/scheduled/:scheduleId error:', err);
+    console.error(JSON.stringify({"code":"routes_chats_failed","route":"DELETE /api/chats/:id/scheduled/:scheduleId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

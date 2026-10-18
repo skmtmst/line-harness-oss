@@ -1,5 +1,6 @@
 'use client'
 
+import { INTENT_OPTIONS } from './area-intent-options'
 import TagPickerField from '@/components/shared/tag-picker-field'
 import { useId } from 'react'
 import { ArrowLeftRight, CalendarClock, Copy, Phone, Send, Zap } from 'lucide-react'
@@ -20,7 +21,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import TapSideEffects from '@/components/shared/tap-side-effects'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
-type Option = { id: string; name: string }
+type Option = { id: string; name: string; folderId?: string | null; updatedAt?: string | null }
 
 type Props = {
   area: Area
@@ -66,19 +67,6 @@ export function isTapCountable(area: Area): boolean {
   if (intent === 'clipboard') return false
   return intent !== 'tel' && intent !== 'form'
 }
-
-/** 運用者に見せる選択肢。並びは使う頻度の順。 */
-const INTENT_OPTIONS: { value: RichMenuAreaIntent; label: string; hint: string }[] = [
-  { value: 'url', label: 'URLを開く', hint: 'ホームページや申し込みページに飛ばす' },
-  { value: 'text', label: 'メッセージを送る', hint: '押した人がその言葉を送ったことにする' },
-  { value: 'template', label: 'テンプレートを送る', hint: '作ってあるメッセージをこちらから送る' },
-  { value: 'form', label: '回答フォームを開く', hint: 'アンケートや申し込みフォームを開く' },
-  { value: 'tel', label: '電話をかける', hint: 'スマホの電話アプリが立ち上がる' },
-  { value: 'switch', label: 'メニューを切り替える', hint: 'タブのように別ページを出す' },
-  { value: 'postback', label: 'こちらで処理する', hint: '自動応答やオートメーションの合図を送る（上級）' },
-  { value: 'datetime', label: '日時を選ぶ', hint: 'カレンダーや時計を出して選んでもらう' },
-  { value: 'clipboard', label: '文字をコピーする', hint: '合言葉などを端末に写す' },
-]
 
 /** intent から、LINE に登録するときの種類を決める。 */
 export function actionTypeForIntent(intent: RichMenuAreaIntent): Area['actionType'] {
@@ -250,9 +238,9 @@ export function AreaProperties({
   const tapKinds: TapActionKind[] = [
     ...(allowed('url') ? ['uri' as const] : []),
     ...(allowed('text') ? ['message' as const] : []),
-    ...(allowed('url') && !isHq ? ['booking' as const] : []),
+    ...(allowed('url') ? ['booking' as const] : []),
     ...(allowed('form') ? ['form' as const] : []),
-    ...(allowed('url') && !isHq ? ['booking_history' as const, 'visit_stamp' as const] : []),
+    ...(allowed('url') ? ['booking_history' as const, 'visit_stamp' as const] : []),
   ]
   /* リッチメニューだけの種類（テンプレートを送る・タブ切り替え・電話・postback・日時・コピー）は今のまま残す。 */
   const extraKinds: TapActionExtraKind[] = intentOptions
@@ -355,14 +343,15 @@ export function AreaProperties({
 
   return (
     <div className="space-y-3 text-sm">
-      <div className="flex items-center justify-between">
+      {/* V8 の作る画面（showManagementDetails=false）は上に「面 A「…」の動き」の題があるので、同じ意味の題を重ねない（cmRZc・rE0ML）。 */}
+      {showManagementDetails ? <div className="flex items-center justify-between">
         <h3 className="text-ink-secondary font-semibold">選択中のボタン</h3>
-        {showManagementDetails && onDelete ? (
+        {onDelete ? (
           <button type="button" onClick={onDelete} className="text-xs text-danger hover:underline">
             削除する
           </button>
         ) : null}
-      </div>
+      </div> : null}
 
       <Field label="ボタン名" htmlFor={`${inputId}-name`} hint="管理用の呼び名。友だちには表示されません。">
         <SaveErrorField names={["label","area.label"]}><input
@@ -423,6 +412,7 @@ export function AreaProperties({
         <span className="text-ink-secondary text-xs font-medium">押したときの動き</span>
         <div className="mt-1">
           <SaveErrorField names={["このボタン","area"]}><TapActionField
+            kindPresentation={showManagementDetails ? 'select' : 'grid'}
             layout="stack"
             name="このボタン"
             kindLabel="押したときの動き"
@@ -434,7 +424,7 @@ export function AreaProperties({
             hasLiff={Boolean(liffId)}
             liffSettingsHref={account?.selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(account.selectedAccountId)}` : '/accounts'}
             readOnly={readOnly}
-            sources={{ ...shopSources, form: forms.map((f) => ({ id: f.id, name: f.name })) }}
+            sources={{ ...shopSources, form: forms.map((f) => ({ id: f.id, name: f.name, folderId: f.folderId, updatedAt: f.updatedAt })) }}
             textMax={300}
             renderBody={(kind) => kind === 'uri' ? urlBody : kind === 'form' && forms.length === 0 ? formEmpty : extraIntentOf(kind) ? null : undefined}
           /></SaveErrorField>

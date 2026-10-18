@@ -1,167 +1,86 @@
 'use client'
-import { EntityPickerDialog } from '@/components/shared/entity-picker';
 
 import { LinePreviewFlex } from '@/components/shared/line-preview'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
-import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import type { Folder, Tag } from '@line-crm/shared'
-import { AlertTriangle, ArrowRight, CheckCircle2, Eye, FileText, Save, Send, Trash2 } from 'lucide-react'
-import {
-  ApiError,
-  api,
-  describeSaveFailure,
-  type ApiBroadcast,
-  type BroadcastBubble,
-  type BroadcastBubbleType,
-  type BroadcastMessageAsset,
-  type BroadcastMessageButton,
-  type BroadcastPreflight,
-} from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import MediaSlot from '@/components/shared/media-slot'
-import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import HelpTip from '@/components/shared/help-tip'
-import styles from './broadcast-form-v8.module.css'
-import StickyBar from '@/components/shared/sticky-bar'
-import { useFormErrors } from '@/lib/use-form-errors'
-import LinePreview from '@/components/shared/line-preview'
 import BroadcastTextBubble from './broadcast-text-bubble'
-import TapActionField from '@/components/shared/tap-action-field'
-import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
-import { TextField } from '@/components/shared/text-field'
-import { tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, type TapActionKind, type TapActionValue } from '@/lib/tap-actions'
-import {
-  MAX_BUBBLES,
-  messageLengthNotice,
-} from './message-limits'
-import {
-  assetBubbleError,
-  bubbleLegacyMessage,
-  bubblesForSave,
-  contentTemplateToBubble,
-  isContentTemplateType,
-  messageButtonsError,
-  messageTemplateToBubble,
-  type BroadcastTemplateOption,
-} from '@/lib/broadcast-template'
-import {
-  TARGET_MODES,
-  audienceError,
-  buildAudienceCondition,
-  conditionHasAnalyticsAudience,
-  type TargetMode,
-} from '@/lib/broadcast-audience'
-import type { SegmentCondition } from '@/lib/segment-condition'
-import { carouselColumnsProblem, flexContentProblem } from '@/components/broadcasts/bubble-content-check'
-import { newBroadcastDraftSession, persistBroadcastDraft, type BroadcastDraftSession } from '@/lib/broadcast-draft'
-import ConditionBuilder from '@/components/shared/condition-builder'
-import DateField from '@/components/shared/date-field'
-import { TimeField } from '@/components/shared/date-time-field'
-import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
-import { audienceSummary } from '@/lib/broadcast-summary'
-import {
-  emptyMessageKindState,
-  messageKindProblem,
-  type MessageKind,
-  type MessageKindState,
-} from '@/components/scenarios/message-kind-fields'
-import {
-  createLoadGeneration,
-  filterSendableTemplates,
-} from '@/components/scenarios/carousel-picker'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Notice from '@/components/shared/notice'
-import { notifyToast } from '@/components/shared/toast'
-import Combobox from '@/components/shared/combobox'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Checkbox from '@/components/shared/checkbox'
-import Button from '@/components/shared/button'
-import { RequiredBadge } from '@/components/shared/form-controls'
-import Select from '@/components/shared/select'
-import { useStaffRole } from '@/lib/staff-role'
-import { canEditFeature } from '@/lib/staff-capability'
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
-import { Steps } from '@/components/templates'
-import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
-import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
-import MessageComposer, { ComposerCarouselPreview, MessageComposerPage } from '@/components/shared/message-composer'
-import CarouselV8, { panelsFromContent } from '@/v8/templates/carousel'
-import { saveCarousel } from '@/v8/templates/carousel-core'
-import TemplateRichEditor from '@/v8/template-edit/rich'
-import TemplateRichVideoEditor from '@/v8/template-edit/rich-video'
-import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/host'
-import Dialog from '@/components/shared/dialog'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import {
-  ApprovalRequestFields,
-  SingleOperatorFields,
-} from '@/components/broadcasts/broadcast-approval'
-import type { BroadcastApprovalCandidate } from '@/lib/api'
-import { formatDateTime, formatDay, formatNumber, formatRelative, formatTime } from '@/lib/format'
-import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import ActionList from '@/components/shared/action-list'
-import { EntityPickerField } from '@/components/shared/entity-picker'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { ComposerCarouselPreview } from '@/components/shared/message-composer'
 
-interface BroadcastFormProps {
-  tags: Tag[]
-  /**
-   * R581: タグ候補の取得状態。呼び側（作成ページ）が持つ。
-   * 取得失敗と真の0件を分け、同じ画面で再試行できるようにする。
-   * 未指定は取得ずみ扱い（一覧の埋め込みフォームは従来どおり）。
-   */
-  tagsStatus?: 'loading' | 'ready' | 'error'
-  /** R581: タグ候補の再取得。入力はフォームが持つので、再試行で消えない。 */
-  onRetryTags?: () => void
-  /** 作成された実物。予約だけを完了画面へ送り、下書きと取り違えない。 */
-  onSuccess: (broadcast: ApiBroadcast) => void
-  /**
-   * BROADCAST-16: 「下書き保存」でフォームが閉じない保存にも呼ぶ。
-   * 呼び側は一覧・フォルダ件数を読み直す（保存した下書きが未分類へ
-   * 増えるのに、再訪しないと件数が古いままだった）。
-   */
-  onDraftSaved?: (broadcast: ApiBroadcast) => void
-  onCancel: () => void
-  openTemplatePickerInitially?: boolean
-  initialTemplateId?: string | null
-  initialContentTemplateId?: string | null
-  initialCondition?: SegmentCondition | null
-  /** 分析画面から渡された一時対象者。人数・期限はAPIで読み直したもの。 */
-  audienceNotice?: { memberCount: number; expiresAt: string; label?: string } | null
-  initialScheduledDate?: string
-  initialScheduledTime?: string
-  /** 正本の `?step=`。未指定は一覧内の従来フォームとして全節を表示する。 */
-  currentStep?: BroadcastStepKey | null
-  onStepChange?: (step: BroadcastStepKey) => void
-  /** visual-qa-accountでだけ使う、Pencilの8月キャンペーン完成状態。 */
-  visualQaAugustCampaign?: boolean
-}
 
-/*
- * 右側のプレビューの枠は、LINEのトーク画面に近い共通部品
- * `LinePreview`（`components/shared/line-preview`）を使う。
- * 画面ごとに枠の色を作らない（B-6）。
- */
-
-/**
- * 種類の名前。**内部の語をそのまま画面へ出さない。**
- *
- * ここに無い種類が来たときに元の値へ落とすと、テンプレートの札に
- * `text` や `carousel` が出る（設計 `p97Tf` で見つかった）。
- * 知らない種類は「その他」にして、内部の語は出さない。
- */
-const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
-  text: 'テキスト', sticker: 'スタンプ', image: '写真', flex: 'Flex', location: '位置情報',
-  audio: '音声', carousel: 'カルーセル', video: '動画', rich_message: 'リッチメッセージ',
-  rich_video: 'リッチビデオ', card_message: 'カードタイプ', coupon: 'クーポン', research: 'リサーチ',
-}
-
+import Disclosure from '@/components/shared/disclosure'
+import SegmentedControl from '@/components/shared/segmented';
+import type { BroadcastFormProps } from './broadcast-form-props';
+import { EntityPickerDialog } from '@/components/shared/entity-picker';
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
+import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import type { Folder } from '@line-crm/shared';
+import { AlertTriangle, ArrowRight, CheckCircle2, Eye, FileText, Save, Send, Trash2 } from 'lucide-react';
+import { ApiError, api, describeSaveFailure, type ApiBroadcast, type BroadcastBubble, type BroadcastBubbleType, type BroadcastMessageAsset, type BroadcastMessageButton, type BroadcastPreflight } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import HelpTip from '@/components/shared/help-tip';
+import styles from './broadcast-form-v8.module.css';
+import StickyBar from '@/components/shared/sticky-bar';
+import { CreateColumns } from '@/components/templates/create-page';
+import { useFormErrors } from '@/lib/use-form-errors';
+import LinePreview from '@/components/shared/line-preview';
+import TapActionField from '@/components/shared/tap-action-field';
+import { useTapActionSources } from '@/components/shared/use-tap-action-sources';
+import { TextField } from '@/components/shared/text-field';
+import { tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, type TapActionKind, type TapActionValue } from '@/lib/tap-actions';
+import { MAX_BUBBLES, messageLengthNotice } from './message-limits';
+import { assetBubbleError, bubbleLegacyMessage, bubblesForSave, contentTemplateToBubble, isContentTemplateType, messageButtonsError, messageTemplateToBubble, type BroadcastTemplateOption } from '@/lib/broadcast-template';
+import { TARGET_MODES, audienceError, buildAudienceCondition, conditionHasAnalyticsAudience, type TargetMode } from '@/lib/broadcast-audience';
+import type { SegmentCondition } from '@/lib/segment-condition';
+import { carouselColumnsProblem, flexContentProblem } from '@/components/broadcasts/bubble-content-check';
+import { newBroadcastDraftSession, persistBroadcastDraft, type BroadcastDraftSession } from '@/lib/broadcast-draft';
+import ConditionBuilder from '@/components/shared/condition-builder';
+import DateField from '@/components/shared/date-field';
+import { TimeField } from '@/components/shared/date-time-field';
+import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls';
+import { audienceSummary } from '@/lib/broadcast-summary';
+import { emptyMessageKindState, messageKindProblem, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields';
+import { createLoadGeneration, filterSendableTemplates } from '@/components/scenarios/carousel-picker';
+import ConfirmDialog from '@/components/shared/confirm-dialog';
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import SendConfirmDialog, { describeExclusion, shiftedShort, shiftedWhen } from '@/components/shared/send-confirm-dialog';
+import { chatSafetyApi } from '@/lib/api-gap1';
+import type { SendConfirmationPreview } from '@line-crm/shared';
+import { useBroadcastAb } from '@/v8/broadcast-ab/use-ab';
+import { broadcastAbApi } from '@/v8/broadcast-ab/api';
+import BroadcastAbTabs from '@/v8/broadcast-ab/tabs';
+import BroadcastAbSettings, { abConfirmLine } from '@/v8/broadcast-ab/settings';
+import Notice from '@/components/shared/notice';
+import { notifyToast } from '@/components/shared/toast';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import Checkbox from '@/components/shared/checkbox';
+import Button from '@/components/shared/button';
+import { RequiredBadge } from '@/components/shared/form-controls';
+import { useStaffRole } from '@/lib/staff-role';
+import { canEditFeature } from '@/lib/staff-capability';
+import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
+import { Steps } from '@/components/templates';
+import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps';
+import { testSendFailure, testSendResult, type TestSendView } from './test-send-view';
+import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer';
+import CarouselV8, { panelsFromContent } from '@/v8/templates/carousel';
+import { saveCarousel } from '@/v8/templates/carousel-core';
+import TemplateRichEditor from '@/v8/template-edit/rich';
+import TemplateRichVideoEditor from '@/v8/template-edit/rich-video';
+import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/host';
+import Dialog from '@/components/shared/dialog';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import { ApprovalRequestFields, SingleOperatorFields } from '@/components/broadcasts/broadcast-approval';
+import type { BroadcastApprovalCandidate } from '@/lib/api';
+import { formatDateTime, formatDay, formatListDay, formatNumber, formatTime } from '@/lib/format';
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import ActionList, { ActionAddButton } from '@/components/shared/action-list';
+import { EntityPickerField } from '@/components/shared/entity-picker';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+export { mediaTooLargeMessage, MediaUpload } from "./broadcast-form-gap-parts"
 /** 知らない種類でも内部の語を出さない。 */
 export function typeLabel(type: string): string {
   return TYPE_LABELS[type as BroadcastBubbleType] ?? 'その他'
@@ -260,13 +179,6 @@ function emptyBubble(type: BroadcastBubbleType = 'text'): BroadcastBubble {
   return { id: crypto.randomUUID(), type, content }
 }
 
-/** 選んだ時点で止める文。上限と今の大きさを両方言う（例「動画は200MBまでです。今のファイルは350MBです」）。 */
-export function mediaTooLargeMessage(isVideo: boolean, bytes: number): string {
-  const mb = bytes / (1024 * 1024)
-  const size = mb >= 10 ? `${Math.round(mb)}MB` : `${Math.round(mb * 10) / 10}MB`
-  return isVideo ? `動画は200MBまでです。今のファイルは${size}です` : `画像は10MBまでです。今のファイルは${size}です`
-}
-
 /**
  * 動画のプレビュー画像。LINE は動画と一緒に必ず受け取り（https・JPEG/PNG・1MBまで）、
  * 無いと保存の時点でサーバーが断る。以前は「任意」と書いていて、保存で英語の文が出ていた。
@@ -276,132 +188,6 @@ export function videoPreviewProblem(value: unknown): string | null {
   if (!url) return '動画のプレビュー画像のURLを入れてください（JPEG・PNG、1MBまで）'
   if (!url.toLowerCase().startsWith('https://')) return '動画のプレビュー画像のURLは https:// から始めてください'
   return null
-}
-
-/**
- * 画像・動画のアップロード欄。統括の一括配信（v8/hq-broadcasts）も同じ欄を使う。
- * lineAccountId を渡すと動画の置き場をそのアカウントにする（null＝どの店にも属さない。統括）。省けば今選んでいる店。
- */
-export function MediaUpload({ bubble, onChange, lineAccountId, mediaAccountId = null }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void; lineAccountId?: string | null; /** 渡すと「登録メディアから選ぶ」を出す（そのアカウントの登録メディア）。 */ mediaAccountId?: string | null }) {
-  const latest = useRef({ bubble, onChange })
-  latest.current = { bubble, onChange }
-  // 登録メディアから選ぶ先。統括（null）はどの店にも属さないので出さない。
-  const pickFrom = mediaAccountId
-  const [picking, setPicking] = useState<'main' | 'preview' | null>(null)
-  const isVideo = bubble.type === 'video' || bubble.type === 'rich_video'
-  const noun = isVideo ? '動画' : '画像'
-  const scope = `${bubble.id}-${bubble.type}-${lineAccountId ?? ''}`
-  const content = bubble.content
-  const original = typeof content.originalContentUrl === 'string' ? content.originalContentUrl : ''
-  const preview = typeof content.previewImageUrl === 'string' ? content.previewImageUrl : ''
-  const sendFile = async (file: File) => {
-    const res = await api.broadcastMessageAssets.upload(file, lineAccountId)
-    if (!res.success) throw new Error(res.error)
-    return res.data.url
-  }
-  const setMain = (url: string) => {
-    const now = latest.current.bubble.content
-    latest.current.onChange({ ...now, originalContentUrl: url, previewImageUrl: isVideo ? (now.previewImageUrl ?? '') : url })
-  }
-  const setPreview = (url: string) => latest.current.onChange({ ...latest.current.bubble.content, previewImageUrl: url })
-  const main = (
-    <SaveErrorField names={["original","main"]}><MediaSlot
-      kind={isVideo ? 'video' : 'image'}
-      title={`${noun}を追加`}
-      value={original || null}
-      accept={isVideo ? 'video/mp4' : 'image/jpeg,image/png'}
-      limitText={isVideo ? '1ファイル200メガバイト以内・MP4' : '1ファイル10メガバイト以内・JPEG・PNG'}
-      validate={(file) => {
-        const allowed = isVideo ? ['video/mp4'] : ['image/jpeg', 'image/png']
-        const max = isVideo ? 200 * 1024 * 1024 : 10 * 1024 * 1024
-        if (!allowed.includes(file.type)) return isVideo ? 'MP4のみ対応しています' : 'JPEG・PNGのみ対応しています'
-        if (file.size > max) return mediaTooLargeMessage(isVideo, file.size)
-        return ''
-      }}
-      upload={sendFile}
-      scope={scope}
-      onChange={(url) => setMain(url ?? '')}
-      onMediaPick={pickFrom ? () => setPicking('main') : undefined}
-    /></SaveErrorField>
-  )
-  return <div className="space-y-3">
-    {isVideo ? (
-      <div className={styles.mediaRow}>
-        {main}
-        <SaveErrorField names={["preview"]}><MediaSlot
-          size="compact"
-          title="プレビュー画像を追加"
-          previewAlt="動画のプレビュー画像"
-          value={preview || null}
-          accept="image/jpeg,image/png"
-          maxBytes={1024 * 1024}
-          upload={sendFile}
-          scope={scope}
-          onChange={(url) => setPreview(url ?? '')}
-          onMediaPick={pickFrom ? () => setPicking('preview') : undefined}
-          urlEntry={{ value: preview, onChange: setPreview, label: '動画のプレビュー画像のURL', placeholder: 'https://…（JPEG/PNG・1MBまで）' }}
-        /></SaveErrorField>
-      </div>
-    ) : main}
-    {isVideo ? <p className="text-xs text-ink-faint">プレビュー画像は LINE 側で必須です（https・JPEG/PNG・1MBまで）。</p> : null}
-    {bubble.type === 'rich_video' && <SaveErrorField names={["actionUrl","content.actionUrl","action_url","content.action_url"]}><input value={String(content.actionUrl ?? '')} onChange={(e) => onChange({ ...content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" /></SaveErrorField>}
-    <MediaPickerDialog
-      open={picking !== null}
-      accountId={pickFrom}
-      kind={picking === 'main' && isVideo ? 'video' : 'image'}
-      onClose={() => setPicking(null)}
-      onSelect={(item) => {
-        if (picking === 'preview') setPreview(item.url)
-        else setMain(item.url)
-        setPicking(null)
-      }}
-    />
-  </div>
-}
-
-/** LINE の見え方の吹き出し1つ。統括の一括配信（v8/hq-broadcasts）も使う。 */
-export function BubblePreview({ bubble, buttons = [], accountName, composer = false }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[]; accountName?: string; composer?: boolean }) {
-  const text = String(bubble.content.text ?? '')
-  const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
-  if (bubble.type === 'text') return <BroadcastTextBubble text={text} buttons={buttons} accountName={accountName} />
-  if (bubble.type === 'sticker') {
-    const st = (bubble.content.state as MessageKindState | undefined)?.sticker
-    return st?.packageId && st?.stickerId
-      ? <img src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${st.stickerId}/android/sticker.png`} alt="スタンプ" className="h-24 w-24 object-contain" />
-      : <div className="bg-canvas-sunken text-ink-faint flex h-24 w-24 items-center justify-center rounded-card text-xs">スタンプ</div>
-  }
-  if (bubble.type === 'location') {
-    const loc = (bubble.content.state as MessageKindState | undefined)?.location
-    return <div className="bg-canvas w-[82%] rounded-card p-3 text-label shadow-card">
-      <p className="text-ink font-bold">{loc?.title || '場所'}</p>
-      <p className="text-ink-faint mt-0.5 text-micro">{loc?.address || '住所を入れると出ます'}</p>
-    </div>
-  }
-  if (bubble.type === 'audio') {
-    const au = (bubble.content.state as MessageKindState | undefined)?.audio
-    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-label shadow-card">
-      <span className="text-lg">▶</span>
-      <span className="text-ink-faint text-micro">{au?.duration ? `${au.duration} 秒` : '音声'}</span>
-    </div>
-  }
-  if (bubble.type === 'carousel') {
-    if (composer) return <ComposerCarouselPreview bubble={bubble} />
-    const name = String(bubble.content.templateName ?? '')
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">
-      {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow-card">
-        <div className="bg-canvas-sunken h-20 rounded-control" />
-        <p className="text-ink mt-2 truncate text-xs font-medium">{i === 0 ? (name || 'カルーセル') : '…'}</p>
-      </div>)}
-    </div>
-  }
-  if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
-  if (bubble.type === 'flex') return <LinePreviewFlex content={typeof bubble.content.flexJson === 'string' ? bubble.content.flexJson : JSON.stringify(bubble.content)} />
-  if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
-  if (bubble.type === 'card_message') {
-    const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><Button variant="primary" className="mt-2 w-full rounded-mini px-0 py-1 text-nano border-0 h-auto whitespace-normal">{String(card.actionLabel ?? '詳しく見る')}</Button></div>)}</div>
-  }
-  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-card">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-micro text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
 
 /*
@@ -533,6 +319,75 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
   return ''
 }
 
+
+
+
+
+/*
+ * 右側のプレビューの枠は、LINEのトーク画面に近い共通部品
+ * `LinePreview`（`components/shared/line-preview`）を使う。
+ * 画面ごとに枠の色を作らない（B-6）。
+ */
+
+/**
+ * 種類の名前。**内部の語をそのまま画面へ出さない。**
+ *
+ * ここに無い種類が来たときに元の値へ落とすと、テンプレートの札に
+ * `text` や `carousel` が出る（設計 `p97Tf` で見つかった）。
+ * 知らない種類は「その他」にして、内部の語は出さない。
+ */
+const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
+  text: 'テキスト', sticker: 'スタンプ', image: '写真', flex: 'Flex', location: '位置情報',
+  audio: '音声', carousel: 'カルーセル', video: '動画', rich_message: 'リッチメッセージ',
+  rich_video: 'リッチビデオ', card_message: 'カードタイプ', coupon: 'クーポン', research: 'リサーチ',
+}
+
+
+
+/** LINE の見え方の吹き出し1つ。統括の一括配信（v8/hq-broadcasts）も使う。 */
+export function BubblePreview({ bubble, buttons = [], accountName, composer = false }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[]; accountName?: string; composer?: boolean }) {
+  const text = String(bubble.content.text ?? '')
+  const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
+  if (bubble.type === 'text') return <BroadcastTextBubble text={text} buttons={buttons} accountName={accountName} />
+  if (bubble.type === 'sticker') {
+    const st = (bubble.content.state as MessageKindState | undefined)?.sticker
+    return st?.packageId && st?.stickerId
+      ? <img src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${st.stickerId}/android/sticker.png`} alt="スタンプ" className="h-24 w-24 object-contain" />
+      : <div className="bg-canvas-sunken text-ink-faint flex h-24 w-24 items-center justify-center rounded-card text-xs">スタンプ</div>
+  }
+  if (bubble.type === 'location') {
+    const loc = (bubble.content.state as MessageKindState | undefined)?.location
+    return <div className="bg-canvas w-[82%] rounded-card p-3 text-label shadow-card">
+      <p className="text-ink font-bold">{loc?.title || '場所'}</p>
+      <p className="text-ink-faint mt-0.5 text-micro">{loc?.address || '住所を入れると出ます'}</p>
+    </div>
+  }
+  if (bubble.type === 'audio') {
+    const au = (bubble.content.state as MessageKindState | undefined)?.audio
+    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-label shadow-card">
+      <span className="text-lg">▶</span>
+      <span className="text-ink-faint text-micro">{au?.duration ? `${au.duration} 秒` : '音声'}</span>
+    </div>
+  }
+  if (bubble.type === 'carousel') {
+    if (composer) return <ComposerCarouselPreview bubble={bubble} />
+    const name = String(bubble.content.templateName ?? '')
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">
+      {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow-card">
+        <div className="bg-canvas-sunken h-20 rounded-control" />
+        <p className="text-ink mt-2 truncate text-xs font-medium">{i === 0 ? (name || 'カルーセル') : '…'}</p>
+      </div>)}
+    </div>
+  }
+  if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
+  if (bubble.type === 'flex') return <LinePreviewFlex content={typeof bubble.content.flexJson === 'string' ? bubble.content.flexJson : JSON.stringify(bubble.content)} />
+  if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
+  if (bubble.type === 'card_message') {
+    const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><Button variant="primary" className="mt-2 w-full rounded-mini px-0 py-1 text-nano border-0 h-auto whitespace-normal">{String(card.actionLabel ?? '詳しく見る')}</Button></div>)}</div>
+  }
+  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-card">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-micro text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
+}
 export default function BroadcastForm({
   tags,
   tagsStatus = 'ready',
@@ -619,6 +474,8 @@ export default function BroadcastForm({
   const [templateSaveCreatedId, setTemplateSaveCreatedId] = useState<string | null>(null)
   const [templateApplyError, setTemplateApplyError] = useState('')
   const templateApplyLock = useRef(false)
+  /* G1 A/B テスト（QOdsh・cM35y・a5r5Wg）。A 案はこの bubbles、B 案は ab が持つ。 */
+  const ab = useBroadcastAb()
   const [bubbles, setBubbles] = useState<BroadcastBubble[]>(visualQaAugustCampaign ? [{
     id: 'visual-qa-august-campaign',
     type: 'text',
@@ -639,6 +496,11 @@ export default function BroadcastForm({
    * (`folders` / kind='broadcast') とは別物なので別に持つ。
    */
   const [templateFolders, setTemplateFolders] = useState<Folder[]>([])
+  /** 「よく使う」：使った回数が1回以上のテンプレートのうち多い順に5件（受信箱のテンプレートを選ぶ窓と同じ数え方）。 */
+  const frequentTemplateIds = useMemo(() => new Set([...messageTemplates]
+    .filter((template) => (template.usageCount ?? 0) > 0)
+    .sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0))
+    .slice(0, 5).map((template) => template.id)), [messageTemplates])
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
   const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'scenario')
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
@@ -1710,6 +1572,10 @@ export default function BroadcastForm({
    */
   const testRecipientsGeneration = useRef(0)
   useEffect(() => { testRecipientsGeneration.current += 1; setTestDialogOpen(false); setTestRecipients([]) }, [selectedAccountId])
+  const afterActionChoices = [{ id: 'common_action', label: '共通アクションを実行する', make: () => '', picker: {
+    title: '公開済みの共通アクションを選ぶ', items: publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` })), apply: (_: string, ids: string[]) => ids[0],
+  } }]
+  const testBlockReason = bubblesError(bubbles) || messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })
   const openTestDialog = async () => {
     const generation = ++testRecipientsGeneration.current
     const validationError = validate()
@@ -1919,6 +1785,7 @@ export default function BroadcastForm({
   useEffect(() => { setInlineComposer(null); setTemplateSaveIndex(null); setTemplateSaveCreatedId(null); setComposerBusy(false); setTemplateSaveError(''); setTemplateApplyError('') }, [selectedAccountId])
   const inlineHost: TemplateEditHost | undefined = inlineComposer && inlineBubble ? {
     composer: { index: inlineComposer.index, accountId: selectedAccountId },
+    accountName: selectedAccount?.name ?? null,
     description: '作った中身をこの吹き出しに入れます。', folders: [], folder: '', onFolderChange: () => {}, busy: composerBusy,
     primaryLabel: 'この吹き出しに入れる',
     initialContent: inlineComposer.kind === 'carousel' && inlineBubble.content.columnsJson ? { kind: 'carousel', name: String(inlineBubble.content.templateName ?? ''), messageContent: String(inlineBubble.content.columnsJson), tapLimitMode: inlineBubble.content.tapLimitMode === 'once' ? 'once' : 'none', tapLimitText: String(inlineBubble.content.tapLimitText ?? ''), carouselActions: inlineBubble.content.carouselActions as Record<string, Record<string, unknown[]>> | undefined, templateId: String(inlineBubble.content.templateId ?? '') } : inlineComposer.kind === 'rich_message' && inlineBubble.content.assetName ? { kind: 'rich_message', name: String(inlineBubble.content.assetName), payload: inlineBubble.content, media: [] } : inlineComposer.kind === 'rich_video' && inlineBubble.content.video ? { kind: 'message', name: String(inlineBubble.content.templateName ?? ''), messageType: 'imagemap', messageContent: JSON.stringify(inlineBubble.content) } : undefined,
@@ -2026,6 +1893,54 @@ export default function BroadcastForm({
     && approvalCountInput.trim() !== ''
     && Number(approvalCountInput) === audienceCount
 
+  /*
+   * 共通の「送る前の確かめ」の中身は、保存した配信に対するサーバーの数え直し（GET send-preview）。
+   * 窓を開くたびに下書きを保存して数え直し、確定は「見た人数・版」を添えて送る（人数・版が変わっていたら 409）。
+   */
+  const canSendBroadcast = useFeatureAccess('broadcasts')
+  const broadcastRole = useStaffRole()
+  const [sendPreview, setSendPreview] = useState<{ state: 'loading' | 'error' | 'ready'; data: SendConfirmationPreview | null; broadcast: ApiBroadcast | null }>({ state: 'loading', data: null, broadcast: null })
+  const [previewSeq, setPreviewSeq] = useState(0)
+  useEffect(() => {
+    if (!confirmOpen || needsApprovalSingle || !currentStep) return
+    let alive = true
+    setSendPreview({ state: 'loading', data: null, broadcast: null })
+    void (async () => {
+      try {
+        const saved = await persistDraft(scheduledAtIso(), true, undefined, 'confirm')
+        if (!alive) return
+        if (!saved) { setSendPreview({ state: 'error', data: null, broadcast: null }); return }
+        const preview = await chatSafetyApi.sendPreview(saved.id)
+        if (!alive) return
+        setSendPreview(preview.success ? { state: 'ready', data: preview.data, broadcast: saved } : { state: 'error', data: null, broadcast: saved })
+      } catch {
+        if (alive) setSendPreview({ state: 'error', data: null, broadcast: null })
+      }
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmOpen, previewSeq])
+  const confirmMessage = async () => {
+    const { data, broadcast } = sendPreview
+    if (!data || !broadcast) return
+    setError('')
+    try {
+      const at = scheduledAtIso()
+      await chatSafetyApi.confirmBroadcast(broadcast.id, { expectedVersion: Number(data.expectedVersion), confirmedRecipientCount: data.recipients, ...(at ? { scheduledAt: at } : {}) })
+      setConfirmOpen(false)
+      /* 送ったあとの状態を読み直す。読めなくても、確定は済んでいるので先へ進む。 */
+      const latest = await api.broadcasts.get(broadcast.id).catch(() => null)
+      onSuccess(latest?.success ? latest.data : broadcast)
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 409) {
+        setError('送る相手や内容が変わりました。数え直しました。もう一度確かめてください。')
+        setPreviewSeq((value) => value + 1)
+        return
+      }
+      setError(describeSaveFailure(caught))
+    }
+  }
+
   const save = async () => {
     if (saving || submittingRef.current) return
     if (currentStep && approvalConfigState !== 'ready') { setError('承認の設定を確認できません。確認画面を開き直してください'); return }
@@ -2050,6 +1965,8 @@ export default function BroadcastForm({
       // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (!saved) return
+      /* G1：A・B 案と A/B の設定を送る（送る・承認の依頼の前に）。版は配信の lock_version。 */
+      const abVersion = await ab.persist(saved.id, Number((saved as { version?: number }).version ?? 0), bubbles)
       // 承認が要るときは、保存のあと承認の依頼まで続ける。依頼までが1つの操作。
       if (needsApproval && !needsApprovalSingle) {
         const requested = await api.broadcasts.approval.request(saved.id, {
@@ -2063,6 +1980,15 @@ export default function BroadcastForm({
       }
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return
       if (currentStep && sendMode === 'now' && (!needsApproval || needsApprovalSingle)) {
+        /* G1：A/B の配信は組2 の今の段では模擬送信だけ（testMode。本物の LINE には送らない）。 */
+        if (ab.enabled && audienceCount !== null) {
+          const started = await broadcastAbApi.startMock(saved.id, abVersion, audienceCount, typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `ab-${Date.now()}`)
+          if ((selectedAccountIdRef.current || null) !== requestAccountId) return
+          if (!started.success) { setError('A/B の試しを始められませんでした'); return }
+          setConfirmOpen(false)
+          onSuccess(saved)
+          return
+        }
         const sent = await api.broadcasts.send(saved.id, needsApprovalSingle ? { confirmedRecipientCount: Number(approvalCountInput) } : undefined)
         if ((selectedAccountIdRef.current || null) !== requestAccountId) return
         if (!sent.success) { setError(sent.error); return }
@@ -2151,7 +2077,7 @@ export default function BroadcastForm({
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
       </p>
     ) : null}
-    <div className={styles.body}>
+    <CreateColumns>
       <div className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
@@ -2364,6 +2290,18 @@ export default function BroadcastForm({
         </section>
         <div className={shows('message') ? 'contents' : 'hidden'}>
         <section id="broadcast-step-message" className={ styles.section}>
+          {targetMode !== 'all' ? <BroadcastAbTabs ab={ab} aBubbles={bubbles} canEdit /> : null}
+          {ab.tab === 'B' && ab.b ? (
+            <MessageComposer bubbles={ab.b} accountId={selectedAccountId} busy={composerBusy}
+              unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
+              onChange={(index, bubble) => ab.setB((items) => (items ?? []).map((item, i) => (i === index ? bubble : item)))}
+              onMove={(index, direction) => ab.setB((items) => { const next = [...(items ?? [])]; const to = index + direction; if (to < 0 || to >= next.length) return next; [next[index], next[to]] = [next[to], next[index]]; return next })}
+              onDelete={(index) => ab.setB((items) => (items ?? []).filter((_, i) => i !== index))}
+              onAdd={() => ab.setB((items) => [...(items ?? []), emptyBubble()])}
+              onPickTemplate={() => undefined} onSaveTemplate={() => undefined} onCompose={() => undefined}
+            />
+          ) : null}
+          <div className={ab.tab === 'B' && ab.b !== null ? 'hidden' : 'contents'}>
           <MessageComposer bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))} bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)} bubbles={bubbles} accountId={selectedAccountId} busy={composerBusy} onBusyChange={(value) => { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(value) }}
             unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
             onChange={updateBubble} onMove={moveBubble} onDelete={(index) => setBubbles((items) => items.filter((_, i) => i !== index))}
@@ -2373,15 +2311,16 @@ export default function BroadcastForm({
             onCompose={(index, kind) => { setTemplateSaveError(''); setInlineComposer({ index, kind }) }}
             extraFields={(index, bubble) => bubble.type === 'text' ? null : isContentTemplateType(bubble.type) ? <SaveErrorField names={["assetId","bubble.content.assetId","content.assetId","asset_id","bubble.content.asset_id","content.asset_id"]}><EntitySelect clearable size="full" aria-label="コンテンツで作成したテンプレートから選択" placeholder="テンプレートを選択してください" value={String(bubble.content.assetId ?? '')} onChange={(id) => { const asset = assets.find((item) => item.id === id); updateBubble(index, { ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : {} }) }} options={assets.filter((item) => item.kind === bubble.type).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name }))} /></SaveErrorField> : null}
           />
+          </div>
         </section>
         {showTemplatePicker && (
-          <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ"
+          <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ" searchPlaceholder="テンプレート名・本文で探す"
             folders={templateFolders} busy={composerBusy} error={templateApplyError}
             state={templateCandidatesStatus === 'loading' ?
-                <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><p role="alert">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</p></SaveErrorField> : undefined}
+                <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><Notice tone="danger">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</Notice></SaveErrorField> : undefined}
             items={[
-                    ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:typeLabel(asset.kind)})),
-              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, content:template.messageType === 'text' ?template.messageContent : undefined, keywords: template.messageContent, meta : typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}
+                    ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:`${typeLabel(asset.kind)}・更新 ${formatListDay(asset.updatedAt)}`})),
+              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, frequent: frequentTemplateIds.has(template.id), keywords: template.messageContent, meta : `${typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}・更新 ${formatListDay(template.updatedAt)}`}
               )),
             ]}
             preview=
@@ -2401,13 +2340,12 @@ export default function BroadcastForm({
           <ActionList
             <string> value={afterActionVersionId ? [afterActionVersionId] : []} onChange={next =>setAfterActionVersionId(next[next.length - 1] ?? '')}
             idOf={id => id} titleOf={id => publishedActions.find(action => action.versionId === id)?.name ?? '設定済みの共通アクション'}
-            choices={afterActionVersionId ? [] :[{ id: 'common_action', label: '共通アクションを実行する', make: () => '', picker: {
-              title: '公開済みの共通アクションを選ぶ', items:publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` })), apply: (_, ids) => ids[0],
-            } }]}
+            choices={afterActionVersionId ? [] :afterActionChoices}
+            addActions={afterActionVersionId ? null : <div className="flex flex-wrap gap-2"><ActionAddButton label="アクションを追加する" choices={afterActionChoices} onAdd={id => setAfterActionVersionId(id)} /></div>}
             renderEditor={(id, update) =>
           <EntityPickerField label="配信後のアクション" noun="共通アクション" items={publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` }))} value={id} onChange={update}/>}/>
         </section>}
-        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <details ref={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><summary>ほかの設定</summary><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></details> : null}
+        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <Disclosure size="compact" title="ほかの設定" hint="クリックを数える・ボタン" detailsRef={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></Disclosure> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
@@ -2506,6 +2444,7 @@ export default function BroadcastForm({
               {concurrentBroadcasts.length > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
             </section>
           )}
+          <BroadcastAbSettings ab={ab} total={audienceCount} targetAll={targetMode === 'all'} start={new Date(scheduledAtIso() ?? Date.now())} approvalThreshold={approvalConfig?.threshold ?? null} ecConnected canEdit onNarrow={() => goToStep('audience')} />
         </section>
 
     <div id="broadcast-step-confirm" className={shows('confirm') ? styles.section : 'hidden'}>
@@ -2557,9 +2496,10 @@ export default function BroadcastForm({
       </div>
       <aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label="LINEの見え方">
         <div className={styles.previewHead}><h3>LINE の見え方</h3><div className={styles.deviceSwitch} role="group" aria-label="プレビューの端末"><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button></div><Button ref={previewCloseRef} className={styles.previewClose} size="compact" onClick={() => { setPreviewOpen(false); previewToggleRef.current?.focus() }}>閉じる</Button></div>
+        {ab.hasB ? <SegmentedControl aria-label="見本の案" size="compact" value={ab.tab} options={[{ value: 'A', label: 'A 案の見本' }, { value: 'B', label: 'B 案の見本' }]} onChange={ab.setTab} /> : null}
         <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
           <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={ Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
-            <div className="flex flex-col gap-3 text-ink">{ bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
+            <div className="flex flex-col gap-3 text-ink">{ (ab.tab === 'B' && ab.b ? ab.b : bubbles).map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
           </LinePreview>
         </div>
         <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>
@@ -2569,18 +2509,18 @@ export default function BroadcastForm({
           ['送る日時', sendWhenLabel ?? '未設定'],
           ['配信後のアクション', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'],
         ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
-        <div className={styles.previewActions}><Button type="button" disabled={Boolean(validate()) || saving} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
+        <div className={styles.previewActions}><Button type="button" disabled={Boolean(testBlockReason) || saving} title={testBlockReason || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
         {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
         <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
       </aside>
-    </div>
+    </CreateColumns>
 
     <StickyBar className={styles.footer} actions={(
       <>
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button variant="secondary" className={styles.textButton} type="button" disabled={saving || composerBusy} onClick={() => void saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
+          <Button variant="secondary" type="button" disabled={saving || composerBusy} onClick={() => void saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" disabled={composerBusy} onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
               {currentStep === 'basic' ? '対象設定へ'
@@ -2682,9 +2622,61 @@ export default function BroadcastForm({
       </ul>
     </ConfirmDialog>
 
+    {/* 共通の「送る前の確かめ」（U1・板 F94nep／RxxfO）。承認が要るときは、承認者を選ぶ下の窓を使う。 */}
+    <SendConfirmDialog
+      open={confirmOpen && !needsApprovalSingle}
+      subtitle={`${title.trim() || '新しい一斉配信'} ・ ${confirmAudienceLabel}`}
+      scheduled={sendMode === 'scheduled'}
+      state={currentStep ? sendPreview.state : audienceCount === null ? 'error' : 'ready'}
+      block={(broadcastRole === 'viewer' || broadcastRole === 'staff') && !canSendBroadcast ? 'no-permission' : null}
+      hidePrimary={Boolean(currentStep) && approvalConfigState !== 'ready'}
+      unavailableNote={currentStep && approvalConfigState === 'loading' ? '承認の設定を確認しています…' : currentStep && approvalConfigState === 'error' ? '承認の設定を確認できません。確認画面を開き直してください' : undefined}
+      onRetry={() => (currentStep ? setPreviewSeq((value) => value + 1) : void runPreflight())}
+      recipients={currentStep ? (sendPreview.data?.recipients ?? null) : audienceCount}
+      recipientsNote={currentStep && sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : exclusionNote ?? undefined}
+      purpose="marketing"
+      whenLabel={currentStep && sendPreview.data?.quietHoursShiftTo
+        ? `${shiftedWhen(sendPreview.data.quietHoursShiftTo)} に送る`
+        : sendMode === 'scheduled' && scheduledLabel ? `${scheduledLabel} に送る（予約）` : '今すぐ送る'}
+      whenNote={currentStep && sendPreview.data?.quietHoursShiftTo
+        ? '夜の静かな時間（21〜8 時）のため、次の 8:00 に送ります'
+        : concurrentBroadcasts.length > 0
+          ? '同じ時刻の前後 1 時間に別の予約配信があります'
+          : sendMode === 'scheduled' ? '予約は送る時刻の 1 分前まで［予約を取り消す］で止められます' : undefined}
+      sender={currentStep ? sendPreview.data?.sender ?? null : null}
+      bodyHead={(currentStep && sendPreview.data?.firstText) || String(bubbles.find((b) => b.type === 'text')?.content.text ?? '') || `${TYPE_LABELS[bubbles[0]?.type ?? 'text'] ?? 'メッセージ'}を送ります`}
+      bubbleCount={bubbles.length}
+      allRecipients={targetMode === 'all'}
+      extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}
+      approval={needsApproval && approvalConfig ? { note: `${formatNumber(approvalConfig.threshold)} 人以上は承認が要る店です。承認されたら${sendMode === 'scheduled' && scheduledDate ? ` ${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime} に` : ''}送ります` } : null}
+      approvalFields={needsApproval && approvalConfig && audienceCount !== null ? (
+        <ApprovalRequestFields
+          bare
+          recipientCount={audienceCount}
+          threshold={approvalConfig.threshold}
+          candidates={approvalCandidates}
+          candidatesState={approvalCandidatesState}
+          approverId={approverId}
+          onApproverChange={setApproverId}
+          note={approvalNote}
+          onNoteChange={setApprovalNote}
+        />
+      ) : undefined}
+      primaryDisabled={needsApproval && approverId === ''}
+      primaryLabel={needsApproval ? '承認を依頼する' : (() => {
+        const n = currentStep ? sendPreview.data?.recipients ?? null : audienceCount
+        const shifted = currentStep ? sendPreview.data?.quietHoursShiftTo : null
+        if (n !== null && shifted) return `${shiftedShort(shifted)} に ${formatNumber(n)} 人へ送る`
+        const shortAt = sendMode === 'scheduled' && scheduledDate ? `${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime}` : null
+        return n === null ? '送る' : sendMode === 'scheduled' ? `${formatNumber(n)} 人に${shortAt ? ` ${shortAt} で` : ''}予約する` : `${formatNumber(n)} 人に送る`
+      })()}
+      onConfirm={() => (currentStep && !needsApproval ? confirmMessage() : save())}
+      onBack={() => { if (!saving) setConfirmOpen(false) }}
+      error={error || undefined}
+    />
     <div data-design-node="FpgxH">
       <ConfirmDialog
-        open={confirmOpen}
+        open={confirmOpen && needsApprovalSingle}
         title={sendMode === 'scheduled' ? 'この内容で予約しますか？' : 'この内容で送りますか？'}
         description={
           needsApproval && !needsApprovalSingle
@@ -2698,6 +2690,7 @@ export default function BroadcastForm({
         onCancel={() => { if (!saving) setConfirmOpen(false) }}
         onConfirm={canConfirm && (!currentStep || approvalConfigState === 'ready') ? () => void save() : undefined}
       >
+        {abConfirmLine(ab, audienceCount, new Date(scheduledAtIso() ?? Date.now())) ? <Notice tone="info" data-design-node="a5r5Wg">{abConfirmLine(ab, audienceCount, new Date(scheduledAtIso() ?? Date.now()))}</Notice> : null}
         {currentStep && approvalConfigState === 'loading' ? <p role="status" className="text-xs text-ink-faint">承認の設定を確認しています…</p> : currentStep && approvalConfigState === 'error' ? <Notice tone="danger">承認の設定を確認できません。戻ってから確認画面を開き直してください</Notice> : null}
         <dl className="border-hairline divide-hairline divide-y rounded-control border text-sm">
           <div className="flex justify-between gap-4 px-4 py-3">
@@ -2795,18 +2788,6 @@ export default function BroadcastForm({
           二者承認（設計 A-1・A-4）。承認が要る人数のときだけ出す。
           境目が読めているときだけ判定し、取得失敗中は確定させない。
         */}
-        {needsApproval && !needsApprovalSingle && audienceCount !== null && approvalConfig !== null ? (
-          <ApprovalRequestFields
-            recipientCount={audienceCount}
-            threshold={approvalConfig.threshold}
-            candidates={approvalCandidates}
-            candidatesState={approvalCandidatesState}
-            approverId={approverId}
-            onApproverChange={setApproverId}
-            note={approvalNote}
-            onNoteChange={setApprovalNote}
-          />
-        ) : null}
         {needsApprovalSingle && audienceCount !== null ? (
           <SingleOperatorFields
             recipientCount={audienceCount}

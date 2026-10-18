@@ -28,12 +28,15 @@ export function SbSettingsScreen({
   saveStatus,
   savePlacement,
   layout = 'wide-nav',
+  contentLayout,
+  notice,
 }: {
   /**
    * 板の作りの違い。wide-nav＝今の設定の板（中のメニュー 208・頭の間 8・説明 12）。
    * narrow-nav＝EC連携・LINE通知・運用状態の板（中のメニュー 200・頭は型のまま・本文の余白 16/24）。
    */
   layout?: 'wide-nav' | 'narrow-nav'
+  contentLayout?: 'wide'
   boardId?: string
   title: ReactNode
   help?: ReactNode
@@ -47,10 +50,13 @@ export function SbSettingsScreen({
   saveActions?: ReactNode
   saveStatus?: ReactNode
   savePlacement?: 'content'
+  /** 板の頭の下・中のメニューより上の帯（競合の帯）。 */
+  notice?: ReactNode
 }) {
   return (
     <SettingsPage
       layout={layout}
+      contentLayout={contentLayout}
       boardId={boardId}
       title={title}
       help={help}
@@ -63,6 +69,7 @@ export function SbSettingsScreen({
       saveActions={saveActions}
       saveStatus={saveStatus}
       savePlacement={savePlacement}
+      notice={notice}
     >
       <div className={styles.screen} data-sb-settings-screen="" data-sb-layout={layout}>{children}</div>
     </SettingsPage>

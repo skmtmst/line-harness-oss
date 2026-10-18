@@ -1,8 +1,10 @@
 'use client'
+
+import { daysUntilClose } from './payment-dates'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarClock, CalendarDays, FileText, Landmark, Lock, ReceiptText, TriangleAlert, Users, Wallet } from 'lucide-react'
+import { Banknote, Calendar, CalendarCheck, FileText, Landmark, Lock, TriangleAlert, Users, Wallet } from 'lucide-react'
 import {
   api,
   type AffiliateAccountSettlementPreview,
@@ -18,16 +20,15 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
 import TruncatedText from '@/components/shared/truncated-text'
-import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
-import { ListPagePagination } from '@/components/templates'
+import { PAYMENT_SECURITY_NOTICE, PaymentPagination } from './payment-footer'
 import { currentSettlementPeriod, formatDate, formatMonthDay, formatYen, pageCountOf, pageOf, periodText } from './display'
 import { AffiliatePaymentConfirmDialog } from './dialogs'
 import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import { PayoutStepUpDialog, SettlementCloseDialog } from './payment-dialogs'
-import { AffiliateToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, StatusPill, ToolbarNotices } from './parts'
+import { AffiliateToolbar, PerPageSelect, RetryButton, RowMenu, SavedSelect, StateCard, StatusPill, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -45,18 +46,6 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  */
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
-
-/** 締め日（periodTo の暦日・日本時間）までの残り日数。取れなければ null。 */
-function daysUntilClose(periodTo: string | null | undefined): number | null {
-  if (!periodTo) return null
-  const end = new Date(periodTo)
-  if (Number.isNaN(end.getTime())) return null
-  const nowJst = new Date(Date.now() + 9 * 3600_000)
-  const today = Date.UTC(nowJst.getUTCFullYear(), nowJst.getUTCMonth(), nowJst.getUTCDate())
-  const endJst = new Date(end.getTime() + 9 * 3600_000)
-  const closing = Date.UTC(endJst.getUTCFullYear(), endJst.getUTCMonth(), endJst.getUTCDate())
-  return Math.round((closing - today) / 86_400_000)
-}
 
 const SAVED_VIEWS = [
   { value: '', label: 'よく使う絞り込み' },
@@ -239,7 +228,7 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="今回 払う額"
-        icon={<Wallet size={14} aria-hidden="true" />}
+        icon={<Banknote size={14} aria-hidden="true" />}
         value={null}
         valueText={ready && preview ? formatYen(preview.totalAmount) : emptyValue('unknown')}
         unit=""
@@ -248,7 +237,7 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="次の締め"
-        icon={<CalendarDays size={14} aria-hidden="true" />}
+        icon={<Calendar size={14} aria-hidden="true" />}
         value={null}
         valueText={ready && preview ? formatMonthDay(preview.periodTo) : emptyValue('unknown')}
         unit=""
@@ -257,16 +246,17 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="次の支払日"
-        icon={<CalendarClock size={14} aria-hidden="true" />}
+        icon={<CalendarCheck size={14} aria-hidden="true" />}
         value={null}
         valueText="—"
         unit=""
         detail="支払日はアフィリエイターごとの取り決めです"
+        detailLayout="single"
       />
       <KpiCard
         presentation="band"
         title="今年 払った合計"
-        icon={<ReceiptText size={14} aria-hidden="true" />}
+        icon={<Wallet size={14} aria-hidden="true" />}
         value={null}
         valueText="—"
         unit=""
@@ -333,7 +323,7 @@ export default function PaymentTab() {
       <div className={styles.fullRow}>
         <div className={styles.noticeStack}>
           {ready && missingBanks.length > 0 ? (
-            <Notice tone="warn">
+            <Notice tone="info" icon={<TriangleAlert size={16} aria-hidden="true" />}>
               {`振込先が登録されていない人が ${formatNumber(missingBanks.length)} 人います（${missingBanks.slice(0, 3).map((item) => item.affiliateName).join('・')}${missingBanks.length > 3 ? ` ほか${formatNumber(missingBanks.length - 3)} 人` : ''}）。締める前に、本人に登録をお願いしてください。`}
             </Notice>
           ) : null}
@@ -409,7 +399,13 @@ export default function PaymentTab() {
                       <span className={styles.cellNum}>登録済み</span>
                       <span className={styles.rowPlan}>口座番号は本人だけに表示</span>
                     </span>
-                  ) : <span className={styles.cellNum}>未登録</span>}
+                  ) : (
+                    /* 絵 aINnz：赤い「未登録」の下に、だれの手待ちかを添える。 */
+                    <span className={styles.stack}>
+                      <span className={`${styles.cellNum} ${styles.cellDanger}`}>未登録</span>
+                      <span className={styles.rowPlan}>本人の登録待ち</span>
+                    </span>
+                  )}
                 </Td>
                 <Td className={styles.colPayState}>
                   <span className={styles.stack}>
@@ -417,11 +413,13 @@ export default function PaymentTab() {
                     {item.bankProfileRegistered && summary?.holdDays ? <span className={styles.rowPlan}>{`認めてから ${formatNumber(summary.holdDays)}日保留`}</span> : null}
                   </span>
                 </Td>
-                <Td className={styles.colPayOps}>
-                  <span className={styles.rowActions}>
-                    <Button type="button" onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}>明細を見る</Button>
-                  </span>
-                </Td>
+                <ActionCell className={styles.colPayOps}>
+                  {/* 行の右端は「…」1つ（B-253・絵 aINnz）。明細はその中から開く。 */}
+                  <RowMenu
+                    label={`${item.affiliateName}の支払いの操作`}
+                    items={[{ id: 'detail', label: '明細を見る', onSelect: () => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName }) }]}
+                  />
+                </ActionCell>
               </Tr>
             )
           })}
@@ -441,14 +439,12 @@ export default function PaymentTab() {
   ) : (
     <>
       {table}
+      <p className={styles.footNote}>{PAYMENT_SECURITY_NOTICE}</p>
     </>
   )
 
-  const pager = ready && shown.length > 0 && pageCount > 1 ? (
-    <ListPagePagination>
-      <span className={styles.pagerCount}>{`${formatNumber(shown.length)} 人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shown.length)} 人`}</span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
-    </ListPagePagination>
+  const pager = ready ? (
+    <PaymentPagination total={shown.length} page={currentPage} pageSize={pageSize} pageCount={pageCount} onPageChange={setPage} />
   ) : undefined
 
   const actions = readonly ? undefined : (
@@ -474,7 +470,7 @@ export default function PaymentTab() {
 
   return (
     <SaveErrorScope errors={saveErrors}><AffiliateFrame
-      help="口座番号は本人だけに表示します。銀行用 CSV（口座情報を含む）は、6桁コードかパスワードで本人確認したときだけ書き出せます（15分で期限切れ）。"
+      help={PAYMENT_SECURITY_NOTICE}
       actions={actions}
       stats={stats}
       toolbar={toolbar}

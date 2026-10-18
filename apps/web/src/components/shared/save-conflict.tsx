@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { GitCompare, RefreshCw, TriangleAlert } from 'lucide-react'
 import Button from './button'
+import { ApiError } from '@/lib/api'
 import Dialog from './dialog'
 import { formatDateTime } from '@/lib/format'
 import styles from './save-conflict.module.css'
@@ -37,6 +38,11 @@ export function saveConflictTitle(updatedAt: string, kind: string, name: string)
   const when = parsed && !Number.isNaN(parsed.getTime()) ? formatDateTime(parsed) : ''
   const subject = name.trim() ? `${kind}「${name.trim()}」` : `この${kind}`
   return when ? `ほかの人が ${when} に${subject}を保存しました` : `ほかの人が先に${subject}を保存しました`
+}
+
+/** 保存のぶつかり（409）か。画面ごとに状態の数字を比べず、この関数で見分ける。 */
+export function isSaveConflict(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'status' in error && error.status === 409
 }
 
 /** 比べる窓に出す違いの1行。add=最新で増えた、remove=最新で消えた、change=変わった。 */
@@ -138,6 +144,7 @@ export function SaveConflictBand({
   compareBusy = false,
   compareDisabled = false,
   reloadHref,
+  reloadVariant = 'primary',
   onCompare,
   compareHref,
   onReload,
@@ -148,6 +155,8 @@ export function SaveConflictBand({
   compareBusy?: boolean
   compareDisabled?: boolean
   reloadHref?: string
+  /** 板ごとの主・副の指定。副を既定とし、既存の緑の読み直しを保つ画面だけ主にする。 */
+  reloadVariant?: 'primary' | 'secondary'
   /** 「違いを比べる」を押したとき（窓を開くなど）。compareHref と どちらかを渡す。 */
   onCompare?: () => void
   /** 比べる先が別の画面のときは、ボタンをその画面へのリンクにする（新しいタブでも開ける）。 */
@@ -174,7 +183,7 @@ export function SaveConflictBand({
           違いを比べる
         </Button>
       ) : null}
-      {reloadHref ? <Button variant="primary" href={reloadHref}><RefreshCw aria-hidden="true" className={styles.buttonIcon} />最新を読み込んで続ける</Button> : <Button variant="primary" onClick={onReload}>
+      {reloadHref ? <Button variant={reloadVariant} href={reloadHref}><RefreshCw aria-hidden="true" className={styles.buttonIcon} />最新を読み込んで続ける</Button> : <Button variant={reloadVariant} onClick={onReload}>
         <RefreshCw aria-hidden="true" className={styles.buttonIcon} />
         最新を読み込んで続ける
       </Button>}
@@ -231,3 +240,15 @@ export function SaveConflictCompareDialog({
     </Dialog>
   )
 }
+
+/** 409は画面ごとに判定しない。版以外の業務上の衝突も、codeは呼び出し側で区別する。 */
+export function isConflictResponse(error: unknown): error is ApiError & { status: 409 } {
+  return error instanceof ApiError && error.status === 409
+}
+/** 短い編集窓で、既存の入力を保ったまま読み直しへ案内する共通の言葉。 */
+export const CONFLICT_TEXT = {
+  retry: 'ほかの人が先に変えました。読み直してから、もう一度お試しください。',
+  reopen: 'ほかの人が先に直しました。閉じて開き直してから、もう一度お試しください。',
+  routing: 'ほかの人が先に変えました。開き直して、最新の内容から変えてください。',
+  save: 'ほかの人が先に保存しました。読み直してから、もう一度保存してください。',
+} as const

@@ -406,12 +406,7 @@ export async function processCodexAutoMerge(
   } catch (error) {
     const failure = githubFailureDetails(error);
     if (!failure) throw error;
-    console.error(JSON.stringify({
-      event: 'codex_auto_merge_github_failed',
-      status: failure.status,
-      path: failure.path,
-      ledgerWrite: failure.kind === 'ledger',
-    }));
+    console.error(JSON.stringify({"code":"codex_auto_merge_github_failed"}));
     const reason = failure.kind === 'ledger'
       ? `マージ済みですが台帳に記録できませんでした。二重マージ防止の記録がないため、人が確認してください (${failure.status} ${failure.path})`
       : `GitHub APIが失敗しました (${failure.status} ${failure.path})`;

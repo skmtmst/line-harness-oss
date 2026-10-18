@@ -1,12 +1,13 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { Pencil, RotateCcw, Trash2 } from 'lucide-react'
+import { RotateCcw, ShieldCheck, SlidersHorizontal, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import FormDocumentRetention from '@/components/shared/form-document-retention'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Card, { CardHeader } from '@/components/shared/card'
 import FilterChip from '@/components/shared/filter-chip'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
@@ -34,6 +35,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
+const SAFETY_NOTICE = <Notice tone="info" icon={<ShieldCheck aria-hidden="true" />}>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
 /* 板の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
 const STATUS_CHIPS = [
@@ -189,8 +191,8 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
-      explanation="確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。">
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={DESCRIPTION}>
+        {SAFETY_NOTICE}
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -222,32 +224,15 @@ export default function FileScanScreen() {
   const legacySecret = Boolean(config?.externalSecretRef && !/^FILE_SCAN_SECRET_[A-Z0-9_]+$/.test(config.externalSecretRef))
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
-      explanation="確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。">
-
-
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={DESCRIPTION}>
+        {SAFETY_NOTICE}
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
       {actionDone ? <p role="status" className={styles.doneBand}>{actionDone}</p> : null}
 
-      <div className={styles.toolbar}>
-        <SearchField
-          aria-label="ファイル名で探す"
-          placeholder="ファイル名で探す"
-          value={query}
-          onChange={changeQuery}
-          className={styles.search}
-        />
-        {STATUS_CHIPS.map((chip) => (
-          <FilterChip
-            key={chip.value}
-            selectedIcon={false}
-            selected={statusFilter === chip.value}
-            onChange={() => changeStatusFilter(chip.value)}
-          >
-            {chip.value === 'released' ? chip.label : `${chip.label} ${counts[chip.value]}`}
-          </FilterChip>
-        ))}
-      </div>
+      <ListToolbar
+        search={{ value: query, onChange: changeQuery, label: 'ファイル名で探す', placeholder: 'ファイル名で探す' }}
+        filters={<>{STATUS_CHIPS.map((chip) => <FilterChip key={chip.value} selectedIcon={false} selected={statusFilter === chip.value} onChange={() => changeStatusFilter(chip.value)}>{chip.value === 'released' ? chip.label : `${chip.label} ${counts[chip.value]}`}</FilterChip>)}</>}
+      />
 
       {items.length === 0 ? (
         statusFilter === 'quarantined' && !query ? (
@@ -292,7 +277,6 @@ export default function FileScanScreen() {
                   {item.status === 'quarantined' || item.status === 'rejected' ? (
                     <span className={styles.menuBox}>
                       <RowMenu
-                        className={styles.more}
                         label={`${item.filename}のその他操作`}
                         items={menuItems(item)}
                         open={openMenuId === item.id}
@@ -320,28 +304,15 @@ export default function FileScanScreen() {
         </div>
       ) : null}
 
-      <section className={styles.external} aria-label="外の検査サービス">
-        <div className={styles.externalHead}>
-          <div className={styles.externalText}>
-            <h2 className={styles.externalTitle}>外の検査サービス</h2>
-            <p className={styles.externalNote}>
-              {externalOn
+      <Card variant="form" aria-label="外の検査サービス">
+        <CardHeader title="外の検査サービス" size="content" meta={externalOn
                 ? '外の検査への送信は有効です。接続先の稼働状況を確認した表示ではありません。'
                 : externalConfigured && config?.externalEnabled === undefined
                   ? '外の検査への送信状態を確認できません。読み直してください。'
-                  : '外の検査への送信は停止中です。いまは内蔵の簡易検査だけです。'}
-            </p>
-          </div>
-          {externalConfigured ? (
-            <Button variant="secondary" type="button" disabled={configBusy} onClick={() => { setStopExternal(true); setStopError('') }}>
-              外の検査を止める
-            </Button>
-          ) : null}
-          <Button variant="secondary" type="button" onClick={toggleConfigOpen}>
-            <Pencil className={styles.btnIcon} aria-hidden="true" />
-            {configOpen ? '設定を閉じる' : '設定を編集'}
-          </Button>
-        </div>
+                  : '外の検査への送信は停止中です。いまは内蔵の簡易検査だけです。'} action={<>
+          {externalConfigured ? <Button variant="secondary" type="button" disabled={configBusy} onClick={() => { setStopExternal(true); setStopError('') }}>外の検査を止める</Button> : null}
+          <Button variant="secondary" type="button" actionWording onClick={toggleConfigOpen}><SlidersHorizontal aria-hidden="true" />{configOpen ? '設定を閉じる' : '設定を編集'}</Button>
+        </>} />
         {legacySecret ? <Notice tone="warn">古い鍵の名前は使えません。運営が用意した検査専用の鍵の名前へ変更してください。</Notice> : null}
         {externalConfigured && !externalOn && config?.externalEnabled === false && !legacySecret ? <Notice tone="warn">現在の設定では外の検査へ送信できません。送り先と鍵の名前の組を運営に確認してください。</Notice> : null}
         {configOpen ? (
@@ -362,7 +333,7 @@ export default function FileScanScreen() {
             </div>
           </div>
         ) : null}
-      </section>
+      </Card>
 
       {selectedAccountId ? <FormDocumentRetention key={selectedAccountId} accountId={selectedAccountId} /> : null}
       {dialogs}

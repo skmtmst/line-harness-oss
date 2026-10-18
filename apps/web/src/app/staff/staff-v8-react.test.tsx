@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import StaffPage from './page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-const net = vi.hoisted(() => ({ role: 'owner' as string }))
+const net = vi.hoisted(() => ({ role: 'owner' as string, populated: false }))
 vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   const summary = {
@@ -35,7 +35,7 @@ vi.mock('@/lib/api', async importOriginal => {
       lineAccounts: { ...actual.api.lineAccounts, list: async () => ({ success: true, data: [] }) },
       access: {
         ...actual.api.access,
-        users: async () => ({ success: true, data: { items: [], summary, pagination: { total: 0 } } }),
+        users: async () => ({ success: true, data: { items: net.populated ? ['administrator', 'operations', 'reception', 'view_only'].map((roleBundle) => ({ id: roleBundle, name: roleBundle, roleBundle, email: `${roleBundle}@***.jp`, status: 'active', accountScope: { type: 'all' }, mfaEnabled: true, lastLoginAt: null })) : [], summary, pagination: { total: net.populated ? 4 : 0 } } }),
         roles: async () => ({ success: true, data: { items: [] } }),
       },
     },
@@ -56,7 +56,7 @@ vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentP
 let host: HTMLDivElement
 let root: Root
 beforeEach(() => {
-  net.role = 'owner'
+  net.role = 'owner'; net.populated = false
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
 })
@@ -82,6 +82,29 @@ describe('ログインユーザーV8（nku0f・A35Gh）', () => {
     await render()
     expect(host.querySelector('[data-design-node~="A35Gh"]')).not.toBeNull()
     expect(host.textContent).toContain('閲覧のみで見ています')
+  })
+
+  it('閲覧の表でも役割ごとの色札を出し、役割と日時の意味順を保つ', async () => {
+    net.role = 'viewer'; net.populated = true
+    await render()
+    const table = host.querySelector('[role="table"][aria-label="いまいる人の一覧"]')!
+    expect(table).not.toBeNull()
+    for (const [role, tone] of [['administrator', 'success'], ['operations', 'info'], ['reception', 'warning'], ['view_only', 'neutral']]) {
+      expect(table.querySelector(`[data-role="${role}"]`)?.getAttribute('data-tone')).toBe(tone)
+    }
+    const heads = [...table.querySelectorAll('[role="columnheader"]')].map(cell => cell.textContent)
+    expect(heads.indexOf('役割')).toBeLessThan(heads.indexOf('最後に入った'))
+  })
+
+  it('一覧は絵 nku0f の列（人・役割・最後に入った）。行に顔とメール、表の頭に絞り込みを置かない', async () => {
+    net.populated = true
+    await render()
+    const table = host.querySelector('[role="table"][aria-label="いまいる人の一覧"]')!
+    const heads = [...table.querySelectorAll('[role="columnheader"]')].map(cell => cell.textContent)
+    expect(heads).not.toContain('担当のLINEアカウント')
+    expect(table.textContent).toContain('operations@***.jp')
+    expect(host.querySelector('[aria-label="役割で絞り込む"]')).toBeNull()
+    expect(host.textContent).not.toContain('最後に入った日が新しい順')
   })
 
   it('テーマ指定がなくてもV8で開く', async () => {

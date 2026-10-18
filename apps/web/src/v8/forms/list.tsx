@@ -1,7 +1,8 @@
 'use client'
+import { pageSizeOptions } from '@/components/shared/page-size-options'
 import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
-import ListToolbar, { ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useFeatureAccess } from '@/lib/use-feature-access';
@@ -11,7 +12,7 @@ import { useSearchParams } from 'next/navigation';
 import { Archive, CircleCheck, ClipboardList, FileText, IdCard, Inbox, Percent, Plus, TriangleAlert } from 'lucide-react';
 
 import Link from '@/components/shared/list-navigation'
-import { RowNameLink } from '@/components/shared/table';
+import { RowNameLink, StatusCell } from '@/components/shared/table';
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye, Link2 } from 'lucide-react';
@@ -37,14 +38,13 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import { FolderDotName } from '@/components/shared/folder-dot';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Pagination from '@/components/shared/pagination'
-import ListRange from '@/components/ui/list-range'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import { notifyToast } from '@/components/shared/toast';
@@ -991,7 +991,7 @@ export default function FormsListV8() {
       >
         情報欄に保存
       </FilterChip>
-      <FilterChip selected={formFilter === 'archived'} onChange={(next) => updateListState({ filter: next ? 'archived' : 'all', page: 1 })}>
+      <FilterChip icon={<Archive size={13} aria-hidden="true" />} selected={formFilter === 'archived'} onChange={(next) => updateListState({ filter: next ? 'archived' : 'all', page: 1 })}>
         アーカイブ済み
       </FilterChip>
       {/* 「後処理未完」は数の帯の「未完を見る」から入る絞り込み。選んでいる間だけ札を出す。 */}
@@ -1019,7 +1019,7 @@ export default function FormsListV8() {
         aria-label="表示件数"
         size="page-size"
         value={String(pageSize)}
-        options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
+        options={pageSizeOptions(FORM_PAGE_SIZES)}
         onChange={(value) => updateListState({ pageSize: Number(value), page: 1 })}
       /></SaveErrorField>
     </div>
@@ -1078,7 +1078,7 @@ export default function FormsListV8() {
       <DelayedSkeleton
         loading
         skeleton={
-          <DataTable>
+          <DataTable columnSizing="content">
             {tableHead}
             <tbody aria-hidden="true">
               {[0, 1, 2, 3, 4].map((index) => (
@@ -1153,7 +1153,7 @@ export default function FormsListV8() {
   } else {
     listBody = (
       <div className={styles.tableWrap}>
-        <DataTable>
+        <DataTable columnSizing="content">
           {tableHead}
           <tbody>
             {duplicateFeedback.order(visibleForms).map((form) => {
@@ -1182,14 +1182,14 @@ export default function FormsListV8() {
                   {!narrow && (
                     <Td className={styles.destCell} title={destination}>{destination}</Td>
                   )}
-                  <Td>
-                    <span className={styles.statusPill} data-tone={form.isActive ? 'live' : 'draft'}>
-                      <span className={styles.dot} aria-hidden="true" />
+                  <StatusCell primary={<>
+                    <StatusBadge tone={form.isActive ? 'success' : 'neutral'}>
                       {form.isActive ? '公開中' : '下書き'}
-                    </span>
+                    </StatusBadge>
+                    {reviewMode && form.accountScopeReviewRequired ? <StatusBadge tone="warning" size="compact">管理者確認</StatusBadge> : null}
+                  </>}>
                     {pendingCount > 0 ? <StatusBadge tone="danger" size="compact">{`後処理の未完 ${pendingCount}`}</StatusBadge> : null}
-                    {reviewMode && form.accountScopeReviewRequired ? <span className={styles.reviewBadge}>管理者確認</span> : null}
-                  </Td>
+                  </StatusCell>
                   <Td className={styles.answerCell}>
                     {reviewMode ? (
                       <span className={styles.answerCount}>{answerCount ? `${formatNumber(answerCount)}件` : emptyValue('unknown')}</span>
@@ -1273,15 +1273,7 @@ export default function FormsListV8() {
       pageCount={pageCount}
       onPageChange={(next) => updateListState({ page: next })}
       ariaLabel="回答フォームのページ送り"
-      summary={(
-        <ListRange
-          bare
-          className={styles.pagerCount}
-          total={listTotal}
-          first={pageStart + 1}
-          last={Math.min(pageStart + visibleForms.length, listTotal)}
-        />
-      )}
+      range={{ total: listTotal, first: pageStart + 1, last: Math.min(pageStart + visibleForms.length, listTotal) }}
     />
   )
 
@@ -1450,8 +1442,7 @@ export default function FormsListV8() {
         busy={deleting || deleteImpactLoading}
         onCancel={closeDelete}
         footer={(
-          <div className={styles.dialogActions}>
-            <span className={styles.dialogActionsSide}>
+          <DialogActions leadingAction={
               <Button
                 type="button"
                 variant="danger"
@@ -1461,7 +1452,7 @@ export default function FormsListV8() {
               >
                 削除する
               </Button>
-            </span>
+          }>
             <Button type="button" variant="secondary" disabled={deleting || deleteImpactLoading} onClick={closeDelete}>
               キャンセル
             </Button>
@@ -1476,8 +1467,7 @@ export default function FormsListV8() {
               <Archive size={15} aria-hidden="true" />
               アーカイブする
             </Button>
-            <span className={styles.dialogActionsSide} aria-hidden="true" />
-          </div>
+          </DialogActions>
         )}
       >
         {/* 絵は頭（題と×）・説明・2枚のカード・注意の帯・ボタンを 14 ずつで並べる。共通の窓の中身の余白（上下24）を詰める。 */}
@@ -1574,9 +1564,9 @@ export default function FormsListV8() {
         help="LINEの中で開くアンケート・申し込みフォームです。答えは友だち情報に保存できます。"
         /* 絵に無い機能（管理者確認）は見出しの右に小さく残す。 */
         actions={canManageFolders ? (
-          <FilterChip selected={reviewMode} onChange={(next) => { setReviewMode(next); setPage(1) }}>
+          <Button variant="secondary" onClick={() => { setReviewMode(!reviewMode); setPage(1) }}>
             {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
-          </FilterChip>
+          </Button>
         ) : undefined}
         tabs={viewerBand}
         stats={reviewMode ? undefined : (

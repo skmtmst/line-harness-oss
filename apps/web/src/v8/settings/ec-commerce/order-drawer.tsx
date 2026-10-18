@@ -12,10 +12,12 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from '@/components/shared/list-navigation'
-import { Link2, ExternalLink } from 'lucide-react'
+import { Link as LinkIcon } from 'lucide-react'
 import { ecEventLabel } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import SectionHeader from '@/components/shared/section-header'
 import ListState from '@/components/shared/list-state'
+import TruncatedText from '@/components/shared/truncated-text'
 import Drawer from '@/components/shared/drawer'
 import { ApiError, api, type EcActionExecution, type EcOrderDetail, type EcOrderDetailEvent } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -40,7 +42,7 @@ function shortTime(value: string | null): string {
 
 /** 日本時間の「10/4」。 */
 function shortDay(value: string): string {
-  return polishFormatDate(value, { style: 'detail' })
+  return polishFormatDate(value, { style: 'list-day' })
 }
 
 function money(currency: string, amount: number | null): string | null {
@@ -62,10 +64,10 @@ const PAYOUT_BATCH_STATE_TEXT: Record<string, string> = { created: 'CSVを作成
 const PAYOUT_RESULT_TEXT: Record<string, string> = { paid: '支払い完了', failed: '支払い失敗', returned: '支払いが戻った' }
 
 /** 時刻＋1行。下に足す行（理由・やり直し）があれば続ける。 */
-function TimeRow({ time, children, extra }: { time: string; children: ReactNode; extra?: ReactNode }) {
+function TimeRow({ time, fullTime, children, extra }: { time: string; fullTime?: string; children: ReactNode; extra?: ReactNode }) {
   return (
     <li className={styles.timeRow}>
-      <span className={styles.time}>{time}</span>
+      <span className={styles.time} title={fullTime}><TruncatedText value={time} /></span>
       <span className={styles.timeBody}>
         <span className={styles.timeText}>{children}</span>
         {extra}
@@ -197,7 +199,7 @@ export default function OrderDrawer({
     : true
 
   return (
-    <Drawer open={open} width="order" title={order ? `注文 ${order.orderNumber}` : '注文の状況'}
+    <Drawer open={open} width="order" heightMode="viewport" title={order ? `注文 ${order.orderNumber}` : '注文の状況'}
       description={order ? <>
         {friendId && order.customerName
           ? <Link className={styles.subLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}`}>{`${order.customerName}さん`}</Link>
@@ -206,7 +208,7 @@ export default function OrderDrawer({
       </> : undefined}
       onClose={onClose}
       footer={order ? <>
-        <Button href="/ec-commerce/identity-candidates"><Link2 size={14} aria-hidden="true" />会員のつき合わせへ</Button>
+        <Button href="/ec-commerce/identity-candidates"><LinkIcon size={14} aria-hidden="true" />会員のつき合わせへ</Button>
         {order.detailUrl ? <Button external href={order.detailUrl}  >ECの管理画面で開く</Button> : null}
       </> : undefined}
     >
@@ -236,7 +238,7 @@ export default function OrderDrawer({
               </section>
 
               <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>この注文に届いた出来事</h3>
+                <SectionHeader title="この注文に届いた出来事" helpLabel="もう一度行うときの説明" help="もう一度行う・再取込では、届き済みの通知や入った成果・マイルは重ねません。" />
                 {detail.events.length === 0 ? <p className={styles.empty}>届いた出来事はありません。</p> : (
                   <ul className={styles.timeline}>
                     {detail.events.map((event) => <EventRow key={event.id} canEdit={canEdit} event={event} retryingId={retryingId} onRetry={(action) => void retry(action)} />)}
@@ -301,6 +303,7 @@ export default function OrderDrawer({
                         <TimeRow
                           key={job.id}
                           time={`${shortDay(job.scheduledAt)} 予定`}
+                          fullTime={`${polishFormatDate(job.scheduledAt, { style: 'detail' })} 予定`}
                           extra={notes.length ? <span className={styles.detailBox}><span className={styles.note} data-tone={info?.tone}>{notes.join('・')}</span></span> : null}
                         >
                           {job.campaignLabel ?? job.campaignKey}
@@ -310,7 +313,6 @@ export default function OrderDrawer({
                   </ul>
                 )}
               </section>
-              <p className={styles.footHint}>もう一度行う・再取込では、届き済みの通知や入った成果・マイルは重ねません。</p>
             </>
           )}
     </Drawer>

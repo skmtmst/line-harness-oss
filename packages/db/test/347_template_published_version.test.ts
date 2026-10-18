@@ -440,6 +440,8 @@ describe('migration 347 テンプレートの公開版固定(#645 / N-131・差�
       INSERT INTO rich_menu_areas (template_id, page_id) VALUES ('tpl-legacy', 'page-1');
     `);
     sqlite.exec(migration347);
+    // 現行の読取ヘルパーへ渡す前に、履歴を残すための列を足す。
+    sqlite.exec("ALTER TABLE templates ADD COLUMN deleted_at TEXT");
 
     const row = sqlite.prepare(`SELECT * FROM templates WHERE id = ?`).get('tpl-legacy') as Record<string, unknown>;
     // 公開版のまま、参照元と同じ持ち主になり、実送信の取得口でも読める。

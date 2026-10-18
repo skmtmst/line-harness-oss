@@ -121,14 +121,10 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
     await settle(100)
     // V8 keeps the active area editor open after resuming the draft.
 
-    const intentTrigger = host.querySelector('button[aria-label="押したときの動き"]')
+    const intentTrigger = host.querySelector('input[type="radio"][aria-label="テンプレートを送る"]')
     expect(intentTrigger).toBeTruthy()
     await act(async () => {
       fireEvent.click(intentTrigger!)
-    })
-    await settle(50)
-    await act(async () => {
-      clickOption('テンプレートを送る')
     })
     await settle(50)
     // acc-1 のテンプレート「お知らせ」を選ぶ（選ぶ窓を開き、行を選んで［選ぶ］）

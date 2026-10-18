@@ -114,3 +114,24 @@ describe('downloadApiFile（TECH-03）', () => {
     expect(clicked).toHaveLength(0)
   })
 })
+
+it('B351 keeps exported CSV importable and stamps the actual downloaded filename with the server actor/time',async()=>{
+  const {parseFriendCsv}=await import('../v8/friends/migrations/friend-csv')
+  const source='\uFEFFline_user_id,display_name\r\nUfixture,Fixture\r\n'
+  let saved:Blob|undefined
+  vi.stubGlobal('URL',Object.assign(URL,{createObjectURL:(blob:Blob)=>{saved=blob;return 'blob:fixture'},revokeObjectURL:()=>undefined}))
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(source,{headers:new Headers([
+    ['Content-Type','text/csv; charset=utf-8'],['X-Exported-By','fixture-actor'],['X-Exported-At','2026-10-17T00:00:00.000Z'],
+  ])})))
+  await downloadApiFile('/api/friends/exports/job/download','friends.csv')
+  expect(clicked[0].download).toBe('友だち_2026-10-17-by-fixture-actor-20261017T000000000Z.csv')
+  expect(parseFriendCsv(await saved!.text())).toEqual([{lineUid:'Ufixture',displayName:'Fixture',realName:null,systemDisplayName:null}])
+})
+
+it('passes a one-use reauthentication grant without replacing the login credential',async()=>{
+ storeAdminSession('fixture-session')
+ const spy=vi.fn(async()=>csvResponse());vi.stubGlobal('fetch',spy)
+ await downloadApiFile('/api/friends/exports/job/download','friends.csv',{stepUpToken:'fixture-grant'})
+ const init=(spy.mock.calls[0] as unknown as [string,RequestInit])[1]
+ expect(init.headers).toMatchObject({Authorization:'Bearer lh_session:fixture-session','X-Step-Up-Token':'fixture-grant'})
+})

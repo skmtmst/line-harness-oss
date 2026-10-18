@@ -26,7 +26,7 @@ beforeEach(() => {
     VALUES ('platform-a', 'meta', ?, 1, 'account-a')`).run(JSON.stringify({
       pixel_id: 'fixture-pixel', access_token: crypto.randomUUID(), click_id_validity_days: 3650,
     }));
-  fetchMock = vi.fn(async () => ({ ok: false, text: async () => '試験の送信失敗' }));
+  fetchMock = vi.fn(async () => ({ ok: false, status: 503, text: async () => '試験の送信失敗' }));
   vi.stubGlobal('fetch', fetchMock);
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); testDb.raw.close(); });
@@ -137,7 +137,7 @@ describe('F-22 広告の同じ送信をやり直す', () => {
   });
   it('再送が失敗しても、同じ行・同じ目印を維持して失敗を返す', async () => {
     const log = await failedLog();
-    fetchMock.mockImplementation(async () => ({ ok: false, text: async () => '試験の送信失敗' }));
+    fetchMock.mockImplementation(async () => ({ ok: false, status: 503, text: async () => '試験の送信失敗' }));
     const response = await post(log.id);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { status: 'failed', providerEventId: log.provider_event_id } });

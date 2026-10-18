@@ -1,10 +1,12 @@
 'use client'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Check } from 'lucide-react'
+import { Check, Send } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
 import Button from '@/components/shared/button'
 import DateTimeField from '@/components/shared/date-time-field'
 import { TextField } from '@/components/shared/text-field'
@@ -164,8 +166,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
 
   const side = (
     <div className={styles.side}>
-      <section className={`${styles.sideCard} ${styles.impactCard}`} aria-labelledby="ev-cr-impact" aria-live="polite">
-        <h2 className={styles.sideTitle} id="ev-cr-impact">影響の確認</h2>
+      <div aria-live="polite"><CreateSummaryCard title="影響の確認" rows={[]}>
         {preview ? (
           <>
             <div className={preview.blocked ? styles.bandDanger : styles.band}>
@@ -194,15 +195,14 @@ function ChangeReview({ eventId }: { eventId: string }) {
             {previewBusy ? '影響を確かめています…' : previewError || '左で日時・定員・受付を変えると、ここに誰への影響が出ます。'}
           </p>
         )}
-      </section>
-      <section className={styles.sideCard} aria-labelledby="ev-cr-promise">
-        <h2 className={styles.sideTitle} id="ev-cr-promise">日時・会場を変えるときの約束</h2>
+      </CreateSummaryCard></div>
+      <CreateSummaryCard title="日時・会場を変えるときの約束" rows={[]}>
         <p className={styles.promise}>
           ・変えた内容は記録に残ります（消すことはできません）<br />
           ・定員を、すでに申し込まれている人数より下げることはできません<br />
           ・日時・会場が動いた回の確定した申込へは、LINE で新旧をお知らせします
         </p>
-      </section>
+      </CreateSummaryCard>
     </div>
   )
 
@@ -212,6 +212,8 @@ function ChangeReview({ eventId }: { eventId: string }) {
       title={`変更の確認：${event.name}`}
       help={description}
       preview={side}
+      previewLabel="影響の確認を見る"
+      previewTitle="影響の確認"
       footerActions={(
         <>
           <Button href={`/events/edit?id=${encodeURIComponent(eventId)}`}>キャンセル</Button>
@@ -286,13 +288,13 @@ function ChangeReview({ eventId }: { eventId: string }) {
             <h2 className={styles.cardTitle} id="ev-cr-edit">変える内容</h2>
             <p className={styles.cardNote}>{`${jstDay(activeSlot.starts_at)}の回`}</p>
           </div>
-          <div className={`${styles.pair} ${styles.datePair}`}>
+          <SettingsFormRow layout="columns">
             <div className={styles.field}><Field label="開始日時" htmlFor="ev-cr-start"><SaveErrorField names={["startsAt","activeEdit.startsAt","starts_at","active_edit.starts_at"]}><DateTimeField size="compact" id="ev-cr-start" invalid={Boolean(startError)} aria-describedby={startError ? 'ev-cr-start-error' : undefined} value={activeEdit.startsAt} onChange={(next) => updateActive({ startsAt: next })} /></SaveErrorField>
 {startError ? <p id="ev-cr-start-error" className={styles.fieldError} role="alert">{startError}</p> : null}</Field></div>
             <div className={styles.field}><Field label="終了日時" htmlFor="ev-cr-end"><SaveErrorField names={["endsAt","activeEdit.endsAt","ends_at","active_edit.ends_at"]}><DateTimeField size="compact" id="ev-cr-end" invalid={Boolean(endError)} aria-describedby={endError ? 'ev-cr-end-error' : undefined} value={activeEdit.endsAt} onChange={(next) => updateActive({ endsAt: next })} /></SaveErrorField>
 {endError ? <p id="ev-cr-end-error" className={styles.fieldError} role="alert">{endError}</p> : null}</Field></div>
-          </div>
-          <div className={styles.pair}>
+          </SettingsFormRow>
+          <SettingsFormRow layout="columns">
             <div className={styles.field}><Field label="定員" htmlFor="ev-cr-cap"><SaveErrorField names={["capacity","activeEdit.capacity","active_edit.capacity"]}><NumberInput numericText
                 id="ev-cr-cap"
                 inputMode="numeric"
@@ -310,7 +312,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
                 <RadioCard variant="row" name="ev-cr-active" value="off" checked={!activeEdit.isActive} onChange={() => updateActive({ isActive: false })} title="止める" />
               </RadioCardGroup></SaveErrorField>
             </div>
-          </div>
+          </SettingsFormRow>
           <div className={styles.field}><Field label="変える理由" htmlFor="ev-cr-reason"><SaveErrorField names={["reason"]}><TextField
               id="ev-cr-reason"
               aria-invalid={Boolean(reasonError) || undefined}
@@ -326,10 +328,10 @@ function ChangeReview({ eventId }: { eventId: string }) {
             {isPublished ? '理由は変更の記録に残ります。友だちには送りません。公開中なので書かないと変えられません。' : '理由は変更の記録に残ります。友だちには送りません。'}
           </p>
           {venueOpen ? (
-            <div className={styles.pair}>
+            <SettingsFormRow layout="columns">
               <div className={styles.field}><Field label="会場" htmlFor="ev-cr-venue"><SaveErrorField names={["venueName","venue_name"]}><TextField id="ev-cr-venue" value={venueName} placeholder="未設定" onChange={(e) => { setVenueName(e.target.value); touchEdits() }} /></SaveErrorField></Field></div>
               <div className={styles.field}><Field label="オンラインの URL（確定した申込にだけ見せます）" htmlFor="ev-cr-url"><SaveErrorField names={["venueUrl","venue_url"]}><TextField id="ev-cr-url" type="url" value={venueUrl} placeholder="未設定" onChange={(e) => { setVenueUrl(e.target.value); touchEdits() }} /></SaveErrorField></Field></div>
-            </div>
+            </SettingsFormRow>
           ) : (
             <div className={styles.linkRow}>
               <button type="button" className={styles.linkButton} onClick={() => setVenueOpen(true)}>会場・オンラインの URL も変える</button>
@@ -343,7 +345,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
         designNode="qUdNh"
         designWidth={620}
         designTop={185}
-        confirmIcon={<Check size={15} aria-hidden="true" />}
+        confirmIcon={<Send size={15} aria-hidden="true" />}
         title="変更内容を確認"
         cancelLabel="戻って直す"
         confirmLabel={`変えて ${preview?.total_confirmed ?? 0} 人にお知らせする`}

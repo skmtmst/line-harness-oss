@@ -202,7 +202,7 @@ beforeEach(async () => {
     RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     AI: { run: vi.fn(async () => ({ response: aiResponse })) } as unknown as Ai,
-    RESTAURANT_TEST_ENABLED: 'true',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', GOOGLE_BUSINESS_ENABLED: 'true',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
@@ -350,9 +350,9 @@ describe('Googleビジネス：変更の送信（GB-12 / GB-15）', () => {
     const body = JSON.parse(String(patch[0].init?.body)) as { specialHours: { specialHourPeriods: Array<{ startDate: { day: number }; closed?: boolean }> } };
     expect(body.specialHours.specialHourPeriods.map((x) => x.startDate.day).sort((a, b) => a - b)).toEqual([1, 23]);
     expect(body.specialHours.specialHourPeriods.every((x) => x.closed)).toBe(true);
-    const audit = logSpy.mock.calls.map((args) => String(args[0])).filter((line) => line.includes('"tag":"audit"') && line.includes('restaurant.google.change.send'));
+    const audit = testDb.raw.prepare("SELECT action FROM audit_events WHERE action='restaurant.google.change.send'").all();
     expect(audit).toHaveLength(1);
-    expect(audit[0]).not.toContain('access-secret');
+    expect(logSpy.mock.calls.flat().join(' ')).not.toContain('access-secret');
   });
 
   it('送信では変更しない日の specialHours を Google の原文のまま送り返す（他の日が変わらない）', async () => {

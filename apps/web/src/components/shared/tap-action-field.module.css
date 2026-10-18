@@ -21,9 +21,23 @@
   align-items: center;
 }
 
+.labeledRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr); align-items: start; }
+.labeledRow > * { min-width: 0; }
+.labeledRow .body { display: block; }
+
 .stack {
   flex-direction: column;
 }
+
+.grid { flex-direction: column; }
+.grid .body { flex: none; flex-direction: column; align-items: stretch; gap: var(--tap-action-gap); }
+.choices { border: 0; margin: 0; padding: 0; min-width: 0; }
+.choiceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.choice { position: relative; display: flex; align-items: center; gap: var(--tap-action-gap); min-width: 0; min-height: var(--tap-action-row-h); padding: var(--tap-action-pad); border-radius: var(--radius-control); color: var(--color-ink); font-size: var(--text-body); font-weight: var(--polish-weight-label); cursor: pointer; }
+.choiceInput { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.choice:has(:checked) { background: var(--color-choice-selected); color: var(--color-accent-deep); outline: 1px solid var(--color-selection-border); outline-offset: -1px; }
+.choice:has(:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+.choice:hover:not(:has(:checked)) { background: var(--color-canvas-sunken); }
 
 .row .kind {
   flex: 0 0 var(--tap-action-kind-w);
@@ -176,6 +190,13 @@
   .row .kind { flex: none; width: 100%; }
 }
 
+@container v8-page (width < 1100px) {
+  .labeledRow { grid-template-columns: minmax(0, 1fr); }
+  .row { flex-direction: column; align-items: stretch; }
+  .row .kind { flex: none; width: 100%; }
+  .row .body { flex: none; }
+}
+
 /* 選ぶ窓（共通の EntityPicker）で候補を読めなかったときの理由。 */
 .pickerEmpty {
   margin: 0;
@@ -183,4 +204,10 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
 }
+}
+
+@container v8-page (width < 1100px) {
+  .row { flex-direction: column; align-items: stretch; }
+  .row .kind, .row .body { flex: none; }
+  .row .body { align-items: stretch; }
 }

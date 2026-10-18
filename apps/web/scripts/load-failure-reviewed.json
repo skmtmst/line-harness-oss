@@ -1,5 +1,12 @@
 [
   {
+    "filename": "src/v8/ai-reply/api.ts",
+    "fingerprint": "3564c53a892dc0be",
+    "disposition": "local-parser",
+    "count": 1,
+    "reason": "保存済みの JSON 文字列を読む部品。壊れた値は質問なしとして扱い、読み込みの失敗ではない。"
+  },
+  {
     "filename": "src/app/accounts/use-uid-migration.ts",
     "fingerprint": "c304f9b5abadfe10",
     "disposition": "error-visible",
@@ -231,7 +238,7 @@
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
-    "filename": "src/v8/hq-broadcasts/create.tsx",
+    "filename": "src/v8/hq-broadcasts/create-gap-parts.tsx",
     "fingerprint": "987114d142fa1bfc",
     "disposition": "local-parser",
     "count": 1,
@@ -350,7 +357,7 @@
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
-    "filename": "src/v8/restaurant/organization/organization.tsx",
+    "filename": "src/v8/restaurant/organization/organization-forms.tsx",
     "fingerprint": "32dbd7c759d8c097",
     "disposition": "error-visible",
     "count": 1,
@@ -392,7 +399,7 @@
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/v8/webhooks/api-tokens.tsx",
+    "filename": "src/v8/webhooks/use-api-tokens.tsx",
     "fingerprint": "3fe44ad892d4f483",
     "disposition": "error-visible",
     "count": 1,
@@ -400,10 +407,10 @@
   },
   {
     "filename": "src/v8/webinar-edit/cta.tsx",
-    "fingerprint": "a9b0c30ee5eb76d7",
+    "fingerprint": "4824e32cbdb8ad58",
     "disposition": "error-visible",
     "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。10-16 司令塔が再確認：catch 同一・error-visible"
   },
   {
     "filename": "src/v8/webinar-edit/new.tsx",

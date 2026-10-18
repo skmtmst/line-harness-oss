@@ -120,9 +120,11 @@ describe('共通部品の影響範囲', () => {
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
 
       // N-193/N-205・B-128: 登録メディアから選ぶ窓。3つの写しを共通部品1つにまとめた。20件ずつのページ送り。
+      'components/shared/list-pagination.tsx',
       'components/shared/media-picker-dialog.tsx',
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
+      'components/ui/list-range.tsx',
       /*
        * 2026-10-07: 入口が src/v8 の新しい画面を出すようになり、描かれなくなった古い画面ファイル
        * （成果とアフィリエイト・オートメーション・共通アクション・予約設定のタブ・登録メディア・共通情報・
@@ -141,7 +143,7 @@ describe('共通部品の影響範囲', () => {
       // ★V8 タグ 保存した検索（IWnYX）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
       'v8/tags/searches-tab.tsx',
       // ★V8 タグ 友だち情報欄（q5gbcM）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
-      'v8/tags/fields-tab.tsx',
+      'v8/tags/fields-table.tsx',
       // ★V8 テンプレートの一覧（v19Ivv）。新しい置き場（src/v8）に一から書いた。
       'v8/templates/list.tsx',
       // ★V8 一斉配信の一覧（l5V9a）。新しい置き場（src/v8）に一から書いた。
@@ -171,12 +173,15 @@ describe('共通部品の影響範囲', () => {
       'v8/mileage/earning-rules.tsx',
       'v8/mileage/rewards.tsx',
       'v8/mileage/balances.tsx',
-      'v8/mileage/history.tsx',
+      'v8/mileage/history-pager.tsx',
       'v8/mileage/score.tsx',
       'v8/mileage/friend-detail.tsx',
       // ★V8 予約設定のメニュー・担当スタッフのタブ（owaS3）。src/v8/booking-menus に書き直した。
       'v8/booking-menus/tabs/menus-tab.tsx',
       'v8/booking-menus/tabs/staff-tab.tsx',
+      // ③-2 第3波：予約設定の回数券・月謝の表、統括の店の比較の表。
+      'v8/booking-passes/passes-tab.tsx',
+      'v8/hq-store-compare/list.tsx',
       // ★V8 統括のアカウント（JKjsE）。新しい置き場（src/v8）に一から書いた。
       'v8/hq/home.tsx',
       // ★V8 統括のひな形の一覧・一括配信の一覧（i0Ao0R・U4Eep0）。店の一覧と同じ形で表の下にページ送り（2026-10-08）。
@@ -184,9 +189,11 @@ describe('共通部品の影響範囲', () => {
       'v8/hq-broadcasts/list.tsx',
       // ★V8 成果とアフィリエイト（nJlxX・h7dmB・OylSV・aINnz）。src/v8 に一から書いた。
       'v8/affiliates/affiliators.tsx',
-      'v8/affiliates/offers.tsx',
-      'v8/affiliates/approvals.tsx',
-      'v8/affiliates/payment.tsx',
+      'v8/affiliates/report.tsx',
+      // G2 自動応答の Q&A・AI が答えた記録（y4nixm・LPkKH）と G9 AI の操作の記録（hqhj5）。src/v8 に一から書いた表の下のページ送り。
+      'v8/ai-reply/qa-list.tsx',
+      'v8/ai-reply/answer-log.tsx',
+      'v8/mcp-connect/log.tsx',
       // ★V8-B NEN配信の一覧（MuhWR・Jxmqh・Tj7n4）。新しい置き場（src/v8）に一から書いた。表の下にページ送りを置く。
       'v8/nen-campaigns/list.tsx',
       // ★V8 外部連携の送る一覧（ZSbFY）。新しい置き場（src/v8）に一から書いた。
@@ -197,7 +204,9 @@ describe('共通部品の影響範囲', () => {
       'v8/nen-members/list.tsx',
       // ★V8 マイペット（wTIej）・健康日記（mIwA4）を src/v8 に一から書いた。ページ送りは共通のまま。
       'v8/nen-pets/list.tsx',
+      'v8/nen-pets/parts.tsx',
       'v8/nen-health/health.tsx',
+      'v8/nen-health/parts.tsx',
       // ★V8 オートメーション（LWQXd・g98F9・LnGNw）。新しい置き場（src/v8）に一から書いた。
       'v8/automations/list.tsx',
       'v8/automations/runs.tsx',
@@ -215,6 +224,8 @@ describe('共通部品の影響範囲', () => {
       'v8/restaurant/google/profile-history.tsx',
       // ★V8 予約台帳の一覧（Z3FoM）。src/v8/restaurant に一から書いた。表の下にページ送りを置く。
       'v8/restaurant/reservations/list.tsx',
+      // ★V8 枠を閉じる知らせ（YMVFD）。表の下に件数とページ送り（2026-10-15 判定役）。
+      'v8/restaurant/close-tasks/close-tasks.tsx',
       // ★V8 ログインユーザー（nku0f）。新しい置き場（src/v8/settings）に書いた。表の下にページ送りを置く。
       'v8/settings/staff/staff.tsx',
       // ★V8 設定のEC連携（GmVR5）・ファイルの検査（PfA4o）。src/v8/settings に一から書いた。表の下にページ送りを置く。

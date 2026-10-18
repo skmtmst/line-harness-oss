@@ -152,6 +152,7 @@ describe('V6受信箱のアカウント境界', () => {
         calls.push(call);
         const statement = {
           bind(...binds: unknown[]) { call.binds = binds; return statement; },
+          first: vi.fn(async () => null), // 期限は初期オフ
           all: vi.fn(async () => ({ results: [] })),
         };
         return statement;

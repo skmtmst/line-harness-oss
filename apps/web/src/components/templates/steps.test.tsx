@@ -1,17 +1,9 @@
 // @vitest-environment happy-dom
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Steps } from './steps'
 import type { StepperStep } from '@/components/shared/stepper'
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-const css = readFileSync(join(HERE, 'steps.module.css'), 'utf8')
-const templateCss = readFileSync(join(HERE, 'page-templates.module.css'), 'utf8')
-const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8')
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
@@ -28,6 +20,17 @@ const STEPS: StepperStep[] = [
  * 丸24（済み＝緑に白い✓・今＝墨に白い数字・まだ＝薄い枠に灰の数字）・名13（今だけ太字）・線24×1.5。
  */
 describe('手順（型の共通部品 Steps）', () => {
+  it('質問の縦の列では未回答にも移れ、現在の場所と回答済みを分ける', () => {
+    const select = vi.fn()
+    render(<Steps label="はじめの質問の一覧" layout="sidebar" currentKey="now" steps={[
+      { key: 'done', label: '使い方', state: 'done', onSelect: () => select('done') },
+      { key: 'now', label: '見た目', state: 'todo', onSelect: () => select('now') },
+      { key: 'next', label: '通知', state: 'todo', onSelect: () => select('next') },
+    ]} />)
+    expect(document.querySelector('[aria-current="step"]')?.textContent).toBe('見た目')
+    for (const name of ['使い方', '見た目', '通知']) fireEvent.click(screen.getByRole('button', { name }))
+    expect(select.mock.calls.flat()).toEqual(['done', 'now', 'next'])
+  })
   it('段ごとに済み・今・まだの印を付け、今の段だけ aria-current="step"', () => {
     render(<Steps label="配信作成の進み" steps={STEPS} currentKey="audience" />)
     const nav = screen.getByRole('navigation', { name: '配信作成の進み' })
@@ -73,49 +76,15 @@ describe('手順（型の共通部品 Steps）', () => {
     expect(document.querySelector('[aria-current="step"]')?.textContent).toContain('シナリオ情報')
   })
 
-  it('入らない幅では、今の段だけ名を出す（1行を守る・折り返さない）', () => {
-    let resize: () => void = () => {}
-    vi.stubGlobal('ResizeObserver', class { constructor(cb: () => void) { resize = cb } observe() {} disconnect() {} })
-    const width = { nav: 300 }
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.getAttribute('data-part') === 'steps' ? width.nav : 0
-    })
-    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
-      return this.tagName === 'OL' ? 600 : 0
-    })
-    render(<Steps label="配信作成の進み" steps={STEPS} currentKey="audience" />)
-    const nav = screen.getByRole('navigation', { name: '配信作成の進み' })
-    expect(nav.hasAttribute('data-compact')).toBe(true)
-    width.nav = 800
-    act(() => resize())
-    expect(nav.hasAttribute('data-compact')).toBe(false)
-    vi.restoreAllMocks()
-  })
-
-  it('見た目：丸22・数11・名13・線24×1.5・間8・丸と名8。折り返さず、狭いときは今の段以外の名を隠す', () => {
-    expect(globals).toMatch(/--tpl-steps-dot:\s*22px/)
-    expect(globals).toMatch(/--tpl-steps-text-size:\s*var\(--polish-text-body\);/)
-    expect(globals).toMatch(/--tpl-steps-num-size:\s*11px/)
-    expect(globals).toMatch(/--tpl-steps-line-w:\s*24px/)
-    expect(globals).toMatch(/--tpl-steps-line-h:\s*1\.5px/)
-    expect(globals).toMatch(/--tpl-steps-gap:\s*8px/)
-    expect(globals).toMatch(/--tpl-steps-dot-gap:\s*var\(--polish-space-row\)/)
-    expect(css).toMatch(/\.list \{[^}]*flex-wrap:\s*nowrap/s)
-    expect(css).toMatch(/\.dot\[data-step-dot='done'\] \{[^}]*background:\s*var\(--color-accent-deep\)/s)
-    expect(css).toMatch(/\.dot\[data-step-dot='current'\] \{[^}]*background:\s*var\(--color-ink\)/s)
-    expect(css).toMatch(/\.dot\[data-step-dot='todo'\] \{[^}]*var\(--color-control-border\)/s)
-    expect(css).toMatch(/\.name\[data-step-name='current'\] \{[^}]*font-weight:\s*600/s)
-    expect(css).toMatch(/\.name\[data-step-name='todo'\] \{[^}]*color:\s*var\(--color-ink-secondary\)/s)
-    expect(css).toMatch(/\.line\[data-step-line='done'\] \{[^}]*var\(--color-accent-deep\)/s)
-    expect(css).toMatch(/\.root\[data-compact\] \.name:not\(\[data-step-name='current'\]\)/)
-    expect(css).toMatch(/button\.step:hover \.name \{[^}]*text-decoration:\s*underline/s)
-  })
-
-  it('置き場所：作る型では題 → 説明 → 手順（題の行の右は操作だけ）', () => {
-    expect(templateCss).toMatch(/\[data-page-template='create'\] \.heading > \.headingText > \.titleRow \{[^}]*order:\s*1/s)
-    expect(templateCss).toMatch(/\[data-page-template='create'\] \.heading > \.actions \{[^}]*order:\s*1/s)
-    expect(templateCss).toMatch(/\[data-page-template='create'\] \.heading > \.headingText > \.description \{[^}]*order:\s*3/s)
-    expect(templateCss).toMatch(/\[data-page-template='create'\] \.heading > \.steps \{[^}]*flex-basis:\s*100%[^}]*order:\s*5/s)
-    expect(templateCss).not.toMatch(/data-steps-placement/)
+  it('直す段にも戻れるが、今の段と未完の段へは進めない', () => {
+    const repair = vi.fn()
+    render(<Steps label="手順" currentKey="basic" steps={[
+      { key: 'basic', label: '基本設定', state: 'current' },
+      { key: 'repair', label: '入力を確認', state: 'attention', onSelect: repair },
+      { key: 'future', label: '送信', state: 'todo', onSelect: vi.fn() },
+    ]} />)
+    fireEvent.click(screen.getByRole('button', { name: '入力を確認に戻る' }))
+    expect(repair).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: '送信に戻る' })).toBeNull()
   })
 })

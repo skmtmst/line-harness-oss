@@ -15,11 +15,10 @@ test('cron advances persisted IDs and profiles with no browser, honors locks and
   const factory=vi.fn((_id: string, _token: string)=>client);
   expect(await processPendingFollowerImports(db,{client:factory})).toEqual({processed:0,busy:1,failed:0});
   sql.prepare("UPDATE account_settings SET value=? WHERE line_account_id='a' AND key='follower_import_v1'").run(JSON.stringify(initial));
-  expect((await processPendingFollowerImports(db,{client:factory})).processed).toBe(1);
-  expect((await getFollowerImportState(db,'a')).phase).toBe('hydrating_profiles');
+  // 1 ティックで ID 取り込みからプロフィールまで走り切る（刻みで待たない）。
   expect((await processPendingFollowerImports(db,{client:factory})).processed).toBe(1);
   expect((await getFollowerImportState(db,'a')).phase).toBe('completed');
   expect((sql.prepare('SELECT COUNT(*) n FROM friends').get() as {n:number}).n).toBe(1);
-  expect(factory.mock.calls.map(args=>args[0])).toEqual(['a','a','a']);
+  expect(factory.mock.calls.map(args=>args[0])).toEqual(['a','a']);
   expect(await processPendingFollowerImports(db,{client:factory})).toEqual({processed:0,busy:0,failed:0});
 });

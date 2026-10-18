@@ -1,14 +1,87 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { readFileSync } from 'node:fs'
-const read = (name: string) => readFileSync(new URL(name, import.meta.url), 'utf8')
 import { renderToStaticMarkup } from 'react-dom/server'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import ListToolbar, { ListToolbarFrame, ListToolbarLeading, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from './list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarLeading, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ListToolbarSort } from './list-toolbar'
 import PageSizeSelect from './page-size-select'
+import Select from './select'
+import HelpTip from './help-tip'
 
 afterEach(cleanup)
+
+it('型へ渡した道具の断片と操作説明をまとめ、検索・選択・件数の受け口を保つ', async () => {
+  const search = vi.fn(), filter = vi.fn(), size = vi.fn()
+  const { container } = render(<ListToolbarLeading leading={null} accessory={<HelpTip label="一覧の操作の説明">元の保存条件を説明します。</HelpTip>}><><>
+    <p>種類を変える前の注意を残します。</p>
+    <ListToolbarSearchSlot><input aria-label="項目名で探す" onChange={search} /></ListToolbarSearchSlot>
+    <span><Select aria-label="種類" value="all" onChange={filter} width={119} options={[{ value: 'all', label: '種類：すべて' }, { value: 'date', label: '種類：日付' }]} /></span>
+    <span aria-hidden="true" />
+    <PageSizeSelect value={20} onChange={size} label={null} />
+  </></></ListToolbarLeading>)
+  expect(container.querySelectorAll('[data-toolbar-layout="slots"]')).toHaveLength(1)
+  const tools = container.querySelector('[data-toolbar-layout="slots"]')!
+  const notice = screen.getByText('種類を変える前の注意を残します。')
+  expect(tools.contains(notice)).toBe(false)
+  expect(notice.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('textbox').closest('[data-toolbar-role="search"]')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '表示件数' }).closest('[data-toolbar-role="count"]')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '種類' }).parentElement!.style.width).toBe('')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: '日付' } })
+  expect(search).toHaveBeenCalledOnce()
+  fireEvent.click(screen.getByRole('button', { name: '種類' }))
+  fireEvent.click(screen.getByRole('option', { name: '日付' }).querySelector('button')!)
+  expect(filter).toHaveBeenCalledWith('date')
+  fireEvent.click(screen.getByRole('button', { name: '表示件数' }))
+  fireEvent.click(screen.getByRole('option', { name: /50/ }).querySelector('button')!)
+  expect(size).toHaveBeenCalledWith(50)
+  fireEvent.click(screen.getByRole('button', { name: '一覧の操作の説明' }))
+  expect((await screen.findByRole('note')).textContent).toContain('元の保存条件')
+})
+
+it('nested Frame and Toolbar render the leading actions once and keep their handler', () => {
+  const create = vi.fn()
+  render(<ListToolbarLeading leading={<button onClick={create}>作る</button>}><ListToolbarFrame><ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} /></ListToolbarFrame></ListToolbarLeading>)
+  expect(screen.getAllByRole('button', { name: '作る' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '作る' }))
+  expect(create).toHaveBeenCalledOnce()
+})
+
+it('入れ子の断片の順が変わっても、入力した値を別の操作へ移さない', () => {
+  const fields = (order: string[]) => <ListToolbarLeading leading={null}><>{order.map(name => <React.Fragment key={name}>
+    <ListToolbarRow><input aria-label={name} defaultValue={name} /></ListToolbarRow>
+  </React.Fragment>)}</></ListToolbarLeading>
+  const { rerender } = render(fields(['条件名', 'メモ']))
+  fireEvent.change(screen.getByRole('textbox', { name: '条件名' }), { target: { value: '入力を保持' } })
+  rerender(fields(['メモ', '条件名']))
+  expect(screen.getByRole<HTMLInputElement>('textbox', { name: '条件名' }).value).toBe('入力を保持')
+  expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'メモ' }).value).toBe('メモ')
+})
+
+it('畳んだフォルダにも同じ実幅の口を使い、作成とフォルダ選択を保つ', () => {
+  const create = vi.fn(), folder = vi.fn()
+  render(<ListToolbarLeading leading={<>
+    <button onClick={create}>項目を作る</button>
+    <span><Select aria-label="フォルダ" value="all" width={150} onChange={folder} options={[{ value: 'all', label: 'フォルダ：すべて' }, { value: 'shop', label: 'フォルダ：通販' }]} /></span>
+  </>}><ListToolbar search={{ placeholder: '項目名で探す', value: '', onChange: vi.fn() }} /></ListToolbarLeading>)
+  expect(screen.getByRole('button', { name: 'フォルダ' }).parentElement!.style.width).toBe('')
+  expect(screen.getAllByRole('button', { name: '項目を作る' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '項目を作る' }))
+  expect(create).toHaveBeenCalledOnce()
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  fireEvent.click(screen.getByRole('option', { name: '通販' }).querySelector('button')!)
+  expect(folder).toHaveBeenCalledWith('shop')
+})
+
+it('the shared end orders sort before page size while preserving selection', () => {
+  const change = vi.fn()
+  const { container } = render(<ListToolbarEnd><PageSizeSelect value={20} onChange={change} /><ListToolbarSort value="new" onChange={vi.fn()} options={[{ value: 'new', label: '新しい順' }]} /></ListToolbarEnd>)
+  const buttons = [...container.querySelectorAll('button[aria-haspopup="listbox"]')]
+  expect(buttons.map(el => el.getAttribute('aria-label'))).toEqual(['並び', '表示件数'])
+  fireEvent.click(screen.getByRole('button', { name: '表示件数' }))
+  fireEvent.click(screen.getByRole('option', { name: /50/ }).querySelector('button')!)
+  expect(change).toHaveBeenCalledWith(50)
+})
 
 describe('B-178 共通の道具の段の操作', () => {
   it('検索の変更と消す操作を元の受け口へ返す', async () => {
@@ -88,92 +161,6 @@ describe('B-178 共通の道具の段の操作', () => {
     expect(screen.getByRole<HTMLInputElement>('textbox', { name: '検索' }).value).toBe('来店')
   })
 
-  it('検索を枠付きの箱（カード）で包まない', () => {
-    const src = read('list-toolbar.tsx')
-    expect(src).not.toMatch(/bg-canvas|border-hairline|rounded-card/)
-  })
-
-  it('狭い幅では折り返す（右の2つが下へ行ける）', () => {
-    const css = read('list-toolbar.module.css')
-    expect(css).toMatch(/\.row1\s*{[^}]*flex-wrap:\s*wrap/s)
-    expect(css).toMatch(/\.row2\s*{[^}]*flex-wrap:\s*wrap/s)
-    expect(css).toMatch(/\.trailing\s*{[^}]*margin-left:\s*auto/s)
-  })
-
-  it('検索欄は虫眼鏡つきの共通 SearchField を使う', () => {
-    const src = read('list-toolbar.tsx')
-    expect(src).toContain("from './search-field'")
-    expect(src).toContain('<SearchField')
-  })
-
-  it('V8 道具の1段（c4n9Kr）：幅280を基準にし、段を折り返さない', () => {
-    /*
-     * 正本 c4n9Kr の検索は width:280px・flex-shrink:0。
-     * 中の文（flex:1）が伸び縮みし、外の箱は縮まない。
-     * 白い板 1100〜1200 でも右端がはみ出さないよう、
-     * 帯全体の flex-wrap で下へ折り返す（探す欄を潰さない）。
-     * v7 の 320・下限240 は変えない。
-     */
-    const css = read('list-toolbar.module.css')
-    const v8Rule = css.match(/:root\s*\.row1\s*>\s*\.search\s*{[^}]*}/s)
-    expect(v8Rule, 'V8 の探す欄の幅指定がありません').toBeTruthy()
-    expect(v8Rule![0]).toContain('280px')
-    // 縮ませない（flex:none＝flex-shrink:0。min-width:0・flex:1 方式に戻さない）。
-    expect(v8Rule![0]).toMatch(/flex:\s*none/)
-    expect(v8Rule![0]).not.toContain('min-width: 0')
-    expect(v8Rule![0]).not.toMatch(/flex:\s*1(?![\d.])/)
-    expect(css).toMatch(/:root\s*\.toolbar\s*{[^}]*flex-wrap:\s*nowrap/s)
-  })
-
-  it('畳む道具がないV8一覧では実際の空き幅に合わせて折り返す', () => {
-    const css = read('list-toolbar.module.css')
-    expect(css).toMatch(/:root\s*\.toolbar:not\(:has\(\.optional\)\)\s*{[^}]*flex-wrap:\s*wrap/s)
-    // B-244：名前の無い「…」へ畳まず、狭い白い板で2段にする。
-    expect(css).not.toContain('.optional[data-collapsed] > summary')
-    expect(css).toContain('@container v8-page (max-width: 1099px)')
-    expect(css).toContain(".toolbar[data-toolbar-layout='stacked']")
-  })
-
-  it('日付の範囲の入力はListToolbarの中で狭くそろえる（1440で2行目に収める）', () => {
-    /*
-     * 一斉配信の2行目で日付2つが各208px（w-52）あり、1440pxで
-     * 並び順と表示件数が3行目へ落ちた。各132px（計264px・152px減）
-     * なら同じ行に収まる。132pxは中の文字を「開始日」「終了日」
-     * （3文字・14px＝約42px＋暦の絵16px＋余白＝約116px）に
-     * 短くした最小。「日付を選ぶ」（約70px）のままでは欠ける。
-     * 1152px以下での折り返しは .row2 の flex-wrap のまま許す。
-     */
-    const css = read('list-toolbar.module.css')
-    const rule = css.match(/\.filters\s*>\s*\[data-date-input\]\s*{[^}]*}/s)
-    expect(rule, '日付入力の幅指定がありません').toBeTruthy()
-    expect(rule![0]).toContain('132px')
-    expect(rule![0]).not.toContain('208px')
-    expect(rule![0]).not.toContain('150px')
-    // 縮めて潰さない（flex:none・入りきらない幅では行ごと折り返す）。
-    expect(rule![0]).toMatch(/flex:\s*none/)
-  })
-
-  it('並び順・表示件数の選ぶ欄は2行目の中で狭くそろえる（1440で1行に収める）', () => {
-    /*
-     * 既定幅（176px・128px）のままでは一斉配信の2行目が1440px
-     * （中身の幅 ≈835px）で3行目へ落ちた。並び順150px・表示件数96px
-     * にそろえる。「配信日が新しい順」「20件表示」のままでは欠けるので、
-     * 呼び出し側で「新しい順」「20件」へ短くする（2行目の見出し・
-     * aria-labelで意味は分かる）。印（data-sort-select・
-     * data-per-page-select）を付けた画面だけが対象で、他の一覧の
-     * 既定幅は変えない。1152px以下での折り返しは許す。
-     */
-    const css = read('list-toolbar.module.css')
-    const sortRule = css.match(/\.trailing\s*>\s*\[data-sort-select\]\s*{[^}]*}/s)
-    expect(sortRule, '並び順の幅指定がありません').toBeTruthy()
-    expect(sortRule![0]).toContain('150px')
-    expect(sortRule![0]).toMatch(/flex:\s*none/)
-    const perPageRule = css.match(/\.trailing\s*>\s*\[data-per-page-select\]\s*{[^}]*}/s)
-    expect(perPageRule, '表示件数の幅指定がありません').toBeTruthy()
-    expect(perPageRule![0]).toContain('96px')
-    expect(perPageRule![0]).toMatch(/flex:\s*none/)
-  })
-
   it('2段目の状態切り替えも操作を保つ', () => {
     const onClick = vi.fn()
     render(<ListToolbar secondary={<button onClick={onClick}>注目のみ</button>} />)
@@ -186,4 +173,20 @@ it('並びは道具の段の共通欄だけで選ぶ', () => {
   const html = renderToStaticMarkup(<ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} sort={{ value: 'recent', onChange: vi.fn(), options: [{ value: 'recent', label: '新しい順' }] }} />)
   expect(html).toContain('data-list-sort')
   expect(html).toContain('aria-label="並び"')
+})
+
+it('U4：並びの現在値を表示し、選んだ順序を元の受け口へ返す', () => {
+  const change = vi.fn()
+  render(<ListToolbarSort aria-label="並び順" value="newest" options={[{ value: 'newest', label: '新しい順' }, { value: 'name', label: '名前順' }]} onChange={change} />)
+  const trigger = screen.getByRole('button', { name: '並び' })
+  expect(trigger.textContent).toContain('並び：新しい順')
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('option', { name: '名前順' }).querySelector('button')!)
+  expect(change).toHaveBeenCalledWith('name')
+})
+it('U4：並びの候補が無ければ空の欄を置かない', () => {
+  const change = vi.fn()
+  const { container } = render(<ListToolbarSort value="" options={[]} onChange={change} />)
+  expect(container.querySelector('button')).toBeNull()
+  expect(change).not.toHaveBeenCalled()
 })

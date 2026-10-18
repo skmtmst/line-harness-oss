@@ -1,0 +1,35 @@
+import { Children, cloneElement, isValidElement, type ReactNode } from 'react'
+import { Check, Save } from 'lucide-react'
+import Button from './button'
+
+type ActionChildren = { children?: ReactNode; 'aria-hidden'?: boolean | 'true' | 'false' }
+
+function actionText(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(actionText).join('')
+  if (!isValidElement<ActionChildren>(node) || node.props['aria-hidden'] === true || node.props['aria-hidden'] === 'true') return ''
+  return actionText(node.props.children)
+}
+
+/** Decorative marks belong to the bar; keep the authored label and its markup. */
+function withoutDecorations(node: ReactNode): ReactNode {
+  if (Array.isArray(node)) return Children.map(node, withoutDecorations)
+  if (!isValidElement<ActionChildren>(node)) return node
+  if (node.type === 'svg' || node.props['aria-hidden'] === true || node.props['aria-hidden'] === 'true') return null
+  if (node.props.children === undefined) return node
+  return cloneElement(node, {}, withoutDecorations(node.props.children))
+}
+
+/** Reserve the save mark by default; an explicit role mark takes precedence. */
+export function normalizeStickySaveActions(node: ReactNode): ReactNode {
+  if (Array.isArray(node)) return Children.map(node, normalizeStickySaveActions)
+  if (!isValidElement<ActionChildren & { variant?: string; href?: unknown; icon?: ReactNode }>(node)) return node
+  if (node.type === Button && node.props.variant === 'primary' && node.props.href === undefined
+    && /(保存|登録|作る|つくって|動かす|変更|公開|発行|有効|追加|やり直す)/.test(actionText(node.props.children))) {
+    const Mark = /保存/.test(actionText(node.props.children)) && !/(登録|作る|つくって|動かす|公開|発行|有効|追加|やり直す)/.test(actionText(node.props.children)) ? Check : Save
+    return cloneElement(node, {}, <>{node.props.icon === undefined ? <Mark size={16} aria-hidden="true" data-sticky-save-icon /> : null}{withoutDecorations(node.props.children)}</>)
+  }
+  if (node.props.children === undefined) return node
+  const children = normalizeStickySaveActions(node.props.children)
+  return children === node.props.children ? node : cloneElement(node, {}, children)
+}

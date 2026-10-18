@@ -27,7 +27,7 @@ import OpsTenantsV8 from './tenants'
 import OpsAnnouncementsV8 from './announcements'
 import OpsTenantDetailV8 from './tenant-detail'
 import KnowledgeArticleV8 from './knowledge-article'
-import type { OpsKnowledgeArticle } from '@/lib/api'
+import { api, type OpsKnowledgeArticle } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -91,7 +91,7 @@ describe('運営コンソールの V8 外枠', () => {
     await act(async () => {
       root.render(<OpsShellV8 me={ME} meError="" onRetryMe={() => {}} pathname="/ops/members"><p>中身</p></OpsShellV8>)
     })
-    for (const label of ['ダッシュボード', '契約先アカウント', 'お問い合わせ', 'お知らせ', 'ナレッジ', '監査ログ', 'メンバー管理', '2要素認証']) {
+    for (const label of ['ダッシュボード', '契約先アカウント', 'お問い合わせ', 'お知らせ', 'ナレッジ', '監査ログ', 'メンバー管理']) {
       expect(text()).toContain(label)
     }
     expect(text()).toContain('運営 › メンバー管理')
@@ -104,7 +104,16 @@ describe('閲覧のみには押せないボタンを置かない', () => {
     await act(async () => { root.render(<OpsMembersV8 />) })
     await settle()
     expect(buttons('招待メールを送る')).toHaveLength(1)
-    expect(buttons('停止')).toHaveLength(1)
+    const menu = document.querySelector<HTMLButtonElement>('button[aria-label="見本 次郎のその他操作"]')!
+    expect(menu).not.toBeNull()
+    act(() => menu.click())
+    const stop = document.querySelector<HTMLElement>('[role="menuitem"]')!
+    expect(stop.textContent).toContain('停止する')
+    act(() => stop.click())
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('停止')
+    expect(calls.filter(call => call.method !== 'GET')).toHaveLength(0)
+    act(() => buttons('キャンセル')[0].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
 
     act(() => root.unmount())
     readOnly = true
@@ -113,7 +122,7 @@ describe('閲覧のみには押せないボタンを置かない', () => {
     await settle()
     expect(text()).toContain('見本 次郎')
     expect(buttons('招待メールを送る')).toHaveLength(0)
-    expect(buttons('停止')).toHaveLength(0)
+    expect(document.querySelector('button[aria-label="見本 次郎のその他操作"]')).toBeNull()
   })
 
   it('契約先アカウント：閲覧のみには「契約先を作る」を出さない', async () => {
@@ -161,6 +170,11 @@ describe('送る・止める前に確かめる', () => {
     await settle()
     await act(async () => { (buttons('停止')[0] as HTMLButtonElement).click() })
     await settle()
+    const name = document.querySelector('input[placeholder="契約先A"]') as HTMLInputElement
+    expect(name.getAttribute('aria-required')).toBe('true')
+    const nameField = name.closest('[data-field]') ?? name.parentElement?.parentElement
+    expect(nameField?.textContent).toContain('必須')
+    expect(nameField?.textContent).not.toContain('任意')
     const confirm = buttons('停止する')[0] as HTMLButtonElement
     expect(confirm).toBeTruthy()
     await act(async () => { confirm.click() })
@@ -186,5 +200,53 @@ describe('B-139 欄で知らせて移る', () => {
     expect(document.querySelector('#ka-title-error')?.textContent).toBe('題名を入力してください')
     expect(document.activeElement).toBe(title)
     expect(calls.some((c) => c.method !== 'GET' && c.url.includes('/knowledge'))).toBe(false)
+  })
+})
+
+
+describe('承認の前に元の問い合わせを読み合わせる', () => {
+  const article = {
+    id: 'k-source', version: 1, sourceRequestId: 'request-source', ticketNo: 1045, sourceCurrent: true,
+    articleKind: 'answer_example', reviewState: 'pending', status: 'draft', reviewReason: '', evidence: [],
+    usedCount: 0, helpfulCount: 0, unhelpfulCount: 0, updatedAt: '2026-10-01T00:00:00Z',
+    title: '返答の例', question: '配信を止めたい', answer: '一時停止を押します', kind: 'usage', keywords: [],
+  } as unknown as OpsKnowledgeArticle
+  const source = (stage: 'resolved' | 'in_progress') => ({ success: true, data: { ticket: {
+    id: 'request-source', ticketLabel: '#1045', stage, stageLabel: stage === 'resolved' ? '解決' : '対応中',
+  } } }) as unknown as Awaited<ReturnType<typeof api.ops.support.ticket>>
+  const openApproval = async () => {
+    await act(async () => { root.render(<KnowledgeArticleV8 article={article} onClose={() => {}} onSaved={() => {}} />) })
+    await act(async () => { (buttons('保存して承認')[0] as HTMLButtonElement).click() })
+    await settle()
+    const dialog = document.querySelector('[data-design-node="eSXxA"]')!
+    fireEvent.click(dialog.querySelector('input[type="checkbox"]')!)
+    await settle()
+    return { dialog, approve: [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '保存して承認')! }
+  }
+  it.each(['resolved', 'in_progress'] as const)('%s は取得した状態を示し、未解決なら承認を止める', async stage => {
+    const fetchTicket = vi.spyOn(api.ops.support, 'ticket').mockResolvedValue(source(stage))
+    try {
+      const { dialog, approve } = await openApproval()
+      expect(fetchTicket).toHaveBeenCalledWith('request-source')
+      expect(dialog.textContent).toContain('元の問い合わせ #1045 が「解決」になっている')
+      const facts = dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+      expect(facts[1].checked).toBe(stage === 'resolved')
+      expect(approve.disabled).toBe(stage !== 'resolved')
+      if (stage !== 'resolved') expect(dialog.textContent).toContain('まだ「対応中」です')
+      expect(calls.some(call => call.method !== 'GET')).toBe(false)
+    } finally { fetchTicket.mockRestore() }
+  })
+  it('状態が読めない間は承認せず、読み直しで実際の解決状態を出す', async () => {
+    const fetchTicket = vi.spyOn(api.ops.support, 'ticket').mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(source('resolved'))
+    try {
+      const { dialog, approve } = await openApproval()
+      expect(approve.disabled).toBe(true)
+      expect(dialog.textContent).toContain('状態を確認できませんでした')
+      await act(async () => { (buttons('もう一度読み込む')[0] as HTMLButtonElement).click() })
+      await settle()
+      expect(approve.disabled).toBe(false)
+      expect(fetchTicket).toHaveBeenCalledTimes(2)
+      expect(calls.some(call => call.method !== 'GET')).toBe(false)
+    } finally { fetchTicket.mockRestore() }
   })
 })

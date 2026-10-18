@@ -20,9 +20,14 @@ export default function SidebarIdentity() {
   const name = brand.name || '管理画面'
   const initial = brandInitial(name)
 
+  return <SidebarBrand name={name} mark={initial} />
+}
+
+/** 取得処理を持たない共通の看板。運営も同じ横並びで描く。 */
+export function SidebarBrand({ name, mark }: { name: string; mark: string }) {
   return (
     <div className={styles.root} data-design-node="J33xq/V2WbXF">
-      <span className={styles.mark} aria-hidden="true">{initial}</span>
+      <span className={styles.mark} aria-hidden="true">{mark}</span>
       <span className={styles.text}>
         <span className={styles.name} title={name}>{name}</span>
         <span className={styles.version}>musubo</span>

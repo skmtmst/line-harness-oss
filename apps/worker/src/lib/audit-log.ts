@@ -8,14 +8,14 @@ import type { Env } from '../index.js';
  * マイルとアフィリエイトは残高や報酬に直結するため、
  * 「誰がいつ何を変更したか」を残す。
  *
- * 構造化ログと共通監査台帳の両方へ残す。ログ集約側と管理画面のどちらでも
- * actor と action で絞れるよう、キーは固定にしている。
+ * 誰が・何を・いつは共通監査台帳へ残す。consoleは固定コードとroute型だけ。
  *
  * 値そのものは残さない。金額やマイル数は変更後の状態を見れば分かるし、
  * 個人情報をログへ流さないため。残すのは「誰が・いつ・何に対して・何をしたか」だけ。
  */
 
 export type AuditAction =
+  | 'form.submission.export'
   | 'ad_conversion.retry'
   | 'line_account_folder.create'
   | 'line_account_folder.update'
@@ -96,6 +96,14 @@ export type AuditAction =
   | 'analytics.export'
   | 'nen.column.duplicate'
   | 'nen.column.import'
+  | 'nen.campaign.save'
+  | 'nen.campaign.enable'
+  | 'nen.campaign.stop'
+  | 'nen.birthday_coupon.save'
+  | 'nen.column.create'
+  | 'nen.column.save'
+  | 'nen.pet.archive'
+  | 'nen.column.schedule'
   | 'nen.delivery.pending_now'
   | 'operator_notification.rule.publish'
   | 'operator_notification.rule.stop'
@@ -243,20 +251,9 @@ export function auditLog(
 ): void {
   const staff = c.get('staff');
   // 認証前に呼ばれることはない想定だが、ログのために例外を投げたくない。
-  const actorId = staff?.id ?? 'unknown';
   const actorRole = staff?.role ?? 'unknown';
   c.set('auditRecorded', true);
-  console.log(
-    JSON.stringify({
-      tag: 'audit',
-      action,
-      actorId,
-      actorRole,
-      targetKind: target?.kind ?? null,
-      targetId: target?.id ?? null,
-      at: new Date().toISOString(),
-    }),
-  );
+  console.log(JSON.stringify({ code: 'audit.recorded', route: c.req.routePath || '(unmatched)' }));
 
   const db = c.env?.DB;
   const writer = commonAuditWriter();
@@ -277,7 +274,7 @@ export function auditLog(
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    console.error('audit_events insert failed:', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"lib_audit_log_failed"}));
   });
   try {
     c.executionCtx.waitUntil(task);

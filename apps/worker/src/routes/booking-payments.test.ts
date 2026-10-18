@@ -331,7 +331,7 @@ describe('予約の支払いの共通口', () => {
       `SELECT id FROM booking_payments WHERE booking_id = 'booking-a'`,
     ).get() as { id: string }).id;
     const refunded = await instance.request(`/api/booking/payments/${paymentId}/refund`, {
-      method: 'POST',
+      method: 'POST', headers: {'Content-Type':'application/json'}, body:JSON.stringify({reason:'取消',idempotencyKey:'refund-all'}),
     }, env());
     await expect(refunded.json()).resolves.toMatchObject({ success: true });
     expect(sqlite.prepare(`SELECT status FROM booking_payments WHERE id = ?`)
@@ -417,4 +417,18 @@ describe('予約の支払いの共通口', () => {
     expect(sqlite.prepare(`SELECT status FROM bookings WHERE id = 'booking-a'`).get())
       .toEqual({ status: 'confirmed' });
   });
+});
+
+describe('B-316 お客さまが選ぶ支払い設定',()=>{
+ it('店の既定・メニュー上書き・解除を保存し、Stripe以外との組合せは断る',async()=>{
+  seedBooking();const headers={'Content-Type':'application/json'};
+  const store='/api/booking/admin/payment-config?account_id=account-a';
+  expect((await app().request(store,{method:'PUT',headers,body:JSON.stringify({mode:'customer_choice',provider:'stripe',holdMinutes:10})},env())).status).toBe(200);
+  expect(await getBookingPaymentConfig(db,'account-a')).toMatchObject({mode:'customer_choice',provider:'stripe'});
+  const menu='/api/booking/admin/menus/menu-a/payment?account_id=account-a';
+  expect((await app().request(menu,{method:'PUT',headers,body:JSON.stringify({mode:'customer_choice',provider:'stripe'})},env())).status).toBe(200);
+  expect((await app().request(menu,{method:'PUT',headers,body:JSON.stringify({mode:'customer_choice',provider:'onsite'})},env())).status).toBe(400);
+  expect((await app().request(store,{method:'PUT',headers,body:JSON.stringify({mode:'customer_choice',provider:'none',holdMinutes:10})},env())).status).toBe(400);
+  expect((await app().request(menu,{method:'DELETE'},env())).status).toBe(200);
+ });
 });

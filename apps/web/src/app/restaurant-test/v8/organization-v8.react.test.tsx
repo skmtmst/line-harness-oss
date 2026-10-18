@@ -2,7 +2,7 @@
 import React from 'react'
 import {cleanup,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import {afterEach,beforeEach,expect,it,vi} from 'vitest'
-const fixture=vi.hoisted(()=>({snapshot:vi.fn(),loginMembers:vi.fn(),linkMembershipLogin:vi.fn(),updateMembership:vi.fn(),gate:vi.fn(),cancel:vi.fn(),listIntakeAddresses:vi.fn()}))
+const fixture=vi.hoisted(()=>({snapshot:vi.fn(),storeGroups:vi.fn(),loginMembers:vi.fn(),linkMembershipLogin:vi.fn(),updateMembership:vi.fn(),gate:vi.fn(),cancel:vi.fn(),listIntakeAddresses:vi.fn()}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'account-1',accounts:[]})}))
 vi.mock('@/lib/restaurant-test-api',()=>({restaurantTestApi:fixture}))
 vi.mock('@/components/step-up-prompt',()=>({useStepUpGate:()=>({gate:fixture.gate,cancel:fixture.cancel,prompt:null}),isStepUpRequired:(e:unknown)=>!!e && typeof e==='object' && 'code' in e && e.code==='STEP_UP_REQUIRED'}))
@@ -13,7 +13,7 @@ vi.mock('@/components/shell/page-chrome',async()=> (await import('@/test-utils/p
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=> 'owner',canManageRole:()=>true}))
 const member={id:'member',organization_id:'org',store_id:'store',staff_name:'試験担当',email:null,role:'staff',status:'active',staff_id:'login',loginName:'試験ログイン',loginRole:'staff',loginPolicyVersion:3,loginAccountScope:'accounts',line_uid:null,google_email:null}
 const data={organization:{id:'org',name:'試験組織'},stores:[{id:'store',name:'試験店',code:'S',status:'active',line_account_id:'account-1'}],memberships:[member],tables:[],menuItems:[],reservations:[],inventory:[],approvals:[],connectors:[],reviews:[],posts:[],lineFlows:[]}
-beforeEach(()=>{fixture.snapshot.mockResolvedValue({data});fixture.listIntakeAddresses.mockResolvedValue({data:[]});fixture.loginMembers.mockResolvedValue({data:[{id:'login',name:'試験ログイン'},{id:'next',name:'別のログイン'}]});fixture.updateMembership.mockResolvedValue({success:true});fixture.linkMembershipLogin.mockResolvedValue({success:true})})
+beforeEach(()=>{fixture.storeGroups.mockResolvedValue({data:[]});fixture.snapshot.mockResolvedValue({data});fixture.listIntakeAddresses.mockResolvedValue({data:[]});fixture.loginMembers.mockResolvedValue({data:[{id:'login',name:'試験ログイン'},{id:'next',name:'別のログイン'}]});fixture.updateMembership.mockResolvedValue({success:true});fixture.linkMembershipLogin.mockResolvedValue({success:true})})
 afterEach(()=>{cleanup();vi.resetAllMocks()})
 it('実際のログイン役割と版を表示し、既存メンバーとの連携を保存する',async()=>{
  render(<OrganizationV8 />)

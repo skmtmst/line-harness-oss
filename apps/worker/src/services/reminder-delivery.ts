@@ -1,3 +1,8 @@
+import { formatBookingDatetime } from './reminder-date-format.js';
+export { formatBookingDatetime } from './reminder-date-format.js';
+import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
+import type { ReminderDeliveryResult } from './reminder-delivery-result.js';
+export type { ReminderDeliveryResult } from './reminder-delivery-result.js';
 /**
  * リマインダ配信処理 — cronトリガーで定期実行
  *
@@ -36,7 +41,7 @@ import { addJitter, sleep } from './stealth.js';
 import { getSendPermissionForAccount, type SendPermission, type SendPermissionCache } from './send-entitlements.js';
 import { buildMessage } from './line-message.js';
 import { expandVariables, resolveMetadata } from './step-delivery.js';
-import { resolveSendInterpolationExtra } from './interpolation-context.js';
+import { resolveSendInterpolationExtra, resolveInterpolationExtra } from './interpolation-context.js';
 import { resolveReminderSendAt } from '@line-crm/shared';
 import {
   classifyExternalDeliveryError,
@@ -71,15 +76,6 @@ export interface ReminderDeliveryOptions {
   beforePush?: (run: { id: string; friendReminderId: string }) => Promise<void>;
 }
 
-export interface ReminderDeliveryResult {
-  succeeded: number;
-  skipped: number;
-  retrying: number;
-  failed: number;
-  /** 緊急停止で claim せず残した登録数（復旧後に届く）。 */
-  held: number;
-}
-
 /** 本番配信と下書き試験が同じテンプレート・変数展開を通る共通口。 */
 /*
  * F10: リマインダの差し込み「予約日時・Google Meet URL」。
@@ -98,18 +94,6 @@ export function contentNeedsBookingPlaceholders(content: string): boolean {
 export interface BookingInterpolation {
   reservationDatetime: string;
   meetUrl: string;
-}
-
-/** 開始日時を「10月10日（木）10:00」の形にする（Meet通知と同じ形）。 */
-export function formatBookingDatetime(startsAt: string): string {
-  const start = new Date(startsAt);
-  const jst = new Date(start.getTime() + 9 * 60 * 60 * 1000);
-  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-  const iso = jst.toISOString();
-  const month = Number(iso.slice(5, 7));
-  const day = Number(iso.slice(8, 10));
-  const time = iso.slice(11, 16);
-  return `${month}月${day}日（${weekdays[jst.getUTCDay()]}）${time}`;
 }
 
 export interface BookingConsultationRow {
@@ -172,7 +156,7 @@ export async function buildReminderStepMessage(
   sourceKind: 'reminder' | 'test_send' = 'reminder',
   // R346: 登録時のテンプレート版の写し {"テンプレートID": 公開版番号}。
   // 無いときは今までどおり最新の版を読む（下書き試験・古い登録）。
-  options?: { pinnedTemplateVersions?: Record<string, number> | null },
+  options?: { pinnedTemplateVersions?: Record<string, number> | null; previewOnly?: boolean },
 ): Promise<{
   message: Message;
   messageType: string;
@@ -189,6 +173,7 @@ export async function buildReminderStepMessage(
     const pinned = options?.pinnedTemplateVersions?.[step.template_id];
     if (pinned != null) {
       const version = await getTemplateVersion(db, step.template_id, pinned);
+      if(version?.message_bubbles_json)throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
       if (version) {
         messageType = version.message_type;
         messageContent = version.message_content;
@@ -197,6 +182,7 @@ export async function buildReminderStepMessage(
     }
     if (templateVersion == null) {
       const template = await getTemplateById(db, step.template_id);
+      if(template?.message_bubbles_json)throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
       if (template) {
         messageType = template.message_type;
         messageContent = template.message_content;
@@ -214,9 +200,9 @@ export async function buildReminderStepMessage(
       await resolveBookingInterpolation(db, friend.id, deliveredAt),
     )
     : messageContent;
-  const extra = await resolveSendInterpolationExtra(
-    db, friend.id, bookingContent, { kind: sourceKind, id: step.id },
-  );
+  const extra = options?.previewOnly
+    ? await resolveInterpolationExtra(db,friend.id,bookingContent)
+    : await resolveSendInterpolationExtra(db, friend.id, bookingContent, { kind: sourceKind, id: step.id });
   const expanded = expandVariables(
     bookingContent,
     { ...friend, metadata: resolvedMeta },
@@ -543,6 +529,11 @@ export async function processReminderDeliveries(
         result.skipped++;
         continue;
       }
+      if (await isFriendDeliverySuppressed(db, friend.id)) {
+        await skipReminderDeliveryRun(db, {id:run.id,code:'delivery_consent_suppressed',message:'配信停止・同意の状態により送信しませんでした。',now:nowIso,expectedLeaseExpiresAt:claimLease?[claimLease]:[]});
+        result.skipped++;
+        continue;
+      }
       if (!friend.is_following) {
         await skipReminderDeliveryRun(db, {
           id: run.id,
@@ -693,13 +684,7 @@ export async function processReminderDeliveries(
         // push と確定の間に取消が確定すると成功にできない (0 件)。
         // 外部送信の有無が曖昧なため送り直さず、運用の追跡用に記録する。
         if (Number(completed[2]?.meta?.changes ?? 0) !== 1) {
-          console.error(JSON.stringify({
-            event: 'reminder_delivery_completed_after_cancel',
-            reminderId: enrollment.reminder_id,
-            friendReminderId: enrollment.id,
-            runId: run.id,
-            messageLogId: logId,
-          }));
+          console.error(JSON.stringify({"code":"reminder_delivery_completed_after_cancel"}));
         }
       } catch (error) {
         const safe = classifyReminderDeliveryError(error);
@@ -725,14 +710,7 @@ export async function processReminderDeliveries(
         if (!recorded) continue;
         if (retryAt) result.retrying++;
         else result.failed++;
-        console.error(JSON.stringify({
-          event: 'reminder_delivery_failed',
-          reminderId: enrollment.reminder_id,
-          friendReminderId: enrollment.id,
-          runId: run.id,
-          code: exhausted ? 'retry_exhausted' : safe.code,
-          retryAt,
-        }));
+        console.error(JSON.stringify({"code":"reminder_delivery_failed"}));
       }
     }
 

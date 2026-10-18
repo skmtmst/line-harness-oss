@@ -91,9 +91,12 @@ describe('実際の画面の成立条件', () => {
     ['表示済み', null, 1999, false],
     ['表示済み', null, 0, false],
   ])('表示 %s / 実際 %s 行の判定', (text, state, rows, expected) => {
+    const stateElement = { getBoundingClientRect: () => ({width:100,height:20}), closest: () => null }
+    vi.stubGlobal('getComputedStyle', () => ({visibility:'visible'}))
     vi.stubGlobal('document', { documentElement: { dataset: { theme: 'v8' } }, querySelector: () => ({
-      textContent: text,
-      querySelectorAll: () => ({ length: rows }),
+      textContent: text, innerText: text,
+      querySelectorAll: (selector: string) => selector.includes('data-friend-row') ? Array.from({length:rows})
+        : selector.includes('error') ? state === 'error' ? [stateElement] : [] : state === 'loading' ? [stateElement] : [],
       querySelector: (selector: string) => selector.includes('error') ? state === 'error' : selector.includes('loading') ? state === 'loading' : rows > 0,
     }) })
     expect(screenReady({ route: '/friends', expectedRows: 2000 })).toBe(expected)

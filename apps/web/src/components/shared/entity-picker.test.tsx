@@ -2,10 +2,20 @@
 import React, { act, useState } from 'react'
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { EntityMultiPickerDialog, EntityPickerField, type EntityPickerItem } from './entity-picker'
+import { EntityPickerDialog, EntityMultiPickerDialog, EntityPickerField, type EntityPickerItem } from './entity-picker'
 // @vitest-environment happy-dom
 
 afterEach(cleanup)
+
+it('単一候補の確定を止める理由を示し、選ぶだけでは反映しない', () => {
+  const confirm = vi.fn()
+  render(<EntityPickerDialog title="テンプレートを選ぶ" items={[{ id: 'a', name: '返信' }]} onCancel={() => {}} onConfirm={confirm} />)
+  expect(screen.getByRole('button', { name: '選ぶ' }).title).toContain('候補を選んで')
+  fireEvent.click(screen.getByRole('radio', { name: '返信' }))
+  expect(confirm).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+  expect(confirm).toHaveBeenCalledWith('a')
+})
 
 const folders = [{ id: 'f1', name: 'アンケート', color: '#3b82f6' }, { id: 'f2', name: '予約の前', color: '#22c55e' }]
 const items: EntityPickerItem[] = [
@@ -102,11 +112,11 @@ describe('まとめて選ぶ窓', () => {
     expect((within(dialog).getByRole('checkbox', { name: '施術後アンケート' }) as HTMLInputElement).checked).toBe(true)
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '施術後アンケート' }))
     expect((within(dialog).getByRole('checkbox', { name: 'アンケートをまとめて選ぶ' }) as HTMLInputElement).indeterminate).toBe(true)
-    expect(within(dialog).getByText(/2 アカウントを選んでいます/)).toBeTruthy()
+    expect(within(dialog).getByText('2 件')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: '選んだものだけ見る' }))
     expect(within(dialog).getAllByRole('checkbox').filter((box) => !box.getAttribute('aria-label')?.includes('まとめて')).map((box) => box.getAttribute('aria-label'))).toEqual(['来店アンケート', '初回カウンセリング'])
     expect(onConfirm).not.toHaveBeenCalled()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'この 2 アカウントにする' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（2件）' }))
     expect(onConfirm).toHaveBeenCalledWith(['b', 'a'])
   })
 
@@ -126,7 +136,7 @@ describe('まとめて選ぶ窓', () => {
     dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '分類なし' }))
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '来店アンケート' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'この 2件にする' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（2件）' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.getByText('来店アンケート')).toBeTruthy()
     expect(screen.getByText('分類なし')).toBeTruthy()

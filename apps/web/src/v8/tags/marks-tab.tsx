@@ -2,18 +2,16 @@
 
 import { useListUrlValue, useListUrlState } from '@/components/shared/list-url-state';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react';
+import { Archive, CircleDot, Flag, GripVertical, History, Info, Loader, Send, AlertCircle } from 'lucide-react'
 
-import { RowNameLink } from '@/components/shared/table';
+import { RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 
-import Link from '@/components/shared/list-navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { AlertCircle } from 'lucide-react';
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api';
 import { createResponseGate } from '@/lib/latest-request';
 import { ListPageBody } from '@/components/templates';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
-import { RowMenu, RowQuickAction } from '@/components/shared/row-actions';
+import { RowMenu } from '@/components/shared/row-actions';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
@@ -24,12 +22,10 @@ import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import Select from '@/components/shared/select'
-import { ListPager } from '@/components/templates/list-page'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton } from '@/components/shared/skeleton';
 import { STATE_TEXT } from '@/components/shared/not-connected';
 import { notifyToast } from '@/components/shared/toast';
@@ -42,7 +38,7 @@ import styles from './list.module.css'
 import type { AttributeListHost } from './attribute-host';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
-import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
@@ -61,7 +57,7 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 const PAGE_SIZES = STANDARD_PAGE_SIZES
 
-export default function MarksTab({ accountId, canEdit, host }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow> }) {
+export default function MarksTab({ accountId, canEdit, host, explanation = false }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow>; explanation?: boolean }) {
   const router = useRouter()
   const [items, setItems] = useState<MarkRow[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -308,7 +304,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => {
     if (host) return canEdit ? [
       { id: 'edit', label: '編集', onSelect: () => host.onEdit(mark.id) },
-      { id: 'distribute', label: '配る', onSelect: () => host.onDistribute(mark.id) },
+      { id: 'distribute', label: '配る', icon: <Send size={16} aria-hidden="true" />, disabled: host.busy, onSelect: () => host.onDistribute(mark.id) },
       { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => host.onRemove(mark.id) },
     ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
@@ -318,6 +314,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
       {
         id: 'archive',
         label: '保管する',
+        icon: <Archive size={16} aria-hidden="true" />,
         tone: 'danger',
         dividerBefore: true,
         disabled: mark.isDefault || mark.isInherited,
@@ -367,6 +364,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   ]
 
   const filterActive = Boolean(query || usage !== 'all' || onlyArchived)
+  const archivedCount = useMemo(() => items.filter((mark) => Boolean(mark.archivedAt)).length, [items])
 
   const table = status === 'forbidden' ? (
     <ListState kind="error" title="対応マークを見る権限がありません" description={permissionDeniedMessage('store')}  />
@@ -387,7 +385,6 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
             <Th className={styles.markColDefault}>はじめの値</Th>
             <Th className={styles.markColAuto}>自動で変わる</Th>
             <Th className={styles.markColPlace}>出す場所</Th>
-            {host && canEdit ? <Th className={styles.colDistribute}><span className="sr-only">配る</span></Th> : null}
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
@@ -434,13 +431,14 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                       <span className={styles.truncate}>{mark.name}</span>
                     </span> : <RowNameLink
                       href={host ? "#" : editHref}
-                      className={styles.markPill}
-                      style={{ '--mark-color': mark.color } as CSSProperties}
                       title={mark.name}
                       onClick={(event) => { event.stopPropagation(); if (host) { event.preventDefault(); if (canEdit) host.onEdit(mark.id) } }}
                     >
-                      <span className={styles.markPillDot} aria-hidden="true" />
-                      <span className={styles.truncate}>{mark.name}</span>
+                      {/* 札は文字の幅（絵 vKDj5）。名前のリンクは列いっぱいの塊なので、札は中の span で描く。 */}
+                      <span className={styles.markPill} style={{ '--mark-color': mark.color } as CSSProperties}>
+                        <span className={styles.markPillDot} aria-hidden="true" />
+                        <span className={styles.truncate}>{mark.name}</span>
+                      </span>
                     </RowNameLink>}
                   </ContextMenu>
                   {mark.archivedAt ? <StatusBadge size="annotation" dot={false}>保管</StatusBadge> : null}
@@ -449,7 +447,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                 <Td className={styles.markColDefault}><span className={styles.cellText}>{mark.isDefault ? '新規の初期値' : emptyValue('unknown')}</span></Td>
                 <Td className={styles.markColAuto}><span className={styles.cellText} title={host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}>{host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}</span></Td>
                 <Td className={styles.markColPlace}><span className={styles.cellText} title={host ? undefined : usageLabel(mark)}>{host ? emptyValue('unknown') : usageLabel(mark)}</span></Td>
-                {host && canEdit ? <Td className={styles.colDistribute}><RowQuickAction label="配る" ariaLabel={`${mark.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(mark.id)} /></Td> : null}
+                {/* 統括の［配る］は行の「…」の中（B-253：行の右端は「…」1つ）。 */}
                 <Td className={styles.colMenu}>
                   <span className={styles.menuAnchor}>
                     {(!host || canEdit) ? <RowMenu
@@ -466,11 +464,6 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
           })}
         </tbody>
       </DataTable>
-
-      <ListPager>
-        <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="対応マークのページ送り"
-          summary={paginationSummary(visible.length, (currentPage - 1) * pageSize + 1, Math.min(currentPage * pageSize, visible.length))} />
-      </ListPager>
 
       {/* 表の下の段（安全確認）。 */}
       <section className={styles.safetyNote}>
@@ -496,19 +489,24 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
         ))}
       </KpiBand>}
 
-      <div className={styles.infoRow}>
+      {!explanation ? <div className={styles.infoRow}>
         <p className={styles.readonlyBand}>
           <Info className={styles.readonlyIcon} aria-hidden="true" />
           対応マークは、受信箱で「未対応・対応中・対応済み・保留」を見分ける印です。新しいメッセージが来たら自動で変える、などのきまりを付けられます。
         </p>
-      </div>
+      </div> : null}
 
       <ConfirmDialog open={restoreTarget !== null} title={`「${restoreTarget?.name ?? ''}」を保管から戻しますか？`}
         description="同じ対応マークを通常の一覧へ戻します。初期値や自動変更は再開せず、友だちの付け替えはそのまま残ります。"
         confirmLabel="保管から戻す" busy={restoring} error={restoreError}
         onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
       <ListPageBody
-        skeleton
+        pagination={status === 'ready' ? (
+          // ページ送りは表の下の安全確認のあと、板の下（絵 vKDj5）。
+          <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="対応マークのページ送り"
+            range={{ total: visible.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, visible.length) }} />
+        ) : undefined}
+        skeleton explanation={explanation ? '対応マークは、受信箱で「未対応・対応中・対応済み・保留」を見分ける印です。新しいメッセージが来たら自動で変える、などのきまりを付けられます。' : undefined}
         toolbar={<>
           <ListToolbarSearchSlot>
             <SearchField
@@ -530,9 +528,10 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               { value: 'unused', label: '使っている：なし' },
             ]}
           /></SaveErrorField>
-          {!host ? <FilterChip selected={onlyArchived} onChange={(next) => { setView({ archived: next ? '1' : '' }); setPage(1) }}>保管</FilterChip> : null}
-          <span className={styles.toolbarSpacer} />
-          <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
+          {!host ? <FilterChip selected={onlyArchived} icon={<Archive aria-hidden="true" />} count={archivedCount || undefined} onChange={(next) => { setView({ archived: next ? '1' : '' }); setPage(1) }}>保管</FilterChip> : null}
+          <ListToolbarEnd>
+            <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
+          </ListToolbarEnd>
         </>}
       >
         {actionError ? (

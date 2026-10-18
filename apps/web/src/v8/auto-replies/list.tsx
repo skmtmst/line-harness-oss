@@ -1,8 +1,11 @@
 'use client'
-import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
+
+import { SORT_OPTIONS, type SortKey } from './list-options'
+import FolderSelect from '@/components/shared/folder-select'
+import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageCircle, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -10,8 +13,8 @@ import { RowNameLink } from '@/components/shared/table';
 
 
 
-
 import SharedStatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
 import { useListUrlValue, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state';
 import { useFeatureAccess } from '@/lib/use-feature-access';
@@ -49,17 +52,19 @@ import FilterChip from '@/components/shared/filter-chip'
 import TagOverflow from '@/components/shared/tag-overflow'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { compareEvaluationOrder, movePriorityUpdates } from './order';
 import QuickCreateV8 from './quick-create'
+import { AutoReplyTabs } from '@/v8/ai-reply/auto-reply-tabs'
+import { conversationAiUiEnabled } from '@/lib/environment-features'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value';
@@ -67,6 +72,13 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
+
+const PAGE_SIZE_OPTIONS = [
+  { value: '20', label: '20件表示' },
+  { value: '50', label: '50件表示' },
+  { value: '100', label: '100件表示' },
+]
+
 
 /*
  * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
@@ -147,20 +159,6 @@ interface PendingToggle {
   accountId: string | null
 }
 
-type SortKey = 'hits' | 'priority' | 'name' | 'created'
-
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: 'priority', label: '評価順' },
-  { value: 'hits', label: 'ヒットが多い順' },
-  { value: 'name', label: '名前順' },
-  { value: 'created', label: '作った順' },
-]
-
-const PAGE_SIZE_OPTIONS = [
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-  { value: '100', label: '100件表示' },
-]
 
 /**
  * よく使う絞り込みの選ぶ欄（設計の札3つ＋選ぶ欄）。
@@ -886,7 +884,7 @@ export default function AutoRepliesListV8() {
     })
     items.push({
       id: 'delete',
-      label: '削除',
+      label: '削除する',
       icon: <Trash2 size={14} aria-hidden="true" />,
       tone: 'danger',
       dividerBefore: true,
@@ -992,7 +990,7 @@ export default function AutoRepliesListV8() {
     {
       key: 'monthly',
       title: '今月の応答',
-      icon: MessageSquare,
+      icon: MessageCircle,
       value: ready ? (monthlyHits === null ? null : monthlyHits) : null,
       unit: '回',
       detail: ready
@@ -1046,7 +1044,7 @@ export default function AutoRepliesListV8() {
   // 狭い板（WPrd5）は回数の列だけ出さない（絵どおり。選ぶ・つまみ・操作は残す）。フォルダの列は型が畳む。
   const tableHeadCells = (
     <>
-      <Th aria-label="並び替え" />
+      {canEdit ? <Th aria-label="並び替え" /> : null}
       <Th className={styles.headCell}>ルール（どんなときに動くか）</Th>
       <Th className={styles.headCell}>返すもの</Th>
       {!narrow && <Th className={styles.headCell}>今月動いた回数</Th>}
@@ -1105,9 +1103,10 @@ export default function AutoRepliesListV8() {
         <DataTable>
           <colgroup>
             {/* ★V8 列の幅＝絵の中身の幅＋欄の間16。端の列は端の24も足す（uE9gf：選ぶ16・つまみ14・返すもの200・回数96・状態60・操作28） */}
-            <col style={{ width: 16 + 24 + 8 }} />
-            <col style={{ width: 14 + 16 }} />
-            {!narrow ? <col style={{ width: 426 }} /> : <col />}
+            {/* 閲覧のみは選ぶ・つまみの列を置かない（押せない物は隠す）。名前の列が表の左端から始まる（Q5lOCc）。 */}
+            {canEdit ? <col style={{ width: 16 + 24 + 8 }} /> : null}
+            {canEdit ? <col style={{ width: 14 + 16 }} /> : null}
+            {!narrow ? <col style={{ width: canEdit ? 426 : 426 + (16 + 24 + 8) + (14 + 16) }} /> : <col />}
             <col style={{ width: 200 + 16 }} />
             {!narrow && <col style={{ width: 96 + 16 }} />}
             <col style={{ width: 80 + 16 }} />
@@ -1115,14 +1114,14 @@ export default function AutoRepliesListV8() {
           </colgroup>
           <thead>
             <TableHeadRow>
-                <Th className={styles.selectCell} aria-label="選択">
-                  {canEdit && <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
+                {canEdit ? <Th className={styles.selectCell} aria-label="選択">
+                  <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのルールをすべて選択"
-                  /></SaveErrorField>}
-                </Th>
+                  /></SaveErrorField>
+                </Th> : null}
               {tableHeadCells}
             </TableHeadRow>
           </thead>
@@ -1148,12 +1147,12 @@ export default function AutoRepliesListV8() {
                   detailKey="reply" onOpen={() => setPanelId(panelId === r.id ? null : r.id)}
                    data-row-id={r.id}
                 >
-                    <Td className={styles.selectCell}>
-                      {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
+                    {canEdit ? <><Td className={styles.selectCell}>
+                      <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
                         checked={selectedIds.has(r.id)}
                         onCheckedChange={() => toggleOne(r.id)}
                         aria-label={`${name}を選択`}
-                      /></SaveErrorField>}
+                      /></SaveErrorField>
                     </Td>
                   <Td
                     className={styles.gripCell}
@@ -1169,7 +1168,7 @@ export default function AutoRepliesListV8() {
                     >
                       <span aria-hidden>⠿</span>
                     </ReorderHandle>}
-                  </Td>
+                  </Td></> : null}
                   <NameCell name={<div className={styles.nameRow}>
                       <>
                         {canEdit ? <RowNameLink
@@ -1223,7 +1222,7 @@ export default function AutoRepliesListV8() {
                             setPage(1)
                           }}
                         >
-                          <span>{`重なり ${conflicts}`}</span>
+                          <StatusBadge tone="warning">{`重なり ${conflicts}`}</StatusBadge>
                         </button>
                       )}
                     {!r.isActive && r.stopReason && (
@@ -1373,7 +1372,7 @@ export default function AutoRepliesListV8() {
   const listPager = ready ? (
     <ListPagePagination>
       <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage}
-        summary={paginationSummary(sortedItems.length, (safePage - 1) * pageSize + 1, Math.min(safePage * pageSize, sortedItems.length))} />
+        range={{ total: sortedItems.length, first: (safePage - 1) * pageSize + 1, last: Math.min(safePage * pageSize, sortedItems.length) }} />
     </ListPagePagination>
   ) : null
 
@@ -1492,7 +1491,7 @@ export default function AutoRepliesListV8() {
 
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" tabs={conversationAiUiEnabled() ? <AutoReplyTabs active="keyword" /> : undefined} title={<>
         自動応答
       </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
@@ -1506,7 +1505,7 @@ export default function AutoRepliesListV8() {
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? () => { setConflictOnly(true); setPage(1) } : undefined} retryLabel="重なりを見る →" />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} detailLayout={kpi.key === 'actions' ? 'single' : undefined} action={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? { label: '重なりを見る', onClick: () => { setConflictOnly(true); setPage(1) } } : undefined} />
           ))}
         </KpiBand>
       </>}
@@ -1539,10 +1538,10 @@ export default function AutoRepliesListV8() {
         }
         confirmLabel={pendingToggle?.kind === 'resume' ? '再開する' : '止める'}
         confirmIcon={pendingToggle?.kind === 'stop' ? <Pause size={16} aria-hidden="true" /> : undefined}
-        designNode="i8F12"
+        designNode="i8F12" actionWidthReserve="idle"
         confirmation
         designLayout="stacked"
-        designWidth={600}
+        designWidth={480}
         designTop={280}
         footerAlign="center"
         titleIcon={false}
@@ -1579,14 +1578,15 @@ export default function AutoRepliesListV8() {
       */}
       <Dialog
         open={pendingDelete !== null}
-        title={`「${pendingDelete ? displayName(pendingDelete.item) : ''}」を削除する`}
+        title={`「${pendingDelete ? displayName(pendingDelete.item) : ''}」を削除しますか？`}
         description="新しく届くメッセージへの自動返信と、タグ付けなどの後の処理が止まります。これまでの実行結果は消えません。"
         busy={deleting}
         error={deleteError}
         designNode="u8sKN"
         confirmation
         designLayout="stacked"
-        designWidth={600}
+        footerAlign="start"
+        designWidth={480}
         designTop={280}
         onCancel={() => {
           if (deleting) return
@@ -1594,18 +1594,19 @@ export default function AutoRepliesListV8() {
           setPendingDelete(null)
         }}
         footer={
-          <div className={styles.deleteFooter}>
+          <DialogActions>
             <Button
               type="button"
               variant="danger"
               disabled={deleting || deleteTargetStale}
               busy={deleting}
               busyLabel="削除中…"
+              /* 絵 u8sKN：幅は「削除する」の文字で決める（結果の文字の分を控えない）。 */
+              widthReserve="idle"
               onClick={() => void runDelete()}
             >
               削除する
             </Button>
-            <div className={styles.deleteAlternatives}>
               <Button
                 type="button"
                 variant="secondary"
@@ -1629,11 +1630,10 @@ export default function AutoRepliesListV8() {
                   代わりに止める
                 </Button>
               ) : null}
-            </div>
-          </div>
+          </DialogActions>
         }
       >
-        <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
+        <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message={pendingDelete?.item.isActive ? '削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。' : '削除は元に戻せません。'} />
         {deleteTargetStale && (
           <Notice tone="danger" >アカウントが切り替わりました。削除する自動応答を選び直してください。</Notice>
         )}
@@ -1656,15 +1656,12 @@ export default function AutoRepliesListV8() {
       >
         <div className={styles.moveBody}>
           <span className={styles.moveLabel}>移動先のフォルダ</span>
-          <SaveErrorField names={["moveDraft","move_draft"]}><Select
+          <SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
             aria-label="移動先のフォルダ"
             size="full"
             value={moveDraft}
             onChange={(value) => setMoveDraft(value)}
-            options={[
-              { value: '', label: '未分類' },
-              ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-            ]}
+            folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
           /></SaveErrorField>
         </div>
       </ConfirmDialog>
@@ -1698,7 +1695,7 @@ export default function AutoRepliesListV8() {
           {/* 案内の帯は表の上の主列に置く（板 uE9gf）。左のフォルダの列を押し下げないよう toolbar 枠の先頭に置き、一行を取る。 */}
 
           {/* 道具の段は型の toolbar 枠に渡す（中身だけ渡す）。 */}
-          <ListToolbar
+          <ListToolbar preserveFilterChips
             search={{
               placeholder: 'ルール名・言葉で探す',
               width: 160,

@@ -1,5 +1,5 @@
 'use client'
-import { CalendarClock, Users, Armchair, CalendarX, Inbox, Check, Download, Send } from 'lucide-react'
+import { Inbox, Check, Download, Send } from 'lucide-react'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -67,9 +67,8 @@ const STATUS_LABELS: Record<string, string> = {
 
 /** 開催回の選び口の表示（板：`10/12（月）14:00`）。曜日は日付から作る。 */
 function formatOccurrence(iso: string): string {
-  return polishFormatDate(iso, { style: 'detail', fallback: iso })
+  return `${polishFormatDate(iso, { style: 'list-day-weekday', fallback: iso })} ${polishFormatDate(iso, { style: 'time', fallback: '' })}`
 }
-
 function participationSub(applicant: EventOccurrenceApplicant): string {
   if (applicant.firstParticipation.isFirst === true) return '初参加'
   if (applicant.firstParticipation.isFirst === false) return '過去のイベント参加あり'
@@ -527,10 +526,10 @@ function Bookings({ eventId }: { eventId: string }) {
       help={subLine || '開催回ごとの申込・承認・キャンセル待ちを確認できます。'}
       contentPadding="var(--tpl-roster-body-pad)"
       stats={<KpiBand data-design="KPIs">
-        <KpiCard presentation="band" title="申込" icon={<Users size={13} />} value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} valueTextWithUnit unit="人・この回" detail="" />
-        <KpiCard presentation="band" title="承認待ち" icon={<CalendarClock size={13} />} value={ready ? requestedSeats : null} unit="件" detail="" />
-        <KpiCard presentation="band" title="キャンセル待ち" icon={<Armchair size={13} />} value={ready ? waitingSeats + offeredSeats : null} unit="人" detail="" />
-        <KpiCard presentation="band" title="キャンセル" icon={<CalendarX size={13} />} value={ready ? cancelledCount : null} unit="件" detail="" />
+        <KpiCard presentation="band" title="申込" value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} valueTextWithUnit unit="人・この回" detail="" />
+        <KpiCard presentation="band" title="承認待ち" value={ready ? requestedSeats : null} unit="件" detail="" />
+        <KpiCard presentation="band" title="キャンセル待ち" value={ready ? waitingSeats + offeredSeats : null} unit="人" detail="" />
+        <KpiCard presentation="band" title="キャンセル" value={ready ? cancelledCount : null} unit="件" detail="" />
       </KpiBand>}
       actions={(
         <div className={styles.headActions}>
@@ -543,7 +542,8 @@ function Bookings({ eventId }: { eventId: string }) {
               value={selectedOccurrenceId}
               onChange={setSelectedOccurrenceId}
               aria-label="開催回を選ぶ"
-              options={slots.map((slot) => ({ ...entityOptionMetadata(slot), value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
+              valuePrefix="開催回："
+              options={slots.map((slot) => ({ ...entityOptionMetadata(slot), value: slot.id, label: formatOccurrence(slot.starts_at) }))}
             /></SaveErrorField>
           </div>
         </div>
@@ -709,8 +709,8 @@ function Bookings({ eventId }: { eventId: string }) {
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 placeholder="当日は動きやすい服装でお越しください"
               /></SaveErrorField>
-              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="確認中…">
-                送る
+              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} title={broadcastMessage.trim() === '' ? 'メッセージを入力してください' : undefined} busy={broadcastBusy} busyLabel="確認中…">
+                <Send size={15} aria-hidden="true" />送る
               </Button>
             </div></Field></div>
           {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}

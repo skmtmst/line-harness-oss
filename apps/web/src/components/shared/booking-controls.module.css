@@ -18,6 +18,7 @@
   text-align: left;
   cursor: pointer;
 }
+.block[data-placement='cell'] { position: static; width: 100%; min-height: var(--tpl-people-block-height); }
 
 .blockLine {
   background: var(--color-accent-soft);
@@ -30,8 +31,16 @@
 }
 
 .blockPhone {
-  background: var(--tpl-rs-rsv-phone-bg);
-  box-shadow: var(--tpl-rs-bar-phone);
+  background: var(--color-status-info-soft);
+  outline: 1px solid var(--color-status-info);
+  outline-offset: -1px;
+}
+
+/* 受付数を超えた予約（赤い地と赤い枠）。 */
+.blockOver {
+  background: var(--color-notice-danger-bg);
+  outline: 1px solid var(--color-menu-danger);
+  outline-offset: -1px;
 }
 
 .blockPending {

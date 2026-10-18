@@ -1,3 +1,4 @@
+import { jstNow } from './utils.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { trackConversion } from './conversions.js';
 
@@ -98,12 +99,7 @@ export async function recordConversionSourceEvent(
 
   if (!isConversionSourceType(event.sourceType)) {
     // 未対応イベントは捨てず、運用者が後で辿れる形で残す(#648 完了条件)。
-    console.log(JSON.stringify({
-      event: 'conversion_source_unmatched',
-      source_type: event.sourceType,
-      friend_id: event.friendId,
-      source_event_id: event.sourceEventId,
-    }));
+    console.log(JSON.stringify({"code":"conversion_source_unmatched"}));
     return { ...empty, skipped: 'unknown_source' };
   }
   if (!event.friendId?.trim() || !event.sourceEventId?.trim()) {
@@ -179,12 +175,38 @@ export async function recordConversionSourceEvent(
         continue;
       }
       failed += 1;
-      console.error('conversion source record failed:', {
-        sourceType: event.sourceType,
-        conversionPointId: point.point_id,
-        reason: error instanceof Error ? error.message : 'unknown',
-      });
+      console.error(JSON.stringify({"code":"src_conversion_event_sources_failed"}));
     }
   }
   return { matched: points.length, recorded, failed, excluded, skipped: null };
+}
+
+
+/** 元業務の取消を追記する。成果本体・金額・承認済み報酬は書き換えない。 */
+export async function reverseSourceConversions(db: D1Database, input: {
+  lineAccountId: string; sourceType: 'reservation_confirmed' | 'ec_order_confirmed';
+  bookingId?: string; orderNumber?: string; friendId?: string | null;
+}): Promise<number> {
+  const match = input.sourceType === 'reservation_confirmed'
+    ? "(json_extract(CASE WHEN json_valid(ce.metadata) THEN ce.metadata ELSE '{}' END, '$.bookingId') = ? OR ce.idempotency_key = ?)"
+    : "json_extract(CASE WHEN json_valid(ce.metadata) THEN ce.metadata ELSE '{}' END, '$.orderNumber') = ?";
+  const bindings = input.sourceType === 'reservation_confirmed'
+    ? [input.bookingId ?? '', `cvsrc:reservation_confirmed:${(input.bookingId ?? '').slice(0, 120)}`]
+    : [input.orderNumber ?? ''];
+  if ((input.sourceType === 'reservation_confirmed' && !input.bookingId) || (input.sourceType === 'ec_order_confirmed' && !input.orderNumber)) return 0;
+  const result = await db.prepare(`INSERT OR IGNORE INTO conversion_event_reversals
+    (id, conversion_event_id, kind, reason, actor_id, actor_name, created_at)
+    SELECT 'source-cancelled:' || ce.id, ce.id, 'reverse', '元の予約・注文が取り消されました', NULL, 'system', ?
+    FROM conversion_events ce
+    JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+    JOIN friends f ON f.id = ce.friend_id
+    WHERE cp.reversal_policy = 'source_cancelled' AND cp.event_type = ?
+      AND f.line_account_id = ? AND (cp.line_account_id IS NULL OR cp.line_account_id = ?)
+      AND (? IS NULL OR ce.friend_id = ?) AND ${match}
+      AND NOT EXISTS (SELECT 1 FROM conversion_event_reversals r WHERE r.conversion_event_id = ce.id AND r.kind = 'reverse'
+        AND NOT EXISTS (SELECT 1 FROM conversion_event_reversals newer WHERE newer.conversion_event_id = r.conversion_event_id
+          AND (newer.created_at > r.created_at OR (newer.created_at = r.created_at AND newer.rowid > r.rowid))))`)
+    .bind(jstNow(), input.sourceType, input.lineAccountId, input.lineAccountId,
+      input.friendId ?? null, input.friendId ?? null, ...bindings).run();
+  return Number(result.meta?.changes ?? 0);
 }

@@ -209,6 +209,10 @@ function seedConfirmedWithConnection(
        (id, calendar_id, line_account_id, staff_id, access_token, auth_type, is_active)
      VALUES ('conn-1', 'cal-1', ?, 'cal-staff-1', 'token-1', 'oauth', ?)`,
   ).run(ACCOUNT, options?.connectionActive ?? 1);
+  // B7: 同期を試す既存ケースは、店・担当の書き込みを明示的にオンにする。
+  raw.prepare(`INSERT OR IGNORE INTO booking_calendar_switches(line_account_id,scope_id,write_enabled,updated_by,updated_at) VALUES(?,'',1,'test',datetime('now'))`).run(ACCOUNT);
+  raw.prepare(`INSERT OR IGNORE INTO booking_calendar_switches(line_account_id,scope_id,write_enabled,updated_by,updated_at) VALUES(?,'cal-staff-1',1,'test',datetime('now'))`).run(ACCOUNT);
+
 }
 
 /** Google への fetch を差し替え、呼出し回数と要求本文を記録する。 */

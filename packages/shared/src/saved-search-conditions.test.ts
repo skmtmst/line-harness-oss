@@ -12,6 +12,7 @@ import type { SavedSearchConditionKind } from './types.js';
  * kind が増えたらここで表への登録忘れを検出する。
  */
 const ALL_KINDS: SavedSearchConditionKind[] = [
+  'visit_count','purchase_amount','last_activity_at','member_tier',
   'name', 'tag', 'field', 'form', 'purchase', 'mark', 'assignee',
   'scenario', 'event_booking', 'calendar_booking', 'chat_status',
   'last_activity', 'reminder', 'memo', 'following', 'status_message',

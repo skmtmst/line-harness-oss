@@ -352,3 +352,16 @@
 
 html:root .body[data-content-spacing='sections'] { display: flex; flex-direction: column; gap: var(--space-16); }
 html:root .body[data-content-spacing='sections'] > * { flex-shrink: 0; }
+
+html:root .panel[data-viewport-inset] { max-width: calc(100vw - var(--space-16) * 2); }
+
+html:root .panel[data-height-mode='viewport']:not(.inline) {
+  height: 100dvh;
+  align-self: stretch;
+}
+html:root .panel[data-height-mode='viewport']:not(.inline) .body {
+  flex: 1 1 auto;
+}
+
+/* 面そのものへ寄せた板（initialFocus='panel'）。面は Tab では止まらず、開いたときにだけ寄るので輪は出さない。 */
+html:root .panel[data-initial-focus='panel']:focus-visible { outline-color: transparent; }

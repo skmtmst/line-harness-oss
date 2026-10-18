@@ -29,6 +29,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => role.value,
+  useStaffIdentity: () => null,
   canManageRole: (value: string | null | undefined) => value === 'owner' || value === 'admin',
 }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => narrow.value }))
@@ -150,6 +151,29 @@ describe('V8 タグ タグの一覧', () => {
     await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '保存した検索' })) })
     expect(screen.queryByRole('link', { name: '友だち一覧で条件を作る' })).toBeNull()
     expect(screen.getByPlaceholderText('条件名で探す')).toBeTruthy()
+    const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+    const panel = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    expect(panel.textContent).toContain('この条件を保存')
+    expect(panel.hidden).toBe(false)
+    await act(async () => { fireEvent.click(toggle) })
+    expect(panel.hidden).toBe(true)
+    expect(screen.getByPlaceholderText('条件名で探す')).toBeTruthy()
+  })
+
+  it('保存した検索の説明は題から開閉し、条件作成のリンクには検索の印を出す', async () => {
+    await render(<TagsList fixture={fixture} />)
+    await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '保存した検索' })) })
+    const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+    const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    expect(body.textContent).toContain('配信や自動処理の宛先にも使えます')
+    expect(body.hidden).toBe(false)
+    await act(async () => { fireEvent.click(toggle) })
+    expect(body.hidden).toBe(true)
+    await act(async () => { fireEvent.click(toggle) })
+    expect(body.hidden).toBe(false)
+    const create = screen.getByRole('link', { name: '友だち一覧で条件を作る' })
+    expect(create.getAttribute('href')).toBe('/friends')
+    expect(create.querySelector('svg.lucide-search')).not.toBeNull()
   })
 
   it('連動は絵の書き方（本人+10・1.2倍 他1）', () => {

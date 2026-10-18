@@ -12,6 +12,9 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const roleFixture = vi.hoisted(() => ({ role: 'owner' as string | null }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => roleFixture.role }))
+
 const push = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({
@@ -67,6 +70,7 @@ async function clickButton(name: string) {
 }
 
 beforeEach(() => {
+  roleFixture.role = 'owner'
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -124,6 +128,8 @@ describe('V8 たまる決めごとを作る', () => {
 
   it('保存して動かすは、作る→下書きの順に送って一覧へ戻る', async () => {
     await mount()
+    expect(screen.queryByRole('button', { name: '付け方' })).toBeNull()
+    expect(screen.getByText('付け方：決まった数')).toBeTruthy()
     type('名前', 'リンクをクリック')
     type('マイル', '10')
     await clickButton('保存して動かす')
@@ -150,4 +156,15 @@ describe('V8 たまる決めごとを作る', () => {
     expect(document.querySelector('[data-design-node="BnrQp"]')).toBeTruthy()
     expect(push).not.toHaveBeenCalled()
   })
+})
+
+it.each([null, 'staff', 'viewer'])('役割%sでは作成・試算を出さずAPIも呼ばない', async role => {
+  roleFixture.role = role
+  await mount()
+  expect(screen.queryByRole('button', { name: '保存して動かす' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '保存して続けて作る' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '試算する' })).toBeNull()
+  expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
+  expect(host.textContent).toContain('閲覧のみ')
+  expect(calls.filter(call => call.method !== 'GET')).toEqual([])
 })

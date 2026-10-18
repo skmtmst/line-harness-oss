@@ -1,3 +1,5 @@
+import {deliverOperatorPush} from './operator-push.js';
+import { ensureOperatorInstance } from './operator-notification-instance.js';
 // N-327 (#663): 公開済み運用者通知ルールの自動実行と回復。
 //
 // 業務イベント → dispatchOperatorEvent → 公開ルールだけ発火 → 台帳へ先に積む
@@ -20,7 +22,7 @@ import {
   EXTERNAL_DELIVERY_MAX_ATTEMPTS,
 } from './external-delivery-retry.js';
 
-const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line']);
+const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line','push']);
 
 /** 共通基盤 §6-2の値をそのまま公開し、独自の回数を持たない。 */
 export const OPERATOR_DELIVERY_MAX_ATTEMPTS = EXTERNAL_DELIVERY_MAX_ATTEMPTS;
@@ -78,6 +80,9 @@ export type OperatorRecipient = {
 
 export type OperatorRuleConditions = {
   teamId?: string;
+  schedule?: 'anytime'|'business_hours'|'morning_digest';
+  threshold?: 'one'|'three'|'ten';
+  onlyAvailable?: boolean;
   importance?: string;
   recipientIds?: string[];
   recipientLabel?: string;
@@ -181,78 +186,6 @@ function operatorMessage(
   const conditions = ruleConditions(rule);
   return override?.trim() || conditions.message?.trim()
     || `【運用者へのお知らせ】${rule.name}\n管理画面で内容を確認してください。`;
-}
-
-async function ensureOperatorInstance(
-  db: D1Database,
-  input: {
-    lineAccountId: string;
-    ruleId: string;
-    ruleVersion: number;
-    ruleName: string;
-    message: string;
-    sourceEventType: string;
-    sourceEventId: string;
-    dedupeMinutes: number;
-    conditions: OperatorRuleConditions;
-    channels: string[];
-  },
-): Promise<string> {
-  const instanceId = crypto.randomUUID();
-  const now = new Date().toISOString();
-  const windowMs = Math.max(0, input.dedupeMinutes) * 60_000;
-  const dedupeKey = windowMs > 0
-    ? `${input.ruleId}:${input.sourceEventType}:${Math.floor(Date.now() / windowMs)}`
-    : `${input.ruleId}:${input.sourceEventId}`;
-  const metadata = JSON.stringify({
-    ruleVersion: input.ruleVersion,
-    ruleName: input.ruleName,
-    message: input.message,
-    conditions: input.conditions,
-    channels: input.channels,
-  });
-  try {
-    await db.prepare(`
-      INSERT INTO notification_instances
-        (id, line_account_id, audience_type, definition_id, definition_version_id,
-         source_event_type, source_event_id, source_metadata_json,
-         dedupe_key, status, created_at, updated_at)
-      VALUES (?, ?, 'operator', ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-    `).bind(
-      instanceId, input.lineAccountId, input.ruleId, String(input.ruleVersion),
-      input.sourceEventType, input.sourceEventId, metadata, dedupeKey, now, now,
-    ).run();
-    return instanceId;
-  } catch (error) {
-    if (error instanceof Error && /UNIQUE/i.test(error.message)) {
-      const existing = await db.prepare(`
-        SELECT id, source_event_id FROM notification_instances
-         WHERE line_account_id = ?
-           AND audience_type = 'operator'
-           AND definition_id = ?
-           AND ((source_event_type = ? AND source_event_id = ?) OR dedupe_key = ?)
-         ORDER BY CASE WHEN source_event_type = ? AND source_event_id = ? THEN 0 ELSE 1 END
-         LIMIT 1
-      `).bind(
-        input.lineAccountId, input.ruleId,
-        input.sourceEventType, input.sourceEventId, dedupeKey,
-        input.sourceEventType, input.sourceEventId,
-      ).first<{ id: string; source_event_id: string }>();
-      if (existing) {
-        if (existing.source_event_id !== input.sourceEventId) {
-          await db.prepare(`
-            UPDATE notification_instances
-               SET occurrence_count = occurrence_count + 1,
-                   grouped_count = grouped_count + 1,
-                   updated_at = ?
-             WHERE id = ? AND line_account_id = ?
-          `).bind(now, existing.id, input.lineAccountId).run();
-        }
-        return existing.id;
-      }
-    }
-    throw error;
-  }
 }
 
 async function claimOperatorDelivery(
@@ -615,6 +548,40 @@ export async function dispatchOperatorEvent(
   return results;
 }
 
+export async function operatorRuleDeferredUntil(db: D1Database, accountId: string, conditions: OperatorRuleConditions, instanceId: string, now = new Date()): Promise<string|null> {
+  const instance = await db.prepare('SELECT created_at,occurrence_count FROM notification_instances WHERE id=? AND line_account_id=?').bind(instanceId,accountId).first<{created_at:string;occurrence_count:number}>();
+  const count = conditions.threshold === 'ten' ? 10 : conditions.threshold === 'three' ? 3 : 1;
+  if (Number(instance?.occurrence_count ?? 0) < count) return new Date(now.getTime()+60_000).toISOString();
+  if (conditions.schedule === 'morning_digest') {
+    const setting = await db.prepare("SELECT value FROM account_settings WHERE line_account_id=? AND key='notifications.digest_time'").bind(accountId).first<{value:string}>();
+    const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(setting?.value ?? '') ? setting!.value : '09:00';
+    const day = new Date(new Date(instance!.created_at).getTime()+9*3600_000+86400_000).toISOString().slice(0,10);
+    const due = new Date(`${day}T${time}:00+09:00`);
+    if (due > now) return due.toISOString();
+  }
+  if (conditions.schedule === 'business_hours') {
+    const setting = await db.prepare('SELECT timezone FROM booking_settings WHERE line_account_id=?').bind(accountId).first<{timezone:string}>();
+    let weekday:number,time:string;
+    try {
+      const parts=new Intl.DateTimeFormat('en-US',{timeZone:setting?.timezone??'Asia/Tokyo',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
+      const part=(kind:string)=>parts.find(value=>value.type===kind)?.value??'';
+      weekday=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(part('weekday'));
+      time=`${part('hour')}:${part('minute')}`;
+    } catch {return new Date(now.getTime()+60_000).toISOString();}
+    const open = await db.prepare(`SELECT 1 FROM booking_business_hours h JOIN booking_settings s ON s.id=h.booking_settings_id
+      WHERE s.line_account_id=? AND s.business_hours_configured=1 AND h.weekday=? AND h.start_time<=? AND h.end_time>?`).bind(accountId,weekday,time,time).first();
+    if (!open) return new Date(now.getTime()+60_000).toISOString();
+  }
+  return null;
+}
+
+async function operatorIsOnShift(db: D1Database, accountId: string, recipientId: string, now=new Date()): Promise<boolean> {
+  const local=new Date(now.getTime()+9*3600_000).toISOString();
+  return Boolean(await db.prepare(`SELECT 1 FROM staff_shifts sh JOIN staff s ON s.id=sh.staff_id
+    WHERE s.staff_member_id=? AND s.line_account_id=? AND s.is_active=1 AND s.deleted_at IS NULL
+      AND sh.work_date=? AND sh.start_time<=? AND sh.end_time>?`).bind(recipientId,accountId,local.slice(0,10),local.slice(11,16),local.slice(11,16)).first());
+}
+
 export async function dispatchOperatorRule(
   db: D1Database,
   env: Parameters<typeof sendOperationEmail>[0],
@@ -628,7 +595,7 @@ export async function dispatchOperatorRule(
     recipientIds?: string[];
   },
 ): Promise<OperatorDispatchPerRule> {
-  const channels = ruleChannels(rule);
+  const channels = ruleChannels(rule);if(channels.includes('push')&&!channels.includes('dashboard'))channels.push('dashboard');
   const conditions = ruleConditions(rule);
   const version = ruleVersion(rule);
   const text = operatorMessage(rule, input.message);
@@ -654,9 +621,18 @@ export async function dispatchOperatorRule(
   let pending = 0;
   let duplicate = 0;
 
+  const deferUntil = input.executionMode === 'test' ? null : await operatorRuleDeferredUntil(db,input.lineAccountId,conditions,instanceId);
   for (const recipient of recipients) {
     const preview = recipientPreview(recipient, channels);
     for (const requestedChannel of channels) {
+      if(requestedChannel==='push'){
+        const message=await db.prepare('SELECT c.id,c.operator_id FROM messages_log m JOIN chats c ON c.friend_id=m.friend_id WHERE m.id=? AND m.line_account_id=?').bind(input.sourceEventId,input.lineAccountId).first<{id:string;operator_id:string|null}>();
+        if(message&&['inbox_new_inquiry','inbox_assigned_reply'].includes(rule.event_type)){
+          const result=await deliverOperatorPush(db,env,{staffId:recipient.id,account:input.lineAccountId,kind:rule.event_type==='inbox_new_inquiry'?'new_inquiry':'assigned_reply',refId:input.sourceEventId,chatId:message.id});accepted+=result.sent;failed+=result.failed;
+        }
+        continue;
+      }
+
       const channel = requestedChannel === 'dashboard' ? 'in_app' : requestedChannel as 'line' | 'email';
       const claimed = await claimOperatorDelivery(db, {
         lineAccountId: input.lineAccountId,
@@ -670,6 +646,14 @@ export async function dispatchOperatorRule(
       if (!claimed) {
         duplicate += 1;
         continue;
+      }
+      if (deferUntil) {
+        await db.prepare("UPDATE notification_deliveries SET status='retry_wait',retryable=1,error_code='schedule_wait',error_message_safe='通知条件を満たすまで待っています',next_retry_at=? WHERE id=?").bind(deferUntil,claimed.id).run();
+        pending++; continue;
+      }
+      if (input.executionMode !== 'test' && conditions.onlyAvailable && !await operatorIsOnShift(db,input.lineAccountId,recipient.id)) {
+        await finishOperatorDelivery(db,{id:claimed.id,lineAccountId:input.lineAccountId,retryKey:claimed.retryKey,finish:{kind:'excluded',errorCode:'staff_off_shift',errorMessage:'勤務時間外です'}});
+        excluded++; continue;
       }
       if (channel === 'in_app') {
         /*
@@ -851,6 +835,16 @@ export async function sweepOperatorNotifications(
         typeof value === 'string' && OPERATOR_NOTIFICATION_CHANNELS.has(value)
       ))
       : [];
+    const conditions = metadata.conditions as OperatorRuleConditions ?? {};
+    const deferUntil = await operatorRuleDeferredUntil(db,row.line_account_id,conditions,row.instance_id,now);
+    if (deferUntil) {
+      await db.prepare("UPDATE notification_deliveries SET status='retry_wait',retryable=1,error_code='schedule_wait',error_message_safe='通知条件を満たすまで待っています',next_retry_at=? WHERE id=? AND updated_at=?").bind(deferUntil,row.id,leaseToken).run();
+      result.pending++; continue;
+    }
+    if (conditions.onlyAvailable && !await operatorIsOnShift(db,row.line_account_id,row.recipient_id,now)) {
+      await finishOperatorDelivery(db,{id:row.id,lineAccountId:row.line_account_id,retryKey:row.idempotency_key,finish:{kind:'excluded',errorCode:'staff_off_shift',errorMessage:'勤務時間外です'}});
+      result.excluded++; continue;
+    }
     const preview = recipientPreview(recipient, channels);
     const ruleConditionsSnapshot = metadata.conditions
       && typeof metadata.conditions === 'object'

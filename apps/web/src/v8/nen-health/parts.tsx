@@ -11,7 +11,7 @@ import { statusLabel } from '@/lib/status-labels'
 import { useState, type ReactNode } from 'react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
-import { formatNumber } from '@/lib/format'
+import { paginationSummary } from '@/components/shared/pagination'
 import type { NenHealthChangeFilter, NenHealthLastFilter, NenHealthRow, NenHealthSort } from '@/lib/nen-pets-api'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './health.module.css'
@@ -37,8 +37,7 @@ export function md(date: string | null | undefined): string {
 
 /** 件数の文（「6件中 1〜6件」）。 */
 export function rangeText(total: number, page: number, size: number): string {
-  if (total === 0) return '0件'
-  return `${formatNumber(total)} 件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)} 件`
+  return paginationSummary(total, total === 0 ? 0 : (page - 1) * size + 1, Math.min(total, page * size))
 }
 
 /**
@@ -79,7 +78,6 @@ export function RowMenu({ subject, items }: { subject: string; items: ActionMenu
   return (
     <span className={styles.menuBox}>
       <SharedRowMenu
-        className={styles.menuButton}
         label={`「${subject}」の操作`}
         open={open}
         onOpenChange={setOpen}

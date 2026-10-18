@@ -1,5 +1,7 @@
 'use client'
-
+import DownloadIcon from './qr-download-icon'
+import QrStoppedNotice from './qr-stopped-notice'
+import QrRoutePicker, { type QrRoutePickerProps } from './qr-route-picker'
 import React, { useEffect, useState } from 'react'
 import { QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
@@ -14,18 +16,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatDateTime } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-
-/**
- * 友だち追加のQRコード（設計 V2 1-1-1）。
- *
- * ダッシュボードの「QRを表示」から開く。設計どおり、印刷に使う大きさを
- * 選べるようにしてある。Worker の /api/qr は size と download を受けるので、
- * 保存もそのまま通る。
- *
- * PDF生成APIは無いため、ブラウザの印刷画面を開く。そこで「PDFに保存」を
- * 選べば、外部サービスへデータを送らずにPDF化できる。
- */
-
+/** QRの取得・画像保存はWorker、PDFはブラウザの印刷で行う。 */
 /*
  * 選べる大きさ（#689）。
  *
@@ -57,9 +48,11 @@ export function resolveOfficialProfileUrl(
 }
 
 export type FixedQrResource = {
+  routePicker?: QrRoutePickerProps
   url: string
   title: string
   stopped?: boolean
+  stoppedPresentation?: 'notice'
   description?: string
   downloadPdf?: (paper: 'A4' | 'A5') => Promise<Blob>
   downloadImage?: (format: string, size: string) => Promise<Blob>
@@ -68,13 +61,6 @@ export type FixedQrResource = {
   sizes?: { value: string; label: string }[]
 }
 
-function DownloadIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M10 3v9m0 0 3-3m-3 3L7 9M4 14v2h12v-2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
 
 export default function QrDialog({
   open,
@@ -92,11 +78,13 @@ export default function QrDialog({
   onRetryRoutes,
   direct,
   resource,
+  disabledReason,
 }: {
   direct?:{title:string;description:string;content?:React.ReactNode;footer?:React.ReactNode;qrContent?:React.ReactNode;downloads?:boolean}
   open: boolean
   /** 流入・クーポン・来店スタンプも同じ窓で出す。取得と保存は元のAPI。 */
   resource?: FixedQrResource
+  disabledReason?: string
   onClose: () => void
   accountName: string
   /** LINE公式プロフィールで発行した lin.ee の短縮URL。 */
@@ -380,7 +368,8 @@ export default function QrDialog({
           </button>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
+        {resource?.routePicker ? <div className="mb-4"><QrRoutePicker {...resource.routePicker} /></div> : null}
+        {resource?.stopped && resource.stoppedPresentation === 'notice' ? <QrStoppedNotice onClose={onClose} /> : <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
           {routesError ? <ListState kind="error" title="経路を読み込めませんでした" onRetry={()=>{if(routesErrorProp)onRetryRoutes?.();else setReadRetry(value=>value+1)}}/> : null}
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
           <div className="flex min-w-0 flex-col items-center">
@@ -514,6 +503,7 @@ export default function QrDialog({
                   type="button"
                   onClick={copy}
                   disabled={blocked}
+                  title={blocked ? disabledReason : undefined}
                   className="shrink-0"
                 >
                   コピー
@@ -533,8 +523,8 @@ export default function QrDialog({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {resource?.downloadImage ? <Button variant="primary" disabled={blocked || pdfState === 'working'} busy={imageState === 'working'} onClick={() => void downloadImage()}><DownloadIcon />{format.toUpperCase()} を保存</Button> : blocked ? (
-                <Button variant="primary" disabled>
+              {resource?.downloadImage ? <Button variant="primary" disabled={blocked || pdfState === 'working'} title={blocked ? disabledReason : undefined} busy={imageState === 'working'} onClick={() => void downloadImage()}><DownloadIcon />{format.toUpperCase()} を保存</Button> : blocked ? (
+                <Button variant="primary" disabled title={disabledReason}>
                   <DownloadIcon />画像をダウンロード
                 </Button>
               ) : (
@@ -556,6 +546,7 @@ export default function QrDialog({
                   type="button"
                   onClick={() => void downloadPdf()}
                   disabled={blocked || pdfState === 'working' || imageState === 'working'}
+                  title={blocked ? disabledReason : undefined}
                 >
                   PDFで印刷
                 </Button>
@@ -565,6 +556,7 @@ export default function QrDialog({
                   type="button"
                   onClick={printQr}
                   disabled={blocked}
+                  title={blocked ? disabledReason : undefined}
                 >
                   PDFで印刷
                 </Button>
@@ -588,7 +580,7 @@ export default function QrDialog({
             </>:null}
             {direct?.footer}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   )

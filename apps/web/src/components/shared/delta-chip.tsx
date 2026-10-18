@@ -9,13 +9,16 @@ import styles from './delta-chip.module.css'
  */
 export default function DeltaChip({
   tone,
+  direction,
   children,
 }: {
   /** up＝良い（緑）・down＝悪い（赤）・attention＝要確認（黄） */
   tone: 'up' | 'down' | 'attention'
+  /** 数の増減の向き。色（良い・悪い）とは別。渡さなければ色と同じ向き。ブロック率が下がって良いときは tone=up・direction=down。 */
+  direction?: 'up' | 'down'
   children: React.ReactNode
 }) {
-  const Icon = tone === 'up' ? TrendingUp : tone === 'down' ? TrendingDown : TriangleAlert
+  const Icon = tone === 'attention' ? TriangleAlert : (direction ?? tone) === 'up' ? TrendingUp : TrendingDown
   return (
     <span className={[styles.root, styles[tone]].join(' ')}>
       <Icon size={12} aria-hidden="true" className={tone === 'attention' ? styles.attentionIcon : undefined} />

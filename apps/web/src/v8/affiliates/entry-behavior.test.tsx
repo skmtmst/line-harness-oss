@@ -24,6 +24,7 @@ const create = vi.hoisted(() => vi.fn())
 const update = vi.hoisted(() => vi.fn())
 const friendsList = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
+const pageTitle = vi.hoisted(() => vi.fn())
 const approvalsList = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/staff-role', async (original) => ({
@@ -72,7 +73,7 @@ vi.mock('@/contexts/account-context', () => ({
     loading: false,
   }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: pageTitle, usePageCrumbs: () => {} }))
 vi.mock('@/lib/use-unsaved-guard', () => ({
   useUnsavedGuard: () => ({ leaveTarget: null, confirmLeave: () => {}, cancelLeave: () => {} }),
 }))
@@ -84,6 +85,7 @@ import NewAffiliatePage from '@/app/affiliates/new/page'
 beforeEach(() => {
   fixture.role = null
   push.mockReset()
+  pageTitle.mockClear()
   friendsList.mockReset().mockResolvedValue({ success: true, data: { items: [], total: 0 } })
   create.mockReset().mockResolvedValue({ success: false, error: 'このコードは既に使われています' })
   update.mockReset().mockResolvedValue({ success: true, data: { id: 'a1' } })
@@ -92,6 +94,10 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('権限（今の入口 /affiliates）', () => {
+  it('実入口からトップバーへ画面名を渡す', () => {
+    render(<AffiliatesPage />)
+    expect(pageTitle).toHaveBeenCalledWith('成果とアフィリエイト')
+  })
   it('権限を確かめる前と閲覧担当は変えられず、管理者と分かった後だけ作れる', async () => {
     const { rerender } = render(<AffiliatesPage />)
     // 確かめる前：作るボタンを出さない（閲覧のみの帯で断る）
@@ -122,6 +128,22 @@ describe('承認待ちの読み込み（WEB003）', () => {
 })
 
 describe('アフィリエイターを作る（今の入口 /affiliates/new）', () => {
+  beforeEach(() => { fixture.role = 'owner' })
+
+  it.each([null, 'staff', 'viewer'])('作る入口でも役割%sには保存と友だちの変更を出さない', role => {
+    fixture.role = role
+    render(<NewAffiliatePage />)
+    expect(screen.queryByRole('button', { name: '保存して続けて作る' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /登録して紹介リンクを発行する/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'LINE の友だちと結びつける' })).toBeNull()
+    expect(document.body.textContent).toContain('閲覧のみで見ています')
+    expect(screen.queryByRole('textbox', { name: /名前（表示名）/ })).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: 'すぐに計測を始める' })).toBeNull()
+    expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
+    expect(create).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
+  })
+
   const fillName = (value: string) => fireEvent.change(screen.getByLabelText(/名前（表示名）/), { target: { value } })
   const fillCode = (value: string) => fireEvent.change(screen.getByRole('textbox', { name: /紹介コード（/ }), { target: { value } })
 

@@ -41,3 +41,9 @@ test('video definition uses the existing store imagemap shape, keeping both orig
   expect(definition.template.messageType).toBe('imagemap');expect(definition.media).toEqual([video,...preview.media])
   expect(JSON.parse(definition.template.messageContent)).toMatchObject({altText:'ご案内',actions:[],video:{previewImageUrl:preview.payload.imageUrl,area:{x:0,y:0,width:1040,height:520}}})
 })
+test('registered HQ media picker uses the tenant-authorized GET and preserves its cursor',async()=>{
+  request.mockResolvedValue({success:true,data:{items:[{...media,selectable:true,sizeKb:3/1024}],nextCursor:'next'}})
+  const result=await hqMediaApi.list({kind:'audio',limit:5,cursor:'next'})
+  expect(result.items[0].selectable).toBe(true)
+  expect(request).toHaveBeenCalledWith('/api/hq/templates/media?kind=audio&limit=5&cursor=next',{method:'GET'})
+})

@@ -1,5 +1,9 @@
+import { publicReminder } from './reminder-display.js';
+import type { ReminderListRow } from './reminder-display.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { buildReminderStepMessage } from '../services/reminder-delivery.js';
+import { getTemplateById } from '@line-crm/db';
 import { Hono, type Context } from 'hono';
 import {
   getFriendById,
@@ -42,7 +46,7 @@ import {
 } from '@line-crm/db';
 import { describeReminderTiming, LEAP_YEAR_POLICIES, REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE, resolveReminderSendAt } from '@line-crm/shared';
 import type { Env } from '../index.js';
-import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   completeOutboundSendStatement,
@@ -132,54 +136,6 @@ function canonicalTargetDate(value: unknown): string | null {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
-
-type ReminderListRow = Awaited<ReturnType<typeof getReminders>>[number] & {
-  step_count?: number | string | null;
-  has_failure?: number | string | null;
-  planned_count?: number | string | null;
-  failed_count?: number | string | null;
-  next_scheduled_at?: string | null;
-};
-
-function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: boolean, timingSummary?: string | null) {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    isActive: Boolean(row.is_active),
-    lifecycleStatus: row.lifecycle_status,
-    currentDraftVersionId: row.current_draft_version_id,
-    currentPublishedVersionId: row.current_published_version_id,
-    triggerType: row.trigger_type ?? 'manual',
-    deliveryMode: row.delivery_mode ?? 'countdown',
-    triggerFieldId: row.trigger_field_id ?? null,
-    repeatYearly: row.repeat_yearly === 1,
-    leapYearPolicy: row.leap_year_policy,
-    triggerOffsetMinutes: row.trigger_offset_minutes ?? null,
-    sendAtTime: row.send_at_time ?? null,
-    targetTagId: row.target_tag_id ?? null,
-    folderId: row.folder_id ?? null,
-    stepCount: stepCount ?? Number(row.step_count ?? 0),
-    /*
-     * REMINDER-10: 一覧の副題（日時・通数）。版から組み立てた値を渡す。
-     * null のとき画面側が reminders 行の値で組み立てる従来の形に戻る。
-     */
-    timingSummary: timingSummary ?? null,
-    hasFailure: hasFailure ?? Number(row.has_failure ?? 0) > 0,
-    /*
-     * ★V8 一覧（`apLqS`）の「これから送る」「次に送る」「失敗 N」。
-     * ページ切替の経路でだけ数える（旧配列応答は null のまま）。
-     * 数え方は「失敗あり」の絞り込みと同じ retry_wait/permanent_failed、
-     * 予定は queued/retry_wait の先に送るもの。
-     */
-    plannedDeliveries: row.planned_count == null ? null : Number(row.planned_count),
-    failedCount: row.failed_count == null ? null : Number(row.failed_count),
-    nextScheduledAt: row.next_scheduled_at ?? null,
-    displayOrder: row.display_order ?? 0,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
 }
 
 interface ReminderVersionStepSummaryRow {
@@ -816,7 +772,7 @@ reminders.patch('/api/reminders/reorder', requireDeliveryAccess('reminders'), in
     await reorderReminders(c.env.DB, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
-    console.error('PATCH /api/reminders/reorder error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"PATCH /api/reminders/reorder"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -987,7 +943,7 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
     /* 旧配列応答は、移行期限（2026-10-31）まで未移行の呼び出しだけに残す。 */
     return c.json({ success: true, data: publicItems });
   } catch (err) {
-    console.error('GET /api/reminders error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/reminders"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1012,7 +968,7 @@ reminders.post('/api/reminders/drafts', requireDeliveryAccess('reminders'), inpu
       data: { id: created.reminder.id, ...versionResponse(created.version) },
     }, 201);
   } catch (err) {
-    console.error('POST /api/reminders/drafts error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/drafts"}));
     return c.json({ success: false, error: '下書きを作成できませんでした' }, 500);
   }
 });
@@ -1067,7 +1023,7 @@ reminders.get('/api/reminders/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/reminders/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/reminders/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1081,7 +1037,7 @@ reminders.get('/api/reminders/:id/draft', async (c) => {
     ).bind(c.req.param('id')).first<{ leap_year_policy: 'feb28' | 'mar1' | 'skip' }>();
     return c.json({ success: true, data: versionResponse(draft, reminderRow?.leap_year_policy) });
   } catch (err) {
-    console.error('GET /api/reminders/:id/draft error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/reminders/:id/draft"}));
     return c.json({ success: false, error: '下書きを読み込めませんでした' }, 500);
   }
 });
@@ -1132,7 +1088,7 @@ reminders.put('/api/reminders/:id/draft', requireDeliveryAccess('reminders'), in
     if (err instanceof Error && err.message === 'REMINDER_DRAFT_CONFLICT') {
       return c.json({ success: false, error: 'この下書きは別の画面で先に更新されました。最新の内容を読み込み直してください' }, 409);
     }
-    console.error('PUT /api/reminders/:id/draft error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"PUT /api/reminders/:id/draft"}));
     return c.json({ success: false, error: '下書きを保存できませんでした' }, 500);
   }
 });
@@ -1146,7 +1102,7 @@ reminders.post('/api/reminders/:id/validate', requireDeliveryAccess('reminders')
     if (referenceError) return inputError(c, { success: false, error: referenceError }, 422, ["steps"]);
     return c.json({ success: true, data: await validateReminderDraft(c.env.DB, settings, draft) });
   } catch (err) {
-    console.error('POST /api/reminders/:id/validate error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/validate"}));
     return c.json({ success: false, error: '検証できませんでした' }, 500);
   }
 });
@@ -1187,9 +1143,28 @@ reminders.post('/api/reminders/:id/audience', requireDeliveryAccess('reminders')
       data: { matched: audience.matched, excluded: audience.excluded, sample },
     });
   } catch (err) {
-    console.error('POST /api/reminders/:id/audience error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/audience"}));
     return c.json({ success: false, error: '対象者を数え直せませんでした' }, 500);
   }
+});
+
+reminders.post('/api/reminders/:id/message-preview',requireRole('owner','admin'),denyReadOnly(),inputJsonBoundary({friendId:['string'],stableStepId:['string'],expectedDraftVersionId:['string'],expectedDraftUpdatedAt:['string'],deliveredAt:['string']}),async c=>{
+  const draft=await getReminderDraftVersion(c.env.DB,c.req.param('id'));
+  if(!draft)return c.json({success:false,error:'下書きが見つかりません'},404);
+  const input=await c.req.json<{friendId:string;stableStepId:string;expectedDraftVersionId:string;expectedDraftUpdatedAt:string;deliveredAt?:string}>();
+  if(input.expectedDraftVersionId!==draft.id||input.expectedDraftUpdatedAt!==draft.updated_at)return c.json({success:false,error:'下書きが更新されました。読み直してください'},409);
+  const settings=parseReminderVersionSettings(draft),friend=typeof input.friendId==='string'?await getFriendById(c.env.DB,input.friendId):null;
+  if(!friend||friend.line_account_id!==settings.lineAccountId||!friend.is_following)return c.json({success:false,error:'友だちが見つかりません'},404);
+  const step=(await getReminderVersionSteps(c.env.DB,draft.id)).find(step=>step.id===input.stableStepId);
+  if(!step)return c.json({success:false,error:'通知が見つかりません'},404);
+  if(step.template_id){const template=await getTemplateById(c.env.DB,step.template_id);if(!template||template.line_account_id!==settings.lineAccountId)return c.json({success:false,error:'テンプレートが見つかりません'},404);}
+  const deliveredAt=input.deliveredAt===undefined?new Date():new Date(input.deliveredAt);
+  if(Number.isNaN(deliveredAt.getTime()))return inputError(c,{success:false,error:'日時を確認してください'},400,['deliveredAt']);
+  const built=await buildReminderStepMessage(c.env.DB,step,friend,deliveredAt,'test_send',{previewOnly:true});
+  const current=await getReminderDraftVersion(c.env.DB,c.req.param('id'));
+  if(current?.id!==draft.id||current.updated_at!==draft.updated_at)return c.json({success:false,error:'下書きが更新されました。読み直してください'},409);
+  c.header('Cache-Control','no-store');
+  return c.json({success:true,data:{dryRun:true,sent:0,persistsSchedule:false,draftVersionId:draft.id,draftUpdatedAt:draft.updated_at,friendId:friend.id,friendName:friend.display_name,stableStepId:step.id,deliveredAt:deliveredAt.toISOString(),messageType:built.messageType,messageContent:built.messageContent,message:built.message}});
 });
 
 reminders.post('/api/reminders/:id/preview', inputJsonBoundary(), async (c) => {
@@ -1217,7 +1192,7 @@ reminders.post('/api/reminders/:id/preview', inputJsonBoundary(), async (c) => {
     const settings = parseReminderVersionSettings(draft);
     return c.json({ success: true, data: await previewReminderDraft(c.env.DB, settings, targetDate) });
   } catch (err) {
-    console.error('POST /api/reminders/:id/preview error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/preview"}));
     return c.json({ success: false, error: '配信予定を確認できませんでした' }, 500);
   }
 });
@@ -1245,7 +1220,7 @@ reminders.get('/api/reminders/:id/test-recipient', async (c) => {
     });
     return c.json({ success: true, data: status });
   } catch (err) {
-    console.error('GET /api/reminders/:id/test-recipient error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/reminders/:id/test-recipient"}));
     return c.json({ success: false, error: 'テスト送信先を読み込めませんでした' }, 500);
   }
 });
@@ -1299,7 +1274,7 @@ reminders.post('/api/reminders/:id/test-send', requireDeliveryAccess('reminders'
     if (code === 'REMINDER_TEST_KEY_CONFLICT') {
       return c.json({ success: false, error: '同じキーが別のテスト送信に使われています' }, 409);
     }
-    console.error('POST /api/reminders/:id/test-send error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/test-send"}));
     return c.json({ success: false, error: 'テスト送信に失敗しました' }, 502);
   }
 });
@@ -1319,7 +1294,7 @@ reminders.post('/api/reminders/:id/publish', requireDeliveryAccess('reminders'),
     const published = await publishReminderDraftVersion(c.env.DB, reminderId, c.get('staff').id);
     return c.json({ success: true, data: versionResponse(published) });
   } catch (err) {
-    console.error('POST /api/reminders/:id/publish error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/publish"}));
     return c.json({ success: false, error: '公開できませんでした' }, 500);
   }
 });
@@ -1437,7 +1412,7 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/reminders/:id/runs error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/reminders/:id/runs"}));
     return c.json({ success: false, error: '実行結果を読み込めませんでした' }, 500);
   }
 });
@@ -1488,7 +1463,7 @@ reminders.post('/api/reminders', requireDeliveryAccess('reminders'), inputJsonBo
     }
     return c.json({ success: true, data: { id: item.id, name: item.name, createdAt: item.created_at } }, 201);
   } catch (err) {
-    console.error('POST /api/reminders error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1533,7 +1508,7 @@ reminders.put('/api/reminders/:id', requireDeliveryAccess('reminders'), inputJso
     if (err instanceof Error && err.message === 'REMINDER_NOT_PUBLISHED') {
       return c.json({ success: false, error: 'まだ公開していない下書きは再開できません。先に公開してください' }, 409);
     }
-    console.error('PUT /api/reminders/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"PUT /api/reminders/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1543,7 +1518,7 @@ reminders.delete('/api/reminders/:id', requireDeliveryAccess('reminders'), async
     await deleteReminder(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/reminders/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"DELETE /api/reminders/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1566,7 +1541,7 @@ reminders.post('/api/reminders/:id/restore', requireDeliveryAccess('reminders'),
       data: { id: restored.id, name: restored.name, isActive: Boolean(restored.is_active) },
     });
   } catch (err) {
-    console.error('POST /api/reminders/:id/restore error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/restore"}));
     return c.json({ success: false, error: 'リマインダを元に戻せませんでした' }, 500);
   }
 });
@@ -1627,7 +1602,7 @@ reminders.post('/api/reminders/:id/steps', requireDeliveryAccess('reminders'), i
       },
     }, 201);
   } catch (err) {
-    console.error('POST /api/reminders/:id/steps error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/steps"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1640,7 +1615,7 @@ reminders.delete('/api/reminders/:id/steps/:stepId', requireDeliveryAccess('remi
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/reminders/:id/steps/:stepId error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"DELETE /api/reminders/:id/steps/:stepId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1671,7 +1646,7 @@ reminders.post('/api/reminders/:id/enroll/:friendId', requireRole('owner', 'admi
       data: { id: enrollment.id, friendId: enrollment.friend_id, reminderId: enrollment.reminder_id, targetDate: enrollment.target_date, status: enrollment.status },
     }, 201);
   } catch (err) {
-    console.error('POST /api/reminders/:id/enroll/:friendId error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/enroll/:friendId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1732,7 +1707,7 @@ reminders.get('/api/reminders/:id/registrants', requireRole('owner', 'admin', 's
     }
     return c.json({ success: true, data: items.map(publicRegistrant) });
   } catch (err) {
-    console.error('GET /api/reminders/:id/registrants error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/reminders/:id/registrants"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1753,7 +1728,7 @@ reminders.patch('/api/reminders/:id/registrants/:enrollmentId', requireRole('own
       scope: await getVisibleLineAccountScope(c.env.DB, c.get('staff')),
     }));
   } catch (err) {
-    console.error('PATCH /api/reminders/:id/registrants/:enrollmentId error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"PATCH /api/reminders/:id/registrants/:enrollmentId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1773,7 +1748,7 @@ reminders.post('/api/reminders/:id/registrants/:enrollmentId/cancel', requireRol
       scope: await getVisibleLineAccountScope(c.env.DB, c.get('staff')),
     }));
   } catch (err) {
-    console.error('POST /api/reminders/:id/registrants/:enrollmentId/cancel error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/registrants/:enrollmentId/cancel"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1836,7 +1811,7 @@ reminders.post('/api/reminders/:id/registrants/:enrollmentId/resume', requireRol
       scope: await getVisibleLineAccountScope(c.env.DB, c.get('staff')),
     }));
   } catch (err) {
-    console.error('POST /api/reminders/:id/registrants/:enrollmentId/resume error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/registrants/:enrollmentId/resume"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1864,7 +1839,7 @@ reminders.get('/api/friends/:friendId/reminders', requireRole('owner', 'admin', 
       })),
     });
   } catch (err) {
-    console.error('GET /api/friends/:friendId/reminders error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/friends/:friendId/reminders"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1913,7 +1888,7 @@ reminders.delete('/api/friend-reminders/:id', requireRole('owner', 'admin', 'sta
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/friend-reminders/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"DELETE /api/friend-reminders/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1960,7 +1935,7 @@ reminders.post('/api/reminder-runs/:runId/retry', requireDeliveryAccess('reminde
       data: { id: retried.run.id, status: retried.run.status, replayed: retried.kind === 'replay' },
     });
   } catch (err) {
-    console.error('POST /api/reminder-runs/:runId/retry error:', err);
+    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminder-runs/:runId/retry"}));
     return c.json({ success: false, error: '再試行を受け付けられませんでした' }, 500);
   }
 });

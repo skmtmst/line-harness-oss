@@ -51,13 +51,18 @@ describe('板ごとの撮影条件', () => {
   it.each([
     { state: { role: 'viewer' } },
     { state: { manual: '失敗状態を撮る' } },
-    { state: { click: ['特定の確認窓を開く'] } },
     { kind: '閲覧のみ' },
   ])('対象板に既存の再現条件がある場合は上書きしない: %j', entry => {
     const map = { boards: { HfK0O: { url: '/hq/templates', ...entry } } }
     const before = structuredClone(map)
     expect(() => applyBoardStateProfiles(map)).toThrow('既存の状態指定')
     expect(map).toEqual(before)
+  })
+
+  it('地図で確定した操作とAPIを補助の既定で上書きしない', () => {
+    const entry = { url: '/hq/templates?kind=text', state: { click: ['特定の確認窓を開く'], api: { match: 'GET /api/example$', body: { success: true } } } }
+    const map = { boards: { HfK0O: entry } }
+    expect(applyBoardStateProfiles(map)).toEqual(map)
   })
 
   it.each([

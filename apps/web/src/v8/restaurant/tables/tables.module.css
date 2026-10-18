@@ -22,11 +22,6 @@
   flex: 1 1 0;
 }
 
-.detailPanel {
-  flex: 0 0 var(--tpl-floor-aside-w);
-  width: var(--tpl-floor-aside-w);
-}
-
 .mapGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -162,3 +157,22 @@
 @media (max-width: 700px) { .rules { grid-template-columns: minmax(0,1fr); } }
 
 .detailRow{padding-inline: var(--tpl-rest1-restaurant-tables-tables-padding-inline-1);}.detailName{font-size: var(--tpl-rest1-restaurant-tables-tables-font-size-1);line-height: var(--tpl-rest1-restaurant-tables-tables-line-height-1);}.detailStatus{width: var(--tpl-rest1-restaurant-tables-tables-width-1);flex: var(--tpl-rest1-restaurant-tables-tables-flex-1);}
+
+/* 卓の割り当て方（jmVYJ・?view=assign） */
+.assignStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-16);
+}
+
+.assignName {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.assignSub {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-11);
+  line-height: var(--tpl-bm-16);
+}

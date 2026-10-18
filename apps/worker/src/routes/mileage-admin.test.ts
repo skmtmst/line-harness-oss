@@ -1100,11 +1100,12 @@ describe('mileage admin API', () => {
     dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', line_account_id: 'account-1' });
     dbMocks.getFriendScore.mockResolvedValue(45);
     const added = await call('/api/friends/friend-1/score', {
-      method: 'POST', body: JSON.stringify({ scoreChange: 3, reason: '対応記録' }),
+      method: 'POST', headers: { 'Idempotency-Key': 'score-visible-test' }, body: JSON.stringify({ scoreChange: 3, reason: '対応記録' }),
     });
     expect(added.status).toBe(201);
     expect(dbMocks.addScore).toHaveBeenCalledWith(env.DB, {
       friendId: 'friend-1', scoreChange: 3, reason: '対応記録',
+      idempotencyKey: JSON.stringify(['manual', 'env-owner', 'score-visible-test']),
       // IDEA-17: 手で動かした点数は実行者を記録へ残す。
       executedByStaffId: 'env-owner', executedByStaffName: 'Owner',
     });

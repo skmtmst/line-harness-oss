@@ -12,15 +12,16 @@ import { describe, expect, it } from 'vitest'
 const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 const INTERACTIONS = readFileSync(join(import.meta.dirname, '../../v8/webhooks/interactions.tsx'), 'utf8')
 const STYLES = readFileSync(join(import.meta.dirname, '../../v8/webhooks/interactions.module.css'), 'utf8')
+const ROW_MENU = readFileSync(join(import.meta.dirname, '../../components/shared/row-actions.tsx'), 'utf8')
 const MENU = readFileSync(join(import.meta.dirname, '../../components/shared/action-menu.tsx'), 'utf8')
 const API = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('N-385: 設定メニューはキーボードだけで開いて選べ、Escape・外側で閉じる', () => {
   it('menu / menuitem の役割と矢印キー移動を持つ', () => {
-    expect(OVERVIEWS).toContain('aria-haspopup="menu"')
     expect(MENU).toContain('role="menu"')
     expect(MENU).toContain('role="menuitem"')
-    expect(OVERVIEWS).toContain('<ActionMenu')
+    expect(OVERVIEWS).toContain('<RowMenu')
+    expect(ROW_MENU).toContain('<ActionMenu')
     expect(MENU).toContain('onKeyDown={moveFocus}')
     expect(MENU).toContain("'ArrowDown'")
     expect(MENU).toContain("'Home'")

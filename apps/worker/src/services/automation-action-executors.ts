@@ -1,3 +1,5 @@
+import { classifyLinePushError } from './automation-line-errors.js';
+import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
 import { patchFriendMetadata } from './friend-metadata.js';
 import {
   addTagToFriend,
@@ -12,6 +14,7 @@ import {
 import { LineClient, type Message } from '@line-crm/line-sdk';
 import {
   AutomationActionError,
+  AutomationActionDeferred,
   type AutomationActionContext,
   type AutomationActionExecutor,
 } from './automation-engine.js';
@@ -40,6 +43,8 @@ interface AutomationLineClient {
 
 export interface AutomationActionExecutorDependencies {
   credentialEncryptionKey?: string;
+  /** Immediate callers own their delivery ledger and require the external acknowledgement. */
+  webhookDeliveryMode?: 'queued' | 'immediate';
   resolveLineAccessToken?: (db: D1Database, lineAccountId: string) => Promise<string | null>;
   createLineClient?: (accessToken: string) => AutomationLineClient;
   fetch?: typeof fetch;
@@ -143,62 +148,6 @@ function classifyLineError(error: unknown): AutomationActionError {
   );
 }
 
-/**
- * R363: メッセージ送信時の失敗分類。受理した可能性がある失敗は
- * `delivery_unconfirmed`（照合待ち）にして自動返却・再送を止める。
- *
- * - 4xx拒否 … 未受理が確定。返却してよい失敗。
- * - 429 … 処理されていない。再試行してよい失敗。
- * - 5xx・応答なし（タイムアウト・通信断）・200のJSON読取失敗 …
- *   受理した可能性がある。照合待ちに残す。
- *
- * `retryable` は他経路の再試行の目安として従来どおり true を保つ。
- * マイル特典の配送はコードで照合待ちにし、返却も再送もしない。
- */
-function classifyLinePushError(error: unknown): AutomationActionError {
-  if (error instanceof AutomationActionError) return error;
-  const message = error instanceof Error ? error.message : String(error);
-  const status = (error as { status?: unknown } | null)?.status;
-  const unconfirmed = (note: string): AutomationActionError => new AutomationActionError(
-    'delivery_unconfirmed',
-    note,
-    true,
-  );
-  if (typeof status === 'number') {
-    if (status === 429) {
-      return new AutomationActionError('line_temporary_failure', message, true);
-    }
-    if (status >= 400 && status < 500) {
-      return new AutomationActionError('line_request_rejected', message, false);
-    }
-    return unconfirmed('LINEの応答が不確定のため、送信結果を確認しています');
-  }
-  // 実SDKは status を付けるが、付けない呼び出しもあるため文面でも見る。
-  if (/LINE API error:\s*(400|401|403|404)\b/.test(message)) {
-    return new AutomationActionError('line_request_rejected', message, false);
-  }
-  if (/LINE API error:\s*(429)\b/.test(message)) {
-    return new AutomationActionError('line_temporary_failure', message, true);
-  }
-  if (/LINE API error:\s*5\d\d\b/.test(message)) {
-    return unconfirmed('LINEの応答が不確定のため、送信結果を確認しています');
-  }
-  if (error instanceof SyntaxError) {
-    // 200を受理した後のJSON読取失敗。送達は不明なので照合待ち。
-    return new AutomationActionError(
-      'delivery_unconfirmed',
-      'LINEの応答が不確定のため、送信結果を確認しています',
-      true,
-    );
-  }
-  // 応答が返らない（タイムアウト・通信断）。受理不明として照合待ち。
-  return new AutomationActionError(
-    'delivery_unconfirmed',
-    'LINEの応答が届かないため、送信結果を確認しています',
-    true,
-  );
-}
-
 async function reserveLineOperation(
   context: AutomationActionContext,
   payload: string,
@@ -260,7 +209,7 @@ async function resolveMessage(
     });
     const template = await context.db.prepare(
       `SELECT message_type, message_content FROM templates
-        WHERE id = ? AND line_account_id = ?`,
+        WHERE id = ? AND line_account_id = ? AND message_bubbles_json IS NULL`,
     ).bind(id, context.lineAccountId).first<{ message_type: string; message_content: string }>();
     if (!template) throw invalid('template_not_found', 'テンプレートが見つかりません');
     return {
@@ -295,6 +244,11 @@ async function tagExecutor(context: AutomationActionContext, operation: 'add' | 
     });
   } else {
     await removeTagFromFriend(context.db, friend.id, tagId);
+  }
+  const depth=Number(context.inputEvent?.automationDepth??0);
+  if(depth<3) {
+    const {fireEvent}=await import('./event-bus.js');
+    await fireEvent(context.db,'tag_change',{friendId:friend.id,sourceEventId:`automation-tag:${context.idempotencyKey}`,sourceKind:'automation',occurredAt:new Date().toISOString(),eventData:{tagId,action:operation,automationDepth:depth+1}},undefined,context.lineAccountId);
   }
 }
 
@@ -412,6 +366,7 @@ async function sendMessageExecutor(
   dependencies: AutomationActionExecutorDependencies,
 ): Promise<{ output: Record<string, unknown> }> {
   const friend = await requireFriend(context);
+  if(await isFriendDeliverySuppressed(context.db,friend.id)) throw invalid('delivery_consent_suppressed','配信停止・同意の状態により送信できません');
   const resolved = await resolveMessage(context);
   // テンプレート/直接本文に {{var.*}} が書かれていても、この経路は従来
   // 差し込みを展開せず生のまま送っていた。消えた共通情報は fail-closed で
@@ -595,6 +550,19 @@ async function webhookExecutor(
     data: { friendId: context.friendId ?? null, event: context.inputEvent },
     attempt: context.attemptNumber,
   });
+  if (dependencies.webhookDeliveryMode !== 'immediate') {
+    const { enqueueOutgoingWebhookDelivery, findOutgoingDeliveryByKey } = await import('./outgoing-webhook-delivery.js');
+    const queued = await enqueueOutgoingWebhookDelivery(context.db, {
+      lineAccountId: context.lineAccountId, webhookId, eventType: 'automation.send_webhook',
+      body, idempotencyKey: context.idempotencyKey, maxAttempts: 8,
+    });
+    const delivery = queued ?? await findOutgoingDeliveryByKey(context.db, webhookId, context.idempotencyKey);
+    if (!delivery) throw new Error('webhook_delivery_not_recorded');
+    if (delivery.status === 'delivered') return { output: { webhookId, deliveryId: delivery.id, delivered: true } };
+    if (delivery.status === 'failed') throw invalid('webhook_delivery_failed', '送信Webhookを届けられませんでした');
+    // Acceptance into the outbox is not completion: dependent actions must wait for acknowledgement.
+    throw new AutomationActionDeferred();
+  }
   const headers = await buildOutgoingWebhookHeaders({ eventId: context.idempotencyKey, body, secret: sendSecret });
   // 送信直前の再検査は配送側と共有する。転送先の各段も送る前に確かめる。
   let outcome: SafePostOutcome;

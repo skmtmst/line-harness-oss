@@ -14,6 +14,8 @@ import { Settings2 } from 'lucide-react'
 import MenuPortal from '@/components/shared/menu-portal'
 import Button from '@/components/shared/button'
 import { api, type SupportMarkListItem } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import RoutingDrawer from './routing-drawer'
 import styles from './inbox-chat.module.css'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
@@ -24,7 +26,9 @@ export function markRuleText(mark: SupportMarkListItem): string {
   return mark.autoOnInbound ? '受信したとき自動で付く' : '手動だけ'
 }
 
-export default function InboxRulesPopover({ accountId }: { accountId: string | null }) {
+export default function InboxRulesPopover({ accountId, onRoutingSaved }: { accountId: string | null; onRoutingSaved?: () => void }) {
+  const canManage = canManageRole(useStaffRole())
+  const [routingOpen, setRoutingOpen] = useState(false)
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [marks, setMarks] = useState<SupportMarkListItem[]>([])
@@ -92,8 +96,10 @@ export default function InboxRulesPopover({ accountId }: { accountId: string | n
             </ul>
           )}
           <Link href="/tags?tab=marks" className={styles.popLink}>対応マークの設定を開く</Link>
+          {canManage && accountId ? <button type="button" className={styles.popLink} onClick={() => { setOpen(false); setRoutingOpen(true) }}>割り当てと返事の期限</button> : null}
         </section>
       </MenuPortal>
+      {canManage && accountId ? <RoutingDrawer accountId={accountId} open={routingOpen} onClose={() => setRoutingOpen(false)} onSaved={() => onRoutingSaved?.()} /> : null}
     </div>
   )
 }

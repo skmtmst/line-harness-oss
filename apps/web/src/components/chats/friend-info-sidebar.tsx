@@ -1,6 +1,11 @@
 'use client'
 
-import { isOwnerOrAdmin } from '@/lib/staff-capability';
+import { STATUS_WORD, STATUS_OPTIONS } from './friend-info-status'
+
+import { type ChatStatusInfo, type Props, type FriendDetail } from './friend-info-types'
+
+
+import { isOwnerOrAdmin, canEditFeature } from '@/lib/staff-capability'
 import { formAnswerText } from '@/lib/form-answer'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionAccess } from '@/lib/use-feature-access'
@@ -8,16 +13,18 @@ import TagOverflow from '@/components/shared/tag-overflow'
 import { DragHandle } from '@/components/shared/row-actions'
 import Link from 'next/link'
 import CustomerInfoPanel from '@/components/shared/customer-info-panel'
+import CustomerInfoMileage, { type CustomerMileageState } from '@/components/shared/customer-info-mileage'
 import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
 import StatusPill, { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Avatar from '@/components/shared/avatar'
 import { Children, cloneElement, isValidElement, useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { api, ApiError, type FriendUpcoming, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
+import { api, ApiError, type FriendUpcoming } from '@/lib/api'
 import { tagTextColor } from '@/lib/presentation'
 import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import TagPill from '@/components/shared/tag-pill'
+import { EntityPickerField, type EntityPickerFolder } from '@/components/shared/entity-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
@@ -28,79 +35,10 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import InlineEdit from '@/components/shared/inline-edit'
 import { runOptimisticWithUndo } from '@/lib/undoable'
 import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
-import { canEditFeature } from '@/lib/staff-capability'
 import { X } from 'lucide-react'
 import { formatDateTime, formatRelative, formatNumber } from '@/lib/format'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-
-interface FriendDetail {
-  id: string
-  displayName: string | null
-  pictureUrl: string | null
-  isFollowing: boolean
-  metadata: Record<string, unknown>
-  /** 100 で足した列。LINEの表示名とは別に、こちらで付けた名前。 */
-  realName: string | null
-  /** 社内での呼び名。表示名が本名と違うときに使う。 */
-  systemDisplayName: string | null
-  refCode: string | null
-  /** N-036: 友だち詳細と同じ流入元名。無い・消えた経路は null。 */
-  firstTrackedLinkName: string | null
-  /** フォーム回答の総数。formSubmissions は最新10件までのため、続きの有無はこれで判別する。 */
-  formSubmissionTotal?: number | null
-  createdAt: string
-  tags: Array<{ id: string; name: string; color: string }>
-  formSubmissions: Array<{
-    id: string
-    formId: string
-    formName: string
-    fields: Array<{ name: string; label: string }>
-    data: Record<string, unknown>
-    createdAt: string
-  }>
-}
-
-interface ChatStatusInfo {
-  status: 'unread' | 'in_progress' | 'on_hold' | 'resolved' | null
-  notes: string | null
-}
-
-interface Props {
-  friendId: string | null
-  /** 親 (ChatDetail) が持っている chat 側の情報 — status / notes */
-  chatStatus?: ChatStatusInfo
-  /** 担当者名 (ChatDetail で operatorId → name 変換済を渡す想定) */
-  operatorName?: string | null
-  /** A-2 その場で直すための会話 ID。無いときは表示のみ（従来どおり）。 */
-  lastContactAt?: string | null
-  chatId?: string | null
-  /** 同時編集の見分け札（chats.revision）。無いときは送らない。 */
-  revision?: number
-  /** 担当の選択肢。無いときは担当の変更欄を出さない。 */
-  operators?: Array<{ id: string; name: string }>
-  /** 現在の担当 ID。無いときは未割り当て扱い。 */
-  operatorId?: string | null
-  /** 開いているLINEアカウントの ID。前払いのみの印に使う。無いときは印を出さない。 */
-  accountId?: string | null
-  /** 保存が通ったあとに親へ知らせる（一覧の読み直しなど）。 */
-  onChatChanged?: () => void
-}
-
-/** B-26 知らせの文に使う対応状況の名前（受信箱の状態の切り替えと同じ言葉）。 */
-const STATUS_WORD: Record<NonNullable<ChatStatusInfo['status']>, string> = {
-  unread: '未対応',
-  in_progress: '対応中',
-  on_hold: '保留',
-  resolved: '対応済み',
-}
-
-const STATUS_OPTIONS: Array<{ value: NonNullable<ChatStatusInfo['status']>; label: string }> = [
-  { value: 'unread', label: '未対応' },
-  { value: 'in_progress', label: '対応中' },
-  { value: 'on_hold', label: '保留' },
-  { value: 'resolved', label: '対応済み' },
-]
 
 const DETAIL_SECTIONS = [
   { key: 'profile', label: 'プロフィール' },
@@ -349,10 +287,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const [sectionOrder, setSectionOrder] = useState<DetailSectionKey[]>(DEFAULT_SECTION_ORDER)
   const [hiddenSections, setHiddenSections] = useState<DetailSectionKey[]>([])
   const [prefsLoaded, setPrefsLoaded] = useState(false)
-  type MileageState =
-    | { kind: 'loading' }
-    | { kind: 'error' }
-    | { kind: 'data'; summary: MileageSummary; history: MileageHistoryItem[] }
+  type MileageState = CustomerMileageState
   const [mileage, setMileage] = useState<MileageState>({ kind: 'loading' })
 
   useEffect(() => {
@@ -781,6 +716,37 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     })
   }, [friendId, effectiveTags])
 
+  const [tagFolders, setTagFolders] = useState<EntityPickerFolder[]>([])
+  const loadTagFolders = useCallback(() => {
+    api.tagGroups.list(accountId ?? undefined).then((res) => {
+      if (res.success && Array.isArray(res.data)) setTagFolders(res.data.map((group) => ({ id: group.id, name: group.name, color: group.color ?? null })))
+    }).catch(() => {})
+  }, [accountId])
+  /** 選ぶ窓の「＋タグを作る」。作るだけで、付けるのは窓の［選ぶ］のとき。 */
+  const createTagForPicker = async (name: string) => {
+    const res = await api.tags.create({ name })
+    if (!res.success) return null
+    const created = res.data
+    setTagOptions((prev) => [...prev.filter((tag) => tag.id !== created.id), created])
+    return { id: created.id, name: created.name, color: created.color, folderId: created.groupId ?? null, frequent: false }
+  }
+  /** 選ぶ窓で決めたタグの組へ、足りない物を付け、外した物を外す。窓で作ったタグは候補を読み直してから付ける。 */
+  const applyTagSelection = async (ids: string[]) => {
+    const current = new Set((effectiveTags ?? []).map((tag) => tag.id))
+    const added = ids.filter((id) => !current.has(id))
+    const removed = [...current].filter((id) => !ids.includes(id))
+    let known = tagOptions
+    if (added.some((id) => !known.some((tag) => tag.id === id))) {
+      const res = await api.tags.list().catch(() => null)
+      if (res?.success && Array.isArray(res.data)) { known = res.data as Tag[]; setTagOptions(known) }
+    }
+    for (const id of added) {
+      const target = known.find((tag) => tag.id === id)
+      if (target) addTagById(id, { name: target.name, color: target.color })
+    }
+    for (const id of removed) removeTagById(id)
+  }
+
   // 購入（EC の直近3件と合計）。今ある口だけを使い、結びつきが無い人は「—」で出す。
   const createAndAddTag = async (query: string) => {
     const name = query.trim()
@@ -911,61 +877,6 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
    * 顧客情報の節（基本情報・マイル・次の対応・タグ・★つき・リッチメニュー・友だち情報・フォーム回答）。
    * v7 は今までどおり右の欄に線で並べ、★V8 は角丸の枠（顧客情報）の中に並べる。中身は同じ。
    */
-  const renderMileage = (friend: FriendDetail) => (
-<div data-customer-section="mileage" style={sectionStyle('mileage')} className={`${sectionVisibility('mileage')} px-5 py-4`}>
-              <h4 className="text-ink mb-2 text-xs font-bold">マイル</h4>
-              {mileage.kind === 'loading' ? (
-                <DelayedSkeleton loading skeleton={<div className="h-24 animate-pulse rounded-card bg-shell" />} />
-              ) : mileage.kind === 'error' ? (
-                /* INBOX-08: 失敗と未登録を分け、その場で再試行できる。 */
-                <div className="space-y-1.5">
-                  <p className="text-micro text-danger">マイルを読み込めませんでした</p>
-                  <button
-                    type="button"
-                    onClick={() => setMileageRetry((key) => key + 1)}
-                    className="text-action text-micro font-semibold underline underline-offset-2"
-                  >
-                    再試行する
-                  </button>
-                </div>
-              ) : (
-                <div className="border-hairline bg-canvas rounded-control border p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-ink-faint text-nano font-semibold">{mileage.summary.programName}</p>
-                      <p className="text-ink mt-0.5 text-xl font-bold tabular-nums">
-                        {formatNumber(mileage.summary.available)}
-                        <span className="text-ink-faint ml-1 text-micro font-semibold">mile</span>
-                      </p>
-                      <p className="text-ink-faint text-nano">利用可能</p>
-                    </div>
-                    {mileage.summary.pending > 0 && (
-                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-1 text-nano font-medium">
-                        確定待ち {formatNumber(mileage.summary.pending)}
-                      </span>
-                    )}
-                  </div>
-
-                  {mileage.history.length > 0 ? (
-                    <div className="border-hairline mt-3 space-y-1.5 border-t pt-2.5">
-                      {mileage.history.slice(0, 3).map((item) => (
-                        <div key={item.id} className="flex items-center justify-between gap-2 text-nano">
-                          <span className="text-ink-faint min-w-0 truncate">{item.reason}</span>
-                          <span className={`shrink-0 font-semibold tabular-nums ${item.amount > 0 ? 'text-success' : 'text-ink-secondary'}`}>
-                            {item.amount > 0 ? '+' : ''}{formatNumber(item.amount ?? 0)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-ink-faint border-hairline mt-3 border-t pt-2.5 text-nano">
-                      まだマイル履歴はありません
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-  )
   const renderSupport = (friend: FriendDetail) => (
 <div data-customer-section="support" style={sectionStyle('support')} className={`${sectionVisibility('support')} space-y-3 px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">次の対応</h4>
@@ -1122,6 +1033,22 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               </div>
             </div>
   )
+  /* 対応の節の「次回予約」「次の自動配信」の値。未取得と「予定なし」は分ける（IDEA-02）。 */
+  const upcomingRowValue = (which: 'booking' | 'delivery'): React.ReactNode => {
+    if (upcoming.kind === 'loading') return '読み込み中…'
+    const failed = upcoming.kind === 'error' || (which === 'booking' ? upcoming.data.nextBookingError : upcoming.data.nextAutoDeliveryError)
+    if (failed) return <span className="text-danger">読み込めませんでした</span>
+    if (upcoming.kind !== 'data') return '予定なし'
+    if (which === 'booking' && upcoming.data.nextBooking) {
+      const next = upcoming.data.nextBooking
+      return <a href={upcomingBookingHref(next, friendId ?? '')} title={`${next.title} ${formatDate(next.startsAt)}`} className="text-action block min-w-0 truncate hover:underline">{formatDate(next.startsAt)} {next.title}</a>
+    }
+    if (which === 'delivery' && upcoming.data.nextAutoDelivery) {
+      const next = upcoming.data.nextAutoDelivery
+      return <a href={upcomingDeliveryHref(next)} title={`${next.name} ${formatDate(next.scheduledAt)}`} className="text-action block min-w-0 truncate hover:underline">{formatDate(next.scheduledAt)} {next.name}</a>
+    }
+    return '予定なし'
+  }
   const renderTags = (friend: FriendDetail) => (
 <div data-customer-section="tags" style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4 ${v8.tagsSection}`}>
               <div className="mb-1.5 flex items-center justify-between">
@@ -1142,18 +1069,22 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {canEditFriend ? (
                 /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
                 <div id="inbox-panel-tag-picker" hidden={!tagPickerOpen} className={v8.editField}>
-                  <EntitySelect clearable size="full" kind="tag"
+                  {/* GBTyR：タグは選ぶ窓（S2Vgi の形）でまとめて選ぶ。付け外しは1つずつ送る（ほかの人の変更を消さない）。 */}
+                  <EntityPickerField multiple
                     id="inbox-panel-tag"
-                    aria-label="タグを探して付ける"
-                    placeholder="タグを探して付ける"
-                    value=""
-                    options={tagOptions
-                      .filter((t) => !(effectiveTags ?? []).some((own) => own.id === t.id))
-                      .map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
-                    onChange={(tagId) => { if (tagId) addTagById(tagId) }}
-                    createLabel={(query) => `＋「${query}」を作って付ける`}
-                    onCreate={(query) => { void createAndAddTag(query) }}
-                    loading={tagSaving}
+                    label="タグ"
+                    ariaLabel="タグを探して付ける"
+                    noun="タグ"
+                    title="タグを選ぶ"
+                    unit="件"
+                    searchPlaceholder="タグの名前で探す"
+                    items={tagOptions.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ id: t.id, name: t.name, color: t.color, folderId: t.groupId ?? null, frequent: Boolean(t.isStarred), meta: t.friendCount == null ? undefined : `${formatNumber(t.friendCount)} 人` }))}
+                    folders={tagFolders}
+                    onOpen={loadTagFolders}
+                    headerCreate={{ label: 'タグを作る', placeholder: '新しいタグの名前', onCreate: createTagForPicker }}
+                    disabled={tagSaving}
+                    value={(effectiveTags ?? []).map((tag) => tag.id)}
+                    onChange={(ids) => { void applyTagSelection(ids) }}
                   />
                 </div>
               ) : canEditFriend ? (
@@ -1222,7 +1153,6 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const renderRichMenu = (friend: FriendDetail) => (
 <div data-customer-section="richMenu" style={sectionStyle('richMenu')} className={`${sectionVisibility('richMenu')} p-4`}>
               <h4 className="text-micro font-semibold text-ink-faint mb-1.5">リッチメニュー</h4>
-              <p className="text-micro text-ink-faint mb-1">現在の設定</p>
               {richMenu.kind === 'loading' ? (
                 <p className="text-micro text-ink-faint italic">読み込み中...</p>
               ) : richMenu.kind === 'error' ? (
@@ -1293,9 +1223,6 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               </div> : null}
               {null}
             </div>
-
-            {/* Harness Mileage — canonical user identity across LINE accounts */}
-            {renderMileage(friend)}
 
             {/* Status / Operator */}
             {/*
@@ -1687,6 +1614,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 */}
                 {accountId && friendId ? <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} /> : null}
                 <CustomerInfoPanel
+                  labelWidth="wide"
                   friendId={friend.id}
                   profile={{ name: friend.realName || friend.displayName, pictureUrl: friend.pictureUrl, addedAt: formatAddedDate(friend.createdAt) }}
                   fields={friendFields.kind === 'data' ? friendFields.items : []}
@@ -1697,19 +1625,22 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   sections={[
                     { key: 'support', label: '対応', action: canEditChat ? <Button variant="text" size="inline" aria-label="対応を編集" aria-expanded={editingSupport} onClick={() => setEditingSupport(value => !value)}>{editingSupport ? '閉じる' : '編集'}</Button> : null, content: <>
                       {editingSupport ? sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) : <>
-                        <CustomerInfoRows rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }]} />
-                        {sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-upcoming'?: boolean }>(child) && child.props['data-customer-upcoming'])}
+                        {/* 絵 eovoG：次回予約・次の自動配信も 状況・担当 と同じ行の形（見出し＋値）で続ける。 */}
+                        <CustomerInfoRows rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }, { label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }, { label: '次回予約', value: upcomingRowValue('booking') }, { label: '次の自動配信', value: upcomingRowValue('delivery') }]} />
+                        {(upcoming.kind === 'error' || (upcoming.kind === 'data' && (upcoming.data.nextBookingError || upcoming.data.nextAutoDeliveryError))) ? (
+                          <Button variant="text" size="inline" onClick={() => setUpcomingRetry((key) => key + 1)}>再試行する</Button>
+                        ) : null}
                       </>}
-                      <CustomerInfoRows rows={[{ label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }]} />
+                      {editingSupport ? <CustomerInfoRows rows={[{ label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }]} /> : null}
                     </> },
                     { key: 'tags', label: 'タグ', action: canEditFriend ? <Button variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen(value => !value)}>{tagPickerOpen ? '閉じる' : '編集'}</Button> : null, content: <>
                       <TagOverflow maxVisible={2}>{(effectiveTags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" onRemove={canEditFriend && tagPickerOpen && friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />)}</TagOverflow>
-                      {(effectiveTags ?? []).length === 0 ? 'タグなし' : null}
+                      {(effectiveTags ?? []).length === 0 ? 'なし' : null}
                       {sectionBody(renderTags(friend)).filter(child => isValidElement<{ id?: string }>(child) && child.props.id === 'inbox-panel-tag-picker')}
                     </> },
-                    { key: 'mileage', label: 'マイル', content: sectionBody(renderMileage(friend)) },
-                    { key: 'richMenu', label: 'リッチメニュー', action: canEditFeature('/rich-menus', staffRole) ? <Link href="/rich-menus">編集</Link> : null, content: sectionBody(renderRichMenu(friend)) },
-                    { key: 'memo', label: 'メモ', action: canEditChat ? <Button variant="text" size="inline" aria-label="メモを編集" aria-expanded={editingMemo} onClick={() => setEditingMemo(value => !value)}>{editingMemo ? '閉じる' : '編集'}</Button> : null, content: editingMemo ? sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) : effectiveNotes || 'まだありません' },
+                    { key: 'mileage', label: 'マイル', action: mileage.kind === 'data' && isOwnerOrAdmin(staffRole) ? <Button href={`/mileage/friends/detail?id=${encodeURIComponent(friend.id)}`} variant="text" size="inline">編集</Button> : null, content: <CustomerInfoMileage state={mileage} onRetry={() => setMileageRetry(key => key + 1)} /> },
+                    { key: 'richMenu', label: 'リッチメニュー', action: canEditFeature('/rich-menus', staffRole) ? <Button href="/rich-menus" variant="text" size="inline">編集</Button> : null, content: sectionBody(renderRichMenu(friend)) },
+                    { key: 'memo', label: 'メモ', action: canEditChat ? <Button variant="text" size="inline" aria-label="メモを編集" aria-expanded={editingMemo} onClick={() => setEditingMemo(value => !value)}>{editingMemo ? '閉じる' : '編集'}</Button> : null, content: editingMemo ? sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) : effectiveNotes || '未設定' },
                   ]}
                   extraSections={Children.toArray(renderDetailSections(friend).props.children).flatMap(child => {
                     if (!isValidElement<{ 'data-customer-section'?: string; children?: React.ReactNode }>(child)) return []

@@ -1,9 +1,10 @@
 'use client'
+import { normalizeActionLabel } from './action-words'
 
 import Link, { useListNavigationHref } from './list-navigation'
 import { ArrowUpRight, Eye, Pencil, Pause, Trash2 } from 'lucide-react'
 import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
-import MenuPortal from './menu-portal'
+import MenuPortal, { type MenuPortalAlign } from './menu-portal'
 import { useV8Leave } from './overlay-utils'
 import styles from './action-menu.module.css'
 
@@ -86,10 +87,17 @@ export type ActionMenuProps = {
    * 基準にする（`MoreAction`＋`ActionMenu` の並びが前提）。
    */
   anchorRef?: RefObject<HTMLElement | null>
+  /** 器（portal）の横の寄せ。既定は押した物の右端。「〜を足す」のように左から読む押し口は start。 */
+  align?: MenuPortalAlign
+  /**
+   * 操作ではなく「1つ選ぶ」一覧（差し込む欄など・絵 g3REI）。渡すと B-244 の組分け・印を付けず、
+   * 渡した順のまま、先頭にこの見出しを出す。
+   */
+  choiceHeading?: string
 }
 
 /** Pencil ★V8 `hnuY9`「その他操作メニュー」を正本にした小型操作メニュー。 */
-export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef }: ActionMenuProps) {
+export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef, align = 'end', choiceHeading }: ActionMenuProps) {
   const navigationHref = useListNavigationHref()
   const leaving = useV8Leave(open, 80)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -208,7 +216,8 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       data-design-part="action-menu"
       data-design-node="xifuV"
     >
-      {orderActionMenuItems(items).map((item) => {
+      {(choiceHeading === undefined ? orderActionMenuItems(items) : items.map((item, index) => ({ ...item, sectionBefore: index === 0 ? choiceHeading : undefined }))).map((item) => {
+        const itemLabel = normalizeActionLabel(item.label)
         const Item = item.href && !item.disabled ? 'a' : 'button'
         return (
         <div key={item.id} data-menu-group={item.group}>
@@ -225,7 +234,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
             role="menuitem"
             className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
             disabled={item.disabled}
-            title={item.label}
+            title={itemLabel}
             data-qa-open={item.qaOpen}
             onClick={(event) => {
               event.stopPropagation()
@@ -238,7 +247,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
           >
             {item.icon ? <span className={styles.icon} aria-hidden="true">{item.icon}</span> : null}
             <span className={styles.itemBody}>
-              <span className={styles.label}>{item.emphasis ? <strong>{item.label}</strong> : item.label}</span>
+              <span className={styles.label}>{item.emphasis ? <strong>{itemLabel}</strong> : itemLabel}</span>
               {item.description ? (
                 <span className={styles.description}>{item.description}</span>
               ) : null}
@@ -263,7 +272,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
   return (
     <>
       {anchorRef ? null : <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />}
-      <MenuPortal open={open} exitDuration={80} getAnchor={getAnchor} onClose={onClose}>
+      <MenuPortal open={open} exitDuration={80} getAnchor={getAnchor} onClose={onClose} align={align}>
         {menu}
       </MenuPortal>
     </>

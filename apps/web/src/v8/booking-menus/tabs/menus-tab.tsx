@@ -1,5 +1,7 @@
 'use client'
 
+import type { MenusTabProps } from './menus-tab-types'
+
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import TagPill from '@/components/shared/tag-pill'
@@ -21,6 +23,7 @@ import { menuPriceLabel } from '../lib/menu-price'
 import { bookingErrorMessage } from '../lib/menu-validation'
 import MenuVersionHistory from '../menu-version-history'
 import { AccountIcon, Band, MENU_PAGE_SIZE, StateCard, SkeletonRows, sortedMenus, type LoadStatus } from './shared'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import styles from '../settings.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
@@ -28,15 +31,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
-export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: {
-  accountId: string
-  menus: BookingMenu[]
-  status: LoadStatus
-  error: string | null
-  menuCount: number | undefined
-  canEdit: boolean
-  onReload: () => void
-}) {
+export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: MenusTabProps) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [query, setQuery] = useListUrlValue('q', '')
@@ -331,7 +326,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                     >
                       {menu.name}
                     </button>
-                    {menu.category_label ? <TagPill name={menu.category_label} size="sm" aria-label={`分類「${menu.category_label}」`} /> : null}
+                    {/* 分類には色の項目が無い。絵 owaS3・P6EdLW どおり、色の一覧の先頭（青）の丸で出す。 */}
+                    {menu.category_label ? <TagPill name={menu.category_label} color={FOLDER_SELECT_COLORS[0].value} size="sm" aria-label={`分類「${menu.category_label}」`} /> : null}
                   </span>
                   {menu.description ? <span className={styles.menuDesc}>{menu.description}</span> : null}
                 </span>
@@ -356,8 +352,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                 </span>
                 <span className={styles.colMenu}>
                   <RowMenu
-                    appearance="plain"
-                    className={styles.rowMenuButton}
+                    appearance="box"
+                    size="row"
                     label={`「${menu.name}」のそのほかの操作`}
                     menuLabel={`「${menu.name}」の操作`}
                     open={openMenuId === menu.id}

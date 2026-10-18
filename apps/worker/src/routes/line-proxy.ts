@@ -1,4 +1,7 @@
+import { getFriendsByLineUserIds, readProxyPushRecipient } from './line-proxy-recipients.js';
+import { hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
 import { Hono } from 'hono';
+import { readBoundedBytes, readBoundedText } from '../lib/input-errors.js';
 import type { Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
@@ -84,9 +87,6 @@ const MAX_FRIEND_CREATIONS = 20;
 // subrequest (25 statements), so even large broadcasts stay in budget.
 const ROWS_PER_INSERT = 12;
 const STATEMENTS_PER_BATCH = 25;
-
-// Chunk size for friend lookups via IN (...) — same 100-bind ceiling.
-const LOOKUP_CHUNK = 90;
 
 const AUTH_FAILED = {
   message:
@@ -227,48 +227,6 @@ function requiredProxyPermission(method: string, path: string): string | null {
   return null;
 }
 
-/** Look up friends for a set of userIds in IN-clause chunks (≤100 binds each). */
-async function getFriendsByLineUserIds(
-  db: D1Database,
-  userIds: string[],
-  lineAccountId: string | null,
-): Promise<Map<string, Friend>> {
-  const found = new Map<string, Friend>();
-  for (let i = 0; i < userIds.length; i += LOOKUP_CHUNK) {
-    const chunk = userIds.slice(i, i + LOOKUP_CHUNK);
-    const placeholders = chunk.map(() => '?').join(',');
-    if (lineAccountId) {
-      const scoped = await db
-        .prepare(
-          `SELECT * FROM friends
-            WHERE line_account_id = ?
-              AND line_user_id IN (${placeholders})`,
-        )
-        .bind(lineAccountId, ...chunk)
-        .all<Friend>();
-      for (const row of scoped.results ?? []) found.set(row.line_user_id, row);
-    }
-
-    // 別アカウント所有の行には触れない (Issue #961)。拾うのは未割当
-    // (line_account_id IS NULL) の行だけ。他アカウントの友だちへ送信を
-    // 記録する場合は、行を移す代わりにこのアカウント用の行を作る側へ回す。
-    const unresolved = chunk.filter((lineUserId) => !found.has(lineUserId));
-    if (unresolved.length > 0) {
-      const unresolvedPlaceholders = unresolved.map(() => '?').join(',');
-      const fallback = await db
-        .prepare(
-          `SELECT * FROM friends
-            WHERE line_account_id IS NULL
-              AND line_user_id IN (${unresolvedPlaceholders})`,
-        )
-        .bind(...unresolved)
-        .all<Friend>();
-      for (const row of fallback.results ?? []) found.set(row.line_user_id, row);
-    }
-  }
-  return found;
-}
-
 /**
  * Create a friend row for a recipient we have never seen. Mirrors
  * ensureFriendFromWebhookUser (webhook.ts) except that line_account_id is only
@@ -286,7 +244,7 @@ async function createFriendForRecipient(
     try {
       profile = await lineClient.getProfile(userId);
     } catch (err) {
-      console.error('[line-proxy] getProfile failed', err);
+      console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
     }
 
     const friend = await upsertFriend(db, {
@@ -307,7 +265,7 @@ async function createFriendForRecipient(
     }
     return friend;
   } catch (err) {
-    console.error('[line-proxy] friend creation failed', err);
+    console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
     return null;
   }
 }
@@ -371,9 +329,9 @@ async function insertLogRows(
 }
 
 /** 1:1 push は operator 手動送信と同じ扱いでチャットを更新する (chats.ts:608 と同型)。 */
-async function touchChat(db: D1Database, friendId: string): Promise<void> {
+async function touchChat(db: D1Database, friendId: string, manualReply: boolean): Promise<void> {
   const chat = (await getChatByFriendId(db, friendId)) ?? (await createChat(db, { friendId }));
-  await updateChat(db, chat.id, { status: 'in_progress', lastMessageAt: jstNow() });
+  await updateChat(db, chat.id, { status: 'in_progress', lastMessageAt: jstNow(), manualReply });
 }
 
 /**
@@ -388,6 +346,7 @@ async function logProxySend(
   rawBody: string,
   source: ProxyLogSource,
   logKey?: string | null,
+  knownPushRecipient?: Friend | null,
 ): Promise<void> {
   try {
     const parsed = JSON.parse(rawBody) as ParsedSend;
@@ -407,15 +366,15 @@ async function logProxySend(
 
     if (path === '/v2/bot/message/push' && typeof parsed.to === 'string') {
       if (!LINE_USER_ID_RE.test(parsed.to)) {
-        console.warn(`[line-proxy] push to non-user target not logged: ${parsed.to.slice(0, 4)}…`);
+        console.warn(JSON.stringify({"code":"routes_line_proxy_warn"}));
         return;
       }
       const friend =
-        (await getFriendByLineUserIdForAccount(db, parsed.to, lineAccountId)) ??
+        (knownPushRecipient !== undefined ? knownPushRecipient : await getFriendByLineUserIdForAccount(db, parsed.to, lineAccountId)) ??
         (await createFriendForRecipient(db, lineClient, parsed.to, lineAccountId));
       if (!friend) return;
       await insertLogRows(db, rowsFor(friend.id, 'push'), source, logKey);
-      await touchChat(db, friend.id);
+      await touchChat(db, friend.id, source === 'manual');
       return;
     }
 
@@ -442,9 +401,7 @@ async function logProxySend(
         if (friend) rows.push(...rowsFor(friend.id, 'push'));
       }
       if (skipped > 0) {
-        console.warn(
-          `[line-proxy] multicast: ${skipped} unknown recipients not logged (friend-creation cap ${MAX_FRIEND_CREATIONS})`,
-        );
+        console.warn(JSON.stringify({"code":"routes_line_proxy_warn"}));
       }
       await insertLogRows(db, rows, source, logKey);
       return;
@@ -487,17 +444,15 @@ async function logProxySend(
       }
       const rows = friendIds.flatMap((friendId) => rowsFor(friendId, null));
       await insertLogRows(db, rows, source, logKey);
-      console.log(`[line-proxy] broadcast logged for ${friendIds.length} friends`);
+      console.log(JSON.stringify({"code":"routes_line_proxy_log"}));
       return;
     }
 
     if (path === '/v2/bot/message/reply' || path === '/v2/bot/message/narrowcast') {
-      console.warn(
-        `[line-proxy] ${path} forwarded but not logged (recipient cannot be resolved)`,
-      );
+      console.warn(JSON.stringify({"code":"routes_line_proxy_warn"}));
     }
   } catch (err) {
-    console.error('[line-proxy] logProxySend failed:', err);
+    console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
   }
 }
 
@@ -565,15 +520,17 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
         return c.json({ message: 'Payload too large' }, 413);
       }
       if (isMessageSend) {
-        rawBody = await c.req.text();
-        if (new TextEncoder().encode(rawBody).byteLength > cap) {
+        const text = await readBoundedText(c.req.raw, cap);
+        if (text === null) {
           return c.json({ message: 'Payload too large' }, 413);
         }
+        rawBody = text;
       } else {
-        binaryBody = await c.req.arrayBuffer();
-        if (binaryBody.byteLength > cap) {
+        const bytes = await readBoundedBytes(c.req.raw, cap);
+        if (bytes === null) {
           return c.json({ message: 'Payload too large' }, 413);
         }
+        binaryBody = bytes.buffer as ArrayBuffer;
       }
     }
 
@@ -617,6 +574,26 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       );
     }
 
+    let knownPushRecipient: Friend | null | undefined;
+    if(isBulkDispatch) {
+      let uids:string[]|undefined;
+      if(path.endsWith('/push')||path.endsWith('/multicast')) {
+        let payload: {to?:unknown};
+        try {payload=JSON.parse(rawBody??'{}');} catch {return c.json({message:'Invalid message payload'},400);}
+        if(typeof payload.to==='string') uids=[payload.to];
+        else if(Array.isArray(payload.to)&&payload.to.every(v=>typeof v==='string')) uids=payload.to;
+        else return c.json({message:'Invalid message recipients'},400);
+      }
+      let suppressed: boolean;
+      if(path==='/v2/bot/message/push'&&caller.lineAccountId&&uids?.length===1&&LINE_USER_ID_RE.test(uids[0])) {
+        const recipient=await readProxyPushRecipient(c.env.DB,caller.lineAccountId,uids[0]);
+        knownPushRecipient=recipient.friend; suppressed=recipient.suppressed;
+      } else suppressed=await hasSuppressedDeliveryRecipients(c.env.DB,caller.lineAccountId,uids);
+      if(suppressed) {
+        return c.json({message:'Message dispatch contains recipients with delivery suppression',code:'DELIVERY_CONSENT_SUPPRESSED'},409);
+      }
+    }
+
     let upstream: Response;
     try {
       upstream = await fetch(`${upstreamBase}${encodedPath}${url.search}`, {
@@ -626,7 +603,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
         signal: AbortSignal.timeout(15_000),
       });
     } catch (err) {
-      console.error('[line-proxy] upstream fetch failed:', err);
+      console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
       return c.json({ message: 'Upstream request failed' }, 502);
     }
 
@@ -644,7 +621,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       // Log in the background where possible: a multicast to hundreds of
       // friends must not delay the client response (timeout → client retry →
       // double send). Falls back to inline await outside a Workers runtime.
-      const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource, retryKey);
+      const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource, retryKey, knownPushRecipient);
       try {
         c.executionCtx.waitUntil(logging);
       } catch {

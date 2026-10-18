@@ -1,5 +1,6 @@
 /**
- * In-memory sliding window rate limiter for Cloudflare Workers.
+ * General burst budgets use isolate memory. Sensitive actions additionally
+ * reserve shared D1 budgets in sensitive-rate-limit.ts, before doing work.
  *
  * Cloudflare Workers have per-isolate memory that persists across
  * requests to the same instance. Counters are lost on cold start,
@@ -9,6 +10,7 @@
 
 import type { Context, Next } from 'hono';
 import type { Env } from '../index.js';
+import { authenticatedSensitiveLimit, preAuthSensitiveLimit } from './sensitive-rate-limit.js';
 
 // ---------------------------------------------------------------------------
 // Core rate-limit logic
@@ -72,6 +74,11 @@ const UNAUTHENTICATED_PATTERNS: Array<string | RegExp> = [
   // 公開受信の負荷抑制が緩むため、Authorization の有無によらず IP 枠で抑える。
   /^\/api\/webhooks\/incoming\/[^/]+\/receive$/,
   '/api/qr',
+  // Public referral URLs do database work too. Share one IP budget across
+  // changing refs/help/query values and ignore unverified credentials.
+  /^\/r\//,
+  /^\/liff\/(?:files|statements)\//,
+  /^\/api\/liff\/files\//,
   // 会員登録・メールログイン・パスワード再設定。認証前に叩かれる入口なので低い上限にする。
   /^\/api\/auth\/(register|password)\//,
 ];
@@ -104,10 +111,12 @@ const UNAUTHENTICATED_WINDOW = 60_000; // 1 min
 export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
   const path = new URL(c.req.url).pathname;
 
-  // Skip rate limiting for docs / static assets
-  if (path === '/docs' || path === '/openapi.json' || path.startsWith('/r/')) {
+  // Public documentation does not perform referral lookups.
+  if (path === '/docs' || path === '/openapi.json') {
     return next();
   }
+  const denied = await preAuthSensitiveLimit(c);
+  if (denied) return denied;
 
   let key: string;
   let max: number;
@@ -144,6 +153,8 @@ export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<
 export async function authenticatedRateLimitMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
   const staff = c.get('staff');
   if (!staff || isUnauthenticatedPath(c.req.path)) return next();
+  const denied = await authenticatedSensitiveLimit(c);
+  if (denied) return denied;
   const result = check(`staff:${staff.tenantId ?? ''}:${staff.id}`, AUTHENTICATED_MAX, AUTHENTICATED_WINDOW);
   if (!result.ok) return c.json({ success: false, error: 'Too many requests. Please try again later.' },
     { status: 429, headers: { 'Retry-After': String(result.retryAfter) } });

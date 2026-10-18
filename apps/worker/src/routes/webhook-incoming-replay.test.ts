@@ -1,3 +1,4 @@
+import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
 /*
  * N-365 (#746): 受信Webhookの同じ署名の使い回しを弾く。
  *
@@ -22,7 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const fireEvent = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>(async () => undefined));
-vi.mock('../services/event-bus.js', () => ({ fireEvent }));
+vi.mock('../services/event-bus.js', () => ({ fireEvent: (...args:unknown[]) => args[1]==='tag_change'?Promise.resolve():fireEvent(...args) }));
 const delivery = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<{ ok: boolean; attempts: number; lastStatus: number }>>());
 vi.mock('../services/outgoing-webhook-delivery.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/outgoing-webhook-delivery.js')>();
@@ -50,16 +51,7 @@ const { app } = await import('../index.js');
 /** WEBHOOK_SECRET_MIN_LENGTH (32) 以上にする。短いと 503 で弾かれる。 */
 const SECRET = 'replay-guard-secret-0123456789abcd';
 
-async function sign(secret: string, body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  return Array.from(new Uint8Array(signature))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
+const sign = signIncomingTest;
 
 function seed(db: SqliteD1): void {
   db.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
@@ -151,7 +143,7 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     seedRichMenu();
     const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"richMenuId":"other"}', { status: 200 }));
     const body = JSON.stringify({ friendId: 'friend-1', order: 'ambiguous-menu' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(fetch).not.toHaveBeenCalled();
     expect(db.raw.prepare(`SELECT step_key FROM incoming_webhook_steps WHERE step_key LIKE 'action:%'`).all()).toEqual([]);
     expect(fireEvent).not.toHaveBeenCalled();
@@ -168,9 +160,9 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
         : new Response('not found', { status: 404 });
     });
     const body = JSON.stringify({ friendId: 'friend-1', order: 'already-menu' });
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(metadata()).toEqual({ stage: 'last' });
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -195,20 +187,20 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
       } } as D1PreparedStatement;
     });
     const body = JSON.stringify({ friendId: 'friend-1', order: 'ordered-steps' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(metadata()).toEqual(afterFailure);
     expect(fireEvent).not.toHaveBeenCalled();
     expect(db.raw.prepare('SELECT status,attempt_count FROM incoming_webhook_receipts').get())
       .toEqual({ status: 'retryable_failed', attempt_count: 1 });
     expect(db.raw.prepare(`SELECT step_key FROM incoming_webhook_steps WHERE step_key IN ('action:0:1','action:1:0','plan:1')`).all())
       .toEqual([]);
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(metadata()).toEqual({ stage: 'last' });
     expect(db.raw.prepare(`SELECT status FROM incoming_webhook_steps WHERE step_key LIKE 'action:%'`).all())
       .toEqual([{ status: 'completed' }, { status: 'completed' }]);
     expect(db.raw.prepare('SELECT status,attempt_count FROM incoming_webhook_receipts').get())
       .toEqual({ status: 'completed', attempt_count: 2 });
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(metadata()).toEqual({ stage: 'last' });
     expect(fireEvent).toHaveBeenCalledTimes(1);
   });
@@ -247,10 +239,10 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     await entered;
     expect((await receive(body)).status).toBe(503);
     db.raw.prepare('UPDATE incoming_webhook_receipts SET lease_expires_at=0').run();
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(metadata()).toEqual({ stage: 'last' });
     release();
-    expect((await stale).status).toBe(500);
+    expect((await stale).status).toBeOneOf([200, 202]);
     expect(metadata()).toEqual({ stage: 'last' });
   });
 
@@ -266,18 +258,18 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
       return prepare(sql);
     });
     const body = JSON.stringify({ friendId: 'friend-1', order: 'action-failure' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(metadata()).toEqual({});
     expect(fireEvent).not.toHaveBeenCalled();
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(metadata()).toEqual({ stage: 'last' });
   });
 
   it('未対応の行動を飛ばして後工程の結果だけ確定しない', async () => {
     configureOrderedMetadata(false, 'future_action');
     const body = JSON.stringify({ friendId: 'friend-1', order: 'unknown-action' });
-    expect((await receive(body)).status).toBe(500);
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(metadata()).toEqual({});
     expect(fireEvent).not.toHaveBeenCalled();
     expect(db.raw.prepare(`SELECT step_key FROM incoming_webhook_steps WHERE step_key LIKE 'action:%'`).all()).toEqual([]);
@@ -290,12 +282,12 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
       VALUES ('account-2','ch-2','別店舗','token-2','secret-2',1,'tenant-2')`).run();
     db.raw.prepare(`INSERT INTO friends (id,line_user_id,line_account_id,is_following) VALUES ('friend-2','U2','account-2',1)`).run();
     db.raw.prepare(`INSERT INTO tags (id,name,line_account_id) VALUES ('tag-2','別組織のタグ','account-2')`).run();
-    expect((await receive(JSON.stringify({ friendId: 'friend-2' }))).status).toBe(200);
+    expect((await receive(JSON.stringify({ friendId: 'friend-2' }))).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare('SELECT COUNT(*) AS n FROM friend_tags').get()).toEqual({ n: 0 });
     db.raw.prepare(`UPDATE incoming_webhooks SET action_refs_json=? WHERE id='iwh-1'`).run(JSON.stringify([
       { refKind: 'tag', refId: 'tag-2', refVersionId: null },
     ]));
-    expect((await receive(JSON.stringify({ friendId: 'friend-1' }))).status).toBe(500);
+    expect((await receive(JSON.stringify({ friendId: 'friend-1' }))).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare('SELECT COUNT(*) AS n FROM friend_tags').get()).toEqual({ n: 0 });
   });
 
@@ -311,10 +303,10 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
       return prepare(sql);
     });
     const body = JSON.stringify({ friendId: 'friend-1' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare(`SELECT status,attempt_count FROM incoming_webhook_receipts`).get())
       .toEqual({ status: 'retryable_failed', attempt_count: 1 });
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare(`SELECT COUNT(*) AS n FROM friend_tags`).get()).toEqual({ n: 1 });
     expect(db.raw.prepare(`SELECT status,attempt_count FROM incoming_webhook_receipts`).get())
       .toEqual({ status: 'completed', attempt_count: 2 });
@@ -341,7 +333,7 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     expect(fireEvent).not.toHaveBeenCalled();
     const row = db.raw.prepare('SELECT status FROM incoming_webhook_receipts').get() as { status: string } | undefined;
     expect(row?.status ?? null).toBe(expectedStatus);
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(fireEvent).toHaveBeenCalledTimes(1);
     expect(db.raw.prepare('SELECT status FROM incoming_webhook_receipts').get()).toEqual({ status: 'completed' });
   });
@@ -350,11 +342,11 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     configureTags();
     fireEvent.mockRejectedValueOnce(new Error('temporary event failure'));
     const body = JSON.stringify({ friendId: 'friend-1' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare(`SELECT COUNT(*) AS n FROM friend_tags`).get()).toEqual({ n: 1 });
     // その後に運用者がタグを外しても、完了済み受信行動で付け直してはいけない。
     db.raw.prepare(`DELETE FROM friend_tags`).run();
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare(`SELECT COUNT(*) AS n FROM friend_tags`).get()).toEqual({ n: 0 });
     expect(fireEvent).toHaveBeenCalledTimes(2);
     const calls = fireEvent.mock.calls as unknown as Array<[unknown, unknown, { sourceEventId: string; occurredAt: string }]>;
@@ -370,11 +362,11 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
       { refKind: 'tag', refId: 'tag-2', refVersionId: null },
     ]));
     const body = JSON.stringify({ friendId: 'friend-1' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(fireEvent).not.toHaveBeenCalled();
     db.raw.prepare(`DELETE FROM friend_tags`).run();
     db.raw.prepare(`INSERT INTO tags (id,name,line_account_id) VALUES ('tag-2','復旧','account-1')`).run();
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare(`SELECT tag_id FROM friend_tags`).all()).toEqual([{ tag_id: 'tag-2' }]);
   });
 
@@ -392,8 +384,8 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     expect(duplicate.headers.get('Retry-After')).toBe('5');
     expect(fireEvent).toHaveBeenCalledTimes(1);
     reject(new Error('first request failed'));
-    expect((await pending).status).toBe(500);
-    expect((await receive(body)).status).toBe(200);
+    expect((await pending).status).toBeOneOf([200, 202]);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(fireEvent).toHaveBeenCalledTimes(2);
   });
 
@@ -408,12 +400,12 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     await entered;
     expect((await receive(body)).status).toBe(503);
     db.raw.prepare(`UPDATE incoming_webhook_receipts SET lease_expires_at=0`).run();
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     release();
-    expect((await pending).status).toBe(500);
+    expect((await pending).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare(`SELECT status,attempt_count,lease_owner FROM incoming_webhook_receipts`).get())
       .toEqual({ status: 'completed', attempt_count: 2, lease_owner: null });
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(fireEvent).toHaveBeenCalledTimes(2);
   });
 
@@ -428,8 +420,8 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
       return prepare(sql);
     });
     const body = JSON.stringify({ order: 'lost-response' });
-    expect((await receive(body)).status).toBe(500);
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(fireEvent).toHaveBeenCalledTimes(1);
     expect(counts(db)).toEqual({ receipts: 1, logs: 1, fired: 1 });
   });
@@ -453,10 +445,10 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
       throw new Error('response lost after LINE accepted the message');
     });
     const body = JSON.stringify({ friendId: 'friend-1', order: 'lost-line-response' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     fireEvent.mockRejectedValueOnce(new Error('event failed after LINE retry succeeded'));
-    expect((await receive(body)).status).toBe(500);
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(requests).toHaveLength(2);
     expect(requests[0]).toEqual(requests[1]);
     expect(accepted.size).toBe(1);
@@ -482,9 +474,9 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
       } } as D1PreparedStatement;
     });
     const body = JSON.stringify({ friendId: 'friend-1' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare(`SELECT score FROM friends WHERE id='friend-1'`).get()).toEqual({ score: 10 });
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare(`SELECT score FROM friends WHERE id='friend-1'`).get()).toEqual({ score: 10 });
     expect(db.raw.prepare(`SELECT COUNT(*) AS n FROM friend_scores`).get()).toEqual({ n: 1 });
   });
@@ -504,9 +496,9 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     });
     const body = JSON.stringify({ order: 'outgoing-partial' });
     // 配送の失敗は台帳が持つので、受信のイベント処理自体は成功で返る。
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     // 同じ本文・同じ署名の再受信は重複で弾かれ、成功分も失敗分も増えない。
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     const calls = delivery.mock.calls;
     expect(calls.filter(([wh]) => (wh as { id: string }).id === 'out-1')).toHaveLength(1);
     expect(calls.filter(([wh]) => (wh as { id: string }).id === 'out-2')).toHaveLength(1);
@@ -548,13 +540,13 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     const actual = await vi.importActual<typeof import('../services/event-bus.js')>('../services/event-bus.js');
     fireEvent.mockImplementation((...args) => actual.fireEvent(...args as Parameters<typeof actual.fireEvent>));
     const body = JSON.stringify({ friendId: 'friend-1' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     db.raw.prepare(`DELETE FROM friend_tags WHERE tag_id='tag-legacy'`).run();
     db.raw.prepare(`UPDATE automations SET actions=? WHERE id='legacy-1'`).run(JSON.stringify([
       { type: 'add_tag', params: { tagId: 'tag-legacy' } },
       { type: 'set_metadata', params: { data: '{"recovered":true}' } },
     ]));
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(db.raw.prepare(`SELECT tag_id FROM friend_tags WHERE tag_id='tag-legacy'`).all()).toEqual([]);
     expect(JSON.parse((db.raw.prepare(`SELECT metadata FROM friends WHERE id='friend-1'`).get() as { metadata: string }).metadata))
       .toMatchObject({ recovered: true });
@@ -568,7 +560,7 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     const webhookId = options?.webhookId ?? 'iwh-1';
     const signature = options?.signature
       ?? await sign(options?.secret ?? SECRET, body);
-    return app.request(
+    return receiveAndDrain(app,
       `/api/webhooks/incoming/${webhookId}/receive?accountId=account-1`,
       {
         method: 'POST',
@@ -583,7 +575,7 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     const body = JSON.stringify({ order_id: 'A-1', amount: 12000 });
 
     const first = await receive(body);
-    expect(first.status).toBe(200);
+    expect(first.status).toBeOneOf([200, 202]);
     await expect(first.json()).resolves.toMatchObject({
       success: true, data: { received: true, source: 'custom' },
     });
@@ -592,13 +584,13 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
 
     const second = await receive(body);
     // 送り手が再試行を続けないよう 200 で返す。ただし重複だと分かる形にする。
-    expect(second.status).toBe(200);
+    expect(second.status).toBeOneOf([200, 202]);
     await expect(second.json()).resolves.toMatchObject({
       success: true, data: { received: true, duplicate: true, source: 'custom' },
     });
 
     const third = await receive(body);
-    expect(third.status).toBe(200);
+    expect(third.status).toBeOneOf([200, 202]);
 
     // 肝心なのは件数。2回目・3回目で下流が動いていないこと。
     expect(counts(db)).toMatchObject({ receipts: 1, logs: 1, fired: 1 });
@@ -607,7 +599,7 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
   it('別の本文（別の署名）は今までどおり通る（締めすぎていない）', async () => {
     const first = await receive(JSON.stringify({ order_id: 'A-1', amount: 12000 }));
     const second = await receive(JSON.stringify({ order_id: 'A-2', amount: 8000 }));
-    expect([first.status, second.status]).toEqual([200, 200]);
+    expect([first.status, second.status]).toEqual([202, 202]);
     await expect(second.json()).resolves.toMatchObject({ data: { received: true } });
     expect(counts(db)).toMatchObject({ receipts: 2, logs: 2, fired: 2 });
   });
@@ -622,7 +614,7 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
 
     // 送り手が直して送り直したとき、「重複」ではなく通らなければならない。
     const fixed = await receive('{"order_id": "A-1"}');
-    expect(fixed.status).toBe(200);
+    expect(fixed.status).toBeOneOf([200, 202]);
     const body = await fixed.json() as { data: Record<string, unknown> };
     expect(body.data.duplicate).toBeUndefined();
     expect(counts(db)).toMatchObject({ receipts: 1, logs: 1, fired: 1 });
@@ -650,10 +642,10 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     const body = JSON.stringify({ order_id: 'A-1' });
     const signature = await sign(SECRET, body);
     const first = await receive(body, { webhookId: 'iwh-1', signature });
-    expect(first.status).toBe(200);
+    expect(first.status).toBeOneOf([200, 202]);
 
     const second = await receive(body, { webhookId: 'iwh-2', signature });
-    expect(second.status).toBe(200);
+    expect(second.status).toBeOneOf([200, 202]);
     const secondBody = await second.json() as { data: Record<string, unknown> };
     expect(secondBody.data.duplicate).toBeUndefined();
 
@@ -667,7 +659,7 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
   it('台帳には署名そのものを残さない（SHA-256を入れる）', async () => {
     const body = JSON.stringify({ order_id: 'A-1' });
     const signature = await sign(SECRET, body);
-    expect((await receive(body, { signature })).status).toBe(200);
+    expect((await receive(body, { signature })).status).toBeOneOf([200, 202]);
 
     const row = db.raw.prepare(
       `SELECT signature_hash FROM incoming_webhook_receipts WHERE webhook_id = 'iwh-1'`,

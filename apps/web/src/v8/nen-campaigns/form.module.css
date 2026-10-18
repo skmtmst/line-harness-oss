@@ -166,15 +166,6 @@
   gap: var(--tpl-nc-form-gap);
 }
 
-.caution {
-  margin: 0;
-  padding: var(--tpl-nc-body-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-nc-pill-lh);
-}
 .chain {
   margin: 0;
   color: var(--color-accent-deep);

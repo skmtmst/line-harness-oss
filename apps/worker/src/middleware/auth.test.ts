@@ -1,5 +1,5 @@
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import {
@@ -121,6 +121,18 @@ function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
   };
 }
 
+const sessionDatabases: ReturnType<typeof createTestD1>[] = [];
+afterEach(() => { for (const db of sessionDatabases.splice(0)) db.raw.close(); });
+
+// Session issuance also records the known device, so successful login fixtures
+// need the real schema and a staff row for its foreign key.
+function sessionEnv(bindings: Env['Bindings']): Env['Bindings'] {
+  const db = createTestD1();
+  sessionDatabases.push(db);
+  db.raw.prepare("INSERT INTO staff_members(id,name,role,api_key) VALUES ('staff-1','Fixture','admin','fixture-key')").run();
+  return { ...bindings, DB: db.db };
+}
+
 // Cross-site production topology with explicit opt-in (the supported case).
 function crossSiteEnv(): Env['Bindings'] {
   return env({ ADMIN_ORIGIN: PAGES, ADMIN_ALLOW_CROSS_SITE: 'true' });
@@ -140,6 +152,7 @@ function app() {
   a.post('/api/broadcasts/:id/send', (c) => c.json({ success: true }));
   a.post('/api/hq/support/requests', (c) => c.json({ success: true }));
   a.get('/api/hq/support/requests', (c) => c.json({ success: true }));
+  a.get('/api/hq/support/summary', (c) => c.json({ success: true }));
   a.get('/api/hq/notices', (c) => c.json({ success: true }));
   a.post('/api/hq/notices/:id/read', (c) => c.json({ success: true }));
   a.get('/api/tenants/me', (c) => c.json({ success: true }));
@@ -229,7 +242,7 @@ describe('admin login cookie attributes', () => {
       method: 'POST',
       body: JSON.stringify({ apiKey: 'staff-key' }),
       headers: { 'Content-Type': 'application/json' },
-    }, crossSiteEnv());
+    }, sessionEnv(crossSiteEnv()));
 
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: { id: string }; csrfToken: string };
@@ -258,7 +271,7 @@ describe('admin login cookie attributes', () => {
       method: 'POST',
       body: JSON.stringify({ apiKey: 'staff-key' }),
       headers: { 'Content-Type': 'application/json' },
-    }, env({ ADMIN_ORIGIN: 'https://admin.example.com', WORKER_URL: 'https://api.example.com' }));
+    }, sessionEnv(env({ ADMIN_ORIGIN: 'https://admin.example.com', WORKER_URL: 'https://api.example.com' })));
 
     expect(res.status).toBe(200);
     expect(cookieFor(res, 'lh_admin_session') ?? '').toContain('SameSite=Lax');
@@ -308,13 +321,15 @@ describe('LINE admin login', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ sub: 'authorized-line-user' }), { status: 200 }));
     const res = await app().request('/api/auth/line/callback?code=abc&state=expected', {
       headers: { Cookie: 'lh_line_state=expected; lh_line_nonce=nonce; lh_line_verifier=verifier' },
-    }, crossSiteEnv());
+    }, sessionEnv(crossSiteEnv()));
     expect(res.status).toBe(302);
     const redirect = new URL(res.headers.get('Location')!);
     expect(redirect.origin).toBe(PAGES);
     expect(new URLSearchParams(redirect.hash.slice(1)).get('lh_session')).toBeTruthy();
     expect(new URLSearchParams(redirect.hash.slice(1)).get('lh_csrf')).toBeTruthy();
     expect(cookieFor(res, 'lh_admin_session')).toBeTruthy();
+    expect(cookieFor(res, 'lh_login_device')).toContain('HttpOnly; Secure; SameSite=None');
+    expect(sessionDatabases[0].raw.prepare('SELECT COUNT(*) AS count FROM auth_known_devices WHERE staff_id=?').get('staff-1')).toEqual({ count: 1 });
     fetchSpy.mockRestore();
   });
 
@@ -905,6 +920,14 @@ describe('CORS allowed / blocked origins', () => {
 describe('N-423 staff deny-by-default (#670)', () => {
   const staffBearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
 
+  test('所属統括の問い合わせ集計はスタッフと閲覧のみも読め、認証なしと更新は通さない',async()=>{
+    for(const token of ['no-permissions-key','viewer-key']) {
+      expect((await app().request('/api/hq/support/summary',staffBearer(token),crossSiteEnv())).status).toBe(200);
+      expect((await app().request('/api/hq/support/summary',{...staffBearer(token),method:'POST'},crossSiteEnv())).status).toBe(403);
+    }
+    expect((await app().request('/api/hq/support/summary',{},crossSiteEnv())).status).toBe(401);
+  });
+
   test.each(['GET', 'POST'] as const)('%s 未登録の管理APIは staff に 403', async (method) => {
     for (const token of ['friends-key', 'no-permissions-key']) {
       const res = await app().request('/api/coverage-unmapped-demo', { ...staffBearer(token), method }, crossSiteEnv());
@@ -1059,6 +1082,7 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['POST', '/api/restaurant-test/stores/abc/select'],
       ['GET', '/api/restaurant-test/snapshot'],
       ['POST', '/api/restaurant-test/reservations/manual'],
+      ['POST', '/api/restaurant-test/channel-close-tasks/task/opened'],
     ] as const) {
       expect(isStaffExplicitAllow(method, path)).toBe(true);
     }

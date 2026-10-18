@@ -27,7 +27,7 @@ export async function routeInboundEmail(
     try {
       await handlers.receiveRestaurantIntakeEmail(message, env);
     } catch (error) {
-      console.error(JSON.stringify({ event: 'restaurant_email_receive_failed', error: String(error) }));
+      console.error(JSON.stringify({"code":"restaurant_email_receive_failed"}));
       message.setReject('予約メール受信処理に失敗しました');
     }
     return;
@@ -37,7 +37,7 @@ export async function routeInboundEmail(
   try {
     await handlers.receiveSupportEmail(message, env);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'support_email_receive_failed', error: String(error) }));
+    console.error(JSON.stringify({"code":"support_email_receive_failed"}));
     message.setReject('メール受信処理に失敗しました');
   }
 }

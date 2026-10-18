@@ -106,6 +106,10 @@ export function CreateButton({
 export interface AffiliateFrameProps {
   /** 板の頭の右（CSV など）。 */
   help?: ReactNode
+  /** 一覧の操作の説明。道具の段の右端の「？」に出す（OylSV）。 */
+  listHelp?: ReactNode
+  explanation?: ReactNode
+  explanationKey?: string
   actions?: ReactNode
   stats?: ReactNode
   folders?: ReactNode
@@ -118,7 +122,7 @@ export interface AffiliateFrameProps {
 }
 
 /** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
-export function AffiliateFrame({ help, actions, stats, folders, folderNav, toolbar, pagination, overlays, children }: AffiliateFrameProps) {
+export function AffiliateFrame({ help, listHelp, explanation, explanationKey, actions, stats, folders, folderNav, toolbar, pagination, overlays, children }: AffiliateFrameProps) {
   const { tab, readonly, narrow, counts } = useAffiliateShell()
   const board = tab === 'affiliates' && narrow
     ? 'KdFRI'
@@ -129,6 +133,8 @@ export function AffiliateFrame({ help, actions, stats, folders, folderNav, toolb
     <ListPage
       help={<>{"紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"}{help}</>}
       skeleton
+      explanation={explanation}
+      explanationKey={explanationKey ?? `affiliates:${tab}`}
       boardId={board}
       headingSize="regular"
       title="成果とアフィリエイト"
@@ -151,6 +157,8 @@ export function AffiliateFrame({ help, actions, stats, folders, folderNav, toolb
       folders={folders}
       folderNav={folderNav}
       toolbar={toolbar}
+      listHelp={listHelp}
+      listHelpPlacement={listHelp ? 'end' : undefined}
       pagination={pagination}
       overlays={overlays}
     >

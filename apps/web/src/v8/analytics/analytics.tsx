@@ -32,17 +32,18 @@ import UsageV8 from './usage'
 import SavedV8 from './saved'
 import FunnelV8, { type FunnelFormSlot, type FunnelSaveSlot } from './funnel'
 import CrossV8 from './cross'
+import SegmentsV8 from './segments'
 import styles from './analytics.module.css'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
-export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved'] as const
+export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved', 'segments'] as const
 export type AnalyticsTabV8 = (typeof ANALYTICS_TABS)[number] | 'conversion-report'
 
 /** 絵の二段：上は組（ふだん見る・深く見る・見直す）、下はその組の見かた。 */
 const GROUPS: Array<{ label: string; tabs: Array<{ key: string; label: string }> }> = [
   { label: 'ふだん見る', tabs: [{ key: 'friends', label: '友だちの増減' }, { key: 'reactions', label: '配信の反応' }, { key: 'routes', label: '経路と成果' }, { key: 'url-clicks', label: 'URLクリック' }] },
-  { label: '深く見る', tabs: [{ key: 'funnel', label: 'ファネル' }, { key: 'cross', label: 'クロス分析' }] },
+  { label: '深く見る', tabs: [{ key: 'funnel', label: 'ファネル' }, { key: 'cross', label: 'クロス分析' }, { key: 'segments', label: 'お客さまの分け方' }] },
   { label: '見直す', tabs: [{ key: 'usage', label: '使われ方' }, { key: 'saved', label: '保存した分析' }] },
 ]
 /** 成果地点ごとのレポートは「経路と成果」の中の1つの見かた（AzrZq はタブが経路と成果）。 */
@@ -51,7 +52,7 @@ const hrefOf = (key: string) => `/analytics?tab=${key}`
 
 const BOARD: Record<string, string> = {
   reactions: 'yvOtn', routes: 'PFe9c', usage: 'N8ZrUl', cross: 'u5CuB8', funnel: 'DkRDE',
-  'url-clicks': 'iK4cQ', saved: 'bglah', 'conversion-report': 'AzrZq',
+  'url-clicks': 'iK4cQ', saved: 'bglah', 'conversion-report': 'AzrZq', segments: 'RMajm',
 }
 
 /** 作る・編集のフォームと結果の保存欄は、入口が今の部品を渡す（src/v8 から @/app を読めないため）。 */
@@ -73,8 +74,9 @@ function readTab(params: URLSearchParams): AnalyticsTabV8 {
 function Navigation({ active, savedCount }: { active: AnalyticsTabV8; savedCount: number | null }) {
   const owner = tabOwner(active)
   const group = GROUPS.find((item) => item.tabs.some((tab) => tab.key === owner)) ?? GROUPS[0]
+  /* 上の段（組）も下の段（その組の見かた）も共通の下線のタブ（司令塔の判断・絵 iK4cQ・AzrZq・PFe9c・N8ZrUl）。 */
   return <div className={styles.navigation}>
-    <Tabs label="分析の組" items={GROUPS.map(item => ({label:item.label,href:hrefOf(item.tabs[0].key),current:item===group}))} />
+    <Tabs label="分析の組" items={GROUPS.map((item) => ({ label: item.label, href: hrefOf(item.tabs[0].key), current: item.label === group.label }))} />
     <Tabs label="分析の見かた" items={group.tabs.map(item => ({label:item.label,href:hrefOf(item.key),current:item.key===owner,count:item.key==='saved' ? savedCount ?? undefined : undefined}))} />
   </div>
 }
@@ -102,9 +104,9 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   const board = tab === 'friends' ? (readOnly ? 'L4Uov' : narrow ? 'eEhYU' : 'ws9wt') : BOARD[tab]
   const exportReady = exportAction !== null && exportAction.scope === scope && !exportAction.disabled
   const actions = <>
-    <Button variant="secondary" className={styles.csvButton} disabled={!exportReady} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
-    {/* 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。場所だけ空けて CSV の位置を保つ。 */}
-    {readOnly ? <span className={styles.createSpace} aria-hidden="true" /> : <Button variant="primary" href="/analytics/reports/new"><Plus size={15} aria-hidden="true" />レポートを作る</Button>}
+    <Button variant="secondary" className={readOnly ? undefined : styles.csvButton} disabled={!exportReady} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+    {/* 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。CSV が右端へ寄る（絵 L4Uov）。 */}
+    {readOnly ? null : <Button variant="primary" href="/analytics/reports/new"><Plus size={15} aria-hidden="true" />レポートを作る</Button>}
   </>
   const tabs = <>
     <Navigation active={tab} savedCount={savedCount} />
@@ -122,6 +124,7 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
       renderSave={slots?.renderSave ? (props) => slots.renderSave?.({ ...props, accountId: selectedAccountId, sourceKind: 'funnel' }) : undefined}
       stepKindsLabel={slots?.funnelStepKindsLabel} />
     : tab === 'saved' ? <SavedV8 key={selectedAccountId} accountId={selectedAccountId} onCountChange={setSavedCount} canManage={canManage} />
+    : tab === 'segments' ? <SegmentsV8 key={selectedAccountId} accountId={selectedAccountId} canManage={canManage} />
     : tab === 'usage' ? <UsageV8 key={selectedAccountId} accountId={selectedAccountId} />
     : <UrlClicksV8 key={selectedAccountId} accountId={selectedAccountId} />
 

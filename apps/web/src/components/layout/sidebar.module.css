@@ -1,7 +1,15 @@
 .nav {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 0 12px 8px;
+}
+
+/* 送られているとき、端で途中まで出ている項目は丸ごと隠す（帯の線で半分に切れて見せない）。 */
+.nav[data-clipped] {
+  mask-image: linear-gradient(to bottom,
+    transparent var(--nav-cut-top, 0px), var(--tpl-sidebar-mask-color) var(--nav-cut-top, 0px),
+    var(--tpl-sidebar-mask-color) calc(100% - var(--nav-cut-bottom, 0px)), transparent calc(100% - var(--nav-cut-bottom, 0px)));
 }
 
 .section {
@@ -195,12 +203,19 @@
 :root .desktop {
   width: 240px;
   flex-basis: 240px;
-  /* 画面の高さいっぱい（zUg8S）。項目が多いときは .nav だけ縦に送る。 */
-  height: 100dvh;
+  /* 上の案内帯を除いた workspace の高さ。項目が多いときは .nav だけ縦に送る。 */
+  height: 100%;
+  min-height: 0;
   border-right: 0;
   background: transparent;
   transition: width var(--motion-base) var(--motion-ease-out),
     flex-basis var(--motion-base) var(--motion-ease-out);
+}
+
+/* 上の案内帯を除いた残りの高さを使い、看板・設定・版・本人カードは縮めない。 */
+:root .desktop > :not(.nav),
+.drawer > :not(.nav) {
+  flex-shrink: 0;
 }
 
 /* 1152 の絵（35 枚）は開いたまま 240。狭い幅でも 216 に詰めない（2026-10-06 司令塔、絵が正本）。 */

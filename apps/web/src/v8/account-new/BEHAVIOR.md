@@ -1,7 +1,16 @@
 # LINEアカウントを登録の動き（BEHAVIOR.md）
 
-対象：`register.tsx`（★V8-B ①LINE準備 `xj3zz`・②チャネル設定 `JYfda`・③基本情報 `GwKE2`・④接続確認 `v2KMj`・⑤完了 `TvXII`・結果の窓 `qw80E`）。
-今までの V8 の登録 `app/accounts/new/register-v8.tsx` から動きを写し、見た目だけを絵どおりに組み直した。判定の小さな計算は `logic.ts`（`connection-check-view.ts`・`account-recovery.ts` の写し）。
+対象：`register.tsx`。絵の正本は **`LINE新規追加_v06.pen`**（利用者承認 2026-10-15）。
+フレームは ①事前確認 `p6zMkA`・②アカウント接続 `Fqy29`・③接続確認 `Lwxyh`・④使い方を選ぶ `X0pGdw`・⑤完了 `Plmq1`。
+（V8-B の `xj3zz`／`JYfda`／`GwKE2`／`v2KMj`／`TvXII`／`qw80E` は v06 で置き換えた。）
+判定の小さな計算は `logic.ts`（`connection-check-view.ts`・`account-recovery.ts` の写し）。
+
+## 5段の並びと、中の小さな段
+- ①事前確認 → ②アカウント接続 → ③接続確認 → ④使い方を選ぶ → ⑤完了。
+- ②は中で3つに分かれる（`Step 1 / 3`〜`Step 3 / 3`）。**絵の正本（`Fqy29` の `②-1`／`②-2`／`②-3`）どおり** Step1＝Messaging API のチャネル、Step2＝Webhook の設定、Step3＝LINE Login のチャネル。
+- ②の中だけ、進むボタンは「次のステップへ」、戻るボタンは行き先の名前（`事前確認へ戻る`／`Messaging API へ戻る`／`Webhook の設定へ戻る`）。③Step1 の戻るは「LINEログインへ戻る」。ほかの段は「次へ」「戻る」。
+- ③は中で2つに分かれる。**Step1 で接続を確かめ、そのまま「登録する」で登録する**（登録は④や⑤ではなく③Step1）。Step2 は「ためしに友だち追加してみましょう」。
+- 済んだ段へは戻れるが、登録後（`createdId` あり）は戻れない。段の表示は登録済みでも先に飛ばさない（`currentKey={String(currentStep)}`）。
 
 ## 入口と外枠
 - `app/accounts/new/page.tsx` が V8 のときだけこの画面を出す（v7 は今までの登録ウィザード）。
@@ -11,19 +20,29 @@
 - なし（今までも URL の指定を読まない）。手順は画面の中だけで持つ。
 
 ## 端末の下書き
-- `localStorage` の `musubo-register-draft-v8`（今までと同じ名前・同じ形）。手順・用意の仕方・表示名・チャネルID・LoginチャネルID・LINE ID・タグ・親アカウント・担当・LIFF・取り込みを残す。**秘密値（シークレット）は書かない**。
+- `localStorage` の `musubo-register-draft-v8`（今までと同じ名前・同じ形）。**秘密値（シークレット）は書かない**。
 - 開いたとき、中身のある下書きなら一度だけ戻し「端末の下書きから続けます」を出す（手順1のまま何も入れていない下書きは戻さない）。登録が終わったら消す。
 
+## 入れてもらうもの（v06で減らした）
+- ②Step1：チャネルID・チャネルシークレット（Messaging API）。②Step3：チャネルID・チャネルシークレット（LINE Login）。この4項目だけが必須（②Step2 に入力欄は無い）。
+- **登録の前にタグ・親アカウント・担当範囲・既存のLIFF ID・表示名は聞かない**（承認済みの v06 で外した）。保存の口（`connect`）の形は変えていないので、`tagIds` などは空のまま送る。
+- ②Step2（Webhook の3つ）・②Step3（LINEログインの2つ）には「LINE側でやったこと」の印（チェック）がある。全部入れるまで進めない。アクセストークンと LIFF ID は musubo 側で作るので入力欄を置かない。
+- 「取得方法を見る」は LINE接続マニュアル（`/manuals/line-connect/index.html`）の該当箇所を別タブで開く。
+
 ## 読み書き（API）
-- ③：タグ `api.lineAccountTags.list`（取れなくても続ける）・タグを追加 `api.lineAccountTags.create`、親アカウントと担当の候補 `api.lineAccounts.list`・`api.staff.list`（取れなければ赤い文）。「LINEから取得」は `api.lineAccounts.connectCheck` で LINE ID を先取りする（保存しない）。
-- ④：「接続して設定する」＝ `api.lineAccounts.connectCheck`。5段すべて通れば結果の窓（`qw80E`）。止まった段は行が赤で示す（同じ文の帯は重ねない）。
-- 窓：手動の1項目（応答メッセージをオフにした）にチェックが無いと登録できない。「確認コードを入れて登録する」＝ `api.lineAccounts.connect`。本人確認を求められたら `StepUpPrompt` で立て直してやり直す。
+- ③Step1「接続を確かめる」＝ `api.lineAccounts.connectCheck`。合否は1回の返事がすべて持ち、画面は5行を上から順に見せる（1行ずつ・各420ms）。行の状態は `data-phase`（`waiting`／`checking`／`ok`／`error`）。
+- 5行すべて `ok` になってはじめて「登録する」が出る。止まったときは案内（`checkErrorText`）と「もう一度確かめる」を出し、`connect` は呼ばない。「Webhookの利用」がOFFのときだけ赤ではなく案内の色にする。
+- 4項目のどれかを変えると接続確認はやり直し（結果を消す）。
+- 「登録する」＝ `api.lineAccounts.connect`。本人確認を求められたら `StepUpPrompt` で立て直してやり直す。
 - 重複・応答なし（R523）：同じチャネルIDで作られた行を `api.lineAccounts.list` で1件だけ特定できれば、その詳細へ案内する（未保存と断定しない）。
-- ⑤：取り込みの進み `api.lineAccounts.followerImportState`（3秒ごと・失敗は5秒後）、総数は前日の友だち数 `api.lineAccounts.followerInsight`。取り込みが終わったら契約者専用LINEの案内（`NoticeLineRegisterDialog`）を一度だけ出す。
+- ③Step2：`api.friends.list` で、ためしの友だち追加が届いたかを見る。友だち追加URL・QRは `lib/qr-image.ts`（`qrcode` は必要になってから読み込む・PERF-09）。
+- ④：使い方の型は画面の中だけで選ぶ（保存の口は無い）。いまは「飲食店向け」だけ選べる。
+- ⑤：取り込みは `api.lineAccounts.stepFollowerImport` で**続きを進めながら**進みを受け取る（1回ぶんが終わったらすぐ次を呼ぶ。他の経路が同じアカウントを握っている `busy` のときだけ3秒待つ。失敗は5秒後）。読むだけ（`followerImportState`）だと次の自動処理（5分ごと）まで進まないので、画面を開いている間はこちらで進める。画面を閉じたあとは自動処理とアカウント一覧の「入る」が続きを拾う。総数は前日の友だち数 `api.lineAccounts.followerInsight`。
+- ⑤：取り込みの間は進み具合だけを出し、終わってから「登録したアカウントを見る」を出す。取り込みが終わったら契約者専用LINEの案内（`NoticeLineRegisterDialog`）を一度だけ出す（運営側で未設定なら出ない）。
 
 ## 入力の検査
-- ②：4項目すべて必須、チャネルIDは半角数字。③：表示名は40文字まで。4項目を変えると接続確認はやり直し（結果と手動チェックを消す）。
+- 空のまま「次へ」を押すと、その段の最初の空欄に赤い文を出して寄せる（`aria-invalid`）。チャネルIDは半角数字。
 
 ## 見せ方（絵との違い）
-- ③：絵に無い「親アカウント・担当・既存のLIFF」は消さず、案内の帯の右の「いま決める」で開く。タグの追加は「タグを追加」で名前の欄が出る。
 - 下の帯は本文のすぐ下に置き、長いときは画面の下に追従する（ボタンは中央）。
+- 寸法は `globals.css` の `--tpl-htn6-*` に置き、CSS に数字を直書きしない（`v8-boundary.test.ts`）。

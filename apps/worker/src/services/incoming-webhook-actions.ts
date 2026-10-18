@@ -323,7 +323,7 @@ export async function executeIncomingWebhookActions(
     return { matchedFriendId: friendId, executed: 0, failed: 0, matchStatus: 'matched' };
   }
 
-  const executors = createAutomationActionExecutors(input.dependencies);
+  const executors = createAutomationActionExecutors({ ...input.dependencies, webhookDeliveryMode: 'immediate' });
   let executed = 0;
   let failed = 0;
   let sequence = 0;
@@ -337,7 +337,7 @@ export async function executeIncomingWebhookActions(
       plan = input.execution ? await input.execution.step(`plan:${refIndex}`, makePlan) : await makePlan();
       if (plan.length === 0) throw new Error(`未対応の受信Webhook処理です: ${ref.refKind}`);
     } catch (error) {
-      console.error('[incoming-webhook-actions] plan failed', error);
+      console.error(JSON.stringify({"code":"services_incoming_webhook_actions_failed"}));
       // 再送する受信は完了済みの先頭部分だけを省略する。途中を飛ばすと、
       // 復旧後に先の処理が再実行されて後の処理の結果を上書きしてしまう。
       if (input.execution) throw error;
@@ -387,7 +387,7 @@ export async function executeIncomingWebhookActions(
         }
         executed++;
       } catch (error) {
-        console.error(`[incoming-webhook-actions] action=${action.id} failed`, error);
+        console.error(JSON.stringify({"code":"services_incoming_webhook_actions_failed"}));
         // 副作用の成功後でも、checkpointが保存できなければ後続へ進まない。
         // actionのonFailureに関係なく受信全体を再試行し、順序を維持する。
         if (input.execution) throw error;

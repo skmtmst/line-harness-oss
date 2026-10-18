@@ -329,12 +329,7 @@ export async function dispatchAutomationEventWithLogging(
   const results = await dispatchAutomationEvent(db, input, options);
   for (const result of results) {
     if (result.kind === 'configuration_error') {
-      console.error(JSON.stringify({
-        event: 'automation_v6_trigger_failed',
-        automationId: result.automationId,
-        eventType: input.eventType,
-        reason: result.error,
-      }));
+      console.error(JSON.stringify({"code":"automation_v6_trigger_failed"}));
     }
   }
   return results;
@@ -471,7 +466,6 @@ export async function processScheduledAutomationTriggers(
     ).bind(pageSize, offset).all<ScheduledCandidate>();
 
     for (const candidate of candidates.results ?? []) {
-      if (results.length >= limit) break;
       if (!SCHEDULE_TRIGGER_TYPES.has(candidate.trigger_type)) continue;
       // 機能オフ中は起動しない。定義は残るため再オンで再開する。
       if (candidate.line_account_id && !await featureJobCanRun(db, { accountId: candidate.line_account_id, featureId: 'automations', job: 'automation triggers' })) {
@@ -482,7 +476,7 @@ export async function processScheduledAutomationTriggers(
         const occurrence = dueOccurrence(candidate.trigger_type, config, now, candidate.timezone);
         if (!occurrence) continue;
         due += 1;
-        if (results.length + config.friendIds.length > limit) {
+        if (config.friendIds.length > limit) {
           results.push({
             automationId: candidate.automation_id,
             runId: null,
@@ -511,7 +505,7 @@ export async function processScheduledAutomationTriggers(
         });
       }
     }
-    if (candidates.results.length < pageSize || results.length >= limit) break;
+    if (candidates.results.length < pageSize) break;
   }
   return { due, results };
 }

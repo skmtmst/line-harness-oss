@@ -94,6 +94,9 @@ async function versionsOnApi(id: string) {
       status: string;
       messageContent: string;
       effectiveFrom: string | null;
+      createdByStaffId: string | null;
+      creatorName: string | null;
+      creatorNameSource: 'current_staff_profile' | null;
     }>;
   };
 }
@@ -294,5 +297,44 @@ describe('参照表と削除の止め', () => {
     expect(body.data.broadcasts).toHaveLength(1);
     expect(body.data.broadcasts[0].title).toBe('秋の会員向け案内');
     expect(body.data.broadcasts[0].templateVersionNumber).toBe(1);
+  });
+});
+
+
+describe('UTbi1: 版を作った人', () => {
+  it('公開時の担当者IDから同じ組織の名前を返す。再公開と名簿の変更も区別する', async () => {
+    store.raw.exec(`INSERT INTO tenants(id,name) VALUES('tenant-api5','組5');
+      INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id)
+        VALUES('account-1','店','api5','fixture','fixture','tenant-api5');
+      INSERT INTO staff_members(id,name,role,api_key,tenant_id)
+        VALUES('owner-1','作成者','owner','fixture','tenant-api5')`);
+    const id = await createTemplateOnApi();
+    await publishOnApi(id, '版1', 'author-1');
+    await publishOnApi(id, '版2', 'author-2');
+    const original = (await versionsOnApi(id)).data;
+    expect(original.map(v => [v.versionNumber, v.createdByStaffId, v.creatorName, v.creatorNameSource]))
+      .toEqual([[2,'owner-1','作成者','current_staff_profile'],[1,'owner-1','作成者','current_staff_profile']]);
+    store.raw.exec("UPDATE staff_members SET name='変更後',is_active=0 WHERE id='owner-1'");
+    expect((await versionsOnApi(id)).data.map(v => v.creatorName)).toEqual(['変更後','変更後']);
+    expect(store.raw.prepare('SELECT COUNT(*) n FROM template_versions').get()).toEqual({ n: 2 });
+  });
+
+  it('旧版・不明な担当者・別組織・アカウント未設定の名前を補わず、担当外は404', async () => {
+    store.raw.exec(`INSERT INTO tenants(id,name) VALUES('tenant-api5','組5'),('tenant-other','別組織');
+      INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id)
+        VALUES('account-1','店','api5','fixture','fixture','tenant-api5');
+      INSERT INTO staff_members(id,name,role,api_key,tenant_id)
+        VALUES('owner-1','別組織の秘密名','owner','fixture','tenant-other')`);
+    const id = await createTemplateOnApi();
+    await publishOnApi(id, '公開版', 'unknown-author');
+    expect((await versionsOnApi(id)).data[0]).toMatchObject({ createdByStaffId: 'owner-1', creatorName: null, creatorNameSource: null });
+    for (const author of [null, 'missing']) {
+      store.raw.prepare('UPDATE template_versions SET created_by_staff_id=? WHERE template_id=?').run(author,id);
+      expect((await versionsOnApi(id)).data[0]).toMatchObject({ creatorName: null, creatorNameSource: null });
+    }
+    store.raw.prepare('UPDATE templates SET line_account_id=NULL WHERE id=?').run(id);
+    expect((await versionsOnApi(id)).data[0].creatorName).toBeNull();
+    accountAccess.canAccessAllLineAccounts.mockResolvedValue(false);
+    expect((await json('GET', `/api/templates/${id}/versions`)).status).toBe(404);
   });
 });

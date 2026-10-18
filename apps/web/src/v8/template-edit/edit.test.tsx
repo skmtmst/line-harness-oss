@@ -5,7 +5,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -166,13 +166,22 @@ describe('V8 メッセージを作る・編集', () => {
     expect(push).toHaveBeenCalledWith('/templates?highlight=template-new')
   })
 
-  it('1152 の幅では板 a1k3d の印を付け、見え方は「LINEでの見え方を見る」の窓で開く', async () => {
+  it('1152 の幅でも共通の入口から見え方を1回で開き、閉じても入力を保つ', async () => {
     narrow.value = true
     await mount()
     expect(document.querySelector('[data-design-node="a1k3d"]')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方を見る' }))
+    type(screen.getByLabelText('テンプレート名'), '確認中の名前')
+    type(screen.getByLabelText('本文'), '確認中の本文')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'LINEの見え方を確認' })) })
     await flush()
-    expect(screen.getByRole('dialog', { name: 'LINEでの見え方' })).toBeTruthy()
+    const dialog = screen.getByRole('dialog', { name: 'LINEの見え方' })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(within(dialog).queryByRole('button', { name: /見え方.*(?:見る|確認)/ })).toBeNull()
+    expect(dialog.querySelector('[data-line-preview-part="phone"]')).toBeTruthy()
+    await act(async () => { fireEvent.click(within(dialog).getAllByRole('button', { name: '閉じる' })[0]) })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect((screen.getByLabelText('テンプレート名') as HTMLInputElement).value).toBe('確認中の名前')
+    expect((screen.getByLabelText('本文') as HTMLTextAreaElement).value).toBe('確認中の本文')
   })
 
   it('名前が空なら保存の口を呼ばず、理由を出す', async () => {
@@ -394,6 +403,17 @@ describe('V8 クーポン・リサーチを作る', () => {
   })
 })
 
+it('畳んだ右欄は共通の窓で見え方を読め、保存せずに閉じられる', async () => {
+  await mount()
+  expect(host.querySelector('[data-template-region="preview"]')?.getAttribute('data-preview-narrow')).toBe('hidden')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'LINEの見え方を確認' })) })
+  expect(screen.getByRole('dialog', { name: 'LINEの見え方' })).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '閉じる' })) })
+  expect(screen.queryByRole('dialog', { name: 'LINEの見え方' })).toBeNull()
+  expect(templatesApi.create).not.toHaveBeenCalled()
+  expect(templatesApi.update).not.toHaveBeenCalled()
+})
+
 it('リサーチの回答後の処理は未動作と知らせ、設定は保存する', async () => {
   assetsCreate.mockResolvedValue({success:true,data:{id:'research'}})
   await mount('kind=research&visual=1')
@@ -402,4 +422,23 @@ it('リサーチの回答後の処理は未動作と知らせ、設定は保存�
   fireEvent.click(screen.getByRole('button',{name:'保存して公開'}))
   await flush()
   expect(assetsCreate).toHaveBeenCalledWith(expect.objectContaining({kind:'research',payload:expect.objectContaining({answerActions:[]})}))
+})
+
+it('リサーチ（EsYo4）：選択肢は札の並び。札を押すとその選択肢の「行うこと」が出て、届き方はお客さまが答える画面', async () => {
+  await mount('kind=research&visual=1')
+  // 問1 は「止めたい」に点数が入っているので、その行うことが出ている。
+  const q1 = screen.getByRole('region', { name: '問 1' })
+  expect(q1.textContent).toContain('選択肢「止めたい」が選ばれたら')
+  expect(q1.textContent).toContain('スコアを足す')
+  expect(within(q1).getByRole('switch', { name: '問 1 を必ず答えてもらう' }).getAttribute('aria-checked')).toBe('true')
+  // 問2 は押すまで出さない。札を押すと出る。
+  const q2 = screen.getByRole('region', { name: '問 2' })
+  expect(q2.textContent).not.toContain('が選ばれたら')
+  await act(async () => { fireEvent.focus(within(q2).getByLabelText('問 2 の選択肢 2')) })
+  expect(q2.textContent).toContain('選択肢「おやつ」が選ばれたら')
+  expect(within(q2).getByRole('button', { name: /行うことを足す/ })).toBeTruthy()
+  // 届き方：LINE のトークではなく、答える画面（回答フォームの LIFF と同じ形）。
+  const preview = host.querySelector('[data-liff-phone-frame]')
+  expect(preview?.textContent).toContain('来月も定期便を続けたいと思いますか？')
+  expect(preview?.textContent).toContain('答えを送る')
 })

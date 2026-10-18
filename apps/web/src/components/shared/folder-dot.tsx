@@ -1,5 +1,8 @@
 
-import { Children, isValidElement, type ReactNode } from 'react'
+'use client'
+
+import { Children, isValidElement, useContext, type ReactNode } from 'react'
+import { ListFolderContext } from './list-folder-context'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import TruncatedText from './truncated-text'
 import Checkbox from './checkbox'
@@ -56,16 +59,19 @@ function nameText(node: ReactNode): string {
 
 /**
  * 丸＋名前の1行。名前は1行のまま省略する（全文は呼ぶ側の title で見せる）。
- * B-194: どの幅でも丸を出す。旧い dot 指定は受け取るだけ。
+ * フォルダを使う一覧は畳んだ幅でも丸を出す。機能の無い一覧は型が丸を外す。
  */
-export function FolderDotName({ folder, children, annotation }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode; annotation?: ReactNode }) {
+export function FolderDotName({ folder, nameCarriesDot, children, annotation, selection }: { folder?: FolderDotFolder | null; dot?: boolean; nameCarriesDot?: boolean; children: ReactNode; annotation?: ReactNode; selection?: ReactNode }) {
+  /* nameCarriesDot：名前そのものが色の丸を持つ札（統括のタグ DzdC3）。丸を二重に置かない（古い dot={false} は B-194 で効かないまま）。 */
+  const listHasFolders = useContext(ListFolderContext)
+  const hasFolders = nameCarriesDot ? false : listHasFolders ?? (folder !== undefined)
   const parts = Children.toArray(children)
-  const selection = parts.filter(child => isValidElement(child) && child.type === Checkbox)
+  const selectionNodes = parts.filter(child => isValidElement(child) && child.type === Checkbox)
   const name = parts.filter(child => !isValidElement(child) || child.type !== Checkbox)
   return (
     <span className={styles.line} data-list-name="" data-has-annotation={annotation ? true : undefined} title={nameText(name)}>
-      {selection}
-      <FolderDot folder={folder} />
+      {selection}{selectionNodes}
+      {hasFolders ? <FolderDot folder={folder} /> : null}
       {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{name}</span>}
       {annotation}
     </span>

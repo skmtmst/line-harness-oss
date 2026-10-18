@@ -46,8 +46,10 @@ function serialize(row: Awaited<ReturnType<typeof getManualLink>>) {
 
 async function lookup(c: AppContext, key: string | undefined) {
   if (!key) return inputError(c, { success: false, error: 'screen が要ります', code: 'INVALID_INPUT' }, 400, []);
+  const keyKind = c.req.query('keyKind') ?? 'screen';
+  if (keyKind !== 'screen' && keyKind !== 'task') return inputError(c, { success: false, error: 'リンクの種類を確認してください', code: 'INVALID_INPUT' }, 400, ['keyKind']);
   const row = await getManualLink(c.env.DB, key);
-  const screenRow = row?.key_kind === 'screen' ? row : null;
+  const screenRow = row?.key_kind === keyKind ? row : null;
   return c.json({
     success: true,
     data: {
@@ -67,7 +69,7 @@ manualLinks.get('/api/manual-links/lookup', async (c) => {
   try {
     return lookup(c, c.req.query('screen') ?? c.req.query('key'));
   } catch (err) {
-    console.error('GET /api/manual-links/lookup error:', err);
+    console.error(JSON.stringify({"code":"routes_manual_links_failed","route":"GET /api/manual-links/lookup"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -89,7 +91,7 @@ manualLinks.get('/api/manual-links', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/manual-links error:', err);
+    console.error(JSON.stringify({"code":"routes_manual_links_failed","route":"GET /api/manual-links"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -143,7 +145,7 @@ async function update(c: AppContext, pathKey?: string) {
         code: 'VERSION_CONFLICT',
       }, 409);
     }
-    console.error('PUT /api/manual-links/:key error:', err);
+    console.error(JSON.stringify({"code":"routes_manual_links_failed","route":"PUT /api/manual-links/:key"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 }
@@ -176,7 +178,7 @@ manualLinks.post('/api/manual-links/check', requireRole('owner', 'admin', 'staff
       },
     });
   } catch (err) {
-    console.error('POST /api/manual-links/check error:', err);
+    console.error(JSON.stringify({"code":"routes_manual_links_failed","route":"POST /api/manual-links/check"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

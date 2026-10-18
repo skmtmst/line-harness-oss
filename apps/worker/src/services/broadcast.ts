@@ -1,3 +1,6 @@
+import {processBroadcastSimulation} from './broadcast-simulation.js';
+import { broadcastWideContext } from './broadcast-wide-context.js';
+import { DELIVERY_CONSENT_ALLOWED_SQL, recordSuppressedBroadcastRecipients, suppressedFriendIds, hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
 import { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
 import { buildBroadcastAudienceQuery as buildSegmentQuery } from './broadcast-audience-query.js';
 import { buildMessage } from './line-message.js';
@@ -86,54 +89,13 @@ const PERSONALIZED_PUSH_BATCH_SIZE = 10;
  */
 const PERSONALIZED_PUSH_PER_TICK = 150;
 
-/**
- * 配信全体で1つに決まる差し込みの値。
- *
- * 共通情報（営業時間など）と配信日は、誰に送っても同じ値になる。
- * 1人ずつ引くと人数分クエリが増えるので、送る前に1回だけ用意する。
- *
- * 配信日の起点は**実際に送る時刻**。予約時刻ではない。cron は5分刻みで
- * 動くので、深夜0時前後の配信では予約時刻と実際の日付が割れる。
- * 相手が受け取った日と、本文に書かれた日が食い違うのがいちばん困る。
- */
-async function broadcastWideContext(
-  db: D1Database,
-  accountId: string | null,
-  content: string,
-  fixedVars: Record<string, string> | undefined,
-  broadcastId: string,
-): Promise<BroadcastRenderContext> {
-  const context: BroadcastRenderContext = { deliveredAt: new Date() };
-  if(/\{\{\s*account\.name\s*\}\}/.test(content)) {
-    if(!accountId)throw new Error('店名の差し込みには店舗が必要です');
-    const a=await db.prepare('SELECT name FROM line_accounts WHERE id=?').bind(accountId).first<{name:string}>();
-    if(!a)throw new Error('店名を確認できません');context.accountName=a.name;
-  }
-  if (accountId) {
-    const { getLineAccountById: getLA } = await import('@line-crm/db');
-    const acct = await getLA(db, accountId);
-    context.liffId = (acct as unknown as { liff_id?: string | null } | null)?.liff_id ?? null;
-  }
-  // 共通情報は本文で使っているときだけ引く。使わない配信で毎回1クエリ増やさない。
-  // snapshot の無い到達経路でも、消えた共通情報を空文字へ落とさず fail-closed にする。
-  if (/\{\{\s*var\./.test(content)) {
-    if (fixedVars) context.vars = fixedVars;
-    else {
-      const { resolveSendCommonVars } = await import('./interpolation-context.js');
-      context.vars = await resolveSendCommonVars(
-        db, accountId, content, { kind: 'broadcast', id: broadcastId },
-      );
-    }
-  }
-  return context;
-}
-
 export async function processBroadcastSend(
   db: D1Database,
   lineClient: LineClient,
   broadcastId: string,
   workerUrl?: string,
 ): Promise<Broadcast> {
+  if(await processBroadcastSimulation(db,broadcastId))return (await getBroadcastById(db,broadcastId))!;
   // Mark as sending
   await updateBroadcastStatus(db, broadcastId, 'sending');
 
@@ -160,6 +122,16 @@ export async function processBroadcastSend(
     throw new Error(
       `Unsupported broadcast variables: ${unsupportedVariables.map((v) => `{{${v}}}`).join(', ')}`,
     );
+  }
+
+  // LINE broadcast cannot omit specific followers. Keep the saved target 'all'
+  // and switch to the existing resumable recipient ledger when consent requires it.
+  if (broadcast.target_type === 'all' && !hasRecipientVariablesInParts(storedParts)
+    && await hasSuppressedDeliveryRecipients(db, broadcast.line_account_id ?? null)) {
+    const conditions = JSON.stringify({ operator: 'AND', rules: [{ type: 'is_following', value: true }] });
+    await db.prepare(`UPDATE broadcasts SET status='sending',batch_offset=0,segment_conditions=? WHERE id=?`)
+      .bind(conditions, broadcast.id).run();
+    return (await getBroadcastById(db, broadcastId))!;
   }
 
   // A recipient variable cannot be delivered through LINE broadcast or
@@ -194,10 +166,10 @@ export async function processBroadcastSend(
       const { sql, bindings } = buildSegmentQuery(storedConditions);
       const segmentAudienceSql = accountId
         ? `SELECT COUNT(*) AS total,
-                  SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                  SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
              FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
         : `SELECT COUNT(*) AS total,
-                  SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                  SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
              FROM (${sql}) q`;
       const segmentAudience = await db
         .prepare(segmentAudienceSql)
@@ -214,7 +186,7 @@ export async function processBroadcastSend(
       return (await getBroadcastById(db, broadcastId))!;
     }
 
-    const where: string[] = ['f.is_following = 1'];
+    const where: string[] = ['f.is_following = 1', 'COALESCE(f.is_hidden,0)=0', DELIVERY_CONSENT_ALLOWED_SQL];
     const binds: unknown[] = [];
     if (accountId) {
       where.push('f.line_account_id = ?');
@@ -281,9 +253,9 @@ export async function processBroadcastSend(
     // 名前を差し込む本文は、名前の無い人がいると差し込めない。送る前に止める。
     if (hasRecipientVariablesInParts(storedParts)) {
       const nameSql = accountId
-        ? `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+        ? `SELECT SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
              FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-        : `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+        : `SELECT SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
              FROM (${sql}) q`;
       const missing = await db.prepare(nameSql).bind(...binds).first<{ missing_name: number | null }>();
       if (Number(missing?.missing_name ?? 0) > 0) {
@@ -369,6 +341,11 @@ export async function processBroadcastSend(
         'broadcast',
         JSON.stringify(messages),
       );
+      if (await hasSuppressedDeliveryRecipients(db,broadcastAccountId)) {
+        await db.prepare(`UPDATE broadcasts SET batch_offset=0,segment_conditions=? WHERE id=?`)
+          .bind(JSON.stringify({operator:'AND',rules:[{type:'is_following',value:true}]}),broadcast.id).run();
+        return (await getBroadcastById(db,broadcastId))!;
+      }
       const { requestId } = await lineClient.broadcast(messages, retryKey);
       await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
       if (broadcastAccountId) {
@@ -385,7 +362,7 @@ export async function processBroadcastSend(
             });
           }
         } catch (error) {
-          console.error('analytics URL exposure record failed:', error);
+          console.error(JSON.stringify({"code":"services_broadcast_failed"}));
         }
       }
       // We don't have exact count for broadcast API, set as 0 (unknown)
@@ -449,7 +426,9 @@ export async function processBroadcastSend(
             await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) break;
         const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
         const batch = followingFriends.slice(i, i + MULTICAST_BATCH_SIZE);
-        const sendable = batch.filter((f) => !blocked.has(f.id));
+        const suppressed = await suppressedFriendIds(db,batch.map(f=>f.id));
+        await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
+        const sendable = batch.filter((f) => !blocked.has(f.id)&&!suppressed.has(f.id));
         if (sendable.length === 0) continue;
         const sendableIds = sendable.map((f) => f.id);
         const lineUserIds = sendable.map((f) => f.line_user_id);
@@ -502,7 +481,7 @@ export async function processBroadcastSend(
           ]);
           for (const id of sendableIds) blocked.add(id);
         } catch (err) {
-          console.error(`Multicast batch ${i / MULTICAST_BATCH_SIZE} failed:`, err);
+          console.error(JSON.stringify({"code":"services_broadcast_failed"}));
           // Continue with next batch; failed batch is not logged.
           // 誰が落ちたかは台帳に残す。断定できた失敗だけが再送の対象になる。
           const outcome = classifyDeliveryFailure(err);
@@ -610,7 +589,7 @@ async function countScheduledRecipients(
   accountId: string,
 ): Promise<number | null> {
   try {
-    const where: string[] = ['f.is_following = 1', 'f.line_account_id = ?'];
+    const where: string[] = ['f.is_following = 1', 'f.line_account_id = ?', 'COALESCE(f.is_hidden,0)=0', DELIVERY_CONSENT_ALLOWED_SQL];
     const binds: unknown[] = [accountId];
     if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
       where.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');
@@ -656,10 +635,11 @@ export async function processScheduledBroadcasts(
     const { sweepBroadcastApprovalExpiry } = await import('./broadcast-approval.js');
     await sweepBroadcastApprovalExpiry(db, nowMs);
   } catch (sweepError) {
-    console.error('[broadcast] approval expiry sweep failed:', sweepError);
+    console.error(JSON.stringify({"code":"services_broadcast_failed"}));
   }
 
   for (const broadcast of scheduled) {
+    if(await processBroadcastSimulation(db,broadcast.id))continue;
     try {
       const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
       if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
@@ -684,7 +664,7 @@ export async function processScheduledBroadcasts(
             title: broadcast.title ?? null,
           });
         } catch (skipError) {
-          console.error(`[broadcast] skipped ledger write failed for ${broadcast.id}:`, skipError);
+          console.error(JSON.stringify({"code":"services_broadcast_failed"}));
         }
         await db.prepare(
           `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'scheduled'`,
@@ -710,7 +690,7 @@ export async function processScheduledBroadcasts(
         const approvalCheck = await checkScheduledBroadcastApproval(db, broadcast);
         if (!approvalCheck.sendable) continue;
       } catch (approvalError) {
-        console.error(`[broadcast] scheduled broadcast ${broadcast.id} held: approval check failed:`, approvalError);
+        console.error(JSON.stringify({"code":"services_broadcast_failed"}));
         continue;
       }
       // Optimistic lock: claim this broadcast (scheduled → sending)
@@ -728,7 +708,7 @@ export async function processScheduledBroadcasts(
           detail: { fromStatus: 'scheduled', trigger: 'schedule' },
         });
       } catch (lifecycleError) {
-        console.error(`[broadcast-lifecycle] send_started record failed:`, lifecycleError);
+        console.error(JSON.stringify({"code":"services_broadcast_failed"}));
       }
 
       // Resolve correct lineClient for this broadcast's account
@@ -759,7 +739,7 @@ export async function processScheduledBroadcasts(
       // 下書きへ戻し、予約は消す。プランを選べば送り直せる。
       const permission = await getSendPermissionForAccount(db, accountId, sendPermissions);
       if (!permission.allowed) {
-        console.warn(`[broadcast] scheduled broadcast ${broadcast.id} held: ${permission.reason}`);
+        console.warn(JSON.stringify({"code":"services_broadcast_warn"}));
         await db.prepare(
           `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending'`,
         ).bind(broadcast.id).run();
@@ -780,23 +760,23 @@ export async function processScheduledBroadcasts(
       // 分析の一時対象者が期限切れ・消滅している予約は毎tick再試行しても
       // 届かない。下書きへ戻して予約を消す（内容は残るので作り直せる）。
       if (err instanceof BroadcastAudienceError) {
-        console.warn(`[broadcast] scheduled broadcast ${broadcast.id} held: ${err.blocker}`);
+        console.warn(JSON.stringify({"code":"services_broadcast_warn"}));
         try {
           await db.prepare(
             `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending'`,
           ).bind(broadcast.id).run();
         } catch (demoteErr) {
-          console.error(`Failed to demote broadcast ${broadcast.id} to draft:`, demoteErr);
+          console.error(JSON.stringify({"code":"services_broadcast_failed"}));
         }
         continue;
       }
-      console.error(`Failed to send scheduled broadcast ${broadcast.id}:`, err);
+      console.error(JSON.stringify({"code":"services_broadcast_failed"}));
       // Reset to scheduled so it can be retried next cron
       try {
         await db.prepare(`UPDATE broadcasts SET status = 'scheduled' WHERE id = ? AND status = 'sending'`)
           .bind(broadcast.id).run();
       } catch (resetErr) {
-        console.error(`Failed to reset broadcast ${broadcast.id} status:`, resetErr);
+        console.error(JSON.stringify({"code":"services_broadcast_failed"}));
       }
     }
   }
@@ -850,6 +830,7 @@ export async function processQueuedBroadcasts(
     (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
   );
   for (const broadcast of queued) {
+    if(await processBroadcastSimulation(db,broadcast.id))continue;
     // 機能オフ中は送信中の続きも止める。行は残るため再オンで再開する。
     const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
     if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
@@ -872,7 +853,7 @@ export async function processQueuedBroadcasts(
     // 送っている途中でトライアルが終わった統括は、残りを送らずに待つ（プランを選べば続きから送れる）。
     const permission = await getSendPermissionForAccount(db, accountId, sendPermissions);
     if (!permission.allowed) {
-      console.warn(`[broadcast] queued broadcast ${broadcast.id} held: ${permission.reason}`);
+      console.warn(JSON.stringify({"code":"services_broadcast_warn"}));
       continue;
     }
     /*
@@ -889,7 +870,7 @@ export async function processQueuedBroadcasts(
           await assertAnalyticsAudiencesUsable(db, storedConditions, accountId);
         } catch (audienceError) {
           if (!(audienceError instanceof BroadcastAudienceError)) throw audienceError;
-          console.warn(`[broadcast] queued broadcast ${broadcast.id} held: ${audienceError.blocker}`);
+          console.warn(JSON.stringify({"code":"services_broadcast_warn"}));
           await db.prepare(
             `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending' AND batch_offset = 0`,
           ).bind(broadcast.id).run();
@@ -910,7 +891,7 @@ export async function processQueuedBroadcasts(
     try {
       await processQueuedBroadcastBatches(db, client, broadcast, workerUrl);
     } catch (err) {
-      console.error(`Failed to process queued broadcast ${broadcast.id}:`, err);
+      console.error(JSON.stringify({"code":"services_broadcast_failed"}));
     }
   }
 }
@@ -1037,9 +1018,12 @@ async function processQueuedBroadcastBatches(
     .bind(broadcast.id).first<{n:number}>();
   if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:Number(raw.total_count ?? 0),
     known:Number(previousAudience?.n ?? 0),started:!!hasAudience || Number(raw.success_count ?? 0)>0 || batchOffset>0 || Number(raw.send_attempt_no ?? 1)>1})) return;
-  if (!hasAudience && (segmentConditionsStr || broadcast.target_tag_id)) {
+  const filterAll = broadcast.target_type === 'all' && await hasSuppressedDeliveryRecipients(db,accountId);
+  if (!hasAudience && (segmentConditionsStr || broadcast.target_tag_id || filterAll)) {
     const conditions = segmentConditionsStr ? JSON.parse(segmentConditionsStr)
-      : { operator: 'AND', rules: [{ type: 'tag_exists', value: broadcast.target_tag_id }] };
+      : { operator: 'AND', rules: broadcast.target_tag_id
+          ? [{ type: 'tag_exists', value: broadcast.target_tag_id }]
+          : [{ type: 'is_following', value: true }] };
     const query = buildSegmentQuery(conditions);
     const sql = accountId ? query.sql.replace('WHERE', 'WHERE f.line_account_id = ? AND') : query.sql;
     const bindings = accountId ? [accountId, ...query.bindings] : query.bindings;
@@ -1060,6 +1044,10 @@ async function processQueuedBroadcastBatches(
       'queued-broadcast',
       JSON.stringify(messages),
     );
+    if (await hasSuppressedDeliveryRecipients(db,accountId)) {
+      await updateBroadcastBatchProgress(db,broadcast.id,0,0);
+      return;
+    }
     const { requestId } = await lineClient.broadcast(messages, retryKey);
     await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
     await createBroadcastInsight(db, broadcast.id);
@@ -1149,6 +1137,8 @@ async function processQueuedBroadcastBatches(
       return;
     }
     const batch = friends.slice(currentOffset, currentOffset + deliveryBatchSize);
+    const suppressed = await suppressedFriendIds(db,batch.map(f=>f.id));
+    await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
     const batchIndex = Math.floor(currentOffset / deliveryBatchSize);
 
     if (personalized) {
@@ -1156,7 +1146,7 @@ async function processQueuedBroadcastBatches(
         // 台帳が「送達済み」「送達不明」と覚えている相手は飛ばす（#662）。
         // 送達不明を飛ばすのは at-most-once のため——外へ出たかもしれない
         // 相手を送り直すと、相手のトークに2通残って取り消せない。
-        if (blocked.has(friend.id)) {
+        if (blocked.has(friend.id)||suppressed.has(friend.id)) {
           currentOffset++;
           continue;
         }
@@ -1230,10 +1220,10 @@ async function processQueuedBroadcastBatches(
           try {
             await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 5 });
           } catch (afterError) {
-            console.error(`[broadcast] after-actions failed broadcast=${broadcast.id}`, afterError);
+            console.error(JSON.stringify({"code":"services_broadcast_failed"}));
           }
         } catch (err) {
-          console.error(`Personalized broadcast recipient ${friend.id} failed:`, err);
+          console.error(JSON.stringify({"code":"services_broadcast_failed"}));
           // 届いていないと断定できたものだけ再送の対象にする。分からない
           // ものは送達不明のまま置き、この tick の残りも飛ばす。
           const outcome = classifyDeliveryFailure(err);
@@ -1284,7 +1274,7 @@ async function processQueuedBroadcastBatches(
      * 失敗分の再送は先頭から歩き直すので、ここで叩いてしまうと送り終えた
      * 相手へ2通目が出る。
      */
-    const sendable = batch.filter((friend) => !blocked.has(friend.id));
+    const sendable = batch.filter((friend) => !blocked.has(friend.id)&&!suppressed.has(friend.id));
     if (sendable.length === 0) {
       currentOffset += batch.length;
       continue;
@@ -1320,7 +1310,7 @@ async function processQueuedBroadcastBatches(
       );
       ({ requestId: queuedRequestId } = await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey));
     } catch (err) {
-      console.error(`Queued broadcast batch ${batchIndex} send failed:`, err);
+      console.error(JSON.stringify({"code":"services_broadcast_failed"}));
       const outcome = classifyDeliveryFailure(err);
       await settleBroadcastRecipients(db, {
         broadcastId: broadcast.id,
@@ -1358,13 +1348,13 @@ async function processQueuedBroadcastBatches(
       ];
       await db.batch(stmts);
     } catch (logErr) {
-      console.error(`Queued broadcast batch ${batchIndex} log failed (messages already sent):`, logErr);
+      console.error(JSON.stringify({"code":"services_broadcast_failed"}));
       // 記録に失敗しても、外の口は受け取っている。台帳だけは必ず閉じる。
       // 閉じ損ねると次の試行がこの相手を送り直して2通目が出る。
       try {
         await db.batch(settleSent());
       } catch (settleErr) {
-        console.error(`Queued broadcast batch ${batchIndex} ledger settle failed:`, settleErr);
+        console.error(JSON.stringify({"code":"services_broadcast_failed"}));
       }
     }
     for (const friend of sendable) blocked.add(friend.id);
@@ -1373,7 +1363,7 @@ async function processQueuedBroadcastBatches(
     try {
       await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
     } catch (afterError) {
-      console.error(`[broadcast] after-actions failed broadcast=${broadcast.id}`, afterError);
+      console.error(JSON.stringify({"code":"services_broadcast_failed"}));
     }
 
     currentOffset += batch.length;

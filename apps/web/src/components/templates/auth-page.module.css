@@ -23,12 +23,22 @@
 
 .card[data-auth-layout='admin'] { max-width: 440px; gap: var(--space-16); }
 .card[data-auth-layout='admin'] h1 { text-align: center; width: 100%; }
-.help { color: var(--color-ink-secondary); font-size: var(--polish-text-body); line-height: var(--tpl-ms-otp-desc-lh); margin: 0; }
+.help { color: var(--color-ink-secondary); font-size: var(--polish-text-note); line-height: var(--tpl-ms-otp-desc-lh); margin: 0; }
 
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); }
 .brand { display: flex; align-items: center; justify-content: center; gap: var(--space-8); }
-.brandMark { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius-control); background: var(--color-surface-pearl); color: var(--color-ink); font-size: var(--polish-text-section); }
+.brandMark { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius-control); background: var(--color-accent-deep); color: var(--color-on-accent); font-size: var(--polish-text-section); }
 .brand strong { font-size: var(--polish-text-support); color: var(--color-ink); }
 .brand small { display: block; color: var(--color-ink-secondary); font-size: var(--text-micro); }
 
 .card[data-title-align='start'] h1 { text-align: left; }
+
+.detailRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); min-width: 0; }
+.detailValue { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-8); min-width: 0; }
+.detailValue h3 { margin: 0; color: var(--color-ink-secondary); font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); }
+.detailValue strong { color: var(--color-ink); font-size: var(--polish-text-body); font-weight: var(--font-weight-bold); }
+
+/* 絵 tOPeY（運営のログイン 2段目）：窓は余白28・段の間14・浮いた影。題は左寄せで、ページの頭の余白を持ち込まない。 */
+.card[data-auth-layout='ops'] { padding: 28px; gap: 14px; box-shadow: var(--shadow-float); }
+.card[data-auth-layout='ops'] > header { padding: 0; }
+.card[data-auth-layout='ops'] h1 { text-align: left; }

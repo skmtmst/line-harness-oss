@@ -1,5 +1,5 @@
 'use client'
-import { AuthPage, AuthStack, AuthActions } from '@/components/templates/auth-page'
+import { AuthPage, AuthStack, AuthActions, AuthHelp } from '@/components/templates/auth-page'
 import { Steps } from '@/components/templates/steps'
 import RecoveryCodeList from '@/components/shared/recovery-code-list'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -21,12 +21,12 @@ export function RecoveryCodePanel({ codes, onContinue, continueLabel = '控え�
   }
   return <AuthStack>
     <RecoveryCodeList codes={codes} />
-    <p>この画面を閉じると、もう表示されません。安全な所に控えてください。</p>
+    <AuthHelp>この画面を閉じると、もう表示されません。安全な所に控えてください。</AuthHelp>
     <Button variant="primary" fullWidth onClick={onContinue}>{continueLabel}</Button>
     <Card surface="muted" padding="compact" layout="vertical" gap="normal">
       <SectionHeader title="控え方" />
-      <AuthActions><CopyTextButton label="コピーする" aria-label="回復コードをコピー" value={codes.join('\n')} />
-      <Button variant="text" onClick={download}>ファイルに保存する</Button></AuthActions>
+      <AuthActions><CopyTextButton size="inline" label="コピーする" aria-label="回復コードをコピー" value={codes.join('\n')} />
+      <Button variant="text" size="inline" onClick={download}>ファイルに保存する</Button></AuthActions>
     </Card>
     {error ? <Notice tone="danger" message={error} /> : null}
   </AuthStack>

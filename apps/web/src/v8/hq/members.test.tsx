@@ -6,7 +6,7 @@
  * 役割を変えないときは役割を送らない（担当者が管理者に上がらない）。
  */
 import React, { act } from 'react'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -101,8 +101,18 @@ describe('V8 統括のメンバーの窓', () => {
     expect(dialogTitles()).toContain('権限者を招待')
     const radios = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]'))
     expect(radios.find((r) => r.value === 'accounts')?.checked).toBe(true)
-    const checks = Array.from(document.querySelectorAll('[role="dialog"] [aria-label="担当するアカウント"] input[type="checkbox"]')).map((l) => l.getAttribute('aria-label')).filter((label) => !label?.endsWith('をまとめて選ぶ'))
+    expect(document.querySelector('[role="dialog"] input[type="checkbox"]')).toBeNull()
+    await act(async () => { screen.getByRole('button', { name: '担当アカウント：変える' }).click() })
+    const picker = screen.getByRole('dialog', { name: '担当アカウントを選ぶ' })
+    const checks = within(picker).getAllByRole('checkbox').map(el => el.getAttribute('aria-label')).filter(label => !label?.endsWith('をまとめて選ぶ'))
     expect(checks).toEqual(['然 -NEN- 本店', '然 -NEN- 渋谷店'])
+    await act(async () => { within(picker).getByRole('checkbox', { name: '然 -NEN- 渋谷店' }).click() })
+    await act(async () => { within(picker).getByRole('button', { name: 'キャンセル' }).click() })
+    await act(async () => { screen.getByRole('button', { name: '担当アカウント：変える' }).click() })
+    const reopened = screen.getByRole('dialog', { name: '担当アカウントを選ぶ' })
+    expect((within(reopened).getByRole('checkbox', { name: '然 -NEN- 本店' }) as HTMLInputElement).checked).toBe(true)
+    expect((within(reopened).getByRole('checkbox', { name: '然 -NEN- 渋谷店' }) as HTMLInputElement).checked).toBe(false)
+    await act(async () => { within(reopened).getByRole('button', { name: 'キャンセル' }).click() })
     expect(document.querySelector('[role="dialog"]')!.textContent).toContain('閲覧のみ（見るだけ）')
   })
 
@@ -112,26 +122,32 @@ describe('V8 統括のメンバーの窓', () => {
     const dialog = document.querySelector('[role="dialog"]')!
     const email = dialog.querySelector('input[type="email"]') as HTMLInputElement
     await act(async () => { fireEvent.change(email, { target: { value: 'staff@example.com' } }) })
-    const first = dialog.querySelector('[aria-label="担当するアカウント"] input[aria-label="然 -NEN- 本店"]') as HTMLInputElement
-    await act(async () => { first.click() })
+    await act(async () => { screen.getByRole('button', { name: '担当アカウント：変える' }).click() })
+    const picker = screen.getByRole('dialog', { name: '担当アカウントを選ぶ' })
+    await act(async () => { within(picker).getByRole('checkbox', { name: '然 -NEN- 本店' }).click() })
+    await act(async () => { within(picker).getByRole('button', { name: '選ぶ（0件）' }).click() })
     await act(async () => { buttonByText('招待メールを送る')!.click() })
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(create).not.toHaveBeenCalled()
     expect(dialog.textContent).toContain('名前を入力してください')
-    const scope = dialog.querySelector('[aria-label="担当するアカウント"]')!
+    expect(dialog.querySelector('input[id$="-name"]')?.closest('[data-form-requirement]')?.getAttribute('data-form-requirement')).toBe('required')
+    expect(email.closest('[data-form-requirement]')?.getAttribute('data-form-requirement')).toBe('required')
+    const scope = screen.getByRole('button', { name: '担当アカウント：選ぶ' })
     expect(scope.getAttribute('aria-describedby')).toMatch(/-scope-error$/)
     expect(dialog.textContent).toContain('担当するアカウントを1つ以上選んでください')
     expect((document.activeElement as HTMLInputElement | null)?.id).toMatch(/-name$/)
   })
 
   it('確認の間は変更の窓を閉じ、やめたら入れた中身のまま戻り、役割を変えないときは役割を送らない', async () => {
-    await act(async () => { buttonByText('中川 由美さんの権限を変更')!.click() })
+    await act(async () => { buttonByText('中川 由美のその他操作')!.click() })
+    await flush()
+    await act(async () => { buttonByText('権限を変更する')!.click() })
     await flush()
     expect(dialogTitles()).toEqual(['メンバーの権限を変更する'])
     // 担当者のまま。状態だけ無効にする。
     const inactive = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'inactive')!
     await act(async () => { inactive.click() })
-    await act(async () => { buttonByText('変更を保存')!.click() })
+    await act(async () => { buttonByText('変更を保存する')!.click() })
     await flush()
     expect(dialogTitles()).toEqual(['中川 由美 さんの権限を変えますか？'])
 
@@ -141,7 +157,7 @@ describe('V8 統括のメンバーの窓', () => {
     const stillInactive = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'inactive')!
     expect(stillInactive.checked).toBe(true)
 
-    await act(async () => { buttonByText('変更を保存')!.click() })
+    await act(async () => { buttonByText('変更を保存する')!.click() })
     await flush()
     await act(async () => { buttonByText('変える')!.click() })
     await flush()
@@ -156,15 +172,19 @@ describe('V8 統括のメンバーの窓', () => {
     list.mockResolvedValue({ success: true, data: [ownerMember, staffMember] })
     await act(async () => { root!.render(<HqMembersV8 key="again" />) })
     await flush()
-    const edit = buttonByText('本部 太郎さんの権限を変更')
+    const edit = buttonByText('本部 太郎のその他操作')
     expect(edit).toBeTruthy()
     await act(async () => { edit!.click() })
     await flush()
+    await act(async () => { buttonByText('権限を変更する')!.click() })
+    await flush()
     const accountsOnly = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'accounts')!
     await act(async () => { accountsOnly.click() })
-    const firstAccount = document.querySelector<HTMLElement>('[role="dialog"] [aria-label="担当するアカウント"] input[type="checkbox"]')!
-    await act(async () => { firstAccount.click() })
-    await act(async () => { buttonByText('変更を保存')!.click() })
+    await act(async () => { screen.getByRole('button', { name: '担当アカウント：選ぶ' }).click() })
+    const picker = screen.getByRole('dialog', { name: '担当アカウントを選ぶ' })
+    await act(async () => { within(picker).getByRole('checkbox', { name: '然 -NEN- 本店' }).click() })
+    await act(async () => { within(picker).getByRole('button', { name: '選ぶ（1件）' }).click() })
+    await act(async () => { buttonByText('変更を保存する')!.click() })
     await flush()
     const confirm = buttonByText('変える')
     if (confirm) await act(async () => { confirm.click() })

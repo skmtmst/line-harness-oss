@@ -1,3 +1,5 @@
+import { serializeFriend } from './friend-display.js';
+import { registerFriendDeliveryConsents } from './friend-delivery-consents.js';
 import { idChunks, sqlIdSet } from '@line-crm/db/id-queries';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
@@ -112,44 +114,14 @@ export const requireVisibleFriend: MiddlewareHandler<Env> = async (c, next) => {
   await next();
 };
 
+registerFriendDeliveryConsents(friends, requireVisibleFriend);
+
 const requireIdempotencyKey: MiddlewareHandler<Env> = async (c, next) => {
   if (!isValidIdempotencyKey(c.req.header('Idempotency-Key')?.trim())) {
     return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
   }
   await next();
 };
-
-/**
- * Convert a D1 snake_case Friend row to the shared camelCase shape.
- *
- * Bare-row variant — emits ONLY columns that exist on the friends table.
- * Used by GET /api/friends/:id and metadata-update responses where we read
- * via plain `getFriendById()` and have no JOINed columns. The list endpoint
- * uses `serializeFriendListRow` instead, which adds firstTrackedLinkName +
- * chatStatus from the JOINed query.
- */
-function serializeFriend(row: DbFriend) {
-  return {
-    id: row.id,
-    lineUserId: row.line_user_id,
-    displayName: row.display_name,
-    pictureUrl: row.picture_url,
-    statusMessage: row.status_message,
-    isFollowing: Boolean(row.is_following),
-    metadata: JSON.parse(row.metadata || '{}'),
-    refCode: (row as unknown as Record<string, unknown>).ref_code as string | null,
-    lineAccountId: ((row as unknown as Record<string, unknown>).line_account_id as string | null) ?? null,
-    userId: row.user_id,
-    // 100 で足した列。友だち詳細（設計 `友だち詳細` の「名前」）が読む。
-    // LINEの表示名と、こちらで付けた本名は別物。取り違えると別人に送るので、
-    // 画面で両方を並べて出せるように、ここから返す。
-    realName: ((row as unknown as Record<string, unknown>).real_name as string | null) ?? null,
-    systemDisplayName:
-      ((row as unknown as Record<string, unknown>).system_display_name as string | null) ?? null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
 
 /**
  * Friend serializer for the list endpoint. Adds firstTrackedLinkName +
@@ -266,7 +238,7 @@ friends.get('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), 
     const items = await Promise.all(rows.map((row) => serializeFriendSavedView(c.env.DB, row)));
     return c.json({ success: true, data: { items, total: items.length } });
   } catch (error) {
-    console.error('GET /api/friends/saved-views error:', error);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/saved-views"}));
     return c.json({ success: false, error: '保存した検索を読み込めませんでした' }, 500);
   }
 });
@@ -324,7 +296,7 @@ friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'),
     if (error instanceof SyntaxError) {
       return inputError(c, { success: false, error: '送信内容のJSONが正しくありません' }, 400, []);
     }
-    console.error('POST /api/friends/saved-views error:', error);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/saved-views"}));
     return c.json({ success: false, error: '保存した検索を作成できませんでした' }, 500);
   }
 });
@@ -859,7 +831,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
         });
       } catch (error) {
         // 集計台帳の一時失敗で、友だち一覧そのものを表示不能にしない。
-        console.error('saved search usage record error:', error);
+        console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends"}));
       }
     }
 
@@ -875,7 +847,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       },
     });
   } catch (err) {
-    console.error('GET /api/friends error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -901,7 +873,7 @@ friends.get('/api/friends/add-breakdown', async (c) => {
     const data = await getFriendAddBreakdown(c.env.DB, safeDays, statsScope);
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/friends/add-breakdown error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/add-breakdown"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -925,7 +897,7 @@ friends.get('/api/friends/count', async (c) => {
     }
     return c.json({ success: true, data: { count } });
   } catch (err) {
-    console.error('GET /api/friends/count error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/count"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -955,7 +927,7 @@ friends.get('/api/friends/ref-stats', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/friends/ref-stats error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/ref-stats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -993,7 +965,7 @@ friends.get('/api/friends/:id/mileage', requireVisibleFriend, async (c) => {
     ]);
     return c.json({ success: true, data: { summary, history, insights, connections } });
   } catch (err) {
-    console.error('GET /api/friends/:id/mileage error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/mileage"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1188,7 +1160,7 @@ friends.get('/api/friends/:id/upcoming', requireVisibleFriend, async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/friends/:id/upcoming error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/upcoming"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1215,7 +1187,7 @@ friends.get('/api/friends/stats', async (c) => {
     const stats = await getFriendStats(c.env.DB, statsScope);
     return c.json({ success: true as const, data: stats });
   } catch (err) {
-    console.error('GET /api/friends/stats error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/stats"}));
     return c.json({ success: false as const, error: '友だちの集計を取得できませんでした' }, 500);
   }
 });
@@ -1315,7 +1287,7 @@ friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/friends/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1344,7 +1316,7 @@ friends.get('/api/friends/:id/form-submissions', requireVisibleFriend, async (c)
       },
     });
   } catch (err) {
-    console.error('GET /api/friends/:id/form-submissions error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/form-submissions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1388,7 +1360,7 @@ friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), re
       return c.json({ success: false, error: 'Tag not found' }, 404);
     }
     // 手動付与禁止のタグは付けられない。
-    if (Number(tag.manual_assignment_allowed ?? 1) !== 1) {
+    if (Number(tag.manual_assignment_allowed ?? 1) !== 1 || await db.prepare('SELECT id FROM member_rank_tiers WHERE tag_id=?').bind(body.tagId).first()) {
       return c.json({ success: false, error: 'Tag not found' }, 404);
     }
 
@@ -1432,7 +1404,7 @@ friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), re
 
     return c.json({ success: true, data: null }, 201);
   } catch (err) {
-    console.error('POST /api/friends/:id/tags error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/:id/tags"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1443,14 +1415,17 @@ friends.delete('/api/friends/:id/tags/:tagId', requireRole('owner', 'admin', 'st
     const friendId = c.req.param('id');
     const tagId = c.req.param('tagId');
 
-    await removeTagFromFriend(c.env.DB, friendId, tagId);
+    if(await c.env.DB.prepare('SELECT id FROM member_rank_tiers WHERE tag_id=?').bind(tagId).first())return c.json({success:false,error:'rank_tag_managed'},403);
+    const removed = await c.env.DB.prepare('DELETE FROM friend_tags WHERE friend_id=? AND tag_id=?').bind(friendId,tagId).run();
+    if (!removed.meta.changes) return c.json({ success: true, data: null });
 
     // イベントバス発火: tag_change
-    await fireEvent(c.env.DB, 'tag_change', { friendId, eventData: { tagId, action: 'remove' } });
+    const friend = await getFriendById(c.env.DB, friendId);
+    await fireEvent(c.env.DB, 'tag_change', { friendId, sourceEventId: `manual_tag_remove:${crypto.randomUUID()}`, sourceKind: 'manual', occurredAt: new Date().toISOString(), eventData: { tagId, action: 'remove' } }, undefined, friend?.line_account_id);
 
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/friends/:id/tags/:tagId error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"DELETE /api/friends/:id/tags/:tagId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1507,7 +1482,7 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
       },
     });
   } catch (err) {
-    console.error('PUT /api/friends/:id/metadata error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"PUT /api/friends/:id/metadata"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1532,7 +1507,7 @@ friends.get('/api/friends/:id/messages', requireVisibleFriend, async (c) => {
       .all<{ id: string; direction: string; messageType: string; content: string; createdAt: string }>();
     return c.json({ success: true, data: result.results.reverse() });
   } catch (err) {
-    console.error('GET /api/friends/:id/messages error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/messages"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1695,7 +1670,7 @@ friends.get(
         },
       });
     } catch (error) {
-      console.error('GET /api/friends/:id/timeline error:', error);
+      console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/timeline"}));
       return c.json({ success: false, error: '友だちの履歴を読み込めませんでした' }, 500);
     }
   },
@@ -1856,7 +1831,7 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
         nextRetryAt: null,
         now: failedAt,
       });
-      console.error('POST /api/friends/:id/messages prepare failed:', prepareError);
+      console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/:id/messages"}));
       return c.json({
         success: false,
         error: '送信の準備に失敗しました',
@@ -1931,7 +1906,7 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
 
     return c.json({ success: true, data: { messageId: logId } });
   } catch (err) {
-    console.error('POST /api/friends/:id/messages error:', err);
+    console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/:id/messages"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

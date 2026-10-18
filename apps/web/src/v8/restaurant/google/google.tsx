@@ -11,8 +11,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
-import { restaurantTestApi, type RestaurantStore } from '@/lib/restaurant-test-api'
-import { restaurantGoogleApi, type GoogleConnectionData, type GooglePostKind } from '@/lib/restaurant-google-api'
+import { restaurantGoogleApi, type GoogleConnectionData, type GoogleBusinessStore, type GooglePostKind } from '@/lib/restaurant-google-api'
 import { BoundaryBanner, RestaurantPage, STORE_PICKER_WIDTH } from '../common-a/frame'
 import { errorMessage } from './format'
 import { ReviewDraft, ReviewsBoard } from './reviews'
@@ -68,7 +67,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const searchParams = useSearchParams()
   const { selectedAccountId, setSelectedAccountId, accounts, loading: accountLoading } = useAccount()
   const [data, setData] = useState<GoogleConnectionData | null>(null)
-  const [stores, setStores] = useState<RestaurantStore[]>([])
+  const [stores, setStores] = useState<GoogleBusinessStore[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [banner, setBanner] = useState<{ tone: 'info' | 'warn' | 'danger'; text: string } | null>(null)
@@ -78,12 +77,9 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     setLoading(true)
     setError('')
     try {
-      const [connection, snapshot] = await Promise.all([
-        restaurantGoogleApi.connection(selectedAccountId),
-        restaurantTestApi.snapshot(selectedAccountId).catch(() => null),
-      ])
+      const connection = await restaurantGoogleApi.connection(selectedAccountId)
       setData(connection)
-      setStores(snapshot?.data.stores ?? [])
+      setStores(connection.stores ?? [{ id: connection.store.id, name: connection.store.name, line_account_id: connection.store.lineAccountId }])
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
       setData(null)
@@ -150,7 +146,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
           requestUnsavedAction(() => setSelectedAccountId(nextAccountId))
         }
       }}
-      options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id }))}
+      options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id, disabledReason: !item.line_account_id ? 'LINE公式アカウントが結び付いていません' : undefined }))}
     /></SaveErrorField>
   ) : null
 
@@ -213,7 +209,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     <SaveErrorScope errors={saveErrors}><RestaurantPage
       boardId={boardId}
       title="Googleビジネス"
-      description="Google の口コミ・投稿・営業時間を、店舗ごとに管理します。"
+      description={boardId === 'j0Wcg' ? 'Google の口コミ・投稿・営業時間を、店舗ごとに管理します。返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。' : 'Google の口コミ・投稿・営業時間を、店舗ごとに管理します。'}
       picker={picker}
     >
       <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : undefined} />

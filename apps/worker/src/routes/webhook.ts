@@ -1,3 +1,5 @@
+import {logWebhookStepFailure,recordWebhookAnalyticsEvent} from './webhook-analytics.js';
+import {assignInbox} from '../services/inbox-assignment.js';
 import { webhookDemoTargets } from '../services/webhook-demo-targets.js';
 import { parseRestaurantConfirmationPostback, respondToRestaurantConfirmation } from '../services/restaurant-confirmations.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
@@ -69,49 +71,9 @@ const webhook = new Hono<Env>();
 // large-payload DoS before signature verification (#104). 1 MiB leaves room for
 // bursty batched deliveries (~100 events × ~5 KB) while still well below the
 // 128 MB Cloudflare Workers memory ceiling.
-const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024; // 1 MiB
+const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024;
 
-function logWebhookStepFailure(
-  stage: string,
-  error: unknown,
-  lineAccountId: string | null,
-  event?: WebhookEvent,
-): void {
-  console.error({
-    event: 'line_webhook_step_failed',
-    stage,
-    webhook_event_id: event?.webhookEventId ?? null,
-    line_account_id: lineAccountId,
-    event_type: event?.type ?? null,
-    reason: classifyLineWebhookError(error),
-  });
-}
 
-async function recordWebhookAnalyticsEvent(
-  db: D1Database,
-  lineAccountId: string | null,
-  event: WebhookEvent,
-  input: {
-    friendId?: string | null;
-    eventType: string;
-    dimensions?: Record<string, unknown>;
-  },
-): Promise<void> {
-  if (!lineAccountId) return;
-  try {
-    await recordAnalyticsEvent(db, {
-      lineAccountId,
-      friendId: input.friendId,
-      eventType: input.eventType,
-      sourceKind: 'line_webhook',
-      sourceId: event.webhookEventId,
-      occurredAt: new Date(event.timestamp).toISOString(),
-      dimensions: input.dimensions,
-    });
-  } catch (error) {
-    logWebhookStepFailure('analytics_event_record', error, lineAccountId, event);
-  }
-}
 
 /**
  * friends.line_user_id はグローバル UNIQUE のため (C-2b までは1ユーザー1行)、
@@ -157,13 +119,10 @@ async function ensureFriendFromWebhookUser(
       if (!isFriendScopeConflict(err)) throw err;
       // 同一 line_user_id が別アカウント所有。C-2b まではこのアカウント用の
       // friend 行を作れないので、相手の行に触れずイベントを諦める。
-      console.warn({
-        event: 'line_webhook_friend_scope_conflict',
-        line_account_id: lineAccountId,
-      });
+      console.warn(JSON.stringify({"code":"line_webhook_friend_scope_conflict"}));
       return null;
     }
-    console.log({ event: 'line_webhook_friend_registered', line_account_id: lineAccountId });
+    console.log(JSON.stringify({"code":"line_webhook_friend_registered"}));
   }
 
   if (lineAccountId && friend.line_account_id !== lineAccountId) {
@@ -272,7 +231,7 @@ webhook.post('/webhook', async (c) => {
         .bind(new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, -1) + '+09:00', matchedAccountId)
         .run();
     } catch (stampError) {
-      console.error('last_webhook_received_at update failed:', stampError);
+      console.error(JSON.stringify({"code":"routes_webhook_failed","route":"POST /webhook"}));
     }
   }
 
@@ -435,6 +394,7 @@ async function handleStoppedTenantEvent(
   });
   if (!recorded.inserted || recorded.isUnsent) return;
   await upsertChatOnMessage(db, friend.id, toJstString(new Date(event.timestamp)));
+  if(friend.line_account_id) await assignInbox(db,friend.line_account_id,friend.id);
   await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
     friendId: friend.id,
     eventType: 'message_received',
@@ -498,12 +458,7 @@ async function handleEvent(
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    console.log({
-      event: 'line_webhook_follow_received',
-      webhook_event_id: event.webhookEventId,
-      line_account_id: lineAccountId,
-      event_type: event.type,
-    });
+    console.log(JSON.stringify({"code":"line_webhook_follow_received"}));
 
     // プロフィール取得 & 友だち登録/更新
     let profile: Awaited<ReturnType<LineClient['getProfile']>> | undefined;
@@ -527,12 +482,7 @@ async function handleEvent(
       if (!isFriendScopeConflict(err)) throw err;
       // 同一 line_user_id が別アカウント所有。friend 行なしではフォロー処理を
       // 進められないので、相手の行に触れずこのイベントを諦める (Issue #961)。
-      console.warn({
-        event: 'line_webhook_friend_scope_conflict',
-        webhook_event_id: event.webhookEventId,
-        line_account_id: lineAccountId,
-        event_type: event.type,
-      });
+      console.warn(JSON.stringify({"code":"line_webhook_friend_scope_conflict"}));
       return;
     }
     if (friend.is_following === 0 || (friend.last_followed_at && Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(friend.last_followed_at)?friend.last_followed_at:`${friend.last_followed_at}${friend.last_followed_at.length===10?'T00:00:00':''}+09:00`) > event.timestamp)) return;
@@ -906,14 +856,14 @@ async function handleEvent(
           if (sent) {
             friendAddDeliveryCount += 1;
             await noteDelivered();
-            console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1`);
+            console.log(JSON.stringify({"code":"routes_webhook_log"}));
           }
         } catch (err) {
           logWebhookStepFailure('routed_scenario_delivery', err, lineAccountId, event);
         }
       }
       if (routing.suppressed) {
-        console.log(`[friend-add-routing] suppressed (kind=${routing.kind})`);
+        console.log(JSON.stringify({"code":"routes_webhook_log"}));
       }
     }
 
@@ -968,7 +918,7 @@ async function handleEvent(
           if (sent) {
             friendAddDeliveryCount += 1;
             await noteDelivered();
-            console.log(`Immediate delivery: sent scenario ${scenario.id} step 1`);
+            console.log(JSON.stringify({"code":"routes_webhook_log"}));
           }
         } catch (err) {
           logWebhookStepFailure('scenario_enrollment', err, lineAccountId, event);
@@ -1012,7 +962,7 @@ async function handleEvent(
               throw pushErr;
             }
             noteSendOutcome('delivered');
-            console.log(`[follow] referral intro push sent route=${referralRoute.id}`);
+            console.log(JSON.stringify({"code":"routes_webhook_log"}));
           }
         } catch (err) {
           logWebhookStepFailure('referral_intro_push', err, lineAccountId, event);
@@ -1028,7 +978,7 @@ async function handleEvent(
       if (referralRoute.scenario_id && await holdSendRight()) {
         try {
           const enrollment = await enrollFriendInScenario(db, friend.id, referralRoute.scenario_id);
-          console.log(`[follow] referral scenario enrolled scenario=${referralRoute.scenario_id}`);
+          console.log(JSON.stringify({"code":"routes_webhook_log"}));
           if (enrollment && await holdSendRight({ external: true })) {
             await pushImmediateFirstStep(
               db,
@@ -1552,7 +1502,17 @@ async function handleEvent(
     // 友だち」をバッジ・未対応一覧から永久に落としてしまう。
     if (!nonTextMatched) {
       await replay('incoming_chat',()=>upsertChatOnMessage(execution?.mutationDb('incoming_chat') ?? db, friend.id, toJstString(new Date(event.timestamp))));
+      if(friend.line_account_id) await assignInbox(db,friend.line_account_id,friend.id);
+      if(operatorMailEnv&&lineAccountId)await replay('operator_push',async()=>{
+        const chat=await db.prepare('SELECT id,operator_id FROM chats WHERE friend_id=?').bind(friend.id).first<{id:string;operator_id:string|null}>();if(!chat)return;
+        const {dispatchOperatorEvent}=await import('../services/operator-notification-dispatch.js');
+        await dispatchOperatorEvent(db,operatorMailEnv!,{lineAccountId:lineAccountId!,eventType:chat.operator_id?'inbox_assigned_reply':'inbox_new_inquiry',sourceEventId:logId,executionMode:'automatic'});
+      });
     }
+    if(!nonTextMatched&&lineAccountId)await replay('ai_qa_simulation',async()=>{
+      const {simulateIncomingQa}=await import('../services/ai-auto-qa.js');
+      await simulateIncomingQa(db,{account:lineAccountId,friendId:friend.id,eventId:event.webhookEventId??logId,question:content,kind:msg.type});
+    });
     await replay('recordWebhookAnalyticsEvent:0',()=>recordWebhookAnalyticsEvent(execution?.mutationDb('recordWebhookAnalyticsEvent:0') ?? db, lineAccountId, event, {
       friendId: friend.id,
       eventType: 'message_received',
@@ -1679,7 +1639,20 @@ async function handleEvent(
     // auto_replies にマッチしなかった = 自発メッセージ → unread にする
     if (!matched) {
       await replay('incoming_chat',()=>upsertChatOnMessage(execution?.mutationDb('incoming_chat') ?? db, friend.id, toJstString(new Date(event.timestamp))));
+      if(friend.line_account_id) await assignInbox(db,friend.line_account_id,friend.id);
+      if(operatorMailEnv&&lineAccountId)await replay('operator_push',async()=>{
+        const chat=await db.prepare('SELECT id,operator_id FROM chats WHERE friend_id=?').bind(friend.id).first<{id:string;operator_id:string|null}>();if(!chat)return;
+        const {dispatchOperatorEvent}=await import('../services/operator-notification-dispatch.js');
+        await dispatchOperatorEvent(db,operatorMailEnv!,{lineAccountId:lineAccountId!,eventType:chat.operator_id?'inbox_assigned_reply':'inbox_new_inquiry',sourceEventId:logId,executionMode:'automatic'});
+      });
     }
+
+    // G2 is simulation-only in this tranche. It cannot consume a reply token or
+    // suppress unread/operator notifications. Keyword rules always take priority.
+    if (!matched && lineAccountId) await replay('ai_qa_simulation', async()=>{
+      const {simulateIncomingQa}=await import('../services/ai-auto-qa.js');
+      await simulateIncomingQa(db,{account:lineAccountId,friendId:friend.id,eventId:event.webhookEventId??logId,question:incomingText,kind:event.message?.type??'text'});
+    });
 
     // イベントバス発火: message_received
     // Pass replyToken only when auto_reply didn't actually consume it

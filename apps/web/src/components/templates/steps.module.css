@@ -1,7 +1,7 @@
 /*
  * ★V8 の手順（共通部品 Fa8ED・決まりの板 q1xNMz。2026-10-08 オーナー）。
  * 寸法は app/globals.css の :root の --tpl-steps-*（丸22・名13・線24×1.5・間8・丸と名8）。
- * 1行を守る：折り返さず、入らない幅では今の段だけ名を出す（data-compact）。
+ * 1行を守る：折り返さず、入らない幅では各名を省略し全文はtitleに残す。
  */
 .root {
   display: block;
@@ -13,6 +13,7 @@
 .list {
   display: flex;
   width: max-content;
+  max-width: 100%;
   flex-wrap: nowrap;
   align-items: center;
   gap: var(--tpl-steps-gap);
@@ -24,7 +25,8 @@
 
 .item {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   align-items: center;
   gap: var(--tpl-steps-gap);
 }
@@ -42,10 +44,11 @@
 
 .step {
   display: inline-flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   align-items: center;
   gap: var(--tpl-steps-dot-gap);
   min-height: 0;
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
@@ -111,6 +114,9 @@ button.step:focus-visible {
 }
 
 .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--color-ink);
   font-size: var(--tpl-steps-text-size);
   font-weight: 400;
@@ -126,8 +132,6 @@ button.step:focus-visible {
   color: var(--color-ink-secondary);
 }
 
-/* 入らない幅：今の段だけ名を出す。ほかの名は読み上げにだけ残す（title にも全文）。 */
-.root[data-compact] .name:not([data-step-name='current']),
 .srOnly {
   position: absolute;
   width: 1px;
@@ -144,3 +148,68 @@ button.step:focus-visible {
 
 /* B-211：今の番号は緑の面＋白い数字。 */
 .dot[data-step-dot='current'] { background: var(--color-selection-border); color: var(--color-on-accent); }
+
+.sectionHead { display: flex; align-items: center; gap: var(--polish-space-field); min-width: 0; }
+.sectionNumber { display: inline-flex; align-items: center; justify-content: center; width: var(--space-24); height: var(--space-24); border-radius: var(--radius-large); background: var(--color-shell); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; flex-shrink: 0; }
+.sectionTitle { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; white-space: nowrap; }
+.sectionSummary { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-body); text-overflow: ellipsis; white-space: nowrap; }
+.sectionBody { display: flex; flex-direction: column; gap: var(--space-16); }
+/* はじめの質問：縦の手順も同じ持ち主が描く。 */
+.root[data-layout="sidebar"] { --sidebar-step-height: 30px; --sidebar-step-padding: 10px; --sidebar-step-icon: 14px; }
+.sidebarList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--polish-space-row) / 4);
+  list-style: none;
+}
+
+.sidebarStep {
+  display: flex;
+  width: 100%;
+  height: var(--sidebar-step-height);
+  align-items: center;
+  gap: var(--polish-space-row);
+  border: 0;
+  border-radius: var(--polish-space-row);
+  padding-inline: var(--sidebar-step-padding);
+  background: transparent;
+  color: var(--color-ink-faint);
+  font: inherit;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebarStep:hover {
+  background: var(--polish-hover);
+}
+
+.sidebarStep[data-state='done'] {
+  color: var(--color-ink-secondary);
+}
+
+:root .sidebarStep[data-state='current'] {
+  box-shadow: none;
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.sidebarIcon {
+  width: var(--sidebar-step-icon);
+  height: var(--sidebar-step-icon);
+  flex: none;
+  color: var(--color-ink-faint);
+}
+
+.sidebarStep[data-state='done'] .sidebarIcon,
+.sidebarStep[data-state='current'] .sidebarIcon {
+  color: var(--color-accent-deep);
+}
+
+.sidebarName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

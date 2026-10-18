@@ -1,0 +1,372 @@
+/*
+ * 予約設定 › お支払い（★V8 修正案 f4bLF：T91bV・UteeA・FY8HC）と
+ * メニューごとのお支払いの段（mauOC・XFRyO）。値は変数だけ。
+ */
+
+.headRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+}
+
+.minor {
+  margin: var(--tpl-layout-zero);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+/* 決済サービス：印・名前と札・アカウント・右に操作 */
+.providerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+  min-width: 0;
+}
+
+.providerMark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-bm-40);
+  height: var(--tpl-bm-40);
+  border-radius: var(--tpl-bm-10);
+  background: var(--color-avatar-indigo);
+  color: var(--color-on-accent);
+  font-size: var(--tpl-bm-18);
+  font-weight: 700;
+}
+
+.providerText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-bm-2);
+  min-width: 0;
+}
+
+.providerName {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
+  line-height: var(--tpl-bm-22);
+  white-space: nowrap;
+}
+
+.providerMeta {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.providerActions {
+  display: flex;
+  flex: none;
+  gap: var(--tpl-bm-12);
+}
+
+.holdRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-16);
+}
+
+.holdSelect {
+  flex: none;
+  min-width: var(--tpl-bm-160);
+}
+
+.refundRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-bm-16);
+}
+
+.refundLabel {
+  flex: none;
+  width: var(--tpl-bm-96);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
+}
+
+/* つなぐ前（UteeA の左） */
+.connectLayout {
+  display: grid;
+  grid-template-columns: minmax(0, var(--tpl-bm-714));
+}
+
+.connectCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-bm-16);
+  max-width: calc(var(--tpl-bm-380) + var(--tpl-bm-40));
+  padding: var(--tpl-bm-28) var(--tpl-bm-28) var(--tpl-bm-36);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.connectTitle {
+  align-self: stretch;
+  margin: var(--tpl-layout-zero);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
+  line-height: var(--tpl-bm-22);
+}
+
+.connectList {
+  display: flex;
+  align-self: stretch;
+  flex-direction: column;
+  gap: var(--tpl-bm-12);
+  margin: var(--tpl-layout-zero);
+  padding: var(--tpl-layout-zero);
+  list-style: none;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-13);
+  line-height: var(--tpl-bm-20);
+}
+
+.connectList li {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+}
+
+/* 右の欄 */
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-16);
+}
+
+.sideTitle {
+  margin: var(--tpl-bm-8) 0 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
+  line-height: var(--tpl-bm-22);
+}
+
+.sideList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-24);
+  margin: var(--tpl-layout-zero);
+  padding: var(--tpl-layout-zero);
+  list-style: none;
+}
+
+.sideMenus {
+  gap: var(--tpl-bm-36);
+}
+
+.sideRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bm-12);
+  min-width: 0;
+  min-height: var(--tpl-bm-22);
+}
+
+.sideName {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  white-space: nowrap;
+}
+
+.sideValue {
+  flex: none;
+  margin: var(--tpl-layout-zero);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* 記録・届いた知らせ */
+.records,
+.events {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-16);
+  min-width: 0;
+}
+
+.recordsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bm-12);
+}
+
+.recordsTitle,
+.eventsTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  margin: var(--tpl-layout-zero);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
+  line-height: var(--tpl-bm-22);
+}
+
+.eventsTitle {
+  font-size: var(--tpl-bm-13);
+}
+
+.count {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  white-space: nowrap;
+}
+
+.cellStack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cellSub {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-11);
+  line-height: var(--tpl-bm-16);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footNote {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  margin: var(--tpl-layout-zero);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+.footNote svg {
+  flex: none;
+}
+
+/* メニューごとのお支払いの段（mauOC・XFRyO） */
+.choiceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-bm-24);
+}
+
+.amountBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+  padding: var(--tpl-bm-12) var(--tpl-bm-16);
+  border-radius: var(--tpl-bm-8);
+  background: var(--color-table-head);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
+}
+
+.amountBox svg {
+  flex: none;
+  color: var(--color-ink-secondary);
+}
+
+.amountNote {
+  margin-left: var(--polish-space-auto);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.sideCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-16);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.sideCardTitle {
+  margin: var(--tpl-layout-zero);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  font-weight: 700;
+}
+
+.sideCardText {
+  margin: var(--tpl-layout-zero);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+.sideCardLink {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+}
+
+.connectionIcon {
+  flex: none;
+  color: var(--color-link);
+}
+
+.readValue {
+  margin: var(--polish-space-none);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
+}
+
+.eventKind {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+  min-width: 0;
+}
+
+.eventKind > .cellStack {
+  flex: 1;
+}
+
+.eventFix {
+  display: flex;
+  flex: none;
+  gap: var(--tpl-bm-8);
+}
+
+/* 予約メニューのお支払い 4 つ（CnV1I） */
+.fourChoices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-bm-12); }
+.depositLine { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--tpl-bm-12); }
+/* 物差し（%・金額）と結果は、入れる欄の高さにそろえる（題の下・補足の上）。 */
+.depositLine > :first-child { margin-top: var(--tpl-bm-28); }
+.depositResult { padding-top: var(--tpl-bm-36); color: var(--color-ink); font-size: var(--tpl-bm-13); white-space: nowrap; }
+.subLabel { margin: var(--tpl-layout-zero); color: var(--color-ink); font-size: var(--tpl-bm-13); font-weight: 700; }
+.checkRow { display: flex; flex-wrap: wrap; gap: var(--tpl-bm-24); }
+@container (max-width: 760px) { .fourChoices { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

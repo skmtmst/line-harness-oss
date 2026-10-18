@@ -29,11 +29,7 @@ describe('resolveLineToken', () => {
     expect(log).toHaveBeenCalledTimes(1);
 
     const event = JSON.parse(String(log.mock.calls[0]?.[0]));
-    expect(event).toEqual({
-      event: 'line_token_default_fallback',
-      accountId: null,
-      context: 'test.default-fallback',
-    });
+    expect(event).toEqual({ code: 'line_token_default_fallback' });
     expect(JSON.stringify(log.mock.calls)).not.toContain(defaultToken);
   });
 });

@@ -31,6 +31,9 @@ describe('選ぶ欄の幅と枠なし', () => {
       icon={<svg aria-hidden="true" />} iconOnly showChevron={false} />)
     const button = screen.getByRole('button', { name: 'よく使う絞り込み' })
     expect(button.getAttribute('data-icon-only')).toBe('true')
+    expect(button.getAttribute('data-size')).toBe('compact')
+    expect(button.getAttribute('data-design-node')).toBe('H0V8EK')
+    expect(button.querySelector('[data-select-value]')?.hasAttribute('hidden')).toBe(true)
     expect(button.querySelector('[class*="chevron"]')).toBeNull()
     fireEvent.keyDown(button, { key: 'ArrowDown' })
     expect(button.getAttribute('aria-expanded')).toBe('true')
@@ -85,4 +88,29 @@ describe('選ぶ欄の幅と枠なし', () => {
     expect(css).toMatch(/:root \.textTrigger \.chevron\s*\{\s*display:\s*none;/s)
     expect(container.querySelector('[class*="directionIcon"]')).not.toBeNull()
   })
+})
+
+
+it('W3: page size wording comes from the shared role while the 100 option still selects 100', () => {
+  document.documentElement.dataset.theme = 'v8'
+  const change=vi.fn()
+  render(<Select size="page-size" aria-label="表示件数" value="20" onChange={change}
+    options={[{value:'20',label:'20 件表示'},{value:'50',label:'50件'},{value:'100',label:'100件'}]} />)
+  const trigger=screen.getByRole('button',{name:'表示件数'})
+  expect(trigger.textContent).toBe('20件表示')
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('option',{name:'100件表示'}).querySelector('button')!)
+  expect(change).toHaveBeenCalledWith('100')
+})
+
+it('W3: a numeric value in an ordinary selector retains its authored label',()=>{
+  render(<Select aria-label="点数" value="20" onChange={()=>{}} options={[{value:'20',label:'20点'}]} />)
+  expect(screen.getByRole('button',{name:'点数'}).textContent).toBe('20点')
+})
+
+
+it('W3: page-size width on a duration selector keeps days and has no page-count marker',()=>{
+  const {container}=render(<Select size="page-size" aria-label="期間" value="7" onChange={()=>{}} options={[{value:'7',label:'7日'},{value:'30',label:'30日'}]} />)
+  expect(screen.getByRole('button',{name:'期間'}).textContent).toBe('7日')
+  expect(container.querySelector('[data-list-page-size]')).toBeNull()
 })

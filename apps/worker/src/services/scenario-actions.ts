@@ -228,7 +228,7 @@ export async function runScenarioActions(
   try {
     actions = await loadScenarioActions(db, input)
   } catch (err) {
-    console.error('[scenario-actions] failed to load actions', err)
+    console.error(JSON.stringify({"code":"services_scenario_actions_failed"}))
     return emptyActionsResult()
   }
   return runActionRows(db, actions, input.friendId, input)
@@ -347,14 +347,12 @@ export async function runActionRows(
       try {
         parsedConfig = JSON.parse(action.config_json)
       } catch {
-        console.error(`[scenario-actions] unreadable config action=${action.id} — skipped`)
+        console.error(JSON.stringify({"code":"services_scenario_actions_failed"}))
         result.failed++
         continue
       }
       if (!isScenarioActionComplete(action.action_type, parsedConfig)) {
-        console.warn(
-          `[scenario-actions] incomplete action=${action.id} type=${action.action_type} — skipped`,
-        )
+        console.warn(JSON.stringify({"code":"services_scenario_actions_warn"}))
         result.skippedIncomplete++
         continue
       }
@@ -390,7 +388,7 @@ export async function runActionRows(
       if (action.condition_json && !condition) {
         // 保存されている条件が読めない。全員に実行するより、飛ばして
         // ログに残すほうが安全側。
-        console.error(`[scenario-actions] unreadable condition action=${action.id} — skipped`)
+        console.error(JSON.stringify({"code":"services_scenario_actions_failed"}))
         result.failed++
         continue
       }
@@ -416,7 +414,7 @@ export async function runActionRows(
       }
     } catch (err) {
       // 1つ失敗しても残りは続ける。配信も止めない。
-      console.error(`[scenario-actions] action=${action.id} type=${action.action_type} failed`, err)
+      console.error(JSON.stringify({"code":"services_scenario_actions_failed"}))
       result.failed++
       if (action.action_type === 'event_booking' && err instanceof Error && 'code' in err &&
         (err.code === 'event_booking_unavailable' || err.code === 'event_booking_missing')) {
@@ -474,9 +472,7 @@ async function executeAction(
         c.scenarioId &&
         !(await isResourceInScenarioAccount(db, 'scenario', c.scenarioId, accountId))
       ) {
-        console.warn(
-          `[scenario-actions] cross-account scenario action=${action.id} target=${c.scenarioId} — skipped`,
-        )
+        console.warn(JSON.stringify({"code":"services_scenario_actions_warn"}))
         return false
       }
       await runScenarioOp(db, friendId, action.scenario_id, c, options.sourceEventId)
@@ -534,7 +530,7 @@ async function resolveTagIds(
       allowed.push(id)
       continue
     }
-    console.warn(`[scenario-actions] cross-account tag=${id} — skipped`)
+    console.warn(JSON.stringify({"code":"services_scenario_actions_warn"}))
   }
   return allowed
 }

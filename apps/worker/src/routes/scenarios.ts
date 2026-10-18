@@ -1,3 +1,6 @@
+import { validateConditionForStorage } from './scenario-condition-validation.js';
+import type { ActionBody } from './scenario-action-input-types.js';
+import { hasDeliveryAccess } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -76,11 +79,7 @@ function scenarioContractError(c: Context<Env>, error: unknown): Response {
       ...(error.field ? { field: error.field } : {}),
     }, error.status, []);
   }
-  console.error(JSON.stringify({
-    event: 'scenario_v6_contract_failed',
-    path: c.req.path,
-    reason: error instanceof Error ? error.message : String(error),
-  }));
+  console.error(JSON.stringify({"code":"scenario_v6_contract_failed"}));
   return c.json({ success: false, error: 'シナリオの情報を処理できませんでした' }, 500);
 }
 
@@ -229,6 +228,7 @@ function serializeStep(row: DbScenarioStep) {
     deliveryTime: row.delivery_time ?? null,
     messageType: row.message_type,
     messageContent: row.message_content,
+    messageBubbles: parseJson(row.message_bubbles_json),
     conditionType: row.condition_type ?? null,
     conditionValue: row.condition_value ?? null,
     nextStepOnFalse: row.next_step_on_false ?? null,
@@ -244,42 +244,6 @@ function serializeStep(row: DbScenarioStep) {
     isDraft: Number(row.is_draft ?? 0) !== 0,
     createdAt: row.created_at,
   };
-}
-
-/**
- * 条件ビルダーの結果を保存してよいか見る。
- *
- * 組み立てを実際に走らせて、例外が出なければ通す。形だけ見る検証を別に書くと、
- * 保存はできるのに配信時に落ちる条件が作れてしまう。**保存時と配信時で同じ
- * 関数を通す**のがここの要点。
- *
- * @returns 保存する JSON 文字列。条件なしなら null。
- */
-function validateConditionForStorage(
-  value: unknown,
-  label: string,
-): { ok: true; json: string | null } | { ok: false; error: string } {
-  if (value === null || value === undefined) return { ok: true, json: null };
-  if (typeof value !== 'object' || Array.isArray(value)) {
-    return { ok: false, error: `${label}の条件の形が不正です。` };
-  }
-  const condition = value as SegmentCondition;
-  if (condition.operator !== 'AND' && condition.operator !== 'OR') {
-    return { ok: false, error: `${label}の条件は operator に AND / OR が要ります。` };
-  }
-  if (!Array.isArray(condition.rules)) {
-    return { ok: false, error: `${label}の条件は rules の配列が要ります。` };
-  }
-  // 中身が空なら「条件なし」として保存する。空の条件を持たせておくと、
-  // 画面上は絞り込んでいるように見えて全員に届く。
-  const empty = condition.rules.length === 0 && (condition.groups?.length ?? 0) === 0;
-  if (empty) return { ok: true, json: null };
-  try {
-    buildSegmentWhere(condition);
-  } catch (err) {
-    return { ok: false, error: `${label}の条件を読めません: ${(err as Error).message}` };
-  }
-  return { ok: true, json: JSON.stringify(condition) };
 }
 
 /** 質問メッセージの中身を見る。 */
@@ -469,7 +433,7 @@ scenarios.patch('/api/scenarios/reorder', requireDeliveryAccess('scenarios'), in
     await reorderScenarios(c.env.DB, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
-    console.error('PATCH /api/scenarios/reorder error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"PATCH /api/scenarios/reorder"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -599,7 +563,7 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/scenarios error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -624,7 +588,7 @@ scenarios.get('/api/scenarios/:id', scenarioPermission('view'), async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/scenarios/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -643,6 +607,7 @@ scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBo
       allowConcurrent?: boolean;
       folderId?: string | null;
     }>();
+    if (body.isActive === true && !hasDeliveryAccess(c.get('staff'), 'scenarios', 'publish')) return c.json({ success: false, error: '公開には管理者権限が必要です' }, 403);
 
     if (!body.name || !body.triggerType) {
       return inputError(c, { success: false, error: 'name and triggerType are required' }, 400, ["name","triggerType"]);
@@ -660,6 +625,7 @@ scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBo
 
     let scenario = await createScenario(c.env.DB, {
       name: body.name,
+      isActive: body.isActive !== false && hasDeliveryAccess(c.get('staff'), 'scenarios', 'publish'),
       description: body.description ?? null,
       triggerType: body.triggerType,
       triggerTagId: body.triggerTagId ?? null,
@@ -675,12 +641,6 @@ scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBo
         .bind(body.lineAccountId, scenario.id).run();
     }
 
-    // createScenario() always sets is_active=1; override if the caller requested inactive
-    if (body.isActive === false) {
-      const updated = await updateScenario(c.env.DB, scenario.id, { is_active: 0 });
-      if (updated) scenario = updated;
-    }
-
     // フォルダは create の中身に入っていないので、指定があればここで付ける
     // （#949 N-055: 新規作成画面が名前・フォルダ・方式をまとめて送る）。
     if (body.folderId !== undefined) {
@@ -690,7 +650,7 @@ scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBo
 
     return c.json({ success: true, data: serializeScenario(scenario) }, 201);
   } catch (err) {
-    console.error('POST /api/scenarios error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -723,6 +683,9 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, inputJsonBounda
       || Array.from(body.reason).length > 200
     )) {
       return inputError(c, { success: false, error: '止める理由は停止時だけ指定でき、200字以内の文字列が必要です' }, 400, ["reason","isActive"]);
+    }
+    if (body.isActive !== undefined && !hasDeliveryAccess(c.get('staff'), 'scenarios', 'publish')) {
+      return c.json({ success: false, error: '公開・停止には管理者権限が必要です' }, 403);
     }
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
       return inputError(c, { success: false, error: 'isActive は真偽値で指定してください' }, 400, ["isActive"]);
@@ -797,7 +760,7 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, inputJsonBounda
 
     return c.json({ success: true, data: serializeScenario(updated) });
   } catch (err) {
-    console.error('PUT /api/scenarios/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"PUT /api/scenarios/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -824,7 +787,7 @@ scenarios.get('/api/scenarios/:id/move-referrers', scenarioPermission('view'), a
       .map(({ id: referrerId, name }) => ({ id: referrerId, name }));
     return c.json({ success: true, data: { items, total: items.length } });
   } catch (err) {
-    console.error('GET /api/scenarios/:id/move-referrers error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/move-referrers"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -844,7 +807,7 @@ scenarios.delete('/api/scenarios/:id', requireDeliveryAccess('scenarios'), requi
     if (code === 'SCENARIO_HAS_DEPENDENTS' || /FOREIGN KEY/i.test(code)) {
       return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
     }
-    console.error('DELETE /api/scenarios/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"DELETE /api/scenarios/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -971,7 +934,7 @@ scenarios.post('/api/scenarios/:id/steps', requireDeliveryAccess('scenarios'), r
 
     return c.json({ success: true, data: serializeStep(step) }, 201);
   } catch (err) {
-    console.error('POST /api/scenarios/:id/steps error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/steps"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1012,6 +975,13 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenari
       }
     }
 
+    // 旧1通の編集で複数吹き出しを黙って消さない。来店フォローの版付き保存へ戻す。
+    if (body.messageType !== undefined || body.messageContent !== undefined || body.templateId !== undefined) {
+      const stored = await c.env.DB.prepare('SELECT message_bubbles_json FROM scenario_steps WHERE id=? AND scenario_id=?')
+        .bind(stepId,scenarioId).first<{message_bubbles_json:string|null}>();
+      if (stored?.message_bubbles_json) return c.json({success:false,code:'MULTIPLE_MESSAGES_REQUIRE_EDITOR',error:'複数の吹き出しは来店フォローの編集で保存してください'},409);
+    }
+
     // conditionType / conditionValue の partial-update 検証（OSS issue #120 回帰防止）。
     // どちらかが touched なときだけ走らせる。effective 値は、body に来た値を優先しつつ
     // 既存行で穴埋めして組み立て、validateStepCondition で pair を検証する。
@@ -1036,7 +1006,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenari
     let templateSnapshot: { message_type: string; message_content: string } | null = null;
     if (body.templateId !== undefined && body.templateId !== null) {
       const tpl = await c.env.DB
-        .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ?`)
+        .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ? AND message_bubbles_json IS NULL`)
         .bind(body.templateId)
         .first<{ id: string; message_type: string; message_content: string }>();
       if (!tpl) return inputError(c, { success: false, error: 'templateId not found' }, 400, ["templateId"]);
@@ -1188,7 +1158,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenari
 
     return c.json({ success: true, data: serializeStep(updated) });
   } catch (err) {
-    console.error('PUT /api/scenarios/:id/steps/:stepId error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"PUT /api/scenarios/:id/steps/:stepId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1200,7 +1170,7 @@ scenarios.delete('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scen
     await deleteScenarioStep(c.env.DB, stepId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/scenarios/:id/steps/:stepId error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"DELETE /api/scenarios/:id/steps/:stepId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1275,7 +1245,7 @@ scenarios.post('/api/scenarios/:id/steps/reorder', requireDeliveryAccess('scenar
 
     return c.json({ success: true });
   } catch (err) {
-    console.error('POST /api/scenarios/:id/steps/reorder error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/steps/reorder"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1395,7 +1365,7 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
       },
     });
   } catch (err) {
-    console.error('GET /api/scenarios/:id/preview error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/preview"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1414,7 +1384,7 @@ scenarios.get('/api/scenarios/:id/stats', scenarioPermission('view'), async (c) 
     const stats = await computeScenarioStats(c.env.DB, scenarioId);
     return c.json({ success: true, data: stats });
   } catch (err) {
-    console.error('GET /api/scenarios/:id/stats error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/stats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1584,7 +1554,7 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireDeliveryAccess('sce
     }
     return c.json({ success: true, data: serializeFriendScenario(enrollment) }, 201);
   } catch (err) {
-    console.error('POST /api/scenarios/:id/enroll/:friendId error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/enroll/:friendId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1594,7 +1564,7 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireDeliveryAccess('sce
 // 下書きの編集は公開するまで配信へ混入しない。購読は開始時の版へ固定され、
 // 開始後の編集は次に公開した版の購読から使う（N-050 / #644）。
 // アカウント境界は /api/scenarios/:id 系の共通ミドルウェアで 404 にする。
-scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, inputJsonBoundary(), async (c) => {
+scenarios.post('/api/scenarios/:id/publish', requireDeliveryAccess('scenarios', 'publish'), requireScenarioEditBoundary, inputJsonBoundary(), async (c) => {
   try {
     const requestKey = c.req.header('Idempotency-Key');
     if (!validScenarioPublishKey(requestKey)) {
@@ -1632,7 +1602,7 @@ scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, inputJ
         : '分岐または完了後の移動が循環しているため公開できません';
       return c.json({ success: false, error: reason, code: 'PUBLISH_CYCLE' }, 409);
     }
-    console.error('POST /api/scenarios/:id/publish error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/publish"}));
     return c.json({ success: false, error: 'シナリオを公開できませんでした' }, 500);
   }
 });
@@ -1643,17 +1613,6 @@ scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, inputJ
 
 const VALID_ACTION_HOOKS = ['step_sent', 'scenario_completed', 'choice_selected'] as const;
 const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var', 'send_message', 'send_template', 'reminder', 'event_booking'] as const;
-
-interface ActionBody {
-  hook?: string;
-  stepId?: string | null;
-  choiceIndex?: number | null;
-  actionType?: string;
-  config?: unknown;
-  condition?: unknown;
-  repeatOnRefire?: boolean;
-  sortOrder?: number;
-}
 
 function serializeAction(row: {
   id: string;
@@ -1761,7 +1720,7 @@ scenarios.get('/api/scenarios/:id/actions', scenarioPermission('view'), async (c
       .all<Parameters<typeof serializeAction>[0]>();
     return c.json({ success: true, data: (rows.results ?? []).map(serializeAction) });
   } catch (err) {
-    console.error('GET /api/scenarios/:id/actions error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/actions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1860,7 +1819,7 @@ scenarios.post('/api/scenarios/:id/actions', requireDeliveryAccess('scenarios'),
       .first<Parameters<typeof serializeAction>[0]>();
     return c.json({ success: true, data: row ? serializeAction(row) : null });
   } catch (err) {
-    console.error('POST /api/scenarios/:id/actions error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/actions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1934,7 +1893,7 @@ scenarios.put('/api/scenarios/:id/actions/:actionId', requireDeliveryAccess('sce
       .first<Parameters<typeof serializeAction>[0]>();
     return c.json({ success: true, data: row ? serializeAction(row) : null });
   } catch (err) {
-    console.error('PUT /api/scenarios/:id/actions/:actionId error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"PUT /api/scenarios/:id/actions/:actionId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1947,7 +1906,7 @@ scenarios.delete('/api/scenarios/:id/actions/:actionId', requireDeliveryAccess('
       .run();
     return c.json({ success: true });
   } catch (err) {
-    console.error('DELETE /api/scenarios/:id/actions/:actionId error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"DELETE /api/scenarios/:id/actions/:actionId"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2025,7 +1984,7 @@ async function runTestSend(
     }
     return c.json({ success: true, data: { sent: result.sent } });
   } catch (err) {
-    console.error('scenario test-send error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed"}));
     return c.json(
       { success: false, error: `テスト送信に失敗しました: ${(err as Error).message}` },
       502,
@@ -2065,7 +2024,7 @@ scenarios.get('/api/scenarios/:id/triggers', scenarioPermission('view'), async (
       data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),
     });
   } catch (err) {
-    console.error('GET /api/scenarios/:id/triggers error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/triggers"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2109,7 +2068,7 @@ scenarios.post('/api/scenarios/:id/triggers', requireScenarioEditBoundary, input
       data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),
     });
   } catch (err) {
-    console.error('POST /api/scenarios/:id/triggers error:', err);
+    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/triggers"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2140,7 +2099,7 @@ scenarios.delete(
       await removeScenarioTrigger(c.env.DB, c.req.param('id'), c.req.param('triggerId'));
       return c.json({ success: true });
     } catch (err) {
-      console.error('DELETE /api/scenarios/:id/triggers/:triggerId error:', err);
+      console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"DELETE /api/scenarios/:id/triggers/:triggerId"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2304,7 +2263,7 @@ scenarios.post(
         };
       });
     } catch (err) {
-      console.error('POST /api/scenario-subscriptions/:id/pause error:', err);
+      console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenario-subscriptions/:subscriptionId/pause"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2345,7 +2304,7 @@ scenarios.post(
         return { status: 200, body: { success: true, data: serializeFriendScenario(resumed) } };
       });
     } catch (err) {
-      console.error('POST /api/scenario-subscriptions/:id/resume error:', err);
+      console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenario-subscriptions/:subscriptionId/resume"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2380,7 +2339,7 @@ scenarios.post(
         return { status: 200, body: { success: true, data: serializeFriendScenario(retried) } };
       });
     } catch (err) {
-      console.error('POST /api/scenario-subscriptions/:id/retry error:', err);
+      console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenario-subscriptions/:subscriptionId/retry"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2446,7 +2405,7 @@ scenarios.post(
         return { status: 200, body: { success: true, data: serializeFriendScenario(moved) } };
       });
     } catch (err) {
-      console.error('POST /api/scenario-subscriptions/:id/move error:', err);
+      console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenario-subscriptions/:subscriptionId/move"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },

@@ -18,10 +18,10 @@ const KEY = 'DRQbIikwNz5FTFNaYWhvdn2Ei5KZoKeutbzDytHY3-Y';
 vi.mock('cloudflare:workers', () => ({ env: { LINE_CREDENTIAL_ENCRYPTION_KEY: KEY } }));
 
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({
+  LineClient: vi.fn().mockImplementation(function () { return ({
     replyMessage: vi.fn().mockResolvedValue(undefined),
     pushMessage: vi.fn().mockResolvedValue(undefined),
-  })),
+  }); }),
 }));
 
 import { fireEvent } from './event-bus.js';

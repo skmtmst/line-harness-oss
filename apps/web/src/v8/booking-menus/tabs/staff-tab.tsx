@@ -3,7 +3,8 @@
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useState } from 'react'
-import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table'
+import HelpTip from '@/components/shared/help-tip'
 import { ListChecks, Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -15,10 +16,17 @@ import ListRange from '@/components/ui/list-range'
 import { ApiError, bookingApi, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
 import { EMPTY_STAFF, StaffEditModal } from '../staff-edit-dialog'
+import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '../../booking-payments/assignment'
+import StatusBadge from '@/components/shared/status-badge'
+import { usePreparingDialog } from '@/components/shared/preparing-dialog'
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { StaffCalendarPanel } from '../staff-calendar'
+import assignStyles from '../../booking-payments/assignment.module.css'
 import {
   AccountIcon,
   StateCard,
   SkeletonRows,
+  useV8TabEdit,
   type LoadStatus,
 } from './shared'
 import styles from '../settings.module.css'
@@ -58,6 +66,22 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   const [pausing, setPausing] = useState(false)
   const [pauseError, setPauseError] = useState<string | null>(null)
   const [page, setPage] = useListUrlValue('page', 1)
+  /* 指名なしの予約の割り当て方（B-306・絵 QJMoY）。保存は下の帯。 */
+  const assignment = useAssignment({ kind: 'staff', accountId })
+  const preparing = usePreparingDialog()
+  const [assignTarget, setAssignTarget] = useState<BookingStaff | null>(null)
+  /* つなぐ先（カレンダーと会議の URL・B7 uRd8A）は右のパネル。URL の ?staff= で開く。 */
+  const [calendarStaffId, setCalendarStaffId] = useDetailPanelUrl('staff')
+  const calendarPerson = staff.find((person) => person.id === calendarStaffId) ?? null
+  const staffOrder = staff.map((person) => person.id)
+  useV8TabEdit({
+    dirty: assignment.dirty,
+    saving: assignment.saving,
+    subject: '割り当て方への変更',
+    saveDisabled: !canEdit,
+    onSave: () => { if (assignment.status === 'not-ready') preparing.open('割り当て方の保存'); else void assignment.save(staffOrder) },
+    onReset: assignment.reset,
+  })
 
   const pageCount = Math.max(1, Math.ceil(staff.length / STAFF_PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
@@ -135,8 +159,9 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Table">
+      <AssignmentSection state={assignment} kind="staff" canEdit={canEdit} />
       <div className={styles.staffHeadRow}>
-        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length} 人`}</h2>
+        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length} 人`} <HelpTip label="担当スタッフの操作の説明">行の「…」から 勤務とシフト・編集・止める。名前を押すと勤務とシフトが開きます。カレンダーにつないでいないスタッフは、ほかの予約サービスの予約で枠が埋まらないので、つなぐのをおすすめします。</HelpTip></h2>
         <div className={styles.staffHeadActions}>
           <Button href="/booking/menus/staff"><ListChecks size={15} aria-hidden="true" />担当メニューをまとめて決める</Button>
           {canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}><Plus size={15} aria-hidden="true" />スタッフを登録</Button> : null}
@@ -155,6 +180,8 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       <div className={`${styles.staffRow} ${styles.staffTableHead}`} aria-hidden="true">
         <span className={styles.staffName}>スタッフ</span>
         <span className={styles.staffColMenus}>担当メニュー</span>
+        <span className={assignStyles.priorityCell}>優先度</span>
+        <span className={assignStyles.limitCell}>1日の上限</span>
         <span className={styles.staffColNoAssign}>指名なし</span>
         <span className={styles.staffColWork}>勤務（今週）</span>
         <span className={styles.staffColLink}>カレンダー・ログイン</span>
@@ -172,8 +199,10 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
             external: false,
             href: `/booking/staff/shifts?staff_id=${person.id}`, onSelect: () => router.push(`/booking/staff/shifts?staff_id=${person.id}`),
           },
+          { id: 'calendar', label: 'カレンダーと会議の URL', onSelect: () => setCalendarStaffId(person.id) },
           ...(canEdit ? [
             { id: 'edit', label: '中身を編集', onSelect: () => setEditing(person) },
+            { id: 'assign', label: '割り当ての設定', onSelect: () => setAssignTarget(person) },
             {
               id: 'pause',
               label: person.is_active ? '止める' : '再開する',
@@ -191,19 +220,25 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         return (
           <div key={person.id} className={styles.staffRow}>
             <span className={styles.staffName}>
-              <Link href={`/booking/staff/shifts?staff_id=${person.id}`} className={styles.staffNameLink}>
+              <RowNameLink href={`/booking/staff/shifts?staff_id=${person.id}`} title={person.name}>
                 {person.name}
-              </Link>
-              {person.role ? <span className={styles.staffRole}>{person.role}</span> : null}
+              </RowNameLink>
+              {person.role ? <span className={styles.staffRole} title={person.role}>{person.role}</span> : null}
             </span>
             <span className={styles.staffColMenus}>
               {offered > 0 ? (
                 <span className={styles.staffCellMain}>{offered}つ</span>
               ) : (
                 <span className={styles.cellWarn}>
-                  0<span className={styles.staffCellSub}>予約画面に出ません</span>
+                  0<span className={styles.staffCellSub} title="予約画面に出ません">予約画面に出ません</span>
                 </span>
               )}
+            </span>
+            <span className={assignStyles.priorityCell}>
+              {(() => { const level = PRIORITY[assignment.resources[person.id]?.priority ?? 'normal']; return <StatusBadge tone={level.tone} size="compact">{level.label}</StatusBadge> })()}
+            </span>
+            <span className={assignStyles.limitCell}>
+              <span className={styles.staffCellMain}>{assignment.resources[person.id]?.dailyLimit ? `${assignment.resources[person.id]?.dailyLimit} 件` : '上限なし'}</span>
             </span>
             <span className={styles.staffColNoAssign}>
               <span className={styles.staffCellMain}>{person.is_designation_optional ? '入る' : emptyValue('unknown')}</span>
@@ -231,8 +266,8 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
             </span>
             <span className={styles.staffColMenu}>
               <RowMenu
-                appearance="plain"
-                className={styles.rowMenuButton}
+                appearance="box"
+                size="row"
                 label={`${person.display_name}のそのほかの操作`}
                 menuLabel={`${person.display_name}の操作`}
                 open={openMenuId === person.id}
@@ -258,9 +293,14 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       </section>
       )}
 
-      <p className={styles.staffNote}>
-        行の「…」から 勤務とシフト・編集・止める。名前を押すと勤務とシフトが開きます。カレンダーにつないでいないスタッフは、ほかの予約サービスの予約で枠が埋まらないので、つなぐのをおすすめします。
-      </p>
+      {preparing.dialog}
+      <StaffCalendarPanel accountId={accountId} person={calendarPerson} menuCount={calendarPerson ? (matrices[calendarPerson.id] ?? []).filter((entry) => entry.is_offered).length : 0}
+        canEdit={canEdit} onClose={() => setCalendarStaffId(null)} />
+      <AssignmentRowDialog open={assignTarget !== null} name={assignTarget?.name ?? ''} unit="件"
+        value={assignTarget ? assignment.resources[assignTarget.id] : undefined}
+        onClose={() => setAssignTarget(null)}
+        onApply={(patch) => { if (assignTarget) assignment.setResource(assignTarget.id, patch) }} />
+      <AssignmentConflict state={assignment} unit="件" order={staffOrder} subject="指名なしの予約の割り当て方" names={Object.fromEntries(staff.map((person) => [person.id, person.name]))} />
 
       {editing ? (
         <StaffEditModal staff={editing} onSave={saveStaff} onClose={() => setEditing(null)} />

@@ -1,21 +1,68 @@
 'use client'
 
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
+import Avatar from './avatar'
 import React from 'react'
+import { recordTableColumns } from './record-table-columns'
 import { useTableActionWidth } from './use-table-action-width'
 import { useListRowDensity } from './use-list-row-density'
+import { useListColumnSizing } from './use-list-column-sizing'
 import { useListUrlState } from './list-url-state'
-import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
-import TruncatedText from './truncated-text'
+import type { ReactNode, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import shell from './data-table.module.css'
 import { loadFailureCopy } from './api-error-message'
-import HelpTip from './help-tip'
 import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
+import cellPresentations from './table-cell-presentations.module.css'
+import type { ThProps } from './table-head-cell'
+export type { ThProps } from './table-head-cell'
+import TruncatedText from './truncated-text'
+import HelpTip from './help-tip'
 import { DelayedSkeleton, ListSkeleton } from './skeleton'
 import presentationStyles from './table-presentation.module.css'
 import PageLink, { RowNavigation, useListNavigationHref } from './list-navigation'
 import { isRowControl } from './destination-policy'
+/** Pencil V5/V6の `tPTMp` を正本にした表見出しセル。 */
+export function Th({
+  children,
+  align = 'left',
+  className,
+  scope = 'col',
+  help,
+  helpLabel,
+  helpHref,
+  truncate,
+  showActionLabel = false,
+  collapseAt,
+  grow,
+  weight,
+  inset,
+  columnKind,
+  ...cellProps
+}: ThProps) {
+  const classes = [
+    styles.cell,
+    align === 'right' && styles.right,
+    align === 'center' && styles.center,
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const hasHelp = help !== undefined && help !== null
+  const actionHeading = children === '操作' && !showActionLabel
+  const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
+  return (
+    <th className={classes} data-align={align} data-column-kind={columnKind} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset || weight ? { ...(inset ? { paddingInlineStart: inset } : {}), ...(weight ? { '--cell-weight': weight } : {}) } as CSSProperties : undefined} data-cell-weight={weight} {...cellProps}>
+      {actionHeading ? <span className="sr-only">操作</span> : truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
+      {hasHelp ? (
+        <HelpTip label={`${heading}の説明`}>
+          {help}
+          {helpHref ? <a href={helpHref}>くわしく</a> : null}
+        </HelpTip>
+      ) : null}
+    </th>
+  )
+}
 
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
@@ -42,76 +89,6 @@ export function TableHeadRow({
   )
 }
 
-type Scope = NonNullable<ThHTMLAttributes<HTMLTableCellElement>['scope']>
-
-export type ThProps = Omit<
-  ThHTMLAttributes<HTMLTableCellElement>,
-  'align' | 'children' | 'className' | 'scope'
-> & {
-  children?: ReactNode
-  align?: 'left' | 'right' | 'center'
-  className?: string
-  scope?: Scope
-  /** 短い列では1行で省略し、titleで全文を読める。 */
-  truncate?: boolean
-  /** 白い板が狭いときだけ、補助列を畳む。見出しと本文で揃える。 */
-  collapseAt?: 'narrow'
-  /** 列の余った幅をこのセルに割り当てる。 */
-  grow?: boolean
-  /** 文字の先頭を名前のフォルダ印に揃える。 */
-  inset?: string
-  /**
-   * 定義・分母・単位・言葉の意味。見出しのすぐ右の「？」へ入れる
-   * （★V7・§2-1b）。表の下の注はここへ移し、2回書かない。
-   */
-  help?: ReactNode
-  /** 「？」の見出し。省略時は見出し文字。読み上げ名は「{見出し}の説明」。 */
-  helpLabel?: string
-  /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
-  helpHref?: string
-}
-
-/** Pencil V5/V6の `tPTMp` を正本にした表見出しセル。 */
-export function Th({
-  children,
-  align = 'left',
-  className,
-  scope = 'col',
-  help,
-  helpLabel,
-  helpHref,
-  truncate,
-  collapseAt,
-  grow,
-  inset,
-  ...cellProps
-}: ThProps) {
-  const classes = [
-    styles.cell,
-    align === 'right' && styles.right,
-    align === 'center' && styles.center,
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
-
-  const hasHelp = help !== undefined && help !== null
-  const actionHeading = children === '操作'
-  const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
-
-  return (
-    <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
-      {actionHeading ? <span className="sr-only">操作</span> : truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
-      {hasHelp ? (
-        <HelpTip label={`${heading}の説明`}>
-          {help}
-          {helpHref ? <a href={helpHref}>くわしく</a> : null}
-        </HelpTip>
-      ) : null}
-    </th>
-  )
-}
-
 /**
  * Pencil V6 `RwC76` を正本にした一覧表の外枠。
  * 設計の節の印は表へ写す（data-design 受け口）。共通化で印を落とすと、
@@ -122,17 +99,23 @@ export function DataTable({
   className,
   'data-design': dataDesign,
   presentation,
+  cellPresentation,
   density,
   columns,
   label,
   columnLayout,
   'aria-label': ariaLabel,
   grid,
+  columnSizing,
+  columnWeights,
 }: {
   children: ReactNode
   className?: string
+  /** 列の幅の割合（1,2.2,…）。均等割りにせず、条件のような長い列に幅を取る。列の数と同じだけ渡す。 */
+  columnWeights?: readonly number[]
   'data-design'?: string
   /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
+  cellPresentation?: 'friends'
   presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery' | 'template-list'
   /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
   density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
@@ -143,14 +126,18 @@ export function DataTable({
   /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
   columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string; collapseScope?: 'page' }
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
-  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
+  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string; headTextSize?: string; bodyTextSize?: string }
+  /** 名前へ残りを配る。contentは補助列の内容幅、controlsは札・操作だけ最低必要幅を確保。 */
+  columnSizing?: 'content' | 'controls'
 }) {
   const actionWidthRef = useTableActionWidth<HTMLDivElement>()
   useListRowDensity(actionWidthRef)
+  useListColumnSizing(actionWidthRef, columnSizing !== undefined)
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
+  columns ??= tableDensity && !grid && !columnLayout ? recordTableColumns(children) : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div ref={actionWidthRef} data-shared-part="list-table" className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
+    <div ref={actionWidthRef} data-shared-part="list-table" data-column-sizing={columnSizing} data-cell-presentation={cellPresentation} className={[shell.frame, cellPresentation === 'friends' && cellPresentations.friendList, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
@@ -169,11 +156,12 @@ export function DataTable({
         '--table-grid-gap':grid.gap,
         '--table-grid-row-height':grid.rowHeight,
         '--table-head-padding': grid.headPadding,
-      } as CSSProperties : undefined}>{children}</table>
+        '--table-head-text-size': grid.headTextSize ?? 'var(--tpl-sb-tbl-head)',
+        '--table-body-text-size': grid.bodyTextSize ?? 'var(--tpl-sb-tbl-head)',
+      } as CSSProperties : undefined}>{columnWeights?.length ? <colgroup>{columnWeights.map((weight, index) => <col key={index} style={{ width: `${(weight / columnWeights.reduce((sum, value) => sum + value, 0)) * 100}%` }} />)}</colgroup> : null}{children}</table>
     </div>
   )
 }
-
 export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
   className?: string
@@ -246,8 +234,8 @@ export function RowNameLink({ onOpen, onClick, ...props }: React.ComponentProps<
 }
 
 /** 名前から既存の詳細を開く操作。行き先の切り替え方は画面が保つ。 */
-export function RowNameButton({ className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" {...props} className={[styles.rowNameLink, className].filter(Boolean).join(' ')} />
+export function RowNameButton({ className, selected, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }) {
+  return <button type="button" aria-pressed={selected} data-part="row-name" {...props} className={[styles.rowNameLink, className].filter(Boolean).join(' ')} />
 }
 
 export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'children' | 'className'> & {
@@ -256,17 +244,23 @@ export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'ch
   className?: string
   collapseAt?: 'narrow'
   grow?: boolean
+  /** 余った幅の割合（grow の列どうしの比）。 */
+  presentation?: 'friend-list' | 'template-plain'
+  columnKind?: 'check' | 'star' | 'menu'
+  weight?: number
 }
 
 /** 標準一覧の本文セル。 */
-export function Td({ children, align = 'left', className, collapseAt, grow, ...cellProps }: TdProps) {
+export function Td({ children, align = 'left', className, collapseAt, grow, presentation, columnKind, weight, style, ...cellProps }: TdProps) {
   const classes = [
     shell.bodyCell,
+    presentation === 'friend-list' && cellPresentations.friendListCell,
+    presentation === 'template-plain' && cellPresentations.templatePlainCell,
     align === 'right' && styles.right,
     align === 'center' && styles.center,
     className,
   ].filter(Boolean).join(' ')
-  return <td className={classes} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
+  return <td className={classes} data-align={align} data-column-kind={columnKind} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} data-cell-weight={weight} style={weight ? { ...style, '--cell-weight': weight } as CSSProperties : style} {...cellProps}>{children}</td>
 }
 
 /** 日時の本文セル。数字の桁と補足色は共通部品が持つ。 */
@@ -274,17 +268,42 @@ export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>)
   return <Td {...cellProps} className={styles.dateCell}>{children}</Td>
 }
 
-/** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, folder, annotation, className }: {
+/** 顔と名前を同じ1行に保つ。狭い列では名前だけを省略する。 */
+export function PersonCell({ name, avatarName, avatarSrc, avatarSize = 24, gap, ...cellProps }: Omit<TdProps, 'children'> & {
   name: ReactNode
+  avatarName?: string | null
+  avatarSrc?: string | null
+  avatarSize?: 24 | 32
+  gap?: string
+}) {
+  return <Td {...cellProps} data-list-person-cell><span className={styles.person} style={gap ? { gap } : undefined}>
+    <Avatar name={avatarName} src={avatarSrc} size={avatarSize} />
+    <span className={styles.personName}>{name}</span>
+  </span></Td>
+}
+
+/** B-194: states belong to their column; stacked badges keep the 60px row. */
+export function StatusCell({ primary, children, ...cellProps }: Omit<TdProps, 'className'> & { primary?: ReactNode }) {
+  return <Td {...cellProps} className={shell.statusCell} data-list-status-cell><div className={shell.statusStack}>{primary ? <span className={shell.statusPrimary}>{primary}</span> : null}{children}</div></Td>
+}
+
+/** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
+export function NameCell({ name, folder, nameCarriesDot, annotation, selection, className, grow }: {
+  name: ReactNode
+  /** 名前が色の丸を持つ札（タグの札）のとき、フォルダの丸を置かない。 */
+  nameCarriesDot?: boolean
   /** 名前の横の状態札。名前やリンクの中には入れない。 */
   annotation?: ReactNode
+  /** Selection stays outside the truncatable name, including its context menu. */
+  selection?: ReactNode
   folder?: FolderDotFolder | null
   className?: string
+  /** 列の余りを名前へ配る。見出しの Th と同じ役割を渡す。 */
+  grow?: boolean
 }) {
   return (
-    <td data-list-name-cell="" className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
-      <div className={shell.name}><FolderDotName folder={folder} annotation={annotation}>{name}</FolderDotName></div>
+    <td data-list-name-cell="" data-cell-grow={grow || undefined} className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
+      <div className={shell.name}><FolderDotName folder={folder} nameCarriesDot={nameCarriesDot} annotation={annotation} selection={selection}>{name}</FolderDotName></div>
     </td>
   )
 }

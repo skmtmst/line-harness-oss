@@ -280,15 +280,17 @@ async function setSelectValue(select: HTMLSelectElement, value: string) {
 }
 
 describe('N-037 staffの情報欄は読み取り専用（403と画面を一致）', () => {
-  it('管理者には入力欄と「保存」「項目を作る」が出る', async () => {
+  it('管理者には入力欄と［キャンセル］［保存する］、情報欄を管理への入口が出る', async () => {
     setRole('admin')
     await render('info')
     const input = host.querySelector<HTMLInputElement>('input[type="text"]')
     expect(input).toBeTruthy()
     expect(input!.disabled).toBe(false)
     expect(buttonsByText('保存する')).toHaveLength(1)
-    expect(linksByText('項目を作る').length).toBeGreaterThan(0)
-    expect(document.body.textContent).toContain('保存できるのはオーナー・管理者')
+    expect(buttonsByText('キャンセル')).toHaveLength(1)
+    // 項目を作るのは「情報欄を管理」から（下の帯は［キャンセル］［保存する］だけ・絵 vX3wQ）。
+    expect(linksByText('情報欄を管理').length).toBeGreaterThan(0)
+    expect(document.body.textContent).not.toContain('保存できるのはオーナー・管理者')
   })
 
   it('staffは値を読めるが、編集欄・保存・項目追加は出ない', async () => {
@@ -377,7 +379,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
 })
 
 function supportEditButtons(): HTMLButtonElement[] {
-  return Array.from(document.querySelectorAll<HTMLButtonElement>('[data-customer-info-panel] section[aria-label="対応"] button')).filter(button => button.textContent?.trim() === '編集')
+  return Array.from(document.querySelectorAll<HTMLButtonElement>('[data-customer-info-panel] section[aria-label="対応"] button')).filter(button => button.textContent?.trim() === '編集する')
 }
 
 describe('N-035 友だち詳細から担当・対応状況を変える', () => {

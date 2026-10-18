@@ -20,7 +20,8 @@
  *
  * 出力：<out>/pattern-audit.json と <out>/pattern-audit.md。数は「候補」なので、直す前に目で確かめる。
  */
-import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync, statSync } from 'node:fs'
+import ts from 'typescript'
 import { dirname, join, relative, resolve, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
@@ -28,10 +29,33 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { checkTemporaryAllowances, patternFindingKey } from './temporary-allowances.mjs'
+import { cssConsumerIndex, selectorTargetsNative, selectorIsCoordinateOverlay } from './pattern-css-evidence.mjs'
 import { clearSourceEvidence, sourceEvidence } from './pattern-source-evidence.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const DEFAULT_CATALOG = join(HERE, 'v8-pattern-catalog.json')
+
+/** 名前だけで通さず、再公開をたどって登録済みの実ファイルに照合する。 */
+function isRegisteredComponent(codeRoot, imported, owners, fromFile, seen = new Set()) {
+  if (!imported) return false
+  const stem = imported.path.startsWith('@/') ? join(codeRoot, 'apps/web/src', imported.path.slice(2))
+    : fromFile && imported.path.startsWith('.') ? resolve(dirname(fromFile), imported.path.replace(/\.js$/, '')) : null
+  if (!stem || relative(codeRoot, stem).startsWith('..')) return false
+  const file = [stem, `${stem}.tsx`, `${stem}.ts`, join(stem, 'index.tsx'), join(stem, 'index.ts')].find(path => existsSync(path) && statSync(path).isFile())
+  if (!file || seen.has(`${file}:${imported.name}`)) return false
+  seen.add(`${file}:${imported.name}`)
+  const rel = relative(codeRoot, file).replaceAll('\\', '/')
+  if (owners.files.includes(rel) && owners.components.includes(imported.name)) return true
+  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  for (const node of source.statements) {
+    if (owners.files.includes(rel) && imported.name === 'default' && ts.isFunctionDeclaration(node)
+      && owners.components.includes(node.name?.text) && node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword)) return true
+    if (!ts.isExportDeclaration(node) || !node.moduleSpecifier || !ts.isStringLiteral(node.moduleSpecifier) || !node.exportClause || !ts.isNamedExports(node.exportClause)) continue
+    const exported = node.exportClause.elements.find(binding => binding.name.text === imported.name)
+    if (exported && isRegisteredComponent(codeRoot, { path: node.moduleSpecifier.text, name: exported.propertyName?.text ?? exported.name.text }, owners, file, seen)) return true
+  }
+  return false
+}
 
 const CODE_ROOTS = ['apps/web/src', 'apps/liff/src']
 const CODE_EXT = /\.(tsx?|css)$/
@@ -77,6 +101,9 @@ export function compilePattern(pattern, catalog = { _global: { excludeFiles: [],
   const glob = catalog._global
   const components = owner.components ?? []
   pattern._code = {
+    choiceOwners: catalog.patterns?.find(p => p.id === 'action-list')?.owner?.code ?? { files: [], components: [] },
+    headingOwners: catalog.patterns?.find(p => p.id === 'page-head')?.owner?.code ?? { files: [], components: [] },
+    tableOwners: catalog.patterns?.find(p => p.id === 'table')?.owner?.code ?? { files: [], components: [] },
     excludeFiles: [...glob.excludeFiles, ...(code.excludeFiles ?? []).map((s) => rx(s)), ...(owner.files ?? []).map((f) => rx(`${escapeRe(f)}$`))],
     ownerFiles: (owner.files ?? []).map((f) => rx(`${escapeRe(f)}$`)),
     canonicalUse: code.canonicalUse ? rx(code.canonicalUse) : (components.length ? rx(`<(${components.map(escapeRe).join('|')})\\b|\\b(${components.map(escapeRe).join('|')})\\(`) : null),
@@ -93,6 +120,8 @@ export function compilePattern(pattern, catalog = { _global: { excludeFiles: [],
       _none: (signal.css?.none ?? []).map((s) => rx(s, 'i')),
     })),
   }
+  const liffComponents = pattern.owner?.liff?.components ?? []
+  pattern._liffPropOverride = liffComponents.length ? rx(`<(${liffComponents.map(escapeRe).join('|')})\\b(?:[^<>]|=>){0,800}?\\s(className|style)=`, 'gm') : null
   const pen = pattern.pen ?? {}
   pattern._pen = {
     excludeBoards: [...glob.penExcludeBoards, ...(pen.excludeBoards ?? []).map((s) => rx(s))],
@@ -213,7 +242,7 @@ export function cssRules(content) {
 }
 
 /** (a) 1つのファイルに型の目印を当てる。 */
-export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] }, codeRoot = null) {
+export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] }, codeRoot = null, consumers = null) {
   const p = pattern._code
   if (p.excludeFiles.some((re) => re.test(rel))) return []
   const usesCanonical = p.canonicalUse ? p.canonicalUse.test(content) : false
@@ -227,6 +256,7 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
     if (signal.css) {
       if (!rel.endsWith('.css')) continue
       for (const rule of cssRules(content)) {
+        if (pattern.id === 'media-slot' && signal.id === 'dashed' && /position:\s*absolute\b/.test(rule.body) && selectorIsCoordinateOverlay(rule.selector, consumers)) continue
         const block = `${rule.selector}{${rule.body}}`
         if (!signal._all.every((re) => re.test(block))) continue
         if (signal._none.some((re) => re.test(block))) continue
@@ -243,15 +273,41 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
     let m
     while ((m = signal._re.exec(content))) {
       if (m[0].length === 0) { signal._re.lastIndex += 1; continue }
-      const proof = sourceEvidence(rel, content, m.index, m[0].length)
+      const proof = sourceEvidence(rel, content, ['own-label', 'limit-text'].includes(signal.id) ? m.index + m[0].length - 1 : m.index, ['own-label', 'limit-text'].includes(signal.id) ? 1 : m[0].length)
       if (proof?.comment) continue
+      if (rel.startsWith('apps/liff/') && codeRoot && pattern.owner?.liff
+        && isRegisteredComponent(codeRoot, proof?.imports?.[proof.tag], pattern.owner.liff, join(codeRoot, rel))) continue
+      if (signal.id === 'limit-text' && proof?.attribute === 'hint' && codeRoot
+        && isRegisteredComponent(codeRoot, proof.imports?.[proof.tag], pattern.owner?.code ?? { files: [], components: [] }, join(codeRoot, rel))) continue
+
+      // searchSlot内の検索も正の道具列の中。実在する持ち主へのimportを照合し、隣の手書きは残す。
+      if (signal.id === 'search-alone' && codeRoot && proof?.enclosingTags?.some(tag =>
+        isRegisteredComponent(codeRoot, proof.imports?.[tag], pattern.owner?.code ?? { files: [], components: [] }))) continue
+      // 題の型へ直接渡した説明の文字は、操作の手書きとは分ける。
+      // help内のbuttonや偽の型は、この照合を通らない。
+      if (signal.id === 'own-extra' && proof?.attribute === 'help' && proof.literalAttribute && codeRoot
+        && isRegisteredComponent(codeRoot, proof.imports?.[proof.tag], p.headingOwners)) continue
+      // 正の行うことの選択肢へ渡す label は、押したらの欄の手書きではない。
+      // 実在する持ち主への import と JSX のデータの口を両方照合する。
+      if (signal.id === 'own-extra' && proof?.literalProperty === 'label' && ['options', 'choices'].includes(proof.attribute) && codeRoot) {
+        const imported = proof.imports?.[proof.tag]
+        const ownerFile = imported?.path.startsWith('@/') ? 'apps/web/src/' + imported.path.slice(2) + '.tsx' : null
+        const ownerName = imported?.name === 'default' ? proof.tag : imported?.name
+        if (ownerFile && p.choiceOwners.files.includes(ownerFile) && p.choiceOwners.components.includes(ownerName) && existsSync(join(codeRoot, ownerFile))) continue
+      }
       // 共通の欄・浮く面へ渡す読み上げ属性は、その面を画面が手書きした証拠ではない。
       if (proof?.imports?.[proof.tag]?.path.startsWith('@/components/') && codeRoot && existsSync(join(codeRoot, 'apps/web/src', proof.imports[proof.tag].path.slice(2) + '.tsx')) && ['role', 'aria-modal', 'aria-invalid'].includes(proof.attribute) && ['raw-dialog', 'raw-alert', 'own-invalid'].includes(signal.id)) continue
       // 必須・エラーのFieldで正の押したらの欄を包んでも、手書きの選択肢にはならない。
       if (signal.id === 'more' && pattern.owner?.code?.components?.includes(proof?.tag) && proof.imports?.[proof.tag]?.path.startsWith('@/components/shared/') && p.ownerFiles.some(re => re.test('apps/web/src/' + proof.imports[proof.tag].path.slice(2) + '.tsx'))) continue
+      if (signal.id === 'own-label' && proof?.readOnlyText && !proof.ancestorTags.some(tag => ['label', 'fieldset'].includes(tag))
+        && (['p', 'span'].includes(proof.tag) || codeRoot && (isRegisteredComponent(codeRoot, proof.imports?.[proof.tag], p.headingOwners, join(codeRoot, rel)) || isRegisteredComponent(codeRoot, proof.imports?.[proof.tag], p.tableOwners, join(codeRoot, rel))))) continue
       if (signal.id === 'own-label' && proof?.imports?.[proof.tag]?.path === '@/components/shared/form-controls' && proof.descendantTags?.some(tag => pattern.owner?.code?.components?.includes(tag) && proof.imports?.[tag]?.path.startsWith('@/components/shared/'))) continue
+      // 固定の行うことの選択肢は、shared ActionListへ渡す設定。隣の手書きやeditor内のJSXは別に検査する。
+      if (signal.id === 'own-extra' && proof?.tag && proof.attribute === 'options'
+        && proof.imports?.[proof.tag]?.path === '@/components/shared/fixed-action-list' && codeRoot
+        && existsSync(join(codeRoot, 'apps/web/src/components/shared/fixed-action-list.tsx'))) continue
       if (proof?.searchString && ['raw-grid', 'raw-dialog', 'raw-alert', 'raw-check', 'own-listbox'].includes(signal.id)) continue
-      if (signal.id === 'own-phone' && proof && !proof.returnsJsx) continue
+      if (signal.id === 'own-phone' && proof && (!proof.returnsJsx || proof.declarationReturnsJsx === false)) continue
       if (signal.id === 'own-phone' && ownedReturn(proof, pattern)) continue
       if (signal.id === 'own-types' && proof?.payloadType) continue
       // 1行の補足は一括操作の帯ではない。件数の文字だけで判定しない。
@@ -365,13 +421,14 @@ function classLookRules(expr, module) {
 /** (b) JSX：持ち主の部品に見た目の className / style を渡している所（幅・余白・並びだけのものは数えない）。 */
 export function scanPropOverrides(pattern, rel, content, codeRoot = null, read = safeRead) {
   const p = pattern._code
-  if (!p.propOverride || !/\.tsx$/.test(rel) || isOwnerSide(scopeOf(rel))) return []
+  const propOverride = rel.startsWith('apps/liff/') && pattern.owner?.liff ? pattern._liffPropOverride : p.propOverride
+  if (!propOverride || !/\.tsx$/.test(rel) || isOwnerSide(scopeOf(rel))) return []
   const lines = content.split('\n')
   const module = cssModuleOf(rel, content, codeRoot, read)
   const hits = []
-  p.propOverride.lastIndex = 0
+  propOverride.lastIndex = 0
   let m
-  while ((m = p.propOverride.exec(content))) {
+  while ((m = propOverride.exec(content))) {
     const at = m.index + m[0].length - m[2].length - 1
     const expr = propExpression(content, m.index + m[0].length)
     if (!overrideLooks(m[2], expr, module)) continue
@@ -417,11 +474,12 @@ function declarations(body) {
 }
 
 /** (b) CSS：画面の .module.css が部品の中身を塗り直している所。型は overrideSelectors で割り当てる。 */
-export function scanCssOverrides(patterns, rel, content) {
+export function scanCssOverrides(patterns, rel, content, consumers) {
   if (!rel.endsWith('.module.css') || isOwnerSide(scopeOf(rel))) return []
   const hits = []
   for (const rule of cssRules(content)) {
     const selector = stripThemeScope(rule.selector)
+    if (selectorTargetsNative(selector, consumers)) continue
     if (!selector.split(',').some((part) => OVERRIDE_SELECTOR.test(` ${part.trim()}`))) continue
     const visual = declarations(rule.body).filter((d) => LOOK_PROP.test(d.prop))
     if (!visual.length) continue
@@ -493,6 +551,7 @@ export function scanCode(catalog, codeRoot, patterns = catalog.patterns) {
   const b = Object.fromEntries([...patterns.map((p) => [p.id, []]), [NO_TYPE, []]])
   const c = Object.fromEntries([...patterns.map((p) => [p.id, []]), [NO_TYPE, []]])
   const usage = Object.fromEntries(patterns.map((p) => [p.id, { files: new Set(), features: new Set() }]))
+  const cssConsumers = cssConsumerIndex(files, path => readFileSync(path, 'utf8'), codeRoot)
   let scanned = 0
   for (const path of files) {
     clearSourceEvidence()
@@ -502,14 +561,14 @@ export function scanCode(catalog, codeRoot, patterns = catalog.patterns) {
     const content = readFileSync(path, 'utf8')
     const scope = scopeOf(rel)
     for (const pattern of patterns) {
-      a[pattern.id].push(...scanCodeFile(pattern, rel, content, glob, codeRoot))
+      a[pattern.id].push(...scanCodeFile(pattern, rel, content, glob, codeRoot, cssConsumers.get(path)))
       for (const hit of scanPropOverrides(pattern, rel, content, codeRoot)) b[pattern.id].push({ ...hit, pattern: pattern.id })
       if (!isOwnerSide(scope) && /\.tsx?$/.test(rel) && pattern._code.canonicalUse?.test(content)) {
         usage[pattern.id].files.add(rel)
         usage[pattern.id].features.add(featureOf(rel))
       }
     }
-    for (const hit of scanCssOverrides(patterns, rel, content)) b[hit.pattern].push(hit)
+    for (const hit of scanCssOverrides(patterns, rel, content, cssConsumers.get(path))) b[hit.pattern].push(hit)
     for (const hit of scanHardcoded(patterns, rel, content, glob)) c[hit.pattern].push(hit)
   }
   const reach = Object.fromEntries(Object.entries(usage).map(([id, u]) => [id, { files: u.files.size, features: u.features.size }]))

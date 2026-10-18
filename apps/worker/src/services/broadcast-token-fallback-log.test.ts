@@ -70,21 +70,13 @@ describe.each([
   it('logs one event with a null account ID when no account is assigned', async () => {
     const logs = await run(kind, null, false);
     expect(logs).toHaveLength(1);
-    expect(JSON.parse(logs[0])).toEqual({
-      event: 'line_token_default_fallback',
-      accountId: null,
-      context,
-    });
+    expect(JSON.parse(logs[0])).toEqual({ code: 'line_token_default_fallback' });
   });
 
   it('logs the missing account ID without exposing a token', async () => {
     const logs = await run(kind, 'missing-account', false);
     expect(logs).toHaveLength(1);
-    expect(JSON.parse(logs[0])).toEqual({
-      event: 'line_token_default_fallback',
-      accountId: 'missing-account',
-      context,
-    });
+    expect(JSON.parse(logs[0])).toEqual({ code: 'line_token_default_fallback' });
     expect(logs.join('\n')).not.toContain(ACCOUNT_TOKEN);
   });
 

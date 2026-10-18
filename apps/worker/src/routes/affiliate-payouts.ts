@@ -1,3 +1,5 @@
+import { simplePdf } from '../services/affiliate-statement-pdf.js';
+import { customerDownloadEntry } from '../services/download-entrypoints.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
@@ -73,43 +75,6 @@ function csvCell(value: string | number): string {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function simplePdf(snapshot: {
-  affiliateCode: string; periodFrom: string; periodTo: string; totalAmount: number; currency: string;
-  grossAmount?: number; deductionAmount?: number;
-}): Uint8Array {
-  const ascii = (value: string) => value.replace(/[^\x20-\x7E]/g, '?').replace(/[()\\]/g, '\\$&');
-  const deduction = snapshot.deductionAmount ?? 0;
-  const lines = [
-    'Affiliate payment statement',
-    `Affiliate: ${ascii(snapshot.affiliateCode)}`,
-    `Period: ${ascii(snapshot.periodFrom)} - ${ascii(snapshot.periodTo)}`,
-    // R288: 取消の差し引きがあるときだけ内訳を分けて出す。
-    ...(deduction > 0 ? [
-      `Gross: ${snapshot.currency} ${snapshot.grossAmount ?? snapshot.totalAmount + deduction}`,
-      `Adjustment: -${snapshot.currency} ${deduction}`,
-    ] : []),
-    `Amount: ${snapshot.currency} ${snapshot.totalAmount}`,
-  ];
-  const stream = `BT /F1 14 Tf 72 760 Td ${lines.map((line, index) => `${index ? '0 -24 Td ' : ''}(${line}) Tj`).join(' ')} ET`;
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
-  ];
-  let document = '%PDF-1.4\n';
-  const offsets = [0];
-  for (let index = 0; index < objects.length; index += 1) {
-    offsets.push(new TextEncoder().encode(document).byteLength);
-    document += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
-  }
-  const xref = new TextEncoder().encode(document).byteLength;
-  document += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (const offset of offsets.slice(1)) document += `${String(offset).padStart(10, '0')} 00000 n \n`;
-  document += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-  return new TextEncoder().encode(document);
-}
 
 affiliatePayouts.get(
   '/api/affiliate-settlements/preview',
@@ -130,7 +95,7 @@ affiliatePayouts.get(
       });
       return c.json({ success: true, data });
     } catch (error) {
-      console.error('GET /api/affiliate-settlements/preview error:', error);
+      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"GET /api/affiliate-settlements/preview"}));
       return c.json({ success: false, error: '締め対象を確認できませんでした' }, 500);
     }
   },
@@ -159,7 +124,7 @@ affiliatePayouts.get(
       });
       return c.json({ success: true, data });
     } catch (error) {
-      console.error('GET /api/affiliate-settlements/current error:', error);
+      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"GET /api/affiliate-settlements/current"}));
       return c.json({ success: false, error: '締め済みの記録を確認できませんでした' }, 500);
     }
   },
@@ -200,7 +165,7 @@ affiliatePayouts.post(
       if (result.kind === 'idempotency_conflict') return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
       return c.json({ success: true, data: result }, result.kind === 'created' ? 201 : 200);
     } catch (error) {
-      console.error('POST /api/affiliate-settlements error:', error);
+      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"POST /api/affiliate-settlements"}));
       return c.json({ success: false, error: '締め処理を完了できませんでした' }, 500);
     }
   },
@@ -240,7 +205,7 @@ affiliatePayouts.post(
       }
       return c.json({ success: true, data: result.batch }, result.kind === 'created' ? 201 : 200);
     } catch (error) {
-      console.error('POST /api/affiliate-payout-batches error:', error);
+      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"POST /api/affiliate-payout-batches"}));
       return c.json({ success: false, error: '支払バッチを作成できませんでした' }, 500);
     }
   },
@@ -319,7 +284,7 @@ affiliatePayouts.post(
         },
       });
     } catch (error) {
-      console.error('POST /api/affiliate-payout-batches/:id/export error:', error);
+      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"POST /api/affiliate-payout-batches/:id/export"}));
       return c.json({ success: false, error: '銀行CSVを出力できませんでした' }, 500);
     }
   },
@@ -391,7 +356,7 @@ affiliatePayouts.post(
       if (snapshot.settlementVersion !== version) {
         return c.json({ success: false, error: '締め内容が更新されています', code: 'VERSION_CONFLICT' }, 409);
       }
-      const pdf = simplePdf(snapshot);
+      const pdf = simplePdf({...snapshot,exportedBy:c.get('staff').id,exportedAt:new Date().toISOString()});
       const checksum = await sha256Hex(new TextDecoder().decode(pdf));
       const objectKey = `affiliate-statements/${body.lineAccountId}/${randomToken(18)}.pdf`;
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60_000).toISOString();
@@ -405,11 +370,11 @@ affiliatePayouts.post(
         c.env.DB,
         c.env,
         body.affiliateId,
-        `支払明細を発行しました。確定額: ¥${snapshot.totalAmount.toLocaleString('ja-JP')}。紹介者マイページから確認できます。`,
+        `支払明細を発行しました。確定額: ¥${snapshot.totalAmount.toLocaleString('ja-JP')}。LINEで本人確認して確認できます。\n${customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', statement.id)}`,
       );
       return c.json({ success: true, data: statement, notificationAttempted: true }, 201);
     } catch (error) {
-      console.error('POST /api/affiliate-statements error:', error);
+      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"POST /api/affiliate-statements"}));
       return c.json({ success: false, error: '支払明細を発行できませんでした' }, 500);
     }
   },

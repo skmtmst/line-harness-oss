@@ -286,7 +286,7 @@ beforeEach(async () => {
     RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     AI: { run: vi.fn(async () => ({ response: '' })) } as unknown as Ai,
-    RESTAURANT_TEST_ENABLED: 'true',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', GOOGLE_BUSINESS_ENABLED: 'true',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
@@ -671,7 +671,7 @@ describe('Instagram 同時投稿', () => {
     expect(graphPaths()).toEqual(['ig-1/media', 'ig-1/media_publish', 'ig-media-1']);
     expect(body.post.status).toBe('published');
     expect(body.post.instagram).toMatchObject({ status: 'published', permalink: 'https://www.instagram.com/p/abc123/', error: null });
-    expect(logSpy.mock.calls.flat().some((line) => String(line).includes('restaurant.google.post.instagram_retry'))).toBe(true);
+    expect(testDb.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='restaurant.google.post.instagram_retry'").get()).toEqual({ n: 1 });
   });
 
   it('再送できない状態（公開済み・Instagramへ出さない設定・未公開）は409で断る', async () => {

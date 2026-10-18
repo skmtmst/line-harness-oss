@@ -168,7 +168,7 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
       '/inflow-links/detail?id=tl-1',
     ])
     // 旧形式オートメーションは開ける画面が無い。リンクを出さず理由を示す
-    expect(screen.getByText('予約後フォロー').closest('[title]')?.getAttribute('title')).toContain('開ける画面がありません')
+    expect(screen.getByText('予約後フォロー').closest('[title="旧形式・開ける画面がありません"]')?.getAttribute('title')).toContain('開ける画面がありません')
     expect(screen.getByText('オートメーション')).toBeTruthy()
     expect(screen.getByText('予約後フォロー')).toBeTruthy()
   })
@@ -192,7 +192,7 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
     })
 
     expect(screen.getByText('前日案内')).toBeTruthy()
-    expect(screen.getByText('版1で固定（変わらない）')).toBeTruthy()
+    expect(screen.getByText('版1で固定')).toBeTruthy()
     expect(screen.getByText('送信待ち')).toBeTruthy()
     const hrefs = screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))
     expect(hrefs).toEqual(['/reminders/detail?id=re-1'])
@@ -240,7 +240,7 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
       '/rich-menus/edit?id=rg-1', '/inflow-links/detail?id=tl-1',
     ])
     expect(screen.getByText('予約後フォロー').closest('a')).toBeNull()
-    expect(screen.getByText('予約後フォロー').closest('[title]')?.getAttribute('title')).toContain('開ける画面がありません')
+    expect(screen.getByText('予約後フォロー').closest('[title="旧形式・開ける画面がありません"]')?.getAttribute('title')).toContain('開ける画面がありません')
   })
 
   test('一覧ドロワーの使用先も個別の画面へ行く', async () => {

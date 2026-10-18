@@ -1,33 +1,15 @@
+import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
+import { readCarouselOptions } from './template-carousel-input.js';
+import { publishedInfoOf, versionInfoOf } from './../services/template-display.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateTapExtraReferences } from '../services/tap-extras.js';
 import { tapExtrasError } from '@line-crm/shared';
 import { Hono } from 'hono';
 import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
-import {
-  getTemplatesWithUsageCount,
-  getTemplateSendCounts,
-  getTemplateFolderCounts,
-  getTemplateById,
-  getTemplateUsage,
-  createTemplate,
-  updateTemplate,
-  saveTemplateDraft,
-  publishTemplate,
-  hasTemplateDraft,
-  deleteTemplate,
-  getCarouselTapTotals,
-  getFolderById,
-  listTemplateVersions,
-  revertTemplateToVersion,
-  listBroadcastReferences,
-  listTemplateReferences,
-  getBroadcastDeleteBlockers,
-  getPinnedReminderDeleteBlockers,
-  MediaReferenceAccountError,
-} from '@line-crm/db';
+import { getTemplatesWithUsageCount, getTemplateSendCounts, getTemplateFolderCounts, getTemplateById, getTemplateUsage, createTemplate, updateTemplate, saveTemplateDraft, publishTemplate, hasTemplateDraft, deleteTemplate, getCarouselTapTotals, getFolderById, listTemplateVersions, revertTemplateToVersion, listBroadcastReferences, listTemplateReferences, getBroadcastDeleteBlockers, getPinnedReminderDeleteBlockers, MediaReferenceAccountError } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess } from '../middleware/role-guard.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { validateCarousel } from '../services/carousel-validation.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -72,7 +54,6 @@ async function readFolderId(
   }
   return { ok: true, folderId: id };
 }
-
 
 const QUESTION_BEHAVIORS = new Set([
   'none',
@@ -158,26 +139,6 @@ function draftCarouselTapLimitTextOf(t: TemplateRow): string | null {
   return hasTemplateDraft(t) ? t.draft_carousel_tap_limit_text : t.carousel_tap_limit_text;
 }
 
-/** 347: 公開版の固定情報。編集・保存では変わらない。 */
-function publishedInfoOf(t: TemplateRow) {
-  return {
-    messageType: t.message_type,
-    messageContent: t.message_content,
-    question: questionValue(t.question_json),
-    questionStatus: t.question_status,
-  };
-}
-
-function versionInfoOf(t: TemplateRow) {
-  return {
-    hasDraft: hasTemplateDraft(t),
-    publishedVersion: Number(t.published_version ?? 0),
-    publishedAt: t.published_at ?? null,
-    draftRevision: Number(t.draft_revision ?? 0),
-    published: publishedInfoOf(t),
-  };
-}
-
 /**
  * カルーセルなら中身を確かめる。
  *
@@ -244,7 +205,6 @@ function checkImageTemplate(messageType: string | undefined, messageContent: str
   } catch { return { ok: false, error: '画像の指定が読み取れません' }; }
 }
 
-
 templates.get('/api/templates', async (c) => {
   try {
     const category = c.req.query('category') ?? undefined;
@@ -299,14 +259,14 @@ templates.get('/api/templates', async (c) => {
       taps = await getCarouselTapTotals(c.env.DB);
     } catch (err) {
       // 数が出ないだけ。一覧そのものは出す。
-      console.error('GET /api/templates — failed to count carousel taps', err);
+      console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates"}));
     }
     let sends = new Map<string, { thisMonth: number; total: number }>();
     try {
       sends = await getTemplateSendCounts(c.env.DB, items.map((item) => item.id));
     } catch (err) {
       // 集計だけ取れないときも、テンプレートそのものは操作できるようにする。
-      console.error('GET /api/templates — failed to count template sends', err);
+      console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates"}));
     }
     /*
      * 差し戻し対応(要件1): 一覧の主 messageType/messageContent は公開版だけを返す。
@@ -321,6 +281,7 @@ templates.get('/api/templates', async (c) => {
       category: t.category,
       messageType: t.message_type,
       messageContent: t.message_content,
+      messageBubbles: t.message_bubbles_json ? JSON.parse(t.message_bubbles_json) : null,
       /*
        * R194: 管理一覧の抜粋・検索が読む最新の下書き。公開版しか無ければ null。
        * 送信の候補選びは `messageContent`（公開版）だけを見る決まりは変えない。
@@ -338,6 +299,7 @@ templates.get('/api/templates', async (c) => {
       createdAt: t.created_at,
       updatedAt: t.updated_at,
     }));
+    const withSamples=await withStyleSampleMetadata(c.env.DB,serialized,'template');
     if (wantsPaging && paging) {
       // フォルダ欄の件数を、一覧を全件読まなくても出せるように添える。
       const folderCounts = c.req.query('folder_counts') === '1'
@@ -350,7 +312,7 @@ templates.get('/api/templates', async (c) => {
         success: true,
         data: {
           ...buildOffsetListResponse({
-            items: serialized,
+            items: withSamples,
             total,
             paging,
             sort: [
@@ -362,9 +324,9 @@ templates.get('/api/templates', async (c) => {
         },
       });
     }
-    return c.json({ success: true, data: serialized });
+    return c.json({ success: true, data: withSamples });
   } catch (err) {
-    console.error('GET /api/templates error:', err);
+    console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -425,12 +387,14 @@ templates.get('/api/templates/:id', async (c) => {
     return c.json({
       success: true,
       data: {
+        ...(await withStyleSampleMetadata(c.env.DB,[{id:item.id}],'template'))[0],
         id: item.id,
         accountId: item.line_account_id,
         name: item.name,
         category: item.category,
         messageType: draftMessageTypeOf(item),
         messageContent: draftMessageContentOf(item),
+        messageBubbles: (hasTemplateDraft(item) ? item.draft_message_bubbles_json : item.message_bubbles_json) ? JSON.parse((hasTemplateDraft(item) ? item.draft_message_bubbles_json : item.message_bubbles_json)!) : null,
         question: questionValue(draftQuestionJsonOf(item)),
         questionStatus: draftQuestionStatusOf(item),
         folderId: item.folder_id ?? null,
@@ -444,7 +408,7 @@ templates.get('/api/templates/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/templates/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -500,46 +464,10 @@ templates.get('/api/templates/:id/usages', async (c) => {
     );
     return c.json({ success: true, data: { ...usage, broadcasts, reminderEnrollments } });
   } catch (err) {
-    console.error('GET /api/templates/:id/usages error:', err);
+    console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates/:id/usages"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
-
-/** 162: カルーセルの選択肢まわりの設定を読む。 */
-function readCarouselOptions(body: Record<string, unknown>):
-  | { ok: true; value: Record<string, unknown> }
-  | { ok: false; error: string } {
-  const value: Record<string, unknown> = {};
-  if ('carouselActions' in body) {
-    const raw = body.carouselActions;
-    if (raw === null) {
-      value.carouselActions = null;
-    } else if (typeof raw !== 'object' || Array.isArray(raw)) {
-      return { ok: false, error: 'carouselActions must be an object keyed by column index' };
-    } else {
-      value.carouselActions = raw;
-    }
-  }
-  if ('carouselTapLimitMode' in body) {
-    if (body.carouselTapLimitMode !== 'none' && body.carouselTapLimitMode !== 'once') {
-      return { ok: false, error: "carouselTapLimitMode must be 'none' or 'once'" };
-    }
-    value.carouselTapLimitMode = body.carouselTapLimitMode;
-  }
-  if ('carouselTapLimitText' in body) {
-    const raw = body.carouselTapLimitText;
-    if (raw === null || raw === '') {
-      value.carouselTapLimitText = null;
-    } else if (typeof raw !== 'string') {
-      return { ok: false, error: 'carouselTapLimitText must be a string' };
-    } else if ([...raw].length > 300) {
-      return { ok: false, error: 'carouselTapLimitText must be 300 characters or fewer' };
-    } else {
-      value.carouselTapLimitText = raw;
-    }
-  }
-  return { ok: true, value };
-}
 
 /**
  * N-146: 空でない文字列か。口を直接叩かれても、空白だけの名前や本文は
@@ -627,7 +555,7 @@ templates.post('/api/templates', requireDeliveryAccess('templates'), inputJsonBo
     if (err instanceof MediaReferenceAccountError) {
       return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
-    console.error('POST /api/templates error:', err);
+    console.error(JSON.stringify({"code":"routes_templates_failed","route":"POST /api/templates"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -650,6 +578,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
     )) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
+    if(existing.message_bubbles_json || existing.draft_message_bubbles_json) return c.json({success:false,code:'MULTIPLE_MESSAGES_REQUIRE_EDITOR',error:'複数通のテンプレートは統括の編集から保存してください'},409);
     /*
      * N-146: 部分更新なので「来なかった項目」はいまのまま残すが、
      * 来た項目が空・空白だけなら断る。画面側は保存前に止めているが、
@@ -779,7 +708,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
     if (err instanceof Error && err.message === 'TEMPLATE_DRAFT_CONFLICT') {
       return c.json({ success: false, error: '編集中に公開状態が変わりました。読み直してください' }, 409);
     }
-    console.error('PUT /api/templates/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_templates_failed","route":"PUT /api/templates/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -889,7 +818,7 @@ templates.post('/api/templates/:id/publish', requireDeliveryAccess('templates'),
     if (err instanceof MediaReferenceAccountError) {
       return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
-    console.error('POST /api/templates/:id/publish error:', err);
+    console.error(JSON.stringify({"code":"routes_templates_failed","route":"POST /api/templates/:id/publish"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -910,6 +839,7 @@ templates.get('/api/templates/:id/versions', async (c) => {
         status: v.status,
         messageType: v.message_type,
         messageContent: v.message_content,
+        messageBubbles: v.message_bubbles_json ? JSON.parse(v.message_bubbles_json) : null,
         carouselActions: v.carousel_actions_json ? JSON.parse(v.carousel_actions_json) : null,
         carouselTapLimitMode: v.carousel_tap_limit_mode,
         carouselTapLimitText: v.carousel_tap_limit_text,
@@ -917,10 +847,13 @@ templates.get('/api/templates/:id/versions', async (c) => {
         questionStatus: v.question_status,
         effectiveFrom: v.effective_from,
         createdAt: v.created_at,
+        createdByStaffId: v.created_by_staff_id,
+        creatorName: v.creator_name ?? null,
+        creatorNameSource: v.creator_name ? 'current_staff_profile' : null,
       })),
     });
   } catch (err) {
-    console.error('GET /api/templates/:id/versions error:', err);
+    console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates/:id/versions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -987,7 +920,7 @@ templates.post('/api/templates/:id/revert', requireDeliveryAccess('templates'), 
     if (code === 'TEMPLATE_PUBLISH_KEY_CONFLICT') {
       return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
     }
-    console.error('POST /api/templates/:id/revert error:', err);
+    console.error(JSON.stringify({"code":"routes_templates_failed","route":"POST /api/templates/:id/revert"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1042,7 +975,7 @@ templates.delete('/api/templates/:id', requireDeliveryAccess('templates'), async
     await deleteTemplate(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/templates/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_templates_failed","route":"DELETE /api/templates/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

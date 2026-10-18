@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { PageExplanationBody, PageExplanationProvider, PageExplanationToggle } from './page-explanation'
+import { ListPage } from '@/components/templates/list-page'
 
 const staff = vi.hoisted(() => ({ id: 'staff-one' }))
 vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => staff }))
@@ -65,4 +66,32 @@ it('保存領域が使えない端末でもその場の開閉はできる', () =
   expect(screen.queryByRole('region')).toBeNull()
   fireEvent.click(toggle)
   expect(screen.getByRole('region')).toBeTruthy()
+})
+
+it('外のProviderが持つ説明の入口を一覧の見出しへ渡し、同じ人の開閉を保つ', () => {
+  const List = () => <PageExplanationProvider pageKey="scenarios-list">
+    <ListPage title="シナリオ" help="用語の説明" explanationToggle={<PageExplanationToggle />}>
+      <PageExplanationBody keepMounted>配信を始める前にテストを送ります。</PageExplanationBody>
+    </ListPage>
+  </PageExplanationProvider>
+  const view = render(<List />)
+  const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+  const help = screen.getByRole('button', { name: 'シナリオの説明' })
+  expect(view.container.querySelector('[data-template-region="heading"]')?.contains(toggle)).toBe(true)
+  expect(help.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('region').id).toBe(toggle.getAttribute('aria-controls'))
+  fireEvent.click(toggle)
+  expect(screen.queryByRole('region')).toBeNull()
+  view.unmount()
+  render(<List />)
+  expect(screen.getByRole('button', { name: 'この画面の説明' }).getAttribute('aria-expanded')).toBe('false')
+  fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
+  expect(screen.getByRole('region').textContent).toContain('テストを送ります')
+})
+
+it('説明本文と明示した入口を渡す一覧は入口を二重に作らない', () => {
+  render(<ListPage title="一覧" explanation="画面全体の説明" explanationToggle={<PageExplanationToggle />}>本文</ListPage>)
+  expect(screen.getAllByRole('button', { name: 'この画面の説明' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
+  expect(screen.queryByRole('region')).toBeNull()
 })

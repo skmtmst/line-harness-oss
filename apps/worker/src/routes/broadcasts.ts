@@ -1,3 +1,11 @@
+import {simulationContext,scheduleSimulation,processBroadcastSimulation,simulationPreview} from '../services/broadcast-simulation.js';
+import {maybeStartAb,maybeReplayAbStart} from './broadcast-ab.js';
+import {GapError} from '../services/gap-common.js';
+import { broadcastSendPreview,broadcastQuietHoursShift } from '../services/gap-send-preview.js';
+import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
+import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
+import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
+import { parseJsonArray, parseJsonObject, sameJsonMeaning } from './broadcast-json.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange } from '@line-crm/shared';
@@ -79,6 +87,7 @@ import { fetchQuota, releaseQuotaSlot } from '../services/broadcast-quota-guard.
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 
 const broadcasts = new Hono<Env>();
+broadcasts.use('/api/broadcasts/:id/*',async(c,next)=>{if(c.req.method!=='GET'&&/\/(test-send|send-segment|resume|retry-failed)$/.test(c.req.path)&&await simulationContext(c.env.DB,c.req.param('id')!))return c.json({success:false,error:'simulation_transport_only'},409);await next();});
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
 const BROADCAST_NOTIFICATION_KEY = 'broadcast_slack_notifications';
@@ -147,49 +156,6 @@ function unsupportedVariablesError(content: string): string | null {
     : null;
 }
 
-/**
- * Parse a D1 JSON-array column. Returns:
- *   - null if the column is null/undefined/empty string or parse fails
- *   - the value as-is if already an array (some D1 drivers auto-parse JSON columns)
- *   - the parsed array if the JSON is a valid string-array
- *   - null if parsed JSON is not an array (e.g., object, scalar)
- */
-function parseJsonArray(s: unknown): string[] | null {
-  if (!s) return null;
-  if (Array.isArray(s)) return s as string[];
-  if (typeof s !== 'string') return null;
-  try {
-    const parsed = JSON.parse(s);
-    return Array.isArray(parsed) ? (parsed as string[]) : null;
-  } catch {
-    return null;
-  }
-}
-
-function canonicalJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalJsonValue);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, canonicalJsonValue(nested)]),
-    );
-  }
-  return value;
-}
-
-/** JSON列とrequest値を、objectのkey順に依存せず比較する。array順は送信順なので維持する。 */
-function sameJsonMeaning(stored: unknown, requested: unknown): boolean {
-  try {
-    const storedValue = typeof stored === 'string' ? JSON.parse(stored) as unknown : stored;
-    return JSON.stringify(canonicalJsonValue(storedValue ?? null))
-      === JSON.stringify(canonicalJsonValue(requested ?? null));
-  } catch {
-    // 壊れた既存JSONを「同じ」と扱ってsnapshotを再利用しない。
-    return false;
-  }
-}
-
 type CreateBroadcastBody = {
   title?: string;
   messageType?: BroadcastMessageType;
@@ -232,20 +198,6 @@ const BROADCAST_ONLY_CONDITION_AXES = [
   ['booking_status', '予約状況'], ['purchase_history', '購入履歴'], ['block_state', 'ブロック状態'],
 ] as const;
 
-function parseJsonObject(value: unknown): Record<string, unknown> | null {
-  if (!value) return null;
-  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
-  if (typeof value !== 'string') return null;
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 function validateMessageOptions(value: unknown): string | null {
   if (value === undefined || value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return 'ボタンの設定を読み込めませんでした';
@@ -278,23 +230,6 @@ function validateMessageOptions(value: unknown): string | null {
     }
   }
   return null;
-}
-
-async function validateAfterActionVersion(
-  db: D1Database,
-  lineAccountId: string | null | undefined,
-  versionId: string | null | undefined,
-): Promise<boolean> {
-  if (!versionId) return true;
-  if (!lineAccountId) return false;
-  const row = await db.prepare(
-    `SELECT cav.id
-       FROM common_action_versions cav
-       JOIN common_actions ca ON ca.id = cav.common_action_id
-      WHERE cav.id = ? AND cav.status = 'published'
-        AND ca.line_account_id = ? AND ca.status = 'published'`,
-  ).bind(versionId, lineAccountId).first<{ id: string }>();
-  return Boolean(row);
 }
 
 /*
@@ -394,6 +329,7 @@ function serializeBroadcast(row: DbBroadcast) {
     targetType: row.target_type,
     targetTagId: row.target_tag_id,
     status: row.status,
+    purpose:r.purpose??'marketing',executionMode:r.execution_mode??'live',testMode:r.execution_mode==='simulation',createdVia:r.created_via??'manual',
     scheduledAt: row.scheduled_at,
     sentAt: row.sent_at,
     totalCount: row.total_count,
@@ -491,7 +427,7 @@ async function failedBreakdown(db: D1Database, id: string): Promise<{ temporary:
   const rows = await db
     .prepare(
       `SELECT error_code, COUNT(*) AS cnt FROM broadcast_send_claims
-        WHERE broadcast_id = ? AND state = 'failed' GROUP BY error_code`,
+        WHERE broadcast_id = ? AND state = 'failed' AND COALESCE(error_code,'') NOT LIKE 'simulation_%' GROUP BY error_code`,
     )
     .bind(id)
     .all<{ error_code: string | null; cnt: number }>();
@@ -526,7 +462,7 @@ async function broadcastStatusView(
   });
   return {
     displayStatus,
-    displayStatusLabel: BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
+    displayStatusLabel: row.execution_mode==='simulation'&&row.status==='sent'?'模擬で確認済み':BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
     ledger: {
       sent: counts.sent,
       failed: counts.failed,
@@ -557,11 +493,11 @@ async function ledgerCountsForBroadcasts(
     const [states, failed] = await Promise.all([
       db.prepare(
         `SELECT broadcast_id, state, COUNT(*) AS cnt FROM broadcast_send_claims
-          WHERE broadcast_id IN (${placeholders}) GROUP BY broadcast_id, state`,
+          WHERE broadcast_id IN (${placeholders}) AND COALESCE(error_code,'') NOT LIKE 'simulation_%' GROUP BY broadcast_id, state`,
       ).bind(...chunk).all<{ broadcast_id: string; state: string; cnt: number }>(),
       db.prepare(
         `SELECT broadcast_id, error_code, COUNT(*) AS cnt FROM broadcast_send_claims
-          WHERE broadcast_id IN (${placeholders}) AND state = 'failed' GROUP BY broadcast_id, error_code`,
+          WHERE broadcast_id IN (${placeholders}) AND state = 'failed' AND COALESCE(error_code,'') NOT LIKE 'simulation_%' GROUP BY broadcast_id, error_code`,
       ).bind(...chunk).all<{ broadcast_id: string; error_code: string | null; cnt: number }>(),
     ]);
     for (const row of states.results ?? []) {
@@ -603,7 +539,7 @@ async function recordLifecycle(
       detail: detail ?? null,
     });
   } catch (err) {
-    console.error(`[broadcast-lifecycle] ${action} record failed:`, err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed"}));
   }
 }
 
@@ -649,7 +585,7 @@ broadcasts.get('/api/broadcasts', async (c) => {
       return {
         ...serializeBroadcast(item),
         displayStatus,
-        displayStatusLabel: BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
+        displayStatusLabel: (item as unknown as Record<string,unknown>).execution_mode==='simulation'&&item.status==='sent'?'模擬で確認済み':BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
       };
     });
     // 同じ中身なら304（list-etag）。
@@ -672,7 +608,7 @@ broadcasts.get('/api/broadcasts', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -696,7 +632,7 @@ broadcasts.get('/api/broadcasts/stats', async (c) => {
       data: await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope),
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/stats error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/stats"}));
     return c.json({ success: false as const, error: '配信の集計を取得できませんでした' }, 500);
   }
 });
@@ -768,7 +704,7 @@ broadcasts.get('/api/broadcasts/saved-views', requireRole('owner', 'admin', 'sta
       })),
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/saved-views error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/saved-views"}));
     return c.json({ success: false, error: '保存した検索を取得できませんでした' }, 500);
   }
 });
@@ -810,7 +746,7 @@ broadcasts.post('/api/broadcasts/saved-views', requireRole('owner', 'admin'), in
       data: { id, name, filters: body.filters, sortKey, pageSize, createdBy: c.get('staff')!.id, createdAt: now, updatedAt: now, version: 1 },
     }, 201);
   } catch (err) {
-    console.error('POST /api/broadcasts/saved-views error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/saved-views"}));
     return c.json({ success: false, error: '保存した検索を保存できませんでした' }, 500);
   }
 });
@@ -838,7 +774,7 @@ broadcasts.get('/api/broadcasts/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -963,7 +899,7 @@ broadcasts.get('/api/broadcasts/:id/recipients', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/recipients error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/recipients"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -988,9 +924,17 @@ broadcasts.get('/api/broadcasts/:id/activity', async (c) => {
       pagination: { limit, cursor, nextCursor },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/activity error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/activity"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
+});
+
+// U1: 読み取りだけ。送信・外の残高照会・下書きの更新はしない。
+broadcasts.get('/api/broadcasts/:id/send-preview', async c => {
+  const b=await getBroadcastById(c.env.DB,c.req.param('id'));
+  if(!b || !await canAccessBroadcast(c.env.DB,c.get('staff'),b)) return c.json({success:false,error:'not_found'},404);
+  try { return c.json({success:true,data:await broadcastSendPreview(c.env.DB,b)}); }
+  catch { return c.json({success:false,error:'send_preview_unavailable'},503); }
 });
 
 // GET /api/broadcasts/:id/preview-count — 送信前の対象人数を計算する。
@@ -1072,7 +1016,7 @@ broadcasts.get('/api/broadcasts/:id/preview-count', async (c) => {
       } catch (segmentError) {
         // 条件が壊れているときは 0 を返す。ここで500にすると、下書きの一覧
         // そのものが開かなくなる。送信を押した時点で理由付きで止まる。
-        console.error('preview-count: invalid segment_conditions', segmentError);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/preview-count"}));
       }
     } else if (broadcast.target_type === 'all') {
       const accountId = (raw.line_account_id as string | null) || null;
@@ -1086,7 +1030,7 @@ broadcasts.get('/api/broadcasts/:id/preview-count', async (c) => {
 
     return c.json({ success: true, data: { count, perAccount } });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/preview-count error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/preview-count"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1174,7 +1118,7 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
               uniqueClick: (overview.uniqueClick as number) ?? null,
             });
           } catch (err) {
-            console.error(`[per-account-stats] account ${aid} insight failed:`, err);
+            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/per-account-stats"}));
           }
         }),
       );
@@ -1190,7 +1134,7 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
 
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/per-account-stats error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/per-account-stats"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1246,7 +1190,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
       accountIds: Array.isArray(body.accountIds) ? body.accountIds.map(String) : undefined,
       segmentConditions,
     });
-    const audience = { total: preview.sendable, hiddenExcluded: preview.exclusions.hidden };
+    const audience = { total: preview.sendable, hiddenExcluded: preview.exclusions.hidden, consentExcluded: preview.exclusions.paused };
 
     // 同じ本文の配信が直近にあるかは、本文が渡されたときだけ見る。
     // 下書きの段階では本文が空のこともある。
@@ -1291,6 +1235,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
       data: {
         audienceCount: audience.total,
         hiddenExcluded: audience.hiddenExcluded,
+        consentExcluded: audience.consentExcluded,
         warnings: buildWarnings(audience, { hasRecentSimilar }),
         audience: {
           matched: preview.matched,
@@ -1315,7 +1260,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
       },
     });
   } catch (err) {
-    console.error('POST /api/broadcasts/preflight error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/preflight"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1461,6 +1406,10 @@ broadcasts.post('/api/broadcasts', inputJsonBoundary({"title":["string"],"messag
       }
     }
 
+    if (body.scheduledAt != null && (!Number.isFinite(Date.parse(body.scheduledAt)) || Date.parse(body.scheduledAt) <= Date.now())) {
+      return inputError(c, { success: false, error: '予約には未来の日時を指定してください', code: 'SCHEDULE_MUST_BE_FUTURE' }, 400, ['scheduledAt']);
+    }
+
     let broadcast: DbBroadcast;
     try {
       broadcast = await createBroadcast(c.env.DB, {
@@ -1505,7 +1454,7 @@ broadcasts.post('/api/broadcasts', inputJsonBoundary({"title":["string"],"messag
     await recordLifecycle(c.env.DB, broadcast.id, c.get('staff')?.id, 'created');
     return c.json({ success: true, data: serializeBroadcast(broadcast) }, 201);
   } catch (err) {
-    console.error('POST /api/broadcasts error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1524,10 +1473,14 @@ broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"mes
     }
     if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
+    if(await simulationContext(c.env.DB,existing.id))return c.json({success:false,error:'use_simulation_draft_endpoint'},409);
     if (existing.status !== 'draft' && existing.status !== 'scheduled') {
       return inputError(c, { success: false, error: 'Only draft or scheduled broadcasts can be updated' }, 400, []);
     }
 
+    if (existing.status === 'scheduled' && !await sensitiveStepUpSatisfied(c, 'broadcast.send')) {
+      return stepUpRequiredResponse(c, '予約した配信を変える前に本人確認してください');
+    }
     const body = await c.req.json<{
       title?: string;
       messageType?: BroadcastMessageType;
@@ -1568,6 +1521,9 @@ broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"mes
     if (body.draftStep !== undefined && body.draftStep !== null
         && !BROADCAST_DRAFT_STEPS.has(body.draftStep)) {
       return inputError(c, { success: false, error: 'draftStep is invalid' }, 400, ["draftStep"]);
+    }
+    if (body.scheduledAt != null && (!Number.isFinite(Date.parse(body.scheduledAt)) || Date.parse(body.scheduledAt) <= Date.now())) {
+      return inputError(c, { success: false, error: '予約には未来の日時を指定してください', code: 'SCHEDULE_MUST_BE_FUTURE' }, 400, ['scheduledAt']);
     }
     const messageOptionsError = validateMessageOptions(body.messageOptions);
     if (messageOptionsError) return inputError(c, { success: false, error: messageOptionsError }, 400, ["messageOptions"]);
@@ -1734,7 +1690,7 @@ broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"mes
             .bind(confirmed, id).run();
         }
       } catch (gateError) {
-        console.error('PUT /api/broadcasts/:id approval gate error:', gateError);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"PUT /api/broadcasts/:id"}));
         return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
       }
     }
@@ -1798,7 +1754,7 @@ broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"mes
           await approval.recordBroadcastApprovalEvent(c.env.DB, id, c.get('staff')?.id ?? '', 'cancelled', '内容の変更');
         }
       } catch (approvalError) {
-        console.error('PUT /api/broadcasts/:id approval reset error:', approvalError);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"PUT /api/broadcasts/:id"}));
       }
     }
 
@@ -1837,7 +1793,7 @@ broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"mes
     );
     return c.json({ success: true, data: updated ? serializeBroadcast(updated) : null });
   } catch (err) {
-    console.error('PUT /api/broadcasts/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"PUT /api/broadcasts/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1875,7 +1831,7 @@ broadcasts.post('/api/broadcasts/:id/cancel', requirePermission(BROADCAST_DEFINI
     await recordLifecycle(c.env.DB, id, c.get('staff')?.id, 'cancelled');
     return c.json({ success: true, data: serializeBroadcast(updated) });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/cancel error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/cancel"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1893,11 +1849,11 @@ function kickQueueProcessing(c: Context<Env>, label: string): void {
     const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
     ctx.waitUntil(
       processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-        console.error(`[${label}] background queue processing failed:`, err);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed"}));
       }),
     );
   } catch (kickErr) {
-    console.warn(`[${label}] waitUntil unavailable, falling back to cron:`, kickErr);
+    console.warn(JSON.stringify({"code":"routes_broadcasts_warn"}));
   }
 }
 
@@ -1967,7 +1923,7 @@ async function recordBroadcastControlAudit(
       deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
     });
   } catch (err) {
-    console.error(`${action} audit insert failed:`, err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed"}));
   }
 }
 
@@ -2006,7 +1962,7 @@ broadcasts.post('/api/broadcasts/:id/stop', requirePermission(BROADCAST_JOB_STOP
      * 宛先の一覧が無い。頼んだあとに止める手段が LINE 側に無いので、
      * **できないことをできるように見せない**。
      */
-    if (existing.target_type === 'all') {
+    if (existing.target_type === 'all' && !existing.segment_conditions) {
       return c.json({
         success: false,
         error: '全員への配信は、送り始めると途中で止められません（LINE側に停止の口がありません）。',
@@ -2099,7 +2055,7 @@ broadcasts.post('/api/broadcasts/:id/stop', requirePermission(BROADCAST_JOB_STOP
       stoppedUnknownCount: closed.unknown,
     });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/stop error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/stop"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2152,7 +2108,7 @@ broadcasts.post('/api/broadcasts/:id/resume', requirePermission(BROADCAST_JOB_ST
     kickQueueProcessing(c, 'resume');
     return c.json({ success: true, data: { ...serializeBroadcast(updated ?? existing), ledger } });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/resume error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/resume"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2173,7 +2129,7 @@ broadcasts.post(
         return c.json({ success: false, error: 'Broadcast not found' }, 404);
       }
       if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
-      if (existing.target_type === 'all') {
+      if (existing.target_type === 'all' && !existing.segment_conditions) {
         return c.json({
           success: false,
           error: '全員への配信は宛先の一覧を持たないため、失敗した相手だけの再送ができません。',
@@ -2246,7 +2202,7 @@ broadcasts.post(
         retryTargets: reopened,
       }, 202);
     } catch (err) {
-      console.error('POST /api/broadcasts/:id/retry-failed error:', err);
+      console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/retry-failed"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2286,7 +2242,7 @@ broadcasts.delete('/api/broadcasts/:id', requirePermission(BROADCAST_DEFINITION_
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/broadcasts/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"DELETE /api/broadcasts/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2300,6 +2256,7 @@ broadcasts.delete('/api/broadcasts/:id', requirePermission(BROADCAST_DEFINITION_
 // 守ったが、API direct 経路は未対応のままだった。
 // 友だちへ実際に届き、取り消せない。権限に加えて明示的な確認を要求する。
 broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('broadcast-send'), inputJsonBoundary(), async (c) => {
+  if(c.get('impersonation'))return c.json({success:false,code:'IMPERSONATION_SEND_BLOCKED',error:'代理ログイン中は送れません'},403);
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -2326,7 +2283,15 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
      */
     try {
       const { enforceBroadcastSendApproval } = await import('../services/broadcast-approval.js');
-      const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown }>().catch(() => null);
+      const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown; expectedVersion?:unknown; scheduledAt?:unknown;testMode?:unknown }>().catch(() => null);
+      if(await simulationContext(c.env.DB,id)){const result=await scheduleSimulation(c.env.DB,id,sendBody??{},c.req.header('Idempotency-Key')??'');await processBroadcastSimulation(c.env.DB,id);return c.json({success:true,data:{...result,...await simulationPreview(c.env.DB,id)}});}
+      const abReplay=await maybeReplayAbStart(c,id,sendBody);if(abReplay)return abReplay;
+      if(sendBody?.expectedVersion!==undefined) {
+        const current=await broadcastSendPreview(c.env.DB,existing);
+        if(sendBody.expectedVersion!==current.expectedVersion||sendBody.confirmedRecipientCount!==current.recipients||current.recipients===0)
+          return c.json({success:false,code:'SEND_PREVIEW_CHANGED',error:'送る相手が変わりました。もう一度確かめてください',data:current},409);
+      }
+
       const approvalGate = await enforceBroadcastSendApproval(c.env.DB, existing, {
         confirmedRecipientCount: sendBody?.confirmedRecipientCount,
       });
@@ -2339,9 +2304,22 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
             threshold: approvalGate.threshold,
           }, approvalGate.status as 409, []);
       }
+      const abResponse=await maybeStartAb(c,id,sendBody);if(abResponse)return abResponse;
+      if(sendBody?.expectedVersion!==undefined && existing.line_account_id) {
+        if(sendBody.scheduledAt!==undefined && (typeof sendBody.scheduledAt!=='string'||!Number.isFinite(Date.parse(sendBody.scheduledAt))||Date.parse(sendBody.scheduledAt)<=Date.now()))return c.json({success:false,error:'invalid_scheduled_at'},400);
+        const at=typeof sendBody.scheduledAt==='string'?sendBody.scheduledAt:new Date().toISOString();
+        const shifted=await broadcastQuietHoursShift(c.env.DB,existing.line_account_id,at),scheduled=shifted??(sendBody.scheduledAt as string|undefined);
+        if(scheduled){
+          const result=await c.env.DB.prepare("UPDATE broadcasts SET status='scheduled',scheduled_at=?,lock_version=lock_version+1 WHERE id=? AND status='draft' AND lock_version=?").bind(scheduled,id,sendBody.expectedVersion).run();
+          if(!result.meta.changes)return c.json({success:false,error:'version_conflict'},409);
+          return c.json({success:true,data:{scheduled:true,scheduledAt:scheduled,quietHoursShiftTo:shifted}});
+        }
+      }
+
     } catch (gateError) {
+      if(gateError instanceof GapError)return c.json({success:false,error:gateError.code},gateError.status);
       // 数えられない（DB到達不能など）ときは送らない。誤送信より停止を選ぶ。
-      console.error('POST /api/broadcasts/:id/send approval gate error:', gateError);
+      console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
       return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
     }
 
@@ -2409,12 +2387,12 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
 
       const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
       let audienceSql = `SELECT COUNT(*) AS total,
-                                SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                                SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
                            FROM (${sql}) q`;
       const audienceBindings = [...bindings];
       if (accountId) {
         audienceSql = `SELECT COUNT(*) AS total,
-                              SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                              SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
                          FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
         audienceBindings.unshift(accountId);
       }
@@ -2445,12 +2423,12 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
         ctx.waitUntil(
           processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-            console.error('[segment-broadcast] background queue processing failed:', err);
+            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
           }),
         );
       } catch (kickErr) {
         // waitUntil が使えない環境では cron が拾う。送れないわけではない。
-        console.warn('[segment-broadcast] waitUntil unavailable, falling back to cron:', kickErr);
+        console.warn(JSON.stringify({"code":"routes_broadcasts_warn","route":"POST /api/broadcasts/:id/send"}));
       }
 
       return c.json({
@@ -2468,7 +2446,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
       && existing.target_type !== 'multi-account-dedup') {
       const rawExisting = existing as unknown as Record<string, unknown>;
       const accountId = rawExisting.line_account_id as string | null;
-      const where: string[] = ['f.is_following = 1'];
+      const where: string[] = ['f.is_following = 1', 'COALESCE(f.is_hidden,0)=0', DELIVERY_CONSENT_ALLOWED_SQL];
       const binds: unknown[] = [];
       if (accountId) {
         where.push('f.line_account_id = ?');
@@ -2517,11 +2495,11 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
         ctx.waitUntil(
           processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-            console.error('[personalized-broadcast] background queue processing failed:', err);
+            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
           }),
         );
       } catch (kickErr) {
-        console.warn('[personalized-broadcast] waitUntil unavailable, falling back to cron:', kickErr);
+        console.warn(JSON.stringify({"code":"routes_broadcasts_warn","route":"POST /api/broadcasts/:id/send"}));
       }
 
       return c.json({
@@ -2588,12 +2566,12 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
         ctx.waitUntil(
           processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-            console.error('[multi-account-dedup] background queue processing failed:', err);
+            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
           }),
         );
       } catch (kickErr) {
         // ExecutionContext 未利用環境 (test 等) — cron 経由にフォールバック
-        console.warn('[multi-account-dedup] waitUntil unavailable, falling back to cron:', kickErr);
+        console.warn(JSON.stringify({"code":"routes_broadcasts_warn","route":"POST /api/broadcasts/:id/send"}));
       }
 
       return c.json({
@@ -2712,6 +2690,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
     }
 
     const result = await getBroadcastById(c.env.DB, id);
+    if (result?.status === 'sending' && result.segment_conditions) kickQueueProcessing(c, 'consent-filtered');
     if (result?.status === 'sent' && result.line_account_id) {
       try {
         await dispatchOperatorEvent(c.env.DB, c.env, {
@@ -2723,7 +2702,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         });
       } catch (notificationError) {
         // 配信本体は完了済み。通知の失敗で再配信させず、台帳の回収口に残す。
-        console.error('[broadcast-completed] operator notification failed:', notificationError);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
       }
     }
     return c.json({ success: true, data: result ? serializeBroadcast(result) : null });
@@ -2731,7 +2710,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
       if (sendAccountId) await releaseQuotaSlot(c.env.DB, sendAccountId, id);
     }
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/send error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2781,7 +2760,7 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
           }, segmentGate.status as 409, []);
       }
     } catch (gateError) {
-      console.error('POST /api/broadcasts/:id/send-segment approval gate error:', gateError);
+      console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send-segment"}));
       return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
     }
 
@@ -2820,12 +2799,12 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
       const { sql, bindings } = buildPublicSegmentQuery(body.conditions);
       const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
       let audienceSql = `SELECT COUNT(*) AS total,
-                                SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                                SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
                            FROM (${sql}) q`;
       const audienceBindings = [...bindings];
       if (accountId) {
         audienceSql = `SELECT COUNT(*) AS total,
-                              SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+                              SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
                          FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
         audienceBindings.unshift(accountId);
       }
@@ -2851,7 +2830,7 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
     const result = await getBroadcastById(c.env.DB, id);
     return c.json({ success: true, data: result ? serializeBroadcast(result) : null, queued: true, message: 'Broadcast queued for batch processing by Cron' }, 202);
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/send-segment error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send-segment"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2926,7 +2905,7 @@ broadcasts.get('/api/broadcasts/:id/insight', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/broadcasts/:id/insight error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/insight"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -3026,7 +3005,7 @@ broadcasts.post('/api/broadcasts/:id/fetch-insight', requirePermission('/broadca
           aggMedia += (overview.uniqueMediaPlayed as number) ?? 0;
           if (messages && messages.length > 0) hasAnyData = true;
         } catch (err) {
-          console.error(`[fetch-insight] dedup account ${aid} failed:`, err);
+          console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/fetch-insight"}));
           responses.push({ accountId: aid, data: { error: String(err) } });
         }
       }
@@ -3107,7 +3086,7 @@ broadcasts.post('/api/broadcasts/:id/fetch-insight', requirePermission('/broadca
       data: { delivered, uniqueImpression, uniqueClick, uniqueMediaPlayed, openRate, clickRate },
     });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/fetch-insight error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/fetch-insight"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -3255,14 +3234,14 @@ broadcasts.post('/api/broadcasts/:id/test-send', requirePermission(BROADCAST_TES
            VALUES (?, ?, 'outgoing', ?, ?, NULL, 'test', 'broadcast', ?)`
         ).bind(crypto.randomUUID(), friend.id, part.messageType, part.messageContent, now)));
       } catch (err) {
-        console.error(`Test send to ${friend.id} failed:`, err);
+        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/test-send"}));
         failed++;
       }
     }
 
     return c.json({ success: true, sent, failed });
   } catch (err) {
-    console.error('POST /api/broadcasts/:id/test-send error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/test-send"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -3397,7 +3376,7 @@ broadcasts.post('/api/segments/count', requirePermission(BROADCAST_DEFINITION_ED
 
     return c.json({ success: true, count: result?.count ?? 0 });
   } catch (err) {
-    console.error('POST /api/segments/count error:', err);
+    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/segments/count"}));
     return inputError(c, { success: false, error: 'Invalid segment conditions' }, 400, ["conditions"]);
   }
 });

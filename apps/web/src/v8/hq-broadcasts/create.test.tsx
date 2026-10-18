@@ -28,6 +28,7 @@ const replace = vi.hoisted(() => vi.fn())
 const params = vi.hoisted(() => ({ value: new URLSearchParams() }))
 
 vi.mock('@/lib/hq-broadcasts-api', () => ({ hqBroadcastsApi: hq }))
+vi.mock('@/lib/api-gap1', () => ({ chatSafetyApi: { hqSendPreview: async () => ({ success: true, data: { recipients: 6120, excluded: { blocked: 0, optedOut: 0, duplicate: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '本文', sender: null, expectedVersion: 2, perAccount: [] } }) } }))
 vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeof import('@/lib/hq-templates-api')>(), hqTemplatesApi: tpl }))
 /*
  * その場で作る：店のカルーセル・リッチメッセージの作る部品（host の口）は、ここでは口だけの代わりにする。
@@ -89,7 +90,7 @@ async function selectAccounts(...names: string[]) {
   fireEvent.click(await screen.findByRole('button', { name: /^送るアカウント：(選ぶ|変える)$/ }))
   const dialog = await screen.findByRole('dialog', { name: '送るアカウントを選ぶ' })
   for (const name of names) fireEvent.click(within(dialog).getByRole('checkbox', { name, exact: true }))
-  fireEvent.click(within(dialog).getByRole('button', { name: `この ${names.length} アカウントにする` }))
+  fireEvent.click(within(dialog).getByRole('button', { name: `選ぶ（${names.length}件）` }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 }
 
@@ -175,7 +176,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(new URLSearchParams(window.location.search).get('step')).toBe('confirm')
     expect(replace).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
-    fireEvent.click(await screen.findByRole('button', { name: '予約する' }))
+    fireEvent.click(await screen.findByRole('button', { name: /人に.*予約する$/ }))
     await waitFor(() => expect(hq.send).toHaveBeenCalledWith('run-1', 2))
     expect(push).toHaveBeenCalledWith('/hq/broadcasts/detail?id=run-1')
   })
@@ -642,3 +643,15 @@ it('B-173: 統括でリサーチの質問と公開版を読み込み下書きへ
  await waitFor(()=>expect(hq.create).toHaveBeenCalled());
  expect(JSON.parse(hq.create.mock.calls[0][0].messageBubblesJson)[0]).toMatchObject({type:'research',content:{hqTemplateId:'research1',hqTemplateVersionId:'v1'}});
 });
+
+
+it('本文の手順でも作成型を重ねず、見出し・入力・保存帯を同じ板に保つ', async () => {
+  params.value = new URLSearchParams('step=message')
+  const { container } = render(React.createElement(HqBroadcastCreate))
+  await waitFor(() => expect(screen.getByText(/メッセージ（/)).not.toBeNull())
+  expect(container.querySelectorAll('[data-page-template="create"]')).toHaveLength(1)
+  const frame = container.querySelector('[data-page-template="create"]')!
+  expect(frame.querySelector('[data-template-region="heading"]')).not.toBeNull()
+  expect(frame.querySelector('[data-template-region="content"] [role="textbox"]')).not.toBeNull()
+  expect(frame.querySelector('[data-sticky-actions]')).not.toBeNull()
+})

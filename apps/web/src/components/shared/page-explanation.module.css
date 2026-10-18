@@ -12,7 +12,7 @@
   background: transparent;
   color: var(--color-status-info);
   font-size: var(--text-caption);
-  font-weight: 500;
+  font-weight: 400;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -21,6 +21,7 @@
   outline-offset: 2px;
 }
 .body {
+  width: 100%;
   padding: var(--tpl-notice-pad);
   border-radius: var(--radius-control);
   background: var(--color-shell);

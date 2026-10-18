@@ -1,7 +1,7 @@
 'use client'
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
+import { Check, Globe, HelpCircle, History, Send, Undo2, X } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import { TextArea } from '@/components/shared/text-field'
@@ -9,23 +9,28 @@ import { FieldError, Field } from '@/components/shared/form-controls'
 import Radio from '@/components/shared/radio'
 import { focusFormField } from '@/lib/use-field-validation'
 import Button from '@/components/shared/button'
-import { RowMenu } from '@/components/shared/row-actions'
+import HelpTip from '@/components/shared/help-tip'
+import { RowActions } from '@/components/shared/row-actions'
 import { collectUncountedListRows } from '@/components/shared/collect-list-rows'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
 import StatusBadge from '@/components/shared/status-badge'
 import Dialog from '@/components/shared/dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { ListPage } from '@/components/templates'
+import { PageContent } from '@/components/templates/page-frame'
 import Notice from '@/components/shared/notice'
+import { DetailColumns } from '@/components/templates/detail-columns'
+import { PhotoReviewHelp, PublicationRules } from './review-summary'
 import SearchField from '@/components/shared/search-field'
 import SegmentedControl from '@/components/shared/segmented'
 import { Tabs } from '@/components/shared/tabs'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Td, Th, Tr, ActionCell } from '@/components/shared/table'
 import { formatNumber, formatListDay as polishFormatListDay } from '@/lib/format'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { formatPhotoReceivedAt } from './time'
@@ -557,16 +562,16 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   }
 
   const tabLabel = (base: string, count: number) => (!countsReady ? base : hasMorePhotos ? `${base} ${count}+` : `${base} ${count}`)
-  const kpiHelp = (label: string, help: string) => (
-    <button type="button" className={styles.kpiMore} title={help} aria-label={`${label}：${help}`}><MoreHorizontal size={16} aria-hidden="true" /></button>
-  )
+
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId={boardNode(view, status, canEdit)}
       headingSize="regular"
       title="投稿"
-      help="お客さまが送ってくれたペットの写真を確かめて、公式サイトに載せるかを決めます。"
+      help={<PhotoReviewHelp pending={`まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? emptyValue('unknown')}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? emptyValue('unknown') : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`}
+        adopted={hasMorePhotos ? '読み込んだ写真の集計です。続きの写真は含みません' : '今月 採用した写真の枚数です'}
+        rejected={hasMorePhotos ? '読み込んだ写真の集計です。理由の内訳も続きの写真は含みません' : '今月 見送った写真の枚数です'} />}
       actions={<Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}><History size={15} aria-hidden="true" />版の履歴を見る</Button>}
       tabs={
         <div className={styles.tabs} data-design-node="photo-tabs-v8">
@@ -591,19 +596,15 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           <div className={styles.stats}>
             <KpiBand data-design="KPIs" aria-label="投稿の数の帯">
               <KpiCard presentation="band" title="審査待ち" icon={<History size={13} aria-hidden="true" />}
-                menu={kpiHelp('審査待ち', `まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? emptyValue('unknown')}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? emptyValue('unknown') : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`)}
                 value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚"
                 detail={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatWaitRough((Date.now() - Date.parse(reviewMetrics.oldestPendingAt)) / 60000)}` : 'いちばん古いもの —'} />
               <KpiCard presentation="band" title="今月 採用" icon={<HelpCircle size={13} aria-hidden="true" />}
-                menu={kpiHelp('今月 採用', hasMorePhotos ? '読み込んだ写真の集計です。続きの写真は含みません' : '今月 採用した写真の枚数です')}
                 value={countsReady ? adoptedThisMonth : null} unit={hasMorePhotos ? '枚以上' : '枚'}
                 detail={policyPoints == null ? '1 枚ごとに —' : `1 枚ごとに ${formatNumber(policyPoints)} マイル`} />
               <KpiCard presentation="band" title="今月 見送り" icon={<HelpCircle size={13} aria-hidden="true" />}
-                menu={kpiHelp('今月 見送り', hasMorePhotos ? '読み込んだ写真の集計です。理由の内訳も続きの写真は含みません' : '今月 見送った写真の枚数です')}
                 value={countsReady ? rejectedThisMonth.length : null} unit={hasMorePhotos ? '枚以上' : '枚'}
                 detail={`理由：${topReason}`} />
               <KpiCard presentation="band" title="公式サイト掲載" icon={<Undo2 size={13} aria-hidden="true" />}
-                menu={kpiHelp('公式サイト掲載', 'いま載っている写真の枚数です')}
                 value={publishedCount} unit={publishedCount == null ? '' : '枚'} detail="いま載っている写真" />
             </KpiBand>
           </div>
@@ -819,6 +820,7 @@ function ReviewListV8(props: ReviewListV8Props) {
         />
       </form>
       <span className={styles.toolsSpace} aria-hidden="true" />
+      {!adopted && status === 'pending' ? <HelpTip label="写真の見え方の説明">「1枚ずつ大きく見る」にすると、写真を大きくして順に確かめられます（← → で次へ）</HelpTip> : null}
       {adopted ? (
         <p className={styles.toolsNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載で公開先を選びます。</p>
       ) : (
@@ -859,13 +861,12 @@ function ReviewListV8(props: ReviewListV8Props) {
       {notice ? <Notice tone="danger" message={notice} /> : null}
       {props.searchQuery ? <p className={styles.toolsNote}>{`「${props.searchQuery}」で絞り込んでいます`}</p> : null}
       {state ?? cards}
-      {!state && status === 'pending' ? <p className={styles.listHint}>「1枚ずつ大きく見る」にすると、写真を大きくして順に確かめられます（← → で次へ）</p> : null}
       {more}
     </div>
   )
 
   return (
-    <div className={styles.body}>
+    <PageContent>
       {showRail ? (
         <div className={styles.reviewGrid}>
           {leftColumn}
@@ -898,8 +899,7 @@ function ReviewListV8(props: ReviewListV8Props) {
       ) : leftColumn}
 
       {status === 'pending' && canEdit ? (
-        <div className={styles.bulkRow}>
-          <BulkBar count={props.selectedPendingCount} total={props.totalPendingCount} onSelectAll={props.onSelectAllPending} onClear={props.onClearSelection} unit="枚" hint={props.allPhotosLoading ? '全ページの写真を確認しています…' : props.allPhotosError ? <><span role="alert">{props.allPhotosError}</span><Button size="compact" onClick={props.onRetryAllPhotos}>もう一度読み込む</Button></> : '審査待ちの写真だけをまとめて処理します'}>
+        <BulkBar count={props.selectedPendingCount} total={props.totalPendingCount} onSelectAll={props.onSelectAllPending} onClear={props.onClearSelection} unit="枚" hint={props.allPhotosLoading ? '全ページの写真を確認しています…' : props.allPhotosError ? <><span role="alert">{props.allPhotosError}</span><Button size="compact" onClick={props.onRetryAllPhotos}>もう一度読み込む</Button></> : '審査待ちの写真だけをまとめて処理します'}>
             <Button variant="secondary" disabled={props.bulkReviewing} onClick={props.onBulkReturn}>
               まとめて見送り
             </Button>
@@ -914,10 +914,9 @@ function ReviewListV8(props: ReviewListV8Props) {
               <Check size={15} aria-hidden="true" />まとめて採用
             </Button>
             <IconButton aria-label="選ぶのをやめる" title="選ぶのをやめる" onClick={props.onClearSelection}><X size={16} aria-hidden="true" /></IconButton>
-          </BulkBar>
-        </div>
+        </BulkBar>
       ) : null}
-    </div>
+    </PageContent>
   )
 }
 
@@ -1124,6 +1123,8 @@ function PublicationsV8({
 }) {
   const saveErrors = useSaveFormErrors()
 
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const [withdrawTarget, setWithdrawTarget] = useState<PublicationItem | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [items, setItems] = useState<PublicationItem[]>([])
   const [orderItems, setOrderItems] = useState<PublicationItem[] | null>(null)
@@ -1134,12 +1135,11 @@ function PublicationsV8({
   const [withdrawnItems, setWithdrawnItems] = useState<PublicationItem[]>([])
   const [editing, setEditing] = useState<PublicationItem | null>(null)
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([])
-  const [menuId, setMenuId] = useState<string | null>(null)
   const generation = useRef(0)
   const loadSequence = useRef(0)
   const placementChoices = [{ type: 'site', label: 'サイト' }, { type: 'column', label: 'NENコラム' }, { type: 'rich_menu', label: 'リッチメニュー' }, { type: 'form', label: '回答フォーム' }] as const
   const openPlacements = (item: PublicationItem) => {
-    setEditing(item); setNotice(''); setMenuId(null)
+    setEditing(item); setNotice('')
     setSelectedPlacements((item.placements ?? []).filter((placement) => Number(placement.active ?? 1) === 1).map((placement) => text(placement.placement_type)))
   }
   const savePlacements = async () => {
@@ -1200,6 +1200,7 @@ function PublicationsV8({
       }, crypto.randomUUID())
       if (accountGeneration !== generation.current) return
       if (!response.success) throw new Error(response.error)
+      setWithdrawTarget(null)
       notifyToast('写真をすべての掲載先から外しました。審査と同意の履歴、付与済みのマイルは残ります。')
       await load()
       onChanged()
@@ -1259,16 +1260,21 @@ function PublicationsV8({
 
   return (
     <SaveErrorScope errors={saveErrors}><>
+      <ConfirmDialog open={withdrawTarget !== null} title="この写真を掲載先から外しますか？"
+        description="すべての掲載先から外します。審査と公開同意の履歴、付与済みのマイルは残ります。"
+        confirmLabel="掲載先から外す" busy={Boolean(busyId)} error={notice || undefined}
+        onCancel={() => { if (!busyId) { setWithdrawTarget(null); setNotice('') } }}
+        onConfirm={() => { if (withdrawTarget) void withdraw(withdrawTarget) }} />
       <Dialog open={orderItems !== null} title="掲載順を変える" description="上から順に公式サイトへ表示します。全件と確認した版をまとめて保存します。"
         confirmLabel="並び順を保存する" error={notice} busy={busyId === 'order'} onConfirm={() => saveOrder()}
         onCancel={() => { if (!busyId) { setOrderItems(null); void load() } }}>
         <ol>{orderItems?.map((item, index) => <li key={text(item.id)} className={styles.orderRow}>
           <span className={styles.orderName}>{index+1}・{photoPetDisplayName(item.pet_name, { honorific: false })}</span>
-          <span className={styles.orderButtons}><Button disabled={index === 0 || Boolean(busyId)} aria-label={`${text(item.pet_name)}を上へ`} onClick={() => moveOrder(index,-1)}>上へ</Button>
-          <Button disabled={index === orderItems.length-1 || Boolean(busyId)} aria-label={`${text(item.pet_name)}を下へ`} onClick={() => moveOrder(index,1)}>下へ</Button></span>
+          <span className={styles.orderButtons}><Button disabled={index === 0 || Boolean(busyId)} title={busyId ? '処理が終わるまでお待ちください' : index === 0 ? 'これより上には移動できません' : undefined} aria-label={`${text(item.pet_name)}を上へ`} onClick={() => moveOrder(index,-1)}>上へ</Button>
+          <Button disabled={index === orderItems.length-1 || Boolean(busyId)} title={busyId ? '処理が終わるまでお待ちください' : index === orderItems.length-1 ? 'これより下には移動できません' : undefined} aria-label={`${text(item.pet_name)}を下へ`} onClick={() => moveOrder(index,1)}>下へ</Button></span>
         </li>)}</ol>
       </Dialog>
-      {notice ? <Notice tone="danger" message={notice} /> : null}
+      {notice && !withdrawTarget && !editing && !orderItems ? <Notice tone="danger" message={notice} /> : null}
       {state === 'loading' ? (
         <ListState kind="loading" title="公式サイト掲載中の写真を読み込んでいます" />
       ) : state === 'forbidden' ? (
@@ -1278,15 +1284,16 @@ function PublicationsV8({
       ) : items.length === 0 && pendingWithdrawals.length === 0 && withdrawnItems.length === 0 ? (
         <ListState kind="empty" emptyPreset="readonly" title="公式サイト掲載中の写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" />
       ) : (
-        <div className={styles.publicationsGrid}>
+        <DetailColumns presentation="card" asideLabel="出すときの決めごと" expanded={rulesOpen} onExpandedChange={setRulesOpen}
+          aside={<PublicationRules canEdit={canEdit} busy={Boolean(busyId)} onOrder={() => void openOrder()} />}>
           <section data-design-node="photo-pubs-table-v8">
             <div className={styles.tableWrap}>
-              <DataTable className={styles.publicationsTable}>
+              <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-field)', padding: '0 var(--polish-space-card)', collapseScope: 'page' }}>
                 <thead>
-                  <TableHeadRow>
+                  <TableHeadRow data-table-layout="columns">
                     <Th>写真</Th>
-                    <Th>ペット</Th>
-                    <Th>どこで使っているか</Th>
+                    <Th grow>ペット</Th>
+                    <Th help="この写真を使っている掲載先です。複数の場所は行にまとめて表示します。">掲載先</Th>
                     <Th align="right"><span title="30日間の集計は未接続です。累計の回数には置き換えません">この30日に見た</span></Th>
                     <Th>公開の同意</Th>
                     <Th align="right">操作</Th>
@@ -1298,7 +1305,7 @@ function PublicationsV8({
                     const name = photoPetDisplayName(item.pet_name, { fallback: 'ペット名未取得', honorific: false })
                     const consented = Boolean(text(item.publication_consent_at)) && !text(item.publication_withdrawn_at)
                     return (
-                      <Tr key={text(item.id)}>
+                      <Tr key={text(item.id)} data-table-layout="columns">
                         <Td>
                           {imageSrc ? (
                             // eslint-disable-next-line @next/next/no-img-element -- 掲載中の公開写真
@@ -1307,7 +1314,7 @@ function PublicationsV8({
                             <span aria-hidden="true" className={styles.pubThumb} />
                           )}
                         </Td>
-                        <Td>
+                        <Td grow>
                           <span className={styles.pubNameRow}>
                             <span className={styles.petNameV8}>{name}</span>
                             {topPhotoId === text(item.id) ? <Chip tone="info">いちばん見られた</Chip> : null}
@@ -1315,19 +1322,13 @@ function PublicationsV8({
                           <span className={styles.petSubV8}>{Number(item.hide_owner_name) === 0 ? '名前を出しています' : '名前は伏せています'}</span>
                         </Td>
                         <Td><span className={styles.pubCell} title={placementLabels(item)}>{placementLabels(item)}</span></Td>
-                        <Td align="right">{viewsText(item.view_count_30_days)}</Td>
-                        <Td>{consented ? <Chip tone="ok">同意あり</Chip> : <Chip tone="neutral">未取得</Chip>}</Td>
-                        <Td align="right">
-                          {canEdit ? <div className={styles.publicationActions}><Button
-                            variant="secondary"
-                            disabled={busyId === text(item.id)}
-                            onClick={() => void withdraw(item)}
-                            busy={busyId === text(item.id)}
-                            busyLabel="外しています..."
-                          >
-                            掲載先から外す
-                          </Button><RowMenu appearance="plain" label={`${name}の掲載操作`} menuLabel="操作" triggerProps={{ title: 'そのほかの操作' }} open={menuId === text(item.id)} onOpenChange={(next) => setMenuId(next ? text(item.id) : null)} items={[{ id: 'placements', label: '使う場所', onSelect: () => openPlacements(item) }]} /></div> : null}
-                        </Td>
+                        <Td align="right" data-list-number>{viewsText(item.view_count_30_days)}</Td>
+                        <Td><StatusBadge tone={consented ? 'success' : 'neutral'} size="compact">{consented ? '同意あり' : '未取得'}</StatusBadge></Td>
+                        <ActionCell>
+                          {canEdit ? <RowActions subjectName={name}
+                            detail={{ label: busyId === text(item.id) ? '外しています...' : '掲載先から外す', disabled: busyId === text(item.id), onClick: () => { setNotice(''); setWithdrawTarget(item) } }}
+                            menuItems={[{ id: 'placements', label: '使う場所', onSelect: () => openPlacements(item) }]} /> : null}
+                        </ActionCell>
                       </Tr>
                     )
                   })}
@@ -1336,24 +1337,11 @@ function PublicationsV8({
             </div>
             <p className={styles.listHint}>{`公式サイト掲載中 ${publishedCount ?? emptyValue('unknown')}枚のうち ${items.length}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）`}</p>
             <details className={styles.publicationHistory}><summary>掲載の整理と外した履歴（{pendingWithdrawals.length + withdrawnItems.length}件）</summary>
-              {pendingWithdrawals.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p>{canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => void withdraw(item)} busy={Boolean(busyId)} busyLabel="処理中…">掲載先から外す</Button> : null}</div>)}
+              {pendingWithdrawals.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p>{canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setNotice(''); setWithdrawTarget(item) }} busy={Boolean(busyId)} busyLabel="処理中…">掲載先から外す</Button> : null}</div>)}
               {withdrawnItems.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || '—'}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
             </details>
           </section>
-          <div className={styles.rail} data-design="Right" data-design-node="photo-pubs-rail-v8">
-            <section className={styles.railCard} aria-label="出すときの決めごと">
-              <h2 className={styles.railTitle}>出すときの決めごと</h2>
-              <ul className={styles.pubRules}>
-                <li>投稿のときに公開への同意をいただいた写真だけを出します</li>
-                <li>名前は写真ごとに伏せられます</li>
-                <li>公開の期限は設けていません。外す操作をするまで掲載され続けます</li>
-                <li>外しても採用時のマイルは戻りません</li>
-                <li>原本は公開しません。選んだ場所へ公開用画像を出します</li>
-              </ul>
-              {canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => void openOrder()} busy={Boolean(busyId)} busyLabel="処理中…">並び順を変える</Button> : null}
-            </section>
-          </div>
-        </div>
+        </DetailColumns>
       )}
       <Dialog open={Boolean(editing)} title="使う場所" description="同意のある写真の掲載先を選びます。原本は公開しません。" busy={Boolean(busyId)} error={notice} confirmLabel="保存する" onCancel={() => { if (!busyId) setEditing(null) }} onConfirm={() => savePlacements()}>
         {placementChoices.map((choice, saveFieldIndex) => <SaveErrorField names={[`placementChoices.${saveFieldIndex}.type`,"type","choice.type","selectedPlacements","selected_placements"]} key={choice.type}><Checkbox key={choice.type} checked={selectedPlacements.includes(choice.type)} onCheckedChange={(checked) => setSelectedPlacements((current) => checked ? [...current, choice.type] : current.filter((type) => type !== choice.type))}>{choice.label}</Checkbox></SaveErrorField>)}

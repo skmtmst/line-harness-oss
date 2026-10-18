@@ -1,8 +1,14 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
-.editor{min-width:0;min-height:577px;}.tools{display:flex;gap:var(--polish-space-row);align-items:center;flex-wrap:wrap;padding-block:0; margin-bottom: var(--polish-space-row);}
+.editor{min-width:0;}.tools{display:flex;gap:var(--polish-space-row);align-items:center;flex-wrap:wrap;padding-block:0; margin-bottom: var(--polish-space-row);}
 
 .tools > :first-child { flex: 1; min-width: 0; }
 
-.tools [role='tablist']{transform:translateY(7px);}
+/* 絵 vOtK2「置く」：ラベル＋札（共通の絞り込み札）を横に並べる。間は8。 */
+.palette { display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); margin-top: var(--polish-space-row); }
+.paletteLabel { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; line-height: 18px; white-space: nowrap; }
+.paletteAnchor { display: inline-flex; position: relative; }
+.paletteNote { margin: var(--polish-space-row) 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: 18px; }
+
+
 }

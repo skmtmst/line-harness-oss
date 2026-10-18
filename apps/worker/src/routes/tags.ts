@@ -1,3 +1,4 @@
+import {tagDefinitionError} from './tag-definition-error.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -182,24 +183,6 @@ async function visibleTagFolder(c: Context<Env>, id: string, accountId?: string 
   return null;
 }
 
-function tagDefinitionError(c: Context<Env>, error: unknown): Response | null {
-  if (error instanceof TagDefinitionError) {
-    const status = error.code === 'not_found' || error.code === 'folder_not_found' ? 404 : 409;
-    return inputError(c, { success: false, code: error.code, error: error.message }, status, []);
-  }
-  if (error instanceof CommonActionValidationError) {
-    return inputError(c, {
-      success: false,
-      code: error.code,
-      error: error.message,
-      ...(error.field ? { field: error.field } : {}),
-    }, 422, ["automationDraft"]);
-  }
-  if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
-    return c.json({ success: false, code: 'name_conflict', error: '同じ名前のタグがあります' }, 409);
-  }
-  return null;
-}
 
 function text(value: unknown): string | undefined {
   return typeof value === 'string' ? value.trim() : undefined;
@@ -566,7 +549,7 @@ tags.get('/api/tag-groups', async (c) => {
     });
     return c.json({ success: true, data: items.map(serializeTagGroup) });
   } catch (err) {
-    console.error('GET /api/tag-groups error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"GET /api/tag-groups"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -600,7 +583,7 @@ tags.post('/api/tag-groups', requireRole('owner', 'admin'), inputJsonBoundary(),
     const group = await createTagGroup(c.env.DB, { name, sortOrder, color, ...(accountId ? { accountId } : {}) });
     return c.json({ success: true, data: serializeTagGroup(group) }, 201);
   } catch (err) {
-    console.error('POST /api/tag-groups error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"POST /api/tag-groups"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -643,7 +626,7 @@ tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), inputJsonBounda
     if (!group) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeTagGroup(group) });
   } catch (err) {
-    console.error('PATCH /api/tag-groups/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"PATCH /api/tag-groups/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -657,7 +640,7 @@ tags.delete('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
     if (!(await deleteFolder(c.env.DB, c.req.param('id')))) return c.json({ success: false, error: 'folder_scope_conflict' }, 409);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/tag-groups/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"DELETE /api/tag-groups/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -682,7 +665,7 @@ tags.patch('/api/tags/:id/group', requireRole('owner', 'admin'), inputJsonBounda
     if (err instanceof Error && err.message.includes('FOREIGN KEY constraint')) {
       return inputError(c, { success: false, error: 'group not found' }, 400, ["groupId"]);
     }
-    console.error('PATCH /api/tags/:id/group error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"PATCH /api/tags/:id/group"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -708,7 +691,7 @@ tags.get('/api/tags', async (c) => {
     // 同じ中身なら304（list-etag）。
     return listResponse(c, { success: true, data: visibleItems.map(serializeTag) });
   } catch (err) {
-    console.error('GET /api/tags error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"GET /api/tags"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -728,7 +711,7 @@ tags.post('/api/tags/import/preview', requireRole('owner', 'admin'), inputJsonBo
     const data: TagCsvImportPreview = { summary: importSummary(rows), rows };
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('POST /api/tags/import/preview error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"POST /api/tags/import/preview"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -803,7 +786,7 @@ tags.post('/api/tags/import', requireRole('owner', 'admin'), inputJsonBoundary()
     const data: TagCsvImportResult = { summary, rows, outcome: importOutcome(summary) };
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('POST /api/tags/import error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"POST /api/tags/import"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -828,7 +811,7 @@ tags.get(
       if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
       return c.json({ success: true, data: impact });
     } catch (err) {
-      console.error('GET /api/tags/:id/delete-impact error:', err);
+      console.error(JSON.stringify({"code":"routes_tags_failed","route":"GET /api/tags/:id/delete-impact"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -855,7 +838,7 @@ tags.get('/api/tags/:id/dependencies', requireRole('owner', 'admin'), async (c) 
       },
     });
   } catch (error) {
-    console.error('GET /api/tags/:id/dependencies error:', error);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"GET /api/tags/:id/dependencies"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -879,7 +862,7 @@ tags.get('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
         : serializeTag(detail.tag),
     });
   } catch (error) {
-    console.error('GET /api/tags/:id error:', error);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"GET /api/tags/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -910,7 +893,7 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), inputJsonBoundary
     await reorderTags(c.env.DB, body.ids as string[], await getVisibleLineAccountScope(c.env.DB, c.get('staff')));
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
-    console.error('PATCH /api/tags/reorder error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"PATCH /api/tags/reorder"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -963,7 +946,7 @@ tags.post('/api/tags/:id/retroactive-preview', requireRole('owner', 'admin'), in
     // mileage の値が不正なら422で返す（PATCHと同じ扱い）。
     const handled = tagDefinitionError(c, err);
     if (handled) return handled;
-    console.error('POST /api/tags/:id/retroactive-preview error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"POST /api/tags/:id/retroactive-preview"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1018,6 +1001,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), 
       if (name !== undefined && TAG_NAME_CONTROL_CHARACTER_PATTERN.test(name)) {
         return inputError(c, { success: false, error: 'name must not contain control characters' }, 400, ["name"]);
       }
+      if(body.manualAssignmentAllowed===true&&await c.env.DB.prepare('SELECT id FROM member_rank_tiers WHERE tag_id=?').bind(c.req.param('id')).first())return c.json({success:false,error:'rank_tag_managed'},403);
       const reapplyPolicy = body.reapplyPolicy;
       if (reapplyPolicy !== undefined
         && reapplyPolicy !== 'first_only'
@@ -1089,7 +1073,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), 
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'tag name already exists' }, 409);
     }
-    console.error('PATCH /api/tags/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"PATCH /api/tags/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1153,7 +1137,7 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), inputJsonBoun
     // 大きいため、画面で遡及を明示したときだけキューへ積む。
     return c.json({ success: true, data: { tag: serializeTag(tag), queued } });
   } catch (err) {
-    console.error('PATCH /api/tags/:id/mileage error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"PATCH /api/tags/:id/mileage"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1270,7 +1254,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), inputJsonBoundary(), async
     if (err instanceof Error && err.message.includes('FOREIGN KEY constraint')) {
       return inputError(c, { success: false, error: 'group not found' }, 400, ["groupId"]);
     }
-    console.error('POST /api/tags error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"POST /api/tags"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1310,7 +1294,7 @@ tags.delete('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
         409,
       );
     }
-    console.error('DELETE /api/tags/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"DELETE /api/tags/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1360,7 +1344,7 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), inputJsonBound
         : err.message;
       return inputError(c, { success: false, code: err.code, error }, err.code === 'not_found' ? 404 : 409, []);
     }
-    console.error('POST /api/tags/:id/archive error:', err);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"POST /api/tags/:id/archive"}));
     return c.json({ success: false, error: 'タグをアーカイブできませんでした' }, 500);
   }
 });
@@ -1379,7 +1363,7 @@ tags.post('/api/tags/:id/restore', requireRole('owner', 'admin'), denyReadOnly()
     return c.json({ success: true, data: await restoreTag(c.env.DB, { id: c.req.param('id'), lineAccountId: accountId, expectedVersion, actorId: c.get('staff').id }) });
   } catch (error) {
     if (error instanceof ArchiveRestoreError) return c.json({ success: false, code: error.code, error: error.code === 'not_found' ? '対象が見つかりません' : '状態が変わりました。もう一度読み込んでください' }, error.code === 'not_found' ? 404 : 409);
-    console.error('POST /api/tags/:id/restore error:', error);
+    console.error(JSON.stringify({"code":"routes_tags_failed","route":"POST /api/tags/:id/restore"}));
     return c.json({ success: false, error: '保管から戻せませんでした' }, 500);
   }
 });

@@ -363,7 +363,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     fns.opsSupportSummary.mockResolvedValue({
       success: true,
       data: {
-        byStage: { all: 3, new: 1, in_progress: 1, waiting: 0, resolved: 1, closed: 0 },
+        byStage: { all: 51, new: 4, in_progress: 7, waiting: 2, resolved: 38, closed: 0 },
         kpis: { untouched: 1, untouchedFromLine: 0, avgFirstReplyMinutes: 95, prevAvgFirstReplyMinutes: 120, resolutionRate: 80, prevResolutionRate: 75, avgResolutionMinutes: 300, prevAvgResolutionMinutes: 360 },
       },
     })

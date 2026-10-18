@@ -1,96 +1,81 @@
 'use client'
 
-import { jstDate, jstCalendar } from '@/lib/jst-datetime'
-
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { PageTitle } from '@/components/templates/page-frame'
-import FilterChip from '@/components/shared/filter-chip'
-import ListState from '@/components/shared/list-state'
-import { InboxMessage, InboxMessageDay, InboxQuotedMessage } from '@/components/shared/inbox-thread'
-import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls, InboxHistoryButton } from '@/components/shared/inbox-list'
-
-import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton'
-import Avatar from '@/components/shared/avatar'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
-import {
-  api,
-  ApiError,
-  fetchApi,
-  type ChatDetail as ApiChatDetail,
-  type ChatDetailMessage,
-  type ChatListItem,
-  type InboxStats,
-  type ScheduledChatSend,
-} from '@/lib/api'
-import { buildSupportEmailInboxQuery } from './support-email-query'
-import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
-import { withRequestTimeout } from '@/lib/request-timeout'
-import { INBOX_INFO_PANEL_MIN_WIDTH } from './inbox-layout'
-import styles from './list-parts.module.css'
-import { InboxPage, InboxListPane, InboxConversationPane, InboxMessages, InboxComposer, InboxSummaryPane } from '@/components/templates/inbox-page'
-import { InboxComposerTools, InboxToolButton, InboxInputBox, InboxDraftArea, InboxDraftCount, InboxComposerBottom, InboxComposerActions } from '@/components/shared/inbox-composer'
-import Select from '@/components/shared/select'
-import SearchField from '@/components/shared/search-field'
-import { buildOperatorRows, type ChatStatus } from '@/components/chats/inbox-dropdown'
-import { unreadLookup } from '@/components/chats/assignee-unread'
-import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
-import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
-import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
-import { startVisiblePoll } from '@/lib/visible-polling'
-import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
-import { runOptimistic } from '@/lib/undoable'
-import { useAccount } from '@/contexts/account-context'
-import TemplatePicker from '@/components/chats/template-picker'
-import FlexPreviewComponent from '@/components/flex-preview'
-import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
-import FriendInfoSidebarBoundary from '@/components/chats/friend-info-sidebar-boundary'
-import ChatThreadWindow from '@/components/chats/chat-thread-window'
-import ChatSearchBar from '@/v8/inbox-search/chat-search-bar'
-import { useChatSearch } from '@/v8/inbox-search/use-chat-search'
-import InboxRulesPopover from '@/v8/inbox-chat/rules-popover'
-import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog'
-import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css'
-import ConversationHead from '@/v8/inbox-chat/conversation-head'
-import { formatInboxListTime } from '@/v8/inbox-chat/list-time'
-import AttachMenu from '@/v8/inbox-chat/attach-menu'
-import AttachmentChip, { type PendingAttachmentView } from '@/v8/inbox-chat/attachment-chip'
-import AttachmentMessage from '@/v8/inbox-chat/attachment-message'
-import {
-  ATTACH_NOTE,
-  ATTACH_NOTE_TITLE,
-  attachmentPreviewLabel,
-  attachmentSendInput,
-  checkAttachment,
-  describeUploadFailure,
-  scheduledContentLabel,
-  type AttachSlot,
-} from '@/v8/inbox-chat/attachments'
-import type { ChatAttachment } from '@line-crm/shared'
-import SegmentedControl from '@/components/shared/segmented'
-import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window'
-import { type ImageUploaderValue } from '@/components/shared/image-uploader'
-import { Suspense } from 'react'
-import EmailThread from '@/components/support/email-thread'
-import Button from '@/components/shared/button'
-
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-
-
-import Notice from '@/components/shared/notice'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import { RowMenu } from '@/components/shared/row-actions'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { InboxMedia, InboxFlexContent, InboxFloatingPanel, InboxInfoBackdrop, InboxEmailHeading } from '@/components/shared/inbox-content'
-import { Bookmark, CheckCircle2, Clock3, ListFilter, Reply, FileText, Link2, NotebookPen, Send, Settings2, X } from 'lucide-react'
-
+import { inboxRoutingApi } from '@/lib/api-gap1';
+import { SlaBadge, assigneeLabel, type ChatSlaFields } from './sla';
+import { jstDate, jstCalendar } from '@/lib/jst-datetime';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import { PageTitle } from '@/components/templates/page-frame';
+import FilterChip from '@/components/shared/filter-chip';
+import ListState from '@/components/shared/list-state';
+import { InboxMessage, InboxMessageDay, InboxQuotedMessage } from '@/components/shared/inbox-thread';
+import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls, InboxHistoryButton } from '@/components/shared/inbox-list';
+import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton';
+import Avatar from '@/components/shared/avatar';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { api, ApiError, fetchApi, type ChatDetail as ApiChatDetail, type ChatDetailMessage, type ChatListItem, type InboxStats, type ScheduledChatSend } from '@/lib/api';
+import { buildSupportEmailInboxQuery } from './support-email-query';
+import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query';
+import { withRequestTimeout } from '@/lib/request-timeout';
+import { INBOX_INFO_PANEL_MIN_WIDTH } from './inbox-layout';
+import styles from './list-parts.module.css';
+import { InboxPage, InboxListPane, InboxConversationPane, InboxMessages, InboxComposer, InboxSummaryPane } from '@/components/templates/inbox-page';
+import { InboxComposerTools, InboxToolButton, InboxInputBox, InboxDraftArea, InboxDraftCount, InboxComposerBottom, InboxComposerActions } from '@/components/shared/inbox-composer';
+import SearchField from '@/components/shared/search-field';
+import { buildOperatorRows, type ChatStatus } from '@/components/chats/inbox-dropdown';
+import { unreadLookup } from '@/components/chats/assignee-unread';
+import InboxFilterPanel from '@/components/chats/inbox-filter-panel';
+import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog';
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
+import { startVisiblePoll } from '@/lib/visible-polling';
+import { UNANSWERED_REFRESH_EVENT } from '@/lib/events';
+import { runOptimistic } from '@/lib/undoable';
+import SenderSelect from '@/components/shared/sender-select';
+import { useStaffRole } from '@/lib/staff-role';
+import { useAccount } from '@/contexts/account-context';
+import TemplatePicker from '@/components/chats/template-picker';
+import FlexPreviewComponent from '@/components/flex-preview';
+import FriendInfoSidebar from '@/components/chats/friend-info-sidebar';
+import FriendInfoSidebarBoundary from '@/components/chats/friend-info-sidebar-boundary';
+import ChatThreadWindow from '@/components/chats/chat-thread-window';
+import ChatSearchBar from '@/v8/inbox-search/chat-search-bar';
+import { useChatSearch } from '@/v8/inbox-search/use-chat-search';
+import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
+import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog';
+import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css';
+import ConversationHead from '@/v8/inbox-chat/conversation-head';
+import { InboxAiDraft, InboxAiHeadMenu, InboxAiSummary, useInboxAi } from '@/v8/ai-reply/inbox-ai';
+import { formatInboxListTime } from '@/v8/inbox-chat/list-time';
+import AttachMenu from '@/v8/inbox-chat/attach-menu';
+import AttachmentChip, { type PendingAttachmentView } from '@/v8/inbox-chat/attachment-chip';
+import AttachmentMessage from '@/v8/inbox-chat/attachment-message';
+import { ATTACH_NOTE, ATTACH_NOTE_TITLE, attachmentPreviewLabel, attachmentSendInput, checkAttachment, describeUploadFailure, scheduledContentLabel, type AttachSlot } from '@/v8/inbox-chat/attachments';
+import type { ChatAttachment } from '@line-crm/shared';
+import SegmentedControl from '@/components/shared/segmented';
+import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
+import { type ImageUploaderValue } from '@/components/shared/image-uploader';
+import { Suspense } from 'react';
+import EmailThread from '@/components/support/email-thread';
+import Button from '@/components/shared/button';
+import ConfirmDialog from '@/components/shared/confirm-dialog';
+import Dialog from '@/components/shared/dialog';
+import Notice from '@/components/shared/notice';
+import { useOverlayFocus } from '@/components/shared/overlay-utils';
+import { RowMenu } from '@/components/shared/row-actions';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { japaneseDetailOf } from '@/components/shared/api-error-message';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { InboxMedia, InboxFlexContent, InboxFloatingPanel, InboxInfoBackdrop, InboxEmailHeading } from '@/components/shared/inbox-content';
+import { Bookmark, Clock3, ListFilter, Reply, FileText, Link2, NotebookPen, Send, Settings2, X } from 'lucide-react';
+import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types';
+import { savedViewFailureMessage } from './saved-view-failure';
+import { savedViewSummary } from './saved-view-summary';
+import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic';
+import { describeSendFailure } from './send-failure';
+import { formatDateTime, formatNumber, formatTime } from '@/lib/format';
+import { StickerMessageImage, ChatImageMessage } from "./screen-gap-parts"
 type Chat = ChatListItem
 
 /**
@@ -138,13 +123,6 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
  */
 const statusFiltersV8 = statusFilters.filter((f) => f.key !== 'all')
 
-import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types'
-import { savedViewFailureMessage } from './saved-view-failure'
-import { savedViewSummary } from './saved-view-summary'
-import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
-import { describeSendFailure } from './send-failure'
-import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
-
 type InboxSavedView = {
   id: string
   name: string
@@ -182,92 +160,6 @@ function toListCursor(
 ): ListCursor | null {
   if (!last?.lastMessageAt) return null
   return { at: last.lastMessageAt, id: last.id, unread: last.isUnread ? 1 : 0 }
-}
-
-function StickerMessageImage({ content }: { content: string }) {
-  const [failed, setFailed] = useState(false)
-  const [retryKey, setRetryKey] = useState(0)
-  const sticker = parseStickerMessageContent(content)
-  const fallback = stickerFallback(content)
-
-  // 本文由来のURLをそのまま読みに行く。https 以外(意図しない scheme・
-  // 空文字など)は画像にせず、文字の代替表示に倒す。共通側の許可リスト
-  // 検証(#493-C1)が入るまでの間の最低限の guard。
-  if (!sticker || failed || !sticker.stickerUrl.startsWith('https://')) {
-    return (
-      <span className="inline-flex flex-col items-center gap-1">
-        <span>{fallback}</span>
-        {sticker && failed ? (
-          <button
-            type="button"
-            onClick={() => { setFailed(false); setRetryKey((key) => key + 1) }}
-            className="text-action text-micro font-semibold underline underline-offset-2"
-          >
-            画像を読み込み直す
-          </button>
-        ) : null}
-      </span>
-    )
-  }
-
-  return (
-    <InboxMedia kind="sticker"
-      key={retryKey}
-      src={sticker.stickerUrl}
-      alt={fallback}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-    />
-  )
-}
-
-/**
- * 履歴の画像メッセージ(INBOX-30)。
- *
- * 以前は alt 空・onError なしの `<img>` だけで、404・期限切れ・回線断で
- * 何も出ない空白になっていた。スタンプと同じく、失敗は代替表示と
- * 再読み込みに倒す。画像の内容は推測して書かない。
- */
-function ChatImageMessage({ content }: { content: string }) {
-  const [failed, setFailed] = useState(false)
-  const [retryKey, setRetryKey] = useState(0)
-  let url: string | null = null
-  try {
-    const parsed = JSON.parse(content) as { originalContentUrl?: unknown; previewImageUrl?: unknown }
-    const candidate = parsed.originalContentUrl ?? parsed.previewImageUrl
-    if (typeof candidate === 'string' && candidate.startsWith('https://')) url = candidate
-  } catch {
-    url = null
-  }
-
-  if (!url || failed) {
-    return (
-      <span className="flex min-w-40 flex-col items-center justify-center gap-1.5 rounded-mini bg-canvas-sunken px-4 py-6 text-center">
-        <span className="text-ink-faint text-xs">画像を読み込めませんでした</span>
-        {url ? (
-          <button
-            type="button"
-            onClick={() => { setFailed(false); setRetryKey((key) => key + 1) }}
-            className="text-action text-xs font-semibold underline underline-offset-2"
-          >
-            画像を読み込み直す
-          </button>
-        ) : null}
-      </span>
-    )
-  }
-
-  return (
-    <InboxMedia kind="image"
-      key={retryKey}
-      src={url}
-      alt="画像"
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-    />
-  )
 }
 
 function formatInboxDatetime(iso: string | null): string {
@@ -467,6 +359,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null)
+  /* G2：会話の要約と返信案（l1i3v）。AI を使っていない店では何も出さない。 */
+  const inboxAi = useInboxAi(chatDetail?.id ?? null, selectedAccountId, chatDetail?.messages)
   /*
    * URLの `?status=` で絞り込み済みの受信箱を開けるようにする（IDEA-01）。
    * ダッシュボードの「対応が必要な受信」は `?status=unread` でここへ来る。
@@ -759,6 +653,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [sending, setSending] = useState(false)
   // N-025: 引用返信。会話の中の1件を引用して返す。
   const [quotedMessage, setQuotedMessage] = useState<ChatDetailMessage | null>(null)
+  /* 訂正：送ったあとは取り消せない。間違えた吹き出しの［訂正を送る］から、見本の文と引用を入れて人が送る。 */
+  const [correctingId, setCorrectingId] = useState<string | null>(null)
+  const staffRole = useStaffRole()
+  /* 送り手（G8）：選ぶと、お客さまの LINE でメッセージの上に出る名前と顔が変わる。空は店の名前。 */
+  const [senderId, setSenderId] = useState('')
   // N-025: 送信予約。JSTの datetime-local 値をそのまま口へ渡し、
   // 保存はサーバー側でUTCへ正規化される。
   const [scheduledSends, setScheduledSends] = useState<ScheduledChatSend[]>([])
@@ -852,6 +751,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     return () => window.clearTimeout(timer)
   }, [nameQuery])
 
+  /* 返事の期限（G3）。店が期限を使っているときだけ、札・期限超過の数・期限が近い順の並びを出す。読めなければ今までの形のまま。 */
+  const [slaEnabled, setSlaEnabled] = useState(false)
+  const [overdueTotal, setOverdueTotal] = useState<number | null>(null)
+  const [slaReload, setSlaReload] = useState(0)
+  useEffect(() => {
+    setSlaEnabled(false); setOverdueTotal(null)
+    if (!selectedAccountId) return
+    let live = true
+    void inboxRoutingApi.get(selectedAccountId).then((res) => { if (live) setSlaEnabled(Boolean(res.data.enabled)) }, () => {})
+    return () => { live = false }
+  }, [selectedAccountId, slaReload])
+
   const buildListParams = useCallback((cursor: ListCursor | null) => {
     const params: {
       status?: string; accountId?: string; q?: string;
@@ -864,6 +775,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (assigneeFilter !== 'all') params.operatorId = assigneeFilter
     if (unreadOnly) params.unreadOnly = true
     if (quickFilter !== 'all') params.quickFilter = quickFilter
+    /* 返事の期限を使う店：「期限超過」は旧い「1時間以上待ち」の絞りを使わない。期限の絞り・並びは読んだ行の slaState・slaDueAt で行う。 */
+    if (slaEnabled && quickFilter === 'overdue') delete params.quickFilter
     params.limit = CHAT_PAGE_SIZE
     if (cursor) {
       params.beforeUnread = cursor.unread
@@ -871,10 +784,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       params.beforeId = cursor.id
     }
     return params
-  }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter])
+  }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled])
 
   // Compare at render time too: an old request can finish before the next effect runs.
-  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter])
+  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled])
   const listFilterKeyRef = useRef(listFilterKey)
   listFilterKeyRef.current = listFilterKey
   const chatListRequestRef = useRef(0)
@@ -883,6 +796,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 描画中の条件と、各一覧が最後まで取得できた条件を結び付ける。
   // useEffect が loading を立てる前の1描画でも、旧条件の0件を新条件の0件と誤認しない。
   const [chatListCompletedKey, setChatListCompletedKey] = useState<string | null>(null)
+  /* 上の「期限超過 N」。一覧と同じ口（期限超過の絞り込み）の総数を使う。行数とは別に数えさせる。 */
+  useEffect(() => {
+    if (!slaEnabled || !selectedAccountId) { setOverdueTotal(null); return }
+    let live = true
+    void inboxRoutingApi.listByDeadline(selectedAccountId, { overdue: true, limit: 1 }).then((res) => { if (live) setOverdueTotal(res.total) }, () => { if (live) setOverdueTotal(null) })
+    return () => { live = false }
+  }, [slaEnabled, selectedAccountId, chatListCompletedKey])
   const [emailListCompletedKey, setEmailListCompletedKey] = useState<string | null>(null)
 
   // メール一覧の1ページ件数。上限200切りっぱなしだった offset なし取得を、
@@ -1691,6 +1611,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // メッセージ指定で口が404を返すため、ここで必ず外す。
   useEffect(() => {
     setQuotedMessage(null)
+    setCorrectingId(null)
     setShowSchedulePanel(false)
     setScheduleInput('')
   }, [selectedChatId])
@@ -1956,7 +1877,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             text: content,
             revision: currentRevision,
             quotedMessageId: quotedMessage?.id,
-          },
+            ...(senderId ? { senderId } : {}),
+          } as Parameters<typeof api.chats.sendCombined>[1],
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -2007,7 +1929,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         })
         const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'image', content: imgPayload, quotedMessageId: quotedMessage?.id ?? null })
         const sendResult = await api.chats.send(sendingChatId,
-          { messageType: 'image', content: imgPayload, revision: currentRevision, quotedMessageId: quotedMessage?.id },
+          { messageType: 'image', content: imgPayload, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -2053,7 +1975,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         const input = attachmentSendInput(sendingAttachment.attachment)
         const signature = JSON.stringify({ chatId: sendingChatId, ...input, quotedMessageId: useCombined ? null : quotedMessage?.id ?? null })
         const sendResult = await api.chats.send(sendingChatId,
-          { ...input, revision: currentRevision, quotedMessageId: useCombined ? undefined : quotedMessage?.id },
+          { ...input, revision: currentRevision, quotedMessageId: useCombined ? undefined : quotedMessage?.id, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -2093,7 +2015,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         const content = messageContent.trim()
         const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content, quotedMessageId: quotedMessage?.id ?? null })
         const sendResult = await api.chats.send(sendingChatId,
-          { content, revision: currentRevision, quotedMessageId: quotedMessage?.id },
+          { content, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(correctingId ? { correctionOfMessageId: correctingId } : {}), ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
@@ -2109,6 +2031,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         }
         // Optimistic update: append message locally instead of refetching (prevents scroll jump / full reload feel)
         // Only mutate chatDetail if it still corresponds to the chat we just sent to
+        setCorrectingId(null)
         const textMessage = buildOutgoingMessage({
           messageType: 'text',
           content,
@@ -2176,7 +2099,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       const now = new Date().toISOString()
       const signature = JSON.stringify({ chatId: sendingChatId, combined: true, texts })
       const sendResult = await api.chats.sendCombined(sendingChatId,
-        { texts, revision: pack.revision },
+        { texts, revision: pack.revision, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.sendCombined>[1],
         sendKeysRef.current.get(signature),
       )
       sendKeysRef.current.clear(signature)
@@ -2352,8 +2275,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       if (res.success) {
         setScheduledSends((prev) => prev.filter((row) => row.id !== scheduleId))
       }
-    } catch {
-      setError('予約の取消に失敗しました。一覧を読み込み直してください。')
+    } catch (caught) {
+      setError((caught as { code?: string })?.code === 'SCHEDULE_TOO_LATE'
+        ? 'まもなく送ります。取り消せません。'
+        : '予約の取消に失敗しました。一覧を読み込み直してください。')
       void loadScheduledSends(selectedChatId)
     }
   }
@@ -2824,7 +2749,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
            * ★V8：絵（XqSvX）の「対応ルール」は settings-2 の印。押してもページを移らず、
            * その場で小窓を開く（オーナー指摘：別のページへ飛ぶのはおかしい）。
            */
-          <InboxRulesPopover accountId={selectedAccountId ?? null} />
+          <InboxRulesPopover accountId={selectedAccountId ?? null} onRoutingSaved={() => setSlaReload((n) => n + 1)} />
         )}
         </InboxListHeadline>
         {[
@@ -2839,11 +2764,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
            * 高さ32にそろえる。行の中で高さが違うと、同じ1行でも上端が
            * ずれて2行に見える（見た目の自動点検 k=5）。
            */
-          { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話', icon: Clock3 },
-        ].map((filter) => (
+          slaEnabled
+            ? { key: 'overdue' as const, label: overdueTotal === null ? '期限超過' : `期限超過 ${overdueTotal}`, title: '最初の返事の期限を過ぎた会話', icon: Clock3 }
+            : { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話', icon: Clock3 },
+        ].sort((a, b) => (slaEnabled ? Number(b.key === 'overdue') - Number(a.key === 'overdue') : 0)).map((filter) => (
           <FilterChip size="inbox" key={filter.key} selected={quickFilter === filter.key} onChange={() => { setQuickFilter(filter.key); dropSavedViewParam() }} title={filter.title} showCheck={false} icon={filter.icon ? <filter.icon aria-hidden size={14} /> : undefined}>
             {filter.label}
-            {quickCountsNow ? <span className="sr-only tabular-nums">{quickCountsNow[filter.key]}</span> : null}
+            {quickCountsNow && !(slaEnabled && filter.key === 'overdue') ? <span className="sr-only tabular-nums">{quickCountsNow[filter.key]}</span> : null}
           </FilterChip>
         ))}
         <SavedViewDialog
@@ -2989,7 +2916,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
           </div>
 
-          <p data-inbox-sort="fixed" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>並び順：未読が先・新しい順</p>
+          <p data-inbox-sort="fixed" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>{slaEnabled ? '並び順：期限が近い順（過ぎた物が先）' : '並び順：未読が先・新しい順'}</p>
           {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
           <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
             <>
@@ -3116,7 +3043,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
                                 {(item.assignedStaffName ?? '未').charAt(0)}
                               </span>
-                              <span className="truncate">担当：{item.assignedStaffName ?? '未割り当て'}</span>
+                              <span className="truncate">{`担当：${item.assignedStaffName ?? '未割り当て'}`}</span>
                             </span>
                           </div>
                         </div>
@@ -3219,8 +3146,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
                                 {(operatorName ?? '未').charAt(0)}
                               </span>
-                              <span className="truncate">担当：{operatorName ?? '未割り当て'}</span>
+                              <span className="truncate">{`担当：${assigneeLabel(operatorName, chat as ChatSlaFields)}`}</span>
                             </span>
+                            <span className="ml-auto shrink-0"><SlaBadge fields={chat as ChatSlaFields} now={Date.now()} /></span>
                           </div>
                         </div>
                       </div>
@@ -3239,7 +3167,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     Number(b.unread) - Number(a.unread)
                     || String(b.at).localeCompare(String(a.at))
                   const rows: ChatListWindowItem[] = []
-                  {
+                  if (slaEnabled) {
+                    // 期限が近い順（過ぎた物が先）。期限の無い行・メールは後ろへ。「期限超過」は期限を過ぎた行だけ。
+                    const dueOf = (chat: ChatSlaFields) => (chat.slaDueAt ? Date.parse(chat.slaDueAt) : Infinity)
+                    const linePicked = (quickFilter === 'overdue' ? chats.filter((chat) => (chat as ChatSlaFields).slaState === 'overdue') : chats)
+                    const keyed = new Set(linePicked.map((chat) => chat.id))
+                    const lineByDue = lineRows.filter((row) => keyed.has(row.key)).sort((a, b) => dueOf(chats.find((chat) => chat.id === a.key) as ChatSlaFields) - dueOf(chats.find((chat) => chat.id === b.key) as ChatSlaFields))
+                    rows.push(...lineByDue, ...(quickFilter === 'overdue' ? [] : mailRows))
+                  } else {
                     let i = 0
                     let j = 0
                     while (i < mailRows.length && j < lineRows.length) {
@@ -3384,8 +3319,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   status={{ value: chatDetail.status as ChatStatus, onChange: (next) => void handleStatusUpdate(next as Chat['status']) }}
                   search={{ open: chatSearch.open, onToggle: () => (chatSearch.open ? chatSearch.close() : openChatSearch()) }}
                   panel={{ open: showFriendInfo, onToggle: () => setShowFriendInfo((current) => !current) }}
+                  extra={<InboxAiHeadMenu inboxAi={inboxAi} accountId={selectedAccountId} />}
                 />
               )}
+              <InboxAiSummary inboxAi={inboxAi} />
 
               {chatSearch.open && (
                 <ChatSearchBar search={chatSearch} focusSeq={chatSearchFocusSeq} busy={chatSearchFilling} />
@@ -3502,7 +3439,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       return <>
                         {showDateSep ? <InboxMessageDay first={idx === 0}>{formatDayJa(msg.createdAt)}</InboxMessageDay> : null}
                         <InboxMessage outgoing={isOutgoing} last={isLast} time={formatTime(msg.createdAt)} searchHit={searchHit} senderName={msg.sentByStaffName} autoLabel={autoLabel}
-                          onQuote={msg.isUnsent ? undefined : () => { setQuotedMessage(msg); textareaRef.current?.focus() }}>
+                          onQuote={msg.isUnsent ? undefined : () => { setQuotedMessage(msg); textareaRef.current?.focus() }}
+                          onCorrect={staffRole !== 'viewer' && isOutgoing && msg.messageType === 'text' && !msg.isUnsent && msg.source !== 'scenario'
+                            ? () => { setQuotedMessage(msg); setCorrectingId(msg.id); setMessageContent((prev) => prev.trim() ? prev : CORRECTION_TEMPLATE); textareaRef.current?.focus() }
+                            : undefined}>
                           {quotedNode}{bubbleContent}
                         </InboxMessage>
                       </>
@@ -3541,6 +3481,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
                 よく使うものだけ出し、設定は畳む。
               */}
+              <InboxAiDraft inboxAi={inboxAi} onInsert={(text) => { setMessageContent(text); textareaRef.current?.focus() }} />
               <InboxComposer
 data-inbox-v4="composer"
 data-drop-over={dropOver ? '' : undefined}
@@ -3866,6 +3807,7 @@ aria-invalid={messageOverLimit} />
                   )}
                   <InboxComposerActions
 >
+                    {staffRole !== 'viewer' ? <SenderSelect accountId={selectedAccountId} value={senderId} onChange={setSenderId} disabled={sending} /> : null}
                     <InboxToolButton
 size={'compact'}
 data-inbox-v6="schedule-toggle"
@@ -3902,6 +3844,7 @@ disabled={sending || messageOverLimit || ((pendingAttachment !== null) && pendin
                         content: scheduledContentLabel(row.messageType, row.content),
                         editable: row.status === 'scheduled',
                         defaultValue: isoToJstDatetimeLocal(row.scheduledAt),
+                        tooLate: Date.parse(row.scheduledAt) - Date.now() < 60_000,
                       }))}
                       rowsFailed={scheduledSendsFailed}
                       onRetryRows={() => { if (selectedChatId) void loadScheduledSends(selectedChatId) }}
@@ -4144,6 +4087,9 @@ function ChatsPageHost() {
     </div>
   )
 }
+
+/** 訂正の見本の文（店ごとに直せる）。 */
+const CORRECTION_TEMPLATE = '先ほどのメッセージに誤りがありました。正しくは次のとおりです。\n'
 
 export default function ChatsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。

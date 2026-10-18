@@ -6,10 +6,26 @@ const m = vi.hoisted(() => ({ report: vi.fn(), range: { from: '2026-10-01', to: 
 vi.mock('@/lib/api', async original => ({ ...await original<typeof import('@/lib/api')>(), api: { conversions: { definitionReport: m.report } } }))
 vi.mock('@/components/shared/period-picker', () => ({ useReportPeriod: () => ({ days: 30, range: m.range, setDays: vi.fn(), setRange: vi.fn(), customRange: null }) }))
 vi.mock('./routes', () => ({ RoutesFrame: ({ children }: {children: () => React.ReactNode}) => <div>{children()}</div> }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 import ConversionReport from './conversion-report'
 import { ApiError } from '@/lib/api'
 beforeEach(() => m.report.mockReset())
 afterEach(cleanup)
+it('成果地点の操作は共通の印ボタンから開き、日ごとの表へ絞り込める', async () => {
+  m.report.mockResolvedValue({ success: true, data: { daily: [], kpis: { netCount: 4, previousNetCount: 2 }, byDefinition: [
+    { conversionPointId: 'cp-1', conversionPointName: '申込', netCount: 4, previousNetCount: 2, countChange: 2, routes: [] },
+  ] } })
+  const { container } = render(<ConversionReport accountId="a" />)
+  const menu = await screen.findByRole('button', { name: '成果地点「申込」の操作' })
+  expect(menu.getAttribute('data-design-node')).toBe('H0V8EK')
+  expect(menu.className).not.toContain('rowMenuButton')
+  fireEvent.click(menu)
+  fireEvent.click(screen.getByRole('menuitem', { name: '日ごとの表を見る' }))
+  expect(screen.getByText('日ごとの成果（申込）')).toBeTruthy()
+  expect(container.querySelector('[role="menu"]')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'すべてに戻す' }))
+  expect(screen.getByText('日ごとの成果（成果地点すべて）')).toBeTruthy()
+})
 it('E2：404は未集計、500は失敗。再試行の連打で要求を増やさない', async () => {
   m.report.mockRejectedValueOnce(new ApiError(404, 'Not found'))
   const { container } = render(<ConversionReport accountId="a" />)

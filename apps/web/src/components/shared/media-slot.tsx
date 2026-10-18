@@ -1,26 +1,23 @@
 'use client'
-import { File as FileIcon, FileAudio, FileUp, Loader } from 'lucide-react'
+import { FileAudio,File as FileIcon,FileUp,Loader } from 'lucide-react'
 import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ClipboardEvent,
-  type DragEvent,
-  type KeyboardEvent,
-  type MouseEvent,
-  type ReactNode,
-  type RefObject,
+useCallback,
+useEffect,
+useRef,
+useState,
+type ClipboardEvent,
+type DragEvent,
+type KeyboardEvent,
+type MouseEvent,
+type ReactNode,
+type RefObject,
 } from 'react'
+import { joinDescribedBy,useFieldContext } from './field-context'
+import HelpTip from './help-tip'
 import styles from './media-slot.module.css'
 import { TextField } from './text-field'
-import HelpTip from './help-tip'
-import { joinDescribedBy, useFieldContext } from './field-context'
+export { MediaLimitNote } from './media-slot-limit'
 
-/** 公開前にも同じ上限を示す。確認欄が独自の上限文を持たない。 */
-export function MediaLimitNote({ kind = '画像', maxMb }: { kind?: string; maxMb: number }) {
-  return <p>{kind}は{maxMb}MBまで。超えると登録できません</p>
-}
 
 /**
  * 画像・動画・ファイルを入れる所。Pencil ★V8 の採用案 Z7vd2（B-128「画像を追加する所」）。
@@ -482,14 +479,15 @@ export default function MediaSlot({
       <>
         <FileUp aria-hidden="true" className={styles.icon} />
         <span className={styles.title}>{readOnly ? `${noun}はありません` : title}</span>
-        {readOnly || controlsBelow && compact ? null : drag === 'reject' ? (
+        {/* 枠の下に理由を出す形（controlsBelow）は、枠の中に理由を重ねず説明と上限を出したままにする。 */}
+        {readOnly ? null : drag === 'reject' && !controlsBelow ? (
           <span className={styles.reason}>{formats ? `${formats} の${noun}を選んでください` : `この${noun}は入れられません`}</span>
-        ) : error ? (
+        ) : error && !controlsBelow ? (
           <>
             <span className={styles.reason} role="alert">{error}</span>
             {limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{limit}</span> : null}
           </>
-        ) : controlsBelow && compact ? null : !canFile ? (
+        ) : !canFile ? (
           limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{compact ? limit : `（${limit}）`}</span> : null
         ) : (
           <>
@@ -541,7 +539,7 @@ export default function MediaSlot({
   if (renderTrigger) return <>{renderTrigger(openPicker)}{picker}{error ? <p role="alert">{error}</p> : null}</>
 
   return (
-    <div id={id} className={styles.root} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined}>
+    <div id={id} className={styles.root} data-controls-below={controlsBelow || undefined} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined}>
       <div
         role="group"
         aria-label={title}
@@ -574,7 +572,8 @@ export default function MediaSlot({
         {picker}
       </div>
       {controlsBelow && !readOnly && (error || drag === 'reject') ? <span className={styles.reason} role="alert">{error ?? (formats ? `${formats} の${noun}を選んでください` : `この${noun}は入れられません`)}</span> : null}
-      {controlsBelow && drag === 'idle' ? <>{!filled && canFile && !readOnly ? <small className={styles.desc}>ドラッグ＆ドロップ またはクリック</small> : null}{links}{!readOnly && limit ? <span className={styles.desc}>{limit}</span> : null}</> : null}
+      {/* 説明と上限は枠の中（絵 J60utH・e875x・D6fh3）。枠の下は「URL で入れる」「登録メディアから選ぶ」だけを左にそろえて縦に並べる。 */}
+      {controlsBelow && drag === 'idle' ? links : null}
       {urlEntry && urlOpen && !readOnly ? (
         <TextField
           id={urlEntry.id}

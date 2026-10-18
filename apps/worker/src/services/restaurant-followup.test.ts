@@ -4,13 +4,13 @@ import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { setRestaurantAttendance } from './restaurant-attendance.js';
 import { publishScenarioVersion } from '@line-crm/db';
 import { requestRestaurantFollowupApproval,scheduleRestaurantFollowup } from './restaurant-followup.js';
-import { processScenarioSourceJobs } from './scenario-source-jobs.js';
+import { processScenarioSourceJobs, type SourceJobSend } from './scenario-source-jobs.js';
 import { respondToRestaurantConfirmation } from './restaurant-confirmations.js';
 import type { RestaurantEvent } from './restaurant-events.js';
 import type { Env } from '../index.js';
 vi.mock('./feature-enforcement.js',()=>({featureJobCanRun:vi.fn(async()=>true)}));
 let t:SqliteD1,env:Env['Bindings'];
-const sender=vi.fn(async()=>{});
+const sender=vi.fn<SourceJobSend>(async()=>{});
 const store='s',scenario='restaurant-followup:s';
 function iso(offset:number){return new Date(Date.now()+offset*60000).toISOString();}
 function reservation(id='r',starts=iso(3000),source='phone',occurredAt?:string) {
@@ -34,15 +34,35 @@ beforeEach(()=>{
  INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','UID','友だち');
  INSERT INTO rt_organizations(id,account_id,name) VALUES('o','a','組織');
  INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('s','o','店舗','S','a');`);
- env={DB:t.db,RESTAURANT_TEST_ENABLED:'true',WORKER_PUBLIC_URL:'https://worker.invalid'} as Env['Bindings'];
+ env={DB:t.db,DEPLOY_ENV:'test',RESTAURANT_TEST_ENABLED:'true',WORKER_PUBLIC_URL:'https://worker.invalid'} as Env['Bindings'];
 });
 afterEach(()=>{vi.useRealTimers();t.raw.close();});
 describe('飲食3・承認した共通版と予約ごとの送り方',()=>{
+ it('複数吹き出しを公開版へ固定し、テキストとカルーセルを1回の送信で同じ順に送る',async()=>{
+  const step='restaurant-followup:s:reservation_created';
+  const bubbles=[{id:'text',type:'text',content:{text:'{{name}}さん、{{var.guest_count}}名のご予約を承りました。'}},
+   {id:'carousel',type:'carousel',content:{columnsJson:JSON.stringify([{text:'{{var.store_name}}のご案内',actions:[{type:'uri',label:'地図',uri:'https://example.test/map'}]}])}}];
+  t.raw.prepare('UPDATE scenario_steps SET message_bubbles_json=? WHERE id=?').run(JSON.stringify(bubbles),step);
+  await activate();
+  const first=(t.raw.prepare('SELECT approved_version_id id FROM rt_store_followup_templates').get() as {id:string}).id;
+  const snapshot=(t.raw.prepare('SELECT steps_snapshot FROM scenario_versions WHERE id=?').get(first) as {steps_snapshot:string}).steps_snapshot;
+  expect(JSON.parse(snapshot).find((s:any)=>s.live_step_id===step).message_bubbles_json).toBe(JSON.stringify(bubbles));
+  const event=reservation();await scheduleRestaurantFollowup(t.db,event);expect(await processScenarioSourceJobs(env,sender)).toBe(1);
+  expect(sender).toHaveBeenCalledTimes(1);
+  const messages=(sender.mock.calls[0] as unknown[])[2] as any[];
+  expect(messages.map(m=>m.type)).toEqual(['text','template']);expect(messages[0].text).toBe('友だちさん、2名のご予約を承りました。');
+  expect(messages[1].template.columns[0].text).toBe('店舗のご案内');
+  expect(await processScenarioSourceJobs(env,sender)).toBe(0);
+  bubbles[0].content.text='改稿';t.raw.prepare('UPDATE scenario_steps SET message_bubbles_json=? WHERE id=?').run(JSON.stringify(bubbles),step);
+  expect(t.raw.prepare('SELECT sending_status FROM rt_store_followup_templates').get()).toEqual({sending_status:'stopped'});
+  expect((t.raw.prepare('SELECT steps_snapshot FROM scenario_versions WHERE id=?').get(first) as {steps_snapshot:string}).steps_snapshot).toBe(snapshot);
+  await activate();expect((t.raw.prepare('SELECT approved_version_id id FROM rt_store_followup_templates').get() as {id:string}).id).not.toBe(first);
+ });
  it('店の追加は下書き・停止、再接続でひな形を二重作成しない',()=>{
   expect(t.raw.prepare('SELECT sending_status,approved_version_id FROM rt_store_followup_templates').get()).toEqual({sending_status:'stopped',approved_version_id:null});
   t.raw.exec("UPDATE rt_stores SET line_account_id='a' WHERE id='s'");
   expect(t.raw.prepare('SELECT COUNT(*) n FROM scenarios').get()).toEqual({n:1});
-  expect(t.raw.prepare('SELECT COUNT(*) n FROM scenario_steps').get()).toEqual({n:6});
+  expect(t.raw.prepare('SELECT COUNT(*) n FROM scenario_steps').get()).toEqual({n:7});
  });
  it('下書き・未承認は送信0、承認後の電話予約だけ同じ版で送る',async()=>{
   const e=reservation();await scheduleRestaurantFollowup(t.db,e);expect(await processScenarioSourceJobs(env,sender)).toBe(0);
@@ -222,4 +242,29 @@ describe('飲食3・承認した共通版と予約ごとの送り方',()=>{
   expect(await processScenarioSourceJobs(env,sender)).toBe(2);
   expect(JSON.stringify(sender.mock.calls)).toContain('10月12日(月)');
  });
+});
+
+it('組5: 記念日の7日前の行は停止で作られ、承認済みの固定版だけを年に1回送る',async()=>{
+ const row=t.raw.prepare("SELECT step_id,offset_minutes,enabled FROM rt_store_followup_step_bindings WHERE trigger='anniversary_before'").get() as {step_id:string;offset_minutes:number;enabled:number};
+ expect(row).toMatchObject({offset_minutes:-10080,enabled:0});
+ t.raw.prepare("INSERT INTO friend_field_values(friend_id,field_id,value) VALUES('f','fixed-anniversary','2000-10-18')").run();
+ t.raw.exec("UPDATE rt_store_followup_step_bindings SET enabled=1 WHERE trigger='anniversary_before'");
+ // At 18:00 JST the 10:00 send is due, still inside the existing 24-hour retry window.
+ expect(await processScenarioSourceJobs(env,sender)).toBe(0);
+ await activate();expect(await processScenarioSourceJobs(env,sender)).toBe(1);
+ expect(sender.mock.calls[0][2]).toMatchObject([{type:'text',text:'もうすぐ記念日ですね。ご来店をお待ちしています。'}]);
+ expect(await processScenarioSourceJobs(env,sender)).toBe(0);expect(sender).toHaveBeenCalledTimes(1);
+ const jobs=t.raw.prepare("SELECT * FROM scenario_source_jobs WHERE source_kind='restaurant_anniversary'").all();expect(jobs).toHaveLength(1);
+});
+
+it('組5: 予約した記念日が変わった場合は送信直前に再確認して古い案内を止める',async()=>{
+ t.raw.exec("UPDATE rt_store_followup_step_bindings SET enabled=1 WHERE trigger='anniversary_before';INSERT INTO friend_field_values(friend_id,field_id,value) VALUES('f','fixed-anniversary','2000-10-18')");
+ await activate();
+ const {scheduleRestaurantAnniversaries,restaurantAnniversaryState}=await import('./restaurant-anniversary-followup.js');
+ await scheduleRestaurantAnniversaries(t.db);
+ const job=t.raw.prepare("SELECT * FROM scenario_source_jobs WHERE source_kind='restaurant_anniversary'").get() as import('./scenario-source-jobs.js').ScenarioSourceJob;
+ expect(await restaurantAnniversaryState(t.db,job)).not.toBeNull();
+ t.raw.exec("UPDATE friend_field_values SET value='2000-11-18' WHERE friend_id='f' AND field_id='fixed-anniversary'");
+ expect(await restaurantAnniversaryState(t.db,job)).toBeNull();expect(await processScenarioSourceJobs(env,sender)).toBe(0);
+ expect(t.raw.prepare('SELECT status FROM scenario_source_jobs WHERE id=?').get(job.id)).toEqual({status:'cancelled'});
 });

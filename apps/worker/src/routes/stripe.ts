@@ -10,6 +10,7 @@ import { awardActivityMileage } from '../services/activity-mileage.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { listLimit } from './list-pagination.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const stripe = new Hono<Env>();
 
@@ -35,7 +36,9 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
     const friendId = c.req.query('friendId') ?? undefined;
     const eventType = c.req.query('eventType') ?? undefined;
     const limit = listLimit(c.req.query('limit'), 100);
-    const items = await getStripeEvents(c.env.DB, { friendId, eventType, limit });
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const items = await getStripeEvents(c.env.DB, { friendId, eventType, limit,
+      lineAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned });
     return c.json({
       success: true,
       data: items.map((e) => ({
@@ -50,7 +53,7 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
       })),
     });
   } catch (err) {
-    console.error('GET /api/integrations/stripe/events error:', err);
+    console.error(JSON.stringify({"code":"routes_stripe_failed","route":"GET /api/integrations/stripe/events"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -148,7 +151,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
           occurredAt: event.processed_at,
         }).catch((error) => {
           // Stripeイベントは記録済み。派生スコアの失敗で再送を誘発しない。
-          console.error('stripe action score failed:', error);
+          console.error(JSON.stringify({"code":"routes_stripe_failed","route":"POST /api/integrations/stripe/webhook"}));
         });
       }
 
@@ -178,7 +181,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
       data: { id: event.id, stripeEventId: event.stripe_event_id, eventType: event.event_type, processedAt: event.processed_at },
     });
   } catch (err) {
-    console.error('POST /api/integrations/stripe/webhook error:', err);
+    console.error(JSON.stringify({"code":"routes_stripe_failed","route":"POST /api/integrations/stripe/webhook"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

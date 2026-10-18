@@ -1,49 +1,58 @@
 'use client'
-import ReservationBoard from '@/components/shared/reservation-board'
-import PeopleDayList from '@/v8/booking-bookings/day-list'
-import { usePeopleVisitMarks } from '@/v8/booking-bookings/use-visit-marks'
-import {peopleBoardEntry} from '@line-crm/shared'
-import {reservationBoardApi,allBoardPages} from '@/lib/api-reservation-board'
 
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import { PageHeading } from '@/components/templates/page-frame'
-import { BookingPage } from '@/components/templates/booking-page'
-import SegmentedControl from '@/components/shared/segmented'
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Phone, X } from 'lucide-react'
-import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Button from '@/components/shared/button'
-import ListToolbar from '@/components/shared/list-toolbar'
-import ListState from '@/components/shared/list-state'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
-import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import Pagination from '@/components/shared/pagination'
-import ListRange from '@/components/ui/list-range'
-import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import BookingDetailV8 from './booking-detail-v8'
-import { canOperateBookings } from '../lib/booking-permissions'
-import { fetchAllPages } from './fetch-all-pages'
-import BookingCalendar, {
-  isLineBooking,
-  moveDay,
-  startOfWeek,
-  type CalendarAvailability,
-  type CalendarSlot,
-} from './booking-calendar'
-import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
-
+import { statusTone } from './booking-status-tone';
+import ReservationBoard, { ReservationLegend } from '@/components/shared/reservation-board';
+import PeopleDayList from '@/v8/booking-bookings/day-list';
+import PeopleDayFrame from '@/v8/booking-bookings/day-frame';
+import { usePeopleVisitMarks } from '@/v8/booking-bookings/use-visit-marks';
+import { peopleBoardEntry } from '@line-crm/shared';
+import { reservationBoardApi, allBoardPages } from '@/lib/api-reservation-board';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import KpiBand from '@/components/shared/kpi-band';
+import KpiCard from '@/components/shared/kpi-card';
+import { PageHeading } from '@/components/templates/page-frame';
+import SegmentedControl from '@/components/shared/segmented';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Calendar, CalendarPlus, CalendarX, CircleAlert, Download, Phone, X } from 'lucide-react';
+import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import ConfirmDialog from '@/components/shared/confirm-dialog';
+import BookingGapSections from '@/v8/booking-gap/booking-gap-sections';
+import SeriesHost, { SERIES_QUERY_KEYS } from '@/v8/booking-gap/series-host';
+import Button from '@/components/shared/button';
+import ListToolbar from '@/components/shared/list-toolbar';
+import ListState from '@/components/shared/list-state';
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message';
+import Notice from '@/components/shared/notice';
+import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame';
+import BookingLedgerBody from '@/v8/booking-bookings/ledger-body';
+import LedgerMonthNavigation, { monthKey, monthLabel, monthDifference } from '@/v8/booking-bookings/month-navigation';
+import FilterChip from '@/components/shared/filter-chip';
+import { ListToolbarEnd, ListToolbarRow, ListToolbarSearchSlot, ResponsiveFilterChips } from '@/components/shared/list-toolbar';
+import StatusBadge from '@/components/shared/status-badge';
+import { RowMenu } from '@/components/shared/row-actions';
+import { BookingChipsLabel, BookingMonthBar, BookingUrlCopy } from '@/v8/booking-bookings/month-bar';
+import ledgerStyles from '@/v8/booking-bookings/month-bar.module.css';
+import Select from '@/components/shared/select';
+import { ActionCell, DataTable, DateCell, StatusCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
+import Pagination from '@/components/shared/pagination';
+import ListRange from '@/components/ui/list-range';
+import FolderPanel from '@/components/shared/folder-panel';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import { withViewTransition } from '@/components/shared/view-transition';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import BookingDetailV8 from './booking-detail-v8';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { BookingChargesSection } from '@/v8/booking-payments/booking-charges';
+import { BookingGroupSection } from '@/v8/booking-payments/booking-group';
+import { canOperateBookings } from '../lib/booking-permissions';
+import { fetchAllPages } from './fetch-all-pages';
+import { isLineBooking, moveDay, startOfWeek, type CalendarAvailability, type CalendarSlot } from './booking-calendar';
+import { formatDate, formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format';
+import { DetailRow, ActionButtons } from "./page-gap-parts"
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
  *
@@ -87,8 +96,20 @@ const statusBadgeColor: Record<string, string> = {
   no_show: 'bg-danger-bg text-danger',
 }
 
+/** 表の予約経路（LINE 以外）。絞り込みの名前と同じ語。古い応答は「電話」。 */
+function sourceLabel(b: BookingRequest): string {
+  const found = SOURCE_FILTERS.find((item) => item.key !== 'all' && item.key === b.source)
+  return found?.label ?? '電話'
+}
+
+/** 表の日時：MM/DD（曜）HH:mm（B-152 の一覧の形）。 */
+function formatLedgerDateTime(iso: string): string {
+  if (Number.isNaN(new Date(iso).getTime())) return '—'
+  return `${formatDate(iso, { style: 'list-day-weekday' })} ${formatTime(iso)}`
+}
+
 const statusLabel: Record<string, string> = {
-  requested: 'リクエスト',
+  requested: '未承認',
   confirmed: '確定',
   rejected: '拒否',
   expired: '期限切れ',
@@ -114,12 +135,6 @@ function formatJpDateTime(iso: string): string {
   return formatDateTime(iso)
 }
 
-/** 表の日時。設計は年を出していない（08/18 14:00）。 */
-function formatShort(iso: string): string {
-  if (Number.isNaN(new Date(iso).getTime())) return '—'
-  return formatDateTime(iso)
-}
-
 function formatJpTime(iso: string): string {
   if (Number.isNaN(new Date(iso).getTime())) return '—'
   return formatTime(iso)
@@ -136,18 +151,6 @@ function formatJpDay(iso: string): string {
 
 function jstDay(iso: string): string {
   return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
-}
-
-function monthKey(offset: number): string {
-  const now = new Date(Date.now() + 9 * 3600_000)
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1))
-  return d.toISOString().slice(0, 7)
-}
-
-/** R90: 「2026-09」→「2026年9月」。対象期間の明示に使う。 */
-function monthLabel(key: string): string {
-  const [year, month] = key.split('-').map(Number)
-  return `${year}年${month}月`
 }
 
 /**
@@ -190,6 +193,7 @@ export default function BookingsPage() {
   const [tab, setTab] = useState<string>('requested')
   /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
   const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
+  /** 「今月」の表の月送り（0＝今月）。数の帯は今月のまま。 */
   /*
    * R317: URLの条件（`?view=` `?status=` `?range=` `?date=` `?q=` …）で
    * 絞り込み済みの一覧を開ける（IDEA-01）。ダッシュボードの「予約状況」
@@ -199,6 +203,7 @@ export default function BookingsPage() {
    * 知らない値は既定へ落とす。
    */
   const urlInitRef = useRef(false)
+  const [ledgerRestored, setLedgerRestored] = useState(false)
   // R317: 復元で絞り込みが変わっても、戻したページは1へ戻さない。
   const pageResetRef = useRef({ seenMount: false, restoreTransition: false })
   useEffect(() => {
@@ -262,12 +267,16 @@ export default function BookingsPage() {
     if (bookingParam) {
       setActiveBookingId(bookingParam)
     }
+    setLedgerRestored(true)
   }, [urlParams])
   const [menuFilter, setMenuFilter] = useState<string>('all')
   // N-398: 担当者・予約経路の絞り込み。一覧の取得とCSV書出しの両方に渡す。
   const [staffFilter, setStaffFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [staffList, setStaffList] = useState<BookingStaff[]>([])
+  const [staffBreaks, setStaffBreaks] = useState<Record<string, Array<{ weekday: number; start_time: string; end_time: string }>>>({})
+  /* 盤の「担当者」の絞り込み（GcyTr）。一覧の絞り込み（staffFilter）とは別に、盤の列だけを絞る。 */
+  const [boardStaff, setBoardStaff] = useState('all')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [items, setItems] = useState<BookingRequest[]>([])
@@ -280,6 +289,8 @@ export default function BookingsPage() {
    * 読まれず全マスが空きに見えた。表示範囲と取得範囲を一致させる。
    */
   const [calendarAnchor, setCalendarAnchor] = useState(() => jstDay(new Date().toISOString()))
+  const monthOffset = monthDifference(calendarAnchor)
+  const setMonthOffset = (next: number | ((previous: number) => number)) => setCalendarAnchor(`${monthKey(typeof next === 'function' ? next(monthOffset) : next)}-01`)
   const calendarFrom = view === 'week' ? startOfWeek(calendarAnchor) : calendarAnchor
   const calendarTo = view === 'week' ? moveDay(calendarFrom, 6) : calendarAnchor
   /*
@@ -353,6 +364,8 @@ export default function BookingsPage() {
    * v7 は今のまま（引き出し・小窓）で、1画素も変えない。
    */
   const [activeBookingId, setActiveBookingId] = useDetailPanelUrl('booking')
+  /* 返金はオーナー・管理者だけ（B1：スタッフは請求・請求しないまで）。 */
+  const canRefundCharges = canManageRole(useStaffRole())
   const openBookingDetail = (id: string) => withViewTransition(() => setActiveBookingId(id))
   const closeBookingDetail = () => setActiveBookingId(null)
 
@@ -399,8 +412,8 @@ export default function BookingsPage() {
     let from: string | undefined
     let to: string | undefined
     if (view === 'month') {
-      from = new Date(`${monthKey(0)}-01T00:00:00+09:00`).toISOString()
-      to = new Date(`${monthKey(1)}-01T00:00:00+09:00`).toISOString()
+      from = new Date(`${monthKey(monthOffset)}-01T00:00:00+09:00`).toISOString()
+      to = new Date(`${monthKey(monthOffset + 1)}-01T00:00:00+09:00`).toISOString()
     }
     if (range !== 'all') {
       const today = jstDay(new Date().toISOString())
@@ -413,7 +426,7 @@ export default function BookingsPage() {
       to = to && to < rangeTo ? to : rangeTo
     }
     return { ...(from ? { from } : {}), ...(to ? { to } : {}) }
-  }, [range, view])
+  }, [range, view, monthOffset])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -667,6 +680,15 @@ export default function BookingsPage() {
     })()
     return () => { alive = false }
   }, [selectedAccountId, view, calendarFrom, calendarTo, candidatesStatus, menus, staffList])
+  // 人（スタッフ）ごとの毎週の休憩。1日表示の盤に「休憩」の枠として出す（絵 O2Z8u）。読めなければ空き枠の失敗として示す。
+  useEffect(() => {
+    if (!selectedAccountId || view !== 'day' || staffList.length === 0) return
+    let alive = true
+    void Promise.all(staffList.map(staff => Promise.resolve().then(() => bookingApi.getBreaks(selectedAccountId, staff.id)).then(res => [staff.id, res.breaks] as const))).then(pairs => {
+      if (alive) setStaffBreaks(Object.fromEntries(pairs))
+    }, () => { if (alive) setAvailability({ status: 'error', slots: [] }) })
+    return () => { alive = false }
+  }, [selectedAccountId, view, staffList])
 
   type BookingAction = 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete'
 
@@ -767,7 +789,7 @@ export default function BookingsPage() {
       return
     }
     setPage(1)
-  }, [tab, menuFilter, query, range, staffFilter, sourceFilter, view])
+  }, [tab, menuFilter, query, range, staffFilter, sourceFilter, view, monthOffset])
 
   /*
    * R317: 表示方法・対象日・絞り込み・ページをURLへ写す。再読み込みで
@@ -787,9 +809,11 @@ export default function BookingsPage() {
     ...(page <= 1 ? [] : [`page=${page}`]),
     // V8 C①：開いている詳細パネルの行を残す。無いとURLの写しが ?booking= を消す。
     ...(activeBookingId ? [`booking=${encodeURIComponent(activeBookingId)}`] : []),
+    // 「繰り返して入れる」の引き出し（B4）：開いている間の指定も残す。
+    ...SERIES_QUERY_KEYS.flatMap((key) => (urlParams.get(key) ? [`${key}=${encodeURIComponent(urlParams.get(key) ?? '')}`] : [])),
   ].join('&')
   useEffect(() => {
-    if (!urlInitRef.current) return
+    if (!urlInitRef.current || !ledgerRestored) return
     try {
       window.sessionStorage.setItem(
         LEDGER_STORAGE_KEY,
@@ -805,7 +829,7 @@ export default function BookingsPage() {
     if (current !== ledgerQuery) {
       router.replace(ledgerQuery ? `/booking/bookings?${ledgerQuery}` : '/booking/bookings')
     }
-  }, [ledgerQuery, router])
+  }, [ledgerQuery, ledgerRestored, router])
 
   // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
   // 一覧から消えることがある。その場合はパネルを閉じる。
@@ -890,7 +914,7 @@ export default function BookingsPage() {
       {canOperate ? <Button variant="primary" size="booking" href="/booking/bookings/new"><Phone size={16} aria-hidden="true" />電話の予約を入れる</Button> : null}
     </>
   )
-  const pageHead = <PageHeading title="予約管理" actions={headingActions} />
+  const pageHead = <PageHeading title="予約管理" help={view === 'month' ? '予約を探して、行から詳細を見られます。CSVは今の絞り込みで書き出します。' : undefined} actions={headingActions} />
 
   const dialogs = (
     <>
@@ -908,6 +932,7 @@ export default function BookingsPage() {
           detailHref={`/booking/bookings/detail?id=${encodeURIComponent(detail.id)}`}
         />
       ))}
+      {selectedAccountId && canOperate ? <SeriesHost params={new URLSearchParams(urlParams.toString())} accountId={selectedAccountId} menus={menus} staffList={staffList} basePath="/booking/bookings" /> : null}
       <ConfirmDialog
         open={decideTarget !== null}
         designNode={decideTarget?.action === 'cancel' ? 'iJdAi' : undefined}
@@ -931,7 +956,7 @@ export default function BookingsPage() {
   {/* 帯同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   if (view === 'day' || view === 'week') {
     return (
-      <BookingPage title="予約管理" actions={headingActions}>
+      <PeopleDayFrame view={view} date={calendarFrom} rows={calendarItems} ready={calendarStatus === 'ready'} availability={availability} actions={headingActions} canWrite={canOperate} onOpen={setDetailId}>
         {/*
           ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
           出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
@@ -947,82 +972,77 @@ export default function BookingsPage() {
             onRetry={() => { setError(''); setCalendarSeq((n) => n + 1); void load() }}
           />
         ) : (
-          <ReservationBoard printContext={selectedAccount?.name??selectedAccountId??'予約管理'} kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
+          <ReservationBoard breaks={view === 'day' ? staffBreaks : undefined} timeDirection={view === 'day' ? 'vertical' : undefined} printContext={selectedAccount?.name??selectedAccountId??'予約管理'} kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
             toolbar={<><Button onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?-7:-1))}>‹</Button><strong>{Number(calendarFrom.slice(5,7))}月{Number(calendarFrom.slice(8))}日{view==='week'?`〜${Number(calendarTo.slice(5,7))}月${Number(calendarTo.slice(8))}日`:null}</strong><Button onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?7:1))}>›</Button><Button onClick={()=>setCalendarAnchor(jstDay(new Date().toISOString()))}>今日</Button></>}
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<p>担当者か予約メニューが未設定です</p>:null}
             slots={availability.status==='ready'?availability.slots.filter(s=>s.remaining>0&&['available','limited'].includes(s.state)).map(s=>({resourceId:staffList.find(t=>t.display_name===s.staffName)?.id??'',startsAt:s.startUtc??`${s.date}T${s.start}:00+09:00`,href:`/booking/bookings/new?${new URLSearchParams({date:s.date,time:s.start,staff:s.staffName,menu:s.menuId})}`})):[]} entries={(calendarStatus==='ready'?calendarItems:[]).map(r=>peopleBoardEntry({...r,customer_name:r.friend_name,lock_version:(r as unknown as {lock_version:number}).lock_version,line_account_id:selectedAccountId}))}
-            resources={staffList.map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
+            trailingToolbar={view==='day'?<><ReservationLegend label="予約元の色" items={[{label:'LINE',tone:'success'},{label:'電話',tone:'neutral'}]}/><EntitySelect aria-label="担当者で絞り込む" value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'担当者：すべて'},...staffList.map(r=>({value:r.id,label:`担当者：${r.display_name}`}))]}/></>:undefined}
+            resources={staffList.filter(r=>view!=='day'||boardStaff==='all'||r.id===boardStaff).map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
             onOpen={setDetailId} canWrite={canOperate}
             renderList={view === 'day' ? () => <PeopleDayList rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
             onMove={async(id,move)=>{if(!selectedAccountId)throw new Error('アカウント未取得');await reservationBoardApi.move(selectedAccountId,id,move);setCalendarSeq(n=>n+1);await load()}}
           />
         )}
         {dialogs}
-      </BookingPage>
+      </PeopleDayFrame>
     )
   }
 
   return (
-    <div className="flex flex-col gap-4" data-design-node="acRIl">
+    <BookingLedgerFrame view={view}>
       {pageHead}
+      <BookingLedgerBody view={view} readOnly={!canOperate}
+        navigation={<LedgerMonthNavigation anchor={calendarAnchor} onChange={(date) => { setCalendarAnchor(date); setRange('all'); setPage(1) }} shareUrl={shareUrl ?? ''} historyUrl={historyUrl ?? ''} />}
+        stats={<>
+          {summaryError && (
+            // 集計の失敗でも一覧は使える。
+            <p className="text-ink-secondary text-xs" role="status">
+              集計を読み込めませんでした。一覧はそのまま使えます。
+              <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
+            </p>
+          )}
 
-      {/*
-        ★V7 `x63W5x`：一覧の失敗でページ上のピンクの帯は出さない。
-        一覧の場所の ListState error だけにまとめる。
-      */}
-
-      {summaryError && (
-        // ★V7 `x63W5x`：補助のデータ（集計）だけ取れないときは、その場所に
-        // 小さく1行だけ。一覧はそのまま使える。文言は契約試験が守る。
-        <p className="text-ink-secondary text-xs" role="status">
-          集計を読み込めませんでした。一覧はそのまま使えます。
-          <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
-        </p>
-      )}
-
-      {/*
-        ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
-        失敗は「読み込めませんでした」と言い分け、0（本当に0件）と混ぜない。
-      */}
-      <KpiBand data-design="KPIs">
-        <KpiCard icon={null} presentation="band"
-          title="今月の予約"
-          value={summaryReady ? kpi.total : null}
-          unit="件"
-          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
-        />
-        <KpiCard icon={null} presentation="band" title="確定" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
-        {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
-            承認待ちを出す。要対応であることは変わらない。 */}
-        <KpiCard icon={null} presentation="band"
-          title="変更依頼"
-          value={summaryReady ? summary.requested : null}
-          unit="件"
-          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '要対応'}
-        />
-        <KpiCard icon={null} presentation="band"
-          title="キャンセル"
-          value={summaryReady ? kpi.cancelled : null}
-          unit="件"
-          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
-        />
-      </KpiBand>
-
-
-      {/* R90: 今月の表示では対象の期間と状態を明示する。 */}
-      {view === 'month' ? (
-        <p className="text-ink-secondary text-xs" role="status">
-          今月（{monthLabel(monthKey(0))}）の予約を「{STATUS_TABS.find((item) => item.key === tab)?.label ?? ''}」で表示しています。
-        </p>
-      ) : null}
-
-      <div
-        data-design="Body"
-        className="flex flex-col items-start gap-4 xl:flex-row"
-      >
-        <div data-design="Folders" className="shrink-0" style={{ width: FOLDER_RAIL_WIDTH }}>
-          <FolderPanel
+          {/* 未取得の数と、取得済みの0件を区別する。 */}
+          <KpiBand data-design="KPIs">
+            <KpiCard icon={view === 'month' ? <Calendar size={16} aria-hidden="true" /> : null} presentation="band"
+              title="今月の予約"
+              value={summaryReady ? kpi.total : null}
+              unit="件"
+              detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
+            />
+            <KpiCard icon={view === 'month' ? <CalendarPlus size={16} aria-hidden="true" /> : null} presentation="band" title="確定" help={view === 'month' ? '今月の予約のうち、確定して来店を予定している件数です。' : undefined} helpDisplay="question" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
+            {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
+                承認待ちを出す。要対応であることは変わらない。 */}
+            <KpiCard icon={view === 'month' ? <CircleAlert size={16} aria-hidden="true" /> : null} presentation="band"
+              title="変更依頼"
+              value={summaryReady ? summary.requested : null}
+              unit="件"
+              badge={view === 'month' && summaryReady && summary.requested > 0 ? '要対応' : undefined}
+              badgeTone="warning"
+              detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : view === 'month' ? `お客さまから ${summary.requested}件` : '要対応'}
+            />
+            <KpiCard icon={view === 'month' ? <CalendarX size={16} aria-hidden="true" /> : null} presentation="band"
+              title="キャンセル"
+              value={summaryReady ? kpi.cancelled : null}
+              unit="件"
+              detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
+            />
+          </KpiBand>
+          <BookingMonthBar
+            monthLabel={view === 'month' ? monthLabel(monthKey(monthOffset)) : undefined}
+            isThisMonth={monthOffset === 0}
+            onPrev={() => setMonthOffset((n) => n - 1)}
+            onNext={() => setMonthOffset((n) => n + 1)}
+            onToday={() => setMonthOffset(0)}
+            urls={shareUrl ? <>
+              <BookingUrlCopy label="友だち予約URL" copied={isCopied(shareUrl)} onCopy={() => void copyUrl(shareUrl)} />
+              {historyUrl ? <BookingUrlCopy label="予約履歴URL" copied={isCopied(historyUrl)} onCopy={() => void copyUrl(historyUrl)} /> : null}
+            </> : null}
+            caption={view === 'month' ? <>{monthOffset === 0 ? `今月（${monthLabel(monthKey(0))}）` : monthLabel(monthKey(monthOffset))}の予約を「{STATUS_TABS.find(item => item.key === tab)?.label ?? ''}」で表示しています。</> : undefined}
+          />
+        </>}
+        folders={<FolderPanel
             heading="メニュー"
             rows={[
               { id: 'all', label: 'すべて', count: summary.total },
@@ -1035,25 +1055,47 @@ export default function BookingsPage() {
             activeId={menuFilter}
             onSelect={setMenuFilter}
             total={`${summary.total} 件`}
-          />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          {/*
-            ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
-            右端にCSVで書き出す。
-            #670 17: 押せない「保存した条件」(準備中です)は置かない。
-            押せない口を並べると「まだ何かある」と読める。条件の保存が
-            要るときは、動く形で足し直す。
-            設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
-            1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
-          */}
-          <div data-design="Bar">
-          <div data-design="Saved">
-          <ListToolbar
+          />}
+        folderNav={{
+          label: 'メニュー',
+          activeId: menuFilter,
+          onSelect: setMenuFilter,
+          rows: [{ id: 'all', label: 'すべて', count: summary.total }, ...menus.map(menu => ({ id: menu.name, label: menu.name, count: menuCounts.get(menu.name) ?? 0 }))],
+        }}
+        toolbar={view === 'month' ? <>
+          {/* R8tlbw：1段目＝探す・担当・経路 … CSV、2段目＝「よく使う」と状態の札。 */}
+          <ListToolbarRow>
+            <ListToolbarSearchSlot search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }} />
+            <EntitySelect
+              aria-label="担当者で絞り込む"
+              valuePrefix="担当: "
+              value={staffFilter}
+              onChange={setStaffFilter}
+              options={[
+                { value: 'all', label: 'すべて' },
+                ...staffList.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.display_name })),
+              ]}
+            />
+            <Select
+              aria-label="予約経路で絞り込む"
+              value={sourceFilter}
+              onChange={setSourceFilter}
+              options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
+            />
+            {selectedAccountId ? <ListToolbarEnd>
+              <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv} busy={csvBusy} busyLabel="書き出しています…"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
+            </ListToolbarEnd> : null}
+          </ListToolbarRow>
+          <ListToolbarRow>
+            <BookingChipsLabel />
+            <ResponsiveFilterChips label="状態">{STATUS_TABS.map(({ key, label }) => <FilterChip key={key} selected={tab === key} onChange={() => setTab(key)}>{label}</FilterChip>)}</ResponsiveFilterChips>
+          </ListToolbarRow>
+        </> : <>
+            <ListToolbar
             search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }}
             filters={
               <>
+                <>
                 <span className="text-ink-faint text-xs">よく使う</span>
                 {STATUS_TABS.map(({ key, label }) => (
                   <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
@@ -1079,7 +1121,9 @@ export default function BookingsPage() {
                   }`) + ' border-0 h-auto whitespace-normal'} onClick={() => setRange(range === 'week' ? 'all' : 'week')} aria-pressed={range === 'week'}>
                   今週
                 </Button>
-                {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
+
+                </>
+                {/* 担当者と予約経路は一覧と件数の両方を絞り込む。 */}
                 <EntitySelect
                   aria-label="担当者で絞り込む"
                   value={staffFilter}
@@ -1098,17 +1142,25 @@ export default function BookingsPage() {
               </>
             }
             trailing={
-              /* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */
+              /* CSVにも画面と同じ絞り込みを使う。 */
               selectedAccountId ? (
                 <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す
                 </Button>
               ) : null
             }
           />
-          </div>
-          </div>
-
-          {!selectedAccountId ? (
+        </>}
+        pagination={view === 'month'
+          ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} range={{ total, first: (current - 1) * PAGE_SIZE + 1, last: Math.min(current * PAGE_SIZE, total) }} />
+          : <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <ListRange
+              total={total}
+              first={(current - 1) * PAGE_SIZE + 1}
+              last={Math.min(current * PAGE_SIZE, total)}
+            />
+            <Pagination page={current} pageCount={pageCount} onPageChange={setPage} />
+          </div>}>
+        {!selectedAccountId ? (
             <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
               サイドバーでアカウントを選択してください
             </div>
@@ -1154,14 +1206,14 @@ export default function BookingsPage() {
                   担当は予約の詳細で読める補助情報。畳んでいる間も操作列は右端に留める。 */}
                   <thead>
                     <TableHeadRow>
-                      <Th style={{ width: '12%' }}>日時</Th>
-                      <Th style={{ width: '16%' }}>お客さま</Th>
-                      <Th style={{ width: '16%' }}>メニュー</Th>
-                      <Th style={{ width: '12%' }} className="cq-hide-below-830">担当</Th>
-                      <Th style={{ width: '10%' }}>予約経路</Th>
-                      <Th style={{ width: '10%' }} align="right">料金</Th>
-                      <Th style={{ width: '12%' }}>状態</Th>
-                      <Th style={{ width: '12%' }} align="right" className="sticky right-0 bg-canvas-sunken">操作</Th>
+                      <Th style={{ width: '15%' }}>日時</Th>
+                      <Th style={{ width: '13%' }}>お客さま</Th>
+                      <Th style={{ width: '17%' }}>メニュー</Th>
+                      <Th style={{ width: '10%' }} className="cq-hide-below-830">担当</Th>
+                      <Th style={{ width: '9%' }}>予約経路</Th>
+                      <Th style={{ width: '9%' }} align="right">料金</Th>
+                      <Th style={{ width: '11%' }}>状態</Th>
+                      <Th style={{ width: 64 }} align="right">操作</Th>
                     </TableHeadRow>
                   </thead>
                   <tbody>
@@ -1182,66 +1234,32 @@ export default function BookingsPage() {
                               },
                             })}
                       >
-                        <Td className="whitespace-nowrap">
-                          {formatShort(b.starts_at)}
-                        </Td>
+                        <DateCell>{formatLedgerDateTime(b.starts_at)}</DateCell>
                         <Td>
                           {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
-                          {(
-                            <ContextMenu label={`予約「${b.friend_name ?? 'お客様'}」の操作`} items={bookingContextItems(b)}>
-                              <span className="text-ink" title={b.friend_name ?? undefined}>
-                                {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
-                              </span>
-                            </ContextMenu>
-                          )}
+                          <ContextMenu label={`予約「${b.friend_name ?? 'お客様'}」の操作`} items={bookingContextItems(b)}>
+                            <span className={ledgerStyles.name} title={b.friend_name ?? undefined}>
+                              {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
+                            </span>
+                          </ContextMenu>
                         </Td>
-                        <Td>{b.menu_name}</Td>
-                        <Td className="cq-hide-below-830">{b.staff_name}</Td>
-                        <Td>
-                          {/* R88: 受付経路は source で分ける。担当者の代理入力をLINEにしない。 */}
-                          <span
-                            className={`${isLineBooking(b) ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
-                          >
-                            {isLineBooking(b) ? 'LINE' : '電話'}
-                          </span>
-                        </Td>
+                        <Td><span className={ledgerStyles.cellText} title={b.menu_name}>{b.menu_name}</span></Td>
+                        <Td className="cq-hide-below-830"><span className={ledgerStyles.cellText} title={b.staff_name ?? undefined}>{b.staff_name}</span></Td>
+                        {/* R88: 受付経路は source で分ける。担当者の代理入力をLINEにしない。 */}
+                        <Td>{isLineBooking(b) ? 'LINE' : sourceLabel(b)}</Td>
                         <Td align="right" className="tabular-nums">
                           ¥{formatNumber(b.price_at_booking)}
                         </Td>
-                        <Td>
-                          <span
-                            className={`inline-block rounded-mini px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
-                          >
-                            {statusLabel[b.status] ?? b.status}
+                        <StatusCell primary={<StatusBadge tone={statusTone[b.status] ?? 'neutral'}>{statusLabel[b.status] ?? b.status}</StatusBadge>} />
+                        <ActionCell>
+                          {/* 行全体が詳細パネルを開くので、操作列の押下は行へ伝えない。
+                              行の右端は「…」1つ（B-253）。詳細・会話・承認などは中へ。承認待ちは状態の札で分かる。 */}
+                          <span className={ledgerStyles.actions} onClick={(event) => event.stopPropagation()}>
+                            <RowMenu
+                              label={`予約「${b.friend_name ?? 'お客様'}」の操作`}
+                              items={bookingContextItems(b).map((item) => ({ id: item.id, label: item.label, tone: item.danger ? 'danger' as const : undefined, onSelect: () => item.onSelect?.(item.id) }))}
+                            />
                           </span>
-                        </Td>
-                        <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
-                          {/* V8では行全体が詳細パネルを開くので、操作列の押下は行へ伝えない。v7は今のまま。 */}
-                          <div className="inline-flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
-                            <button
-                              onClick={() => (openBookingDetail(b.id))}
-                              className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
-                            >
-                              詳細
-                            </button>
-                            {/* R11: 受信箱への行き先は名前ではなく操作列の明示のボタンから。 */}
-                            {b.friend_id ? (
-                              <Link
-                                href={`/chats?friend=${b.friend_id}`}
-                                aria-label={`${b.friend_name ?? 'お客さま'}さんとの会話を受信箱で開く`}
-                                className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
-                              >
-                                会話
-                              </Link>
-                            ) : null}
-                            {/* N-401: 閲覧のみの人には状態を変えるボタンを出さない */}
-                            {canOperate ? (
-                              <ActionButtons
-                                status={b.status}
-                                onAction={(a) => handleDecide(b.id, a)}
-                              />
-                            ) : null}
-                          </div>
                         </ActionCell>
                       </Tr>
                     ))}
@@ -1249,7 +1267,8 @@ export default function BookingsPage() {
             </DataTable>
           )}
 
-          <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
+          {/* URLは数の帯の下の［コピーする］から。ここは作れないときの案内と、コピーできなかったときに全文を選ぶ欄だけ。 */}
+          {!shareUrl || copyFailedUrl ? <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
             <p className="text-ink-secondary text-xs leading-5">
               友だち予約URLと、友だちが自分の予約履歴を見るURLをそれぞれ発行できます。予約履歴URLを配ると「自分の予約を確認したい」という問い合わせを減らせます。
             </p>
@@ -1304,18 +1323,8 @@ export default function BookingsPage() {
                 で LIFF ID を登録してください。
               </p>
             )}
-          </div>
-
-          <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <ListRange
-              total={total}
-              first={(current - 1) * PAGE_SIZE + 1}
-              last={Math.min(current * PAGE_SIZE, total)}
-            />
-            <Pagination page={current} pageCount={pageCount} onPageChange={setPage} />
-          </div>
-        </div>
-      </div>
+          </div> : null}
+      </BookingLedgerBody>
 
       {/* V8「サクサク感」C①・E：表の行の詳細パネル。確認の窓は残す。v7は引き出しのまま。 */}
       {(
@@ -1338,9 +1347,16 @@ export default function BookingsPage() {
           }
           footer={activeBooking ? (
             <>
+              {/* 絵 Nx1kq の言葉（日時を変える）。来店にするを並べても 360 の帯で 1 行に収める。 */}
               <Button href={`/booking/bookings/detail?id=${encodeURIComponent(activeBooking.id)}`} variant="secondary">
-                時間や担当を変える
+                日時を変える
               </Button>
+              {/* 来店にする（Nx1kq・司令塔の判断）：確定の予約だけ。今ある「完了」の確かめの窓を通す。閲覧のみには出さない。 */}
+              {canOperate && activeBooking.status === 'confirmed' ? (
+                <Button variant={activeBooking.friend_id ? 'secondary' : 'primary'} onClick={() => handleDecide(activeBooking.id, 'complete')}>
+                  来店にする
+                </Button>
+              ) : null}
               {activeBooking.friend_id ? (
                 <Button href={`/chats?friend=${activeBooking.friend_id}`} variant="primary">
                   この人と話す
@@ -1351,6 +1367,7 @@ export default function BookingsPage() {
         >
           {activeBooking ? (
             <div>
+              {selectedAccountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={selectedAccountId} bookingId={activeBooking.id} seriesId={(activeBooking as { series_id?: string | null }).series_id ?? null} customerName={activeBooking.friend_name ?? 'お客様'} menuName={activeBooking.menu_name} startsAt={activeBooking.starts_at} canOperate={canOperate} onChanged={() => void load()} /></div> : null}
               <DetailRow label="日時">
                 {formatJpDateTime(activeBooking.starts_at)} 〜 {formatJpTime(activeBooking.ends_at)}
               </DetailRow>
@@ -1366,6 +1383,13 @@ export default function BookingsPage() {
               <DetailRow label="お客様からのご希望">
                 {activeBooking.customer_note ?? <span className="text-ink-faint">記入なし</span>}
               </DetailRow>
+              {/* この組（B5・Nx1kq）と お支払い（B1・Ae1W1・fom2A）。口が無い・対象でない予約は出さない。 */}
+              {selectedAccountId ? <div className="mt-3 flex flex-col gap-3">
+                <BookingGroupSection accountId={selectedAccountId} bookingId={activeBooking.id} canOperate={canOperate} />
+                <BookingChargesSection accountId={selectedAccountId} bookingId={activeBooking.id} customerName={activeBooking.friend_name ?? 'お客'}
+                  bookingLabel={`${formatJpDateTime(activeBooking.starts_at)} ${activeBooking.menu_name}`} price={activeBooking.price_at_booking ?? null}
+                  canCharge={canOperate} canRefund={canOperate && canRefundCharges} />
+              </div> : null}
               <p className="mt-3 text-xs">
                 <Link
                   href={`/booking/bookings/detail?id=${encodeURIComponent(activeBooking.id)}`}
@@ -1380,16 +1404,7 @@ export default function BookingsPage() {
       )}
 
       {dialogs}
-    </div>
-  )
-}
-
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="border-hairline flex gap-4 border-b py-2.5 last:border-b-0">
-      <span className="text-ink-faint w-28 shrink-0 pt-0.5 text-xs font-medium">{label}</span>
-      <div className="text-ink flex-1 text-sm break-words">{children}</div>
-    </div>
+    </BookingLedgerFrame>
   )
 }
 
@@ -1545,53 +1560,4 @@ function BookingDetailPanel({
       </aside>
     </div>
   )
-}
-
-function ActionButtons({
-  status,
-  onAction,
-}: {
-  status: string
-  onAction: (a: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete') => void
-}) {
-  if (status === 'requested') {
-    return (
-      <div className="inline-flex gap-1">
-        <Button variant="primary" className="px-3 py-1 text-xs font-medium border-0 h-auto whitespace-normal" onClick={() => onAction('approve')}>
-          承認
-        </Button>
-        <button
-          onClick={() => onAction('reject')}
-          className="text-danger bg-danger-bg rounded-mini px-3 py-1 text-xs font-medium hover:bg-status-danger-selected"
-        >
-          拒否
-        </button>
-      </div>
-    )
-  }
-  if (status === 'confirmed') {
-    return (
-      <div className="inline-flex gap-1">
-        <button
-          onClick={() => onAction('complete')}
-          className="bg-info-bg text-info rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
-        >
-          閉じる
-        </button>
-        <button
-          onClick={() => onAction('no_show')}
-          className="bg-warning-bg text-warning rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
-        >
-          無断
-        </button>
-        <button
-          onClick={() => onAction('cancel')}
-          className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
-        >
-          取消
-        </button>
-      </div>
-    )
-  }
-  return <span className="text-ink-faint text-xs">-</span>
 }

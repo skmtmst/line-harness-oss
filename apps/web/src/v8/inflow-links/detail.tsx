@@ -1,13 +1,13 @@
 'use client'
+import PageSizeSelect, { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { RowNameLink } from '@/components/shared/table'
+import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr, PersonCell } from '@/components/shared/table'
 import CopyTextButton from '@/components/shared/copy-text-button'
-import Link from '@/components/shared/list-navigation'
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Info, Pause, Pencil, QrCode } from 'lucide-react'
+import { ArrowLeft, Info, Pause, Pencil, QrCode, UserPlus, Gift, Check, CalendarDays, Users, Ban, Target, MousePointerClick, FileText, ShoppingBag, RotateCcw } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -34,7 +34,6 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import EditRouteModal from './edit-route-dialog'
 import QrDialog from './qr-dialog'
 import RefOrdersPanel, { type RefOrdersResult } from './ref-orders'
@@ -46,7 +45,6 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 /*
  * ★V8 流入と計測の詳細（Pencil `Q5le3`）。
@@ -87,7 +85,6 @@ const PERIOD_OPTIONS: Array<{ value: FriendPeriod; label: string }> = [
   { value: 'this', label: '今月' },
   { value: 'last', label: '先月' },
 ]
-const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 const DELETE_CHOICES: ReadonlyArray<readonly [DeleteChoice, string, string]> = [
   ['stop', '新しい人を受けるのをやめる（おすすめ）', 'URLは残し、「受付を終了しました」と表示します。'],
@@ -363,7 +360,6 @@ function InflowDetailContent() {
   })
   const friendPageCount = Math.max(1, Math.ceil(friendRows.length / friendPageSize))
   const friendPageRows = friendRows.slice((friendPage - 1) * friendPageSize, friendPage * friendPageSize)
-  const friendSummary = `${formatNumber(friendRows.length)} 人中 ${(friendPage - 1) * friendPageSize + 1}〜${Math.min(friendPage * friendPageSize, friendRows.length)} 人`
 
   // 削除の窓を開く。「…」と帯の「止める」から、選ぶ内容だけ変える。
   const openDelete = (choice: DeleteChoice) => {
@@ -477,18 +473,18 @@ function InflowDetailContent() {
       ) : <>
         <div >
           {route.couponEnabled ? <KpiBand aria-label={`${route.name}のクーポン概要`}>
-            <KpiCard presentation="band" icon={null} title="読み取り" value={funnel?.click_count ?? null} unit="回" detail="累計" />
-            <KpiCard presentation="band" icon={null} title="友だち追加" value={funnel?.new_friend_add_count ?? null} unit="人" detail="新しく友だちになった人" />
-            <KpiCard presentation="band" icon={null} title="クーポンを受け取った" value={funnel?.coupon_received_count ?? null} unit="人" detail="既存の友だちを含む" />
-            <KpiCard presentation="band" icon={null} title="使った" value={funnel?.coupon_used_count ?? null} unit="人" detail="受け取り後に使った人" />
+            <KpiCard presentation="band" icon={<QrCode size={14} aria-hidden="true" />} title="読み取り" value={funnel?.click_count ?? null} unit="回" detail="累計" />
+            <KpiCard presentation="band" icon={<UserPlus size={14} aria-hidden="true" />} title="友だち追加" value={funnel?.new_friend_add_count ?? null} unit="人" detail="新しく友だちになった人" />
+            <KpiCard presentation="band" icon={<Gift size={14} aria-hidden="true" />} title="クーポンを受け取った" value={funnel?.coupon_received_count ?? null} unit="人" detail="既存の友だちを含む" />
+            <KpiCard presentation="band" icon={<Check size={14} aria-hidden="true" />} title="使った" value={funnel?.coupon_used_count ?? null} unit="人" detail="受け取り後に使った人" />
           </KpiBand> : <KpiBand aria-label={`${route.name}の概要`}>
-            <KpiCard presentation="band" icon={null} title="今月 友だちになった" value={monthTotal} unit="人"
+            <KpiCard presentation="band" icon={<CalendarDays size={14} aria-hidden="true" />} title="今月 友だちになった" value={monthTotal} unit="人"
               detail={`先月より ${monthDelta == null ? emptyValue('unknown') : `${monthDelta >= 0 ? '+' : ''}${formatNumber(monthDelta)}`}`} />
-            <KpiCard presentation="band" icon={null} title="累計" value={funnel ? funnel.friend_add_count : null} unit="人"
+            <KpiCard presentation="band" icon={<Users size={14} aria-hidden="true" />} title="累計" value={funnel ? funnel.friend_add_count : null} unit="人"
               detail={`${createdDate}から・いま残っている ${funnel?.remainingCount == null ? emptyValue('unknown') : formatNumber(funnel.remainingCount)}人`} />
-            <KpiCard presentation="band" icon={null} title="ブロック" value={funnel?.blockedCount ?? null} unit="人"
+            <KpiCard presentation="band" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={funnel?.blockedCount ?? null} unit="人"
               detail={blockRate == null ? '割合は集計できません' : `友だちになった人の ${blockRate}%`} />
-            <KpiCard presentation="band" icon={null} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
+            <KpiCard presentation="band" icon={<Target size={14} aria-hidden="true" />} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
               detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? emptyValue('unknown') : yen(Math.round(funnel.valuePerFriend))}`} />
           </KpiBand>}
         </div>
@@ -515,37 +511,13 @@ function InflowDetailContent() {
                 : '右上の「…」から：受付を止める・別リンクへ送る・削除する'}
             </p>
             {funnel ? (
-              <div className={styles.minis}>
-                <div className={styles.mini}>
-                  <span className={styles.miniTitle}>クリック</span>
-                  <span className={styles.miniValue}>{formatNumber(funnel.click_count)}</span>
-                  <span className={styles.miniSub}>{' '}</span>
-                </div>
-                <div className={styles.mini}>
-                  <span className={styles.miniTitle}>友だち追加</span>
-                  <span className={styles.miniValue}>{formatNumber(funnel.friend_add_count)}</span>
-                  <span className={styles.miniSub}>{`追加率 ${addRate ?? emptyValue('unknown')}%`}</span>
-                </div>
-                <div className={styles.mini}>
-                  <span className={styles.miniTitle}>フォーム</span>
-                  <span className={styles.miniValue}>{formatNumber(funnel.form_submission_count)}</span>
-                  <span className={styles.miniSub}>{' '}</span>
-                </div>
-                <div className={styles.mini}>
-                  <span className={styles.miniTitle}>購入</span>
-                  <span className={styles.miniValue}>{ordersSummary ? formatNumber(ordersSummary.total) : emptyValue('unknown')}</span>
-                  <span className={styles.miniSub}>{ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'}</span>
-                </div>
-                <div className={styles.mini}>
-                  <span className={styles.miniTitle}>返金・取消</span>
-                  <span className={styles.miniValue}>{ordersSummary ? formatNumber(ordersSummary.refunded + ordersSummary.cancelled) : emptyValue('unknown')}</span>
-                  <span className={styles.miniSub}>
-                    {ordersSummary
-                      ? (ordersSummary.refundedAmount == null ? emptyValue('unknown') : `−${yen(ordersSummary.refundedAmount)}`)
-                      : '集計を取得できていません'}
-                  </span>
-                </div>
-              </div>
+              <KpiBand aria-label="流入後の成果">
+                <KpiCard presentation="band" icon={<MousePointerClick size={14} aria-hidden="true" />} title="クリック" value={funnel.click_count} unit="回" detail={null} />
+                <KpiCard presentation="band" icon={<UserPlus size={14} aria-hidden="true" />} title="友だち追加" value={funnel.friend_add_count} unit="人" detail={addRate == null ? '追加率は集計できません' : `追加率 ${addRate}%`} />
+                <KpiCard presentation="band" icon={<FileText size={14} aria-hidden="true" />} title="フォーム" value={funnel.form_submission_count} unit="件" detail={null} />
+                <KpiCard presentation="band" icon={<ShoppingBag size={14} aria-hidden="true" />} title="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'} />
+                <KpiCard presentation="band" icon={<RotateCcw size={14} aria-hidden="true" />} title="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? (ordersSummary.refundedAmount == null ? emptyValue('unknown') : `−${yen(ordersSummary.refundedAmount)}`) : '集計を取得できていません'} />
+              </KpiBand>
             ) : funnelError ? (
               <div className={styles.funnelError}>
                 <p className={styles.note}>段階を読み込めませんでした。集計データは消えていません。</p>
@@ -628,19 +600,14 @@ function InflowDetailContent() {
             <div className={styles.periodBox}>
               <SaveErrorField names={["friendPeriod","friend_period"]}><Select
                 aria-label="期間"
+                size="content"
                 value={friendPeriod}
                 options={PERIOD_OPTIONS}
                 onChange={(value) => { setFriendPeriod(value as FriendPeriod); setFriendPage(1) }}
               /></SaveErrorField>
             </div>
             <div className={styles.sizeBox}>
-              <SaveErrorField names={["friendPageSize","friend_page_size"]}><Select
-                aria-label="表示件数"
-                size="page-size"
-                value={String(friendPageSize)}
-                options={PAGE_SIZE_OPTIONS}
-                onChange={(value) => { setFriendPageSize(Number(value)); setFriendPage(1) }}
-              /></SaveErrorField>
+              <SaveErrorField names={["friendPageSize","friend_page_size"]}><PageSizeSelect label={null} value={friendPageSize} onChange={(value) => { setFriendPageSize(value); setFriendPage(1) }} /></SaveErrorField>
             </div>
           </div>
           {friendsState === 'error' ? (
@@ -662,7 +629,7 @@ function InflowDetailContent() {
               <thead>
                 <TableHeadRow data-table-layout="columns">
                   <Th className={styles.colWhen}>日時</Th>
-                  <Th className={styles.colFriend}>友だち</Th>
+                  <Th grow className={styles.colFriend}>友だち</Th>
                   <Th className={styles.colAccount} collapseAt="narrow">入った LINE アカウント</Th>
                   <Th className={styles.colState}>今の状態</Th>
                   <Th grow collapseAt="narrow">付いたタグ・その後</Th>
@@ -680,12 +647,9 @@ function InflowDetailContent() {
                           {friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/').replace(/^0/, '') : '日時不明'}
                         </span>
                       </Td>
-                      <Td className={styles.colFriend}>
-                        <span className={styles.face} aria-hidden="true">{friend.displayName.slice(0, 1)}</span>
-                        <RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>
-                          {friend.displayName}
-                        </RowNameLink>
-                      </Td>
+                      <PersonCell grow className={styles.colFriend} avatarName={friend.displayName} name={
+                        <RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>{friend.displayName}</RowNameLink>
+                      } />
                       <Td className={styles.colAccount} collapseAt="narrow"><span className={styles.cellText} title={accountName}>{accountName}</span></Td>
                       <Td className={styles.colState}>
                         {blocked ? (
@@ -720,12 +684,8 @@ function InflowDetailContent() {
           )}
           {friendRows.length > 0 ? (
             <div className={styles.pager}>
-              {/* 1ページだけのときは送りの部品が出ないので、件数の行だけ出す（絵は件数とページ送りの1行）。 */}
-              {friendPageCount > 1 ? (
-                <Pagination page={friendPage} pageCount={friendPageCount} onPageChange={setFriendPage} summary={friendSummary} />
-              ) : (
-                <p className={styles.pagerSummary}>{friendSummary}</p>
-              )}
+              <Pagination page={friendPage} pageCount={friendPageCount} onPageChange={setFriendPage}
+                range={{ total: friendRows.length, first: (friendPage - 1) * friendPageSize + 1, last: Math.min(friendPage * friendPageSize, friendRows.length), unit: '人' }} />
             </div>
           ) : null}
         </Card>

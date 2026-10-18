@@ -3,7 +3,7 @@
 import { jstDateOffset } from '@/lib/jst-datetime'
 
 
-import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+import { TrendLineChart } from '@/components/shared/charts'
 
 /*
  * ★V8-B 健康日記 30日のまとめ（BVuYh）。一覧の上に右から出る引き出し（幅 600）。
@@ -19,6 +19,8 @@ import Drawer from '@/components/shared/drawer'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { formatDay } from '@/lib/format'
 import { petAnimalTypeLabel, type NenHealthSummaryData } from '@/lib/nen-pets-api'
@@ -30,6 +32,9 @@ type Logs = NenHealthSummaryData['summary']['logs']
 
 /** 記録の表の涙やけは列が狭いので短い言葉（絵 BVuYh）。印刷面は今までどおり長い言葉。 */
 const TEAR_SHORT: Record<string, string> = { normal: 'なし', mild: '少し', concern: '気になる' }
+/** 「気になる変化」の便・食いつきに数える値以外（問題なし・良い・ふつう）は注意の色で出す（絵 BVuYh）。 */
+const STOOL_OK = new Set(['normal'])
+const APPETITE_OK = new Set(['normal', 'good'])
 
 /** 「こむぎ（犬・柴・4歳）・田中 明子さん・9/1〜9/30」。 */
 function petLine(summary: NenHealthSummaryData): string {
@@ -49,6 +54,7 @@ function signed(value: number, digits: number): string {
 export default function SummaryDrawerV8({
   status,
   summary,
+  weightWarn = false,
   error,
   onClose,
   onRetry,
@@ -56,6 +62,8 @@ export default function SummaryDrawerV8({
 }: {
   status: 'loading' | 'ready' | 'error'
   summary: NenHealthSummaryData | null
+  /** 一覧の「気になる変化」で体重が当たっているとき、30日の増減を注意の色にする（絵 BVuYh）。 */
+  weightWarn?: boolean
   error?: unknown
   onClose: () => void
   onRetry: () => void
@@ -68,7 +76,7 @@ export default function SummaryDrawerV8({
 
   return (
     <Drawer
-      width="editor"
+      width="editor" heightMode="viewport"
       open
       title="健康日記 30日のまとめ"
       description={status === 'ready' && summary ? petLine(summary) : 'まとめを作っています'}
@@ -89,43 +97,41 @@ export default function SummaryDrawerV8({
           <>
             <p className={styles.summaryNote}>お客さまがマイページで付けた記録をまとめたものです。診断や治療の判断は含みません。</p>
             <KpiBand density="compact">
-              <KpiCard icon={null} title="記録" value={s.records} unit="日" detail={null} />
-              <KpiCard icon={null} title="体重" value={null} valueText={s.weight ? `${s.weight.first} → ${s.weight.last} kg` : '—'} unit="" detail={null} />
-              <KpiCard icon={null} title="呼吸数（平均）" value={s.respiratoryRateAvg} unit="回／分" detail={null} />
-              <KpiCard icon={null} title="心拍数（平均）" value={s.heartRateAvg} unit="回／分" detail={null} />
+              <KpiCard density="compact" icon={null} title="記録" value={s.records} unit="日" detail={null} />
+              <KpiCard density="compact" icon={null} title="体重" value={null} valueRange={{ from: s.weight?.first, to: s.weight?.last }} unit="kg" detail={null} />
+              <KpiCard density="compact" icon={null} title="呼吸数（平均）" value={s.respiratoryRateAvg} unit="回／分" detail={null} />
+              <KpiCard density="compact" icon={null} title="心拍数（平均）" value={s.heartRateAvg} unit="回／分" detail={null} />
             </KpiBand>
             <section className={styles.chart} aria-label="体重の30日の推移">
               <div className={styles.chartHead}>
                 <h3 className={styles.chartTitle}>体重</h3>
                 {weightDelta !== null && weightPercent !== null ? (
-                  <p className={styles.chartCaption}>{`30日で ${signed(weightDelta, 1)}kg（${signed(weightPercent, 0)}%）`}</p>
+                  <p className={styles.chartCaption} data-tone={weightWarn ? 'warn' : undefined}>{`30日で ${signed(weightDelta, 1)}kg（${signed(weightPercent, 0)}%）`}</p>
                 ) : null}
               </div>
               <WeightChart30d logs={s.logs} generatedAt={summary.generatedAt} />
             </section>
             {s.logs.length > 0 ? (
-              <div className={styles.logTable} role="table" aria-label="記録の表">
-                <div className={styles.logHead} role="row">
-                  <span className={styles.logDate} role="columnheader">日付</span>
-                  <span className={styles.logWeight} role="columnheader">体重</span>
-                  <span className={styles.logStool} role="columnheader">便</span>
-                  <span className={styles.logStool} role="columnheader">食いつき</span>
-                  <span className={styles.logSkin} role="columnheader">皮膚</span>
-                  <span className={styles.logTear} role="columnheader">涙やけ</span>
-                  <span className={styles.logMemo} role="columnheader">メモ</span>
-                </div>
-                {s.logs.map((log) => (
-                  <div key={log.loggedOn} className={styles.logRow} role="row">
-                    <span className={styles.logDate} role="cell">{md(log.loggedOn)}</span>
-                    <span className={styles.logWeight} role="cell">{log.weightKg == null ? emptyValue('unknown') : `${log.weightKg}kg`}</span>
-                    <span className={styles.logStool} role="cell">{summary.labels.stool[log.stool] ?? log.stool}</span>
-                    <span className={styles.logStool} role="cell">{summary.labels.appetite[log.appetite] ?? log.appetite}</span>
-                    <span className={styles.logSkin} role="cell">{log.skin ? SKIN_LABELS[log.skin] ?? log.skin : emptyValue('unknown')}</span>
-                    <span className={styles.logTear} role="cell">{log.tearStain ? TEAR_SHORT[log.tearStain] ?? log.tearStain : emptyValue('unknown')}</span>
-                    <span className={styles.logMemo} role="cell">{notes.get(log.loggedOn) ?? emptyValue('unknown')}</span>
-                  </div>
-                ))}
-              </div>
+              <DataTable label="記録の表" grid={{
+                columns: 'var(--tpl-nph-lcol-date) var(--tpl-nph-lcol-weight) minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)) minmax(0, 1.5fr)',
+                padding: 'var(--tpl-nph-log-row-pad)', headPadding: 'var(--tpl-nph-log-head-pad)',
+                gap: 'var(--tpl-nph-pair-gap)', headTextSize: 'var(--text-micro)', bodyTextSize: 'var(--text-caption)',
+              }}>
+                <thead><TableHeadRow>
+                  {['日付', '体重', '便', '食いつき', '皮膚', '涙やけ', 'メモ'].map(label => <Th key={label} truncate>{label}</Th>)}
+                </TableHeadRow></thead>
+                <tbody>{s.logs.map(log => (
+                  <Tr key={log.loggedOn}>
+                    <Td><TruncatedText value={md(log.loggedOn)} /></Td>
+                    <Td><TruncatedText value={log.weightKg == null ? emptyValue('unknown') : `${log.weightKg}kg`} /></Td>
+                    <Td><TruncatedText tone={STOOL_OK.has(log.stool) ? undefined : 'warning'} value={summary.labels.stool[log.stool] ?? log.stool} /></Td>
+                    <Td><TruncatedText tone={APPETITE_OK.has(log.appetite) ? undefined : 'warning'} value={summary.labels.appetite[log.appetite] ?? log.appetite} /></Td>
+                    <Td><TruncatedText value={log.skin ? SKIN_LABELS[log.skin] ?? log.skin : emptyValue('unknown')} /></Td>
+                    <Td><TruncatedText value={log.tearStain ? TEAR_SHORT[log.tearStain] ?? log.tearStain : emptyValue('unknown')} /></Td>
+                    <Td><TruncatedText value={notes.get(log.loggedOn) ?? emptyValue('unknown')} /></Td>
+                  </Tr>
+                ))}</tbody>
+              </DataTable>
             ) : (
               <p className={styles.summaryEmpty}>この30日の記録はありません。</p>
             )}
@@ -142,8 +148,8 @@ export default function SummaryDrawerV8({
 }
 
 /**
- * 体重の30日の棒。記録のある日の体重だけ棒にし、無い日は薄い線。
- * 最小〜最大の幅で高さを4段に分ける（棒の高さは CSS の段の値）。
+ * 体重の30日の線（絵 BVuYh）。記録のある日の体重を線でつなぎ、縦は 0kg から 5kg 刻み。
+ * 横は30日の位置（記録の無い日は点を置かない）。
  */
 function WeightChart30d({ logs, generatedAt }: { logs: Logs; generatedAt: string }) {
   const byDay = new Map<string, number>()
@@ -158,10 +164,12 @@ function WeightChart30d({ logs, generatedAt }: { logs: Logs; generatedAt: string
     days.push({ key, value: byDay.get(key) ?? null })
   }
   const known = days.map((d) => d.value).filter((v): v is number => v != null)
-  const min = known.length ? Math.min(...known) : 0
-  const max = known.length ? Math.max(...known) : 0
   const label = known.length >= 2 ? `${known[0]}kg → ${known[known.length - 1]}kg` : known.length === 1 ? `${known[0]}kg` : '記録なし'
-  return <ValueBarChart label={`体重の推移（30日）：${label}`} unit="kg" items={days.map(day=>({key:day.key,label:day.key,value:day.value}))} />
+  const top = Math.max(5, Math.ceil(Math.max(0, ...known) / 5) * 5)
+  const points = days.flatMap((day, index) => day.value == null ? [] : [{ x: index, value: day.value, label: md(day.key) }])
+  // 軸の名前は4日ごと＋最後の日。最後の日に近すぎる名前は重なるので出さない（絵の 9/1・9/5 … 9/25・9/30）。
+  const axisLabels = days.flatMap((day, index) => (index % 4 === 0 && days.length - 1 - index >= 3) || index === days.length - 1 ? [{ x: index, label: md(day.key) }] : [])
+  return <TrendLineChart label={`体重の推移（30日）：${label}`} unit="kg" maxX={days.length - 1} maxY={top} points={points} axisLabels={axisLabels} />
 }
 
 /**

@@ -64,10 +64,10 @@ vi.mock('@line-crm/db', async () => {
 
 vi.mock('@line-crm/line-sdk', () => {
   return {
-    LineClient: vi.fn().mockImplementation(() => ({
+    LineClient: vi.fn().mockImplementation(function () { return ({
       replyMessage: vi.fn().mockResolvedValue(undefined),
       pushMessage: vi.fn().mockResolvedValue(undefined),
-    })),
+    }); }),
   };
 });
 
@@ -177,7 +177,7 @@ describe('fireEvent — send_message action logging', () => {
     (db.getActiveAutomationsByEvent as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue([
       {
         id: 'auto-2',
-        line_account_id: null,
+        line_account_id: 'acc-1',
         conditions: JSON.stringify({}),
         actions: JSON.stringify([
           {
@@ -197,13 +197,13 @@ describe('fireEvent — send_message action logging', () => {
       'tag_added',
       { friendId: 'friend-1', eventData: {} },
       'channel-token',
-      null,
+      'acc-1',
     );
 
     expect(captured).toHaveLength(1);
     expect(captured[0].binds[2]).toBe('text');
     expect(captured[0].binds[3]).toBe('hello');
-    expect(captured[0].binds[6]).toBe(null);
+    expect(captured[0].binds[6]).toBe('acc-1');
   });
 
   it('resolves params.template_id via templates table when set', async () => {
@@ -211,7 +211,7 @@ describe('fireEvent — send_message action logging', () => {
     (db.getActiveAutomationsByEvent as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue([
       {
         id: 'auto-tpl',
-        line_account_id: null,
+        line_account_id: 'acc-1',
         conditions: JSON.stringify({}),
         actions: JSON.stringify([
           {
@@ -243,7 +243,7 @@ describe('fireEvent — send_message action logging', () => {
       'manual_test',
       { friendId: 'friend-1', eventData: {} },
       'channel-token',
-      null,
+      'acc-1',
     );
 
     expect(captured).toHaveLength(1);
@@ -461,11 +461,7 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
     expect(deliveryModule.recordDeliveryOutcome).toHaveBeenCalledWith(db, 'legacy-webhook', true);
     expect(log).toHaveBeenCalledOnce();
     const record = log.mock.calls[0]?.[0] as string;
-    expect(JSON.parse(record)).toEqual({
-      event: 'outgoing_webhook_line_account_unknown',
-      eventType: 'incoming_webhook.custom',
-      hasFriendId: false,
-    });
+    expect(JSON.parse(record)).toEqual({ code: 'outgoing_webhook_line_account_unknown' });
     expect(record).not.toContain('webhook-1');
   });
 });
@@ -664,7 +660,7 @@ describe('fireEvent — 旧式 send_webhook は共通の安全送信へ通す', 
       .mockResolvedValue([
         {
           id: 'auto-legacy',
-          line_account_id: null,
+          line_account_id: 'acc-1',
           conditions: JSON.stringify({}),
           actions: JSON.stringify([{ type: 'send_webhook', params: { url } }]),
         },
@@ -672,7 +668,7 @@ describe('fireEvent — 旧式 send_webhook は共通の安全送信へ通す', 
     (dbModule.getActiveOutgoingWebhooksByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
       .mockResolvedValue([]);
     const db = fakeDb({ capturedInserts: [] });
-    await fireEvent(db, 'message_received', { friendId: 'friend-1', eventData: {} });
+    await fireEvent(db, 'message_received', { friendId: 'friend-1', eventData: {} }, undefined, 'acc-1');
     return dbModule.createAutomationLog as unknown as { mock: { calls: unknown[][] } };
   }
 

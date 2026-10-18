@@ -1,16 +1,8 @@
 'use client'
 
-/*
- * ★V8 バナー生成の窓の枠（W7Z57・AnwtH・I0w2e・B24oNg・rI5uh・UcBQ5）。
- *
- * 絵の窓は「余白 24 の1枚の面に、見出しの行（題＋閉じる）→ 4 下に説明 → 間 14 で中身 → 区切り線 → 真ん中にボタン」。
- * 共通の窓（Dialog）は見出しの行の上下の余白と説明の文字（13px）が違い、説明が 8 上・2行に折れて下の物が全部ずれる。
- * 共通の窓は変えず、同じ動き（フォーカスを閉じ込める・Esc と背景で閉じる・処理中は閉じない・本文を止める）を
- * 共通の `useOverlayFocus` で持たせた枠をここに置く。
- */
-import Dialog from '@/components/shared/dialog'
+/* 本文と下の操作は共通Dialogへ渡す。 */
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { type ReactNode } from 'react'
-import styles from './frame.module.css'
 
 /** 窓の大きさと上からの位置（絵ごと）。値は globals.css の `--tpl-hb-dialog-*`。 */
 export type BannerDialogKind = 'create' | 'upload' | 'confirm' | 'detail' | 'reference'
@@ -27,6 +19,7 @@ export default function BannerDialogFrame({
   actionsAlign = 'center',
   designNode,
   role = 'dialog',
+  contentLayout,
   children,
 }: {
   open: boolean
@@ -43,11 +36,14 @@ export default function BannerDialogFrame({
   designNode: string
   /** 危ない操作の確かめは alertdialog。 */
   role?: 'dialog' | 'alertdialog'
+  contentLayout?: 'form'
   children?: ReactNode
 }) {
-  return <Dialog open={open} title={title} onCancel={onClose} busy={busy} error={error} designNode={designNode}
-    tone={role === 'alertdialog' ? 'destructive' : 'default'} confirmation footer={actions} footerAlign={actionsAlign === 'center' ? 'center' : 'start'}
-    designWidth={kind === 'detail' || kind === 'reference' ? 960 : kind === 'upload' ? 720 : 560}>
-    {description ? <p>{description}</p> : null}{children}
+  // 絵 AnwtH：取り込む窓も作る窓と同じ囲み（幅 560・説明は題の下の小さい文）。
+  const inset = kind === 'create' || kind === 'confirm' || kind === 'detail' || kind === 'upload' || kind === 'reference'
+  return <Dialog open={open} title={title} description={inset && typeof description === 'string' ? description : undefined} onCancel={onClose} busy={busy} error={error} designNode={designNode}
+    tone={role === 'alertdialog' ? 'destructive' : 'default'} confirmation contentLayout={contentLayout} layout={inset ? 'inset' : undefined} footer={inset && actions ? <DialogActions>{actions}</DialogActions> : actions} footerAlign={actionsAlign === 'center' ? 'center' : 'start'}
+    designWidth={kind === 'confirm' ? 480 : kind === 'detail' ? 960 : 560} designTop={kind === 'reference' ? 16 : undefined} fitViewport={kind === 'reference' || undefined}>
+    {description && (!inset || typeof description !== 'string') ? <p>{description}</p> : null}{children}
   </Dialog>
 }

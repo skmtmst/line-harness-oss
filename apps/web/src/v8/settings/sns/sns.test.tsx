@@ -108,6 +108,11 @@ function igCard() {
   return within(screen.getByRole('region', { name: 'Instagram' }))
 }
 
+/* 解除は見出しの右の「…」の中（絵 y3GGTs）。 */
+async function openIgMenu() {
+  fireEvent.click(await igCard().findByRole('button', { name: 'Instagram の連携のその他操作' }))
+}
+
 afterEach(() => {
   cleanup()
   fixture.role.value = 'owner'
@@ -119,7 +124,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
   it('未接続では注記と［Instagram にログインして接続］を出し、ページを選ぶ段は出さない', async () => {
     setup('disconnected')
 
-    expect(await igCard().findByText('未接続')).toBeTruthy()
+    expect(await igCard().findByText('まだつないでいません')).toBeTruthy()
     expect(screen.getByText('Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Instagram にログインして接続' })).toBeTruthy()
     // ページを選ぶ段（利用者の決めで出さない）
@@ -131,13 +136,14 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
   it('接続済みではアカウント名とできることを出し、確かめる・解除のボタンを出す', async () => {
     setup('connected', CONNECTED)
 
-    expect(await screen.findByText('接続しています')).toBeTruthy()
+    expect(await screen.findByText('つながっている')).toBeTruthy()
     expect(screen.getByText('接続しているアカウント')).toBeTruthy()
     expect(screen.getByText('@nen_cafe（ビジネス）')).toBeTruthy()
     expect(screen.getByText('できること')).toBeTruthy()
-    expect(screen.getByText('写真つき投稿の同時公開')).toBeTruthy()
+    expect(screen.getByText('投稿を予約する')).toBeTruthy()
     expect(screen.getByRole('button', { name: /接続を確かめる/ })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: '接続を解除する' }).length).toBeGreaterThan(0)
+    await openIgMenu()
+    expect(screen.getAllByRole('menuitem', { name: '接続を解除する' }).length).toBeGreaterThan(0)
     // 接続済みにはログインを促す注記を出さない。
     expect(screen.queryByText(/個人のアカウントは接続できません/)).toBeNull()
   })
@@ -145,15 +151,16 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
   it('認可が切れているときはログインのボタンと解除のボタンを並べる', async () => {
     setup('expired', CONNECTED)
 
-    expect(await screen.findByText('認可が切れています')).toBeTruthy()
+    expect((await screen.findAllByText('認可が切れています')).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'Instagram にログインして接続' })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: '接続を解除する' }).length).toBeGreaterThan(0)
+    await openIgMenu()
+    expect(screen.getAllByRole('menuitem', { name: '接続を解除する' }).length).toBeGreaterThan(0)
   })
 
   it('「設定がありません」のときは注記だけで、押せるボタンを置かない', async () => {
     setup('unconfigured')
 
-    expect(await screen.findByText('設定がありません')).toBeTruthy()
+    expect((await screen.findAllByText('設定がありません')).length).toBeGreaterThan(0)
     expect(screen.getByText('この環境には Instagram 接続の設定がありません。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Instagram にログインして接続' })).toBeNull()
     expect(screen.queryByRole('button', { name: /接続を確かめる/ })).toBeNull()
@@ -163,9 +170,9 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     fixture.role.value = 'staff'
     setup('connected', CONNECTED)
 
-    expect(await screen.findByText('接続しています')).toBeTruthy()
+    expect(await screen.findByText('つながっている')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /接続を確かめる/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: '接続を解除する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /その他操作/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Instagram にログインして接続' })).toBeNull()
   })
 
@@ -181,7 +188,8 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     fixture.igDisconnect.mockResolvedValue({ success: true })
     setup('connected', CONNECTED)
 
-    fireEvent.click((await screen.findAllByRole('button', { name: '接続を解除する' }))[0])
+    await openIgMenu()
+    fireEvent.click(screen.getAllByRole('menuitem', { name: '接続を解除する' })[0])
     expect(await screen.findByText('Instagram の接続を解除しますか？')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '解除する' }))
     await waitFor(() => expect(fixture.igDisconnect).toHaveBeenCalledWith('acc-1', 3))

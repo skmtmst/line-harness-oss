@@ -1,54 +1,48 @@
 'use client'
 
-import { jstDate } from '@/lib/jst-datetime'
-import { RowActions } from '@/components/shared/row-actions'
-import { RowMenu } from '@/components/shared/row-actions'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import StickyBar from '@/components/shared/sticky-bar'
-import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { api, ApiError, EventSlotsPartialError, eventsApi, type EventDetail, type EventSlot, type EventSlotInput } from '@/lib/api'
-import ImageUploader from '@/components/shared/image-uploader'
-import OgEditor from '@/components/shared/og-editor'
-import { useAccount } from '@/contexts/account-context'
-import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from '@/components/events/bulk-slot-generator'
-import { jstHHMMToUtcIso, splitBand, utcIsoToJstDate, utcIsoToJstHHMM } from '@/components/events/jst'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import Dialog from '@/components/shared/dialog'
-import Button from '@/components/shared/button'
-import SelectionButton from '@/components/shared/selection-button'
-import Notice from '@/components/shared/notice'
-import { notifyToast } from '@/components/shared/toast'
-import Select from '@/components/shared/select'
-import Checkbox from '@/components/shared/checkbox'
-import { Field, TextInput } from '@/components/shared/form-controls'
-import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
-import DateField from '@/components/shared/date-field'
-import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { TimeField } from '@/components/shared/date-time-field'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import FormSection from '@/components/shared/form-section'
-import ListState from '@/components/shared/list-state'
-import { Tabs } from '@/components/shared/tabs'
-import { TextArea } from '@/components/shared/text-field'
-import {
-  EVENT_CANCEL_DEADLINE_OPTIONS,
-  EVENT_DEFAULT_DRAFT,
-  EVENT_DESCRIPTION_MAX_LENGTH,
-  EVENT_ENTRY_CUTOFF_OPTIONS,
-  EVENT_NAME_MAX_LENGTH,
-  deadlineOptionsWithSaved,
-  deadlineSelectValue,
-  parseDeadlineSelect,
-} from '@/components/events/event-draft-shared'
-import { formatDateTime, formatDay, formatTime } from '@/lib/format'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
-
+import { jstDate } from '@/lib/jst-datetime';
+import { RowActions } from '@/components/shared/row-actions';
+import { RowMenu } from '@/components/shared/row-actions';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
+import StickyBar from '@/components/shared/sticky-bar';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { api, ApiError, EventSlotsPartialError, eventsApi, type EventDetail, type EventSlot, type EventSlotInput } from '@/lib/api';
+import ImageUploader from '@/components/shared/image-uploader';
+import OgEditor from '@/components/shared/og-editor';
+import { useAccount } from '@/contexts/account-context';
+import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from '@/components/events/bulk-slot-generator';
+import { splitBand } from '@/components/events/jst';
+import ConfirmDialog from '@/components/shared/confirm-dialog';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import Dialog from '@/components/shared/dialog';
+import Button from '@/components/shared/button';
+import SelectionButton from '@/components/shared/selection-button';
+import Notice from '@/components/shared/notice';
+import { notifyToast } from '@/components/shared/toast';
+import Select from '@/components/shared/select';
+import Checkbox from '@/components/shared/checkbox';
+import { Field, TextInput } from '@/components/shared/form-controls';
+import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor';
+import DateField from '@/components/shared/date-field';
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
+import { TimeField } from '@/components/shared/date-time-field';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import { MenuPaymentCard, PaymentConflictError, useMenuPayment } from '../booking-payments/menu-payment';
+import FormSection from '@/components/shared/form-section';
+import ListState from '@/components/shared/list-state';
+import { Tabs } from '@/components/shared/tabs';
+import { TextArea } from '@/components/shared/text-field';
+import { EVENT_CANCEL_DEADLINE_OPTIONS, EVENT_DEFAULT_DRAFT, EVENT_DESCRIPTION_MAX_LENGTH, EVENT_ENTRY_CUTOFF_OPTIONS, EVENT_NAME_MAX_LENGTH, deadlineOptionsWithSaved, deadlineSelectValue, parseDeadlineSelect } from '@/components/events/event-draft-shared';
+import { formatDateTime, formatDay, formatTime } from '@/lib/format';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { AddSlotDialog, EditSlotDialog } from "./edit-form-gap-parts"
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
+
+import { formatJpDateTime, formatJpSlotRange, toEventDraft } from './edit-format'
+export { formatJpDateTime, formatJpSlotRange, toEventDraft } from './edit-format'
 
 type Tab = 'overview' | 'slots' | 'publish'
 
@@ -70,40 +64,6 @@ export interface EventFormProps {
   eventId: string | null
 }
 
-export function formatJpDateTime(iso: string): string {
-  const d = new Date(iso)
-  /*
-    EVENT-05: 一覧(app/events/page.tsx)は Asia/Tokyo 固定で出す。
-    ここが端末の時間帯に依存すると、同じ開催回が一覧と編集で
-    時差分ずれて見える。保存値(UTC)は変えず、表示だけ日本時間に固定する。
-  */
-  return formatDateTime(d)
-}
-
-/**
- * 枠の日時の出し方。「2026/09/20 23:30 〜 01:00」。
- *
- * 日をまたぐ枠は終了側の日付も出す(DETAIL-10)。時刻だけにすると
- * 「9/20 23:30〜01:00」が当日深夜なのか翌日なのか読めない。
- */
-export function formatJpSlotRange(startsAt: string, endsAt: string): string {
-  const start = formatJpDateTime(startsAt)
-  const end = formatJpDateTime(endsAt)
-  const sameDay = formatDay(startsAt) === formatDay(endsAt)
-  return `${start} 〜 ${sameDay ? formatTime(endsAt) : end}`
-}
-
-/**
- * 保存・読込の応答を draft の形へ戻す（R82）。
- *
- * Worker は質問の定義を questions_json の文字列で返す。ほぐさず
- * `setDraft` すると questions が消え、次の保存で questions:null を送って
- * 定義ごと消してしまう。読み込み時と同じほぐし方を保存後にも使う。
- */
-export function toEventDraft(row: EventDetail): EventDetail {
-  return { ...row, questions: parseEventQuestions(row.questions_json) }
-}
-
 export default function EventForm({ accountId, eventId }: EventFormProps) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
@@ -121,7 +81,30 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const canDuplicate = role === null || canManageRole(role)
   const [loading, setLoading] = useState(true)
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft)
+  /* クラスのお支払い（B-305 追記 3・絵 XFRyO）。保存は「概要を保存する」と一緒。 */
+  const eventPayment = useMenuPayment('event', accountId, eventId)
+  /* 下の帯の左端に［削除する］（絵 XFRyO）。権限と断りの文は一覧の削除と同じ。 */
+  const canDelete = role === 'owner' || role === 'admin'
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  async function removeEvent() {
+    if (!eventId || deleteBusy) return
+    setDeleteBusy(true); setDeleteError('')
+    try {
+      await eventsApi.deleteEvent(accountId, eventId)
+      setDeleteOpen(false)
+      notifyToast('イベントを削除しました')
+      router.push('/events')
+    } catch (cause) {
+      setDeleteError(cause instanceof ApiError && (cause.code === 'event_has_active_bookings' || cause.status === 409)
+        ? '申込中・確定済みの予約、またはキャンセル待ちの人がいるため削除できません。先に申込者への対応を終えてください。'
+        : '削除できませんでした。時間をおいて、もう一度お試しください。')
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+  const dirty = eventPayment.dirty || JSON.stringify(draft) !== JSON.stringify(savedDraft)
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving || duplicating })
 
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
@@ -286,6 +269,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         // 保存後は書きかけを解くので写しも揃える。
         setDraft(toEventDraft(updated))
         setSavedDraft(toEventDraft(updated))
+        /* お支払い・1回の値段は中身を保存したあとに書く（409 は比べる窓。中身の保存は済んでいる）。 */
+        await eventPayment.save(eventId)
         notifyToast('保存しました')
         if (nextTab) setTab(nextTab)
       } else {
@@ -294,6 +279,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         router.replace(`/events/edit?id=${created.id}`)
       }
     } catch (e) {
+      /* お支払い・1回の値段の版が古い（409）ときは、共通の帯と比べる窓（お支払いの段）で選んでもらう。 */
+      if (e instanceof PaymentConflictError) return
       saveErrors.capture(e)
       setError(
         e instanceof ApiError && e.status === 409 && e.code === 'version_conflict'
@@ -357,17 +344,21 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       label: item.label, current: tab === item.key, disabled: item.key !== 'overview' && !eventId,
       onClick: () => { if (item.key === 'overview' || eventId) setTab(item.key) },
     }))} />
-    {tab === 'overview' ? <OverviewTab draft={draft} update={update} accounts={accounts} currentAccountId={accountId} /> : null}
+    {tab === 'overview' ? <OverviewTab draft={draft} update={update} accounts={accounts} currentAccountId={accountId}
+      afterBasics={eventId ? <MenuPaymentCard state={eventPayment} name="event" price={null} priceField unit="名" /> : null} /> : null}
     {tab === 'slots' ? <SlotsTab accountId={accountId} eventId={eventId} slots={slots} setSlots={setSlots} /> : null}
     {tab === 'publish' ? <PublishTab draft={draft} update={update} tags={tags} /> : null}
-    {tab !== 'slots' ? <StickyBar status={tab === 'overview'
-      ? eventId ? '変更を「概要を保存する」で確定します' : '保存するとイベントが作成され、予約枠タブに進みます'
+    {tab !== 'slots' ? <StickyBar destructive={tab === 'overview' && eventId && canDelete ? <Button variant="danger" onClick={() => { setDeleteError(''); setDeleteOpen(true) }} disabled={saving}>削除する</Button> : undefined} status={tab === 'overview'
+      /* 変更のときは左端に［削除する］が入り幅が足りないので、説明の文は出さない（ボタンの名前で分かる）。 */
+      ? eventId ? undefined : '保存するとイベントが作成され、予約枠タブに進みます'
       : '「公開する」ON で友だちに予約 URL を案内できます'} actions={<>
         {tab === 'overview' && eventId ? <Button onClick={() => save('slots')} disabled={saving}>保存して次へ →</Button> : null}
         <Button variant="primary" onClick={() => save()} disabled={saving} busy={saving} busyLabel="保存中...">
           {tab === 'overview' && !eventId ? 'イベントを作る' : TABS.find((item) => item.key === tab)?.saveLabel ?? '保存する'}
         </Button>
       </>} /> : null}
+ <ConfirmDialog open={deleteOpen} title={`「${draft.name || 'このイベント'}」を削除しますか？`} description="削除すると元に戻せません。申込中・確定済みの予約やキャンセル待ちがあるときは削除できません。"
+      confirmLabel="削除する" destructive busy={deleteBusy} error={deleteError || undefined} onCancel={() => { if (!deleteBusy) setDeleteOpen(false) }} onConfirm={() => void removeEvent()} />
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="イベントへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </></SaveErrorScope>
 }
@@ -381,11 +372,14 @@ function OverviewTab({
   update,
   accounts,
   currentAccountId,
+  afterBasics,
 }: {
   draft: EventDetail
   update: <K extends keyof EventDetail>(k: K, v: EventDetail[K]) => void
   accounts: Array<{ id: string; name: string; country: string | null; isActive: boolean }>
   currentAccountId: string
+  /** 絵 XFRyO：「基本」のすぐ下に置く段（お支払い）。 */
+  afterBasics?: React.ReactNode
 }) {
   const descLen = (draft.description ?? '').length
   /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
@@ -404,7 +398,7 @@ function OverviewTab({
   const activeAccounts = accounts.filter((a) => a.isActive)
   return (
     <>
-      <FormSection id="ev-form-overview" title="概要">
+      <FormSection id="ev-form-overview" title="基本">
       <Field label="イベント名" required error={nameError}>
         <SaveErrorField names={["name"]}><TextInput
           type="text"
@@ -457,6 +451,7 @@ function OverviewTab({
           詳細を中央揃えで表示
         </Checkbox>
       </FormSection>
+      {afterBasics}
       <FormSection id="ev-form-questions" title="申し込みのときに聞くこと" description="予約フォームに質問を追加できます。回答は申込の一覧で確認できます。">
         <EventQuestionsEditor
           questions={draft.questions ?? []}
@@ -661,7 +656,7 @@ function SlotsTab({
       saveErrors.capture(e)
       if (e instanceof ApiError && e.status === 409 && e.code === 'version_conflict') {
         await refresh()
-        throw new Error(slotConflictMessage(e))
+        throw new ApiError(409, slotConflictMessage(e), e.code, e.data)
       }
       throw e
     }
@@ -827,125 +822,6 @@ function SlotsTab({
   )
 }
 
-function AddSlotDialog({
-  onClose,
-  onSubmit,
-}: {
-  onClose: () => void
-  onSubmit: (s: { starts_at: string; ends_at: string; capacity: number | null }) => Promise<void>
-}) {
-  const saveErrors = useSaveFormErrors()
-  const todayJst = jstDate()
-  const [date, setDate] = useState(todayJst)
-  const [startTime, setStartTime] = useState('10:00')
-  const [endTime, setEndTime] = useState('12:00')
-  const [capacity, setCapacity] = useState<string>('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
-
-  const submitLock = useRef(false)
-
-  async function submit() {
-    if (submitLock.current) return
-    submitLock.current = true
-    setBusy(true)
-    setErr(null)
-    try {
-      const s = jstHHMMToUtcIso(date, startTime)
-      const e = jstHHMMToUtcIso(date, endTime)
-      if (s >= e) throw new Error('開始時刻 < 終了時刻')
-      const cap = capacity === '' ? null : Number(capacity)
-      if (cap != null && (!Number.isInteger(cap) || cap < 1)) throw new Error('定員は1以上の整数')
-      await onSubmit({ starts_at: s, ends_at: e, capacity: cap })
-    } catch (e) {
-      saveErrors.capture(e)
-      setErr(e instanceof Error ? e.message : String(e))
-    } finally {
-      submitLock.current = false
-      setBusy(false)
-    }
-  }
-
-  return <SaveErrorScope errors={saveErrors}><Dialog open title="予約枠を追加" onCancel={onClose} onConfirm={submit} confirmLabel="追加する" busy={busy} error={err ?? undefined}>
-
-    <Field label="日付（JST）"><SaveErrorField names={["date"]}><DateField value={date} onChange={setDate} aria-label="日付（JST）" /></SaveErrorField></Field>
-    <Field label="開始"><SaveErrorField names={["startTime","start_time","starts_at","startsAt"]}><TimeField value={startTime} onChange={setStartTime} aria-label="開始" /></SaveErrorField></Field>
-    <Field label="終了"><SaveErrorField names={["endTime","end_time","ends_at","endsAt"]}><TimeField value={endTime} onChange={setEndTime} aria-label="終了" /></SaveErrorField></Field>
-    <Field label="定員（空欄=無制限）"><SaveErrorField names={["capacity"]}><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></SaveErrorField></Field>
-  </Dialog></SaveErrorScope>
-}
-
-
-/*
- * 入口29: 既存の予約枠の日時・定員を直す窓。
- *
- * 追加と同じ入力（日付・開始・終了・定員）を、保存値で埋めた状態で開く。
- * 口側の決めごとと同じ検査をここでも先に行う:
- * - 開始 < 終了
- * - 定員は1以上の整数（空欄=無制限）
- * - 予約が入っている枠は、定員をいまの予約数より下げられない
- *
- * 日時を動かしたとき、確定している予約のリマインド予定は口側が
- * 新しい日時へ合わせて動かす。予約者へ「変わった」ことが伝わるよう、
- * 予約のある枠ではそのことを窓の中へ書く。
- */
-function EditSlotDialog({
-  slot,
-  onClose,
-  onSubmit,
-}: {
-  slot: EventSlot
-  onClose: () => void
-  onSubmit: (s: { starts_at: string; ends_at: string; capacity: number | null }) => Promise<void>
-}) {
-  const saveErrors = useSaveFormErrors()
-  const booked = slot.active_count ?? 0
-  const [date, setDate] = useState(() => utcIsoToJstDate(slot.starts_at))
-  const [startTime, setStartTime] = useState(() => utcIsoToJstHHMM(slot.starts_at))
-  const [endTime, setEndTime] = useState(() => utcIsoToJstHHMM(slot.ends_at))
-  const [capacity, setCapacity] = useState<string>(slot.capacity == null ? '' : String(slot.capacity))
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  const submitLock = useRef(false)
-
-  async function submit() {
-    if (submitLock.current) return
-    submitLock.current = true
-    setBusy(true)
-    setErr(null)
-    try {
-      const s = jstHHMMToUtcIso(date, startTime)
-      const e = jstHHMMToUtcIso(date, endTime)
-      if (s >= e) throw new Error('開始時刻 < 終了時刻')
-      const cap = capacity === '' ? null : Number(capacity)
-      if (cap != null && (!Number.isInteger(cap) || cap < 1)) throw new Error('定員は1以上の整数')
-      if (cap != null && cap < booked) {
-        throw new Error(`この枠には${booked}件の予約が入っています。定員は${booked}以上にしてください`)
-      }
-      await onSubmit({ starts_at: s, ends_at: e, capacity: cap })
-    } catch (e) {
-      saveErrors.capture(e)
-      setErr(e instanceof Error ? e.message : String(e))
-    } finally {
-      submitLock.current = false
-      setBusy(false)
-    }
-  }
-
-  // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
-
-  // 新しい部品はデザイントークンで書く（このファイルの古い生色クラスを増やさない）。
-  return <SaveErrorScope errors={saveErrors}><Dialog open title="予約枠を編集" onCancel={onClose} onConfirm={submit} confirmLabel="保存する" busy={busy} error={err ?? undefined}>
-    {booked > 0 ? <Notice tone="warn" message={`この枠には${booked}件の予約が入っています。日時を変えると、確定している予約のリマインド予定も新しい日時へ合わせて動きます。定員は${booked}以上にしてください。`} /> : null}
-    <Field label="日付（JST）"><SaveErrorField names={["date"]}><DateField value={date} onChange={setDate} aria-label="日付（JST）" /></SaveErrorField></Field>
-    <Field label="開始"><SaveErrorField names={["startTime","start_time","starts_at","startsAt"]}><TimeField value={startTime} onChange={setStartTime} aria-label="開始" /></SaveErrorField></Field>
-    <Field label="終了"><SaveErrorField names={["endTime","end_time","ends_at","endsAt"]}><TimeField value={endTime} onChange={setEndTime} aria-label="終了" /></SaveErrorField></Field>
-    <Field label="定員（空欄=無制限）"><SaveErrorField names={["capacity"]}><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></SaveErrorField></Field>
-  </Dialog></SaveErrorScope>
-}
-
 
 /*
  * R84: 予約枠の一括追加の窓は共通 Dialog を使う。
@@ -1032,7 +908,6 @@ export function BulkSlotDialog({
     <Field label="定員（各枠共通・空欄=無制限）"><SaveErrorField names={["capacity"]}><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></SaveErrorField></Field>
   </Dialog></SaveErrorScope>
 }
-
 
 // ----------------------------------------------------------------
 // Tab 3: Publish settings

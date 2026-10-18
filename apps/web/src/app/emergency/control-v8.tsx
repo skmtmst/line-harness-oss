@@ -1,7 +1,9 @@
 'use client'
 
+import { formatMonthDay, stopMinutes } from './control-time'
+
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
+import { GitBranch, OctagonPause, ShieldCheck, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, type OperationCapability, type OperationControl, type OperationHistoryEntry, type OperationImpactPreview, type OperationRestoreDrift } from '@/lib/api'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
@@ -12,10 +14,11 @@ import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import { DialogFormRow } from '@/components/shared/dialog-form-row'
+import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import Select from '@/components/shared/select'
 import OtpInput from '@/components/shared/otp-input'
 import StepUpDialog from '@/components/shared/step-up-dialog'
 import { EmergencyControlFeedback } from './control-feedback-v8'
@@ -31,6 +34,8 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
+import Card from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
 
 /* ★V8-B 緊急コントロール（板 OHwbU）。停止・復旧・本人確認・冪等キーと
  * 競合後の読み直しは、この現役の部品だけで守る。 */
@@ -82,28 +87,29 @@ function failureText(error: unknown, fallback: string): string {
 type Feedback = { tone: 'success' | 'warning' | 'danger'; text: string } | null
 
 const HISTORY_FETCH_LIMIT = 200
+/** 記録の表の「何を」は短い言い方（絵 OHwbU：一斉配信・シナリオ）。全文は title で見る。 */
+const CAPABILITY_SHORT: Partial<Record<keyof typeof CAPABILITY_LABEL, string>> = {
+  broadcast_dispatch: '一斉配信',
+  scenario_dispatch: 'シナリオ',
+  // 上の「何を止めますか」のチェックと同じ短い言い方。
+  automation_actions: '自動処理',
+}
+const capabilityShort = (capability: keyof typeof CAPABILITY_LABEL) => CAPABILITY_SHORT[capability] ?? CAPABILITY_LABEL[capability]
 /** 記録の表に出す件数。全部は更新履歴のタブで見る。 */
 const RECORD_LIMIT = 10
-
-/** 「8/14」の形。記録の表のいつ・いちばん長かった停止の注に使う。 */
-function formatMonthDay(value: string | null): string {
-  if (!value) return '日時不明'
-  const parsed = new Date(value)
-  if (!Number.isFinite(parsed.getTime())) return '日時不明'
-  return `${parsed.getMonth() + 1}/${parsed.getDate()}`
-}
 
 /** 「8/14 19:02〜19:40」の形。終わりが無ければ始まりだけ出す。 */
 function formatStopRange(start: string | null, end: string | null): string {
   if (!start) return '日時不明'
-  if (!end) return formatOperationDate(start)
-  return `${formatOperationDate(start)}〜${formatOperationDate(end)}`
-}
-
-function stopMinutes(start: string | null, end: string | null): number | null {
-  if (!start || !end) return null
-  const diff = Math.round((Date.parse(end) - Date.parse(start)) / 60_000)
-  return Number.isFinite(diff) && diff >= 0 ? diff : null
+  const from = new Date(start)
+  if (!Number.isFinite(from.getTime())) return formatOperationDate(start)
+  const time = (date: Date) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  const head = `${from.getMonth() + 1}/${from.getDate()} ${time(from)}`
+  if (!end) return head
+  const to = new Date(end)
+  if (!Number.isFinite(to.getTime())) return head
+  const sameDay = from.getFullYear() === to.getFullYear() && from.getMonth() === to.getMonth() && from.getDate() === to.getDate()
+  return `${head}〜${sameDay ? time(to) : `${to.getMonth() + 1}/${to.getDate()} ${time(to)}`}`
 }
 
 export type EmergencyControlV8Handle = { openStop: () => void }
@@ -393,7 +399,7 @@ const EmergencyControlV8 = (
 
   /** 確認の窓の足（右寄せの2ボタン）。2段に書くと直書き扱いが増えるので1つにまとめる。 */
   const ConfirmActions = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex flex-wrap items-center justify-end gap-2">{children}</div>
+    <DialogActions>{children}</DialogActions>
   )
 
   const runStop = async (code: string) => {
@@ -531,10 +537,10 @@ const EmergencyControlV8 = (
           valueText={previewSettled && control ? (isStopped ? '停止中' : '有効') : emptyValue('unknown')}
           valueTone={isStopped ? 'danger' : 'default'}
           detail={impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'} />
-        <KpiCard title="止めた回数" icon={<PauseCircle size={14} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
-        <KpiCard title="いちばん長かった停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
+        <KpiCard title="止めた回数" icon={<OctagonPause size={14} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
+        <KpiCard title="最長の停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
           detail={longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'} />
-        <KpiCard title="いまの版" icon={<Tag size={14} />} value={null} unit="" valueText={historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}
+        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} unit="" valueText={historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}
           detail={latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'} />
       </KpiBand>
 
@@ -717,9 +723,10 @@ const EmergencyControlV8 = (
                       <td title={formatStopRange(entry.stoppedAt, entry.resolvedAt)} className={styles.cellTruncate}>
                         {formatStopRange(entry.stoppedAt, entry.resolvedAt)}
                       </td>
-                      <td title={entry.actorId} className={styles.cellTruncate}>{entry.actorId}</td>
+                      {/* 「名前（役割・所属）」は名前だけを出し、全文は title（絵 OHwbU は名前だけ）。 */}
+                      <td title={entry.actorId} className={styles.cellTruncate}>{entry.actorId.split('（')[0].trim() || entry.actorId}</td>
                       <td title={entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')} className={styles.cellTruncate}>
-                        {entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}
+                        {entry.capabilities.length > 3 ? `${entry.capabilities.slice(0, 3).map(capabilityShort).join('・')} ほか${entry.capabilities.length - 3}` : entry.capabilities.map(capabilityShort).join('・')}
                       </td>
                       <td title={entry.detail ? `${entry.reason}（${entry.detail}）` : entry.reason} className={styles.cellTruncate}>
                         {entry.reason}
@@ -746,7 +753,8 @@ const EmergencyControlV8 = (
         open={confirmMode !== null}
         busy={mutationLocked}
         designNode={confirmMode === 'stop' ? 'EA8rM' : 'OHwbU-confirm'}
-        tone={confirmMode === 'stop' ? 'destructive' : 'default'}
+        tone="default" role={confirmMode === 'stop' ? 'alertdialog' : 'dialog'} contentLayout="form" confirmation
+        designTop={confirmMode === 'stop' ? 150 : undefined} fitViewport
         title={confirmMode === 'stop' ? '緊急停止を確認' : '止める前の状態に戻しますか？'}
         description={confirmMode === 'stop'
           ? '止める前に、何と何人に関わるかを実測で確かめました。'
@@ -761,7 +769,7 @@ const EmergencyControlV8 = (
               type="button"
               variant="danger"
               onClick={() => void runStop(stepUpMethod === 'password' ? stopPassword : stopCode)}
-              disabled={!canRunStop}
+              disabled={!canRunStop} title={mutationLocked || running ? '処理中です。' : !canRunStop ? '止める理由、確認の言葉、本人確認を入力してください。' : undefined}
             >
               緊急停止する
             </Button>
@@ -775,7 +783,7 @@ const EmergencyControlV8 = (
               type="button"
               variant="danger"
               onClick={proceedToStepUp}
-              disabled={mutationLocked || confirmWord !== '復旧'}
+              disabled={mutationLocked || confirmWord !== '復旧'} title={mutationLocked ? '処理中です。' : confirmWord !== '復旧' ? '確認の言葉に「復旧」と入力してください。' : undefined}
             >
               復旧を実行する
             </Button>
@@ -785,32 +793,20 @@ const EmergencyControlV8 = (
         <div>
           {confirmMode === 'stop' ? (
             <>
-              <div className={styles.confirmTargets}>
+              <Card surface="muted" corner="control" contentPadding="var(--polish-space-field)" gap="tight">
                 <p className={styles.dialogLabel}>止める対象：{accountName}</p>
-                {selectedTargets.map((key) => (
-                  <div key={key} className={styles.confirmTargetRow}>
-                    <span>{targetLabels[key].label}</span>
-                    <strong>{impactText(key)}</strong>
-                  </div>
-                ))}
-              </div>
-              <p className={styles.dialogHint}>止まらないもの：{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p>
-              <div className={styles.confirmReason}><Field label="止める理由" htmlFor="emergency-reason-v8" required><SaveErrorField names={["reason"]}><input
-                  id="emergency-reason-v8"
-                  aria-label="止める理由"
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  disabled={mutationLocked || running}
-                  maxLength={200}
-                  placeholder="例：宛先の絞り込みを間違えた"
-                  className={styles.dialogInput}
-                  style={{ maxWidth: '100%' }}
-                /></SaveErrorField></Field></div>
-              <div className={styles.detailBlock}>
-                <div className={styles.detailHead}>
-                  <label htmlFor="emergency-detail-v8" className={styles.dialogLabel}>補足（任意）</label>
-                  <p className={styles.detailCounter}>あと{1000 - reasonDetail.length}文字</p>
-                </div>
+                <p>{selectedTargets.map((key) => `${targetLabels[key].label} ${impactText(key)}`).join('・')}</p>
+              </Card>
+              <DialogFormRow><Field label="止める理由" htmlFor="emergency-reason-v8" required><SaveErrorField names={["reason"]}><TextField
+                id="emergency-reason-v8"
+                aria-label="止める理由"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                disabled={mutationLocked || running}
+                maxLength={200}
+                placeholder="例：宛先の絞り込みを間違えた"
+              /></SaveErrorField></Field></DialogFormRow>
+              <DialogFormRow><Field label="補足" htmlFor="emergency-detail-v8" optional note={`あと${1000 - reasonDetail.length}文字`}>
                 <SaveErrorField names={["reasonDetail","detail","reason_detail"]}><textarea
                   id="emergency-detail-v8"
                   value={reasonDetail}
@@ -821,8 +817,7 @@ const EmergencyControlV8 = (
                   placeholder="発生していることを短く入力"
                   className={styles.detailTextarea}
                 /></SaveErrorField>
-              </div>
-              <p className={styles.dialogHint}>停止前にすでに LINE へ渡したものは取り消せません。</p>
+              </Field></DialogFormRow>
             </>
           ) : (
             <>
@@ -838,14 +833,14 @@ const EmergencyControlV8 = (
               ) : null}
             </>
           )}
-          <Field label={`確認のため「${confirmMode === 'stop' ? '停止' : '復旧'}」と入力`} required><SaveErrorField names={["confirmWord","confirm_word"]}><input
+          <DialogFormRow>
+            <p>確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力してください</p>
+            <Field label="確認の文字" required><SaveErrorField names={["confirmWord","confirm_word"]}><TextField
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
-              autoFocus
               disabled={mutationLocked || running}
               aria-label="確認の言葉"
-              className={styles.dialogInput}
-            /></SaveErrorField></Field>
+            /></SaveErrorField></Field></DialogFormRow>
           {confirmMode === 'stop' && stepUpMethod !== 'none' ? (
             <div className={styles.dialogField}>
               <span className={styles.dialogLabel} id="emergency-stepup-label">
@@ -873,7 +868,10 @@ const EmergencyControlV8 = (
               )}
             </div>
           ) : null}
-          <p className={styles.dialogHint}>この操作は記録に残り、ログインユーザーへ通知されます。</p>
+          {confirmMode === 'stop' ? <DialogFormRow><Notice tone="warn" appearance="soft" icon={null}>
+            停止前にすでに LINE へ渡したものは取り消せません。止めたことはログインユーザー全員に知らせます。
+            <span>止まらないもの：{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</span>
+          </Notice></DialogFormRow> : <p className={styles.dialogHint}>この操作は記録に残り、ログインユーザーへ通知されます。</p>}
         </div>
       </Dialog>
 

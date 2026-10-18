@@ -7,7 +7,11 @@
  * (stable_step_id) で統一し、版が変わっても同じ通を指す。
  * FK OFF では隠れるため、このファイルは { foreign_keys: true } で確かめる。
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// 通知の登録を予定より前に置き、FKと二重送信防止を検査する。
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-19T00:00:00Z')); });
+afterEach(() => vi.useRealTimers());
 
 import type { LineClient } from '@line-crm/line-sdk';
 

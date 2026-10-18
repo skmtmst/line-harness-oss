@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
-import { friendsTableReady } from './friends-table-state.mjs'
+import { friendsTableReady, snapshotFriendsTable } from './friends-table-state.mjs'
 import { assertStressResponse, installStressApi, waitForScreenReady } from '../../apps/web/scripts/v8-guard/speed-budget.mjs'
 
 const [base = 'http://127.0.0.1:4388', out = '/tmp/lh-speed2-browser'] = process.argv.slice(2)
@@ -45,11 +45,7 @@ try {
     // Await measured geometry, not exact floating-point equality. Chromium can
     // retain a 1/16px table remainder indefinitely even when every row is 60px.
     mark('measured-height: bounded rows and total height within 1/8 CSS px')
-    await page.waitForFunction(friendsTableReady, {})
-    const initial = await page.evaluate(() => {
-      const body = document.querySelector('tbody[data-virtual-table]')
-      return { rows: Number(body.dataset.rowCount), height: body.getBoundingClientRect().height, rendered: body.querySelectorAll('[data-friend-row]').length }
-    })
+    const initial = await snapshotFriendsTable(page)
     assert.equal(initial.rows, 2000)
     assert.ok(initial.rendered > 0 && initial.rendered < 60)
     const counts = []
@@ -62,22 +58,7 @@ try {
         main.scrollTop = offset + index * (body.getBoundingClientRect().height / 2000)
       }, index)
       await page.locator(`[data-table-index="${index}"]`).waitFor({ state: 'attached' })
-      await page.waitForFunction(friendsTableReady, { targetIndex: index })
-      const geometry = await page.evaluate(() => {
-        const main = document.querySelector('main')
-        const body = main.querySelector('tbody[data-virtual-table]')
-        const rows = [...body.querySelectorAll('[data-friend-row]')]
-        const mainBox = main.getBoundingClientRect()
-        return {
-          height: body.getBoundingClientRect().height, rendered: rows.length,
-          tableRight: body.getBoundingClientRect().right, mainRight: mainBox.right,
-          missingNames: rows.filter((row) => row.querySelector('a[title]')?.getBoundingClientRect().width < 30).length,
-          rowHeights: [...new Set(rows.map((row) => row.getBoundingClientRect().height))],
-          pageX: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-          tableX: body.closest('table').scrollWidth > body.closest('table').clientWidth,
-          outside: rows.filter((row) => row.getBoundingClientRect().right > mainBox.right + 1).length,
-        }
-      })
+      const geometry = await snapshotFriendsTable(page, { targetIndex: index })
       await page.screenshot({ path: join(out, `${width}-${label}.png`) })
       console.log(width, label, JSON.stringify(geometry))
       assert.ok(Math.abs(geometry.height - initial.height) <= 1 / 8, 'scrolling preserves total height within native-table rounding')

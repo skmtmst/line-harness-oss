@@ -1,3 +1,21 @@
+import {depositEstimate,cancellationCardRequired} from '../services/booking-deposit.js';
+import {assertPassRequirement} from '../services/booking-pass-plans.js';
+import {verifyRoutingToken} from '../services/form-routing.js';
+import {bookingAddons,readAddonSettings} from '../services/booking-addons.js';
+import {menuAudience,readAudienceWrite} from '../services/booking-audience.js';
+import {gapWrite,GapError} from '../services/gap-common.js';
+import { cancellationPolicy, cancellationQuote, bookingCancellationQuote, requireCancellationTestConnection } from '../services/booking-cancellation.js';
+import { simulatePaymentRefund } from '../services/booking-payment-refunds.js';
+import type { BookingPaymentRecord } from '@line-crm/db';
+import { customerBookingPayments } from '../services/booking-payment-history.js';
+import { syncSelfBookingMeet } from './booking-self-meet-sync.js';
+import type { SelfBookingChange } from './booking-self-meet-sync.js';
+import { EntitlementError, entitlementUseStatement, validateEntitlementSelection } from '../services/booking-entitlements.js';
+import { featureReadiness, StyleError } from '../services/style-setup.js';
+import { defaultBookingPaymentSelection } from '../services/booking-payment-selection.js';
+import type { TodaySeatRow } from './booking-today-seat-types.js';
+import { resolveFormBookingAnswer, FormBookingAnswerError } from '../services/form-booking-answer.js';
+import { bookingHistoryItem } from '../services/booking-history-item.js';
 import { outputAuditMiddleware } from '../middleware/output-audit.js';
 import { notifyForBooking } from '../services/booking-notification.js';
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../services/booking-confirmed-effects.js';
@@ -24,134 +42,84 @@ import { processVisitStampQueue } from '../services/visit-stamps.js';
 // time-of-event columns (starts_at / ends_at / block_ends_at / requested_at /
 // scheduled_at / decided_at / expires_at) are written from the Worker.
 
+// Booking feature HTTP routes.
+//
+// LIFF-facing endpoints live under /api/liff/booking/* (auth-bypassed by
+// authMiddleware) and resolve the LINE account from the liffId query.
+// Admin-facing endpoints live under /api/booking/admin/* and rely on the
+// global authMiddleware for staff/owner authentication; they require an
+// `account_id` query param to scope to a single LINE account.
+//
+// All UUIDs are generated via crypto.randomUUID(); UTC ISO timestamps for
+// time-of-event columns (starts_at / ends_at / block_ends_at / requested_at /
+// scheduled_at / decided_at / expires_at) are written from the Worker.
+// Booking feature HTTP routes.
+//
+// LIFF-facing endpoints live under /api/liff/booking/* (auth-bypassed by
+// authMiddleware) and resolve the LINE account from the liffId query.
+// Admin-facing endpoints live under /api/booking/admin/* and rely on the
+// global authMiddleware for staff/owner authentication; they require an
+// `account_id` query param to scope to a single LINE account.
+//
+// All UUIDs are generated via crypto.randomUUID(); UTC ISO timestamps for
+// time-of-event columns (starts_at / ends_at / block_ends_at / requested_at /
+// scheduled_at / decided_at / expires_at) are written from the Worker.
+// Booking feature HTTP routes.
+//
+// LIFF-facing endpoints live under /api/liff/booking/* (auth-bypassed by
+// authMiddleware) and resolve the LINE account from the liffId query.
+// Admin-facing endpoints live under /api/booking/admin/* and rely on the
+// global authMiddleware for staff/owner authentication; they require an
+// `account_id` query param to scope to a single LINE account.
+//
+// All UUIDs are generated via crypto.randomUUID(); UTC ISO timestamps for
+// time-of-event columns (starts_at / ends_at / block_ends_at / requested_at /
+// scheduled_at / decided_at / expires_at) are written from the Worker.
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import type { BookingHistoryItem, BookingHistoryResponse } from '@line-crm/shared';
-import {
-  createBookingCustomer,
-  getBookingCustomer,
-  getLineAccounts,
-  resolveLineCredential,
-  searchBookingCustomers,
-  createBookingAvailabilityException,
-  getBookingAdminSettings,
-  saveBookingAdminSettings,
-  createBookingPayment,
-  bookingPaymentInsertStatement,
-  getBookingPaymentByBooking,
-  decidePrepayOnly,
-  prepayNoticeFor,
-  resolveBookingPaymentConfig,
-  listBookingAdminResources,
-  getBookingAvailabilityException,
-  listBookingAvailabilityExceptions,
-  updateBookingAvailabilityException,
-  deleteBookingAvailabilityException,
-  updateBookingMenuSettings,
-  recordMenuVersion,
-  listMenuVersions,
-  revertMenuToVersion,
-  menuVersionContentLines,
-  createBookingResource,
-  deleteBookingResourceSafely,
-  updateBookingResourceSafely,
-  replaceBookingMenuResources,
-  normalizeLiffDateView,
-  type BookingExceptionKind,
-  type BookingExceptionScope,
-  type BookingInterval,
-  type BookingPriceMode,
-  type LiffDateView,
-} from '@line-crm/db';
+import { createBookingCustomer, getBookingCustomer, getLineAccounts, searchBookingCustomers, createBookingAvailabilityException, getBookingAdminSettings, saveBookingAdminSettings, bookingPaymentInsertStatement, getBookingPaymentByBooking, decidePrepayOnly, prepayNoticeFor, resolveBookingPaymentConfig, resolveBookingPaymentForBooking, listBookingAdminResources, getBookingAvailabilityException, listBookingAvailabilityExceptions, updateBookingAvailabilityException, deleteBookingAvailabilityException, updateBookingMenuSettings, recordMenuVersion, listMenuVersions, revertMenuToVersion, menuVersionContentLines, createBookingResource, deleteBookingResourceSafely, updateBookingResourceSafely, replaceBookingMenuResources, normalizeLiffDateView, type BookingExceptionKind, type BookingExceptionScope, type BookingInterval, type BookingPriceMode, type LiffDateView } from '@line-crm/db';
 import { parseBookingStaffInput, BOOKING_SETTINGS_KEY, BOOKING_STAFF_OWN_KEY, BOOKING_MENUS_KEY } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import type { BookingCustomerNotification } from '@line-crm/shared';
 import { requireRole, requirePermission, hasStaffPermission } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt, rescheduleByTrigger } from '../services/reminder-trigger.js';
-import { cancelMeetConsultation, registerMeetConsultation } from '../services/meet-consultation-reminders.js';
+import { cancelMeetConsultation } from '../services/meet-consultation-reminders.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
 import { explainBookingSlot, getAccountTimeZone, getAvailability, getStoreCapacitySnapshot, tzDateStr, tzHHMM } from '../services/availability.js';
 import { STORE_CAPACITY_GUARD_EXCLUDE_SQL, STORE_CAPACITY_GUARD_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../services/booking-store-capacity.js';
-import {
-  BOOKING_RESOURCE_CAPACITY_GUARD_EXCLUDE_SQL,
-  BOOKING_RESOURCE_CAPACITY_GUARD_SQL,
-  bookingResourceGuardBindings,
-  bookingResourceGuardExcludeBindings,
-  insertBookingWithResourceSnapshot,
-} from '../services/booking-resource-capacity.js';
-import {
-  enqueueCalendarDeleteOperation,
-  removeBookingFromGoogle,
-  runBookingGoogleSync,
-  runCalendarDeleteOperation,
-  verifyStaffCalendarConnection,
-} from '../services/booking-calendar-sync.js';
-import {
-  completeIdempotencyResponse,
-  findIdempotencyResponse,
-  releaseReservedIdempotencyResponse,
-  reserveIdempotencyResponse,
-  saveIdempotencyResponse,
-} from '../services/booking-idempotency.js';
-import {
-  type NotificationKind,
-} from '../services/booking-notifier.js';
+import { BOOKING_RESOURCE_CAPACITY_GUARD_EXCLUDE_SQL, BOOKING_RESOURCE_CAPACITY_GUARD_SQL, bookingResourceGuardBindings, bookingResourceGuardExcludeBindings, insertBookingWithResourceSnapshot } from '../services/booking-resource-capacity.js';
+import { enqueueCalendarDeleteOperation, removeBookingFromGoogle, runBookingGoogleSync, runCalendarDeleteOperation, verifyStaffCalendarConnection } from '../services/booking-calendar-sync.js';
+import { completeIdempotencyResponse, findIdempotencyResponse, releaseReservedIdempotencyResponse, reserveIdempotencyResponse, saveIdempotencyResponse } from '../services/booking-idempotency.js';
+import { type NotificationKind } from '../services/booking-notifier.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 import { fireOutgoingWebhooks } from '../services/event-bus.js';
-import {
-  buildConfirmationReminderSchedule,
-  getReminderTiming,
-  insertConfirmationReminders,
-  type BookingReminderScheduleItem,
-} from '../services/booking-confirm.js';
+import { buildConfirmationReminderSchedule, getReminderTiming, insertConfirmationReminders, type BookingReminderScheduleItem } from '../services/booking-confirm.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
-import {
-  BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES,
-  DEFAULT_ACCOUNT_SETTINGS,
-  IDEMPOTENCY_TTL_MINUTES,
-  MENU_IDEMPOTENCY_TTL_MINUTES,
-  type BookingStatus,
-} from '../services/booking-types.js';
+import { BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES, DEFAULT_ACCOUNT_SETTINGS, IDEMPOTENCY_TTL_MINUTES, MENU_IDEMPOTENCY_TTL_MINUTES, type BookingStatus } from '../services/booking-types.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import {
-  bookingAuditInsert,
-  listBookingAuditLogs,
-  recordBookingAudit,
-} from '@line-crm/db';
+import { bookingAuditInsert, listBookingAuditLogs, recordBookingAudit } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { listResponse } from '../lib/list-etag.js';
-import {
-  claimBookingOperationForRetry,
-  finishBookingOperation,
-  listBookingOperations,
-  queueBookingOperation,
-} from '../services/booking-operation-runs.js';
-import {
-  getBookingAdminDetail,
-  getBookingCustomerContext,
-} from '../services/booking-admin-detail.js';
+import { claimBookingOperationForRetry, listBookingOperations, queueBookingOperation } from '../services/booking-operation-runs.js';
+import { getBookingAdminDetail, getBookingCustomerContext } from '../services/booking-admin-detail.js';
 import { finishExpiredWaitlists, promoteBookingWaitlist } from '../services/booking-waitlist.js';
 import { processBookingWaitlists } from '../services/waitlist-tick.js';
 import { insertSeatWaitlistEntry } from './restaurant-test.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { validateInboundReservation } from '../services/restaurant-test.js';
 
-import {
-  getBookingAutoAssign,
-  saveBookingAutoAssign,
-  getBookingChannels,
-  listBookingConflicts,
-  notifyBookingConflicts,
-  bookingAutomaticNotificationAllowed,
-} from '../services/booking-channels.js';
+import { getBookingAutoAssign, saveBookingAutoAssign, getBookingChannels, EXTERNAL_BOOKING_CHANNELS, getBookingChannelSetting, saveBookingChannelSetting, listBookingConflicts, notifyBookingConflicts, bookingAutomaticNotificationAllowed } from '../services/booking-channels.js';
+
+import { assignBookingStaff } from '../services/booking-assignment.js';
+import { assignmentSettingsResponse } from './booking-assignment-settings.js';
 
 const booking = new Hono<Env>();
 booking.use('/api/booking/admin/bookings.csv', outputAuditMiddleware);
 booking.use('/api/booking/*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.ok)await processVisitStampQueue(c.env);});
 
-booking.onError((error,c)=>{if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
-booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{console.error(JSON.stringify({event:'waitlist_reconcile_failed'}));}}});
-
+booking.onError((error,c)=>{if(error instanceof GapError||error instanceof EntitlementError)return c.json({error:error.code},error.status);if(/entitlement_month_change|entitlement_unavailable/.test(String(error)))return c.json({error:String(error).includes('entitlement_month_change')?'entitlement_month_change':'entitlement_unavailable'},409);if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
+booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{console.error(JSON.stringify({"code":"waitlist_reconcile_failed"}));}}});
 
 // 予約の作成・変更・承認の成功後に、同じ店舗内の重なりを確認する。
 booking.use('*', async (c, next) => {
@@ -258,6 +226,7 @@ async function reverifyLatestSlot(
     startsAt: Date;
     minLeadTimeMinutes: number;
     /** R92: お客さま向けの再照合では店舗共通ルールを既定値として使う。 */
+    additionalDurationMinutes?:number;
     applyStoreRules?: boolean;
     /** 予約変更時は変更対象を重なり判定から外す（自予約と衝突しないように）。 */
     excludeBookingId?: string;
@@ -275,8 +244,10 @@ async function reverifyLatestSlot(
     to: date,
     now: new Date(),
     minLeadTimeMinutes: input.minLeadTimeMinutes,
+    additionalDurationMinutes:input.additionalDurationMinutes,
     applyStoreRules: input.applyStoreRules,
     googleCredentials: googleCredentials(env),
+    forceCalendarRefresh: true,
     excludeBookingId: input.excludeBookingId,
     excludeWaitlistId:input.excludeWaitlistId,waitlistOffer:input.waitlistOffer,
   });
@@ -388,58 +359,31 @@ export async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string 
   return acc?.id ?? null;
 }
 
-// LIFF が送る id_token を LINE Login API で verify し、認証済み LINE userId を返す。
-// 失敗時は null（呼び出し側で 401）。
-//
-// 候補チャンネル ID:
-//   1. LINE_LOGIN_CHANNEL_ID env (デフォルトアカウント)
-//   2. DB 内 line_accounts.login_channel_id (LINE Login channel)
-//   3. DB 内 line_accounts.channel_id (Messaging channel) — LIFF を Login channel
-//      ではなく Messaging channel に紐付けてる構成への保険
-//   4. id_token の aud claim を base64 デコードして直接抽出 — どの DB 値とも
-//      一致しない場合の最後の手段（LIFF が独自に発行する場合）
-export async function verifyCallerLineUserId(c: Context<Env>): Promise<string | null> {
+// The token must be verified against the account selected by the stored LIFF ID.
+// A JWT's unverified aud is never a source of trusted login-channel configuration.
+export async function verifyCallerLineUserId(c: Context<Env>, expectedAccountId?: string): Promise<string | null> {
   const auth = c.req.header('Authorization');
   if (!auth || !auth.startsWith('Bearer ')) return null;
   const idToken = auth.slice('Bearer '.length).trim();
   if (!idToken) return null;
-
+  const accountId = expectedAccountId ?? await resolveAccountIdFromLiff(c);
+  if (!accountId) return null;
+  const accounts = await getLineAccounts(c.env.DB);
+  const account = accounts.find(row => row.id === accountId);
+  if (!account) return null;
   const candidates: string[] = [];
-  const push = (v: string | null | undefined) => {
-    if (v && !candidates.includes(v)) candidates.push(v);
+  const push = (value: string | null | undefined) => {
+    if (value && !candidates.includes(value)) candidates.push(value);
   };
-
-  push(c.env.LINE_LOGIN_CHANNEL_ID);
-  const dbAccounts = await getLineAccounts(c.env.DB);
-  for (const a of dbAccounts) {
-    const acc = a as unknown as {
-      login_channel_id?: string | null;
-      channel_id?: string | null;
-      liff_id?: string | null;
-    };
-    push(acc.login_channel_id);
-    push(acc.channel_id);
-    // liff_id は "<channel_id>-<random>" 形式
-    const liffPrefix = acc.liff_id?.split('-')[0];
-    push(liffPrefix);
+  if (account.login_channel_id) {
+    push(account.login_channel_id);
+  } else {
+    // Legacy configured channels remain scoped to this account. The environment
+    // fallback is only meaningful when the installation has a single account.
+    if (accounts.length === 1) push(c.env.LINE_LOGIN_CHANNEL_ID);
+    push(account.liff_id?.split('-')[0]);
+    push(account.channel_id);
   }
-
-  // id_token (JWT) の payload を base64url decode して aud を抽出
-  // Cloudflare Workers の atob は base64 を扱う。base64url の文字置換が必要。
-  try {
-    const parts = idToken.split('.');
-    if (parts.length === 3) {
-      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
-      const json = JSON.parse(atob(padded));
-      if (typeof json.aud === 'string') push(json.aud);
-      else if (Array.isArray(json.aud)) for (const a of json.aud) push(String(a));
-    }
-  } catch {
-    /* decode 失敗は無視: 候補 URL のみで verify を試す */
-  }
-
-  console.log('[verifyCallerLineUserId] candidates:', candidates.length, candidates.join(','));
 
   for (const channelId of candidates) {
     const res = await fetch('https://api.line.me/oauth2/v2.1/verify', {
@@ -451,10 +395,7 @@ export async function verifyCallerLineUserId(c: Context<Env>): Promise<string | 
       const verified = await res.json<{ sub?: string }>();
       if (verified.sub) return verified.sub;
     } else {
-      const errBody = await res.text().catch(() => '');
-      console.log(
-        `[verifyCallerLineUserId] verify fail channel=${channelId} status=${res.status} body=${errBody.slice(0, 200)}`,
-      );
+      // Provider failure is an authentication failure; do not read/log its body.
     }
   }
   return null;
@@ -514,7 +455,7 @@ async function resolveSelfBookingCaller(
 > {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return { ok: false, error: 'unknown_liff', status: 404 };
-  const lineUserId = await verifyCallerLineUserId(c);
+  const lineUserId = await verifyCallerLineUserId(c, accountId);
   if (!lineUserId) return { ok: false, error: 'unauthorized', status: 401 };
   const friendId = await resolveFriendId(c, lineUserId, accountId);
   if (!friendId) return { ok: false, error: 'friend_not_found', status: 404 };
@@ -590,6 +531,21 @@ export async function resolveFriendId(
 // LIFF endpoints (/api/liff/booking/*)
 // ================================================================
 
+booking.get('/api/liff/booking/style-readiness', async c => {
+  const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+  try{return c.json({success:true,data:await featureReadiness(c.env.DB,caller.accountId,c.req.query('feature')??'')});}catch(e){if(e instanceof StyleError)return c.json({error:e.code},e.status);throw e;}
+});
+
+booking.post('/api/liff/booking/page-views', inputJsonBoundary(), async c => {
+  const caller=await resolveSelfBookingCaller(c);
+  if(!caller.ok)return c.json({error:caller.error},caller.status);
+  const body=await c.req.json<{menuId?:unknown;entryPoint?:unknown}>().catch(()=>null);
+  if(!body||(body.menuId!==undefined&&typeof body.menuId!=='string')||(body.entryPoint!==undefined&&(typeof body.entryPoint!=='string'||body.entryPoint.length>100)))return c.json({error:'invalid_page_view'},400);
+  if(body.menuId&&!await c.env.DB.prepare('SELECT id FROM menus WHERE id=? AND line_account_id=? AND is_active=1').bind(body.menuId,caller.accountId).first())return c.json({error:'menu_not_found'},404);
+  await c.env.DB.prepare('INSERT INTO booking_page_views(id,line_account_id,menu_id,friend_id,entry_point,viewed_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),caller.accountId,body.menuId??null,caller.friendId,body.entryPoint??null,new Date().toISOString()).run();
+  return c.json({success:true},201);
+});
+
 booking.get('/api/liff/booking/menus', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
@@ -597,7 +553,7 @@ booking.get('/api/liff/booking/menus', async (c) => {
     .prepare(
       `SELECT id, name, category_label, description,
               duration_minutes, buffer_after_minutes,
-              base_price, price_mode, sort_order,
+              base_price, price_mode, sort_order,audience_mode,audience_tag_ids_json,addon_menu_ids_json,max_party_size,addon_only,customer_recurring_enabled,recurring_freqs_json,recurring_max_count,
               cancel_deadline_hours_before, intake_question,
               COALESCE((SELECT mode FROM booking_payment_menu_settings WHERE menu_id = menus.id AND line_account_id = menus.line_account_id),
                 (SELECT mode FROM booking_payment_configs WHERE line_account_id = menus.line_account_id),'none') AS payment_mode
@@ -607,9 +563,21 @@ booking.get('/api/liff/booking/menus', async (c) => {
     )
     .bind(accountId)
     .all();
-  return c.json({ menus: rows.results });
+  const user=await verifyCallerLineUserId(c);
+  const friend=user?await resolveFriendId(c,user,accountId):null;
+  const visible=[];
+  for(const row of rows.results as Array<{id:string;addon_only:number}>)if(!row.addon_only&&(await menuAudience(c.env.DB,accountId,row.id,friend)).visible)visible.push(row);
+  return c.json({ menus: visible });
 });
 
+booking.get('/api/liff/booking/menus/:id/addons',async(c)=>{
+ const a=await resolveAccountIdFromLiff(c);if(!a)return c.json({error:'unknown_liff'},404);
+ const user=await verifyCallerLineUserId(c),f=user?await resolveFriendId(c,user,a):null;
+ if(!(await menuAudience(c.env.DB,a,c.req.param('id'),f)).visible)return c.json({error:'menu_not_available'},403);
+ const row=await c.env.DB.prepare('SELECT addon_menu_ids_json FROM menus WHERE id=? AND line_account_id=?').bind(c.req.param('id'),a).first<{addon_menu_ids_json:string}>();
+ const ids=JSON.parse(row?.addon_menu_ids_json??'[]') as string[],out=[];for(const id of ids){try{out.push(...await bookingAddons(c.env.DB,a,c.req.param('id'),[id],f));}catch{/* 停止した追加メニューは候補に出さない。 */}}
+ return c.json({success:true,data:out});
+});
 booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
@@ -617,7 +585,7 @@ booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
   const rows = await c.env.DB
     .prepare(
       `SELECT s.id, s.display_name, s.role, s.profile_image_url, s.bio,
-              s.is_designation_optional,
+              s.is_designation_optional,s.nomination_fee,
               COALESCE(sm.override_price, m.base_price) AS price,
               m.price_mode,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS duration_minutes
@@ -647,10 +615,14 @@ booking.get('/api/liff/booking/availability', async (c) => {
   if ((toD.getTime() - fromD.getTime()) / 86400_000 > 28) {
     return c.json({ error: 'range_too_wide' }, 400);
   }
+  let addonIds:unknown;try{addonIds=c.req.query('addon_ids')?JSON.parse(c.req.query('addon_ids')!):undefined;}catch{return c.json({error:'invalid_addons'},400);}
+  const user=addonIds?await verifyCallerLineUserId(c):null,friend=user?await resolveFriendId(c,user,accountId):null;
+  const addons=await bookingAddons(c.env.DB,accountId,menuId,addonIds,friend);
   // R92: お客さまの画面の空き確認では、店舗共通の受付締切・受付期間を
   // メニューの個別指定が無いときの既定値として使う。
   const result = await getAvailability(c.env.DB, {
     lineAccountId: accountId,
+    additionalDurationMinutes:addons.reduce((n,a)=>n+a.duration_minutes,0),
     menuId,
     staffId,
     from,
@@ -694,8 +666,8 @@ async function needsAutoAssignment(c: Context<Env>, accountId: string, staffId: 
   return staff?.is_designation_optional === 1;
 }
 
-async function autoAssignBookingStaff(c: Context<Env>, accountId: string, menuId: string, startsAtRaw: string, customerFacing: boolean): Promise<string | null> {
-  if (!await getBookingAutoAssign(c.env.DB, accountId)) return null;
+async function autoAssignBookingStaff(c: Context<Env>, accountId: string, menuId: string, startsAtRaw: string, customerFacing: boolean,additionalDurationMinutes=0,allowedStaffIds?:string[],forceAssignment=false): Promise<string | null> {
+  if (!forceAssignment&&!await getBookingAutoAssign(c.env.DB, accountId)) return null;
   const startsAt = new Date(startsAtRaw);
   if (!Number.isFinite(startsAt.getTime()) || startsAt.getTime() < Date.now()) return null;
   const timeZone = await getAccountTimeZone(c.env.DB, accountId);
@@ -703,21 +675,23 @@ async function autoAssignBookingStaff(c: Context<Env>, accountId: string, menuId
   const latest = await getAvailability(c.env.DB, {
     lineAccountId: accountId, menuId, from: date, to: date, now: new Date(),
     minLeadTimeMinutes: customerFacing ? DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes : 0,
-    applyStoreRules: customerFacing, googleCredentials: googleCredentials(c.env),
+    applyStoreRules: customerFacing,additionalDurationMinutes, googleCredentials: googleCredentials(c.env),
   });
   const rows = await c.env.DB.prepare('SELECT id FROM staff WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL AND is_designation_optional = 0').bind(accountId).all<{ id: string }>();
   const actualStaff = new Set(rows.results.map((staff) => staff.id));
-  return latest.by_staff.find((staff) => actualStaff.has(staff.staff_id) && findLatestSlotForInstant(staff.slots,startsAt) !== null)?.staff_id ?? null;
+  const availableIds = latest.by_staff.filter((staff) => actualStaff.has(staff.staff_id)&&(!allowedStaffIds||allowedStaffIds.includes(staff.staff_id))
+    && findLatestSlotForInstant(staff.slots, startsAt) !== null).map(staff => staff.staff_id);
+  return assignBookingStaff(c.env.DB, accountId, startsAt.toISOString(), timeZone, availableIds);
 }
 
 booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string"],"staff_id":["string"],"starts_at":["string"],"customer_note":["string"],"waitlist_id":["string"]}), async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
-  const idemKey = c.req.header('Idempotency-Key');
+  let idemKey = c.req.header('Idempotency-Key');
   if (!idemKey) return inputError(c, { error: 'missing_idempotency_key' }, 400, []);
 
   // 認証済み caller の LINE userId を Authorization: Bearer <id_token> から取得。
-  const callerLineUserId = await verifyCallerLineUserId(c);
+  const callerLineUserId = await verifyCallerLineUserId(c, accountId);
   if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
 
   const body = await c.req.json<{
@@ -726,14 +700,42 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     starts_at: string; // UTC ISO8601
     customer_note?: string;
     party_size?: unknown;
+    entitlement_id?: string;
+    addonIds?:string[];
+    routingToken?:string;
+    recurrence?:unknown;members?:unknown;
+    policyAccepted?: boolean;
+    policyVersion?: number;
+    setupIntentId?: string;
+    meeting_mode?: 'online'|'in_person';
+    payment_method?: 'onsite' | 'online';
     waitlist_id?: string;
+    formAnswer?: {formId:string;blockId:string;submissionKey:string};
   }>();
-  if (body.party_size !== undefined && body.party_size !== 1) return inputError(c, { error: 'unsupported_party_size' }, 422, ["party_size"]);
-  if (!body.menu_id || !body.starts_at) {
-    return inputError(c, { error: 'missing_params' }, 400, ["menu_id","starts_at"]);
+  if((body as Record<string,unknown>).routing_token!==undefined){if(body.routingToken!==undefined&&body.routingToken!==(body as Record<string,unknown>).routing_token)return c.json({error:'routing_token_invalid'},400);body.routingToken=String((body as Record<string,unknown>).routing_token);}
+  if(body.recurrence!==undefined||body.members!==undefined){
+    const friend=await resolveFriendId(c,callerLineUserId,accountId);if(!friend)return c.json({error:'friend_not_found'},404);
+    const {createBulkBooking}=await import('../services/booking-bulk.js');return createBulkBooking(c,accountId,friend,body as Record<string,unknown>);
   }
+  try { await assertPassRequirement(c.env.DB,accountId,body.menu_id,body.entitlement_id); } catch(e) { if(e instanceof EntitlementError)return c.json({error:e.code},e.status);throw e; }
+  if (body.entitlement_id !== undefined && (typeof body.entitlement_id !== 'string' || !body.entitlement_id)) return inputError(c,{error:'invalid_entitlement_id'},400,['entitlement_id']);
+  if (body.payment_method !== undefined && !['onsite','online'].includes(body.payment_method)) return inputError(c,{error:'invalid_payment_method'},400,['payment_method']);
+  if (body.party_size !== undefined && body.party_size !== 1) return inputError(c, { error: 'unsupported_party_size' }, 422, ["party_size"]);
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
   if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
+  let formRequiresApproval = false;
+  if (body.formAnswer !== undefined) {
+    try {
+      const source = await resolveFormBookingAnswer(c.env.DB,body.formAnswer,accountId,friendId,await getAccountTimeZone(c.env.DB,accountId));
+      body.menu_id=source.menuId; body.staff_id=source.staffId; body.starts_at=source.startsAt;
+      delete body.waitlist_id;
+      idemKey=source.idempotencyKey; formRequiresApproval=source.requireApproval;
+    } catch(error) {
+      if(error instanceof FormBookingAnswerError)return c.json({error:error.message},error.status);
+      throw error;
+    }
+  }
+  if (!body.menu_id || !body.starts_at) return inputError(c,{error:'missing_params'},400,['menu_id','starts_at']);
 
   // Idempotency lookup は account+friend スコープ。同じ key を別 caller が送っても
   // それぞれの caller のキャッシュを返す（=cross-tenant leak 防止）。
@@ -745,13 +747,13 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   });
   if (cached) {
     if (cached.status !== 202) {
-      const response = cached.body as { booking_id?: string; payment?: unknown };
-      if (cached.status === 201 && response.booking_id && !response.payment) {
+      const response = cached.body as { booking_id?: string; payment?: unknown; payment_required?: boolean };
+      if (cached.status === 201 && response.booking_id && !response.payment && response.payment_required !== false) {
         const saved = await c.env.DB.prepare(`SELECT menu_id, price_at_booking FROM bookings
           WHERE id = ? AND line_account_id = ? AND friend_id = ?`)
           .bind(response.booking_id, accountId, friendId).first<{ menu_id: string; price_at_booking: number }>();
         if (saved && saved.price_at_booking > 0
-          && (await resolveBookingPaymentConfig(c.env.DB, accountId, saved.menu_id)).mode === 'online'
+          && (await resolveBookingPaymentForBooking(c.env.DB, accountId, response.booking_id, saved.menu_id)).mode === 'online'
           && !await getBookingPaymentByBooking(c.env.DB, accountId, response.booking_id)) {
           return c.json({ error: 'booking_payment_unavailable' }, 500);
         }
@@ -769,7 +771,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       if (saved) {
         const payment = await getBookingPaymentByBooking(c.env.DB, accountId, saved.id);
         const requiresPayment = saved.price_at_booking > 0
-          && (await resolveBookingPaymentConfig(c.env.DB, accountId, saved.menu_id)).mode === 'online';
+          && (await resolveBookingPaymentForBooking(c.env.DB, accountId, saved.id, saved.menu_id)).mode === 'online';
         if (requiresPayment && !payment) return c.json({ error: 'booking_payment_unavailable' }, 500);
         if (['expired','cancelled','rejected'].includes(saved.status)) return c.json({ error: 'booking_unavailable' }, 409);
         const prepayNotice = await prepayNoticeFor(
@@ -801,8 +803,17 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     return c.json({ error: 'cannot_book' }, 403);
   }
 
+  if(!(await menuAudience(c.env.DB,accountId,body.menu_id,friendId)).visible)return c.json({error:'menu_not_available'},403);
+  const addons=await bookingAddons(c.env.DB,accountId,body.menu_id,body.addonIds,friendId);
+  if((await c.env.DB.prepare('SELECT addon_only FROM menus WHERE id=?').bind(body.menu_id).first<{addon_only:number}>())?.addon_only)return c.json({error:'addon_only_menu'},400);
+  const addonDuration=addons.reduce((n,a)=>n+a.duration_minutes,0);
+  const nominated=!body.routingToken&&!(await needsAutoAssignment(c,accountId,body.staff_id));
+  let routingAllowedStaff:string[]|undefined;
+  if(body.routingToken){const claim=await verifyRoutingToken(c.env.DB,accountId,friendId,body.routingToken,body.menu_id,body.staff_id||undefined);if(claim.target.staffId)body.staff_id=claim.target.staffId;else body.staff_id='';
+   if(claim.target.staffGroupId){const group=await c.env.DB.prepare('SELECT staff_ids_json FROM booking_routing_staff_groups WHERE id=? AND line_account_id=?').bind(claim.target.staffGroupId,accountId).first<{staff_ids_json:string}>();routingAllowedStaff=JSON.parse(group!.staff_ids_json);}}
+
   if (await needsAutoAssignment(c,accountId,body.staff_id)) {
-    const assigned = await autoAssignBookingStaff(c,accountId,body.menu_id,body.starts_at,true);
+    const assigned = await autoAssignBookingStaff(c,accountId,body.menu_id,body.starts_at,true,addonDuration,routingAllowedStaff,!!body.routingToken);
     if (!assigned) return c.json({ error: 'auto_assignment_unavailable' }, 409);
     body.staff_id = assigned;
   }
@@ -811,7 +822,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   const menuRow = await c.env.DB
     .prepare(
       `SELECT m.id, m.name, m.duration_minutes, m.buffer_after_minutes, m.base_price,
-              m.price_mode, m.version,
+              m.price_mode, m.version,m.meeting_mode,
               m.auto_tag_id, m.concurrent_capacity,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS dur,
               COALESCE(sm.override_price, m.base_price) AS price,
@@ -822,11 +833,30 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
           AND m.deleted_at IS NULL AND m.is_active = 1`,
     )
     .bind(body.menu_id, body.staff_id, accountId)
-    .first<{ name: string; duration_minutes: number; buffer_after_minutes: number; auto_tag_id: string | null; concurrent_capacity: number; dur: number; price: number; price_mode: string; version: number; is_offered: number | null }>();
+    .first<{ name: string; duration_minutes: number; buffer_after_minutes: number; auto_tag_id: string | null; concurrent_capacity: number; dur: number; price: number; price_mode: string; meeting_mode:'online'|'in_person'|'customer_choice'; version: number; is_offered: number | null }>();
   if (!menuRow || menuRow.is_offered !== 1) {
     return inputError(c, { error: 'menu_not_offered' }, 422, ["menu_id","staff_id"]);
   }
 
+  const routing=body.routingToken?await verifyRoutingToken(c.env.DB,accountId,friendId,body.routingToken,body.menu_id,body.staff_id):null;
+  const nominationFee=nominated?((await c.env.DB.prepare('SELECT nomination_fee FROM staff WHERE id=? AND line_account_id=?').bind(body.staff_id,accountId).first<{nomination_fee:number}>())?.nomination_fee??0):0;
+  menuRow.price+=nominationFee+addons.reduce((n,a)=>n+a.base_price,0);
+  menuRow.dur+=addonDuration;
+  const cancellation = await cancellationPolicy(c.env.DB, accountId);
+  if(cancellation.enabled && !body.entitlement_id) {
+    if(body.policyAccepted!==true) return c.json({error:'policy_acceptance_required'},400);
+    if(body.policyVersion!==cancellation.version)return c.json({error:'policy_changed'},409);
+    if(await cancellationCardRequired(c.env.DB,accountId,friendId)){
+    try {await requireCancellationTestConnection(c.env.DB,accountId);} catch {return c.json({error:'payment_not_connected'},409);}
+    if(typeof body.setupIntentId!=='string' || !await c.env.DB.prepare("SELECT id FROM booking_payment_methods WHERE setup_id=? AND friend_id=? AND line_account_id=? AND status='ready' AND test_mode=1")
+      .bind(body.setupIntentId,friendId,accountId).first()) return c.json({error:'card_not_registered'},409);
+    }
+  }
+
+  if(routing?.target.meetingMode&&body.meeting_mode&&routing.target.meetingMode!==body.meeting_mode)return c.json({error:'routing_token_invalid'},400);
+  if(routing?.target.meetingMode)body.meeting_mode=routing.target.meetingMode;
+  const bookingMeetingMode=menuRow.meeting_mode==='customer_choice'?body.meeting_mode:menuRow.meeting_mode;
+  if(!['online','in_person'].includes(bookingMeetingMode??'') || (body.meeting_mode!==undefined&&body.meeting_mode!==bookingMeetingMode))return c.json({error:'meeting_mode_required'},400);
   const startsAt = new Date(body.starts_at);
   if (Number.isNaN(startsAt.getTime())) {
     return inputError(c, { error: 'invalid_starts_at' }, 422, ["starts_at"]);
@@ -853,7 +883,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     startsAt,
     minLeadTimeMinutes: DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes,
     applyStoreRules: true,
-    excludeWaitlistId:body.waitlist_id,waitlistOffer:!!body.waitlist_id,
+    excludeWaitlistId:body.waitlist_id,waitlistOffer:!!body.waitlist_id,additionalDurationMinutes:addonDuration,
   });
   if (!slotMatched) return inputError(c, { error: 'slot_not_available' }, 422, ["menu_id","staff_id","waitlist_id"]);
 
@@ -862,9 +892,23 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   // 予約のルール「お店が承認してから確定する」が automatic の店は、
   // 未承認を通さずその場で確定にする。設定が読めないときは承認ありに倒す。
   const adminSettings = await getBookingAdminSettings(c.env.DB, accountId);
-  const paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
+  let paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
+  if (body.entitlement_id) {
+    try { await validateEntitlementSelection(c.env.DB,accountId,friendId,body.menu_id,body.entitlement_id,startsAt.toISOString()); }
+    catch(error) { if(error instanceof EntitlementError)return c.json({error:error.code},error.status); throw error; }
+    if(body.payment_method) return inputError(c,{error:'choose_entitlement_or_payment'},400,['entitlement_id','payment_method']);
+    paymentConfig={mode:'none',provider:'none',holdMinutes:paymentConfig.holdMinutes};
+  } else if(paymentConfig.mode==='customer_choice') {
+    paymentConfig=body.payment_method
+      ? {...paymentConfig,mode:body.payment_method,provider:body.payment_method==='online'?'stripe':'onsite'}
+      : await defaultBookingPaymentSelection(c.env.DB, accountId);
+  } else if(body.payment_method && body.payment_method!==paymentConfig.mode) {
+    return inputError(c,{error:'payment_method_not_allowed'},400,['payment_method']);
+  }
+  const deposit=await depositEstimate(c.env.DB,accountId,body.menu_id,menuRow.price,startsAt.toISOString(),1,await getAccountTimeZone(c.env.DB,accountId));
+  if(deposit.amount>0&&!body.entitlement_id)return c.json({error:'deposit_collection_not_available'},409);
   const requiresOnlinePayment = paymentConfig.mode === 'online' && menuRow.price > 0;
-  const autoConfirm = adminSettings?.approvalMode === 'automatic' && !requiresOnlinePayment;
+  const autoConfirm = adminSettings?.approvalMode === 'automatic' && !requiresOnlinePayment && !formRequiresApproval;
   const initialStatus = (autoConfirm ? 'confirmed' : 'requested') satisfies BookingStatus;
   const decidedAt = autoConfirm ? nowIso : null;
   const reserved = await reserveIdempotencyResponse(c.env.DB, {
@@ -894,9 +938,9 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         (id, line_account_id, friend_id, staff_id, menu_id,
          starts_at, ends_at, block_ends_at, status,
          customer_note, price_at_booking, requested_at, decided_at,
-         menu_version_number, menu_snapshot_json,waitlist_entry_id)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-        WHERE NOT EXISTS (
+         menu_version_number, menu_snapshot_json,waitlist_entry_id,policy_snapshot_json,meeting_mode,nominated,nomination_fee_at_booking,routing_rule_index,routing_form_version_id)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+        WHERE (SELECT COUNT(*) FROM menus m JOIN json_each(?) j ON m.id=json_extract(j.value,'$.id') AND m.version=json_extract(j.value,'$.version') WHERE m.is_active=1 AND m.deleted_at IS NULL AND m.line_account_id=?)=? AND COALESCE((SELECT version FROM booking_cancellation_policies WHERE line_account_id=?),0)=? AND NOT EXISTS (
           -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
           -- 1対1の施術とグループを同じ時間に入れることはできない。
           SELECT 1 FROM bookings
@@ -937,6 +981,11 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       menuSnapshot.version,
       menuSnapshot.json,
       body.waitlist_id??null,
+      JSON.stringify(body.entitlement_id?{...cancellation,enabled:false}:cancellation),
+      bookingMeetingMode,
+      nominated?1:0,nominationFee,routing?.matchedIndex??null,routing?.versionId??null,
+      JSON.stringify(addons),accountId,addons.length,
+      accountId,cancellation.version,
       // 別メニューの重なりを見る副問い合わせ
       body.staff_id,
       blockEndsAt.toISOString(),
@@ -968,6 +1017,11 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
       bookingInsert, bookingId, lineAccountId: accountId, menuId: body.menu_id,
       additionalStatements: [
+        c.env.DB.prepare("UPDATE bookings SET booking_payment_method_id=(SELECT id FROM booking_payment_methods WHERE setup_id=? AND friend_id=? AND line_account_id=? AND status='ready' AND test_mode=1) WHERE id=?").bind(body.setupIntentId??null,friendId,accountId,bookingId),
+        ...addons.map(addon=>c.env.DB.prepare('INSERT INTO booking_addons(booking_id,addon_menu_id,duration_min,price_at_booking) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM bookings WHERE id=?)').bind(bookingId,addon.id,addon.duration_minutes,addon.base_price,bookingId)),
+        ...(body.entitlement_id ? [entitlementUseStatement(c.env.DB,bookingId,body.entitlement_id,startsAt.toISOString(),await getAccountTimeZone(c.env.DB,accountId))] : []),
+        ...(!body.entitlement_id && paymentConfig.mode !== 'none' ? [c.env.DB.prepare(`INSERT INTO booking_payment_choices(booking_id,line_account_id,mode,provider,hold_minutes)
+          SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM bookings WHERE id=?)`).bind(bookingId,accountId,paymentConfig.mode,paymentConfig.provider,paymentConfig.holdMinutes,bookingId)] : []),
         ...(bookingPayment ? [bookingPaymentInsertStatement(c.env.DB, {
           id: bookingPayment.id, bookingId, lineAccountId: accountId, amount: menuRow.price,
           provider: paymentConfig.provider, holdUntil: bookingPayment.holdUntil!, now: nowIso,
@@ -985,6 +1039,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         key: idemKey, lineAccountId: accountId, friendId, bookingId,
       });
     } catch { /* 不明な結果はキーを残して二重作成を止める。 */ }
+    if(error instanceof Error && error.message.includes('entitlement_unavailable'))return c.json({error:'entitlement_unavailable'},409);
     throw error;
   }
   if (!insertResult.inserted) {
@@ -1036,7 +1091,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       sourceEventId: bookingId,
       subjectKey: body.menu_id,
       occurredAt: nowIso,
-    }).catch((error) => console.error('booking action score failed:', error)),
+    }).catch((error) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
   );
 
   // 予約をきっかけにするリマインダへ登録する。通知やタグ付与と同じく
@@ -1050,7 +1105,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       sourceId: bookingId,
       sourceEventId: bookingId,
       lineAccountId: accountId,
-    }).catch((err) => console.error('reminder enroll (booking) failed:', err)),
+    }).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
   );
 
   if (autoConfirm) {
@@ -1059,13 +1114,13 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     try {
       await runConfirmedBookingSideEffects(c.env.DB, bookingId, { credentials: googleCredentials(c.env) });
     } catch (error) {
-      console.error('booking auto-confirm side effects failed:', error);
+      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}));
     }
   } else {
     // Fire-and-forget notification — failures must not roll back the booking.
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, bookingId, 'requested').catch((err) =>
-        console.error('booking notify (requested) failed:', err),
+        console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"})),
       ),
     );
   }
@@ -1080,7 +1135,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       sourceEventId: bookingId,
       message: '新しい予約が入りました',
       executionMode: 'automatic',
-    }).catch((err) => console.error('booking operator notification failed:', err)),
+    }).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
   );
 
   // R150: 「予約が入ったとき」を購読する送信Webhookへも届ける。
@@ -1098,7 +1153,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         staffId: body.staff_id,
         startsAt: startsAt.toISOString(),
       },
-    }, accountId).catch((err) => console.error('booking outgoing webhook failed:', err)),
+    }, accountId).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
   );
 
   // notifyForBooking と同じく fire-and-forget。タグ付与失敗は予約成功扱い。
@@ -1115,20 +1170,14 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     c.executionCtx.waitUntil(
       (async () => {
         if (!(await isAssignableAutoTag(c.env.DB, tagId, accountId))) {
-          console.warn(JSON.stringify({
-            event: 'booking_auto_tag_skipped',
-            reason: 'tag_not_active_in_account',
-            tag_id: tagId,
-            line_account_id: accountId,
-            booking_id: bookingId,
-          }));
+          console.warn(JSON.stringify({"code":"booking_auto_tag_skipped","route":"POST /api/liff/booking/requests"}));
           return;
         }
         await attachTagAndFireSideEffects(c.env.DB, friendId, tagId, {
           defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
           workerUrl: c.env.WORKER_URL,
         });
-      })().catch((err) => console.error('booking auto-tag failed:', err)),
+      })().catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}))),
     );
   }
 
@@ -1139,7 +1188,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       c.env.DB, accountId, await decidePrepayOnly(c.env.DB, accountId, friendId),
     );
   } catch (error) {
-    console.error('prepay decision failed:', error);
+    console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/liff/booking/requests"}));
   }
 
   const responseBody = {
@@ -1158,129 +1207,6 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   });
   return c.json(responseBody, 201);
 });
-
-// ---- F6 本人日時変更・取消 (core)。待ち列は含まない ----
-
-// 本人変更後の Meet 相談連携。予約の外部予定IDに結び付く相談だけを動かす。
-// 一般予約 reminder と Meet reminder は別経路のため、ここでは Meet 側だけを触る。
-async function syncSelfBookingMeet(
-  c: Context<Env>,
-  self: SelfBookingChange,
-  bookingId: string,
-  oldEventId: string | null,
-  expectedVersion: number,
-): Promise<'updated' | 'recreated' | 'not_linked' | 'failed' | 'superseded'> {
-  try {
-    if (!oldEventId) return 'not_linked';
-    const consult = await c.env.DB
-      .prepare(
-        `SELECT external_event_id, friend_id, title, meet_url, booking_id, booking_version
-           FROM meet_consultations WHERE external_event_id = ?`,
-      )
-      .bind(oldEventId)
-      .first<{
-        external_event_id: string;
-        friend_id: string;
-        title: string;
-        meet_url: string;
-        booking_id: string | null;
-        booking_version: number | null;
-      }>();
-    if (!consult || consult.friend_id !== self.friendId) return 'not_linked';
-    // フェンス: 予約の所有・状態・版を書き込み直前に再確認する。
-    // 交差した取消・別変更が勝っていたら Meet を触らない。
-    const booking = await c.env.DB
-      .prepare(
-        `SELECT status, friend_id, lock_version, starts_at, ends_at, external_event_id
-           FROM bookings WHERE id = ? AND line_account_id = ?`,
-      )
-      .bind(bookingId, self.accountId)
-      .first<{
-        status: BookingStatus;
-        friend_id: string | null;
-        lock_version: number;
-        starts_at: string;
-        ends_at: string;
-        external_event_id: string | null;
-      }>();
-    if (!booking || booking.friend_id !== self.friendId) return 'not_linked';
-    if (
-      (booking.status !== 'requested' && booking.status !== 'confirmed') ||
-      Number(booking.lock_version) !== expectedVersion
-    ) {
-      return 'superseded';
-    }
-    const newEventId = booking.external_event_id ?? oldEventId;
-    if (newEventId !== oldEventId) {
-      // 予定が作り直されても同一相談は続ける。古い相談を止め、新予定ID・
-      // 本人・新日時・同じ Meet URL で登録し直す（前日・1時間前も組み直す）。
-      // 旧予定IDは回転ずみで誰の新予定でもないため、見た版のまま無条件で止める。
-      await cancelMeetConsultation(c.env.DB, oldEventId, new Date(), {
-        failOnSendInFlight: true,
-        expectedBookingId: consult.booking_id,
-        expectedBookingVersion: consult.booking_version,
-      });
-    }
-    const registered = await registerMeetConsultation(c.env.DB, {
-      externalEventId: newEventId,
-      friendId: self.friendId,
-      title: consult.title,
-      startsAt: booking.starts_at,
-      endsAt: booking.ends_at,
-      meetUrl: consult.meet_url,
-      bookingId,
-      bookingVersion: expectedVersion,
-    });
-    // 登録時に後発の勝者がいたら敗者は何も書いていない。補償で勝者を
-    // 消さないよう、そのまま superseded で終える (409)。
-    if (!registered.updated) return 'superseded';
-    // 書込み後の再確認。register との間に取消・別変更が勝っていたら、
-    // 今書いた相談を取り消して戻す（敗者が復活を残さない）。
-    // 補償の失敗は隠さず failed と監査に残す。取消再送が回収口になる。
-    const after = await c.env.DB
-      .prepare(
-        `SELECT status, friend_id, lock_version FROM bookings
-          WHERE id = ? AND line_account_id = ?`,
-      )
-      .bind(bookingId, self.accountId)
-      .first<{ status: BookingStatus; friend_id: string | null; lock_version: number }>();
-    if (
-      !after ||
-      after.friend_id !== self.friendId ||
-      (after.status !== 'requested' && after.status !== 'confirmed') ||
-      Number(after.lock_version) !== expectedVersion
-    ) {
-      try {
-        // 補償は自分の版の行だけを消す。同じ予定IDに後発の勝者がいたら
-        // false になり、勝者の相談・通知を残して superseded で終える。
-        const compensated = await cancelMeetConsultation(c.env.DB, newEventId, new Date(), {
-          failOnSendInFlight: true,
-          expectedBookingId: bookingId,
-          expectedBookingVersion: expectedVersion,
-        });
-        if (!compensated) return 'superseded';
-      } catch (error) {
-        await recordBookingAudit(c.env.DB, {
-          bookingId,
-          lineAccountId: self.accountId,
-          action: 'meet_sync_failed',
-          before: { external_event_id: newEventId },
-          after: { external_event_id: newEventId },
-          reason: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200),
-          actorType: 'customer',
-          actorId: self.friendId,
-          actorName: null,
-          occurredAt: new Date().toISOString(),
-        });
-        return 'failed';
-      }
-      return 'superseded';
-    }
-    return newEventId !== oldEventId ? 'recreated' : 'updated';
-  } catch {
-    return 'failed';
-  }
-}
 
 booking.post('/api/liff/booking/:id/reschedule', inputJsonBoundary(), async (c) => {
   const caller = await resolveSelfBookingCaller(c);
@@ -1331,7 +1257,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
   const accountId = caller.accountId;
   const bookingId = c.req.param('id');
-  const body = await c.req.json<{ lock_version?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ lock_version?: unknown; feeAccepted?:unknown;expectedFeeAmount?:unknown }>().catch(() => null);
   if (!body || !Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
     return inputError(c, { error: 'missing_lock_version' }, 400, ["lock_version"]);
   }
@@ -1372,7 +1298,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
     const claimId = crypto.randomUUID();
     const claim = await c.env.DB
       .prepare(
-        `UPDATE bookings SET decided_at = ?, cancel_claim_id = ?,
+        `UPDATE bookings SET decided_at = COALESCE(decided_at, ?), cancel_claim_id = ?,
                               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
           WHERE id = ? AND line_account_id = ?
             AND status IN ('cancelled','expired')
@@ -1394,7 +1320,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       lineAccountId: accountId,
       action: 'cancel_retry_claimed',
       before: { status: row.status },
-      after: { status: row.status, decided_at: claimAt, cancel_claim_id: claimId },
+      after: { status: row.status, decided_at: row.decided_at ?? claimAt, cancel_claim_id: claimId },
       reason: 'self_cancel_retry',
       actorType: 'customer',
       actorId: caller.friendId,
@@ -1423,14 +1349,17 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   if (Number(row.lock_version) !== expectedVersion) {
     return c.json({ error: 'version_conflict' }, 409);
   }
+  const cancellationAt=new Date();
+  const quote=await bookingCancellationQuote(c.env.DB,bookingId,accountId,cancellationAt);
+  if(quote.feeNow>0 && (body.feeAccepted!==true||body.expectedFeeAmount!==quote.feeNow))return c.json({error:'cancellation_fee_confirmation_required',data:quote},409);
   const rules = await readSelfBookingRules(c.env.DB, accountId, row.menu_id);
-  if (Date.now() > new Date(row.starts_at).getTime() - rules.cancelDeadlineMinutesBefore * 60_000) {
+  if (cancellationAt.getTime() >= new Date(row.starts_at).getTime() || (!quote.policyAcceptedRequired && cancellationAt.getTime() > new Date(row.starts_at).getTime() - rules.cancelDeadlineMinutesBefore * 60_000)) {
     return c.json({ error: 'self_deadline_passed' }, 403);
   }
   // 条件付き確定: 同時取消の race では片方だけが通る。副作用は通った方だけ走る。
   // 所有権は cancel_claim_id (uuid) を同じ UPDATE で書く単文 CAS。
   // 確定と主張が不可分のため、確定→監査の別 await 窓は存在しない。
-  const decidedAt = new Date().toISOString();
+  const decidedAt = cancellationAt.toISOString();
   const claimId = crypto.randomUUID();
   const updateResult = await c.env.DB
     .prepare(
@@ -1480,6 +1409,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
     }
     throw error;
   }
+  await refundSelfBookingPayment(c.env.DB, self, bookingId);
   await cancelLegacyBookingReminders(c.env.DB, bookingId);
   await cancelObsoleteConfirmationRuns(c.env.DB, bookingId, accountId);
   await enqueueCalendarDeleteOperation(c.env.DB, { bookingId, lineAccountId: accountId });
@@ -1510,15 +1440,36 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       startsAt: row.starts_at,
     }, undefined, c.env.LIFF_URL ?? '',c.env);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId }));
+    console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"POST /api/liff/booking/:id/cancel"}));
   }
   return c.json({
+    ...(await bookingCancellationQuote(c.env.DB,bookingId,accountId)),
     status: 'cancelled',
     lock_version: expectedVersion,
     calendar_sync: calResult === 'succeeded' ? 'synced' : calResult === 'retry_wait' ? 'failed' : 'not_applicable',
     meet_sync: meetSync,
   });
 });
+
+/** 期限内の本人取消は、既存の模擬返金と同じ取引・監査を通す。失敗時は取消の再送で回復する。 */
+async function refundSelfBookingPayment(db: D1Database, self: SelfBookingChange, bookingId: string) {
+  const payment = await db.prepare(`SELECT p.* FROM booking_payments p JOIN bookings b
+    ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
+    WHERE b.id=? AND b.line_account_id=? AND b.friend_id=? AND b.status='cancelled' AND p.status='paid'`)
+    .bind(bookingId, self.accountId, self.friendId).first<BookingPaymentRecord>();
+  if (!payment) return; // 店頭払い・未払い・返金済みは自動返金の対象外。
+  const booking = await db.prepare('SELECT starts_at,decided_at,menu_id FROM bookings WHERE id=? AND line_account_id=?')
+    .bind(bookingId, self.accountId).first<{ starts_at: string; decided_at: string; menu_id: string }>();
+  if (!booking || !Number.isFinite(Date.parse(booking.decided_at))) throw new Error('cancellation_time_unavailable');
+  const at = new Date(booking.decided_at);
+  const quote = await bookingCancellationQuote(db, bookingId, self.accountId, at);
+  const rules = await readSelfBookingRules(db, self.accountId, booking.menu_id);
+  if (at.getTime() >= Date.parse(booking.starts_at) || quote.feeNow > 0
+    || (!quote.policyAcceptedRequired && at.getTime() > Date.parse(booking.starts_at) - rules.cancelDeadlineMinutesBefore * 60_000)) return;
+  await simulatePaymentRefund(db, payment, {
+    reason: '期限内の予約キャンセル', notifyLine: false, idempotencyKey: `self-cancel:${bookingId}`,
+  }, { id: self.friendId, name: 'お客さま本人（予約キャンセル）' });
+}
 
 // 本人取消の副作用 (初回・再送で共通)。管理者取消と同じ順番でそろえる。
 async function runSelfBookingCancelSideEffects(
@@ -1539,6 +1490,7 @@ async function runSelfBookingCancelSideEffects(
     cancelReason,
     failOnSendInFlight: true,
   });
+  await refundSelfBookingPayment(c.env.DB, self, row.id);
   await cancelLegacyBookingReminders(c.env.DB, row.id);
   await cancelObsoleteConfirmationRuns(c.env.DB, row.id, self.accountId);
   await enqueueCalendarDeleteOperation(c.env.DB, { bookingId: row.id, lineAccountId: self.accountId });
@@ -1556,7 +1508,7 @@ async function runSelfBookingCancelSideEffects(
       startsAt: row.starts_at,
     }, undefined, c.env.LIFF_URL ?? '',c.env);
   } catch {
-    console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: row.id }));
+    console.error(JSON.stringify({"code":"booking_waitlist_promote_failed"}));
   }
   return {
     calendar_sync: calResult === 'succeeded' ? 'synced' : calResult === 'retry_wait' ? 'failed' : 'not_applicable',
@@ -1605,15 +1557,15 @@ booking.get('/api/liff/booking/me', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
   // 履歴も idToken 検証必須。query の lineUserId に頼ると他人の履歴を覗けてしまう。
-  const callerLineUserId = await verifyCallerLineUserId(c);
+  const callerLineUserId = await verifyCallerLineUserId(c, accountId);
   if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
   if (!friendId) return c.json({ upcoming: [], past: [] });
 
   const upcoming = await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.status, b.customer_note,
-              b.lock_version, b.menu_id, b.staff_id,
+      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.ends_at, b.status, b.customer_note,
+              b.lock_version, b.menu_id, b.staff_id,b.meeting_mode,CASE WHEN b.status='confirmed' THEN b.meeting_url ELSE NULL END meeting_url,b.meeting_url_source,b.policy_snapshot_json,b.price_at_booking,EXISTS(SELECT 1 FROM booking_entitlement_uses u WHERE u.booking_id=b.id) ticket,
               m.name AS menu_name,
               COALESCE(m.cancel_deadline_hours_before * 60, bs.cancel_deadline_minutes_before, 1440) AS cancel_deadline_minutes_before,
               s.display_name AS staff_name, s.profile_image_url
@@ -1627,11 +1579,11 @@ booking.get('/api/liff/booking/me', async (c) => {
         ORDER BY b.starts_at ASC`,
     )
     .bind(friendId, accountId, new Date().toISOString())
-    .all<BookingHistoryItem>();
+    .all<BookingHistoryItem & {policy_snapshot_json:string|null;price_at_booking:number;ticket:number}>();
 
   const past = await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.status, b.lock_version, b.menu_id, b.staff_id,
+      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.ends_at, b.status, b.lock_version, b.menu_id, b.staff_id,b.meeting_mode,CASE WHEN b.status='confirmed' THEN b.meeting_url ELSE NULL END meeting_url,b.meeting_url_source,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url
          FROM bookings b
@@ -1645,7 +1597,15 @@ booking.get('/api/liff/booking/me', async (c) => {
     .bind(friendId, accountId, new Date().toISOString())
     .all<BookingHistoryItem>();
 
-  return c.json({ upcoming: upcoming.results.map(row => ({ ...row, cancel_deadline_at: new Date(new Date(row.starts_at).getTime() - Number(row.cancel_deadline_minutes_before) * 60_000).toISOString() })), past: past.results } satisfies BookingHistoryResponse);
+  const payments = await customerBookingPayments(c.env.DB,accountId,friendId);
+  const historyItem = <T extends BookingHistoryItem>(row: T) => ({...bookingHistoryItem(row),
+    ...(payments.has(row.id) ? {payment:payments.get(row.id)!} : {})});
+  return c.json({ upcoming: upcoming.results.map(row => {
+    const {policy_snapshot_json,price_at_booking,ticket,...item}=historyItem(row);
+    const policy=policy_snapshot_json?JSON.parse(policy_snapshot_json):null;
+    const quote=policy?.enabled?cancellationQuote(policy,row.starts_at,price_at_booking,new Date(),!!ticket):null;
+    return {...item,...(quote?{cancellationQuote:quote}:{}),cancel_deadline_at:quote?.policyAcceptedRequired?row.starts_at:new Date(new Date(row.starts_at).getTime()-Number(row.cancel_deadline_minutes_before)*60000).toISOString()};
+  }), past: past.results.map(historyItem) } satisfies BookingHistoryResponse);
 });
 
 // ================================================================
@@ -1667,7 +1627,7 @@ booking.get('/api/booking/admin/customers', async (c) => {
     });
     return c.json({ customers });
   } catch (error) {
-    console.error('GET /api/booking/admin/customers error:', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"routes_booking_failed","route":"GET /api/booking/admin/customers"}));
     return c.json({ error: 'customer_data_unavailable' }, 503);
   }
 });
@@ -1686,7 +1646,7 @@ booking.get('/api/booking/admin/customers/:id', async (c) => {
       ? c.json({ customer })
       : c.json({ error: 'booking_customer_not_found' }, 404);
   } catch (error) {
-    console.error('GET /api/booking/admin/customers/:id error:', error instanceof Error ? error.name : 'unknown');
+    console.error(JSON.stringify({"code":"routes_booking_failed","route":"GET /api/booking/admin/customers/:id"}));
     return c.json({ error: 'customer_data_unavailable' }, 503);
   }
 });
@@ -1854,7 +1814,7 @@ booking.post(
       if (code.startsWith('booking_customer_') && code.endsWith('_invalid')) {
         return inputError(c, { error: code }, 422, [code.slice('booking_customer_'.length, -'_invalid'.length)]);
       }
-      console.error('POST /api/booking/admin/customers error:', error instanceof Error ? error.name : 'unknown');
+      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/customers"}));
       return c.json({ error: 'customer_data_unavailable' }, 503);
     }
   },
@@ -2235,6 +2195,21 @@ booking.put('/api/booking/admin/channels/settings', requirePermission(BOOKING_SE
   return c.json({ success: true, data: { autoAssign: body.autoAssign } });
 });
 
+booking.put('/api/booking/admin/channels/:channel/settings', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ['account_id']);
+  const channel = EXTERNAL_BOOKING_CHANNELS.find((key) => key === c.req.param('channel'));
+  if (!channel) return c.json({ success: false, error: 'channel_not_found' }, 404);
+  const body = await c.req.json<{ enabled?: unknown; expectedVersion?: unknown }>().catch(() => null);
+  if (!body || typeof body.enabled !== 'boolean' || !Number.isSafeInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
+    return inputError(c, { success: false, error: '連携の状態と読み込んだ版を確認してください' }, 400, ['enabled', 'expectedVersion']);
+  }
+  if (!await saveBookingChannelSetting(c.env.DB, accountId, channel, body.enabled, Number(body.expectedVersion))) {
+    return c.json({ success: false, error: '設定が更新されました。読み直してください' }, 409);
+  }
+  return c.json({ success: true, data: await getBookingChannelSetting(c.env.DB, accountId, channel) });
+});
+
 booking.get('/api/booking/admin/conflicts', requireRole('owner', 'admin', 'staff'), requirePermission('/booking/bookings'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -2268,6 +2243,17 @@ booking.post('/api/booking/admin/sync-notices/:id/done',requireRole('owner','adm
   return c.json({success:true,data:{id:c.req.param('id'),status:'done'}});
 });
 
+booking.get('/api/booking/admin/assignment-settings', async c => {
+  const id = await resolveAccountIdAdmin(c);
+  if (!id) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  return assignmentSettingsResponse(c, c.env.DB, { kind: 'staff', id });
+});
+booking.put('/api/booking/admin/assignment-settings', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async c => {
+  const id = await resolveAccountIdAdmin(c);
+  if (!id) return inputError(c, { success: false, error: 'missing_account_id' }, 400, ['account_id']);
+  return assignmentSettingsResponse(c, c.env.DB, { kind: 'staff', id });
+});
+
 booking.get('/api/booking/admin/settings', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
@@ -2276,7 +2262,7 @@ booking.get('/api/booking/admin/settings', async (c) => {
     if (!settings) return c.json({ success: false, error: 'not_found' }, 404);
     return c.json({ success: true, data: settings });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_settings_read_failed' }));
+    console.error(JSON.stringify({"code":"booking_settings_read_failed","route":"GET /api/booking/admin/settings"}));
     return c.json({ success: false, error: 'booking_settings_unavailable' }, 503);
   }
 });
@@ -2326,7 +2312,7 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
       result.status === 'created' ? 201 : 200,
     );
   } catch {
-    console.error(JSON.stringify({ event: 'booking_settings_save_failed' }));
+    console.error(JSON.stringify({"code":"booking_settings_save_failed","route":"PUT /api/booking/admin/settings"}));
     return c.json({ success: false, error: 'booking_settings_save_failed' }, 503);
   }
 });
@@ -2338,7 +2324,7 @@ booking.get('/api/booking/admin/resources', async (c) => {
     const resources = await listBookingAdminResources(c.env.DB, accountId);
     return c.json({ success: true, data: { resources } });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_resources_read_failed' }));
+    console.error(JSON.stringify({"code":"booking_resources_read_failed","route":"GET /api/booking/admin/resources"}));
     return c.json({ success: false, error: 'booking_resources_unavailable' }, 503);
   }
 });
@@ -2360,7 +2346,7 @@ booking.post('/api/booking/admin/resources', requirePermission(BOOKING_SETTINGS_
     };
     return c.json({ success: true, data: item }, 201);
   } catch {
-    console.error(JSON.stringify({ event: 'booking_resource_create_failed' }));
+    console.error(JSON.stringify({"code":"booking_resource_create_failed","route":"POST /api/booking/admin/resources"}));
     return c.json({ success: false, error: 'booking_resource_save_failed' }, 503);
   }
 });
@@ -2416,7 +2402,7 @@ booking.patch('/api/booking/admin/resources/:id', requirePermission(BOOKING_SETT
     };
     return c.json({ success: true, data: item });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_resource_update_failed' }));
+    console.error(JSON.stringify({"code":"booking_resource_update_failed","route":"PATCH /api/booking/admin/resources/:id"}));
     return c.json({ success: false, error: 'booking_resource_save_failed' }, 503);
   }
 });
@@ -2450,7 +2436,7 @@ booking.delete('/api/booking/admin/resources/:id', requirePermission(BOOKING_SET
     }
     return c.json({ success: true, data: { id: c.req.param('id') } });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_resource_delete_failed' }));
+    console.error(JSON.stringify({"code":"booking_resource_delete_failed","route":"DELETE /api/booking/admin/resources/:id"}));
     return c.json({ success: false, error: 'booking_resource_delete_failed' }, 503);
   }
 });
@@ -2462,7 +2448,7 @@ booking.get('/api/booking/admin/exceptions', async (c) => {
     const items = await listBookingAvailabilityExceptions(c.env.DB, accountId);
     return c.json({ success: true, data: { items } });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_exceptions_read_failed' }));
+    console.error(JSON.stringify({"code":"booking_exceptions_read_failed","route":"GET /api/booking/admin/exceptions"}));
     return c.json({ success: false, error: 'booking_exceptions_unavailable' }, 503);
   }
 });
@@ -2482,7 +2468,7 @@ booking.post('/api/booking/admin/exceptions', requirePermission(BOOKING_SETTINGS
     if (!item) return inputError(c, { success: false, error: 'scope_not_found' }, 422, ["scopeKind","kind","dateFrom","dateTo","scopeId","reason","intervals"]);
     return c.json({ success: true, data: item }, 201);
   } catch {
-    console.error(JSON.stringify({ event: 'booking_exception_create_failed' }));
+    console.error(JSON.stringify({"code":"booking_exception_create_failed","route":"POST /api/booking/admin/exceptions"}));
     return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
   }
 });
@@ -2528,7 +2514,7 @@ booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SET
     }
     return c.json({ success: true, data: result.item });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_exception_update_failed' }));
+    console.error(JSON.stringify({"code":"booking_exception_update_failed","route":"PATCH /api/booking/admin/exceptions/:id"}));
     return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
   }
 });
@@ -2564,7 +2550,7 @@ booking.delete('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SE
     }
     return c.json({ success: true, data: { id: c.req.param('id') } });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_exception_delete_failed' }));
+    console.error(JSON.stringify({"code":"booking_exception_delete_failed","route":"DELETE /api/booking/admin/exceptions/:id"}));
     return c.json({ success: false, error: 'booking_exception_delete_failed' }, 503);
   }
 });
@@ -2670,6 +2656,14 @@ function readMenuBookingRules(
   return { ok: true, value: out };
 }
 
+booking.get('/api/booking/admin/menus/preview-as',async(c)=>{
+ const account=await resolveAccountIdAdmin(c),friend=c.req.query('friend_id');
+ if(!account||!friend)return c.json({error:'missing_params'},400);
+ if(!await c.env.DB.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=?').bind(friend,account).first())return c.json({error:'not_found'},404);
+ const menus=(await c.env.DB.prepare('SELECT * FROM menus WHERE line_account_id=? AND deleted_at IS NULL ORDER BY sort_order,id').bind(account).all<{id:string}>()).results;
+ const results=[];for(const menu of menus)results.push({...menu,...await menuAudience(c.env.DB,account,menu.id,friend)});
+ return c.json({success:true,data:results});
+});
 booking.get('/api/booking/admin/menus', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -2679,7 +2673,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
         `SELECT m.id, m.name, m.category_label, m.description,
                 m.duration_minutes, m.buffer_after_minutes,
                 m.base_price, m.price_mode, m.version,
-                m.sort_order, m.is_active, m.auto_tag_id,
+                m.sort_order, m.is_active, m.auto_tag_id,m.audience_mode,m.audience_tag_ids_json,m.addon_menu_ids_json,m.max_party_size,m.addon_only,m.hq_template_id,m.hq_template_version_id,m.hq_customized,m.image_url,
                 m.concurrent_capacity, m.booking_window_days, m.cutoff_hours_before,
                 m.cancel_deadline_hours_before, m.intake_question,
                 COALESCE((
@@ -2756,6 +2750,9 @@ booking.get('/api/booking/admin/menus', async (c) => {
         sort_order: row.sort_order,
         is_active: row.is_active,
         auto_tag_id: row.auto_tag_id,
+        audience_mode:row.audience_mode,audience_tag_ids_json:row.audience_tag_ids_json,
+        addon_menu_ids_json:row.addon_menu_ids_json,max_party_size:row.max_party_size,addon_only:row.addon_only,
+        hq_template_id:row.hq_template_id,hq_template_version_id:row.hq_template_version_id,hq_customized:row.hq_customized,image_url:row.image_url,
         concurrent_capacity: row.concurrent_capacity,
         booking_window_days: row.booking_window_days,
         cutoff_hours_before: row.cutoff_hours_before,
@@ -2790,7 +2787,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
       })),
     });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_menu_list_failed' }));
+    console.error(JSON.stringify({"code":"booking_menu_list_failed","route":"GET /api/booking/admin/menus"}));
     return c.json({ error: 'booking_menu_data_unavailable' }, 503);
   }
 });
@@ -2827,7 +2824,7 @@ booking.put('/api/booking/admin/menus/:id/resources', requirePermission(BOOKING_
       data: { id: c.req.param('id'), version: result.version, resources: result.resources },
     });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_menu_resources_update_failed' }));
+    console.error(JSON.stringify({"code":"booking_menu_resources_update_failed","route":"PUT /api/booking/admin/menus/:id/resources"}));
     return c.json({ success: false, error: 'booking_menu_resources_save_failed' }, 503);
   }
 });
@@ -3044,8 +3041,12 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), i
   if (autoTagId && !(await isAssignableAutoTag(c.env.DB, autoTagId, accountId))) {
     return inputError(c, { error: 'tag_not_found' }, 400, ["auto_tag_id"]);
   }
+  const audience=await readAudienceWrite(c.env.DB,accountId,b as unknown as Record<string,unknown>),addons=await readAddonSettings(c.env.DB,accountId,b as unknown as Record<string,unknown>);
+  if(audience||addons.sets.length)gapWrite(c,{admin:true});
+  const extraRules:Record<string,unknown>={...rules.value};if(audience){extraRules.audience_mode=audience.mode;extraRules.audience_tag_ids_json=JSON.stringify(audience.ids);}
+  addons.sets.forEach((set,i)=>{extraRules[set.split(' = ')[0]]=addons.values[i];});
   const id = crypto.randomUUID();
-  const ruleColumns = Object.keys(rules.value);
+  const ruleColumns = Object.keys(extraRules);
   await c.env.DB
     .prepare(
       // 受付条件は送られたものだけを列に足す。送られなければ既定値
@@ -3070,7 +3071,7 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), i
       base.value.sortOrder,
       autoTagId,
       toMenuActiveFlag(b.is_active),
-      ...ruleColumns.map((col) => rules.value[col]),
+      ...ruleColumns.map((col) => extraRules[col]),
     )
     .run();
   // R535: 同じキーの再送には作り直さずこの応答を返す。24時間の窓。
@@ -3152,6 +3153,12 @@ booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY)
     return inputError(c, { error: 'tag_not_found' }, 400, ["auto_tag_id"]);
   }
 
+  if(b.is_active===true||b.is_active===1){const source=await c.env.DB.prepare('SELECT hq_template_id FROM menus WHERE id=? AND line_account_id=?').bind(id,accountId).first<{hq_template_id:string|null}>();if(source?.hq_template_id&&!await c.env.DB.prepare('SELECT 1 FROM staff_menus sm JOIN staff s ON s.id=sm.staff_id WHERE sm.menu_id=? AND sm.is_offered=1 AND s.line_account_id=? AND s.is_active=1 AND s.deleted_at IS NULL AND s.is_designation_optional=0').bind(id,accountId).first())throw new GapError('staff_selection_required');}
+  if(Array.isArray((b as unknown as Record<string,unknown>).addonMenuIds)&&((b as unknown as Record<string,unknown>).addonMenuIds as unknown[]).includes(id))throw new GapError('invalid_addon_menus');
+  const addonSettings=await readAddonSettings(c.env.DB,accountId,b as unknown as Record<string,unknown>);
+  if(addonSettings.sets.length)gapWrite(c,{admin:true});
+  const audience=await readAudienceWrite(c.env.DB,accountId,b as unknown as Record<string,unknown>);
+  if(audience)gapWrite(c,{admin:true});
   // 常に書き込む項目（PUT なので、送られなければ既定値で上書きする）
   const sets: string[] = [
     'name = ?',
@@ -3173,6 +3180,8 @@ booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY)
     base.value.sortOrder,
     toMenuActiveFlag(b.is_active),
   ];
+  sets.push(...addonSettings.sets);values.push(...addonSettings.values);
+  if(audience){sets.push('audience_mode = ?','audience_tag_ids_json = ?');values.push(audience.mode,JSON.stringify(audience.ids));}
   if (hasPriceMode) {
     sets.push('price_mode = ?');
     values.push(price.priceMode);
@@ -3302,7 +3311,7 @@ booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KE
     }
     return c.json({ success: true, data: { id: c.req.param('id'), version: result.version } });
   } catch {
-    console.error(JSON.stringify({ event: 'booking_menu_settings_update_failed' }));
+    console.error(JSON.stringify({"code":"booking_menu_settings_update_failed","route":"PATCH /api/booking/admin/menus/:id"}));
     return c.json({ success: false, error: 'booking_menu_save_failed' }, 503);
   }
 });
@@ -3335,7 +3344,7 @@ booking.get('/api/booking/admin/menus/:id/staff', async (c) => {
   const rows = await c.env.DB
     .prepare(
       `SELECT s.id, s.display_name, s.role, s.profile_image_url, s.bio,
-              s.is_designation_optional,
+              s.is_designation_optional,s.nomination_fee,
               COALESCE(sm.override_price, m.base_price) AS price,
               m.price_mode,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS duration_minutes
@@ -3576,7 +3585,7 @@ booking.get('/api/booking/admin/waitlist', async (c) => {
   }
   const rows = await c.env.DB
     .prepare(
-      `SELECT w.*, m.name AS menu_name, s.display_name AS staff_name,
+      `SELECT w.*, CASE WHEN w.status='waiting' THEN (SELECT count(*) FROM booking_waitlist older WHERE older.line_account_id=w.line_account_id AND older.staff_id=w.staff_id AND julianday(older.starts_at)=julianday(w.starts_at) AND older.status='waiting' AND (older.created_at<w.created_at OR older.created_at=w.created_at AND older.id<=w.id)) ELSE NULL END AS position, m.name AS menu_name, s.display_name AS staff_name,
               COALESCE(f.display_name, bc.display_name) AS customer_name
          FROM booking_waitlist w
          INNER JOIN menus m ON m.id = w.menu_id
@@ -3627,7 +3636,7 @@ booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 
         startsAt: entry.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', waitlistId: id }));
+      console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"DELETE /api/booking/admin/waitlist/:id"}));
     }
   }
   return c.json({ status: 'cancelled' });
@@ -3739,7 +3748,7 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
         startsAt: entry.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', waitlistId: id }));
+      console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"DELETE /api/liff/booking/waitlist/:id"}));
     }
   }
   return c.json({ status: 'cancelled' });
@@ -3755,7 +3764,7 @@ booking.get('/api/liff/booking/waitlist', async (c) => {
   await finishExpiredWaitlists(c.env.DB,caller.accountId);
   const rows = await c.env.DB
     .prepare(
-      `SELECT w.id, w.staff_id, w.menu_id, w.starts_at, w.status,
+      `SELECT w.id, w.staff_id, w.menu_id, w.starts_at, w.status,CASE WHEN w.status='waiting' THEN (SELECT count(*) FROM booking_waitlist older WHERE older.line_account_id=w.line_account_id AND older.staff_id=w.staff_id AND julianday(older.starts_at)=julianday(w.starts_at) AND older.status='waiting' AND (older.created_at<w.created_at OR older.created_at=w.created_at AND older.id<=w.id)) ELSE NULL END AS position,
               w.hold_minutes, w.invited_at, w.hold_expires_at, w.created_at,w.ends_at,
               m.name AS menu_name, s.display_name AS staff_name
          FROM booking_waitlist w
@@ -3769,7 +3778,6 @@ booking.get('/api/liff/booking/waitlist', async (c) => {
     .all();
   return c.json({ waitlist: rows.results });
 });
-
 
 booking.get('/api/liff/booking/seat-waitlist',async(c)=>{
  const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return inputError(c, {error:caller.error}, caller.status, []);
@@ -3954,30 +3962,6 @@ async function seatTableLabels(
     .all<{ label: string }>();
   const labels = (siblings.results ?? []).map((row) => row.label);
   return labels.length > 0 ? labels.join('・') : table.label;
-}
-
-interface TodaySeatRow {
-  customer_version: number;
-  table_id: string | null;
-  table_ids_json: string;
-  source: string;
-  kind: 'seat';
-  id: string;
-  store_id: string;
-  store_name: string;
-  starts_at: string;
-  ends_at: string;
-  status: string;
-  customer_name: string;
-  guest_count: number;
-  table_label: string | null;
-  course_name: string | null;
-  visit_mark: {
-    kind: string;
-    late_minutes: number | null;
-    marked_by_name: string | null;
-    marked_at: string;
-  } | null;
 }
 
 async function getTodaySeatReservations(
@@ -4475,14 +4459,6 @@ type AdminBookingPatch = {
   reason?: unknown;
 };
 
-// F6 本人変更の呼び出し情報。管理者の account_id クエリ・staff 認証の代わりに
-// LIFF の idToken→account→friend 所有で渡す。本人口に BOOKING_SETTINGS_KEY は要求しない。
-type SelfBookingChange = {
-  accountId: string;
-  friendId: string;
-  lineUserId: string;
-};
-
 async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch, self?: SelfBookingChange) {
   const accountId = self?.accountId ?? await resolveAccountIdAdmin(c);
   if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
@@ -4923,7 +4899,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
             lineAccountId: accountId,
           });
         } catch (error) {
-          console.error('reminder reschedule (booking update) failed:', error);
+          console.error(JSON.stringify({"code":"routes_booking_failed"}));
           v6Sync = 'failed';
         }
       }
@@ -4941,7 +4917,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
           cancelReason: `booking_updated_notifications_off:${bookingId}:by:${self ? `self:${self.lineUserId}` : (c.get('staff')?.id ?? 'admin')}`,
         });
       } catch (error) {
-        console.error('reminder cancel (booking update) failed:', error);
+        console.error(JSON.stringify({"code":"routes_booking_failed"}));
         v6Sync = 'failed';
       }
     }
@@ -4956,7 +4932,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
         startsAtIso: newStartsAt.toISOString(),
       });
     } catch (error) {
-      console.error('reminder reconcile (booking update) failed:', error);
+      console.error(JSON.stringify({"code":"routes_booking_failed"}));
       v6Sync = 'failed';
     }
   }
@@ -4999,7 +4975,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
     });
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, bookingId, 'changed', changeOperationId).catch((err) =>
-        console.error('booking notify (changed) failed:', err),
+        console.error(JSON.stringify({"code":"routes_booking_failed"})),
       ),
     );
   }
@@ -5220,7 +5196,7 @@ booking.post(
       await notifyForBooking(c.env.DB, bookingId, notificationKind, op.id, `booking-notification-retry:${op.id}`);
     } catch (error) {
       outcome = 'failed';
-      console.error('booking notification retry failed:', error);
+      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/bookings/:id/notifications/:runId/retry"}));
     }
     const refreshed = await c.env.DB
       .prepare(`SELECT status, error_code FROM booking_operation_runs WHERE id = ?`)
@@ -5740,7 +5716,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       adminPrepayOnly = decision.prepayOnly;
       adminPrepayNotice = await prepayNoticeFor(c.env.DB, accountId, decision);
     } catch (error) {
-      console.error('prepay decision failed:', error);
+      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/bookings"}));
     }
   }
   const initialStatus = (adminPrepayOnly ? 'requested' : 'confirmed') satisfies BookingStatus;
@@ -5918,7 +5894,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
           staffId: body.staff_id,
           startsAt: startsAt.toISOString(),
         },
-      }, accountId).catch((err) => console.error('booking outgoing webhook failed:', err)),
+      }, accountId).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/bookings"}))),
     );
   }
   const [reminderRows, operationRows, customerContext] = await Promise.all([
@@ -5973,7 +5949,7 @@ booking.get('/api/booking/admin/staff', async (c) => {
   const rows = await c.env.DB
     .prepare(
       `SELECT id, name, display_name, role, profile_image_url, bio,
-              sort_order, is_designation_optional, is_active, staff_member_id
+              sort_order, is_designation_optional, is_active, staff_member_id,nomination_fee
          FROM staff
         WHERE line_account_id = ? AND deleted_at IS NULL
         ORDER BY sort_order ASC, id ASC`,
@@ -5993,7 +5969,7 @@ booking.get('/api/booking/admin/staff/me', async (c) => {
     ? await c.env.DB
         .prepare(
           `SELECT id, name, display_name, role, profile_image_url, bio,
-                  sort_order, is_designation_optional, is_active
+                  sort_order, is_designation_optional, is_active,nomination_fee
              FROM staff
             WHERE line_account_id = ? AND staff_member_id = ? AND deleted_at IS NULL
             ORDER BY sort_order ASC, id ASC`,
@@ -6027,6 +6003,7 @@ booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY)
     }, 422, []);
   }
   const b = parsed.value;
+  if(b.nominationFee!==undefined)gapWrite(c,{admin:true});
   if (b.staff_member_id) {
     const member = await c.env.DB
       .prepare(`SELECT 1 AS ok FROM staff_members WHERE id = ? AND is_active = 1`)
@@ -6045,8 +6022,8 @@ booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY)
     .prepare(
       `INSERT INTO staff
         (id, line_account_id, name, display_name, role, profile_image_url, bio,
-         sort_order, is_designation_optional, is_active, staff_member_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+         sort_order, is_designation_optional, is_active, staff_member_id,nomination_fee)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
     .bind(
       id,
@@ -6060,6 +6037,7 @@ booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY)
       b.is_designation_optional!,
       b.is_active!,
       b.staff_member_id ?? null,
+      b.nominationFee??0,
     )
     .run();
   return c.json({ id }, 201);
@@ -6081,6 +6059,8 @@ booking.put('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTINGS_K
   }
   const updates: string[] = [];
   const values: Array<string | number | null> = [];
+  const fee=(raw as Record<string,unknown>).nominationFee;
+  if(fee!==undefined){gapWrite(c,{admin:true});if(!Number.isSafeInteger(fee)||Number(fee)<0||Number(fee)>10000000)throw new GapError('invalid_nomination_fee');updates.push('nomination_fee = ?');values.push(Number(fee));}
   for (const [field, column] of [
     ['name', 'name'],
     ['display_name', 'display_name'],
@@ -6827,6 +6807,7 @@ booking.get('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
 });
 
 booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingStaffOrAdmin(), inputJsonBoundary({"calendar_id":["string"]}), async (c) => {
+  if(c.get('impersonation'))return c.json({error:'IMPERSONATION_WRITE_BLOCKED'},403);
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const staffId = c.req.param('id');
@@ -6854,7 +6835,7 @@ booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
       access_token: null,
     }, googleCredentials(c.env));
   } catch (error) {
-    console.error('Google Calendar verification failed:', error);
+    console.error(JSON.stringify({"code":"routes_booking_failed","route":"PUT /api/booking/admin/staff/:id/google-calendar"}));
     const message = error instanceof Error ? error.message : String(error);
     const status = message === 'google_service_account_not_configured' ? 503 : 422;
     return inputError(c, { error: status === 503 ? 'service_account_not_configured' : 'calendar_not_accessible' }, status, []);
@@ -6885,6 +6866,7 @@ booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
 });
 
 booking.delete('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingStaffOrAdmin(), async (c) => {
+  if(c.get('impersonation'))return c.json({error:'IMPERSONATION_WRITE_BLOCKED'},403);
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const staffId = c.req.param('id');
@@ -7130,7 +7112,6 @@ function csvCell(value: unknown): string {
  * CSV行として混入し、式注入防御を迂回する (#959)。
  */
 function csvNoteValue(value: string): string {
-  // eslint-disable-next-line no-control-regex
   return value.replace(/[\x00-\x1F\x7F]/g, '');
 }
 
@@ -7325,7 +7306,8 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const id = c.req.param('id');
-  const b = await c.req.json<{ action: BookingAction }>();
+  const b = await c.req.json<{ action: BookingAction; cancellationReason?:'store'|'customer' }>();
+  if(b.cancellationReason!==undefined&&!['store','customer'].includes(b.cancellationReason))return c.json({error:'invalid_cancellation_reason'},400);
   const row = await c.env.DB
     .prepare(
       `SELECT id, status, starts_at, friend_id, menu_id, staff_id, decided_at
@@ -7392,14 +7374,18 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   // 状態を変えたので 409 を返し、副作用（reminders 作成・通知）は走らせない。
   const updateStatement = c.env.DB
     .prepare(
-      `UPDATE bookings SET status = ?, decided_at = ?,
+      `UPDATE bookings SET status = ?, decided_at = ?, cancellation_reason=COALESCE(?,cancellation_reason),
                             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND status = ?`,
     )
-    .bind(next, new Date().toISOString(), id, row.status);
-  const [updateResult] = await c.env.DB.batch([
+    .bind(next, new Date().toISOString(), next==='cancelled'?b.cancellationReason??null:null, id, row.status);
+  let updateResult: D1Result;
+  try { [updateResult] = await c.env.DB.batch([
     updateStatement, ...(next === 'confirmed' ? [confirmationWorkflowStatement(c.env.DB, id, true)] : []),
-  ]);
+  ]); } catch(error) {
+    if(error instanceof Error && error.message.includes('entitlement_unavailable'))return c.json({error:'entitlement_unavailable'},409);
+    throw error;
+  }
   if ((updateResult.meta?.changes ?? 0) === 0) {
     return c.json({ error: 'concurrent_update' }, 409);
   }
@@ -7420,7 +7406,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
           staffId: row.staff_id,
           startsAt: row.starts_at,
         },
-      }, accountId).catch((err) => console.error('booking outgoing webhook failed:', err)),
+      }, accountId).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"PATCH /api/booking/admin/requests/:id"}))),
     );
   } else if (next === 'rejected') {
     // N-065: 却下でも V6 の未送信予定は止める (通知だけでは送り続ける)。
@@ -7458,7 +7444,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     await cancelObsoleteConfirmationRuns(c.env.DB, id, accountId);
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, id, 'rejected').catch((err) =>
-        console.error('booking notify (rejected) failed:', err),
+        console.error(JSON.stringify({"code":"routes_booking_failed","route":"PATCH /api/booking/admin/requests/:id"})),
       ),
     );
   } else if (next === 'cancelled' || next === 'expired') {
@@ -7508,7 +7494,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         bookingId: id,
         lineAccountId: accountId,
         remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id),
-      }).catch((error) => console.error('Google Calendar delete failed:', error)),
+      }).catch((error) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"PATCH /api/booking/admin/requests/:id"}))),
     );
     // キャンセル待ち：空いた枠を登録の早い順で1人に知らせる。
     // 知らせの失敗で取り消し自体を失敗させない。
@@ -7519,7 +7505,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         startsAt: row.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: id }));
+      console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"PATCH /api/booking/admin/requests/:id"}));
     }
   }
 
@@ -7554,7 +7540,6 @@ booking.get('/api/booking/admin/pending-count', async (c) => {
     .first<{ cnt: number }>();
   return c.json({ count: row?.cnt ?? 0 });
 });
-
 
 /** 本人確認済みのLINE/LIFFで使う席の空き。休業・貸切のメモは公開しない。 */
 booking.get('/api/liff/booking/seat-availability',async c=>{

@@ -47,7 +47,7 @@ brand.get('/api/public/brand', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/public/brand error:', err);
+    console.error(JSON.stringify({"code":"routes_brand_failed","route":"GET /api/public/brand"}));
     return c.json({ success: true, data: empty });
   }
 });

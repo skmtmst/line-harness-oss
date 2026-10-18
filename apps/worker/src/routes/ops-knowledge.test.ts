@@ -11,7 +11,7 @@ import { opsKnowledge } from './ops-knowledge.js';
 
 let store: SqliteD1;
 let requestId: string;
-let run: ReturnType<typeof vi.fn>;
+let run: ReturnType<typeof vi.fn<() => Promise<{ response: string }>>>;
 const action = '管理画面で配信対象の設定を変更しました。';
 const result = '再送したところ正常に配信できました。';
 function environment() { return { DB: store.db, AI: { run } } as unknown as Env['Bindings']; }
@@ -35,7 +35,7 @@ beforeEach(async () => {
   store.raw.prepare('UPDATE hq_support_messages SET created_at = ? WHERE id = ?').run('2026-09-19T10:00:00.000+09:00', first.id);
   store.raw.prepare('UPDATE hq_support_messages SET created_at = ? WHERE id = ?').run('2026-09-19T10:01:00.000+09:00', last.id);
   await updateSupportTicket(store.db, requestId, { stage: 'resolved' });
-  run = vi.fn().mockResolvedValue({ response: JSON.stringify({ decision: 'confirmed', title: '配信対象の確認', question: '配信対象を直すには', keywords: ['配信'], evidence: [
+  run = vi.fn<() => Promise<{ response: string }>>().mockResolvedValue({ response: JSON.stringify({ decision: 'confirmed', title: '配信対象の確認', question: '配信対象を直すには', keywords: ['配信'], evidence: [
     { messageId: first.id, quote: action, role: 'action' }, { messageId: last.id, quote: result, role: 'result' },
   ] }) });
 });
@@ -149,7 +149,7 @@ describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
     expect((await knowledgeForTicket(store.db, requestId)).job?.status).toBe('queued');
     expect(store.raw.prepare('SELECT stage FROM hq_support_requests WHERE id = ?').get(requestId)).toEqual({ stage: 'resolved' });
     expect(store.raw.prepare('SELECT error_code FROM platform_knowledge_jobs').get()).toEqual({ error_code: 'generation_failed' });
-    expect(logger).toHaveBeenCalledWith('[knowledge] generation failed', { name: 'Error' });
+    expect(logger).toHaveBeenCalledWith(JSON.stringify({ code: 'services_platform_knowledge_failed' }));
     expect(JSON.stringify(logger.mock.calls)).not.toContain('provider echoed private conversation');
     logger.mockRestore();
   });
@@ -184,7 +184,7 @@ describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
 
   it('同時に実行要求が来てもリース中はAIを重複実行しない', async () => {
     const response = await run(); run.mockClear();
-    let finish!: (value: unknown) => void;
+    let finish!: (value: { response: string }) => void;
     run.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
     const url = `/api/ops/knowledge/tickets/${requestId}/process`;
     const first = request(url, {});
@@ -225,7 +225,7 @@ describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
   it('HTTP実行の時間切れも予約を残し、遅れて返るAI結果を記事にしない', async () => {
     vi.useFakeTimers();
     try {
-      let finish!: (value: unknown) => void;
+      let finish!: (value: { response: string }) => void;
       run.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
       const pending = request(`/api/ops/knowledge/tickets/${requestId}/process`, {});
       await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));

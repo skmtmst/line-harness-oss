@@ -4,9 +4,10 @@
 import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
+import { OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
 import Dialog from './dialog'
+import IconButton from './icon-button'
 import { useFormInputDirty } from './form-input-dirty'
 import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
 import { drawerWidth } from './destination-policy'
@@ -17,9 +18,12 @@ export type DrawerProps = {
   open: boolean
   title: string
   titleAccessory?: ReactNode
+  closeAppearance?: 'box'
   description?: ReactNode
   contentSpacing?: 'sections'
   dirty?: boolean
+  /** 未保存の確認を保ち、題の印だけ省く場合は false。 */
+  showDirtyIndicator?: boolean
   busy?: boolean
   error?: string
   onClose: () => void
@@ -36,6 +40,10 @@ export type DrawerProps = {
   width?: 'narrow' | 'editor' | 'order' | 'composer'
   /** V8は480・540の2段。旧指定は共通部品で段へそろえる。 */
   designWidth?: number
+  /** 編集の引き出しを画面の下端まで伸ばす。省略時は内容の高さ。 */
+  heightMode?: 'content' | 'viewport'
+  /** 狭い画面でも外側の余白を保つ。 */
+  viewportInset?: boolean
   /** 620幅の紹介者の板など、全体に同じ余白がある型。 */
   layout?: 'inset'
   /** 題に状態の札を添える板。閉じる操作は共通のまま。 */
@@ -44,6 +52,11 @@ export type DrawerProps = {
   toolbar?: ReactNode
   /** 下の帯（footer）のすぐ上に置く知らせ（保存の失敗など）。中身の帯は呼び出し側の Notice。 */
   band?: ReactNode
+  /**
+   * 開いたときに寄せる先。'panel' は面そのもの（輪を出さない）。題がその場で直せる板（tnTn9）で、
+   * 開いただけで題に輪が出て編集の入口に見えるのを避ける。Tab で先頭の操作へ進める。
+   */
+  initialFocus?: 'panel'
 }
 
 /** Pencil V5 `VJKAT` を正本にした右詳細パネル。 */
@@ -51,9 +64,11 @@ export default function Drawer({
   open,
   title,
   titleAccessory,
+  closeAppearance,
   description,
   contentSpacing,
   dirty,
+  showDirtyIndicator = true,
   busy = false,
   error,
   onClose,
@@ -63,10 +78,13 @@ export default function Drawer({
   modal = true,
   width,
   designWidth,
+  viewportInset,
+  heightMode,
   layout,
   heading,
   toolbar,
   band,
+  initialFocus,
 }: DrawerProps) {
   const formInput = useFormInputDirty(open)
   const isDirty = dirty ?? formInput.dirty
@@ -75,7 +93,8 @@ export default function Drawer({
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
-  const panelRef = useOverlayFocus<HTMLElement>(open && modal, discard.requestClose, busy)
+  const panelRef: React.RefObject<HTMLElement | null> = useOverlayFocus<HTMLElement>(open && modal, discard.requestClose, busy, initialFocus === 'panel' ? (): HTMLElement | null => panelRef.current : undefined)
+  const layer = useOverlayLayer(open && modal)
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
 
@@ -84,17 +103,17 @@ export default function Drawer({
 
   const titleBlock = (
     <div>
-      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty ? ' *' : ''}</h2>{titleAccessory}</div>
+      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty && showDirtyIndicator ? ' *' : ''}</h2>{titleAccessory}</div>
       {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
     </div>
   )
-  const closeButton = <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>
+  const closeButton = closeAppearance === 'box' ? <IconButton onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></IconButton> : <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>
 
   const panel = (
     <aside
       ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
       onChangeCapture={formInput.onChangeCapture}
-      onInputCapture={formInput.onChangeCapture}
+      onInputCapture={formInput.onChangeCapture} onInput={formInput.onChange} onChange={formInput.onChange}
       onClickCapture={(event) => { formInput.onClickCapture(event); captureOverlayClose(event, isDirty || busy, discard.requestClose) }}
       className={`${styles.panel} ${modal ? '' : styles.inline}`}
       role="dialog"
@@ -106,8 +125,11 @@ export default function Drawer({
       data-width={width}
       data-layout={layout}
       data-design-width=""
+      data-height-mode={heightMode}
+      data-viewport-inset={viewportInset || undefined}
       style={{ '--drawer-design-width': `${width === 'composer' ? 1160 : width === 'editor' ? 540 : drawerWidth(designWidth ?? (width === 'order' ? 540 : 480))}px` } as CSSProperties}
       tabIndex={-1}
+      data-initial-focus={initialFocus}
       data-closing={leaving || undefined}
       data-design-part="drawer"
       data-design-node="VJKAT"
@@ -136,7 +158,7 @@ export default function Drawer({
   )
   const discardDialog = discard.confirming ? <Dialog open title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null
   if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}{discardDialog}</OverlayDepthContext.Provider>
-  const overlay = <div className={styles.overlay} role="presentation" data-closing={leaving || undefined} onMouseDown={(event) => {
+  const overlay = <div className={styles.overlay} role="presentation" data-closing={leaving || undefined} style={{ zIndex: layer }} onMouseDown={(event) => {
     if (!busy && event.target === event.currentTarget) discard.requestClose()
   }}>{panel}</div>
   return <OverlayDepthContext.Provider value={depth + 1}>{discardDialog}{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>

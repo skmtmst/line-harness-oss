@@ -1,10 +1,12 @@
 'use client'
+
+import { type DrawerTab, DRAWER_TABS } from './drawer-tabs'
 import { Tabs } from '@/components/shared/tabs'
 import { useUrlTab } from '@/lib/use-url-tab'
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, PauseCircle } from 'lucide-react'
+import { Check, Copy, PauseCircle, Pencil } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -51,14 +53,6 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  */
 
 const JOURNEY_PAGE_SIZE = 30
-
-type DrawerTab = 'summary' | 'breakdown' | 'friends' | 'payment'
-const DRAWER_TABS: Array<{ key: DrawerTab; label: string }> = [
-  { key: 'summary', label: '概要' },
-  { key: 'breakdown', label: '内訳' },
-  { key: 'friends', label: '友だち' },
-  { key: 'payment', label: '支払い' },
-]
 
 interface JourneySummary {
   friendId: string
@@ -264,11 +258,12 @@ export default function AffiliateDrawer({
     : null
 
   const summary = (
-    <>
+    <div className={styles.stack}>
       <KpiBand density="compact">
-        <KpiCard icon={null} title="今月の成果" value={report?.conversions} unit="件" detail={report ? `認めた ${formatNumber(report.conversionsApproved)}・待っている ${formatNumber(report.conversionsPending)}` : '読み込めませんでした'} />
+        <KpiCard icon={null} title="今月の成果" value={report?.conversions} unit="件" detail={report ? `認めた ${formatNumber(report.conversionsApproved)}・待ち ${formatNumber(report.conversionsPending)}` : '読み込めませんでした'} />
         <KpiCard icon={null} title="今月の報酬" value={null} valueText={monthReward == null ? '—' : formatYen(monthReward)} unit="" detail={rewardDetail} />
-        <KpiCard icon={null} title="支払いを確定していない報酬" value={null} valueText={settlementState === 'ready' ? formatYen(settlement?.amount ?? 0) : '—'} unit="" detail={settlementState === 'ready' ? `認めた ${formatNumber(settlement?.conversionCount ?? 0)} 件分` : settlementState === 'loading' ? '読み込んでいます' : '読み込めませんでした'} />
+        {/* 引き出しの幅（3つ並び）では「支払いを確定していない報酬」が切れるので短く言う（tnTn9）。 */}
+        <KpiCard icon={null} title="支払い前の報酬" value={null} valueText={settlementState === 'ready' ? formatYen(settlement?.amount ?? 0) : '—'} unit="" detail={settlementState === 'ready' ? `認めた ${formatNumber(settlement?.conversionCount ?? 0)} 件分` : settlementState === 'loading' ? '読み込んでいます' : '読み込めませんでした'} />
       </KpiBand>
 
       <section className={styles.section} aria-label="発行ずみの紹介リンク">
@@ -289,7 +284,7 @@ export default function AffiliateDrawer({
                     <span className={styles.listName}>{link.offer_name ?? link.label ?? link.ref_code}{link.is_active ? '' : '（止めている）'}</span>
                     <span className={styles.listSub} title={url}>{`${shown}・${count}`}</span>
                   </span>
-                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} aria-label="紹介リンクをコピー"  />
+                  <CopyTextButton variant="secondary" label="コピーする" value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} icon={<Copy size={16} aria-hidden />} aria-label="紹介リンクをコピー" />
                 </div>
               )
             })}
@@ -338,7 +333,7 @@ export default function AffiliateDrawer({
           付けた：最後に開いたリンク・数える期間は案件ごとの決まり。リンクを開いた記録が期間内に無い成果は、誰にも付けません。
         </p>
       </section>
-    </>
+    </div>
   )
 
   const breakdown = !report ? (
@@ -465,7 +460,7 @@ export default function AffiliateDrawer({
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} width="editor" layout="inset" busy={paymentOpen} onClose={onClose}
+      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} width="editor" heightMode="viewport" layout="inset" initialFocus="panel" busy={paymentOpen} onClose={onClose}
         heading={<span className={styles.titleRow}>{readonly ? <span>{affiliate.name}</span> : <InlineEdit value={affiliate.name} label="紹介者の名前を直す" maxLength={100} onSave={async (next) => {
           if (!next.trim()) throw new Error('名前を入力してください')
           const response = await api.affiliates.update(affiliate.id, { name: next.trim() })
@@ -473,7 +468,7 @@ export default function AffiliateDrawer({
           notifyToast('名前を保存しました'); onChanged()
         }} />}<StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
         toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => setTab(item.key) }))} />}
-        footer={(<>{readonly ? <span /> : (
+        footer={(<div className={styles.footerRow}>{readonly ? <span /> : (
             <button type="button" className={styles.stop} onClick={() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }} disabled={!affiliate.isActive}>
               <PauseCircle size={14} aria-hidden="true" />
               紹介を止める
@@ -483,7 +478,7 @@ export default function AffiliateDrawer({
           {readonly ? <Button type="button" onClick={onClose}>閉じる</Button> : (
             <>
               <Button type="button" onClick={() => { setTab('payment'); setEditing((current) => !current) }}>
-                {editing ? '編集をやめる' : '編集する'}
+                <Pencil size={16} aria-hidden />{editing ? '編集をやめる' : '編集する'}
               </Button>
               <Button
                 type="button"
@@ -496,7 +491,7 @@ export default function AffiliateDrawer({
                 支払いを確定する
               </Button>
             </>
-          )}</>)}
+          )}</div>)}
       >
         {loading ? (
             <ListState kind="loading" title="詳細を読み込んでいます" />

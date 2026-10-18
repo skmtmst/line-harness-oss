@@ -4,6 +4,10 @@ import type { Env } from '../index.js';
 
 const mocks = vi.hoisted(() => ({
   recordSiteEvent: vi.fn(),
+  consumePublicIngressReceipt: vi.fn(async () => true),
+  getMeasurementSite: vi.fn(async () => ({ id: 'site_test', line_account_id: 'account-a', stopped_at: null })),
+  siteAllowsHost: vi.fn(async () => true),
+  normalizeSiteHost: (host: string) => host,
   linkVisitorToFriend: vi.fn(),
   getPageViewSummary: vi.fn(),
   getFriendSiteEvents: vi.fn(),
@@ -48,12 +52,12 @@ const env = {
   WORKER_URL: 'https://api.example.com',
 };
 
-function post(path: string, body: unknown) {
+function post(path: string, body: unknown, origin: string | null = 'https://shop.example.com') {
   return app.fetch(
     new Request(`https://example.com${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) },
+      body: JSON.stringify({ siteId: 'site_test', sourceEventId: 'event-test-123', ...(body as object) }),
     }),
     env as unknown as Env['Bindings'],
   );
@@ -128,7 +132,7 @@ describe('収集の受け口', () => {
     const res = await post('/api/site/collect', {
       visitorId: VALID_ID, trackingKey: 'hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', eventType: 'page_view',
     });
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://shop.example.com');
   });
 
   it('OPTIONS に答える', async () => {
@@ -405,4 +409,20 @@ describe('管理画面のアカウント境界', () => {
 it('API-02 rejects impossible date in page-view aggregation',async()=>{
  const res=await app.request('/api/site/pages?account_id=account-a&from=2026-02-30&to=2026-03-01',{},env as any);
  expect(res.status).toBe(400);expect(mocks.getPageViewSummary).not.toHaveBeenCalled();
+});
+
+
+describe('B-333 サイト計測の出どころと再送', () => {
+  const body = { visitorId: VALID_ID, trackingKey: 'hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', consent: 'granted' };
+  it('許可していない送信元・送信元なしを記録しない', async () => {
+    mocks.siteAllowsHost.mockResolvedValueOnce(false);
+    await post('/api/site/collect', body, 'https://evil.example.com');
+    await post('/api/site/collect', body, null);
+    expect(mocks.recordSiteEvent).not.toHaveBeenCalled();
+  });
+  it('同じ受信IDを記録しない', async () => {
+    mocks.consumePublicIngressReceipt.mockResolvedValueOnce(false);
+    await post('/api/site/collect', body);
+    expect(mocks.recordSiteEvent).not.toHaveBeenCalled();
+  });
 });

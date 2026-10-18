@@ -15,12 +15,20 @@ import scanOwnerRules from './owner-rules-browser.mjs'
 import scanPanelBlank from './panel-blank-browser.mjs'
 import scanBlankGap from './blank-gap-browser.mjs'
 import scanControlOverlap from './control-overlap-browser.mjs'
+import scanFormRules from './form-rules-browser.mjs'
+import scanCreateConsistency from './create-consistency-browser.mjs'
+import scanPreviewLayout from './create-preview-layout-browser.mjs'
+import scanAffixedInputs from './affixed-input-layout-browser.mjs'
+import scanShiftEntrySpacing from './shift-entry-layout-browser.mjs'
+import collectFormLayouts, { formColumnFindings } from './form-columns-browser.mjs'
+import { collectReservationReading, assessReservationReading } from './reservation-reading-browser.mjs'
+import { inspectCsvPublicationLayout } from './csv-publication-layout.mjs'
 import scanB244Rules from './b244-rules-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
 export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/conversions', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }
 export const keyOf = f => JSON.stringify([f.kind, f.target, f.other || '', f.text])
-const KINDS = ['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu', 'control-overlap', 'control-blocked', 'liffshadow','liffradio','canvasbottom','kpiblank','kpialign','cardspill','cardbottom','segempty','segselected','segstyle','choice-radio','choice-color','pageredge','rowmenu','bandtouch','customer-edit','insertoutside','insertlegacy','internal-window-copy', 'wrap', 'squash', 'clip', 'overlap', 'touch', 'blank', 'blank-vertical', 'blank-horizontal', 'blank-kpi', 'empty-blank-ok', 'align', 'missing', 'short', 'tallrow', 'blue', 'tight', 'rowbg', 'dark', 'boxclip', 'footgap', 'edge', 'inset', 'greenname', 'shortname']
+const KINDS = ['choice-check', 'choice-check-color', 'csv-publication-layout', 'preview-card-width', 'layout-tile-rows', 'layout-tile-radio', 'layout-tile-check', 'layout-tile-title', 'form-shift-entry-spacing', 'form-affixed-height', 'form-keyword-input', 'form-action-value', 'form-preview-surface', 'form-create-title', 'form-save-icon', 'form-help', 'form-copy', 'form-shrink', 'form-color', 'form-footer-action', 'form-optional', 'form-row-end', 'control-overlap', 'control-blocked', 'liffshadow', 'liffradio', 'canvasbottom', 'kpiblank', 'kpialign', 'kpimenu', 'cardspill', 'cardbottom', 'segempty', 'segselected', 'segstyle', 'choice-radio', 'choice-color', 'pageredge', 'rowmenu', 'bandtouch', 'customer-edit', 'insertoutside', 'insertlegacy', 'internal-window-copy', 'wrap', 'squash', 'clip', 'overlap', 'touch', 'blank', 'blank-vertical', 'blank-horizontal', 'blank-kpi', 'empty-blank-ok', 'align', 'missing', 'short', 'tallrow', 'blue', 'tight', 'rowbg', 'dark', 'boxclip', 'footgap', 'edge', 'inset', 'greenname', 'shortname', 'requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu']
 export function validateAllowances(allowances) {
   if (!Array.isArray(allowances)) throw new Error('許可リストは配列です')
   const keys = new Set()
@@ -75,7 +83,7 @@ export function assessAgainstBase(findings, baseFindings, route, width, allowanc
   })
   // 固定の許可の上限を変えない。同じ項目の件数を二重に足すこともない。
   const fixedKeys = new Set(allowances.filter(a => a.route === route && a.width === width).map(keyOf))
-  const baseline = record(baseFindings.filter(f => !['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu'].includes(f.kind)), route, width, '統合先で同じ検出器が確認した既存箇所')
+  const baseline = record(baseFindings.filter(f => !['requirement-conflict', 'field-error-missing', 'menu-group-order', 'menu-icon-missing', 'toolbar-count-position', 'toolbar-unnamed-menu', 'form-required-badge', 'form-action-reason'].includes(f.kind)), route, width, '統合先で同じ検出器が確認した既存箇所')
     .filter(a => !fixedKeys.has(keyOf(a)))
   const baseKeys = new Set(baseline.map(keyOf))
   const result = assess(findings, route, width, [...allowances, ...baseline])
@@ -96,10 +104,13 @@ export function identifyStableTargets(findings) {
     : f)
 }
 export async function measurePage(page) {
+  const formColumns = formColumnFindings(await page.evaluate(collectFormLayouts))
+  const reservationReading = assessReservationReading(await page.evaluate(collectReservationReading))
   const panels = await page.evaluate(scanPanelBlank)
   // 下の空白は panel-blank に一本化。blankfix の途中・横・数の帯は残す。
   const gaps = await page.evaluate(scanBlankGap, { skipPanelBottom: true, exactSelectors: true, selectorDepth: 32, selectorLimit: 4096 })
-  const extra = []
+  const publicationCsv = await page.evaluate(inspectCsvPublicationLayout)
+  const extra = publicationCsv.failures.map(text => ({kind: 'csv-publication-layout', target: publicationCsv.csv ? '[data-design-node="T9gblG"]' : '[data-design-node="SyQA1"]', text, measure: {count: 1}}))
   for (const f of gaps.findings) {
     if (f.excluded || f.where === 'page-bottom' || f.excess < 96) continue
     extra.push({kind: 'blank-' + (f.kind === 'horizontal' ? 'horizontal' : 'vertical'), target: (f.container?.sel || f.edge?.sel || '').replace(/__[\w-]+/g,''), text: [f.where,f.prev?.text,f.next?.text].filter(Boolean).join(' → '), measure:{excess:f.excess}})
@@ -109,8 +120,12 @@ export async function measurePage(page) {
       extra.push({kind:'blank-kpi',target:b.sel.replace(/__[\w-]+/g,''),text:'数の帯の全マスが高い',measure:{minExcess:Math.min(...b.cardH.map((h,i)=>h-b.contentH[i]-16)),maxExcess:Math.max(...b.cardH.map((h,i)=>h-b.contentH[i]-16))}})
   }
   for (const d of gaps.invalidDeclarations || []) extra.push({kind:'empty-blank-ok',target:d.selector.replace(/__[\w-]+/g,''),text:'空白の除外理由なし',measure:{count:1}})
-  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanB244Rules)]
-  return await page.evaluate(identifyStableTargets, findings)
+  const consistency = await page.evaluate(scanCreateConsistency)
+  const consistencyKinds = { Y1: 'form-action-value', Y2: 'form-preview-surface', Y3: 'form-create-title', Y4: 'form-save-icon' }
+  const consistencyFindings = consistency.findings.map(f => ({ ...f, kind: consistencyKinds[f.kind] }))
+  const previewLayout = await page.evaluate(scanPreviewLayout)
+  const findings = [...await page.evaluate(scanShiftEntrySpacing), ...await page.evaluate(scanAffixedInputs), ...previewLayout.findings, ...consistencyFindings, ...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...panels, ...extra, ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanFormRules), ...await page.evaluate(scanB244Rules), ...formColumns]
+  return await page.evaluate(identifyStableTargets, [...findings, ...reservationReading])
 }
 async function measureRoute(browser, baseUrl, route, width) {
   let page

@@ -1,5 +1,8 @@
 'use client'
 
+import ListDateTime from '@/components/shared/list-date-time'
+import StatusBadge from '@/components/shared/status-badge'
+
 import { useActionError } from '@/lib/use-action-error'
 
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
@@ -47,7 +50,7 @@ import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import ManagedFolderPanel, { managedFolderOptions } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import { RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { ActionCell, RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -58,6 +61,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
   AUTOMATIONS_DESCRIPTION,
+  AUTOMATION_TABLE_LAYOUT,
   AutomationBand,
   AutomationTabs,
   READONLY_REASON,
@@ -68,7 +72,6 @@ import {
   type BandCell,
 } from './shell'
 import styles from './list.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
@@ -132,18 +135,13 @@ export function actionSummary(item: Pick<Automation, 'actions'>): { title: strin
   }
 }
 
-/** 月/日（日本時間）。 */
-function monthDay(iso: string): string {
-  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
-}
-
 function TableHead({ selection }: { selection?: ReactNode } = {}) {
   return (
     <thead>
-      <TableHeadRow className={styles.headRow} data-table-layout="columns">
-        <Th className={styles.colName}>{selection}ルール</Th>
+      <TableHeadRow data-table-layout="columns">
+        <Th grow>{selection}ルール</Th>
         <Th className={styles.colTrigger}>きっかけ</Th>
-        <Th className={styles.colWho}>だれに（条件）</Th>
+        <Th collapseAt="narrow" className={styles.colWho}>だれに（条件）</Th>
         <Th className={styles.colDo}>すること</Th>
         <Th className={styles.colRuns} align="right">この30日</Th>
         <Th className={styles.colState}>状態</Th>
@@ -516,8 +514,8 @@ export default function AutomationListV8() {
     listBody = (
       <>
         {actionError ? <div className={styles.errorRow}><Notice tone="danger">{actionError}</Notice></div> : null}
-        <div className={narrow ? `${styles.tableWrap} ${styles.narrowTable}` : styles.tableWrap}>
-          <DataTable className={styles.table}>
+        <div className={styles.tableWrap}>
+          <DataTable columnLayout={AUTOMATION_TABLE_LAYOUT}>
             <TableHead selection={folderMove.pageCheckbox} />
             <tbody>
               {paged.map((item) => {
@@ -527,14 +525,14 @@ export default function AutomationListV8() {
                 const trigger = triggerSummary(item)
                 const who = conditionSummary(item.conditions)
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
-                    <Td className={styles.colName}>
+                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
+                    <Td grow>
                       <FolderDotName folder={folders.find((folder) => folder.id === item.folderId) ?? null}>{folderMove.checkbox(item)}
-                        {canEdit && item.status !== 'archived' ? <RowNameLink href={`/automations/drafts?automationId=${encodeURIComponent(item.id)}`} className={styles.name}><TruncatedText value={String(item.name ?? '')} /></RowNameLink> : <span className={styles.name}><TruncatedText value={String(item.name ?? '')} /></span>}
+                        {canEdit && item.status !== 'archived' ? <RowNameLink href={`/automations/drafts?automationId=${encodeURIComponent(item.id)}`} className={styles.name}><TruncatedText value={String(item.name ?? '')} /></RowNameLink> : <TruncatedText value={String(item.name ?? '')} />}
                       </FolderDotName>
                     </Td>
-                    <Td className={styles.colTrigger}><span className={styles.cell} title={trigger}>{trigger}</span></Td>
-                    <Td className={styles.colWho}><span className={styles.cell} title={who}>{who}</span></Td>
+                    <Td className={styles.colTrigger}><TruncatedText value={trigger} /></Td>
+                    <Td collapseAt="narrow" className={styles.colWho}><TruncatedText value={who} /></Td>
                     <Td className={styles.colDo}>
                       <span className={styles.cellOne} title={action.title}>{action.title}</span>
                       {action.detail ? <span className={styles.sub} title={action.detail}>{action.detail}</span> : null}
@@ -542,16 +540,15 @@ export default function AutomationListV8() {
                     <Td className={styles.colRuns}>
                       <span className={styles.numMain}>{`${formatNumber(item.executionCount30d)} 回`}</span>
                       <span className={styles.numSub}>
-                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)} 回` : `更新 ${monthDay(item.updatedAt)}`}
+                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)} 回` : <>更新 <ListDateTime value={item.updatedAt} /></>}
                       </span>
                     </Td>
                     <Td className={styles.colState}>
-                      <span className={styles.pill} data-tone={item.isActive ? 'active' : 'neutral'}>
-                        <span className={styles.pillDot} aria-hidden="true" />
+                      <StatusBadge tone={item.isActive ? 'success' : 'neutral'}>
                         {item.status === 'archived' ? '保管' : item.isActive ? '動いています' : '止めています'}
-                      </span>
+                      </StatusBadge>
                     </Td>
-                    <Td className={styles.colOps}>
+                    <ActionCell className={styles.colOps}>
                       <div className={styles.opsBox}>
 
                         <RowMenu
@@ -562,7 +559,7 @@ export default function AutomationListV8() {
                           items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect?.() } }))}
                         />
                       </div>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
@@ -573,12 +570,9 @@ export default function AutomationListV8() {
     )
   }
 
-  const pager = ready && pageCount > 1 ? (
+  const pager = ready && paged.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(current - 1) * pageSize + 1}〜{(current - 1) * pageSize + paged.length} / {formatNumber(visible.length)} 件
-      </span>
-      <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="ルール一覧のページ送り" />
+      <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="ルール一覧のページ送り" range={{ total: visible.length, first: (current - 1) * pageSize + 1, last: (current - 1) * pageSize + paged.length }} />
     </ListPagePagination>
   ) : null
 

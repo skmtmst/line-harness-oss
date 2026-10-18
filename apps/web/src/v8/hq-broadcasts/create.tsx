@@ -1,79 +1,79 @@
 'use client'
-import { canManageRole } from '@/lib/staff-role';
 
-import { jstDateOffset, scheduledJstIso } from '@/lib/jst-datetime'
-import { notifySaved } from '@/components/shared/toast'
-import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
-import { useTenantWideAccess } from '@/lib/staff-role'
-import { EntityPickerField, EntityPickerSummary } from '@/components/shared/entity-picker'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { Steps } from '@/components/templates/steps'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from '@/components/shared/list-navigation'
-import { useSearchParams } from 'next/navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { AlertTriangle, ArrowDown, ArrowRight, Building2, CheckCircle2, Eye, Send, Tag as TagIcon, Workflow } from 'lucide-react'
-import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
-import ConditionBuilder from '@/components/shared/condition-builder'
-import Dialog from '@/components/shared/dialog'
-import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
-import { BubblePreview } from '@/components/broadcasts/broadcast-form'
-import { TARGET_MODES } from '@/lib/broadcast-audience'
-import { pruneCondition } from '@/lib/segment-condition'
-import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DateField from '@/components/shared/date-field'
-import { TimeField } from '@/components/shared/date-time-field'
-import HelpTip from '@/components/shared/help-tip'
-import {HqInsertRow,HQ_INSERT_CHIPS,insertHqToken} from '@/components/shared/hq-message-inserts'
-import { InsertButton, type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
-import LinePreview from '@/components/shared/line-preview'
-import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import { RequiredBadge } from '@/components/shared/form-controls'
-import Select from '@/components/shared/select'
-import FolderSelect from '@/components/shared/folder-select'
-import StatusBadge from '@/components/shared/status-badge'
-import StickyBar from '@/components/shared/sticky-bar'
-import { useFormErrors } from '@/lib/use-form-errors'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { notifyToast } from '@/components/shared/toast'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
-import formStyles from '@/components/broadcasts/broadcast-form-v8.module.css'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ApiError, api, describeSaveFailure, type BroadcastMessageAsset } from '@/lib/api'
-import { bubbleLegacyMessage } from '@/lib/broadcast-template'
-import { formatNumber, formatRelative } from '@/lib/format'
-import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
-import { hqTemplatesApi, type HqTemplateListItem } from '@/lib/hq-templates-api'
-import { useStaffRole } from '@/lib/staff-role'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import RowMenu from './row-menu'
-import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
-import { HQ_KIND_LABEL, bubbleFromTemplate, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
-import HqTemplatePicker from './template-picker'
-import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker'
-import { SourcePickerSelection, type SourcePickerItem, type SourcePickerFolder } from '@/components/shared/source-picker-dialog'
-import CarouselV8 from '@/v8/templates/carousel'
-import TemplateRichEditor from '@/v8/template-edit/rich'
-import type { TemplateEditHost } from '@/v8/template-edit/host'
-import { hostDefinition } from '@/v8/hq-templates/console'
-import { freshDefinition } from '@/lib/hq-template-authoring'
-import styles from './create.module.css'
-import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer'
-import { PageHeading } from '@/components/templates/page-frame'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-
+import { jstDateOffset } from '@/lib/jst-datetime';
+import { notifySaved } from '@/components/shared/toast';
+import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker';
+import { useTenantWideAccess } from '@/lib/staff-role';
+import { EntityPickerField, EntityPickerSummary } from '@/components/shared/entity-picker';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { Steps } from '@/components/templates/steps';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from '@/components/shared/list-navigation';
+import { useSearchParams } from 'next/navigation';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { AlertTriangle, ArrowRight, Building2, CheckCircle2, Copy, Eye, FileText, Send, SquarePen, Tag as TagIcon, Workflow } from 'lucide-react';
+import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared';
+import ConditionBuilder from '@/components/shared/condition-builder';
+import Dialog from '@/components/shared/dialog';
+import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval';
+import { BubblePreview } from '@/components/broadcasts/broadcast-form';
+import { TARGET_MODES } from '@/lib/broadcast-audience';
+import { pruneCondition } from '@/lib/segment-condition';
+import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval';
+import Button from '@/components/shared/button';
+import Checkbox from '@/components/shared/checkbox';
+import ConfirmDialog from '@/components/shared/confirm-dialog';
+import SendConfirmDialog, { describeExclusion } from '@/components/shared/send-confirm-dialog';
+import { chatSafetyApi } from '@/lib/api-gap1';
+import type { SendConfirmationPreview } from '@line-crm/shared';
+import DateField from '@/components/shared/date-field';
+import { TimeField } from '@/components/shared/date-time-field';
+import HelpTip from '@/components/shared/help-tip';
+import { HqInsertRow, HQ_INSERT_CHIPS, insertHqToken } from '@/components/shared/hq-message-inserts';
+import { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
+import LinePreview from '@/components/shared/line-preview';
+import ListState from '@/components/shared/list-state';
+import Notice from '@/components/shared/notice';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import { RequiredBadge } from '@/components/shared/form-controls';
+import FolderSelect from '@/components/shared/folder-select';
+import StatusBadge from '@/components/shared/status-badge';
+import { CreatePage } from '@/components/templates/create-page';
+import { useFormErrors } from '@/lib/use-form-errors';
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
+import { notifyToast } from '@/components/shared/toast';
+import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps';
+import formStyles from '@/components/broadcasts/broadcast-form-v8.module.css';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { api, type BroadcastMessageAsset } from '@/lib/api';
+import { bubbleLegacyMessage } from '@/lib/broadcast-template';
+import { formatNumber, formatRelative } from '@/lib/format';
+import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api';
+import { hqTemplatesApi } from '@/lib/hq-templates-api';
+import { useStaffRole } from '@/lib/staff-role';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import RowMenu from './row-menu';
+import { ASSET_KIND, STORE_INSERT_CHIPS, type HqKind, jpDateTime, preflightBadge, previewText, runPeople, sendTotals, splitPreflightRows, toApiContent } from './model';
+import { HQ_KIND_LABEL, bubbleFromTemplate, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, notYetText, toApiBubble } from './bubbles';
+import HqTemplatePicker from './template-picker';
+import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker';
+import { SourcePickerSelection, type SourcePickerItem, type SourcePickerFolder } from '@/components/shared/source-picker-dialog';
+import CarouselV8 from '@/v8/templates/carousel';
+import TemplateRichEditor from '@/v8/template-edit/rich';
+import type { TemplateEditHost } from '@/v8/template-edit/host';
+import { hostDefinition } from '@/v8/hq-templates/console';
+import { freshDefinition } from '@/lib/hq-template-authoring';
+import styles from './create.module.css';
+import MessageComposer from '@/components/shared/message-composer';
+import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame';
+import PreviewLauncher from '@/components/templates/preview-launcher';
+import { Field } from '@/components/shared/form-controls';
+import { SettingsFormRow } from '@/components/shared/settings-form-card';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import { type Audience, type Bubble, newBubble, errorText, jstIso, splitJst, assetContent, bubblesFromInput, audienceFromInput } from "./create-gap-parts"
 /*
  * ★V8 統括 一括配信を作る（B-37・絵 V8.pen の BBRDb：① lmWCZ・② AL5vR・③ lLyFR・④ ZU4Ae・⑤ H9eG3n）。
  *
@@ -87,13 +87,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  */
 
 type Store = BroadcastAccount
-/** 配信対象（店の一斉配信と同じ4つ。名前は店の口と同じ：詳細条件は advanced）。 */
-type Audience = 'all' | 'scenario' | 'tag' | 'advanced'
 type Method = 'new' | 'template' | 'duplicate'
-/** 吹き出し1つ（店の一斉配信と同じく5つまで）。種類と口への形は bubbles.ts。 */
-type Bubble = HqBubble
-const MAX_BUBBLES = 5
-const newBubble = newHqBubble
 /**
  * 統括の条件で選べる種類（API-18：タグ・シナリオは各アカウントの同じ名前に直す）。
  * 友だち情報・対応マーク・回答フォーム・個別の友だち・分析の対象・クリック履歴は店ごとの ID なので選ばせない。
@@ -108,66 +102,6 @@ const BODY_MAX = 5000
 const ROWS_SHOWN = 4
 
 const KIND_LABEL = HQ_KIND_LABEL
-
-function errorText(caught: unknown, fallback: string): string {
-  if (caught instanceof ApiError) {
-    if (caught.status === 403) return permissionDeniedMessage('hq')
-    if (caught.status === 409) return japaneseDetailOf(caught) || 'ほかの人が先に操作しました。もう一度確かめてください。'
-    return withPermissionFailure(caught, describeSaveFailure(caught), 'hq')
-  }
-  // 「API error: 500」のような内部の文は出さない。
-  return japaneseDetailOf(caught) || fallback
-}
-
-/** 送った人数（外したアカウントを除く）。 */
-function runPeople(run: HqBroadcastRun): number {
-  return run.targets.reduce((sum, t) => sum + (t.excluded ? 0 : t.totalCount || 0), 0)
-}
-
-/** 配信の中身の種類（「テキスト＋カルーセル」）。 */
-function runKinds(run: HqBroadcastRun): string {
-  return [...new Set(bubblesFromInput(run.input ?? { messageContent: '' }).map((b) => HQ_KIND_LABEL[b.kind]))].join('＋')
-}
-
-/** 日付（YYYY-MM-DD）と時刻（HH:MM）を日本時間として ISO にする（店の一斉配信と同じ「日本時間」の欄）。 */
-function jstIso(date: string, time: string): string | null {
-  return scheduledJstIso(date, time)
-}
-
-/** 下書きの日時（ISO）を、日本時間の日付と時刻の欄に戻す。 */
-function splitJst(iso: string): { date: string; time: string } | null {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  const j = new Date(d.getTime() + 9 * 60 * 60 * 1000)
-  return { date: `${j.getUTCFullYear()}-${String(j.getUTCMonth() + 1).padStart(2, '0')}-${String(j.getUTCDate()).padStart(2, '0')}`, time: `${String(j.getUTCHours()).padStart(2, '0')}:${String(j.getUTCMinutes()).padStart(2, '0')}` }
-}
-
-/** 素材（クーポン・リッチメッセージ）を吹き出しの中身にする。口の messageBubblesJson と同じ形（店側の一斉配信と同じ）。 */
-function assetContent(asset: BroadcastMessageAsset): Record<string, unknown> {
-  return { assetId: asset.id, assetName: asset.name, ...asset.payload }
-}
-
-/** 保存した吹き出し（messageBubblesJson）を画面の吹き出しに戻す。読めなければ本文1つ。 */
-function bubblesFromInput(saved: Pick<HqBroadcastInput, 'messageBubblesJson' | 'messageContent'>): Bubble[] {
-  let raw: Array<{ id?: string; type?: string; content?: Record<string, unknown> }> = []
-  try { raw = saved.messageBubblesJson ? JSON.parse(saved.messageBubblesJson) : [] } catch { raw = [] }
-  const list = (Array.isArray(raw) ? raw : []).flatMap((item): Bubble[] => { const b = fromApiBubble(item); return b ? [b] : [] })
-  return list.length ? list.slice(0, MAX_BUBBLES) : [{ ...newBubble('text'), body: fromApiContent(saved.messageContent ?? '') }]
-}
-
-/** 保存した配信対象を画面の選び方に戻す（シナリオ1つだけの条件はシナリオ、ほかは詳細条件）。 */
-function audienceFromInput(saved: HqBroadcastInput): { audience: Audience; tagName: string; scenarioName: string; condition: SegmentCondition | null; savedName: string } {
-  const empty = { tagName: '', scenarioName: '', condition: null, savedName: '' }
-  if (saved.audience?.kind === 'tag') return { ...empty, audience: 'tag', tagName: saved.audience.tagName }
-  if (saved.targetType === 'segment') {
-    const rules = saved.segmentConditions?.rules ?? []
-    if (!saved.savedSearchId && rules.length === 1 && rules[0].type === 'scenario_subscribed' && !(saved.segmentConditions?.groups ?? []).length) {
-      return { ...empty, audience: 'scenario', scenarioName: String(rules[0].value ?? '') }
-    }
-    return { ...empty, audience: 'advanced', condition: saved.segmentConditions ?? null, savedName: saved.savedSearchId ?? '' }
-  }
-  return { ...empty, audience: 'all' }
-}
 
 export default function HqBroadcastCreate() {
   const saveErrors = useSaveFormErrors()
@@ -269,7 +203,6 @@ export default function HqBroadcastCreate() {
   const [approvalRequestOpen, setApprovalRequestOpen] = useState(false)
   const [confirmCount, setConfirmCount] = useState('')
   const [previewConfirmed, setPreviewConfirmed] = useState(false)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [previewDevice, setPreviewDevice] = useState<'phone' | 'pc'>('phone')
 
   const [when, setWhen] = useState<'now' | 'later'>('later')
@@ -285,6 +218,9 @@ export default function HqBroadcastCreate() {
   const [errorStep, setErrorStep] = useState<BroadcastStepKey | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [sending, setSending] = useState(false)
+  /* 共通の「送る前の確かめ」の中身は、保存した一括配信に対するサーバーの数え直し（GET /api/hq/broadcasts/:id/send-preview）。 */
+  const [sendPreview, setSendPreview] = useState<{ state: 'loading' | 'error' | 'ready'; data: SendConfirmationPreview | null }>({ state: 'loading', data: null })
+  const [previewSeq, setPreviewSeq] = useState(0)
   const [leaving, setLeaving] = useState(false)
   /* 下書きの依頼番号。作ったとき（または読んだ下書き）のものを、直すときもそのまま使う（口の決まり）。 */
   const requestRef = useRef('')
@@ -622,6 +558,16 @@ export default function HqBroadcastCreate() {
     setConfirmOpen(true)
   }
 
+  useEffect(() => {
+    if (!confirmOpen || !run) return
+    let alive = true
+    setSendPreview({ state: 'loading', data: null })
+    void chatSafetyApi.hqSendPreview(run.id)
+      .then((res) => { if (alive) setSendPreview(res.success ? { state: 'ready', data: res.data } : { state: 'error', data: null }) })
+      .catch(() => { if (alive) setSendPreview({ state: 'error', data: null }) })
+    return () => { alive = false }
+  }, [confirmOpen, run, previewSeq])
+
   const send = async () => {
     if (!run) return
     setSending(true)
@@ -809,25 +755,73 @@ export default function HqBroadcastCreate() {
 
   if (!canManage) {
     return (
-      <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><div className={formStyles.root}>
+      <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><PageFrame kind="create" boardId="BBRDb">
         <PageHeading title={<>一括配信を作る</>} />
-        <div className={formStyles.input}>
+        <PageContent>
           <Notice tone="info">一括配信を作れるのは、統括全体の編集権限がある人（オーナー・管理者）だけです。</Notice>
-        </div>
-      </div></SaveErrorScope></SaveErrorScope>
+        </PageContent>
+      </PageFrame></SaveErrorScope></SaveErrorScope>
     )
   }
 
   const shows = (key: BroadcastStepKey) => step === key
   const nextLabel = step === 'basic' ? '対象設定へ' : step === 'audience' ? 'メッセージ設定へ' : step === 'message' ? '送信設定へ' : '配信前チェックへ'
 
+  const previewContent = <>            <div className={formStyles.previewHead}>
+              <h3>LINE の見え方</h3>
+              <div className={formStyles.deviceSwitch} role="group" aria-label="プレビューの端末">
+                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button>
+                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button>
+              </div>
+            </div>
+            <div className={previewDevice === 'pc' ? formStyles.pcPreview : formStyles.phonePreview}>
+              <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
+                empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
+                <div className="flex flex-col gap-3 text-ink">
+                  {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} composer={step === 'message'} /> : null))}
+                </div>
+              </LinePreview>
+            </div>
+            <p className={formStyles.previewCaption}>{'店名は例のアカウントの名前で見せています'}</p>
+            <div className={formStyles.previewSummary}><h3>設定内容</h3><dl>{[
+              ...(step === 'message' ? [] : [['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択']]),
+              ['送る相手', `${audienceFull}（${peopleLabel}）`],
+              ['送る日時', sendWhenLabel],
+              ...(step === 'message' ? [['配信後のアクション', '—']] : []),
+            ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
+            <div className={formStyles.previewActions}>
+              <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={14} aria-hidden /> テストを送る</Button>
+              <Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button>
+            </div>
+            <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
+</>
+
   return (
     <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><>
-      <MessageComposerPage active={step === 'message'}><div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
-        <PageHeading title={<>一括配信を作る</>} headingSize="compact"
-        subtitle={<span aria-live="polite">{draftLabel}</span>}
+      <CreatePage boardId="BBRDb" dirty={false}
+        footerActions={(
+          <>
+            {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
+            <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
+            {step !== 'confirm' ? (
+              <Button variant="primary" disabled={composerBusy || (step === 'audience' && chosen.length > 0 && tagStatus !== 'ready')} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
+                {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={15} aria-hidden /></> : nextLabel}
+              </Button>
+            ) : (
+              <Button variant="primary" busy={checking || sending} disabled={sending || gate === 'pending'} onClick={() => void askSend()}>
+                {gate === 'needsRequest' ? '承認を依頼する' : gate === 'pending' ? '承認を待っています' : when === 'later' ? 'この内容で予約する' : '今すぐ送る'}
+              </Button>
+            )}
+          </>
+        )}
+        preview={previewContent}
+        previewLabel="LINEの見え方"
+        previewToggle={<PreviewLauncher>{previewContent}</PreviewLauncher>}
+        status={draftLabel}
+         title={<>一括配信を作る</>} headingSize="compact"
+        help="送るアカウントを選び、配信対象・メッセージ・送信設定を確かめてから配信します。下書きの保存では、友だちへ送信しません。"
         steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></>}
-        actions={<>{/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}<Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button></>} />
+        >
         {error ? (
           <Notice
             tone="danger"
@@ -847,19 +841,19 @@ export default function HqBroadcastCreate() {
         ) : null}
         {draftState === 'error' ? <Notice tone="danger" role="alert">下書きを読み込めませんでした。一括配信の一覧から開き直してください。</Notice> : null}
 
-        <div className={formStyles.body}>
-          <div className={formStyles.input}>
+
             {/* ① 基本設定（lmWCZ） */}
             {shows('basic') ? (
               <section id="broadcast-step-basic" className={formStyles.section}>
                 <h3>配信方法</h3>
                 <SaveErrorField names={["hq-broadcast-method","value","method"]}><RadioCardGroup legend="配信方法" className={formStyles.methodCards}>
+                  {/* EpTBB：3つのカードは左上に印（書く・テンプレート・写す）。 */}
                   {([
-                    ['new', '新しいメッセージを作成', 'テキスト・画像・カルーセルなどを組み合わせて一から作ります。'],
-                    ['template', 'テンプレートを選択', '統括のテンプレートを呼び出して手直しします。'],
-                    ['duplicate', '過去の配信を複製', '送った一括配信をそのまま写して作り直します。'],
-                  ] as const).map(([value, label, note]) => (
-                    <RadioCard key={value} name="hq-broadcast-method" value={value} checked={method === value} title={label} note={note} onChange={(next) => setMethod(next as Method)} />
+                    ['new', '新しいメッセージを作成', 'テキスト・画像・カルーセルなどを組み合わせて一から作ります。', SquarePen],
+                    ['template', 'テンプレートを選択', '統括のテンプレートを呼び出して手直しします。', FileText],
+                    ['duplicate', '過去の配信を複製', '送った一括配信をそのまま写して作り直します。', Copy],
+                  ] as const).map(([value, label, note, Icon]) => (
+                    <RadioCard key={value} name="hq-broadcast-method" value={value} checked={method === value} title={label} note={note} icon={<Icon aria-hidden="true" />} onChange={(next) => setMethod(next as Method)} />
                   ))}
                 </RadioCardGroup></SaveErrorField>
                 {/* EpTBB：①は選ぶボタン／選んだ1行だけ。窓の仮選択は確定するまで反映しない。 */}
@@ -872,10 +866,10 @@ export default function HqBroadcastCreate() {
                 <Field label="配信名" requirement={fields.requirement('title')} count={{ value: title.trim().length, max: TITLE_MAX }}><SaveErrorField names={["title"]}><input {...fields.bind('title')} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} /></SaveErrorField>
 <small>友だちには表示されません。一覧で見分けるための名前です</small></Field>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}
-                <div className={formStyles.basicFields}>
+                <SettingsFormRow layout="columns">
                   <Field label="フォルダ"><SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={hqFolders.map((f) => ({ value: f.id, label: f.name, color: f.color }))} onCreate={canManage ? createHqFolder : undefined} size="full" /></SaveErrorField></Field>
                   <Field label="社内メモ" help={<>友だちには表示されません。各アカウントの配信にも同じメモが残ります</>}><SaveErrorField names={["internalMemo","internal_memo"]}><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} maxLength={10000} className={formStyles.textInput} placeholder="友だちには表示されません" /></SaveErrorField></Field>
-                </div>
+                </SettingsFormRow>
                 <div className={formStyles.recentHeader}><h3>最近の配信</h3><Link href="/hq/broadcasts">一括配信の一覧を見る →</Link></div>
                 <div className={formStyles.recentList}>
                   {recent.length ? recent.map((item) => {
@@ -1138,58 +1132,8 @@ export default function HqBroadcastCreate() {
                 <p className="text-xs text-ink-faint">{when === 'later' ? '予約後も送る前までは、一括配信の詳細から止められます。' : '「今すぐ送る」で確認画面を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
               </div>
             ) : null}
-          </div>
-
-          {/* 店の一斉配信と同じ右の列（全部の段でいつも出す。白い板が 1100px 未満のときだけ畳み、頭のボタンで開く）。 */}
-          <aside id="hq-broadcast-line-preview" className={formStyles.preview} data-open={previewOpen || undefined} aria-label="LINEの見え方">
-            <div className={formStyles.previewHead}>
-              <h3>LINE の見え方</h3>
-              <div className={formStyles.deviceSwitch} role="group" aria-label="プレビューの端末">
-                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button>
-                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button>
-              </div>
-              <Button className={formStyles.previewClose} size="compact" onClick={() => setPreviewOpen(false)}>閉じる</Button>
-            </div>
-            <div className={previewDevice === 'pc' ? formStyles.pcPreview : formStyles.phonePreview}>
-              <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
-                empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
-                <div className="flex flex-col gap-3 text-ink">
-                  {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} composer={step === 'message'} /> : null))}
-                </div>
-              </LinePreview>
-            </div>
-            <p className={formStyles.previewCaption}>{'店名は例のアカウントの名前で見せています'}</p>
-            <div className={formStyles.previewSummary}><h3>設定内容</h3><dl>{[
-              ...(step === 'message' ? [] : [['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択']]),
-              ['送る相手', `${audienceFull}（${peopleLabel}）`],
-              ['送る日時', sendWhenLabel],
-              ...(step === 'message' ? [['配信後のアクション', '—']] : []),
-            ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
-            <div className={formStyles.previewActions}>
-              <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={14} aria-hidden /> テストを送る</Button>
-              <Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button>
-            </div>
-            <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
-          </aside>
-        </div>
-
-        <StickyBar className={formStyles.footer} actions={(
-          <>
-            {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
-            <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
-            {step !== 'confirm' ? (
-              <Button variant="primary" disabled={composerBusy || (step === 'audience' && chosen.length > 0 && tagStatus !== 'ready')} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
-                {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={15} aria-hidden /></> : nextLabel}
-              </Button>
-            ) : (
-              <Button variant="primary" busy={checking || sending} disabled={sending || gate === 'pending'} onClick={() => void askSend()}>
-                {gate === 'needsRequest' ? '承認を依頼する' : gate === 'pending' ? '承認を待っています' : when === 'later' ? 'この内容で予約する' : '今すぐ送る'}
-              </Button>
-            )}
-          </>
-        )} />
         {inlineEditor}
-    </div></MessageComposerPage>
+    </CreatePage>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
@@ -1199,8 +1143,36 @@ export default function HqBroadcastCreate() {
         onConfirm={() => { confirmLeave() }}
       />
 
+      {/* 共通の「送る前の確かめ」（U1・板 i7TdtN）。統括担当が 1 人だけで人数を入れて確かめるときは、下の窓を使う。 */}
+      <SendConfirmDialog
+        open={confirmOpen && gate !== 'single'}
+        subtitle={`${title.trim() || '新しい一括配信'} ・ ${formatNumber(totals?.sendStores ?? 0)} アカウントへ`}
+        scheduled={when !== 'now'}
+        state={sendPreview.state}
+        onRetry={() => setPreviewSeq((value) => value + 1)}
+        recipients={sendPreview.data?.recipients ?? null}
+        recipientsNote={sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : undefined}
+        perAccount={sendPreview.data?.perAccount?.map((row) => ({
+          /* 口は店の ID だけを返す。名前は店の一覧から引く。 */
+          name: (stores ?? []).find((store) => store.id === row.accountId)?.name ?? row.accountId,
+          recipients: row.recipients,
+          stopped: row.excluded.optedOut,
+          narrowed: row.excluded.optedOut > 0,
+        }))}
+        accountCount={totals?.sendStores}
+        purpose="marketing"
+        whenLabel={when === 'now' ? '今すぐ送る' : `${sendWhenLabel} に送る（予約）`}
+        whenNote={when === 'now' ? undefined : '予約は送る時刻の 1 分前まで［予約を取り消す］で止められます'}
+        sender={sendPreview.data?.sender ?? null}
+        bodyHead={sendPreview.data?.firstText ?? ''}
+        allRecipients={audience === 'all'}
+        hidePrimary={approval.state === null}
+        primaryLabel={sendPreview.data ? `${totals ? `${formatNumber(totals.sendStores)} アカウント ` : ''}${formatNumber(sendPreview.data.recipients)} 人に${when === 'now' ? '送る' : '予約する'}` : '送る'}
+        onConfirm={() => send()}
+        onBack={() => { if (!sending) setConfirmOpen(false) }}
+      />
       <ConfirmDialog
-        open={confirmOpen}
+        open={confirmOpen && gate === 'single'}
         title={`${formatNumber(totals?.sendStores ?? 0)}アカウントに送ります`}
         description={`${formatNumber(totals?.sendPeople ?? 0)} 人に${when === 'now' ? 'すぐ' : `${sendWhenLabel} に`}送ります。送った LINE は取り消せません。${totals && totals.skipStores ? `外した${formatNumber(totals.skipStores)}アカウントには送りません。` : ''}`}
         confirmLabel={when === 'now' ? '送る' : '予約する'}

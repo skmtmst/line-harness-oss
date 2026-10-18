@@ -8,8 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
-import { Activity, BellRing, Layers, MessageCircle, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
-import { restaurantTestUiEnabled } from '@/lib/environment-features'
+import { Activity, BellRing, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
 
@@ -32,6 +31,7 @@ import styles from './settings-inner-nav.module.css'
  * 2026-10-06：夕41 の並び（専用の小見出し・プール管理なし）から、今の絵の並びへ。
  */
 const SETTINGS_ORDER = [
+  '/settings/customer-look', // お客さまのデザイン（B-237・絵 ewM7i では会社とロゴの次＝今は先頭）
   '/getting-started', // はじめの設定
   '/accounts', // LINEアカウント
   '/pools', // プール管理
@@ -47,6 +47,7 @@ const SETTINGS_ORDER = [
 
 /** 絵の印（lucide）。 */
 const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
+  '/settings/customer-look': Palette,
   '/getting-started': Rocket,
   '/accounts': MessageCircle,
   '/pools': Layers,
@@ -62,6 +63,7 @@ const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
 
 /** 左のメニュー（lib/menu）に無く、設定の中のメニューにだけ出す項目。 */
 const SETTINGS_ONLY_ITEMS: MenuItem[] = [
+  { id: 'settings-customer-look', href: '/settings/customer-look', label: 'お客さまのデザイン', icon: '', note: '予約・回答フォームなど、お客さまに見える画面のデザイン', required: true },
   { id: 'settings-sns', href: '/settings/sns', label: 'SNS 連携', icon: '', note: 'Google ビジネスと Instagram をつなぎます', required: true },
   { id: 'settings-booking-media', href: '/settings/booking-media', label: '予約サイト・グルメ媒体', icon: '', note: '店ごとの予約サイト・グルメ媒体の URL と、他のサイトの枠を閉じる知らせ', required: true },
   { id: 'settings-delivery', href: '/settings/delivery', label: 'デリバリー連携', icon: '', note: 'Uber Eats・出前館・ロケットナウの注文をまとめて受け取ります', required: true },
@@ -152,8 +154,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
    * 設定の中のメニュー）。出し分けの決まりは左のメニューと同じ。
    */
   const itemVisible = (item: MenuItem): boolean => {
-    if ((item.href === '/settings/booking-media' || item.href === '/settings/delivery') && !restaurantTestUiEnabled()) return false
-    if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
+    if ((item.href === '/staff' || item.href === '/settings/customer-look') && staffRole !== 'owner' && staffRole !== 'admin') return false
     if (item.href === '/accounts' && staffRole === 'staff') return false
     const permissionKey = item.permissionKey ?? item.href
     if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
@@ -164,54 +165,82 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   }
 
   const byHref = new Map([...settingsSectionItems, ...SETTINGS_ONLY_ITEMS].map((item) => [item.href, item]))
-  const items = SETTINGS_ORDER
-    .map((href) => byHref.get(href))
-    .filter((item): item is MenuItem => Boolean(item))
-    .filter(itemVisible)
-
   const itemActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`)
 
-  const renderItem = (item: MenuItem) => {
+  // いま開いている画面は、権限の出し分けで隠れる項目でも必ず出す（選ばれた形が消えないように）。
+  const items = SETTINGS_ORDER
+    .map((href) => byHref.get(href))
+    .filter((item): item is MenuItem => Boolean(item))
+    .filter((item) => itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item))
+
+  const entries: SettingsMenuEntry[] = items.map((item) => {
     const active = item.href === '/settings'
       ? pathname === '/settings'
       : itemActive(item.href)
     // 機能設定の下の2つは絵に無いが、ここからしか行けないので消さない。機能設定とその2つを開いているときだけ出す。
     const children = item.href === '/settings' && (pathname === '/settings' || SETTINGS_CHILDREN.some((child) => itemActive(child.href))) ? SETTINGS_CHILDREN : []
-    const Icon = SETTINGS_ICONS[item.href as (typeof SETTINGS_ORDER)[number]]
-    return (
-      <li key={item.href}>
-        <Link
-          href={item.href}
-          className={`${styles.item} ${active ? styles.itemActive : ''}`}
-          aria-current={active ? 'page' : undefined}
-        >
-          {Icon ? <Icon size={16} aria-hidden="true" className={styles.icon} /> : null}
-          {item.label}
-        </Link>
-        {children.length > 0 && (
-          <ul className={styles.children}>
-            {children.map((child) => (
-              <li key={child.href}>
-                <Link
-                  href={child.href}
-                  className={`${styles.child} ${itemActive(child.href) ? styles.itemActive : ''}`}
-                >
-                  {child.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </li>
-    )
-  }
+    return {
+      href: item.href,
+      label: item.label,
+      Icon: SETTINGS_ICONS[item.href as (typeof SETTINGS_ORDER)[number]],
+      active,
+      children: children.map((child) => ({ href: child.href, label: child.label, active: itemActive(child.href) })),
+    }
+  })
 
+  return <SettingsMenu heading="設定" label="設定の中のメニュー" entries={entries} placement={inline ? 'inline' : 'outer'} />
+}
+
+export type SettingsMenuEntry = {
+  href: string
+  label: string
+  Icon?: LucideIcon
+  active: boolean
+  children?: { href: string; label: string; active: boolean }[]
+}
+
+/**
+ * 設定の中のメニューの形（見出し＋印つきの項目・いまの画面は薄い地＋太字）。
+ * 店の設定（SettingsInnerNav）と統括の設定（v8/hq/settings-nav）が同じ形を使う。
+ * placement：'inline'＝白い板の中の左の欄（幅・余白・仕切り線を持つ）、
+ * 'outer'＝まだ移っていない画面の外の欄、'folder'＝型（ListPage）のフォルダの列の中（幅・余白・線は型が持つ）。
+ */
+export function SettingsMenu({ heading, label, entries, placement = 'inline', fit = false }: {
+  heading: string
+  label: string
+  entries: SettingsMenuEntry[]
+  placement?: 'inline' | 'outer' | 'folder'
+  /** 型のフォルダの列を中身の高さで止める（data-folder-fit）。 */
+  fit?: boolean
+}) {
   return (
-    <nav className={`${styles.root} ${inline ? styles.inline : ''}`} aria-label="設定の中のメニュー" data-settings-nav={inline ? 'inline' : 'outer'}>
-      <p className={styles.heading}>設定</p>
+    <nav className={placement === 'folder' ? styles.folder : `${styles.root} ${placement === 'inline' ? styles.inline : ''}`} aria-label={label} data-settings-nav={placement === 'outer' ? 'outer' : placement} data-folder-fit={fit ? '' : undefined}>
+      <p className={styles.heading}>{heading}</p>
       <ul className={styles.list}>
-        {items.map(renderItem)}
+        {entries.map(({ href, label: itemLabel, Icon, active, children = [] }) => (
+          <li key={href}>
+            <Link
+              href={href}
+              className={`${styles.item} ${active ? styles.itemActive : ''}`}
+              aria-current={active ? 'page' : undefined}
+            >
+              {Icon ? <Icon size={16} aria-hidden="true" className={styles.icon} /> : null}
+              {itemLabel}
+            </Link>
+            {children.length > 0 && (
+              <ul className={styles.children}>
+                {children.map((child) => (
+                  <li key={child.href}>
+                    <Link href={child.href} className={`${styles.child} ${child.active ? styles.itemActive : ''}`}>
+                      {child.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
       </ul>
     </nav>
   )

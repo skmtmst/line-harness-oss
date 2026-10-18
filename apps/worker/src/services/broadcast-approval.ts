@@ -181,17 +181,19 @@ export async function evaluateApprovalGate(
   db: D1Database,
   broadcast: Broadcast,
 ): Promise<ApprovalGate> {
+  const context=await db.prepare('SELECT execution_mode,created_via FROM broadcast_execution_contexts WHERE broadcast_id=?').bind(broadcast.id).first<{execution_mode:string;created_via:string}>();
+  const simulation=context?.execution_mode==='simulation';
   const [recipientCount, threshold, operatorCount] = await Promise.all([
-    countApprovalRecipients(db, broadcast),
+    simulation?import('./broadcast-simulation.js').then(m=>m.simulationPreview(db,broadcast.id)).then(p=>p.recipients):countApprovalRecipients(db, broadcast),
     getBroadcastApprovalThreshold(db, broadcast),
     countActiveOperators(db),
   ]);
   return {
     recipientCount,
     threshold,
-    required: recipientCount >= threshold,
+    required: simulation&&context.created_via==='mcp'||recipientCount >= threshold,
     // 数えられなかったとき（0人）は1人運用扱いにしない。二者承認も要らない。
-    singleOperator: operatorCount <= 1,
+    singleOperator: !(simulation&&context.created_via==='mcp')&&operatorCount <= 1,
     operatorCount,
   };
 }
@@ -220,7 +222,7 @@ export async function notifyBroadcastApproval(
       metadata: JSON.stringify({ broadcastId: broadcast.id, action: eventType }),
     });
   } catch (err) {
-    console.error(`[broadcast-approval] notification failed (${eventType}):`, err);
+    console.error(JSON.stringify({"code":"services_broadcast_approval_failed"}));
   }
 }
 
@@ -277,7 +279,7 @@ export async function sweepBroadcastApprovalExpiry(db: D1Database, nowMs: number
   try {
     expired = await expireOverdueBroadcastApprovals(db, nowMs);
   } catch (err) {
-    console.error('[broadcast-approval] expiry sweep failed:', err);
+    console.error(JSON.stringify({"code":"services_broadcast_approval_failed"}));
     return;
   }
   const { getBroadcastById } = await import('@line-crm/db');
@@ -291,7 +293,7 @@ export async function sweepBroadcastApprovalExpiry(db: D1Database, nowMs: number
         '承認されないまま予約の時刻を過ぎたため、送らずに期限切れにしました。送るには作り直してください。',
       );
     } catch (err) {
-      console.error('[broadcast-approval] expiry notification failed:', err);
+      console.error(JSON.stringify({"code":"services_broadcast_approval_failed"}));
     }
   }
 }

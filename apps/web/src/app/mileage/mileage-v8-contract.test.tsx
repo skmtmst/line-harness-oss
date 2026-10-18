@@ -300,29 +300,25 @@ test('v8 のたまる決めごとは板 OC0gy に切り替わる', async () => {
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('100マイル')
 })
 
-test('v8 のたまる決めごと：きっかけ（購入・配信の反応・紹介）は上の絞り込み。左のフォルダの列は「すべて」だけで押せない口を置かない（B-136）', async () => {
+test('v8 のたまる決めごと：きっかけ（購入・配信の反応・紹介）は上の絞り込み。所属先の受け口がないフォルダ列を出さず、作成と絞り込みを保つ（W2）', async () => {
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<MileagePage />))
   await settle()
   await eventually(() => expect(host.textContent).toContain('友だち追加'))
-  const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
-  const rows = [...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))
-  expect(rows).toEqual(['すべて'])
-  expect(nav.textContent).not.toContain('購入')
+  expect(host.querySelector('[data-template-region="folders"]')).toBeNull()
+  expect(host.querySelector('a[href="/mileage/earning-rules/new"]')).toBeTruthy()
   expect(host.textContent).not.toContain('フォルダを追加')
   expect(host.querySelector('button[aria-label="きっかけ"], [aria-label="きっかけ"]')).toBeTruthy()
 })
 
-test('v8 の使い道：種類（クーポン・シナリオなど）は上の絞り込み。左のフォルダの列は「すべて」だけ（B-136）', async () => {
+test('v8 の使い道（S35pO）：左は使い道のフォルダの列。種類の選ぶ欄は道具の段に置かない', async () => {
   document.documentElement.dataset.theme = 'v8'
   query = 'tab=rewards'
   await act(async () => root.render(<MileagePage />))
   await settle()
   await eventually(() => expect(host.textContent).toContain('送料無料クーポン'))
-  const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
-  expect([...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))).toEqual(['すべて'])
-  expect(nav.textContent).not.toContain('クーポン')
-  expect(host.querySelector('[aria-label="種類"]')).toBeTruthy()
+  expect(host.querySelector('[data-template-region="folders"]')).not.toBeNull()
+  expect(host.querySelector('[aria-label="種類"]')).toBeNull()
   query = ''
 })
 
@@ -372,4 +368,14 @@ test('旧テーマの属性が残っていてもV8を出す', async () => {
     expect(host.querySelector('[data-design-node="OC0gy"]')).toBeTruthy()
   })
   expect(host.querySelector('[data-mileage-design="v6"]')).toBeNull()
+})
+
+test('U5：使われたマイルは支出の絶対量で、交換回数を保つ', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await act(async () => root.render(<MileagePage />))
+  await eventually(() => {
+    const card = [...host.querySelectorAll('[data-design-version="v8"]')].find(el => el.querySelector('[data-kpi-label]')?.textContent === '直近30日 使われたマイル')
+    expect(card?.querySelector('[data-kpi-number]')?.textContent).toBe('200')
+    expect(card?.textContent).toContain('交換 2 件')
+  })
 })

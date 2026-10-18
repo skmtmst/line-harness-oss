@@ -1,5 +1,9 @@
+import { isGroupResponse } from './new/create-draft'
+import { ApiError } from '@/lib/api'
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe,expect,it } from 'vitest'
+import { SIZE_LABEL } from './new/create-options'
+import { imageUploadErrorText } from './new/image-upload-error'
 
 const EDIT = readFileSync(new URL('./new/create-v8.tsx', import.meta.url), 'utf8')
 const UNPUBLISH = readFileSync(new URL('../../v8/rich-menu-edit/detail.tsx', import.meta.url), 'utf8')
@@ -20,7 +24,8 @@ const TAG_MODAL = readFileSync(
  */
 describe('#578 リッチメニューの軽整理', () => {
   it('取得結果を as で断定せず、形を確かめる', () => {
-    expect(EDIT).toContain('function isGroupResponse')
+    expect(isGroupResponse({ id: 'menu', name: '案内', pages: [] })).toBe(true)
+    for (const value of [null, {}, { id: 1, name: '案内', pages: [] }, { id: 'menu', name: '案内', pages: null }]) expect(isGroupResponse(value)).toBe(false)
     const loadEdit = EDIT.slice(EDIT.indexOf('const loadEditGroup'), EDIT.indexOf('/* ---------- 下書きの作成・保存'))
     expect(loadEdit).toContain('isGroupResponse(res.data)')
     expect(loadEdit).not.toContain('res.data as Group')
@@ -35,9 +40,10 @@ describe('#578 リッチメニューの軽整理', () => {
   })
 
   it('画像エラーの英語原文をそのまま出さない', () => {
-    expect(EDIT).toContain('imageUploadErrorText(e)')
-    expect(EDIT).toContain('1MB以下の画像を選んでください')
-    expect(EDIT).toContain('RICH_MENU_DIMENSIONS.large.width')
+    expect(imageUploadErrorText(new ApiError(400, 'exceeds 1MB limit'))).toContain('1MB以下の画像を選んでください')
+    expect(imageUploadErrorText(new ApiError(400, 'dimensions mismatch'))).toBe(`画像の大きさが合いません。${SIZE_LABEL.large}（大）か${SIZE_LABEL.compact}（小）の画像を選んでください。`)
+    expect(imageUploadErrorText(new ApiError(400, 'unrecognized image format'))).toBe('画像の形式はPNGかJPEGにしてください。')
+    expect(imageUploadErrorText(new Error('internal server detail'))).toBe('画像を読み込めませんでした。もう一度お試しください。')
   })
 
   it('取り下げの部分的失敗を日本語の定型文に写す', () => {

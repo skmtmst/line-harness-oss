@@ -16,6 +16,7 @@ vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; chil
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc', loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 
+const periodFailure = vi.hoisted(() => ({ value: false }))
 const requests = vi.hoisted(() => [] as Array<Record<string, unknown>>)
 const grant = (id: string) => ({
   id, friendId: 'f', displayName: '田中', entryType: 'grant', mode: 'automatic', amount: 10, reason: '来店',
@@ -29,7 +30,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       ...actual.api,
       mileage: {
         ...actual.api.mileage,
-        history: async (params: Record<string, unknown>) => { requests.push(params); return ({
+        history: async (params: Record<string, unknown>) => { requests.push(params); if (periodFailure.value && params.limit === 1) throw new Error('period unavailable'); return ({
           success: true,
           data: { items: Array.from({ length: 20 }, (_, i) => grant(`g${i}`)), summary: { byType: [] }, pagination: { total: 60, limit: 20, offset: 0 } },
         }) },
@@ -40,7 +41,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 
 import HistoryTab from './history'
 import { flushListUrlState } from '@/components/shared/list-url-state'
-beforeEach(() => { flushListUrlState(); window.history.replaceState(null, '', '/mileage?tab=history') })
+beforeEach(() => { periodFailure.value = false; flushListUrlState(); window.history.replaceState(null, '', '/mileage?tab=history') })
 afterEach(cleanup)
 
 test('使った・取り消しで、このページに無くても「まだありません」と言わず、ページ送りを残す', async () => {
@@ -49,7 +50,7 @@ test('使った・取り消しで、このページに無くても「まだあ�
   await act(async () => { screen.getByRole('button', { name: /使った・取り消し/ }).click() })
   await waitFor(() => expect(screen.getByText('このページには、使った・取り消しの履歴がありません')).toBeTruthy())
   expect(screen.queryByText('条件に合う履歴はありません')).toBeNull()
-  expect(screen.getByText(/使った・取り消し 0 件/)).toBeTruthy()
+  expect(screen.getByText(/使った・取り消し 0\s*件/)).toBeTruthy()
 })
 
  test('WEB-073：履歴の帯は直近30日を別集計し、回数を件で示す', async () => {
@@ -60,3 +61,31 @@ test('使った・取り消しで、このページに無くても「まだあ�
   expect(requests.some(params => typeof params.from === 'string' && typeof params.to === 'string' && params.limit === 1)).toBe(true)
   expect(screen.queryByText('今月の動き')).toBeNull()
  })
+
+ test('期間集計が失敗しても履歴の件数・ページ送りと説明は使える', async () => {
+   periodFailure.value = true
+   render(<HistoryTab />)
+   await screen.findAllByText('田中')
+   const pager = screen.getByRole('navigation', { name: 'ページ送り' })
+   expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('60件中 1〜20件')
+   const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+   const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
+   expect(body.textContent).toContain('取り消しの明細を足します')
+   await act(async () => toggle.click())
+   expect(body.hidden).toBe(true)
+   await act(async () => toggle.click())
+   expect(body.hidden).toBe(false)
+   requests.length = 0
+   await act(async () => screen.getByRole('button', { name: '次のページ' }).click())
+   await waitFor(() => expect(requests.some(params => params.offset === 20)).toBe(true))
+ })
+
+test('直近30日の集計に失敗しても、取得できた履歴の件数とページ送りを使える', async () => {
+  periodFailure.value = true
+  requests.length = 0
+  render(<HistoryTab />)
+  await screen.findAllByText('田中')
+  expect(screen.getByText('60件中 1〜20件')).toBeTruthy()
+  await act(async () => { screen.getByRole('button', { name: '次のページ' }).click() })
+  await waitFor(() => expect(requests.some(params => params.offset === 20)).toBe(true))
+})

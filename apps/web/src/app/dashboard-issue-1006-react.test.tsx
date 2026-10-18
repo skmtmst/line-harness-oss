@@ -259,7 +259,7 @@ function todayCard(title: string): HTMLElement {
 }
 
 async function openEditor() {
-  await act(async () => { button('ダッシュボード編集').click() })
+  await act(async () => { button('表示を変える').click() })
   await waitFor(() => expect(document.body.querySelector('[role="dialog"]')).not.toBeNull())
 }
 

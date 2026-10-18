@@ -67,23 +67,23 @@ export const BROADCAST_EDIT_OPERATION_KEYS: readonly string[] = [
 /** 束の鍵・APIの入口・画面の操作判定が読む共通の表。 */
 export const DELIVERY_FEATURE_POLICIES = {
   broadcasts: { key: '/broadcasts', api: ['/api/broadcasts', '/api/broadcast-message-assets/upload-sessions'], edit: BROADCAST_DEFINITION_EDIT_KEY, test: BROADCAST_TEST_SEND_KEY, export: BROADCAST_RESULT_EXPORT_KEY, bundled: BROADCAST_EDIT_OPERATION_KEYS },
-  scenarios: { key: '/scenarios', api: ['/api/scenarios', '/api/scenario-drafts'], edit: 'scenario.definition.edit', test: 'scenario.definition.edit', bundled: ['scenario.definition.edit'] },
+  scenarios: { key: '/scenarios', api: ['/api/scenarios', '/api/scenario-drafts'], edit: 'scenario.definition.edit', test: 'scenario.definition.edit', publish: 'scenario.definition.publish', managersOnly: ['publish'], bundled: ['scenario.definition.edit'] },
   reminders: { key: '/reminders', api: ['/api/reminders', '/api/friend-reminders', '/api/reminder-runs'], edit: '/reminders' },
   autoReplies: { key: '/auto-replies', api: ['/api/auto-replies', '/api/auto-reply-runs'], edit: '/auto-replies' },
-  friendAdd: { key: '/friend-add-settings', api: ['/api/friend-add', '/api/friend-add-rules', '/api/friend-add-runs'], edit: '/friend-add-settings' },
+  friendAdd: { key: '/friend-add-settings', api: ['/api/friend-add', '/api/friend-add-rules', '/api/friend-add-runs'], edit: '/friend-add-settings', publish: 'friend_add.definition.publish', managersOnly: ['publish'] },
   templates: { key: '/templates', api: ['/api/templates'], edit: '/templates' },
-  richMenus: { key: '/rich-menus', api: ['/api/rich-menu', '/api/rich-menus', '/api/rich-menu-groups', '/api/rich-menu-images'], edit: '/rich-menus' },
+  richMenus: { key: '/rich-menus', api: ['/api/rich-menu', '/api/rich-menus', '/api/rich-menu-groups', '/api/rich-menu-images'], edit: '/rich-menus', test: '/rich-menus', publish: 'richmenu.definition.publish', archive: 'richmenu.definition.archive', managersOnly: ['edit', 'publish', 'archive'] },
   lineNotifications: { key: '/line-notifications', api: ['/api/line-notifications'], edit: '/line-notifications' },
   nenCampaigns: { key: '/nen-campaigns', api: ['/api/nen-campaigns'], edit: '/nen-campaigns' },
   nenMembers: { key: '/nen-members', api: ['/api/nen-members'], edit: '/nen-members' },
   webinars: { key: '/webinars', api: ['/api/webinars'], edit: '/webinars', export: 'administrator' },
   contents: { key: '/contents', api: ['/api/contents', '/api/media', '/api/file-scans'], edit: '/contents' },
   commonVars: { key: '/contents/vars', api: ['/api/common-vars'], edit: '/contents/vars', export: 'administrator' },
-  forms: { key: '/form-submissions', api: ['/api/forms'], edit: '/form-submissions' },
-} satisfies Record<string, { key: string; api: string[]; edit: string; test?: string; export?: string; bundled?: readonly string[] }>;
+  forms: { key: '/form-submissions', api: ['/api/forms'], edit: '/form-submissions', publish: 'form.definition.publish', archive: 'form.definition.archive', export: 'form.submission.export', managersOnly: ['publish', 'archive'] },
+} satisfies Record<string, { key: string; api: string[]; edit: string; test?: string; export?: string; publish?: string; archive?: string; managersOnly?: readonly StaffFeatureOperation[]; bundled?: readonly string[] }>;
 
 export type DeliveryFeature = keyof typeof DELIVERY_FEATURE_POLICIES;
-export type StaffFeatureOperation = 'view' | 'edit' | 'test' | 'export';
+export type StaffFeatureOperation = 'view' | 'edit' | 'test' | 'export' | 'publish' | 'archive';
 export interface StaffAccessSubject {
   role?: string | null;
   permissionKeys?: readonly string[];
@@ -92,7 +92,7 @@ export interface StaffAccessSubject {
 }
 
 export function deliveryPermissionKey(feature: DeliveryFeature, operation: StaffFeatureOperation): string {
-  const policy: { key: string; edit: string; test?: string; export?: string } = DELIVERY_FEATURE_POLICIES[feature];
+  const policy: { key: string; edit: string; test?: string; export?: string; publish?: string; archive?: string } = DELIVERY_FEATURE_POLICIES[feature];
   if (operation === 'view') return policy.key;
   return operation === 'edit' ? policy.edit : policy[operation] ?? policy.edit;
 }
@@ -107,7 +107,9 @@ export function hasStaffAccess(subject: StaffAccessSubject | null | undefined, k
 
 export function hasDeliveryAccess(subject: StaffAccessSubject | null | undefined, feature: DeliveryFeature, operation: StaffFeatureOperation): boolean {
   if (operation === 'export' && subject?.readOnly) return false;
-  const read = operation === 'view' || operation === 'export';
+  const policy: { key: string; managersOnly?: readonly StaffFeatureOperation[] } = DELIVERY_FEATURE_POLICIES[feature];
+  if (policy.managersOnly?.includes(operation) && subject?.role !== 'owner' && subject?.role !== 'admin') return false;
+  const read = operation === 'view';
   return hasStaffAccess(subject, DELIVERY_FEATURE_POLICIES[feature].key, read)
     && hasStaffAccess(subject, deliveryPermissionKey(feature, operation), read);
 }

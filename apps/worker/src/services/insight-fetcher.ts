@@ -93,7 +93,7 @@ export async function processInsightFetch(
             aggMedia += (overview.uniqueMediaPlayed as number) ?? 0
             if (messages && messages.length > 0) hasAnyData = true
           } catch (err) {
-            console.error(`[insight-fetcher] dedup account ${aid} failed:`, err)
+            console.error(JSON.stringify({"code":"services_insight_fetcher_failed"}))
             perAccountResponses.push({ accountId: aid, data: { error: String(err) } })
           }
         }
@@ -144,10 +144,7 @@ export async function processInsightFetch(
         await markInsightFailed(db, item.insightId, item.retryCount)
       }
     } catch (error) {
-      console.error(
-        `Insight fetch failed for broadcast ${item.broadcastId}:`,
-        error,
-      )
+      console.error(JSON.stringify({"code":"services_insight_fetcher_failed"}))
       await markInsightFailed(db, item.insightId, item.retryCount)
     }
   }

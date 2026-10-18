@@ -18,6 +18,7 @@ export default function KpiBand({
   className,
   presentation = 'band',
   border,
+  edgeInset,
   density,
   layout,
   ...rest
@@ -27,10 +28,12 @@ export default function KpiBand({
   gridClassName?: string
   presentation?: 'band'
   className?: string
-  /** 型が下の区切りを持つ帯では、上だけ内側に引く。 */
-  border?: 'inset-top'
+  /** 型が区切りを持つ帯はinset-top、マスの間だけ区切る帯はdividers。 */
+  border?: 'inset-top' | 'dividers'
+  /** 親の本文が左右の余白を持つ場合、帯の両端では重ねない。 */
+  edgeInset?: 'parent'
   /** 段や引き出しの中で使う小さい帯。 */
-  layout?: 'booking'
+  layout?: 'booking' | 'link-row'
   density?: 'compact'
 } & Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'className'>) {
   return (
@@ -38,6 +41,7 @@ export default function KpiBand({
       className={`${kpiStyles.strip} ${gridClassName}${className ? ` ${className}` : ''}`}
       data-kpi-layout={layout}
       data-kpi-border={border}
+      data-kpi-edge-inset={edgeInset}
       data-kpi-density={density}
       data-shared-part="kpi-band"
       data-kpi-strip

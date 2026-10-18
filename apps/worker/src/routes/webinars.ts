@@ -1,3 +1,5 @@
+import { applyVideoMediaSelection } from './webinar-video-selection.js';
+import { isWebinarMissedInWindow, getWebinarWatchedSeconds } from '@line-crm/db';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 // オートウェビナー (疑似ライブ) HTTP routes.
@@ -67,7 +69,6 @@ import {
   replaceWebinarActions,
   countInvalidWebinarActionReferences,
   getFriendByLineUserId,
-  getFriendByLineUserIdForAccount,
   getFormById,
   formBelongsToLineAccount,
   type Webinar,
@@ -85,7 +86,7 @@ import {
   getMediaById,
   getMediaIdByR2Key,
 } from '@line-crm/db';
-import { verifyCallerLineUserId } from '../services/liff-auth.js';
+import { resolveWebinarCaller, loadActiveWebinar } from '../services/webinar-caller.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { runWebinarTriggerActions } from '../services/webinar-action-runner.js';
 import { recordConversionSourceEvent } from '@line-crm/db';
@@ -177,36 +178,6 @@ function onDemandSessionStartAt(row: Webinar, now: number): number {
 }
 
 // LIFF caller を認証し、webinar とそのアカウント配下の friend を解決する。
-// 認証 (401) を webinar 存在確認より先に行う (existence oracle 対策)。
-// friend はウェビナーのアカウント配下の行を優先する (同一プロバイダーの複数
-// アカウントは line_user_id が同一のため、無指定の先頭一致だと別アカウントの
-// friend 行に吸われて予約・確認プッシュ・リマインドのアカウントがズレる)。
-async function resolveWebinarCaller(
-  c: Context<Env>,
-  slug: string,
-): Promise<{ webinar: Webinar; friendId: string } | Response> {
-  const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
-  if (!lineUserId) return c.json({ error: 'unauthorized' }, 401);
-  const loaded = await loadActiveWebinar(c, slug);
-  if (loaded instanceof Response) return loaded;
-  const friend = await getFriendByLineUserIdForAccount(
-    c.env.DB, lineUserId, loaded.webinar.account_id,
-  );
-  if (!friend) return c.json({ error: 'friend_not_found' }, 403);
-  return { webinar: loaded.webinar, friendId: friend.id };
-}
-
-async function loadActiveWebinar(
-  c: Context<Env>,
-  slug: string,
-): Promise<{ webinar: Webinar } | Response> {
-  const webinar = await getWebinarBySlug(c.env.DB, slug);
-  if (!webinar || webinar.status !== 'active') {
-    return c.json({ error: 'not_found' }, 404);
-  }
-  return { webinar };
-}
-
 // ----------------------------------------------------------------
 // LIFF: 視聴状態
 // ----------------------------------------------------------------
@@ -229,7 +200,8 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
           : null;
       const replayEligible =
         replayReg !== null && requestedStart !== null &&
-        now >= requestedStart + webinar.duration_seconds;
+        now >= requestedStart + webinar.duration_seconds
+        && await isWebinarMissedInWindow(c.env.DB, webinar.id, requestedStart, now);
       if (!replayEligible) return c.json({ error: 'not_found' }, 404);
     }
     // R96: オンデマンドは枠を持たない。入場そのものを開始として録画の
@@ -241,7 +213,7 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
         c.executionCtx.waitUntil(
           Promise.resolve(
             attachTagAndFireSideEffects(c.env.DB, auth.friendId, webinar.tag_on_attend),
-          ).catch((err) => console.error('webinar on-demand attend tag error:', err)),
+          ).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/liff/webinars/:slug"}))),
         );
       }
       const exp = now + webinar.duration_seconds + TOKEN_GRACE_SECONDS;
@@ -301,11 +273,12 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
 
     // 配信終了後でも、専用リンクを持つ予約済み本人には
     // その回を先頭から再生する。アセットトークンは開くたびに再発行するため、
-    // 入場リンク自体に期限を持たせない。
+    // 見逃し配信を許可した期間内だけ入場できる。
     if (
       admissionReg &&
       requestedSessionStartAt !== null &&
       now >= requestedSessionStartAt + webinar.duration_seconds
+      && await isWebinarMissedInWindow(c.env.DB, webinar.id, requestedSessionStartAt, now)
     ) {
       await upsertWebinarViewer(
         c.env.DB, webinar.id, auth.friendId, requestedSessionStartAt,
@@ -314,7 +287,7 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
         c.executionCtx.waitUntil(
           Promise.resolve(
             attachTagAndFireSideEffects(c.env.DB, auth.friendId, webinar.tag_on_attend),
-          ).catch((err) => console.error('webinar replay attend tag error:', err)),
+          ).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/liff/webinars/:slug"}))),
         );
       }
 
@@ -427,7 +400,7 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
       c.executionCtx.waitUntil(
         Promise.resolve(
           attachTagAndFireSideEffects(c.env.DB, auth.friendId, webinar.tag_on_attend),
-        ).catch((err) => console.error('webinar attend tag error:', err)),
+        ).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/liff/webinars/:slug"}))),
       );
     }
 
@@ -467,7 +440,7 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
       })),
     });
   } catch (err) {
-    console.error('GET /api/liff/webinars/:slug error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/liff/webinars/:slug"}));
     return c.json({ error: 'internal_error' }, 500);
   }
 });
@@ -534,6 +507,11 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', inputJsonBoundary(), as
     if (parseWebinarHeartbeatPlayerState(body.playerState) === null) {
       return inputError(c, { error: 'invalid_body' }, 422, ["playerState"]);
     }
+    const at = nowEpoch();
+    if (at >= sessionStartAt + loaded.webinar.duration_seconds) {
+      const registration = await getWebinarRegistration(c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt);
+      if (!registration || !await isWebinarMissedInWindow(c.env.DB, loaded.webinar.id, sessionStartAt, at)) return c.json({ error: 'not_found' }, 404);
+    } else if (publicationWindowBlockReason(loaded.webinar)) return c.json({ error: 'not_found' }, 404);
     const heartbeat = await recordWebinarHeartbeat(c.env.DB, {
       webinarId: loaded.webinar.id,
       friendId: auth.friendId,
@@ -553,7 +531,9 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', inputJsonBoundary(), as
       positionSeconds,
       durationSeconds: loaded.webinar.duration_seconds,
     }));
-    if (positionSeconds >= Math.floor(loaded.webinar.duration_seconds * 0.9)) {
+    const watchedSeconds = heartbeat.status === 'recorded'
+      ? await getWebinarWatchedSeconds(c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt) : 0;
+    if (watchedSeconds >= Math.max(1, Math.ceil(loaded.webinar.duration_seconds * 0.9))) {
       c.executionCtx.waitUntil(enqueueWebinarCompletedNotification(
         c.env.DB,
         loaded.webinar.id,
@@ -567,7 +547,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', inputJsonBoundary(), as
         friendId: auth.friendId,
         sourceEventId: `${loaded.webinar.id}:${auth.friendId}:complete`,
         metadata: { webinarId: loaded.webinar.id, sessionStartAt },
-      }).catch((err) => console.error('webinar conversion record failed:', err)));
+      }).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/heartbeat"}))));
       // R97: 保存した視聴後アクション（完了のきっかけ）を実行口へ接続する。
       // 同じ視聴の再送は実行記録の冪等キーで1件にまとまる。
       c.executionCtx.waitUntil(runWebinarTriggerActions(c.env.DB, {
@@ -576,11 +556,11 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', inputJsonBoundary(), as
         sessionStartAt,
         trigger: 'completed',
         executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY, operatorMailEnv: c.env },
-      }).catch((err) => console.error('webinar completed actions failed:', err)));
+      }).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/heartbeat"}))));
     }
     return c.json({ ok: true });
   } catch (err) {
-    console.error('POST heartbeat error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/heartbeat"}));
     return c.json({ error: 'internal_error' }, 500);
   }
 });
@@ -643,7 +623,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/comments', inputJsonBoundary(), asy
     });
     return c.json({ ok: true });
   } catch (err) {
-    console.error('POST webinar comment error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/comments"}));
     return c.json({ error: 'internal_error' }, 500);
   }
 });
@@ -748,7 +728,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/register', inputJsonBoundary(), asy
       confirmationQueued: registered.created && (notificationSettings?.registrationEnabled ?? true),
     });
   } catch (err) {
-    console.error('POST webinar register error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/register"}));
     return c.json({ error: 'internal_error' }, 500);
   }
 });
@@ -791,7 +771,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/cta-click', inputJsonBoundary(), as
           attachTagAndFireSideEffects(
             c.env.DB, auth.friendId, loaded.webinar.tag_on_cta_click,
           ),
-        ).catch((err) => console.error('webinar cta tag error:', err)),
+        ).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/cta-click"}))),
       );
     }
     // R97: 保存した視聴後アクション（CTAクリックのきっかけ）を実行口へ接続する。
@@ -801,10 +781,10 @@ webinarRoutes.post('/api/liff/webinars/:slug/cta-click', inputJsonBoundary(), as
       sessionStartAt,
       trigger: 'cta_clicked',
       executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY, operatorMailEnv: c.env },
-    }).catch((err) => console.error('webinar cta actions failed:', err)));
+    }).catch((err) => console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/cta-click"}))));
     return c.json({ ok: true });
   } catch (err) {
-    console.error('POST cta-click error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/cta-click"}));
     return c.json({ error: 'internal_error' }, 500);
   }
 });
@@ -860,7 +840,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/funnel-event', inputJsonBoundary(),
     });
     return c.json({ ok: true });
   } catch (err) {
-    console.error('POST funnel-event error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/funnel-event"}));
     return c.json({ error: 'internal_error' }, 500);
   }
 });
@@ -884,7 +864,7 @@ webinarRoutes.get('/webinar-assets/:token/:slug/*', async (c) => {
   const valid = await verifyWebinarToken(c.env.LINE_CHANNEL_SECRET, slug, token, nowEpoch());
   if (!valid) return c.json({ error: 'forbidden' }, 403);
 
-  const webinar = await getWebinarBySlug(c.env.DB, slug);
+  const webinar = await getWebinarBySlug(c.env.DB, slug, { activeAccountOnly: true });
   if (!webinar || !webinar.video_prefix) return c.json({ error: 'not_found' }, 404);
 
   const prefix = `/webinar-assets/${token}/${slug}/`;
@@ -975,7 +955,7 @@ webinarRoutes.get('/api/webinars/overview', async (c) => {
     const overview = await getWebinarOverview(c.env.DB, accountId);
     return c.json({ success: true, data: overview });
   } catch (err) {
-    console.error('GET /api/webinars/overview error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/overview"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1028,32 +1008,6 @@ async function serializeWebinarWithVideoMedia(c: Context<Env>, row: Webinar) {
       ? await getMediaIdByR2Key(c.env.DB, row.video_prefix, row.account_id)
       : null,
   };
-}
-
-/**
- * videoMediaId（メディア選択）を保存値 video_prefix へ解決する。
- * 選べるのは対象ウェビナーと同じアカウントの kind='video' のメディアだけ。
- * null は動画の解除。返り値はエラーコードで、問題なければ null。
- */
-async function applyVideoMediaSelection(
-  db: D1Database,
-  input: Record<string, unknown>,
-  accountId: string | null,
-): Promise<string | null> {
-  if (input.videoMediaId === undefined) return null;
-  const mediaId = input.videoMediaId;
-  delete input.videoMediaId;
-  if (mediaId === null) {
-    input.videoPrefix = null;
-    return null;
-  }
-  const media = typeof mediaId === 'string' && mediaId
-    ? await getMediaById(db, mediaId, accountId)
-    : null;
-  if (!media) return 'video_media_not_found';
-  if (media.kind !== 'video') return 'video_media_not_video';
-  input.videoPrefix = media.r2_key;
-  return null;
 }
 
 function serializeWebinarList(row: WebinarListRow) {
@@ -1378,7 +1332,7 @@ webinarRoutes.get('/api/webinars', async (c) => {
       }),
     });
   } catch (err) {
-    console.error('GET /api/webinars error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1422,7 +1376,7 @@ webinarRoutes.post('/api/webinars', requireDeliveryAccess('webinars'), inputJson
     });
     return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, created) });
   } catch (err) {
-    console.error('POST /api/webinars error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1433,7 +1387,7 @@ webinarRoutes.get('/api/webinars/:id', async (c) => {
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, row) });
   } catch (err) {
-    console.error('GET /api/webinars/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1444,7 +1398,7 @@ webinarRoutes.get('/api/webinars/:id/editor', async (c) => {
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: await getEditorPayload(c, row) });
   } catch (err) {
-    console.error('GET /api/webinars/:id/editor error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/editor"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1502,7 +1456,7 @@ webinarRoutes.put('/api/webinars/:id/editor', requireDeliveryAccess('webinars'),
     if (!saved) return c.json({ success: false, error: 'version_conflict' }, 409);
     return c.json({ success: true, data: await getEditorPayload(c, row) });
   } catch (err) {
-    console.error('PUT /api/webinars/:id/editor error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/editor"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1531,7 +1485,7 @@ webinarRoutes.post('/api/webinars/:id/public-page/test', requireDeliveryAccess('
     if (!saved) return c.json({ success: false, error: 'version_conflict' }, 409);
     return c.json({ success: true, data: await getEditorPayload(c, row) });
   } catch (err) {
-    console.error('POST /api/webinars/:id/public-page/test error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/public-page/test"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1642,7 +1596,7 @@ webinarRoutes.get('/api/webinars/:id/publish-validation', async (c) => {
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: await buildPublishValidation(c, row) });
   } catch (err) {
-    console.error('GET /api/webinars/:id/publish-validation error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/publish-validation"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1666,7 +1620,7 @@ webinarRoutes.post('/api/webinars/:id/publish', requireDeliveryAccess('webinars'
     auditLog(c, 'webinar.publish', { kind: 'webinar', id });
     return c.json({ success: true, data: { webinar: serializeWebinar(updated!), validation } });
   } catch (err) {
-    console.error('POST /api/webinars/:id/publish error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/publish"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1709,7 +1663,7 @@ webinarRoutes.get('/api/webinars/:id/video-asset', async (c) => {
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: { asset: serializeVideoAsset(await getWebinarVideoAsset(c.env.DB, id)) } });
   } catch (err) {
-    console.error('GET /api/webinars/:id/video-asset error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/video-asset"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1753,7 +1707,7 @@ webinarRoutes.post('/api/webinars/:id/video-asset/advance', requireDeliveryAcces
     auditLog(c, 'webinar.video_stage', { kind: 'webinar', id });
     return c.json({ success: true, data: { asset: serializeVideoAsset(advanced) } });
   } catch (err) {
-    console.error('POST /api/webinars/:id/video-asset/advance error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/video-asset/advance"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1781,7 +1735,7 @@ webinarRoutes.get('/api/webinars/:id/sessions/:startAt', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/webinars/:id/sessions error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/sessions/:startAt"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1812,7 +1766,7 @@ webinarRoutes.put('/api/webinars/:id/sessions/:startAt', requireDeliveryAccess('
       },
     });
   } catch (err) {
-    console.error('PUT /api/webinars/:id/sessions error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/sessions/:startAt"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1831,7 +1785,7 @@ webinarRoutes.post('/api/webinars/:id/pause', requireDeliveryAccess('webinars'),
     auditLog(c, 'webinar.pause', { kind: 'webinar', id });
     return c.json({ success: true, data: serializeWebinar(updated!) });
   } catch (err) {
-    console.error('POST /api/webinars/:id/pause error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/pause"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1874,7 +1828,7 @@ webinarRoutes.post('/api/webinars/:id/duplicate', requireDeliveryAccess('webinar
     auditLog(c, 'webinar.duplicate', { kind: 'webinar', id });
     return c.json({ success: true, data: serializeWebinar(duplicate) }, 201);
   } catch (err) {
-    console.error('POST /api/webinars/:id/duplicate error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/duplicate"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1888,7 +1842,7 @@ webinarRoutes.get('/api/webinars/:id/notifications', async (c) => {
     ]);
     return c.json({ success: true, data: { settings, overview } });
   } catch (err) {
-    console.error('GET /api/webinars/:id/notifications error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/notifications"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1941,7 +1895,7 @@ webinarRoutes.put(
       if (code === 'invalid_time' || code === 'invalid_hour_before' || code === 'invalid_missed_window') {
         return inputError(c, { success: false, error: code }, 400, code === 'invalid_time' ? ['dayBeforeTime', 'missedTime'] : code === 'invalid_hour_before' ? ['hourBeforeMinutes'] : ['missedWindowDays']);
       }
-      console.error('PUT /api/webinars/:id/notifications error:', err);
+      console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/notifications"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2002,7 +1956,7 @@ webinarRoutes.post(
       ].includes(code)) {
         return inputError(c, { success: false, error: code }, 400, []);
       }
-      console.error('POST /api/webinars/:id/notifications/test error:', err);
+      console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/notifications/test"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2014,6 +1968,7 @@ webinarRoutes.put('/api/webinars/:id', requireDeliveryAccess('webinars'), inputJ
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<WebinarBody>();
+    if (!Number.isInteger(body.expectedVersion) || body.expectedVersion! < 0) return inputError(c, { success: false, code: 'EXPECTED_VERSION_REQUIRED', error: '確認した版が必要です' }, 400, ['expectedVersion']);
     // R95: 下書きから公開中への切替は通常更新では受けない。公開前検査と
     // 公開版の固定を通す公開専用口（POST /:id/publish）へ寄せる。
     // 公開中のまま他項目を直す保存は通す。
@@ -2044,10 +1999,11 @@ webinarRoutes.put('/api/webinars/:id', requireDeliveryAccess('webinars'), inputJ
       const dupe = await getWebinarBySlug(c.env.DB, body.slug);
       if (dupe) return c.json({ success: false, error: 'slug_taken' }, 409);
     }
-    const updated = await updateWebinar(c.env.DB, id, input as Parameters<typeof updateWebinar>[2]);
+    const updated = await updateWebinar(c.env.DB, id, input as Parameters<typeof updateWebinar>[2], body.expectedVersion);
+    if (!updated) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
     return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, updated!) });
   } catch (err) {
-    console.error('PUT /api/webinars/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2057,7 +2013,7 @@ webinarRoutes.get('/api/webinars/:id/actions', async (c) => {
     const actions = await getWebinarActions(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: actions.map(serializeWebinarAction) });
   } catch (err) {
-    console.error('GET /api/webinars/:id/actions error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/actions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2077,7 +2033,7 @@ webinarRoutes.put('/api/webinars/:id/actions', requireDeliveryAccess('webinars')
     const saved = await replaceWebinarActions(c.env.DB, c.req.param('id'), actions);
     return c.json({ success: true, data: saved.map(serializeWebinarAction) });
   } catch (err) {
-    console.error('PUT /api/webinars/:id/actions error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/actions"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2094,7 +2050,7 @@ async function archiveVisibleWebinar(c: Context<Env>) {
     auditLog(c, 'webinar.archive', { kind: 'webinar', id });
     return c.json({ success: true, data: serializeWebinar(archived!) });
   } catch (err) {
-    console.error('Archive /api/webinars/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 }
@@ -2116,7 +2072,7 @@ webinarRoutes.get('/api/webinars/:id/comments', async (c) => {
       })),
     });
   } catch (err) {
-    console.error('GET /api/webinars/:id/comments error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/comments"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2151,7 +2107,7 @@ webinarRoutes.put('/api/webinars/:id/comments', requireDeliveryAccess('webinars'
     const count = await replaceWebinarComments(c.env.DB, id, cleaned);
     return c.json({ success: true, data: { count } });
   } catch (err) {
-    console.error('PUT /api/webinars/:id/comments error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/comments"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2180,7 +2136,7 @@ webinarRoutes.get('/api/webinars/:id/ctas', async (c) => {
       })),
     });
   } catch (err) {
-    console.error('GET /api/webinars/:id/ctas error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/ctas"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2262,7 +2218,7 @@ webinarRoutes.put('/api/webinars/:id/ctas', requireDeliveryAccess('webinars'), i
     if (count === null) return c.json({ success: false, error: 'version_conflict' }, 409);
     return c.json({ success: true, data: { count, version: expectedVersion + 1 } });
   } catch (err) {
-    console.error('PUT /api/webinars/:id/ctas error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/ctas"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2376,7 +2332,7 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/webinars/:id/analytics error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/analytics"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2461,7 +2417,7 @@ webinarRoutes.get(
       },
     });
   } catch (err) {
-    console.error('GET /api/webinars/:id/participants error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/participants"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
   },
@@ -2536,7 +2492,7 @@ webinarRoutes.get(
         },
       });
     } catch (err) {
-      console.error('GET /api/webinars/:id/participants.csv error:', err);
+      console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/participants.csv"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2562,7 +2518,7 @@ webinarRoutes.get('/api/webinars/:id/user-comments', async (c) => {
       })),
     });
   } catch (err) {
-    console.error('GET /api/webinars/:id/user-comments error:', err);
+    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/user-comments"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

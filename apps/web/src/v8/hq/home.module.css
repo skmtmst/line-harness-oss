@@ -4,7 +4,6 @@
  */
 .folderBox { min-width: 0; }
 
-.createButton { width: 100%; }
 .buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
 .full { width: 100%; }
 
@@ -20,33 +19,19 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-hq-body-gap);
-  padding: var(--tpl-hq-home-pad);
+  padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block);
   min-width: 0;
 }
 
 .progress { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
 
 /* 道具の段（1段目：探す欄 280、2段目：札・切り替え・並び・件数） */
-.tools {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hq-plan-head-gap);
-}
-
 .searchBox {
   width: var(--tpl-hq-search-w);
   max-width: 100%;
 }
 
-.toolRow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--tpl-hq-plan-head-gap);
-}
-
 .chips { display: flex; flex-wrap: wrap; gap: var(--tpl-hq-plan-head-gap); }
-.spacer { flex: 1; }
 
 /* アカウントのカード（3列・横の間16・縦の間14・余白18） */
 .grid {
@@ -62,8 +47,8 @@
 .card {
   display: grid;
   grid-template-rows: subgrid;
-  grid-row: span 4;
-  row-gap: var(--tpl-hq-form-gap);
+  grid-row: span 5;
+  row-gap: var(--tpl-hq-body-gap);
   min-width: 0;
   padding: var(--tpl-hq-home-account-pad);
   border-radius: var(--radius-card);
@@ -73,7 +58,7 @@
   box-shadow: var(--card-shadow);
 }
 
-.cardWarn { outline-color: var(--color-status-warn-deep); }
+.cardWarn { outline-color: var(--card-edge); }
 /* 帯を含む中身に高さを合わせ、並ぶカードは grid の高さを共有する。 */
 
 .cardHead {
@@ -83,6 +68,7 @@
   gap: var(--tpl-hq-attach-gap);
   min-width: 0;
   flex-shrink: 0;
+  margin-bottom: var(--tpl-hq-form-gap);
 }
 
 .logo {
@@ -123,12 +109,11 @@
 
 .meta {
   margin: 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  white-space: nowrap;
+  display: block;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-hq-small-lh);
@@ -151,7 +136,7 @@
   align-items: center;
   align-self: end;
   gap: var(--tpl-hq-plan-head-gap);
-  margin-top: auto;
+  margin-top: var(--tpl-hq-body-gap);
   flex-shrink: 0;
 }
 @container v8-page (max-width: 1099px) {
@@ -215,7 +200,7 @@
 .head,
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-amount) var(--tpl-hq-col-actions);
+  grid-template-columns: minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-amount) calc(var(--space-32) + var(--space-8));
   align-items: center;
   column-gap: var(--tpl-hq-col-gap);
 }
@@ -254,6 +239,7 @@
 
 .footNote {
   flex: 1;
+  text-align: right;
   /* 絵は言葉のまとまりで折らず、行の端まで詰めて折る（全体の auto-phrase を外す）。 */
   word-break: normal;
   min-width: 0;
@@ -265,3 +251,5 @@
 
 .dialogFields { display: flex; flex-direction: column; gap: var(--tpl-hq-field-gap); }
 .dialogLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; }
+
+.rowEnd { display: inline-flex; justify-content: flex-end; }

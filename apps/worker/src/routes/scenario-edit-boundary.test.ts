@@ -170,12 +170,10 @@ describe('シナリオ変更の共通境界(N-051)', () => {
     expect(hidden.status).toBe(404);
   });
 
-  test('公開は編集権ありstaffが自accountでできる', async () => {
+  test('公開は編集権だけのstaffでは自accountでもできない', async () => {
     const res = await postPublish('sc-1', editStaff);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: { scenarioId: string; versionNumber: number } };
-    expect(body.data.scenarioId).toBe('sc-1');
-    expect(body.data.versionNumber).toBe(1);
+    expect(res.status).toBe(403);
+    expect(sqlite.raw.prepare("SELECT COUNT(*) AS n FROM scenario_versions WHERE scenario_id = 'sc-1'").get()).toEqual({ n: 0 });
   });
 
   test('公開は権限なしstaffに403、担当外accountに404', async () => {

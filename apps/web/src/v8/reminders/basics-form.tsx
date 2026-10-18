@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CalendarDays, IdCard } from 'lucide-react'
+import { CalendarDays, IdCard, Ticket } from 'lucide-react'
 import type { FriendField, ReminderDraftSettings, ReminderDraftStep, ReminderTriggerType } from '@line-crm/shared'
 import { api, eventsApi, type EventListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -12,7 +12,8 @@ import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { TextArea, TextField } from '@/components/shared/text-field'
-import Card from '@/components/shared/card'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import Card, { CardHeader } from '@/components/shared/card'
 import { ChoiceCardV8 } from './ui'
 import styles from './edit.module.css'
 import { Field } from '@/components/shared/form-controls'
@@ -263,13 +264,10 @@ export function ReminderBasicsFormV8({
 
   return (
     <>
-      <Card padding="spacious" layout="vertical" className={styles.formCard}>
-        <div className={styles.sectionHeading}>
-          <h2 className={styles.formTitle}>名前とフォルダ</h2>
-          <p className={styles.formNote}>一覧に出る名前です。友だちには見えません。</p>
-        </div>
-        <div className={styles.fieldGrid}>
-          <div className={styles.field}><Field label="リマインダ名（60文字まで）" htmlFor="v8-reminder-name"><SaveErrorField names={["name","value.name"]}><TextField
+      <Card variant="form" gap="normal">
+        <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
+        <SettingsFormRow layout="name-folder">
+          <div className={styles.field}><Field label="リマインダ名（60文字まで）" htmlFor="v8-reminder-name" required><SaveErrorField names={["name","value.name"]}><TextField
               id="v8-reminder-name"
               invalid={fieldError?.key === 'name'}
               aria-describedby={fieldError?.key === 'name' ? 'v8-reminder-name-error' : undefined}
@@ -280,7 +278,7 @@ export function ReminderBasicsFormV8({
             /></SaveErrorField>
 {fieldError?.key === 'name' ? <p id="v8-reminder-name-error" className={styles.fieldError} role="alert">{fieldError.message}</p> : null}</Field></div>
           <div className={styles.field}>
-            <span className={styles.label}>フォルダ</span>
+            <Field label="フォルダ">
             <div className={styles.testRow}>
               <SaveErrorField names={["folderId","value.folderId","folder_id","value.folder_id"]}><FolderSelect
                 value={value.folderId}
@@ -299,22 +297,20 @@ export function ReminderBasicsFormV8({
                 <Button onClick={() => setFoldersReloadToken((current) => current + 1)}>もう一度読み込む</Button>
               ) : null}
             </div>
+            </Field>
           </div>
-          <div className={`${styles.field} ${styles.span2}`}><Field label="社内メモ" htmlFor="v8-reminder-memo">{value.description.includes('\n') ? (
+        </SettingsFormRow>
+          <div className={styles.field}><Field label="社内メモ" htmlFor="v8-reminder-memo">{value.description.includes('\n') ? (
               <SaveErrorField names={["description","value.description"]}><TextArea id="v8-reminder-memo" rows={3} value={value.description}
                 placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} /></SaveErrorField>
             ) : (
               <SaveErrorField names={["description","value.description"]}><TextField id="v8-reminder-memo" value={value.description}
                 placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} /></SaveErrorField>
             )}</Field></div>
-        </div>
       </Card>
 
-      <Card padding="spacious" layout="vertical" className={styles.formCard}>
-        <div className={styles.sectionHeading}>
-          <h2 className={styles.formTitle}>基準日</h2>
-          <p className={styles.formNote}>この日時の前や後に送ります</p>
-        </div>
+      <Card variant="form" gap="normal">
+        <CardHeader size="stacked" title={<>基準日</>} meta={<>この日時の前や後に送ります</>} />
         <div className={styles.choiceGrid} role="radiogroup" aria-label="基準日">
           <SaveErrorField names={["reminder-v8-trigger","triggerType","value.triggerType"]}><ChoiceCardV8
             name="reminder-v8-trigger"
@@ -339,7 +335,7 @@ export function ReminderBasicsFormV8({
             value="event"
             checked={value.triggerType === 'event'}
             onChange={() => patch({ triggerType: 'event' })}
-            icon={<CalendarDays size={18} />}
+            icon={<Ticket size={18} />}
             title="イベントの予約日時"
             note="イベントの開始日時"
           /></SaveErrorField>
@@ -414,11 +410,8 @@ export function ReminderBasicsFormV8({
         ) : null}
       </Card>
 
-      <Card padding="spacious" layout="vertical" className={styles.formCard}>
-        <div className={styles.sectionHeading}>
-          <h2 className={styles.formTitle}>ひな形から作る（任意）</h2>
-          <p className={styles.formNote}>基準日・送るタイミング・本文がまとめて入ります</p>
-        </div>
+      <Card variant="form" gap="normal">
+        <CardHeader size="stacked" title="ひな形から作る" optional meta={<>基準日・送るタイミング・本文がまとめて入ります</>} />
         <div className={styles.tplGrid}>
           {reminderTemplatesV8.map((template) => (
             <Card key={template.id} padding="default" layout="vertical" className={styles.templateCard}>

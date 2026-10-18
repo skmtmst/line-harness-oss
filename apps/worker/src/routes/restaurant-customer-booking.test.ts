@@ -30,7 +30,7 @@ const start = '2027-10-01T03:00:00.000Z';
 function app() {
   const a = new Hono<Env>();
   a.use('*', async (c, next) => {
-    c.env = { DB: db.db, RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
+    c.env = { DB: db.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
     await next();
   });
   a.route('/', restaurantCustomerBooking);
@@ -147,17 +147,20 @@ describe('飲食店の本人予約', () => {
       hold('request_two'),
     ]);
     expect([a.status, b.status].sort()).toEqual([201, 409]);
+    // 均等方式の同点は乱数で選ばれる。本人重複の対照は実際に空いている卓へ入れる。
+    const occupied=(db.raw.prepare("SELECT table_id FROM rt_reservations WHERE store_id='store'").get() as {table_id:string}).table_id;
+    const vacant=occupied==='table1'?'table2':'table1';
     expect(() =>
       db.raw.exec(
-        `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,customer_request_id) VALUES('duplicate','store','line','unique','本人','Uone',2,'${start}','2027-10-01T05:00:00Z','table2','confirmed','request_direct')`,
+        `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,customer_request_id) VALUES('duplicate','store','line','unique','本人','Uone',2,'${start}','2027-10-01T05:00:00Z','${vacant}','confirmed','request_direct')`,
       ),
     ).toThrow('customer_duplicate_booking');
-    db.raw.exec("UPDATE rt_tables SET is_active=0 WHERE id='table2'");
+    db.raw.prepare('UPDATE rt_tables SET is_active=0 WHERE id=?').run(vacant);
     const other = await hold('request_three', 'two');
     expect(other.status).toBe(409);
     expect(() =>
       db.raw.exec(
-        `INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status) VALUES('external','store','manual','外部','other',2,'${start}','2027-10-01T05:00:00Z','table1','confirmed')`,
+        `INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status) VALUES('external','store','manual','外部','other',2,'${start}','2027-10-01T05:00:00Z','${occupied}','confirmed')`,
       ),
     ).toThrow(/(?:customer|restaurant)_table_conflict/);
   });
@@ -411,7 +414,7 @@ describe('飲食4：コース・フォーム・系列店',()=>{
   const r=await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,courseId:'c90',tableId:'foreign',requestId:'course_hold'});
   expect(r.status).toBe(201);const h=(await read(r)).data;
   expect(h.endsAt).toBe('2027-10-01T04:30:00.000Z');expect(h.courseId).toBe('c90');
-  expect(db.raw.prepare('SELECT table_id,dining_snapshot_json FROM rt_reservations WHERE id=?').get(h.id)).toMatchObject({table_id:'table1',dining_snapshot_json:expect.stringContaining('乳')});
+  expect(db.raw.prepare('SELECT table_id,dining_snapshot_json FROM rt_reservations WHERE id=?').get(h.id)).toMatchObject({table_id:expect.stringMatching(/^table[12]$/),dining_snapshot_json:expect.stringContaining('乳')});
   expect((await request(`/api/liff/restaurant/reservations/${h.id}/confirm`,{expectedVersion:1})).status).toBe(200);
   const changed=await request(`/api/liff/restaurant/reservations/${h.id}/reschedule`,{expectedVersion:2,startsAt:start,guestCount:2,courseId:'c180'});
   expect(changed.status).toBe(200);expect((await read(changed)).data.endsAt).toBe('2027-10-01T06:00:00.000Z');

@@ -1,10 +1,5 @@
-import { redirect } from 'next/navigation'
-import { restaurantTestUiEnabled } from '@/lib/environment-features'
+import EnvironmentFeatureGate from '@/components/shared/environment-feature-gate'
 
 export default function RestaurantTestLayout({ children }: { children: React.ReactNode }) {
-  if (!restaurantTestUiEnabled()) {
-    redirect('/hq')
-  }
-
-  return children
+  return <EnvironmentFeatureGate feature="飲食店向けの機能">{children}</EnvironmentFeatureGate>
 }

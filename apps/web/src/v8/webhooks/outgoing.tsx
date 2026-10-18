@@ -1,12 +1,11 @@
 'use client'
 
 import { useFolderMove } from '@/components/shared/use-folder-move'
-import { RowNameLink } from '@/components/shared/table'
+import { RowNameLink, ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { moveOutgoingWebhookToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from '@/components/shared/list-navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Bookmark, LayoutTemplate, Pause, Play, Plus, Send } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
@@ -16,7 +15,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
@@ -34,12 +33,11 @@ import ManagedFolderPanel, { folderDotFor, managedFolderOptions } from '@/compon
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import ContextMenu from '@/components/shared/context-menu'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { notifyToast } from '@/components/shared/toast'
-import { describeApiFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import {
   MANAGE_REASON,
@@ -54,7 +52,6 @@ import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { eventLabel, isHttpsUrl, maskedUrl, payloadLabel, shortDateTime, urlHost } from './words'
 import styles from './outgoing.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
@@ -439,7 +436,7 @@ export default function WebhooksOutgoingV8() {
   )
   /* 閲覧のみには押せない作るボタンを置かない（場所だけ空ける）。 */
   const createButton = canManage
-    ? <Button variant="primary" href="/webhooks/new" className={styles.createButton}><Plus size={15} aria-hidden="true" />送り先を作る</Button>
+    ? <Button variant="primary" href="/webhooks/new"><Plus size={15} aria-hidden="true" />送り先を作る</Button>
     : <span className={styles.createSpace} aria-hidden="true" />
 
   /* ===== 道具の段 ===== */
@@ -572,7 +569,7 @@ export default function WebhooksOutgoingV8() {
           }}
         >
         <div className={styles.tableWrap}>
-          <DataTable columnLayout={{ headHeight: 'var(--tpl-wh-head-h)', rowHeight: narrow ? 'var(--tpl-af2-wh-narrow-row-h)' : 'var(--tpl-wh-row-h)', gap: narrow ? '0px' : 'var(--tpl-wh-col-gap)', padding: narrow ? 'var(--tpl-wh-narrow-column-pad)' : 'var(--tpl-wh-row-pad)', numberInset: 'var(--tpl-wh-num-pad-end)', nameInset: narrow ? 'var(--tpl-af2-wh-name-end)' : undefined }}>
+          <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--tpl-wh-head-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--tpl-wh-col-gap)', padding: '0 var(--tpl-list-inset)', numberInset: 'var(--tpl-wh-num-pad-end)' }}>
             <thead>
               {narrow ? (
                 /* 1152 の絵 AsfFB：送り先・今月送った・状態・操作の4列。 */
@@ -609,7 +606,7 @@ export default function WebhooksOutgoingV8() {
                     {canManage ? (
                       <RowNameLink href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></RowNameLink>
                     ) : (
-                      <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
+                      <TruncatedText value={String(item.name ?? '')} />
                     )}
                   </FolderDotName>
                 )
@@ -628,7 +625,7 @@ export default function WebhooksOutgoingV8() {
                       <Td className={styles.colStateNarrow}>
                         <StatusBadge tone={tone === 'active' ? 'success' : tone}>{stateWord}</StatusBadge>
                       </Td>
-                      <Td className={styles.colOpsNarrow}>
+                      <ActionCell>
                         {/* 狭い幅は「…」だけ（中身を見る・やり直すも中に入れる。絵 AsfFB の下の説明のとおり）。 */}
                         <div className={styles.opsBox}>
                           <RowMenu
@@ -637,16 +634,16 @@ export default function WebhooksOutgoingV8() {
                             open={menuId === item.id}
                             onOpenChange={(next) => setMenuId(next ? item.id : null)}
                             items={[
-                              { id: 'view', label: "送信の記録を見る", onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } },
+                              { id: 'view', label: "送信の記録を見る", onSelect: () => { setMenuId(null); router.replace('/webhooks?tab=interactions') } },
                               ...(item.deliverySummary.canRetry && canManage
-                                ? [{ id: 'retry', label: '失敗をやり直す', onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } }]
+                                ? [{ id: 'retry', label: '失敗をやり直す', onSelect: () => { setMenuId(null); router.replace('/webhooks?tab=interactions') } }]
                                 : []),
                               ...menuItems,
                             ]}
                             note={canManage ? undefined : MANAGE_REASON}
                           />
                         </div>
-                      </Td>
+                      </ActionCell>
                     </Tr>
                   )
                 }
@@ -658,13 +655,13 @@ export default function WebhooksOutgoingV8() {
                         {canManage ? (
                           <RowNameLink href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></RowNameLink>
                         ) : (
-                          <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
+                          <TruncatedText value={String(item.name ?? '')} />
                         )}
                       </FolderDotName>
 
                     </Td>
-                    <Td className={styles.colWhen}><span className={styles.cellText} title={when}>{when}</span></Td>
-                    <Td className={styles.colPayload}><span className={styles.cellText} title={payload}>{payload}</span></Td>
+                    <Td className={styles.colWhen}><TruncatedText value={when} /></Td>
+                    <Td className={styles.colPayload}><TruncatedText value={payload} /></Td>
                     <Td align="right" className={styles.colCount}>
                       <span className={styles.num}>{formatNumber(item.deliverySummary.total)} 回</span>
                       <span className={styles.numSub}>
@@ -679,32 +676,25 @@ export default function WebhooksOutgoingV8() {
                         ? <span className={styles.sub}>最終 {shortDateTime(completedAt)}</span>
                         : item.isActive && !toggling ? <span className={styles.sub}>まだ送っていません</span> : null}
                     </Td>
-                    <Td className={styles.colOps}>
+                    <ActionCell className={styles.colOps}>
+                      {/* 行の右端は「…」だけ（B-253）。中身を見る・やり直すも中に入れる。見るだけの担当者にも出す。 */}
                       <div className={styles.opsBox}>
-                        {item.deliverySummary.canRetry && canManage
-                          ? <Button href="/webhooks?tab=interactions">やり直す</Button>
-                          : <Button href="/webhooks?tab=interactions">中身を見る</Button>}
-                        {showMenu ? (
-                          <>
-                            <Button
-                              aria-haspopup="menu"
-                              aria-expanded={menuId === item.id}
-                              aria-label={`「${item.name}」の設定`}
-                              onClick={() => setMenuId((current) => (current === item.id ? null : item.id))}
-                            >
-                              設定
-                            </Button>
-                            <ActionMenu
-                              open={menuId === item.id}
-                              onClose={() => setMenuId(null)}
-                              ariaLabel={`「${item.name}」の設定`}
-                              items={menuItems}
-                              note={canManage ? undefined : MANAGE_REASON}
-                            />
-                          </>
-                        ) : null}
+                        <RowMenu
+                          label={`「${item.name}」の操作`}
+                          title="操作"
+                          open={menuId === item.id}
+                          onOpenChange={(next) => setMenuId(next ? item.id : null)}
+                          items={[
+                            { id: 'view', label: '送信の記録を見る', onSelect: () => { setMenuId(null); router.replace('/webhooks?tab=interactions') } },
+                            ...(item.deliverySummary.canRetry && canManage
+                              ? [{ id: 'retry', label: '失敗をやり直す', onSelect: () => { setMenuId(null); router.replace('/webhooks?tab=interactions') } }]
+                              : []),
+                            ...(showMenu ? menuItems : []),
+                          ]}
+                          note={canManage ? undefined : MANAGE_REASON}
+                        />
                       </div>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
@@ -716,12 +706,9 @@ export default function WebhooksOutgoingV8() {
     )
   }
 
-  const pager = ready && pageCount > 1 ? (
+  const pager = ready && visible.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length} / {formatNumber(filtered.length)} 件
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="送り先一覧のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="送り先一覧のページ送り" range={{ total: filtered.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + visible.length }} />
     </ListPagePagination>
   ) : null
 
@@ -730,7 +717,7 @@ export default function WebhooksOutgoingV8() {
       skeleton
       help={<>{WEBHOOKS_DESCRIPTION}{narrow
           ? '行の「…」から 中身を見る・試しに送る・失敗をやり直す・鍵を作り直す・止める・削除。'
-          : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}</>}
+          : '行の「…」から 送信の記録を見る・直す・止める・鍵を作り直す・試しに送る・失敗をやり直す・削除。'}</>}
       explanation="友だちの動きを、決めたタイミングでほかのシステムへ送ります。送るときは秘密の鍵を付けます。鍵は「…」から作り直せます。"
       boardId={narrow ? 'AsfFB' : 'ZSbFY'}
       headingSize="regular"

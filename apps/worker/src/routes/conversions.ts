@@ -1,3 +1,5 @@
+import { serializeConversionPoint } from './conversion-point-serialization.js';
+import { consumePublicIngressReceipt } from '@line-crm/db';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { hasStaffAccess } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -116,24 +118,6 @@ const requireVisibleConversionEvent: MiddlewareHandler<Env> = async (c, next) =>
 
 const MEASURE_METHODS: ConversionMeasureMethod[] = ['url_reach', 'webhook', 'manual'];
 
-function serializeConversionPoint(p: ConversionPoint) {
-  return {
-    id: p.id,
-    name: p.name,
-    eventType: p.event_type,
-    value: p.value,
-    measureMethod: p.measure_method,
-    targetUrl: p.target_url,
-    countRepeat: p.count_repeat !== 0,
-    attributionDays: p.attribution_days,
-    lineAccountId: p.line_account_id,
-    version: p.version,
-    status: p.status,
-    stoppedAt: p.stopped_at,
-    createdAt: p.created_at,
-  };
-}
-
 type ConversionPermission = 'view' | 'edit' | 'export';
 
 function conversionPermission(permission: ConversionPermission): MiddlewareHandler<Env> {
@@ -152,11 +136,7 @@ function conversionContractError(c: Context<Env>, error: unknown): Response {
   if (error instanceof ConversionDefinitionError) {
     return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
   }
-  console.error(JSON.stringify({
-    event: 'conversion_definition_contract_failed',
-    path: c.req.path,
-    reason: error instanceof Error ? error.message : String(error),
-  }));
+  console.error(JSON.stringify({"code":"conversion_definition_contract_failed"}));
   return c.json({ success: false, error: '成果地点の情報を処理できませんでした' }, 500);
 }
 
@@ -856,7 +836,7 @@ conversions.post('/api/conversions/ingest/:id', inputJsonBoundary(), async (c) =
     try {
       await recordConversionIngestionEvent(c.env.DB, { conversionPointId: pointId, ...entry });
     } catch (logError) {
-      console.error('conversion ingestion log failed:', logError);
+      console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/ingest/:id"}));
     }
   };
   try {
@@ -927,6 +907,19 @@ conversions.post('/api/conversions/ingest/:id', inputJsonBoundary(), async (c) =
     if (!payload) {
       await log({ result: 'rejected', reason: 'invalid_json', signatureSha256: signatureHash });
       return inputError(c, { success: false, error: 'Invalid JSON body' }, 400, []);
+    }
+    // 時刻とnonceも本文HMACの対象。署名だけを別のイベントへ使い回せない。
+    const timestamp = payload.timestamp;
+    const nonce = payload.nonce;
+    if (typeof timestamp !== 'number' || !Number.isInteger(timestamp)
+        || Math.abs(Date.now() / 1000 - timestamp) > 300
+        || typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(nonce)) {
+      await log({ result: 'rejected', reason: 'invalid_freshness', signatureSha256: signatureHash });
+      return c.json({ success: false, error: '有効な送信時刻とnonceが必要です', code: 'INVALID_FRESHNESS' }, 401);
+    }
+    if (!await consumePublicIngressReceipt(c.env.DB, { kind: 'conversion_nonce', scopeId: pointId, key: await sha256Hex(nonce) })) {
+      await log({ result: 'rejected', reason: 'nonce_reused', signatureSha256: signatureHash });
+      return c.json({ success: false, error: '同じnonceは再利用できません', code: 'NONCE_REUSED' }, 409);
     }
     const payloadShape = maskedPayloadShape(payload);
     /*
@@ -1037,7 +1030,7 @@ conversions.post('/api/conversions/ingest/:id', inputJsonBoundary(), async (c) =
       throw trackError;
     }
   } catch (error) {
-    console.error('POST /api/conversions/ingest/:id error:', error);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/ingest/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1166,7 +1159,7 @@ conversions.get('/api/conversions/points', conversionPermission('view'), async (
       data: items.map(serializeConversionPoint),
     });
   } catch (err) {
-    console.error('GET /api/conversions/points error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"GET /api/conversions/points"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1198,7 +1191,7 @@ conversions.post('/api/conversions/points', requireRole('owner', 'admin'), input
     });
     return c.json({ success: true, data: serializeConversionPoint(point) }, 201);
   } catch (err) {
-    console.error('POST /api/conversions/points error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/points"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1278,7 +1271,7 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), re
     if (!point) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeConversionPoint(point) });
   } catch (err) {
-    console.error('PUT /api/conversions/points/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"PUT /api/conversions/points/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1317,7 +1310,7 @@ conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'),
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/conversions/points/:id error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"DELETE /api/conversions/points/:id"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1408,7 +1401,7 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), inputJ
     if (err instanceof Error && err.message === 'conversion_excluded') {
       return inputError(c, { success: false, error: '「数えない条件」に当てはまるため記録できません' }, 422, []);
     }
-    console.error('POST /api/conversions/track error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/track"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1455,7 +1448,7 @@ conversions.get('/api/conversions/events', conversionPermission('view'), async (
       })),
     });
   } catch (err) {
-    console.error('GET /api/conversions/events error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"GET /api/conversions/events"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1496,7 +1489,7 @@ conversions.get(
         })),
       });
     } catch (err) {
-      console.error('GET /api/conversions/events/:id/reversals error:', err);
+      console.error(JSON.stringify({"code":"routes_conversions_failed","route":"GET /api/conversions/events/:id/reversals"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1566,7 +1559,7 @@ conversions.post(
         throw err;
       }
     } catch (err) {
-      console.error('POST /api/conversions/events/:id/reversals error:', err);
+      console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/events/:id/reversals"}));
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1649,7 +1642,7 @@ conversions.get('/api/conversions/approvals/counts', conversionPermission('view'
       allowedAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned,
     }) });
   } catch (err) {
-    console.error('GET /api/conversions/approvals/counts error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"GET /api/conversions/approvals/counts"}));
     return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
   }
 });
@@ -1678,7 +1671,7 @@ conversions.get('/api/conversions/approvals', conversionPermission('view'), asyn
 
     return c.json({ success: true, data: rows });
   } catch (err) {
-    console.error('GET /api/conversions/approvals error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"GET /api/conversions/approvals"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1784,7 +1777,7 @@ async function notifyOfferActionFailure(
       }),
     });
   } catch (error) {
-    console.error(`offer action failure notice failed (event=${plan.eventId} action=${failure.action}):`, error);
+    console.error(JSON.stringify({"code":"routes_conversions_failed"}));
   }
 }
 
@@ -1832,7 +1825,7 @@ async function runApprovedConversionOfferActions(
       try {
         await attachTagAndFireSideEffects(db, plan.friendId, plan.tagId);
       } catch (error) {
-        console.error(`offer tag action failed (event=${eventId} tag=${plan.tagId}):`, error);
+        console.error(JSON.stringify({"code":"routes_conversions_failed"}));
         attachError = error;
       }
       // 例外を投げない失敗（マイル工程・走り直し経路の失敗）も未完として拾う。
@@ -1901,7 +1894,7 @@ async function runApprovedConversionOfferActions(
             }
           }
         } catch (error) {
-          console.error(`offer scenario action failed (event=${eventId} scenario=${plan.scenarioId}):`, error);
+          console.error(JSON.stringify({"code":"routes_conversions_failed"}));
           failures.push({
             action: 'scenario',
             refId: plan.scenarioId,
@@ -1965,7 +1958,7 @@ conversions.get('/api/conversions/events/:id/attribution', conversionPermission(
       },
     });
   } catch (err) {
-    console.error('GET /api/conversions/events/:id/attribution error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"GET /api/conversions/events/:id/attribution"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2074,7 +2067,7 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
 
     return c.json({ success: true, data: { id: c.req.param('id'), approvalStatus: parsed.status } });
   } catch (err) {
-    console.error('PATCH /api/conversions/events/:id/approval error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"PATCH /api/conversions/events/:id/approval"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2150,7 +2143,7 @@ async function notifyApprovalOnce(
       throw err;
     }
   } catch (err) {
-    console.error('Affiliate approval notify failed (non-blocking):', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed"}));
   }
 }
 
@@ -2222,7 +2215,7 @@ conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, i
               continue;
             }
           } catch (err) {
-            console.error(`offer actions failed (bulk, event=${itemId}):`, err);
+            console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/approvals/bulk"}));
             result.failed.push({ id: itemId, error: '案件の動作を実行できませんでした' });
             continue;
           }
@@ -2231,13 +2224,13 @@ conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, i
       } catch (err) {
         // m22u R353: 途中の失敗で全体を500にしない。処理済み・失敗の一覧を
         // 必ず返し、一部だけ承認済みのまま黙って止まらないようにする。
-        console.error(`bulk approval item failed (event=${itemId}):`, err);
+        console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/approvals/bulk"}));
         result.failed.push({ id: itemId, error: '処理できませんでした。もう一度お試しください' });
       }
     }
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error('POST /api/conversions/approvals/bulk error:', err);
+    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/approvals/bulk"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

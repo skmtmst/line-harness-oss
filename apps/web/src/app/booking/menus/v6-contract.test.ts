@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ChannelsTabV8 from '@/v8/booking-menus/channels-tab'
+import { V8_TABS } from '@/v8/booking-menus/settings-parts'
 
 vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -59,15 +60,16 @@ describe('V8 予約設定', () => {
   })
 
   it('表示している一覧操作は実際に使える', () => {
-    // 分割先のコメントは画面の文言ではない。
-    expect(LIST.replace(/^\s*\/\/.*$/gm, '')).not.toContain('準備中')
+    // 分割先のコメントは画面の文言ではない。口が来るまでの「現在準備中です」の案内は B-314（オーナー）で認められた形なので除く。
+    expect(LIST.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').replaceAll('現在準備中です', '')).not.toContain('準備中')
     expect(LIST).toContain('bookingApi.getSettings(accountId)')
     expect(LIST).toContain('<Pagination page={safePage} pageCount={pageCount}')
     expect(LIST).toContain("label: (visOverride[menu.id] ?? menu.is_active) ? '止める' : '出す'")
     expect(LIST).toContain('bookingApi.patchMenu(accountId, menu.id, version')
     expect(LIST).toContain('visibilityError ? <Notice')
     expect(LIST).not.toContain('メニュー名で検索')
-    expect(LIST).not.toContain('CSVで書き出す')
+    // メニュー一覧（menus-tab）に CSV の書き出しは置かない。お支払いの記録（B-305）の書き出しは別のタブ。
+    expect(SETTINGS_MENUS_TAB).not.toContain('CSVで書き出す')
   })
 
   it('作成後の担当保存だけが失敗した場合は、作成済みと伝えて設定導線を出す (DEEP-16)', () => {
@@ -137,28 +139,17 @@ describe('V8 予約設定', () => {
     expect(LIST).not.toContain('.at(-1)!')
   })
 
-  it('C9fv7A: 閲覧のみは帯を出し作成操作を隠す', () => {
-    // 閲覧のみの帯と押せない作るボタンはメニュータブの中にある。
-    expect(SETTINGS_V8).toContain('<ReadOnlyNotice')
-    expect(SETTINGS_MENUS_TAB).toContain('{canEdit ? (')
-    expect(SETTINGS_MENUS_TAB).not.toContain('<Button variant="primary" disabled')
-    expect(SETTINGS_V8).toContain("tab === 'menus' && !canEditMenus ? 'C9fv7A'")
-  })
+  // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('P6EdLW: 1152ではメニュー表の担当・30日を畳む', () => {
     expect(SETTINGS_CSS).toContain('@container (max-width: 1080px)')
     expect(SETTINGS_CSS).toMatch(/\.colStaff,\s*\.colCount\s*\{\s*display:\s*none/)
   })
 
-  it('VFxWU: 1152の右欄は見え方ボタンと確かめるボタンの2つ', () => {
-    expect(SETTINGS_V8).toContain('LINEでの見え方を見る')
-    expect(SETTINGS_V8).toContain('setPhoneOpen(true)')
-    expect(SETTINGS_V8).toContain('お客さまに見える画面を確かめる')
-    expect(SETTINGS_CSS).toMatch(/\.sidePhoneButton\s*\{[^}]*display:\s*flex/)
-  })
+  // この状態は booking-settings-boards-nodes.test.tsx で実際に描いて確認する。
 
   it('ZyDd6: 予約経路タブは経路の口から表を作る', () => {
-    expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路', node: 'ZyDd6' }")
+    expect(V8_TABS.find(tab => tab.key === 'channels')).toEqual({ key: 'channels', label: '予約経路の連携', node: 'ZyDd6' })
     expect(SETTINGS_V8).toContain('/api/booking/admin/channels?account_id=')
     expect(SETTINGS_V8).toContain('スタッフの Google カレンダー')
     expect(SETTINGS_V8).toContain('data-design-node="wJYQb"')

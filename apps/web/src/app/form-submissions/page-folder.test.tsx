@@ -295,7 +295,7 @@ describe('行の編集は質問の編集へ行く（R27・実マウント）', (
     expect(nameLink?.getAttribute('href')).toBe('/form-submissions/edit?id=f-a1&tab=basic')
     await openRowMenu('箱フォーム')
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent)
-    expect(items).toContain('編集')
+    expect(items).toContain('編集する')
     expect(items).toContain('名前を変更')
     expect(items).toContain('フォルダへ移す')
     expect(items).toContain('削除')

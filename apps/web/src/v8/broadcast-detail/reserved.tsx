@@ -8,10 +8,14 @@
  * 右の欄（次にできること → メッセージのスマホ）。
  * 予約の読み込み・取消・複製・テスト送信の中身は入口（app/broadcasts/reserved/page.tsx）が持つ。
  */
-import { CalendarCheck2, Copy, Eye, Info, Send, TriangleAlert } from 'lucide-react'
+import { CalendarCheck, Copy, Eye, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import { PageFrame } from '@/components/templates/page-frame'
+import { DetailPage } from '@/components/templates/detail-page'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
+import StatusBadge from '@/components/shared/status-badge'
+import SectionHeader from '@/components/shared/section-header'
+import TruncatedText from '@/components/shared/truncated-text'
 import type { ApiBroadcast } from '@/lib/api'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { formatNumber } from '@/lib/format'
@@ -19,7 +23,6 @@ import BroadcastPhone from './phone'
 import { CancelReservationDialog } from './detail'
 import { formatBroadcastDateTime, formatShortDateTime } from './display'
 import styles from './reserved.module.css'
-import { PageHeading } from '@/components/templates/page-frame'
 import { emptyValue } from '@/components/shared/empty-value'
 
 type AudienceEstimate = {
@@ -90,97 +93,46 @@ export default function Reserved({
   const canCancel = canEdit && broadcast.status === 'scheduled' && !cancelled
   const shortTime = formatShortDateTime(broadcast.scheduledAt)
 
-  return (
-    <PageFrame kind="detail" boardId="cdZBf CRtK8">
-      <PageHeading title={broadcast.title}
-        help={<>{`${scheduledLabel} に、${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}へ送ります。開始の前までは確かめる・取り消すができます。`}</>}
-        titleAccessory={<><span className={styles.badge}>
-            <span className={styles.dot} aria-hidden="true" />
-            予約中
-          </span></>} />
-
-      <div className={styles.split}>
-        <div className={styles.main}>
-          <section className={styles.done}>
-            <div className={styles.doneHead}>
-              <span className={styles.doneIcon}><CalendarCheck2 aria-hidden="true" /></span>
-              <div className={styles.doneText}>
-                <h3 className={styles.doneTitle}>一斉配信を予約しました</h3>
-                <p className={styles.doneDesc}>送る前にもう一度、対象の人数を数え直します</p>
-              </div>
-            </div>
-            <dl className={styles.rows}>
-              <Row label="管理名" value={broadcast.title} />
-              <Row
-                label="配信対象"
-                value={`${audienceLabel}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)} 人`}${estimate && estimate.hiddenExcluded > 0 ? `（除く見込み ${formatNumber(estimate.hiddenExcluded)} 人）` : ''}`}
-              />
-              <Row label="送る日時" value={scheduledLabel} />
-              <Row label="メッセージ" value={`${messageTypeLabel(broadcast.messageType)} ${bubbleCount} 通`} />
-              <Row label="状態" value={`予約中${approverLabel}`} />
-            </dl>
-            <p className={styles.slack}>
-              <Info className={styles.slackIcon} aria-hidden="true" />
-              <span>{notificationText || '配信の開始・完了・エラーは、Slack の同じスレッドへ知らせます。'}</span>
-            </p>
-            <div className={styles.doneButtons}>
-              <></>
-              <Button variant="primary" href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}>
-                <Eye aria-hidden="true" />
-                予約の内容を見る
-              </Button>
-            </div>
-          </section>
-
-          <section className={styles.warn}>
-            <p className={styles.warnTitle}>
-              <TriangleAlert className={styles.warnIcon} aria-hidden="true" />
-              送る前に確かめること
-            </p>
-            {warnings.map((message, index) => <p key={index} className={styles.warnItem}>{`・${message}`}</p>)}
-          </section>
-
-          {cancelled ? (
-            <Notice tone="success" message="予約を取り消しました。内容は下書きとして残っています。" />
-          ) : null}
-        </div>
-
-        <aside className={styles.side} aria-label="次にできることとメッセージ">
-          {canEdit ? (
-            <>
-              <h3 className={styles.secTitle}>次にできること</h3>
-              <div className={styles.nextActions}>
-                <Button onClick={testSend} disabled={actionBusy !== null} busy={actionBusy === 'test'} busyLabel="テスト送信中…">
-                  <Send aria-hidden="true" />
-                  テストを送る
-                </Button>
-                <Button onClick={duplicate} disabled={actionBusy !== null} busy={actionBusy === 'duplicate'} busyLabel="複製中…">
-                  <Copy aria-hidden="true" />
-                  複製して別の配信を作る
-                </Button>
-                {canCancel ? (
-                  <>
-                    <span className={styles.rule} aria-hidden="true" />
-                    <div className={styles.cancelRow}>
-                      <Button variant="text" className={styles.cancelButton} onClick={openCancel}>
-                        予約を取り消す…
-                      </Button>
-                    </div>
-                  </>
-                ) : null}
-              </div>
-              {actionError ? <Notice tone="danger" message={actionError} onClose={clearActionError} /> : null}
-            </>
-          ) : null}
-          <h3 className={styles.secTitle}>メッセージ</h3>
-          <BroadcastPhone
-            broadcast={broadcast}
-            accountName={accountName}
-            chip={shortTime ? `${shortTime} に届きます` : undefined}
-            time={shortTime ? shortTime.slice(shortTime.indexOf('）') + 1) : emptyValue('unknown')}
-          />
-        </aside>
+  const summary = <div className={styles.aside}>
+    {canEdit ? <>
+      <SectionHeader title="次にできること" />
+      <div className={styles.nextActions}>
+        <Button fullWidth onClick={testSend} disabled={actionBusy !== null} title={actionBusy === 'duplicate' ? '複製が終わるまでお待ちください' : undefined} busy={actionBusy === 'test'} busyLabel="テスト送信中…">
+          <Send aria-hidden="true" />テストを送る
+        </Button>
+        <Button fullWidth onClick={duplicate} disabled={actionBusy !== null} title={actionBusy === 'test' ? 'テスト送信が終わるまでお待ちください' : undefined} busy={actionBusy === 'duplicate'} busyLabel="複製中…">
+          <Copy aria-hidden="true" />複製して別の配信を作る
+        </Button>
+        {canCancel ? <Button variant="text" textTone="danger" onClick={openCancel}>予約を取り消す…</Button> : null}
       </div>
+      {actionError ? <Notice tone="danger" message={actionError} onClose={clearActionError} /> : null}
+    </> : null}
+    <SectionHeader title="メッセージ" />
+    <BroadcastPhone broadcast={broadcast} accountName={accountName}
+      chip={shortTime ? `${shortTime} に届きます` : undefined}
+      time={shortTime ? shortTime.slice(shortTime.indexOf('）') + 1) : emptyValue('unknown')} />
+  </div>
+  const rows = [
+    { label: '管理名', value: broadcast.title },
+    { label: '配信対象', value: `${audienceLabel}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)} 人`}${estimate && estimate.hiddenExcluded > 0 ? `（除く見込み ${formatNumber(estimate.hiddenExcluded)} 人）` : ''}` },
+    { label: '送る日時', value: scheduledLabel },
+    { label: 'メッセージ', value: `${messageTypeLabel(broadcast.messageType)} ${bubbleCount} 通` },
+    { label: '状態', value: `予約中${approverLabel}` },
+  ].map(row => ({ ...row, value: <TruncatedText value={row.value} /> }))
+
+  return (
+    <DetailPage layout="record-detail" heightMode="content" boardId="cdZBf CRtK8" readOnly={!canEdit}
+      title={broadcast.title}
+      subtitle={`${scheduledLabel} に、${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}へ送ります。開始の前までは確かめる・取り消すができます。`}
+      titleAccessory={<StatusBadge tone="info">予約中</StatusBadge>}
+      summary={summary} summaryLabel="次にできることとメッセージ"
+      summaryPreview={{ label: '次の操作とメッセージを見る', title: '次にできることとメッセージ' }}>
+      <CreateSummaryCard variant="completion" completionIcon={<CalendarCheck />} title="一斉配信を予約しました" description="送る前にもう一度、対象の人数を数え直します" rows={rows}>
+        <Notice tone="info" message={notificationText || '配信の開始・完了・エラーは、Slack の同じスレッドへ知らせます。'} />
+        <div className={styles.doneButtons}><Button variant="primary" href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}><Eye aria-hidden="true" />予約の内容を見る</Button></div>
+      </CreateSummaryCard>
+      <Notice tone="warn" heading="送る前に確かめること">{warnings.map((message,index) => <span key={index}>{`・${message}`}{index < warnings.length - 1 ? <br /> : null}</span>)}</Notice>
+      {cancelled ? <Notice tone="success" message="予約を取り消しました。内容は下書きとして残っています。" /> : null}
 
       <CancelReservationDialog
         open={cancelOpen}
@@ -193,15 +145,6 @@ export default function Reserved({
         onConfirm={confirmCancel}
         onClose={closeCancel}
       />
-    </PageFrame>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={styles.row}>
-      <dt>{label}</dt>
-      <dd title={value}>{value}</dd>
-    </div>
+    </DetailPage>
   )
 }

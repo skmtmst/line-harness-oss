@@ -184,6 +184,27 @@
 .legend[data-layout='dashboard'] .swatch { width: var(--tpl-db-swatch); height: var(--tpl-db-swatch); border-radius: var(--tpl-db-swatch-r); }
 .legend[data-layout='dashboard'] .swatchRemoved { background: var(--tpl-db-chart-bar-blocked); }
 
+.swatchBroadcast { background: var(--color-status-info); }
+.swatchScenario { background: var(--color-avatar-purple-ink); }
+.eventMark { display: inline-block; flex-shrink: 0; width: var(--tpl-an-mark); height: var(--tpl-an-mark); border-radius: var(--tpl-an-mark-radius); }
+.legend[data-layout='analytics'] { justify-content: flex-start; flex-wrap: wrap; gap: var(--tpl-an-legend-gap); padding: 0; margin: 0; list-style: none; font-size: var(--text-caption); line-height: var(--tpl-an-text-lh); }
+.legend[data-layout='analytics'] .legendItem { gap: var(--tpl-an-swatch-gap); }
+.legend[data-layout='analytics'] .swatch { width: var(--tpl-an-swatch); height: var(--tpl-an-swatch); border-radius: var(--radius-chart-dot); }
+.chart[data-chart-distribution='diverging'] .plot { margin-top: calc(var(--tpl-an-mark) + var(--tpl-an-mark-gap)); margin-bottom: calc(var(--text-micro) * 2); }
+.chart[data-chart-distribution='diverging'] .dayButton { flex: 0 0 auto; height: 100%; }
+.chart[data-chart-distribution='diverging'] .bars { position: relative; padding: 0; }
+.chart[data-chart-distribution='diverging'] .bar { position: absolute; }
+/* 分析の日ごとの増減（絵 L4Uov・eEhYU）：棒は細く（5px）、増えたは LINE の緑。凡例の四角も同じ色。 */
+.chart[data-chart-distribution='diverging'] .bars { gap: 0; }
+.chart[data-chart-distribution='diverging'] .bar { width: var(--tpl-an-bar-w); min-width: var(--tpl-an-bar-w); max-width: var(--tpl-an-bar-w); left: calc(50% - var(--tpl-an-bar-w) / 2); }
+.chart[data-chart-distribution='diverging'] .addedBar,
+.legend[data-layout='analytics'] .swatchAdded { background: var(--color-accent); }
+.chart[data-chart-distribution='diverging'] .addedBar { bottom: var(--chart-zero); }
+.chart[data-chart-distribution='diverging'] .removedBar { top: calc(100% - var(--chart-zero)); border-radius: var(--radius-mini); border-start-start-radius: 0; border-start-end-radius: 0; }
+.chart[data-chart-distribution='diverging'] .axisLabel { position: absolute; top: 100%; width: 100%; }
+.chart[data-chart-distribution='diverging'] [data-chart-baseline] { border-color: var(--color-ink-faint); }
+.events { position: absolute; top: calc(0px - var(--tpl-an-mark) - var(--tpl-an-mark-gap)); display: flex; justify-content: center; gap: var(--tpl-an-mark-gap); }
+
 /*
  * ★V8 G3 はみ出し直し（parity 1004-0513：目盛り 58＞24 など 104 件）。
  * 狭い列で中央寄せの字が隣の列へはみ出すと、後に描かれる隣の列の棒の

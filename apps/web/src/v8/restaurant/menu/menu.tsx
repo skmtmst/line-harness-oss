@@ -1,29 +1,25 @@
 'use client'
 
-import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 
-import { FolderDotName } from '@/components/shared/folder-dot'
 import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import { Check, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
-import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { TextField } from '@/components/shared/text-field'
-import DateTimeField from '@/components/shared/date-time-field'
+import Notice from '@/components/shared/notice'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { DataTable, TableHeadRow, Td, Th, Tr, ActionCell, NameCell, RowNameButton } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { formatYen } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
 import RestaurantShell, { Panel, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
-import { DialogField, DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
+import { DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
 import styles from './menu.module.css'
 import { formatDateTime as polishFormatDateTime } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 メニュー管理（板 `MJoJR`・停止の確認 `MV5Os`・追加と変更 `NkmwU`）。
@@ -43,25 +39,8 @@ export function safeArray(value: string): string[] {
   }
 }
 
-function periodLabel(periods: string[]): string {
+export function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
-}
-
-type Period = 'lunch' | 'dinner' | 'both'
-type Draft = { kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string }
-
-const emptyDraft: Draft = { kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '' }
-
-function draftOf(item: RestaurantMenuItem): Draft {
-  const periods = safeArray(item.service_periods_json)
-  return {
-    kind: item.kind,
-    name: item.name,
-    price: String(item.price),
-    period: periods.length > 1 ? 'both' : periods[0] === 'lunch' ? 'lunch' : 'dinner',
-    effectiveAt: '',
-    allergens: safeArray(item.allergens_json).join(', '),
-  }
 }
 
 function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
@@ -72,39 +51,14 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const canEdit = canManageRole(role)
   const rows = store ? data.menuItems.filter((row) => row.store_id === store.id) : data.menuItems
   const pendingApprovals = data.approvals.filter((item) => item.kind === 'menu_change' && item.status === 'pending')
-  /* 窓：'new' は追加、品目の id は変更。 */
-  const [editor, setEditor] = useState<string | null>(null)
-  const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [stopId, setStopId] = useState('')
   const [deleteId, setDeleteId] = useState('')
-  const editing = editor && editor !== 'new' ? rows.find((row) => row.id === editor) ?? null : null
   const stopping = rows.find((row) => row.id === stopId)
   const deleting = rows.find((row) => row.id === deleteId)
-  const priceChanged = Boolean(editing && draft.price !== '' && Number(draft.price) !== editing.price)
-
-  const openNew = () => { setDraft(emptyDraft); setEditor('new') }
-  const openEdit = (item: RestaurantMenuItem) => { setDraft(draftOf(item)); setEditor(item.id) }
-
-  const save = async () => {
-    if (!selectedAccountId || !draft.name.trim() || draft.price === '') return
-    const body = {
-      kind: draft.kind,
-      name: draft.name,
-      price: Number(draft.price),
-      effectiveAt: draft.effectiveAt ? datetimeLocalJstToUtcIso(draft.effectiveAt) : null,
-      allergens: draft.allergens.split(',').map((part) => part.trim()).filter(Boolean),
-      servicePeriods: draft.period === 'both' ? ['lunch', 'dinner'] : [draft.period],
-    }
-    const ok = editing
-      ? await mutate(
-        () => restaurantTestApi.updateMenu(selectedAccountId, editing.id, body),
-        priceChanged ? '価格変更を承認待ちとして申請しました。現在の価格は変わりません。' : 'メニューを更新しました。',
-      )
-      : store
-        ? await mutate(() => restaurantTestApi.createMenu(selectedAccountId, { storeId: store.id, ...body }), 'メニューを追加しました。')
-        : false
-    if (ok) setEditor(null)
-  }
+  /* 追加・変更は 1 枚の編集ページ（mauOC）。前の窓（NkmwU）は消した（B-319）。 */
+  const router = useRouter()
+  const openNew = () => router.push(`/restaurant-test/menu/edit${store ? `?store=${encodeURIComponent(store.id)}` : ''}`)
+  const openEdit = (item: RestaurantMenuItem) => router.push(`/restaurant-test/menu/edit?id=${encodeURIComponent(item.id)}`)
 
   const stop = (item: RestaurantMenuItem) => {
     if (!selectedAccountId) return
@@ -133,12 +87,13 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
 
   return (
     <>
+      {!canEdit ? <ReadOnlyNotice /> : null}
       <StatRow>
-        <KpiCard title="全メニュー" valueText={`${rows.length}`} detail="公開・下書き・アーカイブ" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="コース" valueText={`${rows.filter((item) => item.kind === 'course').length}`} detail="予約時に選択" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="単品" valueText={`${rows.filter((item) => item.kind !== 'course').length}`} detail="アラカルト" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="要承認" valueText={`${pendingApprovals.length}`} detail="価格・内容改定" valueTone={pendingApprovals.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="アレルギー登録" valueText={`${rows.filter((item) => safeArray(item.allergens_json).length > 0).length}`} detail="注意品目あり" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="全メニュー" value={rows.length} unit="公開・下書き・アーカイブ" detail={null} presentation="band" />
+        <KpiCard title="コース" value={rows.filter((item) => item.kind === 'course').length} unit="予約時に選択" detail={null} presentation="band" />
+        <KpiCard title="単品" value={rows.filter((item) => item.kind !== 'course').length} unit="アラカルト" detail={null} presentation="band" />
+        <KpiCard title="要承認" value={pendingApprovals.length} unit="価格・内容改定" detail={null} valueTone={pendingApprovals.length > 0 ? 'warning' : 'default'} presentation="band" />
+        <KpiCard title="アレルギー登録" value={rows.filter((item) => safeArray(item.allergens_json).length > 0).length} unit="注意品目あり" detail={null} presentation="band" />
       </StatRow>
       <Panel
         title="メニュー一覧"
@@ -148,18 +103,18 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         ) : null}
         flush
       >
-        <p className={styles.legend}>「…」の中身：有効＝変更・停止／アーカイブ＝変更・再開／一度も公開していない下書き＝変更・削除</p>
-        <DataTable className={styles.table}>
+        <Notice tone="info">「…」の中身：有効＝変更・停止／アーカイブ＝変更・再開／一度も公開していない下書き＝変更・削除</Notice>
+        <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
           <thead>
-            <TableHeadRow className={styles.headRow}>
-              <Th className={`${styles.th} ${styles.colName}`}>メニュー</Th>
-              <Th className={`${styles.th} ${styles.colKind}`}>種類</Th>
-              <Th className={`${styles.th} ${styles.colPrice}`} align="right">価格</Th>
-              <Th className={`${styles.th} ${styles.colPeriod}`}>提供時間</Th>
-              <Th className={`${styles.th} ${styles.colDuration}`}>所要時間</Th>
-              <Th className={`${styles.th} ${styles.colAllergy}`}>アレルギー</Th>
-              <Th className={`${styles.th} ${styles.colStatus}`}>状態</Th>
-              <Th className={`${styles.th} ${styles.colOps}`} align="right"><span className={styles.srOnly}>操作</span></Th>
+            <TableHeadRow data-table-layout="columns">
+              <Th grow>メニュー</Th>
+              <Th className={styles.colKind}>種類</Th>
+              <Th className={styles.colPrice} align="right">価格</Th>
+              <Th collapseAt="narrow" className={styles.colPeriod}>提供時間</Th>
+              <Th collapseAt="narrow" className={styles.colDuration}>所要時間</Th>
+              <Th className={styles.colAllergy}>アレルギー</Th>
+              <Th className={styles.colStatus}>状態</Th>
+              <Th className={styles.colOps} align="right">操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
@@ -169,25 +124,21 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
               const pending = item.pendingPrice != null
               const allergens = safeArray(item.allergens_json)
               return (
-                <Tr data-row-id={item.id} key={item.id} className={styles.row} onOpen={() => openEdit(item)}>
-                  <Td className={`${styles.td} ${styles.colName}`}><FolderDotName>
-                    {canEdit ? (
-                      <button type="button" className={styles.name} title={item.name} onClick={() => openEdit(item)}>{item.name}</button>
-                    ) : <span className={styles.name} title={item.name}>{item.name}</span>}
-                  </FolderDotName></Td>
-                  <Td className={styles.td}>{item.kind === 'course' ? 'コース' : '単品'}</Td>
-                  <Td className={`${styles.td} ${styles.colPrice}`} align="right">{formatYen(item.price)}</Td>
-                  <Td className={styles.td}>{periodLabel(safeArray(item.service_periods_json))}</Td>
-                  <Td className={styles.td}>{item.duration_minutes ? `${item.duration_minutes}分` : emptyValue('unknown')}</Td>
-                  <Td className={styles.td}><span className={styles.clip} title={allergens.join('・') || emptyValue('none')}>{allergens.join('・') || emptyValue('none')}</span></Td>
-                  <Td className={styles.td}>
+                <Tr data-row-id={item.id} key={item.id} data-table-layout="columns" onOpen={() => openEdit(item)}>
+                  <NameCell grow name={<RowNameButton title={item.name} onClick={() => openEdit(item)}>{item.name}</RowNameButton>} />
+                  <Td className={styles.colKind}>{item.kind === 'course' ? 'コース' : '単品'}</Td>
+                  <Td className={styles.colPrice} align="right">{formatYen(item.price)}</Td>
+                  <Td collapseAt="narrow" className={styles.colPeriod}>{periodLabel(safeArray(item.service_periods_json))}</Td>
+                  <Td collapseAt="narrow" className={styles.colDuration}>{item.duration_minutes ? `${item.duration_minutes}分` : emptyValue('unknown')}</Td>
+                  <Td className={styles.colAllergy}><TruncatedText value={allergens.join('・') || emptyValue('none')} /></Td>
+                  <Td className={styles.colStatus}>
                     {pending ? (
                       <span title={`新価格 ${formatYen(item.pendingPrice ?? 0)}${item.pendingEffectiveAt ? `・${polishFormatDateTime(new Date(item.pendingEffectiveAt))}から` : ''}`}>
                         <Status value="pending" label={item.priceChangeStatus === 'approved' ? '開始待ち' : '申請中'} />
                       </span>
                     ) : <Status value={archived ? 'archived' : draftItem ? 'draft' : item.status === 'paused' ? 'paused' : 'active'} />}
                   </Td>
-                  <Td className={`${styles.td} ${styles.colOps}`} align="right">
+                  <ActionCell className={styles.colOps}>
                     {canEdit ? (
                       <span className={styles.rowActions}>
                         {archived ? <Button disabled={busy} onClick={() => resume(item)}>再開</Button> : null}
@@ -204,63 +155,13 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                         />
                       </span>
                     ) : null}
-                  </Td>
+                  </ActionCell>
                 </Tr>
               )
             })}
           </tbody>
         </DataTable>
       </Panel>
-      <RsDialog
-        open={editor !== null}
-        title={editing ? `「${editing.name}」を変更` : 'メニューを追加する'}
-        width={560}
-        top={180}
-        busy={busy}
-        designNode="NkmwU"
-        onCancel={() => setEditor(null)}
-        onSubmit={() => void save()}
-        actions={(
-          <>
-            <Button type="button" onClick={() => setEditor(null)} disabled={busy}>キャンセル</Button>
-            <Button type="submit" variant="primary" disabled={busy || !draft.name.trim() || draft.price === ''}>
-              <Check size={15} aria-hidden="true" />{editing ? (priceChanged ? '保存して申請する' : '保存する') : '保存して追加する'}
-            </Button>
-          </>
-        )}
-      >
-        <DialogField label="種類" kind="select">
-          <SaveErrorField names={["kind","draft.kind"]}><Select aria-label="種類" size="full" value={draft.kind} onChange={(value) => setDraft({ ...draft, kind: value === 'a_la_carte' ? 'a_la_carte' : 'course' })} options={[{ value: 'course', label: 'コース' }, { value: 'a_la_carte', label: '単品' }]} /></SaveErrorField>
-        </DialogField>
-        <DialogField label="メニュー名" htmlFor="rs-menu-name">
-          <SaveErrorField names={["name","draft.name"]}><TextField id="rs-menu-name" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></SaveErrorField>
-        </DialogField>
-        <div className={styles.pair}>
-          <DialogField label="価格（税込）" htmlFor="rs-menu-price">
-            <SaveErrorField names={["price","draft.price"]}><NumberInput id="rs-menu-price" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></SaveErrorField>
-          </DialogField>
-          <DialogField label="提供時間" kind="select">
-            <SaveErrorField names={["period","draft.period"]}><Select
-              aria-label="提供時間"
-              size="full"
-              value={draft.period}
-              onChange={(value) => setDraft({ ...draft, period: value === 'lunch' ? 'lunch' : value === 'both' ? 'both' : 'dinner' })}
-              options={[{ value: 'lunch', label: 'ランチ' }, { value: 'dinner', label: 'ディナー' }, { value: 'both', label: 'ランチ・ディナー' }]}
-            /></SaveErrorField>
-          </DialogField>
-        </div>
-        <DialogField label={editing ? '新しい価格の開始日時' : '価格の開始日時'} htmlFor="rs-menu-effective">
-          <SaveErrorField names={["effectiveAt","draft.effectiveAt","effective_at","draft.effective_at"]}><DateTimeField id="rs-menu-effective" value={draft.effectiveAt} onChange={(next) => setDraft({ ...draft, effectiveAt: next })} /></SaveErrorField>
-        </DialogField>
-        <DialogField label="アレルギー（カンマ区切り）" htmlFor="rs-menu-allergens">
-          <SaveErrorField names={["allergens","draft.allergens"]}><TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} /></SaveErrorField>
-        </DialogField>
-        <DialogNote>
-          {editing
-            ? `価格を変えると承認ワークフローへ申請されます。承認されるまで、いまの価格（${formatYen(editing.price)}）のまま出ます。空欄の開始日時は承認後すぐに反映します。`
-            : '追加したメニューは、予約台帳・Google投稿・LINEカードで同じマスターとして使われます。あとから価格を変えるときは承認ワークフローへ申請されます。'}
-        </DialogNote>
-      </RsDialog>
       <RsDialog
         open={Boolean(stopping)}
         title="このメニューを停止しますか？"

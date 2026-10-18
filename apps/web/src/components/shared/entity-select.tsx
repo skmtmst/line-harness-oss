@@ -37,6 +37,7 @@ export function entityOptionMetadata(row: object): Pick<EntitySelectOption, 'fol
 
 type CommonProps = {
   'aria-label': string
+  'aria-describedby'?: string
   options: EntitySelectOption[]
   kind?: EntityKind
   noun?: string
@@ -61,6 +62,8 @@ type CommonProps = {
   width?: number
   /** 選択した名前が長い小さな設定欄だけ、札を小さい口で出す。 */
   compact?: boolean
+  /** 狭い頭の欄（会話の頭の担当 eovoG）：欄全体が押す口なので「変える ›」を出さず、名前の札だけにする。 */
+  actionHidden?: boolean
   /** 呼び出し元の印は欄に入れず、窓を開く操作の意味を共通にする。 */
   icon?: ReactNode
   /** 移行前のSelectと同じ呼び出し口。 */
@@ -95,9 +98,9 @@ export default function EntitySelect(props: EntitySelectProps) {
     onOpen: hasFolderInfo && kind ? load : undefined, disabled, readOnly, invalid: Boolean(error) || invalid, id,
     placeholder: props.placeholder ?? options.find((option) => option.value === '')?.label ?? `${noun}を選ぶ`,
     state: loading ? <p role="status">読み込んでいます。</p> : undefined,
-    describedBy: error ? errorId : undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix,
+    describedBy: [props['aria-describedby'], error ? errorId : undefined].filter(Boolean).join(' ') || undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix, actionHidden: props.actionHidden,
   }
-  return <div className={[selectStyles.root, selectStyles[size === 'page-size' ? 'pageSize' : size], className].filter(Boolean).join(' ')} style={width ? { width, maxWidth: '100%' } : undefined} data-entity-picker-field>
+  return <div className={[selectStyles.root, selectStyles[size === 'page-size' ? 'pageSize' : size], className].filter(Boolean).join(' ')} style={width ? { width, maxWidth: '100%', flexShrink: 0 } : undefined} data-entity-picker-field>
     {name ? <input type="hidden" name={name} value={props.values ? props.values.join(',') : props.value} disabled={disabled} /> : null}
     {props.values !== undefined ? <EntityPickerField key={account?.selectedAccountId ?? 'unscoped'} {...common} multiple value={props.values} onChange={props.onChange} />
       : <EntityPickerField key={account?.selectedAccountId ?? 'unscoped'} {...common} value={props.value} onChange={props.onChange} clearable={props.clearable}

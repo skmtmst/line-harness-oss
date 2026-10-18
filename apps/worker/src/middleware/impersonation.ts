@@ -87,7 +87,7 @@ export async function resolveImpersonation(
 // ---------------------------------------------------------------------------
 
 /** Classify fields independently of URL; new admin routes inherit protection. */
-const NAME_KEYS = new Set(['displayname', 'systemdisplayname', 'realname', 'friendname', 'fullname', 'customername', 'staffname', 'recipientname', 'firstname', 'lastname', 'bankaccountholder', 'furigana', 'kana']);
+const NAME_KEYS = new Set(['ownername', 'personname', 'displayname', 'systemdisplayname', 'realname', 'friendname', 'fullname', 'customername', 'staffname', 'recipientname', 'firstname', 'lastname', 'bankaccountholder', 'furigana', 'kana']);
 const CONTACT_KEYS = new Set(['pictureurl', 'phone', 'phonenumber', 'email', 'emailaddress', 'address', 'postalcode', 'zipcode', 'birthdate', 'birthday', 'dateofbirth', 'lineuserid', 'allergies', 'allergy', 'accountnumber', 'bankaccountnumber', 'filename', 'r2key', 'downloadurl', 'contenturl', 'originalurl', 'attachmenturl', 'customeremail', 'customerphone', 'recipientemail', 'recipientphone', 'contactemail', 'contactphone', 'phonee164', 'addressline1', 'addressline2', 'city', 'prefecture', 'bankcode', 'branchcode', 'accountlast4', 'url', 'uri', 'imageurl', 'avatarurl', 'thumbnailurl', 'originalcontenturl', 'previewimageurl']);
 const TEXT_KEYS = new Set(['alttext', 'subject', 'caption', 'snippet', 'usercomment', 'friendcomment', 'notificationtext', 'reason', 'text', 'content', 'message', 'body', 'lastmessage', 'preview', 'customernote', 'internalnote', 'note', 'memo', 'description']);
 // Arbitrary answers/metadata cannot be safely classified by their nested keys.
@@ -124,7 +124,7 @@ export function maskPiiDeep(value: unknown, depth = 0): unknown {
   if (Array.isArray(value)) return value.map((item) => maskPiiDeep(item, depth + 1));
   const source = value as Record<string, unknown>;
   const out: Record<string, unknown> = {};
-  const person = Object.keys(source).some(key => ['friendid', 'lineuserid', 'realname', 'customername', 'customerid', 'email', 'phonenumber', 'phone', 'fieldid', 'submissionid', 'displayname', 'systemdisplayname', 'friendname', 'fullname', 'recipientname', 'pictureurl', 'role', 'rolebundle'].includes(fieldKey(key)));
+  const person = Object.keys(source).some(key => ['friendid', 'lineuserid', 'realname', 'customername', 'customerid', 'email', 'phonenumber', 'phone', 'fieldid', 'submissionid', 'ownername', 'personname', 'displayname', 'systemdisplayname', 'friendname', 'fullname', 'recipientname', 'pictureurl', 'role', 'rolebundle'].includes(fieldKey(key)));
   const id = source.id ?? source.friend_id ?? source.friendId ?? source.line_user_id ?? source.lineUserId;
   for (const [key, raw] of Object.entries(source)) {
     const classified = fieldKey(key);
@@ -203,6 +203,9 @@ export const piiMaskMiddleware: MiddlewareHandler<Env> = async (c, next) => {
 // ---------------------------------------------------------------------------
 
 const FORBIDDEN_WHILE_IMPERSONATING: Array<[string, RegExp]> = [
+  ['POST', /^\/api\/chats\/[^/]+\/(?:send|send-combined|messages|schedule)$/],
+  ['POST', /^\/api\/(?:hq\/)?broadcasts\/[^/]+\/(?:send|correction)$/],
+  ['POST', /^\/v2\/bot\/message\//],
   ['DELETE', /^\/api\/staff(?:\/|$)/],
   ['DELETE', /^\/api\/line-accounts(?:\/|$)/],
   ['DELETE', /^\/api\/accounts(?:\/|$)/],

@@ -3,7 +3,9 @@ import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import Link from '@/components/shared/list-navigation'
+import TextLink from '@/components/shared/text-link'
+import Card, { CardHeader } from '@/components/shared/card'
+import { LinePreviewMessage } from '@/components/shared/line-preview'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
@@ -26,13 +28,13 @@ import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
 import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { ROLE_LABELS } from '@/lib/hq-members'
+import DialogRecipientList from '@/components/shared/dialog-recipient-list'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import type { OperatorNotificationTeam } from '@line-crm/shared'
 import { DEDUPE_OPTIONS, DEFAULT_EVENT_TYPE, EVENT_OPTIONS, IMPORTANCE_OPTIONS, RECIPIENTS_SAVE_GUARD_MESSAGE, SCHEDULE_OPTIONS, THRESHOLD_OPTIONS, eventLabel, eventPlaceLabel, importanceLabel, readConditions } from './operator-words'
 import styles from './operator-edit.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
-import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect from '@/components/shared/entity-select'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -473,15 +475,13 @@ function OperatorEditInner() {
             expanded={previewExpanded}
             onExpandedChange={setPreviewExpanded}
             aside={<>
-              <FormSection id="operator-preview-heading" title="お店の人にはこう届きます" description="文面はここで確かめられます">
+              <FormSection variant="aside" id="operator-preview-heading" title="お店の人にはこう届きます" description="文面はここで確かめられます">
                 <div className={styles.previewBack}>
-                  <div className={styles.previewBubble}>
-                    <p className={styles.previewName}>【{importanceLabel(importance)}】{name.trim() || 'お知らせ名'}</p>
-                    <p className={styles.previewBody}>
-                      {eventLabel(eventType)}・{dedupeMinutes === '0' ? 'その都度知らせる' : `${dedupeMinutes}分のあいだは1回だけ`}
-                    </p>
-                    <p className={styles.previewBody}>{`${eventPlaceLabel(eventType)}で見る ›`}</p>
-                  </div>
+                  <LinePreviewMessage accountName="musubo" avatar={<Send size={16} aria-hidden="true" />} time="" density="compact">
+                    <strong>【{importanceLabel(importance)}】{name.trim() || 'お知らせ名'}</strong><br />
+                    {eventLabel(eventType)}・{dedupeMinutes === '0' ? 'その都度知らせる' : `${dedupeMinutes}分のあいだは1回だけ`}<br />
+                    {`${eventPlaceLabel(eventType)}で見る ›`}
+                  </LinePreviewMessage>
                 </div>
                 {canWrite ? (
                   <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => void testSend()} disabled={saveDisabled} busy={Boolean(saving)} busyLabel="処理中…">
@@ -490,7 +490,7 @@ function OperatorEditInner() {
                 ) : null}
               </FormSection>
 
-              <FormSection id="operator-care-heading" title="気をつけること">
+              <FormSection variant="aside" id="operator-care-heading" title="気をつけること">
                 <ul className={styles.careList}>
                   <li>・受け取る人が0人だと公開できません</li>
                   <li>・下書きを保存しても通知は始まりません</li>
@@ -498,11 +498,11 @@ function OperatorEditInner() {
                 </ul>
               </FormSection>
 
-              <FormSection id="operator-links-heading" title="つながる先">
+              <FormSection variant="aside" id="operator-links-heading" title="つながる先">
                 <p className={styles.linkRow}>
-                  <Link href="/chats" className={styles.linkItem}>→ 受信箱</Link>
-                  <Link href="/staff" className={styles.linkItem}>→ ログインユーザー</Link>
-                  <Link href="/line-notifications" className={styles.linkItem}>→ 顧客へのお知らせ</Link>
+                  <TextLink href="/chats">受信箱</TextLink>
+                  <TextLink href="/staff">ログインユーザー</TextLink>
+                  <TextLink href="/line-notifications">顧客へのお知らせ</TextLink>
                 </p>
               </FormSection>
             </>}
@@ -560,21 +560,19 @@ function OperatorEditInner() {
                     <Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button>
                   </div>
                 ) : null) : (
-                <div className={styles.staffBox}>
-                  <div className={styles.staffHead}>
-                    <h3 className={styles.staffTitle}>受け取るスタッフ</h3>
-                    {canWrite && items.length > 0 && !teamFormOpen ? (
-                      <button type="button" className={styles.textButton} onClick={() => setTeamFormOpen(true)}>
+                <Card variant="form">
+                  <CardHeader size="stacked" headingLevel={3} title="受け取るスタッフ" action={
+                    canWrite && items.length > 0 && !teamFormOpen ? (
+                      <Button type="button" variant="text" onClick={() => setTeamFormOpen(true)}>
                         {teamId ? 'チームを更新する…' : 'この顔ぶれをチームにする…'}
-                      </button>
-                    ) : null}
-                  </div>
+                      </Button>
+                    ) : null} />
                   {recipients
                     ? (items.length === 0 ? (
                       <div className={styles.emptyRecipients}>
                         <p className={styles.emptyTitle}>受け取る人がいません</p>
                         <p className={styles.cardNote}>スタッフを登録し、LINE連携が済んだ人が宛先になります。</p>
-                        <Link href="/staff" className={styles.linkItem}>ログインユーザーでスタッフを確認する</Link>
+                        <TextLink href="/staff">ログインユーザーでスタッフを確認する</TextLink>
                       </div>
                     ) : (
                       <EntitySelect aria-label="受け取るスタッフ" noun="スタッフ" values={recipientIds} readOnly={!canWrite}
@@ -618,7 +616,7 @@ function OperatorEditInner() {
                       <Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button>
                     </div>
                   ) : null}
-                </div>
+                </Card>
                 )}
                 {canWrite ? <>
                   <SaveErrorField names={["onlyAvailable","only_available"]}><Checkbox checked={onlyAvailable} onCheckedChange={setOnlyAvailable}>
@@ -640,7 +638,7 @@ function OperatorEditInner() {
               </FormSection>
 
               {error ? <Notice tone="danger" className={styles.formErrorNoticePlacement} >{error}</Notice> : null}
-              {notice ? <p className={styles.formNotice} role="status">{notice}</p> : null}
+              {notice ? <Notice tone="success">{notice}</Notice> : null}
           </DetailColumns>
 
           <StickyBar
@@ -695,17 +693,10 @@ function OperatorEditInner() {
               </span>
             </p>
           </div>
-          <ul className={styles.confirmList} aria-label="受け取る人">
-            {selectedRecipients.map((recipient) => (
-              <li key={recipient.id} className={styles.confirmRow}>
-                <span className={styles.confirmName} ><TruncatedText value={String(recipient.name ?? '')} /></span>
-                <span className={styles.confirmRole}>{recipientRole(recipient, staffRoles)}</span>
-                <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
-                  {recipient.channels.line ? 'LINE' : '画面だけ'}
-                </StatusBadge>
-              </li>
-            ))}
-          </ul>
+          <DialogRecipientList rows={selectedRecipients.map(recipient => ({
+            id: recipient.id, name: String(recipient.name ?? ''), role: recipientRole(recipient, staffRoles),
+            channel: <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>{recipient.channels.line ? 'LINE' : '画面だけ'}</StatusBadge>,
+          }))} />
           <p className={styles.confirmNote}>LINE 未登録の人には、管理画面のお知らせだけで届きます。</p>
           <div className={styles.confirmActions}>
             <Button type="button" onClick={() => setConfirmOpen(false)} disabled={publishing}>戻って直す</Button>
@@ -731,7 +722,7 @@ function OperatorEditInner() {
 /** 宛先の役割。口が役割を返せばそれを、無ければログインユーザーの一覧から引いた名前を出す。 */
 function recipientRole(recipient: OperatorRecipientPreview['items'][number], staffRoles: Record<string, string>): string {
   const own = (recipient as { roleLabel?: unknown }).roleLabel
-  return typeof own === 'string' && own ? own : staffRoles[recipient.id] ?? ''
+  return typeof own === 'string' && own ? own : staffRoles[recipient.id] || '—'
 }
 
 /** 題（12px・太字）＋選ぶ欄。2つ並べるときは .pair に入れる。 */

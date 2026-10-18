@@ -6,7 +6,7 @@ import AttributeDistribution from './attribute-distribution'
 import { fieldDefinition, fieldOf } from './attribute-model'
 import type { HqFriendAttributeDetail } from '@line-crm/shared'
 const mocks = vi.hoisted(() => ({ role: 'owner', list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), stats: vi.fn(), accounts: vi.fn(), received: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), result: vi.fn(), context: vi.fn() }))
-vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => ['owner', 'admin'].includes(mocks.role), useStaffRole: () => mocks.role, canManageRole: (role: string) => ['owner', 'admin'].includes(role) }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => ['owner', 'admin'].includes(mocks.role), useStaffRole: () => mocks.role, useStaffIdentity: () => ({ id: 'hq-owner' }), canManageRole: (role: string) => ['owner', 'admin'].includes(role) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/friend-attributes' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { context: mocks.context } }))
@@ -22,6 +22,40 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 describe('統括の情報欄・対応マーク', () => {
+  it('情報欄の操作説明を題から開閉し、単独の質問印を置かない', async () => {
+    window.localStorage.clear()
+    render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
+    await screen.findByText('愛犬のお名前')
+    const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+    expect(toggle.closest('[data-template-region="heading"]')).toBeTruthy()
+    const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    expect(body.textContent).toContain('情報欄のひな形を各アカウントへ配れます。')
+    expect(body.closest('[data-list-toolbar]')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '一覧の操作の説明' })).toBeNull()
+    fireEvent.click(toggle)
+    expect(body.hidden).toBe(true)
+    fireEvent.click(toggle)
+    expect(body.hidden).toBe(false)
+  })
+
+  it('対応マークの説明は題から開閉し、数の帯と道具の間に一度だけ出す', async () => {
+    window.localStorage.clear()
+    mocks.list.mockResolvedValue([mark.template]); mocks.get.mockResolvedValue(mark)
+    render(<HqAttributes type="mark" tab="marks" onTab={vi.fn()} />)
+    await screen.findByText('未対応')
+    const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+    expect(toggle.closest('[data-template-region="heading"]')).toBeTruthy()
+    const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    expect(body.textContent).toContain('新しいメッセージが来たら自動で変える')
+    expect(body.closest('[data-list-toolbar]')).toBeTruthy()
+    expect(screen.getAllByText(/対応マークは、受信箱で/)).toHaveLength(1)
+    fireEvent.click(toggle)
+    expect(body.hidden).toBe(true)
+    expect(window.localStorage.getItem('lh_page_explanation_v1:hq-owner:hq:marks')).toBe('closed')
+    fireEvent.click(toggle)
+    expect(body.hidden).toBe(false)
+    expect(screen.getByRole('button', { name: '対応マーク「未対応」の操作' })).toBeTruthy()
+  })
   it('店の情報欄一覧を使い、API未取得の使用先は—、閲覧のみは変更操作を隠す', async () => {
     mocks.role = 'staff'; render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
     await screen.findByText('愛犬のお名前'); expect(screen.queryByRole('button', { name: '項目を作る' })).toBeNull(); expect(screen.queryByRole('button', { name: '愛犬のお名前を配る' })).toBeNull()
@@ -107,7 +141,7 @@ it('統括の情報欄のフォルダも保存色を読み、色の保存に失�
   render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「基本情報」の操作' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '色を変える' }))
-  const dialog = within(screen.getByRole('dialog', { name: 'フォルダを直す' }))
+  const dialog = within(screen.getByRole('dialog', { name: 'フォルダを編集する' }))
   fireEvent.click(dialog.getByRole('button', { name: 'フォルダの色：紫' }))
   fireEvent.click(screen.getByRole('radio', { name: 'ピンク' }))
   fireEvent.click(dialog.getByRole('button', { name: '保存する' }))

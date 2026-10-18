@@ -24,26 +24,47 @@ import { requireIrreversibleConfirmation, requireRole } from '../middleware/role
 import { auditLog } from '../lib/audit-log.js';
 import type { AuditAction } from '../lib/audit-log.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
-import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import { randomToken } from '../services/google-business.js';
 import {
-  UBER_PROVISIONING_SCOPES,
   UberEatsError,
   buildAuthorizeUrl as buildUberAuthorizeUrl,
   exchangeAuthorizationCode as exchangeUberAuthorizationCode,
 } from '../services/uber-eats.js';
+import { UBER_PROVISIONING_SCOPES } from '../services/uber-eats-hosts.js';
+import { verifySupportRelay } from '../services/support-relay.js';
+import {
+  UBER_PROBE_CHECK_BODY,
+  platformCooldownStore,
+  probeUberSandboxToken,
+  uberProbeReadiness,
+  uberProbeSecret,
+} from '../services/ubereats-token-probe.js';
 import { accountId, fail, staffTenantId, storeFor } from './restaurant-google.js';
 import type { StoreContext } from './restaurant-google.js';
+import {
+  deliveryWebhookIpAllowlist,
+  isDeliveryWebhookIpAllowed,
+  webhookSourceIp,
+} from '../services/delivery-webhook-ip.js';
+import {
+  deliveryWebhookSigningSecret,
+  verifyDeliveryWebhook,
+} from '../services/delivery-webhook-auth.js';
+import {
+  MAX_WEBHOOK_BODY_BYTES,
+  parseWebhookPayload,
+  utf8Length,
+  type WebhookOrder,
+} from '../services/delivery-webhook-payload.js';
 import {
   UBER_OAUTH_CALLBACK_PATH,
   uberOAuthClient,
   DELIVERY_SERVICES,
   DELIVERY_SERVICE_LABELS,
   canTransitionOrder,
-  deliveryWebhookSecret,
   dispatchToDeliveryService,
   isDeliveryService,
   isIntakeStopPreset,
@@ -181,9 +202,9 @@ function isoFromMs(ms: number | null | undefined): string | null {
 // ---------- 入口の検査（restaurant-google.ts と同じ3点検査） ----------
 
 export const deliveryAccessGuard: MiddlewareHandler<Env> = async (c, next) => {
+  if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
   // 署名検証で守る外部受信は管理画面の認証を通さない。
   if (c.req.path.startsWith(WEBHOOK_PREFIX)) return next();
-  if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
   // 統括ゲート。パック無しは環境無効と同じ404。
   if (!(await tenantHasFeaturePack(dbFor(c.env), staffTenantId(c), 'restaurant'))) {
     return fail(c, 404, 'Not found');
@@ -1558,135 +1579,6 @@ restaurantDelivery.post(
 
 // ---------- 受信（各サービスの公式窓口からの通知） ----------
 
-const MAX_WEBHOOK_BODY_BYTES = 128 * 1024;
-/** 署名の時刻ずれの許容。他の受信口（EC連携・成果受信）と同じ5分。 */
-const WEBHOOK_SKEW_SECONDS = 5 * 60;
-
-function utf8Length(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
-}
-
-/** 文字列の必須項目。長さ上限を超えた値は受け取らない（画面の崩れとDB肥大を防ぐ）。 */
-function textField(value: unknown, max: number): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > max) return null;
-  return trimmed;
-}
-
-function optionalText(value: unknown, max: number): string | null {
-  if (value === undefined || value === null) return null;
-  return textField(value, max);
-}
-
-function countField(value: unknown, max: number): number | null {
-  if (!Number.isSafeInteger(value)) return null;
-  const num = Number(value);
-  if (num < 0 || num > max) return null;
-  return num;
-}
-
-/** エポック秒。範囲外・形式違いは null にして、呼び出し側で既定値へ落とす。 */
-function epochField(value: unknown, now: number): number | null {
-  if (!Number.isSafeInteger(value)) return null;
-  const num = Number(value);
-  // 過去30日〜未来7日の外は受け取らない（誤った単位・ミリ秒混入を弾く）。
-  if (num < now - 30 * 86400 || num > now + 7 * 86400) return null;
-  return num;
-}
-
-interface WebhookItem {
-  name: string;
-  note: string | null;
-  quantity: number;
-  amount: number;
-}
-
-interface WebhookOrder {
-  externalOrderId: string;
-  orderNumber: string;
-  totalAmount: number;
-  pickupMethod: string | null;
-  wantedAt: number | null;
-  customerNote: string | null;
-  receivedAt: number;
-  items: WebhookItem[];
-}
-
-interface WebhookPayload {
-  eventId: string;
-  eventType: string;
-  storeId: string;
-  order: WebhookOrder | null;
-  cancel: { externalOrderId: string; canceledBy: 'customer' | 'service' } | null;
-}
-
-/**
- * 3サービス共通の受信形式。
- * サービスごとの項目名の違いは各サービスの窓口設定側で共通名へ寄せる。
- * ここで受け取るのは検証済みの項目だけで、サービスから届いた自由文の
- * エラー文や説明文は取り込まない。
- */
-function parseWebhookPayload(
-  raw: unknown,
-  now: number,
-): { ok: true; payload: WebhookPayload } | { ok: false; error: string } {
-  if (!raw || typeof raw !== 'object') return { ok: false, error: 'Invalid payload' };
-  const body = raw as Record<string, unknown>;
-  const eventId = textField(body.event_id, 128);
-  const eventType = textField(body.event_type, 64);
-  const storeId = textField(body.store_id, 128);
-  if (!eventId || !eventType || !storeId) return { ok: false, error: 'Invalid payload' };
-
-  let order: WebhookOrder | null = null;
-  if (body.order && typeof body.order === 'object') {
-    const source = body.order as Record<string, unknown>;
-    const externalOrderId = textField(source.external_order_id, 128);
-    const orderNumber = textField(source.order_number, 64);
-    const totalAmount = countField(source.total_amount, 10_000_000);
-    if (!externalOrderId || !orderNumber || totalAmount === null) {
-      return { ok: false, error: 'Invalid order' };
-    }
-    const items: WebhookItem[] = [];
-    if (Array.isArray(source.items)) {
-      if (source.items.length > 100) return { ok: false, error: 'Invalid order' };
-      for (const entry of source.items) {
-        if (!entry || typeof entry !== 'object') return { ok: false, error: 'Invalid order' };
-        const item = entry as Record<string, unknown>;
-        const name = textField(item.name, 200);
-        const quantity = countField(item.quantity, 999);
-        const amount = countField(item.amount, 10_000_000);
-        if (!name || quantity === null || quantity === 0 || amount === null) {
-          return { ok: false, error: 'Invalid order' };
-        }
-        items.push({ name, note: optionalText(item.note, 200), quantity, amount });
-      }
-    }
-    order = {
-      externalOrderId,
-      orderNumber,
-      totalAmount,
-      pickupMethod: optionalText(source.pickup_method, 100),
-      wantedAt: epochField(source.wanted_at, now),
-      customerNote: optionalText(source.customer_note, 500),
-      receivedAt: epochField(source.received_at, now) ?? now,
-      items,
-    };
-  }
-
-  let cancel: WebhookPayload['cancel'] = null;
-  if (body.cancel && typeof body.cancel === 'object') {
-    const source = body.cancel as Record<string, unknown>;
-    const externalOrderId = textField(source.external_order_id, 128);
-    if (!externalOrderId) return { ok: false, error: 'Invalid cancel' };
-    // 発生元は店舗以外の2つだけ。店舗のキャンセルは画面（D-3）から記録する。
-    const canceledBy = source.canceled_by === 'customer' ? 'customer' : 'service';
-    cancel = { externalOrderId, canceledBy };
-  }
-
-  return { ok: true, payload: { eventId, eventType, storeId, order, cancel } };
-}
-
 /** 署名検証を通った通知の宛先店舗。担当者の認証は通らないため、ここで店舗を確定する。 */
 async function webhookStore(c: Context<Env>, storeId: string): Promise<StoreContext | null> {
   const row = await dbFor(c.env, storeId)
@@ -1806,10 +1698,11 @@ async function ingestCancel(
 /**
  * 各サービスからの通知の受け口。
  *
- * 担当者の認証は通らない。守りは3つで、
- * 1) サービスごとの合言葉によるHMAC-SHA256の署名検証、
- * 2) 5分の時刻ずれ制限、
- * 3) 受信台帳 `rt_delivery_events` の UNIQUE (service, external_event_id) による重複排除。
+ * 担当者の認証は通らない。守りは4つで、
+ * 1) 送信元IPの許可リスト（設定されているときだけ。出前館QA#7）、
+ * 2) サービスごとの合言葉によるHMAC-SHA256の署名検証、
+ * 3) 5分の時刻ずれ制限、
+ * 4) 受信台帳 `rt_delivery_events` の UNIQUE (service, external_event_id) による重複排除。
  * 署名が合わない通知は本文を保存しない。
  */
 restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async (c) => {
@@ -1817,10 +1710,25 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
   if (!isDeliveryService(service)) {
     return c.json({ success: false, error: 'Unknown service' }, 404);
   }
-  const secret = deliveryWebhookSecret(c.env, service);
+  // 送信元IPの確認は本文を読む前に行う。許可外からの通知は本文も台帳も残さない。
+  const allowlist = deliveryWebhookIpAllowlist(c.env, service);
+  if (allowlist !== null) {
+    const sourceIp = webhookSourceIp({
+      cfConnectingIp: c.req.header('cf-connecting-ip'),
+      forwardedFor: c.req.header('x-forwarded-for'),
+      realIp: c.req.header('x-real-ip'),
+    });
+    if (!isDeliveryWebhookIpAllowed(sourceIp, allowlist)) {
+      // 符号と道筋だけを記録する。相手のIPやサービス名は記録に残さない。
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_webhook_ip_not_allowed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+  }
+  // 署名の鍵はサービスごとに違う（Uber は公式仕様で client_secret。delivery-webhook-auth.ts）。
+  const secret = deliveryWebhookSigningSecret(c.env, service);
   if (!secret) {
     // 合言葉が未設定・短すぎる場合は検証できない。受け取らずに設定不足として返す。
-    console.error('[rt-delivery] webhook secret is not configured', JSON.stringify({ service }));
+    console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
     return c.json({ success: false, error: 'Integration is not configured' }, 503);
   }
 
@@ -1833,19 +1741,17 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
     return c.json({ success: false, error: 'Payload too large' }, 413);
   }
 
-  const timestamp = c.req.header('x-nen-timestamp') || '';
-  const timestampSeconds = Number(timestamp);
   const now = nowSec();
-  if (!Number.isInteger(timestampSeconds) || Math.abs(now - timestampSeconds) > WEBHOOK_SKEW_SECONDS) {
-    return c.json({ success: false, error: 'Expired request' }, 401);
-  }
-  const signature = (c.req.header('x-nen-signature') || '').replace(/^sha256=/i, '').toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(signature)) {
-    return c.json({ success: false, error: 'Invalid signature' }, 401);
-  }
-  const expected = await computeHmacSha256Hex(secret, `${timestamp}.${rawBody}`);
-  if (!safeEqualHex(signature, expected)) {
-    return c.json({ success: false, error: 'Invalid signature' }, 401);
+  // 確かめ方の違いは service 層に閉じてある。合わない通知はここで止めて本文を保存しない。
+  const verified = await verifyDeliveryWebhook({
+    service,
+    secret,
+    rawBody,
+    header: (name) => c.req.header(name),
+    nowSeconds: now,
+  });
+  if (!verified.ok) {
+    return c.json({ success: false, error: verified.error }, 401);
   }
 
   let parsedJson: unknown;
@@ -1925,10 +1831,7 @@ restaurantDelivery.post('/api/restaurant-test/delivery/webhooks/:service', async
     return c.json({ success: true, result: 'ignored' });
   } catch (error) {
     // 例外の本文は残さない。種類だけを符号にして台帳へ入れ、相手には再試行を促す。
-    console.error(
-      '[rt-delivery] webhook processing failed',
-      JSON.stringify({ service, name: error instanceof Error ? error.name : 'unknown' }),
-    );
+    console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
     await closeEvent('retryable_failed', 'processing_failed');
     return c.json({ success: false, error: 'Processing failed' }, 503);
   }
@@ -2098,6 +2001,7 @@ restaurantDelivery.post(
         clientId: client.clientId,
         redirectUri: client.redirectUri,
         state,
+        hosts: client.hosts,
         // 店舗の認可で求めるのは店舗一覧と連携の有効化だけ。運用の権限は混ぜられない。
         scopes: UBER_PROVISIONING_SCOPES,
       }),
@@ -2239,11 +2143,75 @@ restaurantDelivery.get(
         )
         .bind(code_, Date.now(), store.id)
         .run();
-      console.error(
-        '[rt-delivery] ubereats oauth exchange failed',
-        JSON.stringify({ code: code_, storeId: store.id }),
-      );
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
       return c.redirect(uberReturnUrl(c, lineAccountId, `error:${code_}`));
     }
   },
 );
+
+/**
+ * Uber Eats Sandbox への最小の実接続（トークン1回）を配備先の中から行う口。画面は持たない。
+ *
+ * Application ID と Client Secret は配備先の暗号化された秘密設定で読み戻せないため、
+ * 外から curl で叩くには秘密値を取り出すことになる。取り出さずに済むよう、
+ * 「配備先の中から1回だけ送って、結果の形だけを返す」入口をここに置く。
+ *
+ * - 管理画面の認証は通さない（`/api/` で始まらないため共通認証の対象外）。
+ *   代わりに `/webhooks/xserver/support-email` と同じ合言葉の署名で守る。
+ *   `x-nen-timestamp`（通算秒10桁）と `x-nen-signature`（`<時刻>.<本文>` の HMAC-SHA256・16進）。
+ * - 返すのは「取れたか」と `scope` と残り秒だけ。
+ *   **トークンの値と Client Secret は返さない・記録しない。**
+ * - 接続先が Sandbox でないときは送らない。冷却時間の中でも送らない。
+ * - 本文が `{"mode":"check"}` のときは下見。署名を確かめたあと、Uber へは送らずに
+ *   接続先と設定の有無だけを返す。トークンの口の回数も冷却時間も使わない。
+ */
+restaurantDelivery.post('/internal/ubereats/sandbox-token-probe', async (c) => {
+  if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
+  const gate = uberProbeSecret(c.env);
+  // 合言葉が無いあいだは口を閉じたまま。誰でも叩ける状態にはしない。
+  // 返すのは「届いていない」か「短すぎる」かの理由だけ。長さも値も返さない。
+  if (!gate.ok) return c.json({ success: false, code: gate.code }, 503);
+  const rawBody = await c.req.text();
+  const verified = await verifySupportRelay(
+    gate.secret,
+    c.req.header('x-nen-timestamp'),
+    c.req.header('x-nen-signature'),
+    rawBody,
+  );
+  if (!verified) return c.json({ success: false, code: 'probe_unauthorized' }, 401);
+  // 下見。Uber へは送らないので、トークンの口の回数も冷却時間も使わない。
+  if (rawBody === UBER_PROBE_CHECK_BODY) {
+    return c.json({ success: true, mode: 'check', ...uberProbeReadiness(c.env) });
+  }
+  const outcome = await probeUberSandboxToken({
+    env: c.env,
+    store: platformCooldownStore(dbFor(c.env)),
+    fetch: (url, init) => fetch(url, init),
+    nowMs: Date.now(),
+  });
+  switch (outcome.kind) {
+    case 'ok':
+      return c.json({
+        success: true,
+        environment: 'sandbox',
+        scope: outcome.scope,
+        expiresInSec: outcome.expiresInSec,
+      });
+    case 'sandbox_only':
+      return c.json({ success: false, code: 'probe_sandbox_only' }, 403);
+    case 'cooldown':
+      return c.json({ success: false, code: 'probe_cooldown', retryAfterSec: outcome.retryAfterSec }, 429);
+    case 'uber_error':
+      // 残すのは分類済みの符号だけ。Uber から返った自由文・本文は保存も表示もしない。
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+      return c.json(
+        { success: false, code: outcome.code, uberCode: outcome.uberCode, status: outcome.status },
+        502,
+      );
+    case 'network_failed':
+      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+      return c.json({ success: false, code: 'probe_network_failed' }, 502);
+    default:
+      return c.json({ success: false, code: 'oauth_not_configured' }, 503);
+  }
+});

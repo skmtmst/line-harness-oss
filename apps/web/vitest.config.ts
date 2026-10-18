@@ -10,6 +10,9 @@ export default defineConfig({
      */
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Some web tests mount real Worker routes. Resolve their SDK dependency
+      // from source, as the Worker tests do, before dist has been built.
+      '@line-crm/line-sdk': fileURLToPath(new URL('../../packages/line-sdk/src/index.ts', import.meta.url)),
       /*
        * 実物の worker ルートを画面試験へ mount すると、packages/db が
        * Workers 専用の 'cloudflare:workers' を読みにいって解決に落ちる。
@@ -28,6 +31,9 @@ export default defineConfig({
     jsx: 'automatic',
   },
   test: {
+    maxWorkers: 4,
+    // Vitest 4 restoreAllMocks no longer clears standalone vi.fn call history.
+    clearMocks: true,
     // 全画面のソースを読む見張りの試験は、CI が混むと既定の 5 秒を超える。待つ上限だけ伸ばす（速さの見張りは別の検査）。
     testTimeout: 30_000,
     environment: 'node',

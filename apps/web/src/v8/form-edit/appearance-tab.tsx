@@ -1,11 +1,13 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import { requiredText } from '@/lib/form-requirement'
 export const formNameRequirement = requiredText('フォーム名を入力してください')
 
 
 import Card from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
 import { useRef, useState } from 'react'
-import { Sparkles, Link2 } from 'lucide-react'
+import { Sparkles, Link2, Store, Palette } from 'lucide-react'
 import {
   FORM_THEME_DEFAULT, CUSTOMER_DESIGNS, DEFAULT_CUSTOMER_LOOK, resolveCustomerFormTheme, type CustomerLook,
   formThemeContrastError,
@@ -16,7 +18,6 @@ import {
   type FormTheme,
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import Link from 'next/link'
 import RadioCard, {RadioCardGroup} from '@/components/shared/radio-card'
 import CustomerDesignPicker from '@/components/shared/customer-design-picker'
 import Checkbox from '@/components/shared/checkbox'
@@ -36,6 +37,7 @@ import { Field, FieldError } from '@/components/shared/form-controls'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
  * 「受付と見た目」のタブ（tpRRT）。受付のきまり・色と文字・背景とリンクの見え方・
@@ -179,10 +181,10 @@ export function AppearanceTab(props: Props) {
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>色と文字</h3>
           <RadioCardGroup legend="見た目の使い方" className={styles.designModes}>
-            <RadioCard name="form-design-mode" value="account" checked={mode === 'account'} onChange={() => onChangeOptions({customerDesign:{mode:'account',preset:'line'}})} title={props.portable?'配った先の店のデザインに合わせる':'店の設定に合わせる'} note={props.portable?'配った先で、その店の設定を使います':`今：${accountLabel}`} />
-            <RadioCard name="form-design-mode" value="fixed" checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} title={props.portable?'色を決めて配る':'このフォームだけ変える'} note="型かカスタムを選ぶ" />
+            <RadioCard name="form-design-mode" value="account" checked={mode === 'account'} onChange={() => onChangeOptions({customerDesign:{mode:'account',preset:'line'}})} icon={<Store size={props.portable ? 16 : 14} />} title={props.portable?'配った先の店のデザインに合わせる（おすすめ）':'店の設定に合わせる'} note={props.portable?'店ごとに決めたデザインで出ます':`今：${accountLabel}`} />
+            <RadioCard name="form-design-mode" value="fixed" checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} icon={<Palette size={props.portable ? 16 : 14} />} title={props.portable?'色を決めて配る（型かカスタム）':'このフォームだけ変える'} note={props.portable?'どの店でも同じ色で出ます':'型かカスタムを選ぶ'} />
           </RadioCardGroup>
-          {!props.portable ? <Link href="/settings/customer-look">店のデザインを変える ↗</Link> : mode === 'fixed' ? <p className={styles.cardNote}>このフォームは色を固定して配ります。配った先の店の設定より優先します。</p> : null}
+          {!props.portable ? <span><TextLink external href="/settings/customer-look">店のデザインを変える</TextLink></span> : mode === 'fixed' ? <Notice tone="info" compact>このフォームは色を固定して配ります。配った先の店のデザインは使いません。</Notice> : null}
           {props.accountLookError && !props.portable ? <FieldError id="account-look-error">{props.accountLookError}</FieldError> : null}
           {mode === 'fixed' ? <><p className={styles.fieldLabelPlain}>デザインの型</p><CustomerDesignPicker value={preset} onChange={next => onChangeOptions({customerDesign:{mode:'fixed',preset:next}})} /></> : null}
           {mode === 'fixed' && preset === 'custom' ? <>
@@ -250,11 +252,11 @@ export function AppearanceTab(props: Props) {
           <span>次へ</span>
           <span>送る</span>
         </div>
-        <div className={styles.wordsRow}>
+        <SettingsFormRow layout="columns" columns={3}>
           <SaveErrorField names={["prevLabel","options.prevLabel","prev_label","options.prev_label"]}><TextField aria-label="前へボタンの文字" value={options.prevLabel ?? ''} placeholder="前へ" onChange={(e) => onChangeOptions({ prevLabel: e.target.value })} /></SaveErrorField>
           <SaveErrorField names={["nextLabel","options.nextLabel","next_label","options.next_label"]}><TextField aria-label="次へボタンの文字" value={options.nextLabel ?? ''} placeholder="次へ" onChange={(e) => onChangeOptions({ nextLabel: e.target.value })} /></SaveErrorField>
           <SaveErrorField names={["submitLabel","options.submitLabel","submit_label","options.submit_label"]}><TextField aria-label="送るボタンの文字" value={options.submitLabel ?? ''} placeholder="送信する" onChange={(e) => onChangeOptions({ submitLabel: e.target.value })} /></SaveErrorField>
-        </div>
+        </SettingsFormRow>
       </Card>
 
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-about-title">

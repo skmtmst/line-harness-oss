@@ -21,7 +21,16 @@ import { createServer } from 'node:http';
 
 const PORT = Number(process.env.QA_MOCK_PORT ?? 8790);
 
-const state = { delayMs: 0, fail: null };
+/* features：③-2 第2弾の画面（waitlist・waitlist-expired・party・recurring・lesson・routed など）を出すときだけ撮影が足す。既定は空＝今までの見本のまま。 */
+const state = { delayMs: 0, fail: null, features: [] };
+let qaAvailableMiles = 1250;
+let qaBankProfile = null;
+const qaRedemptions = new Map();
+const qaPrefs = [
+  { purpose: 'booking_reminders', label: '予約のお知らせ', state: 'granted', enabled: true, recorded: true, version: 1, updatedAt: null },
+  { purpose: 'marketing', label: 'キャンペーン・宣伝', state: 'granted', enabled: true, recorded: true, version: 1, updatedAt: null },
+];
+const qaBankSaves = new Map();
 
 // 見本の言葉・日付は ★V8 の絵 (gVjiC・EscPA・y1bs9A など) に合わせる。
 const QA_EVENT = {
@@ -205,7 +214,7 @@ function json(res, status, body) {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, Idempotency-Key',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     'Content-Length': Buffer.byteLength(text),
   });
   res.end(text);
@@ -261,6 +270,7 @@ const QA_FORM_COVER = `data:image/svg+xml,${encodeURIComponent(
 
 /** 来店アンケート (★V8 の B8rCt・g9osGN・aNZKe)。2ページ目に予約の欄。 */
 function qaForm() {
+  const routed = state.features.includes('routed') || state.features.includes('routed-empty');
   return {
     id: 'qa-form-1',
     name: '来店アンケート',
@@ -319,7 +329,7 @@ function qaForm() {
               label: '次回のご希望の日時を選んでください',
               required: true,
               // g9osGN は 10/14(水)〜18(日) の5日。16日は満席。
-              booking: { menuId: 'qa-menu-1', staffId: 'qa-staff-form', daysAhead: 5 },
+              booking: { menuId: 'qa-menu-1', staffId: 'qa-staff-form', daysAhead: 5, ...(routed ? { routing: { enabled: true, rules: [], fallback: { menuId: 'qa-menu-4' } } } : {}) },
             },
             {
               id: 'qa-b4',
@@ -352,12 +362,26 @@ function qaForm() {
   };
 }
 
+function qaDocumentForm() {
+  return {
+    id: 'qa-document', name: '書類確認', description: '試験用の書類入力です。実際の書類は使わないでください。', isActive: true,
+    layout: {
+      version: 2, header: [],
+      sections: [{ id: 'qa-document-section', name: '書類', blocks: [{
+        id: 'qa-document-file', kind: 'input', type: 'file', name: 'identity', label: '本人確認書類',
+        required: true, fileKind: 'identity', fileBothSides: true, fileMaxCount: 2,
+      }] }],
+      options: { confirmDialog: { enabled: false } },
+    },
+  };
+}
+
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, Idempotency-Key',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     });
     res.end();
     return;
@@ -375,12 +399,18 @@ const server = createServer(async (req, res) => {
     if (body.fail === undefined || body.fail === null || body.fail === 'all' || Array.isArray(body.fail)) {
       state.fail = body.fail ?? null;
     }
+    if (Array.isArray(body.features)) state.features = body.features.filter((f) => typeof f === 'string');
     json(res, 200, state);
     return;
   }
   if (pathname === '/__qa/reset' && req.method === 'POST') {
     state.delayMs = 0;
     state.fail = null;
+    state.features = [];
+    qaAvailableMiles = 1250;
+    qaBankProfile = null;
+    qaRedemptions.clear();
+    qaBankSaves.clear();
     json(res, 200, state);
     return;
   }
@@ -450,9 +480,50 @@ const server = createServer(async (req, res) => {
     }
   }
 
+  // ---- 答えで予約の行き先を分ける（③-2 第2弾 B6：Z76uuv・R02q7）。features に routed があるときだけフォームを書き換える ----
+  if (method === 'POST' && /^\/api\/liff\/forms\/[^/]+\/routing\/resolve$/.test(pathname)) {
+    json(res, 200, { success: true, data: { matchedIndex: 1, routingToken: 'qa-routing-token', expiresAt: '2026-10-16T05:00:00.000Z', target: { menuId: 'qa-menu-online', staffId: state.features.includes('routed-empty') ? 'qa-staff-empty' : 'qa-staff-1', meetingMode: 'online' } } });
+    return;
+  }
+  // ---- 繰り返しの確かめ（B4・口はまだ無い。見本：3 回目だけ取れない）----
+  if (method === 'POST' && pathname === '/api/liff/booking/series/preview') {
+    const body = await readBody(req);
+    const start = Date.parse(body.starts_at);
+    const count = Math.min(Math.max(Number(body.count) || 4, 2), 12);
+    json(res, 200, { occurrences: Array.from({ length: count }, (_, i) => {
+      const at = start + i * 7 * 86_400_000;
+      const blocked = i === 2;
+      return { index: i, starts_at: new Date(at).toISOString(), available: !blocked, ...(blocked ? { reason: 'お休み' } : {}), alternatives: blocked ? [1, 2, 3].map((h) => new Date(at + h * 3_600_000).toISOString()) : [] };
+    }) });
+    return;
+  }
+  // ---- 追加メニュー（③-2 第2弾 B5：hhUtj）。features に party があるときだけ。形は API-CONTRACT-GAP2 のとおり ----
+  if (method === 'GET' && /^\/api\/liff\/booking\/menus\/[^/]+\/addons$/.test(pathname)) {
+    json(res, 200, { success: true, data: state.features.includes('party') && pathname.includes('qa-menu-1') ? [{ id: 'qa-addon-1', name: '歯みがき', duration_minutes: 15, base_price: 800, version: 1 }, { id: 'qa-addon-2', name: '爪切り', duration_minutes: 10, base_price: 500, version: 1 }] : [] });
+    return;
+  }
+  // ---- キャンセル待ち（③-2 第2弾：Zm2Vh・xANkO）。features に waitlist / waitlist-expired があるときだけ行を返す ----
+  if (method === 'GET' && pathname === '/api/liff/booking/waitlist') {
+    const base = { staff_id: 'qa-staff-1', menu_id: 'qa-menu-1', hold_minutes: 30, created_at: '2026-10-15T01:00:00.000Z', menu_name: 'トリミング（小型犬）', staff_name: '佐々木' };
+    const rows = [];
+    if (state.features.includes('waitlist')) {
+      rows.push({ ...base, id: 'qa-wl-1', starts_at: '2026-11-20T05:00:00.000Z', status: 'invited', hold_expires_at: new Date(Date.now() + 18 * 60_000 - 1000).toISOString(), position: 1 });
+    }
+    if (state.features.includes('waitlist-expired')) {
+      rows.push({ ...base, id: 'qa-wl-3', starts_at: '2026-11-20T05:00:00.000Z', status: 'finished', hold_expires_at: '2026-10-16T02:00:00.000Z', position: 1, hold_minutes: 18 });
+    }
+    if (state.features.includes('waitlist') || state.features.includes('waitlist-expired')) {
+      rows.push({ ...base, id: 'qa-wl-2', menu_id: 'qa-menu-3', menu_name: 'シャンプーのみ', starts_at: '2026-11-22T01:00:00.000Z', status: 'waiting', hold_expires_at: null, position: 3 });
+    }
+    json(res, 200, { waitlist: rows });
+    return;
+  }
+  if (method === 'DELETE' && /^\/api\/liff\/booking\/waitlist\/[^/]+$/.test(pathname)) { json(res, 200, { status: 'cancelled' }); return; }
+  if (method === 'POST' && pathname === '/api/liff/booking/waitlist') { json(res, 200, { id: 'qa-wl-new' }); return; }
+
   // ---- 予約 ----
   if (method === 'GET' && pathname === '/api/liff/booking/menus') {
-    json(res, 200, {
+    const menusBody = {
       menus: [
         {
           id: 'qa-menu-1',
@@ -483,6 +554,8 @@ const server = createServer(async (req, res) => {
           duration_minutes: 60,
           buffer_after_minutes: 10,
           base_price: 4200,
+          // 予約の履歴の「お店で払う」の札（nWby5）。
+          payment_mode: 'onsite',
           sort_order: 3,
         },
         {
@@ -496,7 +569,13 @@ const server = createServer(async (req, res) => {
           sort_order: 4,
         },
       ],
-    });
+    };
+    /* ③-2 第2弾 B5・B4：人数の上限・繰り返し（hhUtj・qOUmy）。features があるときだけ。 */
+    if (state.features.includes('party')) for (const m of menusBody.menus) if (m.id !== 'qa-menu-4') m.max_party_size = 3;
+    if (state.features.includes('recurring')) { const m = menusBody.menus.find((x) => x.id === 'qa-menu-1'); if (m) m.recurring = { enabled: true, max_count: 12 }; }
+    /* ③-2 第2弾 B6：答えの行き先のメニュー（Z76uuv）。features に routed があるときだけ足す。 */
+    if (state.features.includes('routed') || state.features.includes('routed-empty')) menusBody.menus.push({ id: 'qa-menu-online', name: 'オンライン相談 60 分', category_label: '相談', description: null, duration_minutes: 60, buffer_after_minutes: 0, base_price: 3300, sort_order: 9 });
+    json(res, 200, menusBody);
     return;
   }
   {
@@ -526,7 +605,7 @@ const server = createServer(async (req, res) => {
             profile_image_url: null,
             bio: null,
             is_designation_optional: 0,
-            price: basePrice,
+            price: basePrice + 500, // 指名料 +¥500（B9・C6NcOH）
             duration_minutes: duration,
           },
           {
@@ -550,6 +629,7 @@ const server = createServer(async (req, res) => {
   }
   if (method === 'GET' && pathname === '/api/liff/booking/availability') {
     const staffId = url.searchParams.get('staff_id') ?? 'qa-staff-1';
+    if (staffId === 'qa-staff-empty') { json(res, 200, { by_staff: [{ staff_id: staffId, display_name: 'QA スタッフ', slots: [] }], closed_dates: [] }); return; }
     // ★V8 の絵 (M2p63S・k3aJKU) に合わせた日付で決める。月曜はお休み、
     // 4・10・15・20・25・30 日は満席 (枠はあって残り0)。時刻は 9:00〜16:00 の6つで、
     // 10:00 と 16:00 は埋まっている。
@@ -610,18 +690,19 @@ const server = createServer(async (req, res) => {
     json(res, 200, { lock_version: 2, status: pathname.endsWith('/cancel') ? 'cancelled' : 'confirmed' });
     return;
   }
+  // 予約の履歴・マイページ（★V8 nWby5・L5g75）。支払いの状態は by-booking で返す。
   if (method === 'GET' && pathname === '/api/liff/booking/me') {
     json(res, 200, {
       upcoming: [
         {
           id: 'qa-history-1',
-          starts_at: '2026-10-02T13:00:00+09:00',
-          status: 'requested',
+          starts_at: '2026-10-18T14:00:00+09:00',
+          status: 'confirmed',
           customer_note: null,
-          menu_name: 'トリミング（小型犬）',
-          staff_name: 'QA スタッフ',
+          menu_name: 'カット＋カラー',
+          staff_name: '佐々木',
           profile_image_url: null,
-          // F-6 本人の変更・取消に要る値（履歴の口が返すようになったときの形）。
+          // F-6 本人の変更・取消に要る値。
           lock_version: 1,
           menu_id: 'qa-menu-1',
           staff_id: 'qa-staff-1',
@@ -638,17 +719,120 @@ const server = createServer(async (req, res) => {
           menu_id: 'qa-menu-3',
           staff_id: 'qa-staff-1',
         },
+        {
+          id: 'qa-history-3',
+          starts_at: '2026-10-24T11:00:00+09:00',
+          status: 'requested',
+          customer_note: null,
+          menu_name: 'トリミング（中型犬）',
+          staff_name: 'QA スタッフ',
+          profile_image_url: null,
+          lock_version: 1,
+          menu_id: 'qa-menu-2',
+          staff_id: 'qa-staff-1',
+        },
       ],
-      past: [],
+      past: [
+        {
+          id: 'qa-history-past-1',
+          starts_at: '2026-10-02T11:00:00+09:00',
+          status: 'cancelled',
+          customer_note: null,
+          menu_name: 'カット',
+          staff_name: '佐々木',
+          profile_image_url: null,
+          lock_version: 2,
+          menu_id: 'qa-menu-1',
+          staff_id: 'qa-staff-1',
+        },
+        {
+          id: 'qa-history-past-2',
+          starts_at: '2026-09-12T15:00:00+09:00',
+          status: 'expired',
+          customer_note: null,
+          menu_name: 'トリミング（中型犬）',
+          staff_name: 'QA スタッフ',
+          profile_image_url: null,
+          lock_version: 1,
+          menu_id: 'qa-menu-2',
+          staff_id: 'qa-staff-1',
+        },
+      ],
     });
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/liff/booking/payments/by-booking') {
+    const id = url.searchParams.get('bookingId');
+    const receipt = 'https://pay.stripe.com/receipts/qa-test-receipt';
+    const payments = {
+      'qa-history-1': { id: 'qa-pay-1', status: 'paid', amount: 8800, currency: 'jpy', hold_until: null, receipt_url: receipt },
+      'qa-history-3': { id: 'qa-pay-3', status: 'unpaid', amount: 12600, currency: 'jpy', hold_until: '2026-10-16T10:00:00+09:00' },
+      'qa-history-past-1': { id: 'qa-pay-p1', status: 'refunded', amount: 4400, currency: 'jpy', hold_until: null, receipt_url: receipt },
+      'qa-history-past-2': { id: 'qa-pay-p2', status: 'expired', amount: 12600, currency: 'jpy', hold_until: null },
+    };
+    json(res, 200, { payment: payments[id] ?? null });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/liff/booking/payments/start') {
+    // 試験用の決済の見本。本番の鍵・本物の支払いページは使わない。
+    json(res, 200, { payment: { id: 'qa-pay-3', status: 'pending', amount: 12600 }, checkoutUrl: 'https://checkout.stripe.com/c/pay/qa-test-session' });
+    return;
+  }
+  // 自分のキャンセル待ち（マイページの「キャンセル待ち 1 件」）。id 指定の読み（空きの知らせ）はここでは返さない。
+  if (method === 'GET' && pathname === '/api/liff/booking/waitlist' && !url.searchParams.get('id')) {
+    json(res, 200, { waitlist: [{ id: 'qa-wl-1', staff_id: 'qa-staff-1', menu_id: 'qa-menu-1', starts_at: '2026-10-25T13:00:00+09:00', status: 'waiting', hold_minutes: 30, hold_expires_at: null, created_at: '2026-10-14T09:00:00+09:00' }] });
+    return;
+  }
+  // 組3：本人の回数券・月謝（API-CONTRACT-3 の LIFF の返り値の形）。
+  if (method === 'GET' && pathname === '/api/liff/booking/entitlements') {
+    json(res, 200, { success: true, data: [
+      { id: 'qa-ent-1', name: '10回券', kind: 'ticket', menuId: null, remaining: 9, monthlyLimit: null, monthAllowance: null, monthUsed: null, monthRemaining: null,
+        validFrom: '2026-04-01T00:00:00Z', expiresAt: '2027-03-31T15:00:00Z', periodStart: null, periodEnd: null, usable: true },
+      { id: 'qa-ent-2', name: '月謝（月4回）', kind: 'monthly', menuId: null, remaining: null, monthlyLimit: 4, monthAllowance: 4, monthUsed: 2, monthRemaining: 2,
+        validFrom: '2026-04-01T00:00:00Z', expiresAt: null, periodStart: '2026-09-30T15:00:00Z', periodEnd: '2026-10-31T15:00:00Z', usable: true },
+    ] });
+    return;
+  }
+  // 組1 の 16：お知らせの受け取り（637 を共用）。見本では目的ごとに止められる形で返す。
+  if (pathname === '/api/liff/notification-preferences' || pathname.startsWith('/api/liff/notification-preferences/')) {
+    if (method === 'PUT') {
+      const purpose = pathname.split('/').pop();
+      const body = await readBody(req);
+      const item = qaPrefs.find((p) => p.purpose === purpose);
+      if (item) { item.enabled = Boolean(body?.enabled); item.state = item.enabled ? 'granted' : 'revoked'; item.version += 1; item.recorded = true; }
+    }
+    json(res, 200, { success: true, data: { items: qaPrefs, purposeSpecificEnforcement: true, deliveryEnforcement: 'purpose_specific' } });
     return;
   }
 
   // ---- イベント ----
   if (method === 'GET' && pathname === '/api/liff/events/me') {
+    if (state.features.includes('lesson')) {
+      /* ③-2 第2弾 B3：振替を使う教室（rx3FL・kzE16）。 */
+      const lesson = (id, starts) => ({ ...QA_EVENT_BOOKING, id, event_name: '朝ヨガ（初級）', venue_name: 'スタジオ A', status: 'confirmed', cancel_deadline_hours_before: null, slot_starts_at: starts, slot_ends_at: new Date(Date.parse(starts) + 3_600_000).toISOString(), makeup: { enabled: true, cutoff_at: new Date(Date.parse(starts) - 3 * 3_600_000).toISOString(), plan_label: '月謝', valid_until: '2026-12-14T14:59:59.000Z' } });
+      json(res, 200, { items: [lesson('qa-lesson-1', '2026-11-14T00:00:00.000Z'), lesson('qa-lesson-2', '2026-11-21T00:00:00.000Z')] });
+      return;
+    }
     json(res, 200, { items: [QA_EVENT_BOOKING, QA_EVENT_WAITLIST] });
     return;
   }
+  // ---- 欠席の振替（③-2 第2弾 B3）----
+  if (method === 'GET' && pathname === '/api/liff/events/makeup-credits') {
+    json(res, 200, { success: true, data: state.features.includes('makeup') ? [{ id: 'qa-credit-1', status: 'open', expires_at: '2026-12-14T14:59:59.000Z', source_event_booking_id: 'qa-lesson-1', source_event_id: 'qa-event-1', used_event_booking_id: null, version: 1 }] : [] });
+    return;
+  }
+  if (method === 'GET' && /^\/api\/liff\/events\/makeup-credits\/[^/]+\/options$/.test(pathname)) {
+    const at = (day, hm) => `2026-11-${day}T${hm}:00.000Z`;
+    json(res, 200, { success: true, data: [
+      { id: 'qa-ms-1', event_id: 'qa-event-1', starts_at: at('18', '01:00'), ends_at: at('18', '02:00'), capacity: 5, name: 'ヨガ（初級）', occupied: 2 },
+      { id: 'qa-ms-2', event_id: 'qa-event-1', starts_at: at('18', '10:00'), ends_at: at('18', '11:00'), capacity: 6, name: '朝ヨガ（オンライン）', occupied: 1 },
+      { id: 'qa-ms-3', event_id: 'qa-event-1', starts_at: at('18', '11:30'), ends_at: at('18', '12:30'), capacity: 4, name: 'ヨガ（中級）', occupied: 4 },
+      { id: 'qa-ms-4', event_id: 'qa-event-1', starts_at: at('19', '01:00'), ends_at: at('19', '02:00'), capacity: 4, name: 'ヨガ（初級）', occupied: 2 },
+    ] });
+    return;
+  }
+  if (method === 'POST' && /^\/api\/liff\/events\/makeup-credits\/[^/]+\/use$/.test(pathname)) { json(res, 200, { success: true, data: { bookingId: 'qa-event-booking-new', replayed: false } }); return; }
+  if (method === 'POST' && /^\/api\/liff\/events\/bookings\/[^/]+\/absence$/.test(pathname)) { json(res, 200, { success: true, data: { eventBooking: { id: 'qa-lesson-1', status: 'absent' }, makeupCredit: { id: 'qa-credit-1', status: 'open', expires_at: '2026-12-14T14:59:59.000Z', source_event_booking_id: 'qa-lesson-1', source_event_id: 'qa-event-1', used_event_booking_id: null, version: 1 }, reasonIfNone: null } }); return; }
   // 自分のキャンセル待ち (qVdiX の「順番 2 番目」「キャンセル待ちをやめる」)。
   if (method === 'GET' && pathname === '/api/liff/events/me/waitlist') {
     json(res, 200, { items: [QA_EVENT_WAITLIST_MINE] });
@@ -728,6 +912,21 @@ const server = createServer(async (req, res) => {
   {
     const m = pathname.match(/^\/api\/forms\/([^/]+)\/files$/);
     if (method === 'POST' && m) {
+      if (m[1] === 'qa-document') {
+        const chunks = [];
+        for await (const chunk of req) chunks.push(chunk);
+        const bytes = Buffer.concat(chunks);
+        const side = url.searchParams.get('side');
+        if (!['front', 'back'].includes(side) || !bytes.length || url.searchParams.get('block_id') !== 'qa-document-file') {
+          json(res, 400, { success: false, error: 'invalid_document_upload' });
+          return;
+        }
+        json(res, 200, { success: true, data: { file: {
+          fileId: `qa-document-${side}`, side, filename: url.searchParams.get('filename') || 'qa.png',
+          mimeType: req.headers['content-type'] || 'image/png', size: bytes.length, state: 'ready',
+        } } });
+        return;
+      }
       json(res, 200, {
         success: true,
         data: { key: 'qa-key', url: 'https://example.com/qa.png', mimeType: 'image/png', size: 123 },
@@ -747,7 +946,8 @@ const server = createServer(async (req, res) => {
     if (method === 'GET' && m) {
       // 本物と同じ包み。試し合言葉付きは本物と同じく isTest:true を足す。
       const testToken = url.searchParams.get('test_token');
-      json(res, 200, { success: true, data: testToken ? { ...qaForm(), isTest: true } : qaForm() });
+      const form = m[1] === 'qa-document' ? qaDocumentForm() : qaForm();
+      json(res, 200, { success: true, data: testToken ? { ...form, isTest: true } : form });
       return;
     }
   }
@@ -789,6 +989,69 @@ const server = createServer(async (req, res) => {
       json(res, seat[0], seat[1]);
       return;
     }
+  }
+
+  if (method === 'GET' && pathname === '/api/liff/mileage/rewards') {
+    json(res, 200, { success: true, availableMiles: qaAvailableMiles, rewards: [{
+      id: 'qa-reward-1', name: 'QA 割引券', description: '試験用の交換先', imageUrl: null,
+      currentVersion: { requiredMiles: 100 }, canRedeem: qaAvailableMiles >= 100,
+      unavailableReason: qaAvailableMiles >= 100 ? null : '必要なマイルが足りません',
+    }] });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/liff/mileage/rewards/qa-reward-1/redeem') {
+    await readBody(req);
+    const key = req.headers['idempotency-key'];
+    if (!key) { json(res, 400, { error: '再実行キーを確認してください' }); return; }
+    if (!qaRedemptions.has(key)) {
+      if (qaAvailableMiles < 100) { json(res, 409, { error: '必要なマイルが足りません' }); return; }
+      qaAvailableMiles -= 100;
+      qaRedemptions.set(key, { status: 'succeeded', rewardName: 'QA 割引券', customerMessage: '試験用です', rewardCode: 'QA-ONLY', message: null });
+    }
+    json(res, 200, qaRedemptions.get(key));
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/liff/affiliate/bank') {
+    json(res, 200, { success: true, data: qaBankProfile });
+    return;
+  }
+  if (method === 'PUT' && pathname === '/api/liff/affiliate/bank') {
+    const body = await readBody(req);
+    const key = req.headers['idempotency-key'];
+    const fingerprint = JSON.stringify(body);
+    const prior = qaBankSaves.get(key);
+    if (prior) {
+      json(res, prior.fingerprint === fingerprint ? 200 : 409, prior.fingerprint === fingerprint
+        ? { success: true, data: prior.profile } : { success: false, error: '同じ再実行キーが別の入力に使われています' });
+      return;
+    }
+    if (body.expectedVersion !== (qaBankProfile?.version ?? 0)) {
+      json(res, 409, { success: false, error: '振込先が更新されています' }); return;
+    }
+    if (!req.headers['idempotency-key'] || !/^\d{1,8}$/.test(body.accountNumber ?? '')) {
+      json(res, 400, { success: false, error: '振込先を確認してください' }); return;
+    }
+    const { bankCode, bankName, branchCode, branchName, accountType, accountHolderName } = body;
+    qaBankProfile = { bankCode, bankName, branchCode, branchName, accountType, accountHolderName,
+      accountLast4: body.accountNumber.slice(-4), version: (qaBankProfile?.version ?? 0) + 1 };
+    qaBankSaves.set(key, { fingerprint, profile: qaBankProfile });
+    json(res, 200, { success: true, data: qaBankProfile });
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/liff/affiliate/statements') {
+    json(res, 200, { success: true, data: [{ id: 'qa-statement-1', totalAmount: 1000, createdAt: '2026-10-01T00:00:00Z', expiresAt: null }] });
+    return;
+  }
+  if (method === 'GET' && pathname === '/api/liff/affiliate/statements/qa-statement-1/download') {
+    const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>', '<< /Length 0 >>\nstream\n\nendstream'];
+    let pdf = '%PDF-1.4\n'; const offsets = [0];
+    for (const [i, object] of objects.entries()) { offsets.push(Buffer.byteLength(pdf)); pdf += `${i + 1} 0 obj\n${object}\nendobj\n`; }
+    const xref = Buffer.byteLength(pdf);
+    pdf += `xref\n0 5\n0000000000 65535 f \n${offsets.slice(1).map(n => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    res.writeHead(200, { 'Content-Type': 'application/pdf', 'Access-Control-Allow-Origin': '*', 'Content-Disposition': 'attachment; filename="qa-statement.pdf"' });
+    res.end(pdf);
+    return;
   }
 
   // ---- アフィリエイト・ mileage ----
@@ -871,15 +1134,19 @@ const server = createServer(async (req, res) => {
       return;
     }
   }
+  if (method === 'GET' && pathname === '/api/liff/member-card') {
+    json(res, 200, { success: true, data: { name: 'シルバー', since: '2026-09-01T00:00:00.000Z', downgradeDueAt: '2026-12-31T00:00:00.000Z', next: { name: 'ゴールド', remaining: 2, metric: 'visits', progress: 0.65 }, memberNumber: '0012-3456', benefits: ['マイル 1.2 倍', '誕生月 10% OFF'], benefitDetails: { couponCode: null, mileMultiplier: 1.2 } } });
+    return;
+  }
   if (method === 'GET' && pathname === '/api/liff/mileage/me') {
     json(res, 200, {
       mileage: {
         programId: 'qa-program',
         programName: 'QA マイル',
-        available: 1250,
+        available: qaAvailableMiles,
         pending: 500,
         lifetimeEarned: 2000,
-        spent: 750,
+        spent: 2000 - qaAvailableMiles,
       },
       history: [],
       insights: {

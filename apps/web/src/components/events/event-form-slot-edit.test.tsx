@@ -276,4 +276,15 @@ describe('予約枠の編集（入口29）', () => {
     expect(document.body.textContent).toContain('定員12')
     expect(listSlots).toHaveBeenCalledTimes(2)
   })
+
+  it('保存先の英語エラーは案内文に置き換え、窓と入力を保つ', async () => {
+    const { ApiError } = await import('@/lib/api')
+    await openEdit()
+    updateSlot.mockRejectedValueOnce(new ApiError(500, 'API error: 500'))
+    await click(dialogSaveButton())
+    expect(dialog()?.textContent).toContain('保存できませんでした。もう一度お試しください。')
+    expect(dialog()?.textContent).not.toContain('API error: 500')
+    expect(dialogInput('number').value).toBe('8')
+  })
+
 })

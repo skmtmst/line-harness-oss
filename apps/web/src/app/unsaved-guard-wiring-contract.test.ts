@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { readUiSource } from '../../scripts/test-ui-source.mjs'
+// @ts-expect-error 型を持たない点検の道具（.mjs）。
+import { screensWithoutLeaveGuard } from '../../scripts/unsaved-guard-wiring.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -20,6 +22,9 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  // 友だち詳細の情報欄（vX3wQ）。保存前の入力があればタブ・ほかの画面へ移る前に確認する。
+  'v8/friend-detail/info-tab.tsx',
+  'v8/restaurant/organization/store-groups.tsx',
   'v8/inbox-chat/screen.tsx',
   'v8/settings/customer-look/screen.tsx',
   'v8/hq-deliveries/console.tsx',
@@ -55,6 +60,8 @@ const GUARDED = [
   'app/reminders/new/new-v8.tsx',
   'app/reminders/new/page.tsx',
   'v8/restaurant/google/profile-edit.tsx',
+  // 卓の割り当て方（jmVYJ）。下の帯で保存する変更を、離れる前に確認する。
+  'v8/restaurant/tables/assign.tsx',
   'v8/restaurant/google/profile-hours.tsx',
   'app/rich-menus/new/create-v8.tsx',
   'app/rich-menus/new/page.tsx',
@@ -133,7 +140,23 @@ const GUARDED = [
  * dirty を子（pane・部分部品）から親へ報告し、番兵は親が持つ画面。
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
-const COVERED_BY_PARENT: Record<string, string> = {
+const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  // 統合後の入力の持ち主。各画面が dirty を型／番兵へ渡す。
+  'v8/booking-gap/series-drawer.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/booking-menus/meeting-mode.tsx': 'v8/booking-menus/menu-form.tsx',
+  'v8/booking-menus/staff-calendar.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/booking-menus/tabs/staff-tab.tsx': 'v8/booking-menus/settings.tsx',
+  'v8/booking-payments/assignment.tsx': ['v8/booking-menus/settings.tsx', 'v8/restaurant/tables/assign.tsx'],
+  'v8/booking-payments/cancellation.tsx': 'v8/booking-menus/settings.tsx',
+  'v8/booking-payments/menu-deposit.tsx': 'v8/booking-menus/menu-form.tsx',
+  'v8/booking-payments/menu-payment.tsx': 'v8/booking-menus/menu-form.tsx',
+  'v8/booking-payments/payments-tab.tsx': 'v8/booking-menus/settings.tsx',
+  'v8/inbox-chat/routing-drawer.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/restaurant/menu/edit.tsx': 'components/templates/create-page.tsx',
+  'v8/restaurant/tables/assign.tsx': 'components/shared/form-leave-guard.tsx',
+
+  // ③-2 第3波：作る画面は CreatePage の dirty、編集の引き出しは Drawer の離脱の確認、ランクの段の窓は Dialog が守る。
+  'v8/booking-passes/create.tsx': 'components/templates/create-page.tsx',
   'v8/form-edit/content-tab.tsx': 'v8/form-edit/edit.tsx',
   // 動き1：画面のdirtyは型／共通の番兵が守る。
   'app/emergency/control-v8.tsx': 'components/shared/form-leave-guard.tsx',
@@ -154,6 +177,7 @@ const COVERED_BY_PARENT: Record<string, string> = {
   // 予約設定V8のタブ分割。書きかけは V8TabEditContext で親へ報告し、
   // 番兵（useUnsavedGuard＋離脱確認）は殻の settings-v8.tsx が持つ。
   // ★V8 予約設定（src/v8/booking-menus）のタブ。書きかけは V8TabEditContext で殻の settings.tsx へ報告し、番兵は殻が持つ。
+  'v8/booking-menus/settings-view.tsx': 'v8/booking-menus/settings.tsx',
   'v8/booking-menus/tabs/shared.tsx': 'v8/booking-menus/settings.tsx',
   'v8/booking-menus/tabs/hours-tab.tsx': 'v8/booking-menus/settings.tsx',
   'v8/booking-menus/tabs/holidays-tab.tsx': 'v8/booking-menus/settings.tsx',
@@ -164,6 +188,12 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'v8/webinar-edit/cta.tsx': 'v8/webinar-edit/edit.tsx',
   'v8/webinar-edit/notifications.tsx': 'v8/webinar-edit/edit.tsx',
   'v8/webinar-edit/video.tsx': 'v8/webinar-edit/edit.tsx',
+  // 予約設定のタブ。書きかけは V8TabEditContext で殻の settings.tsx へ報告し、番兵は殻が持つ。
+  // 割り当て方・メニューごとの支払いは「状態の持ち方」の部品。dirty を返すだけで、番兵は使う側の画面が持つ。
+  // 配信の自動応答の編集は、一覧と同じ console.tsx の中で開く。書きかけの有無は親が持ち、番兵は親が持つ。
+  'v8/hq-deliveries/auto-reply-editor.tsx': 'v8/hq-deliveries/console.tsx',
+  // 作る・直す型（CreatePage）に dirty を渡す画面。離脱の番兵は型が持つ。
+  'v8/restaurant/menu/edit.tsx': 'components/templates/create-page.tsx',
 }
 
 /*
@@ -171,6 +201,12 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'v8/mileage/ranks.tsx':
+    '③-2 第3波：会員ランクのタブ。入力は段を足す・直す小窓（Dialog）の中だけで、窓の保存か［キャンセル］で閉じる。タブ本体は入力を溜めず、数える物・期間は選ぶと即保存する。',
+  'v8/ec-auto-line/edit-drawer.tsx':
+    '③-2 第3波：自動の LINE の編集の引き出し。Drawer に dirty を渡しており、閉じる・Esc・外側押しは共通の離脱の確認（useOverlayDiscard）が止める。画面の遷移は引き出しが開いている間は起きない。',
+  'v8/style-dashboard/settings-panels.tsx': '表示を変える引き出し・休みを入れる窓。入力は引き出し・窓の中だけで、閉じると戻る。引き出しは dirty の間、閉じる前に破棄の確認を出す',
+  'v8/onboarding/wizard.tsx': 'はじめの質問の窓（B-313）。答えは途中で閉じても保存してから閉じる（失わない）。どの答えも「あとから変えられます」で、離れる確認で止める物が無い',
   'components/friend-fields/edit-tag-page-v4.tsx':
     '保管済みタグの名前と説明の訂正。元の取消は確認なしで入力を破棄するため、共通作成型も dirty=false で同じ動きを保つ。番兵の要否は削除台帳の司令塔に確認へ記録する',
   'v8/restaurant/google/google.tsx':
@@ -186,6 +222,9 @@ const EXEMPTIONS: Record<string, string> = {
     '編集を持たない上部の帯。アカウント切替と移動を共通の未保存確認へ委ねる',
   'components/shared/command-palette.tsx':
     '編集を持たない探す窓（⌘K）。選んだ行き先への移動を共通の未保存確認へ委ねる',
+  'v8/ai-reply/qa-edit-dialog.tsx': 'G2 の Q&A を作る・直す窓（y4nixm）。保存の口は窓の中だけで、開くたびに元の Q&A か記録の質問から作り直し、入力のある窓は Dialog の dirty で閉じる前に確かめる。',
+  'v8/ai-reply/qa-list.tsx': 'G2 の Q&A タブ（y4nixm）。一覧上の操作（公開・止める・削除・AI の使い方）は確認窓で確定し、画面に残る下書きを持たない。取り込む窓の URL は閉じると戻る窓の中の入力',
+  'v8/mcp-connect/section.tsx': 'G9 AI とつなぐの区画（Xb0yc）。作る窓の入力は閉じると何も作らない窓の中だけで、止める・作り直すは確認窓で確定する。画面に残る下書きを持たない',
   'v8/restaurant/closures/closure-dialog.tsx': '臨時休業・貸切を足す・変える窓（提案 E-10 nVvXy）。保存の口は窓の中だけで、開くたびに押した日か記録から作り直し、閉じると入力を破棄する。',
   'v8/restaurant/front-desk/phone-drawer.tsx': '電話予約の引き出し（提案 E-2）。保存の口は引き出しの中だけで、開くたびに空から始まり、閉じると入力を破棄する（入力中は題に * が付く）。',
   'v8/reminders/basics-form.tsx':
@@ -436,17 +475,16 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
   }
 
   it('番兵を持つ画面は共通フックと離脱確認ダイアログを配線している', () => {
-    for (const file of GUARDED) {
-      const source = screenSources(file)
-      expect(source, file).toContain('useUnsavedGuard(')
-      expect(source, `${file} の離脱確認`).toContain('leaveTarget !== null')
-    }
+    // 足りない画面の一覧が空であること（ソース文字を直接は比べない。点検は scripts/unsaved-guard-wiring.mjs）。
+    expect(screensWithoutLeaveGuard(SRC, [...new Set(GUARDED)])).toEqual([])
   })
 
   it('親へ dirty を報告する画面の親は、共通フックで番兵を持っている', () => {
-    for (const [file, parent] of Object.entries(COVERED_BY_PARENT)) {
-      const parentSource = screenSources(parent)
-      expect(parentSource, `${file} の番兵を持つ親 ${parent}`).toContain('useUnsavedGuard(')
+    for (const [file, parents] of Object.entries(COVERED_BY_PARENT)) {
+      for (const parent of typeof parents === 'string' ? [parents] : parents) {
+        const parentSource = screenSources(parent)
+        expect(parentSource, `${file} の番兵を持つ親 ${parent}`).toContain('useUnsavedGuard(')
+      }
     }
   })
 

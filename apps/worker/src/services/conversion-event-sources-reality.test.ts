@@ -424,16 +424,12 @@ describe('起点3: 動画を見終えた (webinar_completed)', () => {
     addPoint('webinar_completed');
     setupWebinar();
 
-    const half = await heartbeat(400, 400);
-    expect(half.status).toBe(200);
-    // 90%に届かない位置では数えない。
+    // 位置を飛ばさず15秒ごとの有効区間で実視聴を積む。
+    for (let position = 15; position <= 450; position += 15) expect((await heartbeat(position, 15)).status).toBe(200);
     expect(countEvents('webinar_completed')).toBe(0);
-
-    const done = await heartbeat(950, 300);
-    expect(done.status).toBe(200);
+    for (let position = 465; position <= 900; position += 15) expect((await heartbeat(position, 15)).status).toBe(200);
     expect(countEvents('webinar_completed')).toBe(1);
-
-    await heartbeat(980, 60);
+    await heartbeat(915, 15);
     expect(countEvents('webinar_completed')).toBe(1);
   });
 });

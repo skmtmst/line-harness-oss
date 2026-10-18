@@ -4,18 +4,6 @@
  */
 
 /* 段のカード。 */
-.cardHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-compact-gap);
-}
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-cn-card-title-size);
-  font-weight: 700;
-  line-height: var(--tpl-cn-card-title-lh);
-}
 .cardNote {
   margin: 0;
   color: var(--color-ink-secondary);
@@ -66,37 +54,6 @@
   flex-direction: column;
   gap: var(--tpl-cn-field-gap);
 }
-.actionRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-cn-field-row-gap);
-  padding: var(--tpl-cn-action-pad);
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-}
-.actionText {
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: var(--tpl-compact-gap);
-  min-width: 0;
-}
-.actionTitle {
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-cn-name-lh);
-}
-.actionValue {
-  overflow: hidden;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-cn-main-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* 発行される URL：薄い地の箱（角8・余白 10/12・間8）。右に小さく「発行するとできます」。 */
 .urlBox {
   display: flex;
@@ -133,13 +90,6 @@
   flex-direction: column;
   gap: var(--tpl-cn-side-gap);
   width: 100%;
-}
-.sideTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-preview-title-size);
-  font-weight: 600;
-  line-height: var(--tpl-preview-title-lh);
 }
 .steps {
   display: flex;
@@ -224,3 +174,8 @@
   font-size: var(--text-micro);
   line-height: var(--tpl-cn-sub-lh);
 }
+
+/* クーポン QR（絵 QUF2R）：スイッチ＋名前を左、札を右に1行で。 */
+.couponSwitchRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
+.couponSwitchLabel { flex: 1; min-width: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; white-space: nowrap; }
+.couponAudience { display: flex; flex-direction: column; gap: var(--polish-space-row); }

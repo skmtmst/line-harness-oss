@@ -67,6 +67,8 @@ export interface InsertTextFieldProps
   extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'defaultValue' | 'onChange'> {
   /** 高さ72の短い本文欄。指定しなければ従来の呼び出し側の見た目。 */
   compact?: boolean
+  /** 本文／コードの大きさと内側の余白を共通にする。 */
+  editorSize?: 'message' | 'code'
   value: string
   onValueChange: (next: string) => void
   /** 画面ごとに意味が違う差し込み（リマインダの {{date}}＝予約日時、統括の {店名} など）。 */
@@ -267,6 +269,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
     tokenNames = EMPTY_NAMES,
     className,
     compact,
+    editorSize,
     style,
     placeholder,
     maxLength,
@@ -471,8 +474,8 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
     return () => label.removeEventListener('click', onClick)
   }, [id])
 
-  /* 箱の要素にも value を持たせる（試験・自動操作が textarea と同じに書ける）。 */
-  useEffect(() => {
+  /* 箱の要素にも value を持たせる（試験・自動操作が textarea と同じに書ける）。後回し（useEffect）だと混雑時に一瞬 value が無い隙間ができるため、描画と同時（useLayoutEffect）に必ず持たせる。 */
+  useLayoutEffect(() => {
     const root = rootRef.current
     if (!root) return
     Object.defineProperty(root, 'value', {
@@ -627,7 +630,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
       aria-placeholder={placeholder}
       {...({ placeholder } as Record<string, string | undefined>)}
       data-insert-field=""
-      className={`${styles.editor} ${compact ? styles.editorCompact : ''} ${className ?? ''}`}
+      className={`${styles.editor} ${editorSize ? styles.editorMessage : ''} ${editorSize === 'code' ? styles.editorCode : ''} ${compact ? styles.editorCompact : ''} ${className ?? ''}`}
       style={{ ...minHeight, ...style }}
       contentEditable={editable}
       suppressContentEditableWarning
@@ -689,8 +692,8 @@ export const InsertButton = forwardRef<HTMLButtonElement, {
 
 
 /** 閲覧用の本文。差し込みの札は入力欄と同じ形で、元の文字列を変えずに描く。 */
-export function InsertText({ value, resolvedValue, tokenNames = EMPTY_NAMES }: { value: string; resolvedValue?: string; tokenNames?: InsertTokenNames }) {
-  const pieces = resolvedValue === undefined ? splitInsertTokens(value, EMPTY_TOKENS, tokenNames) : splitResolvedInsertTokens(value, resolvedValue, tokenNames)
+export function InsertText({ value, resolvedValue, tokenNames = EMPTY_NAMES, extraTokens = EMPTY_TOKENS }: { value: string; resolvedValue?: string; tokenNames?: InsertTokenNames; extraTokens?: readonly InsertTokenSpec[] }) {
+  const pieces = resolvedValue === undefined ? splitInsertTokens(value, extraTokens, tokenNames) : splitResolvedInsertTokens(value, resolvedValue, tokenNames)
   return <>{pieces.map((piece, index) => piece.kind === 'text' ? piece.text : (
     <span key={index} className={styles.chip} title={piece.spec.hint} data-token={piece.spec.token}>
       <svg className={styles.chipIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON_PATHS[piece.spec.icon] }} />

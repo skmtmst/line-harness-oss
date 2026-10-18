@@ -27,6 +27,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 /** 取り込める画像（API と同じ）。 */
 export const BANNER_UPLOAD_ACCEPT = ['image/png', 'image/jpeg', 'image/webp']
 export const BANNER_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+const uploadProjectRequirement = requiredText('入れるプロジェクトを選んでください。')
 
 /** 選んだファイルを手元で確かめる。だめなら理由、よければ null。 */
 export function uploadRefusal(file: File): string | null {
@@ -67,7 +68,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
   return (
     <BannerDialogFrame
       open={open}
-      kind="create"
+      kind="create" contentLayout="form"
       title={project ? '名前と説明を変える' : 'プロジェクトを作る'}
       description={project ? undefined : '案件やキャンペーンごとに作ります。画像はプロジェクトの中で生成・取り込みします。'}
       busy={busy}
@@ -78,7 +79,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
           <>
             <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
             {/* W7Z57: 名前が空のまま作らせない。 */}
-            <Button variant="primary" onClick={submit} disabled={busy || Boolean(projectNameRequirement.check(name))} busy={busy} busyLabel="保存しています…">
+            <Button widthReserve="idle" variant="primary" onClick={submit} disabled={busy || Boolean(projectNameRequirement.check(name))} title={projectNameRequirement.check(name) ?? undefined} busy={busy} busyLabel="保存しています…">
               {project ? '変更を保存' : <><Plus aria-hidden="true" className={styles.icon} />作って開く</>}
             </Button>
         </>
@@ -96,10 +97,6 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
               className={styles.full}
             /></SaveErrorField></Field></div>
           <div className={styles.field}>
-            <div className={styles.labelRow}>
-
-
-            </div>
             <Field label="説明" htmlFor={`${uid}-description`}><SaveErrorField names={["description"]}><TextArea
               id={`${uid}-description`}
               rows={2}
@@ -172,7 +169,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
   }
 
   const takeIn = async () => {
-    if (!file || !projectId || uploading) return
+    if (!file || uploadProjectRequirement.check(projectId) || uploading) return
     setUploading(true)
     setError('')
     try {
@@ -192,6 +189,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
     <BannerDialogFrame
       open={open}
       kind="upload"
+      contentLayout="form"
       title="画像を取り込む"
       description="手持ちの画像をプロジェクトへ入れます。PNG・JPEG・WebP、10MB まで。取り込んだ画像も生成した画像と同じようにアカウントへ渡せます。"
       onClose={onClose}
@@ -201,7 +199,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
       actions={(
           <>
             <Button onClick={onClose} disabled={uploading}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void takeIn()} disabled={!file || !projectId || loading || uploading} busy={uploading} busyLabel="取り込み中…">
+            <Button variant="primary" onClick={() => void takeIn()} disabled={!file || Boolean(uploadProjectRequirement.check(projectId)) || loading || uploading} title={loading ? 'プロジェクトを読み込んでいます。' : uploadProjectRequirement.check(projectId) ?? (!file ? '取り込む画像を選んでください。' : undefined)} busy={uploading} busyLabel="取り込み中…">
               <Upload aria-hidden="true" className={styles.icon} />取り込む
             </Button>
         </>
@@ -211,7 +209,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
           <p className={styles.note}>まずプロジェクトを作ってください。画像はプロジェクトの中に入ります。</p>
         ) : (
           <>
-            <div className={styles.field}><Field label="入れるプロジェクト" htmlFor={`${uid}-project`}><div className={styles.full}>
+            <div className={styles.field}><Field label="入れるプロジェクト" requirement={uploadProjectRequirement} htmlFor={`${uid}-project`}><div className={styles.full}>
                 <SaveErrorField names={["projectId","project_id"]}><EntitySelect
                   aria-label="入れるプロジェクト"
                   size="full"
@@ -228,7 +226,8 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
               value={filePreview}
               fit="contain"
               accept={BANNER_UPLOAD_ACCEPT.join(',')}
-              help={`1ファイル${BANNER_UPLOAD_MAX_BYTES / 1024 / 1024}メガバイト以内・PNG・JPEG・WebP`}
+              /* 絵 AnwtH：大きさの上限も形式と同じ行に書く（「？」に隠さない）。 */
+              maxBytes={BANNER_UPLOAD_MAX_BYTES}
               busy={uploading}
               onFile={(next) => pickFile(next)}
               onRemove={() => setFile(null)}

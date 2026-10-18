@@ -1,16 +1,13 @@
+import type { BroadcastPreflight } from './api-broadcast-preflight-types';
+export type { BroadcastPreflight } from './api-broadcast-preflight-types';
+import type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types';
+export type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types';
+import { type RichMenuPublishRun } from './api-rich-menu-publish-types'
+export { type RichMenuPublishRun } from './api-rich-menu-publish-types'
 import { SESSION_LOST_EVENT } from './session-events'
-import type { ApiFieldErrors } from '@line-crm/shared'
+import { type ApiFieldErrors, type QuestionAnswerRecovery, type ResumeQuestionAnswerRequest, type ResumeQuestionAnswerResponse, type AutomationTabCounts, type MediaTabCounts, type ConversionApprovalCounts, type BookingMenuReorderRequest, type BookingMenuReorderResponse, type MileageHistoryTypeFilter, type MileageHistoryKind, type MileageFriendHistorySummary, type ReminderRunReadOptions, type ReminderScheduleMetrics, type WebhookCreateState, type EcIdentityDuplicateSignal, type CustomerNotificationFailureCounts, type BannerGenerationCreateOptions, type RichMenuGroupListOptions, CHAT_FILE_TYPES, type TenantCompanyContactInfo, type SaveTenantCompanyContact, type ChatAttachment, type ChatAttachmentUploadSession, type ChatSendInput, type ChatScheduleInput, type BookingSyncRules, type BookingSyncRulesInput, type BookingSyncNotice, type BookingConflictsResponse, type BookingReassignInput, type BookingCustomerNotification, type LineMessageType, type BookingWaitlistSlotSummary, type SeatWaitlistSlotSummary, type CustomerSeatWaitlist, type ReminderDraftSettings, type ReminderDraftVersion, type ReminderPreviewResult, type ReminderPublishResult, type ReminderTestRecipientStatus, type ReminderStopConditions, type ReminderValidationResult, type AutoReplyRunsResponse, type AutoReplyConflict, type AutoReplyDraftInput, type AutoReplyDraftVersion, type AutoReplyDryRunResult, type AutoReplyPublishResult, type AutoReplyValidationResult, type Friend, type FriendUpcomingItem, type FriendSummary, type DashboardActivityItem, type FormSubmissionDetail, type FormSubmissionPage, type FriendAddEventKind, type FriendAddEventAttributionStatus, type FriendAddEventRoutingStatus, type Tag, type TagGroup, type TagCsvImportInputRow, type TagCsvImportPreview, type TagCsvImportResult, type FriendField, type FriendFieldListSummary, type FriendFieldType, type SupportMark, type Folder, type SavedSearch, type SavedSearchConditions, type SavedSegmentPreset, type SavedSegmentConditions, type MediaItem, type MediaDeleteImpact, type MediaReplacementImpact, type MediaReplacementResult, type CommonVar, type CommonVarChangeImpact, type CommonVarDeleteImpact, type CommonVarSchedule, type Scenario, type ScenarioStep, type ApiResponse, type PaginatedResponse, type User, type LineAccount, type ConversionPoint, type ConversionMeasureMethod, type Affiliate, type Automation, type AutomationLog, type Chat, type Reminder, type ReminderStep, type ReminderTriggerType, type ScoringRule, type IncomingWebhook, type IncomingWebhookCreated, type OutgoingWebhook, type OutgoingWebhookCreated, type WebhookInteraction, type WebhookInteractionDirection, type WebhookInteractionList, type NotificationRule, type Notification, type NotificationCenterData, type AccountHealthLog, type AccountMigration, type StaffMember, type Broadcast, type BroadcastTargetType, type EntryRoute, type EntryRouteGenre, type CreateEntryRouteInput, type EntryRouteFunnel, type TrafficPool, type PoolAccount, type FormLayout, type MergedPersonDetail, type UpdateMergedPersonRequest, type UpdateMergedPersonDeliveryPrioritiesRequest, type FriendBulkSelection, type FriendBulkOperation, type FriendBulkPreview, type FriendBulkRunSummary, type FriendBulkRunDetail, type IdentityCandidateDetail, type IdentityCandidateImpactMetric, type IdentityCandidateKind, type IdentityCandidateList, type IdentityCandidateStatus, type DetectIdentityCandidatesResult, type DecideIdentityCandidateRequest, type UndoIdentityCandidateRequest, type RichMenuAreaIntent, type GoogleSheetsConnectionStatus, type GoogleSheetsConnection, type GoogleSheetsSyncRun, type BroadcastMessageOptions, type BroadcastBubble } from '@line-crm/shared'
 import { csvFileName } from './csv-file-name'
 import { getFeatureDisabledContext } from './feature-disabled-context'
-import type {QuestionAnswerRecovery,ResumeQuestionAnswerRequest,ResumeQuestionAnswerResponse} from '@line-crm/shared';
-import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
-import type { BookingMenuReorderRequest, BookingMenuReorderResponse, MileageHistoryTypeFilter, MileageHistoryKind, MileageFriendHistorySummary, ReminderRunReadOptions, ReminderScheduleMetrics, WebhookCreateState, EcIdentityDuplicateSignal, CustomerNotificationFailureCounts, BannerGenerationCreateOptions, RichMenuGroupListOptions } from '@line-crm/shared'
-import { CHAT_FILE_TYPES } from '@line-crm/shared';
-import type { TenantCompanyContactInfo, SaveTenantCompanyContact } from '@line-crm/shared';
-import type { ChatAttachment, ChatAttachmentUploadSession, ChatSendInput, ChatScheduleInput } from '@line-crm/shared';
-import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
-import type { BookingConflictsResponse, BookingReassignInput, BookingCustomerNotification } from '@line-crm/shared';
-import type { LineMessageType, BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
 import type {
@@ -27,111 +24,6 @@ import type {
 } from './hq-banners'
 import type { HqSupportContext, HqSupportDetail, HqSupportKind, HqSupportMessage, HqSupportRequest } from './hq-support'
 import type { BillingInterval, BillingInvoice, BillingSummary, PlanKey } from './hq-billing'
-import type {
-  ReminderDraftSettings,
-  ReminderDraftVersion,
-  ReminderPreviewResult,
-  ReminderPublishResult,
-  ReminderTestRecipientStatus,
-  ReminderStopConditions,
-  ReminderValidationResult,
-  AutoReplyRunsResponse,
-  AutoReplyConflict,
-  AutoReplyDraftInput,
-  AutoReplyDraftVersion,
-  AutoReplyDryRunResult,
-  AutoReplyPublishResult,
-  AutoReplyValidationResult,
-  Friend,
-  FriendUpcomingItem,
-  FriendSummary,
-  DashboardActivityItem,
-  FormSubmissionDetail,
-  FormSubmissionPage,
-  FriendAddEventKind,
-  FriendAddEventAttributionStatus,
-  FriendAddEventRoutingStatus,
-  Tag,
-  TagGroup,
-  TagCsvImportInputRow,
-  TagCsvImportPreview,
-  TagCsvImportResult,
-  FriendField,
-  FriendFieldListSummary,
-  FriendFieldType,
-  SupportMark,
-  Folder,
-  SavedSearch,
-  SavedSearchConditions,
-  SavedSegmentPreset,
-  SavedSegmentConditions,
-  MediaItem,
-  MediaDeleteImpact,
-  MediaReplacementImpact,
-  MediaReplacementResult,
-  CommonVar,
-  CommonVarChangeImpact,
-  CommonVarDeleteImpact,
-  CommonVarSchedule,
-  Scenario,
-  ScenarioStep,
-  ApiResponse,
-  PaginatedResponse,
-  User,
-  LineAccount,
-  ConversionPoint,
-  ConversionMeasureMethod,
-  Affiliate,
-  Automation,
-  AutomationLog,
-  Chat,
-  Reminder,
-  ReminderStep,
-  ReminderTriggerType,
-  ScoringRule,
-  IncomingWebhook,
-  IncomingWebhookCreated,
-  OutgoingWebhook,
-  OutgoingWebhookCreated,
-  WebhookInteraction,
-  WebhookInteractionDirection,
-  WebhookInteractionList,
-  NotificationRule,
-  Notification,
-  NotificationCenterData,
-  AccountHealthLog,
-  AccountMigration,
-  StaffMember,
-  Broadcast,
-  BroadcastTargetType,
-  EntryRoute,
-  EntryRouteGenre,
-  CreateEntryRouteInput,
-  EntryRouteFunnel,
-  TrafficPool,
-  PoolAccount,
-  FormLayout,
-  MergedPersonDetail,
-  UpdateMergedPersonRequest,
-  UpdateMergedPersonDeliveryPrioritiesRequest,
-  FriendBulkSelection,
-  FriendBulkOperation,
-  FriendBulkPreview,
-  FriendBulkRunSummary,
-  FriendBulkRunDetail,
-  IdentityCandidateDetail,
-  IdentityCandidateImpactMetric,
-  IdentityCandidateKind,
-  IdentityCandidateList,
-  IdentityCandidateStatus,
-  DetectIdentityCandidatesResult,
-  DecideIdentityCandidateRequest,
-  UndoIdentityCandidateRequest,
-  RichMenuAreaIntent,
-  GoogleSheetsConnectionStatus,
-  GoogleSheetsConnection,
-  GoogleSheetsSyncRun,
-} from '@line-crm/shared'
 
 export type { RichMenuAreaIntent } from '@line-crm/shared'
 
@@ -1147,31 +1039,6 @@ export type RichMenuScheduleInput = {
   restoreGroupId?: string | null
 }
 
-/** 公開run1件。版の要約・状態・試行に使ったLINE ID・最終エラー。 */
-export type RichMenuPublishRun = {
-  id: string
-  status: 'running' | 'succeeded' | 'failed'
-  lastErrorCode: string | null
-  idempotencyKey: string
-  requestedByStaffId: string
-  createdAt: string
-  updatedAt: string
-  version: {
-    name: string | null
-    chatBarText: string | null
-    pageCount: number | null
-    /** その版が「誰に出る版」だったか。読めないスナップショットでは null。 */
-    isDefaultForAll: boolean | null
-    targetingEnabled: boolean | null
-  }
-  pages: Array<{
-    pageId: string
-    orderIndex: number
-    newRichMenuId: string
-    oldRichMenuId: string | null
-  }>
-}
-
 /**
  * 公開履歴の応答。`published` はいま対象へ出ている版（最後に成功したrun）、
  * `draftDiffersFromPublished` は編集中の下書きが公開版と違うか。
@@ -1925,45 +1792,6 @@ export type BroadcastLedger = {
 };
 
 export type { BroadcastMessageButton, BroadcastMessageOptions } from '@line-crm/shared';
-import type { BroadcastMessageOptions } from '@line-crm/shared';
-
-export type BroadcastPreflight = {
-  audienceCount: number
-  hiddenExcluded: number
-  warnings: Array<{ level: 'info' | 'warning'; message: string }>
-  audience?: {
-    matched: number
-    sendable: number
-    evaluatedAt: string
-    representatives: Array<{
-      friendId: string
-      displayName: string | null
-      pictureUrl: string | null
-      summary: string
-    }>
-  }
-  exclusions?: {
-    blocked: number
-    hidden: number
-    missingDestination: number
-    duplicate: number
-    paused: number | null
-    total: number
-  }
-  quota?: {
-    monthlyUsed: number | null
-    monthlyLimit: number | null
-    remaining: number | null
-    planned: number
-    state: 'available' | 'insufficient' | 'unavailable'
-    reason: string | null
-  }
-  concurrentBroadcasts?: Array<{ id: string; title: string; scheduledAt: string }>
-  conditionAxes?: {
-    standard: Array<{ key: string; label: string }>
-    broadcastOnly: Array<{ key: string; label: string }>
-  }
-}
 
 export type BroadcastSavedView = {
   id: string
@@ -1978,7 +1806,6 @@ export type BroadcastSavedView = {
 }
 
 export type { BroadcastBubbleType, BroadcastBubble } from '@line-crm/shared';
-import type { BroadcastBubble } from '@line-crm/shared';
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
   publishedPayload?: Record<string, unknown>;
@@ -3079,7 +2906,7 @@ export async function fetchApiBlob(path: string, init?: { method?: string; accou
  * R495: 上限で切れたCSVを見分けるため、応答の頭の件数も返す。
  * 既存の呼び出しは戻り値を使わないので、そのまま動く。
  */
-export async function downloadApiFile(path: string, fallbackFilename: string): Promise<{
+export async function downloadApiFile(path: string, fallbackFilename: string, options?: { stepUpToken?: string }): Promise<{
   totalCount: number | null
   returnedCount: number | null
   truncated: boolean
@@ -3087,7 +2914,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   const context = apiAccountContext(path)
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     credentials: 'include',
-    headers: adminSessionHeaders(),
+    headers: { ...adminSessionHeaders(), ...(options?.stepUpToken ? { 'X-Step-Up-Token': options.stepUpToken } : {}) },
   })
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
@@ -3125,7 +2952,15 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   try {
     const anchor = document.createElement('a')
     anchor.href = href
-    anchor.download = /\.csv$/i.test(fallbackFilename) ? csvFileName(fallbackFilename) : named ? decodeURIComponent(named) : fallbackFilename
+    const exportActor = res.headers.get('X-Exported-By') ?? ''
+    const exportedAt = res.headers.get('X-Exported-At') ?? ''
+    const stamped = /^[A-Za-z0-9_-]{1,100}$/.test(exportActor)
+      && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(exportedAt)
+      && Number.isFinite(Date.parse(exportedAt))
+    const csvName = csvFileName(fallbackFilename, stamped ? new Date(exportedAt) : undefined)
+    anchor.download = /\.csv$/i.test(fallbackFilename)
+      ? stamped ? `${csvName.slice(0, -4)}-by-${exportActor}-${exportedAt.replace(/[^0-9TZ]/g, '')}.csv` : csvName
+      : named ? decodeURIComponent(named) : fallbackFilename
     anchor.click()
   } finally {
     URL.revokeObjectURL(href)
@@ -3629,6 +3464,7 @@ export type MileageFriendV6 = {
   lifetimeEarned: number
   spent: number
   lastChangedAt: string | null
+  lastAction?: { name: string; amount: number; occurredAt: string; entryType: string; status: string } | null
   walletScope: 'verified_user' | 'friend'
   lineAccount: { id: string; name: string }
 }
@@ -4169,7 +4005,7 @@ export type RichMenuTapStats = {
   total: number
 }
 
-export type RichMenuGroupListItem = {
+export type RichMenuGroupListItem = Partial<import('@line-crm/shared').StyleSampleMetadata> & {
   id: string
   accountId: string
   name: string
@@ -4573,7 +4409,7 @@ export type DashboardMetric<T> = {
   state: 'available' | 'empty' | 'unavailable' | 'estimated' | 'partial' | 'stale'
   reason: 'source_failed' | 'fetch_failed' | 'not_connected' | 'not_loaded' | 'not_applicable' | null
   asOf: string | null
-  period: 'today' | 'last7' | 'last28' | 'latest' | 'last7-fixed' | 'this-month'
+  period: 'today' | 'last7' | 'last28' | 'last30' | 'latest' | 'last7-fixed' | 'this-month'
 }
 
 export type DashboardFriendTrendPoint = {
@@ -4589,7 +4425,7 @@ export type DashboardFriendTrendPoint = {
 
 /** ダッシュボードが1回で読む数（設計 `V6 1-1 ダッシュボード`）。 */
 export type DashboardOverview = {
-  period: 'today' | 'last7' | 'last28'
+  period: 'today' | 'last7' | 'last28' | 'last30'
   /** 集計した時刻。カードごとの基準がずれていないことの手がかり。 */
   generatedAt: string
   /** 取得に成功した元データのうち最も古い時刻。 */
@@ -4652,7 +4488,7 @@ export type DashboardOverview = {
       asOf: string | null
       freshness?: 'fresh' | 'delayed' | 'stale' | 'unavailable' | 'partial'
       reason?: 'source_failed' | 'fetch_failed' | 'not_connected' | 'not_loaded' | 'not_applicable' | null
-      period: 'today' | 'last7' | 'last28' | 'latest' | 'last7-fixed' | 'this-month'
+      period: 'today' | 'last7' | 'last28' | 'last30' | 'latest' | 'last7-fixed' | 'this-month'
     }
   >
   /** V6指標。段階配備中の旧Workerでは未返却。 */
@@ -5417,6 +5253,26 @@ export type NenPhotoRewardActionResult = {
 }
 
 /** 掲載先1件。active=0 の外した先も removed_at つきで残る（Issue #1040）。 */
+/**
+ * GET /api/nen-members/photos/publications の応答本体（Issue #1040）。
+ * `pendingWithdrawals` は同意撤回済みで掲載先の整理が残るもの、
+ * `withdrawnItems` は外し終えた履歴。撤回後に残る公開先を追うための口。
+ */
+export type NenPhotoPublicationList = {
+  summary: {
+    publishedCount: number
+    placementCount: number
+    topPhoto: Record<string, unknown> | null
+    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
+    consentedCount: number
+    attentionCount: number
+    withdrawnCount: number
+  }
+  items: Array<Record<string, unknown>>
+  pendingWithdrawals: Array<Record<string, unknown>>
+  withdrawnItems: Array<Record<string, unknown>>
+}
+
 export type NenPhotoPublicationPlacement = {
   id: string
   publication_id?: string
@@ -5481,47 +5337,6 @@ export type PhotoRewardPolicyVersion = {
   createdBy: string | null
   createdAt: string
   status: 'in_use' | 'reserved' | 'past'
-}
-
-/**
- * GET /api/nen-members/photos/publications の応答本体（Issue #1040）。
- * `pendingWithdrawals` は同意撤回済みで掲載先の整理が残るもの、
- * `withdrawnItems` は外し終えた履歴。撤回後に残る公開先を追うための口。
- */
-export type NenPhotoPublicationList = {
-  summary: {
-    publishedCount: number
-    placementCount: number
-    topPhoto: Record<string, unknown> | null
-    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
-    consentedCount: number
-    attentionCount: number
-    withdrawnCount: number
-  }
-  items: Array<Record<string, unknown>>
-  pendingWithdrawals: Array<Record<string, unknown>>
-  withdrawnItems: Array<Record<string, unknown>>
-}
-
-/** GET /api/accounts/health-summary の応答。ログ本文は含まない。 */
-export type AccountHealthSummary = {
-  items: Array<{ lineAccountId: string; riskLevel: string | null }>
-  warningCount: number
-  dangerCount: number
-}
-
-export type PhotoAssetRun = {
-  id: string
-  photoId: string
-  lineAccountId: string
-  requestedVersion: number
-  status: 'queued' | 'processing' | 'completed' | 'failed'
-  requestedBy: string
-  createdAt: string
-  startedAt: string | null
-  completedAt: string | null
-  errorMessage: string | null
-  operation?: 'review' | 'public' | 'thumbnail' | 'all'
 }
 
 export type PhotoAssetStatus = {
@@ -5743,6 +5558,7 @@ export interface UidMigrationItem {
   errorMessage: string | null
 }
 export interface UidMigrationRun {
+  suppressionReconciliation?: { status: 'unavailable'; transferredCount: null; mismatchCount: null; reason: 'delivery_consent_snapshot_missing' } | { status: 'matched' | 'mismatch' | 'rolled_back'; transferredCount: number; mismatchCount: number; reason: null }
   id: string
   fromAccountId: string
   toAccountId: string
@@ -6147,6 +5963,7 @@ export type OpsTenantDetail = {
   accounts: Array<{ id: string; name: string; is_active: number; archived_at: string | null; updated_at: string; friend_count: number }>
   members: Array<{ id: string; name: string; email: string | null; role: string; access_level: string; is_active: number; invite_status: string; last_login_at: string | null }>
   audit: OpsAuditRow[]
+  metrics: {monthlyListPriceYen:number|null;monthlyListPriceSource:string;thisMonthBilledYen:number|null;invoiceSource:string;accountCount:number;activeAccountCount:number;friendCount:number;friendChangeLastMonth:null;supportCount:number;unresolvedSupportCount:number}
 }
 
 export type OpsAuditRow = {
@@ -6375,6 +6192,12 @@ export type OpsSupportDetail = {
 
 /** 大事な操作の直前再確認（V）が対象にする操作の名前。Workerの STEP_UP_PURPOSES と一致させる。 */
 export type StepUpPurpose =
+  | 'auth.api_key'
+  | 'privacy.retention'
+  | 'data.export'
+  | 'broadcast.send'
+  | 'ops.impersonation'
+  | 'secrets.reveal'
   | 'auth.mfa.policy'
   | 'auth.mfa.recovery'
   | 'auth.mfa.reenroll'
@@ -6390,6 +6213,8 @@ export type StepUpPurpose =
   | 'broadcast.approval'
   | 'webhook.api_token'
   | 'webhook.secret'
+  | 'ai.settings'
+  | 'mcp.connection'
 
 /** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。 */
 export type LineAccountTag = { id: string; name: string; color: string | null; displayOrder: number }
@@ -7552,13 +7377,15 @@ export const api = {
   },
   /** 回答フォーム。 */
   forms: {
+    exportResponses: (formId: string, accountId: string) => fetchApiBlob(`/api/forms/${encodeURIComponent(formId)}/exports?account_id=${encodeURIComponent(accountId)}`, { method: 'POST', accountId }),
     submission: (formId: string, submissionId: string, accountId: string) =>
       fetchApi<ApiResponse<FormSubmissionDetail>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}?account_id=${encodeURIComponent(accountId)}`,
       ),
-    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string } = {}) => {
+    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string; from?: string; to?: string; period?: 'this_month' | 'last_month' | 'all' } = {}) => {
       const query = new URLSearchParams({ account_id: accountId, page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
       if (params.query) query.set('q', params.query)
+      for (const key of ['from','to','period'] as const) if (params[key] !== undefined) query.set(key, params[key]!)
       return fetchApi<ApiResponse<FormSubmissionPage>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions?${query}`,
       )
@@ -7592,6 +7419,7 @@ export const api = {
            * されていた。型に無いものは、来ていないことに誰も気づけない。
            */
           contentRevision: number
+          latestEdit?: {staffId:string;staffName:string;savedAt:string}|null
           /** お客さまに出している不変版。null は未公開。 */
           publishedVersionId: string | null
           /** 現在公開版の元になった編集版。 */
@@ -7627,7 +7455,10 @@ export const api = {
         name?: string
         description?: string | null
         fields?: unknown
-        /** 送ると fields もこちらから作り直される */
+        /**
+         * 送ると fields もこちらから作り直される。
+         * 予約のつまみは各ブロックのbooking.allowMenuSelection/requireApproval。
+         */
         layout?: FormLayout
         onSubmitTagId?: string | null
         onSubmitMessageType?: string | null
@@ -7901,6 +7732,7 @@ export const api = {
       { method: 'POST', body: JSON.stringify(data) },
     ),
     update: (id: string, accountId: string, data: {
+      expectedRevision?: number
       filename?: string
       folderId?: string | null
       /** 既知の利用期限（YYYY-MM-DD）。null で記録を消して「不明」へ戻す。 */
@@ -7910,6 +7742,7 @@ export const api = {
     }) =>
       fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
+        headers: data.expectedRevision === undefined ? undefined : { 'If-Match': String(data.expectedRevision) },
         body: JSON.stringify(data),
       }),
     /** 削除確認を開くたびに、現在の使用先と削除可否を読み直す。 */
@@ -9185,6 +9018,7 @@ export const api = {
   },
   /** 統括から運営へのお問い合わせ（★V6 36-3）。形は `apps/worker/src/routes/hq-support.ts`。 */
   hqSupport: {
+    summary: () => fetchApi<ApiResponse<{ total: number; newCount: number; inProgressCount: number; assignedInProgressCount: number; resolvedThisMonth: number; resolvedPreviousMonth: number; averageFirstReplyHours: number | null; firstReplySampleCount: number }>>('/api/hq/support/summary'),
     context: () => fetchApi<ApiResponse<HqSupportContext>>('/api/hq/support/context'),
     kinds: () => fetchApi<ApiResponse<Array<{ key: HqSupportKind; label: string }>>>('/api/hq/support/kinds'),
     list: () => fetchApi<ApiResponse<HqSupportRequest[]>>('/api/hq/support/requests'),
@@ -9393,9 +9227,9 @@ export const api = {
   */
   manualLinks: {
     /** 画面から1つ引く。**開けないと分かっているものは URL が null で返る。** */
-    lookup: (screen: string) =>
+    lookup: (screen: string, keyKind: 'screen' | 'task' = 'screen') =>
       fetchApi<ApiResponse<{ key: string; url: string | null; status: 'ok' | 'broken' | 'unset' }>>(
-        `/api/manual-links/lookup?screen=${encodeURIComponent(screen)}`,
+        `/api/manual-links/lookup?screen=${encodeURIComponent(screen)}${keyKind === 'task' ? '&keyKind=task' : ''}`,
       ),
     list: () =>
       fetchApi<ApiResponse<{ items: ManualLink[]; total: number; brokenCount: number }>>(
@@ -9743,8 +9577,8 @@ export const api = {
         `/api/line-accounts/${id}/follower-import/start`,
         { method: 'POST' },
       ),
-    stepFollowerImport: (id: string) =>
-      fetchApi<ApiResponse<{ state: FollowerImportState; busy: boolean }>>(
+    stepFollowerImport: (id: string) => // 続きを進める（済み・未開始なら何もせず返る）
+      fetchApi<ApiResponse<{ state: FollowerImportState; busy: boolean; profilesFetched: number }>>(
         `/api/line-accounts/${id}/follower-import/step`,
         { method: 'POST' },
       ),
@@ -9970,8 +9804,8 @@ export const api = {
       ),
   },
   affiliates: {
-    list: () =>
-      fetchApi<ApiResponse<Affiliate[]>>('/api/affiliates'),
+    list: (accountId?: string) =>
+      fetchApi<ApiResponse<Affiliate[]>>('/api/affiliates' + (accountId ? `?accountId=${encodeURIComponent(accountId)}` : '')),
     get: (id: string) =>
       fetchApi<ApiResponse<Affiliate>>(`/api/affiliates/${id}`),
     // Admin-side create. Codes are auto-generated (random) — no manual `code`
@@ -10211,6 +10045,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         /** R194: 管理一覧の抜粋・検索が読む最新の下書き本文。公開版だけのときは null。 */
         draftMessageContent: string | null;
         folderId: string | null;
@@ -10268,6 +10103,7 @@ export const api = {
           category: string;
           messageType: string;
           messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
           folderId: string | null;
           question: TemplateQuestion | null;
           questionStatus: 'draft' | 'published';
@@ -10297,6 +10133,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
         folderId: string | null;
@@ -10341,6 +10178,7 @@ export const api = {
         accountId: string | null;
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         publishedVersion: number;
         publishedAt: string | null;
         published: boolean;
@@ -10372,13 +10210,15 @@ export const api = {
       /** 置き場。省略・null は未分類。 */
       folderId?: string | null
     }) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; folderId: string | null; createdAt: string; updatedAt: string }>>(
         '/api/templates',
         { method: 'POST', body: JSON.stringify(data) },
       ),
     update: (
       id: string,
-      data: Partial<{ name: string; category: string; messageType: string; messageContent: string; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
+      data: Partial<{ name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null
@@ -10389,7 +10229,8 @@ export const api = {
         folderId?: string | null
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null; folderId: string | null; createdAt: string; updatedAt: string }>>(
         `/api/templates/${id}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
@@ -10417,6 +10258,7 @@ export const api = {
         status: 'in_use' | 'reserved' | 'past';
         messageType: string;
         messageContent: string;
+        messageBubbles?: BroadcastBubble[] | null;
         carouselActions: unknown | null;
         carouselTapLimitMode: string | null;
         carouselTapLimitText: string | null;
@@ -10424,6 +10266,9 @@ export const api = {
         questionStatus: string | null;
         effectiveFrom: string | null;
         createdAt: string;
+        createdByStaffId: string | null;
+        creatorName: string | null;
+        creatorNameSource: 'current_staff_profile' | null;
       }>>>(`/api/templates/${id}/versions`),
     /**
      * 466: この版に戻す。過去の版は変えず、その中身で新しい版を作る。
@@ -11040,14 +10885,14 @@ export const api = {
       fetchApi<ApiResponse<{ items: DashboardActivityItem[] }>>(
         `/api/dashboard/activity?account_id=${encodeURIComponent(accountId)}&limit=${encodeURIComponent(String(limit))}`,
       ),
-    overview: (params: { period?: 'today' | 'last7' | 'last28'; accountId: string }) => {
+    overview: (params: { period?: 'today' | 'last7' | 'last28' | 'last30'; accountId: string }) => {
       const query = new URLSearchParams()
       if (params?.period) query.set('period', params.period)
       query.set('account_id', params.accountId)
       const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<DashboardOverview>>(`/api/dashboard/overview${suffix}`)
     },
-    organizationOverview: (params?: { period?: 'today' | 'last7' | 'last28' }) => {
+    organizationOverview: (params?: { period?: 'today' | 'last7' | 'last28' | 'last30' }) => {
       const query = new URLSearchParams()
       if (params?.period) query.set('period', params.period)
       const suffix = query.size ? `?${query}` : ''
@@ -12264,6 +12109,7 @@ export const api = {
       fetchApi<ApiResponse<FriendScoreDetail>>(`/api/friends/${friendId}/score`),
   },
   mileage: {
+    exportCsv: (accountId: string, kind: 'balances' | 'history' | 'rewards' | 'scores', reason: string) => fetchApiBlob('/api/mileage/exports', { method: 'POST', accountId, body: JSON.stringify({ accountId, kind, reason }) }),
     rewardFolders: (accountId: string) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>(`/api/mileage/reward-folders?accountId=${encodeURIComponent(accountId)}`),
     createRewardFolder: (accountId: string, name: string) => fetchApi<ApiResponse<{ id: string; name: string; displayOrder: number; count: number }>>('/api/mileage/reward-folders', { method: 'POST', body: JSON.stringify({ accountId, name }) }),
     reorderRewardFolders: (accountId: string, ids: string[]) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>('/api/mileage/reward-folders/order', { method: 'PUT', body: JSON.stringify({ accountId, ids }) }),
@@ -12645,14 +12491,14 @@ export const api = {
         fetchApi<ApiResponse<IncomingWebhookDetail>>(
           `/api/webhooks/incoming/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret: string } & WebhookCreateState, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret?: string } & WebhookCreateState, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhookCreated>>('/api/webhooks/incoming', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
       update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string; folderId?: string | null }, stepUpToken?: string) =>
-        fetchApi<ApiResponse<IncomingWebhook>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
+        fetchApi<ApiResponse<IncomingWebhook & { secret?: string }>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
@@ -12703,7 +12549,7 @@ export const api = {
         fetchApi<ApiResponse<OutgoingWebhook>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number } & WebhookCreateState, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number } & WebhookCreateState, stepUpToken?: string) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12715,7 +12561,7 @@ export const api = {
         data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string; expectedVersion?: number; folderId?: string | null },
         stepUpToken?: string,
       ) =>
-        fetchApi<ApiResponse<OutgoingWebhook>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
+        fetchApi<ApiResponse<OutgoingWebhook & { secret?: string }>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
@@ -13568,7 +13414,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<CreateEntryRouteInput>) =>
+    update: (id: string, data: Partial<CreateEntryRouteInput> & { expectedUpdatedAt?: string }) =>
       fetchApi<ApiResponse<EntryRoute>>(`/api/entry-routes/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -14424,6 +14270,7 @@ export interface BookingTodayResponse {
 
 /** キャンセル待ちの1件（booking-plus 2）。 */
 export interface BookingWaitlistEntry {
+  position?: number | null
   id: string;
   staff_id: string;
   menu_id: string;
@@ -14779,7 +14626,7 @@ function withAccount(path: string, accountId: string): string {
 }
 
 export interface BookingPaymentAdminConfig {
-  mode: 'none' | 'onsite' | 'online';
+  mode: 'none' | 'onsite' | 'online' | 'customer_choice';
   provider: string;
   holdMinutes: number;
   keyConfigured: boolean;
@@ -14843,13 +14690,23 @@ export interface BookingSalesSummary {
 }
 
 export const bookingApi = {
+  getChannels: (accountId: string) => fetchApi<ApiResponse<{
+    timeZone: string; autoAssign: boolean;
+    staff: Array<{ staffId: string; displayName: string; status: 'connected' | 'disconnected' | 'expired'; externalEventsThisWeek: number | null; lastReadAt: string | null; readError: string | null }>;
+    channels: Array<{ key: string; status: string; todayCount: number | null; enabled?: boolean; version?: number; connectionStatus?: 'requested' | 'disabled'; operational?: false }>;
+  }>>(withAccount('/api/booking/admin/channels', accountId)),
+  /** 外部サービスの実接続ではなく、連携を希望する設定だけを保存する。 */
+  saveChannelSetting: (accountId: string, channel: 'hot_pepper_beauty' | 'google_reserve' | 'epark', data: { enabled: boolean; expectedVersion: number }) =>
+    fetchApi<ApiResponse<{ key: string; enabled: boolean; version: number; connectionStatus: 'requested' | 'disabled'; operational: false }>>(
+      withAccount(`/api/booking/admin/channels/${channel}/settings`, accountId), { method: 'PUT', body: JSON.stringify(data) },
+    ),
   getPaymentConfig: (accountId: string) =>
     fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
       withAccount('/api/booking/admin/payment-config', accountId),
     ),
   savePaymentConfig: (
     accountId: string,
-    body: { mode: 'none' | 'onsite' | 'online'; provider: 'none' | 'onsite' | 'stripe'; holdMinutes: number },
+    body: { mode: 'none' | 'onsite' | 'online' | 'customer_choice'; provider: 'none' | 'onsite' | 'stripe'; holdMinutes: number },
   ) =>
     fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
       withAccount('/api/booking/admin/payment-config', accountId),
@@ -14858,7 +14715,7 @@ export const bookingApi = {
   saveMenuPayment: (
     accountId: string,
     menuId: string,
-    body: { mode: 'none' | 'onsite' | 'online'; provider: 'none' | 'onsite' | 'stripe' },
+    body: { mode: 'none' | 'onsite' | 'online' | 'customer_choice'; provider: 'none' | 'onsite' | 'stripe' },
   ) =>
     fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
       withAccount(`/api/booking/admin/menus/${menuId}/payment`, accountId),

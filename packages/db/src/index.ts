@@ -22,6 +22,7 @@ export * from './broadcast-lifecycle';
 export * from './broadcast-message-assets';
 export * from './users';
 export * from './line-accounts';
+export * from './line-account-rollback';
 export * from './conversions';
 export * from './conversion-definitions';
 export * from './conversion-event-sources';
@@ -184,3 +185,5 @@ export * from './hq-folders.js';
 export * from './archive-restore.js';
 
 export * from './id-queries.js';
+
+export * from './public-ingress.js';

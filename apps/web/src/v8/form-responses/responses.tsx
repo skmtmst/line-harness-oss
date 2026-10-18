@@ -1,43 +1,46 @@
 'use client'
-import { HorizontalBarChart } from '@/components/shared/charts'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from '@/components/shared/list-navigation'
-import { useSearchParams } from 'next/navigation'
-import { AlertCircle, ArrowLeft, ArrowRight, Download, Pencil, RotateCw, Search, User } from 'lucide-react'
-import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
-import { fetchApi, ApiError } from '@/lib/api'
-import { formAnswerText } from '@/lib/form-answer'
-import { csvCell } from '@/lib/presentation'
-import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/lib/format'
-import { useAccount } from '@/contexts/account-context'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import Notice from '@/components/shared/notice'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { DetailPage, DetailColumns } from '@/components/templates'
-import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
+import { classifyApiFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
+import Card,{ CardHeader } from '@/components/shared/card'
+import { HorizontalBarChart } from '@/components/shared/charts'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { emptyValue } from '@/components/shared/empty-value'
+import FilterChip from '@/components/shared/filter-chip'
 import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListState from '@/components/shared/list-state'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import TargetMissing from '@/components/shared/target-missing'
-import { ActionCell, DataTable, DateCell, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import Card, { CardHeader } from '@/components/shared/card'
-import StatusBadge from '@/components/shared/status-badge'
-import { Tabs } from '@/components/shared/tabs'
-import ListRange from '@/components/ui/list-range'
-import { postActionStepLabel, ratingAverageText, type DestinationWrite, type FormSubmissionSummary, type SubmissionPostActions } from './summary'
-import styles from './responses.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { RowMenu } from '@/components/shared/row-actions'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { RowMenu } from '@/components/shared/row-actions'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import SearchField from '@/components/shared/search-field'
+import StatusBadge from '@/components/shared/status-badge'
+import { ActionCell,DataTable,DateCell,NameCell,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
+import TargetMissing from '@/components/shared/target-missing'
+import TruncatedText from '@/components/shared/truncated-text'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { DetailColumns,DetailPage } from '@/components/templates'
+import ListRange from '@/components/ui/list-range'
+import { useAccount } from '@/contexts/account-context'
+import { ApiError,fetchApi } from '@/lib/api'
+import { csvFileName } from '@/lib/csv-file-name'
+import { formAnswerText } from '@/lib/form-answer'
+import { formatDateTime,formatNumber,formatDate as polishFormatDate } from '@/lib/format'
+import { csvCell } from '@/lib/presentation'
+import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { useCustomerDeletion } from '@/lib/use-customer-deletion'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import type { FormBlock,FormInputType,FormLayout } from '@line-crm/shared'
+import { ArrowRight,Download,Filter,Pencil,RotateCw,User } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense,useCallback,useEffect,useMemo,useRef,useState } from 'react'
+import styles from './responses.module.css'
+import { retryEffectsFailureText } from './retry-failure'
+import { postActionStepLabel,ratingAverageText,type DestinationWrite,type FormSubmissionSummary,type SubmissionPostActions } from './summary'
+
 
 /*
  * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
@@ -89,17 +92,6 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
   anchor.download = filename
   anchor.click()
   URL.revokeObjectURL(url)
-}
-function retryEffectsFailureText(error: unknown): string {
-  if (error instanceof ApiError) {
-    return describeApiFailure(error, '後処理の再実行', {
-      scope: 'store',
-    })
-  }
-  if (error instanceof Error && error.message && error.message !== 'retry_failed' && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) {
-    return error.message
-  }
-  return describeApiFailure(error, '後処理の再実行')
 }
 /** 「9/30 17:40」（日本時間）。絵どおり年と曜日は出さない。 */
 function shortWhen(iso: string): string {
@@ -167,6 +159,10 @@ function Responses() {
   const loadRequest = useRef(0)
   const queryRef = useRef(query)
   queryRef.current = query
+  /* 集計と一覧の期間（今月・先月・すべて）。口は submissions の period（組1）。 */
+  const [period, setPeriod] = useState<'this_month' | 'last_month' | 'all'>('this_month')
+  const periodRef = useRef(period)
+  periodRef.current = period
 
   const load = useCallback(async (nextPage = 1, nextLimit = 20, searchText?: string) => {
     if (!selectedAccountId || !formId) {
@@ -184,7 +180,7 @@ function Responses() {
       const search = needle ? `&q=${encodeURIComponent(needle)}` : ''
       const [formResult, responseResult] = await Promise.all([
         fetchApi<{ success: boolean; data: FormDetail }>(`/api/forms/${formId}?${account}`),
-        fetchApi<{ success: boolean; data: SubmissionPage }>(`/api/forms/${formId}/submissions?page=${nextPage}&limit=${nextLimit}&${account}${search}`),
+        fetchApi<{ success: boolean; data: SubmissionPage }>(`/api/forms/${formId}/submissions?page=${nextPage}&limit=${nextLimit}&${account}${search}&period=${periodRef.current}`),
       ])
       if (!formResult.success || !responseResult.success) throw new Error('load_failed')
       if (request !== loadRequest.current) return
@@ -217,6 +213,14 @@ function Responses() {
   useEffect(() => {
     void load(1, 20)
   }, [load])
+
+  const firstPeriod = useRef(true)
+  useEffect(() => {
+    if (firstPeriod.current) { firstPeriod.current = false; return }
+    if (!selectedAccountId || !formId) return
+    void load(1, pageSize)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period])
 
   /* 検索語が変わったら1ページ目から取り直す（打ち終わりを待つ）。 */
   const firstQuery = useRef(true)
@@ -378,7 +382,7 @@ function Responses() {
   const firstKey = fieldKeys[0]
   const headLine = [
     total === null ? emptyValue('unknown') : `${formatNumber(total)}件`,
-    rate != null ? `答え終えた割合 ${formatNumber(rate)}%` : null,
+    rate != null ? `全回答の答え終えた割合 ${formatNumber(rate)}%` : null,
   ].filter(Boolean).join('・')
   const longKey = fieldKeys.find((key) => blockByKey(key)?.type === 'textarea'
     && items.some((item) => String((item.data as Record<string, unknown>)[key] ?? '').trim() !== ''))
@@ -387,8 +391,10 @@ function Responses() {
     <div className={styles.rail}>
       {view === 'rows' && selected ? (
         <Card variant="aside" gap="var(--polish-space-row)" aria-label={`回答の詳細：${selected.friendName ?? '不明'}`}>
-          <h2 className={styles.railTitle}>{`回答の詳細：${selected.friendName ?? '不明'}`}</h2>
-          {canDeleteResponse ? <RowMenu label="回答の詳細の操作" items={[{ id: 'delete-response', label: '回答を削除する', tone: 'danger', onSelect: () => openDeletion(selected) }]} /> : null}
+          <div className={styles.railHead}>
+            <h2 className={styles.railTitle}>{`回答の詳細：${selected.friendName ?? '不明'}`}</h2>
+            {canDeleteResponse ? <RowMenu label="回答の詳細の操作" items={[{ id: 'delete-response', label: '回答を削除する', tone: 'danger', onSelect: () => openDeletion(selected) }]} /> : null}
+          </div>
           <dl className={styles.detailList}>
             <div className={styles.detailRow}>
               <dt>答えた日時</dt>
@@ -434,22 +440,20 @@ function Responses() {
       ) : null}
       <div className={styles.railButtonsWide}>
         {canEditForm ? <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`}><Pencil size={15} aria-hidden="true" />フォームを編集</Button> : null}
-        <Button onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel={exportProgress || 'CSVを準備しています'}>
+        <Button onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel={exportProgress || 'CSVを準備しています'} widthReserve="idle">
           <Download size={15} aria-hidden="true" />CSVで書き出す
         </Button>
       </div>
       {exportError ? <p className={styles.error}>{exportError}</p> : null}
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
       <Card variant="aside" aria-labelledby="fr-filter">
-        <h2 className={styles.railTitle} id="fr-filter">絞り込み</h2>
-        <p className={styles.railNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
-        <Field label={<><Search size={15} aria-hidden="true" /></>}><SaveErrorField names={["query"]}><input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="名前・答えで探す（全件から）"
-            aria-label="名前・答えで探す（全件から）"
-          /></SaveErrorField></Field>
+        <CardHeader size="stacked" title="絞り込み" titleId="fr-filter" meta={total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`} />
+        <div role="group" aria-label="集計する期間" className={styles.periodChips}>
+          {([['this_month', '今月'], ['last_month', '先月'], ['all', 'すべて']] as const).map(([value, label]) => (
+            <FilterChip key={value} selected={period === value} onChange={() => setPeriod(value)}>{label}</FilterChip>
+          ))}
+        </div>
+        <ListToolbar searchSlot={<SaveErrorField names={["query"]}><SearchField updateMode="immediate" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・答えで探す（全件から）" aria-label="名前・答えで探す（全件から）" /></SaveErrorField>} />
       </Card>
     </div>
   )
@@ -479,14 +483,10 @@ function Responses() {
           ) : view === 'summary' ? (
             <>
               {incompleteItems.length > 0 ? (
-                <div className={styles.alert} role="status">
-                  <AlertCircle size={18} aria-hidden="true" className={styles.alertIcon} />
-                  <div className={styles.alertText}>
-                    <p className={styles.alertTitle}>{`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}</p>
-                    <p className={styles.alertNote}>{`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}</p>
-                  </div>
-                  <Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length} 件を見る`}</Button>
-                </div>
+                <Notice tone="danger" role="status"
+                  heading={`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}
+                  message={`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}
+                  action={<Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}><Filter size={15} aria-hidden="true" />{`その${incompleteItems.length} 件を見る`}</Button>} />
               ) : null}
               {summaries.map((fieldSummary) => {
                 const block = blockByKey(fieldSummary.key)
@@ -495,8 +495,8 @@ function Responses() {
                 const kind = block ? typeLabel(block.type) : null
                 const rating = block?.type === 'rating' ? summary?.ratingFields?.find((field) => field.key === fieldSummary.key) : undefined
                 const sub = rating
-                  ? `5段階・平均 ${ratingAverageText(rating.average)}`
-                  : `${kind ? `${kind}・` : ''}${answered === 0 ? 'まだ答えがありません' : `${formatNumber(answered)} 件が答えた`}`
+                  ? `5段階・全回答の平均 ${ratingAverageText(rating.average)}／棒は表示中の ${formatNumber(answered)} 件`
+                  : `${kind ? `${kind}・` : ''}${answered === 0 ? '表示中の回答はありません' : `表示中の ${formatNumber(answered)} 件の回答`}`
                 /* 5段階は ★5・★4・★3以下 の3段にまとめる（絵 v0SbYR）。 */
                 const values: Array<[string, number]> = block?.type === 'rating'
                   ? [
@@ -506,15 +506,11 @@ function Responses() {
                     ]
                   : fieldSummary.values
                 const top = values.slice(0, 6)
-                const max = Math.max(0, ...top.map(([, count]) => count))
                 return (
                   <Card key={fieldSummary.key} variant="form" padding="roomy" aria-label={labels[fieldSummary.key] ?? fieldSummary.key}>
-                    <div className={styles.cardHead}>
-                      <h2 className={styles.cardTitle}>{labels[fieldSummary.key] ?? fieldSummary.key}</h2>
-                      <p className={styles.cardNote}>{sub}</p>
-                    </div>
+                    <CardHeader size="stacked" title={labels[fieldSummary.key] ?? fieldSummary.key} meta={sub} />
                     {answered > 0 ? (
-                      <HorizontalBarChart label={labels[fieldSummary.key] ?? fieldSummary.key} unit="件" items={top.map(([value,count])=>({key:value,label:block?.type==='rating'?`★${value}`:value,value:count,detail:<span>{`${formatNumber(Math.round(count/answered*100))}%`}</span>}))} />
+                      <HorizontalBarChart label={labels[fieldSummary.key] ?? fieldSummary.key} unit="件" total={answered} items={top.map(([value,count])=>({key:value,label:block?.type==='rating'?`★${value}`:value,value:count}))} />
                     ) : null}
                   </Card>
                 )
@@ -522,25 +518,21 @@ function Responses() {
               {longKey ? (() => {
                 const recents = items.filter((item) => String((item.data as Record<string, unknown>)[longKey] ?? '').trim() !== '')
                 return (
-                  <Card variant="form" padding="roomy" gap="var(--polish-space-row)" aria-label={labels[longKey] ?? longKey}>
-                    <div className={styles.cardHead}>
-                      <h2 className={styles.cardTitle}>{labels[longKey] ?? longKey}</h2>
-                      <p className={styles.cardNote}>{`複数行・${formatNumber(recents.length)} 件`}</p>
-                    </div>
-                    <ul className={styles.quotes}>
+                  <Card variant="form" padding="roomy" aria-label={labels[longKey] ?? longKey}>
+                    <CardHeader size="stacked" title={labels[longKey] ?? longKey} meta={`表示中の複数行回答・${formatNumber(recents.length)} 件`} />
+                    <DataTable label={`${labels[longKey] ?? longKey}の新しい回答`} presentation="columns" columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'auto', gap: 'var(--polish-space-card)', padding: 'var(--polish-space-row) 0' }}><tbody>
                       {recents.slice(0, 2).map((item) => {
                         const text = String((item.data as Record<string, unknown>)[longKey])
                         return (
-                          <li key={item.id} className={styles.quoteRow}>
-                            <span className={styles.quoteText} title={text}>{`「${text}」`}</span>
-                            <span className={styles.quoteWho}>{`${shortDay(item.createdAt)} ${item.friendName ?? '不明'}`}</span>
-                          </li>
+                          <Tr key={item.id} interactive={false} data-table-layout="columns">
+                            <Td grow><TruncatedText value={`「${text}」`} /></Td>
+                            <Td align="right"><TruncatedText value={`${shortDay(item.createdAt)} ${item.friendName ?? '不明'}`} /></Td>
+                          </Tr>
                         )
                       })}
-                    </ul>
-                    <div className={styles.cardFoot}>
-                      <Button variant="text" onClick={() => setView('rows')}><ArrowRight size={14} aria-hidden="true" />1件ずつ見る</Button>
-                    </div>
+                    </tbody></DataTable>
+                    {/* 絵 v0SbYR：「1件ずつ見る」は一覧の下の右端。 */}
+                    <div className={styles.cardFootEnd}><Button variant="text" onClick={() => setView('rows')}><ArrowRight size={14} aria-hidden="true" />1件ずつ見る</Button></div>
                   </Card>
                 )
               })() : null}

@@ -143,6 +143,9 @@
   padding: 0 var(--tpl-cell-gap-half);
   font-weight: 600;
 }
+/* 端の列は行の端の余白（--tpl-row-pad-side）にそろえる。見出しだけ内側にずれていた（MKQyJ）。 */
+:root .headRow[data-presentation='embedded'] .cell:first-child { padding-left: var(--tpl-row-pad-side); }
+:root .headRow[data-presentation='embedded'] .cell:last-child { padding-right: var(--tpl-row-pad-side); }
 .truncated {
   display: block;
   overflow: hidden;
@@ -160,3 +163,8 @@ html:root .headRow[data-table-layout='columns'] { padding-inline: var(--tpl-list
 
 html:root button.rowNameLink { padding: 0; border: 0; background: none; font: inherit; color: var(--color-ink); font-weight: 700; text-align: left; cursor: pointer; }
 html:root button.rowNameLink:hover { text-decoration: underline; }
+/* 選んでいる行の色は行（Tr selected）が持つ。名前のボタンに選ぶ札（aria-pressed）の緑の枠を重ねない。 */
+html:root button.rowNameLink.rowNameLink[aria-pressed='true'] { background: none; border: 0; box-shadow: none; color: var(--color-ink); }
+
+html:root .person { display: flex; align-items: center; gap: var(--space-8); min-width: 0; width: 100%; flex-wrap: nowrap; }
+html:root .personName { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

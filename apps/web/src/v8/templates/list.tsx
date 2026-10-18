@@ -1,14 +1,18 @@
 'use client'
+import FolderSelect from '@/components/shared/folder-select'
+
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+import ListDateTime from '@/components/shared/list-date-time'
 
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional } from '@/components/shared/list-toolbar';
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
 import { runOptimistic } from '@/lib/undoable';
-import { Bookmark, Braces, ClipboardList, Copy, FileText, Folder as FolderIcon, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Layers, Link2, List, Mail, MessageSquare, Plus, Send, SquareArrowOutUpRight, Ticket, Trash2, Unlink, Video } from 'lucide-react';
+import { Bookmark, Braces, ClipboardList, Copy, FileText, Folder as FolderIcon, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, LayoutGrid, Layers, Link2, List, Mail, MessageSquare, Plus, Send, SquareArrowOutUpRight, Ticket, Trash2, Unlink, Video } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { RowNameLink } from '@/components/shared/table';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -19,14 +23,14 @@ import { clampSearchQuery } from '@/lib/search-query';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { formatNumber, formatDate as polishFormatDate, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
+import { formatNumber, formatListTimestamp } from '@/lib/format';
 import { contentExcerpt } from '@/lib/broadcast-summary';
 import { ListPage } from '@/components/templates';
 import { notifyToast } from '@/components/shared/toast';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import { RowMenu } from '@/components/shared/row-actions';
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -34,11 +38,13 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel';
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import { FolderDotName, folderDisplayColor, type FolderDotFolder } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TemplateDeleteDialog from './delete-dialog'
 import Dialog from '@/components/shared/dialog'
+import DialogChoiceCards from '@/components/shared/dialog-choice-cards'
 import { exampleHref, loadTemplateExamples, type TemplateExample } from './examples';
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import Pagination from '@/components/shared/pagination'
@@ -119,16 +125,12 @@ const SAVED_FILTER_OPTIONS = [
 ]
 
 /** 表示件数（決まり：ページ送りのある一覧は 10・20・50 件）。 */
-const PAGE_SIZE_OPTIONS = [
-  { value: '10', label: '10件表示' },
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-]
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** 削除できない窓に並べる行の数（残りは「ほか N か所」）。 */
 const BLOCKED_ROWS_SHOWN = 2
 
-/** 種類を選ぶ窓（`R9XUMr`）の6枚のカード。行き先は今ある作る画面のまま。 */
+/** 作る種類と、それぞれの作成先。 */
 const KIND_CARDS: Array<{
   key: string
   title: string
@@ -140,7 +142,7 @@ const KIND_CARDS: Array<{
 }> = [
   { key: 'message', title: 'メッセージ', icon: MessageSquare, desc: 'テキスト・カード型・画像。差し込みも使える', useFor: 'いちばんよく使う', cannot: 'できない：答えを集める（→ 質問・リサーチ）', href: '/templates/edit' },
   { key: 'card_message', title: 'カルーセル', icon: GalleryHorizontalEnd, desc: '横にめくるカードを最大10枚', useFor: '商品の紹介に', cannot: 'できない：1枚の画像を面に分ける（→ リッチ）', href: '/templates/carousel' },
-  { key: 'rich_message', title: 'リッチメッセージ', icon: ImageIcon, desc: '1枚の画像を面に分けて、押すと動く', useFor: 'キャンペーンの告知に', cannot: 'できない：文字だけの本文（→ メッセージ）', href: '/templates/edit?kind=rich_message' },
+  { key: 'rich_message', title: 'リッチメッセージ', icon: LayoutGrid, desc: '1枚の画像を面に分けて、押すと動く', useFor: 'キャンペーンの告知に', cannot: 'できない：文字だけの本文（→ メッセージ）', href: '/templates/edit?kind=rich_message' },
   { key: 'rich_video', title: 'リッチビデオ', icon: Video, desc: 'トーク画面で自動で流れる動画。見終わったらボタンで案内', useFor: '新商品・お店の紹介に', cannot: 'できない：画像を面に分ける（→ リッチメッセージ）', href: '/templates/edit?kind=rich_video' },
   { key: 'question', title: '質問', icon: HelpCircle, desc: 'ボタンで答えてもらい、答えでタグなどを付ける', useFor: '好みを聞くときに', cannot: 'できない：何問も続けて聞く（→ リサーチ）', href: '/templates/questions/new' },
   { key: 'coupon', title: 'クーポン', icon: Ticket, desc: '期間・回数・抽選を決めて配る', useFor: '来店・購入のきっかけに', cannot: 'できない：本文を自由に組む（→ メッセージ）', href: '/templates/edit?kind=coupon' },
@@ -150,11 +152,6 @@ const KIND_CARDS: Array<{
 /** 検索欄と検索対象を、大小文字・全半角・空白の違いで外れない形へそろえる。 */
 function normalizeTemplateSearchText(value: string): string {
   return value.normalize('NFKC').toLocaleLowerCase('ja-JP').trim().replace(/\s+/gu, ' ')
-}
-
-/** M月D日（絵 v19Ivv は曜日を書かない）。時刻は title で見せる。 */
-function formatMonthDay(iso: string): string {
-  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 /** 一覧・検索は「いまの最新」を対象にする（下書きがあれば下書き）。 */
@@ -922,9 +919,9 @@ export default function TemplatesListV8() {
     >
       {/* 補助のデータ（フォルダ）だけ取れないときは、その場所に小さく1行だけ。 */}
       {folderError ? <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}</Notice> : null}
-      <p className={styles.folderNote}>
+      <FolderPanelNote>
         フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります
-      </p>
+      </FolderPanelNote>
     </FolderPanel>
   )
 
@@ -1061,7 +1058,7 @@ export default function TemplatesListV8() {
         shouldOpen={(event) => Boolean((event.target as HTMLElement | null)?.closest?.('tr[data-row-id]'))}
       >
         <div className={styles.tableWrap}>
-          <DataTable presentation="template-list">
+          <DataTable presentation="template-list" columnSizing="content">
             <colgroup>
               <col className={styles.colSelect} />
               <col />
@@ -1075,15 +1072,13 @@ export default function TemplatesListV8() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {/* 閲覧のみ：まとめて変える操作が無いので、選ぶチェックを置かない（列の幅は残す） */}
-                  {canMutateTemplates ? (
-                    <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
+                  {/* 閲覧のみ：対象外の枠と理由だけを残す（差し戻しH）。 */}
+                  {canMutateTemplates ? (<SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && selectedCount > 0}
                       onCheckedChange={() => toggleAllOnPage()}
                       aria-label="このページのテンプレートをすべて選択"
-                    /></SaveErrorField>
-                  ) : null}
+                    /></SaveErrorField>) : <UnavailableSelection label="このページのテンプレートをすべて選択" />}
                 </Th>
                 <Th className={styles.headCell}>テンプレート</Th>
                 <Th className={styles.headCell}>種類</Th>
@@ -1112,13 +1107,11 @@ export default function TemplatesListV8() {
 
                   >
                     <Td className={styles.selectCell}>
-                      {canMutateTemplates ? (
-                        <SaveErrorField names={[`shownItems.${saveFieldIndex}.id`,"id","t.id"]}><Checkbox
+                      {canMutateTemplates ? (<SaveErrorField names={[`shownItems.${saveFieldIndex}.id`,"id","t.id"]}><Checkbox
                           checked={selectedIds.has(t.id)}
                           onCheckedChange={() => toggleOne(t.id)}
                           aria-label={`「${t.name}」を選択`}
-                        /></SaveErrorField>
-                      ) : null}
+                        /></SaveErrorField>) : <UnavailableSelection label={`「${t.name}」を選択`} />}
                     </Td>
                     <NameCell name={
                         <div className={styles.dotLine}>
@@ -1129,6 +1122,7 @@ export default function TemplatesListV8() {
                           </>
                         </div>
                       } folder={folder}
+                      annotation={String(t.name ?? '').startsWith('【見本】') ? <StatusBadge tone="neutral" dot>見本</StatusBadge> : undefined}
                     />
                     <Td>
                       <TagPill name={isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)} color={folder ? folderDisplayColor(folder) : undefined} aria-label={`種類：${isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}`} />
@@ -1160,8 +1154,8 @@ export default function TemplatesListV8() {
                       </Td>
                     )}
                     {!narrow && (
-                      <Td className={styles.cellPlain} title={polishFormatListDateTime(t.updatedAt)}>
-                        {formatMonthDay(t.updatedAt)}
+                      <Td className={styles.cellPlain} title={formatListTimestamp(t.updatedAt)}>
+                        <ListDateTime value={t.updatedAt} />
                       </Td>
                     )}
                     <Td className={styles.menuCell}>
@@ -1218,9 +1212,8 @@ export default function TemplatesListV8() {
 
   /* ページ送りは型の pagination 枠へ。件数は部品の summary に入れる（絵：左に「26件中 1〜20件」、右に頁。帯の内側は部品の 10・20）。 */
   const showPager = view === 'ready' && filteredTemplates.length > 0
-  const pagerSummary = `${formatNumber(filteredTemplates.length)} 件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(safePage * pageSize, filteredTemplates.length)} 件`
   const listPager = !showPager ? null : (
-    <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
+    <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} range={{ total: filteredTemplates.length, first: (safePage - 1) * pageSize + 1, last: Math.min(safePage * pageSize, filteredTemplates.length) }} />
   )
 
   const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
@@ -1236,8 +1229,8 @@ export default function TemplatesListV8() {
       {!canMutateTemplates ? (
         <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="hEDTK"></ReadOnlyNotice></div>
       ) : null}
-      <div className={styles.tabsBox}>
       <Tabs
+        size="compact"
         label="テンプレートの種類"
         items={[
           { label: 'メッセージ', count: loading ? undefined : templates.filter((t) => !t.question && !isRichVideoTemplate(t)).length, current: activeSection === 'message', onClick: () => switchSection('message') },
@@ -1249,7 +1242,6 @@ export default function TemplatesListV8() {
           { label: 'リサーチ', count: assetCounts.research, current: activeSection === 'research', onClick: () => switchSection('research') },
         ]}
       />
-      </div>
     </>
   )
 
@@ -1259,10 +1251,6 @@ export default function TemplatesListV8() {
   const overlays = (
     <>
       {savedMenu}
-      {/*
-        種類を選ぶ窓（`R9XUMr`）：6つの種類（3つずつ2段）と「見本から作る」（F-5）、下に真ん中のキャンセル。
-        窓の頭は絵の値（上と左右 24・題の行 24）、キャンセルは本文の続きに置く（絵は線なし・間 20）。
-      */}
       <Dialog
         open={pickerOpen}
         title="どの種類を作りますか"
@@ -1275,30 +1263,10 @@ export default function TemplatesListV8() {
         footer={<></>}
       >
         <div className={styles.picker}>
-          <div className={styles.pickerGrid}>
-            {KIND_CARDS.map((card) => (
-              <button
-                key={card.key}
-                type="button"
-                className={styles.kindCard}
-                onClick={() => {
-                  setPickerOpen(false)
-                  router.push(card.href)
-                }}
-              >
-                <span className={styles.kindIcon}>
-                  <card.icon size={16} aria-hidden="true" />
-                </span>
-                <span className={styles.kindTitle}>{card.title}</span>
-                <span className={styles.kindDesc}>{card.desc}</span>
-                <span className={styles.kindSpacer} aria-hidden="true" />
-                <span className={styles.kindMeta}>
-                  <span>{card.useFor}</span>
-                  <span>{card.cannot}</span>
-                </span>
-              </button>
-            ))}
-          </div>
+          <DialogChoiceCards choices={KIND_CARDS.map(card => ({
+            key: card.key, title: card.title, icon: <card.icon size={16} />,
+            description: card.desc, notes: [card.useFor, card.cannot], href: card.href,
+          }))} columns={4} onChoose={href => { setPickerOpen(false); router.push(href) }} />
           {examplesError?<ListState kind="error" title="見本を読み込めませんでした" onRetry={()=>setExamplesRetry(value=>value+1)}/>:null}
           {examples && examples.length > 0 ? (
             <section className={styles.examples} aria-label="見本から作る">
@@ -1335,20 +1303,15 @@ export default function TemplatesListV8() {
         削除の確認窓（`V6JFnd`：使っていないテンプレート）。
         危ないボタンは左端、キャンセルは真ん中（V8 の窓の決まり）。
       */}
-      <ConfirmDialog
+      <TemplateDeleteDialog
         open={pendingDelete !== null}
         title={`「${pendingDelete?.item.name ?? ''}」を削除しますか？`}
-        deleteName={pendingDelete?.item.name ?? ''}
         description={DELETE_UNUSED_DESCRIPTION}
-        destructive busy={deleting} error={deleteError}
-        designNode="V6JFnd"
+        busy={deleting} error={deleteError}
         confirmDisabled={pendingDelete !== null && pendingDelete.accountId !== selectedAccountId}
         onConfirm={() => confirmDelete()}
         onCancel={() => { if (!deleting) { setPendingDelete(null); setDeleteError('') } }}
-      >
-        <Notice tone="danger" message="削除は元に戻せません。" />
-        {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >アカウントが切り替わりました。削除するテンプレートを選び直してください。</Notice> : null}
-      </ConfirmDialog>
+      />
 
       {/* まとめて削除の確認窓。対象は「使っていない」ものだけ。 */}
       <ConfirmDialog
@@ -1459,16 +1422,13 @@ export default function TemplatesListV8() {
       >
         <div className={styles.moveBody}>
           <span className={styles.moveLabel}>移動先のフォルダ</span>
-          <SaveErrorField names={["moveDraft","move_draft"]}><Select
+          <SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
             aria-label="移動先のフォルダ"
             size="full"
             value={moveDraft}
             onChange={(value) => setMoveDraft(value)}
             disabled={moving}
-            options={[
-              { value: '', label: '未分類' },
-              ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-            ]}
+            folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
           /></SaveErrorField>
         </div>
       </ConfirmDialog>
@@ -1604,16 +1564,13 @@ export default function TemplatesListV8() {
               <>
                 <p className={styles.panelLabel}>移動先のフォルダ</p>
                 <div className={styles.moveBody}>
-                  <SaveErrorField names={["moveDraft","move_draft"]}><Select
+                  <SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
                     aria-label="移動先のフォルダ"
                     size="full"
                     value={moveDraft}
                     onChange={(value) => setMoveDraft(value)}
                     disabled={moving}
-                    options={[
-                      { value: '', label: '未分類' },
-                      ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
-                    ]}
+                    folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
                   /></SaveErrorField>
                   <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => void runMove()} busyLabel="移動中…">
                     移動する
@@ -1630,7 +1587,7 @@ export default function TemplatesListV8() {
 
   const heading = {
     title: 'テンプレート',
-    description: '一斉配信・自動応答・シナリオなどで使う、メッセージのひな形です。直して公開すると、使っている所に反映されます。',
+    help: '一斉配信・自動応答・シナリオなどで使う、メッセージのひな形です。直して公開すると、使っている所に反映されます。',
   }
 
   /* 資産タブ（カルーセル・リッチメッセージ・クーポン・リサーチ）。中身の管理は既存の部品のまま。 */
@@ -1662,7 +1619,7 @@ export default function TemplatesListV8() {
       tabs={tabs}
       stats={
         /* 数の帯 4つ。並びと間は共有の帯に任せる。 */
-        <KpiBand data-design="KPIs" className={styles.kpiStrip}>
+        <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
             <KpiCard
               key={kpi.key}

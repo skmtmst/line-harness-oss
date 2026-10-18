@@ -15,12 +15,12 @@ const dbMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({
+  LineClient: vi.fn().mockImplementation(function () { return ({
     uploadRichMenuImage,
     getRichMenuList,
     getRichMenuIdOfUser,
     getDefaultRichMenuId,
-  })),
+  }); }),
 }));
 
 vi.mock('../services/account-access.js', () => ({

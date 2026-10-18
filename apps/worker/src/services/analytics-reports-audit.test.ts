@@ -15,7 +15,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
  */
 const pushMessage = vi.fn(async () => ({}));
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage })),
+  LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage }); }),
 }));
 
 const sendXServerMail = vi.fn(async () => undefined);

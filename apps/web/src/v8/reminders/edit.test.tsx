@@ -183,6 +183,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
   it('保存が 409 のときは競合の帯（k32cn）を出し、比べる・読み込むを選べる', async () => {
     draftStore.conflict = true
     await render('basics')
+    expect(buttonByText('設定内容を見る')).toBeTruthy()
     const save = buttonByText('下書きを保存')
     expect(save).toBeTruthy()
     await act(async () => { save!.click() })
@@ -254,6 +255,10 @@ describe('V8 リマインダを作る②〜⑤', () => {
     await render('done')
     expect(host.querySelector('[data-design-node="hjNpJ"]')).toBeTruthy()
     expect(host.querySelector('[data-template-region="footer"]')).toBeNull()
+    const completion = host.querySelector('[data-part="create-completion-heading"]')
+    expect(completion?.querySelector('[aria-hidden="true"] svg')).toBeTruthy()
+    expect(completion?.querySelector('h2')?.textContent).toContain('を有効にしました')
+    expect(completion?.querySelector('p')?.textContent).toContain('一時停止する')
     expect(buttonByText('一覧へ戻る')?.getAttribute('href')).toBe('/reminders')
     expect(buttonByText('配信予定を見る')?.getAttribute('href')).toBe('/reminders/detail?id=reminder-new&tab=schedule&status=planned')
     expect(buttonByText('詳細を見る')?.getAttribute('href')).toBe('/reminders/detail?id=reminder-new')
@@ -313,6 +318,15 @@ it('WEB-087：手動保存中は追加編集を止める', async () => {
   await act(async () => release()); draftStore.wait = null
 })
 describe('監査 WEB079/080/082', () => {
+  it('基準日の種類を印で区別し、イベントへ切り替えても予約の設定を保存しない', async () => {
+    await render('basics')
+    const event = host.querySelector<HTMLInputElement>('input[value="event"]')!
+    expect(event.closest('[data-choice-card]')?.querySelector('.lucide-ticket')).toBeTruthy()
+    expect(host.querySelector<HTMLInputElement>('input[value="booking"]')?.closest('[data-choice-card]')?.querySelector('.lucide-calendar-days')).toBeTruthy()
+    await act(async () => event.click())
+    expect(event.checked).toBe(true)
+    expect(draftStore.saved).toHaveLength(0)
+  })
   it('遅いフォルダ取得は、その間に入力した名前を消さない', async () => {
     const { api } = await import('@/lib/api')
     let complete!: (v: Awaited<ReturnType<typeof api.folders.list>>) => void

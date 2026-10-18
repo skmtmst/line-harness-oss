@@ -4,7 +4,8 @@
  */
 .body { display: flex; flex-direction: column; gap: var(--tpl-hb-body-gap); padding: var(--tpl-hb-project-pad); min-width: 0; }
 .split { display: flex; align-items: flex-start; gap: var(--tpl-hb-project-gap); min-width: 0; }
-.gallery { display: flex; flex-direction: column; flex: 1; gap: var(--tpl-hb-gallery-gap); min-width: 0; }
+.gallery { display: flex; flex-direction: column; flex: 1; gap: var(--tpl-hb-gallery-gap); min-width: 0; align-self: stretch; }
+/* 下の帯は左の列の下端に置き、画面の下に付いてくる（右のパネルには重ねない）。 */
 /*
  * 見出しの行（`KWlQY` 154x20 ＝ 文字14・行の高さ20の太字／`LWv01`・`h4yzAO` は小さい字）。
  * 板では3つが左から間8で続くので、右へ押し出す詰め物（`.spacer`）は置かない。
@@ -41,7 +42,7 @@
 .tileImage {
   display: flex;
   height: var(--tpl-hb-project-tile-h);
-  padding: 0;
+  padding: var(--polish-space-none);
   overflow: hidden;
   border: 0;
   border-radius: var(--tpl-hb-tile-radius);
@@ -86,7 +87,7 @@
 
 .dot { width: var(--tpl-hb-dot); height: var(--tpl-hb-dot); border-radius: var(--radius-pill); background: currentColor; }
 
-.star { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--tpl-hb-star); height: var(--tpl-hb-star); padding: 0; border: 0; border-radius: var(--radius-mini); background: transparent; cursor: pointer; }
+.star { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--tpl-hb-star); height: var(--tpl-hb-star); padding: var(--polish-space-none); border: 0; border-radius: var(--radius-mini); background: transparent; cursor: pointer; }
 .star svg { width: var(--tpl-hb-star-glyph); height: var(--tpl-hb-star-glyph); }
 .starOn { fill: var(--color-status-warn); color: var(--color-status-warn); }
 .starOff { color: var(--color-ink-faint); }
@@ -108,8 +109,11 @@
 .tileSelect { position: absolute; z-index: 1; top: var(--tpl-hb-tool-gap); left: var(--tpl-hb-tool-gap); }
 .tile[data-selected] .tileImage { outline: var(--tpl-hb-selection-outline); outline-offset: var(--tpl-hb-selection-inset); }
 .selectionCount { white-space: nowrap; font-size: var(--text-caption); font-weight: 600; color: var(--color-ink); }
-.generationInfo { display: flex; flex-direction: column; font-size: var(--text-micro); color: var(--color-ink-secondary); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
+.generationInfo { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--text-micro); color: var(--color-ink-secondary); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
 .distributionProgress { margin-top: var(--tpl-hb-tool-gap); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); color: var(--color-ink-secondary); }
 .tileImage:focus-visible, .star:focus-visible { outline: var(--tpl-hb-selection-outline); outline-offset: var(--tpl-hb-selection-outset); }
 
 .footer { margin-inline: var(--tpl-hb-footer-margin); }
+.generationInfo.warnText { color: var(--color-status-warn-deep); }
+.limitText { color: var(--color-status-warn-deep); }
+.nowrap { white-space: nowrap; }

@@ -153,6 +153,23 @@ it('下書きの配信したい日時を日本時間で残し、予約済みと�
 })
 
 describe('V8 NEN配信の一覧', () => {
+  it.each(['columns', 'history'] as const)('%sは1ページでも件数とページ送りを同じ帯に出す', async (tab) => {
+    await render(baseProps({ tab }))
+    const pager = within(host).getByRole('navigation', { name: 'ページ送り' })
+    expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe(tab === 'columns' ? '2件中 1〜2件' : '1件中 1〜1件')
+    expect(within(pager).getByRole('button', { name: '前のページ' }).hasAttribute('disabled')).toBe(true)
+    expect(within(pager).getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('送信履歴の総数と実際に読めた範囲を分け、次ページのカーソルを渡す', async () => {
+    const props = baseProps({ tab: 'history', deliveryList: { ...DELIVERIES, pagination: { ...DELIVERIES.pagination, total: 41 } } })
+    await render(props)
+    const pager = within(host).getByRole('navigation', { name: 'ページ送り' })
+    expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('41件中 1〜1件')
+    await act(async () => fireEvent.click(within(pager).getByRole('button', { name: '次のページ' })))
+    expect(props.onChangeDeliveryView).toHaveBeenCalledWith(undefined, '20', '')
+  })
+
   it('V8 のテーマで、自動配信の表に止めている配信も今月多く送った順で並び、コラムは並ばない', async () => {
     await render(baseProps())
     expect(document.documentElement.dataset.theme).toBe('v8')
@@ -160,7 +177,7 @@ describe('V8 NEN配信の一覧', () => {
     expect(rowNames()).toEqual(['注文ありがとうございます', '口コミのお願い', 'お誕生日クーポン', '困っていませんか'])
     expect(host.textContent).toContain('自動配信 4')
     expect(host.textContent).toContain('停止中 1')
-    expect(host.textContent).toContain('4 件中 1〜4 件')
+    expect(host.textContent).toContain('4件中 1〜4件')
   })
 
   it('札「止めている」で止めている配信だけになり、もう一度押すと戻る', async () => {
@@ -178,7 +195,7 @@ describe('V8 NEN配信の一覧', () => {
     await render(props)
     await act(async () => { fireEvent.click(button('「お誕生日クーポン」の操作')!) })
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())
-    expect(items).toEqual(expect.arrayContaining(['編集', 'テスト送信', 'クーポンの決めごと', '止める', '送った履歴を見る']))
+    expect(items).toEqual(expect.arrayContaining(['編集する', 'テスト送信', 'クーポンの決めごと', '止める', '送った履歴を見る']))
     const stop = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.trim() === '止める') as HTMLElement
     await act(async () => { fireEvent.click(stop) })
     expect(props.onToggleSetting).not.toHaveBeenCalled()
@@ -195,9 +212,11 @@ describe('V8 NEN配信の一覧', () => {
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())
     expect(items).not.toContain('止める')
     expect(items).not.toContain('テスト送信')
-    expect(items).not.toContain('編集')
-    // 押せない（disabled）ボタンを置いて見せることもしない。
-    expect([...host.querySelectorAll('button[disabled]')].map((b) => b.textContent)).toEqual([])
+    expect(items).not.toContain('編集する')
+    // 閲覧のみには押せない更新を置かない。ページ送りの境界は残す。
+    expect(host.querySelector('[data-pagination] button[aria-label="前のページ"]')).toHaveProperty('disabled', true)
+    expect(host.querySelector('[data-pagination] button[aria-label="次のページ"]')).toHaveProperty('disabled', true)
+    expect([...host.querySelectorAll('button[disabled]')].filter(b => !b.closest('[data-pagination]'))).toEqual([])
     await render(baseProps({ tab: 'columns' }))
     expect(host.textContent).not.toContain('コラムを書く')
     // クーポンの決めごとは値だけ見せる（入力欄・保存を置かない）。
@@ -205,7 +224,7 @@ describe('V8 NEN配信の一覧', () => {
     expect(document.body.textContent).toContain('お誕生日月限定クーポン')
     expect(button('設定を保存する')).toBeUndefined()
     expect(document.querySelector('[role="switch"]')).toBeNull()
-    expect([...document.querySelectorAll('button[disabled]')].map((b) => b.textContent)).toEqual([])
+    expect([...document.querySelectorAll('button[disabled]')].filter(b => !b.closest('[data-pagination]'))).toEqual([])
   })
 
   it('コラムのタブは公開日を「9/26」、予約中の下書きを「10/10 予定」と出す', async () => {

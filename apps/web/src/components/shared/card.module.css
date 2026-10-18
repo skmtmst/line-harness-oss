@@ -17,6 +17,8 @@
   flex-direction: column;
 }
 .horizontal { display: flex; align-items: center; justify-content: space-between; }
+/* Edge-to-edge media above padded content; the content owns its inset. */
+.media { display: flex; flex-direction: column; gap: 0; }
 
 .overflowHidden {
   overflow: hidden;
@@ -58,6 +60,14 @@
   min-width: 0;
   align-items: baseline;
   gap: 8px;
+}
+
+/* 題と「？」の行（CardHeader の help）。「？」は題の行の真ん中、間 6。 */
+.titleRow {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
 }
 
 .title {
@@ -134,10 +144,16 @@
 /* 縦に積む小さな設定カード。指定したカードだけに適用。 */
 
 /* カード内の設定段。既定のカード頭には効かない。 */
+.content { display: flex; flex-direction: column; gap: var(--polish-space-row); padding: var(--polish-space-card); min-width: 0; }
+/* CardContent owns the inset; its heading must not add another inset or divider. */
+html:root .headerContent { padding: 0; min-height: 0; align-items: flex-start; gap: var(--polish-space-field); }
+html:root .headerContent .titleGroup { flex: 1; flex-direction: column; align-items: stretch; gap: var(--polish-space-row); }
+html:root .headerContent .title { margin: 0; }
+html:root .headerContent .meta { display: flex; flex-direction: column; align-items: flex-start; gap: var(--polish-space-row); min-width: 0; }
 .headerStacked, .headerPanel { flex: 0 1 auto; min-width: 0; min-height: 0; align-items: flex-start; gap: var(--tpl-rs-panel-head-gap); padding: 0; }
 .headerStacked .titleGroup, .headerPanel .titleGroup { flex: 1 1 0; flex-direction: column; align-items: stretch; gap: var(--tpl-rs-panel-head-text-gap); }
 .headerStacked .title, .headerPanel .title { margin: 0; line-height: var(--tpl-rs-lh-14); }
-.headerStacked .meta, .headerPanel .meta { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; line-height: var(--tpl-rs-lh-11); }
+.headerStacked .meta, .headerPanel .meta { color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: 400; line-height: var(--tpl-rs-lh-11); }
 .headerPanel { padding: var(--tpl-rs-panel-head-pad); box-shadow: var(--tpl-rs-line-bottom); }
 
 :root .card[data-spacing='settings'] {
@@ -208,6 +224,7 @@ html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface=
 }
 html:root .paddingCompact { padding: var(--space-16); }
 html:root .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
+html:root .card[data-card-spacing][data-card-spacing-sides] { padding: var(--card-content-padding); }
 /* B-208 の16は箱の端。中の見出しと本文・欄の間は指定した8〜12も使える。 */
 html:root .vertical { gap: max(var(--space-8), var(--card-content-gap, var(--space-16))); }
 
@@ -223,3 +240,11 @@ html:root .records {
 }
 html:root .records > .header { padding-inline: var(--polish-space-section); }
 html:root .records > [data-card-footer] { padding-inline: var(--polish-space-section); }
+
+/* 段の中の頭はCardの余白を使う。通常の頭の左右16を重ねない。 */
+html:root .headerStacked { padding: 0; }
+
+/* 内側の薄い面は平らにする。form/asideの外枠を重ねない。 */
+html:root .card[data-card-surface='muted'] { border: 0; outline: revert; box-shadow: none; background: var(--color-surface-pearl); }
+
+html:root .card[data-card-selected] { --card-edge: var(--color-accent-deep); background: var(--color-accent-soft); }

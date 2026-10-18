@@ -171,6 +171,46 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     expect(document.querySelector('[role="dialog"][aria-labelledby]')?.textContent).toContain('動画を差し替える')
   })
 
+  it.each([
+    [{ capacity: 80, reservedCount: 32, remaining: 48, state: 'open' }, '残り 48 人', 'info'],
+    [{ capacity: null, reservedCount: 32, remaining: null, state: 'open' }, '受付中', 'info'],
+    [{ capacity: 80, reservedCount: 80, remaining: 0, state: 'full' }, '満員', 'warning'],
+    [{ capacity: 80, reservedCount: 32, remaining: 48, state: 'closed' }, '受付終了', 'neutral'],
+    [null, '定員なし', 'neutral'],
+  ])('開催回の%sを正の状態札へ渡し、APIの状態を保存で変えない', async (session, label, tone) => {
+    apiMocks.webinarSession.mockResolvedValue({ data: { session } })
+    let host!: HTMLElement
+    await act(async () => { host = render({ ...EDITOR, deliveryKind: 'scheduled' }) })
+    const badge = [...host.querySelectorAll('[data-design-node="xRvDB"]')].find(el => el.textContent === label)
+    expect(badge).toBeDefined()
+    expect(badge?.getAttribute('data-tone')).toBe(tone)
+    expect(badge?.querySelector('[data-truncated-text]')?.textContent).toBe(label)
+    expect(apiMocks.setSessionCapacity).not.toHaveBeenCalled()
+    expect(apiMocks.update).not.toHaveBeenCalled()
+  })
+
+  it('開催回の取得失敗は空きや満員として表示せず、再取得して残席を読む', async () => {
+    apiMocks.webinarSession.mockRejectedValue(new Error('offline'))
+    let host!: HTMLElement
+    await act(async () => { host = render({ ...EDITOR, deliveryKind: 'scheduled' }) })
+    expect(host.querySelector('[data-design-node="xRvDB"]')?.textContent).toBe('読み込めません')
+    apiMocks.webinarSession.mockResolvedValue({ data: { session: { capacity: 80, reservedCount: 32, remaining: 48, state: 'open' } } })
+    await act(async () => { [...host.querySelectorAll('button')].find(el => el.textContent === 'もう一度読み込む')!.click() })
+    const badge = host.querySelector('[data-design-node="xRvDB"]')
+    expect(badge?.textContent).toBe('残り 48 人')
+    expect(badge?.getAttribute('data-tone')).toBe('info')
+  })
+
+  it('開催回の取得中は確定した残席や受付状態を表示しない', async () => {
+    apiMocks.webinarSession.mockImplementation(() => new Promise(() => {}))
+    let host!: HTMLElement
+    await act(async () => { host = render({ ...EDITOR, deliveryKind: 'scheduled' }) })
+    const badge = host.querySelector('[data-design-node="xRvDB"]')
+    expect(badge?.textContent).toBe('確認中')
+    expect(badge?.getAttribute('data-tone')).toBe('neutral')
+    expect(host.textContent).not.toContain('残り 48 人')
+  })
+
   it('公開期間だけを保存して更新日時が変わっても詳細の未保存入力を消さない', async () => {
     apiMocks.update.mockResolvedValueOnce({ data: { ...WEBINAR, updatedAt: '2026-10-04T18:37:00+09:00' } })
     let host!: HTMLElement

@@ -1,13 +1,15 @@
 'use client'
 
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import Pagination from '@/components/shared/pagination'
+import { ListPagePagination } from '@/components/templates'
 
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListItemHref, useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Banknote, CalendarDays, Download, ListOrdered, ReceiptText, ShoppingBag, Trophy, Users } from 'lucide-react'
+import { Banknote, Calculator, CalendarDays, Download, ListOrdered, ShoppingBag, Trophy, Users } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -19,6 +21,8 @@ import Select from '@/components/shared/select'
 import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import {
   downloadCsv,
+  pageCountOf,
+  pageOf,
   formatYen,
   jstMonthKey,
   listAllConversionApprovals,
@@ -29,9 +33,10 @@ import {
   type ReportPeriod,
 } from './display'
 import AffiliateDrawer from './drawer'
+import { rewardText, type Agg } from './report-values'
 import { AffiliateArchiveDialog } from './dialogs'
 import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
-import { AffiliateToolbar, RetryButton, RowMenu, SavedSelect, StateCard, ToolbarNotices } from './parts'
+import { AffiliateToolbar, PerPageSelect, RetryButton, RowMenu, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
@@ -39,27 +44,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
-/*
- * ★V8 成果とアフィリエイト「レポート」（板 `Eo56k`）。
- *
- * app/affiliates/v8-report-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
- * 数えるのは「認めた成果」だけ（承認の全件読み）。期間は今月・前の期間・すべて。
- * アフィリエイターごと・案件ごとの2つの見方。行（名前）を押すとその人の詳細の引き出し（tnTn9）。
- * 取得の上限を超えたら、合計を出さずに知らせる（今と同じ）。
- */
-
 type ViewKey = 'affiliate' | 'offer'
-
-interface Agg {
-  id: string
-  name: string
-  sub: string | null
-  conversions: number
-  revenue: number
-  reward: number
-  missingReward: boolean
-  prevReward: number | null
-}
 
 const SAVED_VIEWS = [
   { value: '', label: 'よく使う絞り込み' },
@@ -78,6 +63,8 @@ export default function ReportTab() {
   const [loadError, setLoadError] = useState('')
   const [query, setQuery] = useListUrlValue('q', '')
   const [view, setView] = useListUrlValue<ViewKey>('view', 'affiliate')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const { days, setDays, range, customRange, setRange } = useReportPeriod()
   const periodLabel = customRange ? `${range.from}〜${range.to}` : `過去${days}日`
   const setPeriod = (period: ReportPeriod) => {
@@ -185,6 +172,18 @@ export default function ReportTab() {
     return rows.filter((row) => !needle || row.name.toLocaleLowerCase('ja-JP').includes(needle))
   }, [query, rows])
 
+  const pageCount = pageCountOf(shown.length, pageSize)
+  const currentPage = Math.min(Math.floor(page), pageCount)
+  const paged = pageOf(shown, currentPage, pageSize)
+  const filterKey = JSON.stringify([query, view, range.from, range.to, pageSize])
+  const previousFilter = useRef(filterKey)
+  useEffect(() => {
+    if (previousFilter.current !== filterKey) {
+      previousFilter.current = filterKey
+      setPage(1)
+    }
+  }, [filterKey, setPage])
+
   const ready = state === 'ready'
 
   const exportCsv = () => {
@@ -193,16 +192,6 @@ export default function ReportTab() {
       : [['案件', '成果', '売上', '報酬', '前の期間の報酬'], ...shown.map((row) => [row.name, row.conversions, row.revenue, row.missingReward ? '' : row.reward, row.prevReward ?? ''])])
   }
 
-  const rewardText = (row: Agg): string => {
-    if (row.conversions === 0 || row.missingReward) return '—'
-    if (row.reward === 0) return '計測のみ'
-    const base = formatYen(row.reward)
-    if (false || row.prevReward == null) return base
-    if (row.prevReward === 0) return `${base}（初めて）`
-    const diff = row.reward - row.prevReward
-    if (diff === 0) return `${base}（±¥0）`
-    return `${base}（${diff > 0 ? '+' : '−'}¥${formatNumber(Math.abs(diff))}）`
-  }
 
   const affiliate = affiliates.find(a => a.id === drawerId)
   const agg = affiliateRows.find(row => row.id === drawerId)
@@ -243,7 +232,7 @@ export default function ReportTab() {
       <KpiCard
         presentation="band"
         title="1件あたりの報酬"
-        icon={<ReceiptText size={14} aria-hidden="true" />}
+        icon={<Calculator size={14} aria-hidden="true" />}
         value={null}
         valueText={ready && !hasMissingReward ? formatYen(perItem) : emptyValue('unknown')}
         unit=""
@@ -272,7 +261,8 @@ export default function ReportTab() {
           setPeriod(when === 'last' ? 'last_month' : 'this_month')
         }}
       />
-      <PeriodPicker days={days} onChange={setDays} customRange={customRange} onRangeChange={setRange} />
+      <PeriodPicker size="small" days={days} onChange={setDays} customRange={customRange} onRangeChange={setRange} />
+      <PerPageSelect value={pageSize} onChange={setPageSize} />
     </>
   )
 
@@ -280,7 +270,6 @@ export default function ReportTab() {
     <AffiliateToolbar
       narrow={narrow}
       notices={<ToolbarNotices
-        info={`期間は${periodLabel}。数は「認めた成果」だけ。${hasMissingReward ? '未確定の報酬は金額を出さず、CSVも空欄にしています。' : ''}成果地点ごとのレポートは「分析 › レポート」で見られます。`}
         error={state === 'error' ? loadError : undefined}
       />}
       search={{ placeholder: view === 'affiliate' ? '名前で探す' : '案件名で探す', value: query, onChange: setQuery }}
@@ -301,7 +290,7 @@ export default function ReportTab() {
           </TableHeadRow>
         </thead>
         <tbody>
-          {shown.map((row) => (
+          {paged.map((row) => (
             <Tr data-row-id={row.id} key={row.id} data-table-layout="columns" detailKey="affiliate" onOpen={() => openDrawer(row.id)}>
               <Td grow><FolderDotName>
                 <span className={styles.stack}>
@@ -352,8 +341,17 @@ export default function ReportTab() {
     </>
   )
 
+  const pager = ready && shown.length > 0 ? (
+    <ListPagePagination>
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage}
+        range={{ total: shown.length, first: (currentPage - 1) * Math.max(1, pageSize) + 1, last: (currentPage - 1) * Math.max(1, pageSize) + paged.length }} />
+    </ListPagePagination>
+  ) : undefined
+
   return (
     <AffiliateFrame
+      explanation={`期間は${periodLabel}。数は「認めた成果」だけ。${hasMissingReward ? '未確定の報酬は金額を出さず、CSVも空欄にしています。' : ''}成果地点ごとのレポートは「分析 › レポート」で見られます。`}
+      pagination={pager}
       help={view === 'affiliate'
           ? '行を押すと、その人の成果の明細（いつ・どの案件・いくら）を開きます。CSV は今の期間・今の並びで書き出します。'
           : '案件ごとの成果・売上・報酬です。CSV は今の期間・今の並びで書き出します。'}

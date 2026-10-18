@@ -6,6 +6,25 @@ import { isImeComposing } from './ime'
 export const OverlayDepthContext = createContext(0)
 const activeOverlays = new Map<object, { depth: number; order: number }>()
 let overlayOrder = 0
+const openLayers = new Set<object>()
+/** 窓・引き出しの重なりの基準。後から開いたものほど上（+1 ずつ）。メニューなど上に出す物は 100 以上。 */
+export const OVERLAY_LAYER_BASE = 90
+/**
+ * 後から開いた窓・引き出しを前に出す。窓の上に引き出しを、引き出しの上に窓を開いても、
+ * 新しい方が手前になる（画面ごとの z-index は書かない）。開いている間だけ番号を持つ。
+ */
+export function useOverlayLayer(open: boolean): number {
+  const key = useRef<object>({})
+  const [layer, setLayer] = useState(OVERLAY_LAYER_BASE)
+  useEffect(() => {
+    if (!open) return
+    const self = key.current
+    setLayer(OVERLAY_LAYER_BASE + openLayers.size)
+    openLayers.add(self)
+    return () => { openLayers.delete(self) }
+  }, [open])
+  return layer
+}
 let originalOverflow = ''
 
 const FOCUSABLE = [

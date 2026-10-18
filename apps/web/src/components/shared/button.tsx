@@ -2,13 +2,9 @@
 import Link from '@/components/shared/list-navigation'
 import type { LinkProps } from 'next/link'
 import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type {
-  AnchorHTMLAttributes,
-  ButtonHTMLAttributes,
-  ReactNode,
-} from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import styles from './button.module.css'
+import { normalizeActionLabel, normalizeActionNode } from './action-words'
 
 type CommonProps = {
   /**
@@ -42,15 +38,23 @@ type CommonProps = {
    * サービス札の「停止」「再開」）。画面CSSから共通ボタンを上書きしない書き方（設計ルール2節）。
    */
   textTone?: 'action' | 'ink' | 'danger' | 'accent' | 'quiet'
+  /** よく使う絞り込みが適用中の印。開閉状態は aria-expanded で別に伝える。 */
+  filterActive?: boolean
   /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
   presentation?: 'account-inline' | 'registration-inline' | 'restaurant'
   className?: string
+  /** Authored action words only; entity names and arbitrary values remain unchanged. */
+  actionWording?: boolean
+  /** 保存・公開・比較など、明示した役目の印。省略時は従来の描画を保つ。 */
+  icon?: ReactNode
   children: ReactNode
 }
 
 type NativeButtonProps = CommonProps &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'href' | 'aria-busy'> & {
     href?: never
+    /** 既存の無効条件に対応する理由。押せる状態では表示しない。 */
+    disabledReason?: string | null
     /** 開いた直後に標的を寄せたいときだけ渡す（未保存の離脱確認の主ボタン）。 */
     ref?: React.Ref<HTMLButtonElement>
     /**
@@ -79,7 +83,8 @@ type NativeButtonProps = CommonProps &
      * かつ絵が幅を指定している並び（窓の足など）で使う。`busy` の間も
      * 平常時の幅を下回らないので、こちらでも幅は跳ねない。
      */
-    widthReserve?: 'states' | 'idle'
+    /** `dynamic` は件数などで平常時の文字が変わる操作。状態の予約を保ち、現在の全文で測り直す。 */
+    widthReserve?: 'states' | 'idle' | 'dynamic'
   }
 
 type LinkButtonProps = CommonProps &
@@ -112,8 +117,9 @@ function hasButtonText(children: ReactNode): boolean {
     return hasButtonText(child.props.children)
   })
 }
-function iconButtonLabel(props: {children:ReactNode;title?:string;'aria-label'?:string;'aria-labelledby'?:string}) {
-  return props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
+function iconButtonLabel(props: {children:ReactNode;title?:string;actionWording?:boolean;'aria-label'?:string;'aria-labelledby'?:string}) {
+  const label = props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
+  return props.actionWording && typeof label === 'string' ? normalizeActionLabel(label) : label
 }
 
 /** 字の色の指定を束ねの名前へ。`action`（既定）は何も足さない。 */
@@ -128,14 +134,14 @@ export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
   const size = props.size ?? 'standard'
   const tone = props.textTone && props.textTone !== 'action' ? styles[TEXT_TONE[props.textTone]] : null
-  const classes = [styles.button, styles[variant], styles[size], tone, props.className].filter(Boolean).join(' ')
+  const classes = [styles.button, styles[variant], styles[size], tone, props.filterActive && styles.filterActive, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, ...linkProps } = props
+    const { children, icon, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, filterActive: _filterActive, ...linkProps } = props
     const newTab = external || linkProps.target === '_blank'
     return (
       <Link href={href} className={classes} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
-        {children}
+        {icon}{props.actionWording ? normalizeActionNode(children) : children}
         {newTab ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
@@ -146,7 +152,9 @@ export default function Button(props: ButtonProps) {
 
 function NativeButton(props: NativeButtonProps & { classes: string }) {
   const {
-    children,
+    children: rawChildren,
+    icon,
+    actionWording: _actionWording,
     classes,
     className: _className,
     variant: _variant,
@@ -154,6 +162,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     align,
     fullWidth,
     textTone: _textTone,
+    filterActive: _filterActive,
     presentation,
     href: _href,
     type = 'button',
@@ -163,10 +172,12 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     doneLabel = '保存しました',
     widthReserve = 'states',
     disabled,
+    disabledReason,
     ref,
     onClick,
     ...buttonProps
   } = props
+  const children = props.actionWording ? normalizeActionNode(rawChildren) : rawChildren
 
   /*
    * ★V7 仕上げ §2「保存中・完了」。DOM に出す文字は常に今のラベル1つだけ
@@ -203,9 +214,10 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       return
     }
     // 親の再描画でラベルが変わらなければ、複製・挿入・幅取得を繰り返さない。
-    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, presentation, buttonProps.style, buttonProps.hidden])
+    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, widthReserve, presentation, buttonProps.style, buttonProps.hidden])
     if (measuredLabelRef.current === measurementKey) return
     measuredLabelRef.current = measurementKey
+    if (widthReserve === 'dynamic') el.style.width = ''
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
     if (widthReserve === 'idle') {
@@ -263,11 +275,14 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       disabled={disabled || busyNow}
       aria-busy={busyNow ? true : undefined}
       {...buttonProps}
+      title={disabled && disabledReason ? disabledReason : buttonProps.title}
+      aria-description={disabled && disabledReason ? disabledReason : buttonProps['aria-description']}
       aria-label={iconButtonLabel(props)}
       onClick={handleClick}
     >
       {busyNow ? <LoaderCircle className={styles.spin} size={15} aria-hidden="true" /> : null}
       {shownDone ? <Check size={15} aria-hidden="true" /> : null}
+      {!busyNow && !shownDone ? icon : null}
       {busyNow ? busyLabel : shownDone ? doneLabel : children}
     </button>
     {automaticError ? <span role="alert" data-button-error>{automaticError}</span> : null}

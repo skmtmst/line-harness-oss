@@ -1,0 +1,9 @@
+/* Search Consoleの中身の並び。枠・頭・表・グラフ・札は共通部品。 */
+.body { display: flex; flex-direction: column; gap: var(--polish-space-card); padding: var(--polish-space-section); }
+.toolbar, .controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-field); }
+.spacer { flex: 1; min-width: 0; }
+.rankings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--tpl-an-sc-devices-w); align-items: start; gap: var(--tpl-an-report-col-gap); }
+.property { width: var(--tpl-an-flow-w); min-width: 0; }
+.compareRow { display: flex; align-items: center; gap: var(--polish-space-field); min-width: 0; font-size: var(--text-caption); }
+.compareRow > strong { min-width: 0; overflow-wrap: anywhere; }
+@container v8-page (max-width: 1099px) { .rankings { grid-template-columns: minmax(0, 1fr); } }

@@ -70,6 +70,6 @@ it.each(['消す', '空にしてEnter'])('予約中時刻の%sは予約を変更
   expect(screen.getByRole('button', { name: '予約時刻を変更(日本時間)' }).textContent).toContain('日時を選ぶ')
   expect(onReschedule).not.toHaveBeenCalled()
   expect(onCancelRow).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: '取消' }))
+  fireEvent.click(screen.getByRole('button', { name: '予約を取り消す' }))
   expect(onCancelRow).toHaveBeenCalledWith('a')
 })

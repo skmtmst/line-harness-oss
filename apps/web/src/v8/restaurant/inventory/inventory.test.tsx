@@ -103,6 +103,13 @@ describe('Y8SjT2 予約枠・在庫', () => {
     const dialog = document.querySelector('[data-design-node="Yyw6i"]') as HTMLElement
     expect(dialog.textContent).toContain('19:00 が残り 2 席になりました')
     expect(within(dialog).getAllByRole('checkbox')).toHaveLength(1)
+    const record = within(dialog).getByRole('button', { name: '閉じたものを記録する' }) as HTMLButtonElement
+    expect(record.disabled).toBe(true)
+    expect(record.title).toContain('チェック')
+    fireEvent.click(within(dialog).getByRole('checkbox'))
+    expect(record.disabled).toBe(false)
+    fireEvent.click(record)
+    expect(document.querySelector('[data-design-node="Yyw6i"]')).toBeNull()
   })
 
   it('予約経路の連携（hQQlt）は媒体ごとの受け取りと読めなかったものを出す', async () => {
@@ -111,8 +118,8 @@ describe('Y8SjT2 予約枠・在庫', () => {
     fireEvent.click(screen.getByRole('tab', { name: '予約経路の連携' }))
     await screen.findByText('Hot Pepper グルメ')
     expect(screen.getByText('7日届いていない')).not.toBeNull()
-    expect(screen.getByText('読めなかったもの 1 件')).not.toBeNull()
-    expect(screen.getByText('r-1@in.example.jp')).not.toBeNull()
+    expect(screen.getByText('読めなかったもの')).not.toBeNull()
+    expect(screen.getByDisplayValue('r-1@in.example.jp')).not.toBeNull()
   })
 
   it('読めなかった予約の空入力は欄で知らせ、最初の欄へ移動して取り込まない', async () => {
@@ -135,6 +142,8 @@ describe('Y8SjT2 予約枠・在庫', () => {
     await screen.findByText('19:00 の卓')
     expect(screen.queryByRole('button', { name: /開ける時間と配分を保存/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '＋ 時間帯を足す' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '媒体の受付を閉じる' })).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain('閲覧のみで見ています。')
   })
 
   it('埋まっている卓は個室→テーブル→カウンターの順、3つ以上の連番は「〜」で縮める', () => {

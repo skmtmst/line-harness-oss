@@ -14,7 +14,7 @@ import type { StaffMember } from '@line-crm/shared'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MENU_SECTIONS } from '@/lib/menu'
@@ -70,8 +70,8 @@ const ALL_FEATURES_ON = Object.fromEntries(
     .map((key) => [key, true]),
 )
 
-/** 飲食店向け（テスト）は環境の旗が立たないと出ない。テストでは 8 組。 */
-const VISIBLE_GROUP_LABELS = ['メイン', '配信', 'コンテンツ', '成果と分析', '自動化', '予約', '専用機能', '設定']
+/** B-261: 設定は下の歯車から開く。定義は設定内のナビゲーションに残す。 */
+const VISIBLE_GROUP_LABELS = ['メイン', '配信', 'コンテンツ', '成果と分析', '自動化', '予約', '専用機能']
 
 async function renderSidebar(props: { friendAttributesV2Mode?: boolean } = {}) {
   const view = render(<Sidebar {...props} />)
@@ -114,6 +114,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     for (const label of VISIBLE_GROUP_LABELS) {
       expect(view.getAllByRole('button', { name: label }).length, `組「${label}」の見出しが無い`).toBeGreaterThan(0)
     }
+    expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
   })
 
   it('主要4組ははじめから開き、ほかの組は見出しだけ', async () => {
@@ -179,6 +180,23 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(staffView.queryAllByRole('link', { name: '設定' })).toHaveLength(0)
   })
 
+  it.each(['owner', 'admin'] as const)('設定の段を外しても%sの歯車と設定内の現在地を保つ', async (role) => {
+    rememberStaffIdentity({ role } as StaffMember)
+    // 保存していた組の開閉も、重複した入口を復活させない。
+    window.localStorage.setItem('lh-sidebar-groups', JSON.stringify({ settings: true }))
+    for (const pathname of ['/settings', '/accounts', '/emergency']) {
+      rememberStaffIdentity({ role } as StaffMember)
+      fixture.pathname = pathname
+      const view = await renderSidebar()
+      expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
+      expect(view.queryAllByRole('link', { name: '機能設定', exact: true })).toHaveLength(0)
+      const gear = view.getAllByRole('link', { name: '設定', exact: true })[0]!
+      expect(gear.getAttribute('href')).toBe('/settings')
+      expect(gear.className).toMatch(/active/)
+      cleanup()
+    }
+  })
+
   it('★V8 店の画面の左下に自分のメニュー（店の形）を出す（オーナー 2026-10-07）', async () => {
     const view = await renderSidebar()
     expect(view.getAllByText('me-store').length).toBeGreaterThan(0)
@@ -187,10 +205,11 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
 
   it('V2 のタグモードでも、v8 では組を丸ごと隠さない', async () => {
     const view = await renderSidebar({ friendAttributesV2Mode: true })
-    // v7 では「自動化・予約・設定」の組が消えるが、v8 では見出しが残る
-    for (const label of ['自動化', '予約', '設定']) {
+    for (const label of ['自動化', '予約']) {
       expect(view.getAllByRole('button', { name: label }).length, `組「${label}」が消えている`).toBeGreaterThan(0)
     }
+    expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
+    expect(view.getAllByRole('link', { name: '設定', exact: true }).length).toBeGreaterThan(0)
   })
 
   it('旧テーマ指定でも組を開閉でき、設定と自分の入口を出す', async () => {
@@ -200,8 +219,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(automation.getAttribute('aria-expanded')).toBe('false')
     await act(async () => { automation.click() })
     expect(view.getAllByRole('link', { name: 'オートメーション' }).length).toBeGreaterThan(0)
-    await act(async () => { view.getAllByRole('button', { name: '設定' })[0]!.click() })
-    expect(view.getAllByRole('link', { name: '機能設定' }).length).toBeGreaterThan(0)
+    expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
     expect(view.getAllByRole('link', { name: '設定' }).length).toBeGreaterThan(0)
     expect(view.getAllByTestId('sidebar-account').length).toBeGreaterThan(0)
   })
@@ -281,8 +299,32 @@ describe('統括の左メニューを出す住所', () => {
     expect(isHqShellPath('/hq')).toBe(true)
     expect(isHqShellPath('/hq/templates')).toBe(true)
     expect(isHqShellPath('/accounts/new')).toBe(true)
+    expect(isHqShellPath('/restaurant-test/stores/new')).toBe(true)
+    expect(isHqShellPath('/restaurant-test/terms')).toBe(true)
+    expect(isHqShellPath('/restaurant-test/stores')).toBe(false)
     expect(isHqShellPath('/accounts')).toBe(false)
     expect(isHqShellPath('/hqx')).toBe(false)
     expect(isHqShellPath(null)).toBe(false)
+  })
+})
+
+
+describe('B-368 本番の入口', () => {
+  afterEach(() => vi.unstubAllEnvs())
+  it('Google と飲食店の入口を残し、飲食店を押すと共通の窓を出す', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'false')
+    fixture.pathname = '/restaurant-test/google'
+    clearFeatureVisibilityCache()
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
+    fixture.visibility.mockResolvedValue({ success: true, data: { features: { ...ALL_FEATURES_ON, restaurant_test: false } } })
+    fixture.get.mockResolvedValue({ success: true, data: { sidebarOrder: [], sidebarItemOrder: {} } })
+    const view = await renderSidebar()
+    expect(view.getAllByRole('link', { name: 'Googleビジネス' })[0].getAttribute('href')).toBe('/restaurant-test/google')
+    const delivery = view.getAllByRole('link', { name: 'デリバリー受注' })[0]
+    expect(fireEvent.click(delivery)).toBe(false)
+    expect(view.getByRole('dialog', { name: '現在準備中です' })).toBeTruthy()
+    fireEvent.click(view.getAllByRole('button', { name: '閉じる' }).at(-1)!)
+    expect(view.queryByRole('dialog')).toBeNull()
   })
 })

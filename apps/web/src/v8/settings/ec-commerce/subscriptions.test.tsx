@@ -84,7 +84,7 @@ describe('#731 定期便のページ送りとタブの件数', () => {
     await screen.findByText(/900件中/)
     const footer = screen.getByText(/900件中/).textContent ?? ''
     console.log('AUDIT-WEB フッター(1ページ目) =', footer)
-    expect(footer).toContain('1〜10件を表示')
+    expect(footer).toContain('1〜10件')
     expect(fixture.subscriptions.mock.calls[0][0]).toMatchObject({ limit: 10, offset: 0 })
 
     // 2ページ目へ。**offset が乗ること**が要点。
@@ -96,7 +96,7 @@ describe('#731 定期便のページ送りとタブの件数', () => {
     const second = fixture.subscriptions.mock.calls.at(-1)![0]
     console.log('AUDIT-WEB 2ページ目の要求 =', JSON.stringify(second))
     expect(second).toMatchObject({ limit: 10, offset: 10 })
-    await screen.findByText(/11〜20件を表示/)
+    await screen.findByText(/11〜20件/)
   })
 
   test('9ページ目(81件目以降)へも行ける', async () => {
@@ -110,9 +110,9 @@ describe('#731 定期便のページ送りとタブの件数', () => {
     await waitFor(() => {
       expect(fixture.subscriptions.mock.calls.at(-1)![0]).toMatchObject({ offset: 80 })
     })
-    const footer = await screen.findByText(/81〜90件を表示/)
+    const footer = await screen.findByText(/81〜90件/)
     console.log('AUDIT-WEB フッター(9ページ目) =', footer.textContent)
-    expect(footer.textContent).toContain('81〜90件を表示')
+    expect(footer.textContent).toContain('81〜90件')
   })
 
   test('タブの件数は overview から取り、定期便の口を別に叩かない', async () => {
@@ -140,13 +140,13 @@ describe('#731 定期便のページ送りとタブの件数', () => {
 describe('V8 定期便の表示件数', () => {
   test('10件で開き、50件へ変えた後の次ページはoffset50を使う', async () => {
     render(<SubscriptionsPanel accountId="account-a" />)
-    await screen.findByText(/1〜10件を表示/)
+    await screen.findByText(/1〜10件/)
     expect(fixture.subscriptions.mock.calls[0][0]).toMatchObject({ limit: 10, offset: 0 })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '表示件数' })) })
     await act(async () => { fireEvent.click(within(screen.getByRole('option', { name: '50件表示' })).getByRole('button')) })
-    await screen.findByText(/1〜50件を表示/)
+    await screen.findByText(/1〜50件/)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '2ページ目へ' })) })
-    await screen.findByText(/51〜100件を表示/)
+    await screen.findByText(/51〜100件/)
     expect(fixture.subscriptions.mock.calls.at(-1)![0]).toMatchObject({ limit: 50, offset: 50 })
   })
 })

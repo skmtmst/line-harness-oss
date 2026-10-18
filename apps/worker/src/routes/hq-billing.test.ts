@@ -413,11 +413,7 @@ describe('課金 Webhook', () => {
     expect(res.status).toBe(200);
     expect(await res.json<{ data: { matched: boolean } }>()).toMatchObject({ data: { matched: false } });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM billing_invoices').get()).toMatchObject({ n: 0 });
-    expect(info).toHaveBeenCalledWith(JSON.stringify({
-      message: 'billing webhook: charge.refunded 対象外',
-      eventId: 'evt_ec_refund',
-      reason: 'Stripe Billing請求書でない',
-    }));
+    expect(info).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_info', route: 'POST /api/hq/billing/webhook' }));
   });
 
   it('invoiceが無くpayment_intentのみのEC-CUBE返金でも、Billing請求書のPaymentIntentならStripeに問い合わせて反映する', async () => {
@@ -449,11 +445,7 @@ describe('課金 Webhook', () => {
 
     expect(res.status).toBe(200);
     expect(stripe.retrievePaymentIntent).not.toHaveBeenCalled();
-    expect(info).toHaveBeenCalledWith(JSON.stringify({
-      message: 'billing webhook: charge.refunded 対象外',
-      eventId: 'evt_pi_no_invoice',
-      reason: 'Stripe Billing請求書でない',
-    }));
+    expect(info).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_info', route: 'POST /api/hq/billing/webhook' }));
   });
 
   it('請求書IDがあっても更新対象がなければ警告する', async () => {
@@ -466,12 +458,7 @@ describe('課金 Webhook', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(warn).toHaveBeenCalledWith(JSON.stringify({
-      message: 'billing webhook: charge.refunded 更新対象なし',
-      eventId: 'evt_missing_invoice_refund',
-      invoiceId: 'in_missing',
-      reason: 'billing_invoice_not_found',
-    }));
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_warn', route: 'POST /api/hq/billing/webhook' }));
   });
 
   it('知らない顧客の請求書はイベントだけ記録し、請求書行は作らない', async () => {
@@ -547,5 +534,30 @@ describe('即時変更の日割り見積り', () => {
     expect(await failed.text()).not.toContain('secret details');
     stripe.createInvoicePreview.mockResolvedValueOnce({ currency: 'jpy', lines: { has_more: true, data: [] } });
     expect((await call('GET', path)).status).toBe(502);
+  });
+});
+
+type StoredBillingMetrics = NonNullable<Awaited<ReturnType<typeof import('../services/hq-billing-metrics.js').hqBillingMetrics>>>;
+describe('統括の請求の数の帯（保存済み請求のみ）',()=>{
+  it('今月の額・未払いと組織単位の契約を、他組織と分けて返す',async()=>{
+    vi.useFakeTimers();vi.setSystemTime(new Date('2026-09-30T15:00:00Z'));
+    try {
+      setTenant({plan_status:'active',stripe_subscription_id:'sub-test',current_period_ends_at:'2026-11-01T00:00:00+09:00'});
+      testDb.raw.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES ('local','Local','local','test','test',?)").run(DEFAULT_TENANT_ID);
+      testDb.raw.exec("INSERT INTO tenants(id,name) VALUES ('other','Other')");
+      for(const [id,tenant,at,amount,status] of [['old',DEFAULT_TENANT_ID,'2026-09-01 00:00:00',900,'paid'],['new',DEFAULT_TENANT_ID,'2026-09-30T15:00:00Z',29800,'open'],['foreign','other','2026-10-01 00:00:00',99999,'open']])testDb.raw.prepare("INSERT INTO billing_invoices(id,tenant_id,created_at,amount_due,status,currency,synced_at) VALUES (?,?,?,?,?,'jpy','2026-10-01 00:00:00')").run(id,tenant,at,amount,status);
+      const r=await call('GET','/api/hq/billing/metrics');expect(r.status).toBe(200);const b=await r.json() as {data:StoredBillingMetrics};
+      expect(b.data).toMatchObject({thisMonthBilledYen:29800,contractCount:1,contractUnit:'organization',activeAccountCount:1,contractAccountCount:null,trialCount:0,unpaidInvoiceCount:1,paymentFailureCount:null,nextBillingAt:'2026-11-01T00:00:00+09:00'});
+      expect(stripe.retrievePrice).not.toHaveBeenCalled();expect(stripe.retrieveSubscription).not.toHaveBeenCalled();
+    } finally {vi.useRealTimers()}
+  });
+  it('請求の未取得は0で埋めず、アカウント限定とスタッフ権限は拒否する',async()=>{
+    const r=await call('GET','/api/hq/billing/metrics');const b=await r.json() as {data:StoredBillingMetrics};expect(b.data).toMatchObject({thisMonthBilledYen:null,unpaidInvoiceCount:null,unavailable:{invoices:'NOT_SYNCED'}});
+    testDb.raw.prepare("INSERT INTO billing_invoices(id,tenant_id,created_at,status,amount_due,amount_paid,currency,synced_at) VALUES ('past-only',?,'2020-01-01','paid',100,100,'jpy','2020-01-01')").run(DEFAULT_TENANT_ID);
+    expect((await (await call('GET','/api/hq/billing/metrics')).json() as {data:StoredBillingMetrics}).data).toMatchObject({thisMonthBilledYen:null,unavailable:{thisMonthBilledYen:'NOT_OBSERVED_THIS_MONTH'}});
+    setTenant({plan_status:'active',stripe_subscription_id:null});
+    expect((await (await call('GET','/api/hq/billing/metrics')).json() as {data:StoredBillingMetrics}).data.contractCount).toBe(1);
+    expect((await call('GET','/api/hq/billing/metrics',undefined,{staff:staffOf({role:'staff'})})).status).toBe(403);
+    testDb.raw.exec("UPDATE staff_members SET account_scope='accounts' WHERE id='staff-1'");expect((await call('GET','/api/hq/billing/metrics')).status).toBe(403);
   });
 });

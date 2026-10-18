@@ -1,29 +1,19 @@
 'use client'
 
-import TagOverflow from './tag-overflow'
-import { useEffect, useState } from 'react'
-import { TagToggle } from './tag-pill'
-import { api } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { useFeatureVisibility } from '@/lib/use-feature-visibility'
-import DateField from './date-field'
-import { TextField } from './text-field'
-import Combobox from './combobox'
-import Select from './select'
-import {
-  findInvalidRangeIssue,
-  isStructurallyEmpty,
-  pruneCondition,
-  type FieldOperator,
-  type SegmentCondition,
-  type SegmentRule,
-} from '@/lib/segment-condition'
-import { formatNumber } from '@/lib/format'
-import Button from '@/components/shared/button'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import EntityRemoteField from './entity-remote-field'
-
-
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { useFeatureVisibility } from '@/lib/use-feature-visibility';
+import DateField from './date-field';
+import { TextField } from './text-field';
+import Card, { CardHeader } from './card';
+import Select from './select';
+import { findInvalidRangeIssue, isStructurallyEmpty, pruneCondition, type FieldOperator, type SegmentCondition, type SegmentRule } from '@/lib/segment-condition';
+import { formatNumber } from '@/lib/format';
+import Button from '@/components/shared/button';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import EntityRemoteField from './entity-remote-field';
+import { type RuleKind, type Option, KindPicker, TagPicker, MemberTierRule } from "./condition-builder-gap-parts"
 /*
  * 友だちの絞り込み条件を作る部品。
  *
@@ -50,28 +40,6 @@ export {
   findInvalidRangeIssue,
 } from '@/lib/segment-condition'
 export type { FieldOperator, SegmentCondition, SegmentRule } from '@/lib/segment-condition'
-
-/**
- * 追加できる絞り込みの種類。並びは Lステップの並びに合わせてある。
- * `group` は候補の右端に出すまとまり名（友だちの情報・タグ・行動など）。
- */
-const RULE_KINDS: { type: string; label: string; group: string; feature?: 'support_marks' | 'friend_fields'; make: () => SegmentRule }[] = [
-  { type: 'name', label: '名前', group: '友だちの情報', make: () => ({ type: 'name', value: { text: '', targets: ['display', 'real', 'system'] } }) },
-  { type: 'private_memo', label: 'メモ', group: '友だちの情報', make: () => ({ type: 'private_memo', value: '' }) },
-  { type: 'status_message', label: 'ステータスメッセージ', group: '友だちの情報', make: () => ({ type: 'status_message', value: '' }) },
-  { type: 'registered_at', label: '友だち登録日', group: '友だちの情報', make: () => ({ type: 'registered_at', value: { from: '', to: '' } }) },
-  { type: 'support_mark', label: '対応マーク', group: 'タグ・記入欄', feature: 'support_marks' as const, make: () => ({ type: 'support_mark', value: { markIds: [], exclude: false } }) },
-  { type: 'tag_exists', label: 'タグ', group: 'タグ・記入欄', make: () => ({ type: 'tag_exists', value: '' }) },
-  { type: 'friend_field', label: '友だち情報', group: 'タグ・記入欄', feature: 'friend_fields' as const, make: () => ({ type: 'friend_field', value: { fieldId: '', op: 'contains', text: '' } }) },
-  { type: 'scenario_subscribed', label: 'シナリオ購読', group: '参加', make: () => ({ type: 'scenario_subscribed', value: '' }) },
-  { type: 'scenario_state', label: 'シナリオ', group: '参加', make: () => ({ type: 'scenario_state', value: { scenarioId: '', state: 'subscribed' } }) },
-  { type: 'form_answered', label: '回答フォーム', group: '行動', make: () => ({ type: 'form_answered', value: '' }) },
-  { type: 'last_reaction_at', label: '最終反応日', group: '行動', make: () => ({ type: 'last_reaction_at', value: { from: '', to: '' } }) },
-  { type: 'reaction_state', label: '反応状態', group: '行動', make: () => ({ type: 'reaction_state', value: 'reply_or_postback' }) },
-  { type: 'score_range', label: '行動スコア', group: '行動', make: () => ({ type: 'score_range', value: { min: 30, max: 69 } }) },
-  { type: 'is_following', label: 'ブロック状態', group: '友だちの情報', make: () => ({ type: 'is_following', value: true }) },
-  { type: 'is_hidden', label: '表示状態', group: '友だちの情報', make: () => ({ type: 'is_hidden', value: false }) },
-]
 
 const TAG_OPS: { value: string; label: string }[] = [
   { value: 'tag_exists', label: '選択したタグのいずれか1つ以上を含む人' },
@@ -106,14 +74,6 @@ const SCENARIO_STATES: { value: string; label: string }[] = [
   { value: 'completed', label: 'を読み終えた人' },
   { value: 'ever', label: 'を1度でも購読した人' },
 ]
-
-interface Option {
-  id: string
-  name: string
-  color?: string | null
-  groupId?: string | null
-  folderId?: string | null
-}
 
 export interface ConditionBuilderProps {
   value: SegmentCondition | null
@@ -321,9 +281,8 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
 
   /*
    * 条件の足し口。15個の札を並べっぱなしにすると1440pxでも3行に
-   * 折れて、どれがどれだか探せない。共通の候補つき入力（Combobox）で
-   * 打って絞り、右端のまとまり名（友だちの情報・タグ・行動など）で
-   * 確かめてから足す。札は1つも並べないので折り返しは起きない。
+   * 折れて、どれがどれだか探せない。共通の選ぶ窓で検索し、
+   * まとまり名（友だちの情報・タグ・行動など）を確かめてから足す。
    */
   const kindButtons = (groupIndex: number | null) => (
     <div className="mt-2 max-w-md">
@@ -342,25 +301,17 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           <button type="button" className="font-semibold underline" onClick={() => setOptionsAttempt((n) => n + 1)}>読み直す</button>
         </p>
       ) : null}
-      <div className="content-card rounded-card border p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-ink text-sm font-bold">
-            「すべて満たす」必要がある条件<span className="text-ink-faint ml-1 font-normal">(and条件)</span>
-          </p>
-          {label && <span className="text-ink-faint text-xs">{label}</span>}
-        </div>
+      <Card surface="muted" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
+        <CardHeader size="stacked" headingLevel={3} title="すべて満たす条件" meta={label} />
         <div className="mt-3">{renderRules(condition.rules, null)}</div>
         <p className="text-ink-faint mt-3 text-center text-xs">絞り込む項目を更に追加できます</p>
         {kindButtons(null)}
-      </div>
+      </Card>
 
       {(condition.groups ?? []).map((group, gi) => (
-        <div key={gi} className="border-hairline rounded-card border p-4">
+        <Card key={gi} surface="muted" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-ink text-sm font-bold">
-              「いずれか1つ以上を満たす」必要がある条件
-              <span className="text-ink-faint ml-1 font-normal">(or条件)</span>
-            </p>
+            <CardHeader headingLevel={3} size="stacked" title="いずれか1つ以上を満たす条件" />
             <Button variant="secondary" className="text-ink-faint hover:text-danger h-9 px-3 text-xs whitespace-normal" type="button" onClick={() =>
                 update({ ...condition, groups: (condition.groups ?? []).filter((_, i) => i !== gi) })
               }>
@@ -369,16 +320,16 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           </div>
           <div className="mt-3">{renderRules(group.rules, gi)}</div>
           {kindButtons(gi)}
-        </div>
+        </Card>
       ))}
 
-      <Button variant="secondary" className="text-ink-secondary rounded-card w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
+      <Button variant="secondary" aria-label="いずれか条件のかたまりを足す" className="text-ink-secondary rounded-card w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
           update({
             ...condition,
             groups: [...(condition.groups ?? []), { operator: 'OR', rules: [] }],
           })
         }>
-        ＋「いずれか1つ以上を満たす」必要がある条件(or条件)を追加
+        ＋いずれか1つ以上を満たす条件を足す
       </Button>
 
       {showCount && (
@@ -399,60 +350,6 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
       )}
     </div>
   )
-}
-
-/**
- * 条件の足し口（1つ選ぶ）。共通の候補つき入力（★V7 `WUVcz`）を使う。
- *
- * 選んだ直後は欄を空に戻す（続けてもう1つ足せる）。Combobox は value と
- * 一致する選択肢の名前を欄に出すため、どの選択肢とも一致しない値を渡して
- * 空に戻す。焦点は欄に残る。
- */
-function KindPicker({
-  kinds,
-  onPick,
-}: {
-  kinds: typeof RULE_KINDS
-  onPick: (kind: (typeof RULE_KINDS)[number]) => void
-}) {
-  const [added, setAdded] = useState(0)
-  return (
-    <Combobox
-      aria-label="追加する条件を選ぶ"
-      placeholder="条件を追加（文字で検索）"
-      value={added === 0 ? '' : `added-${added}`}
-      onChange={(next) => {
-        const kind = kinds.find((item) => item.type === next)
-        if (!kind) return
-        onPick(kind)
-        setAdded((current) => current + 1)
-      }}
-      options={kinds.map((kind) => ({ value: kind.type, label: kind.label, hint: kind.group }))}
-    />
-  )
-}
-
-/**
- * タグを選ぶ。
- *
- * 全部を並べるだけだと、タグが増えたときに画面が埋まる。実際の運用アカウントで
- * 101個あり、条件を1つ足すだけで縦20行のタグの壁ができて、その下にある
- * 「送る内容」まで届かなかった。Lステップも入力して絞る形にしている。
- *
- * 選んだものは常に先頭に出す。絞り込んだ状態で選ぶと、消したいときに
- * もう一度同じ言葉を打ち直さないと見つからない。
- */
-function TagPicker({
-  tags,
-  selected, multiple, onChange
-}: {
-  tags: Option[];
-  selected: string[]; multiple: boolean; onChange: (ids: string[]) => void
-}) {
-  const options = tags.map((tag) =>({...entityOptionMetadata(tag), value: tag.id, label: tag.name }))
-  return multiple ?<EntitySelect kind="tag" aria-label="条件のタグ" size ="full" options={options} values={selected} onChange={onChange}/>
-    : <EntitySelect kind="tag" aria-label="条件のタグ" size="full" options={[{ value: '', label: 'タグを選ぶ' }, ...options]} value={selected[0] ?? ''} onChange={(id) => onChange(id ? [id] : []
-      )}/>
 }
 
 interface RuleEditorProps {
@@ -590,6 +487,38 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
         </div>
       )
 
+    case 'visit_count':
+    case 'purchase_amount': {
+      const visit = rule.type === 'visit_count'
+      const name = visit ? '来店の回数' : '購入の合計金額'
+      const num = (x: unknown) => (typeof x === 'number' ? x : '')
+      const put = (key: 'min' | 'max', text: string) => {
+        const next: Record<string, unknown> = { ...v }
+        if (text === '') delete next[key]
+        else next[key] = Number(text)
+        onChange({ type: rule.type, value: next })
+      }
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink text-sm font-semibold">{name}</span>
+          <TextField type="number" min={0} step={1} value={num(v.min)} onChange={(e) => put('min', e.target.value)} placeholder="下限なし" aria-label={`${name}の下限`} />
+          <span className="text-ink-faint text-sm">{visit ? '回以上〜' : '円以上〜'}</span>
+          <TextField type="number" min={0} step={1} value={num(v.max)} onChange={(e) => put('max', e.target.value)} placeholder="上限なし" aria-label={`${name}の上限`} />
+          <span className="text-ink-faint text-sm">{visit ? '回以下' : '円以下'}</span>
+        </div>
+      )
+    }
+    case 'member_tier':
+      return <MemberTierRule value={typeof rule.value === 'string' ? rule.value : ''} onChange={(next) => onChange({ type: 'member_tier', value: next })} />
+    case 'last_activity_at':
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink text-sm font-semibold">最後の来店・購入の日</span>
+          <DateField value={String(v.from ?? '')} onChange={(next) => onChange({ type: rule.type, value: { ...v, from: next } })} aria-label="最後の来店・購入の日の開始" className="w-48" />
+          <span className="text-ink-faint text-sm">〜</span>
+          <DateField value={String(v.to ?? '')} onChange={(next) => onChange({ type: rule.type, value: { ...v, to: next } })} aria-label="最後の来店・購入の日の終了" className="w-48" />
+        </div>
+      )
     case 'registered_at':
     case 'last_reaction_at':
       return (
@@ -817,3 +746,25 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません（{rule.type}）</span>
   }
 }
+
+const RULE_KINDS: RuleKind[] = [
+  { type: 'name', label: '名前', group: '友だちの情報', make: () => ({ type: 'name', value: { text: '', targets: ['display', 'real', 'system'] } }) },
+  { type: 'private_memo', label: 'メモ', group: '友だちの情報', make: () => ({ type: 'private_memo', value: '' }) },
+  { type: 'status_message', label: 'ステータスメッセージ', group: '友だちの情報', make: () => ({ type: 'status_message', value: '' }) },
+  { type: 'registered_at', label: '友だち登録日', group: '友だちの情報', make: () => ({ type: 'registered_at', value: { from: '', to: '' } }) },
+  { type: 'support_mark', label: '対応マーク', group: 'タグ・記入欄', feature: 'support_marks' as const, make: () => ({ type: 'support_mark', value: { markIds: [], exclude: false } }) },
+  { type: 'tag_exists', label: 'タグ', group: 'タグ・記入欄', make: () => ({ type: 'tag_exists', value: '' }) },
+  { type: 'friend_field', label: '友だち情報', group: 'タグ・記入欄', feature: 'friend_fields' as const, make: () => ({ type: 'friend_field', value: { fieldId: '', op: 'contains', text: '' } }) },
+  { type: 'scenario_subscribed', label: 'シナリオ購読', group: '参加', make: () => ({ type: 'scenario_subscribed', value: '' }) },
+  { type: 'scenario_state', label: 'シナリオ', group: '参加', make: () => ({ type: 'scenario_state', value: { scenarioId: '', state: 'subscribed' } }) },
+  { type: 'form_answered', label: '回答フォーム', group: '行動', make: () => ({ type: 'form_answered', value: '' }) },
+  { type: 'last_reaction_at', label: '最終反応日', group: '行動', make: () => ({ type: 'last_reaction_at', value: { from: '', to: '' } }) },
+  { type: 'reaction_state', label: '反応状態', group: '行動', make: () => ({ type: 'reaction_state', value: 'reply_or_postback' }) },
+  { type: 'score_range', label: '行動スコア', group: '行動', make: () => ({ type: 'score_range', value: { min: 30, max: 69 } }) },
+  { type: 'visit_count', label: '来店の回数', group: '来店・購入', make: () => ({ type: 'visit_count', value: { min: 1 } }) },
+  { type: 'purchase_amount', label: '購入の合計金額', group: '来店・購入', make: () => ({ type: 'purchase_amount', value: { min: 1 } }) },
+  { type: 'last_activity_at', label: '最後の来店・購入の日', group: '来店・購入', make: () => ({ type: 'last_activity_at', value: { from: '', to: '' } }) },
+  { type: 'member_tier', label: '会員ランク', group: '来店・購入', make: () => ({ type: 'member_tier', value: '' }) },
+  { type: 'is_following', label: 'ブロック状態', group: '友だちの情報', make: () => ({ type: 'is_following', value: true }) },
+  { type: 'is_hidden', label: '表示状態', group: '友だちの情報', make: () => ({ type: 'is_hidden', value: false }) },
+]

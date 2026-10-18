@@ -7,7 +7,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -48,13 +48,17 @@ const GROUP = {
 let host: HTMLDivElement
 let root: Root
 let groupStatus = 200
+let readonlyMode: 'owner' | 'readonly' | 'unknown' = 'owner'
 
 function stubFetch() {
-  vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
+  let saved = GROUP
+  vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
     const path = new URL(String(url), 'http://localhost').pathname
+    if (path === '/api/staff/me') return { ok: true, status: 200, json: async () => readonlyMode === 'unknown' ? ({ success: false, error: 'role unavailable' }) : ({ success: true, data: { id: 'owner-1', role: 'owner', readOnly: readonlyMode === 'readonly' } }) }
     if (path === '/api/rich-menu-groups/rmg-x') {
+      if (init?.method === 'PATCH') saved = { ...saved, ...JSON.parse(String(init.body)) }
       return groupStatus === 200
-        ? { ok: true, status: 200, json: async () => ({ success: true, data: GROUP }) }
+        ? { ok: true, status: 200, json: async () => ({ success: true, data: saved }) }
         : { ok: false, status: groupStatus, json: async () => ({ success: false, error: 'not found' }) }
     }
     if (path === '/api/rich-menu-groups') {
@@ -71,6 +75,7 @@ async function settle() {
 describe('作りかけの下書きを ?id= で開き直す', () => {
   beforeEach(() => {
     groupStatus = 200
+    readonlyMode = 'owner'
     window.history.replaceState(null, '', '/rich-menus/new?id=rmg-x&step=buttons')
     stubFetch()
     host = document.createElement('div')
@@ -175,6 +180,39 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     expect(Array.from(host.querySelectorAll('button')).some((b) => (b.getAttribute('aria-label') ?? '').includes('誰に出すか'))).toBe(false)
   })
 
+  it('公開前に全ページの不足を示し、該当する面へ戻れる', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new?id=rmg-x&step=publish')
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    expect(screen.getByRole('heading', { name: '確かめる' })).toBeTruthy()
+    expect(screen.getAllByText('トップ', { exact: true }).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('タブA：予約', { exact: true }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('heading', { name: '足りないもの' })).toBeTruthy()
+    expect(screen.getByText('トップ：面 B の動きが未設定')).toBeTruthy()
+    expect(screen.getByText('タブA：予約：面が未設定')).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: '②で決める' })[0]) })
+    await settle()
+    expect(screen.getByRole('heading', { name: '面 B「会員証」の動き' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: '足りないもの' })).toBeNull()
+  })
+
+  it('出す相手を決めずに保存しても、メニューの内容を保つ', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new?id=rmg-x&step=audience')
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    const unset = screen.getByRole('radio', { name: /決めない/ }) as HTMLInputElement
+    await act(async () => { fireEvent.click(unset) })
+    expect(unset.checked).toBe(true)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true })) })
+    await waitFor(() => {
+      const writes = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'PATCH')
+      expect(writes).toHaveLength(1)
+      expect(JSON.parse(String(writes[0][1]?.body))).toMatchObject({ isDefaultForAll: false, targetingEnabled: false })
+    })
+    expect(host.textContent).toContain('このメニューはLINEへの登録だけです')
+    expect(host.textContent).toContain('通常メニュー（会員向け）')
+  })
+
   it('下書きが読めなければ理由を出す', async () => {
     groupStatus = 404
     await act(async () => { root.render(<RichMenuCreateV8 />) })
@@ -197,6 +235,16 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     await act(async () => release({ ok: false, status: 500, json: async () => ({ success: false, error: 'down' }) }))
     await settle(); expect(name.closest('fieldset[disabled]')).toBeNull()
     expect(name.value).toBe('直した名前')
+  })
+
+  for (const mode of ['readonly', 'unknown'] as const) it(`${mode}では編集と保存を置かず戻る道を残す`, async () => {
+    readonlyMode = mode
+    window.history.replaceState(null, '', '/rich-menus/new')
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '下書きを保存', exact: true })).toBeNull()
+    expect(screen.queryByLabelText('メニュー名（友だちには見えません）')).toBeNull()
   })
 
 })

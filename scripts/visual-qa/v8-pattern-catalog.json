@@ -37,6 +37,43 @@
   },
   "patterns": [
     {
+      "id": "people-day-grid",
+      "name": "人の当日予約盤",
+      "role": "時刻を縦、担当を横に並べ、実際の予約と空き枠を開く",
+      "rules": ["B-260", "B-262"],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/reservation-board.tsx",
+            "apps/web/src/components/shared/reservation-people-grid.tsx",
+            "apps/web/src/components/shared/reservation-people-grid.module.css",
+            "apps/web/src/components/templates/booking-page.tsx",
+            "apps/web/src/components/templates/booking-day-layout.module.css",
+            "apps/web/src/components/shared/calendar-parts.tsx",
+            "apps/web/src/components/shared/calendar-parts.module.css"
+          ],
+          "components": [
+            "ReservationBoard",
+            "ReservationPeopleGrid",
+            "BookingPage",
+            "BookingSidebarSection",
+            "CalendarSlotButton",
+            "CalendarLegendItem",
+            "CalendarPerson"
+          ],
+          "vars": [
+            "--tpl-people-time-width",
+            "--tpl-people-hour-height",
+            "--tpl-people-block-height",
+            "--tpl-people-block-gap"
+          ]
+        },
+        "pen": [],
+        "status": "使用板はGcyTr/O2Z8u。Penの再利用する盤の部品は未指定"
+      },
+      "code": { "selectorHint": "data-people-day-grid", "overrideSelectors": [], "signals": [] }
+    },
+    {
       "id": "card",
       "name": "カード（中身のまとまりの箱）",
       "role": "中身のまとまりを白地＋薄い縁＋影＋角丸12で1枚に見せる",
@@ -55,7 +92,9 @@
           ],
           "components": [
             "Card",
-            "CardHeader"
+            "CardHeader",
+            "CardContent",
+            "ListPageCards"
           ],
           "vars": [
             "--card-shadow",
@@ -216,6 +255,8 @@
         "code": {
           "files": [
             "apps/web/src/components/templates/page-frame.tsx",
+            "apps/web/src/components/templates/create-page.tsx",
+            "apps/web/src/components/shared/create-page.tsx",
             "apps/web/src/components/shared/page-header.tsx",
             "apps/web/src/components/shared/help-tip.tsx",
             "apps/web/src/components/shared/page-explanation.tsx",
@@ -234,7 +275,10 @@
             "InboxPage",
             "PageExplanationProvider",
             "PageExplanationToggle",
-            "PageExplanationBody"
+            "PageExplanationBody",
+            "PageContent",
+            "CreateColumns",
+            "HelpTip"
           ],
           "vars": [
             "--text-title"
@@ -249,7 +293,15 @@
             "id": "KjC1z",
             "name": "？"
           }
-        ]
+        ],
+        "liff": {
+          "files": [
+            "apps/liff/src/components/ui/PageHeading.tsx"
+          ],
+          "components": [
+            "PageHeading"
+          ]
+        }
       },
       "code": {
         "selectorHint": "pageHead|heading|header\\b|title\\b|lead|subtitle|description",
@@ -309,11 +361,14 @@
           "files": [
             "apps/web/src/components/shared/list-toolbar.tsx",
             "apps/web/src/components/shared/list-toolbar.module.css",
-            "apps/web/src/components/shared/search-field.tsx"
+            "apps/web/src/components/shared/search-field.tsx",
+            "apps/web/src/components/shared/distribution-table.tsx"
           ],
           "components": [
             "ListToolbar",
             "ListToolbarSearch",
+            "ListToolbarSearchSlot",
+            "DistributionToolbar",
             "ListToolbarOptional"
           ],
           "vars": [
@@ -389,10 +444,16 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/filter-chip.tsx",
-            "apps/web/src/components/shared/filter-chip.css"
+            "apps/web/src/components/shared/filter-chip.css",
+            "apps/web/src/components/shared/filter-link.tsx",
+            "apps/web/src/components/shared/filter-link.module.css",
+            "apps/web/src/components/shared/heatmap-table.tsx",
+            "apps/web/src/components/shared/heatmap-table.module.css"
           ],
           "components": [
-            "FilterChip"
+            "FilterChip",
+            "FilterLink",
+            "HeatmapTable"
           ],
           "vars": [
             "--color-control-border"
@@ -467,12 +528,16 @@
             "apps/web/src/components/shared/folder-row-actions.tsx",
             "apps/web/src/components/shared/folder-add-dialog.tsx",
             "apps/web/src/components/shared/folder-editor-dialog.tsx",
-            "apps/web/src/components/shared/folder-dot.tsx"
+            "apps/web/src/components/shared/folder-dot.tsx",
+            "apps/web/src/components/shared/list-folder-context.tsx",
+            "apps/web/src/components/templates/list-page.tsx",
+            "apps/web/src/components/shared/category-panel.tsx"
           ],
           "components": [
             "ManagedFolderPanel",
             "FolderPanel",
-            "FolderDot"
+            "FolderDot",
+            "CategoryPanel"
           ],
           "vars": [
             "--color-hairline"
@@ -552,7 +617,12 @@
             "apps/web/src/components/shared/grid-table.tsx",
             "apps/web/src/components/shared/grid-table.module.css",
             "apps/web/src/components/shared/data-table.module.css",
-            "apps/web/src/components/shared/table-presentation.module.css"
+            "apps/web/src/components/shared/table-presentation.module.css",
+            "apps/web/src/components/shared/heatmap-table.tsx",
+            "apps/web/src/components/shared/heatmap-table.module.css",
+            "apps/web/src/components/shared/month-calendar.tsx",
+            "apps/web/src/components/shared/month-calendar.module.css",
+            "apps/web/src/components/shared/table-cell-presentations.module.css"
           ],
           "components": [
             "DataTable",
@@ -564,7 +634,10 @@
             "GridTable",
             "GridHeadRow",
             "GridRow",
-            "GridCell"
+            "GridCell",
+            "PersonCell",
+            "HeatmapTable",
+            "MonthCalendarGrid"
           ],
           "vars": [
             "--color-table-head",
@@ -721,6 +794,7 @@
             "apps/web/src/components/ui/page-size-select.tsx",
             "apps/web/src/components/ui/list-range.tsx",
             "apps/web/src/components/shared/page-size-select.tsx",
+            "apps/web/src/components/shared/page-size-options.ts",
             "apps/web/src/components/shared/inbox-list.tsx",
             "apps/web/src/components/shared/inbox-list.module.css"
           ],
@@ -728,7 +802,9 @@
             "Pagination",
             "PageSizeSelect",
             "ListPagePagination",
-            "InboxHistoryButton"
+            "InboxHistoryButton",
+            "pageSizeOptions",
+            "pageSizeLabel"
           ],
           "vars": []
         },
@@ -738,7 +814,7 @@
             "name": "ページ送り"
           }
         ],
-        "status": "PageSizeSelect は components/ui にあり shared に無い（B-143）"
+        "status": "Pagination・PageSizeSelect・pageSizeOptionsが共通の件数とページ送りの正本"
       },
       "code": {
         "selectorHint": "pagination|pager|pageSize|perPage",
@@ -766,6 +842,11 @@
             "re": "(?:>|['\"`])[^<'\"`]{0,40}(?:前へ|次へ)",
             "why": "前へ・次へを手で置く",
             "onlyWithoutCanonical": true
+          },
+          {
+            "id": "own-range-text",
+            "re": "(?:summary=\\{\\s*|\\b(?:const|let)\\s+(?:pagerSummary|summary)\\s*=\\s*)`[^`]{0,500}(?:件中|人中)",
+            "why": "ページ送りの件数文を画面で組む（Pagination.rangeへ数値を渡す）"
           }
         ]
       },
@@ -884,12 +965,25 @@
             "apps/web/src/components/shared/dialog.tsx",
             "apps/web/src/components/shared/dialog.module.css",
             "apps/web/src/components/shared/confirm-dialog.tsx",
-            "apps/web/src/components/shared/overlay-utils.ts"
+            "apps/web/src/components/shared/overlay-utils.ts",
+            "apps/web/src/components/shared/action-words.ts",
+            "apps/web/src/components/shared/dialog-choice-cards.tsx",
+            "apps/web/src/components/shared/dialog-choice-cards.module.css",
+            "apps/web/src/components/shared/dialog-usage-table.tsx",
+        "apps/web/src/components/shared/dialog-form-row.tsx",
+        "apps/web/src/components/shared/dialog-content-row.module.css",
+        "apps/web/src/components/shared/dialog-recipient-list.tsx",
+        "apps/web/src/components/shared/dialog-recipient-list.module.css"
           ],
           "components": [
             "Dialog",
             "ConfirmDialog",
-            "DialogSteps"
+            "DialogSteps",
+            "DialogChoiceCards",
+            "DialogUsageTable",
+        "DialogFormRow",
+        "DialogContentRow",
+        "DialogRecipientList"
           ],
           "vars": [
             "--radius-panel",
@@ -965,12 +1059,14 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/entity-picker.tsx",
+            "apps/web/src/components/shared/entity-picker-window.tsx",
             "apps/web/src/components/shared/entity-picker.module.css",
             "apps/web/src/components/shared/entity-picker-sources.tsx",
             "apps/web/src/components/shared/hq-account-picker.tsx"
           ],
           "components": [
             "EntityPickerDialog",
+            "EntityPickerWindow",
             "EntityMultiPickerDialog",
             "HqAccountPickerDialog"
           ],
@@ -1037,13 +1133,16 @@
       "owner": {
         "code": {
           "files": [
-            "apps/web/src/components/shared/entity-picker.tsx"
+            "apps/web/src/components/shared/entity-picker.tsx",
+            "apps/web/src/components/shared/friend-match-row.tsx",
+            "apps/web/src/components/shared/friend-match-row.module.css"
           ],
           "components": [
             "EntityPickerSummary",
             "EntityPickerField",
             "HqAccountPickerField",
-            "HqAccountSelectField"
+            "HqAccountSelectField",
+            "FriendMatchRow"
           ],
           "vars": []
         },
@@ -1099,11 +1198,14 @@
             "apps/web/src/components/shared/select.module.css",
             "apps/web/src/components/shared/select-menu.tsx",
             "apps/web/src/components/shared/select-menu.module.css",
-            "apps/web/src/components/shared/menu-portal.tsx"
+            "apps/web/src/components/shared/menu-portal.tsx",
+            "apps/web/src/components/shared/image-multi-select.tsx",
+            "apps/web/src/components/shared/image-multi-select.module.css"
           ],
           "components": [
             "Select",
-            "SelectMenu"
+            "SelectMenu",
+            "ImageMultiSelect"
           ],
           "vars": [
             "--color-control-border",
@@ -1178,10 +1280,14 @@
             "apps/web/src/components/shared/tap-action-field.module.css",
             "apps/web/src/lib/tap-actions.ts",
             "apps/web/src/components/shared/use-tap-action-sources.ts"
+          ,
+            "apps/web/src/components/shared/tap-action-summary.tsx"
           ],
           "components": [
             "TapActionField",
             "TapTargetPicker"
+          ,
+            "TapActionSummary"
           ],
           "vars": []
         },
@@ -1256,9 +1362,13 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/tap-action-field.tsx"
+          ,
+            "apps/web/src/components/shared/tap-extras-rows.tsx"
           ],
           "components": [
             "TapActionField"
+          ,
+            "ChoiceExtrasRows"
           ],
           "vars": []
         },
@@ -1314,8 +1424,15 @@
       ],
       "owner": {
         "code": {
-          "files": [],
-          "components": [],
+          "files": [
+            "apps/web/src/components/shared/action-list.tsx",
+            "apps/web/src/components/shared/action-list.module.css",
+            "apps/web/src/components/shared/fixed-action-list.tsx"
+          ],
+          "components": [
+            "ActionList",
+            "FixedActionList"
+          ],
           "vars": []
         },
         "pen": [],
@@ -1364,11 +1481,13 @@
             "apps/web/src/components/shared/media-slot.tsx",
             "apps/web/src/components/shared/media-slot.module.css",
             "apps/web/src/components/shared/media-picker-dialog.tsx",
-            "apps/web/src/components/shared/media-library-upload.ts"
+            "apps/web/src/components/shared/media-library-upload.ts",
+            "apps/web/src/components/shared/image-multi-upload.tsx"
           ],
           "components": [
             "MediaSlot",
-            "MediaPickerDialog"
+            "MediaPickerDialog",
+            "ImageMultiUpload"
           ],
           "vars": []
         },
@@ -1555,7 +1674,15 @@
             "id": "fDAyI",
             "name": "入力欄/エラー"
           }
-        ]
+        ],
+        "liff": {
+          "files": [
+            "apps/liff/src/components/ui/FieldError.tsx"
+          ],
+          "components": [
+            "FieldError"
+          ]
+        }
       },
       "code": {
         "selectorHint": "error|invalid|alert",
@@ -2293,12 +2420,17 @@
       ],
       "owner": {
         "code": {
-          "files": [],
-          "components": [],
+          "files": [
+            "apps/web/src/components/shared/period-picker.tsx",
+            "apps/web/src/components/shared/period-picker.module.css"
+          ],
+          "components": [
+            "PeriodPicker"
+          ],
           "vars": []
         },
         "pen": [],
-        "status": "未実装（B-158 の 5：部品を作る）"
+        "status": "集計期間は共通PeriodPickerを使う"
       },
       "code": {
         "selectorHint": "range|period|days",
@@ -2342,11 +2474,14 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/bar-chart.tsx",
-            "apps/web/src/components/shared/bar-chart.module.css"
+            "apps/web/src/components/shared/bar-chart.module.css",
+            "apps/web/src/components/shared/heatmap-table.tsx",
+            "apps/web/src/components/shared/heatmap-table.module.css"
           ],
           "components": [
             "BarChart",
-            "BarChartEmpty"
+            "BarChartEmpty",
+            "HeatmapTable"
           ],
           "vars": []
         },
@@ -2513,7 +2648,8 @@
             "apps/web/src/components/shared/button.tsx",
             "apps/web/src/components/shared/button.module.css",
             "apps/web/src/components/shared/icon-button.tsx",
-            "apps/web/src/components/shared/icon-button.module.css"
+            "apps/web/src/components/shared/icon-button.module.css",
+            "apps/web/src/components/shared/action-words.ts"
           ],
           "components": [
             "Button",
@@ -2665,6 +2801,8 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/toggle.tsx",
+            "apps/web/src/components/shared/icon-button.tsx",
+            "apps/web/src/components/shared/icon-button.module.css",
             "apps/web/src/components/shared/checkbox.tsx",
             "apps/web/src/components/shared/segmented.tsx",
             "apps/web/src/components/shared/radio-card.tsx",
@@ -2672,15 +2810,22 @@
             "apps/web/src/components/shared/check-card.tsx",
             "apps/liff/src/card-surface.css",
             "apps/liff/src/index.css",
-            "apps/liff/src/components/ui/liff-skin.css"
+            "apps/liff/src/components/ui/liff-skin.css",
+            "apps/web/src/components/shared/heatmap-table.tsx",
+            "apps/web/src/components/shared/heatmap-table.module.css"
           ],
           "components": [
             "Toggle",
+            "IconButton",
             "Checkbox",
             "SegmentedControl",
             "RadioCard",
             "RadioCardGroup",
-            "CheckCard"
+            "CheckCard",
+            "UnavailableSelection",
+            "Radio",
+            "RadioGroup",
+            "HeatmapTable"
           ],
           "vars": [
             "--shadow-controls-toggle"
@@ -2715,7 +2860,15 @@
             "id": "r3xz1W",
             "name": "選ぶカード/オフ"
           }
-        ]
+        ],
+        "liff": {
+          "files": [
+            "apps/liff/src/components/ui/Button.tsx"
+          ],
+          "components": [
+            "Button"
+          ]
+        }
       },
       "code": {
         "selectorHint": "toggle|switch|segment|checkbox|radio",
@@ -2811,7 +2964,8 @@
             "apps/liff/src/components/ui/Stepper.tsx"
           ],
           "components": [
-            "Steps"
+            "Steps",
+            "StepSection"
           ],
           "vars": []
         },
@@ -3230,6 +3384,97 @@
       }
     },
     {
+      "id": "list-date-time",
+      "name": "一覧の日時",
+      "role": "時刻を持つ記録を統一した日付と時刻で1行に表示し、共通4pxの間隔と実寸を確保する",
+      "rules": [
+        "B-260",
+        "B-262"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/lib/format.ts",
+            "apps/web/src/components/shared/list-date-time.tsx",
+            "apps/web/src/components/shared/list-date-time.module.css"
+          ],
+          "components": [
+            "ListDateTime"
+          ],
+          "vars": [
+            "--tpl-slot-gap"
+          ]
+        },
+        "pen": [],
+        "status": "U1：Penの書式と役目の同期は司令塔"
+      },
+      "code": {
+        "selectorHint": "listDateTime",
+        "overrideSelectors": [
+          "listDateTime"
+        ],
+        "signals": [
+          {
+            "id": "own-split",
+            "re": "formatListTimestamp\\([^\\n]*\\)\\.split\\(",
+            "why": "日時の段分けを画面で書く（ListDateTimeへ日時を渡す）"
+          }
+        ]
+      },
+      "pen": {
+        "names": [
+          "一覧の日時"
+        ],
+        "types": [],
+        "ancestorNot": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/list-date-time.test.tsx",
+          "apps/web/src/lib/format.test.ts"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "list-status-cell",
+      "name": "一覧の状態の列",
+      "role": "名前と状態を分け、複数札を共通の間で並べる",
+      "rules": [
+        "B-194",
+        "B-254",
+        "B-267"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/table.tsx",
+            "apps/web/src/components/shared/data-table.module.css"
+          ],
+          "components": [
+            "StatusCell"
+          ],
+          "vars": [
+            "--tpl-slot-gap"
+          ]
+        },
+        "pen": []
+      },
+      "code": {
+        "overrideSelectors": [],
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/table.test.tsx"
+        ],
+        "needed": ""
+      }
+    },
+    {
       "id": "auth-page",
       "name": "認証の画面",
       "role": "確認・初回登録・回復コードを同じログインの枠で見せる",
@@ -3243,7 +3488,9 @@
             "apps/web/src/components/templates/auth-page.module.css"
           ],
           "components": [
-            "AuthPage"
+            "AuthPage",
+            "AuthHelp",
+            "AuthDetailRow"
           ],
           "vars": [
             "--tpl-ms-otp-card-w"
@@ -3254,6 +3501,35 @@
       },
       "code": {
         "selectorHint": "authPage",
+        "overrideSelectors": [],
+        "signals": []
+      }
+    },
+    {
+      "id": "verification-list",
+      "name": "接続のチェックの行",
+      "role": "入力した接続情報の検査結果を印・題・説明・状態で見せる",
+      "rules": [
+        "B-172",
+        "B-178",
+        "B-260"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/verification-list.tsx",
+            "apps/web/src/components/shared/verification-list.module.css"
+          ],
+          "components": [
+            "VerificationList"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "v2KMjの接続確認の行を共通部品へ"
+      },
+      "code": {
+        "selectorHint": "verification-list",
         "overrideSelectors": [],
         "signals": []
       }

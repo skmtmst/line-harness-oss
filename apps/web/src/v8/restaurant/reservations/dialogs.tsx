@@ -4,6 +4,7 @@ import { datetimeLocalJstToUtcIso, jstDateTimeLocal, jstCalendar } from '@/lib/j
 
 
 import { useEffect, useState } from 'react'
+import { Check, Download } from 'lucide-react'
 import { Field } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import Button from '@/components/shared/button'
@@ -101,7 +102,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   }
   const tableOptions = [
     { value: '', label: '未配席' },
-    ...tables.filter((table) => table.is_active || table.id === reservation.table_id).map((table) => ({ value: table.id, label: `${table.code}・${table.label}（${table.min_capacity}〜${table.max_capacity}名）` })),
+    ...tables.filter((table) => table.is_active || table.id === reservation.table_id).map((table) => ({ value: table.id, label: `${table.code}・${table.label}` })),
   ]
   const courseOptions = [
     { value: '', label: '席のみ' },
@@ -129,7 +130,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             )
           ) : null}
           <Button type="button" onClick={onClose} disabled={busy}>{canWrite && !hold ? 'キャンセル' : '閉じる'}</Button>
-          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy}>保存する</Button> : null}
+          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy}><Check aria-hidden="true" />保存する</Button> : null}
         </>
       )}
     >
@@ -242,7 +243,7 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
       actions={(
         <>
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button type="submit" variant="primary" disabled={busy}>受信として取り込む</Button>
+          <Button type="submit" variant="primary" disabled={busy}><Download aria-hidden="true" />受信として取り込む</Button>
         </>
       )}
     >

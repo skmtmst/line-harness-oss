@@ -1,3 +1,4 @@
+import { fingerprintMatches } from './ad-conversion-fingerprint.js';
 import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstNow, toJstString } from './utils.js';
 import { decryptCredential, encryptCredential } from './credential-crypto.js';
@@ -518,21 +519,6 @@ function conversionFingerprint(input: { clickId: string; clickIdType: string; ev
   return JSON.stringify({ c: `${input.clickIdType}:${input.clickId}`, v: input.eventValue ?? null, cur: (input.currency ?? 'JPY').toUpperCase() });
 }
 
-function fingerprintMatches(stored: string | null, expected: string): boolean {
-  // 指紋のない旧行は比較できないので、状態の判定に任せる。
-  if (stored == null || stored === '') return true;
-  if (stored === expected) return true;
-  // 通貨なしの旧形式は、cとvが合えば円として通す。通貨違いは別内容。
-  try {
-    const s = JSON.parse(stored) as { c?: unknown; v?: unknown; cur?: unknown };
-    const e = JSON.parse(expected) as { c?: unknown; v?: unknown; cur?: unknown };
-    if (typeof s !== 'object' || s === null || typeof e !== 'object' || e === null) return false;
-    return s.c === e.c && s.v === e.v && (s.cur ?? 'JPY') === (e.cur ?? 'JPY');
-  } catch {
-    return false;
-  }
-}
-
 function isUniqueViolation(error: unknown): boolean {
   const message = error instanceof Error ? `${error.name} ${error.message}` : String(error);
   return /unique/i.test(message);
@@ -697,7 +683,7 @@ export async function finishAdConversionSend(
 }
 
 /** 取り出し回数の上限。超えた行は failed のまま残し、人の手で送り直す。 */
-export const AD_CONVERSION_OUTBOX_MAX_ATTEMPTS = 5;
+export const AD_CONVERSION_OUTBOX_MAX_ATTEMPTS = 3;
 
 /** 失敗時の待ち時間の基準(分)。回数ごとに倍にし、12時間で頭打ちにする。 */
 export const AD_CONVERSION_OUTBOX_RETRY_BASE_MINUTES = 30;
@@ -816,6 +802,11 @@ export async function claimAdConversionOutboxDue(
   const staleBefore = toJstString(new Date(now.getTime() - (opts.staleMs ?? AD_CONVERSION_PENDING_TAKEOVER_MS)));
   const lease = crypto.randomUUID();
   const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
+  await db.prepare(`UPDATE ad_conversion_outbox SET status = 'failed', is_retryable = 0,
+    next_attempt_at = NULL, last_error = 'retry_limit_exceeded', updated_at = ?
+    WHERE is_retryable = 1 AND attempt_count >= ?
+      AND (status = 'failed' OR (status = 'sending' AND updated_at < ?))`)
+    .bind(nowStr, AD_CONVERSION_OUTBOX_MAX_ATTEMPTS, staleBefore).run();
   await db
     .prepare(
       `UPDATE ad_conversion_outbox SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
@@ -829,7 +820,7 @@ export async function claimAdConversionOutboxDue(
          LIMIT ?
        )`,
     )
-    .bind(lease, nowStr, opts.maxAttempts ?? AD_CONVERSION_OUTBOX_MAX_ATTEMPTS, nowStr, staleBefore, limit)
+    .bind(lease, nowStr, Math.min(opts.maxAttempts ?? AD_CONVERSION_OUTBOX_MAX_ATTEMPTS, AD_CONVERSION_OUTBOX_MAX_ATTEMPTS), nowStr, staleBefore, limit)
     .run();
   const result = await db
     .prepare(`SELECT * FROM ad_conversion_outbox WHERE lease_token = ?`)
@@ -862,7 +853,7 @@ export async function takeAdConversionOutboxRow(db: D1Database, id: string): Pro
   const result = await db
     .prepare(
       `UPDATE ad_conversion_outbox SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
-       WHERE id = ? AND is_retryable = 1 AND status IN ('pending', 'failed', 'sent')`,
+       WHERE id = ? AND is_retryable = 1 AND attempt_count < 3 AND status IN ('pending', 'failed', 'sent')`,
     )
     .bind(lease, jstNow(), id)
     .run<{ success: boolean; meta?: { changes?: number } }>();
@@ -905,7 +896,7 @@ export async function finishAdConversionOutbox(
     .bind(opts.id, opts.lease)
     .first<{ attempt_count: number }>();
   if (!row) return;
-  if (opts.retryable === false) {
+  if (opts.retryable === false || row.attempt_count >= 3) {
     await db
       .prepare(
         `UPDATE ad_conversion_outbox
@@ -977,7 +968,7 @@ export async function claimAdConversionRetry(
   const result = await db.prepare(`UPDATE ad_conversion_outbox
     SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
     WHERE id = ? AND line_account_id = ? AND created_at = ?
-      AND is_retryable = 1 AND status IN ('pending', 'failed')
+      AND is_retryable = 1 AND attempt_count < 3 AND status IN ('pending', 'failed')
       AND julianday(created_at) > julianday(?) - 90
       AND provider_event_id = ?
       AND EXISTS (SELECT 1 FROM ad_conversion_logs l

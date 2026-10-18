@@ -7,7 +7,7 @@ import { jstNow } from './utils.js';
  * ここが持つのは「どの店・どのメニューがどう払うか」と「払った記録」だけ。
  */
 
-export type BookingPaymentMode = 'none' | 'onsite' | 'online';
+export type BookingPaymentMode = 'none' | 'onsite' | 'online' | 'customer_choice';
 export type BookingPaymentProviderName = 'none' | 'onsite' | 'stripe';
 export type BookingPaymentStatus =
   | 'unpaid'
@@ -27,7 +27,7 @@ export interface BookingPaymentConfig {
 const DEFAULT_CONFIG: BookingPaymentConfig = { mode: 'none', provider: 'none', holdMinutes: 10 };
 
 function normalizeMode(value: unknown): BookingPaymentMode | null {
-  return value === 'none' || value === 'onsite' || value === 'online' ? value : null;
+  return value === 'none' || value === 'onsite' || value === 'online' || value === 'customer_choice' ? value : null;
 }
 
 function normalizeProvider(value: unknown, fallback = 'none'): string {
@@ -120,6 +120,11 @@ export interface BookingPaymentRecord {
   idempotency_key: string;
   hold_until: string | null;
   paid_at: string | null;
+  refunded_amount?: number;
+  actor_label?: string | null;
+  action_reason?: string | null;
+  refunded_at?: string | null;
+  receipt_url?: string | null;
 }
 
 /** 予約保存のbatch用。枠の競合で予約が作られなければ支払い行も作らない。 */
@@ -193,13 +198,24 @@ export async function markBookingPayment(
     `UPDATE booking_payments
         SET status = ?, provider_payment_id = COALESCE(?, provider_payment_id),
             paid_at = CASE WHEN ? = 'paid' THEN COALESCE(paid_at, ?) ELSE paid_at END,
+            refunded_at = CASE WHEN ? = 'refunded' THEN COALESCE(refunded_at, ?) ELSE refunded_at END,
             updated_at = ?
       WHERE id = ? AND line_account_id = ?`,
   ).bind(
-    input.status, input.providerPaymentId ?? null, input.status, now, now,
+    input.status, input.providerPaymentId ?? null, input.status, now, input.status, now, now,
     input.paymentId, input.lineAccountId,
   ).run();
   return await db.prepare(
     `SELECT * FROM booking_payments WHERE id = ? AND line_account_id = ?`,
   ).bind(input.paymentId, input.lineAccountId).first<BookingPaymentRecord>();
+}
+
+/** 予約時の本人の選択を優先し、既存予約は店/メニューの設定を読む。 */
+export async function resolveBookingPaymentForBooking(db: D1Database, accountId: string, bookingId: string, menuId: string): Promise<BookingPaymentConfig> {
+  const entitlement=await db.prepare('SELECT u.booking_id FROM booking_entitlement_uses u JOIN bookings b ON b.id=u.booking_id WHERE b.id=? AND b.line_account_id=?').bind(bookingId,accountId).first();
+  if(entitlement)return {mode:'none',provider:'none',holdMinutes:10};
+  const choice = await db.prepare(`SELECT mode,provider,hold_minutes FROM booking_payment_choices WHERE booking_id=? AND line_account_id=?`)
+    .bind(bookingId,accountId).first<{mode:'onsite'|'online';provider:string;hold_minutes:number}>();
+  if (choice) return {mode:choice.mode,provider:choice.provider,holdMinutes:choice.hold_minutes};
+  return resolveBookingPaymentConfig(db,accountId,menuId);
 }

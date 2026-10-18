@@ -1,4 +1,7 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
+import { serializeGroup } from './rich-menu-group-display.js';
+import { type ExternalLineArea } from './rich-menu-external-types.js'
+import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../services/rich-menu-group-input.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -115,33 +118,6 @@ import {
 } from '../lib/rich-menu-publisher.js';
 
 export const richMenuGroups = new Hono<Env>();
-
-// ----- Serialization (snake_case row → camelCase response) -----
-
-function serializeGroup(row: RichMenuGroup) {
-  return {
-    id: row.id,
-    accountId: row.account_id,
-    name: row.name,
-    chatBarText: row.chat_bar_text,
-    size: row.size,
-    defaultPageId: row.default_page_id,
-    isDefaultForAll: row.is_default_for_all === 1,
-    status: row.status,
-    publishingAt: row.publishing_at,
-    targetingCondition: row.targeting_condition,
-    targetingPriority: row.targeting_priority,
-    targetingEnabled: row.targeting_enabled === 1,
-    folderId: row.folder_id,
-    displayOrder: row.display_order,
-    // V8「トークを開いたとき メニューを開いておく」。LINE payload の selected。
-    defaultOpen: row.default_open === 1,
-    // M951: 保存時に送り返す版。古い版での保存は 409 で止める。
-    version: row.version ?? 1,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
 
 function serializeGroupWithPages(row: RichMenuGroupWithPages) {
   return {
@@ -304,18 +280,6 @@ async function recoverManualPublishShellsFromLine(
   }
   return recovered;
 }
-
-type ExternalLineArea = {
-  bounds?: { x?: number; y?: number; width?: number; height?: number };
-  action?: {
-    type?: string;
-    label?: string;
-    uri?: string;
-    text?: string;
-    displayText?: string;
-    richMenuAliasId?: string;
-  };
-};
 
 /** LINE 未管理メニューの動きを、画面が安全に説明できる最小形へ絞る。 */
 function serializeExternalArea(area: ExternalLineArea) {
@@ -1307,13 +1271,13 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
         // 数えられない行があっても一覧は出す。その行だけ人数を出さない。
       }
     }));
-    const items = pageItems.map((g) => ({
+    const items = await withStyleSampleMetadata(c.env.DB,pageItems.map((g) => ({
         ...g,
         thumbnailR2Key: imageByGroupId.get(g.id)?.key ?? null,
         pageCount: shapeByGroupId.get(g.id)?.pageCount ?? 0,
         defaultPageAreaCount: shapeByGroupId.get(g.id)?.areaCount ?? 0,
         audienceCount: audienceByGroupId.get(g.id) ?? null,
-      }));
+      })), 'rich_menu');
     if (paging) {
       const sort = sortKey === 'taps'
         ? [{ field: 'monthlyStats.taps', direction: 'desc' as const }, { field: 'id', direction: 'asc' as const }]
@@ -1336,7 +1300,7 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
     }
     return c.json({ success: true, data: items });
   } catch (error) {
-    console.error('GET /api/rich-menu-groups error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"GET /api/rich-menu-groups"}));
     return c.json({ success: false, error: 'リッチメニュー一覧を取得できませんでした' }, 503);
   }
 });
@@ -1355,7 +1319,7 @@ richMenuGroups.get(
       }
       return c.json({ success: true, data: impact });
     } catch (error) {
-      console.error('GET /api/rich-menu-groups/:groupId/delete-impact error:', error);
+      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"GET /api/rich-menu-groups/:groupId/delete-impact"}));
       return c.json(
         { success: false, error: '削除したときの影響を確認できませんでした' },
         503,
@@ -1491,7 +1455,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', requireDel
       },
     });
   } catch (error) {
-    console.error('POST /api/rich-menu-groups/:groupId/preview-targets error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/preview-targets"}));
     return c.json({ success: false, error: '対象人数を確認できませんでした' }, 503);
   }
 });
@@ -1513,7 +1477,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/usages', async (c) => {
       },
     });
   } catch (error) {
-    console.error('GET /api/rich-menu-groups/:groupId/usages error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"GET /api/rich-menu-groups/:groupId/usages"}));
     return c.json({ success: false, error: '使用先を確認できませんでした' }, 503);
   }
 });
@@ -1656,7 +1620,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId', async (c) => {
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return c.json({ success: false, error: 'not found' }, 404);
   }
-  return c.json({ success: true, data: serializeGroupWithPages(group) });
+  return c.json({ success: true, data: (await withStyleSampleMetadata(c.env.DB,[serializeGroupWithPages(group)],'rich_menu'))[0] });
 });
 
 richMenuGroups.post('/api/rich-menu-groups', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
@@ -1713,14 +1677,14 @@ richMenuGroups.post('/api/rich-menu-groups', requireDeliveryAccess('richMenus'),
         try {
           await c.env.IMAGES.delete(key);
         } catch {
-          console.error('POST /api/rich-menu-groups image apply orphan cleanup failed:', key);
+          console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups"}));
         }
         throw dbError;
       }
       const refreshed = await getRichMenuGroupWithPages(c.env.DB, created.id);
       return c.json({ success: true, data: serializeGroupWithPages(refreshed ?? created) });
     } catch (error) {
-      console.error('POST /api/rich-menu-groups image apply error:', error);
+      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups"}));
       return c.json(
         {
           success: false,
@@ -1887,13 +1851,13 @@ richMenuGroups.post(
   },
 );
 
-richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireDeliveryAccess('richMenus'), async (c) => {
+richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireDeliveryAccess('richMenus', 'archive'), async (c) => {
   const groupId = c.req.param('groupId');
   let impact: Awaited<ReturnType<typeof getRichMenuDeleteImpact>>;
   try {
     impact = await getRichMenuDeleteImpact(c.env.DB, groupId);
   } catch (error) {
-    console.error('DELETE /api/rich-menu-groups/:groupId impact error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"DELETE /api/rich-menu-groups/:groupId"}));
     return c.json(
       { success: false, error: '削除したときの影響を確認できませんでした' },
       503,
@@ -1956,7 +1920,8 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
     return c.json({ success: false, error: '画像が大きすぎます。1MB以下の画像を選んでください' }, 413);
   }
 
-  const buf = new Uint8Array(await c.req.arrayBuffer());
+  const buf = await readBoundedBytes(c.req.raw, 1024 * 1024);
+  if (buf === null) return c.json({ success: false, error: '画像が大きすぎます。1MB以下の画像を選んでください' }, 413);
   const validation = validateRichMenuImage(buf, buf.byteLength);
   if (!validation.ok) return inputError(c, { success: false, error: validation.error }, 400, ["pages"]);
 
@@ -1981,9 +1946,9 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
       await c.env.IMAGES.delete(key);
     } catch {
       // 片付けの失敗は元の失敗に付けない。ログだけ残す。
-      console.error('POST /api/rich-menu-groups/:groupId/pages/:pageId/image orphan cleanup failed:', key);
+      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/pages/:pageId/image"}));
     }
-    console.error('POST /api/rich-menu-groups/:groupId/pages/:pageId/image db error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/pages/:pageId/image"}));
     return c.json(
       {
         success: false,
@@ -2233,7 +2198,7 @@ function createLineClient(channelAccessToken: string): LineRichMenuClient {
   };
 }
 
-richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireDeliveryAccess('richMenus', 'publish'), inputJsonBoundary(), async (c) => {
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
   if (!idempotencyKey) {
     return inputError(c, { success: false, error: 'Idempotency-Key header required' }, 400, []);
@@ -2828,6 +2793,7 @@ richMenuGroups.get(
       }
       runs.push({
         id: request.id,
+        versionNumber: request.version_number ?? null,
         status: request.status,
         lastErrorCode: request.last_error_code,
         idempotencyKey: request.idempotency_key,
@@ -3005,7 +2971,7 @@ richMenuGroups.post(
         deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
       });
     } catch (auditError) {
-      console.error('rich_menu.reconcile audit insert failed:', auditError);
+      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/reconcile"}));
     }
 
     return c.json({
@@ -3020,7 +2986,7 @@ richMenuGroups.post(
 // LINE 上の alias / richmenu / default を全削除して draft に戻す。
 // 削除フローや、別 group を default にしたい時に使う。idempotent (既に消えてる
 // alias / richmenu は 404 を許容)。
-richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireDeliveryAccess('richMenus', 'publish'), inputJsonBoundary(), async (c) => {
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -3116,7 +3082,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireDeliveryA
 //     同 account 内の他 group の is_default_for_all は 0 にリセット。
 //
 // 前提: group が published かつ default_page に line_richmenu_id がセット済み。
-richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireDeliveryAccess('richMenus', 'publish'), inputJsonBoundary(), async (c) => {
   const groupId = c.req.param('groupId');
   let body: unknown;
   try {
@@ -3299,7 +3265,7 @@ richMenuGroups.post(
         deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
       });
     } catch (auditError) {
-      console.error('rich_menu.duplicate audit insert failed:', auditError);
+      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/duplicate"}));
     }
 
     return c.json(
@@ -3410,7 +3376,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/audience-summary', async (c) 
       },
     });
   } catch (error) {
-    console.error('GET /api/rich-menu-groups/:groupId/audience-summary error:', error);
+    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"GET /api/rich-menu-groups/:groupId/audience-summary"}));
     return c.json({ success: false, error: '対象人数を確認できませんでした' }, 503);
   }
 });
@@ -3495,7 +3461,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/test-apply', async (c) => {
  */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/test-apply',
-  requireDeliveryAccess('richMenus'),
+  requireDeliveryAccess('richMenus', 'test'),
   inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
@@ -3680,7 +3646,7 @@ richMenuGroups.post(
           deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
         });
       } catch (auditError) {
-        console.error('rich_menu.test_apply audit insert failed:', auditError);
+        console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/test-apply"}));
       }
 
       const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);
@@ -3702,7 +3668,7 @@ richMenuGroups.post(
  */
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/test-apply/revert',
-  requireDeliveryAccess('richMenus'),
+  requireDeliveryAccess('richMenus', 'test'),
   inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     // pages まで読む。公開済みメニューの「適用に使ったID」を確定し、
@@ -3820,7 +3786,7 @@ richMenuGroups.post(
             }
           }
         } catch (aliasError) {
-          console.warn('[test-apply revert] alias cleanup failed (non-fatal):', aliasError);
+          console.warn(JSON.stringify({"code":"routes_rich_menu_groups_warn","route":"POST /api/rich-menu-groups/:groupId/test-apply/revert"}));
         }
       }
       await deleteRichMenuShells(line, testShellIds);
@@ -3850,7 +3816,7 @@ richMenuGroups.post(
           deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
         });
       } catch (auditError) {
-        console.error('rich_menu.test_apply_revert audit insert failed:', auditError);
+        console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/test-apply/revert"}));
       }
 
       const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);

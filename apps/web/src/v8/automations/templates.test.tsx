@@ -117,13 +117,17 @@ describe('V8 オートメーションの見本（c7dxp）', () => {
     await render()
     expect(host.querySelector('[data-design-node="c7dxp"]')).not.toBeNull()
     expect(chipLabels()).toEqual([
+      'すべて 8', '友だちになった', 'メッセージを受け取った', 'タグが付いた', 'フォームに答えた', '+2',
+    ])
+    await act(async () => { named('+2')[0]!.click() })
+    expect(chipLabels()).toEqual([
       'すべて 8', '友だちになった', 'メッセージを受け取った', 'タグが付いた', 'フォームに答えた', '予約が確定した', '注文が確定した',
     ])
-    expect(host.querySelectorAll('li')).toHaveLength(8)
+    expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(8)
     expect(host.textContent).toContain('メッセージを受け取った（含まれる言葉）')
 
     await act(async () => { named('注文が確定した')[0]!.click() })
-    const names = [...host.querySelectorAll('li h2')].map((element) => element.textContent)
+    const names = [...host.querySelectorAll('[role="listitem"] h2')].map((element) => element.textContent)
     expect(names).toEqual(['購入のお礼', '初回購入でマイル'])
   })
 
@@ -144,6 +148,6 @@ describe('V8 オートメーションの見本（c7dxp）', () => {
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(named('この見本で下書きを作る')).toHaveLength(0)
     expect(named('見本から作る')).toHaveLength(0)
-    expect(host.querySelectorAll('li')).toHaveLength(8)
+    expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(8)
   })
 })

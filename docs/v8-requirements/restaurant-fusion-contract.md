@@ -57,3 +57,7 @@ allergy/anniversary/seat_preference は friend_fixed_fields で既存の情報�
 ## 次の束への受け渡し
 
 飲食2はこの全卓の占有・版を使い、628の実退店で全卓を解放する。飲食3の結果通知・来店回答は別物として扱う。飲食4のコース所要時間・フォームも同じ候補と版を使う。632のできごとのID・受取側完了・ジョブ取消条件は飲食2/3で追加する。ここでは未実装の送信を開始しない。
+
+## 操作と挙動（受け入れ）
+
+操作したらどう動くか・連携とエラー・日々の手順・今の作りとの食い違いは [飲食 操作と挙動](behavior/restaurant-fusion.md) にまとめた（2026-10-16 B-333）。 お金まわり・業種のダッシュボードは [style-and-money](behavior/style-and-money.md)、外のサービスの失敗は [integration-failures](behavior/integration-failures.md)、毎日の流れは [daily-operations](behavior/daily-operations.md)。

@@ -674,11 +674,7 @@ ecCommerce.get(
   const malformedSnapshots = Number(malformedRow?.count ?? 0);
   if (malformedSnapshots > 0) {
     // 運用者が「なぜ数が合わないのか」を後から追えるようにする。
-    console.warn(JSON.stringify({
-      event: 'ec_subscriptions_malformed_snapshots_skipped',
-      line_account_id: lineAccountId,
-      skipped: malformedSnapshots,
-    }));
+    console.warn(JSON.stringify({"code":"ec_subscriptions_malformed_snapshots_skipped","route":"GET /api/ec-commerce/subscriptions"}));
   }
 
   const items = rows.results.map((row) => {

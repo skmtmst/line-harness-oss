@@ -1,58 +1,41 @@
 'use client'
 
+import { revealInScroller } from './sidebar-current-item'
+import { V8_NAV_ICONS } from './sidebar-icons'
+export { revealInScroller } from './sidebar-current-item'
+
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 
+import { SidebarAccountMenu } from '@/components/hq/account-menu'
+import Notice from '@/components/shared/notice'
+import { defaultTitleForPath } from '@/components/shell/app-top-bar'
+import { usePageChrome } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
+import { allowFeatureNavigation, featureGateVisibility, usePreparingDialog } from './sidebar-feature-gate'
+import { SIDEBAR_TOGGLE_EVENT,UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import {
+FEATURE_SETTINGS_UPDATED_EVENT,
+SIDEBAR_FEATURE_BY_HREF,
+SPECIALIZED_FEATURE_KEYS,
+} from '@/lib/feature-settings'
+import { HQ_MENU_SECTIONS,isHqShellPath,menuOwnerForScreen,orderedMenuSections,type MenuItem,type MenuSection } from '@/lib/menu'
 import { useStaffRole } from '@/lib/staff-role'
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useBrand } from '@/lib/use-brand'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useAccount } from '@/contexts/account-context'
-import { SIDEBAR_TOGGLE_EVENT, UNANSWERED_REFRESH_EVENT } from '@/lib/events'
-import { useBrand } from '@/lib/use-brand'
-import { restaurantTestUiEnabled } from '@/lib/environment-features'
-import { HQ_MENU_SECTIONS, isHqShellPath, menuOwnerForScreen, orderedMenuSections, type MenuItem, type MenuSection } from '@/lib/menu'
-import { usePageChrome } from '@/components/shell/page-chrome'
-import { defaultTitleForPath } from '@/components/shell/app-top-bar'
-import SidebarIdentity from './sidebar-identity'
+import { useEffect,useLayoutEffect,useRef,useState } from 'react'
 import { brandInitial } from './brand-initial'
+import SidebarIdentity from './sidebar-identity'
+import { isBooleanRecord,watchNavOverflow } from './sidebar-nav-overflow'
 import SidebarVersion from './sidebar-version'
-import Notice from '@/components/shared/notice'
-import { SidebarAccountMenu } from '@/components/hq/account-menu'
-import {
-  FEATURE_SETTINGS_UPDATED_EVENT,
-  SIDEBAR_FEATURE_BY_HREF,
-  SPECIALIZED_FEATURE_KEYS,
-} from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
-import {
-  Bell, CalendarCheck, CalendarCog, Clipboard, ClipboardList, Clock, FileText, Folder, House, Inbox,
-  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Type, UserPlus, Users, Video, type LucideIcon,
-} from 'lucide-react'
 
-/*
- * ★V8 の左メニューの印（絵 d8X09・WQmep の「項目 〇〇 / 印」は lucide）。
- * V8 のときだけ使い、v7 は MENU_SECTIONS の線画のまま。載っていない項目も v7 の線画。鍵は MENU_SECTIONS の id。
- */
-const V8_NAV_ICONS: Record<string, LucideIcon> = {
-  dashboard: House,
-  inbox: Inbox,
-  friends: Users,
-  'friend-attributes': Tag,
-  scenarios: ClipboardList,
-  broadcasts: Send,
-  reminders: Bell,
-  'auto-replies': MessageCircleMore,
-  'friend-add-settings': UserPlus,
-  webinars: Video,
-  templates: FileText,
-  'rich-menus': LayoutGrid,
-  forms: Clipboard,
-  'common-vars': Type,
-  contents: Folder,
-  'booking-bookings': CalendarCheck,
-  'booking-menus': CalendarCog,
-  events: Ticket,
-  'booking-own-shifts': Clock,
+function NavIcon({ d, className }: { d: string; className?: string }) {
+  return (
+    <svg className={className ?? "h-[18px] w-[18px]"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
+    </svg>
+  )
 }
 
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
@@ -75,38 +58,6 @@ export const SIDEBAR_AUTO_COLLAPSE_BELOW = 1152
 
 /** 左メニューのいちばん下の「設定」（夕41・部品 njl8e）。歯車は予約設定と同じ形。 */
 const SETTINGS_GEAR_ICON = 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31-.826 2.37-2.37 1.04-.6 2.296-.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
-
-// ─── メニュー定義 ───
-//
-// Pen.dev の V5正式共通メニュー（`J33xq`）に合わせている。
-// 区分・並び・呼び名は設計が出どころで、勝手に足したり並べ替えたりしない。
-//
-// 行き先（href）は実装側の都合で決まる。設計は画面の名前しか持たないので、
-// 「設計の名前 → 実装のルート」の対応をここで引き受けている。
-// 例: 設計の「受信箱」は実装の /chats、「タグ」は /tags。
-//
-// 設計に無い画面（重複検出、プール管理など）は、対応する画面のタブとして
-// 中に入っている。サイドバーから消しても行けなくならない。
-
-/*
- * 項目そのものは `@/lib/menu` に置いてある。機能設定と同じものを読む。
- * ここに別で並べていた頃は、メニューにしか無い項目・機能設定にしか無い
- * 項目が双方にできて、切り替えても消えない項目があった。
- */
-function NavIcon({ d, className }: { d: string; className?: string }) {
-  return (
-    <svg className={className ?? "h-[18px] w-[18px]"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
-    </svg>
-  )
-}
-
-function isBooleanRecord(value: unknown): value is Record<string, boolean> {
-  return typeof value === 'object'
-    && value !== null
-    && !Array.isArray(value)
-    && Object.values(value).every((entry) => typeof entry === 'boolean')
-}
 
 /*
  * PERF-08: バッジ件数をアカウント単位で共有する直近値。
@@ -151,6 +102,7 @@ export default function Sidebar({
   const { title: chromeTitle } = usePageChrome()
   const mobileTitle = chromeTitle ?? defaultTitleForPath(pathname ?? '')
   const [isOpen, setIsOpen] = useState(false)
+  const preparing = usePreparingDialog()
   /*
    * ★V8（夕44-A・部品 T7XSI6）：組の開閉と V2 モードの扱いにテーマが要る。
    * SSR・最初の描画は v7 の形（hydration を一致させるため）で、
@@ -391,7 +343,6 @@ export default function Sidebar({
   const sections = isHq ? HQ_MENU_SECTIONS : orderedStoreSections
 
   const visibleSections = sections
-    .filter((section) => section.id !== 'restaurant-test' || restaurantTestUiEnabled())
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
@@ -407,8 +358,6 @@ export default function Sidebar({
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
 
-
-
         if (item.href === '/staff' && staffReadRole !== 'owner' && staffReadRole !== 'admin') return false
         if (item.href === '/accounts' && staffReadRole === 'staff') return false
         // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
@@ -417,6 +366,7 @@ export default function Sidebar({
         // 変えられる権限でも見えるだけ権限でも、メニューには出す（N-424）。
         const permissionKey = item.permissionKey ?? item.href
         if (staffReadRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
+        const gated = featureGateVisibility(item); if (gated !== undefined) return gated
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (!featureKey) return true
         if (!currentVisibility || currentVisibility[featureKey] !== true) return false
@@ -445,6 +395,26 @@ export default function Sidebar({
    * アカウントごとの直近値をモジュールに共有しておき、表示はそれで
    * 即復帰させてから裏で取り直す。
    */
+  /* 統括の「対応が要るもの」の札（B-322）。全アカウントの件数の合計。読めないときは出さない。 */
+  const [hqAttentionCount, setHqAttentionCount] = useState(0)
+  useEffect(() => {
+    if (!isHq) return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const { hqStyleApi } = await import('@/lib/api-styles')
+        const res = await hqStyleApi.attention()
+        if (cancelled || !res.success) return
+        setHqAttentionCount(res.data.items.reduce((sum, item) => sum + Object.values(item.counts as Record<string, number>).reduce<number>((a, b) => a + (b ?? 0), 0), 0))
+      } catch {
+        // 口がまだ無い・読めない：札を出さない
+      }
+    }
+    void load()
+    const id = setInterval(load, 5 * 60_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [isHq])
+
   const photosBadgeVisible = visibleSections.some(
     (section) => section.items.some((item) => item.badge === 'photos'),
   )
@@ -550,6 +520,7 @@ export default function Sidebar({
    */
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLElement>(null)
+  const desktopRef = useRef<HTMLElement>(null)
   const wasOpen = useRef(false)
   useEffect(() => {
     if (isOpen) {
@@ -577,6 +548,7 @@ export default function Sidebar({
    * 取り残される。
    */
   const badgeCount = (item: MenuItem) => {
+    if (item.badge === 'hq-attention') return hqAttentionCount
     if (item.badge === 'unanswered') return unansweredCount
     if (item.badge === 'photos') return pendingPhotoCount
     if (item.badge === 'unmatched') return unmatchedCount
@@ -660,6 +632,31 @@ export default function Sidebar({
     sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)),
   )
 
+  /*
+   * いまの画面の項目を、左メニューを開いたときに必ず全部見える位置へ巻く（2026-10-15 判定役）。
+   * 項目が多いと、下の方の項目（NEN配信など）が巻く領域の下端で半分切れ、
+   * 下に固定した「設定」の帯の陰に隠れて見えなかった。組を開く動き（--motion-base）が
+   * 終わってからもう一度測り、領域の中だけを巻く（ページ全体は巻かない）。
+   */
+  const activeItemKey = visibleSections
+    .flatMap((section) => section.items)
+    .find((item) => isActive(item))?.id ?? ''
+  // 機能の表示可否を読み終えて項目が増減したときも測り直す。
+  const visibleItemCount = visibleSections.reduce((sum, section) => sum + section.items.length, 0)
+  useEffect(() => {
+    if (!activeItemKey) return
+    const reveal = () => {
+      for (const root of [desktopRef.current, drawerRef.current]) {
+        const nav = root?.querySelector<HTMLElement>('[data-sidebar-scroll]')
+        const item = nav?.querySelector<HTMLElement>('[data-nav-active]')
+        if (nav && item) revealInScroller(nav, item, 8, item.closest<HTMLElement>(`.${styles.section}`))
+      }
+    }
+    const frame = requestAnimationFrame(reveal)
+    const timer = window.setTimeout(reveal, 320)
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(timer) }
+  }, [activeItemKey, isOpen, visibleItemCount])
+
   /**
    * 中身は1つ。ドロワーでも常時表示でも同じものを出す。
    *
@@ -715,7 +712,7 @@ export default function Sidebar({
       <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
-      <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
+      <nav ref={watchNavOverflow} className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
         {/*
           ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
           小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
@@ -739,7 +736,8 @@ export default function Sidebar({
             機能設定を読み込めませんでした。
           </Notice>
         )}
-        {visibleSections.map((section) => {
+        {/* B-261: 設定の入口は下の歯車。定義と現在地の判定は残す。 */}
+        {visibleSections.filter((section) => isHq || section.id !== 'settings').map((section) => {
           /*
            * ★V8（夕44-A）：組の見出しは押せる開閉。畳んだ組は見出しだけ
            * 残るので、組が丸ごと消えることはない。見出しの無い組（統括）は
@@ -789,8 +787,10 @@ export default function Sidebar({
                   href={item.href}
                   // V8は多数の別画面を先読みせず、選んだ画面だけ読み込む。
                   prefetch={false}
-                  onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
+                  onClick={(event) => allowFeatureNavigation(event, item.href, item.label, preparing) && setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={visibleLabel}
+                  aria-current={active ? 'page' : undefined}
+                  data-nav-active={active ? '' : undefined}
                   /*
                     いま開いている項目は、薄い緑の地に濃い緑の文字。設計も
                     この形。緑で塗りつぶして白抜きにすると、色の面積が大きく
@@ -846,10 +846,11 @@ export default function Sidebar({
 
       {/*
         ★V8（夕41・部品 njl8e）：左メニューのいちばん下、版の上に「設定」。
-        オーナー・管理者にだけ出す。設定の画面ではここが選ばれた形にする。
+        オーナー・管理者にだけ出す（閲覧専用のオーナー・管理者にも出す。設定は見るだけで開ける）。
+        設定の画面ではここが選ばれた形にする。
         nav は中身が多いときだけ縦に送り、この入口と版は下端に固定される。
       */}
-      {!isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
+      {!isHq && !preview && (staffReadRole === 'owner' || staffReadRole === 'admin') && (
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"
@@ -951,7 +952,7 @@ export default function Sidebar({
       </div>
 
       {/* オーバーレイ。ドロワーが開くのは xl 未満 */}
-      {isOpen && <div className={`${styles.scrim} ${styles.mobileOnly}`} onClick={() => setIsOpen(false)} />}
+      {preparing.dialog}{isOpen && <div className={`${styles.scrim} ${styles.mobileOnly}`} onClick={() => setIsOpen(false)} />}
 
       {/*
         スライドインするメニュー。
@@ -988,7 +989,7 @@ export default function Sidebar({
 
         中身は常に展開表示。幅で文字を出し分ける必要がなくなった。
       */}
-      <aside className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
+      <aside ref={desktopRef} className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
         {sidebarContent(false)}
       </aside>
     </>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 
 export type FormFieldProblem = {
   key: string
@@ -91,6 +91,7 @@ export function focusFieldById(id: string) {
  */
 export function useFormErrors() {
   const [, bump] = useState(0)
+  const focusAfterCommit = useRef(false)
   /** blur か送信で「見せてよい」になった欄 */
   const touchedRef = useRef(new Set<string>())
   /** 欄の定義（描画順＝まとめの並び順） */
@@ -279,9 +280,9 @@ export function useFormErrors() {
       touchedRef.current.add(key)
       if (def.check()) problems.push({ key, label: def.label })
     }
+    focusAfterCommit.current = problems.length > 0
     setSubmitted(true)
     bump((v) => v + 1)
-    if (problems.length > 0) requestAnimationFrame(focusFirst)
     return problems
   }
 
@@ -303,9 +304,9 @@ export function useFormErrors() {
       if (!inDialog.length) definitions().get(key)?.reveal?.()
       shown += 1
     }
+    focusAfterCommit.current = shown > 0
     setSubmitted(true)
     bump((v) => v + 1)
-    if (shown > 0) requestAnimationFrame(focusFirst)
     return shown
   }
 
@@ -321,12 +322,20 @@ export function useFormErrors() {
 
   /** 開き直した窓・空に戻した入力で、触れた印・まとめ・サーバーの誤りを消す。 */
   const reset = () => {
+    focusAfterCommit.current = false
     touchedRef.current.clear()
     serverRef.current.clear()
     serverTargets.current.clear()
     setSubmitted(false)
     bump((v) => v + 1)
   }
+
+  // Queue field focus only after React has committed errors and cleared saving.
+  useLayoutEffect(() => {
+    if (!focusAfterCommit.current) return
+    focusAfterCommit.current = false
+    requestAnimationFrame(focusFirst)
+  })
 
   const requirement = (key: string) => ({ required: Boolean(defsRef.current.get(key)?.required) })
   return { register, registerReveal, define, requirement, error, errorFor, invalid, touch, bind, listProblems, countIn, focusFirst, submit, setServerErrors, fail, clear, reset }

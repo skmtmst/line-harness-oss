@@ -11,6 +11,9 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const manual = vi.hoisted(() => ({ href: null as string | null }))
+vi.mock('@/lib/use-manual-href', () => ({ useTaskManualHref: () => manual.href }))
+
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string } & Record<string, unknown>) =>
     React.createElement('a', { href, ...rest }, children),
@@ -40,6 +43,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  manual.href = null;
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -127,4 +131,14 @@ describe('R174 店舗追加の入力欄の項目名', () => {
     expect(secret.getAttribute('aria-describedby')).toContain('-help')
     expect(channelId.getAttribute('type')).not.toBe('hidden')
   })
+})
+
+
+it('案内のURLを読めない間はリンクを隠し、取得後だけその案内を開ける', async () => {
+  await mount()
+  expect([...host.querySelectorAll('a,button')].find(el => el.textContent === 'アカウント作成方法・連携ガイド')).toBeUndefined()
+  manual.href = 'https://docs.example/guide'
+  await mount()
+  const guide = [...host.querySelectorAll('a')].find(el => el.textContent === 'アカウント作成方法・連携ガイド')
+  expect(guide?.getAttribute('href')).toBe('https://docs.example/guide')
 })

@@ -1,161 +1,41 @@
 'use client'
 
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { jstDate } from '@/lib/jst-datetime';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { closedOn, closedRanges, closedSpan } from './lib/closed-ranges';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { useAccount } from '@/contexts/account-context';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { useBookingEdit } from './lib/edit-permission';
+import { api, bookingApi, type BookingAvailabilitySlot, type BookingMenu, type BookingResource, type BookingSettings, type BookingStaff, type StaffMenuMatrix } from '@/lib/api';
+import type { StaffMember } from '@line-crm/shared';
+import { fetchAllPages } from './lib/fetch-all-pages';
+import { mergeStaffSlots } from './lib/preview-slots';
+import { bookingErrorMessage, bookingRulesErrorMessage } from './lib/menu-validation';
+import { DAYS, WEEKDAY_JP, sortedMenus, type LoadStatus, type V8TabEdit } from './tabs/shared';
+import { V8TabKey, V8_TAB_KEYS, V8_TAB_NODE, previewRange } from './settings-parts'
 
-import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
-
-/*
- * V8 予約設定（Pencil 板: owaS3 / P6EdLW / yRPxl / KRgTQ / x1OZS6 / VLEaj / xCoDe）。
- *
- * 白い1枚の板。頭に「← 予約へ」・題名・5タブ、左に設定、右にお客さまの
- * LINE 予約画面（LIFF）の写し、書きかけがある間だけ下に保存帯を出す。
- *
- * 動き（版つき保存・409 での読み直し・権限での閲覧のみ化・未保存の離脱
- * 確認）は v7 の /booking/menus と /booking/staff/shifts と同じ。
- * テーマが v7 のときはこのファイルは読まれず、従来の見た目が出る。
- */
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { closedOn, closedRanges, closedSpan } from './lib/closed-ranges'
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
-import { useSearchParams } from 'next/navigation'
-import dynamic from 'next/dynamic'
-import { Check, Smartphone } from 'lucide-react'
-import StickyBar from '@/components/shared/sticky-bar'
-import { notifyToast } from '@/components/shared/toast'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import { Tabs } from '@/components/shared/tabs'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useAccount } from '@/contexts/account-context'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { useBookingEdit } from './lib/edit-permission'
-import {
-  api,
-  bookingApi,
-  type BookingAvailabilitySlot,
-  type BookingMenu,
-  type BookingResource,
-  type BookingSettings,
-  type BookingStaff,
-  type StaffMenuMatrix,
-} from '@/lib/api'
-import type { StaffMember } from '@line-crm/shared'
-import { fetchAllPages } from './lib/fetch-all-pages'
-import { mergeStaffSlots } from './lib/preview-slots'
-import { bookingErrorMessage, bookingRulesErrorMessage } from './lib/menu-validation'
+import BookingSettingsView from './settings-view'
+import { LiffPhoneMenuStep, LiffPhoneDatetimeStep, LiffPhoneStaffStep } from './settings-parts'
 
-/*
- * 右の「見え方」の写し3部品も、見えてから読む（動的 import）。
- * タブと同じく、読み待ちは骨組みで段を保つ。
- */
-const LiffPhoneMenuStep = memo(dynamic(() => import('./liff-phone').then((module) => module.LiffPhoneMenuStep), {
-  loading: () => <SkeletonRows rows={7} />,
-  ssr: false,
-}))
-const LiffPhoneDatetimeStep = memo(dynamic(() => import('./liff-phone').then((module) => module.LiffPhoneDatetimeStep), {
-  loading: () => <SkeletonRows rows={7} />,
-  ssr: false,
-}))
-const LiffPhoneStaffStep = memo(dynamic(() => import('./liff-phone').then((module) => module.LiffPhoneStaffStep), {
-  loading: () => <SkeletonRows rows={7} />,
-  ssr: false,
-}))
-import {
-  DAYS,
-  V8TabEditContext,
-  WEEKDAY_JP,
-  AccountIcon,
-  StateCard,
-  SkeletonRows,
-  sortedMenus,
-  type LoadStatus,
-  type V8TabEdit,
-} from './tabs/shared'
-import styles from './settings.module.css'
-import ChannelsTabV8 from './channels-tab'
-import { PageHeading } from '@/components/templates/page-frame'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-
-/*
- * 速さのため、使わないタブの中身は後から読む（動的 import）。
- * 開いているタブの束だけ先に読み、ほかは選ばれてから読む。
- * 読み待ちの間は骨組みを出し、段のずれは作らない。
- * memo で包み、殻の描き直し（写し・保存帯など）が
- * タブの中まで波及しないようにする。
- */
-const MenusTabV8 = memo(dynamic(() => import('./tabs/menus-tab').then((module) => module.MenusTabV8), {
-  loading: () => <SkeletonRows rows={7} />,
-  ssr: false,
-}))
-const HoursTabV8 = memo(dynamic(() => import('./tabs/hours-tab').then((module) => module.HoursTabV8), {
-  loading: () => <SkeletonRows rows={7} />,
-  ssr: false,
-}))
-const HolidaysTabV8 = memo(dynamic(() => import('./tabs/holidays-tab').then((module) => module.HolidaysTabV8), {
-  loading: () => <SkeletonRows rows={7} />,
-  ssr: false,
-}))
-const RulesTabV8 = memo(dynamic(() => import('./tabs/rules-tab').then((module) => module.RulesTabV8), {
-  loading: () => <SkeletonRows rows={7} />,
-  ssr: false,
-}))
-const StaffTabV8 = memo(dynamic(() => import('./tabs/staff-tab').then((module) => module.StaffTabV8), {
-  loading: () => <SkeletonRows rows={7} />,
-  ssr: false,
-}))
-
-
-const V8_TABS = [
-  { key: 'menus', label: 'メニュー', node: 'owaS3' },
-  { key: 'hours', label: '受付枠', node: 'yRPxl' },
-  { key: 'holidays', label: '休業日', node: 'KRgTQ' },
-  { key: 'rules', label: '予約のルール', node: 'x1OZS6' },
-  { key: 'staff', label: '担当スタッフ', node: 'VLEaj' },
-  { key: 'channels', label: '予約経路', node: 'ZyDd6' },
-] as const
-type V8TabKey = (typeof V8_TABS)[number]['key']
-const V8_TAB_KEYS = new Set<string>(V8_TABS.map((tab) => tab.key))
-const V8_TAB_NODE: Record<V8TabKey, string> = {
-  menus: 'owaS3',
-  hours: 'yRPxl',
-  holidays: 'KRgTQ',
-  rules: 'x1OZS6',
-  staff: 'VLEaj',
-  channels: 'ZyDd6',
-}
-
-
-// LIFF の日時選択（apps/liff DateTimePicker）と同じく JST の今日から14日分。
-function previewRange(): { from: string; to: string } {
-  const now = new Date()
-  return { from: jstDate(now), to: jstDateOffset(13, now) }
-}
-
-
-
-
-
-
-
-
-/* ==================== 板（シェル） ==================== */
-
-export default function BookingSettingsV8({ accountId }: { accountId: string | null }) {
+export function useBookingSettings(accountId: string | null) {
   usePageTitle('予約設定')
-  usePageCrumbs([{ label: '予約', href: '/booking/bookings' }, { label: '予約設定' }])
+  // 左メニューの項目そのものの画面なので、上の帯は「ホーム › 予約設定」だけ（絵 VLEaj・P6EdLW）。
+  usePageCrumbs(null)
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
-  const rawTab = searchParams.get('tab')
+  const requestedTab = searchParams.get('tab')
+  const rawTab = requestedTab === 'tickets' ? 'passes' : requestedTab
+  useEffect(() => {
+    if (requestedTab !== 'tickets') return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', 'passes')
+    samePageUrl.replace(`?${params.toString()}`)
+  }, [requestedTab, searchParams, samePageUrl])
   const tab: V8TabKey = V8_TAB_KEYS.has(rawTab ?? '') ? (rawTab as V8TabKey) : 'menus'
   const tabRef = useRef(tab)
   tabRef.current = tab
@@ -198,7 +78,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     staffName: string | null
   }>({ status: 'loading', slots: [], closedDates: [], staffName: null })
   const [closedBookingCount, setClosedBookingCount] = useState<number | null>(null)
-  /* WEB057：設定・休業日・設備を保存したら、右の写しの空き枠も取り直す。 */
+  /* 設定・休業日・設備を保存したら、右の写しの空き枠も取り直す。 */
   const [previewRevision, setPreviewRevision] = useState(0)
 
   const generationRef = useRef(0)
@@ -371,7 +251,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     () => (settings?.exceptions ?? []).filter((item) => !item.scopeKind || item.scopeKind === 'store'),
     [settings],
   )
-  /* WEB056：長い休みも31日で打ち切らない。範囲で数える。 */
+  /* 長い休みも31日で打ち切らない。範囲で数える。 */
   const closedRangeList = useMemo(() => closedRanges(storeExceptions), [storeExceptions])
   useEffect(() => {
     const span = closedSpan(closedRangeList)
@@ -405,7 +285,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     setTabEdit(next)
   }, [])
   const [switchTarget, setSwitchTarget] = useState<V8TabKey | null>(null)
-  /* 保存が終わったらボタンを「✓ 保存しました」にする（B-17）。 */
+  /* 保存が終わったらボタンを「✓ 保存しました」にする。 */
   const [saveDone, setSaveDone] = useState(false)
   const prevSavingRef = useRef(false)
   useEffect(() => {
@@ -488,226 +368,22 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     [staff],
   )
   const phoneView = settings?.liffDateView ?? 'list'
-  const phone = useMemo(() => {
-    if (tab === 'menus') return <LiffPhoneMenuStep menus={menus} status={menusStatus} />
-    if (tab === 'staff') {
-      return <LiffPhoneStaffStep menu={previewMenu} staff={staff} designationFree={designationFree} status={staffStatus} />
-    }
-    return (
-      <LiffPhoneDatetimeStep
-        menu={previewMenu}
-        staffName={preview.staffName}
-        slots={preview.slots}
-        closedDates={preview.closedDates}
-        closedWeekdays={closedWeekdays}
-        view={phoneView}
-        status={preview.status}
-      />
-    )
-  }, [tab, menus, menusStatus, previewMenu, staff, designationFree, staffStatus, preview, closedWeekdays, phoneView])
 
-  return (
-    <V8TabEditContext.Provider value={registerTabEdit}>
-      <div className={styles.shell} data-design-node="owaS3">
-        <PageHeading title={<>予約設定</>}
-        help={<>お客さまの予約画面に出るメニュー・時間・ルールを決めます</>}
-        tabs={<><Tabs
-              label="予約設定のタブ"
-              items={V8_TABS.map((item) => ({
-                label: item.label,
-                current: item.key === tab,
-                onClick: () => requestTab(item.key),
-              }))}
-            /></>} />
-
-        {accountId && tabReadOnly ? (
-          <div className={styles.readOnlyRow} data-design="Bar">
-            <ReadOnlyNotice />
-          </div>
-        ) : null}
-
-        <div className={styles.body} data-design="Body">
-          <div className={tab === 'channels' ? `${styles.main} ${styles.mainChannels}` : styles.main} data-design-node={tab === 'menus' && !canEditMenus ? 'C9fv7A' : tabNode}>
-            {!accountId ? (
-              <StateCard
-                icon={<AccountIcon />}
-                title="LINEアカウントを選んでください"
-                description="共通メニューで、予約設定を開くLINEアカウントを選んでください。"
-              />
-            ) : tab === 'menus' ? (
-              <MenusTabV8
-                accountId={accountId}
-                menus={menus}
-                status={menusStatus}
-                error={menusError}
-                menuCount={settings?.menuCount}
-                canEdit={canEditMenus}
-                onReload={reloadCore}
-              />
-            ) : tab === 'hours' ? (
-              <HoursTabV8
-                accountId={accountId}
-                settings={settings}
-                settingsStatus={settingsStatus}
-                settingsError={settingsError}
-                resources={resources}
-                resourcesStatus={resourcesStatus}
-                resourcesError={resourcesError}
-                canEdit={canEditSettings}
-                menus={menus}
-                onSaved={saveSettings}
-                onReload={reloadCore}
-                onResourceSaved={saveResource}
-                onResourceCreated={createResource}
-                onResourceDeleted={deleteResource}
-                onResourcesRetry={retryResources}
-              />
-            ) : tab === 'holidays' ? (
-              <HolidaysTabV8
-                accountId={accountId}
-                settings={settings}
-                status={settingsStatus}
-                error={settingsError}
-                exceptions={storeExceptions}
-                closedWeekdays={closedWeekdays}
-                bookingCountOnClosed={closedBookingCount}
-                canEdit={canEditSettings}
-                onSaved={saveSettings}
-                onReload={reloadCore}
-              />
-            ) : tab === 'rules' ? (
-              <RulesTabV8
-                accountId={accountId}
-                settings={settings}
-                status={settingsStatus}
-                error={settingsError}
-                staff={staff}
-                staffReady={staffStatus === 'ready'}
-                canEdit={canEditSettings}
-                onSaved={saveSettings}
-                onReload={reloadCore}
-              />
-            ) : tab === 'staff' ? (
-              <StaffTabV8
-                accountId={accountId}
-                staff={staff}
-                status={staffStatus}
-                error={staffError}
-                matrices={staffMatrices}
-                extras={staffExtras}
-                members={members}
-                canEdit={canEditSettings}
-                onReload={reloadCore}
-              />
-            ) : (
-              <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} staff={staff} />
-            )}
-          </div>
-
-          {/* 予約経路の連携は横に広い表なので、右のスマホを出さず全幅にする（絵 ZyDd6）。 */}
-          {tab === 'channels' ? null : (
-          <aside className={styles.side} data-design="Side">
-            <div className={styles.sideActions}>
-              <span className={styles.sidePhoneButton}>
-                <Button onClick={() => setPhoneOpen(true)}><Smartphone size={15} aria-hidden="true" />LINEでの見え方を見る</Button>
-              </span>
-              {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
-            </div>
-            <p className={styles.sideTitle}>お客さまの予約画面</p>
-            <div className={styles.sidePhone}>{phone}</div>
-            {previewUrl ? null : (
-              <p className={styles.sideLineLink}>このアカウントには予約画面のURLがまだありません</p>
-            )}
-          </aside>
-          )}
-        </div>
-
-        {/* 下の帯（追従・常に画面の下）。キャンセル・保存は中央（絵 yRPxl・x1OZS6）。
-            変えられない人（閲覧のみ）には押せないボタンを置かないので帯ごと出さない。 */}
-        {tabEdit && tabEdit.showBar !== false && !tabEdit.saveDisabled ? (
-          <div className={styles.saveBarWrap} data-design="Savebar">
-            <StickyBar
-              status={tabEdit.dirty ? (
-                <span className={styles.saveBarStatus}>
-                  <span className={styles.saveBarStatusDot} aria-hidden="true" />
-                  {tabEdit.subject}があります
-                </span>
-              ) : undefined}
-              actions={(
-                <>
-                  <Button onClick={() => tabEdit.onReset()} disabled={tabEdit.saving}>キャンセル</Button>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      if (!tabEdit.dirty) {
-                        notifyToast('変更はありません。')
-                        return
-                      }
-                      tabEdit.onSave()
-                    }}
-                    disabled={tabEdit.saving}
-                    busy={tabEdit.saving}
-
-                  >
-                    <Check size={15} aria-hidden="true" />{tabEdit.saveLabel ?? '保存する'}
-                  </Button>
-                </>
-              )}
-            />
-          </div>
-        ) : null}
-      </div>
-
-      {/* タブをまたぐときの破棄確認（タブ内のデータは外れると消える）。 */}
-      <ConfirmDialog
-        open={switchTarget !== null}
-        title={`${tabEdit?.subject ?? '変更'}を捨てて移りますか？`}
-        description="保存していない変更は消えます。"
-        confirmLabel="捨てて移る"
-        cancelLabel="編集に戻る"
-        primaryAction="cancel"
-        onCancel={() => setSwitchTarget(null)}
-        onConfirm={confirmSwitch}
-      />
-      <UnsavedLeaveDialog
-        open={leaveTarget !== null}
-        subject={tabEdit?.subject ?? '変更'}
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
-      {/* 板 VFxWU（1152）：畳んだスマホの代わりに見せる窓。実行ボタンなしの参照窓。 */}
-      <Dialog
-        open={phoneOpen}
-        title="お客さまの予約画面"
-        onCancel={() => setPhoneOpen(false)}
-      >
-        {phone}
-      </Dialog>
-    </V8TabEditContext.Provider>
-  )
+  return { accountId, tab, previewUrl, tabNode, canEditMenus, canEditSettings, tabReadOnly, menus, menusStatus, menusError, settings, settingsStatus, settingsError, staff, staffStatus, staffError, staffMatrices, staffExtras, phoneOpen, setPhoneOpen, members, resources, resourcesStatus, resourcesError, closedBookingCount, storeExceptions, tabEdit, registerTabEdit, switchTarget, setSwitchTarget, leaveTarget, confirmLeave, cancelLeave, requestTab, confirmSwitch, reloadCore, saveSettings, saveResource, createResource, deleteResource, retryResources, closedWeekdays, previewMenu, designationFree, preview, phoneView, hasChanges: Boolean(tabEdit?.dirty), menuFormState: { dirty: false } }
 }
 
-
-/* ==================== ① メニュー（owaS3） ==================== */
-
-
-/* ==================== ② 受付枠（yRPxl） ==================== */
-
-
-/* 設備の1行。中身の編集は窓で、止める・消すは「…」の中。 */
-
-/* 設備の追加・編集の窓。版つき保存・409 は v7 の ResourceEditor と同じ。 */
-
-/* IDEA-28: 日時を指定して予約できるか確かめる。読み取りだけで予約は作らない。 */
-
-/* ==================== ③ 休業日（KRgTQ） ==================== */
-
-/** `YYYY-MM` の月を日曜はじまりの週ごとの日付（YYYY-MM-DD）に並べる。 */
-
-
-
-
-/* ==================== ④ 予約のルール（x1OZS6） ==================== */
-
-
-/* ==================== ⑤ 担当スタッフ（VLEaj） ==================== */
+export default function BookingSettingsV8({ accountId }: { accountId: string | null }) {
+  const model = useBookingSettings(accountId)
+  const { tab, menus, menusStatus, previewMenu, staff, designationFree, staffStatus, preview, closedWeekdays, phoneView } = model
+  const phone = useMemo(() => {
+    if (tab === 'menus') return <LiffPhoneMenuStep menus={menus} status={menusStatus} />
+    if (tab === 'staff') return <LiffPhoneStaffStep menu={previewMenu} staff={staff} designationFree={designationFree} status={staffStatus} />
+    return <LiffPhoneDatetimeStep menu={previewMenu} staffName={preview.staffName} slots={preview.slots}
+      closedDates={preview.closedDates} closedWeekdays={closedWeekdays} view={phoneView} status={preview.status} />
+  }, [tab, menus, menusStatus, previewMenu, staff, designationFree, staffStatus, preview, closedWeekdays, phoneView])
+  return <>
+    <BookingSettingsView {...model} phone={phone} />
+    <UnsavedLeaveDialog open={model.leaveTarget !== null} subject={model.tabEdit?.subject ?? '変更'}
+      onConfirm={model.confirmLeave} onCancel={model.cancelLeave} />
+  </>
+}

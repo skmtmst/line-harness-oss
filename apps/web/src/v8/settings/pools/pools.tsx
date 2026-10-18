@@ -1,5 +1,8 @@
 'use client'
 
+import { orderPools } from './pool-order'
+export { orderPools } from './pool-order'
+
 import { useSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle } from '@/components/shared/save-conflict'
 
 /*
@@ -14,12 +17,13 @@ import { useSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConfl
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Info, Plus } from 'lucide-react'
+import { Copy, Plus } from 'lucide-react'
+import Card, { CardHeader } from '@/components/shared/card'
 import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import { useStaffRole } from '@/lib/staff-role'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
@@ -44,17 +48,10 @@ type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
 const TITLE = 'プール管理'
 const DESCRIPTION = '来たお客さまを振り分ける LINE アカウントをまとめる入れ物です。公開 URL から来た人を、有効の所属アカウントからランダムに振り分けます。'
 
-/** 既定のプール（main）を先頭に、あとは作った順。 */
-export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {
-  return [...pools].sort((a, b) => {
-    if (a.slug === 'main') return -1
-    if (b.slug === 'main') return 1
-    return a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name, 'ja')
-  })
-}
 
 export default function PoolsV8() {
   usePageTitle(TITLE)
+  usePageCrumbs([{ label: '設定', href: '/settings' }])
   const role = useStaffRole()
   // APIと同じくオーナーだけ。役割の確認中も変更操作を隠す。
   const canManage = role === 'owner'
@@ -97,7 +94,7 @@ export default function PoolsV8() {
   if (featureOff) {
     return (
       <div className={frame.screen}>
-        <SettingsPage layout="accounts" boardId="u3iab3" title={TITLE} help={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
+        <SettingsPage layout="accounts" heightMode="content" boardId="u3iab3" title={TITLE} help={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
           <FeatureDisabledScreen featureId="multi_store_hierarchy" />
         </SettingsPage>
       </div>
@@ -115,7 +112,7 @@ export default function PoolsV8() {
 
   return (
     <div className={frame.screen}>
-      <SettingsPage layout="accounts"
+      <SettingsPage layout="accounts" heightMode="content"
         boardId="u3iab3"
         title={TITLE}
         help={DESCRIPTION}
@@ -138,10 +135,7 @@ export default function PoolsV8() {
                 <PoolCard key={pool.id} pool={pool} accounts={accounts} canManage={canManage} onChange={() => void load()} />
               ))}
             </div>
-            <p className={styles.notice} role="note">
-              <Info size={16} aria-hidden="true" className={styles.noticeIcon} />
-              <span>「外す」と、これから来たお客さまはそのアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。</span>
-            </p>
+            <Notice tone="info">「外す」と、これから来たお客さまはそのアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。</Notice>
           </>
         )}
       </SettingsPage>
@@ -225,13 +219,9 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   }
 
   return (
-    <section className={styles.card} aria-label={pool.name}>
-      <div className={styles.cardHead}>
-        <div className={styles.cardTitleBox}>
-          <h2 className={styles.cardTitle} title={pool.name}>{pool.name}</h2>
-          <p className={styles.slug} title={pool.slug}>slug：{pool.slug}{isMain ? '・既定' : ''}</p>
-        </div>
-        {canManage ? (
+    <Card layout="vertical" padding="compact" gap="var(--polish-space-field)" aria-label={pool.name}>
+      <CardHeader size="stacked" title={pool.name} meta={`slug：${pool.slug}${isMain ? '・既定' : ''}`} action={
+        canManage ? (
           <div className={styles.menuBox}>
             <RowMenu
               label={`${pool.name}の操作`}
@@ -241,12 +231,11 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
               items={[{ id: 'edit', label: '編集する', onSelect: () => { setMenuOpen(false); setEditName(pool.name); setEditVersion(pool.updatedAt); conflict.clear(); setEditError(''); setNameError(''); setEditing(true) } }, ...(!isMain ? [{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } } as const] : [])]}
             />
           </div>
-        ) : null}
-      </div>
-      <div className={styles.urlRow}>
+        ) : null} />
+      <Card layout="horizontal" surface="muted" padding="compact" gap="var(--polish-space-row)">
         <span className={styles.url} ><TruncatedText value={String(publicUrl ?? '')} url /></span>
-        <CopyTextButton value={publicUrl} aria-label="公開URLをコピー"  />
-      </div>
+        <CopyTextButton value={publicUrl} aria-label="公開URLをコピー" variant="secondary" label="公開 URL コピー" icon={<Copy size={16} aria-hidden="true" />} />
+      </Card>
       {copyError ? <Notice tone="danger" >{copyError}</Notice> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
 
@@ -273,7 +262,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
           setDeleteError('')
         }}
       />
-    </section>
+    </Card>
   )
 }
 
@@ -351,32 +340,34 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
           const name = acc?.name ?? m.lineAccountId
           const friends = acc?.stats?.friendCount == null ? '—' : polishFormatNumber(acc.stats.friendCount)
           return (
-            <li key={m.id} className={styles.member}>
+            <li key={m.id}><Card frame="inset" layout="horizontal" surface="inset" corner="control" padding="compact" gap="var(--polish-space-row)">
               <span className={styles.memberName} ><TruncatedText value={String(name ?? '')} /></span>
               <span className={styles.memberFriends}>{`友だち ${friends}`}</span>
               {canManage ? (
                 <Button variant="secondary" onClick={() => { setRemoveError(''); setRemoveTarget({ id: m.id, name }) }}>外す</Button>
               ) : null}
-            </li>
+            </Card></li>
           )
         })}
         {members.length === 0 && !listError ? <li className={styles.empty}>所属アカウントなし</li> : null}
       </ul>
       {listError ? (
-        <Notice tone="danger" >{listError}{' '}<button type="button" className={styles.textButton} onClick={() => void reload()}>もう一度読み込む</button></Notice>
+        <Notice tone="danger" >{listError}{' '}<Button type="button" variant="text" onClick={() => void reload()}>もう一度読み込む</Button></Notice>
       ) : null}
       {canManage && candidates.length > 0 ? (
         <div className={styles.menuBox}>
-          <button
+          <Button
             ref={addRef}
             type="button"
-            className={styles.addLink}
+            variant="text"
+            size="inline"
+            textTone="accent"
             aria-haspopup="menu"
             aria-expanded={addOpen}
             onClick={() => setAddOpen(!addOpen)}
           >
-            ＋ アカウントを追加
-          </button>
+            <Plus size={14} aria-hidden="true" />アカウントを追加
+          </Button>
           <ActionMenu
             open={addOpen}
             anchorRef={addRef}

@@ -87,20 +87,24 @@ type DialogProps = {
   error?: string
   allowEmpty?: boolean
   initialFolder?: string
+  /** 窓の下の段の案内（一括配信の「除く人は次の手順で決めます」など）。 */
+  note?: string
+  /** 行を2段にする（名前の下に人数と状態・WjFWW）。 */
+  stacked?: boolean
   onConfirm: (ids: string[]) => void
   onCancel: () => void
 }
 
 /** 配るアカウントを選ぶ窓（まとめて選ぶ・アカウントのフォルダ）。 */
-export function HqAccountPickerDialog({ title = '配るアカウントを選ぶ', description, accounts, data, initialIds, meta, disabledIds, rowExtra, readOnly, busy, error, allowEmpty, initialFolder, onConfirm, onCancel }: DialogProps) {
+export function HqAccountPickerDialog({ title = '配るアカウントを選ぶ', description, accounts, data, initialIds, meta, disabledIds, rowExtra, readOnly, busy, error, allowEmpty, initialFolder, note, stacked, onConfirm, onCancel }: DialogProps) {
   const items = useMemo(() => toHqAccountItems(accounts, data, meta, disabledIds ? (account) => disabledIds.includes(account.id) : undefined), [accounts, data, meta, disabledIds])
   return <EntityMultiPickerDialog title={title} description={description} unit="アカウント" items={items} folders={toPickerFolders(data.folders)} foldersFailed={data.failed}
     initialIds={initialIds} searchPlaceholder="名前で探す" rowExtra={rowExtra} readOnly={readOnly} busy={busy} error={error} allowEmpty={allowEmpty} initialFolder={initialFolder}
-    createHref="/hq/accounts" createLabel="アカウントを足す" onConfirm={onConfirm} onCancel={onCancel} />
+    createHref="/hq/accounts" createLabel="アカウントを足す" note={note} stacked={stacked} onConfirm={onConfirm} onCancel={onCancel} />
 }
 
 /** 配るアカウントの欄（「3 アカウント 渋谷エリア 2・テスト 1 ［変える］」）。 */
-export function HqAccountPickerField({ label = '配るアカウント', title, description, accounts, value, onChange, meta, disabledIds, rowExtra, disabled, readOnly, allowEmpty = true, buttonRef, id }: {
+export function HqAccountPickerField({ label = '配るアカウント', title, description, accounts, value, onChange, meta, disabledIds, rowExtra, disabled, readOnly, allowEmpty = true, buttonRef, id, invalid, describedBy }: {
   label?: string
   title?: string
   description?: string
@@ -115,6 +119,8 @@ export function HqAccountPickerField({ label = '配るアカウント', title, d
   allowEmpty?: boolean
   buttonRef?: Ref<HTMLButtonElement>
   id?: string
+  invalid?: boolean
+  describedBy?: string
 }) {
   const data = useHqAccountFolders(true)
   const [open, setOpen] = useState(false)
@@ -122,7 +128,7 @@ export function HqAccountPickerField({ label = '配るアカウント', title, d
   const folders = useMemo(() => toPickerFolders(data.folders), [data.folders])
   const picked = describePicked(items, folders, value, 'アカウント', (chosen) => summarizeByFolder(chosen, folders))
   return <>
-    <EntityPickerSummary label={label} noun={label} icon={Building2} name={picked.name} meta={picked.meta} disabled={disabled} readOnly={readOnly} id={id} buttonRef={buttonRef} onOpen={() => setOpen(true)} />
+    <EntityPickerSummary label={label} noun={label} icon={Building2} name={picked.name} meta={picked.meta} disabled={disabled} readOnly={readOnly} id={id} buttonRef={buttonRef} invalid={invalid} describedBy={describedBy} onOpen={() => setOpen(true)} />
     {open ? <HqAccountPickerDialog title={title ?? `${label}を選ぶ`} description={description} accounts={accounts} data={data} initialIds={value} meta={meta} disabledIds={disabledIds} rowExtra={rowExtra}
       readOnly={readOnly} allowEmpty={allowEmpty} onCancel={() => setOpen(false)} onConfirm={(ids) => { onChange(ids); setOpen(false) }} /> : null}
   </>

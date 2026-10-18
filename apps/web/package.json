@@ -9,6 +9,7 @@
     "update:raw-color-baseline": "node ./scripts/raw-color-baseline.mjs",
     "update:direct-values-baseline": "node ./scripts/direct-values-baseline.mjs",
     "build": "next build",
+    "postbuild": "node ../../scripts/security/externalize-bootstrap.mjs out",
     "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "typecheck": "tsc --noEmit",
     "start": "next start",
@@ -27,7 +28,7 @@
     "@line-crm/shared": "workspace:*",
     "@line-harness/update-engine": "workspace:*",
     "lucide-react": "^1.34.0",
-    "next": "^15.5.21",
+    "next": "15.5.27",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

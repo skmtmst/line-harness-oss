@@ -48,7 +48,7 @@ async function load(testDb: SqliteD1) {
   const response = await app().request(
     '/api/settings/features?account_id=account-1',
     {},
-    { DB: testDb.db, RESTAURANT_TEST_ENABLED: 'true' },
+    { DB: testDb.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' },
   );
   expect(response.status).toBe(200);
   return response.json<{

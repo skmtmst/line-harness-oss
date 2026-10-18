@@ -387,7 +387,7 @@ async function fetchSlots(date: string): Promise<void> {
     if (generation === slotsGeneration && date === state.selectedDate) state.slots = json.data;
   } catch (err) {
     if (generation === slotsGeneration && date === state.selectedDate) state.slotsFailed = true;
-    console.error('fetchSlots error:', err);
+    console.error(JSON.stringify({"code":"client_booking_failed"}));
   } finally {
     if (generation === slotsGeneration && date === state.selectedDate) {
       state.loading = false;

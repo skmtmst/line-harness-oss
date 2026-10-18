@@ -1,0 +1,32 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.grid { display: grid; grid-template-columns: calc(var(--space-32) * 3 + var(--space-14)) repeat(5, minmax(0, 1fr)); column-gap: var(--space-4); row-gap: var(--space-4); }
+.gridFixed { grid-column: 1; }
+.colHead { display: flex; justify-content: center; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.rowHead { display: flex; align-items: center; color: var(--color-ink-secondary); font-size: var(--text-caption); grid-column: 1; }
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-block-size: calc(var(--space-32) * 2);
+  padding: var(--space-8);
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+  background: var(--color-accent-soft);
+}
+.cell[data-level='0'] { background: var(--color-canvas-sunken); }
+.cell[data-level='1'] { background: color-mix(in srgb, var(--color-accent-deep) 12%, var(--color-canvas)); }
+.cell[data-level='2'] { background: color-mix(in srgb, var(--color-accent-deep) 28%, var(--color-canvas)); }
+.cell[data-level='3'] { background: color-mix(in srgb, var(--color-accent-deep) 55%, var(--color-canvas)); }
+.cell[data-level='4'] { background: var(--color-accent-deep); color: var(--color-on-accent); }
+.cell[aria-pressed='true'] { outline: var(--polish-focus-width) solid var(--color-ink); outline-offset: calc(var(--polish-focus-offset) * -1); }
+.cellName { overflow: hidden; font-size: var(--text-micro); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.cellCount { font-size: var(--text-body); font-weight: 700; }
+
+
+.cell:focus-visible { outline: var(--focus-ring); outline-offset: var(--polish-focus-offset); }
+}

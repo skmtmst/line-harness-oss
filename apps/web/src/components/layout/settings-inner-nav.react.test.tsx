@@ -89,6 +89,8 @@ describe('★V8 設定の中のメニュー', () => {
     await waitFor(() => expect(view.queryByRole('link', { name: 'プール管理' })).toBeTruthy())
     const links = view.getAllByRole('link').map((link) => link.textContent)
     expect(links).toEqual([
+      // B-237（10-11）で足したお客さまのデザイン。絵 ewM7i では会社とロゴ（API 待ち）の次。
+      'お客さまのデザイン',
       'はじめの設定',
       'LINEアカウント',
       'プール管理',
@@ -101,7 +103,7 @@ describe('★V8 設定の中のメニュー', () => {
       'EC連携',
       'LINE通知',
       // 提案 E-6：今ある絵の並びを動かさないよう末尾に足した
-      'SNS 連携',
+      'SNS 連携', '予約サイト・グルメ媒体', 'デリバリー連携',
     ])
     expect(view.getByText('設定')).toBeTruthy()
     expect(view.queryByText('専用')).toBeNull()
@@ -110,7 +112,7 @@ describe('★V8 設定の中のメニュー', () => {
   })
 
   // 2026-10-12：デリバリー連携（承認案 DL-1 `dF4Ov`）を予約サイト・グルメ媒体の下に足した
-  it('飲食のテスト機能を有効にした時だけ予約サイト・グルメ媒体とデリバリー連携へ進める', async () => {
+  it('検証環境でも予約サイト・グルメ媒体とデリバリー連携へ進める', async () => {
     vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true')
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
@@ -121,10 +123,10 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.getAllByRole('link').slice(-2)).toEqual([booking, delivery])
   })
 
-  it('飲食のテスト機能が無い環境ではデリバリー連携を出さない', async () => {
+  it('本番でも飲食店の設定の入口を残す（B-368）', async () => {
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
-    expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
+    expect(view.getByRole('link', { name: 'デリバリー連携' }).getAttribute('href')).toBe('/settings/delivery')
   })
 
   it('SNS 連携の画面では SNS 連携が今の画面になり、機能設定の下の2つは出さない', async () => {
@@ -167,6 +169,17 @@ describe('★V8 設定の中のメニュー', () => {
     // 必須項目（はじめの設定・機能設定・運用状態）は残る
     expect(labels).toContain('はじめの設定')
     expect(labels).toContain('機能設定')
+  })
+
+  it('隠れる項目でも、いま開いている画面なら選ばれた形で出す（閲覧のみのログインユーザー A35Gh）', async () => {
+    window.localStorage.setItem('lh_staff_role', 'staff')
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
+    fixture.pathname = '/staff'
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    const link = view.getByRole('link', { name: 'ログインユーザー' })
+    expect(link.getAttribute('aria-current')).toBe('page')
+    expect(view.queryByRole('link', { name: 'LINEアカウント' })).toBeNull()
   })
 
   it('任意機能がオフなら専用の項目は出ない', async () => {

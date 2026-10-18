@@ -142,6 +142,20 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('作る①（dnzqC）', () => {
+  test('F7: 画面の説明が開け、名前の必須と欄の理由を読む', async () => {
+    render(<ScenarioCreateV8 />)
+    const name = screen.getByRole('textbox', { name: 'シナリオ名' })
+    expect(name.getAttribute('aria-required')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'シナリオを作るの説明' }))
+    expect(screen.getByText('名前とフォルダを決め、配信方式を選んでから1通目を設定します。作ったあとは配信方式を変えられません。')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /この方式で保存する/ }))
+    await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'))
+    expect(name.getAttribute('aria-describedby')).toContain('scenario-name-error')
+    expect(document.getElementById('scenario-name-error')?.textContent).toBe('シナリオ名を入力してください')
+    expect(document.activeElement).toBe(name)
+    expect(create).not.toHaveBeenCalled()
+  })
+
   test('はじめは「時刻で指定」を選び、図を押しても方式を替えられ、札は個別に読ませない', async () => {
     render(<ScenarioCreateV8 />)
     const absolute = screen.getByRole('radio', { name: /時刻で指定/ }) as HTMLInputElement
@@ -156,6 +170,8 @@ describe('作る①（dnzqC）', () => {
     expect((screen.getByRole('radio', { name: /経過時間で指定/ }) as HTMLInputElement).checked).toBe(true)
     expect(diagrams[0].getAttribute('data-selected')).toBe('false')
     expect(diagrams[1].getAttribute('data-selected')).toBe('true')
+    // 下の見本の表は置かない（図に入ったため・絵 R83uvQ）。
+    expect(screen.queryByRole('table', { name: '選んだ配信方式の見本' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '配信方式の説明' }))
     expect(screen.getByText('作ったあとは変えられません')).toBeTruthy()
   })
@@ -283,6 +299,23 @@ describe('作る①：書きかけをシナリオの下書きの口へ残す（�
 })
 
 describe('配信結果（X4STXS）', () => {
+  test('再参加の古い完了と新しい途中を人数から引かず、購読件数と未取得を分ける', async () => {
+    const previous = { total: stats.enrolledTotal, summary: { ...runs.summary } }
+    stats.enrolledTotal = 1; runs.summary = { active: 1, paused: 0, completed: 2, delivering: 0 }
+    try {
+      search = 'id=sc-1'; render(<ScenarioResultsV8 />); await screen.findByText('高橋 直人')
+      const metric = (name: string) => screen.getByText(name, { selector: '[data-kpi-label] span' }).closest('[data-kpi-presentation]')!
+      expect(metric('始まった').querySelector('[data-kpi-number]')?.textContent).toBe('1')
+      expect(metric('読み終えた').querySelector('[data-kpi-number]')?.textContent).toBe('2')
+      expect(metric('読み終えた').textContent).toContain('件')
+      expect(metric('途中').textContent).toContain('購読')
+      expect(screen.getByText(/件（購読）$/)).toBeTruthy()
+      expect(metric('離れた').querySelector('[data-kpi-number]')?.textContent).toBe('—')
+      expect(metric('読み終えた').textContent).not.toContain('200.0%')
+      expect(screen.queryByText(/ここで .*離れた/)).toBeNull()
+    } finally { stats.enrolledTotal = previous.total; runs.summary = previous.summary }
+  })
+
   test('B-248: 送達不明は要確認と確認方法を出し、再開・再送・移動を出さない', async () => {
     const uncertain = sub('unknown', '確認対象', 'paused', 1, 'delivery_unconfirmed')
     runs.subscriptions.push(uncertain)

@@ -93,3 +93,21 @@ describe('S4-OR 空のかたまりと中身のある入れ子', () => {
     ).toBeNull()
   })
 })
+
+import { isRuleComplete as isRuleCompleteB5 } from './segment-condition'
+import { describe as describeB5, expect as expectB5, it as itB5 } from 'vitest'
+
+describeB5('来店・購入・会員ランクの条件（fmToi）', () => {
+  itB5('回数・金額は下限か上限のどちらかがあれば書けている。逆転は書けていない', () => {
+    expectB5(isRuleCompleteB5({ type: 'visit_count', value: { min: 3 } } as never)).toBe(true)
+    expectB5(isRuleCompleteB5({ type: 'purchase_amount', value: { max: 5000 } } as never)).toBe(true)
+    expectB5(isRuleCompleteB5({ type: 'visit_count', value: {} } as never)).toBe(false)
+    expectB5(isRuleCompleteB5({ type: 'visit_count', value: { min: 5, max: 3 } } as never)).toBe(false)
+  })
+  itB5('会員ランクは段を選ぶまで、最後の来店・購入の日は日付が入るまで、書きかけ', () => {
+    expectB5(isRuleCompleteB5({ type: 'member_tier', value: '' } as never)).toBe(false)
+    expectB5(isRuleCompleteB5({ type: 'member_tier', value: 't1' } as never)).toBe(true)
+    expectB5(isRuleCompleteB5({ type: 'last_activity_at', value: { from: '', to: '' } } as never)).toBe(false)
+    expectB5(isRuleCompleteB5({ type: 'last_activity_at', value: { from: '2026-10-01', to: '' } } as never)).toBe(true)
+  })
+})

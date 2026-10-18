@@ -1,3 +1,5 @@
+import type { WebhookInteractionFailureReason } from './webhook-failure-types.js';
+export type { WebhookInteractionFailureReason } from './webhook-failure-types.js';
 import type { WebhookCreateState } from '@line-crm/shared';
 import { readFolderAssignment } from './folder-assignment.js';
 import { EC_EVENT_TYPES } from '@line-crm/shared';
@@ -124,18 +126,6 @@ export interface OutgoingWebhookRow {
 
 export type WebhookInteractionDirection = 'outgoing' | 'incoming';
 export type WebhookInteractionStatus = 'pending' | 'succeeded' | 'failed' | 'retried';
-export type WebhookInteractionFailureReason =
-  | 'connection_failed'
-  | 'response_4xx'
-  | 'response_429'
-  | 'response_5xx'
-  | 'processing_failed'
-  | 'unknown'
-  /**
-   * d23b R415: こちら側の署名用の合言葉が読めず、外部へ一度も送れて
-   * いない失敗。「相手から返事がない」(connection_failed)と区別する。
-   */
-  | 'secret_unavailable';
 
 export interface WebhookInteractionRow {
   id: string;
@@ -365,7 +355,7 @@ export async function claimWebhookInteractionRetryAndInsert(
     try {
       await deletePendingWebhookInteraction(db, retryId, original.line_account_id);
     } catch (error) {
-      console.error('webhook_interaction_logs の孤児行の後始末に失敗:', error);
+      console.error(JSON.stringify({"code":"src_webhooks_failed"}));
     }
   }
   return { claimed: claimChanged && insertChanged, retryId };
@@ -455,6 +445,8 @@ export async function listWebhookInteractions(
     search?: string;
     page?: number;
     limit?: number;
+    /** Internal export only. The HTTP list route never passes this option. */
+    exportAll?: boolean;
   },
 ): Promise<{
   items: WebhookInteractionListRow[];
@@ -467,15 +459,15 @@ export async function listWebhookInteractions(
     Number.isFinite(value) ? Math.floor(value as number) : fallback;
   const periodDays = Math.min(365, Math.max(1, integerOr(input.periodDays, 30)));
   const cutoff = toJstString(new Date(Date.now() - periodDays * 86_400_000));
-  const page = Math.max(1, integerOr(input.page, 1));
-  const limit = Math.min(50, Math.max(10, integerOr(input.limit, 20)));
+  const page = input.exportAll ? 1 : Math.max(1, integerOr(input.page, 1));
+  const limit = input.exportAll ? 5001 : Math.min(50, Math.max(10, integerOr(input.limit, 20)));
   // d23b R409: 結果を書く途中で止まった「処理中」を先に回収する。
   // 一覧を開いた時点で回収すれば、滞留分はここで失敗として見える。
   try {
     await markStalePendingWebhookInteractions(db, input.lineAccountId);
   } catch (error) {
     // 回収だけの失敗で一覧そのものを止めない。
-    console.error('webhook_interaction_logs の滞留回収に失敗:', error);
+    console.error(JSON.stringify({"code":"src_webhooks_failed"}));
   }
   const clauses = ['l.line_account_id=?', 'l.created_at>=?', "l.status!='retried'"];
   const binds: unknown[] = [input.lineAccountId, cutoff];
@@ -509,7 +501,7 @@ export async function listWebhookInteractions(
               d.next_retry_at AS delivery_next_retry_at
          FROM ${joinedTables}
         WHERE ${where}
-        ORDER BY l.created_at DESC LIMIT ? OFFSET ?`,
+        ORDER BY l.created_at DESC,l.id DESC LIMIT ? OFFSET ?`,
     ).bind(...binds, limit, (page - 1) * limit).all<WebhookInteractionListRow>(),
     db.prepare(`SELECT COUNT(*) AS count FROM webhook_interaction_logs l WHERE ${where}`)
       .bind(...binds).first<{ count: number }>(),
@@ -817,10 +809,7 @@ export async function resolveWebhookSecret(
   if (row.secret_encrypted) {
     const parsed = parseStoredSecret(row.secret_encrypted);
     if (!parsed) {
-      console.error(JSON.stringify({
-        event: 'webhook_secret_unknown_format',
-        webhookId: row.id ?? null,
-      }));
+      console.error(JSON.stringify({"code":"webhook_secret_unknown_format"}));
       throw new Error('Unable to decrypt webhook secret');
     }
     const set = await readWebhookKeySet(keys);
@@ -830,11 +819,7 @@ export async function resolveWebhookSecret(
         : [set.current, ...set.previous])
       : [];
     if (candidates.length === 0) {
-      console.error(JSON.stringify({
-        event: 'webhook_secret_key_unavailable',
-        webhookId: row.id ?? null,
-        keyId: parsed.keyId,
-      }));
+      console.error(JSON.stringify({"code":"webhook_secret_key_unavailable"}));
       throw new Error('Unable to decrypt webhook secret');
     }
     for (const candidate of candidates) {
@@ -845,11 +830,7 @@ export async function resolveWebhookSecret(
         if (parsed.keyId) break;
       }
     }
-    console.error(JSON.stringify({
-      event: 'webhook_secret_decrypt_failed',
-      webhookId: row.id ?? null,
-      keyId: parsed.keyId,
-    }));
+    console.error(JSON.stringify({"code":"webhook_secret_decrypt_failed"}));
     throw new Error('Unable to decrypt webhook secret');
   }
   return row.secret;
@@ -874,10 +855,7 @@ export async function resolvePreviousWebhookSecret(
       keys,
     );
   } catch {
-    console.error(JSON.stringify({
-      event: 'webhook_secret_previous_decrypt_failed',
-      webhookId: row.id ?? null,
-    }));
+    console.error(JSON.stringify({"code":"webhook_secret_previous_decrypt_failed"}));
     return null;
   }
 }
@@ -1466,15 +1444,11 @@ export async function getActiveOutgoingWebhooksByEvent(
     try {
       types = JSON.parse(w.event_types);
     } catch {
-      console.error(
-        JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId: w.id, reason: 'malformed_json' }),
-      );
+      console.error(JSON.stringify({"code":"outgoing_webhook_event_types_broken"}));
       continue;
     }
     if (!Array.isArray(types)) {
-      console.error(
-        JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId: w.id, reason: 'event_types_not_array' }),
-      );
+      console.error(JSON.stringify({"code":"outgoing_webhook_event_types_broken"}));
       continue;
     }
     if (types.includes(eventType) || types.includes('*')) matched.push(w);

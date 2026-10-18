@@ -33,6 +33,7 @@ class MockMediaUsageReferenceError extends Error {
 }
 
 const mocks = {
+  recordAuditEvent: vi.fn(async () => undefined),
   getStaffNameMap: vi.fn(async () => new Map()),
   getMedia: vi.fn(),
   countMedia: vi.fn(),
@@ -40,6 +41,7 @@ const mocks = {
   getFolderById: vi.fn(),
   updateMedia: vi.fn(),
   deleteMedia: vi.fn(),
+  getMediaVersionKeys: vi.fn(async () => []),
   archiveMedia: vi.fn(),
   restoreMedia: vi.fn(),
   getMediaUsages: vi.fn(),
@@ -171,7 +173,7 @@ const del = vi.fn().mockResolvedValue(undefined);
 const head = vi.fn();
 const get = vi.fn();
 const env = {
-  DB: {} as D1Database,
+  DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) } as unknown as D1Database,
   IMAGES: { put, delete: del, head, get } as unknown as R2Bucket,
   WORKER_URL: 'https://api.example.com',
   CF_ACCOUNT_ID: 'cf-account',
@@ -195,11 +197,12 @@ function req(
   method: string,
   body?: unknown,
   role: 'owner' | 'admin' | 'staff' | null = 'owner',
+  ifMatch: string | null = '1',
 ) {
   return makeApp(role).fetch(
     new Request(`https://example.com${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(ifMatch && method === 'PATCH' && path.startsWith('/api/media/') ? { 'If-Match': ifMatch } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
     env as unknown as Env['Bindings'],
@@ -1082,7 +1085,7 @@ describe('#550 M6 メディアの名前・フォルダ変更の検証', () => {
   it('正しい名前とメディア用フォルダは通る', async () => {
     const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png', folderId: 'folder-1' });
     expect(res.status).toBe(200);
-    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', {
+    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', { expectedRevision: 1,
       filename: 'b.png',
       folderId: 'folder-1',
     });
@@ -1091,7 +1094,7 @@ describe('#550 M6 メディアの名前・フォルダ変更の検証', () => {
   it('フォルダを外す（未分類へ戻す）は通る', async () => {
     const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { folderId: null });
     expect(res.status).toBe(200);
-    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', { folderId: null });
+    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', { expectedRevision: 1, folderId: null });
   });
 });
 
@@ -1253,7 +1256,7 @@ describe('IDEA-15 メディアの利用期限・同意の記録', () => {
       usageConsentNote: '出演者の同意書を確認済み',
     });
     expect(res.status).toBe(200);
-    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', {
+    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', { expectedRevision: 1,
       usageExpiresAt: '2027-03-31',
       usageConsentNote: '出演者の同意書を確認済み',
     });
@@ -1268,7 +1271,7 @@ describe('IDEA-15 メディアの利用期限・同意の記録', () => {
       usageConsentNote: '',
     });
     expect(res.status).toBe(200);
-    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', {
+    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', { expectedRevision: 1,
       usageExpiresAt: null,
       usageConsentNote: null,
     });
@@ -1469,13 +1472,8 @@ describe('メディア使用先の一括差し替え', () => {
         expectedRevision: revision,
       });
       expect(response.status).toBe(200);
-      const audited = logSpy.mock.calls
-        .map((call) => String(call[0]))
-        .filter((line) => line.includes('"tag":"audit"'))
-        .map((line) => JSON.parse(line) as { action: string; targetId: string });
-      expect(audited).toEqual(expect.arrayContaining([
-        expect.objectContaining({ action: 'media.replace_usages', targetId: 'md-1' }),
-      ]));
+      expect(mocks.recordAuditEvent).toHaveBeenCalledWith(env.DB, expect.objectContaining({ action: 'media.replace_usages', targetId: 'md-1' }));
+      expect(logSpy.mock.calls.flat().join(' ')).not.toContain('md-1');
     } finally {
       logSpy.mockRestore();
     }
@@ -1771,7 +1769,7 @@ describe('共通情報', () => {
     });
     expect(preview.status).toBe(200);
     const { impactProof } = (await preview.json() as { data: { impactProof: string } }).data;
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactProof, changeReason: '理由' });
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { expectedVersion: 3, value: '11-20', impactProof, changeReason: '理由' });
     expect(res.status).toBe(200);
   });
 
@@ -1957,17 +1955,15 @@ describe('共通情報', () => {
     expect(await conflict.json()).toMatchObject({ code: 'common_var_version_conflict', currentVersion: 4 });
   });
 
-  it('#544 N5 版番号なしの上書きは許す(衝突検出は版番号つきのみ)', async () => {
-    // N-185: 確認値は必須だが、版番号の添付は任意のまま。
+  it('B-333 版番号なしの上書きを断る', async () => {
+    // 影響の確認値があっても、読み込んだ版を欠く保存は通さない。
     const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
       accountId: 'account-1', nextValue: '11-20',
     });
     const { impactProof } = (await preview.json() as { data: { impactProof: string } }).data;
     const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactProof, changeReason: '理由' });
-    expect(res.status).toBe(200);
-    expect(mocks.updateCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1', expect.objectContaining({
-      expectedVersion: undefined,
-    }));
+    expect(res.status).toBe(400);
+    expect(mocks.updateCommonVar).not.toHaveBeenCalled();
   });
 
   it('#544 N6 存在しない・別種別のフォルダは登録も更新も止める', async () => {
@@ -2633,4 +2629,20 @@ describe('公開配信の安全ヘッダ', () => {
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(res.headers.get('Content-Disposition')).toContain('attachment');
   });
+});
+
+
+it('B-333 メディアは版の指定なし・古い版で保存しない', async () => {
+  const missing = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png' }, 'owner', null);
+  expect(missing.status).toBe(400);
+  const stale = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png' }, 'owner', '999');
+  expect(stale.status).toBe(409);
+  expect(mocks.updateMedia).not.toHaveBeenCalled();
+});
+it('B-333 保管庫の削除に失敗したら記録を消さず再試行できる', async () => {
+  vi.mocked(env.IMAGES.delete).mockRejectedValueOnce(new Error('R2 unavailable'));
+  const response = await req('/api/media/md-1?accountId=account-1', 'DELETE');
+  expect(response.status).toBe(503);
+  expect(await response.json()).toMatchObject({ code: 'MEDIA_STORAGE_DELETE_FAILED' });
+  expect(mocks.deleteMedia).not.toHaveBeenCalled();
 });

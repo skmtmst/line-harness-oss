@@ -130,6 +130,15 @@ describe('dashboard organization account policy', () => {
     });
   });
 
+  test('30日の要求を今日へ戻さず、同じアカウント範囲で集計する', async () => {
+    dbMocks.getDashboardOverview.mockResolvedValue(overview());
+    const response = await app().request('/api/dashboard/overview?accountId=account-2&period=last30', {}, env());
+    expect(response.status).toBe(200);
+    expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'last30', {
+      allowedAccountIds: ['account-2'], includeUnassigned: false,
+    }, { allowedAccountIds: ['account-2'], includeUnassigned: true });
+  });
+
   test('account-scoped staff cannot select an unassigned account', async () => {
     dbMocks.getStaffById.mockResolvedValue({ account_scope: 'accounts' });
     dbMocks.getStaffAccountScopeIds.mockResolvedValue(['account-1']);

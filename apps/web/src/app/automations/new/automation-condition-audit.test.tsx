@@ -1,3 +1,4 @@
+import { screen } from '@testing-library/react'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -182,18 +183,13 @@ async function fillMinimum(el: HTMLElement): Promise<void> {
 
 /** 条件部品で「名前に『田中』を含む」を組み立てる。 */
 async function addNameCondition(el: HTMLElement): Promise<void> {
-  await act(async () => { el.querySelector<HTMLButtonElement>('[aria-labelledby="v8-target-label"]')!.click() })
+  await act(async () => { el.querySelector<HTMLButtonElement>('[aria-label="動かす相手を変える"]')!.click() })
   // 現役の条件の窓で、共通の検索できる足し口を操作する。
-  const picker = document.querySelector('input[aria-label="追加する条件を選ぶ"]') as HTMLInputElement
+  const picker = document.querySelector('button[aria-label="追加する条件を選ぶ"]') as HTMLButtonElement
   expect(picker, '条件の足し口が出ていない').toBeTruthy()
-  await act(async () => { picker.focus() })
-  await typeText(picker, '名前')
-  await act(async () => {
-    picker.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
-  })
-  await act(async () => {
-    picker.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-  })
+  await act(async () => { picker.click() })
+  await act(async () => { screen.getByRole('radio', { name: '名前' }).click() })
+  await act(async () => { screen.getByRole('button', { name: '条件を足す' }).click() })
   const input = document.querySelector('input[aria-label="名前に含む文字"]') as HTMLInputElement
   expect(input, '名前の条件の入力欄が出ていない').toBeTruthy()
   await typeText(input, '田中')

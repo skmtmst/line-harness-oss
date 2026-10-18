@@ -13,15 +13,16 @@ import { Steps } from '@/components/templates/steps';
 import { notifyToast } from '@/components/shared/toast';
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
+import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';
 import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
-import HelpTip from '@/components/shared/help-tip'
 import { TextField } from '@/components/shared/text-field';
-import { RequiredBadge } from '@/components/shared/form-controls';
+import { Field } from '@/components/shared/form-controls';
+import { SettingsFormRow } from '@/components/shared/settings-form-card';
 import { isForbiddenOrRateLimited, loadFailureCopy, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -47,7 +48,8 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export default function ScenarioCreateV8() {
   const saveErrors = useSaveFormErrors()
-  usePageTitle('シナリオを作成')
+  const pageTitle = 'シナリオを作る'
+  usePageTitle(pageTitle)
   usePageCrumbs([{ label: 'シナリオ配信', href: '/scenarios' }])
   const router = useRouter()
   const params = useSearchParams()
@@ -375,7 +377,8 @@ export default function ScenarioCreateV8() {
     <SaveErrorScope errors={saveErrors}><CreatePage
       stepsSpacing="compact"
       boardId="dnzqC"
-      title="シナリオを作る"
+      title={pageTitle}
+      help="名前とフォルダを決め、配信方式を選んでから1通目を設定します。作ったあとは配信方式を変えられません。"
 
       steps={(
         <Steps
@@ -442,11 +445,11 @@ export default function ScenarioCreateV8() {
         <ScenarioDraftConflictNotice ago={browserDraft.conflictAgo} onLoadLatest={loadLatestDraft} onOverwrite={browserDraft.overwrite} />
       </div>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="シナリオ情報" id="scenario-step-info">
-        <h2 className={styles.cardTitle}>シナリオ情報</h2>
-        <div className={styles.infoRow}>
-          <div className={styles.nameField} ref={nameWrapRef}>
-            <span className={styles.fieldLabel}>シナリオ名 <RequiredBadge /></span>
+      <Card variant="form" gap="normal" aria-label="シナリオ情報" id="scenario-step-info">
+        <CardHeader size="stacked" title="シナリオ情報" />
+        <SettingsFormRow layout="name-folder">
+          <div ref={nameWrapRef}>
+            <Field label="シナリオ名" required error={nameError} errorId="scenario-name-error">
             <SaveErrorField names={["name"]}><TextField
               value={name}
               disabled={fieldsDisabled}
@@ -457,11 +460,12 @@ export default function ScenarioCreateV8() {
               aria-label="シナリオ名"
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
             /></SaveErrorField>
-            {nameError ? <span id="scenario-name-error" className={styles.fieldError}>{nameError}</span> : null}
+            </Field>
           </div>
-          <div className={styles.folderField}>
-            <span className={styles.fieldLabelStrong}>フォルダ</span>
-            <span title={selectedFolderName} className={styles.folderSelect}>
+          <Field label="フォルダ" optional note={folderState !== 'ready' || detailsSaving
+            ? folderState === 'loading' ? 'フォルダを読み込んでいます。' : folderState === 'error' ? 'フォルダを確認できないため、いまは変更できません。' : 'フォルダを保存しています。'
+            : undefined}>
+            <span title={selectedFolderName}>
               <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                 value={folderId}
                 disabled={fieldsDisabled || folderState !== 'ready'}
@@ -481,30 +485,16 @@ export default function ScenarioCreateV8() {
                   : undefined}
               /></SaveErrorField>
             </span>
-            {folderState !== 'ready' || detailsSaving ? (
-              <span className={styles.fieldHint}>
-                {folderState === 'loading'
-                  ? 'フォルダを読み込んでいます。'
-                  : folderState === 'error'
-                    ? 'フォルダを確認できないため、いまは変更できません。'
-                    : 'フォルダを保存しています。'}
-              </span>
-            ) : null}
             {/* 保存済みのフォルダがこのアカウントの候補に無いときは理由を出す（黙って未分類に見せない）。 */}
             {folderState === 'ready' && selectedFolderMissing ? (
-              <span className={styles.fieldWarn}>
-                選択中のフォルダはこのアカウントの候補にありません（別アカウントまたは削除済み）。このまま保存すると外れます。
-              </span>
+              <Notice tone="warn">選択中のフォルダはこのアカウントの候補にありません（別アカウントまたは削除済み）。このまま保存すると外れます。</Notice>
             ) : null}
-          </div>
-        </div>
+          </Field>
+        </SettingsFormRow>
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="配信方式">
-        <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>配信方式</h2>
-          <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip>
-        </div>
+      <Card variant="form" gap="normal" aria-label="配信方式">
+        <CardHeader size="stacked" title={<>配信方式 <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip></>} />
         <SaveErrorField names={["delivery-mode","selectedMode"]}><RadioCardGroup legend="配信方式" className={styles.modeRow}>
           <RadioCard
             name="delivery-mode"
@@ -516,6 +506,7 @@ export default function ScenarioCreateV8() {
             title="時刻で指定"
             note="購読開始から〇日後の〇時に届きます。決まった時刻の定期配信（メルマガ・朝の配信）に"
           >
+            {/* G-5：2人がいつ受け取るかの図を各カードの中に（絵 cu3vm・dnzqC。下の見本の表は図に入ったので消した・R83uvQ）。 */}
             <DeliveryModeDiagram mode="absolute_time" selected={selectedMode === 'absolute_time'} />
           </RadioCard>
           <RadioCard

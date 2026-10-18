@@ -2,13 +2,12 @@
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpDown, Check, ChevronDown, ChevronRight, GitCompare, Lock, RotateCcw, Save } from 'lucide-react'
+import { ArrowUpDown, ChevronDown, ChevronRight, GitCompare, Lock, RotateCcw, Save } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import ReorderList from '@/components/shared/reorder-list'
-import { RowMenu } from '@/components/shared/row-actions'
+import { ReorderDialog } from './reorder-dialog'
+export { ReorderDialog } from './reorder-dialog'
 import ListState from '@/components/shared/list-state'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import SearchField from '@/components/shared/search-field'
@@ -17,9 +16,9 @@ import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { groupEnabledCount, groupFeatureCount, itemIsEnabled, type FeatureGroup, type FeatureItem, type MenuItemOrder } from '@/lib/feature-settings'
+import { groupEnabledCount, groupFeatureCount, itemIsEnabled, type FeatureGroup, type FeatureItem } from '@/lib/feature-settings'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
-import { applyItemOrder, FEATURE_SETTINGS_CONFLICT_MESSAGE } from './feature-settings-view'
+import { FEATURE_SETTINGS_CONFLICT_MESSAGE } from './feature-settings-view'
 import { groupSummary, shortUsageDate, useFeatureSettings, type FeatureUsage, type UsageCategory } from './use-feature-settings'
 import styles from './screen.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
@@ -210,48 +209,6 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
   )
 }
 
-/** 並び替えの窓（★V8-B `ztgRD`）。下書きの並びを動かし、確定で反映する。 */
-export function ReorderDialog({ groups, initialOrder, onCancel, onApply }: {
-  groups: FeatureGroup[]
-  initialOrder: MenuItemOrder
-  onCancel: () => void
-  onApply: (order: MenuItemOrder) => void
-  moveItemInOrder: (order: MenuItemOrder, groupId: string, itemId: string, direction: -1 | 1) => MenuItemOrder
-}) {
-  const [draft, setDraft] = useState<MenuItemOrder>(initialOrder)
-  const draftGroups = useMemo(() => applyItemOrder(groups, draft), [groups, draft])
-  const [groupId, setGroupId] = useState(groups.find((group) => group.id === 'delivery')?.id ?? groups[0]?.id ?? '')
-  const [groupMenuOpen, setGroupMenuOpen] = useState(false)
-  const group = draftGroups.find((item) => item.id === groupId)
-  return (
-    <Dialog
-      open
-      designNode="ztgRD"
-      designWidth={560}
-      designTop={140}
-      designHeaderPadding="24px 24px 0"
-      designContentPadding="4px 24px 0"
-      designFooterPadding="10px 24px 24px"
-      footerAlign="start"
-      footerDivider={false}
-      footerLeadFlexible={false}
-      confirmIcon={<Check size={14} aria-hidden="true" />}
-      title="左のメニューの並びを変える"
-      titleHelp={<RowMenu label="並びを変える区分を選ぶ" open={groupMenuOpen} onOpenChange={setGroupMenuOpen} items={groups.map((item) => ({ id: item.id, label: item.label, onSelect: () => { setGroupId(item.id); setGroupMenuOpen(false) } }))} />}
-      confirmLabel="この並びにする"
-      footerLead={<Button variant="text" onClick={() => setDraft(initialOrder)}><RotateCcw size={14} aria-hidden="true" />元の並びに</Button>}
-      onCancel={onCancel}
-      onConfirm={() => onApply(draft)}
-    >
-      <p className={styles.orderDescription}>つまみで動かすか、矢印で1つずつ動かします。区分（メイン・配信…）の中で並べ替えます。</p>
-      {group ? <>
-        <p className={styles.orderGroupName}>{group.label}</p>
-        <ReorderList items={group.items} visibleRows={5} onChange={(ids) => setDraft((current) => ({ ...current, [group.id]: ids }))} />
-      </> : null}
-    </Dialog>
-  )
-}
-
 export default function FeatureSettingsScreen() {
   const settings = useFeatureSettings()
   const {
@@ -377,7 +334,7 @@ export default function FeatureSettingsScreen() {
     for (const node of scrolled) if (node.scrollTop > 0) node.scrollTo({ top: 0 })
   }, [conflicted])
   const conflictBand = conflicted ? (
-    <div ref={conflictRef} className={styles.conflict} role="status" data-design-node="ziYCN">
+    <div ref={conflictRef} role="status" data-design-node="ziYCN">
       <SaveConflictBand title="ほかの人が先に機能設定を保存しました" onCompare={() => setCompareOpen(true)} onReload={() => void load()} />
     </div>
   ) : null
@@ -385,6 +342,7 @@ export default function FeatureSettingsScreen() {
   return (
     <SbSettingsScreen
       boardId="ywFJT"
+      notice={conflictBand}
       title={TITLE}
       help={DESCRIPTION}
       explanation="公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。"
@@ -422,7 +380,6 @@ export default function FeatureSettingsScreen() {
         </span>
       ) : undefined}
     >
-      {conflictBand}
       {!canManage && (
         <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       )}

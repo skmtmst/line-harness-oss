@@ -28,7 +28,7 @@ const account = (over: Partial<LineAccount> = {}): LineAccount => ({
 })
 
 /** LINEアカウントの詳細・編集（設計 ★V6 33-3 `T9rA9`）。 */
-describe('V6 33-3 LINEアカウントの詳細・編集', () => {
+describe('V8 LINEアカウントの詳細・編集', () => {
   it('設計の4タブを持つ', () => {
     expect(DETAIL_TABS).toEqual(['overview', 'connection', 'credentials', 'handover'])
   })
@@ -40,9 +40,9 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
     expect(toTab(null)).toBe('overview')
   })
 
-  it('タブは ?tab= のまま。履歴を積まない', () => {
+  it('資格情報とWebhookの見出しを識別でき、履歴を積まない', () => {
     // 共有・再読込・戻るに強い（`docs/v8-design-rules.md` §5）。
-    expect(PAGE).toContain('id="acd-credentials"')
+    expect(PAGE).toContain('titleId="acd-credentials"')
     expect(PAGE).toContain('id="acd-webhook"')
     expect(PAGE).not.toContain('history.pushState')
   })

@@ -52,8 +52,19 @@ export function sourceEvidence(file, source, offset, length = 1) {
   const descendantTags = []
   if (jsx) { const descendants = node => { if (node !== jsx && (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node))) descendantTags.push((ts.isJsxElement(node) ? node.openingElement : node).tagName.getText(entry.tree)); ts.forEachChild(node, descendants) }; descendants(jsx) }
   const shape = opening && JSON.stringify([opening.tagName.getText(entry.tree), shapeProps.map(print)])
-  const statement = parents.findLast(ts.isVariableStatement)
-  const initializer = statement?.declarationList.declarations[0]?.initializer
+  const declaration = parents.findLast(ts.isVariableDeclaration)
+    ?? parents.findLast(ts.isVariableStatement)?.declarationList.declarations.find(node => node.getStart(entry.tree) < offset + length && node.end > offset)
+  const initializer = declaration?.initializer
+  // A nested boolean named *Preview is not the JSX returned by its parent screen.
+  let declarationReturnsJsx
+  if (initializer) {
+    declarationReturnsJsx = false
+    const inspect = node => {
+      if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) declarationReturnsJsx = true
+      else ts.forEachChild(node, inspect)
+    }
+    inspect(initializer)
+  }
   const functionNode = parents.findLast(node => ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) ?? (initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) ? initializer : null)
   let returnsJsx = false
   const returnTags = []
@@ -105,15 +116,25 @@ export function sourceEvidence(file, source, offset, length = 1) {
     tag: opening?.tagName.getText(entry.tree),
     emptyElement: Boolean(jsx && (ts.isJsxSelfClosingElement(jsx) || jsx.children.every(child => ts.isJsxText(child) && !child.text.trim()))),
     attribute: attribute?.name.getText(entry.tree),
+    literalAttribute: Boolean(literal && attribute && (attribute.initializer === literal || (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression === literal))),
+    literalProperty: literal && ts.isPropertyAssignment(literal.parent) ? literal.parent.name.getText(entry.tree) : undefined,
     imports: entry.imports,
     calls: parents.filter(ts.isCallExpression).map(node => node.expression.getText(entry.tree)),
     ancestorTags: parents.filter(node => ts.isJsxElement(node)).map(node => node.openingElement.tagName.getText(entry.tree)),
+    enclosingTags: parents.filter(node => ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)).map(node => (ts.isJsxElement(node) ? node.openingElement : node).tagName.getText(entry.tree)),
     visualPropCount: shapeProps.length,
     shapeIdentity: shape && digest(shape),
     dialogIdentity,
     jsxStart: jsx?.getStart(entry.tree),
     descendantTags,
+    readOnlyText: Boolean(jsx && !attribute && ['p', 'span', 'HelpTip', 'GridCell'].includes(opening?.tagName.getText(entry.tree))
+      && descendantTags.every(tag => ['span', 'strong', 'em', 'br', 'Info'].includes(tag))
+      && (['p', 'span'].includes(opening.tagName.getText(entry.tree))
+        || entry.imports[opening.tagName.getText(entry.tree)]?.path === '@/components/shared/help-tip'
+        || entry.imports[opening.tagName.getText(entry.tree)]?.path === '@/components/shared/grid-table')),
+
     returnsJsx,
+    declarationReturnsJsx,
     returnTags,
     payloadType: Boolean(literal && ts.isPropertyAssignment(literal.parent) && literal.parent.name.getText(entry.tree) === 'type' && ts.isObjectLiteralExpression(literal.parent.parent) && literal.parent.parent.properties.some(node => ts.isPropertyAssignment(node) && node.name.getText(entry.tree) === 'uri')),
     identity: nearest ? digest(print(nearest)) : undefined,

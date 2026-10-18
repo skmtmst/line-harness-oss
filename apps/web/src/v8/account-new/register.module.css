@@ -7,7 +7,7 @@
 }
 
 .stepBody { outline: none; }
-.split { display: flex; align-items: stretch; gap: var(--tpl-htn-gap); }
+:global(html:root) .stepBody:focus-visible { outline: none; }
 .column { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-panel-gap); }
 
 .panel {
@@ -17,20 +17,13 @@
 .panelTitle {
   margin: 0; padding: 0; font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink);
 }
-.fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-panel-gap); }
-.fieldset > legend { float: left; width: 100%; }
-.fieldset > legend + * { clear: both; }
+/* 右の案内は共通の Card（surface="muted"）が地と角を持つ。画面CSSは置き場所だけ（★V8 §24）。 */
+.aside { align-self: flex-start; }
+/* 中の字は Card ではなく中の h2・p に直接あてる。Card へ渡す .aside には見た目を書かない。 */
+.asideH2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
+.asideP { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
 
-.aside {
-  align-self: flex-start;
-  width: var(--tpl-htn-aside-w); flex-shrink: 0;
-  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary);
-}
-.aside h2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
-.aside p { margin: 0; }
-
-/* ① 用意の仕方 */
-.radios { display: flex; align-items: center; gap: var(--tpl-htn-radio-gap); }
+/* 案内の一文を囲む箱と、横並びのボタン（②③で使う） */
 .noteBox {
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary);
 }
@@ -39,7 +32,6 @@
 
 /* ② チャネル設定 */
 .groupLabel { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink-secondary); }
-.twoCol { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--tpl-htn-panel-gap); }
 .field { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); min-width: 0; }
 .label { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 600; color: var(--color-ink); }
 .fieldError { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-danger); }
@@ -51,11 +43,12 @@
 }
 
 /* ③ 基本情報 */
-.basicGrid {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  column-gap: var(--tpl-htn-panel-gap); row-gap: var(--tpl-htn-gap-xs); align-items: center;
-}
 .tagRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-chip-gap); }
+/* タグの選ぶ欄は残りの幅いっぱい、［タグを追加］は同じ行の右。 */
+.tagPick { flex: 1 1 0; min-width: 0; }
+/* 表示名・LINE ID の2列と［LINEから取得］を1行に。ボタンは欄の下端にそろえる。 */
+.idRow { display: flex; align-items: flex-end; gap: var(--tpl-htn-chip-gap); min-width: 0; }
+.idRow > :first-child { flex: 1 1 0; min-width: 0; }
 .tagAdd { display: inline-flex; align-items: center; gap: var(--tpl-htn-chip-gap); width: var(--tpl-htn-tag-input-w); }
 .infoBox {
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary);
@@ -67,38 +60,6 @@
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary);
 }
 
-/* ④ 接続確認 */
-.checkList {
-  margin: 0; padding: 0; list-style: none; border-radius: var(--tpl-htn-radius-l);
-  background: var(--color-canvas); box-shadow: var(--tpl-htn-ring);
-}
-.checkRow {
-  display: flex; align-items: center; gap: var(--tpl-htn-panel-gap); height: var(--tpl-htn-check-row-h);
-  padding: var(--tpl-htn-check-pad); box-shadow: var(--tpl-htn-line-bottom);
-}
-.checkRow:last-child { box-shadow: none; }
-.checkIcon { flex-shrink: 0; color: var(--color-ink-faint); }
-.checkRow[data-state='passed'] .checkIcon { color: var(--color-accent-deep); }
-.checkRow[data-state='failed'] .checkIcon { color: var(--color-danger); }
-.checkTitle { flex-shrink: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink); }
-.checkDetail {
-  flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary);
-}
-.checkRow[data-state='failed'] .checkDetail { color: var(--color-danger); }
-.importBox {
-  display: flex; align-items: center;
-}
-.importText { display: flex; flex-direction: column; gap: var(--tpl-htn-import-gap); min-width: 0; }
-.importText strong { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink); }
-.importText span { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
-
-/* ⑤ 完了 */
-.doneLine {
-  margin: 0; display: flex; align-items: center; gap: var(--tpl-htn-gap-s); /* 絵：印の円 22（線込み）＋間 10。lucide 24 の円は 22 なので間は 8 */
-  font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink);
-}
-.doneLine svg { color: var(--color-accent-deep); flex-shrink: 0; }
 .progressHead {
   display: flex; justify-content: space-between; gap: var(--tpl-htn-panel-gap);
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink);
@@ -123,3 +84,164 @@
 .resultLead { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
 
 .manualAck { padding: var(--tpl-htn-ack-pad); }
+
+/* ===== ここから v06（p6zMkA・Fqy29・Lwxyh・X0pGdw・Plmq1）。寸法は globals.css の --tpl-htn6-*。 ===== */
+
+/* ②③の段の札（Step 2 / 3） */
+.subBadge {
+  align-self: flex-start; padding: var(--tpl-htn-chip-pad); border-radius: var(--tpl-htn-radius-pill);
+  background: var(--color-surface-pearl); box-shadow: var(--tpl-htn-ring);
+  font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-18); font-weight: 700; color: var(--color-ink-secondary);
+}
+
+/* ① 事前確認（p6zMkA）。カードの頭は 題・？・のび・札 の順（B2SpuV）。 */
+/* 字の塊の初期余白はここで一度だけ消す。段ごとに margin: 0 を書くと
+   画面側の余白の数が増える（apps/web/scripts/screen-css-budget.mjs）。 */
+.precheckLead,
+.precheckSummaryText,
+.precheckQuestionTitle,
+.precheckNote p,
+.precheckNoteTitle,
+.precheckUpcomingTitle,
+.precheckUpcomingItem,
+.precheckResultHeading,
+.precheckResultTitle,
+.precheckResultBody,
+.ackNote { margin: 0; }
+.precheckHead { display: flex; align-items: center; gap: var(--tpl-htn6-pre-head-gap); }
+.precheckHead .subBadge { margin-inline-start: auto; }
+.precheckHelpMark { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--color-ink-faint); }
+.precheckLead { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
+
+/* 答えた質問の一覧。1行ずつ「ラベル　→　答え」と「変更」。 */
+.precheckSummary { display: flex; flex-direction: column; gap: var(--tpl-htn6-pre-row-gap); }
+.precheckSummaryRow {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s);
+  padding: var(--tpl-htn6-pre-row-pad); border-radius: var(--tpl-htn-radius-m);
+  background: var(--color-surface-pearl);
+}
+.precheckSummaryText { min-width: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink); }
+
+/* いまの質問。題・補足・選択肢・案内・チェックを縦に積む。 */
+.precheckQuestion { display: flex; flex-direction: column; gap: var(--tpl-htn6-pre-group-gap); }
+.precheckQuestionTitle { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
+
+/* 選択肢の下の案内。v06 は白地の案内（SwjOv・細枠あり）と砂色の注意（Z0v3c・枠なし）で地が違う。 */
+.precheckNote {
+  display: flex; flex-direction: column; border-radius: var(--radius-control);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink);
+}
+.precheckNote p { min-width: 0; }
+.precheckNoteInfo {
+  padding: var(--tpl-htn-note-pad); gap: var(--tpl-htn6-pre-note-gap);
+  background: var(--color-canvas); border: 1px solid var(--color-hairline);
+}
+.precheckNoteInfo .precheckNoteTitle { color: var(--color-accent-deep); }
+.precheckNoteWarn {
+  padding: var(--tpl-htn6-pre-note-pad); gap: var(--tpl-htn6-pre-row-gap);
+  background: var(--color-caution-band);
+}
+.precheckNoteWarn .precheckNoteTitle { color: var(--color-warning); }
+.precheckNoteTitle { font-weight: 700; }
+.precheckNoteLink { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-htn6-pre-link-gap); }
+.precheckAck { padding: var(--tpl-htn-ack-pad); }
+
+/* このあとの質問。進む前に全体の見通しを出す（nGlq4）。 */
+.precheckUpcoming { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); }
+.precheckUpcomingTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink-secondary); }
+.precheckUpcomingItem { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-faint); }
+
+/* チェック結果（eOQAo）。印の箱と文を横に並べる。字と色は行ごとに持つ。 */
+.precheckResultHeading { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
+.precheckResultItem { display: flex; align-items: flex-start; gap: var(--tpl-htn6-pre-mark-gap); }
+.precheckResultMark {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: var(--tpl-htn6-pre-mark); height: var(--tpl-htn6-pre-mark);
+  border-radius: var(--tpl-htn-radius-pill); background: var(--color-canvas);
+  box-shadow: var(--tpl-htn-ring); color: var(--color-accent-deep);
+}
+.precheckResultText { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); }
+.precheckResultTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; color: var(--color-ink); }
+.precheckResultBody { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
+
+/* ② 確認のチェック。印の下に理由の一文を置く。 */
+.ackList { display: flex; flex-direction: column; gap: var(--tpl-htn6-ack-gap); }
+.ackNote {
+  padding-inline-start: var(--tpl-htn6-ack-note-pad);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary);
+}
+
+/* ③Step1 止まったときの赤い案内箱。カードのいちばん上。 */
+.errorBox {
+  display: flex; flex-direction: column; gap: var(--tpl-htn6-err-gap);
+  padding: var(--tpl-htn6-err-pad); border-radius: var(--tpl-htn-radius-m);
+  background: var(--color-status-danger-soft); box-shadow: var(--tpl-htn-ring-danger);
+}
+.errorBox p { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink); }
+.errorBox p:first-child { font-weight: 700; color: var(--color-danger); }
+/* Webhook が「オフ」のときは失敗ではなく案内なので青で出す（絵 Lwxyh の案内の箱）。 */
+.errorBoxInfo { background: var(--color-info-bg); box-shadow: var(--tpl-htn-ring-info); }
+.errorBoxInfo p:first-child { color: var(--color-accent-deep); }
+
+/* ③Step1 確認の5行。行は上下中央そろえ。 */
+.checkList { margin: 0; padding: 0; list-style: none; }
+.checkRow {
+  display: flex; align-items: center; gap: var(--tpl-htn-gap-s);
+  min-height: var(--tpl-htn-check-row-h); padding: var(--tpl-htn-check-pad); box-shadow: var(--tpl-htn-line-bottom);
+}
+.checkRow:last-child { box-shadow: none; }
+.checkIcon { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--color-ink-faint); }
+.checkRow[data-phase='ok'] .checkIcon { color: var(--color-accent-deep); }
+.checkRow[data-phase='error'] .checkIcon { color: var(--color-danger); }
+.checkTitle { flex-shrink: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 600; color: var(--color-ink); }
+.checkDetail {
+  flex: 1 1 0; min-width: 0; overflow-wrap: anywhere;
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary);
+}
+.checkRow[data-phase='error'] .checkDetail { color: var(--color-danger); }
+
+/* 確認中の回るリング。外枠が道、上側だけ濃くして時計回りに回す。 */
+.ring {
+  display: block; width: var(--tpl-htn6-ring); height: var(--tpl-htn6-ring);
+  border-radius: var(--tpl-htn-radius-pill);
+  border: var(--tpl-htn6-ring-w) solid var(--color-control-border);
+  border-top-color: var(--color-accent-deep);
+  animation: tplHtn6Spin var(--tpl-htn6-spin) linear infinite;
+}
+@keyframes tplHtn6Spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ring { animation: none; } }
+
+/* ③Step2 友だち追加テスト */
+.qrBlock { display: flex; align-items: center; gap: var(--tpl-htn6-qr-gap); flex-wrap: wrap; }
+.qrFrame {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: var(--tpl-htn6-qr); height: var(--tpl-htn6-qr); padding: var(--tpl-htn6-qr-pad);
+  border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas); box-shadow: var(--tpl-htn-ring);
+}
+.qrFrame img { display: block; width: 100%; height: 100%; }
+.qrSide { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-gap-s); }
+.qrWait { display: inline-flex; align-items: center; gap: var(--tpl-htn-gap-s); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
+
+/* ④ 使い方のひな型は共通の RadioCardGroup／RadioCard・StatusBadge が持つ（★V8 §24）。
+   画面CSSは持たない。 */
+
+/* ⑤-0 引き継ぎ中。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
+.handoverBox {
+  display: flex; flex-direction: column; gap: var(--tpl-htn6-hand-gap);
+  padding: var(--tpl-htn6-hand-pad);
+}
+.handoverStats { display: flex; flex-wrap: wrap; gap: var(--tpl-htn6-stat-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
+.handoverStats strong { font-weight: 700; color: var(--color-ink); }
+
+/* ⑤ 完了 */
+.doneHero { display: flex; flex-direction: column; align-items: center; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn6-done-pad); text-align: center; }
+.doneIcon { color: var(--color-accent-deep); }
+.doneTitle { margin: 0; font-size: var(--tpl-htn6-text-20); line-height: var(--tpl-htn6-lh-28); font-weight: 700; color: var(--color-ink); }
+/* ⑤ 名前の箱。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
+.accountBox {
+  display: flex; align-items: center; gap: var(--tpl-htn-gap-s);
+  padding: var(--tpl-htn6-acct-pad);
+}
+.accountName { font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
+.accountId { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
+.useRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s); }

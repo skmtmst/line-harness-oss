@@ -1,4 +1,8 @@
 'use client'
+import { isConflict } from './cta-errors'
+export { isConflict } from './cta-errors'
+
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import Card from '@/components/shared/card'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -11,7 +15,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import TapActionField from '@/components/shared/tap-action-field'
@@ -42,15 +46,12 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 口・保存前の確かめ・同時編集（409）の扱いは BEHAVIOR.md。
  */
 
-type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'; items: Array<{ id: string; name: string; isActive: boolean }> }
+type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'; items: Array<{ id: string; name: string; isActive: boolean; folderId?: string | null }> }
 
 /** CTA の押したら：URL を開く・回答フォーム。 */
 const WEBINAR_CTA_KINDS: readonly TapActionKind[] = ['uri', 'form']
 const EMPTY_CARD = (atSeconds: number): WebinarCtaCard => ({ atSeconds, kind: 'form', title: '', body: null, buttonLabel: '', autoOpen: false, formId: null, url: null })
 
-export function isConflict(cause: unknown): boolean {
-  return cause instanceof ApiError && cause.status === 409 && (!cause.code || /version_conflict/i.test(cause.code))
-}
 
 export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
   const saveErrors = useSaveFormErrors()
@@ -111,11 +112,11 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     const id = ++formRequestId.current
     if (!accountId) { setForms({ state: 'idle', items: [] }); return }
     setForms({ state: 'loading', items: [] })
-    fetchApi<{ success: boolean; data: Array<{ id: string; name: string; isActive?: boolean }> }>(`/api/forms?account_id=${encodeURIComponent(accountId)}`)
+    fetchApi<{ success: boolean; data: Array<{ id: string; name: string; isActive?: boolean; folderId?: string | null }> }>(`/api/forms?account_id=${encodeURIComponent(accountId)}`)
       .then((response) => {
         if (id !== formRequestId.current) return
         if (!response.success || !Array.isArray(response.data)) throw new Error('forms_not_loaded')
-        setForms({ state: 'ready', items: response.data.map((item) => ({ id: item.id, name: item.name, isActive: item.isActive === true })) })
+        setForms({ state: 'ready', items: response.data.map((item) => ({ ...item, isActive: item.isActive === true })) })
       })
       .catch((cause: unknown) => {
         if (id !== formRequestId.current) return
@@ -324,12 +325,12 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
             <fieldset className={styles.editor} disabled={busy}>
               {/* 閲覧のみ：文字の欄は読み取りだけ、選ぶ部品は選んでいる値を文字で見せる（2026-10-06 オーナー決定）。 */}
               <p className={styles.editorTitle}>{`選んでいるカード：${times[currentIndex] ?? fmtMinSec(current.atSeconds)}`}</p>
-              <div className={form.pair}>
+              <SettingsFormRow layout="columns">
                 <div className={form.field}><Field label="見出し" htmlFor="cta-title" requirement={fields.requirement(`cta-${currentIndex}-title`)}><SaveErrorField names={["title","current.title"]}><TextField {...fields.bind(`cta-${currentIndex}-title`)} id="cta-title" value={current.title} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-title`)} aria-describedby={errId('title')} onChange={(event) => update(currentIndex, { title: event.target.value })} /></SaveErrorField>
 <FieldError id="cta-title-error">{fields.error(`cta-${currentIndex}-title`)}</FieldError></Field></div>
                 <div className={form.field}><Field label="出す時刻（分:秒）" htmlFor="cta-time" requirement={fields.requirement(`cta-${currentIndex}-time`)}><SaveErrorField names={["times"]}><TextField {...fields.bind(`cta-${currentIndex}-time`)} id="cta-time" value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" invalid={fields.invalid(`cta-${currentIndex}-time`)} aria-describedby={errId('time')} onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /></SaveErrorField>
 <FieldError id="cta-time-error">{fields.error(`cta-${currentIndex}-time`)}</FieldError></Field></div>
-              </div>
+              </SettingsFormRow>
               <div className={form.field}><Field label="ボタンの言葉" htmlFor="cta-button" requirement={fields.requirement(`cta-${currentIndex}-button`)}><SaveErrorField names={["buttonLabel","current.buttonLabel","button_label","current.button_label"]}><TextField {...fields.bind(`cta-${currentIndex}-button`)} id="cta-button" value={current.buttonLabel} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-button`)} aria-describedby={errId('button')} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /></SaveErrorField>
 <FieldError id="cta-button-error">{fields.error(`cta-${currentIndex}-button`)}</FieldError></Field></div>
               <div className={form.field}>
@@ -353,13 +354,13 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
                     kinds={WEBINAR_CTA_KINDS}
                     hasLiff
                     readOnly={readOnly}
-                    sources={forms.state === 'ready' ? { form: forms.items.map((item) => ({ id: item.id, name: item.name, note: item.isActive ? '公開中' : '公開していません', disabled: !item.isActive })) } : undefined}
+                    sources={forms.state === 'ready' ? { form: forms.items.map((item) => ({ ...item, note: item.isActive ? '公開中' : '公開していません', disabled: !item.isActive })) } : undefined}
                   /></SaveErrorField>
                 </div>
                 </Field>
               </div>
               <div className={styles.toggleRow}>
-                {readOnly ? null : <SaveErrorField names={["autoOpen","current.autoOpen","auto_open","current.auto_open"]}><SettingCheckbox checked={current.autoOpen} label="ボタンを押したら、フォームを自動で開く" onChange={(next) => update(currentIndex, { autoOpen: next })} /></SaveErrorField>}
+                {readOnly ? null : <SaveErrorField names={["autoOpen","current.autoOpen","auto_open","current.auto_open"]}><Toggle checked={current.autoOpen} label="ボタンを押したら、フォームを自動で開く" onChange={(next) => update(currentIndex, { autoOpen: next })} /></SaveErrorField>}
                 <span className={styles.toggleText}>{readOnly ? `ボタンを押したら、フォームを自動で${current.autoOpen ? '開く' : '開かない'}` : 'ボタンを押したら、フォームを自動で開く'}</span>
               </div>
             </fieldset>
@@ -374,7 +375,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
           <span className={form.labelSmall}>申込フォーム</span>
           {forms.state === 'ready' ? (
             <div className={styles.formSelect}>
-              {readOnly ? <ReadValue label="申込に使う回答フォーム">{editor.publicPage.form?.name ?? formName(registrationFormId)}</ReadValue> : <SaveErrorField names={["registrationFormId"]}><EntityKindField kind="form" label="申込に使う回答フォーム" options={formRows(registrationFormId)} meta={formMeta} accountId={accountId} value={registrationFormId} disabled={busy || conflict} invalid={Boolean(registrationFormId) && !published.some((item) => item.id === registrationFormId)} onChange={setRegistrationFormId} /></SaveErrorField>}
+              {readOnly ? <ReadValue label="申込に使う回答フォーム">{editor.publicPage.form?.name ?? formName(registrationFormId)}</ReadValue> : <SaveErrorField names={["registrationFormId"]}><EntityKindField kind="form" label="申込に使う回答フォーム" options={formRows(registrationFormId)} meta={formMeta} accountId={accountId} value={registrationFormId} disabled={busy || conflict} disabledReason={conflict ? 'ほかの人が更新しました。最新の内容を読み込んでください。' : busy ? '処理中です。完了してから操作してください。' : undefined} invalid={Boolean(registrationFormId) && !published.some((item) => item.id === registrationFormId)} onChange={setRegistrationFormId} /></SaveErrorField>}
             </div>
           ) : forms.state === 'loading' ? <p className={form.cardNote}>回答フォームを読み込んでいます。</p>
             : forms.state === 'forbidden' ? <p className={form.cardNote}>{permissionDeniedMessage('store')}</p>

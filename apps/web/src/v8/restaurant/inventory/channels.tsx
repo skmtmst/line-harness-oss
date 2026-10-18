@@ -7,7 +7,9 @@ const b244Requirements = {
 
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
-import { BookOpen, Copy, FlaskConical } from 'lucide-react'
+import { CircleHelp, Copy, FlaskConical, RefreshCw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ReservationSource } from '@/components/shared/reservation-board'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
@@ -21,7 +23,7 @@ import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantIntakeAddress } from '@/lib/restaurant-test-api'
 import { Status } from '../booking-kit/shell'
-import { DialogNote, RsDialog } from '../booking-kit/parts'
+import { DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
 import { dayLabelParen, formatAt } from './format'
 import styles from './inventory.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -62,15 +64,9 @@ type InboundEmail = {
 }
 
 const METHOD_LABEL: Record<RestaurantChannel['receiveMethod'], string> = {
-  email_forward: 'メール転送（自動）',
-  direct: '直接つなぐ（自動）',
-  manual: '手で入れる',
-}
-
-const METHOD_SUB: Record<RestaurantChannel['receiveMethod'], string> = {
-  email_forward: '予約通知メールを読む',
-  direct: '直接の受け口',
-  manual: '台帳へ直接入れる',
+  email_forward: 'メール転送',
+  direct: '直接つなぐ',
+  manual: '手入力',
 }
 
 function channelStatus(channel: RestaurantChannel): { value: string; label: string } {
@@ -97,8 +93,9 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
   const [emails, setEmails] = useState<InboundEmail[] | null>(null)
   const [total, setTotal] = useState(0)
   const [failed, setFailed] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [howToOpen, setHowToOpen] = useState(false)
+  const [reissueOpen, setReissueOpen] = useState(false)
+  const router = useRouter()
   const [detail, setDetail] = useState<InboundEmail | null>(null)
   const [importing, setImporting] = useState<InboundEmail | null>(null)
   const [draft, setDraft] = useState({ customerName: '', guestCount: '2', startsAt: '' })
@@ -175,48 +172,53 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
   const received = automaticChannels.some((channel) => channel.todayCount === null)
     ? null : automaticChannels.reduce((sum, channel) => sum + (channel.todayCount ?? 0), 0)
 
+  const methodLabel = (channel: RestaurantChannel) => (channel.status === 'preparing' && channel.receiveMethod === 'email_forward' ? 'メール転送（未設定）' : METHOD_LABEL[channel.receiveMethod])
+  const rowItems = (channel: RestaurantChannel) => channel.receiveMethod === 'manual'
+    ? [{ id: 'ledger', label: '予約台帳で入れる', onSelect: () => router.push('/restaurant-test/reservations') }]
+    : channel.status === 'preparing'
+      ? [{ id: 'start', label: '始める（転送の設定のしかた）', onSelect: () => setHowToOpen(true) }]
+      : [{ id: 'records', label: '取り込んだ記録を見る', onSelect: () => router.push(`/restaurant-test/reservations?source=${encodeURIComponent(channel.code)}`) }]
+
   return (
     <div data-design-node="hQQlt" className={styles.channels}>
       {message ? <Notice role="status" tone={message.tone === 'success' ? 'success' : 'danger'} message={message.text} /> : null}
+      {/* 絵 mVUo3：左に取り込みアドレス（欄＋コピー・3つの操作）、右に今日の取り込み（中身の高さ）。 */}
       <div className={styles.channelCards}>
         <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.card} aria-labelledby="rs-intake-title">
-          <CardHeader size="stacked" titleId="rs-intake-title" title="取り込みアドレス（メール転送）" />
-          <p className={styles.cardText}>予約媒体から店に届く「予約のお知らせメール」を、このアドレスへ転送すると自動で台帳に入ります。</p>
-          <div className={styles.addressBox}>
-            <span className={styles.addressText} title={address ?? undefined}>{address ?? (canEdit ? 'まだ発行されていません' : '管理者だけが見られます')}</span>
-            {address ? (
-              <CopyTextButton value={address ?? ""} aria-label="メールアドレスをコピー"  />
-            ) : canEdit ? (
-              <Button variant="primary" disabled={busy} onClick={issue} busy={Boolean(busy)} busyLabel="処理中…">発行する</Button>
-            ) : null}
-          </div>
+          <CardHeader size="stacked" titleId="rs-intake-title" title="予約メールの取り込みアドレス" />
+          <p className={styles.cardText}>予約媒体から届く予約のお知らせメールを、このアドレスへ転送すると台帳に入ります。</p>
+          <Field label="取り込みアドレス" htmlFor="rs-intake-address" optional={false}>
+            <div className={styles.addressBox}>
+              <TextField id="rs-intake-address" readOnly title={address ?? undefined} value={address ?? (canEdit ? 'まだ発行されていません' : '管理者だけが見られます')} />
+              {address ? <CopyTextButton variant="secondary" icon={<Copy size={15} aria-hidden="true" />} value={address} aria-label="取り込みアドレスをコピー" /> : null}
+            </div>
+          </Field>
           <div className={styles.cardActions}>
-            <Button onClick={() => setHowToOpen(true)}><BookOpen size={15} aria-hidden="true" />転送の設定のしかた</Button>
-            <Button href="/restaurant-test/reservations"><FlaskConical size={15} aria-hidden="true" />試しに受け取る</Button>
+            <Button onClick={() => setHowToOpen(true)}><CircleHelp size={15} aria-hidden="true" />転送の設定のしかた</Button>
+            <Button href="/restaurant-test/reservations"><FlaskConical size={15} aria-hidden="true" />試しに受け取る（予約台帳へ）</Button>
+            {canEdit ? (address
+              ? <Button onClick={() => setReissueOpen(true)} disabled={busy}><RefreshCw size={15} aria-hidden="true" />発行し直す（旧は 90 日で失効）</Button>
+              : <Button variant="primary" disabled={busy} onClick={issue} busy={Boolean(busy)} busyLabel="処理中…">発行する</Button>) : null}
           </div>
         </Card>
-        <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.card} aria-labelledby="rs-today-title">
+        <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.todayCard} aria-labelledby="rs-today-title">
           <CardHeader size="stacked" titleId="rs-today-title" title="今日の取り込み" />
-          <p className={styles.cardText}>{`${dayLabelParen(date)}0:00〜いま`}</p>
-          <div className={styles.todayStats}>
+          <div className={styles.todayStats} title={`${dayLabelParen(date)}0:00〜いま`}>
             <KpiCard className={styles.todayStat} title="取り込んだ" value={received} unit={received === null ? '' : '件'} detail={null} icon={null} presentation="inline" />
             <KpiCard className={styles.todayStat} title="読めなかった" value={total} unit="件" detail={null} icon={null} presentation="inline" valueTone={total > 0 ? 'danger' : 'default'} />
           </div>
-          {total > 0 ? (
-            <p className={styles.warnNote}>{`読めなかった ${total} 件は、下の「読めなかったもの」から手で直して取り込めます。`}</p>
-          ) : null}
         </Card>
       </div>
       <DataTable presentation="channels">
         <thead>
           <TableHeadRow>
-            <Th className={styles.chName}>予約経路</Th>
+            <Th className={styles.chName}>経路</Th>
             <Th className={styles.chMethod}>受け取り方</Th>
             <Th className={styles.chStatus}>状態</Th>
-            <Th className={styles.chToday} align="right">今日</Th>
+            <Th className={styles.chToday}>今日</Th>
             <Th className={styles.chLast}>最後に届いた</Th>
-            <Th className={styles.chUnread} align="right">読めなかった</Th>
-            <Th className={styles.chOps}>操作</Th>
+            <Th className={styles.chUnread}>読めなかった</Th>
+            <Th className={styles.chOps}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
         <tbody>
@@ -225,24 +227,13 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
             const preparing = channel.status === 'preparing'
             return (
               <Tr key={channel.id} data-row-id={channel.id}>
-                <Td>
-                  <p className={styles.channelName} ><TruncatedText value={String(channel.name ?? '')} /></p>
-                  <p className={styles.channelSub}>{METHOD_SUB[channel.receiveMethod]}</p>
-                </Td>
-                <Td>{preparing && channel.receiveMethod === 'email_forward' ? 'メール転送（未設定）' : METHOD_LABEL[channel.receiveMethod]}</Td>
+                <Td><ReservationSource value={channel.code} label={channel.name} /></Td>
+                <Td><TruncatedText value={methodLabel(channel)} /></Td>
                 <Td><Status value={state.value} label={state.label} /></Td>
-                <Td align="right">{preparing || channel.todayCount === null ? emptyValue('unknown') : `${channel.todayCount}件`}</Td>
+                <Td>{preparing || channel.todayCount === null ? emptyValue('unknown') : channel.todayCount}</Td>
                 <Td>{preparing ? emptyValue('unknown') : formatAt(channel.lastReceivedAt, timezone)}</Td>
-                <Td align="right">{preparing || channel.receiveMethod === 'manual' ? emptyValue('unknown') : channel.unreadableCount ?? emptyValue('unknown')}</Td>
-                <Td>
-                  {channel.receiveMethod === 'manual' ? (
-                    <Button href="/restaurant-test/reservations">台帳へ</Button>
-                  ) : preparing ? (
-                    <Button onClick={() => setHowToOpen(true)}>始める</Button>
-                  ) : (
-                    <Button href={`/restaurant-test/reservations?source=${encodeURIComponent(channel.code)}`} aria-label={`${channel.name}の記録`}>記録</Button>
-                  )}
-                </Td>
+                <Td>{preparing || channel.receiveMethod === 'manual' ? emptyValue('unknown') : channel.unreadableCount ?? emptyValue('unknown')}</Td>
+                <Td><RowMore subject={channel.name} items={rowItems(channel)} /></Td>
               </Tr>
             )
           })}
@@ -250,22 +241,35 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
       </DataTable>
       {canEdit ? (
         <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.card} aria-labelledby="rs-unread-title">
-          <CardHeader size="stacked" titleId="rs-unread-title" title={`読めなかったもの ${total} 件`} />
-          <p className={styles.cardText}>形が変わったメールや、店の情報が合わないメールは、捨てずにここに残ります。</p>
+          <CardHeader size="stacked" titleId="rs-unread-title" title="読めなかったもの" />
+          <p className={styles.cardText}>本文は出さない</p>
           {emails.length === 0 ? (
             <ListState kind="empty" title="いま残っているものはありません" description="読めなかった予約メールは、ここに残ります。" />
           ) : emails.map((mail) => (
             <div key={mail.id} className={styles.unreadRow}>
-              <div className={styles.unreadMain}>
-                <p className={styles.channelName}>{`${mail.mediaName ?? mail.mediaCode ?? '媒体不明'}の予約メール`}</p>
-                <p className={styles.channelSub}>{`${formatAt(mail.receivedAt, timezone)} 受信・${mail.reason ?? '読めなかった理由は分かりません'}`}</p>
-              </div>
+              <p className={styles.unreadMain}><TruncatedText value={[formatAt(mail.receivedAt, timezone), mail.mediaName ?? mail.mediaCode ?? '媒体不明', mail.reason ?? '読めなかった理由は分かりません'].join(' ・ ')} /></p>
               <Button onClick={() => setDetail(mail)}>詳しく見る</Button>
               <Button variant="primary" onClick={() => { setDraft({ customerName: '', guestCount: '2', startsAt: '' }); setFieldErrors({}); setImportError(''); setImporting(mail) }}>手で直して取り込む</Button>
             </div>
           ))}
         </Card>
       ) : null}
+      <RsDialog
+        open={reissueOpen}
+        title="取り込みアドレスを発行し直しますか？"
+        width={480}
+        top={220}
+        busy={busy}
+        onCancel={() => setReissueOpen(false)}
+        actions={(
+          <>
+            <Button type="button" onClick={() => setReissueOpen(false)} disabled={busy}>キャンセル</Button>
+            <Button type="button" variant="primary" disabled={busy} busy={busy} busyLabel="処理中…" onClick={() => { setReissueOpen(false); issue() }}>発行し直す</Button>
+          </>
+        )}
+      >
+        <DialogNote>新しいアドレスを発行します。今のアドレスも 90 日は受け取り、その後は使えなくなります。予約媒体の転送先を新しいアドレスへ変えてください。</DialogNote>
+      </RsDialog>
       <RsDialog
         open={howToOpen}
         title="転送の設定のしかた"

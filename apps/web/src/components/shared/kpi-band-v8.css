@@ -31,6 +31,15 @@
   outline-color: transparent;
   box-shadow: none;
 }
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-border='dividers'] {
+  border-block: 0;
+}
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:first-child {
+  padding-inline-start: 0;
+}
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:last-child {
+  padding-inline-end: 0;
+}
 :root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]:not(:last-child) {
   border-right: 1px solid var(--tpl-band-line);
 }
@@ -78,17 +87,21 @@
   height: var(--tpl-band-compact-number-lh);
 }
 
-/* 補足の省略表示。空の段の有無は下のB-220で帯全体から決める。 */
-:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 補足は文節で折り返す。single指定は1行で省略し、全文はtitle。行き先は次の行へ保つ。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] { flex-direction: column; align-items: flex-start; }
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child {
+  display: block; flex: none; width: 100%; white-space: normal;
+  overflow: visible; text-overflow: clip; overflow-wrap: break-word; word-break: auto-phrase; /* 語の途中（「離／れています」）で折らない。文節に入らない幅だけ字で折る */
+}
+/* detailLayout='single'：1行＋省略（全文は title）。最後の1字だけ次の行に落ちる補足に使う（aINnz・t2SMXX）。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail-layout='single'] [data-kpi-detail] > span:first-child {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* B-178：一覧は116の帯。マスのcompact指定を残しても段の寸法は共通。 */
 :root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > [data-design-version] {
   min-height: var(--tpl-list-band-h); box-sizing: border-box;
   padding: var(--tpl-list-band-pad); gap: var(--tpl-list-gap);
-}
-/* 長い説明は1行で省略する。KpiCardのtitleから全文を確かめられる。 */
-:root [data-list-skeleton] [data-kpi-strip]:not([data-kpi-density='compact']) [data-kpi-detail] > span {
-  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* B-220：補足はマスでなく帯全体で有無を決める。1つでもあれば全マスをそろえる。 */
@@ -108,4 +121,20 @@ html:root [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] {
   font-size: var(--text-caption);
   line-height: 18px;
+}
+
+/* 括弧の補足を分ける指定は、明示した改行を残す。 */
+html:root [data-list-skeleton] [data-kpi-detail-layout='qualifier'] [data-kpi-detail] > span:first-child {
+  white-space: pre-line;
+  word-break: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* 業種ダッシュボード（XBkC2・NqAvL ほか）：補足と行き先を同じ行に置く（補足は左・1行＋省略、行き先は右）。layout="link-row" の帯だけ。 */
+html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] { flex-direction: row; align-items: center; gap: var(--polish-space-row); }
+html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { flex: 1 1 auto; width: auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 狭い板（白い板が 1100 未満）では数と前との比べの札を折り返し、札を切らない。 */
+@container v8-page (max-width: 1099px) {
+  html:root [data-kpi-strip][data-kpi-layout='link-row'] [data-unit-spacing] { flex-wrap: wrap; row-gap: var(--space-2); }
 }

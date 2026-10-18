@@ -55,21 +55,41 @@ export async function reconcilePaidBookingPayment(
     return { duplicate: true };
   }
   const nowIso = now.toISOString();
+  const statements = paidBookingPaymentStatements(db, row, nowIso, applyPaid);
+  const result = statements.length ? await db.batch(statements) : [];
+  if (row.booking_id && await db.prepare(`SELECT id FROM booking_operation_runs
+      WHERE booking_id = ? AND line_account_id = ? AND idempotency_key = ? AND status IN ('queued','retry_wait')`)
+      .bind(row.booking_id, row.line_account_id, `${row.booking_id}:confirmation-effects`).first()) {
+    try { await runConfirmedBookingSideEffects(db, row.booking_id, { now, credentials }); }
+    catch { console.error(JSON.stringify({"code":"paid_booking_confirmation_incomplete"})); }
+  }
+  return { duplicate: !applyPaid || (result[0]?.meta?.changes ?? 0) === 0 };
+}
+
+export interface PaidPaymentRow {
+  id: string; line_account_id: string; booking_id: string | null; status: string;
+}
+
+/** 通知台帳も同じbatchで確定できるよう、原子的な更新を組み立てる。 */
+export function paidBookingPaymentStatements(
+  db: D1Database, row: PaidPaymentRow, nowIso: string, applyPaid: boolean,
+  gate: { sql: string; args: (string | number)[] } = { sql: '1', args: [] },
+): D1PreparedStatement[] {
   const statements: D1PreparedStatement[] = [];
   if (applyPaid) {
     statements.push(db.prepare(`UPDATE booking_payments
       SET status = 'paid', paid_at = COALESCE(paid_at, ?), updated_at = ?
-      WHERE id = ? AND status IN ('unpaid', 'pending')`).bind(nowIso, nowIso, paymentId));
+      WHERE id = ? AND status IN ('unpaid', 'pending') AND (${gate.sql})`).bind(nowIso, nowIso, row.id, ...gate.args));
   }
   if (row.booking_id !== null) {
     statements.push(db.prepare(`UPDATE bookings
       SET status = 'confirmed', decided_at = ?, updated_at = ?
-      WHERE id = ? AND line_account_id = ? AND status = 'requested'
+      WHERE id = ? AND line_account_id = ? AND status = 'requested' AND (${gate.sql})
         AND EXISTS (SELECT 1 FROM booking_payments p WHERE p.id = ? AND p.status = 'paid'
           AND p.booking_id = bookings.id AND p.line_account_id = bookings.line_account_id)
         AND COALESCE((SELECT approval_mode FROM booking_settings
           WHERE line_account_id = bookings.line_account_id), 'automatic') = 'automatic'`)
-      .bind(nowIso, nowIso, row.booking_id, row.line_account_id, paymentId));
+      .bind(nowIso, nowIso, row.booking_id, row.line_account_id, ...gate.args, row.id));
     // changes() は直前の予約更新だけを見る。並走・重複通知でも履歴を重ねない。
     statements.push(db.prepare(`INSERT INTO booking_audit_logs
       (id, booking_id, line_account_id, action, after_json, actor_type, occurred_at)
@@ -77,14 +97,7 @@ export async function reconcilePaidBookingPayment(
       WHERE changes() = 1`).bind(crypto.randomUUID(), row.booking_id, row.line_account_id, nowIso));
     statements.push(confirmationWorkflowStatement(db, row.booking_id, true));
   }
-  const result = statements.length ? await db.batch(statements) : [];
-  if (row.booking_id && await db.prepare(`SELECT id FROM booking_operation_runs
-      WHERE booking_id = ? AND line_account_id = ? AND idempotency_key = ? AND status IN ('queued','retry_wait')`)
-      .bind(row.booking_id, row.line_account_id, `${row.booking_id}:confirmation-effects`).first()) {
-    try { await runConfirmedBookingSideEffects(db, row.booking_id, { now, credentials }); }
-    catch { console.error(JSON.stringify({ event: 'paid_booking_confirmation_incomplete' })); }
-  }
-  return { duplicate: !applyPaid || (result[0]?.meta?.changes ?? 0) === 0 };
+  return statements;
 }
 
 /** requested の不整合だけを有限数で回収する。承認待ちの支払い済みは期限切れにしない。 */
@@ -97,7 +110,7 @@ export async function recoverPaidBookingPayments(db: D1Database, now: Date, cred
     ORDER BY p.id LIMIT 200`).all<{ id: string }>();
   for (const row of rows.results ?? []) {
     try { await reconcilePaidBookingPayment(db, row.id, now, false, credentials); }
-    catch { console.error(JSON.stringify({ event: 'paid_booking_recovery_failed' })); }
+    catch { console.error(JSON.stringify({"code":"paid_booking_recovery_failed"})); }
   }
 }
 

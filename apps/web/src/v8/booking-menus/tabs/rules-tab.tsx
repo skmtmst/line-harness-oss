@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import Disclosure from '@/components/shared/disclosure'
 import HelpTip from '@/components/shared/help-tip'
 import { bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
@@ -19,6 +19,7 @@ import styles from '../settings.module.css'
 import { ruleNumberRequirements } from '../lib/rule-number-requirements'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { Field } from '@/components/shared/form-controls'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import SaveFeedback, { useSaveFeedback } from '@/components/shared/save-feedback'
@@ -308,25 +309,17 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>いつまで予約を受けるか</h2>
           </div>
-          {/* 絵 x1OZS6：見出しの段と欄の段を分けて3列に並べる。 */}
-          <div className={styles.ruleGrid}>
-            <span className={styles.ruleHead}>
-              先の予約が取れる範囲
-              <HelpTip label="先の予約が取れる範囲の説明">今は {bookingWindowEnd(draft.bookingWindowDays)} まで受け付けます。</HelpTip>
-            </span>
-            <span className={styles.ruleHead}>
-              受付の締め切り
-              <HelpTip label="受付の締め切りの説明">「直前まで」は開始の直前まで受け付けます。</HelpTip>
-            </span>
-            <span className={styles.ruleHead}>キャンセルの期限</span>
-            {canEdit ? <>
-              <SaveErrorField names={["bookingWindowDays","draft.bookingWindowDays","booking_window_days","draft.booking_window_days"]}><Select size="full"
+          <SettingsFormRow layout="columns" columns={3}>
+            <Field label="先の予約が取れる範囲" optional={false} help={<>今は {bookingWindowEnd(draft.bookingWindowDays)} まで受け付けます。</>}>
+              {canEdit ? <SaveErrorField names={["bookingWindowDays","draft.bookingWindowDays","booking_window_days","draft.booking_window_days"]}><Select size="full"
                 aria-label="先の予約が取れる範囲"
                 value={String(draft.bookingWindowDays)}
                 onChange={(value) => set('bookingWindowDays', Number(value))}
                 options={windowOptions}
-              /></SaveErrorField>
-              <SaveErrorField names={["cutoffMinutesBefore","draft.cutoffMinutesBefore","cutoff_minutes_before","draft.cutoff_minutes_before"]}><Select size="full"
+              /></SaveErrorField> : <ReadOnlyText label="先の予約が取れる範囲" value={`${draft.bookingWindowDays} 日先まで`} />}
+            </Field>
+            <Field label="受付の締め切り" optional={false} help="「直前まで」は開始の直前まで受け付けます。">
+              {canEdit ? <SaveErrorField names={["cutoffMinutesBefore","draft.cutoffMinutesBefore","cutoff_minutes_before","draft.cutoff_minutes_before"]}><Select size="full"
                 aria-label="受付の締め切り"
                 value={cutoffEmpty ? '' : String(draft.cutoffMinutesBefore)}
                 onChange={(value) => {
@@ -334,8 +327,10 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                   if (value !== '') set('cutoffMinutesBefore', Number(value))
                 }}
                 options={cutoffOptions}
-              /></SaveErrorField>
-              <SaveErrorField names={["cancelDeadlineMinutesBefore","draft.cancelDeadlineMinutesBefore","cancel_deadline_minutes_before","draft.cancel_deadline_minutes_before"]}><Select size="full"
+              /></SaveErrorField> : <ReadOnlyText label="受付の締め切り" value={beforeLabel(draft.cutoffMinutesBefore)} />}
+            </Field>
+            <Field label="キャンセルの期限" optional={false}>
+              {canEdit ? <SaveErrorField names={["cancelDeadlineMinutesBefore","draft.cancelDeadlineMinutesBefore","cancel_deadline_minutes_before","draft.cancel_deadline_minutes_before"]}><Select size="full"
                 aria-label="キャンセルの期限"
                 value={cancelEmpty ? '' : String(draft.cancelDeadlineMinutesBefore)}
                 onChange={(value) => {
@@ -343,13 +338,9 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                   if (value !== '') set('cancelDeadlineMinutesBefore', Number(value))
                 }}
                 options={cancelOptions}
-              /></SaveErrorField>
-            </> : <>
-              <ReadOnlyText label="先の予約が取れる範囲" value={`${draft.bookingWindowDays} 日先まで`} />
-              <ReadOnlyText label="受付の締め切り" value={beforeLabel(draft.cutoffMinutesBefore)} />
-              <ReadOnlyText label="キャンセルの期限" value={beforeLabel(draft.cancelDeadlineMinutesBefore)} />
-            </>}
-          </div>
+              /></SaveErrorField> : <ReadOnlyText label="キャンセルの期限" value={beforeLabel(draft.cancelDeadlineMinutesBefore)} />}
+            </Field>
+          </SettingsFormRow>
         </section>
 
         <section className={styles.section}>
@@ -359,7 +350,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
           <div className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>お店が承認してから確定する</span>
             {canEdit ? (
-              <SaveErrorField names={["approvalMode","draft.approvalMode","approval_mode","draft.approval_mode"]}><SettingCheckbox
+              <SaveErrorField names={["approvalMode","draft.approvalMode","approval_mode","draft.approval_mode"]}><Toggle
                 label="お店が承認してから確定する"
                 checked={draft.approvalMode === 'manual'}
                 onChange={(next) => set('approvalMode', next ? 'manual' : 'automatic')}
@@ -385,7 +376,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
               <HelpTip label="「指名なし」の説明">オンにすると、受付中のスタッフ全員が「指名なし」での予約の対象になります。</HelpTip>
             </span>
             {canEdit ? (
-              <SaveErrorField names={["noAssign","initialNoAssign","no_assign","initial_no_assign"]}><SettingCheckbox
+              <SaveErrorField names={["noAssign","initialNoAssign","no_assign","initial_no_assign"]}><Toggle
                 label="「指名なし」を出す"
                 checked={noAssign ?? initialNoAssign}
                 onChange={(next) => setNoAssign(next)}
@@ -417,7 +408,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
 
         {/* 絵に無いが機能がある欄（送る時刻・当日・枠の間隔・仮押さえ・タイムゾーン・日時の最初の形）は「ほかの設定」で開く。 */}
         <Disclosure title="ほかの設定（お知らせの時刻・予約枠の間隔・仮押さえ・タイムゾーン・日時の最初の形）">
-          <div className={styles.ruleFields}>
+          <SettingsFormRow layout="columns" columns={3}>
             <Field label="前日のお知らせを送る時刻"><span className="mt-1 flex items-center gap-2">
                 {canEdit ? (
                   <SaveErrorField names={["reminderDayBeforeTime","draft.reminderDayBeforeTime","reminder_day_before_time","draft.reminder_day_before_time"]}><TimeField
@@ -459,7 +450,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                 /></SaveErrorField>
               ) : <ReadOnlyText label="日時を選ぶ画面の最初の形" value={draft.liffDateView === 'calendar' ? 'カレンダー' : '週で見る（日付の横ならび）'} spaced />}</Field>
             <Notice tone="info">お客さまの画面の色と書体は、すべての画面で共通です。<Link href="/settings/customer-look">お客さまのデザインを開く ↗</Link></Notice>
-          </div>
+          </SettingsFormRow>
         </Disclosure>
 
         {saveError && feedback.state.kind === 'idle' ? (

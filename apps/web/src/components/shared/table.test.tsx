@@ -191,3 +191,13 @@ describe('一覧の行と選択', () => {
     expect(calls).toBe(1)
   })
 })
+
+
+it('読むための履歴では操作の題を見せ、普通の表は読み上げだけを保つ', () => {
+  const view = renderTable(<thead><TableHeadRow><Th>操作</Th></TableHeadRow></thead>)
+  expect(screen.getByRole('columnheader', { name: '操作' }).querySelector('.sr-only')).toBeTruthy()
+  view.rerender(<DataTable><thead><TableHeadRow><Th showActionLabel>操作</Th></TableHeadRow></thead></DataTable>)
+  const heading = screen.getByRole('columnheader', { name: '操作' })
+  expect(heading.querySelector('.sr-only')).toBeNull()
+  expect(heading.getAttribute('scope')).toBe('col')
+})

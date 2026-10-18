@@ -1,65 +1,49 @@
 'use client'
-import SegmentedControl from '@/components/shared/segmented'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import dynamic from 'next/dynamic'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Fragment, useState, type ReactNode } from 'react'
-import { Calendar, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
-import type { DashboardCardId } from '@line-crm/shared'
-import { DashboardColumns, DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
+import { dashboardPeriodLabel } from '@/components/dashboard/freshness'
+import { partialFailureLabels,partialFailuresWithoutCard } from '@/components/dashboard/partial-failure-labels'
+import ShipmentPanel from '@/components/dashboard/shipment-panel'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
+import { emptyValue } from '@/components/shared/empty-value'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import SectionHeader from './head'
-import PeriodPicker from '@/components/shared/period-picker'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { STATE_TEXT } from '@/components/shared/not-connected'
-import ShipmentPanel from '@/components/dashboard/shipment-panel'
-import { dashboardPeriodLabel, formatDashboardAsOf } from '@/components/dashboard/freshness'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { useAccount } from '@/contexts/account-context'
 import Notice from '@/components/shared/notice'
-import { partialFailureLabels, partialFailuresWithoutCard } from '@/components/dashboard/partial-failure-labels'
-import { formatWaitRough } from '@/lib/format-duration'
-import { formatNumber, formatTime } from '@/lib/format'
-import { PERIODS, jstDay, useDashboard, type PeriodKey } from './use-dashboard'
-import { FirstStepsCard, useFirstSteps } from './first-steps'
-import { FriendTrend, trendRangeNote } from './trend'
-import { InboxSection } from './inbox'
-import { FriendAddLink } from './friend-add'
-import { ConnectionStatus, DeliveryFailures, FriendStatus, Loading, Metric, MonthlyDelivery, OperationalAlerts, RecentActivity, RecentResults, SendQuota, SupportStatus, Tag, Unavailable, Upcoming } from './sections'
+import PeriodPicker from '@/components/shared/period-picker'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RetryLabel } from '@/components/shared/retry-label'
+import { DashboardColumns,DashboardPage,DashboardRow } from '@/components/templates/dashboard-page'
+import { useAccount } from '@/contexts/account-context'
+import { formatNumber,formatTime } from '@/lib/format'
+import { formatWaitRough } from '@/lib/format-duration'
+import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { SetupCard,SetupWarningBands,setupSummary } from '@/v8/onboarding/setup-card'
+import { useStyleSetup } from '@/v8/onboarding/use-style-setup'
+import type { DashboardCardId } from '@line-crm/shared'
+import { Calendar,Image as ImageIcon,Inbox,Package,Plus,SlidersHorizontal } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { useSearchParams } from 'next/navigation'
+import { Fragment,useEffect,useState,type ReactNode } from 'react'
+import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
+import { FirstStepsCard,useFirstSteps } from './first-steps'
+import { FriendAddLink } from './friend-add'
+import SectionHeader from './head'
+import { InboxSection } from './inbox'
+import { ConnectionStatus,DeliveryFailures,FriendStatus,Loading,Metric,MonthlyDelivery,OperationalAlerts,RecentActivity,RecentResults,SendQuota,SupportStatus,Tag,Unavailable,Upcoming } from './sections'
+import { FriendTrend,trendRangeNote } from './trend'
+import { PERIODS,jstDay,useDashboard } from './use-dashboard'
+export { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
+
 
 /* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
+/* はじめの質問の窓（xxpM9 ほか）も開くまで読まない。 */
+const StyleSetupWizard = dynamic(() => import('@/v8/onboarding/wizard').then((module) => module.default))
+
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,
 })
-
-/**
- * ダッシュボード編集（自分の並び）を出してよい役割か。隠すのは閲覧のみ（読み取り専用。
- * `/api/staff/me` の role が 'viewer'＝サーバーが保存を断る人）だけ。書き込みできる
- * スタッフは押せるので出す（決まりは「押せないボタンを隠す」）。読めるまで（null）は出す。
- */
-export function canEditDashboardLayout(role: string | null): boolean {
-  return role !== 'viewer'
-}
-
-/** 時間帯のあいさつ（日本時間）。 */
-export function greeting(name: string | null, now = new Date()): string {
-  const hour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Asia/Tokyo' }).format(now))
-  const word = hour >= 4 && hour < 10 ? 'おはようございます' : hour >= 10 && hour < 18 ? 'こんにちは' : 'こんばんは'
-  const first = name?.trim().split(/\s+/)[0]
-  return first ? `${word}、${first} さん` : word
-}
-
-/** 見出しの下の1行：「更新 1月13日（火）9:30 ・ 正常に動いています」。 */
-export function headline(asOf: string | null | undefined, risk: 'normal' | 'warning' | 'danger' | null): string {
-  const time = formatDashboardAsOf(asOf)?.replace(/） /, '）')
-  const health = risk === 'normal' ? '正常に動いています' : risk === 'warning' ? '確かめることがあります' : risk === 'danger' ? '止まっているところがあります' : '動きを確かめています'
-  return time ? `更新 ${time} ・ ${health}` : health
-}
 
 /* 右の列の組み合わせ（WQmep）：どの本文の段の右に、どの右の列のカードを置くか。 */
 const ASIDE_OF: Partial<Record<DashboardCardId, DashboardCardId[]>> = {
@@ -83,6 +67,34 @@ export default function DashboardV8() {
   const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
+  /* B-311〜B-313：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
+  const setup = useStyleSetup(d.selectedAccountId, role)
+  const setupRest = setupSummary(setup.data)
+  const params = useSearchParams()
+  const setupParam = params.get('setup')
+  const [wizardStep, setWizardStep] = useState<number | 'summary' | null>(null)
+  useEffect(() => {
+    if (setupParam === 'summary') setWizardStep('summary')
+    else if (setupParam !== null && /^\d+$/.test(setupParam)) setWizardStep(Number(setupParam))
+  }, [setupParam])
+  /* まだスタイルを選んでいない（あとでも選んでいない）アカウントは、最初に入ったとき 1 問目を開く。 */
+  useEffect(() => {
+    const state = setup.data?.state
+    /* 「あとで」「手動」は口の styleMode に残る（別の人・別の端末でも自動では開かない）。 */
+    if (!state || !canManage || state.styleSelected || !d.selectedAccountId) return
+    if (state.styleMode === 'later' || state.styleMode === 'manual') return
+    setWizardStep((current) => current ?? 0)
+  }, [setup.data, canManage, d.selectedAccountId])
+  const openSetupStep = (step: string | number) => {
+    if (typeof step === 'number') { setWizardStep(step); return }
+    const names = setup.data ? ['style', 'image'] : []
+    setWizardStep(step === 'summary' ? 'summary' : Math.max(0, names.indexOf(step)))
+  }
+  const closeWizard = (changed: boolean) => {
+    setWizardStep(null)
+    if (setupParam !== null) router.replace('/')
+    if (changed) setup.reload()
+  }
   const [openDetail, setOpenDetail] = useState<DashboardCardId | null>(null)
   const data = d.data
   const reference = d.reference
@@ -318,12 +330,14 @@ export default function DashboardV8() {
     ...d.visibleRight.map((item) => item.id),
   ])
   const looseFailures = partialFailuresWithoutCard(data?.partialFailures ?? [], shownCardIds)
-  const notice = start.summary || viewer || d.error || looseFailures.length ? (
+  const setupBands = setup.data && canManage ? <SetupWarningBands data={setup.data} /> : null
+  const notice = start.summary || setupRest || setup.data?.warnings.length || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <ReadOnlyNotice />
       ) : null}
-      {start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
+      {setupBands}
+      {setupRest && canManage ? <SetupCard summary={setupRest} onOpenStep={openSetupStep} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
       {d.error ? (
         <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}>{d.error}</Notice>
       ) : null}
@@ -345,8 +359,8 @@ export default function DashboardV8() {
       title={greeting(d.staffName)}
       help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
-        <PeriodPicker days={d.period === 'today' ? 1 : d.period === 'last7' ? 7 : 28} supportedDays={[1,7,28]} choices={PERIODS.map((item) => ({ days: item.key === 'today' ? 1 : item.key === 'last7' ? 7 : 28, label: item.label }))} onChange={(value) => d.selectPeriod(value === 1 ? 'today' : value === 7 ? 'last7' : 'last28')} />
-        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />ダッシュボード編集</Button> : null}
+        <PeriodPicker days={d.period === 'today' ? 1 : d.period === 'last7' ? 7 : 30} supportedDays={[1,7,30]} choices={PERIODS.map((item) => ({ days: item.key === 'today' ? 1 : item.key === 'last7' ? 7 : 30, label: item.label }))} onChange={(value) => d.selectPeriod(value === 1 ? 'today' : value === 7 ? 'last7' : 'last30')} />
+        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />表示を変える</Button> : null}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={15} aria-hidden="true" />配信を作る</Button> : null}
       </>}
       notice={notice}
@@ -378,6 +392,8 @@ export default function DashboardV8() {
         {rows}
         <RecentActivity items={d.notifications} failed={d.notificationFailed} />
       </div>
+      {/* はじめの質問の窓（B-313）。`?setup=0〜|summary` かスタイル未選択の最初の訪問で開く。 */}
+      {wizardStep !== null && setup.data && d.selectedAccountId && canManage ? <StyleSetupWizard accountId={d.selectedAccountId} state={setup.data.state} initialStep={wizardStep} onClose={closeWizard} /> : null}
     </DashboardPage>
   )
 }

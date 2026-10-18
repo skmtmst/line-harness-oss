@@ -37,7 +37,7 @@ test('SCALE-04 上限まで失敗した100件で後ろの飲食店イベント�
     f.raw.prepare("UPDATE workflow_steps SET status='exhausted',attempt_count=50 WHERE subject_id=?").run(id+':mileage');
    }
   }
-  await processRestaurantEvents({DB:f.db,RESTAURANT_TEST_ENABLED:'true'} as any);
+  await processRestaurantEvents({DB:f.db,DEPLOY_ENV:'test',RESTAURANT_TEST_ENABLED:'true'} as any);
   expect(f.raw.prepare("SELECT status FROM rt_reservation_event_receipts WHERE event_id='event100'").get()).toEqual({status:'succeeded'});
  } finally {f.raw.close();}
 });

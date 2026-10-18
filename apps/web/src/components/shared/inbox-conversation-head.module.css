@@ -1,0 +1,74 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/* ── 会話の頭（XqSvX「会話の頭」。LINE もメールも同じ形） ───────── */
+.chead {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-inbox-chead-gap);
+  padding: var(--tpl-inbox-chead-pad);
+  box-shadow: var(--tpl-inbox-search-line-bottom);
+  background: var(--color-canvas);
+  position: relative;
+}
+/* 🔍：頭の段には置かず、頭の下の右端に浮かせる（絵の頭は4つ）。探す帯が開いている間は隠す。 */
+.cheadSearch {
+  position: absolute;
+  z-index: 1;
+  top: 100%;
+  right: var(--tpl-inbox-chead-search-right);
+  margin-top: var(--tpl-inbox-chead-gap);
+}
+.cheadSearch[aria-expanded='true'] { visibility: hidden; }
+.cheadWho { display: flex; min-width: var(--tpl-inbox-chead-who-min); flex: 1 1 0; align-items: center; gap: var(--tpl-inbox-chead-gap); }
+.cheadBack { flex: none; border: 0; background: none; color: var(--color-ink-faint); cursor: pointer; }
+.cheadText { display: flex; min-width: 0; flex-direction: column; }
+.cheadName {
+  display: block;
+  min-width: 0;
+  /* 共通のボタンの最小の高さ（32）を受けない：絵は名前の行 23＋補足 18 で頭が 64 */
+  height: var(--tpl-inbox-chead-name-lh);
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font-size: var(--tpl-inbox-chead-name);
+  font-weight: 600;
+  line-height: var(--tpl-inbox-chead-name-lh);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cheadName[aria-expanded='true'] { height: auto; white-space: normal; word-break: break-all; }
+.cheadSub { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); text-overflow: ellipsis; white-space: nowrap; }
+.cheadTools { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--tpl-inbox-chead-gap); margin-left: auto; }
+.cheadSquare {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-inbox-chead-ctl);
+  height: var(--tpl-inbox-chead-ctl);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+.cheadSquare:hover { background: var(--color-canvas-sunken); }
+.cheadSquare svg { width: var(--tpl-inbox-chead-panel-icon); height: var(--tpl-inbox-chead-panel-icon); }
+.cheadStar { width: var(--tpl-inbox-chead-star); height: var(--tpl-inbox-chead-star); }
+.cheadStar svg { width: var(--tpl-inbox-chead-star-icon); height: var(--tpl-inbox-chead-star-icon); }
+.cheadStar[aria-pressed='true'] { background: var(--color-status-warn-soft); outline-color: var(--color-warning); color: var(--color-warning); }
+.cheadSquare[aria-expanded='true'] { background: var(--color-surface-pearl); }
+.cheadSquare:disabled { cursor: wait; opacity: 0.6; }
+
+.cheadName:focus-visible, .cheadSquare:focus-visible, .cheadBack:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+}

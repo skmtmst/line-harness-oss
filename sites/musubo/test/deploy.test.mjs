@@ -30,7 +30,8 @@ test("first-install program is valid bash and scoped to the approved host", () =
   assert.doesNotMatch(script, /rm -|--delete|wrangler|\.env/);
   assert.ok(script.indexOf("tar -czf") < script.indexOf("started=1"));
   assert.ok(script.indexOf("started=1") < script.indexOf("install -m"));
-  assert.equal(publicFiles.length, 11);
+  assert.equal(publicFiles.length, 18);
+  assert.ok(publicFiles.includes("404.html"));
   assert.ok(!publicFiles.includes(".user.ini"));
   assert.ok(!publicFiles.includes("default_page.png"));
 });
@@ -67,4 +68,63 @@ test("the audited subdomain initial state is accepted but an existing htaccess i
     () => validateInitialState(names + "\n.htaccess", hash),
     /変更/,
   );
+});
+
+test("update program for the installed review site is valid bash, verified, backed up and self-restoring", async () => {
+  const {
+    remoteUpdate,
+    validateInstalledState,
+    validateChecksums,
+    isInitialState,
+    installedRootNames,
+    installedFiles,
+  } = await import("../deploy-preview.mjs");
+  const sums = publicFiles.map((f, i) => `${String(i).padStart(64, "a")}  ${f}`).join("\n");
+  const script = remoteUpdate("20261013083000-123456789abc", "fixtureuser", sums);
+  execFileSync("bash", ["-n"], { input: script });
+  assert.match(script, /\.musubo-stg-site-deploy\.lock/);
+  assert.match(script, /musubo-site-backups\/stg-/);
+  assert.doesNotMatch(
+    script,
+    /install -m 644 [^\n]+ '\/home\/fixtureuser\/musubo\.jp\/public_html\/(?!stg\.musubo\.jp\/)/,
+  );
+  assert.doesNotMatch(script, /rm -|--delete|wrangler|\.env/);
+  assert.match(script, /trap finish EXIT/);
+  assert.match(script, /BEFORE_SHA256SUMS/);
+  assert.ok(script.indexOf("tar -czf") < script.indexOf("started=1"));
+  assert.ok(script.indexOf("sha256sum -c SHA256SUMS") < script.indexOf("started=1"));
+  const firstInstallToSite = script.search(/install -m 644 '[^']+\/payload\/[^']+' '\/home\/fixtureuser\/musubo\.jp\/public_html\/stg\.musubo\.jp\//);
+  assert.ok(firstInstallToSite > script.indexOf("started=1"));
+  assert.throws(() => remoteUpdate("../../escape", "fixtureuser", sums), /Invalid/);
+  assert.throws(() => validateChecksums("bad"), /全件|形式/);
+  const dup = sums.split("\n");
+  dup[1] = dup[0];
+  assert.throws(() => validateChecksums(dup.join("\n")), /全件/);
+  assert.match(script, /find "\$root" -mindepth 1 -type f/); // every depth is inventoried
+  assert.throws(
+    () => validateChecksums(sums.replace("index.html", "../index.html")),
+    /形式/,
+  );
+
+  assert.equal(isInitialState(".user.ini\ndefault_page.png\nindex.html"), true);
+  assert.equal(isInitialState(installedRootNames.join("\n")), false);
+  const ok = { rootNames: installedRootNames.join("\n"), files: installedFiles.join("\n"), symlinks: "" };
+  assert.equal(validateInstalledState(ok), publicFiles);
+  const { legacyInstalledRootNames, legacyInstalledFiles, legacyPublicFiles } = await import("../deploy-preview.mjs");
+  assert.equal(
+    validateInstalledState({
+      rootNames: legacyInstalledRootNames.join("\n"),
+      files: legacyInstalledFiles.join("\n"),
+      symlinks: "",
+    }),
+    legacyPublicFiles,
+  );
+  const legacySums = legacyPublicFiles.map((f, i) => `${String(i).padStart(64, "b")}  ${f}`).join("\n");
+  const migrate = remoteUpdate("20261013083000-123456789abc", "fixtureuser", legacySums, legacyPublicFiles);
+  execFileSync("bash", ["-n"], { input: migrate });
+  assert.match(migrate, /failed-added\/404\.html/);
+  assert.doesNotMatch(migrate, /rm -|--delete/);
+  assert.throws(() => validateInstalledState({ ...ok, rootNames: ok.rootNames + "\nindex.php" }), /想定外/);
+  assert.throws(() => validateInstalledState({ ...ok, files: ok.files + "\nassets/extra.js" }), /想定外/);
+  assert.throws(() => validateInstalledState({ ...ok, symlinks: "index.html" }), /シンボリック/);
 });

@@ -140,7 +140,7 @@ describe('#817 報酬の決まりの版', () => {
   });
   afterEach(() => { testDb.raw.close(); });
 
-  it('最初から第1版（5pt・使用中）が1つだけある', async () => {
+  it('最初から第1版（100pt・使用中）が1つだけある', async () => {
     const res = await app(testDb.db).request('/api/nen-members/photo-reward-policy/versions');
     expect(res.status).toBe(200);
     const json = await res.json() as {
@@ -148,7 +148,7 @@ describe('#817 報酬の決まりの版', () => {
     };
     expect(json.data).toHaveLength(1);
     expect(json.data[0]).toMatchObject({
-      versionNumber: 1, policyKey: 'legacy-5', points: 5, status: 'in_use',
+      versionNumber: 1, policyKey: 'default-100', points: 100, status: 'in_use',
     });
   });
 
@@ -157,7 +157,7 @@ describe('#817 報酬の決まりの版', () => {
     const created = await target.request('/api/nen-members/photo-reward-policy/versions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'policy-key-1' },
-      body: JSON.stringify({ points: 10, summary: '報酬を5pt→10ptに' }),
+      body: JSON.stringify({ points: 10, summary: '報酬を100pt→10ptに' }),
     });
     expect(created.status).toBe(200);
     const createdJson = await created.json() as {
@@ -171,7 +171,7 @@ describe('#817 報酬の決まりの版', () => {
     };
     expect(list.data.map((v) => [v.versionNumber, v.points, v.status])).toEqual([
       [2, 10, 'in_use'],
-      [1, 5, 'past'],
+      [1, 100, 'past'],
     ]);
     // 第1版の中身は変わらない。
     expect(list.data.find((v) => v.versionNumber === 1)?.summary).toBe('最初の報酬の決まり');
@@ -179,7 +179,7 @@ describe('#817 報酬の決まりの版', () => {
 
   it('同じ確認キーの再送では版が増えない', async () => {
     const target = app(testDb.db);
-    const payload = { points: 10, summary: '報酬を5pt→10ptに' };
+    const payload = { points: 10, summary: '報酬を100pt→10ptに' };
     const headers = { 'Content-Type': 'application/json', 'Idempotency-Key': 'same-key' };
     const first = await target.request('/api/nen-members/photo-reward-policy/versions', {
       method: 'POST', headers, body: JSON.stringify(payload),
@@ -217,7 +217,7 @@ describe('#817 報酬の決まりの版', () => {
     await target.request('/api/nen-members/photo-reward-policy/versions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'policy-v2' },
-      body: JSON.stringify({ points: 10, summary: '報酬を5pt→10ptに' }),
+      body: JSON.stringify({ points: 10, summary: '報酬を100pt→10ptに' }),
     });
     const reverted = await target.request('/api/nen-members/photo-reward-policy/revert', {
       method: 'POST',
@@ -229,12 +229,12 @@ describe('#817 報酬の決まりの版', () => {
       data: { version: { versionNumber: number; points: number; summary: string } };
     };
     expect(revertedJson.data.version).toMatchObject({
-      versionNumber: 3, points: 5, summary: '最初の報酬の決まり',
+      versionNumber: 3, points: 100, summary: '最初の報酬の決まり',
     });
     const v2 = testDb.raw.prepare(
       `SELECT points, summary FROM photo_reward_policies WHERE version_number = 2`,
     ).get() as { points: number; summary: string };
-    expect(v2).toMatchObject({ points: 10, summary: '報酬を5pt→10ptに' });
+    expect(v2).toMatchObject({ points: 10, summary: '報酬を100pt→10ptに' });
   });
 
   it('古い版確認での保存は409で止まり、上書きしない', async () => {
@@ -252,7 +252,7 @@ describe('#817 報酬の決まりの版', () => {
     const list = await (await target.request('/api/nen-members/photo-reward-policy/versions')).json() as {
       data: Array<{ versionNumber: number; points: number }>;
     };
-    expect(list.data.map((v) => [v.versionNumber, v.points])).toEqual([[2, 10], [1, 5]]);
+    expect(list.data.map((v) => [v.versionNumber, v.points])).toEqual([[2, 10], [1, 100]]);
   });
 
   it('点数が範囲外・確認キーなし・無い版は受け付けない', async () => {
@@ -346,9 +346,9 @@ describe('#817 写真の重複と報酬', () => {
     const json = await res.json() as {
       data: { awardedPoints: number; rewardSkipped: string | null };
     };
-    expect(json.data.awardedPoints).toBe(5);
+    expect(json.data.awardedPoints).toBe(100);
     expect(json.data.rewardSkipped).toBeNull();
-    expect(outboxRows(testDb.raw, 'photo-1')).toEqual([{ policy_version: 'legacy-5', points: 5 }]);
+    expect(outboxRows(testDb.raw, 'photo-1')).toEqual([{ policy_version: 'default-100', points: 100 }]);
   });
 
   it('同じ写真が2回採用されても報酬は1回だけ', async () => {
@@ -393,13 +393,13 @@ describe('#817 写真の重複と報酬', () => {
   it('版を変えても過去の付与は変わらず、新しい採用から新しい版を見る', async () => {
     insertPhoto(testDb.raw, { id: 'photo-old', status: 'pending', contentHash: 'hash-old', customerId: '12345' });
     await putReview(app(testDb.db), 'photo-old', { status: 'adopted' });
-    expect(outboxRows(testDb.raw, 'photo-old')).toEqual([{ policy_version: 'legacy-5', points: 5 }]);
+    expect(outboxRows(testDb.raw, 'photo-old')).toEqual([{ policy_version: 'default-100', points: 100 }]);
 
     const target = app(testDb.db);
     await target.request('/api/nen-members/photo-reward-policy/versions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'policy-10pt' },
-      body: JSON.stringify({ points: 10, summary: '報酬を5pt→10ptに' }),
+      body: JSON.stringify({ points: 10, summary: '報酬を100pt→10ptに' }),
     });
     insertPhoto(testDb.raw, { id: 'photo-new', status: 'pending', contentHash: 'hash-new', customerId: '12345' });
     const res = await putReview(target, 'photo-new', { status: 'adopted' });
@@ -407,7 +407,7 @@ describe('#817 写真の重複と報酬', () => {
     expect(json.data.awardedPoints).toBe(10);
     expect(outboxRows(testDb.raw, 'photo-new')).toEqual([{ policy_version: 'v2', points: 10 }]);
     // 過去の付与は変わらない。
-    expect(outboxRows(testDb.raw, 'photo-old')).toEqual([{ policy_version: 'legacy-5', points: 5 }]);
+    expect(outboxRows(testDb.raw, 'photo-old')).toEqual([{ policy_version: 'default-100', points: 100 }]);
   });
 
   it('一括採用も版の点数を使い、重複は報酬なし', async () => {
@@ -437,8 +437,8 @@ describe('#817 写真の重複と報酬', () => {
       `SELECT awarded_points FROM nen_photo_submissions WHERE id = ?`,
     ).get(photoId) as { awarded_points: number }).awarded_points;
     expect(awarded('photo-b1')).toBe(0);
-    expect(awarded('photo-b2')).toBe(5);
+    expect(awarded('photo-b2')).toBe(100);
     expect(outboxRows(testDb.raw, 'photo-b1')).toEqual([]);
-    expect(outboxRows(testDb.raw, 'photo-b2')).toEqual([{ policy_version: 'legacy-5', points: 5 }]);
+    expect(outboxRows(testDb.raw, 'photo-b2')).toEqual([{ policy_version: 'default-100', points: 100 }]);
   });
 });

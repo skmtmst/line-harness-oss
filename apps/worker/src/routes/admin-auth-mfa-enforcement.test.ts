@@ -8,6 +8,17 @@ import { adminAuth } from './admin-auth.js';
 import { authEmail } from './auth-email.js';
 import { authMiddleware, sha256Hex } from '../middleware/auth.js';
 
+// Keep real token/config validation; simulate only Cloudflare's network response.
+vi.mock('../services/turnstile.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../services/turnstile.js')>();
+  const verify: typeof actual.verifyTurnstile = (environment, token, ip) => actual.verifyTurnstile(environment, token, ip, async (url, init) => {
+    const sent = new URLSearchParams(String(init?.body ?? ''));
+    return Response.json({ success: String(url) === 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+      && init?.method === 'POST' && sent.get('secret') === 'fixture-turnstile-secret' && sent.get('response') === 'fixture-login-robot' });
+  });
+  return { ...actual, verifyTurnstile: verify };
+});
+
 /** B-263: default-On applies to every human, with explicit Off compatibility tests. */
 const MASTER_KEY = 'test-master-key-which-is-longer-than-32-characters';
 const SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
@@ -17,6 +28,7 @@ let testDb: SqliteD1;
 function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
   return {
     DB: testDb.db,
+    TURNSTILE_SECRET_KEY: 'fixture-turnstile-secret',
     ADMIN_ORIGIN: 'https://admin.example.com',
     ADMIN_PUBLIC_URL: 'https://admin.example.com',
     LINE_LOGIN_CHANNEL_ID: 'login-channel',
@@ -43,7 +55,7 @@ async function call(
   return app().request(`https://api.example.com${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', ...(opts.headers ?? {}) },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(path === '/api/auth/password/login' ? { ...(body as Record<string, unknown>), turnstileToken: 'fixture-login-robot' } : body),
   }, env(opts.env));
 }
 

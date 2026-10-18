@@ -152,11 +152,10 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(updateProject).toHaveBeenCalledWith('p1', { isFavorite: false })
   })
 
-  it('お気に入り・生成中・アーカイブは上の絞り込みの札。左のフォルダの列は「すべて」だけで、フォルダを追加は置かない（B-136）', async () => {
+  it('お気に入り・生成中・アーカイブは上の絞り込みの札。選ぶ物のないフォルダ列を出さず、絞り込みを保つ（W2）（B-136）', async () => {
     act(() => { root.render(<HqBannersListV8 />) })
     await flush()
-    const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
-    expect([...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))).toEqual(['すべて'])
+    expect(host.querySelector('[data-template-region="folders"]')).toBeNull()
     expect(host.textContent).not.toContain('フォルダを追加')
     const chips = host.querySelector('[role="group"][aria-label="見るもので絞り込む"]') as HTMLElement
     expect(chips.textContent).toContain('お気に入り 1')
@@ -219,4 +218,18 @@ it.each([false,true])('B-241：ライブラリの案件取得success:false（保
  await flush()
  expect(host.querySelector('[data-list-state="error"]')).toBeTruthy()
  expect(host.querySelector('[data-list-state="empty"]')).toBeNull()
+})
+
+// 接続の文字列ではなく、両一覧で実際に描かれる数と作成入口を確かめる。
+it.each(['', 'tab=library'])('数・タブ・説明とフォルダなしの作成入口を型へ接続する（%s）', async query => {
+  nav.query = query
+  act(() => { root.render(<HqBannersListV8 />) })
+  await flush()
+  const frame = host.querySelector('[data-page-template="list"]')!
+  const statsRegion = frame.querySelector('[data-template-region="stats"]')!
+  expect(statsRegion.querySelector('[data-content-layout="stats"] [data-kpi-strip]')).toBeTruthy()
+  expect(statsRegion.querySelectorAll('[data-kpi-label]')).toHaveLength(4)
+  expect(frame.querySelector('[data-template-region="tabs"]')).toBeTruthy()
+  expect(frame.querySelector('[data-screen-explanation-toggle]')).toBeTruthy()
+  expect(frame.querySelector('[data-list-heading-create]')?.textContent).toContain(query ? '画像を取り込む' : 'プロジェクトを作る')
 })

@@ -68,8 +68,8 @@ describe('リマインダ実行記録', () => {
         (id, reminder_id, offset_minutes, message_type, message_content)
       VALUES ('step-1', 'reminder-1', -60, 'text', 'ご来店をお待ちしています');
       INSERT INTO friend_reminders
-        (id, friend_id, reminder_id, target_date, status)
-      VALUES ('enrollment-1', 'friend-1', 'reminder-1', '2026-08-28T10:00:00.000Z', 'active');
+        (id, friend_id, reminder_id, target_date, status, created_at, updated_at)
+      VALUES ('enrollment-1', 'friend-1', 'reminder-1', '2026-08-28T10:00:00.000Z', 'active', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z');
     `)
   })
 

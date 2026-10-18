@@ -46,12 +46,15 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
+const styleMocks=vi.hoisted(()=>({initializeAccountStyle:vi.fn(async()=>({}))}));
+vi.mock('../services/style-setup.js',()=>styleMocks);
+
 const lineClientMocks = {
   getFollowersInsight: vi.fn(),
   getFollowerIds: vi.fn(),
 };
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => lineClientMocks),
+  LineClient: vi.fn().mockImplementation(function () { return lineClientMocks; }),
 }));
 
 // Re-import after mock so the module picks up mocked deps.
@@ -121,6 +124,7 @@ const fakeAccount = {
 };
 
 beforeEach(() => {
+  styleMocks.initializeAccountStyle.mockClear();
   for (const fn of Object.values(dbMocks)) {
     if ('mockReset' in fn) fn.mockReset();
   }
@@ -589,6 +593,35 @@ describe('GET /api/line-accounts/:id/follower-insight', () => {
     expect(res.status).toBe(200);
     expect(lineClientMocks.getFollowersInsight).toHaveBeenCalled();
   });
+
+  test('reports the LINE status number on failure so 401 is not hidden behind 502', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+    const lineError = Object.assign(new Error('LINE API error: 401 Unauthorized — {}'), { status: 401 });
+    lineClientMocks.getFollowersInsight.mockRejectedValue(lineError);
+
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts/acc-1/follower-insight?date=20260616');
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { success: boolean; error: string; lineStatus: number | null };
+    expect(body.lineStatus).toBe(401);
+    // 本文・トークンは外に出さない。
+    expect(body.error).toBe('Failed to fetch LINE follower insight');
+    expect(JSON.stringify(body)).not.toContain('Unauthorized');
+    expect(JSON.stringify(body)).not.toContain(fakeAccount.channel_access_token);
+  });
+
+  test('keeps lineStatus null when the failure is not a LINE API response', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+    lineClientMocks.getFollowersInsight.mockRejectedValue(new Error('network down'));
+
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts/acc-1/follower-insight?date=20260616');
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { lineStatus: number | null };
+    expect(body.lineStatus).toBeNull();
+  });
 });
 
 function installAutoConnectFetch() {
@@ -706,6 +739,7 @@ describe('POST /api/line-accounts/connect', () => {
     });
     expect(res.status).toBe(201);
     expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();
+    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account',expect.anything(),expect.anything());
     expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
       name: 'LINE公式名',
       channelAccessToken: 'issued-token',
@@ -1412,37 +1446,47 @@ describe('GET /api/line-accounts/summary', () => {
 });
 
 describe('PATCH /api/line-accounts/:id', () => {
-  test('stores a lin.ee official profile URL and returns it', async () => {
+  test.each([
+    'https://lin.ee/nen-official',
+    'https://line.me/R/ti/p/@nen-official',
+  ])('stores the official profile URL %s and returns it', async (officialProfileUrl) => {
     dbMocks.updateLineAccountFields.mockResolvedValue({
       ...fakeAccount,
-      official_profile_url: 'https://lin.ee/nen-official',
+      official_profile_url: officialProfileUrl,
     });
 
     const res = await setupApp('admin').request('/api/line-accounts/acc-1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ officialProfileUrl: 'https://lin.ee/nen-official' }),
+      body: JSON.stringify({ officialProfileUrl }),
     });
 
     expect(res.status).toBe(200);
     expect(dbMocks.updateLineAccountFields.mock.calls[0][2]).toMatchObject({
-      officialProfileUrl: 'https://lin.ee/nen-official',
+      officialProfileUrl,
     });
     await expect(res.json()).resolves.toMatchObject({
-      data: { officialProfileUrl: 'https://lin.ee/nen-official' },
+      data: { officialProfileUrl },
     });
   });
 
-  test('rejects a profile URL outside lin.ee without updating data', async () => {
+  test.each([
+    'https://example.com/not-line',
+    'https://line.me/other-path',
+    'https://line.me/R/ti/p/nen-official',
+  ])('rejects the invalid profile URL %s without updating data', async (officialProfileUrl) => {
     const res = await setupApp('admin').request('/api/line-accounts/acc-1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ officialProfileUrl: 'https://example.com/not-line' }),
+      body: JSON.stringify({ officialProfileUrl }),
     });
 
     expect(res.status).toBe(400);
     expect(dbMocks.updateLineAccountFields).not.toHaveBeenCalled();
     expect(dbMocks.updateLineAccount).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('https://lin.ee/ or https://line.me/R/ti/p/@'),
+    });
   });
 
   test('updates loginChannelId / loginChannelSecret / liffId via metadata path', async () => {

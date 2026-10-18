@@ -1,3 +1,5 @@
+import type { KeywordRule } from './auto-reply-keyword-types.js';
+export type { KeywordRule } from './auto-reply-keyword-types.js';
 import { replyToUnmatchedLine } from './auto-reply-unmatched.js';
 import { runAutoReplyAction, type AutoReplyExecutionAction } from './auto-reply-operator-action.js';
 import type { Env } from '../index.js';
@@ -39,30 +41,6 @@ import {
   messageToLogPayload,
   resolveMetadata,
 } from './step-delivery.js';
-
-/**
- * キーワード1行ぶんの設定（151）。
- *
- * これまでは1ルールに言葉が1つだけだった。実運用では「渋谷」「しぶや」
- * 「シブヤ」を同じ応答にしたい、という形が普通なので、複数行を持てるようにする。
- */
-export interface KeywordRule {
-  keyword: string;
-  matchType: 'exact' | 'contains';
-  /**
-   * 受け取った文がこの字数に満たなければ当てない。
-   *
-   * 部分一致は短い言葉ほど誤爆する。「はい」を含む応答を作ると
-   * 「はいどうも」「配送はいつ」まで当たってしまう。字数の下限を置くと、
-   * ひとことの返事だけを拾える。
-   */
-  minLength?: number;
-  /**
-   * 大文字小文字・全角半角を区別するか。既定は区別する。
-   * 切ると「LINE」「line」「ＬＩＮＥ」が同じものとして当たる。
-   */
-  caseSensitive?: boolean;
-}
 
 /** 大文字小文字と全角半角の違いを均す。 */
 function normalizeForLooseMatch(text: string): string {
@@ -196,6 +174,7 @@ export async function resolveAutoReplyContent(
 ): Promise<{ messageType: string; content: string }> {
   if (rule.template_id) {
     const tpl = await getTemplateById(db, rule.template_id);
+    if (tpl?.message_bubbles_json) throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
     if (tpl) {
       return { messageType: tpl.message_type, content: tpl.message_content };
     }
@@ -693,7 +672,7 @@ export async function matchAndReply(
           // 動作は済んだのに完了の記録だけ書けなかった。ここで
           // permanent_failed を書くと、成功した動作が「もう一度実行」の
           // 対象になり二度動いてしまう。行は claimed のまま残す。
-          console.error('[auto-reply] failed to write action run outcome', finishError);
+          console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
         }
       } catch (err) {
         actionSummary.failed += 1;
@@ -705,9 +684,9 @@ export async function matchAndReply(
             errorCode: safeErrorCode(err),
           });
         } catch (finishError) {
-          console.error('[auto-reply] failed to mark action run failed', finishError);
+          console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
         }
-        console.error('[auto-reply] failed to run action', err);
+        console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
       }
       if (actionFailed && action.onFailure === 'stop' && !continueAfterEventBookingStop) break;
     }
@@ -773,7 +752,7 @@ export async function matchAndReply(
     });
   } catch (err) {
     replyError = err;
-    console.error(`Failed to send auto-reply${logContext ? ` (${logContext})` : ''}`, err);
+    console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
   }
 
   if (replyTokenConsumed) {
@@ -795,7 +774,7 @@ export async function matchAndReply(
       });
     } catch (error) {
       // LINEへの返信は既に成功している。集計の失敗を「返信失敗」へ書き換えない。
-      console.error('[auto-reply] failed to record successful hit', error);
+      console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
     }
   } else {
     await markAutoReplyEvaluationFinished(db, {
@@ -969,7 +948,7 @@ export async function retryAutoReplyActionRuns(
           errorCode: safeErrorCode(error),
         });
       } catch (finishError) {
-        console.error('[auto-reply] retry: failed to mark action run failed', finishError);
+        console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
       }
       continue;
     }
@@ -983,7 +962,7 @@ export async function retryAutoReplyActionRuns(
     } catch (finishError) {
       // 動作は済んだのに完了の記録だけ書けなかった。行は claimed のまま
       // 残す——permanent_failed へ戻すと、成功した動作がもう一度動く。
-      console.error('[auto-reply] retry: failed to write action run outcome', finishError);
+      console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
       continue;
     }
     retriedCount += 1;

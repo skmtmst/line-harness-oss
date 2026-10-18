@@ -31,6 +31,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  console.error(JSON.stringify({"code":"src_index_failed"}));
   process.exit(1);
 });
