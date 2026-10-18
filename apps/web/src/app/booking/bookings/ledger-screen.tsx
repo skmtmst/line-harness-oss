@@ -90,8 +90,11 @@ import { DetailRow, ActionButtons } from "./page-gap-parts"
 import { STATUS_TABS, SOURCE_FILTERS, statusBadgeColor, sourceLabel, formatLedgerDateTime, statusLabel, actionLabel, PAGE_SIZE, formatJpDateTime, formatJpTime, formatJpDay, jstDay } from './ledger-model'
 
 import type { BookingLedgerModel } from './page'
+import { bookingWords } from '@/v8/booking-bookings/words'
 
 export default function BookingLedgerScreen({ model }: { model: BookingLedgerModel }) {
+  const usageStyle = model.styleProfile?.data?.style
+  const words = bookingWords(usageStyle)
   const {
     selectedAccountId,
     selectedAccount,
@@ -205,6 +208,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
          * `data-theme="v8"` のときだけ小窓にする。
          */
         <BookingDetailV8
+          usageStyle={usageStyle}
           booking={detail}
           accountId={selectedAccountId}
           canOperate={canOperate}
@@ -237,7 +241,8 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
   {/* 帯同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   if (view === 'day' || view === 'week') {
     return (
-      <PeopleDayFrame view={view} date={calendarFrom} rows={calendarItems} ready={calendarStatus === 'ready'} availability={availability} actions={headingActions} canWrite={canOperate} onOpen={setDetailId}>
+      <PeopleDayFrame usageStyle={usageStyle} view={view} date={calendarFrom} rows={calendarItems} ready={calendarStatus === 'ready'} availability={availability} actions={headingActions} canWrite={canOperate} onOpen={setDetailId}>
+        {model.styleProfile?.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={model.styleProfile.error} onRetry={model.styleProfile.reload} /> : null}
         {/*
           ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
           出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
@@ -261,7 +266,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             trailingToolbar={view==='day'?<><ReservationLegend label="予約元の色" items={[{label:'LINE',tone:'success'},{label:'電話',tone:'neutral'}]}/><EntitySelect aria-label="担当者で絞り込む" value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'担当者：すべて'},...staffList.map(r=>({value:r.id,label:`担当者：${r.display_name}`}))]}/></>:undefined}
             resources={staffList.filter(r=>view!=='day'||boardStaff==='all'||r.id===boardStaff).map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
             onOpen={setDetailId} canWrite={canOperate}
-            renderList={view === 'day' ? () => <PeopleDayList rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
+            renderList={view === 'day' ? () => <PeopleDayList usageStyle={usageStyle} rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
             onMove={async(id,move)=>{if(!selectedAccountId)throw new Error('アカウント未取得');await reservationBoardApi.move(selectedAccountId,id,move);setCalendarSeq(n=>n+1);await load()}}
           />
         )}
@@ -273,6 +278,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
   return (
     <BookingLedgerFrame view={view}>
       {pageHead}
+      {model.styleProfile?.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={model.styleProfile.error} onRetry={model.styleProfile.reload} /> : null}
       <BookingLedgerBody view={view} readOnly={!canOperate}
         stats={<>
           {summaryError && (
@@ -291,7 +297,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
               unit="件"
               detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
             />
-            <KpiCard icon={view === 'month' ? <CalendarPlus size={16} aria-hidden="true" /> : null} presentation="band" title="確定" help={view === 'month' ? '今月の予約のうち、確定して来店を予定している件数です。' : undefined} helpDisplay="question" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
+            <KpiCard icon={view === 'month' ? <CalendarPlus size={16} aria-hidden="true" /> : null} presentation="band" title="確定" help={view === 'month' ? (usageStyle === 'consult' || usageStyle === 'lesson' ? `今月の予約のうち、確定した${words.planned}の件数です。` : '今月の予約のうち、確定して来店を予定している件数です。') : undefined} helpDisplay="question" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : words.planned} />
             {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
                 承認待ちを出す。要対応であることは変わらない。 */}
             <KpiCard icon={view === 'month' ? <CircleAlert size={16} aria-hidden="true" /> : null} presentation="band"
@@ -487,9 +493,9 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                   <thead>
                     <TableHeadRow>
                       <Th style={{ width: '15%' }}>日時</Th>
-                      <Th style={{ width: '13%' }}>お客さま</Th>
-                      <Th style={{ width: '17%' }}>メニュー</Th>
-                      <Th style={{ width: '10%' }} className="cq-hide-below-830">担当</Th>
+                      <Th style={{ width: '13%' }}>{words.person}</Th>
+                      <Th style={{ width: '17%' }}>{words.menu}</Th>
+                      <Th style={{ width: '10%' }} className="cq-hide-below-830">{words.staff}</Th>
                       <Th style={{ width: '9%' }}>予約経路</Th>
                       <Th style={{ width: '9%' }} align="right">料金</Th>
                       <Th style={{ width: '11%' }}>状態</Th>
@@ -634,7 +640,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
               {/* 来店にする（Nx1kq・司令塔の判断）：確定の予約だけ。今ある「完了」の確かめの窓を通す。閲覧のみには出さない。 */}
               {canOperate && activeBooking.status === 'confirmed' ? (
                 <Button variant={activeBooking.friend_id ? 'secondary' : 'primary'} onClick={() => handleDecide(activeBooking.id, 'complete')}>
-                  来店にする
+                  {usageStyle === 'consult' || usageStyle === 'lesson' ? words.completeAction : '来店にする'}
                 </Button>
               ) : null}
               {activeBooking.friend_id ? (

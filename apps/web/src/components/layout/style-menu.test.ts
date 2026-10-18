@@ -1,0 +1,24 @@
+import { expect, it } from 'vitest'
+import { ACCOUNT_STYLES } from '@line-crm/shared'
+import { MENU_SECTIONS } from '@/lib/menu'
+import { styleMenuItemVisible, styleMenuLabel } from './style-menu'
+const items = MENU_SECTIONS.flatMap(section => section.items)
+const item = (href: string) => items.find(item => item.href === href)!
+it.each(ACCOUNT_STYLES)('%sの飲食・EC・予約の初期表示を既存の機能設定と重ねる', style => {
+  const shown = items.filter(item => styleMenuItemVisible(item, style, false))
+  expect(shown.some(item => item.featureKey === 'restaurant_test')).toBe(style === 'restaurant')
+  expect(shown.some(item => item.href === '/ec-commerce')).toBe(style === 'ec' || style === 'restaurant')
+  expect(shown.some(item => item.href === '/events')).toBe(style === 'lesson' || style === 'restaurant')
+  for (const required of items.filter(item => item.required)) expect(shown).toContain(required)
+})
+it('明示した共通機能をスタイル変更で落とさず、飲食専用へは広げない', () => {
+  expect(styleMenuItemVisible(item('/events'), 'standard', true)).toBe(true)
+  expect(styleMenuItemVisible(item('/booking/bookings'), 'ec', true)).toBe(true)
+  const restaurants = items.filter(item => item.featureKey === 'restaurant_test')
+  for (const item of restaurants) expect(styleMenuItemVisible(item, 'consult', true)).toBe(false)
+})
+it('業種未取得なら専用機能を隠し、辞書のメニュー名を使う', () => {
+  expect(styleMenuItemVisible(item('/ec-commerce'), null, true)).toBe(false)
+  expect(styleMenuLabel(item('/'), 'consult')).toBe('ダッシュボード')
+  expect(styleMenuLabel(item('/events'), 'lesson')).toBe('イベント予約')
+})

@@ -11,6 +11,8 @@ import Notice from '@/components/shared/notice'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { useAccountStyle } from '@/hooks/use-account-style'
+import { styleMenuItemVisible, styleMenuLabel } from './style-menu'
 import { allowFeatureNavigation, featureGateVisibility, usePreparingDialog } from './sidebar-feature-gate'
 import { SIDEBAR_TOGGLE_EVENT,UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import {
@@ -93,6 +95,7 @@ export default function Sidebar({
    */
   const isHq = isHqShellPath(pathname)
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const accountStyle = useAccountStyle(isHq ? null : selectedAccountId)
   const brand = useBrand()
   /*
    * モバイルの固定ヘッダーに出す現在地（U037）。
@@ -233,6 +236,7 @@ export default function Sidebar({
   const [visibilityStatus, setVisibilityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [visibilityRetry, setVisibilityRetry] = useState(0)
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
+  const [explicitSettings, setExplicitSettings] = useState<{ accountId: string; value: boolean } | null>(null)
   const [currentSearch, setCurrentSearch] = useState('')
 
   // 同じ画面の別タブをメニューへ出す項目（コンバージョン、データ移行）が
@@ -283,6 +287,7 @@ export default function Sidebar({
     const accountId = selectedAccountId
     const canManageFeatureSettings = staffRole === 'owner' || staffRole === 'admin'
     setFeatureVisibility(null)
+    setExplicitSettings(null)
     setVisibilityAccountId(null)
     setVisibilityStatus('loading')
     const loadSettings = () => {
@@ -306,6 +311,7 @@ export default function Sidebar({
             // 機能設定画面と同じ答えを共有する。保存の合図で捨てられる。
             const settings = await loadFeatureSettings(accountId)
             if (!cancelled && settings.success) {
+              setExplicitSettings({ accountId, value: settings.data.version > 0 })
               setSectionOrder(settings.data.sidebarOrder)
               setItemOrder(settings.data.sidebarItemOrder)
             }
@@ -355,6 +361,7 @@ export default function Sidebar({
          */
 
         if (isHq) return true
+        if (!styleMenuItemVisible(item, accountStyle.data?.style ?? null, explicitSettings?.accountId === selectedAccountId && explicitSettings.value)) return false
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
 
@@ -372,7 +379,7 @@ export default function Sidebar({
         if (!currentVisibility || currentVisibility[featureKey] !== true) return false
         if (SPECIALIZED_FEATURE_KEYS.includes(featureKey) && !specializedFeatureKeys.includes(featureKey)) return false
         return true
-      }),
+      }).map(item => isHq ? item : { ...item, label: styleMenuLabel(item, accountStyle.data?.style ?? null) }),
     }))
     .filter((section) => section.items.length > 0)
     /*
@@ -719,21 +726,21 @@ export default function Sidebar({
           失敗の1枚が使う言葉なので、ここは短い「もう一度」にして
           1画面に同じ読み直しボタンを2つ出さない。
         */}
-        {visibilityStatus === 'error' && selectedAccountId && (
+        {(visibilityStatus === 'error' || accountStyle.error) && selectedAccountId && (
           <Notice
             tone="warn"
             className="mx-3 mb-2"
             action={(
               <button
                 type="button"
-                onClick={() => setVisibilityRetry((current) => current + 1)}
+                onClick={() => { setVisibilityRetry((current) => current + 1); accountStyle.reload() }}
                 className="cursor-pointer font-bold text-action underline"
               >
                 もう一度
               </button>
             )}
           >
-            機能設定を読み込めませんでした。
+            {accountStyle.error ? '使い方のスタイルを読み込めませんでした。' : '機能設定を読み込めませんでした。'}
           </Notice>
         )}
         {/* B-261: 設定の入口は下の歯車。定義と現在地の判定は残す。 */}

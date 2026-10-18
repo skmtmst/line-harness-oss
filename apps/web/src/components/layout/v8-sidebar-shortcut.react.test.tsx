@@ -53,6 +53,8 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+// この試験は既存の権限・旗・並びを検査する。業種の対照はstyle-menu.testで行う。
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' }, status: 'ready', error: null, reload: vi.fn() }) }))
 import Sidebar from './sidebar'
 import TopBar from '../shared/top-bar'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'

@@ -4,6 +4,8 @@ import Dialog from '@/components/shared/dialog'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingAdminDetail, type BookingRequest } from '@/lib/api'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
+import type { AccountStyle } from '@line-crm/shared'
+import { bookingWords } from '@/v8/booking-bookings/words'
 import BookingGapSections from '@/v8/booking-gap/booking-gap-sections'
 
 /*
@@ -35,12 +37,14 @@ function safeTime(iso: string): string {
 
 export default function BookingDetailV8({
   booking: b,
+  usageStyle,
   accountId,
   canOperate,
   onClose,
   onCancel,
   detailHref,
 }: {
+  usageStyle?: AccountStyle
   booking: BookingRequest
   accountId: string | null
   /** N-401: 閲覧のみの人には変更・取消の入口を出さない。 */
@@ -52,7 +56,8 @@ export default function BookingDetailV8({
   const [historyTotal, setHistoryTotal] = useState<number | null>(null)
   const [historyError, setHistoryError] = useState(false)
   const [historySeq, setHistorySeq] = useState(0)
-  const name = b.friend_name ?? 'お客様'
+  const words = bookingWords(usageStyle)
+  const name = b.friend_name ?? words.person
 
   useEffect(() => {
     if (!accountId) return
@@ -100,22 +105,22 @@ export default function BookingDetailV8({
         <div>
           <dt className="text-ink-faint text-xs">日時</dt>
           <dd className="text-ink mt-0.5">
-            {safeDateTime(b.starts_at)}〜{safeTime(b.ends_at)} ・ 担当 {b.staff_name}
+            {safeDateTime(b.starts_at)}〜{safeTime(b.ends_at)} ・ {words.staff} {b.staff_name}
           </dd>
         </div>
         <div>
-          <dt className="text-ink-faint text-xs">メニュー</dt>
+          <dt className="text-ink-faint text-xs">{words.menu}</dt>
           <dd className="text-ink mt-0.5">
             {b.menu_name} <span className="tabular-nums">¥{formatNumber(b.price_at_booking)}</span> ・
             {SOURCE_LABEL[b.source] ?? b.source}から
           </dd>
         </div>
         <div>
-          <dt className="text-ink-faint text-xs">これまでの来店</dt>
+          <dt className="text-ink-faint text-xs">{usageStyle === 'consult' || usageStyle === 'lesson' ? words.history : 'これまでの来店'}</dt>
           <dd className="text-ink mt-0.5" aria-busy={historyTotal === null && !historyError}>
             {historyError ? (
               <>
-                来店履歴を読み込めませんでした
+                {words.history}を読み込めませんでした
                 <button type="button" onClick={() => setHistorySeq((n) => n + 1)} className="text-action ml-2 font-medium underline">
                   もう一度読み込む
                 </button>
