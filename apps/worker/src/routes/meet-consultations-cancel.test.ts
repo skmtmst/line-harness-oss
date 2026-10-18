@@ -76,7 +76,7 @@ function seedBase(sqlite: Database.Database) {
       (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)
     VALUES ('MC1','EV1','f1','個別相談','${S1}','${S1_END}',
       'https://meet.google.com/abc-defg-hij','confirmed');
-    INSERT INTO meet_consultation_reminders
+    INSERT INTO meet_consultation_notification_runs
       (id, consultation_id, kind, scheduled_at, status, sent_at, retry_count, created_at, updated_at)
     VALUES ('MR-day','MC1','day_before','${S1_DAY_BEFORE}','sent',
         '2026-09-19T01:00:05.000Z',0,'2026-09-01T00:00:00.000Z','2026-09-19T01:00:05.000Z'),
@@ -117,15 +117,16 @@ describe('Meet V6連動 (実ルート)', () => {
       expect(res.status).toBe(201);
       // 送信ずみは pending に戻さず、sent_at も消さない (履歴保持)。
       expect(sqlite.prepare(
-        `SELECT status, sent_at, scheduled_at FROM meet_consultation_reminders WHERE id = 'MR-day'`,
+        `SELECT status, sent_at, scheduled_at FROM meet_consultation_notification_runs WHERE id = 'MR-day'`,
       ).get()).toEqual({
         status: 'sent',
         sent_at: '2026-09-19T01:00:05.000Z',
         scheduled_at: S1_DAY_BEFORE,
       });
-      // 未来分だけ新しい日時に直る。
+      expect(sqlite.prepare("SELECT status, scheduled_at FROM meet_consultation_notification_runs WHERE id='MR-hour'").get()).toEqual({status:'cancelled',scheduled_at:S1_HOUR_BEFORE});
+      // 未来分は新しい世代へ追加し、古い予定を保持する。
       expect(sqlite.prepare(
-        `SELECT status, scheduled_at FROM meet_consultation_reminders WHERE id = 'MR-hour'`,
+        `SELECT status, scheduled_at FROM meet_consultation_notification_runs WHERE kind='hour_before' ORDER BY schedule_revision DESC LIMIT 1`,
       ).get()).toEqual({ status: 'pending', scheduled_at: S2_HOUR_BEFORE });
       // V6 も新しい起点へ直る。
       expect(sqlite.prepare(

@@ -105,7 +105,7 @@ export const OPERATION_DISPATCH_JOB_CROSSWALK: readonly DispatchJobCrosswalk[] =
     jobName: 'meet consultation reminders',
     sources: [
       {
-        table: 'meet_consultation_reminders',
+        table: 'meet_consultation_notification_runs',
         requiredColumns: ['consultation_id', 'status', 'retry_count', 'scheduled_at'],
       },
       { table: 'meet_consultations', requiredColumns: ['id', 'friend_id'] },
@@ -118,7 +118,7 @@ export const OPERATION_DISPATCH_JOB_CROSSWALK: readonly DispatchJobCrosswalk[] =
                WHEN mcr.status = 'failed' THEN 'dead'
              END AS state,
              COUNT(*) AS item_count, MIN(mcr.scheduled_at) AS oldest_at
-        FROM meet_consultation_reminders mcr
+        FROM meet_consultation_notification_runs mcr
         JOIN meet_consultations mc ON mc.id = mcr.consultation_id
         JOIN friends f ON f.id = mc.friend_id
        WHERE f.line_account_id = ? AND mcr.status IN ('pending', 'failed')

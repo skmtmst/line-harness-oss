@@ -1,3 +1,4 @@
+import { validateEventEntitlement } from '../services/event-entitlements.js';
 import {passUnusable} from '../services/booking-pass-plans.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
@@ -55,10 +56,11 @@ bookingEntitlements.get('/api/liff/booking/entitlements',async c=>{
   const friend=await resolveFriendId(c,caller,account);if(!friend)return c.json({error:'friend_not_found'},404);
   const at=c.req.query('starts_at')??new Date().toISOString();
   if(!Number.isFinite(Date.parse(at)))return inputError(c,{error:'invalid_starts_at'},400,['starts_at']);
-  const menu=c.req.query('menu_id');
+  const menu=c.req.query('menu_id'),event=c.req.query('event_id');
+  if(event&&!await c.env.DB.prepare("SELECT id FROM events WHERE id=? AND line_account_id=? AND is_published=1 AND deleted_at IS NULL AND (lifecycle_status IS NULL OR lifecycle_status='published')").bind(event,account).first())return c.json({error:'not_found'},404);
   const rows=await entitlementViews(c.env.DB,account,friend,at);
   // 管理側の理由や操作担当者はお客さまへ出さない。
-  const data=await Promise.all(rows.filter(e=>e.status==='active').map(async e=>{const unusableReason=await passUnusable(c.env.DB,e,account,menu,at);return ({
+  const data=await Promise.all(rows.filter(e=>e.status==='active').map(async e=>{let unusableReason=await passUnusable(c.env.DB,e,account,menu,at);if(event){try{await validateEventEntitlement(c.env.DB,account,friend,event,e.id,at);unusableReason=null;}catch(error){if(!(error instanceof EntitlementError))throw error;unusableReason='event_out_of_scope';}}return ({
     id:e.id,name:e.name,kind:e.kind,menuId:e.menu_id,remaining:e.remaining,monthlyLimit:e.monthly_limit,
     monthAllowance:e.monthAllowance,monthUsed:e.monthUsed,monthRemaining:e.monthRemaining,validFrom:e.valid_from,expiresAt:e.expires_at,
     periodStart:e.periodStart,periodEnd:e.periodEnd,

@@ -2,6 +2,11 @@
  * custom filenames retain the old URL lookup until their key mapping is migrated.
  */
 export async function photoImageScanAllowed(db: D1Database, key: string): Promise<boolean> {
+  const indexed=await db.prepare(`SELECT ps.id FROM nen_photo_submissions ps
+    JOIN media_file_scans scan ON scan.subject_kind='photo' AND scan.subject_id=ps.id
+      AND scan.line_account_id=ps.line_account_id AND scan.status='clean'
+    WHERE ps.review_r2_key=? OR ps.public_r2_key=?`).bind(key,key).first();
+  if(indexed)return true;
   const suffix = `/images/${key}`;
   const id = /^nen-photo-(?:review|public)\/[^/]+\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:-v\d+)?\.[a-z]+$/i.exec(key)?.[1];
   if (id) {

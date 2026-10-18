@@ -1,3 +1,5 @@
+import { replacementEventTransition } from '../../services/event-transition-plan.js';
+import { transferEventEntitlement } from '../../services/event-entitlements.js';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
@@ -63,6 +65,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
   try {
     return await runChangeFlow();
   } catch (e) {
+    if(e instanceof Error&&e.message.includes('entitlement_unavailable'))return finalize(409,{error:'entitlement_unavailable'});
     console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/liff/bookings/:id/change"}));
     return finalize(500, { error: 'internal_error' });
   }
@@ -75,7 +78,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
     const bookingId = c.req.param('id');
     const current = await c.env.DB
       .prepare(
-        `SELECT b.id, b.status, b.line_account_id, b.event_id, b.slot_id, b.friend_id,
+        `SELECT b.id,b.lock_version, b.status, b.line_account_id, b.event_id, b.slot_id, b.friend_id,
                 b.party_size, b.identity_key, b.customer_note, b.answer_snapshot_json,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at
@@ -88,6 +91,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
       .first<{
         id: string;
         status: string;
+        lock_version:number;
         line_account_id: string;
         event_id: string;
         slot_id: string;
@@ -191,7 +195,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
             requested_at, identity_key, party_size, answer_snapshot_json,
             event_version_id, event_snapshot_json)
          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-          WHERE EXISTS (SELECT 1 FROM event_bookings WHERE id = ? AND status IN ('requested','confirmed'))
+          WHERE EXISTS (SELECT 1 FROM event_bookings WHERE id = ? AND status IN ('requested','confirmed') AND lock_version=?)
             AND (? IS NULL OR
               COALESCE((SELECT SUM(party_size) FROM event_bookings WHERE slot_id = ? AND status IN ('requested','confirmed')), 0)
               + COALESCE((SELECT SUM(party_size) FROM event_waitlist WHERE slot_id = ? AND status IN ('offered','accepted')), 0)
@@ -199,12 +203,15 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
         .bind(newId, account_id, event.id, target.id, friend.id, current.status,
           current.customer_note, nowIso, current.identity_key, current.party_size,
           current.answer_snapshot_json, event.current_published_version_id, bookingSnapshotJson,
-          current.id, target.capacity, target.id, target.id, current.party_size, target.capacity),
+          current.id,current.lock_version, target.capacity, target.id, target.id, current.party_size, target.capacity),
       c.env.DB.prepare(`UPDATE event_bookings
             SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
-          WHERE id = ? AND status IN ('requested', 'confirmed')
+          WHERE id = ? AND status IN ('requested', 'confirmed') AND lock_version=?
             AND EXISTS (SELECT 1 FROM event_bookings WHERE id = ?)`)
-        .bind(nowIso, nowIso, current.id, newId),
+        .bind(nowIso, nowIso, current.id,current.lock_version, newId),
+      await transferEventEntitlement(c.env.DB,account_id,current.id,newId,target.starts_at),
+      c.env.DB.prepare("UPDATE event_booking_transition_runs SET action='change_from',input_snapshot=json_set(input_snapshot,'$.replacementId',?) WHERE booking_id=? AND booking_version=(SELECT lock_version FROM event_bookings WHERE id=?) AND status='pending'").bind(newId,current.id,current.id),
+      replacementEventTransition(c.env.DB,current.id,newId),
     ]);
     if ((moved[0].meta?.changes ?? 0) === 0) {
       const latest = await c.env.DB.prepare('SELECT status FROM event_bookings WHERE id = ?')
@@ -227,13 +234,14 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
     } catch (error) {
       if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
         await c.env.DB.batch([
+          await transferEventEntitlement(c.env.DB,account_id,newId,current.id,current.slot_starts_at),
           c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId),
           c.env.DB.prepare(
             `UPDATE event_bookings
                 SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
-              WHERE id = ? AND status = 'cancelled'`,
+              WHERE id = ? AND status = 'cancelled' AND lock_version=?`,
           )
-          .bind(current.status, nowIso, current.id),
+          .bind(current.status, nowIso, current.id,current.lock_version+1),
         ]);
         return finalize(409, { error: 'send_in_flight_retry' });
       }

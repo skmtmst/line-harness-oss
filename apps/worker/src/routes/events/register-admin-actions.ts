@@ -79,13 +79,15 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
   // same `requested` row. The losing request gets changes=0 and treats the
   // booking as already decided.
   const plans=action==='confirm'?await prepareConfirmedEventBooking(c.env.DB,booking.id,new Date(nowIso)):[];
-  const [upd] = await c.env.DB.batch([c.env.DB
+  const decision = await c.env.DB.batch([c.env.DB
     .prepare(
       `UPDATE event_bookings
           SET status = ?, decided_at = ?, decided_by_staff_id = ?, updated_at = ?
-        WHERE id = ? AND status = ? AND decided_at IS NULL`,
+        WHERE id = ? AND status = ? AND decided_at IS NULL AND lock_version=?`,
     )
-    .bind(next, nowIso, staff?.id ?? null, nowIso, booking.id, booking.status),...plans]);
+    .bind(next, nowIso, staff?.id ?? null, nowIso, booking.id, booking.status,booking.lock_version),...plans]).catch(error=>{if(error instanceof Error&&error.message.includes('entitlement_unavailable'))return null;throw error;});
+  if(!decision)return bad(c,'entitlement_unavailable',409);
+  const [upd]=decision;
   if ((upd.meta?.changes ?? 0) === 0) {
     // 同時確定との競合敗北は成功にしない。落選ずみへの承認は 409。
     // 落選ずみへの却下の再送だけ V6 修復を受け付けて 200 にする。
@@ -189,9 +191,9 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
             `UPDATE event_bookings
                 SET status = 'requested', decided_at = NULL,
                     decided_by_staff_id = NULL, updated_at = ?
-              WHERE id = ? AND status = 'rejected'`,
+              WHERE id = ? AND status = 'rejected' AND lock_version=?`,
           )
-          .bind(nowIso, booking.id)
+          .bind(nowIso, booking.id,booking.lock_version+1)
           .run();
         return bad(c, 'send_in_flight_retry', 409);
       }
@@ -266,9 +268,9 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     .prepare(
       `UPDATE event_bookings
           SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'admin', updated_at = ?
-        WHERE id = ? AND status = ?`,
+        WHERE id = ? AND status = ? AND lock_version=?`,
     )
-    .bind(nowIso, nowIso, booking.id, booking.status)
+    .bind(nowIso, nowIso, booking.id, booking.status,booking.lock_version)
     .run();
   if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
   const slot = await c.env.DB
@@ -295,9 +297,9 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
         .prepare(
           `UPDATE event_bookings
               SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
-            WHERE id = ? AND status = 'cancelled'`,
+            WHERE id = ? AND status = 'cancelled' AND lock_version=? AND NOT EXISTS(SELECT 1 FROM event_booking_transition_runs t WHERE t.booking_id=event_bookings.id AND t.booking_version=event_bookings.lock_version AND t.status='complete') AND NOT EXISTS(SELECT 1 FROM event_booking_entitlement_uses u WHERE u.event_booking_id=event_bookings.id AND u.returned_at IS NOT NULL)`,
         )
-        .bind(booking.status, nowIso, booking.id)
+        .bind(booking.status, nowIso, booking.id,booking.lock_version+1)
         .run();
       return bad(c, 'send_in_flight_retry', 409);
     }

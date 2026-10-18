@@ -742,7 +742,7 @@ describe('日程変更の途中失敗', () => {
     );
     // 前日通知は送りずみ (履歴)、1時間前はまだ未来。
     raw.prepare(
-      `UPDATE meet_consultation_reminders
+      `UPDATE meet_consultation_notification_runs
           SET status = 'sent', sent_at = ?, updated_at = ?
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
           AND kind = 'day_before'`,
@@ -757,12 +757,14 @@ describe('日程変更の途中失敗', () => {
     // 送りずみは pending に戻さず sent_at も消さない (二重送信・履歴欠け防止)。
     expect(
       raw.prepare(
-        `SELECT status, sent_at, scheduled_at FROM meet_consultation_reminders
+        `SELECT status, sent_at, scheduled_at FROM meet_consultation_notification_runs
           WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
-          ORDER BY kind`,
+          ORDER BY kind,schedule_revision`,
       ).all('google-event-a'),
     ).toEqual([
       { status: 'sent', sent_at: at(-DAY_MS), scheduled_at: at(-DAY_MS) },
+      {status:'pending',sent_at:null,scheduled_at:at(6*DAY_MS)},
+      {status:'cancelled',sent_at:null,scheduled_at:at(-HOUR_MS)},
       { status: 'pending', sent_at: null, scheduled_at: at(7 * DAY_MS - HOUR_MS) },
     ]);
   });

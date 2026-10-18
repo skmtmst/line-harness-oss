@@ -10,6 +10,7 @@ export interface BookingActionRow {
   slot_id: string;
   friend_id: string;
   status: string;
+  lock_version:number;
   decided_at: string | null;
 }
 
@@ -26,7 +27,7 @@ export async function loadBookingForAction(
   // 操作可能にする。
   const row = await db
     .prepare(
-      `SELECT id, line_account_id, event_id, slot_id, friend_id, status, decided_at
+      `SELECT id, line_account_id, event_id, slot_id, friend_id, status, decided_at,lock_version
          FROM event_bookings
         WHERE id = ? AND event_id = ?`,
     )
@@ -46,7 +47,7 @@ export async function notifyBookingFriend(
         `SELECT e.name AS event_name, e.venue_name, e.venue_url,
                 e.confirmation_message_extra,
                 s.starts_at AS slot_starts_at,
-                b.line_account_id,b.status,b.slot_id,
+                b.line_account_id,b.status,b.slot_id,b.lock_version,
                 la.channel_access_token,
                 la.channel_access_token_encrypted,
                 f.line_user_id
@@ -64,7 +65,7 @@ export async function notifyBookingFriend(
         venue_url: string | null;
         confirmation_message_extra: string | null;
         slot_starts_at: string;
-        line_account_id: string; status: string; slot_id: string;
+        line_account_id: string; status: string; slot_id: string; lock_version:number;
         channel_access_token: string;
         channel_access_token_encrypted: string | null;
         line_user_id: string;
@@ -76,8 +77,8 @@ export async function notifyBookingFriend(
       { lineAccountId: row.line_account_id, field: 'channel_access_token' },
     );
     await sendEventBookingNotification({
-      delivery: { db, accountId: row.line_account_id, operationId: `event-booking:${booking_id}:${kind}:${row.slot_id}`,
-        subject:{bookingId:booking_id,slotId:row.slot_id,status:row.status,startsAt:row.slot_starts_at},
+      delivery: { db, accountId: row.line_account_id, operationId: `event-transition:${booking_id}:${row.lock_version}`,
+        subject:{version:row.lock_version,bookingId:booking_id,slotId:row.slot_id,status:row.status,startsAt:row.slot_starts_at},
         authorize: async () => !!await db.prepare('SELECT 1 ok FROM event_bookings WHERE id=? AND line_account_id=? AND status=? AND slot_id=?')
           .bind(booking_id,row.line_account_id,row.status,row.slot_id).first() },
       channelAccessToken: accessToken,

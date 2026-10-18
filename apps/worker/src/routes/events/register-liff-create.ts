@@ -1,3 +1,5 @@
+import { EntitlementError } from '../../services/booking-entitlements.js';
+import { assertEventPassRequirement, validateEventEntitlement, eventEntitlementUse } from '../../services/event-entitlements.js';
 import { prepareEventNotification } from '../../services/event-notification-plan.js';
 import { prepareEventReminders } from '../../services/event-reminder-plan.js';
 import type { Env } from '../../index.js';
@@ -77,6 +79,8 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   try {
     return await runBookingFlow();
   } catch (e) {
+    if(e instanceof EntitlementError)return finalize(e.status,{error:e.code});
+    if(e instanceof Error&&e.message.includes('entitlement_unavailable'))return finalize(409,{error:'entitlement_unavailable'});
     console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}));
     return finalize(500, { error: 'internal_error' });
   }
@@ -112,6 +116,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
 
   const body = (await c.req.json().catch(() => ({}))) as {
     slot_id?: string;
+    entitlement_id?: unknown;
     customer_note?: string | null;
     party_size?: unknown;
     participation_mode?: unknown;
@@ -129,7 +134,9 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   if (!Number.isInteger(requestedPartySize) || (requestedPartySize as number) < 1 || (requestedPartySize as number) > EVENT_PARTY_SIZE_MAX) {
     return finalize(422, { error: 'invalid_party_size' });
   }
+  await assertEventPassRequirement(c.env.DB,account_id,event.id,body.entitlement_id);
   const partySize = requestedPartySize as number;
+  if(body.entitlement_id!==undefined&&(typeof body.entitlement_id!=='string'||!body.entitlement_id||partySize!==1)) return finalize(422,{error:'invalid_entitlement'});
   const participationMode=body.participation_mode??'classroom';
   if(participationMode!=='classroom'&&participationMode!=='online')return finalize(422,{error:'invalid_participation_mode'});
   const answerSnapshot = serializeAnswerSnapshot(body.answers);
@@ -292,6 +299,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     }
   }
 
+  if(typeof body.entitlement_id==='string') await validateEventEntitlement(c.env.DB,account_id,friend.id,event.id,body.entitlement_id,slot.starts_at);
   const modeRemaining=await eventModeRemaining(c.env.DB,slot.id,participationMode);
   if(modeRemaining!==null&&partySize>modeRemaining){if(event.waitlist_enabled===1)return enterWaitlist();return finalize(409,{error:'slot_full'});}
 
@@ -384,7 +392,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       event.id, slot.id, identityKey,
       event.max_bookings_per_friend, event.id, identityKey,
       event.id, identityKey, event.max_bookings_per_friend,slot.id,partySize,
-    ),notificationPlan,...reminderPlans]);
+    ),...(typeof body.entitlement_id==='string'?[await eventEntitlementUse(c.env.DB,account_id,id,body.entitlement_id,slot.starts_at)]:[]),notificationPlan,...reminderPlans]);
   if ((bookingInserted.meta?.changes ?? 0) === 0) {
     const remaining=await eventModeRemaining(c.env.DB,slot.id,participationMode);
     if(remaining!==null&&remaining<partySize){if(event.waitlist_enabled===1)return enterWaitlist();return finalize(409,{error:'slot_full'});}

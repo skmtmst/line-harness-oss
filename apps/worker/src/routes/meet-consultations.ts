@@ -33,7 +33,7 @@ meetConsultations.get('/api/meet-consultations', requireRole('owner', 'admin', '
               SUM(CASE WHEN r.status='failed' THEN 1 ELSE 0 END) AS failed_reminders
          FROM meet_consultations c
          INNER JOIN friends f ON f.id = c.friend_id
-         LEFT JOIN meet_consultation_reminders r ON r.consultation_id = c.id
+         LEFT JOIN meet_consultation_notification_runs r ON r.consultation_id = c.id
         WHERE (? = 'all' OR c.status = ?)
           ${accountWhere}
         GROUP BY c.id
