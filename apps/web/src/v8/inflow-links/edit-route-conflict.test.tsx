@@ -20,7 +20,7 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
   net.update.mockReset(); net.get.mockReset(); net.saved.mockReset()
   net.update.mockRejectedValueOnce(new ApiError(409, 'conflict', 'VERSION_CONFLICT'))
-  net.get.mockResolvedValue({ success: true, data: { ...route, couponEnabled: undefined, couponAssetId: undefined, couponAudience: undefined, name: 'ほかの人の名前', updatedAt: '2026-10-19T00:00:00Z' } })
+  net.get.mockResolvedValue({ success: true, data: { ...route, couponEnabled: undefined, couponAssetId: undefined, couponAudience: undefined, tagId: 'tag-missing', name: 'ほかの人の名前', updatedAt: '2026-10-19T00:00:00Z' } })
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove() })
 it('開いた版を送信し、409では入力を残して最新と比較・読込した後に新しい版を送る', async () => {
@@ -38,6 +38,7 @@ it('開いた版を送信し、409では入力を残して最新と比較・読�
   await act(async () => { screen.getByRole('button', { name: '違いを比べる' }).click() })
   expect(document.body.textContent).toContain('下書き 自分の下書き ／ 最新 ほかの人の名前')
   expect(screen.getByRole('dialog').textContent).not.toContain('クーポン')
+  expect(screen.getByRole('dialog').textContent).toContain('選択済み（名前を読み込めませんでした）')
   expect(name.value).toBe('自分の下書き')
   await act(async () => { screen.getAllByRole('button', { name: '最新を読み込んで続ける' }).at(-1)!.click() })
   expect(name.value).toBe('ほかの人の名前')

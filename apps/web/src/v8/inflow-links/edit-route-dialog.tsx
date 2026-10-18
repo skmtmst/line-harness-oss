@@ -406,7 +406,7 @@ function routeFieldValue(key: string, value: unknown, resources: { tags: Tag[]; 
   if (value === null || value === undefined || value === '') return '未設定'
   if (typeof value === 'boolean') return value ? 'する' : 'しない'
   const list = key === 'tagId' ? resources.tags : key === 'poolId' ? resources.pools : key === 'scenarioId' ? resources.scenarios : key === 'introTemplateId' ? resources.templates : null
-  if (list) return list.find(item => item.id === value)?.name ?? '選択済み（名前を取得できません）'
+  if (list) return list.find(item => item.id === value)?.name ?? '選択済み（名前を読み込めませんでした）'
   if (key === 'couponAudience') return value === 'new_friends' ? '新しく友だちになった人' : 'すべての人'
   if (key === 'couponAssetId') return '選択済みのクーポン'
   return String(value)
