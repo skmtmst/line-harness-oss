@@ -49,11 +49,11 @@ L01のprimaryBundleと長いファイルのbundleはともに0件。
 
 ## 検証
 
-重点試験100件（配備安全の既存試験と欠落/後回しの対照を含む）、scripts型、Workflow構造と故障対照、既存接続検査11件、
+重点試験102件（配備安全の既存試験と欠落/後回し・Worker名不備の対照を含む）、scripts型、Workflow構造と故障対照、既存接続検査11件、
 actionlint 1.7.7、全WorkflowのYAML/run shell 226工程、差分検査が成功。
 Worker・管理画面の実ビルドと生成設定/見出し検査が成功（直接実行はNode26）。
 管理画面211生成ページ、HTML208枚・外出しスクリプト644個の存在とinline除去を確認。
-新設補助の相対importの循環は0。ci-local（Node22）は下記の試験追随後にやり直す。
+新設補助の相対importの循環は0。ci-local（Node22）は試験追随後に全体と最終修正の関連ジョブを完走した。
 実際のGitHub配備Workflow、Cloudflareへの設定変更・DB操作・配備は実行しない。
 画面の実装変更0のため、L01固有のPencil/撮影の対象はない。
 
@@ -97,4 +97,46 @@ DB更新後に止まる余地があった。新しい失敗対照2件で、修�
 明示して渡すようにした。修正後は関連102件・scripts型・構造/故障対照・actionlintが成功。
 本番/検証の設定変更はしていない。変更は配備補助とその試験・親のenvだけで、
 apps/・packages/の製品入力と既存のアプリ検査ジョブ定義はcecbから変更0。
-cecbの全体CIを継続し、変更した補助のRoot検査と両ビルドの検査は追加コミットで再確認する。
+cecbの全体CIを完走した。cf13ではRoot検査・型・Workflowを追加実行して成功した。
+apps/・packages/・buildジョブ・check-build.tsと生成物を検査する関数は不変なので、
+両ビルドと機能検査の結果はcecbに紐付けて保持し、同じ入力での重複ビルドはしない。
+差分と適用範囲は外部followup-input-proof.jsonに記録する。
+
+## 全体ci-localの最終結果（cecb583e38）
+
+`~/lh-work/tools/hq/ci-local/run.sh`を指定土台7b42fc5e44と、GitHubの個別変数APIで
+未設定を確認した4変数の実効値（空）で実行した。秘密や値を証拠へ転記しない。
+正式log: `~/lh-work/tools/hq/ci-local/logs/20261019-012350-cecb583e38-49383/`。
+
+- root scripts: 124ファイル、1,107成功・既存skip 1。scripts型も成功。
+- Worker: 1,135ファイル、13,436成功、型・実ビルド・追加生成設定/見出し検査成功。
+- LIFF: 100ファイル、582成功、型・公開エントリ/見出し/SDKの実ブラウザ検査成功。
+- 管理画面: 2,309ファイル、13,637成功、lint・型・Webhookブラウザ検査成功。
+  実ビルド（HTML208/外出しscript644）、追加見出し/全HTML検査と既存の権限・切替・
+  通知・タグ・MFA三幅・認証/見出し・設計・ブラウザ検査も成功。
+- DBの安全検査・bootstrap、shared、self-update、CLI、SDK/MCPの試験・型・build、
+  文書サイト試験、actionlintとWorkflow構造/故障対照も成功。
+- DB本体の試験とV8 screen guardは、それぞれDB/画面入力の変更0により、
+  既存のscope判定で対象外。
+- 正式PR未作成なので`github.event.pull_request.title`が不明となり、反映履歴ゲートは
+  未実行。この結果を受けて集約ゲートが失敗し、**run全体の終了は1（合格ではない）**。
+  他の実行可能な工程に失敗0。題名・番号を捏造したり、skip記号で迂回したりしていない。
+  #0000の独立書式検査は通常ゲートの検査文を無改変で使って成功したが、正式PR検査を
+  代替しない。正式採番後の反映履歴更新と通常PRゲートは司令塔が実行する。
+
+全体CIの一時worktree・processは終了時に片付き、LINE作業木はcleanだった。
+
+## 最終修正の追加ci-local（cf13cc2d87）
+
+`--job changes --job repository-checks`で同じ土台・変数を使った。
+正式log: `~/lh-work/tools/hq/ci-local/logs/20261019-035415-cf13cc2d87-85199/`。
+Root 124ファイル・1,109成功/既存skip 1、scripts型、共通型/試験（UTC・Bangkok）、
+LIFF 100ファイル・582成功/型、共通build、DB bootstrap/安全、更新/CLI試験、
+既存所有/見た目契約、Workflow構造/故障対照・actionlint・shellがすべて成功。
+工程の失敗0・未評価1で**終了2**。未評価は同じ正式PR情報の不足だけで、
+部分検査を全体CIの合格とは呼ばない。両runのログとSHAを分けて保存する。
+
+この記録の最後のコミットはQA文書だけ。実装の検査対象はcf13、全体のアプリ入力は
+cecbと同一であり、文書の追記を検査済みの製品コードに混ぜて申告しない。
+削除/改名/移動した既存ファイル・試験0、migration0、親ECの変更0。
+DONE-L01.tsvの4区分と計数/対応表は外部CLEANUP-1017へ記録する。
