@@ -11,7 +11,7 @@ import StandardDashboard from '@/v8/dashboard/dashboard'
 /*
  * ホーム（/）の入口。アカウントの使い方のスタイル（B-294）で出し分ける。
  * 飲食・サロン・面談・教室は業種ダッシュボード、標準・ECは共通のダッシュボードに、それぞれ使うカードだけを出す。
- * スタイルは GET /api/dashboard/style（styleApi.get）。前に読んだスタイルを店ごとに覚えておき、次からは最初からその画面を出す（標準の画面が一瞬出ないように）。
+ * スタイルは GET /api/dashboard/style（styleApi.get）の正本を読む。未取得・失敗は分け、端末に残った前の業種へ戻さない。
  */
 
 const StyleDashboard = dynamic(() => import('./style-dashboard'), { ssr: false })

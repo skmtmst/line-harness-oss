@@ -8,7 +8,7 @@ type ResolvedPreview = { key: string; buttons: StarterButton[] }
 
 /** 保存と同じ解決済みのボタンだけ。未設定の行き先を見本で補わない。 */
 export function useStarterMenu(accountId: string | null, style: AccountStyle) {
-  const [snapshot, setSnapshot] = useState<{ accountId: string; style: AccountStyle; buttons: StarterButton[]; error: unknown } | null>(null)
+  const [snapshot, setSnapshot] = useState<{ accountId: string; style: AccountStyle; buttons: StarterButton[] | null; error: unknown } | null>(null)
   const [tick, setTick] = useState(0)
   useEffect(() => {
     setSnapshot(null)
@@ -21,7 +21,7 @@ export function useStarterMenu(accountId: string | null, style: AccountStyle) {
       if (!Array.isArray(preview)) throw new Error('見本の行き先を確認できませんでした')
       const buttons = preview.flatMap(menu => menu.buttons)
       if (active) setSnapshot({ accountId, style, buttons, error: null })
-    }).catch(error => { if (active) setSnapshot({ accountId, style, buttons: [], error }) })
+    }).catch(error => { if (active) setSnapshot({ accountId, style, buttons: null, error }) })
     return () => { active = false }
   }, [accountId, style, tick])
   const current = snapshot?.accountId === accountId && snapshot.style === style ? snapshot : null
