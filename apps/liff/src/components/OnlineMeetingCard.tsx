@@ -53,12 +53,12 @@ export default function OnlineMeetingCard({ bookingId, status, now = () => Date.
         {provider ? `オンライン（${provider}）` : 'オンライン'}
       </p>
       {!confirmed ? (
-        <p className="text-[13px] leading-5 text-ink">確定したら、会議の URL を LINE でお送りします。</p>
+        <p className="text-[13px] leading-5 text-ink">会議の自動発行は準備中です。確定後の参加用URLは、トークで担当者へご確認ください。</p>
       ) : !item.meeting_url ? (
-        <p className="text-[13px] leading-5 text-ink">会議の URL は前日までに LINE でお送りします。</p>
+        <p className="text-[13px] leading-5 text-ink">会議の自動発行は準備中です。参加用URLは、トークで担当者へご確認ください。</p>
       ) : (
         <>
-          <p className="text-[13px] leading-5 text-ink">{`担当：${item.staff_name} ・ URL は LINE にも送りました`}</p>
+          <p className="text-[13px] leading-5 text-ink">{`担当：${item.staff_name}`}</p>
           {open ? (
             <Button variant="primary" onClick={() => window.open(item.meeting_url ?? '', '_blank', 'noopener')}>会議に参加する</Button>
           ) : null}

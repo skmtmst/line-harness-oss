@@ -15,7 +15,7 @@ function booking(status: string, url: string | null) {
 it('確認待ちは URL もボタンも出さず、確定したら LINE で送ると伝える', async () => {
   booking('requested', null);
   render(<OnlineMeetingCard bookingId="b1" status="requested" now={() => START} />);
-  expect(await screen.findByText('確定したら、会議の URL を LINE でお送りします。')).toBeTruthy();
+  expect(await screen.findByText('会議の自動発行は準備中です。確定後の参加用URLは、トークで担当者へご確認ください。')).toBeTruthy();
   expect(screen.queryByRole('button', { name: '会議に参加する' })).toBeNull();
 });
 
