@@ -280,3 +280,12 @@ export const STYLE_DEFAULT_METRIC_IDS: Record<
     'newBookings',
   ],
 };
+
+/** EC uses its existing order projection, outside the four industry booking dashboards. */
+export type EcStyleSummary = {
+  style: 'ec'; from: string; to: string; timeZone: string; range: StyleRange;
+  asOf: string | null; computedAt: string; dateBasis: 'ordered_at';
+  status: 'available' | 'unconfigured' | 'unavailable' | 'stale';
+  orders: StyleMetric; repeatCustomers: StyleMetric;
+  changeAt: string; ordersAt: string; autoLineAt: string;
+};

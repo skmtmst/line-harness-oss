@@ -246,7 +246,7 @@ describe('B-335 safety regressions', () => {
     await setup({ expectedVersion: 1, style: 'restaurant' });
     await setup({ expectedVersion: 2, style: 'salon' });
     expect(sql.raw.prepare('SELECT COUNT(*) n FROM templates').get()).toEqual({
-      n: before.n + 5,
+      n: before.n + 16,
     });
     expect(
       sql.raw
@@ -320,9 +320,7 @@ describe('B-335 safety regressions', () => {
       },
     });
     const set = await request(base + '/starter-set?account_id=a&style=consult');
-    const declared = set.body.data.definition.items.find(
-      (i: any) => i.kind === 'rich_menu',
-    ).buttons;
+    const declared = set.body.data.preview.find((i: any) => i.key === 'menu').buttons;
     const actual = sql.raw
       .prepare(
         `SELECT a.label FROM rich_menu_areas a JOIN rich_menu_pages p ON p.id=a.page_id JOIN rich_menu_groups g ON g.id=p.group_id WHERE g.account_id='a' ORDER BY a.bounds_y,a.bounds_x`,

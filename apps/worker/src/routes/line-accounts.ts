@@ -1,4 +1,5 @@
 import { readOfficialProfileUrl } from './line-account-profile-url.js';
+import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
 import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -1131,6 +1132,7 @@ function duplicateAccountError(
 }
 
 type ConnectBody = {
+  style?: unknown;
   tagIds?: unknown; staffIds?: unknown; parentLineAccountId?: unknown; liffId?: unknown;
   name?: unknown;
   channelId?: unknown;
@@ -1140,8 +1142,9 @@ type ConnectBody = {
 };
 
 function readConnectBody(body: ConnectBody):
-  | { ok: true; value: { name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
+  | { ok: true; value: { style?: AccountStyle; name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
   | { ok: false; error: string } {
+  if (body.style !== undefined && !ACCOUNT_STYLES.includes(body.style as AccountStyle)) return { ok: false, error: 'invalid_style' };
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
   const channelSecret = typeof body.channelSecret === 'string' ? body.channelSecret.trim() : '';
@@ -1157,7 +1160,7 @@ function readConnectBody(body: ConnectBody):
   for(const value of [body.tagIds,body.staffIds]) if(value!==undefined && (!Array.isArray(value)||value.length>50||value.some(v=>!id(v))||new Set(value).size!==value.length)) return {ok:false,error:'タグ・担当者の指定を確認してください'};
   if(body.parentLineAccountId!==undefined && body.parentLineAccountId!==null && !id(body.parentLineAccountId)) return {ok:false,error:'親アカウントを確認してください'};
   if(body.liffId!==undefined && (typeof body.liffId!=='string'||!/^\d+-[A-Za-z0-9_-]+$/.test(body.liffId))) return {ok:false,error:'LIFF IDを確認してください'};
-  return { ok: true, value: { name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:(body.tagIds ?? []) as string[],staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
+  return { ok: true, value: { style: body.style as AccountStyle | undefined, name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:(body.tagIds ?? []) as string[],staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
 }
 
 async function readConnectRequest(c: Context<Env>) {
@@ -1323,6 +1326,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
   if (duplicate) return c.json({ success: false, error: duplicate }, 409);
 
   let account: DbLineAccount | null = null;
+  let savingStyle = false;
   try {
     account = await createLineAccount(c.env.DB, {
       channelId: parsed.value.channelId,
@@ -1380,7 +1384,9 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
 
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
     const started = followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
-    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id);
+    savingStyle = true;
+    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style);
+    savingStyle = false;
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
     return c.json({
       success: true,
@@ -1390,6 +1396,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
       }, account.id),
     }, 201);
   } catch (error) {
+    if (account && savingStyle) return c.json({ success: false, error: 'style_save_failed', data: { accountId: account.id, style: parsed.value.style ?? null, styleSaved: false, retryAt: `/api/dashboard/style?account_id=${encodeURIComponent(account.id)}` } }, 502);
     if (account) await deleteUncommittedLineAccount(c.env.DB, account.id);
     if (error instanceof RegistrationOptionsError) return inputError(c, {success:false,error:'登録中にタグ・親・担当範囲が変わりました。選び直してください',code:error.code}, error.status, []);
     if (error instanceof CredentialEncryptionKeyError) {
@@ -1423,6 +1430,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
   let attemptedLiffId: string | null = null;
   try {
     let body: {
+      style?: AccountStyle;
       channelId: string;
       name: string;
       channelAccessToken: string;
@@ -1447,6 +1455,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
       return inputError(c, { success: false, error: 'request body must be valid JSON' }, 422, []);
     }
 
+    if (body.style !== undefined && !ACCOUNT_STYLES.includes(body.style)) return inputError(c, { success: false, error: 'invalid_style' }, 422, ['style']);
     if (!body.channelId || !body.name || !body.channelAccessToken || !body.channelSecret) {
       return inputError(c, { success: false, error: 'channelId, name, channelAccessToken, and channelSecret are required' }, 400, ["channelId","name","channelAccessToken","channelSecret"]);
     }
@@ -1595,7 +1604,11 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
       console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts"}));
     }
 
-    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id);
+    try {
+      await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,body.style);
+    } catch {
+      return c.json({ success: false, error: 'style_save_failed', data: { accountId: account.id, style: body.style ?? null, styleSaved: false, retryAt: `/api/dashboard/style?account_id=${encodeURIComponent(account.id)}` } }, 502);
+    }
     return c.json({ success: true, data: serializeLineAccountFull(account) }, 201);
   } catch (err) {
     if (err instanceof CredentialEncryptionKeyError) {
