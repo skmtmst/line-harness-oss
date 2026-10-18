@@ -74,9 +74,9 @@ async function shot(page, viewport, name, url, opts = {}) {
     if (opts.after) await opts.after(page);
     if (name === 'booking-done') await page.getByRole('button', { name: '予約の履歴を見る', exact: true }).waitFor();
     if (name === 'booking-confirm') {
-      const submit = page.getByRole('button', { name: 'この内容で予約をリクエスト', exact: true });
+      const submit = page.getByRole('button', { name: 'この内容で予約をリクエストする', exact: true });
       await submit.waitFor();
-      await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'この内容で予約をリクエスト' && !button.disabled));
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'この内容で予約をリクエストする' && !button.disabled));
     }
     await page.evaluate(async () => {
       await document.fonts.ready;
@@ -85,7 +85,16 @@ async function shot(page, viewport, name, url, opts = {}) {
     });
     const overflow = await page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - innerWidth));
     measurements.push({ width: viewport.width, name, overflow });
-    await page.screenshot({ path: join(OUT, viewport.name, `${name}.png`), fullPage: !['booking-card-policy', 'booking-paid-cancel'].includes(name) });
+    // 固定帯を長い全体画像へ合成せず、実際の表示範囲の上端/下端で確認する。
+    await page.screenshot({ path: join(OUT, viewport.name, `${name}.png`), fullPage: false });
+    const hasLowerContent = await page.evaluate(() => scrollY + innerHeight < document.documentElement.scrollHeight - 1);
+    if (hasLowerContent) {
+      await page.evaluate(async () => {
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
+      await page.screenshot({ path: join(OUT, viewport.name, `${name}-bottom.png`), fullPage: false });
+    }
     if (overflow !== 0) throw new Error(`横はみ出し ${overflow}px`);
     console.log(`ok ${viewport.name}/${name}`);
   } catch (err) {
