@@ -296,6 +296,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `binding_exists` | [宣言](../apps/worker/src/services/common-actions-find-by-request-key.ts)（1か所） |
 | `binding_not_found` | [宣言](../apps/worker/src/services/common-actions-find-by-request-key.ts)（1か所） |
 | `body_too_large` | [宣言](../apps/worker/src/routes/booking-pass-billing.ts)（4か所） |
+| `booking_changed` | [宣言](../apps/worker/src/services/event-entitlements.ts)（1か所） |
 | `booking_circuit_conflict` | [宣言](../apps/worker/src/services/booking-external-circuits.ts)（1か所） |
 | `booking_circuit_invalid` | [宣言](../apps/worker/src/services/booking-external-circuits.ts)（1か所） |
 | `booking_conflict_notification_failed` | [宣言](../apps/worker/src/services/booking-channels.ts)（1か所） |

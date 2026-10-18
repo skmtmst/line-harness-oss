@@ -31,6 +31,10 @@ export async function persistMeetGeneration(db: D1Database, input: RegisterMeetC
   writes.push(db.prepare(`UPDATE meet_consultation_notification_runs SET status='cancelled',updated_at=?
     WHERE consultation_id=? AND schedule_revision<>? AND (status='pending' OR status='failed' AND last_error='notification_preflight_failed') AND ${guard}`)
     .bind(now,id,revision,id,revision));
+  writes.push(db.prepare(`UPDATE meet_consultation_notification_runs SET status='cancelled',updated_at=?
+    WHERE consultation_id=? AND schedule_revision=? AND (status='pending' OR status='failed' AND last_error='notification_preflight_failed')
+      AND kind NOT IN(SELECT value FROM json_each(?)) AND ${guard}`)
+    .bind(now,id,revision,JSON.stringify(schedules.map(item=>item.kind)),id,revision));
   for (const item of schedules) {
     const runId=crypto.randomUUID();
     writes.push(db.prepare(`INSERT OR IGNORE INTO meet_consultation_notification_runs

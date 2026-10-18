@@ -1,3 +1,4 @@
+import {eventEntitlementUse} from './event-entitlements.js';
 import {readFileSync} from 'node:fs';
 import {Miniflare} from 'miniflare';
 import {afterAll,beforeAll,it,expect} from 'vitest';
@@ -33,4 +34,26 @@ it('実D1のbatchとトリガーでも監査付き付与/同時調整/最後の1
  expect(await db.prepare('SELECT remaining FROM booking_entitlements').first()).toEqual({remaining:0});
  expect(await db.prepare("SELECT COUNT(*) n FROM booking_entitlement_events WHERE action='consume'").first()).toEqual({n:1});
  expect(await db.prepare("SELECT COUNT(*) n FROM bookings WHERE status='requested'").first()).toEqual({n:1});
+},30000);
+
+it('実D1でも通常予約とクラスが同じ券の残り1回を共有し、片方だけ確定する',async()=>{
+ await db.batch([
+  db.prepare(`INSERT INTO booking_pass_plans(id,line_account_id,kind,name,price,count,valid_days,event_target_scope_json,status,created_by,created_at,idempotency_key,request_json) VALUES('native-plan','a','ticket','券',0,1,3650,'[]','on_sale','operator','2026-01-01','native-plan','{}')`),
+  db.prepare("INSERT INTO events(id,line_account_id,name,is_published,lifecycle_status) VALUES('native-event','a','クラス',1,'published')"),
+  db.prepare("INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity,is_active) VALUES('native-slot','native-event','2030-01-11T01:00:00Z','2030-01-11T02:00:00Z',2,1)"),
+ ]);
+ const e=await grantEntitlement(db,'a','operator','manual:native-class',{planId:'native-plan',friendId:'f',validFrom:'2026-01-01T00:00:00Z',reason:'現金'});
+ await db.batch([
+  db.prepare(`INSERT INTO bookings(id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at) VALUES('native-regular','a','f','s','m','2030-01-11T04:00:00Z','2030-01-11T04:30:00Z','2030-01-11T04:30:00Z','requested',0,'2026-10-15T00:00:00Z')`),
+  entitlementUseStatement(db,'native-regular',e.data.id,'2030-01-11T04:00:00Z','Asia/Tokyo'),
+  db.prepare("INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at,identity_key) VALUES('native-class','a','native-event','native-slot','f','requested','2026-10-15','native-class')"),
+  await eventEntitlementUse(db,'a','native-class',e.data.id,'2030-01-11T01:00:00Z'),
+ ]);
+ const results=await Promise.allSettled([
+  db.prepare("UPDATE bookings SET status='confirmed' WHERE id='native-regular'").run(),
+  db.prepare("UPDATE event_bookings SET status='confirmed' WHERE id='native-class'").run(),
+ ]);
+ expect(results.map(r=>r.status).sort()).toEqual(['fulfilled','rejected']);
+ expect(await db.prepare('SELECT remaining FROM booking_entitlements WHERE id=?').bind(e.data.id).first()).toEqual({remaining:0});
+ expect(await db.prepare("SELECT COUNT(*) n FROM booking_entitlement_events WHERE entitlement_id=? AND action='consume'").bind(e.data.id).first()).toEqual({n:1});
 },30000);

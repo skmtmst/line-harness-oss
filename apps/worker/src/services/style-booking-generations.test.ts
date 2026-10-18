@@ -1,3 +1,5 @@
+import { deleteCustomerData } from './customer-data-deletion.js';
+import { prepareEventNotification } from './event-notification-plan.js';
 import { bookingPassPlans } from '../routes/booking-pass-plans.js';
 import { absence,useMakeup } from './booking-makeup.js';
 import { cancelByTrigger } from './reminder-trigger.js';
@@ -8,7 +10,7 @@ import events from '../routes/events.js';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { entitlementUseStatement, entitlementViews, grantEntitlement } from './booking-entitlements.js';
-import { eventEntitlementUse, returnEventEntitlement, transferEventEntitlement, validateEventEntitlement } from './event-entitlements.js';
+import { discardUnacceptedEventBooking, eventEntitlementUse, returnEventEntitlement, transferEventEntitlement, validateEventEntitlement } from './event-entitlements.js';
 import { registerMeetConsultation, cancelMeetConsultation, processDueMeetConsultationReminders } from './meet-consultation-reminders.js';
 import { recoverEventTransitions } from './event-transition-recovery.js';
 import { passPlanInput } from './booking-pass-plans.js';
@@ -19,7 +21,7 @@ vi.mock('./event-booking-notifier.js',async original=>({...await original<typeof
 vi.mock('./reminder-trigger.js',()=>({cancelByTrigger:vi.fn(async()=>({})),enrollByTrigger:vi.fn(async()=>({})),reconcileV6ToStartsAt:vi.fn(async()=>({}))}));
 let f: ReturnType<typeof createTestD1>;
 beforeEach(()=>{
-  f=createTestD1();
+  f=createTestD1({foreignKeys:true});
   f.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','a','A','synthetic','synthetic'),('b','b','B','synthetic','synthetic');
     INSERT INTO friends(id,line_user_id,line_account_id,is_following) VALUES('f','Uf','a',1),('other','Uother','a',1),('foreign','Uforeign','b',1);
     INSERT INTO staff(id,line_account_id,name,display_name) VALUES('s','a','担当','担当');
@@ -96,13 +98,15 @@ test('foreign person/account, expired pass and unset or unrelated event scopes a
     expect(f.raw.prepare("SELECT id FROM event_bookings WHERE id='denied'").get()).toBeUndefined();
   }
 });
-test('changing occurrences transfers the consumed use and deleting an unreturned use is refused',async()=>{
+test('changing occurrences transfers the consumed use and deleting customer data retains its usage history',async()=>{
   const e=await grant();await use('old',e.id);booking('new','confirmed','a','f','next');
   await f.db.batch([f.db.prepare("UPDATE event_bookings SET status='cancelled' WHERE id='old'"),await transferEventEntitlement(f.db,'a','old','new','2030-01-11T01:00:00Z')]);
   await returnEventEntitlement(f.db,'a','old');
   expect(f.raw.prepare('SELECT event_booking_id,event_booking_id_history,consumed_at FROM event_booking_entitlement_uses').get()).toMatchObject({event_booking_id:'new',event_booking_id_history:'old',consumed_at:expect.any(String)});
   expect(f.raw.prepare('SELECT remaining FROM booking_entitlements').get()).toEqual({remaining:0});
-  expect(()=>f.raw.exec("DELETE FROM event_bookings WHERE id='new'")).toThrow('entitlement_history_in_use');
+  f.raw.exec("DELETE FROM event_bookings WHERE id='new'");
+  expect(f.raw.prepare('SELECT event_booking_id,event_booking_id_history,returned_at FROM event_booking_entitlement_uses').get()).toEqual({event_booking_id:null,event_booking_id_history:'old',returned_at:null});
+  expect(f.raw.prepare('SELECT remaining FROM booking_entitlements').get()).toEqual({remaining:0});
 });
 test('absence with a makeup credit never refunds the original pass',async()=>{
   const e=await grant();await use('absent',e.id);
@@ -235,4 +239,51 @@ test('the LIFF occurrence change moves a consumed pass and records both halves f
  expect(f.raw.prepare('SELECT remaining FROM booking_entitlements').get()).toEqual({remaining:0});
  expect(f.raw.prepare("SELECT COUNT(*) n FROM booking_entitlement_events WHERE action='consume'").get()).toEqual({n:1});
  expect(f.raw.prepare("SELECT COUNT(*) n FROM workflow_steps WHERE process_kind='booking_line_delivery'").get()).toEqual({n:1});
+});
+
+test('discarding a new capacity-race loser restores its pass once and retains the detached usage audit',async()=>{
+ const e=await grant();await use('loser',e.id);
+ f.raw.exec("INSERT INTO event_booking_reminders(id,booking_id,kind,scheduled_at) VALUES('unaccepted-reminder','loser','day_before','2030-01-09')");
+ await discardUnacceptedEventBooking(f.db,'a','loser');
+ await expect(discardUnacceptedEventBooking(f.db,'a','loser')).rejects.toThrow('booking_changed');
+ expect(f.raw.prepare('SELECT remaining FROM booking_entitlements').get()).toEqual({remaining:1});
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM event_bookings').get()).toEqual({n:0});
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM event_booking_reminders').get()).toEqual({n:0});
+ expect(f.raw.prepare('SELECT event_booking_id,event_booking_id_history,returned_at FROM event_booking_entitlement_uses').get()).toMatchObject({event_booking_id:null,event_booking_id_history:'loser',returned_at:expect.any(String)});
+ expect(f.raw.prepare("SELECT COUNT(*) n FROM booking_entitlement_events WHERE request_key='event-return:loser'").get()).toEqual({n:1});
+});
+
+test('an unknown notification fences compensation and preserves both the reservation and its consumed pass',async()=>{
+ const e=await grant();await use('unknown-notice',e.id);
+ await (await prepareEventNotification(f.db,{accountId:'a',operationId:'unknown-notice',to:'Uf',kind:'received_confirmed',ctx:{eventName:'クラス',startsAtJst:'2030-01-10 10:00'},subject:{bookingId:'unknown-notice',slotId:'slot',status:'confirmed',startsAt:'2030-01-10T01:00:00Z'},now})).run();
+ f.raw.exec("UPDATE workflow_steps SET status='unknown',attempt_count=1");
+ await expect(discardUnacceptedEventBooking(f.db,'a','unknown-notice')).rejects.toThrow('booking_changed');
+ expect(f.raw.prepare('SELECT status FROM event_bookings').get()).toEqual({status:'confirmed'});
+ expect(f.raw.prepare('SELECT remaining FROM booking_entitlements').get()).toEqual({remaining:0});
+ expect(f.raw.prepare('SELECT returned_at FROM event_booking_entitlement_uses').get()).toEqual({returned_at:null});
+});
+test('customer deletion removes detached transition snapshots and keeps anonymous pass usage history',async()=>{
+ const e=await grant();await use('delete-source',e.id);
+ f.raw.exec("UPDATE event_bookings SET status='cancelled' WHERE id='delete-source';DELETE FROM event_bookings WHERE id='delete-source'");
+ expect(f.raw.prepare('SELECT booking_id FROM event_booking_transition_runs').get()).toEqual({booking_id:null});
+ expect(await deleteCustomerData({DB:f.db},{kind:'friend_data',id:'f',friendId:'f',accountId:'a',lineUserId:'Uf'},'operator')).toMatchObject({deleted:true});
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM event_booking_transition_runs').get()).toEqual({n:0});
+ expect(f.raw.prepare('SELECT event_booking_id,event_booking_id_history FROM event_booking_entitlement_uses').get()).toEqual({event_booking_id:null,event_booking_id_history:'delete-source'});
+ expect(f.raw.prepare('SELECT remaining,friend_id FROM booking_entitlements').get()).toEqual({remaining:0,friend_id:null});
+ expect(f.raw.prepare("SELECT id FROM friends WHERE id='foreign'").get()).toEqual({id:'foreign'});
+});
+
+test("an explicit all-class scope still cannot consume a pass for a different account's class",async()=>{
+ const e=await grant();f.raw.exec("UPDATE booking_pass_plans SET event_target_scope_json='[]'");
+ await expect(validateEventEntitlement(f.db,'a','f','foreign-class',e.id,'2030-01-10T01:00:00Z')).rejects.toThrow('entitlement_unavailable');
+ await expect(f.db.batch([f.db.prepare("INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at,identity_key) VALUES('foreign-link','a','foreign-class','foreign-slot','f','confirmed','2029-12-01','foreign-link')"),await eventEntitlementUse(f.db,'a','foreign-link',e.id,'2030-01-10T01:00:00Z')])).rejects.toThrow('entitlement_unavailable');
+ expect(f.raw.prepare("SELECT id FROM event_bookings WHERE id='foreign-link'").get()).toBeUndefined();
+ expect(f.raw.prepare('SELECT remaining FROM booking_entitlements').get()).toEqual({remaining:1});
+});
+
+test('retrying the same Meet registration within the final hour cancels only the unnecessary unsent day reminder',async()=>{
+ const input={externalEventId:'late-retry',friendId:'f',title:'相談',startsAt:'2030-01-10T01:00:00Z',endsAt:'2030-01-10T02:00:00Z',meetUrl:'https://meet.google.com/abc-defg-hij'};
+ await registerMeetConsultation(f.db,input,now);
+ await registerMeetConsultation(f.db,input,new Date('2030-01-10T00:30:00Z'));
+ expect(f.raw.prepare('SELECT kind,status,schedule_revision FROM meet_consultation_notification_runs ORDER BY kind').all()).toEqual([{kind:'day_before',status:'cancelled',schedule_revision:0},{kind:'hour_before',status:'pending',schedule_revision:0}]);
 });

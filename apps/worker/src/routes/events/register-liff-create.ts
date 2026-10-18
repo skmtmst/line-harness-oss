@@ -1,5 +1,5 @@
 import { EntitlementError } from '../../services/booking-entitlements.js';
-import { assertEventPassRequirement, validateEventEntitlement, eventEntitlementUse } from '../../services/event-entitlements.js';
+import { discardUnacceptedEventBooking, assertEventPassRequirement, validateEventEntitlement, eventEntitlementUse } from '../../services/event-entitlements.js';
 import { logger } from '@line-crm/shared/server';
 import { prepareEventNotification } from '../../services/event-notification-plan.js';
 import { prepareEventReminders } from '../../services/event-reminder-plan.js';
@@ -430,10 +430,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
         .all<{ id: string }>();
       const winners = new Set((winner.results ?? []).map((r) => r.id));
       if (!winners.has(id)) {
-        await c.env.DB
-          .prepare(`DELETE FROM event_bookings WHERE id = ?`)
-          .bind(id)
-          .run();
+        await discardUnacceptedEventBooking(c.env.DB,account_id,id);
         // 席を戻してから待ちへ入れる。順序が逆だと、自分の予約行が残った
         // まま待ちの行が増え、一瞬だけ定員を二重に押さえる。
         if (event.waitlist_enabled === 1) return enterWaitlist();
@@ -466,10 +463,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
         .all<{ id: string }>();
       const winners = new Set((winner.results ?? []).map((r) => r.id));
       if (!winners.has(id)) {
-        await c.env.DB
-          .prepare(`DELETE FROM event_bookings WHERE id = ?`)
-          .bind(id)
-          .run();
+        await discardUnacceptedEventBooking(c.env.DB,account_id,id);
         const code = effectiveMax === 1 ? 'duplicate_friend_booking' : 'over_friend_limit';
         return finalize(409, { error: code });
       }
