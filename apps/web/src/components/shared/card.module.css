@@ -251,5 +251,5 @@ html:root .card[data-card-selected] { --card-edge: var(--color-accent-deep); bac
 
 /* 内側の線だけの面。外枠・影で本文の寸法を増やさず、既存のカードは変えない。 */
 html:root .card[data-card-frame='ring'] {
-  border: 0; outline: none; box-shadow: var(--tpl-sa-ring);
+  border: 0; box-shadow: var(--tpl-sa-ring);
 }
