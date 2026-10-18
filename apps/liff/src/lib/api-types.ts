@@ -4,6 +4,7 @@ import type { LiffLookApiSettings } from './liff-look.js';
 
 
 export interface MenuItem {
+  photo_url?: string | null;
   id: string;
   name: string;
   category_label: string | null;
@@ -27,6 +28,7 @@ export interface MenuItem {
 
 
 export interface StaffItem {
+  photo_url?: string | null;
   id: string;
   display_name: string;
   role: string | null;

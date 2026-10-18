@@ -51,7 +51,7 @@ export function useBookingSettings(accountId: string | null) {
   const canEditMenus = useBookingEdit('/booking/menus')
   const canEditSettings = useBookingEdit('booking.settings')
   /* 開いているタブを変えられない人には、頭の下に「閲覧のみ」の帯を出す（板 C9fv7A）。 */
-  const tabReadOnly = tab === 'menus' ? !canEditMenus : !canEditSettings
+  const tabReadOnly = tab === 'photos' ? !canEditMenus && !canEditSettings : tab === 'menus' ? !canEditMenus : !canEditSettings
 
   const [menus, setMenus] = useState<BookingMenu[]>([])
   const [menusStatus, setMenusStatus] = useState<LoadStatus>('loading')

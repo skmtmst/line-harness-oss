@@ -82,9 +82,9 @@ export default function StaffList({
                 onClick={() => onSelect(s)}
                 aria-pressed={selected}
               >
-                {s.profile_image_url ? (
+                {s.photo_url || s.profile_image_url ? (
                   <img
-                    src={s.profile_image_url}
+                    src={s.photo_url || s.profile_image_url!}
                     alt=""
                     className="h-12 w-12 shrink-0 rounded-full object-cover"
                   />

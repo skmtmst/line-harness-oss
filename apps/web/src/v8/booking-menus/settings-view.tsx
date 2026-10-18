@@ -14,7 +14,7 @@ import styles from './settings.module.css'
 import ChannelsTabV8 from './channels-tab'
 import PassesTabV8 from '../booking-passes/passes-tab'
 import type { useBookingSettings } from './settings'
-import { MenusTabV8, HoursTabV8, HolidaysTabV8, RulesTabV8, StaffTabV8, PaymentsTabV8, PaymentsSideV8, V8_TABS } from './settings-parts'
+import { MenusTabV8, HoursTabV8, HolidaysTabV8, RulesTabV8, StaffTabV8, PaymentsTabV8, PaymentsSideV8, PhotosTabV8, V8_TABS } from './settings-parts'
 import { useSearchParams } from 'next/navigation'
 
 export default function BookingSettingsView({ accountId, tab, previewUrl, tabNode, canEditMenus, canEditSettings, tabReadOnly, menus, menusStatus, menusError, settings, settingsStatus, settingsError, staff, staffStatus, staffError, staffMatrices, staffExtras, members, resources, resourcesStatus, resourcesError, closedBookingCount, storeExceptions, tabEdit, hasChanges, registerTabEdit, switchTarget, setSwitchTarget, requestTab, confirmSwitch, reloadCore, saveSettings, saveResource, createResource, deleteResource, retryResources, closedWeekdays, phone }: ReturnType<typeof useBookingSettings> & { phone: ReactNode }) {
@@ -25,7 +25,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
   /* つなぐ前（UteeA）も右の欄を出さない。 */
   const paymentsWide = tab === 'payments' && (paymentsView === 'records' || paymentsView === 'events')
   /* 担当スタッフは割り当て方（QJMoY）が入って横いっぱいの表になった。スマホの見本は出さない。 */
-  const withoutPreview = tab === 'channels' || tab === 'payments' || tab === 'staff' || tab === 'passes'
+  const withoutPreview = tab === 'photos' || tab === 'channels' || tab === 'payments' || tab === 'staff' || tab === 'passes'
   const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
@@ -161,6 +161,8 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                 canEdit={canEditSettings}
                 onReload={reloadCore}
               />
+            ) : tab === 'photos' ? (
+              <PhotosTabV8 key={accountId} accountId={accountId} canEditMenus={canEditMenus} canEditSettings={canEditSettings} onSaved={reloadCore} />
             ) : tab === 'passes' ? (
               <PassesTabV8 accountId={accountId} canEdit={canEditSettings} />
             ) : tab === 'payments' ? (
