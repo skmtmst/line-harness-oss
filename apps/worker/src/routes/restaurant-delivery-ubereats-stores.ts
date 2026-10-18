@@ -7,6 +7,7 @@
  * 親（`restaurant-delivery.ts`）からは読み込まない。店舗の引き当て・接続の読み取り・
  * 時刻の整え方だけを引数（`deps`）で受け取る。親と行き違いにならないようにするため。
  */
+import { logger } from '@line-crm/shared/server';
 import type { Context, Hono } from 'hono';
 import { decryptCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -190,7 +191,7 @@ export function registerUberStoreRoutes(app: Hono<Env>, deps: UberStoreRoutesDep
         // 残すのは分類済みの符号だけ。Uber から返った自由文・本文・例外は保存も表示もしない。
         const code = error instanceof UberEatsError ? error.kind : 'store_list_failed';
         await uberMarkConnectionError(c, store.id, code, uberStatusForError(error));
-        console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+        logger.error('routes_restaurant_delivery_failed');
         return fail(c, 502, 'Uber Eats からお店の一覧を取れませんでした', { code });
       }
 
@@ -292,7 +293,7 @@ export function registerUberStoreRoutes(app: Hono<Env>, deps: UberStoreRoutesDep
         const code = error instanceof UberEatsError ? error.kind : 'provisioning_failed';
         const unknown = !(error instanceof UberEatsError) || error.status === null || error.status === 408 || (error.status ?? 0) >= 500 || error.kind === 'unknown';
         await failPosActivation(db, store.id, unknown ? POS_ACTIVATION_UNKNOWN : code, unknown ? undefined : uberStatusForError(error));
-        console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+        logger.error('routes_restaurant_delivery_failed');
         return fail(c, 502, unknown ? UBER_TOKEN_FAILURE_MESSAGES.pos_activation_unknown : 'Uber Eats でお店をつなげませんでした', { code: unknown ? POS_ACTIVATION_UNKNOWN : code });
       }
 
