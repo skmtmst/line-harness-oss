@@ -702,16 +702,19 @@ export async function processReminderDeliveries(
         const rejected=!accepted&&status>=400&&status<500&&status!==408;
         const unknown=sendStarted&&!rejected;
         const safe = unknown?{code:'delivery_unknown',message:'送信結果を確認できません。LINEの送信履歴を照合するまで再送しません。',retryable:false}:classifyReminderDeliveryError(error);
+        // The relative provider wait starts when its response arrives, rather
+        // than at the beginning of a potentially long cron sweep.
+        const failureNow = options.now ?? new Date();
         const retryAt = externalDeliveryRetryAt(
           error,
           run.retry_cycle_attempt_count,
-          now,
+          failureNow,
           safe.retryable,
         )?.toISOString() ?? null;
-        const notBefore=unknown?undefined:externalDeliveryNotBefore(error,now);
+        const notBefore=unknown?undefined:externalDeliveryNotBefore(error,failureNow);
         const providerDate=new Date(notBefore ?? Number.NaN);
         const notBeforeAt=Number.isFinite(providerDate.getTime())?providerDate.toISOString():null;
-        const overWait=notBefore!==undefined&&notBefore-now.getTime()>EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES*60_000;
+        const overWait=notBefore!==undefined&&notBefore-failureNow.getTime()>EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES*60_000;
         const exhausted = safe.retryable && !retryAt;
         // R340: 持ち主が移っているときは書けず false になる。
         // 新しい持ち主が結果を記録するため、ここでは数えない。

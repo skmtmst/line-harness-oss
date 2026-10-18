@@ -1371,3 +1371,13 @@ it('does not let manual retry bypass a normal provider deadline',async()=>{
     expect((await retryReminderDeliveryRun(db,{id:run.id,requestKey:crypto.randomUUID(),now:'2026-08-28T09:02:00Z'}))?.kind).toBe('scheduled');
   }finally{raw.close();}
 });
+
+it('starts provider delta seconds at the response even when the sweep began earlier',async()=>{
+ vi.useFakeTimers();vi.setSystemTime(new Date('2026-08-28T09:00:00Z'));
+ const {db,raw}=createTestD1();seedReminder(raw);
+ try {
+  const client=makeClient(async()=>{vi.advanceTimersByTime(1500);throw Object.assign(new Error('rejected'),{status:429,retryAfter:'120'});});
+  await processReminderDeliveries(db,client,{pause:noPause,resolveClient:async()=>client});
+  expect(raw.prepare('SELECT next_retry_at FROM reminder_delivery_runs').get()).toEqual({next_retry_at:'2026-08-28T09:02:01.500Z'});
+ }finally{raw.close();vi.useRealTimers();}
+});

@@ -1410,7 +1410,8 @@ export async function sweepOutgoingWebhookDeliveries(
       attempt = outgoingAttemptOf(sendResult);
       await logSweptDeliveryAttempt(db, row, webhook.name, sendResult, Date.now() - started);
     }
-    const outcome = await finishOutgoingDelivery(db, row, lease, attempt, now);
+    // Retry-After delta seconds begin at the response, not sweep start.
+    const outcome = await finishOutgoingDelivery(db, row, lease, attempt, input.now ?? new Date());
     if (outcome === 'delivered') {
       result.delivered += 1;
       try {

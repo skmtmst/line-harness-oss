@@ -406,3 +406,15 @@ it('stops an over-budget provider wait without claiming that the 24-hour window 
     expect(await claimOutgoingDelivery(testDb.db, held, new Date('2026-11-02T04:00:00Z'))).toBeTruthy();
   } finally { testDb.raw.close(); }
 });
+
+it('starts cron Retry-After at the response instead of the sweep snapshot',async()=>{
+ vi.useFakeTimers();vi.setSystemTime(new Date(NOW.getTime()+10*60_000));
+ const testDb=createTestD1();seed(testDb);
+ try {
+  const queued=(await enqueueOutgoingWebhookDelivery(testDb.db,{lineAccountId:ACCOUNT,webhookId:'wh-1',eventType:'friend_add',body:'{}',idempotencyKey:'response-clock',maxAttempts:4,now:NOW}))!;
+  const fetchImpl=vi.fn<typeof fetch>(async()=>{vi.advanceTimersByTime(100);return new Response('',{status:429,headers:{'Retry-After':'120'}});});
+  await sweepOutgoingWebhookDeliveries(testDb.db,{fetchImpl,lookupHost:publicOnlyLookup});
+  expect(fetchImpl).toHaveBeenCalledOnce();
+  expect(deliveryRow(testDb,queued.id)).toMatchObject({status:'retry_wait',next_retry_at:'2026-11-02T03:12:00.100Z'});
+ }finally{testDb.raw.close();vi.useRealTimers();}
+});
