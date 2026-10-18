@@ -49,11 +49,11 @@ L01のprimaryBundleと長いファイルのbundleはともに0件。
 
 ## 検証
 
-重点試験73件、scripts型、Workflow構造と故障対照、既存接続検査11件、
+重点試験100件（配備安全の既存試験と欠落/後回しの対照を含む）、scripts型、Workflow構造と故障対照、既存接続検査11件、
 actionlint 1.7.7、全WorkflowのYAML/run shell 226工程、差分検査が成功。
 Worker・管理画面の実ビルドと生成設定/見出し検査が成功（直接実行はNode26）。
 管理画面211生成ページ、HTML208枚・外出しスクリプト644個の存在とinline除去を確認。
-新設補助の相対importの循環は0。ci-local（Node22）はコミットした同版でこれから実行する。
+新設補助の相対importの循環は0。ci-local（Node22）は下記の試験追随後にやり直す。
 実際のGitHub配備Workflow、Cloudflareへの設定変更・DB操作・配備は実行しない。
 画面の実装変更0のため、L01固有のPencil/撮影の対象はない。
 
@@ -73,3 +73,18 @@ Worker・管理画面の実ビルドと生成設定/見出し検査が成功（�
 - migration・表・列の追加は不要で、番号案も不要。上限・許可先・依存・lockfile・
   staging配備Workflow・画面・親ECは変更していない。
 - 反映履歴は指示された#0000。正式採番と通常PRゲート、push/PR/統合は司令塔。
+
+## 最初のci-localと試験の追随
+
+`f09d1f6da0` のrunは、root scriptsの古い配備コマンド名の照合2件で失敗したため中止。
+実装の先行検査は残っていたが、配備を値を出さない共通の入口へ移したため、
+`scripts/security/deployment-safety.test.ts` の探索先が見つからなかった。
+新しい実行行を対象にし、Workerはソースと生成物の2回、Adminとstagingは各1回の
+検査が配備前にあることを維持。検査を外す・配備後へ回す対照も追加した。
+同ファイルの設定・別環境・秘密・R2・CORSの既存試験は残し、直接100件と型が成功。
+製品・Workflow・ビルド入力の変更は0。最初の失敗ログは削除しない。
+
+初回log: `~/lh-work/tools/hq/ci-local/logs/20261019-011726-f09d1f6da0-29058/`。
+中止時のMac用ci-local cleanupで既知のPermissionErrorが出た。自分の残存processが0、
+自分の一時worktreeがcleanであることを確認し、そのworktreeだけ通常のremoveで片付けた。
+他束のprocess・worktree・共用ツールは変更していない。
