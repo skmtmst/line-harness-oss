@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), connection: vi.fn(), listReviews: vi.fn(), syncReviews: vi.fn() }))
 const search = vi.hoisted(() => ({ tab: null as string | null, view: null as string | null }))
 
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', setSelectedAccountId: vi.fn(), accounts: [] }) }))
 vi.mock('next/navigation',async()=>({... (await import('@/test-utils/navigation-mock')).navigationMock(),
  usePathname:()=>'/restaurant-test/google',

@@ -14,6 +14,7 @@ const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), stepFollowerImport: vi.fn(), list: vi.fn(),
 }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return { ...actual, api: { lineAccounts: calls, hqNotices: notices, friends: { list: async () => ({success:true,data:{total:0}}) }, lineAccountTags: { list: async () => ({success:true,data:[]}) }, staff: { list: async () => ({success:true,data:[]}) } } }

@@ -25,6 +25,7 @@ vi.mock('@/lib/api', () => ({
     lineAccountTags: { list: calls.tagList, create: calls.tagCreate, setForAccount: calls.tagSet },
   },
 }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('@/components/step-up-prompt', () => ({
   default: () => null,

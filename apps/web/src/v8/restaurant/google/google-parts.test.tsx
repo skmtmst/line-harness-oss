@@ -3,8 +3,8 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ review: vi.fn(), publishReply: vi.fn(), listReviews: vi.fn(), createPost: vi.fn(), profile: vi.fn(), role: 'owner' }))
-vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { review: fixture.review, publishReply: fixture.publishReply, listReviews: fixture.listReviews, createPost: fixture.createPost, profile: fixture.profile } }))
+const fixture = vi.hoisted(() => ({ review: vi.fn(), publishReply: vi.fn(), listReviews: vi.fn(), syncReviews: vi.fn(), generateDraft: vi.fn(), saveDraft: vi.fn(), createPost: vi.fn(), profile: vi.fn(), role: 'owner' as string | null }))
+vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { review: fixture.review, publishReply: fixture.publishReply, listReviews: fixture.listReviews, syncReviews: fixture.syncReviews, generateDraft: fixture.generateDraft, saveDraft: fixture.saveDraft, createPost: fixture.createPost, profile: fixture.profile } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/google', useSearchParams: () => new URLSearchParams() }))
 import { compareText } from './performance'
@@ -144,3 +144,65 @@ it('WEB176：平均と件数は期間集計ではなく総合と表示する', a
   expect(screen.getByText('総合・42件')).toBeTruthy();
   expect(screen.queryByText('この30日・42 件')).toBeNull();
 });
+
+
+it.each(['viewer', null])('口コミは変更権限がない間（%s）も読めるが、下書き・同期操作を出さない', async (role) => {
+  fixture.role = role
+  fixture.listReviews.mockResolvedValue({ success: true, reviews: [{ ...review, replyDraft: null }, { ...review, id: 'published', replyStatus: 'published', replyComment: '返信済みの本文' }], total: 2, page: 1, perPage: 20 })
+  const data = connection(true, true)
+  data.summary.syncStale = true
+  const go = vi.fn()
+  render(<ReviewsBoard accountId="a" data={data} go={go} onSynced={vi.fn()} />)
+  await screen.findAllByText('Kenji')
+  expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '下書きを作る' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Googleから同期する' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '返信を見る' }))
+  expect(go).toHaveBeenCalledWith({ tab: 'reviews', view: 'draft', id: 'published' })
+  expect(fixture.syncReviews).not.toHaveBeenCalled()
+})
+
+it.each(['viewer', null])('下書きのURLを直接開いても変更権限がない間（%s）は読むだけ', async (role) => {
+  fixture.role = role
+  render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
+  await screen.findByText('待ちました。')
+  expect(screen.getByText('下書き', { exact: true })).toBeTruthy()
+  expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+  expect(screen.queryByRole('textbox', { name: '返信文' })).toBeNull()
+  for (const name of ['下書きを保存する', 'AIで下書きを作る', '返信内容を確認する']) expect(screen.queryByRole('button', { name })).toBeNull()
+  expect(fixture.generateDraft).not.toHaveBeenCalled()
+  expect(fixture.saveDraft).not.toHaveBeenCalled()
+  expect(fixture.publishReply).not.toHaveBeenCalled()
+})
+
+it('編集を任された担当者は口コミの下書きを作り、保存できる', async () => {
+  fixture.role = 'staff'
+  fixture.saveDraft.mockResolvedValue({ review: { ...review, replyDraft: '直した返信' } })
+  render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, false)} go={vi.fn()} onPublished={vi.fn()} />)
+  fireEvent.change(await screen.findByRole('textbox', { name: '返信文' }), { target: { value: '直した返信' } })
+  fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+  await waitFor(() => expect(fixture.saveDraft).toHaveBeenCalledWith('a', 'rv-2', '直した返信'))
+  expect(screen.queryByRole('button', { name: '返信内容を確認する' })).toBeNull()
+})
+
+
+it('閲覧のみでも保存済みの下書きは開いて読むことができる', async () => {
+  fixture.role = 'viewer'
+  fixture.listReviews.mockResolvedValue({ reviews: [{ ...review, replyStatus: 'draft' }], total: 1, page: 1, perPage: 20 })
+  const go = vi.fn()
+  render(<ReviewsBoard accountId="a" data={connection(false, false)} go={go} onSynced={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: '返信を見る' }))
+  expect(go).toHaveBeenCalledWith({ tab: 'reviews', view: 'draft', id: 'rv-2' })
+  expect(screen.queryByRole('button', { name: '下書きを作る' })).toBeNull()
+})
+
+it('公開の確認中に閲覧のみに変わっても、送信へ進めない', async () => {
+  const view = render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: '返信内容を確認する' }))
+  await screen.findByText('この返信をGoogleに公開しますか？')
+  fixture.role = 'viewer'
+  view.rerender(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
+  expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'この内容で返信する' })).toBeNull()
+  expect(fixture.publishReply).not.toHaveBeenCalled()
+})
