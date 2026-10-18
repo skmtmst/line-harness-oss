@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { readImplementationSource } from '../test-utils/implementation-source.js';
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const SOURCE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'friends.ts'), 'utf8')
-const CHATS_SOURCE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'chats.ts'), 'utf8')
+const SOURCE = readImplementationSource(join(dirname(fileURLToPath(import.meta.url)), 'friends.ts'))
+const CHATS_SOURCE = readImplementationSource(join(dirname(fileURLToPath(import.meta.url)), 'chats.ts'))
 
 describe('V6友だち一覧API契約', () => {
   it('担当者とシナリオをページング前のSQLで絞る', () => {

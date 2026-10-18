@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
+import { readImplementationSource } from '../test-utils/implementation-source.js';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const source = (path: string) => readFileSync(join(ROOT, path), 'utf8');
+const source = (path: string) => readImplementationSource(join(ROOT, path));
 // 薄い入口が実際に読む機能モジュールだけをたどる。登録を外した故障も元どおり落とす。
 function routeSource(feature: 'booking' | 'events'): string {
   const directory=resolve(ROOT,'routes',feature)+sep,seen=new Set<string>();
@@ -19,7 +20,6 @@ function routeSource(feature: 'booking' | 'events'): string {
   };
   return visit(resolve(ROOT,'routes',feature+'.ts'));
 }
-
 
 describe('V6オートメーションの発生元配線', () => {
   it('フォーム回答は保存済み回答IDを一意な発生元IDにする', () => {
@@ -52,7 +52,7 @@ describe('V6オートメーションの発生元配線', () => {
   });
 
   it('5分Cronが日時起動と待機・再試行の再開を同じ実行器へ接続する', () => {
-    const text = source('index.ts');
+    const text = source('cron/scheduled.ts');
     expect(text).toContain('processScheduledAutomationTriggers(env.DB');
     expect(text).toContain('processDueAutomationRuns(env.DB');
     expect(text).toContain('createAutomationActionExecutors({');

@@ -1,10 +1,11 @@
+import { API_RETRY_WAIT, parseRetryAfter } from '../lib/external-call/policy.js';
 // V6 共通基盤 §6-2: 外部APIは初回後に1分・5分・30分の最大3回だけ再試行する。
 export const EXTERNAL_DELIVERY_MAX_ATTEMPTS = 4;
-const EXTERNAL_DELIVERY_RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
+const EXTERNAL_DELIVERY_RETRY_DELAYS_MINUTES = API_RETRY_WAIT.kind === 'fixed' ? API_RETRY_WAIT.delaysMs.map(ms => ms / 60_000) : [];
 /**
  * Retry-After の指定をそのまま信じる上限（分）。§6-2 の再試行間隔の
  * 最大30分にそろえる。N-374: 上限のない指定は遠すぎる未来に飛ぶため、
- * 超える指定は30分へクランプし、読めない指定だけ既定の間隔へ丸める。
+ * 超える指定は自動再送を止め、読めない指定だけ既定の間隔へ丸める。
  * 超過時に短い既定値へ戻すと、相手の混雑中に再送を早めてしまう。
  */
 export const EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES = 30;
@@ -84,20 +85,12 @@ export function externalDeliveryRetryAt(
   const status = statusOf(error);
   const retryAfter = (error as { retryAfter?: unknown } | null)?.retryAfter;
   if (status === 429 && typeof retryAfter === 'string' && retryAfter.trim()) {
-    const text = retryAfter.trim();
-    const capMs = EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000;
-    // 秒数形式と HTTP-date 形式の両方を受け付ける。上限超えは30分へ
-    // クランプし、不正・過去の指定だけ下の既定の間隔へ落とす。
-    if (/^\d+(\.\d+)?$/.test(text)) {
-      const waitMs = Number(text) * 1_000;
-      if (Number.isFinite(waitMs) && waitMs >= 0) {
-        return new Date(now.getTime() + Math.min(waitMs, capMs));
-      }
-    } else {
-      const retryDate = Date.parse(text);
-      if (Number.isFinite(retryDate) && retryDate >= now.getTime()) {
-        return new Date(Math.min(retryDate, now.getTime() + capMs));
-      }
+    const at = parseRetryAfter(retryAfter, now.getTime());
+    if (at !== undefined) {
+      // Keep the existing 30-minute budget. An over-budget provider wait stops
+      // automatic retries rather than shortening Retry-After or raising a limit.
+      if (at - now.getTime() > EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000) return null;
+      return new Date(at);
     }
   }
   const delay = EXTERNAL_DELIVERY_RETRY_DELAYS_MINUTES[
