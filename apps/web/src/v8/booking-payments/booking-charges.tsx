@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CreditCard, MessageCircle, RotateCcw } from 'lucide-react'
 import type { BookingCancellationCharge, BookingCancellationQuote } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import Dialog from '@/components/shared/dialog'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import TestModeNote from '@/components/shared/test-mode-note'
@@ -14,14 +15,15 @@ import { Field } from '@/components/shared/form-controls'
 import { notifySaved } from '@/components/shared/toast'
 import { ApiError } from '@/lib/api'
 import { bookingCancellationApi } from '@/lib/api-gap1'
-import { gapDraftApi, type BookingCard } from '@/lib/api-gap-draft'
+import { bookingAdvancedApi } from '@/lib/api-booking-advanced'
+type BookingCard = NonNullable<Awaited<ReturnType<typeof bookingAdvancedApi.card>>['data']>
 import { formatListTimestamp } from '@/lib/format'
 import styles from './booking-charges.module.css'
 
 /*
  * 予約の詳細の「お支払い」の段（B1・絵 Ae1W1・fom2A）。キャンセル料の請求・請求しない・返金（2 段の確かめ）。
  * 口は gap1（bookingCancellationApi・模擬の請求と返金。本当の請求・LINE の送信はしない）。
- * カードの末尾 4 桁は口の案（api-gap-draft：口が要る）。読めないときは「—」。
+ * カード情報は予約の実APIから読む。未登録と取得失敗を分ける。
  * 権限：請求する・請求しないはオーナー・管理者・スタッフ、返金はオーナー・管理者だけ、閲覧のみはボタンを出さない。
  */
 
@@ -39,7 +41,11 @@ const uuid = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? cr
 
 type Load = { state: 'loading' } | { state: 'ready'; charges: BookingCancellationCharge[]; quote: BookingCancellationQuote; testMode: boolean } | { state: 'error' }
 
-export function BookingChargesSection({ accountId, bookingId, customerName, bookingLabel, price, canCharge, canRefund }: {
+export function BookingChargesSection(props: Parameters<typeof BookingChargesInner>[0]) {
+  return <BookingChargesInner key={`${props.accountId}:${props.bookingId}`} {...props} />
+}
+
+function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel, price, canCharge, canRefund }: {
   accountId: string
   bookingId: string
   customerName: string
@@ -58,6 +64,7 @@ export function BookingChargesSection({ accountId, bookingId, customerName, book
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const key = useRef(uuid())
+  const preparing = usePreparingDialog()
 
   const reload = useCallback(async () => {
     setLoad({ state: 'loading' })
@@ -67,7 +74,7 @@ export function BookingChargesSection({ accountId, bookingId, customerName, book
     } catch {
       setLoad({ state: 'error' })
     }
-    void Promise.resolve().then(() => gapDraftApi.bookingCard(accountId, bookingId)).then((response) => setCard(response.data)).catch(() => setCard(null))
+    void Promise.resolve().then(() => bookingAdvancedApi.card(accountId, bookingId)).then((response) => setCard(response.data)).catch(() => setCard(null))
   }, [accountId, bookingId])
   useEffect(() => { void reload() }, [reload])
 
@@ -78,7 +85,13 @@ export function BookingChargesSection({ accountId, bookingId, customerName, book
   const badge = STATUS[charge.status]
   const percent = price ? Math.round(charge.amount / price * 100) : null
   const cardLabel = card ? `${card.brand} •••• ${card.last4}` : '—'
-  const open = (next: 'charge' | 'waive' | 'refund') => { setError(null); setReason(''); setRefundStep(1); key.current = uuid(); setDialog(next) }
+  const open = (next: 'charge' | 'waive' | 'refund') => {
+    if (next !== 'waive' && !load.testMode) {
+      preparing.open(next === 'charge' ? 'カードの請求' : 'カードの返金')
+      return
+    }
+    setError(null); setReason(''); setRefundStep(1); key.current = uuid(); setDialog(next)
+  }
   const close = () => { if (!busy) setDialog(null) }
 
   async function run(action: () => Promise<unknown>, done: string) {
@@ -112,18 +125,20 @@ export function BookingChargesSection({ accountId, bookingId, customerName, book
         {canRefund && charge.status === 'succeeded' ? <Button onClick={() => open('refund')}>返金する</Button> : null}
       </div>
 
+      {preparing.dialog}
+
       {/* 請求の確かめ（Ae1W1）：金額・カード・わけ。額は決まりの額だけ（上げられない）。 */}
       <Dialog open={dialog === 'charge'} title="キャンセル料を請求しますか？" titleNote={`${customerName} さま ・ ${bookingLabel}`} size="medium" contentLayout="form"
         busy={busy} error={error ?? undefined} cancelLabel="戻る" onCancel={close}
         confirmLabel={`${yen(charge.amount)} を請求する`} confirmIcon={<CreditCard size={15} aria-hidden="true" />}
-        onConfirm={() => void run(() => bookingCancellationApi.charge(accountId, bookingId, { kind: charge.kind, amount: charge.amount, expectedVersion: charge.version }, key.current), `${yen(charge.amount)} を請求しました`)}>
+        onConfirm={() => void run(() => bookingCancellationApi.charge(accountId, bookingId, { kind: charge.kind, amount: charge.amount, expectedVersion: charge.version }, key.current), `${yen(charge.amount)} の請求を模擬で記録しました。実際の請求・LINE送信はしていません`)}>
         <dl className={styles.facts}>
           <div><dt>金額</dt><dd className={styles.big}>{yen(charge.amount)}</dd></div>
           <div><dt>カード</dt><dd>{cardLabel}</dd></div>
           <div><dt>わけ</dt><dd>{reasonLine}</dd></div>
         </dl>
         {load.testMode ? <TestModeNote>本当の請求は起きません</TestModeNote> : null}
-        <p className={styles.info}><MessageCircle size={15} aria-hidden="true" />{`請求すると、お客さまに LINE で「キャンセル料 ${yen(charge.amount)} を請求しました」と届きます。金額は決まりの額より上げられません。`}</p>
+        <p className={styles.info}><MessageCircle size={15} aria-hidden="true" />試験の請求を記録します。実際のカード請求・LINE送信はしていません。金額は決まりの額より上げられません。</p>
       </Dialog>
 
       {/* 請求しない：理由は必須。 */}
@@ -147,7 +162,7 @@ export function BookingChargesSection({ accountId, bookingId, customerName, book
       <Dialog open={dialog === 'refund' && refundStep === 2} title="返金すると戻せません" titleNote={`手順 2 / 2 ・ ${customerName} さまへキャンセル料を全額返金`} size="medium" contentLayout="form" tone="destructive"
         busy={busy} error={error ?? undefined} cancelLabel="戻る" onCancel={() => { if (!busy) setRefundStep(1) }}
         confirmLabel={`${yen(charge.amount)} を返金する`} confirmIcon={<RotateCcw size={15} aria-hidden="true" />}
-        onConfirm={() => void run(() => bookingCancellationApi.refund(accountId, charge.id, { reason: reason.trim(), expectedVersion: charge.version, confirmed: true, confirmedIrreversible: true }, key.current), `${yen(charge.amount)} を返金しました`)}>
+        onConfirm={() => void run(() => bookingCancellationApi.refund(accountId, charge.id, { reason: reason.trim(), expectedVersion: charge.version, confirmed: true, confirmedIrreversible: true }, key.current), `${yen(charge.amount)} の返金を模擬で記録しました。実際の返金・LINE送信はしていません`)}>
         <dl className={styles.facts}>
           <div><dt>金額</dt><dd className={styles.big}>{yen(charge.amount)}</dd></div>
           <div><dt>カード</dt><dd>{cardLabel}</dd></div>

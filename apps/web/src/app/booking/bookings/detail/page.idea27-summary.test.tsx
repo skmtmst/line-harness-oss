@@ -286,3 +286,11 @@ describe('IDEA-27: 長い変更履歴は追加取得する', () => {
     expect(screen.queryByText(/記録を読み込む/)).toBeNull()
   })
 })
+
+it('送達不明は通常の失敗と区別し、再送の入口を置かない', async () => {
+  m.get.mockResolvedValue({ booking: booking({ operations: [{ id: 'unknown-line', kind: 'confirmation_line', status: 'permanent_failed', scheduledAt: null, completedAt: null, openedAt: null, result: {}, errorCode: 'delivery_unknown' }] }) })
+  render(<Page />)
+  await flush()
+  expect(screen.getByText(/送達不明・要確認（自動では送り直しません）/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'もう一度送る' })).toBeNull()
+})

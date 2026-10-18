@@ -1,5 +1,5 @@
 import { readApiSource } from '../../../../scripts/test-api-source.mjs'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 const LIST = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
