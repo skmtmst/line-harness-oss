@@ -235,7 +235,7 @@ describe('通知の再試行 (R323・R324)', () => {
     expect(retry.status).toBe(200);
     expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
     // R323: 同じ行の再送は安定キーで行う。
-    expect(notifierMocks.calls[0]).toMatchObject({ retryKey: 'booking-notification-retry:OP1' });
+    expect(notifierMocks.calls[0]).toMatchObject({ retryKey: 'OP1' });
   });
 
   test('R324: 取消ずみの確定通知は送らず、未成功行は止まる', async () => {

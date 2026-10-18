@@ -1,3 +1,4 @@
+import { CUSTOMER_WORDS, PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 import BookingCancelDeadline from './BookingCancelDeadline.js';
 import type { BookingHistoryItem } from '../lib/api.js';
 import { paymentText, type PaymentView } from '../lib/booking-payment-view.js';
@@ -57,6 +58,7 @@ export default function HistoryCard({
             </div>
           </div>
         </div>
+        {payment?.actionRequired ? <p role="status" className="text-xs leading-5 text-liff-sub">{PAYMENT_UNKNOWN}</p> : null}
         {onReceipt && (
           <div className="flex items-center justify-between gap-2">
             <Button variant="link" onClick={onReceipt} disabled={disabled}>
@@ -64,7 +66,7 @@ export default function HistoryCard({
               領収書を見る
               <Icon name="external-link" className="h-3.5 w-3.5" />
             </Button>
-            <span className="truncate text-[11px] text-liff-sub">Stripe のページが開きます</span>
+            <span className="truncate text-[11px] text-liff-sub">{payment?.receiptUrl ? '領収書のページが開きます' : '領収書は準備中です'}</span>
           </div>
         )}
         {/* 未払い（B-338・nWby5）：払う期限と、［お支払いへ進む］を日時を変えるの位置に（主ボタン）。 */}
@@ -93,7 +95,7 @@ export default function HistoryCard({
 }
 
 const STATUS_META: Record<string, { label: string; tone: 'confirmed' | 'pending' | 'neutral' }> = {
-  requested: { label: 'お店の確認待ち', tone: 'pending' },
+  requested: { label: CUSTOMER_WORDS.approvalPending, tone: 'pending' },
   confirmed: { label: '確定', tone: 'confirmed' },
   rejected: { label: '不可', tone: 'neutral' },
   expired: { label: '期限切れ', tone: 'neutral' },

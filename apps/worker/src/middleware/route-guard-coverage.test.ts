@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import {requireRole} from './role-guard.js';
 import { isOutputRequest } from './output-audit.js';
+import { QA_STAGING_DATABASE } from '../services/staging-qa-safety.js';
 
 const authState = vi.hoisted(() => ({ readOnly: false, role: 'staff' as 'owner' | 'admin' | 'staff', permissionKeys: [] as string[], viewKeys: [] as string[] }));
 vi.mock('@line-crm/db', async (original) => ({
@@ -25,8 +26,15 @@ vi.mock('@line-crm/db', async (original) => ({
 }));
 import { app } from '../index.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { collectSecurityRoutes } from '../test-utils/route-security-inventory.js';
+import { collectSecurityRoutes, routeSourceFiles } from '../test-utils/route-security-inventory.js';
 import { isLegacyGlobalApi } from './tenant-scope.js';
+
+// Exercise authorization with the staging-only routes actually enabled. Their
+// disabled/production 404 boundary is covered by the real QA entrypoint tests.
+const stagingEnvironment = {
+  DEPLOY_ENV: 'staging', WORKER_NAME: 'nen-line-stg', D1_DATABASE_ID: QA_STAGING_DATABASE,
+  WORKER_PUBLIC_URL: 'https://stg-api.musubo.jp', STAGING_QA_ENABLED: 'true', STAGING_QA_OUTBOUND_DISABLED: 'true',
+};
 
 beforeEach(() => { authState.role = 'staff'; authState.readOnly = false; authState.permissionKeys = []; authState.viewKeys = []; });
 
@@ -44,6 +52,10 @@ const ROUTES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'routes')
 type Finding = { file: string; method: string; path: string };
 
 function collectUnguarded(fixtures?: Record<string, string>): Finding[] {
+  if (!fixtures) return collectSecurityRoutes(join(ROUTES_DIR, '..'))
+    .filter(route => ['POST', 'PUT', 'PATCH', 'DELETE', 'ALL'].includes(route.method)
+      && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path) && !route.guarded)
+    .map(route => ({ file: route.file.replace(/\.ts$/, ''), method: route.method.toLowerCase(), path: route.path }));
   const sources = fixtures ?? Object.fromEntries(readdirSync(ROUTES_DIR)
     .filter((entry) => entry.endsWith('.ts') && !entry.includes('.test.'))
     .map((entry) => [entry, readFileSync(join(ROUTES_DIR, entry), 'utf8')]));
@@ -98,7 +110,7 @@ describe('更新系の権限ガードの網羅', () => {
         const response = await (aggregateCsv?aggregate:app).request(`${path}?format=csv`, { headers: {
           Authorization: `Bearer ${String(++index).padStart(16, '0')}`,
           'CF-Connecting-IP': `s07-output-${index}`,
-        } }, { DB: {} } as never);
+        } }, { ...stagingEnvironment, DB: {} } as never);
         expect(response.status, `${role} GET ${route.path}: read-only export`).toBe(aggregateCsv&&role!=='staff'?200:403);
       }
     }
@@ -177,7 +189,7 @@ describe('更新系の権限ガードの網羅', () => {
     try {
     for (const route of routes) {
       const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
-      const env = { DB: matrixDb.db };
+      const env = { ...stagingEnvironment, DB: matrixDb.db };
       const unauthenticated = await app.request(path, { method: route.method,
         headers: { 'CF-Connecting-IP': `s07-unauth-${++index}` } }, env as never);
       expect(unauthenticated.status, `${route.method} ${route.path}: unauthenticated`).toBe(401);
@@ -241,7 +253,7 @@ describe('更新系の権限ガードの網羅', () => {
     for (const route of routes) {
       const authorization = `Bearer ${String(++requestIndex).padStart(16, '0')}`;
       const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
-      const env = { DB: {} as D1Database };
+      const env = { ...stagingEnvironment, DB: {} as D1Database };
       const unauth = await app.request(path, { method: route.method,
         headers: { 'CF-Connecting-IP': `unauth-${route.method}-${path}` } }, env as never);
       expect(unauth.status, `${route.method} ${route.path}: unauthenticated`).toBe(401);
@@ -290,9 +302,7 @@ function isStaffApiFailClosed(entry: string): boolean {
 
 function collectStaffApiClassification(extraRoutes: string[] = []): { all: string[]; failClosed: string[] } {
   const srcDir = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const files = readdirSync(join(srcDir, 'routes'))
-    .filter((entry) => entry.endsWith('.ts') && !entry.includes('.test.'))
-    .map((entry) => join(srcDir, 'routes', entry));
+  const files = routeSourceFiles(join(srcDir, 'routes'));
   files.push(join(srcDir, 'index.ts'));
   const seen = new Set<string>();
   for (const file of files) {

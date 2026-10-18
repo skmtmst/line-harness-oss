@@ -1,4 +1,5 @@
-import { describe, expect, test, vi } from 'vitest';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { processDueReminders } from './booking-reminders.js';
 
 interface DueRow {
@@ -15,38 +16,26 @@ interface DueRow {
   timezone?: string | null;
 }
 
+const fixtures: SqliteD1[] = [];
+afterEach(() => { for (const fixture of fixtures.splice(0)) fixture.raw.close(); });
 function stubDB(due: DueRow[]) {
-  const updates: Array<{ sql: string; bound: unknown[] }> = [];
-  const db = {
-    prepare(sql: string) {
-      let bound: unknown[] = [];
-      const stmt = {
-        bind(...args: unknown[]) {
-          bound = args;
-          return stmt;
-        },
-        async all() {
-          if (sql.includes('FROM booking_reminders')) {
-            return { results: due };
-          }
-          return { results: [] };
-        },
-        async run() {
-          updates.push({ sql, bound });
-          return { success: true, meta: { changes: 1 } };
-        },
-        async first() {
-          if (sql.includes('RETURNING retry_key')) {
-            updates.push({ sql, bound });
-            return { retry_key: bound[1], recipient_line_user_id: bound[2], messages_json: bound[3] };
-          }
-          return null;
-        },
-      };
-      return stmt;
-    },
-  } as unknown as D1Database;
-  return { db, updates };
+  const fixture=createTestD1();fixtures.push(fixture);
+  const {raw,db}=fixture;
+  raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','c','A','tok','secret');
+    INSERT INTO friends(id,line_user_id,line_account_id,is_following) VALUES('f','U','a',1);
+    INSERT INTO staff(id,line_account_id,name,display_name) VALUES('s','a','S','S');
+    INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('m','a','M',60,100);
+    INSERT INTO booking_settings(id,line_account_id,timezone) VALUES('settings','a','Asia/Tokyo');`);
+  for(const row of due) {
+    raw.prepare('UPDATE friends SET line_user_id=?').run(row.line_user_id);
+    raw.prepare('UPDATE menus SET name=?').run(row.menu_name);raw.prepare('UPDATE staff SET display_name=?').run(row.staff_name);
+    raw.prepare('UPDATE booking_settings SET timezone=?').run(row.timezone??'Asia/Tokyo');
+    raw.prepare(`INSERT INTO bookings(id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at)
+      VALUES(?,'a','f','s','m',?,?,?,'confirmed',100,'2026-01-01')`).run(row.booking_id,row.starts_at,new Date(Date.parse(row.starts_at)+3600000).toISOString(),new Date(Date.parse(row.starts_at)+3600000).toISOString());
+    raw.prepare(`INSERT INTO booking_reminders(id,booking_id,kind,scheduled_at,retry_count,last_error)
+      VALUES(?,?,?,'2026-05-09',?,'notification_preflight_failed')`).run(row.id,row.booking_id,row.kind,row.retry_count);
+  }
+  return {db,raw};
 }
 
 const NOW = new Date('2026-05-10T05:01:00Z');
@@ -59,14 +48,14 @@ describe('processDueReminders', () => {
         booking_id: 'B1',
         kind: 'day_before',
         retry_count: 0,
-        starts_at: '2026-05-10T05:00:00Z',
+        starts_at: '2026-05-10T05:10:00Z',
         menu_name: 'カット',
         staff_name: '山田',
         channel_access_token: 'tok',
         line_user_id: 'U_xyz',
       },
     ];
-    const { db, updates } = stubDB(due);
+    const { db, raw } = stubDB(due);
     const sender = vi.fn().mockResolvedValue(undefined);
     const result = await processDueReminders(db, {
       now: NOW,
@@ -81,7 +70,7 @@ describe('processDueReminders', () => {
         kind: 'day_before',
       }),
     );
-    expect(updates.find((u) => u.sql.includes("status='sent'"))).toBeTruthy();
+    expect(raw.prepare("SELECT status FROM booking_reminders").get()).toEqual({status:"sent"});
   });
 
   test('未来の reminder は対象外（DB が返さない前提なので空入力）', async () => {
@@ -95,31 +84,29 @@ describe('processDueReminders', () => {
     expect(sender).not.toHaveBeenCalled();
   });
 
-  test('送信失敗 1 回目: status=failed, retry_count=1', async () => {
+  test('送信後の失敗は初回でも結果不明で停止し、retry_count=1', async () => {
     const due: DueRow[] = [
       {
         id: 'R1',
         booking_id: 'B1',
         kind: 'day_before',
         retry_count: 0,
-        starts_at: '2026-05-10T05:00:00Z',
+        starts_at: '2026-05-10T05:10:00Z',
         menu_name: 'カット',
         staff_name: '山田',
         channel_access_token: 'tok',
         line_user_id: 'U',
       },
     ];
-    const { db, updates } = stubDB(due);
+    const { db, raw } = stubDB(due);
     const sender = vi.fn().mockRejectedValue(new Error('LINE 500'));
     const result = await processDueReminders(db, {
       now: NOW,
       sender,
     });
     expect(result).toEqual({ sent: 0, failed: 1 });
-    const failedUpdate = updates.find((u) => u.sql.includes('SET status = ?, retry_count = ?'));
-    expect(failedUpdate).toBeTruthy();
-    expect(failedUpdate!.bound[0]).toBe('failed');
-    expect(failedUpdate!.bound[1]).toBe(1); // retry_count
+    expect(raw.prepare('SELECT status,retry_count,last_error FROM booking_reminders').get())
+      .toEqual({status:'failed_permanent',retry_count:1,last_error:'delivery_unknown'});
   });
 
   // R333: 文面の残り時間は送信時点の実測。店舗設定のオフセットは
@@ -213,21 +200,20 @@ describe('processDueReminders', () => {
         booking_id: 'B1',
         kind: 'hours_before',
         retry_count: 2, // 3回目
-        starts_at: '2026-05-10T05:00:00Z',
+        starts_at: '2026-05-10T05:10:00Z',
         menu_name: 'カット',
         staff_name: '山田',
         channel_access_token: 'tok',
         line_user_id: 'U',
       },
     ];
-    const { db, updates } = stubDB(due);
+    const { db, raw } = stubDB(due);
     const sender = vi.fn().mockRejectedValue(new Error('LINE 500'));
     const result = await processDueReminders(db, {
       now: NOW,
       sender,
     });
-    const u = updates.find((x) => x.sql.includes('SET status = ?, retry_count = ?'));
-    expect(u!.bound[0]).toBe('failed_permanent');
-    expect(u!.bound[1]).toBe(3);
+    expect(raw.prepare('SELECT status,retry_count FROM booking_reminders').get())
+      .toEqual({status:'failed_permanent',retry_count:3});
   });
 });

@@ -1,4 +1,5 @@
 import liff from '@line/liff';
+import { fetchAffiliateSelf } from './affiliate-self-fetch.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 export interface Reward {
@@ -33,10 +34,8 @@ export class SelfApiError extends Error {
 async function request<T>(path: string, method = 'GET', body?: object, key?: string): Promise<T> {
   const accessToken = token();
   const url = new URL(`${BASE}/api/liff/${path}`, window.location.origin);
-  const statement = path.startsWith('affiliate/statements');
-  if (method === 'GET' && !statement) url.searchParams.set('lineAccessToken', accessToken);
-  const response = await fetch(url, {
-    method, headers: { 'Content-Type': 'application/json', ...(statement ? { Authorization: `Bearer ${accessToken}` } : {}), ...(key ? { 'Idempotency-Key': key } : {}) },
+  const response = method === 'GET' ? await fetchAffiliateSelf(path, accessToken) : await fetch(url, {
+    method, headers: { 'Content-Type': 'application/json', ...(key ? { 'Idempotency-Key': key } : {}) },
     ...(body ? { body: JSON.stringify({ ...body, lineAccessToken: accessToken }) } : {}),
   });
   const result = await response.json();
@@ -55,12 +54,12 @@ export const affiliateSelfApi = {
     const url = new URL(`${BASE}/api/liff/affiliate/statements/${encodeURIComponent(id)}/download`, window.location.origin);
     url.searchParams.set('issue', '1');
     const headers = { Authorization: `Bearer ${token()}` };
-    const issued = await fetch(url, { headers, cache: 'no-store', referrerPolicy: 'no-referrer' });
+    const issued = await fetch(url, { headers, cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
     if (!issued.ok) throw new Error('支払明細を取得できませんでした。もう一度お試しください。');
     const result = await issued.json() as { data: { url: string } };
     const signed = new URL(result.data.url);
     if (signed.origin !== url.origin || signed.pathname !== url.pathname || signed.searchParams.has('lineAccessToken')) throw new Error('取得用URLが無効です');
-    const response = await fetch(signed, { headers, cache: 'no-store', referrerPolicy: 'no-referrer' });
+    const response = await fetch(signed, { headers, cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
     if (!response.ok) throw new Error('支払明細を取得できませんでした。もう一度お試しください。');
     const blobUrl = URL.createObjectURL(await response.blob());
     const link = document.createElement('a');
