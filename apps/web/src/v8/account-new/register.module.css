@@ -17,11 +17,14 @@
 .panelTitle {
   margin: 0; padding: 0; font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink);
 }
-/* 右の案内は共通の Card（surface="muted"）が地と角を持つ。画面CSSは置き場所だけ（★V8 §24）。 */
+/* 右の案内は共通の Card が地と角を持つ。画面CSSは置き場所だけ（★V8 §24）。 */
 .aside { align-self: flex-start; }
 /* 中の字は Card ではなく中の h2・p に直接あてる。Card へ渡す .aside には見た目を書かない。 */
 .asideH2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
 .asideP { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
+/* 正本 v06 ②の右の列（RtWJZ）の小さな題（右題3）と、その上の細い区切り（sKgxt／D4k4qv）。 */
+.asideH3 { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
+.asideLine { height: 1px; background: var(--color-hairline); }
 
 /* 案内の一文を囲む箱と、横並びのボタン（②③で使う） */
 .noteBox {
@@ -107,6 +110,10 @@
 .precheckResultHeading,
 .precheckResultTitle,
 .precheckResultBody,
+.outlineTitle,
+.outlineCount,
+.outlineText p,
+.outlineAuto p,
 .ackNote { margin: 0; }
 .precheckHead { display: flex; align-items: center; gap: var(--tpl-htn6-pre-head-gap); }
 .precheckHead .subBadge { margin-inline-start: auto; }
@@ -245,3 +252,47 @@
 .accountName { font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
 .accountId { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
 .useRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s); }
+
+/* ② 左の細い列「AC左 操作ステップ」（正本 v06 Fqy29 の g48QV）。
+   いまどこを触っているかと、musubo が自動でやることを、3つの段で見せる。 */
+.outlineCard {
+  flex: 1 1 auto;
+}
+.outlineTitle { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
+.outlineCount { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+/* 題のかたまりと段の間だけ、もう一段あける（ZibvL）。 */
+.outlineGap { height: var(--tpl-htn-gap-xs); }
+/* 段より下を押し下げて、自動の説明をいちばん下に置く（t8JqzS）。 */
+.outlineSpacer { flex: 1 1 auto; }
+.outlineRow {
+  display: flex; align-items: flex-start; gap: var(--tpl-htn6-ac-row-gap);
+  padding: var(--tpl-htn6-ac-row-pad); border-radius: var(--tpl-htn6-ac-radius); background: transparent;
+}
+.outlineNum {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: var(--tpl-htn6-ac-num); height: var(--tpl-htn6-ac-num); border-radius: var(--tpl-htn-radius-pill);
+  font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); font-weight: 700;
+}
+.outlineText { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-text-gap); min-width: 0; }
+.outlineRowTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; }
+.outlineRowNote { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+/* 済んだ段。 */
+.outlineDone .outlineNum { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.outlineDone .outlineRowTitle { color: var(--color-ink-faint); }
+/* いまの段。 */
+.outlineCurrent { background: var(--color-canvas); box-shadow: var(--tpl-htn-ring-info); }
+.outlineCurrent .outlineNum { background: var(--color-accent-deep); color: var(--color-on-accent); }
+.outlineCurrent .outlineRowTitle { color: var(--color-ink); }
+/* これからの段。 */
+.outlineFuture .outlineNum { background: var(--color-shell-gray); color: var(--color-ink-faint); }
+.outlineFuture .outlineRowTitle { color: var(--color-ink-faint); }
+/* いちばん下の「musubo が自動で行うこと」（C7BtB）。 */
+.outlineAuto {
+  display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-auto-gap);
+  padding: var(--tpl-htn6-ac-auto-pad); border-radius: var(--tpl-htn6-ac-radius); background: var(--color-accent-soft);
+}
+.outlineAutoTitle { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); font-weight: 700; color: var(--color-accent-deep); }
+.outlineAutoBody { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-secondary); }
+/* ②の入力は縦に積む（正本 v06 の AC入力）。横2列にしない。 */
+.acInputs { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-input-gap); min-width: 0; }
+.acField { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-field-gap); min-width: 0; }

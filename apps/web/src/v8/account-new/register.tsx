@@ -7,32 +7,30 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   Activity, ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CircleDashed,
-  Copy, Lock, CircleHelp, Plug, QrCode, Users,
+  Copy, Plug, QrCode, Users,
 } from 'lucide-react'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
 import { Steps } from '@/components/templates/steps'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
-import { TextField } from '@/components/shared/text-field'
-import { Field } from '@/components/shared/form-controls'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
   DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, checkActionLabel, checkErrorText,
-  checkStage, developerChannelUrl, formatJaDuration, handoverProgress, insightDateJst, isDuplicateChannelError,
+  checkStage, formatJaDuration, handoverProgress, insightDateJst, isDuplicateChannelError,
   loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, readDraft, stepLabel, subTotal,
   toV06CheckRows,
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
   type DraftState, type PrecheckAnswers, type PrecheckAt, type PrecheckKey, type StepNumber,
 } from './logic'
 import Step1Precheck from './step1-precheck'
+import Step2Connect from './step2-connect'
 import Step4Template from './step4-template'
 import styles from './register.module.css'
 import { qrToDataURL } from '@/lib/qr-image'
@@ -40,6 +38,7 @@ import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { describeActionFailure } from '@/lib/use-action-error'
 
 /*
  * ★v06 LINEアカウントを登録（板 ①p6zMkA ②Fqy29 ③Lwxyh ④X0pGdw ⑤Plmq1）。
@@ -55,8 +54,6 @@ const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string;
   { number: 4, label: '使い方を選ぶ', node: 'X0pGdw', lead: 'いちばん近い使い方を選びます。あとから変えられます。' },
   { number: 5, label: '完了', node: 'Plmq1', lead: 'いまの友だちを引き継いでいます。終わると完了です。' },
 ]
-
-const MANUAL = '/manuals/line-connect/index.html'
 
 type BusyAction = 'check' | 'save' | null
 interface FormState {
@@ -76,7 +73,7 @@ export default function AccountRegisterV8() {
   // API の接続・登録と同じくオーナーだけ。権限確認前に下書きの復元や変更処理を起動しない。
   if (role !== 'owner') return <PageFrame kind="wizard" boardId="p6zMkA">
     <PageHeading title="LINEアカウントを登録" />
-    {role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>閲覧のみで見ています。LINEアカウントの登録はオーナーに頼んでください。</ReadOnlyNotice>}
+    <PageContent>{role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>閲覧のみで見ています。LINEアカウントの登録はオーナーに頼んでください。</ReadOnlyNotice>}</PageContent>
   </PageFrame>
   return <AccountRegistrationForm />
 }
@@ -126,9 +123,8 @@ function AccountRegistrationForm() {
     setError('')
   }
   const createdId = connection?.id ?? ''
-  const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : emptyValue('unknown')
-  const webhookUrl = workerBase && form.channelId.trim() ? `${workerBase}/webhook/${form.channelId.trim()}` : emptyValue('unknown')
+  /* Webhook URL も Callback URL も musubo が自動で登録するので画面に出さない
+     （正本 v06 ②-2 の gcbIm、②-3 の CE8q1 には控えの欄が無い）。 */
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
   const importRunning = importPhase === 'importing_ids' || importPhase === 'hydrating_profiles'
   const basicId = connection?.basicId ?? ''
@@ -346,7 +342,9 @@ function AccountRegistrationForm() {
     } catch (saveFailure) {
       setCheckRunning(false)
       const fieldFailure = saveErrors.capture(saveFailure)
-      if (!fieldFailure) setError('LINEに接続できませんでした。時間をおいて、もう一度お試しください。')
+      /* 「時間をおいて」の一文に畳むと、権限不足の人が待ち続け、混み合いの人が連打する。
+         403・404・429・入力の直しは原因どおりに言い分ける（共通の describeActionFailure）。 */
+      if (!fieldFailure) setError(describeActionFailure(saveFailure, '接続の確認'))
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -537,91 +535,15 @@ function AccountRegistrationForm() {
           )}
 
           {currentStep === 2 && (
-            <CreateStepColumns data-design-node="Fqy29" previewTitle="どこにある？" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="どこにある？">
-                <h2 className={styles.asideH2}>どこにある？</h2>
-                <p className={styles.asideP}>チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
-                <p className={styles.asideP}>登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
-                <p className={styles.asideP}>秘密値は保存後に画面へ表示されません。</p>
-              </Card>
-              )}>
-              {sub === 1 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Messaging API のチャネル">
-                  <p className={styles.subBadge}>{badge}</p>
-                  <h2 className={styles.panelTitle}>Messaging API のチャネル</h2>
-                  <SettingsFormRow layout="columns">
-                    <Field htmlFor="v8-channel-id" label="チャネルID" error={fieldErrors.channelId}>
-                      <SaveErrorField names={["channelId","form.channelId","channel_id","form.channel_id"]}><TextField id="v8-channel-id" value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} /></SaveErrorField>
-                    </Field>
-                    <Field htmlFor="v8-channel-secret" label="チャネルシークレット" error={fieldErrors.channelSecret}>
-                      <SaveErrorField names={["channelSecret","form.channelSecret","channel_secret","form.channel_secret"]}><TextField id="v8-channel-secret" type="password" autoComplete="new-password" value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} required aria-invalid={fieldErrors.channelSecret ? true : undefined} /></SaveErrorField>
-                    </Field>
-                  </SettingsFormRow>
-                  <div className={styles.secretRow}>
-                    <span className={styles.secretNote}><Lock size={14} aria-hidden="true" />秘密値は保存後に画面へ表示されません。</span>
-                    <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />取得方法を見る</Button>
-                  </div>
-                </Card>
-              )}
-              {sub === 2 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook の設定">
-                  <p className={styles.subBadge}>{badge}</p>
-                  <h2 className={styles.panelTitle}>Webhook の設定</h2>
-                  <div className={styles.field}>
-                    <span className={styles.groupLabel}>Webhook URL</span>
-                    <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--space-8) var(--space-8) var(--space-8) var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
-                      <span className={styles.endpointValue} ><TruncatedText value={String(webhookUrl ?? '')} url /></span>
-                      <CopyButton value={webhookUrl} />
-                    </Card>
-                  </div>
-                  <div className={styles.ackList}>
-                    {WEBHOOK_ACKS.map((ack) => (
-                      <div key={ack.key}>
-                        <SaveErrorField names={[ack.key]}><Checkbox checked={Boolean(acks[ack.key])} onCheckedChange={(next) => toggleAck(ack.key, next)}>{ack.label}</Checkbox></SaveErrorField>
-                        <p className={styles.ackNote}>{ack.note}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className={styles.buttonRow}>
-                    <Button external href={developerChannelUrl(form.channelId)}  >LINE Developersでこのチャネルを開く</Button>
-                    <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />設定の場所を見る</Button>
-                  </div>
-                </Card>
-              )}
-              {sub === 3 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="LINE Login のチャネル">
-                  <p className={styles.subBadge}>{badge}</p>
-                  <h2 className={styles.panelTitle}>LINE Login のチャネル</h2>
-                  <SettingsFormRow layout="columns">
-                    <Field htmlFor="v8-login-channel-id" label="LoginチャネルID" error={fieldErrors.loginChannelId}>
-                      <SaveErrorField names={["loginChannelId","form.loginChannelId","login_channel_id","form.login_channel_id"]}><TextField id="v8-login-channel-id" value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} /></SaveErrorField>
-                    </Field>
-                    <Field htmlFor="v8-login-channel-secret" label="Loginチャネルシークレット" error={fieldErrors.loginChannelSecret}>
-                      <SaveErrorField names={["loginChannelSecret","form.loginChannelSecret","login_channel_secret","form.login_channel_secret"]}><TextField id="v8-login-channel-secret" type="password" autoComplete="new-password" value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} /></SaveErrorField>
-                    </Field>
-                  </SettingsFormRow>
-                  <div className={styles.field}>
-                    <span className={styles.groupLabel}>Callback URL</span>
-                    <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--space-8) var(--space-8) var(--space-8) var(--polish-space-card)" gap="var(--tpl-htn-panel-gap)">
-                      <span className={styles.endpointValue} ><TruncatedText value={String(callbackUrl ?? '')} url /></span>
-                      <CopyButton value={callbackUrl} />
-                    </Card>
-                  </div>
-                  <p className={styles.groupLabel}>LINE Developers でやること</p>
-                  <div className={styles.ackList}>
-                    {LOGIN_ACKS.map((ack) => (
-                      <div key={ack.key}>
-                        <SaveErrorField names={[ack.key]}><Checkbox checked={Boolean(acks[ack.key])} onCheckedChange={(next) => toggleAck(ack.key, next)}>{ack.label}</Checkbox></SaveErrorField>
-                        <p className={styles.ackNote}>{ack.note}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className={styles.buttonRow}>
-                    <Button external href={developerChannelUrl(form.loginChannelId)}  >LINE Developersでこのチャネルを開く</Button>
-                  </div>
-                </Card>
-              )}
-            </CreateStepColumns>
+            <Step2Connect
+              sub={sub}
+              badge={badge}
+              values={form}
+              fieldErrors={fieldErrors}
+              acks={acks}
+              onUpdate={update}
+              onToggleAck={toggleAck}
+            />
           )}
 
           {currentStep === 3 && sub === 1 && (
