@@ -236,6 +236,17 @@ describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
     expect(attemptRows()).toHaveLength(1);
   });
 
+  it('受理後の保存失敗でも元のEC送信行へprovider参照を残し、再送しない',async()=>{
+    sqlite.exec("CREATE TRIGGER fail_ec_checkpoint BEFORE UPDATE ON workflow_steps WHEN NEW.step_key='customer_notification' AND NEW.status='succeeded' BEGIN SELECT RAISE(ABORT,'injected'); END");
+    expect((await post(baseEvent())).status).toBe(503);
+    const receipt=sqlite.prepare("SELECT status,result_json,retry_key FROM workflow_steps WHERE step_key='customer_notification'").get() as {status:string,result_json:string,retry_key:string};
+    expect(receipt.status).toBe('unknown');expect(JSON.parse(receipt.result_json)).toEqual({requestId:'req-1'});
+    expect((await post(baseEvent())).status).toBe(503);
+    expect(pushMessageWithRequestId).toHaveBeenCalledOnce();
+    expect(deliveries()).toHaveLength(1);expect(deliveries()[0]).toMatchObject({attempts:1,idempotency_key:receipt.retry_key});
+    expect(attemptRows()).toHaveLength(1);
+  });
+
   it('処理済みイベントの再送は新しい台帳行を作らない', async () => {
     expect((await post(baseEvent())).status).toBe(200);
     const response = await post(baseEvent());

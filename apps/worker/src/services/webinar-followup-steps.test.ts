@@ -43,11 +43,15 @@ describe('W9 bounded automatic followup recovery',()=>{
   expect(await processWebinarFollowups(item.db,options(dispatch))).toEqual({sent:1,failed:0});
  });
  it.each(['disconnect','accepted_storage_failure'])('does not send an unknown followup again: %s',async failure=>{
-  const dispatch=vi.fn(async()=>{if(failure==='disconnect')throw new Error('lost response');return new Response('{}')});
+  const dispatch=vi.fn(async()=>{if(failure==='disconnect')throw new Error('lost response');return new Response('{}',{headers:{'x-line-request-id':'accepted-webinar'}})});
   if(failure==='accepted_storage_failure')item.raw.exec("CREATE TRIGGER fail_followup_completion BEFORE UPDATE ON workflow_steps WHEN NEW.status='succeeded' BEGIN SELECT RAISE(ABORT,'injected'); END");
   await processWebinarFollowups(item.db,options(dispatch));
   vi.advanceTimersByTime(3600_000);await processWebinarFollowups(item.db,options(dispatch));
   expect(dispatch).toHaveBeenCalledOnce();
+  if(failure==='accepted_storage_failure') {
+    const row=item.raw.prepare('SELECT result_json FROM workflow_steps').get() as {result_json:string};
+    expect(JSON.parse(row.result_json)).toEqual({requestId:'accepted-webinar'});
+  }
   expect(item.raw.prepare('SELECT status,error_code FROM workflow_steps').get()).toEqual({status:'unknown',error_code:'delivery_unknown'});
  });
 

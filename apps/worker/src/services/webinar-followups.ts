@@ -446,6 +446,7 @@ export async function processWebinarFollowups(
     const ref={scopeId:`line:${candidate.account_id ?? 'default'}`,processKind:'webinar_followup',subjectId:followup.id,stepKey:'send'};
     let owner: string | null=null;
     let started=false,accepted=false;
+    let providerRequestId: string | null = null;
     try {
       const delivery=await deliveryConfig(db,candidate.account_id,options);
       if(!delivery.liffId) throw new Error('configuration_missing');
@@ -485,6 +486,7 @@ export async function processWebinarFollowups(
       const result=await pushViaHarnessProxy(options.proxyBaseUrl,delivery.accessToken,input.to,[{type:'text',text:input.text}],
         lease.retry_key,options.proxyDispatch,'reminder_dispatch');
       accepted=true;
+      providerRequestId = result.requestId;
       await finishWorkflowStep(db,ref,owner,{result:{accepted:true,requestId:result.requestId},statements:[
         db.prepare(`UPDATE ${table} SET status='sent',sent_at=?,last_error=NULL,updated_at=? WHERE id=? AND status IN ('pending','failed')`)
           .bind(jstNow(),jstNow(),followup.id),
@@ -506,7 +508,7 @@ export async function processWebinarFollowups(
       const next=status===429?externalDeliveryRetryAt(err,lease?.attempt_count ?? 1,failureNow,true):null;
       const notBefore = rejected ? externalDeliveryNotBefore(err, failureNow) : undefined;
       const overWait = notBefore !== undefined && notBefore - failureNow.getTime() > EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000;
-      await failWorkflowStep(db,ref,owner,{now:failureNow.getTime(),unknown,code:unknown?'delivery_unknown':!started?'delivery_not_started':overWait?'retry_after_exceeds_budget':next?'line_rate_limited':'line_rejected',permanent:rejected&&!next,
+      await failWorkflowStep(db,ref,owner,{now:failureNow.getTime(),providerRequestId,unknown,code:unknown?'delivery_unknown':!started?'delivery_not_started':overWait?'retry_after_exceeds_budget':next?'line_rate_limited':'line_rejected',permanent:rejected&&!next,
         delayMs:Math.max(0,(next?.getTime() ?? notBefore ?? failureNow.getTime()+60_000)-failureNow.getTime())});
       await db.prepare(`UPDATE ${table} SET status='failed',last_error=?,updated_at=? WHERE id=? AND status!='sent'
         AND EXISTS(SELECT 1 FROM workflow_steps WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?

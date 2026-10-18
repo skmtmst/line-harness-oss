@@ -39,12 +39,15 @@ describe('PKG67 shared workflow recovery',()=>{
  });
  it('does not replay an accepted push after its success checkpoint cannot be saved',async()=>{
   const one=(await acquireWorkflow(item.db,ref))!;
-  const send=vi.fn().mockResolvedValue(undefined);
+  const send=vi.fn().mockResolvedValue({requestId:'accepted-before-db-failure'});
   item.raw.exec("CREATE TRIGGER fail_push_completion BEFORE UPDATE ON workflow_steps WHEN NEW.status='succeeded' AND NEW.step_key LIKE 'line:%' BEGIN SELECT RAISE(ABORT,'injected'); END");
   await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'original'}])).rejects.toThrow();
   item.raw.exec('DROP TRIGGER fail_push_completion');
   await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'changed'}])).rejects.toThrow('delivery_unknown');
   expect(send).toHaveBeenCalledOnce();
+  const checkpoint=item.raw.prepare("SELECT result_json,retry_key,status FROM workflow_steps WHERE step_key LIKE 'line:%'").get() as {result_json:string,status:string};
+  expect(checkpoint.status).toBe('unknown');
+  expect(JSON.parse(checkpoint.result_json)).toEqual({requestId:'accepted-before-db-failure'});
  });
  it('does not reclaim a started push after its lease expires',async()=>{
   const one=(await acquireWorkflow(item.db,ref))!;

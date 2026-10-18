@@ -54,6 +54,7 @@ export function workflowLineClient(client: LineClient, execution: WorkflowExecut
       if (!row) throw new WorkflowDeferred((await getWorkflowStep(execution.db, ref))?.status ?? 'busy');
       const original = JSON.parse(row.input_json!);
       let started = false, accepted = false;
+      let providerRequestId: string | null = null;
       try {
         if (!reply && options.retryKeyValidityMs !== undefined && row.attempt_count > 1
           && row.first_attempt_at !== null && Date.now() - row.first_attempt_at >= options.retryKeyValidityMs) {
@@ -70,6 +71,8 @@ export function workflowLineClient(client: LineClient, execution: WorkflowExecut
           ? await target[method as 'replyMessage'](toOrToken, original.messages)
           : await target[method as 'pushMessage'](original.to, original.messages, row.retry_key);
         accepted = true;
+        const receipt = result as unknown as { requestId?: unknown } | null;
+        if (typeof receipt?.requestId === 'string') providerRequestId = receipt.requestId;
         await finishWorkflowStep(execution.db, ref, row.lease_owner!, { result });
         return result;
       } catch (error) {
@@ -82,6 +85,7 @@ export function workflowLineClient(client: LineClient, execution: WorkflowExecut
         const overWait = notBefore !== undefined && notBefore - now.getTime() > EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000;
         await failWorkflowStep(execution.db, ref, row.lease_owner!, {
           now: now.getTime(),
+          providerRequestId,
           unknown, permanent: rejected && !next,
           code: unknown ? reply ? 'reply_unknown' : 'delivery_unknown' : !started ? 'delivery_not_started' : overWait ? 'retry_after_exceeds_budget' : next ? 'line_rate_limited' : 'line_rejected',
           delayMs: Math.max(0, (next?.getTime() ?? notBefore ?? now.getTime()) - now.getTime()),
