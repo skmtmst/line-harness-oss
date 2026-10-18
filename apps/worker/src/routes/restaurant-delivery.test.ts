@@ -16,6 +16,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import { currentInvocation, withInvocation } from '@line-crm/shared/server';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 type MockStaff = {
@@ -1830,7 +1831,13 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       // 401は再試行しない相手の拒否。権限切れとして扱う。
       stubUberApi({ listStatus: 401 });
 
-      const res = await call(STORES_PATH);
+      const { res, trace } = await withInvocation('http', async () => ({
+        res: await call(STORES_PATH), trace: currentInvocation()!,
+      }));
+      expect(errorSpy.mock.calls.map((args: unknown[]) => JSON.parse(String(args[0])))).toContainEqual(expect.objectContaining({
+        code: 'routes_restaurant_delivery_failed', level: 'error', source: 'http',
+        requestId: trace.requestId, invocationId: trace.invocationId,
+      }));
       expect(res.status).toBe(502);
       const body = (await res.json()) as Record<string, unknown>;
       expect(body).toMatchObject({ code: 'auth_expired' });
@@ -1934,7 +1941,13 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       const calls = stubUberApi({ posStatus: 503 });
       await call(STORES_PATH);
 
-      const res = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      const { res, trace } = await withInvocation('http', async () => ({
+        res: await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } }), trace: currentInvocation()!,
+      }));
+      expect(errorSpy.mock.calls.map((args: unknown[]) => JSON.parse(String(args[0])))).toContainEqual(expect.objectContaining({
+        code: 'routes_restaurant_delivery_failed', level: 'error', source: 'http',
+        requestId: trace.requestId, invocationId: trace.invocationId,
+      }));
       expect(res.status).toBe(502);
       const body = (await res.json()) as Record<string, unknown>;
       expect(body).toMatchObject({ code: 'pos_activation_unknown' });
